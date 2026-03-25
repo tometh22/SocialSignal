@@ -53,7 +53,8 @@ export const parseDec = (v: unknown): number => {
   }
   
   const n = Number(s);
-  return (neg ? -n : n) || 0;
+  const result = neg ? -n : n;
+  return Number.isFinite(result) ? result : 0;
 };
 
 /**

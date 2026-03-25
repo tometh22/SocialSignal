@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient } from "@/lib/queryClient";
+import { queryClient, getAuthHeader } from "@/lib/queryClient";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -209,6 +209,10 @@ export default function Clients() {
       
       const response = await fetch(`/api/clients/${clientId}/logo`, {
         method: 'POST',
+        credentials: 'include',
+        headers: {
+          ...getAuthHeader(),
+        },
         body: formData,
       });
       
@@ -243,17 +247,19 @@ export default function Clients() {
   // Mutación para importar clientes desde Google Sheets
   const importClientsMutation = useMutation({
     mutationFn: async () => {
-      const response = await fetch('/api/google-sheets/import-clients', {
+      const response = await fetch('/api/google-sheets/sync', {
         method: 'POST',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
+          ...getAuthHeader(),
         },
       });
-      
+
       if (!response.ok) {
         throw new Error('Failed to import clients');
       }
-      
+
       return response.json();
     },
     onSuccess: (data) => {

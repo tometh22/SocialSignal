@@ -248,8 +248,23 @@ export function getMonthsInFilter(filter: string): number {
   }
 }
 
-export function getMonthNumber(date: Date): number {
-  return date.getMonth() + 1; // getMonth() returns 0-11, we want 1-12
+export function getMonthNumber(dateOrName: Date | string): number {
+  if (dateOrName instanceof Date) {
+    return dateOrName.getMonth() + 1; // getMonth() returns 0-11, we want 1-12
+  }
+  // Handle string month names (Spanish)
+  const monthMap: Record<string, number> = {
+    'enero': 1, 'febrero': 2, 'marzo': 3, 'abril': 4,
+    'mayo': 5, 'junio': 6, 'julio': 7, 'agosto': 8,
+    'septiembre': 9, 'octubre': 10, 'noviembre': 11, 'diciembre': 12,
+    'ene': 1, 'feb': 2, 'mar': 3, 'abr': 4,
+    'may': 5, 'jun': 6, 'jul': 7, 'ago': 8,
+    'sep': 9, 'oct': 10, 'nov': 11, 'dic': 12,
+    '01 ene': 1, '02 feb': 2, '03 mar': 3, '04 abr': 4,
+    '05 may': 5, '06 jun': 6, '07 jul': 7, '08 ago': 8,
+    '09 sep': 9, '10 oct': 10, '11 nov': 11, '12 dic': 12
+  };
+  return monthMap[dateOrName.toLowerCase()] || 1;
 }
 
 export function createRouter() {
@@ -3833,7 +3848,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Si se actualiza el sueldo fijo y hay horas mensuales, recalcular tarifa por hora
       if (validatedData.monthlyFixedSalary !== undefined) {
-        const currentPerson = await storage.getPersonnelById(id);
         const monthlyHours = validatedData.monthlyHours || currentPerson?.monthlyHours || 0;
         if (validatedData.monthlyFixedSalary > 0 && monthlyHours > 0) {
           const newHourlyRate = Math.round(validatedData.monthlyFixedSalary / monthlyHours);
@@ -4264,7 +4278,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/quotations/:id", async (req, res) => {
+  app.patch("/api/quotations/:id", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "Invalid quotation ID" });
 
@@ -4285,7 +4299,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/quotations/:id/status", async (req, res) => {
+  app.patch("/api/quotations/:id/status", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "Invalid quotation ID" });
 
@@ -4395,7 +4409,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Actualizar el cliente asociado a una cotización
-  app.patch("/api/quotations/:id/client", async (req, res) => {
+  app.patch("/api/quotations/:id/client", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "Invalid quotation ID" });
 
@@ -4806,7 +4820,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(assignmentsWithRoles);
   });
 
-  app.post("/api/template-roles", async (req, res) => {
+  app.post("/api/template-roles", requireAuth, async (req, res) => {
     try {
       const validatedData = insertTemplateRoleAssignmentSchema.parse(req.body);
       const assignment = await storage.createTemplateRoleAssignment(validatedData);
@@ -4819,7 +4833,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/template-roles/:id", async (req, res) => {
+  app.patch("/api/template-roles/:id", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "Invalid assignment ID" });
 
@@ -4840,7 +4854,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/template-roles/:id", async (req, res) => {
+  app.delete("/api/template-roles/:id", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "Invalid assignment ID" });
 
@@ -4857,7 +4871,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/template-roles/template/:templateId", async (req, res) => {
+  app.delete("/api/template-roles/template/:templateId", requireAuth, async (req, res) => {
     const templateId = parseInt(req.params.templateId);
     if (isNaN(templateId)) return res.status(400).json({ message: "Invalid template ID" });
 
@@ -6750,7 +6764,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Obtener registros de tiempo por cliente
-  app.get("/api/time-entries/client/:clientId", async (req, res) => {
+  app.get("/api/time-entries/client/:clientId", requireAuth, async (req, res) => {
     const clientId = parseInt(req.params.clientId);
     if (isNaN(clientId)) return res.status(400).json({ message: "Invalid client ID" });
 
@@ -7036,7 +7050,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Guardar asignaciones de presupuesto para subproyectos Always-On
-  app.post("/api/projects/budget-allocations", async (req, res) => {
+  app.post("/api/projects/budget-allocations", requireAuth, async (req, res) => {
     try {
       const { macroProjectId, allocations } = req.body;
 
@@ -7193,20 +7207,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Separar projectName del resto de los datos ya que no es parte del esquema de activeProjects
       const { projectName, ...projectData } = req.body;
       
-      // Limpiar valores null antes de validar
+      // Preservar valores null para campos de fecha (permite limpiarlos)
       const cleanedData: any = {};
+      const nullableDateFields = ['startDate', 'expectedEndDate', 'actualEndDate'];
       for (const [key, value] of Object.entries(projectData)) {
         if (value !== null) {
           cleanedData[key] = value;
+        } else if (nullableDateFields.includes(key)) {
+          cleanedData[key] = null; // Allow clearing date fields
         }
       }
-      
-      // Convertir fechas si existen
-      if (cleanedData.startDate) {
+
+      // Convertir fechas string a Date si existen (no si son null)
+      if (cleanedData.startDate && cleanedData.startDate !== null) {
         cleanedData.startDate = new Date(cleanedData.startDate);
       }
-      if (cleanedData.expectedEndDate) {
+      if (cleanedData.expectedEndDate && cleanedData.expectedEndDate !== null) {
         cleanedData.expectedEndDate = new Date(cleanedData.expectedEndDate);
+      }
+      if (cleanedData.actualEndDate && cleanedData.actualEndDate !== null) {
+        cleanedData.actualEndDate = new Date(cleanedData.actualEndDate);
       }
       
       // Validar solo los campos del proyecto
@@ -7253,7 +7273,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ---------- RUTAS PARA COMPONENTES DE PROYECTO ----------
 
   // Obtener todos los componentes de un proyecto
-  app.get("/api/project-components/:projectId", async (req, res) => {
+  app.get("/api/project-components/:projectId", requireAuth, async (req, res) => {
     const projectId = parseInt(req.params.projectId);
     if (isNaN(projectId)) return res.status(400).json({ message: "ID de proyecto inválido" });
 
@@ -7267,7 +7287,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Obtener componente específico
-  app.get("/api/project-components/detail/:id", async (req, res) => {
+  app.get("/api/project-components/detail/:id", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "ID de componente inválido" });
 
@@ -7284,7 +7304,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Obtener componente predeterminado de un proyecto
-  app.get("/api/project-components/default/:projectId", async (req, res) => {
+  app.get("/api/project-components/default/:projectId", requireAuth, async (req, res) => {
     const projectId = parseInt(req.params.projectId);
     if (isNaN(projectId)) return res.status(400).json({ message: "ID de proyecto inválido" });
 
@@ -7301,7 +7321,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Crear nuevo componente
-  app.post("/api/project-components", async (req, res) => {
+  app.post("/api/project-components", requireAuth, async (req, res) => {
     try {
       const validatedData = insertProjectComponentSchema.parse(req.body);
       const component = await storage.createProjectComponent(validatedData);
@@ -7316,7 +7336,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Actualizar componente
-  app.patch("/api/project-components/:id", async (req, res) => {
+  app.patch("/api/project-components/:id", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "ID de componente inválido" });
 
@@ -7339,7 +7359,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Eliminar componente
-  app.delete("/api/project-components/:id", async (req, res) => {
+  app.delete("/api/project-components/:id", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "ID de componente inválido" });
 
@@ -7360,7 +7380,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ---------- RUTAS PARA REGISTRO DE HORAS ----------
 
   // Obtener registros de horas con filtros opcionales
-  app.get("/api/time-entries", async (req, res) => {
+  app.get("/api/time-entries", requireAuth, async (req, res) => {
     try {
       const { projectId, startDate, endDate, personnelId } = req.query;
 
@@ -7382,7 +7402,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Obtener registros de horas agrupados por proyecto (para métricas rápidas)
-  app.get("/api/time-entries/all-projects", async (req, res) => {
+  app.get("/api/time-entries/all-projects", requireAuth, async (req, res) => {
     try {
       const timeFilter = req.query.timeFilter as string;
       
@@ -7435,7 +7455,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Obtener registros de horas por proyecto con información del personal
-  app.get("/api/time-entries/project/:projectId", async (req, res) => {
+  app.get("/api/time-entries/project/:projectId", requireAuth, async (req, res) => {
     const projectId = parseInt(req.params.projectId);
     if (isNaN(projectId)) return res.status(400).json({ message: "Invalid project ID" });
 
@@ -7469,7 +7489,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Obtener registros de horas por persona
-  app.get("/api/time-entries/personnel/:personnelId", async (req, res) => {
+  app.get("/api/time-entries/personnel/:personnelId", requireAuth, async (req, res) => {
     const personnelId = parseInt(req.params.personnelId);
     if (isNaN(personnelId)) return res.status(400).json({ message: "Invalid personnel ID" });
 
@@ -7485,7 +7505,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
 
   // Obtener una entrada de tiempo específica
-  app.get("/api/time-entries/:id", async (req, res) => {
+  app.get("/api/time-entries/:id", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "Invalid time entry ID" });
 
@@ -7501,7 +7521,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Crear un nuevo registro de horas
-  app.post("/api/time-entries", async (req, res) => {
+  app.post("/api/time-entries", requireAuth, async (req, res) => {
     try {
       // Adaptar fechas si vienen como strings ISO
       const processedData = {
@@ -7645,7 +7665,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Actualizar un registro de horas
-  app.patch("/api/time-entries/:id", async (req, res) => {
+  app.patch("/api/time-entries/:id", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "Invalid time entry ID" });
 
@@ -7668,7 +7688,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Eliminar un registro de horas
-  app.delete("/api/time-entries/:id", async (req, res) => {
+  app.delete("/api/time-entries/:id", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "Invalid time entry ID" });
 
@@ -7687,7 +7707,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Aprobar un registro de horas
-  app.post("/api/time-entries/:id/approve", async (req, res) => {
+  app.post("/api/time-entries/:id/approve", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "Invalid time entry ID" });
 
@@ -7717,7 +7737,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ---------- RUTAS PARA INFORMES DE PROGRESO ----------
 
   // Obtener informes de progreso por proyecto
-  app.get("/api/progress-reports/project/:projectId", async (req, res) => {
+  app.get("/api/progress-reports/project/:projectId", requireAuth, async (req, res) => {
     const projectId = parseInt(req.params.projectId);
     if (isNaN(projectId)) return res.status(400).json({ message: "Invalid project ID" });
 
@@ -7731,7 +7751,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Obtener un informe de progreso específico
-  app.get("/api/progress-reports/:id", async (req, res) => {
+  app.get("/api/progress-reports/:id", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "Invalid report ID" });
 
@@ -7747,7 +7767,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Crear un nuevo informe de progreso
-  app.post("/api/progress-reports", async (req, res) => {
+  app.post("/api/progress-reports", requireAuth, async (req, res) => {
     try {
       const validatedData = insertProgressReportSchema.parse(req.body);
 
@@ -7775,7 +7795,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Actualizar un informe de progreso
-  app.patch("/api/progress-reports/:id", async (req, res) => {
+  app.patch("/api/progress-reports/:id", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "Invalid report ID" });
 
@@ -7951,7 +7971,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Actualizar nombre de proyecto
-  app.patch("/api/projects/:id/update-name", async (req, res) => {
+  app.patch("/api/projects/:id/update-name", requireAuth, async (req, res) => {
 
     const id = parseInt(req.params.id);
     if (isNaN(id)) {
@@ -8180,7 +8200,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Admin route para reinicializar la base de datos con los nuevos datos
-  app.post("/api/admin/reinit-database", async (req, res) => {
+  app.post("/api/admin/reinit-database", requireAuth, async (req, res) => {
     try {
       await reinitializeDatabase();
       res.json({ message: "Database reinitialized successfully" });
@@ -8324,7 +8344,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Crear/actualizar inflación mensual
-  app.post("/api/admin/monthly-inflation", async (req, res) => {
+  app.post("/api/admin/monthly-inflation", requireAuth, async (req, res) => {
     try {
       const validatedData = insertMonthlyInflationSchema.parse(req.body);
       
@@ -8365,7 +8385,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Actualizar dato de inflación específico
-  app.patch("/api/admin/monthly-inflation/:id", async (req, res) => {
+  app.patch("/api/admin/monthly-inflation/:id", requireAuth, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const validatedData = insertMonthlyInflationSchema.parse(req.body);
@@ -8394,7 +8414,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Eliminar dato de inflación
-  app.delete("/api/admin/monthly-inflation/:id", async (req, res) => {
+  app.delete("/api/admin/monthly-inflation/:id", requireAuth, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       
@@ -8425,7 +8445,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Crear/actualizar configuración del sistema
-  app.post("/api/admin/system-config", async (req, res) => {
+  app.post("/api/admin/system-config", requireAuth, async (req, res) => {
     try {
       const validatedData = insertSystemConfigSchema.parse(req.body);
       
@@ -8462,7 +8482,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // =========== RUTAS PARA ENCUESTAS NPS ===========
 
   // Obtener todas las encuestas NPS
-  app.get("/api/nps-surveys", async (req, res) => {
+  app.get("/api/nps-surveys", requireAuth, async (req, res) => {
     try {
       const surveys = await storage.getAllNpsSurveys();
       res.json(surveys);
@@ -8473,7 +8493,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Crear nueva encuesta NPS
-  app.post("/api/nps-surveys", async (req, res) => {
+  app.post("/api/nps-surveys", requireAuth, async (req, res) => {
     try {
       const surveyData = req.body;
       const newSurvey = await storage.createNpsSurvey(surveyData);
@@ -8501,7 +8521,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Obtener encuesta NPS específica
-  app.get("/api/nps-surveys/:id", async (req, res) => {
+  app.get("/api/nps-surveys/:id", requireAuth, async (req, res) => {
     try {
       const surveyId = parseInt(req.params.id);
       if (isNaN(surveyId)) {
@@ -8543,7 +8563,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Eliminar encuesta NPS
-  app.delete("/api/nps-surveys/:id", async (req, res) => {
+  app.delete("/api/nps-surveys/:id", requireAuth, async (req, res) => {
     try {
       const surveyId = parseInt(req.params.id);
       if (isNaN(surveyId)) {
@@ -8581,7 +8601,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create new recurring template
-  app.post("/api/recurring-templates", async (req, res) => {
+  app.post("/api/recurring-templates", requireAuth, async (req, res) => {
     try {
       const templateData = {
         ...req.body,
@@ -8617,7 +8637,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Delete recurring template
-  app.delete("/api/recurring-templates/:id", async (req, res) => {
+  app.delete("/api/recurring-templates/:id", requireAuth, async (req, res) => {
     try {
       const templateId = parseInt(req.params.id);
       if (isNaN(templateId)) {
@@ -8639,7 +8659,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // =========== RUTAS PARA MODO (SEGUIMIENTO OPERACIONES) ===========
 
   // Obtener todos los entregables (opcionalmente filtrados por cliente)
-  app.get("/api/deliverables", async (req, res) => {
+  app.get("/api/deliverables", requireAuth, async (req, res) => {
     try {
       const clientId = req.query.clientId ? parseInt(req.query.clientId as string) : undefined;
       const deliverables = clientId ? await storage.getDeliverablesByProjects([clientId]) : await storage.getDeliverables([]);
@@ -8651,7 +8671,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Obtener entregables para un proyecto específico
-  app.get("/api/modo/deliverables/project/:projectId", async (req, res) => {
+  app.get("/api/modo/deliverables/project/:projectId", requireAuth, async (req, res) => {
     const projectId = parseInt(req.params.projectId);
     if (isNaN(projectId)) {
       return res.status(400).json({ message: "ID de proyecto inválido" });
@@ -8659,8 +8679,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     try {
       // Consulta SQL directa para obtener entregable de un proyecto
-      const { rows } = await db.execute(
-        `SELECT * FROM deliverables WHERE project_id = ${projectId} LIMIT 1`
+      const { rows } = await pool.query(
+        'SELECT * FROM deliverables WHERE project_id = $1 LIMIT 1', [projectId]
       );
 
       if (rows.length === 0) {
@@ -8682,8 +8702,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
 
     try {
-      const { rows } = await db.execute(
-        `SELECT * FROM deliverables WHERE project_id = ${projectId} ORDER BY created_at DESC`
+      const { rows } = await pool.query(
+        'SELECT * FROM deliverables WHERE project_id = $1 ORDER BY created_at DESC', [projectId]
       );
 
       res.json(rows);
@@ -8694,7 +8714,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Obtener un entregable por ID
-  app.get("/api/deliverables/:id", async (req, res) => {
+  app.get("/api/deliverables/:id", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "Invalid deliverable ID" });
 
@@ -8711,7 +8731,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Crear un nuevo entregable
-  app.post("/api/deliverables", async (req, res) => {
+  app.post("/api/deliverables", requireAuth, async (req, res) => {
     try {
       const validatedData = insertDeliverableSchema.parse(req.body);
       const deliverable = await storage.createDeliverable(validatedData);
@@ -8726,7 +8746,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Actualizar un entregable
-  app.patch("/api/deliverables/:id", async (req, res) => {
+  app.patch("/api/deliverables/:id", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "Invalid deliverable ID" });
 
@@ -8747,7 +8767,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Actualizar los indicadores de robustez de un entregable (ruta simplificada)
-  app.post("/api/deliverables/:id/indicators", async (req, res) => {
+  app.post("/api/deliverables/:id/indicators", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "Invalid deliverable ID" });
 
@@ -8755,23 +8775,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Solución simple: ejecutar una actualización SQL directa con los valores correctos
 
-      await pool.query(`
-        UPDATE deliverables 
-        SET 
-          narrative_quality = ${Number(req.body.narrative_quality || 0)},
-          graphics_effectiveness = ${Number(req.body.graphics_effectiveness || 0)},
-          format_design = ${Number(req.body.format_design || 0)},
-          relevant_insights = ${Number(req.body.relevant_insights || 0)},
-          operations_feedback = ${Number(req.body.operations_feedback || 0)},
-          mes_entrega = ${Number(req.body.mes_entrega || 1)},
-          retrabajo = ${req.body.retrabajo ? 'true' : 'false'},
-          on_time = ${req.body.delivery_on_time ? 'true' : 'false'},
-          analysts = '${(req.body.analysts || '').replace(/'/g, "''")}',
-          pm = '${(req.body.pm || '').replace(/'/g, "''")}',
-          hours_available = ${Number(req.body.hours_available || 0)},
+      await pool.query(
+        `UPDATE deliverables
+        SET
+          narrative_quality = $1,
+          graphics_effectiveness = $2,
+          format_design = $3,
+          relevant_insights = $4,
+          operations_feedback = $5,
+          mes_entrega = $6,
+          retrabajo = $7,
+          on_time = $8,
+          analysts = $9,
+          pm = $10,
+          hours_available = $11,
           updated_at = NOW()
-        WHERE id = ${id}
-      `);
+        WHERE id = $12`,
+        [
+          Number(req.body.narrative_quality || 0),
+          Number(req.body.graphics_effectiveness || 0),
+          Number(req.body.format_design || 0),
+          Number(req.body.relevant_insights || 0),
+          Number(req.body.operations_feedback || 0),
+          Number(req.body.mes_entrega || 1),
+          !!req.body.retrabajo,
+          !!req.body.delivery_on_time,
+          String(req.body.analysts || ''),
+          String(req.body.pm || ''),
+          Number(req.body.hours_available || 0),
+          id
+        ]
+      );
 
       // Obtener el entregable actualizado
       const { rows } = await pool.query('SELECT * FROM deliverables WHERE id = $1', [id]);
@@ -8789,7 +8823,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Eliminar un entregable
-  app.delete("/api/deliverables/:id", async (req, res) => {
+  app.delete("/api/deliverables/:id", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "Invalid deliverable ID" });
 
@@ -8936,14 +8970,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Obtener entregables a través de proyectos activos relacionados con el cliente
-      const { rows: activeProjects } = await db.execute(
+      const { rows: activeProjectRows } = await pool.query(
         `SELECT ap.id FROM active_projects ap
          JOIN quotations q ON ap.quotation_id = q.id
-         WHERE q.client_id = ${clientId}`
+         WHERE q.client_id = $1`, [clientId]
       );
 
       // Si no hay proyectos, devolver resultado vacío
-      if (!activeProjects.length) {
+      if (!activeProjectRows.length) {
         return res.json({
           totalDeliverables: 0,
           onTimeDeliveries: 0,
@@ -8967,12 +9001,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Crear lista de IDs de proyectos para usar en IN clause
-      const projectIds = activeProjects.map(p => p.id).join(',');
+      // Obtener entregables usando parameterized query con ANY()
+      const projectIds = activeProjectRows.map(p => p.id);
 
-      // Obtener entregables usando los IDs de proyectos activos
-      const { rows: deliverables } = await db.execute(
-        `SELECT * FROM deliverables WHERE project_id IN (${projectIds})`
+      const { rows: deliverables } = await pool.query(
+        'SELECT * FROM deliverables WHERE project_id = ANY($1)', [projectIds]
       );
 
 
@@ -11330,8 +11363,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // INTELIGENCIA DE NEGOCIO: Análisis predictivo de riesgos
       if (costDeviation > 10) {
-        const monthlyBurn = totalActualCost / (filterEndDate && filterStartDate ? 
-          (new Date(filterEndDate).getMonth() - new Date(filterStartDate as string).getMonth() + 1) : 1);
+        const filterEndD = filterEndDate ? new Date(filterEndDate) : new Date();
+        const filterStartD = filterStartDate ? new Date(filterStartDate as string) : new Date();
+        const monthsDiffCalc = Math.max(1,
+          (filterEndD.getFullYear() - filterStartD.getFullYear()) * 12 +
+          (filterEndD.getMonth() - filterStartD.getMonth()) + 1
+        );
+        const monthlyBurn = totalActualCost / monthsDiffCalc;
         const projectedOverrun = monthlyBurn * 12 - (quotation?.baseCost ?? 0);
         
         recommendations.push({
@@ -11903,7 +11941,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const { googleSheetsService } = await import('./services/googleSheetsService');
 
   // Sincronizar datos desde Google Sheets
-  app.post("/api/google-sheets/sync", async (req, res) => {
+  app.post("/api/google-sheets/sync", requireAuth, async (req, res) => {
     try {
       console.log('🔄 Iniciando sincronización con Google Sheets...');
       
@@ -11933,7 +11971,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ==================== DIRECT COSTS SYNC ====================
   
   // Sincronizar datos desde Excel MAESTRO manualmente
-  app.post("/api/direct-costs/sync", async (req, res) => {
+  app.post("/api/direct-costs/sync", requireAuth, async (req, res) => {
     try {
       console.log('🔄 Iniciando sincronización manual de Excel MAESTRO...');
       
@@ -15575,7 +15613,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   })();
 
   // GET /api/crm/stages
-  app.get("/api/crm/stages", async (_req: Request, res: Response) => {
+  app.get("/api/crm/stages", requireAuth, async (_req: Request, res: Response) => {
     try {
       const stages = await db.select().from(crmStages).orderBy(asc(crmStages.position));
       res.json(stages);
@@ -15585,7 +15623,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /api/crm/stages
-  app.post("/api/crm/stages", async (req: Request, res: Response) => {
+  app.post("/api/crm/stages", requireAuth, async (req: Request, res: Response) => {
     try {
       const { label, color = 'slate' } = req.body;
       if (!label?.trim()) return res.status(400).json({ message: "El nombre es requerido" });
@@ -15601,7 +15639,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // PATCH /api/crm/stages/reorder — must be BEFORE /:id to avoid route conflict
-  app.patch("/api/crm/stages/reorder", async (req: Request, res: Response) => {
+  app.patch("/api/crm/stages/reorder", requireAuth, async (req: Request, res: Response) => {
     try {
       const { order } = req.body as { order: number[] };
       if (!Array.isArray(order)) return res.status(400).json({ message: "order debe ser un array de ids" });
@@ -15613,7 +15651,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // PATCH /api/crm/stages/:id
-  app.patch("/api/crm/stages/:id", async (req: Request, res: Response) => {
+  app.patch("/api/crm/stages/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const id = parseInt(req.params.id);
       const { label, color, position, isActive, followUpDays } = req.body;
@@ -15631,7 +15669,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // DELETE /api/crm/stages/:id
-  app.delete("/api/crm/stages/:id", async (req: Request, res: Response) => {
+  app.delete("/api/crm/stages/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const id = parseInt(req.params.id);
       const [stage] = await db.select().from(crmStages).where(eq(crmStages.id, id));
@@ -15646,7 +15684,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // GET /api/crm/stats — métricas del pipeline
-  app.get("/api/crm/stats", async (req: Request, res: Response) => {
+  app.get("/api/crm/stats", requireAuth, async (req: Request, res: Response) => {
     try {
       const now = new Date();
       const leadsResult = await db.select().from(crmLeads);
@@ -15686,7 +15724,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // GET /api/crm/leads — lista de leads
-  app.get("/api/crm/leads", async (req: Request, res: Response) => {
+  app.get("/api/crm/leads", requireAuth, async (req: Request, res: Response) => {
     try {
       const { stage, search } = req.query;
       
@@ -15726,7 +15764,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /api/crm/leads — crear lead
-  app.post("/api/crm/leads", async (req: Request, res: Response) => {
+  app.post("/api/crm/leads", requireAuth, async (req: Request, res: Response) => {
     try {
       const data = insertCrmLeadSchema.parse(req.body);
       const userId = (req.session as any)?.userId;
@@ -15752,7 +15790,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // GET /api/crm/leads/:id — detalle completo
-  app.get("/api/crm/leads/:id", async (req: Request, res: Response) => {
+  app.get("/api/crm/leads/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const id = parseInt(req.params.id);
       const [lead] = await db.select().from(crmLeads).where(eq(crmLeads.id, id));
@@ -15784,7 +15822,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // PATCH /api/crm/leads/:id — actualizar lead
-  app.patch("/api/crm/leads/:id", async (req: Request, res: Response) => {
+  app.patch("/api/crm/leads/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const id = parseInt(req.params.id);
       const updates: any = { ...req.body, updatedAt: new Date() };
@@ -15802,7 +15840,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // DELETE /api/crm/leads/:id
-  app.delete("/api/crm/leads/:id", async (req: Request, res: Response) => {
+  app.delete("/api/crm/leads/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const id = parseInt(req.params.id);
       await db.delete(crmLeads).where(eq(crmLeads.id, id));
@@ -15813,7 +15851,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // GET /api/crm/leads/:id/contacts
-  app.get("/api/crm/leads/:id/contacts", async (req: Request, res: Response) => {
+  app.get("/api/crm/leads/:id/contacts", requireAuth, async (req: Request, res: Response) => {
     try {
       const contacts = await db.select().from(crmContacts)
         .where(eq(crmContacts.leadId, parseInt(req.params.id)))
@@ -15825,7 +15863,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /api/crm/leads/:id/contacts
-  app.post("/api/crm/leads/:id/contacts", async (req: Request, res: Response) => {
+  app.post("/api/crm/leads/:id/contacts", requireAuth, async (req: Request, res: Response) => {
     try {
       const leadId = parseInt(req.params.id);
       const data = insertCrmContactSchema.parse({ ...req.body, leadId });
@@ -15838,18 +15876,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // PATCH /api/crm/contacts/:id
-  app.patch("/api/crm/contacts/:id", async (req: Request, res: Response) => {
+  app.patch("/api/crm/contacts/:id", requireAuth, async (req: Request, res: Response) => {
     try {
-      const [contact] = await db.update(crmContacts).set(req.body)
-        .where(eq(crmContacts.id, parseInt(req.params.id))).returning();
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ error: 'Invalid contact ID' });
+
+      // Validate with partial schema to only allow known fields
+      const validatedData = insertCrmContactSchema.partial().parse(req.body);
+      // Remove fields that shouldn't be updatable via PATCH
+      const { leadId, ...updateData } = validatedData as any;
+
+      const [contact] = await db.update(crmContacts).set(updateData)
+        .where(eq(crmContacts.id, id)).returning();
+      if (!contact) return res.status(404).json({ error: 'Contact not found' });
       res.json(contact);
     } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ error: error.errors });
       res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
     }
   });
 
   // DELETE /api/crm/contacts/:id
-  app.delete("/api/crm/contacts/:id", async (req: Request, res: Response) => {
+  app.delete("/api/crm/contacts/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       await db.delete(crmContacts).where(eq(crmContacts.id, parseInt(req.params.id)));
       res.json({ success: true });
@@ -15859,7 +15907,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // GET /api/crm/leads/:id/activities
-  app.get("/api/crm/leads/:id/activities", async (req: Request, res: Response) => {
+  app.get("/api/crm/leads/:id/activities", requireAuth, async (req: Request, res: Response) => {
     try {
       const activities = await db.select().from(crmActivities)
         .where(eq(crmActivities.leadId, parseInt(req.params.id)))
@@ -15871,7 +15919,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /api/crm/leads/:id/activities
-  app.post("/api/crm/leads/:id/activities", async (req: Request, res: Response) => {
+  app.post("/api/crm/leads/:id/activities", requireAuth, async (req: Request, res: Response) => {
     try {
       const leadId = parseInt(req.params.id);
       const userId = (req.session as any)?.userId;
@@ -15889,7 +15937,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // DELETE /api/crm/activities/:id
-  app.delete("/api/crm/activities/:id", async (req: Request, res: Response) => {
+  app.delete("/api/crm/activities/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       await db.delete(crmActivities).where(eq(crmActivities.id, parseInt(req.params.id)));
       res.json({ success: true });
@@ -15899,7 +15947,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // GET /api/crm/reminders/due — recordatorios vencidos o próximos (24hs) + alertas automáticas de inactividad
-  app.get("/api/crm/reminders/due", async (req: Request, res: Response) => {
+  app.get("/api/crm/reminders/due", requireAuth, async (req: Request, res: Response) => {
     try {
       const now = new Date();
       const in24h = new Date(now.getTime() + 24 * 60 * 60 * 1000);
@@ -15988,7 +16036,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // GET /api/crm/leads/:id/reminders
-  app.get("/api/crm/leads/:id/reminders", async (req: Request, res: Response) => {
+  app.get("/api/crm/leads/:id/reminders", requireAuth, async (req: Request, res: Response) => {
     try {
       const reminders = await db.select().from(crmReminders)
         .where(eq(crmReminders.leadId, parseInt(req.params.id)))
@@ -16000,7 +16048,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /api/crm/leads/:id/reminders
-  app.post("/api/crm/leads/:id/reminders", async (req: Request, res: Response) => {
+  app.post("/api/crm/leads/:id/reminders", requireAuth, async (req: Request, res: Response) => {
     try {
       const leadId = parseInt(req.params.id);
       const userId = (req.session as any)?.userId;
@@ -16017,7 +16065,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // PATCH /api/crm/reminders/:id — marcar completo u otros cambios
-  app.patch("/api/crm/reminders/:id", async (req: Request, res: Response) => {
+  app.patch("/api/crm/reminders/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const updates: any = { ...req.body };
       if (req.body.completed === true) updates.completedAt = new Date();
@@ -16030,7 +16078,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // DELETE /api/crm/reminders/:id
-  app.delete("/api/crm/reminders/:id", async (req: Request, res: Response) => {
+  app.delete("/api/crm/reminders/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       await db.delete(crmReminders).where(eq(crmReminders.id, parseInt(req.params.id)));
       res.json({ success: true });
@@ -16040,7 +16088,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /api/crm/leads/:id/send-email — enviar email via SendGrid y registrar actividad
-  app.post("/api/crm/leads/:id/send-email", async (req: Request, res: Response) => {
+  app.post("/api/crm/leads/:id/send-email", requireAuth, async (req: Request, res: Response) => {
     try {
       const leadId = parseInt(req.params.id);
       const { to, subject, body, contactId } = req.body;
@@ -16048,6 +16096,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (!to || !subject || !body) {
         return res.status(400).json({ error: 'Se requieren los campos: to, subject, body' });
+      }
+
+      // Validate email format
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(to)) {
+        return res.status(400).json({ error: 'Dirección de email inválida' });
+      }
+
+      // Sanitize subject to prevent email header injection (strip newlines, carriage returns)
+      const sanitizedSubject = String(subject).replace(/[\r\n\t]/g, ' ').trim();
+      if (!sanitizedSubject) {
+        return res.status(400).json({ error: 'El asunto no puede estar vacío' });
       }
 
       const sgApiKey = process.env.SENDGRID_API_KEY;
@@ -16058,13 +16118,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Enviar email via SendGrid
       const sgMail = await import('@sendgrid/mail');
       sgMail.default.setApiKey(sgApiKey);
-      
+
       const fromEmail = process.env.SENDGRID_FROM_EMAIL || 'noreply@epical.digital';
-      
+
       await sgMail.default.send({
-        to,
+        to: String(to).trim(),
         from: fromEmail,
-        subject,
+        subject: sanitizedSubject,
         text: body,
         html: body.replace(/\n/g, '<br>'),
       });
@@ -16429,11 +16489,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         'startDate', 'dueDate', 'estimatedHours', 'sectionName', 'parentTaskId', 'position'
       ];
       
+      const taskId = parseInt(id);
       const updates: any = { updatedAt: new Date() };
       for (const field of ALLOWED_FIELDS) {
         if (field in req.body) updates[field] = req.body[field];
       }
-      
+
+      // Prevent circular parent-child relationship
+      if (updates.parentTaskId !== undefined && updates.parentTaskId !== null) {
+        if (updates.parentTaskId === taskId) {
+          return res.status(400).json({ message: "Una tarea no puede ser su propio padre" });
+        }
+      }
+
       // Handle status completion timestamp
       if (updates.status === "done") updates.completedAt = new Date();
       else if (updates.status !== undefined && updates.status !== "done") updates.completedAt = null;

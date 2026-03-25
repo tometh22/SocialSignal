@@ -38,7 +38,7 @@ export async function resolveFX(period: string, projectId?: string): Promise<FXR
       const rate: FXRate = {
         period,
         usdToArs: cotizacionesFX,
-        arsToUsd: 1 / cotizacionesFX,
+        arsToUsd: safeInverse(cotizacionesFX),
         source: 'cotizaciones',
         timestamp: new Date()
       };
@@ -56,7 +56,7 @@ export async function resolveFX(period: string, projectId?: string): Promise<FXR
         const rate: FXRate = {
           period,
           usdToArs: costosFX,
-          arsToUsd: 1 / costosFX,
+          arsToUsd: safeInverse(costosFX),
           source: 'costos_median',
           timestamp: new Date()
         };
@@ -72,7 +72,7 @@ export async function resolveFX(period: string, projectId?: string): Promise<FXR
     const rate: FXRate = {
       period,
       usdToArs: fallbackRate,
-      arsToUsd: 1 / fallbackRate,
+      arsToUsd: safeInverse(fallbackRate),
       source: 'config_fallback',
       timestamp: new Date()
     };
@@ -89,7 +89,7 @@ export async function resolveFX(period: string, projectId?: string): Promise<FXR
     return {
       period,
       usdToArs: fallbackRate,
-      arsToUsd: 1 / fallbackRate,
+      arsToUsd: safeInverse(fallbackRate),
       source: 'config_fallback',
       timestamp: new Date()
     };
@@ -132,7 +132,7 @@ async function tryGetFromCostosMedian(period: string, projectId: string): Promis
 function getFallbackFX(period: string): number {
   // Extraer año del período
   const year = parseInt(period.split('-')[0]);
-  
+
   // Configuración FX por año (estimada)
   const fallbackRates: { [year: number]: number } = {
     2023: 900,
@@ -140,8 +140,14 @@ function getFallbackFX(period: string): number {
     2025: 1350,
     2026: 1500
   };
-  
+
   return fallbackRates[year] || 1350; // Default 2025
+}
+
+/** Safe inverse: prevents division by zero in FX calculations */
+function safeInverse(rate: number): number {
+  if (!rate || !Number.isFinite(rate) || rate === 0) return 0;
+  return 1 / rate;
 }
 
 /**

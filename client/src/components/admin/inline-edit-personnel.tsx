@@ -229,9 +229,6 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
       console.log(`✅ [${person.name}] Personnel ${person.id} updated successfully:`, updatedPerson);
       console.log(`📊 [${person.name}] Final monthly hours: ${updatedPerson.monthlyHours}`);
       
-      // LIMPIAR TODO EL CACHE antes de actualizar
-      queryClient.clear();
-      
       // Actualizar estados locales inmediatamente con datos del servidor
       setEditedName(updatedPerson.name);
       setEditedEmail(updatedPerson.email);
@@ -242,31 +239,20 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
       setEditedIncludeInRealCosts(updatedPerson.includeInRealCosts ?? true);
       setEditedMonthlyHours(updatedPerson.monthlyHours?.toString() || '');
 
-      console.log(`🔧 [${person.name}] Local state FORCED - editedMonthlyHours: ${updatedPerson.monthlyHours?.toString() || 'undefined'}`);
+      console.log(`🔧 [${person.name}] Local state updated - monthlyHours: ${updatedPerson.monthlyHours}`);
 
-      // RECARGAR TODOS LOS DATOS desde el servidor
-      setTimeout(() => {
-        console.log(`🔄 [${person.name}] RELOADING ALL PERSONNEL DATA...`);
-        queryClient.refetchQueries({ queryKey: ["/api/personnel"] });
-      }, 50);
-
-      // FORZAR segundo reload
-      setTimeout(() => {
-        console.log(`🔄 [${person.name}] FORCE SECOND RELOAD...`);
-        queryClient.invalidateQueries();
-        queryClient.refetchQueries({ queryKey: ["/api/personnel"] });
-      }, 200);
+      // Actualizar el cache optimistamente y luego invalidar para refetch
+      queryClient.setQueryData(["/api/personnel"], (old: any) => {
+        if (!Array.isArray(old)) return old;
+        return old.map((p: any) => p.id === person.id ? updatedPerson : p);
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/personnel"] });
 
       toast({
         title: "Éxito",
-        description: `${person.name} actualizado. Horas mensuales: ${updatedPerson.monthlyHours}h`
+        description: `${person.name} actualizado correctamente`
       });
-      
-      // FORZAR re-render completo del componente padre
-      // setTimeout(() => {
-      //   window.location.reload();
-      // }, 1000);
-      
+
       setIsEditing(false);
     },
     onError: (err) => {
@@ -516,7 +502,7 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
     // Para campos numéricos (tarifas y salarios)
     const numericValue = value === '' ? null : parseFloat(value);
 
-    if (value === '' || (!isNaN(numericValue!) && numericValue! >= 0)) {
+    if (value === '' || (numericValue !== null && !isNaN(numericValue) && numericValue >= 0)) {
       // Si es un campo de sueldo mensual para full-time, calcular tarifa por hora automáticamente usando las horas mensuales asignadas
       if (field.includes('MonthlySalaryARS') && person.contractType === 'full-time' && numericValue) {
         const monthlyHours = person.monthlyHours || 160; // Usar horas mensuales asignadas, defaultear a 160
@@ -625,10 +611,13 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
   };
 
   const handleSave = () => {
-    const hourlyRate = parseFloat(editedHourlyRate) || getLatestHistoricalHourlyRate() || person.hourlyRate;
-    const monthlyFixedSalary = parseFloat(editedMonthlyFixedSalary) || getLatestHistoricalSalary() || person.monthlyFixedSalary;
+    const parsedHourlyRate = parseFloat(editedHourlyRate);
+    const hourlyRate = !isNaN(parsedHourlyRate) ? parsedHourlyRate : (getLatestHistoricalHourlyRate() ?? person.hourlyRate);
+    const parsedSalary = parseFloat(editedMonthlyFixedSalary);
+    const monthlyFixedSalary = !isNaN(parsedSalary) ? parsedSalary : (getLatestHistoricalSalary() ?? person.monthlyFixedSalary ?? null);
     const roleId = parseInt(editedRoleId);
-    const monthlyHours = editedMonthlyHours ? parseFloat(editedMonthlyHours) : null;
+    const parsedHours = editedMonthlyHours ? parseFloat(editedMonthlyHours) : null;
+    const monthlyHours = parsedHours !== null && !isNaN(parsedHours) ? parsedHours : null;
 
     console.log(`🔧 Validating data before save:`, {
       name: editedName,
@@ -685,9 +674,13 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
       roleId: roleId,
       hourlyRate: hourlyRate,
       contractType: editedContractType,
-      monthlyFixedSalary: monthlyFixedSalary,
       includeInRealCosts: editedIncludeInRealCosts
     };
+
+    // Solo incluir monthlyFixedSalary cuando tiene un valor numérico válido
+    if (monthlyFixedSalary !== null && monthlyFixedSalary !== undefined) {
+      dataToSend.monthlyFixedSalary = monthlyFixedSalary;
+    }
 
     // Solo incluir monthlyHours para empleados no-freelance
     if (editedContractType !== 'freelance' && monthlyHours) {
