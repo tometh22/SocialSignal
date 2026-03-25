@@ -248,8 +248,23 @@ export function getMonthsInFilter(filter: string): number {
   }
 }
 
-export function getMonthNumber(date: Date): number {
-  return date.getMonth() + 1; // getMonth() returns 0-11, we want 1-12
+export function getMonthNumber(dateOrName: Date | string): number {
+  if (dateOrName instanceof Date) {
+    return dateOrName.getMonth() + 1; // getMonth() returns 0-11, we want 1-12
+  }
+  // Handle string month names (Spanish)
+  const monthMap: Record<string, number> = {
+    'enero': 1, 'febrero': 2, 'marzo': 3, 'abril': 4,
+    'mayo': 5, 'junio': 6, 'julio': 7, 'agosto': 8,
+    'septiembre': 9, 'octubre': 10, 'noviembre': 11, 'diciembre': 12,
+    'ene': 1, 'feb': 2, 'mar': 3, 'abr': 4,
+    'may': 5, 'jun': 6, 'jul': 7, 'ago': 8,
+    'sep': 9, 'oct': 10, 'nov': 11, 'dic': 12,
+    '01 ene': 1, '02 feb': 2, '03 mar': 3, '04 abr': 4,
+    '05 may': 5, '06 jun': 6, '07 jul': 7, '08 ago': 8,
+    '09 sep': 9, '10 oct': 10, '11 nov': 11, '12 dic': 12
+  };
+  return monthMap[dateOrName.toLowerCase()] || 1;
 }
 
 export function createRouter() {
@@ -4264,7 +4279,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/quotations/:id", async (req, res) => {
+  app.patch("/api/quotations/:id", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "Invalid quotation ID" });
 
@@ -4285,7 +4300,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/quotations/:id/status", async (req, res) => {
+  app.patch("/api/quotations/:id/status", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "Invalid quotation ID" });
 
@@ -4395,7 +4410,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Actualizar el cliente asociado a una cotización
-  app.patch("/api/quotations/:id/client", async (req, res) => {
+  app.patch("/api/quotations/:id/client", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "Invalid quotation ID" });
 
@@ -4806,7 +4821,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(assignmentsWithRoles);
   });
 
-  app.post("/api/template-roles", async (req, res) => {
+  app.post("/api/template-roles", requireAuth, async (req, res) => {
     try {
       const validatedData = insertTemplateRoleAssignmentSchema.parse(req.body);
       const assignment = await storage.createTemplateRoleAssignment(validatedData);
@@ -4819,7 +4834,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/template-roles/:id", async (req, res) => {
+  app.patch("/api/template-roles/:id", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "Invalid assignment ID" });
 
@@ -4840,7 +4855,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/template-roles/:id", async (req, res) => {
+  app.delete("/api/template-roles/:id", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "Invalid assignment ID" });
 
@@ -4857,7 +4872,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/template-roles/template/:templateId", async (req, res) => {
+  app.delete("/api/template-roles/template/:templateId", requireAuth, async (req, res) => {
     const templateId = parseInt(req.params.templateId);
     if (isNaN(templateId)) return res.status(400).json({ message: "Invalid template ID" });
 
@@ -7036,7 +7051,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Guardar asignaciones de presupuesto para subproyectos Always-On
-  app.post("/api/projects/budget-allocations", async (req, res) => {
+  app.post("/api/projects/budget-allocations", requireAuth, async (req, res) => {
     try {
       const { macroProjectId, allocations } = req.body;
 
@@ -7193,20 +7208,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Separar projectName del resto de los datos ya que no es parte del esquema de activeProjects
       const { projectName, ...projectData } = req.body;
       
-      // Limpiar valores null antes de validar
+      // Preservar valores null para campos de fecha (permite limpiarlos)
       const cleanedData: any = {};
+      const nullableDateFields = ['startDate', 'expectedEndDate', 'actualEndDate'];
       for (const [key, value] of Object.entries(projectData)) {
         if (value !== null) {
           cleanedData[key] = value;
+        } else if (nullableDateFields.includes(key)) {
+          cleanedData[key] = null; // Allow clearing date fields
         }
       }
-      
-      // Convertir fechas si existen
-      if (cleanedData.startDate) {
+
+      // Convertir fechas string a Date si existen (no si son null)
+      if (cleanedData.startDate && cleanedData.startDate !== null) {
         cleanedData.startDate = new Date(cleanedData.startDate);
       }
-      if (cleanedData.expectedEndDate) {
+      if (cleanedData.expectedEndDate && cleanedData.expectedEndDate !== null) {
         cleanedData.expectedEndDate = new Date(cleanedData.expectedEndDate);
+      }
+      if (cleanedData.actualEndDate && cleanedData.actualEndDate !== null) {
+        cleanedData.actualEndDate = new Date(cleanedData.actualEndDate);
       }
       
       // Validar solo los campos del proyecto
@@ -7301,7 +7322,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Crear nuevo componente
-  app.post("/api/project-components", async (req, res) => {
+  app.post("/api/project-components", requireAuth, async (req, res) => {
     try {
       const validatedData = insertProjectComponentSchema.parse(req.body);
       const component = await storage.createProjectComponent(validatedData);
@@ -7316,7 +7337,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Actualizar componente
-  app.patch("/api/project-components/:id", async (req, res) => {
+  app.patch("/api/project-components/:id", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "ID de componente inválido" });
 
@@ -7339,7 +7360,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Eliminar componente
-  app.delete("/api/project-components/:id", async (req, res) => {
+  app.delete("/api/project-components/:id", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "ID de componente inválido" });
 
@@ -7501,7 +7522,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Crear un nuevo registro de horas
-  app.post("/api/time-entries", async (req, res) => {
+  app.post("/api/time-entries", requireAuth, async (req, res) => {
     try {
       // Adaptar fechas si vienen como strings ISO
       const processedData = {
@@ -7645,7 +7666,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Actualizar un registro de horas
-  app.patch("/api/time-entries/:id", async (req, res) => {
+  app.patch("/api/time-entries/:id", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "Invalid time entry ID" });
 
@@ -7668,7 +7689,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Eliminar un registro de horas
-  app.delete("/api/time-entries/:id", async (req, res) => {
+  app.delete("/api/time-entries/:id", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "Invalid time entry ID" });
 
@@ -7687,7 +7708,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Aprobar un registro de horas
-  app.post("/api/time-entries/:id/approve", async (req, res) => {
+  app.post("/api/time-entries/:id/approve", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "Invalid time entry ID" });
 
@@ -7747,7 +7768,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Crear un nuevo informe de progreso
-  app.post("/api/progress-reports", async (req, res) => {
+  app.post("/api/progress-reports", requireAuth, async (req, res) => {
     try {
       const validatedData = insertProgressReportSchema.parse(req.body);
 
@@ -7775,7 +7796,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Actualizar un informe de progreso
-  app.patch("/api/progress-reports/:id", async (req, res) => {
+  app.patch("/api/progress-reports/:id", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "Invalid report ID" });
 
@@ -7951,7 +7972,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Actualizar nombre de proyecto
-  app.patch("/api/projects/:id/update-name", async (req, res) => {
+  app.patch("/api/projects/:id/update-name", requireAuth, async (req, res) => {
 
     const id = parseInt(req.params.id);
     if (isNaN(id)) {
@@ -8180,7 +8201,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Admin route para reinicializar la base de datos con los nuevos datos
-  app.post("/api/admin/reinit-database", async (req, res) => {
+  app.post("/api/admin/reinit-database", requireAuth, async (req, res) => {
     try {
       await reinitializeDatabase();
       res.json({ message: "Database reinitialized successfully" });
@@ -8324,7 +8345,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Crear/actualizar inflación mensual
-  app.post("/api/admin/monthly-inflation", async (req, res) => {
+  app.post("/api/admin/monthly-inflation", requireAuth, async (req, res) => {
     try {
       const validatedData = insertMonthlyInflationSchema.parse(req.body);
       
@@ -8365,7 +8386,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Actualizar dato de inflación específico
-  app.patch("/api/admin/monthly-inflation/:id", async (req, res) => {
+  app.patch("/api/admin/monthly-inflation/:id", requireAuth, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const validatedData = insertMonthlyInflationSchema.parse(req.body);
@@ -8394,7 +8415,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Eliminar dato de inflación
-  app.delete("/api/admin/monthly-inflation/:id", async (req, res) => {
+  app.delete("/api/admin/monthly-inflation/:id", requireAuth, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       
@@ -8425,7 +8446,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Crear/actualizar configuración del sistema
-  app.post("/api/admin/system-config", async (req, res) => {
+  app.post("/api/admin/system-config", requireAuth, async (req, res) => {
     try {
       const validatedData = insertSystemConfigSchema.parse(req.body);
       
@@ -8473,7 +8494,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Crear nueva encuesta NPS
-  app.post("/api/nps-surveys", async (req, res) => {
+  app.post("/api/nps-surveys", requireAuth, async (req, res) => {
     try {
       const surveyData = req.body;
       const newSurvey = await storage.createNpsSurvey(surveyData);
@@ -8543,7 +8564,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Eliminar encuesta NPS
-  app.delete("/api/nps-surveys/:id", async (req, res) => {
+  app.delete("/api/nps-surveys/:id", requireAuth, async (req, res) => {
     try {
       const surveyId = parseInt(req.params.id);
       if (isNaN(surveyId)) {
@@ -8581,7 +8602,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create new recurring template
-  app.post("/api/recurring-templates", async (req, res) => {
+  app.post("/api/recurring-templates", requireAuth, async (req, res) => {
     try {
       const templateData = {
         ...req.body,
@@ -8617,7 +8638,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Delete recurring template
-  app.delete("/api/recurring-templates/:id", async (req, res) => {
+  app.delete("/api/recurring-templates/:id", requireAuth, async (req, res) => {
     try {
       const templateId = parseInt(req.params.id);
       if (isNaN(templateId)) {
@@ -8711,7 +8732,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Crear un nuevo entregable
-  app.post("/api/deliverables", async (req, res) => {
+  app.post("/api/deliverables", requireAuth, async (req, res) => {
     try {
       const validatedData = insertDeliverableSchema.parse(req.body);
       const deliverable = await storage.createDeliverable(validatedData);
@@ -8726,7 +8747,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Actualizar un entregable
-  app.patch("/api/deliverables/:id", async (req, res) => {
+  app.patch("/api/deliverables/:id", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "Invalid deliverable ID" });
 
@@ -8747,7 +8768,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Actualizar los indicadores de robustez de un entregable (ruta simplificada)
-  app.post("/api/deliverables/:id/indicators", async (req, res) => {
+  app.post("/api/deliverables/:id/indicators", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "Invalid deliverable ID" });
 
@@ -8789,7 +8810,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Eliminar un entregable
-  app.delete("/api/deliverables/:id", async (req, res) => {
+  app.delete("/api/deliverables/:id", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "Invalid deliverable ID" });
 
@@ -11903,7 +11924,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const { googleSheetsService } = await import('./services/googleSheetsService');
 
   // Sincronizar datos desde Google Sheets
-  app.post("/api/google-sheets/sync", async (req, res) => {
+  app.post("/api/google-sheets/sync", requireAuth, async (req, res) => {
     try {
       console.log('🔄 Iniciando sincronización con Google Sheets...');
       
@@ -11933,7 +11954,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ==================== DIRECT COSTS SYNC ====================
   
   // Sincronizar datos desde Excel MAESTRO manualmente
-  app.post("/api/direct-costs/sync", async (req, res) => {
+  app.post("/api/direct-costs/sync", requireAuth, async (req, res) => {
     try {
       console.log('🔄 Iniciando sincronización manual de Excel MAESTRO...');
       
@@ -15585,7 +15606,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /api/crm/stages
-  app.post("/api/crm/stages", async (req: Request, res: Response) => {
+  app.post("/api/crm/stages", requireAuth, async (req: Request, res: Response) => {
     try {
       const { label, color = 'slate' } = req.body;
       if (!label?.trim()) return res.status(400).json({ message: "El nombre es requerido" });
@@ -15601,7 +15622,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // PATCH /api/crm/stages/reorder — must be BEFORE /:id to avoid route conflict
-  app.patch("/api/crm/stages/reorder", async (req: Request, res: Response) => {
+  app.patch("/api/crm/stages/reorder", requireAuth, async (req: Request, res: Response) => {
     try {
       const { order } = req.body as { order: number[] };
       if (!Array.isArray(order)) return res.status(400).json({ message: "order debe ser un array de ids" });
@@ -15613,7 +15634,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // PATCH /api/crm/stages/:id
-  app.patch("/api/crm/stages/:id", async (req: Request, res: Response) => {
+  app.patch("/api/crm/stages/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const id = parseInt(req.params.id);
       const { label, color, position, isActive, followUpDays } = req.body;
@@ -15631,7 +15652,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // DELETE /api/crm/stages/:id
-  app.delete("/api/crm/stages/:id", async (req: Request, res: Response) => {
+  app.delete("/api/crm/stages/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const id = parseInt(req.params.id);
       const [stage] = await db.select().from(crmStages).where(eq(crmStages.id, id));
@@ -15726,7 +15747,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /api/crm/leads — crear lead
-  app.post("/api/crm/leads", async (req: Request, res: Response) => {
+  app.post("/api/crm/leads", requireAuth, async (req: Request, res: Response) => {
     try {
       const data = insertCrmLeadSchema.parse(req.body);
       const userId = (req.session as any)?.userId;
@@ -15784,7 +15805,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // PATCH /api/crm/leads/:id — actualizar lead
-  app.patch("/api/crm/leads/:id", async (req: Request, res: Response) => {
+  app.patch("/api/crm/leads/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const id = parseInt(req.params.id);
       const updates: any = { ...req.body, updatedAt: new Date() };
@@ -15802,7 +15823,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // DELETE /api/crm/leads/:id
-  app.delete("/api/crm/leads/:id", async (req: Request, res: Response) => {
+  app.delete("/api/crm/leads/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const id = parseInt(req.params.id);
       await db.delete(crmLeads).where(eq(crmLeads.id, id));
@@ -15825,7 +15846,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /api/crm/leads/:id/contacts
-  app.post("/api/crm/leads/:id/contacts", async (req: Request, res: Response) => {
+  app.post("/api/crm/leads/:id/contacts", requireAuth, async (req: Request, res: Response) => {
     try {
       const leadId = parseInt(req.params.id);
       const data = insertCrmContactSchema.parse({ ...req.body, leadId });
@@ -15838,7 +15859,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // PATCH /api/crm/contacts/:id
-  app.patch("/api/crm/contacts/:id", async (req: Request, res: Response) => {
+  app.patch("/api/crm/contacts/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const [contact] = await db.update(crmContacts).set(req.body)
         .where(eq(crmContacts.id, parseInt(req.params.id))).returning();
@@ -15849,7 +15870,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // DELETE /api/crm/contacts/:id
-  app.delete("/api/crm/contacts/:id", async (req: Request, res: Response) => {
+  app.delete("/api/crm/contacts/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       await db.delete(crmContacts).where(eq(crmContacts.id, parseInt(req.params.id)));
       res.json({ success: true });
@@ -15871,7 +15892,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /api/crm/leads/:id/activities
-  app.post("/api/crm/leads/:id/activities", async (req: Request, res: Response) => {
+  app.post("/api/crm/leads/:id/activities", requireAuth, async (req: Request, res: Response) => {
     try {
       const leadId = parseInt(req.params.id);
       const userId = (req.session as any)?.userId;
@@ -15889,7 +15910,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // DELETE /api/crm/activities/:id
-  app.delete("/api/crm/activities/:id", async (req: Request, res: Response) => {
+  app.delete("/api/crm/activities/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       await db.delete(crmActivities).where(eq(crmActivities.id, parseInt(req.params.id)));
       res.json({ success: true });
@@ -16000,7 +16021,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /api/crm/leads/:id/reminders
-  app.post("/api/crm/leads/:id/reminders", async (req: Request, res: Response) => {
+  app.post("/api/crm/leads/:id/reminders", requireAuth, async (req: Request, res: Response) => {
     try {
       const leadId = parseInt(req.params.id);
       const userId = (req.session as any)?.userId;
@@ -16017,7 +16038,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // PATCH /api/crm/reminders/:id — marcar completo u otros cambios
-  app.patch("/api/crm/reminders/:id", async (req: Request, res: Response) => {
+  app.patch("/api/crm/reminders/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const updates: any = { ...req.body };
       if (req.body.completed === true) updates.completedAt = new Date();
@@ -16030,7 +16051,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // DELETE /api/crm/reminders/:id
-  app.delete("/api/crm/reminders/:id", async (req: Request, res: Response) => {
+  app.delete("/api/crm/reminders/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       await db.delete(crmReminders).where(eq(crmReminders.id, parseInt(req.params.id)));
       res.json({ success: true });
@@ -16040,7 +16061,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /api/crm/leads/:id/send-email — enviar email via SendGrid y registrar actividad
-  app.post("/api/crm/leads/:id/send-email", async (req: Request, res: Response) => {
+  app.post("/api/crm/leads/:id/send-email", requireAuth, async (req: Request, res: Response) => {
     try {
       const leadId = parseInt(req.params.id);
       const { to, subject, body, contactId } = req.body;

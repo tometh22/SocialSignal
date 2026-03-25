@@ -502,7 +502,7 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
     // Para campos numéricos (tarifas y salarios)
     const numericValue = value === '' ? null : parseFloat(value);
 
-    if (value === '' || (!isNaN(numericValue!) && numericValue! >= 0)) {
+    if (value === '' || (numericValue !== null && !isNaN(numericValue) && numericValue >= 0)) {
       // Si es un campo de sueldo mensual para full-time, calcular tarifa por hora automáticamente usando las horas mensuales asignadas
       if (field.includes('MonthlySalaryARS') && person.contractType === 'full-time' && numericValue) {
         const monthlyHours = person.monthlyHours || 160; // Usar horas mensuales asignadas, defaultear a 160

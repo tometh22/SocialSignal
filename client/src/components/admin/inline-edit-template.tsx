@@ -56,8 +56,7 @@ export function InlineEditTemplate({ template, onUpdate, onDelete }: InlineEditT
         deviationPercentage: number;
       } 
     }) => {
-      const response = await apiRequest("PATCH", `/api/templates/${id}`, data);
-      return await response.json();
+      return await apiRequest(`/api/templates/${id}`, "PATCH", data);
     },
     onSuccess: (updatedData: ReportTemplate) => {
       setUpdatedTemplate(updatedData);
@@ -248,7 +247,7 @@ export function InlineEditTemplate({ template, onUpdate, onDelete }: InlineEditT
                       min="0"
                       step="0.01"
                       value={editPlatformCost}
-                      onChange={(e) => setEditPlatformCost(parseFloat(e.target.value) || 0)}
+                      onChange={(e) => { const v = parseFloat(e.target.value); setEditPlatformCost(!isNaN(v) ? v : 0); }}
                       className="h-8 text-sm"
                     />
                   </div>
@@ -259,7 +258,7 @@ export function InlineEditTemplate({ template, onUpdate, onDelete }: InlineEditT
                       min="0"
                       max="100"
                       value={editDeviationPercentage}
-                      onChange={(e) => setEditDeviationPercentage(parseFloat(e.target.value) || 0)}
+                      onChange={(e) => { const v = parseFloat(e.target.value); setEditDeviationPercentage(!isNaN(v) ? v : 0); }}
                       className="h-8 text-sm"
                     />
                   </div>

@@ -510,10 +510,12 @@ export const insertQuotationTeamMemberSchema = createInsertSchema(quotationTeamM
   personnelId: z.number().nullable().optional(),
   quotationId: z.number(),
   variantId: z.number().nullable().optional(),
-  roleId: z.number(), // roleId es siempre requerido
+  roleId: z.number().nullable().optional(),
   hours: z.number(),
   rate: z.number(),
-  cost: z.number()
+  cost: z.number(),
+  fte: z.number().nullable().optional(),
+  dedication: z.number().nullable().optional()
 });
 
 export type QuotationTeamMember = typeof quotationTeamMembers.$inferSelect;
@@ -676,26 +678,26 @@ const baseInsertActiveProjectSchema = createInsertSchema(activeProjects).omit({
 // Esquema personalizado que permite tanto Date como string para las fechas
 export const insertActiveProjectSchema = baseInsertActiveProjectSchema.extend({
   startDate: z.union([z.date(), z.string().transform((str) => new Date(str))]),
-  expectedEndDate: z.union([z.date(), z.string().transform((str) => new Date(str))]).optional(),
-  actualEndDate: z.union([z.date(), z.string().transform((str) => new Date(str))]).optional(),
-  completedDate: z.union([z.date(), z.string().transform((str) => new Date(str))]).optional(),
-  parentProjectId: z.number().optional(),
+  expectedEndDate: z.union([z.date(), z.string().transform((str) => new Date(str))]).nullable().optional(),
+  actualEndDate: z.union([z.date(), z.string().transform((str) => new Date(str))]).nullable().optional(),
+  completedDate: z.union([z.date(), z.string().transform((str) => new Date(str))]).nullable().optional(),
+  parentProjectId: z.number().nullable().optional(),
   isAlwaysOnMacro: z.boolean().optional(),
-  macroMonthlyBudget: z.number().optional(),
+  macroMonthlyBudget: z.number().nullable().optional(),
 
   // Nuevos campos para entregables
-  deliverableFrequency: z.string().optional(), // quincenal, mensual, trimestral, etc.
-  deliverableType: z.string().optional(), // tipo de entregable
-  deliverableBudget: z.number().optional(), // presupuesto específico para este entregable
-  additionalDeliverableCost: z.number().optional(), // costo adicional para entregables fuera de lo planeado
-  deliverableDescription: z.string().optional(), // descripción detallada del entregable
+  deliverableFrequency: z.string().nullable().optional(),
+  deliverableType: z.string().nullable().optional(),
+  deliverableBudget: z.number().nullable().optional(),
+  additionalDeliverableCost: z.number().nullable().optional(),
+  deliverableDescription: z.string().nullable().optional(),
 
   // Nuevos campos para subproyectos únicos
-  subprojectName: z.string().optional(), // nombre único del subproyecto
-  completionStatus: z.enum(["pending", "in_progress", "completed", "cancelled"]).optional(),
-  
+  subprojectName: z.string().nullable().optional(),
+  completionStatus: z.enum(["pending", "in_progress", "completed", "cancelled"]).nullable().optional(),
+
   // Campo para presupuesto
-  budget: z.number().optional(), // presupuesto total del proyecto
+  budget: z.number().nullable().optional(),
 });
 
 // ==================== PROJECT ALIASES FOR EXCEL MAPPING ====================
@@ -985,8 +987,8 @@ export const insertQuickTimeEntrySchema = createInsertSchema(quickTimeEntries).o
 }).extend({
   startDate: z.union([z.date(), z.string().transform((str) => new Date(str))]),
   endDate: z.union([z.date(), z.string().transform((str) => new Date(str))]),
-  submittedAt: z.union([z.date(), z.string().transform((str) => new Date(str))]).optional(),
-  approvedAt: z.union([z.date(), z.string().transform((str) => new Date(str))]).optional(),
+  submittedAt: z.union([z.date(), z.string().transform((str) => new Date(str))]).nullable().optional(),
+  approvedAt: z.union([z.date(), z.string().transform((str) => new Date(str))]).nullable().optional(),
 });
 
 export type QuickTimeEntry = typeof quickTimeEntries.$inferSelect;
@@ -1090,14 +1092,15 @@ const baseInsertTimeEntrySchema = createInsertSchema(timeEntries).omit({
 // Esquema personalizado que permite tanto Date como string para las fechas y valida los nuevos campos
 export const insertTimeEntrySchema = baseInsertTimeEntrySchema.extend({
   date: z.union([z.date(), z.string().transform((str) => new Date(str))]),
-  approvedDate: z.union([z.date(), z.string().transform((str) => new Date(str))]).optional(),
-  startDate: z.union([z.date(), z.string().transform((str) => new Date(str))]).optional(),
-  endDate: z.union([z.date(), z.string().transform((str) => new Date(str))]).optional(),
+  approvedDate: z.union([z.date(), z.string().transform((str) => new Date(str))]).nullable().optional(),
+  startDate: z.union([z.date(), z.string().transform((str) => new Date(str))]).nullable().optional(),
+  endDate: z.union([z.date(), z.string().transform((str) => new Date(str))]).nullable().optional(),
+  componentId: z.number().nullable().optional(),
   entryType: z.enum(["hours", "cost"]).default("hours"),
   totalCost: z.number().positive("El costo total debe ser positivo"),
   hourlyRateAtTime: z.number().positive("El valor hora debe ser positivo"),
   isDateRange: z.boolean().optional(),
-  periodDescription: z.string().optional(),
+  periodDescription: z.string().nullable().optional(),
 });
 
 // ==================== INFORMES DE PROGRESO ====================
@@ -1169,7 +1172,7 @@ export const insertProjectPriceAdjustmentSchema = createInsertSchema(projectPric
   createdAt: true,
 }).extend({
   effectiveDate: z.union([z.date(), z.string().transform((str) => new Date(str))]),
-  approvalDate: z.union([z.date(), z.string().transform((str) => new Date(str))]).optional(),
+  approvalDate: z.union([z.date(), z.string().transform((str) => new Date(str))]).nullable().optional(),
 });
 
 export type ProjectPriceAdjustment = typeof projectPriceAdjustments.$inferSelect;
