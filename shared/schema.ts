@@ -622,7 +622,7 @@ export const insertExchangeRateSchema = createInsertSchema(exchangeRates).omit({
   createdAt: true,
   updatedAt: true,
 }).extend({
-  specificDate: z.union([z.date(), z.string().transform((str) => new Date(str))]).optional(),
+  specificDate: z.union([z.date(), z.string().transform((str) => new Date(str))]).nullable().optional(),
 });
 
 export type ExchangeRate = typeof exchangeRates.$inferSelect;
