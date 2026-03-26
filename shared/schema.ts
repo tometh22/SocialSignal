@@ -190,6 +190,8 @@ export const insertClientSchema = createInsertSchema(clients).pick({
   contactPhone: true,
   logoUrl: true,
   createdBy: true,
+}).extend({
+  createdBy: z.number().int().nullable().optional(),
 });
 
 // ==================== ROLES ====================
@@ -3159,6 +3161,13 @@ export const projectStatusReviews = pgTable("project_status_reviews", {
 export const insertProjectStatusReviewSchema = createInsertSchema(projectStatusReviews).omit({
   id: true,
   updatedAt: true,
+}).extend({
+  healthStatus: z.enum(['verde', 'amarillo', 'rojo']).default('verde'),
+  marginStatus: z.enum(['alto', 'medio', 'bajo']).default('medio'),
+  teamStrain: z.enum(['alto', 'medio', 'bajo']).default('bajo'),
+  decisionNeeded: z.enum(['ninguna', 'priorizacion', 'recursos', 'reprecio', 'salida']).default('ninguna'),
+  nextMilestoneDate: z.union([z.date(), z.string().transform((str) => new Date(str))]).nullable().optional(),
+  deadline: z.union([z.date(), z.string().transform((str) => new Date(str))]).nullable().optional(),
 });
 export type ProjectStatusReview = typeof projectStatusReviews.$inferSelect;
 export type InsertProjectStatusReview = z.infer<typeof insertProjectStatusReviewSchema>;
@@ -3186,7 +3195,7 @@ export const weeklyStatusItems = pgTable("weekly_status_items", {
   subtitle: text("subtitle"),
   healthStatus: varchar("health_status", { length: 20 }).default('verde'),
   marginStatus: varchar("margin_status", { length: 20 }).default('medio'),
-  teamStrain: varchar("team_strain", { length: 20 }).default('medio'),
+  teamStrain: varchar("team_strain", { length: 20 }).default('bajo'),
   mainRisk: text("main_risk"),
   currentAction: text("current_action"),
   nextMilestone: text("next_milestone"),
@@ -3202,6 +3211,12 @@ export const insertWeeklyStatusItemSchema = createInsertSchema(weeklyStatusItems
   id: true,
   updatedAt: true,
   createdAt: true,
+}).extend({
+  healthStatus: z.enum(['verde', 'amarillo', 'rojo']).default('verde'),
+  marginStatus: z.enum(['alto', 'medio', 'bajo']).default('medio'),
+  teamStrain: z.enum(['alto', 'medio', 'bajo']).default('bajo'),
+  decisionNeeded: z.enum(['ninguna', 'priorizacion', 'recursos', 'reprecio', 'salida']).default('ninguna'),
+  deadline: z.union([z.date(), z.string().transform((str) => new Date(str))]).nullable().optional(),
 });
 export type WeeklyStatusItem = typeof weeklyStatusItems.$inferSelect;
 export type InsertWeeklyStatusItem = z.infer<typeof insertWeeklyStatusItemSchema>;

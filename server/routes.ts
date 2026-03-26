@@ -4308,13 +4308,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (!status) return res.status(400).json({ message: "Status is required" });
 
+      const validStatuses = ['draft', 'pending', 'approved', 'rejected', 'in-negotiation'];
+      if (!validStatuses.includes(status)) {
+        return res.status(400).json({ message: `Invalid status. Must be one of: ${validStatuses.join(', ')}` });
+      }
+
       // Get the current quotation to check its status
       const currentQuotation = await storage.getQuotation(id);
       if (!currentQuotation) {
         return res.status(404).json({ message: "Quotation not found" });
       }
 
-      // Check if status is changing from "in-negotiation" to "approved"
+      // Validate status transitions
+      const validTransitions: Record<string, string[]> = {
+        'draft': ['pending', 'rejected'],
+        'pending': ['approved', 'rejected', 'in-negotiation'],
+        'approved': ['in-negotiation'],
+        'in-negotiation': ['approved', 'rejected', 'pending'],
+        'rejected': ['draft', 'pending']
+      };
+
+      const allowed = validTransitions[currentQuotation.status];
+      if (allowed && !allowed.includes(status)) {
+        return res.status(400).json({
+          message: `No se puede cambiar de "${currentQuotation.status}" a "${status}". Transiciones válidas: ${allowed.join(', ')}`
+        });
+      }
+
       let updateData: any = { status };
       
       if (currentQuotation.status === 'in-negotiation' && status === 'approved') {
@@ -4479,8 +4499,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         proposalLink
       } = req.body;
 
-      // Calculate adjustment percentage
-      const adjustmentPercentage = ((newPrice - quotation.totalAmount) / quotation.totalAmount) * 100;
+      // Calculate adjustment percentage (guard against division by zero)
+      const adjustmentPercentage = quotation.totalAmount > 0
+        ? ((newPrice - quotation.totalAmount) / quotation.totalAmount) * 100
+        : 0;
 
       const negotiationEntry = await storage.createNegotiationHistory({
         quotationId,
@@ -5014,16 +5036,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .set({ isSelected: false })
         .where(eq(quotationVariants.quotationId, quotationId));
 
-      // Then select the chosen variant
-      await db.update(quotationVariants)
+      // Then select the chosen variant and return it
+      const [selectedVariant] = await db.update(quotationVariants)
         .set({ isSelected: true })
         .where(and(
           eq(quotationVariants.id, variantId),
           eq(quotationVariants.quotationId, quotationId)
-        ));
+        ))
+        .returning();
 
       console.log(`✅ Variant ${variantId} selected for quotation ${quotationId}`);
-      res.json({ success: true, message: "Variant selected successfully" });
+      res.json({ success: true, message: "Variant selected successfully", variant: selectedVariant });
       
     } catch (error) {
       console.error(`❌ Error selecting variant ${variantId} for quotation ${quotationId}:`, error);
@@ -16914,17 +16937,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // PATCH /api/status-semanal/:projectId — upsert status review for a project
-  app.patch("/api/status-semanal/:projectId", requireAuth, async (req: Request, res: Response) => {
+  app.patch("/api/status-semanal/:projectId", requireAuth, async (req: Request, res: Response, next) => {
     try {
-      const projectId = parseInt(req.params.projectId);
-      if (isNaN(projectId)) {
-        return res.status(400).json({ message: "projectId inválido" });
+      // Skip if this matches a /custom/ sub-route (let Express try next handler)
+      if (isNaN(parseInt(req.params.projectId))) {
+        return next();
       }
+      const projectId = parseInt(req.params.projectId);
       if (!req.body || typeof req.body !== 'object') {
         return res.status(400).json({ message: "Body vacío o inválido" });
       }
       console.log(`PATCH /api/status-semanal/${projectId}`, JSON.stringify(req.body));
       const { healthStatus, marginStatus, teamStrain, mainRisk, currentAction, nextMilestone, nextMilestoneDate, deadline, ownerId, decisionNeeded, hiddenFromWeekly } = req.body;
+
+      // Validate enum fields
+      const validHealth = ['verde', 'amarillo', 'rojo'];
+      const validLevel = ['alto', 'medio', 'bajo'];
+      const validDecision = ['ninguna', 'priorizacion', 'recursos', 'reprecio', 'salida'];
+
+      if (healthStatus !== undefined && !validHealth.includes(healthStatus)) {
+        return res.status(400).json({ message: `healthStatus inválido. Debe ser: ${validHealth.join(', ')}` });
+      }
+      if (marginStatus !== undefined && !validLevel.includes(marginStatus)) {
+        return res.status(400).json({ message: `marginStatus inválido. Debe ser: ${validLevel.join(', ')}` });
+      }
+      if (teamStrain !== undefined && !validLevel.includes(teamStrain)) {
+        return res.status(400).json({ message: `teamStrain inválido. Debe ser: ${validLevel.join(', ')}` });
+      }
+      if (decisionNeeded !== undefined && !validDecision.includes(decisionNeeded)) {
+        return res.status(400).json({ message: `decisionNeeded inválido. Debe ser: ${validDecision.join(', ')}` });
+      }
 
       const update: Record<string, any> = { updatedAt: new Date() };
       if (healthStatus !== undefined) update.healthStatus = healthStatus;
@@ -17247,6 +17289,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       console.log(`PATCH /api/status-semanal/custom/${id}`, JSON.stringify(req.body));
       const { title, subtitle, healthStatus, marginStatus, teamStrain, mainRisk, currentAction, nextMilestone, deadline, ownerId, decisionNeeded, hiddenFromWeekly } = req.body;
+
+      // Validate enum fields
+      const validHealth = ['verde', 'amarillo', 'rojo'];
+      const validLevel = ['alto', 'medio', 'bajo'];
+      const validDecision = ['ninguna', 'priorizacion', 'recursos', 'reprecio', 'salida'];
+
+      if (healthStatus !== undefined && !validHealth.includes(healthStatus)) {
+        return res.status(400).json({ message: `healthStatus inválido. Debe ser: ${validHealth.join(', ')}` });
+      }
+      if (marginStatus !== undefined && !validLevel.includes(marginStatus)) {
+        return res.status(400).json({ message: `marginStatus inválido. Debe ser: ${validLevel.join(', ')}` });
+      }
+      if (teamStrain !== undefined && !validLevel.includes(teamStrain)) {
+        return res.status(400).json({ message: `teamStrain inválido. Debe ser: ${validLevel.join(', ')}` });
+      }
+      if (decisionNeeded !== undefined && !validDecision.includes(decisionNeeded)) {
+        return res.status(400).json({ message: `decisionNeeded inválido. Debe ser: ${validDecision.join(', ')}` });
+      }
+
       const update: Record<string, any> = { updatedAt: new Date() };
       if (title !== undefined) update.title = title;
       if (subtitle !== undefined) update.subtitle = subtitle;
