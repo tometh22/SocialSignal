@@ -7222,9 +7222,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Sync budget from quotation totalAmount
+      // Sync budget and selected variant from quotation
       if (quotation.totalAmount && !validatedData.budget) {
         (validatedData as any).budget = quotation.totalAmount;
+      }
+      // Find and preserve the selected variant
+      const selectedVariant = await db.select().from(quotationVariants)
+        .where(and(
+          eq(quotationVariants.quotationId, Number(validatedData.quotationId)),
+          eq(quotationVariants.isSelected, true)
+        ))
+        .limit(1);
+      if (selectedVariant.length > 0 && !validatedData.selectedVariantId) {
+        (validatedData as any).selectedVariantId = selectedVariant[0].id;
       }
 
       const project = await storage.createActiveProject(validatedData);

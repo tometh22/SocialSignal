@@ -665,7 +665,11 @@ export const activeProjects = pgTable("active_projects", {
   
   // Campo para presupuesto del proyecto
   budget: doublePrecision("budget"), // presupuesto total del proyecto (puede diferir de la cotización)
-  
+  selectedVariantId: integer("selected_variant_id").references(() => quotationVariants.id), // variante elegida por el cliente
+
+  // Campo para tipo de proyecto (facturable vs interno)
+  projectCategory: text("project_category").notNull().default("billable"), // billable, internal
+
   // Campo para marcar proyectos como terminados/archivados
   isFinished: boolean("is_finished").default(false), // indica si el proyecto ha sido marcado como terminado
 });
@@ -700,6 +704,8 @@ export const insertActiveProjectSchema = baseInsertActiveProjectSchema.extend({
 
   // Campo para presupuesto
   budget: z.number().nullable().optional(),
+  selectedVariantId: z.number().nullable().optional(),
+  projectCategory: z.enum(["billable", "internal"]).default("billable"),
 });
 
 // ==================== PROJECT ALIASES FOR EXCEL MAPPING ====================
@@ -1118,6 +1124,7 @@ export const insertTimeEntrySchema = baseInsertTimeEntrySchema.extend({
   startDate: z.union([z.date(), z.string().transform((str) => new Date(str))]).nullable().optional(),
   endDate: z.union([z.date(), z.string().transform((str) => new Date(str))]).nullable().optional(),
   componentId: z.number().nullable().optional(),
+  hours: z.number().min(0.25, "El mínimo son 15 minutos (0.25 horas)"),
   entryType: z.enum(["hours", "cost"]).default("hours"),
   totalCost: z.number().positive("El costo total debe ser positivo"),
   hourlyRateAtTime: z.number().positive("El valor hora debe ser positivo"),
@@ -1310,7 +1317,7 @@ export const insertTaskTimeEntrySchema = createInsertSchema(taskTimeEntries).omi
   createdAt: true,
 }).extend({
   date: z.union([z.date(), z.string().transform((str) => new Date(str))]),
-  hours: z.number().positive(),
+  hours: z.number().min(0.25, "El mínimo son 15 minutos (0.25 horas)"),
 });
 
 export type TaskTimeEntry = typeof taskTimeEntries.$inferSelect;
