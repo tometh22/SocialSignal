@@ -33,6 +33,10 @@ import {
   FolderOpen,
   Home,
   ClipboardList,
+  Gauge,
+  CalendarCheck,
+  TrendingUp,
+  Calendar,
 } from "lucide-react";
 
 const PROJECT_ICON_COLORS = [
@@ -176,6 +180,15 @@ export default function SidebarFixed() {
         { href: "/tasks/projects", title: "Proyectos", icon: FolderOpen, description: "Hub de proyectos", permission: 'projects' as AppSection },
         { href: "/tasks/team-calendar", title: "Calendario", icon: CalendarDays, description: "Vista del equipo", permission: 'projects' as AppSection },
         { href: "/tasks/hours-dashboard", title: "Panel de Horas", icon: BarChart2, description: "Horas por persona y proyecto", permission: 'projects' as AppSection },
+      ]
+    },
+    {
+      title: "Operaciones",
+      items: [
+        { href: "/operations/capacity", title: "Capacidad Semanal", icon: Gauge, description: "Capacidad operativa por persona", permission: 'operations' as AppSection },
+        { href: "/operations/monthly-closing", title: "Cierre Mensual", icon: CalendarCheck, description: "Cierre de horas del mes", permission: 'operations' as AppSection },
+        { href: "/operations/estimated-rates", title: "Valor Hora Estimado", icon: TrendingUp, description: "Proyección de valor hora", permission: 'operations' as AppSection },
+        { href: "/operations/holidays", title: "Feriados", icon: Calendar, description: "Gestión de feriados", permission: 'operations' as AppSection },
       ]
     },
     {
