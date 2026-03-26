@@ -4374,6 +4374,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Quotation not found" });
       }
 
+      // Sync budget to active project when quotation price changes on approval
+      if (status === 'approved' && updateData.totalAmount) {
+        try {
+          const projects = await db.select().from(activeProjects)
+            .where(eq(activeProjects.quotationId, id));
+          for (const project of projects) {
+            await storage.updateActiveProject(project.id, { budget: updateData.totalAmount });
+            console.log(`[API] Synced budget for project ${project.id}: ${updateData.totalAmount}`);
+          }
+        } catch (budgetErr) {
+          console.warn('[API] Failed to sync project budget, quotation updated successfully:', budgetErr);
+        }
+      }
+
       res.json(updatedQuotation);
     } catch (error) {
       console.error(`[API] Error actualizando estado de cotización ID ${id}:`, error);
@@ -7208,8 +7222,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      // Sync budget from quotation totalAmount
+      if (quotation.totalAmount && !validatedData.budget) {
+        (validatedData as any).budget = quotation.totalAmount;
+      }
+
       const project = await storage.createActiveProject(validatedData);
-      
+
       // Copiar automáticamente el equipo de la cotización al proyecto recién creado
       try {
         console.log(`📋 Copiando equipo automáticamente desde cotización ${validatedData.quotationId} al proyecto ${project.id}`);
