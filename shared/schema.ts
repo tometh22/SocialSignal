@@ -625,10 +625,80 @@ export const insertExchangeRateSchema = createInsertSchema(exchangeRates).omit({
   updatedAt: true,
 }).extend({
   specificDate: z.union([z.date(), z.string().transform((str) => new Date(str))]).nullable().optional(),
+  rateType: z.enum(["end_of_month", "daily", "average", "estimated"]).default("end_of_month"),
+  source: z.enum(["Manual", "BCRA", "Blue", "REM", "MEP", "CCL"]).default("Manual"),
 });
 
 export type ExchangeRate = typeof exchangeRates.$inferSelect;
 export type InsertExchangeRate = z.infer<typeof insertExchangeRateSchema>;
+
+// ==================== FERIADOS Y DISPONIBILIDAD ====================
+export const holidays = pgTable("holidays", {
+  id: serial("id").primaryKey(),
+  date: timestamp("date").notNull(),
+  name: text("name").notNull(),
+  isNational: boolean("is_national").notNull().default(true),
+  year: integer("year").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertHolidaySchema = createInsertSchema(holidays).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  date: z.union([z.date(), z.string().transform((str) => new Date(str))]),
+});
+
+export type Holiday = typeof holidays.$inferSelect;
+export type InsertHoliday = z.infer<typeof insertHolidaySchema>;
+
+// ==================== CIERRE MENSUAL ====================
+export const monthlyClosings = pgTable("monthly_closings", {
+  id: serial("id").primaryKey(),
+  personnelId: integer("personnel_id").notNull().references(() => personnel.id),
+  year: integer("year").notNull(),
+  month: integer("month").notNull(), // 1-12
+  actualHours: doublePrecision("actual_hours").notNull(), // horas reales trabajadas
+  adjustedHours: doublePrecision("adjusted_hours").notNull(), // horas ajustadas para facturación (ej: 160)
+  hourlyRate: doublePrecision("hourly_rate").notNull(), // valor hora al cierre
+  totalCost: doublePrecision("total_cost").notNull(), // adjustedHours * hourlyRate
+  notes: text("notes"),
+  closedBy: integer("closed_by").references(() => users.id),
+  closedAt: timestamp("closed_at").notNull().defaultNow(),
+}, (table) => ({
+  uniquePersonMonth: unique("unique_person_month_closing").on(table.personnelId, table.year, table.month),
+}));
+
+export const insertMonthlyClosingSchema = createInsertSchema(monthlyClosings).omit({
+  id: true,
+  closedAt: true,
+});
+
+export type MonthlyClosing = typeof monthlyClosings.$inferSelect;
+export type InsertMonthlyClosing = z.infer<typeof insertMonthlyClosingSchema>;
+
+// ==================== VALOR HORA ESTIMADO ====================
+export const estimatedRates = pgTable("estimated_rates", {
+  id: serial("id").primaryKey(),
+  personnelId: integer("personnel_id").notNull().references(() => personnel.id),
+  year: integer("year").notNull(),
+  month: integer("month").notNull(), // 1-12
+  estimatedRateARS: doublePrecision("estimated_rate_ars").notNull(),
+  adjustmentPct: doublePrecision("adjustment_pct"), // ej: 8.5 para ajuste trimestral
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  createdBy: integer("created_by").references(() => users.id),
+}, (table) => ({
+  uniquePersonMonthRate: unique("unique_person_month_rate").on(table.personnelId, table.year, table.month),
+}));
+
+export const insertEstimatedRateSchema = createInsertSchema(estimatedRates).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type EstimatedRate = typeof estimatedRates.$inferSelect;
+export type InsertEstimatedRate = z.infer<typeof insertEstimatedRateSchema>;
 
 // ==================== PROYECTOS ACTIVOS ====================
 // Proyectos Activos
