@@ -1,4 +1,8 @@
 /**
+ * @deprecated Use shared/utils/timePeriod.ts instead.
+ * This file is legacy and will be removed in a future version.
+ * All new code should import from 'shared/utils/timePeriod.ts'.
+ *
  * 📅 Period Resolution Utils
  * Soporte para mes, trimestre y períodos custom con meses en español
  */
