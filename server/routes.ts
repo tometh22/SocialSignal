@@ -7347,6 +7347,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/project-components", requireAuth, async (req, res) => {
     try {
       const validatedData = insertProjectComponentSchema.parse(req.body);
+
+      // Validate project exists
+      if (validatedData.projectId) {
+        const project = await storage.getActiveProject(validatedData.projectId);
+        if (!project) {
+          return res.status(404).json({ message: "Proyecto no encontrado" });
+        }
+      }
+
       const component = await storage.createProjectComponent(validatedData);
       res.status(201).json(component);
     } catch (error) {
@@ -7387,6 +7396,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (isNaN(id)) return res.status(400).json({ message: "ID de componente inválido" });
 
     try {
+      // Clear componentId on related time entries before deleting
+      await db.update(timeEntries)
+        .set({ componentId: null })
+        .where(eq(timeEntries.componentId, id));
+
       const success = await storage.deleteProjectComponent(id);
 
       if (!success) {
@@ -7694,6 +7708,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     try {
       const validatedData = insertTimeEntrySchema.partial().parse(req.body);
+
+      // Validate positive hours if provided
+      if (validatedData.hours !== undefined && validatedData.hours <= 0) {
+        return res.status(400).json({ message: "Las horas deben ser un número positivo" });
+      }
+
+      // Validate projectId exists if changing it
+      if (validatedData.projectId !== undefined) {
+        const project = await storage.getActiveProject(validatedData.projectId);
+        if (!project) {
+          return res.status(404).json({ message: "Proyecto no encontrado" });
+        }
+      }
+
+      // Validate date range consistency
+      if (validatedData.startDate && validatedData.endDate) {
+        if (new Date(validatedData.startDate) > new Date(validatedData.endDate)) {
+          return res.status(400).json({ message: "La fecha de inicio debe ser anterior a la fecha de fin" });
+        }
+      }
+
       const updatedEntry = await storage.updateTimeEntry(id, validatedData);
 
       if (!updatedEntry) {
