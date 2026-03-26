@@ -226,3 +226,28 @@ export function resolveTimeFilter(timeFilter: string): ResolvedPeriod {
   console.warn('resolveTimeFilter is deprecated, use resolvePeriod instead');
   return resolvePeriod(timeFilter);
 }
+
+/**
+ * 🇦🇷 Get current period key in Argentina timezone (America/Buenos_Aires)
+ * Returns YYYY-MM format. Use this for all sync jobs and ETL to avoid
+ * UTC midnight boundary issues (e.g. 00:30 UTC = 21:30 AR previous day).
+ */
+export function getArgentinaPeriodKey(date?: Date): string {
+  const d = date || new Date();
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Buenos_Aires',
+    year: 'numeric',
+    month: '2-digit',
+  });
+  // en-CA gives YYYY-MM format
+  return formatter.format(d);
+}
+
+/**
+ * Get current year and month in Argentina timezone
+ */
+export function getArgentinaYearMonth(date?: Date): { year: number; month: number } {
+  const pk = getArgentinaPeriodKey(date);
+  const [year, month] = pk.split('-').map(Number);
+  return { year, month };
+}
