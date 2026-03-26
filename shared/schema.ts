@@ -2067,6 +2067,12 @@ export const insertQuarterlyNpsSurveySchema = createInsertSchema(quarterlyNpsSur
   createdAt: true,
   updatedAt: true,
   npsCategory: true, // Se calcula automáticamente
+}).extend({
+  npsScore: z.number().int().min(0).max(10).nullable().optional(),
+  reportQuality: z.number().int().min(0).max(10).nullable().optional(),
+  insightsClarity: z.number().int().min(0).max(10).nullable().optional(),
+  briefObjectives: z.number().int().min(0).max(10).nullable().optional(),
+  reportPresentation: z.number().int().min(0).max(10).nullable().optional(),
 });
 
 export type QuarterlyNpsSurvey = typeof quarterlyNpsSurveys.$inferSelect;

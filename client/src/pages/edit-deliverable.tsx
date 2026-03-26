@@ -43,8 +43,7 @@ import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { queryClient } from "@/lib/queryClient";
-import { apiRequest } from "@/lib/queryClient";
+import { queryClient, apiRequest, getAuthHeader } from "@/lib/queryClient";
 import { Loader2, ArrowLeft, Save, HelpCircle, Info, Clock } from "lucide-react";
 
 // Esquema de validación para los datos del entregable
@@ -238,8 +237,10 @@ export default function EditDeliverable() {
       
       const response = await fetch(`/api/deliverables/${id}`, {
         method: "PATCH",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
+          ...getAuthHeader(),
         },
         body: JSON.stringify(serverData),
       });

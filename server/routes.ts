@@ -8528,7 +8528,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Obtener encuestas NPS por cliente
-  app.get("/api/clients/:clientId/nps-surveys", async (req, res) => {
+  app.get("/api/clients/:clientId/nps-surveys", requireAuth, async (req, res) => {
     try {
       const clientId = parseInt(req.params.clientId);
       if (isNaN(clientId)) {
@@ -8564,7 +8564,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Actualizar encuesta NPS
-  app.put("/api/nps-surveys/:id", async (req, res) => {
+  app.put("/api/nps-surveys/:id", requireAuth, async (req, res) => {
     try {
       const surveyId = parseInt(req.params.id);
       if (isNaN(surveyId)) {
@@ -8608,7 +8608,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // =========== RUTAS PARA RECURRING TEMPLATES ===========
 
   // Get recurring templates for a project
-  app.get("/api/projects/:projectId/recurring-templates", async (req, res) => {
+  app.get("/api/projects/:projectId/recurring-templates", requireAuth, async (req, res) => {
     try {
       const projectId = parseInt(req.params.projectId);
       if (isNaN(projectId)) {
@@ -8628,7 +8628,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const templateData = {
         ...req.body,
-        createdBy: 1 // Default user ID for now
+        createdBy: req.user?.id || 1
       };
 
       const newTemplate = await storage.createRecurringTemplateWithTeam(templateData);
@@ -8640,7 +8640,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update recurring template
-  app.put("/api/recurring-templates/:id", async (req, res) => {
+  app.put("/api/recurring-templates/:id", requireAuth, async (req, res) => {
     try {
       const templateId = parseInt(req.params.id);
       if (isNaN(templateId)) {
@@ -9341,7 +9341,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Actualizar plantilla recurrente
-  app.put("/api/recurring-templates/:id", async (req, res) => {
+  app.put("/api/recurring-templates/:id", requireAuth, async (req, res) => {
     try {
       const templateId = parseInt(req.params.id);
       if (isNaN(templateId)) {
@@ -15260,11 +15260,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid exchange rate ID" });
       }
       
-      const { exchangeRates } = await import('../shared/schema');
-      
+      const { exchangeRates, insertExchangeRateSchema } = await import('../shared/schema');
+
+      const validatedData = insertExchangeRateSchema.partial().parse(req.body);
+
       const [updatedRate] = await db.update(exchangeRates)
         .set({
-          ...req.body,
+          ...validatedData,
           updatedBy: req.user?.id,
           updatedAt: new Date(),
         })

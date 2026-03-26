@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useRoute, useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { getAuthHeader } from "@/lib/queryClient";
 import {
   Card,
   CardContent,
@@ -122,8 +123,10 @@ const QualityScoresPage = () => {
     mutationFn: async (data: any) => {
       const response = await fetch(`/api/deliverables/${selectedDeliverable}`, {
         method: "PATCH",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
+          ...getAuthHeader(),
         },
         body: JSON.stringify(data),
       });

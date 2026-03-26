@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { getAuthHeader } from "@/lib/queryClient";
 import { useParams, useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -59,8 +60,10 @@ export default function QuarterlyNpsSurvey() {
     mutationFn: async (data: QuarterlyNpsSurvey) => {
       const response = await fetch('/api/nps-surveys', {
         method: 'POST',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
+          ...getAuthHeader(),
         },
         body: JSON.stringify(data),
       });

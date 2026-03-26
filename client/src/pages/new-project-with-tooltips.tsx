@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { getAuthHeader } from "@/lib/queryClient";
 
 import { z } from "zod";
 import { useForm } from "react-hook-form";
@@ -133,8 +134,10 @@ export default function NewProjectWithTooltips() {
     mutationFn: async (data: FormData) => {
       const response = await fetch("/api/active-projects", {
         method: "POST",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
+          ...getAuthHeader(),
         },
         body: JSON.stringify(data),
       });
