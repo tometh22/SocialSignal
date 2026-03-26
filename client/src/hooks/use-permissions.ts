@@ -1,8 +1,8 @@
 import { useAuth } from "@/hooks/use-auth";
 
-export type AppSection = 'crm' | 'quotations' | 'projects' | 'status' | 'dashboard' | 'finance' | 'admin';
+export type AppSection = 'crm' | 'quotations' | 'projects' | 'status' | 'dashboard' | 'finance' | 'admin' | 'operations';
 
-export const ALL_SECTIONS: AppSection[] = ['crm', 'quotations', 'projects', 'status', 'dashboard', 'finance', 'admin'];
+export const ALL_SECTIONS: AppSection[] = ['crm', 'quotations', 'projects', 'status', 'dashboard', 'finance', 'admin', 'operations'];
 
 export const SECTION_LABELS: Record<AppSection, string> = {
   crm: 'CRM Ventas',
@@ -12,6 +12,7 @@ export const SECTION_LABELS: Record<AppSection, string> = {
   dashboard: 'Dashboard Ejecutivo',
   finance: 'Finanzas y Analytics',
   admin: 'Administración',
+  operations: 'Operaciones (Capacidad, Cierre)',
 };
 
 export function usePermissions() {
@@ -36,5 +37,10 @@ export function usePermissions() {
 
   const allowedSections = ALL_SECTIONS.filter(s => hasPermission(s));
 
-  return { hasPermission, getFirstAllowedRoute, allowedSections };
+  // Role helpers: operations team sees capacity, closings, rates
+  const isOperations = hasPermission('operations') || (user as any)?.isAdmin;
+  // Team members see their own hours only (no capacity/idle metrics)
+  const isTeamMember = !!user && !isOperations;
+
+  return { hasPermission, getFirstAllowedRoute, allowedSections, isOperations, isTeamMember };
 }
