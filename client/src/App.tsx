@@ -55,6 +55,10 @@ import EditRobustnessPage from "@/pages/edit-robustness";
 import AlwaysOnProjectView from "@/pages/always-on-project-view";
 import RecurringTemplatesPage from "@/pages/recurring-templates";
 import AdminUsersPage from "@/pages/admin-users";
+import CapacityDashboard from "@/pages/capacity-dashboard";
+import MonthlyClosing from "@/pages/monthly-closing";
+import EstimatedRates from "@/pages/estimated-rates";
+import HolidaysManagement from "@/pages/holidays-management";
 import UnauthorizedPage from "@/pages/unauthorized";
 import SidebarFixed from "@/components/layout/sidebar-fixed";
 import Topbar from "@/components/layout/topbar";
@@ -198,6 +202,12 @@ function AppRoutes() {
                   <ProtectedRoute path="/admin/users" component={AdminUsersPage} requiredPermission="admin" />
                   <ProtectedRoute path="/admin/inflation" component={AdminInflation} requiredPermission="admin" />
                   <ProtectedRoute path="/admin" component={Admin} requiredPermission="admin" />
+
+                  {/* Operations Management */}
+                  <ProtectedRoute path="/operations/capacity" component={CapacityDashboard} requiredPermission="operations" />
+                  <ProtectedRoute path="/operations/monthly-closing" component={MonthlyClosing} requiredPermission="operations" />
+                  <ProtectedRoute path="/operations/estimated-rates" component={EstimatedRates} requiredPermission="operations" />
+                  <ProtectedRoute path="/operations/holidays" component={HolidaysManagement} requiredPermission="operations" />
                   <ProtectedRoute path="/google-sheets" component={GoogleSheetsManager} requiredPermission="admin" />
                   
                   {/* Specialized Tools */}
