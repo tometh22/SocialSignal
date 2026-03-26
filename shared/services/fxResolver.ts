@@ -130,18 +130,33 @@ async function tryGetFromCostosMedian(period: string, projectId: string): Promis
  * Fallback FX basado en configuración
  */
 function getFallbackFX(period: string): number {
-  // Extraer año del período
-  const year = parseInt(period.split('-')[0]);
+  // Extraer año y mes del período para buscar rate específico
+  const [yearStr, monthStr] = period.split('-');
+  const year = parseInt(yearStr);
 
-  // Configuración FX por año (estimada)
-  const fallbackRates: { [year: number]: number } = {
+  // Intentar buscar rate mensual específico (alineado con FX_TABLE de fx.ts)
+  const monthlyRates: Record<string, number> = {
+    "2024-01": 1150, "2024-02": 1160, "2024-03": 1170, "2024-04": 1165,
+    "2024-05": 1175, "2024-06": 1180, "2024-07": 1185, "2024-08": 1190,
+    "2024-09": 1195, "2024-10": 1200, "2024-11": 1195, "2024-12": 1190,
+    "2025-01": 1200, "2025-02": 1180, "2025-03": 1190, "2025-04": 1205,
+    "2025-05": 1220, "2025-06": 1210, "2025-07": 1215, "2025-08": 1200,
+    "2025-09": 1195, "2025-10": 1205, "2025-11": 1210, "2025-12": 1200,
+  };
+
+  if (monthlyRates[period]) {
+    return monthlyRates[period];
+  }
+
+  // Fallback por año
+  const yearlyFallback: Record<number, number> = {
     2023: 900,
-    2024: 1200,
-    2025: 1350,
+    2024: 1190,
+    2025: 1200,
     2026: 1500
   };
 
-  return fallbackRates[year] || 1350; // Default 2025
+  return yearlyFallback[year] || 1200;
 }
 
 /** Safe inverse: prevents division by zero in FX calculations */
