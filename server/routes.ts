@@ -3445,11 +3445,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/clients", requireAuth, async (req, res) => {
     try {
       const validatedData = insertClientSchema.parse(req.body);
+      // Normalize client name to prevent duplicates
+      if (validatedData.name) {
+        validatedData.name = validatedData.name.trim().replace(/\s+/g, ' ');
+      }
       const client = await storage.createClient(validatedData);
       res.status(201).json(client);
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Invalid client data", errors: error.errors });
+      }
+      // Handle unique constraint violation
+      if ((error as any)?.code === '23505' || (error as any)?.constraint?.includes('unique')) {
+        return res.status(409).json({ message: "Ya existe un cliente con ese nombre" });
       }
       res.status(500).json({ message: "Failed to create client" });
     }
@@ -3463,6 +3471,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Partial validation - only validate the fields provided
       const validatedData = insertClientSchema.partial().parse(req.body);
+      // Normalize client name
+      if (validatedData.name) {
+        validatedData.name = validatedData.name.trim().replace(/\s+/g, ' ');
+      }
 
       const updatedClient = await storage.updateClient(id, validatedData);
 

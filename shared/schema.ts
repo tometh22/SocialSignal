@@ -175,7 +175,7 @@ export type InsertCashMovement = z.infer<typeof insertCashMovementSchema>;
 // Clients table
 export const clients = pgTable("clients", {
   id: serial("id").primaryKey(),
-  name: text("name").notNull(),
+  name: text("name").notNull().unique(),
   contactName: text("contact_name"),
   contactEmail: text("contact_email"),
   contactPhone: text("contact_phone"),
