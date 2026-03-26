@@ -464,7 +464,9 @@ function ProjectCard({ p, dense, period, taskStats, hoursCost }: { p: ProjectIte
       <div className="flex items-start justify-between gap-4">
         <div>
           <div className="text-sm text-slate-500 dark:text-slate-400">{p.clientName}</div>
-          <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">{p.projectName}</div>
+          <Link href={`/active-projects/${p.projectId}${period ? `?period=${period}` : ''}`}>
+            <div className="text-lg font-semibold text-slate-900 dark:text-slate-100 hover:text-indigo-600 cursor-pointer transition-colors">{p.projectName}</div>
+          </Link>
           <div className="mt-2 flex items-center gap-2 flex-wrap">
             <Badge tone="green">{statusLabel}</Badge>
             {p.isOneShot && (
