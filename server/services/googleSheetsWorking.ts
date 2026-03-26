@@ -1934,8 +1934,40 @@ class GoogleSheetsWorkingService {
    */
   private async findPersonnelByName(storage: any, personName: string): Promise<number | null> {
     try {
+      // 1. Try exact name match in personnel table
       const personnel = await storage.getPersonnelByName(personName);
-      return personnel?.id || null;
+      if (personnel?.id) return personnel.id;
+
+      // 2. Try personnel_aliases table for Excel name mappings
+      try {
+        const { personnelAliases } = await import('../../shared/schema');
+        const { eq } = await import('drizzle-orm');
+        const { db } = await import('../db');
+        const [alias] = await db.select().from(personnelAliases)
+          .where(eq(personnelAliases.excelName, personName.trim()));
+        if (alias?.personnelId) {
+          console.log(`🔗 Personnel alias match: "${personName}" → personnelId ${alias.personnelId}`);
+          return alias.personnelId;
+        }
+      } catch {
+        // Alias table may not exist yet, continue with fallback
+      }
+
+      // 3. Try case-insensitive partial match as last resort
+      const allPersonnel = await storage.getPersonnel();
+      const normalized = personName.toLowerCase().trim();
+      const match = allPersonnel.find((p: any) =>
+        p.name.toLowerCase().trim() === normalized ||
+        p.name.toLowerCase().includes(normalized) ||
+        normalized.includes(p.name.toLowerCase())
+      );
+      if (match) {
+        console.log(`🔍 Personnel fuzzy match: "${personName}" → ${match.name} (id=${match.id})`);
+        return match.id;
+      }
+
+      console.warn(`⚠️ Personnel not found: "${personName}"`);
+      return null;
     } catch (error) {
       return null;
     }

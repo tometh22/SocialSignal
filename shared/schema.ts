@@ -733,6 +733,26 @@ export const insertProjectAliasSchema = createInsertSchema(projectAliases).omit(
 export type ProjectAlias = typeof projectAliases.$inferSelect;
 export type InsertProjectAlias = z.infer<typeof insertProjectAliasSchema>;
 
+// ==================== PERSONNEL ALIASES FOR EXCEL MAPPING ====================
+// Explicit mapping table for Excel person names to personnel IDs
+// Replaces fuzzy name matching with explicit, reliable mappings
+export const personnelAliases = pgTable("personnel_aliases", {
+  id: serial("id").primaryKey(),
+  personnelId: integer("personnel_id").notNull().references(() => personnel.id),
+  excelName: varchar("excel_name", { length: 255 }).notNull().unique(), // Name as it appears in Excel/Sheets
+  source: varchar("source", { length: 50 }).notNull().default("manual"), // "manual", "auto_detected"
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertPersonnelAliasSchema = createInsertSchema(personnelAliases).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type PersonnelAlias = typeof personnelAliases.$inferSelect;
+export type InsertPersonnelAlias = z.infer<typeof insertPersonnelAliasSchema>;
+
 // ==================== DIMENSIONAL ALIAS TABLES (SOT ETL V2) ====================
 
 /**
