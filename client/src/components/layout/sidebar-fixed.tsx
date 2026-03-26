@@ -158,27 +158,24 @@ export default function SidebarFixed() {
     {
       title: "",
       items: [
-        { href: "/", title: "Dashboard", icon: LayoutDashboard, description: "Resumen general y KPIs", permission: 'dashboard' as AppSection }
+        { href: "/", title: "Inicio", icon: Home, description: "Accesos directos y resumen", permission: 'dashboard' as AppSection },
+        { href: "/dashboard", title: "Dashboard Ejecutivo", icon: LayoutDashboard, description: "KPIs financieros y operativos", permission: 'dashboard' as AppSection },
       ]
     },
     {
       title: "Comercial",
       items: [
         { href: "/crm", title: "CRM Ventas", icon: Target, badge: crmOverdue > 0 ? crmOverdue.toString() : undefined, description: "Pipeline de prospectos", permission: 'crm' as AppSection },
-        { href: "/optimized-quote", title: "Nueva Cotización", icon: Plus, status: 'new' as const, description: "Crear cotización", permission: 'quotations' as AppSection },
         { href: "/quotations", title: "Cotizaciones", icon: FileText, description: "Gestionar cotizaciones", permission: 'quotations' as AppSection },
         { href: "/clients", title: "Clientes", icon: Building2, description: "Base de clientes", permission: 'crm' as AppSection },
-        { href: "/active-projects", title: "Rentabilidad", icon: Briefcase, badge: projectCount.toString(), description: "Análisis financiero de proyectos", permission: 'projects' as AppSection },
-        { href: "/status-semanal", title: "Status Semanal", icon: ClipboardList, description: "Visión ejecutiva de proyectos", permission: 'status' as AppSection },
       ]
     },
     {
-      title: "Tareas",
+      title: "Proyectos",
       items: [
-        { href: "/tasks", title: "Inicio", icon: Home, description: "Resumen de tareas", permission: 'projects' as AppSection },
-        { href: "/tasks/my-tasks", title: "Mis Tareas", icon: CheckSquare, description: "Tus tareas asignadas", permission: 'projects' as AppSection },
-        { href: "/tasks/projects", title: "Proyectos", icon: FolderOpen, description: "Hub de proyectos", permission: 'projects' as AppSection },
-        { href: "/tasks/team-calendar", title: "Calendario", icon: CalendarDays, description: "Vista del equipo", permission: 'projects' as AppSection },
+        { href: "/active-projects", title: "Rentabilidad", icon: Briefcase, badge: projectCount.toString(), description: "Análisis financiero de proyectos", permission: 'projects' as AppSection },
+        { href: "/status-semanal", title: "Status Semanal", icon: ClipboardList, description: "Visión ejecutiva de proyectos", permission: 'status' as AppSection },
+        { href: "/tasks", title: "Tareas", icon: CheckSquare, description: "Gestión de tareas", permission: 'projects' as AppSection },
         { href: "/tasks/hours-dashboard", title: "Panel de Horas", icon: BarChart2, description: "Horas por persona y proyecto", permission: 'projects' as AppSection },
       ]
     },
@@ -187,7 +184,7 @@ export default function SidebarFixed() {
       items: [
         { href: "/operations/capacity", title: "Capacidad Semanal", icon: Gauge, description: "Capacidad operativa por persona", permission: 'operations' as AppSection },
         { href: "/operations/monthly-closing", title: "Cierre Mensual", icon: CalendarCheck, description: "Cierre de horas del mes", permission: 'operations' as AppSection },
-        { href: "/operations/estimated-rates", title: "Valor Hora Estimado", icon: TrendingUp, description: "Proyección de valor hora", permission: 'operations' as AppSection },
+        { href: "/operations/estimated-rates", title: "Valor Hora", icon: TrendingUp, description: "Proyección de valor hora", permission: 'operations' as AppSection },
         { href: "/operations/holidays", title: "Feriados", icon: Calendar, description: "Gestión de feriados", permission: 'operations' as AppSection },
       ]
     },

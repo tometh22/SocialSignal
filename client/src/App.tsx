@@ -59,6 +59,7 @@ import CapacityDashboard from "@/pages/capacity-dashboard";
 import MonthlyClosing from "@/pages/monthly-closing";
 import EstimatedRates from "@/pages/estimated-rates";
 import HolidaysManagement from "@/pages/holidays-management";
+import HomeDashboard from "@/pages/home-dashboard";
 import UnauthorizedPage from "@/pages/unauthorized";
 import SidebarFixed from "@/components/layout/sidebar-fixed";
 import Topbar from "@/components/layout/topbar";
@@ -145,7 +146,7 @@ function AppRoutes() {
                   <Route path="/unauthorized" component={UnauthorizedPage} />
 
                   {/* Core Application Routes */}
-                  <ProtectedRoute path="/" component={ExecutiveDashboard} requiredPermission="dashboard" />
+                  <ProtectedRoute path="/" component={HomeDashboard} requiredPermission="dashboard" />
                   <ProtectedRoute path="/dashboard" component={ExecutiveDashboard} requiredPermission="dashboard" />
                   <ProtectedRoute path="/executive-dashboard-new" component={ExecutiveDashboardLegacy} requiredPermission="dashboard" />
                   <ProtectedRoute path="/executive/operativo" component={ExecutiveOperativo} requiredPermission="dashboard" />
