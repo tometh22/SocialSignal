@@ -157,9 +157,13 @@ export default function Clients() {
   // Mutación para eliminar cliente
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
-      const response = await fetch(`/api/clients/${id}`, { 
+      const response = await fetch(`/api/clients/${id}`, {
         method: 'DELETE',
-        credentials: 'include'
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAuthHeader(),
+        }
       });
       
       if (!response.ok) {

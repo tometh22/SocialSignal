@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { authFetch } from "@/lib/queryClient";
+import { authFetch, getAuthHeader } from "@/lib/queryClient";
 import { useLocation, useParams } from "wouter";
 import { watchSummaryDropped } from "@/utils/consistencyWatchdog";
 import { toProjectVM, formatCurrency, useWhichCost } from "@/selectors/projectVM";
@@ -589,7 +589,8 @@ function ProjectTeamSection({
     mutationFn: async () => {
       const response = await fetch(`/api/projects/${projectId}/copy-quotation-team`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', ...getAuthHeader() }
       });
       if (!response.ok) {
         throw new Error('Failed to copy team');

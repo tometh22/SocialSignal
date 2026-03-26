@@ -175,7 +175,7 @@ export type InsertCashMovement = z.infer<typeof insertCashMovementSchema>;
 // Clients table
 export const clients = pgTable("clients", {
   id: serial("id").primaryKey(),
-  name: text("name").notNull(),
+  name: text("name").notNull().unique(),
   contactName: text("contact_name"),
   contactEmail: text("contact_email"),
   contactPhone: text("contact_phone"),
@@ -190,6 +190,8 @@ export const insertClientSchema = createInsertSchema(clients).pick({
   contactPhone: true,
   logoUrl: true,
   createdBy: true,
+}).extend({
+  createdBy: z.number().int().nullable().optional(),
 });
 
 // ==================== ROLES ====================
@@ -623,10 +625,80 @@ export const insertExchangeRateSchema = createInsertSchema(exchangeRates).omit({
   updatedAt: true,
 }).extend({
   specificDate: z.union([z.date(), z.string().transform((str) => new Date(str))]).nullable().optional(),
+  rateType: z.enum(["end_of_month", "daily", "average", "estimated"]).default("end_of_month"),
+  source: z.enum(["Manual", "BCRA", "Blue", "REM", "MEP", "CCL"]).default("Manual"),
 });
 
 export type ExchangeRate = typeof exchangeRates.$inferSelect;
 export type InsertExchangeRate = z.infer<typeof insertExchangeRateSchema>;
+
+// ==================== FERIADOS Y DISPONIBILIDAD ====================
+export const holidays = pgTable("holidays", {
+  id: serial("id").primaryKey(),
+  date: timestamp("date").notNull(),
+  name: text("name").notNull(),
+  isNational: boolean("is_national").notNull().default(true),
+  year: integer("year").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertHolidaySchema = createInsertSchema(holidays).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  date: z.union([z.date(), z.string().transform((str) => new Date(str))]),
+});
+
+export type Holiday = typeof holidays.$inferSelect;
+export type InsertHoliday = z.infer<typeof insertHolidaySchema>;
+
+// ==================== CIERRE MENSUAL ====================
+export const monthlyClosings = pgTable("monthly_closings", {
+  id: serial("id").primaryKey(),
+  personnelId: integer("personnel_id").notNull().references(() => personnel.id),
+  year: integer("year").notNull(),
+  month: integer("month").notNull(), // 1-12
+  actualHours: doublePrecision("actual_hours").notNull(), // horas reales trabajadas
+  adjustedHours: doublePrecision("adjusted_hours").notNull(), // horas ajustadas para facturación (ej: 160)
+  hourlyRate: doublePrecision("hourly_rate").notNull(), // valor hora al cierre
+  totalCost: doublePrecision("total_cost").notNull(), // adjustedHours * hourlyRate
+  notes: text("notes"),
+  closedBy: integer("closed_by").references(() => users.id),
+  closedAt: timestamp("closed_at").notNull().defaultNow(),
+}, (table) => ({
+  uniquePersonMonth: unique("unique_person_month_closing").on(table.personnelId, table.year, table.month),
+}));
+
+export const insertMonthlyClosingSchema = createInsertSchema(monthlyClosings).omit({
+  id: true,
+  closedAt: true,
+});
+
+export type MonthlyClosing = typeof monthlyClosings.$inferSelect;
+export type InsertMonthlyClosing = z.infer<typeof insertMonthlyClosingSchema>;
+
+// ==================== VALOR HORA ESTIMADO ====================
+export const estimatedRates = pgTable("estimated_rates", {
+  id: serial("id").primaryKey(),
+  personnelId: integer("personnel_id").notNull().references(() => personnel.id),
+  year: integer("year").notNull(),
+  month: integer("month").notNull(), // 1-12
+  estimatedRateARS: doublePrecision("estimated_rate_ars").notNull(),
+  adjustmentPct: doublePrecision("adjustment_pct"), // ej: 8.5 para ajuste trimestral
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  createdBy: integer("created_by").references(() => users.id),
+}, (table) => ({
+  uniquePersonMonthRate: unique("unique_person_month_rate").on(table.personnelId, table.year, table.month),
+}));
+
+export const insertEstimatedRateSchema = createInsertSchema(estimatedRates).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type EstimatedRate = typeof estimatedRates.$inferSelect;
+export type InsertEstimatedRate = z.infer<typeof insertEstimatedRateSchema>;
 
 // ==================== PROYECTOS ACTIVOS ====================
 // Proyectos Activos
@@ -663,7 +735,11 @@ export const activeProjects = pgTable("active_projects", {
   
   // Campo para presupuesto del proyecto
   budget: doublePrecision("budget"), // presupuesto total del proyecto (puede diferir de la cotización)
-  
+  selectedVariantId: integer("selected_variant_id").references(() => quotationVariants.id), // variante elegida por el cliente
+
+  // Campo para tipo de proyecto (facturable vs interno)
+  projectCategory: text("project_category").notNull().default("billable"), // billable, internal
+
   // Campo para marcar proyectos como terminados/archivados
   isFinished: boolean("is_finished").default(false), // indica si el proyecto ha sido marcado como terminado
 });
@@ -698,6 +774,8 @@ export const insertActiveProjectSchema = baseInsertActiveProjectSchema.extend({
 
   // Campo para presupuesto
   budget: z.number().nullable().optional(),
+  selectedVariantId: z.number().nullable().optional(),
+  projectCategory: z.enum(["billable", "internal"]).default("billable"),
 });
 
 // ==================== PROJECT ALIASES FOR EXCEL MAPPING ====================
@@ -730,6 +808,26 @@ export const insertProjectAliasSchema = createInsertSchema(projectAliases).omit(
 
 export type ProjectAlias = typeof projectAliases.$inferSelect;
 export type InsertProjectAlias = z.infer<typeof insertProjectAliasSchema>;
+
+// ==================== PERSONNEL ALIASES FOR EXCEL MAPPING ====================
+// Explicit mapping table for Excel person names to personnel IDs
+// Replaces fuzzy name matching with explicit, reliable mappings
+export const personnelAliases = pgTable("personnel_aliases", {
+  id: serial("id").primaryKey(),
+  personnelId: integer("personnel_id").notNull().references(() => personnel.id),
+  excelName: varchar("excel_name", { length: 255 }).notNull().unique(), // Name as it appears in Excel/Sheets
+  source: varchar("source", { length: 50 }).notNull().default("manual"), // "manual", "auto_detected"
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertPersonnelAliasSchema = createInsertSchema(personnelAliases).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type PersonnelAlias = typeof personnelAliases.$inferSelect;
+export type InsertPersonnelAlias = z.infer<typeof insertPersonnelAliasSchema>;
 
 // ==================== DIMENSIONAL ALIAS TABLES (SOT ETL V2) ====================
 
@@ -1096,6 +1194,7 @@ export const insertTimeEntrySchema = baseInsertTimeEntrySchema.extend({
   startDate: z.union([z.date(), z.string().transform((str) => new Date(str))]).nullable().optional(),
   endDate: z.union([z.date(), z.string().transform((str) => new Date(str))]).nullable().optional(),
   componentId: z.number().nullable().optional(),
+  hours: z.number().min(0.25, "El mínimo son 15 minutos (0.25 horas)"),
   entryType: z.enum(["hours", "cost"]).default("hours"),
   totalCost: z.number().positive("El costo total debe ser positivo"),
   hourlyRateAtTime: z.number().positive("El valor hora debe ser positivo"),
@@ -1288,7 +1387,7 @@ export const insertTaskTimeEntrySchema = createInsertSchema(taskTimeEntries).omi
   createdAt: true,
 }).extend({
   date: z.union([z.date(), z.string().transform((str) => new Date(str))]),
-  hours: z.number().positive(),
+  hours: z.number().min(0.25, "El mínimo son 15 minutos (0.25 horas)"),
 });
 
 export type TaskTimeEntry = typeof taskTimeEntries.$inferSelect;
@@ -2065,6 +2164,12 @@ export const insertQuarterlyNpsSurveySchema = createInsertSchema(quarterlyNpsSur
   createdAt: true,
   updatedAt: true,
   npsCategory: true, // Se calcula automáticamente
+}).extend({
+  npsScore: z.number().int().min(0).max(10).nullable().optional(),
+  reportQuality: z.number().int().min(0).max(10).nullable().optional(),
+  insightsClarity: z.number().int().min(0).max(10).nullable().optional(),
+  briefObjectives: z.number().int().min(0).max(10).nullable().optional(),
+  reportPresentation: z.number().int().min(0).max(10).nullable().optional(),
 });
 
 export type QuarterlyNpsSurvey = typeof quarterlyNpsSurveys.$inferSelect;
@@ -3159,6 +3264,13 @@ export const projectStatusReviews = pgTable("project_status_reviews", {
 export const insertProjectStatusReviewSchema = createInsertSchema(projectStatusReviews).omit({
   id: true,
   updatedAt: true,
+}).extend({
+  healthStatus: z.enum(['verde', 'amarillo', 'rojo']).default('verde'),
+  marginStatus: z.enum(['alto', 'medio', 'bajo']).default('medio'),
+  teamStrain: z.enum(['alto', 'medio', 'bajo']).default('bajo'),
+  decisionNeeded: z.enum(['ninguna', 'priorizacion', 'recursos', 'reprecio', 'salida']).default('ninguna'),
+  nextMilestoneDate: z.union([z.date(), z.string().transform((str) => new Date(str))]).nullable().optional(),
+  deadline: z.union([z.date(), z.string().transform((str) => new Date(str))]).nullable().optional(),
 });
 export type ProjectStatusReview = typeof projectStatusReviews.$inferSelect;
 export type InsertProjectStatusReview = z.infer<typeof insertProjectStatusReviewSchema>;
@@ -3186,7 +3298,7 @@ export const weeklyStatusItems = pgTable("weekly_status_items", {
   subtitle: text("subtitle"),
   healthStatus: varchar("health_status", { length: 20 }).default('verde'),
   marginStatus: varchar("margin_status", { length: 20 }).default('medio'),
-  teamStrain: varchar("team_strain", { length: 20 }).default('medio'),
+  teamStrain: varchar("team_strain", { length: 20 }).default('bajo'),
   mainRisk: text("main_risk"),
   currentAction: text("current_action"),
   nextMilestone: text("next_milestone"),
@@ -3202,6 +3314,12 @@ export const insertWeeklyStatusItemSchema = createInsertSchema(weeklyStatusItems
   id: true,
   updatedAt: true,
   createdAt: true,
+}).extend({
+  healthStatus: z.enum(['verde', 'amarillo', 'rojo']).default('verde'),
+  marginStatus: z.enum(['alto', 'medio', 'bajo']).default('medio'),
+  teamStrain: z.enum(['alto', 'medio', 'bajo']).default('bajo'),
+  decisionNeeded: z.enum(['ninguna', 'priorizacion', 'recursos', 'reprecio', 'salida']).default('ninguna'),
+  deadline: z.union([z.date(), z.string().transform((str) => new Date(str))]).nullable().optional(),
 });
 export type WeeklyStatusItem = typeof weeklyStatusItems.$inferSelect;
 export type InsertWeeklyStatusItem = z.infer<typeof insertWeeklyStatusItemSchema>;

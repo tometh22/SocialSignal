@@ -99,6 +99,13 @@ import {
   projectStatusReviews,
   projectReviewNotes,
   weeklyStatusItems,
+  holidays,
+  insertHolidaySchema,
+  monthlyClosings,
+  insertMonthlyClosingSchema,
+  estimatedRates,
+  insertEstimatedRateSchema,
+  quotationTeamMembers,
 } from "@shared/schema";
 import { ActiveProjectsAggregator } from "./domain/projectsActive";
 import { resolveTimeFilter } from "./services/time";
@@ -3445,11 +3452,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/clients", requireAuth, async (req, res) => {
     try {
       const validatedData = insertClientSchema.parse(req.body);
+      // Normalize client name to prevent duplicates
+      if (validatedData.name) {
+        validatedData.name = validatedData.name.trim().replace(/\s+/g, ' ');
+      }
       const client = await storage.createClient(validatedData);
       res.status(201).json(client);
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Invalid client data", errors: error.errors });
+      }
+      // Handle unique constraint violation
+      if ((error as any)?.code === '23505' || (error as any)?.constraint?.includes('unique')) {
+        return res.status(409).json({ message: "Ya existe un cliente con ese nombre" });
       }
       res.status(500).json({ message: "Failed to create client" });
     }
@@ -3463,6 +3478,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Partial validation - only validate the fields provided
       const validatedData = insertClientSchema.partial().parse(req.body);
+      // Normalize client name
+      if (validatedData.name) {
+        validatedData.name = validatedData.name.trim().replace(/\s+/g, ' ');
+      }
 
       const updatedClient = await storage.updateClient(id, validatedData);
 
@@ -4308,13 +4327,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (!status) return res.status(400).json({ message: "Status is required" });
 
+      const validStatuses = ['draft', 'pending', 'approved', 'rejected', 'in-negotiation'];
+      if (!validStatuses.includes(status)) {
+        return res.status(400).json({ message: `Invalid status. Must be one of: ${validStatuses.join(', ')}` });
+      }
+
       // Get the current quotation to check its status
       const currentQuotation = await storage.getQuotation(id);
       if (!currentQuotation) {
         return res.status(404).json({ message: "Quotation not found" });
       }
 
-      // Check if status is changing from "in-negotiation" to "approved"
+      // Validate status transitions
+      const validTransitions: Record<string, string[]> = {
+        'draft': ['pending', 'rejected'],
+        'pending': ['approved', 'rejected', 'in-negotiation'],
+        'approved': ['in-negotiation'],
+        'in-negotiation': ['approved', 'rejected', 'pending'],
+        'rejected': ['draft', 'pending']
+      };
+
+      const allowed = validTransitions[currentQuotation.status];
+      if (allowed && !allowed.includes(status)) {
+        return res.status(400).json({
+          message: `No se puede cambiar de "${currentQuotation.status}" a "${status}". Transiciones válidas: ${allowed.join(', ')}`
+        });
+      }
+
       let updateData: any = { status };
       
       if (currentQuotation.status === 'in-negotiation' && status === 'approved') {
@@ -4340,6 +4379,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (!updatedQuotation) {
         return res.status(404).json({ message: "Quotation not found" });
+      }
+
+      // Sync budget to active project when quotation price changes on approval
+      if (status === 'approved' && updateData.totalAmount) {
+        try {
+          const projects = await db.select().from(activeProjects)
+            .where(eq(activeProjects.quotationId, id));
+          for (const project of projects) {
+            await storage.updateActiveProject(project.id, { budget: updateData.totalAmount });
+            console.log(`[API] Synced budget for project ${project.id}: ${updateData.totalAmount}`);
+          }
+        } catch (budgetErr) {
+          console.warn('[API] Failed to sync project budget, quotation updated successfully:', budgetErr);
+        }
       }
 
       res.json(updatedQuotation);
@@ -4479,8 +4532,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         proposalLink
       } = req.body;
 
-      // Calculate adjustment percentage
-      const adjustmentPercentage = ((newPrice - quotation.totalAmount) / quotation.totalAmount) * 100;
+      // Calculate adjustment percentage (guard against division by zero)
+      const adjustmentPercentage = quotation.totalAmount > 0
+        ? ((newPrice - quotation.totalAmount) / quotation.totalAmount) * 100
+        : 0;
 
       const negotiationEntry = await storage.createNegotiationHistory({
         quotationId,
@@ -5014,16 +5069,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .set({ isSelected: false })
         .where(eq(quotationVariants.quotationId, quotationId));
 
-      // Then select the chosen variant
-      await db.update(quotationVariants)
+      // Then select the chosen variant and return it
+      const [selectedVariant] = await db.update(quotationVariants)
         .set({ isSelected: true })
         .where(and(
           eq(quotationVariants.id, variantId),
           eq(quotationVariants.quotationId, quotationId)
-        ));
+        ))
+        .returning();
 
       console.log(`✅ Variant ${variantId} selected for quotation ${quotationId}`);
-      res.json({ success: true, message: "Variant selected successfully" });
+      res.json({ success: true, message: "Variant selected successfully", variant: selectedVariant });
       
     } catch (error) {
       console.error(`❌ Error selecting variant ${variantId} for quotation ${quotationId}:`, error);
@@ -7173,8 +7229,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      // Sync budget and selected variant from quotation
+      if (quotation.totalAmount && !validatedData.budget) {
+        (validatedData as any).budget = quotation.totalAmount;
+      }
+      // Find and preserve the selected variant
+      const selectedVariant = await db.select().from(quotationVariants)
+        .where(and(
+          eq(quotationVariants.quotationId, Number(validatedData.quotationId)),
+          eq(quotationVariants.isSelected, true)
+        ))
+        .limit(1);
+      if (selectedVariant.length > 0 && !validatedData.selectedVariantId) {
+        (validatedData as any).selectedVariantId = selectedVariant[0].id;
+      }
+
       const project = await storage.createActiveProject(validatedData);
-      
+
       // Copiar automáticamente el equipo de la cotización al proyecto recién creado
       try {
         console.log(`📋 Copiando equipo automáticamente desde cotización ${validatedData.quotationId} al proyecto ${project.id}`);
@@ -7324,6 +7395,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/project-components", requireAuth, async (req, res) => {
     try {
       const validatedData = insertProjectComponentSchema.parse(req.body);
+
+      // Validate project exists
+      if (validatedData.projectId) {
+        const project = await storage.getActiveProject(validatedData.projectId);
+        if (!project) {
+          return res.status(404).json({ message: "Proyecto no encontrado" });
+        }
+      }
+
       const component = await storage.createProjectComponent(validatedData);
       res.status(201).json(component);
     } catch (error) {
@@ -7364,6 +7444,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (isNaN(id)) return res.status(400).json({ message: "ID de componente inválido" });
 
     try {
+      // Clear componentId on related time entries before deleting
+      await db.update(timeEntries)
+        .set({ componentId: null })
+        .where(eq(timeEntries.componentId, id));
+
       const success = await storage.deleteProjectComponent(id);
 
       if (!success) {
@@ -7671,6 +7756,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     try {
       const validatedData = insertTimeEntrySchema.partial().parse(req.body);
+
+      // Validate positive hours if provided
+      if (validatedData.hours !== undefined && validatedData.hours <= 0) {
+        return res.status(400).json({ message: "Las horas deben ser un número positivo" });
+      }
+
+      // Validate projectId exists if changing it
+      if (validatedData.projectId !== undefined) {
+        const project = await storage.getActiveProject(validatedData.projectId);
+        if (!project) {
+          return res.status(404).json({ message: "Proyecto no encontrado" });
+        }
+      }
+
+      // Validate date range consistency
+      if (validatedData.startDate && validatedData.endDate) {
+        if (new Date(validatedData.startDate) > new Date(validatedData.endDate)) {
+          return res.status(400).json({ message: "La fecha de inicio debe ser anterior a la fecha de fin" });
+        }
+      }
+
       const updatedEntry = await storage.updateTimeEntry(id, validatedData);
 
       if (!updatedEntry) {
@@ -8505,7 +8611,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Obtener encuestas NPS por cliente
-  app.get("/api/clients/:clientId/nps-surveys", async (req, res) => {
+  app.get("/api/clients/:clientId/nps-surveys", requireAuth, async (req, res) => {
     try {
       const clientId = parseInt(req.params.clientId);
       if (isNaN(clientId)) {
@@ -8541,7 +8647,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Actualizar encuesta NPS
-  app.put("/api/nps-surveys/:id", async (req, res) => {
+  app.put("/api/nps-surveys/:id", requireAuth, async (req, res) => {
     try {
       const surveyId = parseInt(req.params.id);
       if (isNaN(surveyId)) {
@@ -8585,7 +8691,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // =========== RUTAS PARA RECURRING TEMPLATES ===========
 
   // Get recurring templates for a project
-  app.get("/api/projects/:projectId/recurring-templates", async (req, res) => {
+  app.get("/api/projects/:projectId/recurring-templates", requireAuth, async (req, res) => {
     try {
       const projectId = parseInt(req.params.projectId);
       if (isNaN(projectId)) {
@@ -8605,7 +8711,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const templateData = {
         ...req.body,
-        createdBy: 1 // Default user ID for now
+        createdBy: req.user?.id || 1
       };
 
       const newTemplate = await storage.createRecurringTemplateWithTeam(templateData);
@@ -8617,7 +8723,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update recurring template
-  app.put("/api/recurring-templates/:id", async (req, res) => {
+  app.put("/api/recurring-templates/:id", requireAuth, async (req, res) => {
     try {
       const templateId = parseInt(req.params.id);
       if (isNaN(templateId)) {
@@ -9318,7 +9424,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Actualizar plantilla recurrente
-  app.put("/api/recurring-templates/:id", async (req, res) => {
+  app.put("/api/recurring-templates/:id", requireAuth, async (req, res) => {
     try {
       const templateId = parseInt(req.params.id);
       if (isNaN(templateId)) {
@@ -15237,11 +15343,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid exchange rate ID" });
       }
       
-      const { exchangeRates } = await import('../shared/schema');
-      
+      const { exchangeRates, insertExchangeRateSchema } = await import('../shared/schema');
+
+      const validatedData = insertExchangeRateSchema.partial().parse(req.body);
+
       const [updatedRate] = await db.update(exchangeRates)
         .set({
-          ...req.body,
+          ...validatedData,
           updatedBy: req.user?.id,
           updatedAt: new Date(),
         })
@@ -16914,17 +17022,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // PATCH /api/status-semanal/:projectId — upsert status review for a project
-  app.patch("/api/status-semanal/:projectId", requireAuth, async (req: Request, res: Response) => {
+  app.patch("/api/status-semanal/:projectId", requireAuth, async (req: Request, res: Response, next) => {
     try {
-      const projectId = parseInt(req.params.projectId);
-      if (isNaN(projectId)) {
-        return res.status(400).json({ message: "projectId inválido" });
+      // Skip if this matches a /custom/ sub-route (let Express try next handler)
+      if (isNaN(parseInt(req.params.projectId))) {
+        return next();
       }
+      const projectId = parseInt(req.params.projectId);
       if (!req.body || typeof req.body !== 'object') {
         return res.status(400).json({ message: "Body vacío o inválido" });
       }
       console.log(`PATCH /api/status-semanal/${projectId}`, JSON.stringify(req.body));
       const { healthStatus, marginStatus, teamStrain, mainRisk, currentAction, nextMilestone, nextMilestoneDate, deadline, ownerId, decisionNeeded, hiddenFromWeekly } = req.body;
+
+      // Validate enum fields
+      const validHealth = ['verde', 'amarillo', 'rojo'];
+      const validLevel = ['alto', 'medio', 'bajo'];
+      const validDecision = ['ninguna', 'priorizacion', 'recursos', 'reprecio', 'salida'];
+
+      if (healthStatus !== undefined && !validHealth.includes(healthStatus)) {
+        return res.status(400).json({ message: `healthStatus inválido. Debe ser: ${validHealth.join(', ')}` });
+      }
+      if (marginStatus !== undefined && !validLevel.includes(marginStatus)) {
+        return res.status(400).json({ message: `marginStatus inválido. Debe ser: ${validLevel.join(', ')}` });
+      }
+      if (teamStrain !== undefined && !validLevel.includes(teamStrain)) {
+        return res.status(400).json({ message: `teamStrain inválido. Debe ser: ${validLevel.join(', ')}` });
+      }
+      if (decisionNeeded !== undefined && !validDecision.includes(decisionNeeded)) {
+        return res.status(400).json({ message: `decisionNeeded inválido. Debe ser: ${validDecision.join(', ')}` });
+      }
 
       const update: Record<string, any> = { updatedAt: new Date() };
       if (healthStatus !== undefined) update.healthStatus = healthStatus;
@@ -17247,6 +17374,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       console.log(`PATCH /api/status-semanal/custom/${id}`, JSON.stringify(req.body));
       const { title, subtitle, healthStatus, marginStatus, teamStrain, mainRisk, currentAction, nextMilestone, deadline, ownerId, decisionNeeded, hiddenFromWeekly } = req.body;
+
+      // Validate enum fields
+      const validHealth = ['verde', 'amarillo', 'rojo'];
+      const validLevel = ['alto', 'medio', 'bajo'];
+      const validDecision = ['ninguna', 'priorizacion', 'recursos', 'reprecio', 'salida'];
+
+      if (healthStatus !== undefined && !validHealth.includes(healthStatus)) {
+        return res.status(400).json({ message: `healthStatus inválido. Debe ser: ${validHealth.join(', ')}` });
+      }
+      if (marginStatus !== undefined && !validLevel.includes(marginStatus)) {
+        return res.status(400).json({ message: `marginStatus inválido. Debe ser: ${validLevel.join(', ')}` });
+      }
+      if (teamStrain !== undefined && !validLevel.includes(teamStrain)) {
+        return res.status(400).json({ message: `teamStrain inválido. Debe ser: ${validLevel.join(', ')}` });
+      }
+      if (decisionNeeded !== undefined && !validDecision.includes(decisionNeeded)) {
+        return res.status(400).json({ message: `decisionNeeded inválido. Debe ser: ${validDecision.join(', ')}` });
+      }
+
       const update: Record<string, any> = { updatedAt: new Date() };
       if (title !== undefined) update.title = title;
       if (subtitle !== undefined) update.subtitle = subtitle;
@@ -17370,6 +17516,166 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("BI revenue-por-cliente error:", error);
       res.status(500).json({ message: "Error fetching client revenue data", error: error.message });
+    }
+  });
+
+  // ==================== HOLIDAYS CRUD ====================
+  app.get("/api/holidays", requireAuth, async (req, res) => {
+    try {
+      const year = req.query.year ? parseInt(req.query.year as string) : new Date().getFullYear();
+      const result = await db.select().from(holidays).where(eq(holidays.year, year));
+      res.json(result);
+    } catch (error) { res.status(500).json({ message: "Error fetching holidays" }); }
+  });
+
+  app.post("/api/holidays", requireAuth, async (req, res) => {
+    try {
+      const data = insertHolidaySchema.parse(req.body);
+      const [holiday] = await db.insert(holidays).values(data).returning();
+      res.status(201).json(holiday);
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: "Datos inválidos", errors: error.errors });
+      res.status(500).json({ message: "Error creating holiday" });
+    }
+  });
+
+  app.delete("/api/holidays/:id", requireAuth, async (req, res) => {
+    try {
+      await db.delete(holidays).where(eq(holidays.id, parseInt(req.params.id)));
+      res.json({ success: true });
+    } catch (error) { res.status(500).json({ message: "Error deleting holiday" }); }
+  });
+
+  // ==================== MONTHLY CLOSINGS CRUD ====================
+  app.get("/api/monthly-closings", requireAuth, async (req, res) => {
+    try {
+      const year = req.query.year ? parseInt(req.query.year as string) : new Date().getFullYear();
+      const month = req.query.month ? parseInt(req.query.month as string) : undefined;
+      let query = db.select().from(monthlyClosings).where(eq(monthlyClosings.year, year));
+      if (month) {
+        query = db.select().from(monthlyClosings).where(
+          and(eq(monthlyClosings.year, year), eq(monthlyClosings.month, month))
+        );
+      }
+      const result = await query;
+      res.json(result);
+    } catch (error) { res.status(500).json({ message: "Error fetching monthly closings" }); }
+  });
+
+  app.post("/api/monthly-closings", requireAuth, async (req, res) => {
+    try {
+      const data = insertMonthlyClosingSchema.parse({ ...req.body, closedBy: req.user?.id });
+      const [closing] = await db.insert(monthlyClosings).values(data)
+        .onConflictDoUpdate({
+          target: [monthlyClosings.personnelId, monthlyClosings.year, monthlyClosings.month],
+          set: {
+            actualHours: data.actualHours,
+            adjustedHours: data.adjustedHours,
+            hourlyRate: data.hourlyRate,
+            totalCost: data.totalCost,
+            notes: data.notes,
+            closedBy: data.closedBy,
+          }
+        })
+        .returning();
+      res.status(201).json(closing);
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: "Datos inválidos", errors: error.errors });
+      res.status(500).json({ message: "Error creating monthly closing" });
+    }
+  });
+
+  // ==================== ESTIMATED RATES CRUD ====================
+  app.get("/api/estimated-rates", requireAuth, async (req, res) => {
+    try {
+      const year = req.query.year ? parseInt(req.query.year as string) : new Date().getFullYear();
+      const result = await db.select().from(estimatedRates).where(eq(estimatedRates.year, year));
+      res.json(result);
+    } catch (error) { res.status(500).json({ message: "Error fetching estimated rates" }); }
+  });
+
+  app.post("/api/estimated-rates", requireAuth, async (req, res) => {
+    try {
+      const data = insertEstimatedRateSchema.parse({ ...req.body, createdBy: req.user?.id });
+      const [rate] = await db.insert(estimatedRates).values(data)
+        .onConflictDoUpdate({
+          target: [estimatedRates.personnelId, estimatedRates.year, estimatedRates.month],
+          set: {
+            estimatedRateARS: data.estimatedRateARS,
+            adjustmentPct: data.adjustmentPct,
+            notes: data.notes,
+          }
+        })
+        .returning();
+      res.status(201).json(rate);
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: "Datos inválidos", errors: error.errors });
+      res.status(500).json({ message: "Error creating estimated rate" });
+    }
+  });
+
+  // ==================== CAPACITY DASHBOARD ====================
+  app.get("/api/capacity/weekly", requireAuth, async (req, res) => {
+    try {
+      const weekStart = req.query.weekStart as string; // YYYY-MM-DD
+      const allPersonnel = await db.select().from(personnel);
+      const year = weekStart ? new Date(weekStart).getFullYear() : new Date().getFullYear();
+      const holidaysList = await db.select().from(holidays).where(eq(holidays.year, year));
+
+      // Calculate working days in the week (5 - holidays in that week)
+      const weekStartDate = weekStart ? new Date(weekStart) : new Date();
+      const weekEndDate = new Date(weekStartDate);
+      weekEndDate.setDate(weekEndDate.getDate() + 6);
+
+      const holidaysInWeek = holidaysList.filter(h => {
+        const hDate = new Date(h.date);
+        return hDate >= weekStartDate && hDate <= weekEndDate;
+      });
+      const workingDays = 5 - holidaysInWeek.length;
+
+      // Get time entries for this week
+      const entries = await db.select().from(timeEntries)
+        .where(and(
+          sql`${timeEntries.date} >= ${weekStartDate.toISOString()}`,
+          sql`${timeEntries.date} <= ${weekEndDate.toISOString()}`
+        ));
+
+      const capacityData = allPersonnel.map(person => {
+        const dailyHours = (person.monthlyHours || 160) / 20; // monthly hours / 20 working days
+        const maxCapacity = dailyHours * workingDays;
+        const personEntries = entries.filter(e => e.personnelId === person.id);
+        const actualHours = personEntries.reduce((sum, e) => sum + (e.hours || 0), 0);
+        const idleHours = Math.max(0, maxCapacity - actualHours);
+
+        return {
+          personnelId: person.id,
+          name: person.name,
+          roleId: person.roleId,
+          maxCapacity: Math.round(maxCapacity * 100) / 100,
+          actualHours: Math.round(actualHours * 100) / 100,
+          idleHours: Math.round(idleHours * 100) / 100,
+          utilizationPct: maxCapacity > 0 ? Math.round((actualHours / maxCapacity) * 100) : 0,
+          isOverloaded: actualHours > maxCapacity,
+        };
+      });
+
+      res.json({
+        weekStart: weekStartDate.toISOString().split('T')[0],
+        workingDays,
+        holidaysInWeek: holidaysInWeek.map(h => ({ date: h.date, name: h.name })),
+        personnel: capacityData,
+        totals: {
+          totalMaxCapacity: capacityData.reduce((s, p) => s + p.maxCapacity, 0),
+          totalActualHours: capacityData.reduce((s, p) => s + p.actualHours, 0),
+          totalIdleHours: capacityData.reduce((s, p) => s + p.idleHours, 0),
+          avgUtilization: capacityData.length > 0
+            ? Math.round(capacityData.reduce((s, p) => s + p.utilizationPct, 0) / capacityData.length)
+            : 0,
+        }
+      });
+    } catch (error) {
+      console.error("Error in capacity dashboard:", error);
+      res.status(500).json({ message: "Error fetching capacity data" });
     }
   });
 

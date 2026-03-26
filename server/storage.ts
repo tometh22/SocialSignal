@@ -788,11 +788,13 @@ export class DatabaseStorage implements IStorage {
         return false;
       }
 
-      // Use transaction to ensure safe deletion
+      // Use transaction to ensure safe deletion of all related records
       await db.transaction(async (tx) => {
-        // Delete related records first
+        // Delete related records first (order matters for FK constraints)
         await tx.delete(clientModoComments).where(eq(clientModoComments.clientId, id));
-        
+        await tx.delete(quarterlyNpsSurveys).where(eq(quarterlyNpsSurveys.clientId, id));
+        await tx.delete(crmLeads).where(eq(crmLeads.clientId, id));
+
         // Finally delete the client
         await tx.delete(clients).where(eq(clients.id, id));
       });
@@ -1026,13 +1028,17 @@ export class DatabaseStorage implements IStorage {
 
   async deleteQuotation(id: number): Promise<boolean> {
     try {
-      // Primero eliminar las variantes de cotización
-      await db.delete(quotationVariants).where(eq(quotationVariants.quotationId, id));
-      
-      // Luego eliminar los miembros del equipo
+      // Delete in correct order to respect foreign keys
+      // 1. Delete negotiation history
+      await db.delete(negotiationHistory).where(eq(negotiationHistory.quotationId, id));
+
+      // 2. Delete all team members (both quotation-level and variant-level)
       await db.delete(quotationTeamMembers).where(eq(quotationTeamMembers.quotationId, id));
-      
-      // Finalmente eliminar la cotización
+
+      // 3. Delete variants
+      await db.delete(quotationVariants).where(eq(quotationVariants.quotationId, id));
+
+      // 4. Delete the quotation itself
       const result = await db.delete(quotations).where(eq(quotations.id, id)).returning();
       return result.length > 0;
     } catch (error) {

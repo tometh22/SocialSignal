@@ -433,7 +433,8 @@ export async function getUnifiedDashboard(periodKey: string): Promise<UnifiedDas
       costosIndirectos: ci,
       ebitOperativo: ebit,
       beneficioNeto: bn,
-      markup: cd > 0 ? Math.round((rv / cd) * 100) / 100 : 0,
+      markup: cd > 0 ? Math.round((rv / cd) * 100) / 100 : 0, // ratio
+      markupRatio: cd > 0 ? Math.round((rv / cd) * 100) / 100 : 0,
       margenOperativoPct: num(row.margen_operativo) !== 0 ? num(row.margen_operativo) : pct(ebit, rv),
       margenNetoPct: num(row.margen_neto) !== 0 ? num(row.margen_neto) : pct(bn, rv),
       cashflowNeto: num(row.cashflow_neto),
@@ -463,7 +464,8 @@ export async function getUnifiedDashboard(periodKey: string): Promise<UnifiedDas
     impuestos,
     beneficioNeto,
     margenNetoPct: sheetMargenNeto !== 0 ? sheetMargenNeto : pct(beneficioNeto, ventasMes),
-    markup: Math.round(markup * 100) / 100,
+    markup: Math.round(markup * 100) / 100, // ratio: revenue/cost (e.g. 2.5 = 250%)
+    markupRatio: Math.round(markup * 100) / 100, // alias for clarity (same value as markup)
 
     // Balance
     totalActivo,

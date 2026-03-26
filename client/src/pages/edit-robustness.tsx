@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRoute, Link } from 'wouter';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { getAuthHeader } from '@/lib/queryClient';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -134,8 +135,10 @@ const EditRobustnessPage = () => {
       // Usar la nueva ruta especializada para indicadores
       return fetch(`/api/deliverables/${id}/indicators`, {
         method: "POST",
+        credentials: "include",
         headers: {
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
+          ...getAuthHeader()
         },
         body: JSON.stringify(serverData)
       }).then(response => {
