@@ -90,12 +90,19 @@ export default function Clients() {
 
   // Mutación para crear cliente
   const createMutation = useMutation({
-    mutationFn: (client: InsertClient) => 
-      fetch('/api/clients', {
+    mutationFn: async (client: InsertClient) => {
+      const res = await fetch('/api/clients', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
         body: JSON.stringify(client),
-      }).then(res => res.json()),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ message: 'Error al crear cliente' }));
+        throw new Error(err.message || `Error ${res.status}`);
+      }
+      return res.json();
+    },
     onSuccess: (newClient: Client) => {
       // Agregar inmediatamente a la lista local
       setNewClients(prev => [...prev, newClient]);
@@ -123,12 +130,19 @@ export default function Clients() {
 
   // Mutación para actualizar cliente
   const updateMutation = useMutation({
-    mutationFn: ({ id, client }: { id: number; client: Partial<InsertClient> }) =>
-      fetch(`/api/clients/${id}`, {
+    mutationFn: async ({ id, client }: { id: number; client: Partial<InsertClient> }) => {
+      const res = await fetch(`/api/clients/${id}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
         body: JSON.stringify(client),
-      }).then(res => res.json()),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ message: 'Error al actualizar' }));
+        throw new Error(err.message || `Error ${res.status}`);
+      }
+      return res.json();
+    },
     onSuccess: () => {
       // Invalidar múltiples queries para actualización inmediata
       queryClient.invalidateQueries({ queryKey: ['/api/clients'] });

@@ -5646,7 +5646,7 @@ const ProjectDetailsPage = () => {
                 <h3 className="text-base font-semibold text-foreground">Gestión de Tareas</h3>
                 <p className="text-sm text-muted-foreground mt-0.5">Tareas organizadas por sección para este proyecto</p>
               </div>
-              <ProjectTaskList projectId={parseInt(params.id)} />
+              <ProjectTaskList projectId={parseInt(projectId || '0')} />
             </div>
           </TabsContent>
 

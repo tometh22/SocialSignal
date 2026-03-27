@@ -115,7 +115,7 @@ const formSchema = z.object({
   isPeriod: z.boolean().default(false), // Indica si es registro de período
   hours: z.number({
     required_error: "Ingresa las horas",
-  }).min(0.1, "Mínimo 0.1 horas").max(500, "Máximo 500 horas (para registros de período)"),
+  }).min(0.25, "Mínimo 0.25 horas (15 minutos)").max(500, "Máximo 500 horas (para registros de período)"),
   description: z.string().optional(),
   billable: z.boolean().default(true),
   componentId: z.number().nullable().optional(),

@@ -84,7 +84,7 @@ export default function HolidaysManagement() {
             className="flex-1"
             onKeyDown={(e) => e.key === "Enter" && handleAdd()}
           />
-          <Button onClick={handleAdd} disabled={addMutation.isPending}>
+          <Button onClick={handleAdd} disabled={addMutation.isPending || !newDate || !newName.trim()}>
             {addMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4 mr-1" />}
             Agregar
           </Button>

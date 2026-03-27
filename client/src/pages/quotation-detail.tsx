@@ -696,19 +696,23 @@ const QuotationDetail: React.FC = () => {
                     <span className="text-slate-700 truncate">{client.contactName}</span>
                   </div>
                   
+                  {client.contactEmail && (
                   <div className="flex items-center gap-2 p-1.5">
                     <Mail className="h-3.5 w-3.5 text-slate-500 shrink-0" />
                     <a href={`mailto:${client.contactEmail}`} className="text-blue-600 truncate hover:underline text-xs">
                       {client.contactEmail}
                     </a>
                   </div>
-                  
+                  )}
+
+                  {client.contactPhone && (
                   <div className="flex items-center gap-2 p-1.5">
                     <Phone className="h-3.5 w-3.5 text-slate-500 shrink-0" />
                     <a href={`tel:${client.contactPhone}`} className="text-slate-700 truncate hover:underline text-xs">
                       {client.contactPhone}
                     </a>
                   </div>
+                  )}
                 </div>
               </div>
             </div>
