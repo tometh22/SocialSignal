@@ -83,7 +83,7 @@ export function BudgetAllocationTool({ project, subprojects = [] }: BudgetAlloca
   // Mutación para guardar asignaciones de presupuesto
   const saveBudgetAllocationMutation = useMutation({
     mutationFn: async (data: any) => {
-      const response = await fetch(`/api/projects/budget-allocations`, {
+      const response = await fetch(`/api/projects/budget-allocations`, { credentials: 'include',
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

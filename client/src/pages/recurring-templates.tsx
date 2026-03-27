@@ -140,7 +140,7 @@ export default function RecurringTemplatesPage() {
   // Mutations
   const createTemplateMutation = useMutation({
     mutationFn: async (data: any) => {
-      const response = await fetch('/api/recurring-templates', {
+      const response = await fetch('/api/recurring-templates', { credentials: 'include',
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
@@ -160,7 +160,7 @@ export default function RecurringTemplatesPage() {
 
   const deleteTemplateMutation = useMutation({
     mutationFn: async (id: number) => {
-      const response = await fetch(`/api/recurring-templates/${id}`, {
+      const response = await fetch(`/api/recurring-templates/${id}`, { credentials: 'include',
         method: 'DELETE'
       });
       if (!response.ok) throw new Error('Failed to delete template');

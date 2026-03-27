@@ -1363,8 +1363,11 @@ class GoogleSheetsWorkingService {
         if (parsedUSD > 0) {
           amountUSD = parsedUSD;
         } else if (parsedARS > 0) {
-          // TODO: Obtener FX del período - por ahora usar 1350 como default
-          const fxRate = 1350; // Esto debería venir de resolveFX(period)
+          // Use fxForMonth from fx.ts for period-specific rate
+          const { fxForMonth } = await import('./fx');
+          const parsedMonth = this.parseMonthLabel(mes, parseInt(año) || undefined);
+          const fxMonthKey = parsedMonth ? `${parsedMonth.year}-${String(parsedMonth.month).padStart(2, '0')}` : `${año}-01`;
+          const fxRate = fxForMonth(fxMonthKey);
           amountUSD = parsedARS / fxRate;
           console.log(`💱 Conversión ARS→USD: ${parsedARS} / ${fxRate} = ${amountUSD}`);
         }
@@ -2244,7 +2247,7 @@ class GoogleSheetsWorkingService {
       const yearValue = parseInt((row[yearColIdx] || '').toString()) || new Date().getFullYear();
       
       // Parsear el mes desde "01 ene", "02 feb", etc.
-      const monthMatch = this.parseMonthLabel(mesLabel);
+      const monthMatch = this.parseMonthLabel(mesLabel, yearValue);
       if (!monthMatch) {
         console.log(`  ⚠️ No se pudo parsear mes: "${mesLabel}"`);
         continue;
@@ -2290,10 +2293,10 @@ class GoogleSheetsWorkingService {
    * Parsear etiqueta de mes del Excel - múltiples formatos soportados
    * Formatos: "10 oct", "Oct 2024", "Octubre 2024", "oct-24", "10/2024", etc.
    */
-  private parseMonthLabel(label: string): { label: string; year: number; month: number } | null {
+  private parseMonthLabel(label: string, explicitYear?: number): { label: string; year: number; month: number } | null {
     const currentYear = new Date().getFullYear();
     const currentMonth = new Date().getMonth() + 1;
-    
+
     const monthNames: Record<string, number> = {
       'ene': 1, 'enero': 1, 'jan': 1, 'january': 1,
       'feb': 2, 'febrero': 2, 'february': 2,
@@ -2308,14 +2311,15 @@ class GoogleSheetsWorkingService {
       'nov': 11, 'noviembre': 11, 'november': 11,
       'dic': 12, 'diciembre': 12, 'dec': 12, 'december': 12,
     };
-    
+
     // Formato 1: "DD mmm" como "10 oct", "09 sep"
     let match = label.match(/^(\d{1,2})\s*([a-záéíóú]+)$/i);
     if (match) {
       const monthStr = match[2].toLowerCase();
       const month = monthNames[monthStr];
       if (month) {
-        const year = month > currentMonth ? currentYear - 1 : currentYear;
+        // Use explicit year from spreadsheet column if available, otherwise infer
+        const year = explicitYear || (month > currentMonth ? currentYear - 1 : currentYear);
         return { label, year, month };
       }
     }
@@ -2364,13 +2368,13 @@ class GoogleSheetsWorkingService {
       }
     }
     
-    // Formato 6: Solo nombre de mes "Octubre", "Oct" - asumir año actual
+    // Formato 6: Solo nombre de mes "Octubre", "Oct" - use explicit year or infer
     match = label.match(/^([a-záéíóú]+)$/i);
     if (match) {
       const monthStr = match[1].toLowerCase();
       const month = monthNames[monthStr];
       if (month) {
-        const year = month > currentMonth ? currentYear - 1 : currentYear;
+        const year = explicitYear || (month > currentMonth ? currentYear - 1 : currentYear);
         return { label, year, month };
       }
     }
@@ -3955,9 +3959,9 @@ class GoogleSheetsWorkingService {
         if (isNaN(year)) continue;
         
         // Parse month from "01 ene", "02 feb", etc.
-        const monthParsed = this.parseMonthLabel(mesLabel);
+        const monthParsed = this.parseMonthLabel(mesLabel, year);
         if (!monthParsed) continue;
-        
+
         const periodKey = `${year}-${String(monthParsed.month).padStart(2, '0')}`;
         
         // Parse amount (European format: $52.228,91 → 52228.91)

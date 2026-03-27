@@ -37,7 +37,7 @@ export default function TimeEntryForm({ projectId, open, onOpenChange }: TimeEnt
 
   const createTimeEntry = useMutation({
     mutationFn: async (data: any) => {
-      const response = await fetch("/api/time-entries", {
+      const response = await fetch("/api/time-entries", { credentials: 'include',
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),

@@ -133,7 +133,7 @@ const ModoTab = ({ clientId }: ModoTabProps) => {
     }
 
     try {
-      const response = await fetch(`/api/clients/${clientId}/modo-comments`, {
+      const response = await fetch(`/api/clients/${clientId}/modo-comments`, { credentials: 'include',
         method: "POST",
         headers: {
           "Content-Type": "application/json",
