@@ -133,7 +133,7 @@ const EditRobustnessPage = () => {
       
       
       // Usar la nueva ruta especializada para indicadores
-      return fetch(`/api/deliverables/${id}/indicators`, { credentials: 'include',
+      return fetch(`/api/deliverables/${id}/indicators`, {
         method: "POST",
         credentials: "include",
         headers: {
