@@ -173,7 +173,7 @@ export default function SidebarFixed() {
     {
       title: "Proyectos",
       items: [
-        { href: "/active-projects", title: "Rentabilidad", icon: Briefcase, badge: projectCount.toString(), description: "Análisis financiero de proyectos", permission: 'projects' as AppSection },
+        { href: "/active-projects", title: "Vista de Proyectos", icon: Briefcase, badge: projectCount > 0 ? projectCount.toString() : undefined, description: "Proyectos activos y rentabilidad", permission: 'projects' as AppSection },
         { href: "/status-semanal", title: "Status Semanal", icon: ClipboardList, description: "Visión ejecutiva de proyectos", permission: 'status' as AppSection },
         { href: "/tasks", title: "Tareas", icon: CheckSquare, description: "Gestión de tareas", permission: 'projects' as AppSection },
         { href: "/tasks/hours-dashboard", title: "Panel de Horas", icon: BarChart2, description: "Horas por persona y proyecto", permission: 'projects' as AppSection },
