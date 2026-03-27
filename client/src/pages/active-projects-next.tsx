@@ -987,11 +987,13 @@ export default function ActiveProjectsNext(){
     
     let result = allProjects
       .filter(p => {
+        // Filter out ghost projects with no real data
+        const hasAnyData = (p.metrics?.revenueDisplay || 0) > 0
+          || (p.metrics?.costDisplay || 0) > 0
+          || (p.metrics?.totalHours || 0) > 0;
+        if (!hasAnyData && activeOnly) return false;
+
         const shouldShow = !activeOnly || isActiveForPeriod(p, period);
-        const hasActivity = hasActivityThisPeriod(p);
-        if (!shouldShow) {
-          console.log(`❌ FILTERED OUT: ${p.clientName} - ${p.projectName}, hasActivity=${hasActivity}, revenue=${p.metrics?.revenueDisplay}, cost=${p.metrics?.costDisplay}`);
-        }
         return shouldShow;
       })
       .filter(p => !q || `${p.clientName} ${p.projectName}`.toLowerCase().includes(q));
