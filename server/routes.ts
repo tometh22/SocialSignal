@@ -5157,6 +5157,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // 📊 DIRECT SHEETS DASHBOARD - reads from Google Sheets in real-time (like Looker Studio)
+  app.get("/api/v2/executive/dashboard", requireAuth, async (req, res) => {
+    try {
+      const year = req.query.year ? parseInt(req.query.year as string) : undefined;
+      const month = req.query.month ? parseInt(req.query.month as string) : undefined;
+      const { fetchResumenEjecutivoDirectly } = await import('./services/direct-sheets-dashboard');
+      const result = await fetchResumenEjecutivoDirectly(year, month);
+      res.json(result);
+    } catch (error: any) {
+      console.error('❌ Direct sheets dashboard error:', error?.message || error);
+      res.status(500).json({ message: 'Error fetching dashboard data from Google Sheets', error: error?.message });
+    }
+  });
+
   // 📊 MANUAL TRIGGER: ETL Resumen Ejecutivo → monthly_financial_summary
   let resumenSyncInProgress = false;
   app.post("/api/trigger-resumen-ejecutivo-sync", requireAuth, async (req, res) => {

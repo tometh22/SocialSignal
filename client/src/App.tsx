@@ -6,6 +6,7 @@ import NotFound from "@/pages/not-found";
 // Core Pages
 import ExecutiveDashboardLegacy from "@/pages/executive-dashboard-new";
 import ExecutiveDashboard from "@/pages/executive-dashboard-unified";
+import ExecutiveDashboardV2 from "@/pages/executive-dashboard-v2";
 import OptimizedQuote from "@/pages/optimized-quote";
 import { OptimizedQuoteProvider } from "@/context/optimized-quote-context";
 import ManageQuotes from "@/pages/manage-quotes";
@@ -148,7 +149,8 @@ function AppRoutes() {
 
                   {/* Core Application Routes */}
                   <ProtectedRoute path="/" component={HomeDashboard} requiredPermission="dashboard" />
-                  <ProtectedRoute path="/dashboard" component={ExecutiveDashboard} requiredPermission="dashboard" />
+                  <ProtectedRoute path="/dashboard" component={ExecutiveDashboardV2} requiredPermission="dashboard" />
+                  <ProtectedRoute path="/dashboard-legacy" component={ExecutiveDashboard} requiredPermission="dashboard" />
                   <ProtectedRoute path="/executive-dashboard-new" component={ExecutiveDashboardLegacy} requiredPermission="dashboard" />
                   <ProtectedRoute path="/executive/operativo" component={ExecutiveOperativo} requiredPermission="dashboard" />
                   <ProtectedRoute path="/executive/economico" component={ExecutiveDashboard} requiredPermission="dashboard" />
