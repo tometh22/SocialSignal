@@ -43,15 +43,16 @@ export default function HomeDashboard() {
   });
 
   // Fetch projects for smart alerts
-  const { data: projectsRaw } = useQuery<any[]>({
-    queryKey: ["/api/projects"],
-    queryFn: () => fetch("/api/projects?period=current_month", { credentials: "include" })
+  const { data: projectsRaw } = useQuery<any>({
+    queryKey: ["/api/projects/alerts-data"],
+    queryFn: () => fetch("/api/active-projects", { credentials: "include" })
       .then(r => r.ok ? r.json() : []).catch(() => []),
     enabled: hasPermission('projects'),
   });
 
-  // Compute alerts from project data
-  const projectsForAlerts = (projectsRaw || []).map((p: any) => ({
+  // Compute alerts from project data - ensure we have an array
+  const projectsList = Array.isArray(projectsRaw) ? projectsRaw : (projectsRaw?.projects || []);
+  const projectsForAlerts = projectsList.map((p: any) => ({
     projectId: p.projectId || p.id,
     projectName: p.projectName || p.name || 'Sin nombre',
     clientName: p.clientName || '',
