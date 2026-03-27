@@ -78,7 +78,7 @@ const EditIndicatorsForm: React.FC<EditIndicatorsFormProps> = ({
 
 
       // Hacer la solicitud al servidor usando Fetch API
-      const response = await fetch(`/api/deliverables/${deliverableId}/indicators`, {
+      const response = await fetch(`/api/deliverables/${deliverableId}/indicators`, { credentials: 'include',
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

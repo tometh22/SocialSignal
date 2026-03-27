@@ -136,7 +136,7 @@ export function ProjectModoMetrics({ deliverable, projectId }: ProjectModoMetric
       
       
       // Usar la nueva ruta especializada para indicadores
-      const response = await fetch(`/api/deliverables/${deliverable.id}/indicators`, {
+      const response = await fetch(`/api/deliverables/${deliverable.id}/indicators`, { credentials: 'include',
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(serverData)
@@ -191,7 +191,7 @@ export function ProjectModoMetrics({ deliverable, projectId }: ProjectModoMetric
       
       
       // Usar la nueva ruta especializada para indicadores con POST
-      const response = await fetch(`/api/deliverables/${deliverable.id}/indicators`, {
+      const response = await fetch(`/api/deliverables/${deliverable.id}/indicators`, { credentials: 'include',
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(serverData)

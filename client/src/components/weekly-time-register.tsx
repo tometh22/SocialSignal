@@ -273,7 +273,7 @@ export default function WeeklyTimeRegister({ projectId, onSuccess, onCancel }: W
 
   const createTimeEntry = useMutation({
     mutationFn: async (data: any) => {
-      const response = await fetch('/api/time-entries', {
+      const response = await fetch('/api/time-entries', { credentials: 'include',
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),

@@ -133,7 +133,7 @@ const EditRobustnessPage = () => {
       
       
       // Usar la nueva ruta especializada para indicadores
-      return fetch(`/api/deliverables/${id}/indicators`, {
+      return fetch(`/api/deliverables/${id}/indicators`, { credentials: 'include',
         method: "POST",
         credentials: "include",
         headers: {
@@ -198,7 +198,7 @@ const EditRobustnessPage = () => {
     
     // Después de enviar el formulario, vamos a forzar la recarga del entregable
     setTimeout(() => {
-      fetch(`/api/deliverables/${id}`)
+      fetch(`/api/deliverables/${id}`, { credentials: 'include' })
         .then(response => response.json())
         .then(data => {
           setFormData({
