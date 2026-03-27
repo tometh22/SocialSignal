@@ -29,13 +29,13 @@ import ProjectTaskList from "@/components/tasks/ProjectTaskList";
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 const fmt = (n: number | null | undefined, prefix = "$") =>
-  n == null ? "—" : `${prefix}${Math.round(n).toLocaleString("es-AR")}`;
+  n == null || !Number.isFinite(n) ? "—" : `${prefix}${Math.round(n).toLocaleString("es-AR")}`;
 
 const fmtPct = (n: number | null | undefined) =>
-  n == null ? "—" : `${n.toFixed(1)}%`;
+  n == null || !Number.isFinite(n) ? "—" : `${n.toFixed(1)}%`;
 
 const fmtHours = (n: number | null | undefined) =>
-  n == null ? "—" : `${n.toFixed(1)}h`;
+  n == null || !Number.isFinite(n) ? "—" : `${n.toFixed(1)}h`;
 
 const healthColor = (margin: number | null | undefined) => {
   if (margin == null) return "bg-slate-100 text-slate-600";
