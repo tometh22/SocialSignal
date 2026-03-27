@@ -16438,7 +16438,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // GET /api/tasks/hours-cost — costo de horas internas por proyecto
+  // GET /api/tasks/hours-cost — costo de horas internas por proyecto (ops/admin only para totalCostUSD)
   app.get("/api/tasks/hours-cost", requireAuth, async (req: Request, res: Response) => {
     try {
       const { getTaskHoursCost } = await import("./domain/taskHoursCost");
@@ -16455,6 +16455,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const pid = projectId ? parseInt(projectId as string) : undefined;
       const result = await getTaskHoursCost({ projectId: pid, dateFrom, dateTo });
+
+      // Only expose cost data to operations/admin users
+      const reqUser = (req as any).user;
+      const isOps = reqUser?.isAdmin || (reqUser?.permissions || []).includes("operations");
+      if (!isOps && result.projects) {
+        result.projects = result.projects.map(({ totalCostUSD: _cost, ...rest }: any) => rest);
+      }
+
       res.json({ period: period || null, ...result });
     } catch (error) {
       console.error("Error en GET /api/tasks/hours-cost:", error);
