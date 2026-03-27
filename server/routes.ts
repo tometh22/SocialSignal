@@ -4646,7 +4646,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Quotation team members routes
-  app.get("/api/quotation-team/:quotationId", async (req, res) => {
+  app.get("/api/quotation-team/:quotationId", requireAuth, async (req, res) => {
     const quotationId = parseInt(req.params.quotationId);
     if (isNaN(quotationId)) return res.status(400).json({ message: "Invalid quotation ID" });
 
@@ -6834,7 +6834,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Obtener resumen de costos por cliente
-  app.get("/api/clients/:clientId/cost-summary", async (req, res) => {
+  app.get("/api/clients/:clientId/cost-summary", requireAuth, async (req, res) => {
     const clientId = parseInt(req.params.clientId);
     if (isNaN(clientId)) return res.status(400).json({ message: "Invalid client ID" });
 
@@ -7673,7 +7673,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      if (typeof processedData.hours !== 'number' || isNaN(processedData.hours) || processedData.hours <= 0) {
+      if (typeof processedData.hours !== 'number' || isNaN(processedData.hours) || processedData.hours < 0.25) {
         console.error('❌ Validación hours fallida:', {
           hours: processedData.hours,
           type: typeof processedData.hours,
@@ -8413,7 +8413,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // =========== RUTAS PARA INFLACIÓN Y CONFIGURACIÓN ===========
 
   // Obtener historial de inflación mensual
-  app.get("/api/admin/monthly-inflation", async (req, res) => {
+  app.get("/api/admin/monthly-inflation", requireAuth, async (req, res) => {
     try {
       const inflation = await db.select().from(monthlyInflation).orderBy(desc(monthlyInflation.year), desc(monthlyInflation.month));
       res.json(inflation);
@@ -8435,7 +8435,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Ruta para obtener tipo de cambio
-  app.get("/api/exchange-rate", async (req, res) => {
+  app.get("/api/exchange-rate", requireAuth, async (req, res) => {
     try {
       const exchangeRateConfig = await db.select()
         .from(systemConfig)
@@ -8540,7 +8540,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Obtener configuración del sistema
-  app.get("/api/admin/system-config", async (req, res) => {
+  app.get("/api/admin/system-config", requireAuth, async (req, res) => {
     try {
       const config = await db.select().from(systemConfig);
       res.json(config);
@@ -9357,7 +9357,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/deliverables/:id", async (req, res) => {
+  app.put("/api/deliverables/:id", requireAuth, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
@@ -15001,7 +15001,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ==================== INTERNAL BACKFILL ENDPOINT ====================
   // Temporary endpoint to backfill SoT tables from aggregator data
-  app.get('/internal/rebuild-sot', async (_req: Request, _res: Response) => {
+  app.get('/internal/rebuild-sot', requireAuth, async (_req: Request, _res: Response) => {
     try {
       const period = String(_req.query.period || '');
       
@@ -15120,7 +15120,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ==================== INTERNAL IMPORT INCOMES ENDPOINT ====================
   // Endpoint para importar ingresos desde "Proyectos confirmados y estimados"
-  app.post('/internal/import-incomes', upload.single('file'), async (req: Request, res: Response) => {
+  app.post('/internal/import-incomes', requireAuth, upload.single('file'), async (req: Request, res: Response) => {
     try {
       console.log('📥 IMPORT INCOMES: Starting import from CSV/JSON');
       
@@ -15167,7 +15167,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ==================== SYNC INCOMES FROM GOOGLE SHEETS ====================
   // Sincronizar ingresos automáticamente desde "Proyectos confirmados y estimados"
-  app.get('/internal/sync/income', async (req: Request, res: Response) => {
+  app.get('/internal/sync/income', requireAuth, async (req: Request, res: Response) => {
     try {
       console.log('🔄 SYNC INCOME: Starting automatic sync from Google Sheets');
       
@@ -15215,7 +15215,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ==================== SYNC FINANCIAL SOT FROM RENDIMIENTO CLIENTE ====================
   // Sincronizar financial_sot desde "Rendimiento Cliente"
-  app.get('/internal/sync/financial', async (req: Request, res: Response) => {
+  app.get('/internal/sync/financial', requireAuth, async (req: Request, res: Response) => {
     try {
       console.log('🔄 SYNC FINANCIAL: Starting sync from "Rendimiento Cliente"');
       
@@ -15242,7 +15242,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ==================== SYNC MONTHLY AGGREGATES (ETL 3 VISTAS) ====================
   // Sincroniza un período específico y genera las 3 vistas (Original, Operativa, USD)
-  app.post('/internal/sync/monthly-aggregates', async (req: Request, res: Response) => {
+  app.post('/internal/sync/monthly-aggregates', requireAuth, async (req: Request, res: Response) => {
     try {
       const { periodKey } = req.body; // YYYY-MM format
       
@@ -16259,7 +16259,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /api/crm/attachments — subir archivo adjunto para propuesta
-  app.post("/api/crm/attachments", (req: Request, res: Response) => {
+  app.post("/api/crm/attachments", requireAuth, (req: Request, res: Response) => {
     uploadDocument.single('file')(req, res, (err: any) => {
       if (err) {
         return res.status(400).json({ error: err.message || 'Error al procesar el archivo.' });
