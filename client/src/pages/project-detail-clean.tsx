@@ -9,6 +9,7 @@ import { authFetch, apiRequest } from "@/lib/queryClient";
 import { useLocation } from "wouter";
 import { useCompleteProjectData } from "@/hooks/useCompleteProjectData";
 import { toProjectVM, useWhichCost } from "@/selectors/projectVM";
+import { ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RTooltip } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -366,6 +367,31 @@ export default function ProjectDetailClean() {
               </CardContent>
             </Card>
           </div>
+
+          {/* Project AI Insights */}
+          {cost > 0 && (
+            <Card className="border-indigo-100 bg-gradient-to-r from-indigo-50/20 to-purple-50/20">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Zap className="h-4 w-4 text-indigo-500" /> Análisis del Proyecto
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {[
+                  markup >= 3.0 && { text: `Markup de ${markup.toFixed(1)}x está excelente. Proyecto altamente rentable.`, color: "text-emerald-700" },
+                  markup >= 2.5 && markup < 3.0 && { text: `Markup de ${markup.toFixed(1)}x dentro del estándar Epical. Monitorear costos.`, color: "text-emerald-600" },
+                  markup > 0 && markup < 2.5 && { text: `Markup de ${markup.toFixed(1)}x debajo del mínimo (2.5x). Revisar asignación de equipo.`, color: "text-amber-600" },
+                  margin < 0 && { text: `Margen negativo (${margin.toFixed(1)}%). Este proyecto genera pérdida.`, color: "text-red-600" },
+                  budgetUsed > 80 && budget > 0 && { text: `${budgetUsed.toFixed(0)}% del presupuesto consumido. Planificar cierre o extensión.`, color: "text-amber-600" },
+                  totalHours > 0 && cost > 0 && { text: `Burn rate: ${fmt(cost / totalHours)}/hora. ${teamCount} personas activas.`, color: "text-slate-600" },
+                ].filter(Boolean).map((ins: any, i) => (
+                  <p key={i} className={`text-sm flex items-start gap-2 ${ins.color}`}>
+                    <span className="text-indigo-400 mt-0.5">·</span> {ins.text}
+                  </p>
+                ))}
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         {/* ─── Tab: Equipo ───────────────────────────────────────── */}
@@ -418,6 +444,36 @@ export default function ProjectDetailClean() {
               )}
             </CardContent>
           </Card>
+
+          {/* Team Cost Distribution Chart */}
+          {a?.teamBreakdown && a.teamBreakdown.length > 1 && (() => {
+            const CHART_COLORS = ["#6366f1", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4", "#ec4899", "#84cc16"];
+            const pieData = a.teamBreakdown
+              .filter((m: any) => (m.costUSD || 0) > 0)
+              .map((m: any, i: number) => ({
+                name: (m.name || "").split(" ")[0],
+                value: Math.round(m.costUSD || 0),
+                color: CHART_COLORS[i % CHART_COLORS.length],
+              }));
+            if (pieData.length === 0) return null;
+            return (
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">Distribución de Costos por Persona</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={180}>
+                    <PieChart>
+                      <Pie data={pieData} cx="50%" cy="50%" outerRadius={70} dataKey="value" label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`} labelLine={false}>
+                        {pieData.map((entry: any, i: number) => <Cell key={i} fill={entry.color} />)}
+                      </Pie>
+                      <RTooltip formatter={(v: number) => [`$${v.toLocaleString("es-AR")}`, ""]} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+            );
+          })()}
         </TabsContent>
 
         {/* ─── Tab: Finanzas ─────────────────────────────────────── */}

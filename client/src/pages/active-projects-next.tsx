@@ -3,6 +3,7 @@
 import React, {useMemo, useState, useEffect} from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { authFetch } from "@/lib/queryClient";
+import PortfolioAnalytics from "@/components/portfolio-analytics";
 import { RefreshCcw, Search, BriefcaseBusiness, DollarSign, TrendingUp, Clock, AlertTriangle, Filter, ArrowUpDown, Maximize2, Minimize2, Eye, CheckSquare } from "lucide-react";
 import { motion } from "framer-motion";
 import { Link } from "wouter";
@@ -1067,6 +1068,13 @@ export default function ActiveProjectsNext(){
           <SummaryBar data={data} />
         )}
       </div>
+
+      {/* Portfolio Analytics - Charts, Health & AI Insights */}
+      {data?.projects && data.projects.length > 0 && (
+        <div className="mt-6">
+          <PortfolioAnalytics projects={data.projects} />
+        </div>
+      )}
 
       <div className="mt-6">
         {isLoading ? (
