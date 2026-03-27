@@ -52,12 +52,13 @@ const CurrencySelection: React.FC = () => {
       let finalMarkupAmount = markupAmount;
 
       if (quotationData.quotationCurrency === 'ARS') {
-        // Convertir a ARS si está seleccionada esa moneda
+        // Internal values are in USD, convert to ARS for storage
         finalTotalAmount = totalAmount * exchangeRate;
         finalBaseCost = baseCost * exchangeRate;
         finalComplexityAdjustment = complexityAdjustment * exchangeRate;
         finalMarkupAmount = markupAmount * exchangeRate;
       }
+      // If USD, values are already in USD - no conversion needed
 
       // Crear cotización con el formato correcto que espera el API
       const finalQuotationData = {
