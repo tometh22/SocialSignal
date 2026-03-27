@@ -1,111 +1,55 @@
 "use client";
 
-import React, {useMemo, useState, useEffect} from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import React, { useMemo, useState, useEffect, useCallback } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { authFetch } from "@/lib/queryClient";
 import PortfolioAnalytics from "@/components/portfolio-analytics";
 import { usePermissions } from "@/hooks/use-permissions";
-import { RefreshCcw, Search, BriefcaseBusiness, DollarSign, TrendingUp, Clock, AlertTriangle, Filter, ArrowUpDown, Maximize2, Minimize2, Eye, CheckSquare } from "lucide-react";
-import { motion } from "framer-motion";
+import {
+  RefreshCcw, Search, ChevronDown, ChevronRight,
+  Filter, DollarSign, TrendingUp, Clock, BriefcaseBusiness, ExternalLink,
+} from "lucide-react";
 import { Link } from "wouter";
 
-// ---------- Translations ----------
-const i18n = {
-  es: {
-    title: "Proyectos",
-    subtitle: "Vista unificada de proyectos activos",
-    refresh: "Actualizar",
-    searchPlaceholder: "Buscar proyectos o clientes…",
-    activeOnly: "Solo activos",
-    all: "Todos",
-    thisMonth: "Este mes",
-    lastMonth: "Mes anterior",
-    custom: "Personalizado…",
-    kpiRevenue: "Facturación del período (USD)",
-    kpiProfit: "Ganancia del período (USD)",
-    kpiHours: "Horas del período",
-    kpiActive: "Proyectos activos",
-    kpiFx: "Tipo de cambio (ref.)",
-    labelRevenue: "Facturación",
-    labelCost: "Costo",
-    labelProfit: "Ganancia",
-    labelMarkup: "Markup",
-    labelMargin: "Margen",
-    anomaly: "Anomalía",
-    flags: "Señales:",
-    noProjects: "No hay proyectos para este período.",
-    errorLoading: "Error al cargar datos:",
-    errorLoadingProjects: "Error al cargar proyectos",
-    period: "Período:",
-    updated: "Actualizado:",
-    statusActive: "Activo",
-    statusInactive: "Inactivo",
-    tagOneShot: "Puntual",
-    tagFee: "Fee",
-    // New translations
-    sortBy: "Ordenar por:",
-    sortRevenue: "Facturación",
-    sortProfit: "Ganancia",
-    sortMargin: "Margen",
-    sortMarkup: "Markup",
-    density: "Densidad:",
-    comfortable: "Confort",
-    compact: "Compacto",
-    normalizedUSD: "Normalizado USD:",
-    viewMonth: "Mes",
-    viewAccumulated: "Acumulado",
-    viewTotal: "Total",
-    markAsFinished: "Marcar como terminado",
-    monthData: "Datos del mes",
-    viewProject: "Ver proyecto",
-    accumulatedToDate: "Acumulado a la fecha",
-    projectTotal: "Total del proyecto",
-  }
-} as const;
-
-const t = (k: keyof typeof i18n["es"]) => i18n.es[k];
-
-// ---------- Types (tolerant to unknown backend fields) ----------
-const API_BASE = ""; // same origin
+// ─── Types ───────────────────────────────────────────────────────────────────
 
 export type Currency = "ARS" | "USD";
 
 export type ProjectItem = {
-  projectId?: number; // Database ID for navigation
+  projectId?: number;
   clientName: string;
   projectName: string;
   projectKey?: string;
   status?: "Active" | "Inactive";
-  tags?: string[]; // e.g., ["Fee"|"One-Shot"]
-  currencyNative?: Currency; // if not present, infer from clientName
-  isOneShot?: boolean; // One-shot project flag from backend
+  tags?: string[];
+  currencyNative?: Currency;
+  isOneShot?: boolean;
   metrics: {
-    revenueDisplay?: number; // native currency number
-    costDisplay?: number;    // native currency number
-    revenueUSDNormalized?: number; // USD number
-    costUSDNormalized?: number;    // USD number
-    markup?: number; // e.g., 2.3 = 2.3x
-    margin?: number; // e.g., 0.34 = 34%
+    revenueDisplay?: number;
+    costDisplay?: number;
+    revenueUSDNormalized?: number;
+    costUSDNormalized?: number;
+    markup?: number;
+    margin?: number;
+    totalHours?: number;
   };
-  anomaly?: string[]; // optional flags from /debug or SoT
-  // Optional metadata for intelligent visibility
+  anomaly?: string[];
   projectType?: "Fee" | "Puntual";
-  // One-shot specific lifetime metrics
-  lifetimeRevenueUSD?: number;  // Total revenue across all periods
-  lifetimeCostUSD?: number;     // Total cost across all periods
-  revenuePeriod?: string;       // Period with revenue (YYYY-MM)
-  startMonthKey?: string; // YYYY-MM
-  endMonthKey?: string;   // YYYY-MM
-  lastActivity?: string;  // YYYY-MM
+  lifetimeRevenueUSD?: number;
+  lifetimeCostUSD?: number;
+  revenuePeriod?: string;
+  startMonthKey?: string;
+  endMonthKey?: string;
+  lastActivity?: string;
   isFinished?: boolean;
   supportsRollup?: boolean;
   allowFinish?: boolean;
 };
 
 export type ProjectsApi = {
-  period: string;                 // YYYY-MM
-  updatedAt?: string;             // ISO
-  fx?: number;                    // monthly FX used by SoT (if relevant)
+  period: string;
+  updatedAt?: string;
+  fx?: number;
   projects: ProjectItem[];
   summary?: {
     periodRevenueUSD?: number;
@@ -113,112 +57,23 @@ export type ProjectsApi = {
     periodHours?: number;
     activeProjects?: number;
     totalProjects?: number;
+    [key: string]: any;
   };
 };
 
-// ---------- Visibility Helpers ----------
+// ─── Utilities ────────────────────────────────────────────────────────────────
 
-function hasActivityThisPeriod(p: ProjectItem) {
-  const m = p.metrics || {};
-  return !!(
-    (m.revenueDisplay || 0) !== 0 || 
-    (m.costDisplay || 0) !== 0 ||
-    (m.revenueUSDNormalized || 0) !== 0 || 
-    (m.costUSDNormalized || 0) !== 0
-  );
-}
-
-function isActiveForPeriod(p: ProjectItem, period: string) {
-  // Respect explicit finished flag
-  if (p.isFinished === true) {
-    return false;
-  }
-
-  // Respect status if it comes from backend
-  if (typeof p.status === 'string') {
-    return p.status !== 'Inactive';
-  }
-
-  // If ranges and type are available (optional), apply rules
-  const tags = (p.tags || []).map(t => t.toLowerCase());
-  const isPuntual = tags.includes('one-shot') || tags.includes('puntual') || p.projectType === 'Puntual';
-  const isFee = tags.includes('fee') || p.projectType === 'Fee';
-  const start = p.startMonthKey;
-  const end = p.endMonthKey;
-
-  // Puntual: only active within range or if there's activity
-  if (isPuntual && (start || end)) {
-    const okStart = !start || period >= start;
-    const okEnd = !end || period <= end;
-    return okStart && okEnd;
-  }
-
-  // Fee: active if there's activity or within grace period (1 month)
-  if (isFee) {
-    // Fee WITH lastActivity metadata: apply grace period logic
-    if (p.lastActivity) {
-      const [pYear, pMonth] = period.split('-').map(Number);
-      const [lYear, lMonth] = p.lastActivity.split('-').map(Number);
-      const periodDate = new Date(pYear, pMonth - 1);
-      const lastActDate = new Date(lYear, lMonth - 1);
-      const monthsDiff = (periodDate.getFullYear() - lastActDate.getFullYear()) * 12 + 
-                        (periodDate.getMonth() - lastActDate.getMonth());
-      
-      // Active if period <= lastActivity + 1 month (grace period)
-      return monthsDiff <= 1;
-    }
-    
-    // Fee WITHOUT lastActivity metadata: assume active (backward compatibility)
-    // Only hide if explicitly marked inactive or finished
-    return true;
-  }
-
-  // Fallback universal: active if there's activity in the month
-  return hasActivityThisPeriod(p);
-}
-
-// ---------- Helpers ----------
-const currencySymbol = (c: Currency | undefined) => (c === "ARS" ? "ARS" : "$");
-
-function formatKM(n?: number, currency?: Currency) {
-  if (n == null || isNaN(n)) return "—";
-  const abs = Math.abs(n);
-  const sign = n < 0 ? "-" : "";
-  let v = abs;
-  let suffix = "";
-  if (abs >= 1_000_000) { v = abs / 1_000_000; suffix = "M"; }
-  else if (abs >= 1_000) { v = abs / 1_000; suffix = "K"; }
-  const num = v.toLocaleString(undefined, { maximumFractionDigits: 2, minimumFractionDigits: 0 });
-  const sym = currencySymbol(currency);
-  return `${sign}${sym} ${num}${suffix}`;
-}
-
-function formatUSD(n?: number) {
-  if (n == null || isNaN(n)) return "—";
-  const abs = Math.abs(n);
-  const sign = n < 0 ? "-" : "";
-  let v = abs;
-  let suffix = "";
-  if (abs >= 1_000_000) { v = abs / 1_000_000; suffix = "M"; }
-  else if (abs >= 1_000) { v = abs / 1_000; suffix = "K"; }
-  const num = v.toLocaleString(undefined, { maximumFractionDigits: 2, minimumFractionDigits: 0 });
-  return `${sign}$ ${num}${suffix}`;
-}
-
-function monthKeyOf(date: Date) {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  return `${y}-${m}`;
+function monthKeyOf(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
 }
 
 function lastMonthKey(): string {
   const d = new Date();
-  d.setDate(1); // go to first day this month
+  d.setDate(1);
   d.setMonth(d.getMonth() - 1);
   return monthKeyOf(d);
 }
 
-// Helpers for navigation and pretty labels
 function addMonths(period: string, delta: number): string {
   const [y, m] = period.split("-").map(Number);
   const d = new Date(y, m - 1, 1);
@@ -229,56 +84,92 @@ function addMonths(period: string, delta: number): string {
 function periodToLabel(period: string): string {
   try {
     const [y, m] = period.split("-").map(Number);
-    const d = new Date(y, m - 1, 1);
-    return d.toLocaleDateString("es", { month: "short", year: "numeric" });
+    return new Date(y, m - 1, 1).toLocaleDateString("es", { month: "long", year: "numeric" });
   } catch {
     return period;
   }
 }
 
-function transformBackendResponse(backendData: any): ProjectsApi {
-  // Extract period string from backend period object or construct it
-  const periodStr = backendData.period?.start 
-    ? backendData.period.start.substring(0, 7) // "2025-07-01" -> "2025-07"
-    : "";
+function formatKM(n?: number, prefix = "$\u00A0"): string {
+  if (n == null || isNaN(n)) return "—";
+  const abs = Math.abs(n);
+  const sign = n < 0 ? "-" : "";
+  let v = abs, suffix = "";
+  if (abs >= 1_000_000) { v = abs / 1_000_000; suffix = "M"; }
+  else if (abs >= 1_000) { v = abs / 1_000; suffix = "K"; }
+  const num = v.toLocaleString(undefined, { maximumFractionDigits: 1, minimumFractionDigits: 0 });
+  return `${sign}${prefix}${num}${suffix}`;
+}
 
-  // Extract FX rate if available
+function formatUSD(n?: number): string { return formatKM(n); }
+
+// ─── Health / Semaphore ──────────────────────────────────────────────────────
+
+type Health = "green" | "yellow" | "red" | "gray";
+
+function getHealth(markup?: number): Health {
+  if (markup == null || !isFinite(markup) || markup <= 0) return "gray";
+  if (markup >= 2.5) return "green";
+  if (markup >= 2.0) return "yellow";
+  return "red";
+}
+
+const HEALTH_ORDER: Record<Health, number> = { red: 0, yellow: 1, green: 2, gray: 3 };
+
+function Semaphore({ markup }: { markup?: number }) {
+  const health = getHealth(markup);
+  const cls: Record<Health, string> = {
+    green: "bg-emerald-500",
+    yellow: "bg-amber-400",
+    red: "bg-red-500",
+    gray: "bg-slate-300",
+  };
+  const label: Record<Health, string> = {
+    green: `Saludable — markup ${markup?.toFixed(1)}x >= 2.5x`,
+    yellow: `Atención — markup ${markup?.toFixed(1)}x (2.0–2.5x)`,
+    red: `CRÍTICO — markup ${markup?.toFixed(1)}x < 2.0x`,
+    gray: "Sin datos de markup",
+  };
+  return (
+    <span
+      className={`inline-block h-3 w-3 rounded-full ${cls[health]} flex-shrink-0`}
+      title={label[health]}
+    />
+  );
+}
+
+// ─── Data Fetching ────────────────────────────────────────────────────────────
+
+function transformBackendResponse(backendData: any): ProjectsApi {
+  const periodStr =
+    typeof backendData.period === "string"
+      ? backendData.period
+      : backendData.period?.start
+      ? backendData.period.start.substring(0, 7)
+      : "";
   const fx = backendData.period?.fxRate || backendData.fx;
 
-  // Transform projects array
   const projects: ProjectItem[] = (backendData.projects || []).map((p: any) => {
-    // Determine native currency based on client
     const clientName = p.client?.name || p.clientName || "";
-    const isUSDClient = clientName.toLowerCase().includes("warner") || 
-                       clientName.toLowerCase().includes("kimberly");
+    const isUSDClient =
+      clientName.toLowerCase().includes("warner") ||
+      clientName.toLowerCase().includes("kimberly");
     const currencyNative: Currency = isUSDClient ? "USD" : "ARS";
-
-    // Determine status
     const status = p.status === "active" || p.status === "Active" ? "Active" : "Inactive";
-
-    // Determine tags
     const tags: string[] = [];
     if (p.type === "fee" || p.type === "Fee") tags.push("Fee");
     if (p.type === "one-shot" || p.type === "One-Shot") tags.push("One-Shot");
 
-    // Get display values (native currency)
     const revenueDisplay = p.metrics?.revenueDisplay?.amount ?? p.metrics?.revenueUSD ?? 0;
     const costDisplay = p.metrics?.costDisplay?.amount ?? p.metrics?.costUSD ?? 0;
-
-    // Get USD normalized values
     const revenueUSDNormalized = p.metrics?.revenueUSDNormalized ?? p.metrics?.revenueUSD ?? 0;
     const costUSDNormalized = p.metrics?.costUSDNormalized ?? p.metrics?.costUSD ?? 0;
-
-    // Get markup and margin
     const markup = p.metrics?.markupRatio ?? p.metrics?.markup;
     const margin = p.metrics?.marginFrac ?? p.metrics?.margin;
 
-    // Collect anomalies
     const anomaly: string[] = [];
     if (p.flags?.hasAnomaly) anomaly.push("ANOMALY");
-    if (p.anomaly && Array.isArray(p.anomaly)) {
-      anomaly.push(...p.anomaly);
-    }
+    if (Array.isArray(p.anomaly)) anomaly.push(...p.anomaly);
 
     return {
       projectId: p.projectId,
@@ -296,9 +187,9 @@ function transformBackendResponse(backendData: any): ProjectsApi {
         costUSDNormalized,
         markup,
         margin,
+        totalHours: p.metrics?.totalHours,
       },
       anomaly: anomaly.length > 0 ? anomaly : undefined,
-      // Include optional metadata from backend
       projectType: p.projectType,
       startMonthKey: p.startMonthKey,
       endMonthKey: p.endMonthKey,
@@ -315,9 +206,11 @@ function transformBackendResponse(backendData: any): ProjectsApi {
     fx,
     projects,
     summary: {
+      ...(backendData.summary ?? {}),
       periodRevenueUSD: backendData.summary?.periodRevenueUSD,
       periodProfitUSD: backendData.summary?.periodProfitUSD,
-      periodHours: backendData.summary?.periodWorkedHours ?? backendData.summary?.periodHours,
+      periodHours:
+        backendData.summary?.periodWorkedHours ?? backendData.summary?.periodHours,
       activeProjects: backendData.summary?.activeProjects,
       totalProjects: backendData.summary?.totalProjects,
     },
@@ -325,18 +218,14 @@ function transformBackendResponse(backendData: any): ProjectsApi {
 }
 
 async function fetchProjects(period: string, fresh: boolean): Promise<ProjectsApi> {
-  const url = new URL(`/api/projects`, window.location.origin + API_BASE);
+  const url = new URL("/api/projects", window.location.origin);
   url.searchParams.set("period", period);
-  if (fresh) url.searchParams.set("source", "fresh"); // backend bypass cache
-
+  if (fresh) url.searchParams.set("source", "fresh");
   const res = await authFetch(url.toString(), { cache: "no-store" });
   if (!res.ok) throw new Error(`API ${res.status}`);
-  const backendData = await res.json();
-  
-  return transformBackendResponse(backendData);
+  return transformBackendResponse(await res.json());
 }
 
-// ---------- React Query Hooks ----------
 function useActiveProjects(period: string, fresh: boolean) {
   return useQuery({
     queryKey: ["projects", period, fresh ? "fresh" : "cached"],
@@ -345,763 +234,641 @@ function useActiveProjects(period: string, fresh: boolean) {
   });
 }
 
-// ---------- UI Components ----------
-function KPICard({ 
-  title, 
-  value, 
-  icon, 
-  tooltip, 
-  subtitle 
-}: { 
-  title: string; 
-  value: string; 
-  icon: React.ReactNode; 
-  tooltip?: string;
-  subtitle?: string;
-}) {
-  return (
-    <div 
-      className="relative rounded-xl bg-white px-4 py-3 shadow-sm border border-slate-200 hover:shadow-md transition-shadow flex items-center gap-3"
-      title={tooltip}
-    >
-      <div className="rounded-lg bg-slate-100 text-slate-700 p-2">
-        {icon}
-      </div>
-      <div className="flex-1">
-        <div className="text-xs text-slate-500">{title}</div>
-        <div className="text-xl font-semibold text-slate-900">{value}</div>
-        {subtitle && (
-          <div className="text-[10px] text-slate-400 mt-0.5">{subtitle}</div>
-        )}
-      </div>
-    </div>
-  );
+// ─── Active filter (activity within last 2 months) ────────────────────────────
+
+function isRecentlyActive(p: ProjectItem, period: string): boolean {
+  if (p.isFinished) return false;
+  if (p.status === "Inactive") return false;
+  if ((p.metrics?.revenueDisplay || 0) > 0 || (p.metrics?.costDisplay || 0) > 0) return true;
+  if (p.lastActivity) {
+    const [pY, pM] = period.split("-").map(Number);
+    const [lY, lM] = p.lastActivity.split("-").map(Number);
+    const diff = (pY - lY) * 12 + (pM - lM);
+    return diff <= 2;
+  }
+  return false;
 }
 
-function Badge({ children, tone = "indigo" }: { children: React.ReactNode; tone?: "indigo"|"green"|"orange"|"slate" }) {
-  const map:any = {
-    indigo: "bg-indigo-50 text-indigo-700 ring-indigo-200",
-    green: "bg-emerald-50 text-emerald-700 ring-emerald-200",
-    orange: "bg-orange-50 text-orange-700 ring-orange-200",
-    slate: "bg-slate-50 text-slate-700 ring-slate-200",
-  };
-  return (
-    <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs ring-1 ${map[tone]}`}>
-      {children}
-    </span>
-  );
-}
+// ─── KPI Summary Bar ──────────────────────────────────────────────────────────
 
-type TaskStats = { taskCount: number; pendingCount: number };
-type HoursCostStats = { totalHours: number; totalCostUSD: number };
+function KPIBar({ data, isOperations }: { data?: ProjectsApi; isOperations: boolean }) {
+  const asanaHours = data?.summary?.periodAsanaHours ?? data?.summary?.periodHours ?? 0;
+  const fxValue = data?.fx
+    ? `ARS ${data.fx.toLocaleString("es-AR", { maximumFractionDigits: 0 })}`
+    : "—";
 
-function ProjectCard({ p, dense, period, taskStats, hoursCost }: { p: ProjectItem; dense?: boolean; period?: string; taskStats?: TaskStats; hoursCost?: HoursCostStats }) {
-  const queryClient = useQueryClient();
-
-  const nativeCurrency: Currency | undefined = p.currencyNative ?? (p.clientName?.toLowerCase().includes("warner") || p.clientName?.toLowerCase().includes("kimberly") ? "USD" : "ARS");
-  
-  // For one-shot projects, show lifetime revenue instead of period revenue
-  const revenueDisplay = p.isOneShot && p.lifetimeRevenueUSD 
-    ? p.lifetimeRevenueUSD 
-    : (p.metrics.revenueDisplay ?? 0);
-  
-  const costDisplay = p.metrics.costDisplay ?? 0;
-  
-  // For one-shot, calculate profit using lifetime revenue
-  const profitDisplay = p.isOneShot && p.lifetimeRevenueUSD && p.lifetimeCostUSD
-    ? p.lifetimeRevenueUSD - p.lifetimeCostUSD
-    : ((p.metrics.revenueDisplay ?? 0) - (p.metrics.costDisplay ?? 0));
-
-  const markup = p.metrics.markup ?? safeRatio(
-    p.isOneShot && p.lifetimeRevenueUSD ? p.lifetimeRevenueUSD : p.metrics.revenueUSDNormalized, 
-    p.isOneShot && p.lifetimeCostUSD ? p.lifetimeCostUSD : p.metrics.costUSDNormalized
-  );
-  const margin = p.metrics.margin ?? safeMargin(
-    p.isOneShot && p.lifetimeRevenueUSD ? p.lifetimeRevenueUSD : p.metrics.revenueUSDNormalized, 
-    p.isOneShot && p.lifetimeCostUSD ? p.lifetimeCostUSD : p.metrics.costUSDNormalized
-  );
-  
-  // Format revenue period for display
-  const formatRevenuePeriod = (periodKey: string | undefined) => {
-    if (!periodKey) return '';
-    const [year, month] = periodKey.split('-');
-    const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-    return `${monthNames[parseInt(month) - 1]} ${year}`;
-  };
-
-  const hasAnomaly = (p.anomaly?.length || 0) > 0;
-  
-  const statusLabel = p.status === "Inactive" ? t("statusInactive") : t("statusActive");
-  const tagLabel = (tag: string) => {
-    if (tag === "One-Shot") return t("tagOneShot");
-    if (tag === "Fee") return t("tagFee");
-    return tag;
-  };
-
-  const marginTone: 'good'|'warn'|'bad'|undefined =
-    Number.isFinite(margin) ? (margin! < 0 ? 'bad' : margin! < 0.5 ? 'warn' : 'good') : undefined;
-
-  const markupTone: 'good'|'warn'|'bad'|undefined =
-    Number.isFinite(markup) ? (markup! < 1 ? 'bad' : markup! < 2 ? 'warn' : 'good') : undefined;
-
-  const padding = dense ? "p-3" : "p-5";
-  
-  return (
-    <motion.div layout initial={{opacity:0, y:8}} animate={{opacity:1, y:0}} className={`relative overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 ${padding} shadow-sm transition-shadow hover:shadow-md hover:border-slate-300 dark:hover:border-slate-600`}>
-      <div className="absolute inset-y-0 left-0 w-1 bg-gradient-to-b from-indigo-500 via-violet-500 to-fuchsia-500" />
-      
-      {/* View project button - top right corner */}
-      {p.projectId && (
-        <Link href={`/active-projects/${p.projectId}${period ? `?period=${period}` : ''}`}>
-          <button 
-            className="absolute top-3 right-3 p-2 rounded-lg bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300 transition-colors"
-            title={t("viewProject")}
-            data-testid={`button-view-project-${p.projectId}`}
-          >
-            <Eye className="h-4 w-4" />
-          </button>
-        </Link>
-      )}
-      
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <div className="text-sm text-slate-500 dark:text-slate-400">{p.clientName}</div>
-          <Link href={`/active-projects/${p.projectId}${period ? `?period=${period}` : ''}`}>
-            <div className="text-lg font-semibold text-slate-900 dark:text-slate-100 hover:text-indigo-600 cursor-pointer transition-colors">{p.projectName}</div>
-          </Link>
-          <div className="mt-2 flex items-center gap-2 flex-wrap">
-            <Badge tone="green">{statusLabel}</Badge>
-            {p.isOneShot && (
-              <Badge tone="indigo">
-                🎯 ONE-SHOT
-              </Badge>
-            )}
-            {p.tags?.map((tag, i) => (
-              <Badge key={i} tone="slate">{tagLabel(tag)}</Badge>
-            ))}
-            {hasAnomaly && (
-              <Badge tone="orange"><AlertTriangle className="h-3.5 w-3.5"/> {t("anomaly")}</Badge>
-            )}
-          </div>
-        </div>
-        <div className="text-right mr-12">
-          <div className="text-sm text-slate-500 dark:text-slate-400">
-            {p.isOneShot ? "Facturación Total" : t("labelRevenue")}
-          </div>
-          <div className="text-xl font-semibold text-slate-900 dark:text-slate-100">
-            {formatKM(revenueDisplay, nativeCurrency === "USD" ? "USD" : "ARS")}
-          </div>
-          {p.isOneShot && p.revenuePeriod && (
-            <div className="text-xs text-indigo-600 dark:text-indigo-400 mt-0.5">
-              Facturado en {formatRevenuePeriod(p.revenuePeriod)}
-            </div>
-          )}
-          {!p.isOneShot && p.metrics.revenueUSDNormalized && p.metrics.revenueUSDNormalized !== revenueDisplay && (
-            <div className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
-              {t("normalizedUSD")} {formatUSD(p.metrics.revenueUSDNormalized)}
-            </div>
-          )}
-        </div>
-      </div>
-
-      <div className={`${dense ? 'mt-3' : 'mt-4'} grid grid-cols-2 gap-${dense ? '3' : '4'} sm:grid-cols-4`}>
-        <Stat label={t("labelCost")} value={formatKM(costDisplay, nativeCurrency)} />
-        <Stat label={t("labelProfit")} value={formatKM(profitDisplay, nativeCurrency)} />
-        <Stat label={t("labelMarkup")} value={Number.isFinite(markup) ? `${markup.toFixed(1)}x` : "—"} tone={markupTone} />
-        <Stat label={t("labelMargin")} value={Number.isFinite(margin) ? `${(margin*100).toFixed(1)}%` : "—"} tone={marginTone} progress={Number.isFinite(margin) ? margin : undefined} />
-      </div>
-
-      {hasAnomaly && (
-        <div className="mt-3 text-xs text-orange-700 dark:text-orange-400">
-          {t("flags")} {p.anomaly?.join(", ")}
-        </div>
-      )}
-
-      {/* Task stats bar — only if linked project has tasks */}
-      {p.projectId && taskStats && taskStats.taskCount > 0 && (
-        <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-700 flex items-center gap-3">
-          <CheckSquare className="h-3.5 w-3.5 text-violet-500 flex-shrink-0" />
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mb-1">
-              <span>
-                <span className="font-medium text-slate-700 dark:text-slate-300">{taskStats.taskCount - taskStats.pendingCount}</span>
-                /{taskStats.taskCount} tareas completadas
-                {taskStats.pendingCount > 0 && (
-                  <span className="ml-2 inline-flex items-center gap-0.5 rounded-full bg-amber-100 dark:bg-amber-900/40 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-400">
-                    {taskStats.pendingCount} pendientes
-                  </span>
-                )}
-              </span>
-              <span className="font-medium">
-                {taskStats.taskCount > 0 ? Math.round(((taskStats.taskCount - taskStats.pendingCount) / taskStats.taskCount) * 100) : 0}%
-              </span>
-            </div>
-            <div className="h-1.5 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden">
-              <div
-                className="h-full rounded-full bg-violet-500 transition-all duration-500"
-                style={{ width: `${taskStats.taskCount > 0 ? Math.round(((taskStats.taskCount - taskStats.pendingCount) / taskStats.taskCount) * 100) : 0}%` }}
-              />
-            </div>
-          </div>
-          <Link href={`/tasks/projects/${p.projectId}`}>
-            <button className="flex-shrink-0 text-[11px] font-medium text-violet-600 dark:text-violet-400 hover:text-violet-800 dark:hover:text-violet-200 transition-colors whitespace-nowrap">
-              Ver tareas →
-            </button>
-          </Link>
-        </div>
-      )}
-
-      {/* Link to tasks when no tasks yet */}
-      {p.projectId && taskStats && taskStats.taskCount === 0 && (
-        <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-700 flex items-center justify-between">
-          <span className="text-xs text-slate-400 dark:text-slate-500 flex items-center gap-1.5">
-            <CheckSquare className="h-3 w-3" />Sin tareas cargadas
-          </span>
-          <Link href={`/tasks/projects/${p.projectId}`}>
-            <button className="text-[11px] font-medium text-violet-600 dark:text-violet-400 hover:text-violet-800 transition-colors">
-              Ir a tareas →
-            </button>
-          </Link>
-        </div>
-      )}
-
-      {/* Internal hours cost from tasks */}
-      {p.projectId && hoursCost && hoursCost.totalHours > 0 && (
-        <div className="mt-2 flex items-center gap-2 text-xs text-slate-400 dark:text-slate-500">
-          <Clock className="h-3 w-3 flex-shrink-0" />
-          <span>
-            <span className="font-medium text-slate-600 dark:text-slate-300">{hoursCost.totalHours.toFixed(1)}h</span>
-            {" "}internas
-            {hoursCost.totalCostUSD > 0 && (
-              <span className="ml-1 text-slate-400 dark:text-slate-500">
-                · ~USD {hoursCost.totalCostUSD.toLocaleString("es", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-              </span>
-            )}
-          </span>
-        </div>
-      )}
-
-      {/* Mark as finished button - only show if allowFinish is true */}
-      {p.projectId && p.allowFinish && (
-        <div className="mt-3 flex justify-end">
-          <button
-            onClick={async () => {
-              if (!confirm(`¿Estás seguro de marcar "${p.projectName}" como terminado?`)) return;
-              try {
-                const res = await authFetch(`/api/active-projects/${p.projectId}/finish`, {
-                  method: 'PATCH',
-                });
-                if (!res.ok) throw new Error(await res.text());
-                // Invalidate cache to refresh data
-                queryClient.invalidateQueries({ queryKey: ['projects'] });
-                alert('Proyecto marcado como terminado exitosamente');
-              } catch (e) {
-                console.error('Error marking project as finished:', e);
-                alert('No se pudo cerrar el proyecto.');
-              }
-            }}
-            className="text-xs rounded-lg border border-rose-200 dark:border-rose-800 px-3 py-1.5 hover:bg-rose-50 dark:hover:bg-rose-900/30 text-rose-700 dark:text-rose-400 transition-colors"
-          >
-            {t("markAsFinished")}
-          </button>
-        </div>
-      )}
-    </motion.div>
-  );
-}
-
-function Stat({label, value, tone, progress}:{label:string; value:string; tone?: 'default'|'good'|'warn'|'bad'; progress?: number}) {
-  const color = tone==='good' ? 'text-emerald-700'
-              : tone==='warn' ? 'text-amber-700'
-              : tone==='bad'  ? 'text-rose-700'
-              : 'text-slate-900';
-  const progressColor = tone==='good' ? 'bg-emerald-500'
-                      : tone==='warn' ? 'bg-amber-500'
-                      : tone==='bad'  ? 'bg-rose-500'
-                      : 'bg-slate-400';
-  
-  return (
-    <div className="rounded-xl bg-slate-50 dark:bg-slate-800 p-3 text-center">
-      <div className="text-xs text-slate-500 dark:text-slate-400">{label}</div>
-      <div className={`text-sm font-semibold ${color} dark:brightness-125`}>{value}</div>
-      {progress !== undefined && (
-        <div className="mt-1.5 h-1 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
-          <div className={`h-full ${progressColor} transition-all`} style={{ width: `${Math.min(100, Math.max(0, progress * 100))}%` }} />
-        </div>
-      )}
-    </div>
-  );
-}
-
-function Controls({ period, setPeriod, onRefresh, search, setSearch, activeOnly, setActiveOnly, sortBy, setSortBy, tagFilters, setTagFilters, dense, setDense }:{
-  period:string; setPeriod:React.Dispatch<React.SetStateAction<string>>; onRefresh:()=>void;
-  search:string; setSearch:(v:string)=>void; activeOnly:boolean; setActiveOnly:(v:boolean)=>void;
-  sortBy:string; setSortBy:(v:string)=>void; tagFilters:string[]; setTagFilters:React.Dispatch<React.SetStateAction<string[]>>;
-  dense:boolean; setDense:(v:boolean)=>void;
-}){
-  const [showNativePicker, setShowNativePicker] = useState(false);
-  const nativePickerRef = React.useRef<HTMLInputElement | null>(null);
-
-  // Keyboard navigation
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "ArrowLeft") setPeriod((p: string) => addMonths(p, -1));
-      if (e.key === "ArrowRight") setPeriod((p: string) => addMonths(p, 1));
-    }
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [setPeriod]);
-
-  const toggleTag = (tag: string) => {
-    setTagFilters((prev: string[]) => prev.includes(tag) ? prev.filter((t: string) => t !== tag) : [...prev, tag]);
-  };
+  const kpis = [
+    {
+      label: "Facturación (USD)",
+      value: formatUSD(data?.summary?.periodRevenueUSD),
+      icon: <DollarSign className="h-4 w-4" />,
+    },
+    {
+      label: "Ganancia (USD)",
+      value: formatUSD(data?.summary?.periodProfitUSD),
+      icon: <TrendingUp className="h-4 w-4" />,
+      hidden: !isOperations,
+    },
+    {
+      label: "Horas del período",
+      value: `${Number(asanaHours).toFixed(0)}h`,
+      icon: <Clock className="h-4 w-4" />,
+    },
+    {
+      label: "Proyectos activos",
+      value: `${data?.summary?.activeProjects ?? 0}/${data?.summary?.totalProjects ?? 0}`,
+      icon: <BriefcaseBusiness className="h-4 w-4" />,
+    },
+    {
+      label: "FX referencia",
+      value: fxValue,
+      icon: <DollarSign className="h-4 w-4" />,
+      hidden: !isOperations,
+    },
+  ].filter(k => !k.hidden);
 
   return (
-    <div className="sticky top-0 z-10 backdrop-blur supports-[backdrop-filter]:bg-white/60 dark:supports-[backdrop-filter]:bg-slate-900/60 bg-white/70 dark:bg-slate-900/70 border-b border-slate-100 dark:border-slate-800 py-3">
-      {/* Period navigator */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-3">
-      <div className="flex items-center gap-2">
-        <button
-          onClick={() => setPeriod(addMonths(period, -1))}
-          className="inline-flex items-center rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 px-3 py-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-700"
-          aria-label="Previous month"
-        >‹</button>
-        <button
-          onClick={() => setShowNativePicker(true)}
-          className="inline-flex items-center gap-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"
-          aria-label="Pick month"
-        >{periodToLabel(period)}</button>
-        <button
-          onClick={() => setPeriod(addMonths(period, 1))}
-          className="inline-flex items-center rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 px-3 py-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-700"
-          aria-label="Next month"
-        >›</button>
-
-        {/* Presets */}
-        <div className="ml-2 hidden sm:flex items-center gap-2">
-          <button
-            onClick={() => setPeriod(monthKeyOf(new Date()))}
-            className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 px-3 py-2 text-xs hover:bg-slate-50 dark:hover:bg-slate-700"
-          >{t("thisMonth")}</button>
-          <button
-            onClick={() => setPeriod(lastMonthKey())}
-            className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 px-3 py-2 text-xs hover:bg-slate-50 dark:hover:bg-slate-700"
-          >{t("lastMonth")}</button>
-          <button
-            onClick={() => setShowNativePicker(true)}
-            className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 px-3 py-2 text-xs hover:bg-slate-50 dark:hover:bg-slate-700"
-          >{t("custom")}</button>
-        </div>
-
-        {/* Hidden native month input */}
-        {showNativePicker && (
-          <input
-            ref={nativePickerRef}
-            type="month"
-            value={period}
-            onChange={(e) => { setPeriod(e.target.value); setShowNativePicker(false); }}
-            onBlur={() => setShowNativePicker(false)}
-            className="absolute opacity-0 pointer-events-none"
-            autoFocus
-          />
-        )}
-
-        <button onClick={onRefresh} className="ml-2 inline-flex items-center gap-2 rounded-xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-900/30 px-3 py-2 text-sm font-medium text-indigo-700 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/40">
-          <RefreshCcw className="h-4 w-4"/> {t("refresh")}
-        </button>
-      </div>
-
-      {/* Search & Active only */}
-      <div className="flex items-center gap-2">
-        <div className="relative w-72">
-          <Search className="absolute left-2 top-2.5 h-4 w-4 text-slate-400 dark:text-slate-500"/>
-          <input
-            placeholder={t("searchPlaceholder")}
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 pl-8 pr-3 py-2 text-sm shadow-sm focus:ring-2 focus:ring-indigo-500"
-          />
-        </div>
-        <button
-          onClick={() => setActiveOnly(!activeOnly)}
-          className={`inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm ${activeOnly ? "border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400" : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300"}`}
+    <div className="grid grid-cols-2 gap-3 mb-6 sm:grid-cols-3 lg:grid-cols-5">
+      {kpis.map((kpi, i) => (
+        <div
+          key={i}
+          className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm"
         >
-          <Filter className="h-4 w-4"/> {activeOnly ? t("activeOnly") : t("all")}
-        </button>
-      </div>
-      </div>
-
-      {/* Second row: Sort, Tag Filters, Density */}
-      <div className="flex flex-wrap items-center gap-2">
-        {/* Sort */}
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-slate-500 dark:text-slate-400">{t("sortBy")}</span>
-          <select 
-            value={sortBy} 
-            onChange={(e) => setSortBy(e.target.value)}
-            className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 px-2 py-1 text-xs focus:ring-2 focus:ring-indigo-500"
-          >
-            <option value="revenue">{t("sortRevenue")}</option>
-            <option value="profit">{t("sortProfit")}</option>
-            <option value="margin">{t("sortMargin")}</option>
-            <option value="markup">{t("sortMarkup")}</option>
-          </select>
-        </div>
-
-        {/* Tag Filters */}
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => toggleTag("Fee")}
-            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs transition-colors ${
-              tagFilters.includes("Fee") 
-                ? "bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-400 ring-1 ring-indigo-200 dark:ring-indigo-800" 
-                : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400"
-            }`}
-          >
-            {t("tagFee")}
-          </button>
-          <button
-            onClick={() => toggleTag("One-Shot")}
-            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs transition-colors ${
-              tagFilters.includes("One-Shot") 
-                ? "bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-400 ring-1 ring-indigo-200 dark:ring-indigo-800" 
-                : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400"
-            }`}
-          >
-            {t("tagOneShot")}
-          </button>
-        </div>
-
-        {/* Density */}
-        <div className="flex items-center gap-2 ml-auto">
-          <span className="text-xs text-slate-500 dark:text-slate-400">{t("density")}</span>
-          <button
-            onClick={() => setDense(!dense)}
-            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2 py-1 text-xs text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"
-          >
-            {dense ? <><Minimize2 className="h-3 w-3"/> {t("compact")}</> : <><Maximize2 className="h-3 w-3"/> {t("comfortable")}</>}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function SummaryBar({ data }:{ data?: ProjectsApi }){
-  const active = data?.summary?.activeProjects ?? data?.projects?.filter(p=>p.status!=="Inactive").length ?? 0;
-  const total = data?.summary?.totalProjects ?? data?.projects?.length ?? 0;
-  
-  // Horas detalladas
-  const asanaHours = (data?.summary as any)?.periodAsanaHours ?? data?.summary?.periodHours ?? 0;
-  const billingHours = (data?.summary as any)?.periodBillingHours ?? 0;
-  const billableRate = (data?.summary as any)?.billableRate ?? 0;
-  
-  // Formatear horas con detalle
-  const hoursValue = billingHours > 0 
-    ? `${asanaHours.toFixed(0)}h`
-    : `${asanaHours.toFixed(0)}h`;
-  
-  const hoursSubtitle = billingHours > 0 
-    ? `${billingHours.toFixed(0)}h facturables (${billableRate.toFixed(0)}%)`
-    : 'ETL Maestro · Asana';
-  
-  // FX con tipo
-  const fxType = (data?.period as any)?.fxType;
-  const fxValue = data?.fx ? `ARS ${data.fx.toLocaleString()}` : "—";
-  const fxSubtitle = fxType === 'weighted' ? 'Ponderado por monto' : 'ETL Maestro';
-  
-  return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-      <KPICard 
-        title={t("kpiRevenue")} 
-        value={formatUSD(data?.summary?.periodRevenueUSD)} 
-        icon={<DollarSign className="h-5 w-5"/>}
-        tooltip="Suma de ingresos USD del período desde Star Schema (fact_rc_month)"
-        subtitle="Star Schema SoT"
-      />
-      <KPICard 
-        title={t("kpiProfit")} 
-        value={formatUSD(data?.summary?.periodProfitUSD)} 
-        icon={<TrendingUp className="h-5 w-5"/>}
-        tooltip="Ganancia = Ingresos - Costos (USD)"
-        subtitle="Star Schema SoT"
-      />
-      <KPICard 
-        title={t("kpiHours")} 
-        value={hoursValue} 
-        icon={<Clock className="h-5 w-5"/>}
-        tooltip="Horas trabajadas registradas en Asana (fact_labor_month). Billing hours = horas facturables cuando disponibles."
-        subtitle={hoursSubtitle}
-      />
-      <KPICard 
-        title={t("kpiActive")} 
-        value={`${active}/${total}`} 
-        icon={<BriefcaseBusiness className="h-5 w-5"/>}
-        tooltip="Proyectos activos = con ingresos o costos en el período"
-        subtitle="Con actividad"
-      />
-      <KPICard 
-        title={t("kpiFx")} 
-        value={fxValue} 
-        icon={<DollarSign className="h-5 w-5"/>}
-        tooltip="Tipo de cambio ponderado: SUM(ARS) / SUM(USD) del período (ingresos + costos)"
-        subtitle={fxSubtitle}
-      />
-    </div>
-  );
-}
-
-function safeRatio(rev?: number, cost?: number) {
-  if (rev == null || cost == null || cost === 0) return NaN;
-  return rev / cost;
-}
-function safeMargin(rev?: number, cost?: number) {
-  if (rev == null || cost == null || rev === 0) return NaN;
-  return (rev - cost) / rev;
-}
-
-function ProjectsList({ items, dense, period, taskStatsMap, hoursCostMap }:{ items: ProjectItem[]; dense?: boolean; period?: string; taskStatsMap?: Record<number, TaskStats>; hoursCostMap?: Record<number, HoursCostStats> }){
-  if (!items?.length) {
-    return (
-      <div className="rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 p-10 text-center text-slate-500 dark:text-slate-400">
-        {t("noProjects")}
-      </div>
-    );
-  }
-
-  // Group by client for separators
-  const grouped: {client: string; projects: ProjectItem[]}[] = [];
-  let currentClient = "";
-  let currentGroup: ProjectItem[] = [];
-
-  items.forEach((p) => {
-    if (p.clientName !== currentClient) {
-      if (currentGroup.length > 0) {
-        grouped.push({client: currentClient, projects: currentGroup});
-      }
-      currentClient = p.clientName;
-      currentGroup = [p];
-    } else {
-      currentGroup.push(p);
-    }
-  });
-  if (currentGroup.length > 0) {
-    grouped.push({client: currentClient, projects: currentGroup});
-  }
-
-  return (
-    <div className={`grid gap-${dense ? '3' : '4'}`}>
-      {grouped.map((group, gIdx) => (
-        <div key={`${group.client}-${gIdx}`}>
-          {gIdx > 0 && (
-            <div className="flex items-center gap-3 my-6">
-              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-slate-200 dark:via-slate-700 to-transparent" />
-              <div className="text-xs font-medium text-slate-400 dark:text-slate-500">{group.client}</div>
-              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-slate-200 dark:via-slate-700 to-transparent" />
-            </div>
-          )}
-          {group.projects.map((p) => (
-            <ProjectCard
-              key={p.projectId || p.projectKey || `${p.clientName}-${p.projectName}`}
-              p={p}
-              dense={dense}
-              period={period}
-              taskStats={p.projectId ? taskStatsMap?.[p.projectId] : undefined}
-              hoursCost={p.projectId ? hoursCostMap?.[p.projectId] : undefined}
-            />
-          ))}
+          <div className="flex-shrink-0 rounded-lg bg-slate-50 p-2 text-slate-500">
+            {kpi.icon}
+          </div>
+          <div>
+            <div className="text-[11px] text-slate-400 leading-tight">{kpi.label}</div>
+            <div className="text-lg font-semibold text-slate-900 leading-tight">{kpi.value}</div>
+          </div>
         </div>
       ))}
     </div>
   );
 }
 
-export default function ActiveProjectsNext(){
+// ─── Controls Bar ─────────────────────────────────────────────────────────────
+
+function Controls({
+  period,
+  setPeriod,
+  onRefresh,
+  isFetching,
+  search,
+  setSearch,
+  activeOnly,
+  setActiveOnly,
+}: {
+  period: string;
+  setPeriod: (p: string) => void;
+  onRefresh: () => void;
+  isFetching: boolean;
+  search: string;
+  setSearch: (s: string) => void;
+  activeOnly: boolean;
+  setActiveOnly: (v: boolean) => void;
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement) return;
+      if (e.key === "ArrowLeft") setPeriod(addMonths(period, -1));
+      if (e.key === "ArrowRight") setPeriod(addMonths(period, 1));
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [period, setPeriod]);
+
+  return (
+    <div className="sticky top-0 z-20 -mx-5 sm:-mx-8 px-5 sm:px-8 py-3 mb-6 bg-white/90 backdrop-blur border-b border-slate-100 flex flex-wrap gap-2 items-center">
+      {/* Period navigation */}
+      <div className="flex items-center gap-1">
+        <button
+          onClick={() => setPeriod(addMonths(period, -1))}
+          className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm text-slate-600 hover:bg-slate-50"
+        >
+          ‹
+        </button>
+        <span className="min-w-[140px] text-center text-sm font-medium text-slate-700 rounded-lg border border-slate-200 bg-white px-3 py-1.5 capitalize">
+          {periodToLabel(period)}
+        </span>
+        <button
+          onClick={() => setPeriod(addMonths(period, 1))}
+          className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm text-slate-600 hover:bg-slate-50"
+        >
+          ›
+        </button>
+      </div>
+
+      <button
+        onClick={() => setPeriod(monthKeyOf(new Date()))}
+        className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs text-slate-500 hover:bg-slate-50"
+      >
+        Este mes
+      </button>
+      <button
+        onClick={() => setPeriod(lastMonthKey())}
+        className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs text-slate-500 hover:bg-slate-50"
+      >
+        Mes anterior
+      </button>
+
+      <div className="flex-1 min-w-0" />
+
+      {/* Search */}
+      <div className="relative">
+        <Search className="absolute left-2.5 top-2 h-4 w-4 text-slate-400 pointer-events-none" />
+        <input
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Buscar proyecto o cliente…"
+          className="w-52 rounded-lg border border-slate-200 pl-8 pr-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white"
+        />
+      </div>
+
+      {/* Active filter */}
+      <button
+        onClick={() => setActiveOnly(!activeOnly)}
+        className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs transition-colors ${
+          activeOnly
+            ? "border-emerald-300 bg-emerald-50 text-emerald-700"
+            : "border-slate-200 bg-white text-slate-500"
+        }`}
+      >
+        <Filter className="h-3.5 w-3.5" />
+        {activeOnly ? "Solo activos" : "Todos"}
+      </button>
+
+      {/* Refresh */}
+      <button
+        onClick={onRefresh}
+        disabled={isFetching}
+        className="flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs text-indigo-700 hover:bg-indigo-100 disabled:opacity-50 transition-colors"
+      >
+        <RefreshCcw className={`h-3.5 w-3.5 ${isFetching ? "animate-spin" : ""}`} />
+        Actualizar
+      </button>
+    </div>
+  );
+}
+
+// ─── Table Header ─────────────────────────────────────────────────────────────
+
+function TableHeader({ isOperations }: { isOperations: boolean }) {
+  const cols = [
+    { label: "Proyecto", align: "text-left", cls: "pl-4 pr-3" },
+    { label: "Status", align: "text-left", cls: "px-3" },
+    { label: "Revenue", align: "text-right", cls: "px-3" },
+    ...(isOperations
+      ? [
+          { label: "Costo", align: "text-right", cls: "px-3" },
+          { label: "Markup", align: "text-right", cls: "px-3" },
+          { label: "Margen", align: "text-right", cls: "px-3" },
+        ]
+      : []),
+    { label: "Horas", align: "text-right", cls: "px-3" },
+    { label: "🚦", align: "text-center", cls: "px-3" },
+    { label: "", align: "text-center", cls: "pr-3 pl-1 w-6" },
+  ];
+
+  return (
+    <thead>
+      <tr className="border-b border-slate-100 bg-slate-50/80">
+        {cols.map((col, i) => (
+          <th
+            key={i}
+            className={`py-2 ${col.cls} ${col.align} text-[11px] font-semibold text-slate-400 uppercase tracking-wide`}
+          >
+            {col.label}
+          </th>
+        ))}
+      </tr>
+    </thead>
+  );
+}
+
+// ─── Project Row ──────────────────────────────────────────────────────────────
+
+function ProjectRow({
+  p,
+  isOperations,
+  period,
+}: {
+  p: ProjectItem;
+  isOperations: boolean;
+  period: string;
+}) {
+  const health = getHealth(p.metrics.markup);
+
+  const borderColor: Record<Health, string> = {
+    red: "border-l-red-500",
+    yellow: "border-l-amber-400",
+    green: "border-l-emerald-500",
+    gray: "border-l-slate-200",
+  };
+  const markupCls: Record<Health, string> = {
+    red: "text-red-600 font-bold",
+    yellow: "text-amber-600 font-semibold",
+    green: "text-emerald-700",
+    gray: "text-slate-400",
+  };
+
+  const revenue = p.metrics.revenueUSDNormalized ?? p.metrics.revenueDisplay ?? 0;
+  const cost = p.metrics.costUSDNormalized ?? p.metrics.costDisplay ?? 0;
+  const href = `/active-projects/${p.projectId}?period=${period}`;
+
+  return (
+    <tr
+      className={`group border-b border-slate-100 border-l-2 ${borderColor[health]} hover:bg-slate-50 transition-colors`}
+    >
+      {/* Name */}
+      <td className="py-2.5 pl-4 pr-3">
+        <Link href={href}>
+          <span className="font-medium text-slate-800 hover:text-indigo-600 transition-colors cursor-pointer flex items-center gap-1.5 flex-wrap">
+            {p.projectName}
+            {p.isOneShot && (
+              <span className="text-[10px] bg-indigo-50 text-indigo-600 rounded px-1.5 py-0.5 flex-shrink-0">
+                PUNTUAL
+              </span>
+            )}
+            {(p.anomaly?.length ?? 0) > 0 && (
+              <span
+                className="text-[10px] bg-orange-50 text-orange-600 rounded px-1.5 py-0.5 flex-shrink-0"
+                title={p.anomaly?.join(", ")}
+              >
+                ⚠ anomalía
+              </span>
+            )}
+          </span>
+        </Link>
+      </td>
+
+      {/* Status */}
+      <td className="py-2.5 px-3">
+        <span
+          className={`text-[11px] rounded-full px-2 py-0.5 ${
+            p.status === "Active"
+              ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200"
+              : "bg-slate-100 text-slate-400"
+          }`}
+        >
+          {p.status === "Active" ? "Activo" : "Inactivo"}
+        </span>
+      </td>
+
+      {/* Revenue */}
+      <td className="py-2.5 px-3 text-right tabular-nums text-sm text-slate-700 font-medium">
+        {formatUSD(revenue)}
+      </td>
+
+      {/* Ops-only */}
+      {isOperations && (
+        <>
+          <td className="py-2.5 px-3 text-right tabular-nums text-sm text-slate-500">
+            {formatUSD(cost)}
+          </td>
+          <td className={`py-2.5 px-3 text-right tabular-nums text-sm ${markupCls[health]}`}>
+            {isFinite(p.metrics.markup ?? NaN) ? `${p.metrics.markup!.toFixed(1)}x` : "—"}
+          </td>
+          <td className="py-2.5 px-3 text-right tabular-nums text-sm text-slate-600">
+            {isFinite(p.metrics.margin ?? NaN)
+              ? `${(p.metrics.margin! * 100).toFixed(0)}%`
+              : "—"}
+          </td>
+        </>
+      )}
+
+      {/* Hours */}
+      <td className="py-2.5 px-3 text-right tabular-nums text-sm text-slate-400">
+        {p.metrics.totalHours ? `${p.metrics.totalHours.toFixed(0)}h` : "—"}
+      </td>
+
+      {/* Semaphore */}
+      <td className="py-2.5 px-3 text-center">
+        <Semaphore markup={p.metrics.markup} />
+      </td>
+
+      {/* Link */}
+      <td className="py-2.5 pr-3 pl-1 text-center w-6">
+        <Link href={href}>
+          <ExternalLink className="h-3.5 w-3.5 text-slate-300 group-hover:text-indigo-400 transition-colors cursor-pointer" />
+        </Link>
+      </td>
+    </tr>
+  );
+}
+
+// ─── Client Group (collapsible) ───────────────────────────────────────────────
+
+function ClientGroup({
+  client,
+  projects,
+  isOperations,
+  period,
+  defaultOpen,
+}: {
+  client: string;
+  projects: ProjectItem[];
+  isOperations: boolean;
+  period: string;
+  defaultOpen: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+
+  const totalRevenue = projects.reduce(
+    (s, p) => s + (p.metrics.revenueUSDNormalized ?? p.metrics.revenueDisplay ?? 0),
+    0
+  );
+  const criticalCount = projects.filter(p => getHealth(p.metrics.markup) === "red").length;
+  const warningCount = projects.filter(p => getHealth(p.metrics.markup) === "yellow").length;
+
+  const avgMarkup = (() => {
+    const withMarkup = projects.filter(
+      p => isFinite(p.metrics.markup ?? NaN) && (p.metrics.markup ?? 0) > 0
+    );
+    if (withMarkup.length === 0) return null;
+    return withMarkup.reduce((s, p) => s + p.metrics.markup!, 0) / withMarkup.length;
+  })();
+
+  const avgMarkupCls =
+    avgMarkup == null
+      ? "text-slate-400"
+      : avgMarkup >= 2.5
+      ? "text-emerald-600"
+      : avgMarkup >= 2.0
+      ? "text-amber-600"
+      : "text-red-600";
+
+  return (
+    <div className="rounded-xl border border-slate-200 overflow-hidden shadow-sm mb-2">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center gap-2.5 px-4 py-2.5 bg-slate-50 hover:bg-slate-100 transition-colors text-left"
+      >
+        <span className="text-slate-400 flex-shrink-0">
+          {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+        </span>
+
+        <span className="font-semibold text-slate-800 text-sm">{client}</span>
+        <span className="text-xs text-slate-400">
+          {projects.length} proyecto{projects.length !== 1 ? "s" : ""}
+        </span>
+
+        {criticalCount > 0 && (
+          <span className="flex items-center gap-1 text-[11px] text-red-600 bg-red-50 rounded-full px-2 py-0.5 ring-1 ring-red-200 flex-shrink-0">
+            <span className="h-1.5 w-1.5 rounded-full bg-red-500 inline-block" />
+            {criticalCount} crítico{criticalCount !== 1 ? "s" : ""}
+          </span>
+        )}
+        {warningCount > 0 && (
+          <span className="flex items-center gap-1 text-[11px] text-amber-600 bg-amber-50 rounded-full px-2 py-0.5 ring-1 ring-amber-200 flex-shrink-0">
+            <span className="h-1.5 w-1.5 rounded-full bg-amber-400 inline-block" />
+            {warningCount} en atención
+          </span>
+        )}
+
+        <div className="ml-auto flex items-center gap-4">
+          {isOperations && avgMarkup !== null && (
+            <span className={`text-xs font-semibold ${avgMarkupCls}`}>
+              avg {avgMarkup.toFixed(1)}x
+            </span>
+          )}
+          <span className="text-sm font-semibold text-slate-700">{formatUSD(totalRevenue)}</span>
+        </div>
+      </button>
+
+      {open && (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <TableHeader isOperations={isOperations} />
+            <tbody>
+              {projects.map(p => (
+                <ProjectRow
+                  key={p.projectId ?? p.projectKey}
+                  p={p}
+                  isOperations={isOperations}
+                  period={period}
+                />
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Main Page ────────────────────────────────────────────────────────────────
+
+export default function ActiveProjectsNext() {
   const { isOperations } = usePermissions();
-  // Initialize period from localStorage
+
   const initialPeriod = useMemo(() => {
-    if (typeof window !== 'undefined') {
-      const saved = window.localStorage.getItem('ap.period');
-      if (saved) return saved;
+    if (typeof window !== "undefined") {
+      const saved = window.localStorage.getItem("ap.period");
+      if (saved && /^\d{4}-\d{2}$/.test(saved)) return saved;
     }
     return lastMonthKey();
   }, []);
 
-  const [period, setPeriod] = useState<string>(initialPeriod);
-  const [freshToggle, setFreshToggle] = useState<boolean>(false);
+  const [period, setPeriod] = useState(initialPeriod);
+  const [freshToggle, setFreshToggle] = useState(false);
   const [search, setSearch] = useState("");
   const [activeOnly, setActiveOnly] = useState(true);
-  const [sortBy, setSortBy] = useState("revenue");
-  const [tagFilters, setTagFilters] = useState<string[]>([]);
-  const [dense, setDense] = useState(false);
-  const queryClient = useQueryClient();
 
-  // Save period to localStorage when it changes
   useEffect(() => {
-    if (typeof window !== 'undefined') window.localStorage.setItem('ap.period', period);
+    if (typeof window !== "undefined") window.localStorage.setItem("ap.period", period);
   }, [period]);
 
-  const { data, isLoading, isError, error, refetch, isFetching } = useActiveProjects(period, freshToggle);
+  const { data, isLoading, isError, error, refetch, isFetching } = useActiveProjects(
+    period,
+    freshToggle
+  );
 
-  const { data: taskProjects = [] } = useQuery<{ id: number; taskCount: number; pendingCount: number }[]>({
-    queryKey: ["/api/tasks/projects"],
-    queryFn: () => authFetch("/api/tasks/projects").then(r => r.json()),
-    staleTime: 60_000,
-    select: (data) => Array.isArray(data) ? data : [],
-  });
-
-  const taskStatsMap = useMemo<Record<number, TaskStats>>(() => {
-    const map: Record<number, TaskStats> = {};
-    taskProjects.forEach(tp => {
-      if (tp.id < 1_000_000) {
-        map[tp.id] = { taskCount: tp.taskCount, pendingCount: tp.pendingCount };
-      }
-    });
-    return map;
-  }, [taskProjects]);
-
-  const { data: hoursCostData } = useQuery<{ projects: { projectId: number; totalHours: number; totalCostUSD: number }[] }>({
-    queryKey: ["/api/tasks/hours-cost", period],
-    queryFn: () => authFetch(`/api/tasks/hours-cost?period=${period}`).then(r => r.json()),
-    staleTime: 120_000,
-    select: (data) => data && Array.isArray(data.projects) ? data : { projects: [] },
-  });
-
-  const hoursCostMap = useMemo<Record<number, HoursCostStats>>(() => {
-    const map: Record<number, HoursCostStats> = {};
-    (hoursCostData?.projects ?? []).forEach(hp => {
-      map[hp.projectId] = { totalHours: hp.totalHours, totalCostUSD: hp.totalCostUSD };
-    });
-    return map;
-  }, [hoursCostData]);
-
-  // Reset fresh flag after a fetch cycle
-  useEffect(()=>{
+  useEffect(() => {
     if (!isFetching && freshToggle) setFreshToggle(false);
   }, [isFetching, freshToggle]);
 
-  const filtered = useMemo(()=>{
+  const handlePeriodChange = useCallback((p: string) => setPeriod(p), []);
+  const handleRefresh = useCallback(() => {
+    setFreshToggle(true);
+    refetch();
+  }, [refetch]);
+
+  // Filter → health-first sort, then revenue desc
+  const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    const allProjects = data?.projects ?? [];
-    console.log(`🔍 FILTRADO: Total projects=${allProjects.length}, activeOnly=${activeOnly}, period=${period}`);
-    
-    let result = allProjects
+    return (data?.projects ?? [])
       .filter(p => {
-        // Filter out ghost projects with no real data
-        const hasAnyData = (p.metrics?.revenueDisplay || 0) > 0
-          || (p.metrics?.costDisplay || 0) > 0
-          || (p.metrics?.totalHours || 0) > 0;
-        if (!hasAnyData && activeOnly) return false;
-
-        const shouldShow = !activeOnly || isActiveForPeriod(p, period);
-        return shouldShow;
+        if (activeOnly && !isRecentlyActive(p, period)) return false;
+        if (q && !`${p.clientName} ${p.projectName}`.toLowerCase().includes(q)) return false;
+        return true;
       })
-      .filter(p => !q || `${p.clientName} ${p.projectName}`.toLowerCase().includes(q));
-    
-    // Tag filtering
-    if (tagFilters.length > 0) {
-      result = result.filter(p => p.tags?.some(tag => tagFilters.includes(tag)));
-    }
+      .sort((a, b) => {
+        const ha = HEALTH_ORDER[getHealth(a.metrics.markup)];
+        const hb = HEALTH_ORDER[getHealth(b.metrics.markup)];
+        if (ha !== hb) return ha - hb;
+        const ra = a.metrics.revenueUSDNormalized ?? a.metrics.revenueDisplay ?? 0;
+        const rb = b.metrics.revenueUSDNormalized ?? b.metrics.revenueDisplay ?? 0;
+        return rb - ra;
+      });
+  }, [data?.projects, search, activeOnly, period]);
 
-    // Sorting
-    result.sort((a, b) => {
-      let aVal = 0, bVal = 0;
-      if (sortBy === "revenue") {
-        aVal = a.metrics.revenueUSDNormalized ?? 0;
-        bVal = b.metrics.revenueUSDNormalized ?? 0;
-      } else if (sortBy === "profit") {
-        aVal = (a.metrics.revenueUSDNormalized ?? 0) - (a.metrics.costUSDNormalized ?? 0);
-        bVal = (b.metrics.revenueUSDNormalized ?? 0) - (b.metrics.costUSDNormalized ?? 0);
-      } else if (sortBy === "margin") {
-        aVal = a.metrics.margin ?? 0;
-        bVal = b.metrics.margin ?? 0;
-      } else if (sortBy === "markup") {
-        aVal = a.metrics.markup ?? 0;
-        bVal = b.metrics.markup ?? 0;
-      }
-      return bVal - aVal; // Descending order
+  // Group by client — clients with worst health bubble up
+  const clientGroups = useMemo(() => {
+    const map = new Map<string, ProjectItem[]>();
+    filtered.forEach(p => {
+      const arr = map.get(p.clientName) ?? [];
+      arr.push(p);
+      map.set(p.clientName, arr);
     });
+    return Array.from(map.entries()).sort(([, a], [, b]) => {
+      const worstA = Math.min(...a.map(p => HEALTH_ORDER[getHealth(p.metrics.markup)]));
+      const worstB = Math.min(...b.map(p => HEALTH_ORDER[getHealth(p.metrics.markup)]));
+      return worstA - worstB;
+    });
+  }, [filtered]);
 
-    return result;
-  }, [data?.projects, search, activeOnly, tagFilters, sortBy]);
+  const hasCritical = filtered.some(p => getHealth(p.metrics.markup) === "red");
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white dark:from-slate-900 dark:to-slate-950">
-      <div className="mx-auto max-w-6xl p-5 sm:p-8">
-        <div className="mb-6">
-        <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">{t("title")}</h1>
-          {(data?.summary as any)?.dataFreshness && (
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 dark:bg-emerald-900/30 px-2.5 py-1 text-[11px] font-medium text-emerald-700 dark:text-emerald-400 ring-1 ring-emerald-200 dark:ring-emerald-800">
-              <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              Datos: {new Date((data?.summary as any)?.dataFreshness).toLocaleDateString('es', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
+      <div className="mx-auto max-w-7xl p-5 sm:p-8">
+        {/* Header */}
+        <div className="mb-4 flex items-start justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-3 flex-wrap">
+              <h1 className="text-2xl font-semibold text-slate-900">Proyectos</h1>
+              {hasCritical && (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-red-50 px-2.5 py-1 text-[11px] font-medium text-red-700 ring-1 ring-red-200">
+                  <span className="h-1.5 w-1.5 rounded-full bg-red-500 inline-block animate-pulse" />
+                  Proyectos críticos
+                </span>
+              )}
+            </div>
+            <p className="text-sm text-slate-400 mt-0.5">
+              {filtered.length} proyecto{filtered.length !== 1 ? "s" : ""} •{" "}
+              <span className="capitalize">{periodToLabel(period)}</span>
+            </p>
+          </div>
+
+          {data?.summary?.dataFreshness && (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-medium text-emerald-700 ring-1 ring-emerald-200 flex-shrink-0">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse inline-block" />
+              {new Date(data.summary.dataFreshness).toLocaleDateString("es", {
+                day: "numeric",
+                month: "short",
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
             </span>
           )}
         </div>
-        <p className="text-sm text-slate-500 dark:text-slate-400">{t("period")} <span className="font-medium">{periodToLabel(data?.period ?? period)}</span> • {t("subtitle")}</p>
-      </div>
 
-      <Controls
-        period={period}
-        setPeriod={setPeriod}
-        onRefresh={() => { setFreshToggle(true); refetch(); }}
-        search={search}
-        setSearch={setSearch}
-        activeOnly={activeOnly}
-        setActiveOnly={setActiveOnly}
-        sortBy={sortBy}
-        setSortBy={setSortBy}
-        tagFilters={tagFilters}
-        setTagFilters={setTagFilters}
-        dense={dense}
-        setDense={setDense}
-      />
+        {/* Controls */}
+        <Controls
+          period={period}
+          setPeriod={handlePeriodChange}
+          onRefresh={handleRefresh}
+          isFetching={isFetching}
+          search={search}
+          setSearch={setSearch}
+          activeOnly={activeOnly}
+          setActiveOnly={setActiveOnly}
+        />
 
-      <div className="mt-6">
+        {/* KPI Bar */}
         {isLoading ? (
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-            {[...Array(5)].map((_,i)=> (
-              <div key={i} className="h-20 animate-pulse rounded-2xl bg-slate-100"/>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 mb-6">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="h-20 animate-pulse rounded-xl bg-slate-100" />
             ))}
           </div>
         ) : isError ? (
-          <div className="rounded-2xl border border-rose-200 dark:border-rose-800 bg-rose-50 dark:bg-rose-900/30 p-4 text-rose-700 dark:text-rose-400">
-            {t("errorLoading")} {(error as Error)?.message}
+          <div className="mb-6 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
+            Error al cargar datos: {(error as Error)?.message}
           </div>
         ) : (
-          <SummaryBar data={data} />
+          <KPIBar data={data} isOperations={isOperations} />
         )}
-      </div>
 
-      {/* Portfolio Analytics - Charts, Health & AI Insights */}
-      {/* Portfolio Analytics - only for Ops/Admin */}
-      {isOperations && data?.projects && data.projects.length > 0 && (
-        <div className="mt-6">
-          <PortfolioAnalytics projects={data.projects} />
-        </div>
-      )}
+        {/* Portfolio Analytics — ops/admin only */}
+        {isOperations && !isLoading && data?.projects && data.projects.length > 0 && (
+          <div className="mb-6">
+            <PortfolioAnalytics projects={data.projects} period={period} />
+          </div>
+        )}
 
-      <div className="mt-6">
+        {/* Semaphore legend (ops only) */}
+        {isOperations && !isLoading && (
+          <div className="flex items-center gap-5 text-xs text-slate-400 mb-3">
+            <span className="font-medium text-slate-500">Semáforo:</span>
+            <span className="flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 inline-block" />
+              Saludable (markup ≥ 2.5x)
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-full bg-amber-400 inline-block" />
+              Atención (2.0x – 2.5x)
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-full bg-red-500 inline-block" />
+              Crítico (&lt; 2.0x)
+            </span>
+          </div>
+        )}
+
+        {/* Projects table */}
         {isLoading ? (
-          <div className="grid gap-4">
-            {[...Array(3)].map((_,i)=> (
-              <div key={i} className="h-48 animate-pulse rounded-2xl bg-slate-100"/>
+          <div className="space-y-2">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="h-14 animate-pulse rounded-xl bg-slate-100" />
             ))}
           </div>
         ) : isError ? (
-          <div className="rounded-2xl border border-rose-200 dark:border-rose-800 bg-rose-50 dark:bg-rose-900/30 p-4 text-rose-700 dark:text-rose-400">
-            {t("errorLoadingProjects")}
+          <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
+            Error al cargar proyectos.
+          </div>
+        ) : clientGroups.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-slate-300 p-12 text-center text-slate-400">
+            <BriefcaseBusiness className="h-8 w-8 mx-auto mb-3 opacity-40" />
+            <p className="font-medium text-slate-500">No hay proyectos para este período.</p>
+            {activeOnly && (
+              <button
+                onClick={() => setActiveOnly(false)}
+                className="mt-2 text-indigo-600 hover:underline text-sm"
+              >
+                Ver todos los proyectos →
+              </button>
+            )}
           </div>
         ) : (
-          <ProjectsList items={filtered} dense={dense} period={period} taskStatsMap={taskStatsMap} hoursCostMap={hoursCostMap} />
+          <div>
+            {clientGroups.map(([client, projects], i) => (
+              <ClientGroup
+                key={client}
+                client={client}
+                projects={projects}
+                isOperations={isOperations}
+                period={period}
+                defaultOpen={i < 6}
+              />
+            ))}
+          </div>
         )}
-      </div>
 
-      {data?.updatedAt && (
-        <div className="mt-6 text-center text-xs text-slate-400 dark:text-slate-500">
-          {t("updated")} {new Date(data.updatedAt).toLocaleString("es")} • {t("period")} {data.period}
-        </div>
-      )}
+        {/* Footer */}
+        {data?.updatedAt && (
+          <p className="mt-6 text-center text-xs text-slate-400">
+            Actualizado:{" "}
+            {new Date(data.updatedAt).toLocaleString("es", {
+              day: "numeric",
+              month: "short",
+              hour: "2-digit",
+              minute: "2-digit",
+            })}{" "}
+            • Período: {data.period}
+          </p>
+        )}
       </div>
     </div>
   );
