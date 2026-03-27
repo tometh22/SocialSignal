@@ -21,6 +21,7 @@ import {
   AlertTriangle, CheckCircle, BarChart3, Target, Zap,
 } from "lucide-react";
 import { Link } from "wouter";
+import { usePermissions } from "@/hooks/use-permissions";
 
 // Lazy imports for heavy tab content
 import ProjectTaskList from "@/components/tasks/ProjectTaskList";
@@ -150,6 +151,8 @@ export default function ProjectDetailClean() {
   const pid = parseInt(projectId || "0", 10);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { isOperations } = usePermissions();
+  const canSeeCosts = isOperations; // Only Ops/Admin see costs, PM/Analysts don't
   const [activeTab, setActiveTab] = useState("resumen");
 
   // Period from URL or default to current month
@@ -254,8 +257,8 @@ export default function ProjectDetailClean() {
         </div>
       </div>
 
-      {/* ─── Markup Alert Banner ──────────────────────────────── */}
-      {cost > 0 && markup < 2.5 && (
+      {/* ─── Markup Alert Banner (only for Ops/Admin) ────────── */}
+      {canSeeCosts && cost > 0 && markup < 2.5 && (
         <div className={`flex items-center gap-3 p-4 rounded-xl border ${markup < 2.0 ? "bg-red-50 border-red-200" : "bg-amber-50 border-amber-200"}`}>
           <AlertTriangle className={`h-5 w-5 flex-shrink-0 ${markup < 2.0 ? "text-red-600" : "text-amber-600"}`} />
           <div className="flex-1">
@@ -272,8 +275,8 @@ export default function ProjectDetailClean() {
         </div>
       )}
 
-      {/* ─── Budget Progress ────────────────────────────────────── */}
-      {budget > 0 && (
+      {/* ─── Budget Progress (only for Ops/Admin) ──────────────── */}
+      {canSeeCosts && budget > 0 && (
         <Card>
           <CardContent className="p-4">
             <ProgressBar
@@ -295,9 +298,11 @@ export default function ProjectDetailClean() {
           <TabsTrigger value="equipo" className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm">
             <Users className="h-4 w-4 mr-1.5" /> Equipo
           </TabsTrigger>
+          {canSeeCosts && (
           <TabsTrigger value="finanzas" className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm">
             <DollarSign className="h-4 w-4 mr-1.5" /> Finanzas
           </TabsTrigger>
+          )}
           <TabsTrigger value="tareas" className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm">
             <Target className="h-4 w-4 mr-1.5" /> Tareas
           </TabsTrigger>
@@ -305,16 +310,16 @@ export default function ProjectDetailClean() {
 
         {/* ─── Tab: Resumen ──────────────────────────────────────── */}
         <TabsContent value="resumen" className="mt-6 space-y-6">
-          {/* KPIs */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <KpiCard label="Revenue" value={fmt(revenue)} icon={TrendingUp} color="text-emerald-700" />
-            <KpiCard label="Costo Real" value={fmt(cost)} icon={DollarSign} color="text-red-600" />
-            <KpiCard label="Margen" value={fmtPct(margin)} subtitle={`Markup: ${markup.toFixed(1)}x`} icon={BarChart3} color={margin >= 20 ? "text-emerald-700" : "text-red-600"} alert={margin < 15} />
+          {/* KPIs - costs hidden for PM/Analysts */}
+          <div className={`grid grid-cols-2 ${canSeeCosts ? "lg:grid-cols-4" : "lg:grid-cols-2"} gap-4`}>
+            {canSeeCosts && <KpiCard label="Revenue" value={fmt(revenue)} icon={TrendingUp} color="text-emerald-700" />}
+            {canSeeCosts && <KpiCard label="Costo Real" value={fmt(cost)} icon={DollarSign} color="text-red-600" />}
+            {canSeeCosts && <KpiCard label="Margen" value={fmtPct(margin)} subtitle={`Markup: ${markup.toFixed(1)}x`} icon={BarChart3} color={margin >= 20 ? "text-emerald-700" : "text-red-600"} alert={margin < 15} />}
             <KpiCard label="Horas Trabajadas" value={fmtHours(totalHours)} subtitle={`${teamCount} personas activas`} icon={Clock} color="text-indigo-700" />
           </div>
 
-          {/* Budget + Quick insights */}
-          <div className="grid lg:grid-cols-2 gap-4">
+          {/* Budget + Quick insights (costs only for Ops) */}
+          {canSeeCosts && <div className="grid lg:grid-cols-2 gap-4">
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm font-medium text-muted-foreground">Resultado del Proyecto</CardTitle>
@@ -366,10 +371,10 @@ export default function ProjectDetailClean() {
                 </div>
               </CardContent>
             </Card>
-          </div>
+          </div>}
 
-          {/* Project AI Insights */}
-          {cost > 0 && (
+          {/* Project AI Insights (only for Ops/Admin) */}
+          {canSeeCosts && cost > 0 && (
             <Card className="border-indigo-100 bg-gradient-to-r from-indigo-50/20 to-purple-50/20">
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm flex items-center gap-2">

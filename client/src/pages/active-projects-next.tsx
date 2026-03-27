@@ -4,6 +4,7 @@ import React, {useMemo, useState, useEffect} from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { authFetch } from "@/lib/queryClient";
 import PortfolioAnalytics from "@/components/portfolio-analytics";
+import { usePermissions } from "@/hooks/use-permissions";
 import { RefreshCcw, Search, BriefcaseBusiness, DollarSign, TrendingUp, Clock, AlertTriangle, Filter, ArrowUpDown, Maximize2, Minimize2, Eye, CheckSquare } from "lucide-react";
 import { motion } from "framer-motion";
 import { Link } from "wouter";
@@ -11,8 +12,8 @@ import { Link } from "wouter";
 // ---------- Translations ----------
 const i18n = {
   es: {
-    title: "Proyectos Activos",
-    subtitle: "Tablero unificado con datos de Excel/DB SoT",
+    title: "Proyectos",
+    subtitle: "Vista unificada de proyectos activos",
     refresh: "Actualizar",
     searchPlaceholder: "Buscar proyectos o clientes…",
     activeOnly: "Solo activos",
@@ -916,6 +917,7 @@ function ProjectsList({ items, dense, period, taskStatsMap, hoursCostMap }:{ ite
 }
 
 export default function ActiveProjectsNext(){
+  const { isOperations } = usePermissions();
   // Initialize period from localStorage
   const initialPeriod = useMemo(() => {
     if (typeof window !== 'undefined') {
@@ -1070,7 +1072,8 @@ export default function ActiveProjectsNext(){
       </div>
 
       {/* Portfolio Analytics - Charts, Health & AI Insights */}
-      {data?.projects && data.projects.length > 0 && (
+      {/* Portfolio Analytics - only for Ops/Admin */}
+      {isOperations && data?.projects && data.projects.length > 0 && (
         <div className="mt-6">
           <PortfolioAnalytics projects={data.projects} />
         </div>
