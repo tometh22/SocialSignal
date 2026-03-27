@@ -962,7 +962,12 @@ export default function ManageQuotes() {
                                       {(() => {
                                         // Mostrar cotización en su moneda original
                                         const currency = quote.quotationCurrency || 'ARS';
-                                        const displayAmount = currency === 'ARS' ? quote.totalAmount : convertFromUSD(quote.totalAmount, currency);
+                                        // If currency is USD but totalAmount looks like ARS (saved before conversion),
+                                        // divide by the exchange rate at quote time
+                                        const fxAtQuote = quote.exchangeRateAtQuote || quote.usdExchangeRate || exchangeRate || 1;
+                                        const displayAmount = currency === 'USD'
+                                          ? quote.totalAmount / fxAtQuote
+                                          : quote.totalAmount;
                                         return formatCurrencyWithConversion(displayAmount, currency);
                                       })()}
                                     </p>
@@ -975,7 +980,10 @@ export default function ManageQuotes() {
                                       <span className="font-medium text-gray-700">
                                         {(() => {
                                           const currency = quote.quotationCurrency || 'ARS';
-                                          const displayAmount = currency === 'ARS' ? quote.baseCost : convertFromUSD(quote.baseCost, currency);
+                                          const fxAtQuote = quote.exchangeRateAtQuote || quote.usdExchangeRate || exchangeRate || 1;
+                                          const displayAmount = currency === 'USD'
+                                            ? quote.baseCost / fxAtQuote
+                                            : quote.baseCost;
                                           return formatCurrencyWithConversion(displayAmount, currency);
                                         })()}
                                       </span>
