@@ -253,6 +253,24 @@ export default function ProjectDetailClean() {
         </div>
       </div>
 
+      {/* ─── Markup Alert Banner ──────────────────────────────── */}
+      {cost > 0 && markup < 2.5 && (
+        <div className={`flex items-center gap-3 p-4 rounded-xl border ${markup < 2.0 ? "bg-red-50 border-red-200" : "bg-amber-50 border-amber-200"}`}>
+          <AlertTriangle className={`h-5 w-5 flex-shrink-0 ${markup < 2.0 ? "text-red-600" : "text-amber-600"}`} />
+          <div className="flex-1">
+            <p className={`text-sm font-semibold ${markup < 2.0 ? "text-red-800" : "text-amber-800"}`}>
+              {markup < 2.0 ? "Markup Crítico" : "Markup Bajo"}: {markup.toFixed(1)}x
+              <span className="font-normal ml-1">(mínimo Epical: 2.5x)</span>
+            </p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {markup < 2.0
+                ? "Este proyecto está generando pérdida. Revisar asignación de equipo y renegociar precio."
+                : "El markup está por debajo del estándar. Considerar optimizar horas senior."}
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* ─── Budget Progress ────────────────────────────────────── */}
       {budget > 0 && (
         <Card>
