@@ -19,6 +19,7 @@ import AdminInflation from "@/pages/admin-inflation";
 import ActiveProjectsV2 from "@/pages/active-projects-v2";
 import ActiveProjectsNext from "@/pages/active-projects-next";
 import ProjectDetailsRedesigned from "@/pages/project-details-redesigned";
+import ProjectDetailClean from "@/pages/project-detail-clean";
 import ProjectSingle from "@/pages/project-single";
 import ProjectSettings from "@/pages/project-settings";
 import NewProjectWithTooltips from "@/pages/new-project-with-tooltips";
@@ -172,7 +173,7 @@ function AppRoutes() {
                   <ProtectedRoute path="/active-projects-old" component={ActiveProjectsV2} requiredPermission="projects" />
                   <ProtectedRoute path="/active-projects/new" component={NewProjectWithTooltips} requiredPermission="projects" />
                   <ProtectedRoute path="/active-projects/:id/edit" component={EditProject} requiredPermission="projects" />
-                  <ProtectedRoute path="/active-projects/:id" component={ProjectDetailsWithProvider} requiredPermission="projects" />
+                  <ProtectedRoute path="/active-projects/:id" component={ProjectDetailClean} requiredPermission="projects" />
                   <ProtectedRoute path="/active-projects/:id/time-entries" component={TimeEntries} requiredPermission="projects" />
                   <ProtectedRoute path="/active-projects/:projectId/financial-management" component={ProjectFinancialManagement} requiredPermission="projects" />
                   <ProtectedRoute path="/projects/:id" component={({ params }: { params: { id: string } }) => <Redirect to={`/active-projects/${params.id}`} />} />
