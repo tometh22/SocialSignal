@@ -211,6 +211,15 @@ export default function ProjectDetailClean() {
     costUSD: m.costUSD ?? m.cost ?? 0,
   }));
 
+  // Fallback: if vm metrics are 0 but team has data, use team aggregates
+  const teamTotalCost  = enrichedTeam.reduce((s: number, m: any) => s + (m.costUSD ?? 0), 0);
+  const teamTotalHours = enrichedTeam.reduce((s: number, m: any) => s + (m.hoursAsana ?? m.hours ?? 0), 0);
+  const effectiveCost  = cost  > 0 ? cost  : teamTotalCost;
+  const effectiveHours = totalHours > 0 ? totalHours : teamTotalHours;
+  const effectiveMarkup = markup > 0 ? markup : (revenue > 0 && effectiveCost > 0 ? revenue / effectiveCost : 0);
+  const effectiveMargin = effectiveMarkup > 0 ? ((revenue - effectiveCost) / revenue) * 100 : margin;
+  const effectiveBudgetUtil = budget > 0 && effectiveCost > 0 ? (effectiveCost / budget) * 100 : budgetUtil;
+
   return (
     <div className="max-w-7xl mx-auto px-4 py-6 space-y-5">
 
@@ -221,28 +230,28 @@ export default function ProjectDetailClean() {
         projectStatus={projectStatus}
         period={periodFromUrl}
         revenue={revenue}
-        cost={cost}
-        markup={markup}
-        margin={margin}
-        totalHours={totalHours}
+        cost={effectiveCost}
+        markup={effectiveMarkup}
+        margin={effectiveMargin}
+        totalHours={effectiveHours}
         estimatedHours={estimatedHours}
         budget={budget}
-        budgetUtilization={budgetUtil}
+        budgetUtilization={effectiveBudgetUtil}
         hoursDeviation={hoursDeviation}
         canSeeCosts={canSeeCosts}
         prevMarkup={unifiedData.previousPeriod?.metrics?.markup ?? undefined}
       />
 
-      {/* ── AI Copilot (ops only, only if there's financial data) ──────── */}
-      {canSeeCosts && cost > 0 && (
+      {/* ── AI Copilot (ops only) ──────────────────────────────────────── */}
+      {canSeeCosts && (effectiveCost > 0 || budget > 0) && (
         <AICopilot
           revenue={revenue}
-          cost={cost}
-          markup={markup}
-          margin={margin}
+          cost={effectiveCost}
+          markup={effectiveMarkup}
+          margin={effectiveMargin}
           budget={budget}
-          budgetUtilization={budgetUtil}
-          totalHours={totalHours}
+          budgetUtilization={effectiveBudgetUtil}
+          totalHours={effectiveHours}
           estimatedHours={estimatedHours}
           hoursDeviation={hoursDeviation}
           costDeviation={costDeviation}
@@ -265,11 +274,11 @@ export default function ProjectDetailClean() {
           <div className="space-y-5">
             <PLBreakdown
               revenue={revenue}
-              cost={cost}
+              cost={effectiveCost}
               budget={budget}
-              budgetUtilization={budgetUtil}
-              totalHours={totalHours}
-              markup={markup}
+              budgetUtilization={effectiveBudgetUtil}
+              totalHours={effectiveHours}
+              markup={effectiveMarkup}
             />
             <QuotationInfo quotation={q} />
           </div>
@@ -283,10 +292,10 @@ export default function ProjectDetailClean() {
             </div>
             <div className="p-5 grid grid-cols-2 gap-4">
               {[
-                { label: "Horas totales",  value: fmtHours(totalHours) },
+                { label: "Horas totales",   value: fmtHours(effectiveHours) },
                 { label: "Horas estimadas", value: fmtHours(estimatedHours) },
-                { label: "Desvío",         value: estimatedHours > 0 ? `${hoursDeviation > 0 ? "+" : ""}${hoursDeviation.toFixed(0)}%` : "—" },
-                { label: "Equipo",         value: `${enrichedTeam.length} personas` },
+                { label: "Desvío",          value: estimatedHours > 0 ? `${hoursDeviation > 0 ? "+" : ""}${hoursDeviation.toFixed(0)}%` : "—" },
+                { label: "Equipo",          value: `${enrichedTeam.length} personas` },
               ].map((kpi, i) => (
                 <div key={i} className="rounded-xl bg-slate-50 px-3 py-2.5">
                   <p className="text-[10px] text-slate-400 uppercase tracking-wide">{kpi.label}</p>

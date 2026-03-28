@@ -158,8 +158,12 @@ export default function ProjectHero(props: ProjectHeroProps) {
               Proyectos
             </button>
           </Link>
-          <span className="text-white/20">·</span>
-          <span className="text-white/40 text-xs">{clientName}</span>
+          {clientName && clientName !== "—" && (
+            <>
+              <span className="text-white/20">·</span>
+              <span className="text-white/40 text-xs">{clientName}</span>
+            </>
+          )}
           {period && (
             <>
               <span className="text-white/20">·</span>
@@ -191,9 +195,9 @@ export default function ProjectHero(props: ProjectHeroProps) {
                 {STATUS_LABEL[projectStatus] ?? projectStatus}
               </span>
 
-              {/* Markup badge */}
+              {/* Markup badge with trend arrow */}
               {canSeeCosts && markup > 0 && (
-                <span className={`text-xs font-bold rounded-full px-3 py-1 border ${
+                <span className={`text-xs font-bold rounded-full px-3 py-1 border inline-flex items-center gap-1 ${
                   markup >= 2.5
                     ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30"
                     : markup >= 2.0
@@ -202,7 +206,7 @@ export default function ProjectHero(props: ProjectHeroProps) {
                 }`}>
                   Markup {markup.toFixed(2)}x
                   {markupTrend != null && Math.abs(markupTrend) >= 0.1 && (
-                    <span className={`ml-1.5 inline-flex items-center gap-0.5 ${markupTrend > 0 ? "text-emerald-300" : "text-red-300"}`}>
+                    <span className={`inline-flex items-center gap-0.5 ${markupTrend > 0 ? "text-emerald-300" : "text-red-300"}`}>
                       {markupTrend > 0
                         ? <TrendingUp className="h-3 w-3" />
                         : <TrendingDown className="h-3 w-3" />}
@@ -211,16 +215,6 @@ export default function ProjectHero(props: ProjectHeroProps) {
                   )}
                 </span>
               )}
-
-              {/* Health label */}
-              <span className={`text-xs font-semibold rounded-full px-3 py-1 border ${
-                score >= 70 ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/20"
-                : score >= 50 ? "bg-amber-500/15 text-amber-300 border-amber-500/20"
-                : score >= 30 ? "bg-orange-500/15 text-orange-300 border-orange-500/20"
-                : "bg-red-500/15 text-red-300 border-red-500/20"
-              }`}>
-                {info.text}
-              </span>
             </div>
           </div>
         </div>
