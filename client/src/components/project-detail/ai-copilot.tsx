@@ -374,62 +374,73 @@ const IMPACT_BADGE: Record<string, string> = {
 export default function AICopilot(props: AICopilotProps) {
   const { signals, recommendations, whatIfScenarios, diagnosis } = useProjectIntelligence(props);
 
-  const diagnosisLabel = {
-    critical: "Proyecto en Riesgo",
-    warning:  "Requiere Atención",
-    healthy:  "Proyecto Saludable",
+  // Header accent matches health diagnosis
+  const headerBorder =
+    diagnosis === "critical" ? "border-l-red-500"
+    : diagnosis === "warning"  ? "border-l-amber-400"
+    : "border-l-emerald-500";
+
+  const diagnosisMeta = {
+    critical: { label: "Proyecto en Riesgo",  dot: "bg-red-500",     text: "text-red-700",     bg: "bg-red-50 border-red-100" },
+    warning:  { label: "Requiere Atención",   dot: "bg-amber-400",   text: "text-amber-700",   bg: "bg-amber-50 border-amber-100" },
+    healthy:  { label: "Proyecto Saludable",  dot: "bg-emerald-500", text: "text-emerald-700", bg: "bg-emerald-50 border-emerald-100" },
   }[diagnosis];
 
-  const diagnosisColor = {
-    critical: "text-red-600",
-    warning:  "text-amber-600",
-    healthy:  "text-emerald-600",
-  }[diagnosis];
-
-  const diagnosisBullet = {
-    critical: "bg-red-500",
-    warning:  "bg-amber-400",
-    healthy:  "bg-emerald-500",
-  }[diagnosis];
+  const criticalCount = signals.filter(s => s.level === "critical").length;
+  const warningCount  = signals.filter(s => s.level === "warning").length;
 
   return (
-    <div className="rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
-      {/* Header */}
-      <div className="flex items-center gap-3 px-5 py-3.5 bg-slate-950">
-        <Zap className="h-4 w-4 text-indigo-400 flex-shrink-0" />
-        <span className="text-sm font-semibold text-white">AI Copilot</span>
-        <span className="text-[11px] text-slate-500">· Epical Intelligence</span>
+    <div className={`bg-white rounded-2xl border border-slate-200 border-l-4 ${headerBorder} shadow-sm overflow-hidden`}>
+
+      {/* ── Header ── */}
+      <div className="flex items-center gap-3 px-5 py-3.5 border-b border-slate-100 bg-slate-50">
+        <Zap className="h-3.5 w-3.5 text-indigo-500 flex-shrink-0" />
+        <span className="text-sm font-semibold text-slate-800">AI Copilot</span>
+        <span className="text-[11px] text-slate-400">· Epical Intelligence</span>
+
+        {/* Summary chips */}
         <div className="ml-auto flex items-center gap-2">
-          <span className={`h-2 w-2 rounded-full ${diagnosisBullet} animate-pulse`} />
-          <span className={`text-xs font-semibold ${diagnosisColor}`}>{diagnosisLabel}</span>
+          {criticalCount > 0 && (
+            <span className="text-[11px] font-semibold bg-red-50 text-red-700 border border-red-200 rounded-full px-2.5 py-0.5">
+              {criticalCount} crítico{criticalCount > 1 ? "s" : ""}
+            </span>
+          )}
+          {warningCount > 0 && (
+            <span className="text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 rounded-full px-2.5 py-0.5">
+              {warningCount} atención
+            </span>
+          )}
+          <span className={`flex items-center gap-1.5 text-[11px] font-semibold rounded-full px-2.5 py-0.5 border ${diagnosisMeta.bg} ${diagnosisMeta.text}`}>
+            <span className={`w-1.5 h-1.5 rounded-full ${diagnosisMeta.dot} ${diagnosis !== "healthy" ? "animate-pulse" : ""}`} />
+            {diagnosisMeta.label}
+          </span>
         </div>
       </div>
 
-      {/* Top grid: Signals + Recommendations */}
-      <div className="bg-white p-5 grid md:grid-cols-2 gap-6">
+      {/* ── Signals + Recommendations grid ── */}
+      <div className="p-5 grid md:grid-cols-2 gap-6">
+
         {/* Left: Signals */}
         <div>
-          <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-3">
+          <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-3">
             Señales detectadas
           </p>
-          <div className="space-y-2.5">
+          <div className="space-y-2">
             {signals.map((s, i) => (
               <div key={i} className={`rounded-xl border px-3.5 py-2.5 ${SIGNAL_BG[s.level]}`}>
-                <div className="flex items-start gap-2">
+                <div className="flex items-start gap-2.5">
                   <SignalIcon level={s.level} />
-                  <div>
-                    <p className="text-sm font-semibold text-slate-800 leading-tight">{s.headline}</p>
-                    <p className="text-xs text-slate-600 mt-0.5 leading-relaxed">{s.detail}</p>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-slate-800 leading-snug">{s.headline}</p>
+                    <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">{s.detail}</p>
                   </div>
                 </div>
               </div>
             ))}
             {signals.length === 0 && (
-              <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2.5">
-                <div className="flex items-center gap-2">
-                  <CheckCircle className="h-4 w-4 text-emerald-500" />
-                  <p className="text-sm text-emerald-700 font-medium">Sin señales de riesgo detectadas.</p>
-                </div>
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2.5 flex items-center gap-2">
+                <CheckCircle className="h-4 w-4 text-emerald-500 flex-shrink-0" />
+                <p className="text-sm text-emerald-700 font-medium">Sin señales de riesgo detectadas.</p>
               </div>
             )}
           </div>
@@ -437,60 +448,61 @@ export default function AICopilot(props: AICopilotProps) {
 
         {/* Right: Recommendations */}
         <div>
-          <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-3">
+          <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-3">
             Acciones recomendadas
           </p>
-          <div className="space-y-2.5">
+          <div className="space-y-2">
             {recommendations.map((r) => (
-              <div key={r.rank} className="flex items-start gap-3 rounded-xl border border-slate-100 bg-slate-50 px-3.5 py-2.5">
-                <span className="flex-shrink-0 w-5 h-5 rounded-full bg-slate-800 text-white text-[10px] font-bold flex items-center justify-center mt-0.5">
+              <div key={r.rank} className="flex items-start gap-3 rounded-xl border border-slate-100 bg-slate-50/80 px-3.5 py-2.5">
+                <span className="flex-shrink-0 w-5 h-5 rounded-full bg-slate-700 text-white text-[10px] font-bold flex items-center justify-center mt-0.5">
                   {r.rank}
                 </span>
-                <p className="text-sm text-slate-700 leading-relaxed flex-1">{r.text}</p>
-                <span className={`flex-shrink-0 text-[10px] font-semibold rounded-full px-2 py-0.5 mt-0.5 ${IMPACT_BADGE[r.impact]}`}>
+                <p className="text-sm text-slate-600 leading-relaxed flex-1">{r.text}</p>
+                <span className={`flex-shrink-0 text-[10px] font-semibold rounded-md px-2 py-0.5 mt-0.5 border ${IMPACT_BADGE[r.impact]}`}>
                   {r.impact === "high" ? "URGENTE" : r.impact === "medium" ? "MEDIO" : "OK"}
                 </span>
               </div>
             ))}
+            {recommendations.length === 0 && (
+              <div className="rounded-xl border border-slate-100 bg-slate-50 px-3.5 py-2.5">
+                <p className="text-sm text-slate-400 italic">Sin acciones requeridas por ahora.</p>
+              </div>
+            )}
           </div>
         </div>
       </div>
 
-      {/* What-If Scenarios */}
+      {/* ── What-If Scenarios ── */}
       {whatIfScenarios.length > 0 && (
-        <div className="border-t border-slate-100 bg-slate-950/3 px-5 py-4">
+        <div className="border-t border-slate-100 bg-slate-50/60 px-5 py-4">
           <div className="flex items-center gap-2 mb-3">
             <FlaskConical className="h-3.5 w-3.5 text-indigo-500" />
-            <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+            <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
               Escenarios What-If
             </p>
-            <span className="text-[10px] text-slate-400 ml-1">— simulación instantánea</span>
+            <span className="text-[10px] text-slate-300 ml-0.5">— simulación instantánea</span>
           </div>
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
             {whatIfScenarios.map((sc, i) => (
-              <div key={i} className="rounded-xl border border-slate-100 bg-white px-3.5 py-3 shadow-sm">
-                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">{sc.label}</p>
-                <p className="text-[11px] text-slate-400 leading-snug mb-2">{sc.change}</p>
+              <div key={i} className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">{sc.label}</p>
+                <p className="text-[11px] text-slate-400 leading-snug mb-2.5">{sc.change}</p>
                 <div className="flex items-baseline gap-1.5">
-                  <span className="text-lg font-bold text-slate-900 tabular-nums">
+                  <span className="text-xl font-bold text-slate-900 tabular-nums">
                     {sc.newMarkup.toFixed(2)}x
                   </span>
-                  <span className={`text-xs font-semibold tabular-nums flex items-center gap-0.5 ${sc.positive ? "text-emerald-600" : "text-red-500"}`}>
-                    {sc.positive
-                      ? <TrendingUp className="h-3 w-3" />
-                      : <TrendingDown className="h-3 w-3" />}
+                  <span className={`text-xs font-semibold flex items-center gap-0.5 ${sc.positive ? "text-emerald-600" : "text-red-500"}`}>
+                    {sc.positive ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
                     {sc.delta > 0 ? "+" : ""}{sc.delta.toFixed(2)}x
                   </span>
                 </div>
-                <div className={`mt-1.5 text-[10px] font-semibold rounded-full px-2 py-0.5 inline-block ${
-                  sc.newMarkup >= 2.5
-                    ? "bg-emerald-50 text-emerald-700"
-                    : sc.newMarkup >= 2.0
-                    ? "bg-amber-50 text-amber-700"
-                    : "bg-red-50 text-red-700"
+                <span className={`mt-2 text-[10px] font-semibold rounded-md px-2 py-0.5 inline-block border ${
+                  sc.newMarkup >= 2.5 ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                  : sc.newMarkup >= 2.0 ? "bg-amber-50 text-amber-700 border-amber-200"
+                  : "bg-red-50 text-red-700 border-red-200"
                 }`}>
                   {sc.newMarkup >= 2.5 ? "✓ En target" : sc.newMarkup >= 2.0 ? "⚠ Bajo estándar" : "✗ Crítico"}
-                </div>
+                </span>
               </div>
             ))}
           </div>

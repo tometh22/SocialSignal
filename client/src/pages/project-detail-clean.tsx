@@ -39,58 +39,74 @@ function PLBreakdown({
   revenue: number; cost: number; budget: number; budgetUtilization: number;
   totalHours: number; markup: number;
 }) {
-  const profit = revenue - cost;
-  const burnRate = totalHours > 0 ? cost / totalHours : 0;
-
-  const rows = [
-    { label: "Revenue (venta)",    value: revenue, color: "text-emerald-700", bar: "bg-emerald-500", positive: true },
-    { label: "Costos directos",    value: -cost,   color: "text-red-600",     bar: "bg-red-400",    positive: false },
-  ];
-  const maxVal = Math.max(revenue, cost);
+  const profit    = revenue - cost;
+  const burnRate  = totalHours > 0 ? cost / totalHours : 0;
+  const margin    = revenue > 0 ? (profit / revenue) * 100 : null;
+  const maxVal    = Math.max(revenue, cost, 1);
+  const noRevenue = revenue === 0 && cost > 0;
 
   return (
     <div className="rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
-      <div className="px-5 py-3.5 border-b border-slate-100 bg-slate-50">
+      <div className="px-5 py-3.5 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
         <h3 className="text-sm font-semibold text-slate-800 flex items-center gap-2">
-          <BarChart3 className="h-4 w-4 text-slate-500" /> P&L del Proyecto
+          <BarChart3 className="h-4 w-4 text-slate-400" /> P&L del Proyecto
         </h3>
+        {noRevenue && (
+          <span className="text-[11px] text-amber-600 bg-amber-50 border border-amber-200 rounded-md px-2 py-0.5 font-medium">
+            Sin facturación registrada
+          </span>
+        )}
       </div>
-      <div className="p-5 space-y-3">
-        {rows.map((row, i) => (
-          <div key={i}>
-            <div className="flex justify-between items-baseline mb-1.5">
-              <span className="text-sm text-slate-500">{row.label}</span>
-              <span className={`text-base font-bold tabular-nums ${row.color}`}>{fmt(Math.abs(row.value))}</span>
-            </div>
-            <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
-              <div
-                className={`h-full rounded-full ${row.bar}`}
-                style={{ width: `${maxVal > 0 ? (Math.abs(row.value) / maxVal) * 100 : 0}%` }}
-              />
-            </div>
-          </div>
-        ))}
 
-        {/* Result */}
-        <div className="pt-3 border-t border-slate-200">
-          <div className="flex justify-between items-baseline">
-            <span className="text-sm font-semibold text-slate-700">Resultado bruto</span>
-            <span className={`text-xl font-bold tabular-nums ${profit >= 0 ? "text-emerald-700" : "text-red-700"}`}>
-              {fmt(profit)}
+      <div className="p-5 space-y-3">
+        {/* Revenue row */}
+        <div>
+          <div className="flex justify-between items-baseline mb-1.5">
+            <span className="text-sm text-slate-500">Revenue (venta)</span>
+            <span className={`text-base font-bold tabular-nums ${revenue > 0 ? "text-emerald-700" : "text-slate-400"}`}>
+              {revenue > 0 ? fmt(revenue) : "Pendiente"}
             </span>
+          </div>
+          <div className="h-1.5 rounded-full bg-slate-100 overflow-hidden">
+            <div className="h-full rounded-full bg-emerald-500" style={{ width: `${(revenue / maxVal) * 100}%` }} />
           </div>
         </div>
 
-        {/* Secondary KPIs */}
-        <div className="pt-2 grid grid-cols-2 gap-3">
+        {/* Cost row */}
+        {cost > 0 && (
+          <div>
+            <div className="flex justify-between items-baseline mb-1.5">
+              <span className="text-sm text-slate-500">Costos directos</span>
+              <span className="text-base font-bold tabular-nums text-red-600">{fmt(cost)}</span>
+            </div>
+            <div className="h-1.5 rounded-full bg-slate-100 overflow-hidden">
+              <div className="h-full rounded-full bg-red-400" style={{ width: `${(cost / maxVal) * 100}%` }} />
+            </div>
+          </div>
+        )}
+
+        {/* Result */}
+        <div className="pt-3 border-t border-slate-200 flex justify-between items-baseline">
+          <span className="text-sm font-semibold text-slate-700">Resultado bruto</span>
+          <span className={`text-xl font-bold tabular-nums ${
+            revenue === 0 ? "text-slate-400"
+            : profit >= 0 ? "text-emerald-700"
+            : "text-red-700"
+          }`}>
+            {revenue === 0 ? "—" : fmt(profit)}
+          </span>
+        </div>
+
+        {/* Secondary KPIs grid */}
+        <div className="pt-1 grid grid-cols-2 gap-2.5">
           {[
-            { label: "Markup",        value: markup > 0 ? `${markup.toFixed(2)}x` : "—" },
-            { label: "Margen",        value: revenue > 0 ? fmtPct((profit / revenue) * 100) : "—" },
-            { label: "Burn rate",     value: burnRate > 0 ? `${fmt(burnRate)}/h` : "—" },
-            { label: "Budget usado",  value: budget > 0 ? fmtPct(budgetUtilization) : "Sin budget" },
+            { label: "Markup",       value: markup > 0 ? `${markup.toFixed(2)}x` : "—" },
+            { label: "Margen",       value: margin != null ? fmtPct(margin) : "—" },
+            { label: "Burn rate",    value: burnRate > 0 ? `${fmt(burnRate)}/h` : "—" },
+            { label: "Budget usado", value: budget > 0 ? fmtPct(budgetUtilization) : "Sin budget" },
           ].map((kpi, i) => (
-            <div key={i} className="rounded-xl bg-slate-50 px-3 py-2">
-              <p className="text-[10px] text-slate-400 uppercase tracking-wide">{kpi.label}</p>
+            <div key={i} className="rounded-lg bg-slate-50 border border-slate-100 px-3 py-2">
+              <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">{kpi.label}</p>
               <p className="text-sm font-semibold text-slate-800 mt-0.5">{kpi.value}</p>
             </div>
           ))}
