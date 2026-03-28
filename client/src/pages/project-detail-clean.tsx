@@ -230,6 +230,7 @@ export default function ProjectDetailClean() {
         budgetUtilization={budgetUtil}
         hoursDeviation={hoursDeviation}
         canSeeCosts={canSeeCosts}
+        prevMarkup={unifiedData.previousPeriod?.metrics?.markup ?? undefined}
       />
 
       {/* ── AI Copilot (ops only, only if there's financial data) ──────── */}

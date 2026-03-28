@@ -4,7 +4,7 @@
  * Solo visible para Ops/Admin (canSeeCosts).
  */
 import { useMemo } from "react";
-import { Zap, TrendingUp, TrendingDown, AlertTriangle, CheckCircle, ChevronRight } from "lucide-react";
+import { Zap, TrendingUp, TrendingDown, AlertTriangle, CheckCircle, ChevronRight, FlaskConical } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -54,6 +54,16 @@ interface Recommendation {
   rank: number;
   text: string;
   impact: "high" | "medium" | "low";
+}
+
+interface WhatIfScenario {
+  label: string;           // e.g. "+10% precio"
+  change: string;          // what changes
+  newMarkup: number;
+  newRevenue?: number;
+  newCost?: number;
+  delta: number;           // markup delta
+  positive: boolean;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -263,6 +273,69 @@ function useProjectIntelligence(props: AICopilotProps) {
       });
     }
 
+    // ── 5. What-If Scenarios ─────────────────────────────────────────────────
+    const whatIfScenarios: WhatIfScenario[] = [];
+
+    if (cost > 0 && revenue > 0) {
+      const avgRate = totalHours > 0 ? cost / totalHours : 0;
+
+      // Scenario A: +10% price increase
+      const rev10 = revenue * 1.1;
+      const markup10 = rev10 / cost;
+      whatIfScenarios.push({
+        label: "+10% precio",
+        change: `Revenue ${usd(revenue)} → ${usd(rev10)}`,
+        newMarkup: markup10,
+        newRevenue: rev10,
+        delta: markup10 - markup,
+        positive: markup10 > markup,
+      });
+
+      // Scenario B: reduce 10h at avg rate
+      if (avgRate > 0) {
+        const costSaved = 10 * avgRate;
+        const newCostB = Math.max(0, cost - costSaved);
+        const markupB = newCostB > 0 ? revenue / newCostB : 0;
+        whatIfScenarios.push({
+          label: "−10h de equipo",
+          change: `Ahorro ~${usd(costSaved)} (a ${usd(avgRate)}/h)`,
+          newMarkup: markupB,
+          newCost: newCostB,
+          delta: markupB - markup,
+          positive: markupB > markup,
+        });
+      }
+
+      // Scenario C: hit estimated hours target (if overrun)
+      if (estimatedHours > 0 && totalHours > estimatedHours && avgRate > 0) {
+        const costAtTarget = estimatedHours * avgRate;
+        const markupTarget = revenue / costAtTarget;
+        const savings = cost - costAtTarget;
+        if (savings > 0) {
+          whatIfScenarios.push({
+            label: "Llegar a horas estimadas",
+            change: `${totalHours.toFixed(0)}h → ${estimatedHours.toFixed(0)}h, ahorro ${usd(savings)}`,
+            newMarkup: markupTarget,
+            newCost: costAtTarget,
+            delta: markupTarget - markup,
+            positive: markupTarget > markup,
+          });
+        }
+      }
+
+      // Scenario D: -5% cost reduction (general)
+      const costMinus5 = cost * 0.95;
+      const markupMinus5 = revenue / costMinus5;
+      whatIfScenarios.push({
+        label: "−5% costos generales",
+        change: `Costo ${usd(cost)} → ${usd(costMinus5)}`,
+        newMarkup: markupMinus5,
+        newCost: costMinus5,
+        delta: markupMinus5 - markup,
+        positive: markupMinus5 > markup,
+      });
+    }
+
     // Overall diagnosis
     const diagnosis = hasCritical
       ? "critical"
@@ -270,7 +343,7 @@ function useProjectIntelligence(props: AICopilotProps) {
       ? "warning"
       : "healthy";
 
-    return { signals, recommendations, diagnosis };
+    return { signals, recommendations, whatIfScenarios, diagnosis };
   }, [props]);
 }
 
@@ -299,7 +372,7 @@ const IMPACT_BADGE: Record<string, string> = {
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function AICopilot(props: AICopilotProps) {
-  const { signals, recommendations, diagnosis } = useProjectIntelligence(props);
+  const { signals, recommendations, whatIfScenarios, diagnosis } = useProjectIntelligence(props);
 
   const diagnosisLabel = {
     critical: "Proyecto en Riesgo",
@@ -332,6 +405,7 @@ export default function AICopilot(props: AICopilotProps) {
         </div>
       </div>
 
+      {/* Top grid: Signals + Recommendations */}
       <div className="bg-white p-5 grid md:grid-cols-2 gap-6">
         {/* Left: Signals */}
         <div>
@@ -381,6 +455,47 @@ export default function AICopilot(props: AICopilotProps) {
           </div>
         </div>
       </div>
+
+      {/* What-If Scenarios */}
+      {whatIfScenarios.length > 0 && (
+        <div className="border-t border-slate-100 bg-slate-950/3 px-5 py-4">
+          <div className="flex items-center gap-2 mb-3">
+            <FlaskConical className="h-3.5 w-3.5 text-indigo-500" />
+            <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+              Escenarios What-If
+            </p>
+            <span className="text-[10px] text-slate-400 ml-1">— simulación instantánea</span>
+          </div>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {whatIfScenarios.map((sc, i) => (
+              <div key={i} className="rounded-xl border border-slate-100 bg-white px-3.5 py-3 shadow-sm">
+                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">{sc.label}</p>
+                <p className="text-[11px] text-slate-400 leading-snug mb-2">{sc.change}</p>
+                <div className="flex items-baseline gap-1.5">
+                  <span className="text-lg font-bold text-slate-900 tabular-nums">
+                    {sc.newMarkup.toFixed(2)}x
+                  </span>
+                  <span className={`text-xs font-semibold tabular-nums flex items-center gap-0.5 ${sc.positive ? "text-emerald-600" : "text-red-500"}`}>
+                    {sc.positive
+                      ? <TrendingUp className="h-3 w-3" />
+                      : <TrendingDown className="h-3 w-3" />}
+                    {sc.delta > 0 ? "+" : ""}{sc.delta.toFixed(2)}x
+                  </span>
+                </div>
+                <div className={`mt-1.5 text-[10px] font-semibold rounded-full px-2 py-0.5 inline-block ${
+                  sc.newMarkup >= 2.5
+                    ? "bg-emerald-50 text-emerald-700"
+                    : sc.newMarkup >= 2.0
+                    ? "bg-amber-50 text-amber-700"
+                    : "bg-red-50 text-red-700"
+                }`}>
+                  {sc.newMarkup >= 2.5 ? "✓ En target" : sc.newMarkup >= 2.0 ? "⚠ Bajo estándar" : "✗ Crítico"}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
