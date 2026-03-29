@@ -1,15 +1,16 @@
 /**
- * Project Hero — dark header con gradient dinámico por salud, KPIs inline, budget burndown
- * El color del header refleja el estado de salud del proyecto.
+ * Project Hero — light-mode, integrated with app design system.
+ * Health score drives a colored left-border accent (Linear-style).
+ * KPIs are the visual hero: large tabular numbers on white.
  */
-import { ArrowLeft, TrendingUp, TrendingDown } from "lucide-react";
+import { ArrowLeft, TrendingUp, TrendingDown, Activity } from "lucide-react";
 import { Link } from "wouter";
-import HealthScore, { computeHealthScore, healthLabel } from "./health-score";
+import { computeHealthScore, healthLabel, healthGrade } from "./health-score";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function usd(n: number) {
-  if (!Number.isFinite(n)) return "—";
+  if (!Number.isFinite(n) || n === 0) return "$0";
   const abs = Math.abs(n);
   const sign = n < 0 ? "-" : "";
   if (abs >= 1_000_000) return `${sign}$${(abs / 1_000_000).toFixed(1)}M`;
@@ -34,65 +35,109 @@ export interface ProjectHeroProps {
   budgetUtilization: number;
   hoursDeviation: number;
   canSeeCosts: boolean;
-  prevMarkup?: number; // previous period markup for trend arrow
+  prevMarkup?: number;
 }
 
 const STATUS_LABEL: Record<string, string> = {
   active: "Activo", completed: "Completado", cancelled: "Cancelado", "on-hold": "Pausado",
 };
 
-// ─── Budget Bar ───────────────────────────────────────────────────────────────
+// ─── KPI Column ───────────────────────────────────────────────────────────────
 
-function BudgetBar({ used, total, utilization }: { used: number; total: number; utilization: number }) {
-  const color =
+function KPICol({
+  label, value, sub, highlight,
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+  highlight?: "green" | "amber" | "red" | "neutral";
+}) {
+  const valColor =
+    highlight === "green"  ? "text-emerald-600"
+    : highlight === "amber" ? "text-amber-600"
+    : highlight === "red"   ? "text-red-600"
+    : "text-slate-900";
+
+  return (
+    <div className="flex flex-col min-w-[80px] px-5 border-r border-slate-100 last:border-0 first:pl-0">
+      <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">{label}</p>
+      <p className={`text-2xl font-bold tabular-nums leading-tight mt-1 ${valColor}`}>{value}</p>
+      {sub && <p className="text-[11px] text-slate-400 mt-0.5 leading-snug">{sub}</p>}
+    </div>
+  );
+}
+
+// ─── Budget bar ───────────────────────────────────────────────────────────────
+
+function BudgetStrip({
+  cost, budget, utilization,
+}: {
+  cost: number; budget: number; utilization: number;
+}) {
+  const barColor =
     utilization >= 90 ? "bg-red-500"
     : utilization >= 75 ? "bg-amber-400"
     : "bg-emerald-500";
-  const remaining = total - used;
+
+  const textColor =
+    utilization >= 90 ? "text-red-600 font-semibold"
+    : utilization >= 75 ? "text-amber-600"
+    : "text-slate-500";
 
   return (
-    <div className="w-full">
-      <div className="flex justify-between text-[11px] mb-1.5 text-slate-400">
-        <span>Presupuesto</span>
-        <span className={utilization >= 90 ? "text-red-400 font-bold" : "text-slate-300"}>
-          {usd(used)} / {usd(total)} · {utilization.toFixed(0)}%
+    <div className="border-t border-slate-100 px-6 py-3 bg-slate-50/60">
+      <div className="flex items-center justify-between mb-1.5">
+        <span className="text-[11px] text-slate-400">Presupuesto</span>
+        <span className={`text-[11px] ${textColor}`}>
+          {usd(cost)} / {usd(budget)} · {utilization.toFixed(0)}%
         </span>
       </div>
-      <div className="h-2 rounded-full bg-white/10 overflow-hidden">
+      <div className="h-1.5 bg-slate-200 rounded-full overflow-hidden">
         <div
-          className={`h-full rounded-full transition-all duration-700 ${color}`}
+          className={`h-full rounded-full transition-all duration-700 ${barColor}`}
           style={{ width: `${Math.min(100, utilization)}%` }}
         />
       </div>
-      <div className="flex justify-between mt-1.5 text-[10px]">
-        <span className={utilization >= 90 ? "text-red-400 font-semibold" : utilization >= 75 ? "text-amber-400" : "text-slate-500"}>
+      <div className="flex items-center justify-between mt-1">
+        <span className={`text-[10px] ${
+          utilization >= 90 ? "text-red-500" : utilization >= 75 ? "text-amber-500" : "text-slate-400"
+        }`}>
           {utilization >= 90 ? "⚠ Budget casi agotado" : utilization >= 75 ? "Zona de atención" : "Budget disponible"}
         </span>
-        <span className="text-slate-400">Quedan {usd(remaining)}</span>
+        <span className="text-[10px] text-slate-400">Quedan {usd(budget - cost)}</span>
       </div>
     </div>
   );
 }
 
-// ─── KPI Pill ─────────────────────────────────────────────────────────────────
+// ─── Health Badge ─────────────────────────────────────────────────────────────
 
-function KPIPill({
-  label, value, sub, highlight,
-}: {
-  label: string; value: string; sub?: string;
-  highlight?: "green" | "red" | "amber" | "neutral";
-}) {
-  const textColor =
-    highlight === "green"  ? "text-emerald-300"
-    : highlight === "red"  ? "text-red-300"
-    : highlight === "amber" ? "text-amber-300"
-    : "text-white";
+function HealthBadge({ score }: { score: number }) {
+  const info  = healthLabel(score);
+  const grade = healthGrade(score);
+
+  const styles =
+    score >= 70 ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+    : score >= 50 ? "bg-amber-50 text-amber-700 border-amber-200"
+    : score >= 30 ? "bg-orange-50 text-orange-700 border-orange-200"
+    : "bg-red-50 text-red-700 border-red-200";
+
+  const dot =
+    score >= 70 ? "bg-emerald-500"
+    : score >= 50 ? "bg-amber-400"
+    : score >= 30 ? "bg-orange-500"
+    : "bg-red-500";
 
   return (
-    <div className="flex flex-col items-center px-5 border-r border-white/10 last:border-0">
-      <p className="text-[10px] text-white/40 uppercase tracking-wider leading-tight">{label}</p>
-      <p className={`text-lg font-bold tabular-nums leading-tight mt-0.5 ${textColor}`}>{value}</p>
-      {sub && <p className="text-[10px] text-white/30 leading-tight">{sub}</p>}
+    <div className="flex flex-col items-end gap-1">
+      <div className={`flex items-center gap-1.5 border rounded-lg px-3 py-1.5 text-sm font-semibold ${styles}`}>
+        <span className={`w-2 h-2 rounded-full ${dot} ${score < 50 ? "animate-pulse" : ""}`} />
+        {info.text}
+      </div>
+      <p className="text-[11px] text-slate-400 flex items-center gap-1">
+        <Activity className="h-3 w-3" />
+        Score {score}/100 · Grado {grade}
+      </p>
     </div>
   );
 }
@@ -114,26 +159,14 @@ export default function ProjectHero(props: ProjectHeroProps) {
     hasHoursEstimate: estimatedHours > 0,
   });
 
-  const info = healthLabel(score);
+  const leftBorder =
+    score >= 70 ? "border-l-emerald-500"
+    : score >= 50 ? "border-l-amber-400"
+    : score >= 30 ? "border-l-orange-500"
+    : "border-l-red-500";
 
-  // Dynamic gradient based on health
-  const gradientClass =
-    score >= 70 ? "from-slate-950 via-slate-900 to-emerald-950"
-    : score >= 50 ? "from-slate-950 via-slate-900 to-slate-900"
-    : score >= 30 ? "from-slate-950 via-slate-900 to-orange-950"
-    : "from-slate-950 via-slate-900 to-red-950";
-
-  const accentLine =
-    score >= 70 ? "bg-gradient-to-r from-emerald-500 via-emerald-400 to-transparent"
-    : score >= 50 ? "bg-gradient-to-r from-amber-500 via-amber-400 to-transparent"
-    : score >= 30 ? "bg-gradient-to-r from-orange-500 via-orange-400 to-transparent"
-    : "bg-gradient-to-r from-red-500 via-red-400 to-transparent";
-
-  const markupHighlight: "green" | "red" | "amber" =
-    markup >= 2.5 ? "green" : markup >= 2.0 ? "amber" : "red";
-
-  const markupTrend = prevMarkup != null && prevMarkup > 0
-    ? markup - prevMarkup : null;
+  const markupTrend = prevMarkup != null && prevMarkup > 0 ? markup - prevMarkup : null;
+  const profit = revenue - cost;
 
   const periodLabel = (() => {
     if (!period) return "";
@@ -143,138 +176,107 @@ export default function ProjectHero(props: ProjectHeroProps) {
     } catch { return period; }
   })();
 
+  const hasClient = clientName && clientName !== "—";
+
   return (
-    <div className="rounded-2xl overflow-hidden shadow-xl border border-white/5">
-      {/* ── Accent line at top ── */}
-      <div className={`h-0.5 w-full ${accentLine}`} />
+    <div className={`bg-white rounded-2xl border border-slate-200 border-l-4 ${leftBorder} shadow-sm overflow-hidden`}>
 
-      {/* ── Dark header ── */}
-      <div className={`bg-gradient-to-br ${gradientClass} px-6 pt-5 pb-5`}>
-        {/* Breadcrumb */}
-        <div className="flex items-center gap-2 mb-5">
-          <Link href="/active-projects">
-            <button className="flex items-center gap-1.5 text-white/40 hover:text-white/80 transition-colors text-xs">
-              <ArrowLeft className="h-3.5 w-3.5" />
-              Proyectos
-            </button>
-          </Link>
-          <span className="text-white/20">·</span>
-          <span className="text-white/40 text-xs">{clientName}</span>
-          {period && (
-            <>
-              <span className="text-white/20">·</span>
-              <span className="text-white/30 text-xs capitalize">{periodLabel}</span>
-            </>
-          )}
-        </div>
+      {/* ── Breadcrumb ── */}
+      <div className="flex items-center gap-1.5 px-6 pt-4 pb-0">
+        <Link href="/active-projects">
+          <button className="flex items-center gap-1.5 text-slate-400 hover:text-slate-700 transition-colors text-xs font-medium">
+            <ArrowLeft className="h-3 w-3" />
+            Proyectos
+          </button>
+        </Link>
+        {hasClient && (
+          <>
+            <span className="text-slate-200 text-xs">/</span>
+            <span className="text-slate-400 text-xs truncate max-w-[160px]">{clientName}</span>
+          </>
+        )}
+        {period && (
+          <>
+            <span className="text-slate-200 text-xs">/</span>
+            <span className="text-slate-400 text-xs capitalize">{periodLabel}</span>
+          </>
+        )}
+      </div>
 
-        {/* Title row */}
-        <div className="flex items-start gap-6">
-          {/* Health gauge */}
-          {canSeeCosts && (
-            <div className="flex-shrink-0 mt-1">
-              <HealthScore score={score} size="md" />
-            </div>
-          )}
-
-          {/* Name + badges */}
+      {/* ── Title row ── */}
+      <div className="px-6 pt-3 pb-5">
+        <div className="flex items-start justify-between gap-6">
           <div className="flex-1 min-w-0">
-            <p className="text-white/50 text-sm mb-0.5 truncate">{clientName}</p>
-            <h1 className="text-3xl font-bold text-white leading-tight truncate tracking-tight">
+            {hasClient && (
+              <p className="text-xs font-medium text-slate-400 mb-0.5">{clientName}</p>
+            )}
+            <h1 className="text-[26px] font-bold text-slate-900 leading-tight tracking-tight truncate">
               {projectName}
             </h1>
-
-            {/* Badges row */}
-            <div className="flex items-center gap-2 mt-3 flex-wrap">
-              {/* Status */}
-              <span className="text-xs font-medium rounded-full px-3 py-1 bg-white/10 text-white/70 border border-white/10">
+            <div className="flex items-center gap-2 mt-2.5 flex-wrap">
+              <span className="text-[11px] font-medium rounded-md px-2.5 py-1 bg-slate-100 text-slate-600 border border-slate-200">
                 {STATUS_LABEL[projectStatus] ?? projectStatus}
               </span>
-
-              {/* Markup badge */}
               {canSeeCosts && markup > 0 && (
-                <span className={`text-xs font-bold rounded-full px-3 py-1 border ${
-                  markup >= 2.5
-                    ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30"
-                    : markup >= 2.0
-                    ? "bg-amber-500/20 text-amber-300 border-amber-500/30"
-                    : "bg-red-500/20 text-red-300 border-red-500/30 animate-pulse"
+                <span className={`text-[11px] font-semibold rounded-md px-2.5 py-1 border inline-flex items-center gap-1.5 ${
+                  markup >= 2.5 ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                  : markup >= 2.0 ? "bg-amber-50 text-amber-700 border-amber-200"
+                  : "bg-red-50 text-red-700 border-red-200"
                 }`}>
                   Markup {markup.toFixed(2)}x
                   {markupTrend != null && Math.abs(markupTrend) >= 0.1 && (
-                    <span className={`ml-1.5 inline-flex items-center gap-0.5 ${markupTrend > 0 ? "text-emerald-300" : "text-red-300"}`}>
-                      {markupTrend > 0
-                        ? <TrendingUp className="h-3 w-3" />
-                        : <TrendingDown className="h-3 w-3" />}
-                      {Math.abs(markupTrend).toFixed(1)}x
+                    <span className={`inline-flex items-center gap-0.5 text-[10px] font-semibold ${markupTrend > 0 ? "text-emerald-600" : "text-red-600"}`}>
+                      {markupTrend > 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                      {markupTrend > 0 ? "+" : ""}{markupTrend.toFixed(1)}x
                     </span>
                   )}
                 </span>
               )}
-
-              {/* Health label */}
-              <span className={`text-xs font-semibold rounded-full px-3 py-1 border ${
-                score >= 70 ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/20"
-                : score >= 50 ? "bg-amber-500/15 text-amber-300 border-amber-500/20"
-                : score >= 30 ? "bg-orange-500/15 text-orange-300 border-orange-500/20"
-                : "bg-red-500/15 text-red-300 border-red-500/20"
-              }`}>
-                {info.text}
-              </span>
             </div>
           </div>
+          {canSeeCosts && <HealthBadge score={score} />}
         </div>
 
-        {/* ── KPI strip ── */}
-        <div className="mt-6 flex items-stretch overflow-x-auto border-t border-white/10 pt-4">
-          {canSeeCosts && revenue > 0 && (
-            <KPIPill label="Revenue" value={usd(revenue)} highlight="green" />
-          )}
-          {canSeeCosts && cost > 0 && (
-            <KPIPill label="Costo" value={usd(cost)} highlight="neutral" />
-          )}
-          {canSeeCosts && Number.isFinite(margin) && (
-            <KPIPill
-              label="Margen"
-              value={`${margin.toFixed(1)}%`}
-              sub={revenue > 0 ? usd(revenue - cost) : undefined}
-              highlight={margin >= 25 ? "green" : margin >= 10 ? "amber" : "red"}
-            />
-          )}
-          <KPIPill
-            label="Horas"
-            value={`${totalHours.toFixed(0)}h`}
-            sub={estimatedHours > 0 ? `de ${estimatedHours.toFixed(0)}h est.` : undefined}
-            highlight={
-              estimatedHours > 0 && totalHours > estimatedHours * 1.2 ? "red"
-              : estimatedHours > 0 && totalHours > estimatedHours * 1.05 ? "amber"
-              : "neutral"
-            }
-          />
-          {canSeeCosts && markup > 0 && (
-            <KPIPill
-              label="Markup"
-              value={`${markup.toFixed(2)}x`}
-              sub="meta: 2.5x"
-              highlight={markupHighlight}
-            />
-          )}
-          {budget > 0 && canSeeCosts && (
-            <KPIPill
-              label="Budget"
-              value={`${budgetUtilization.toFixed(0)}%`}
-              sub={`quedan ${usd(budget - cost)}`}
-              highlight={budgetUtilization >= 90 ? "red" : budgetUtilization >= 75 ? "amber" : "green"}
-            />
-          )}
-        </div>
+        {canSeeCosts && (
+          <div className="mt-5 pt-5 border-t border-slate-100 flex items-start flex-wrap gap-y-4">
+            {revenue > 0 && <KPICol label="Revenue" value={usd(revenue)} highlight="green" />}
+            {cost > 0 && <KPICol label="Costo" value={usd(cost)} sub={revenue === 0 ? "sin facturación" : undefined} />}
+            {markup > 0 && <KPICol label="Markup" value={`${markup.toFixed(2)}x`} sub="meta: 2.5x" highlight={markup >= 2.5 ? "green" : markup >= 2.0 ? "amber" : "red"} />}
+            {revenue > 0 && <KPICol label="Margen" value={`${margin.toFixed(1)}%`} sub={profit !== 0 ? usd(profit) : undefined} highlight={margin >= 25 ? "green" : margin >= 10 ? "amber" : "red"} />}
+            {(totalHours > 0 || estimatedHours > 0) && (
+              <KPICol
+                label="Horas"
+                value={`${Math.round(totalHours)}h`}
+                sub={estimatedHours > 0 ? `de ${Math.round(estimatedHours)}h est.` : undefined}
+                highlight={estimatedHours > 0 && totalHours > estimatedHours * 1.2 ? "red" : estimatedHours > 0 && totalHours > estimatedHours * 1.05 ? "amber" : "neutral"}
+              />
+            )}
+            {budget > 0 && (
+              <KPICol
+                label="Budget"
+                value={`${budgetUtilization.toFixed(0)}%`}
+                sub={`quedan ${usd(budget - cost)}`}
+                highlight={budgetUtilization >= 90 ? "red" : budgetUtilization >= 75 ? "amber" : "green"}
+              />
+            )}
+          </div>
+        )}
+
+        {!canSeeCosts && (totalHours > 0 || estimatedHours > 0) && (
+          <div className="mt-4 pt-4 border-t border-slate-100 flex items-center gap-2 text-sm text-slate-600">
+            <span className="font-semibold text-slate-900">{Math.round(totalHours)}h</span>
+            {estimatedHours > 0 && <span className="text-slate-400">de {Math.round(estimatedHours)}h estimadas</span>}
+            {hoursDeviation !== 0 && estimatedHours > 0 && (
+              <span className={`text-xs font-medium rounded-full px-2 py-0.5 ${hoursDeviation > 20 ? "bg-red-50 text-red-600" : hoursDeviation > 5 ? "bg-amber-50 text-amber-600" : "bg-emerald-50 text-emerald-600"}`}>
+                {hoursDeviation > 0 ? "+" : ""}{hoursDeviation.toFixed(0)}%
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
-      {/* ── Budget burndown strip (ops only) ── */}
       {canSeeCosts && budget > 0 && (
-        <div className="bg-slate-900/80 backdrop-blur px-6 py-3 border-t border-white/5">
-          <BudgetBar used={cost} total={budget} utilization={budgetUtilization} />
-        </div>
+        <BudgetStrip cost={cost} budget={budget} utilization={budgetUtilization} />
       )}
     </div>
   );
