@@ -107,10 +107,10 @@ function KPICard({
     : "text-slate-900";
 
   return (
-    <div className={`rounded-lg bg-slate-50 border border-slate-100 border-l-4 ${borderColor} px-3 py-2 flex-1 min-w-[90px]`}>
+    <div className={`rounded-lg bg-slate-50 border border-slate-100 border-l-4 ${borderColor} px-4 py-3 flex-1 min-w-[120px]`}>
       <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">{label}</p>
-      <div className="flex items-baseline gap-1.5 mt-0.5">
-        <p className={`text-base font-bold tabular-nums leading-tight ${valColor}`}>{value}</p>
+      <div className="flex items-baseline gap-1.5 mt-1">
+        <p className={`text-lg font-bold tabular-nums leading-tight ${valColor}`}>{value}</p>
         {trend && (
           <span className={`text-[10px] font-semibold flex items-center gap-0.5 ${trend.positive ? "text-emerald-600" : "text-red-500"}`}>
             {trend.positive ? <ArrowUpRight className="h-2.5 w-2.5" /> : <ArrowDownRight className="h-2.5 w-2.5" />}
@@ -118,7 +118,7 @@ function KPICard({
           </span>
         )}
       </div>
-      {sub && <p className="text-[10px] text-slate-400 mt-0.5">{sub}</p>}
+      {sub && <p className="text-[11px] text-slate-400 mt-1">{sub}</p>}
     </div>
   );
 }
@@ -141,15 +141,10 @@ function BudgetStrip({ cost, budget, utilization }: { cost: number; budget: numb
           {usd(cost)} / {usd(budget)} · <span className="font-semibold">{utilization.toFixed(0)}%</span>
         </span>
       </div>
-      <div className={`h-2 ${bgTrack} rounded-full overflow-hidden`}>
+      <div className={`h-2.5 ${bgTrack} rounded-full overflow-hidden`}>
         <div className={`h-full rounded-full transition-all duration-700 ${barColor}`} style={{ width: `${Math.min(100, utilization)}%` }} />
       </div>
-      <div className="flex items-center justify-between mt-1">
-        <span className={`text-[10px] font-medium ${
-          utilization >= 90 ? "text-red-500" : utilization >= 75 ? "text-amber-500" : "text-emerald-500"
-        }`}>
-          {utilization >= 90 ? "Budget casi agotado" : utilization >= 75 ? "Zona de atención" : "Budget disponible"}
-        </span>
+      <div className="flex items-center justify-end mt-1">
         <span className="text-[10px] text-slate-400">Quedan {usd(budget - cost)}</span>
       </div>
     </div>
@@ -283,6 +278,9 @@ export default function ProjectHero(props: ProjectHeroProps) {
             <div className="mt-3 pt-3 border-t border-slate-100 flex flex-col sm:flex-row gap-3 items-start">
               {/* Hero metric — Health Score */}
               <HeroMetric score={score} label={healthLabel(score).text} grade={healthGrade(score)} />
+
+              {/* Divider */}
+              <div className="hidden sm:block self-stretch border-r border-slate-200" />
 
               {/* Supporting KPIs — max 3 */}
               <div className="flex flex-wrap gap-2 flex-1">
