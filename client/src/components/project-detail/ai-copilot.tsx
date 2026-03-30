@@ -185,10 +185,10 @@ function SignalIcon({ level }: { level: SignalLevel }) {
 }
 
 const SIGNAL_BG: Record<SignalLevel, string> = {
-  critical: "bg-red-50 border-red-200 border-l-4 border-l-red-500",
-  warning: "bg-amber-50 border-amber-200 border-l-4 border-l-amber-400",
-  good: "bg-emerald-50 border-emerald-200 border-l-4 border-l-emerald-500",
-  info: "bg-indigo-50 border-indigo-100 border-l-4 border-l-indigo-300",
+  critical: "bg-red-50/50 border-red-200/60 border-l-4 border-l-red-500",
+  warning: "bg-amber-50/50 border-amber-200/60 border-l-4 border-l-amber-400",
+  good: "bg-emerald-50/50 border-emerald-200/60 border-l-4 border-l-emerald-500",
+  info: "bg-indigo-50/50 border-indigo-100/60 border-l-4 border-l-indigo-300",
 };
 
 const IMPACT_BADGE: Record<string, string> = {
@@ -209,6 +209,7 @@ export default function AICopilot(props: AICopilotProps) {
   const { signals, recommendations, whatIfScenarios, diagnosis } = useProjectIntelligence(props);
   const [showAllSignals, setShowAllSignals] = useState(false);
   const [showWhatIf, setShowWhatIf] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   const headerBorder = diagnosis === "critical" ? "border-l-red-500" : diagnosis === "warning" ? "border-l-amber-400" : "border-l-emerald-500";
   const diagnosisMeta = {
@@ -223,30 +224,62 @@ export default function AICopilot(props: AICopilotProps) {
   // Smart collapse: show critical/warning expanded, collapse good/info by default
   const prioritySignals = signals.filter(s => s.level === "critical" || s.level === "warning");
   const secondarySignals = signals.filter(s => s.level === "good" || s.level === "info");
-  const visibleSignals = showAllSignals ? signals : (prioritySignals.length > 0 ? prioritySignals : signals.slice(0, 2));
+  // Limit to 2 visible signals when expanded
+  const allVisible = showAllSignals ? signals : (prioritySignals.length > 0 ? prioritySignals.slice(0, 2) : signals.slice(0, 2));
+  const visibleSignals = allVisible;
   const hiddenCount = signals.length - visibleSignals.length;
 
   return (
     <div className={`bg-indigo-50/40 rounded-2xl border border-indigo-200/50 border-l-4 ${headerBorder} shadow-sm overflow-hidden`}>
-      {/* Header */}
-      <div className="flex items-center gap-2.5 px-4 py-2.5 border-b border-indigo-100/60 bg-indigo-50/60">
+      {/* Header — clickable to toggle expand/collapse */}
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="w-full flex items-center gap-2.5 px-4 py-2.5 border-b border-indigo-100/60 bg-indigo-50/60 hover:bg-indigo-50/80 transition-colors cursor-pointer"
+      >
         <div className="w-6 h-6 rounded-lg bg-indigo-100 flex items-center justify-center">
           <Zap className="h-3 w-3 text-indigo-600" />
         </div>
         <span className="text-xs font-semibold text-indigo-700 uppercase tracking-wide">AI Copilot</span>
         <span className="text-[10px] text-indigo-400">Epical Intelligence</span>
         <div className="ml-auto flex items-center gap-2">
-          {criticalCount > 0 && <span className="text-[11px] font-semibold bg-red-50 text-red-700 border border-red-200 rounded-full px-2.5 py-0.5">{criticalCount} critico{criticalCount > 1 ? "s" : ""}</span>}
+          {criticalCount > 0 && <span className="text-[11px] font-semibold bg-red-50 text-red-700 border border-red-200 rounded-full px-2.5 py-0.5">{criticalCount} crítico{criticalCount > 1 ? "s" : ""}</span>}
           {warningCount > 0 && <span className="text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 rounded-full px-2.5 py-0.5">{warningCount} atención</span>}
           <span className={`flex items-center gap-1.5 text-[11px] font-semibold rounded-full px-2.5 py-0.5 border ${diagnosisMeta.bg} ${diagnosisMeta.text}`}>
             <span className={`w-1.5 h-1.5 rounded-full ${diagnosisMeta.dot} ${diagnosis !== "healthy" ? "animate-pulse" : ""}`} />
             {diagnosisMeta.label}
           </span>
+          <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform ${isExpanded ? "rotate-180" : ""}`} />
         </div>
-      </div>
+      </button>
 
-      <div className="p-4 grid md:grid-cols-2 gap-4 bg-white/50">
-        {/* Signals */}
+      {!isExpanded ? null : <><div className="p-4 grid md:grid-cols-2 gap-4 bg-white/50">
+        {/* Recommendations (LEFT — actionable) */}
+        <div>
+          <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+            <Lightbulb className="h-3 w-3" />
+            Acciones recomendadas
+          </p>
+          <div className="space-y-2">
+            {recommendations.map((r) => (
+              <div key={r.rank} className="flex items-start gap-3 rounded-xl border border-slate-100 bg-slate-50/80 px-3 py-2 hover:bg-slate-100/60 transition-colors group">
+                <span className="flex-shrink-0 w-6 h-6 rounded-full bg-slate-700 text-white text-[11px] font-bold flex items-center justify-center mt-0.5">{r.rank}</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-slate-600 leading-relaxed">{r.text}</p>
+                </div>
+                <span className={`flex-shrink-0 text-[10px] font-semibold rounded-md px-2 py-0.5 mt-0.5 ${IMPACT_BADGE[r.impact]}`}>
+                  {IMPACT_LABEL[r.impact]}
+                </span>
+              </div>
+            ))}
+            {recommendations.length === 0 && (
+              <div className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2">
+                <p className="text-sm text-slate-400 italic">Sin acciones requeridas por ahora.</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Signals (RIGHT — diagnostic) */}
         <div>
           <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
             <Eye className="h-3 w-3" />
@@ -254,7 +287,7 @@ export default function AICopilot(props: AICopilotProps) {
           </p>
           <div className="space-y-2">
             {visibleSignals.map((s, i) => (
-              <div key={i} className={`rounded-xl border px-3.5 py-2.5 transition-all ${SIGNAL_BG[s.level]}`}>
+              <div key={i} className={`rounded-xl border px-3 py-2 transition-all ${SIGNAL_BG[s.level]}`}>
                 <div className="flex items-start gap-2.5">
                   <SignalIcon level={s.level} />
                   <div className="min-w-0">
@@ -265,12 +298,11 @@ export default function AICopilot(props: AICopilotProps) {
               </div>
             ))}
             {signals.length === 0 && (
-              <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2.5 flex items-center gap-2">
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 flex items-center gap-2">
                 <CheckCircle className="h-4 w-4 text-emerald-500 flex-shrink-0" />
                 <p className="text-sm text-emerald-700 font-medium">Sin señales de riesgo detectadas.</p>
               </div>
             )}
-            {/* Show more / less toggle */}
             {hiddenCount > 0 && !showAllSignals && (
               <button
                 onClick={() => setShowAllSignals(true)}
@@ -288,32 +320,6 @@ export default function AICopilot(props: AICopilotProps) {
                 <ChevronDown className="h-3 w-3 rotate-180" />
                 Mostrar solo alertas
               </button>
-            )}
-          </div>
-        </div>
-
-        {/* Recommendations */}
-        <div>
-          <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
-            <Lightbulb className="h-3 w-3" />
-            Acciones recomendadas
-          </p>
-          <div className="space-y-2">
-            {recommendations.map((r) => (
-              <div key={r.rank} className="flex items-start gap-3 rounded-xl border border-slate-100 bg-slate-50/80 px-3.5 py-3 hover:bg-slate-100/60 transition-colors group">
-                <span className="flex-shrink-0 w-6 h-6 rounded-full bg-slate-700 text-white text-[11px] font-bold flex items-center justify-center mt-0.5">{r.rank}</span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm text-slate-600 leading-relaxed">{r.text}</p>
-                </div>
-                <span className={`flex-shrink-0 text-[10px] font-semibold rounded-md px-2 py-0.5 mt-0.5 ${IMPACT_BADGE[r.impact]}`}>
-                  {IMPACT_LABEL[r.impact]}
-                </span>
-              </div>
-            ))}
-            {recommendations.length === 0 && (
-              <div className="rounded-xl border border-slate-100 bg-slate-50 px-3.5 py-2.5">
-                <p className="text-sm text-slate-400 italic">Sin acciones requeridas por ahora.</p>
-              </div>
             )}
           </div>
         </div>
@@ -359,6 +365,7 @@ export default function AICopilot(props: AICopilotProps) {
           )}
         </div>
       )}
+      </>}
     </div>
   );
 }

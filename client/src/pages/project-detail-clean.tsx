@@ -6,7 +6,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { Link } from "wouter";
-import { AlertTriangle, DollarSign, BarChart3, TrendingUp, Target, ListTodo, ArrowRight, LayoutDashboard, Users, Receipt } from "lucide-react";
+import { AlertTriangle, BarChart3, TrendingUp, ListTodo, LayoutDashboard, Users, Receipt } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 import { useCompleteProjectData } from "@/hooks/useCompleteProjectData";
@@ -80,18 +80,7 @@ function PLBreakdown({
   const noRevenue = revenue === 0 && cost > 0;
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
-      <div className="px-4 py-2.5 border-b border-slate-100 flex items-center justify-between">
-        <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wide flex items-center gap-2">
-          <BarChart3 className="h-3.5 w-3.5" /> P&L del Proyecto
-        </h3>
-        {noRevenue && (
-          <span className="text-[11px] text-amber-600 bg-amber-50 border border-amber-200 rounded-md px-2 py-0.5 font-medium">
-            Sin facturación
-          </span>
-        )}
-      </div>
-
+    <div>
       <div className="p-4 space-y-3">
         {/* Revenue */}
         <div>
@@ -144,34 +133,10 @@ function PLBreakdown({
           </div>
         )}
 
-        {/* Secondary KPIs */}
-        <div className="pt-2 border-t border-slate-100 grid grid-cols-2 gap-2">
-          {[
-            { label: "Markup",       value: markup > 0 ? `${markup.toFixed(2)}x` : "—",
-              color: markup >= 2.5 ? "border-l-emerald-500" : markup >= 2.0 ? "border-l-amber-400" : markup > 0 ? "border-l-red-500" : "border-l-slate-200" },
-            { label: "Margen",       value: margin != null ? fmtPct(margin) : "—",
-              color: (margin ?? 0) >= 25 ? "border-l-emerald-500" : (margin ?? 0) >= 10 ? "border-l-amber-400" : "border-l-slate-200" },
-            { label: "Burn rate",    value: burnRate > 0 ? `${fmt(burnRate)}/h` : "—",
-              color: "border-l-slate-200" },
-            { label: "Budget usado", value: budget > 0 ? fmtPct(budgetUtilization) : "Sin budget",
-              color: budgetUtilization >= 90 ? "border-l-red-500" : budgetUtilization >= 75 ? "border-l-amber-400" : "border-l-emerald-500" },
-          ].map((kpi, i) => (
-            <div key={i} className={`rounded-lg bg-slate-50 border border-slate-100 border-l-4 ${kpi.color} px-3 py-2`}>
-              <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">{kpi.label}</p>
-              <p className="text-sm font-bold text-slate-800 mt-0.5 tabular-nums">{kpi.value}</p>
-            </div>
-          ))}
-        </div>
-
-        {/* No-revenue CTA */}
+        {/* No-revenue notice — clean and minimal */}
         {noRevenue && (
-          <div className="rounded-xl bg-amber-50/50 border border-amber-200/50 px-3 py-2.5 flex items-center gap-3">
-            <DollarSign className="h-4 w-4 text-amber-500 flex-shrink-0" />
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-medium text-amber-700">Sin revenue registrado</p>
-              <p className="text-[11px] text-amber-600/70">Registrar facturación para calcular markup y margen.</p>
-            </div>
-            <ArrowRight className="h-3.5 w-3.5 text-amber-400 flex-shrink-0" />
+          <div className="pt-2 border-t border-slate-100">
+            <p className="text-sm text-slate-400">Pendiente de facturación</p>
           </div>
         )}
       </div>
@@ -187,7 +152,7 @@ function QuotationInfo({ quotation }: { quotation: any }) {
     { label: "Precio cotizado", value: fmt(quotation.totalAmount) },
     { label: "Costo base",      value: fmt(quotation.baseCost) },
     { label: "Horas estimadas", value: fmtHours(quotation.estimatedHours) },
-    { label: "Tipo",            value: quotation.quotationType ?? "—" },
+    { label: "Tipo",            value: quotation.quotationType || "—" },
   ];
   return (
     <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
@@ -200,7 +165,7 @@ function QuotationInfo({ quotation }: { quotation: any }) {
         {fields.map((f, i) => (
           <div key={i}>
             <p className="text-[11px] text-slate-400 uppercase tracking-wide">{f.label}</p>
-            <p className="text-sm font-semibold text-slate-700 mt-0.5 capitalize">{f.value}</p>
+            <p className={`text-sm font-semibold mt-0.5 capitalize ${f.value === "—" ? "text-slate-300" : "text-slate-700"}`}>{f.value}</p>
           </div>
         ))}
       </div>
@@ -339,8 +304,19 @@ export default function ProjectDetailClean() {
   const effectiveMargin = effectiveMarkup > 0 ? ((revenue - effectiveCost) / revenue) * 100 : margin;
   const effectiveBudgetUtil = budget > 0 && effectiveCost > 0 ? (effectiveCost / budget) * 100 : budgetUtil;
 
+  // Compute task summary stats
+  const taskSummaryActive = 0; // Will be shown from ProjectTaskList data
+  const taskSummaryCompleted = 0;
+  const teamAvgDeviation = enrichedTeam.length > 0
+    ? enrichedTeam.reduce((sum: number, m: any) => {
+        const target = m.targetHours ?? m.estimatedHours ?? 0;
+        const actual = m.hoursAsana ?? m.hours ?? 0;
+        return sum + (target > 0 ? Math.abs(((actual - target) / target) * 100) : 0);
+      }, 0) / enrichedTeam.filter((m: any) => (m.targetHours ?? m.estimatedHours ?? 0) > 0).length || 0
+    : 0;
+
   return (
-    <div className="w-full px-3 py-5 space-y-6 bg-slate-100 min-h-screen">
+    <div className="w-full px-3 py-5 space-y-8 bg-slate-100 min-h-screen">
 
       {/* ── 1. Hero Header ─────────────────────────────────────────── */}
       <div id="section-overview" className="animate-fadeIn">
@@ -366,7 +342,7 @@ export default function ProjectDetailClean() {
       {/* ── Sticky Section Nav ─────────────────────────────────────── */}
       <SectionNav activeSection={activeSection} />
 
-      {/* ── 2. AI Copilot — LOUD (ops only) ────────────────────────── */}
+      {/* ── 2. AI Copilot — collapsed by default (ops only) ────────── */}
       {canSeeCosts && (effectiveCost > 0 || budget > 0) && (
         <div className="animate-fadeIn" style={{ animationDelay: "100ms" }}>
           <AICopilot
@@ -387,63 +363,95 @@ export default function ProjectDetailClean() {
         </div>
       )}
 
-      {/* ── 3. Tasks — ELEVATED (daily workhorse) ──────────────────── */}
+      {/* ── 3. Tasks — Compact Summary ─────────────────────────────── */}
       <div id="section-tareas" className="animate-fadeIn" style={{ animationDelay: "200ms" }}>
+        <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Tareas</p>
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="flex items-center gap-2 px-4 py-2.5 border-b border-slate-100">
-            <ListTodo className="h-3.5 w-3.5 text-slate-400" />
-            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Tareas</h3>
-          </div>
           <div className="p-1">
             <ProjectTaskList projectId={pid} />
           </div>
         </div>
       </div>
 
-      {/* ── 4. Finances + Team grid — NORMAL/QUIET ─────────────────── */}
-      <div id="section-finanzas" className="grid md:grid-cols-2 gap-4 items-start animate-fadeIn" style={{ animationDelay: "300ms" }}>
-        {/* P&L + Quotation (ops only) */}
-        {canSeeCosts ? (
-          <div className="space-y-4">
-            <PLBreakdown
-              revenue={revenue}
-              cost={effectiveCost}
-              budget={budget}
-              budgetUtilization={effectiveBudgetUtil}
-              totalHours={effectiveHours}
-              markup={effectiveMarkup}
-            />
-            <QuotationInfo quotation={q} />
-          </div>
-        ) : (
-          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
-            <div className="px-4 py-2.5 border-b border-slate-100">
-              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wide flex items-center gap-2">
-                <TrendingUp className="h-3.5 w-3.5" /> Resumen
-              </h3>
+      {/* ── 4. Finances — P&L + Quotation merged ──────────────────── */}
+      <div id="section-finanzas" className="animate-fadeIn" style={{ animationDelay: "300ms" }}>
+        <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Finanzas</p>
+        <div className="grid md:grid-cols-2 gap-4 items-start">
+          {canSeeCosts ? (
+            <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+              {/* P&L Section */}
+              <div className="px-4 py-2.5 border-b border-slate-100 flex items-center justify-between">
+                <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wide flex items-center gap-2">
+                  <BarChart3 className="h-3.5 w-3.5" /> P&L del Proyecto
+                </h3>
+                {revenue === 0 && effectiveCost > 0 && (
+                  <span className="text-[11px] text-amber-600 bg-amber-50 border border-amber-200 rounded-md px-2 py-0.5 font-medium">
+                    Sin facturación
+                  </span>
+                )}
+              </div>
+              <PLBreakdown
+                revenue={revenue}
+                cost={effectiveCost}
+                budget={budget}
+                budgetUtilization={effectiveBudgetUtil}
+                totalHours={effectiveHours}
+                markup={effectiveMarkup}
+              />
+              {/* Quotation — merged with internal divider */}
+              {q && (
+                <>
+                  <div className="border-t border-slate-100 px-4 py-2.5">
+                    <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wide flex items-center gap-2">
+                      <Receipt className="h-3.5 w-3.5" /> Cotización
+                    </h3>
+                  </div>
+                  <div className="px-4 pb-4 grid grid-cols-2 gap-3">
+                    {[
+                      { label: "Precio cotizado", value: fmt(q.totalAmount) },
+                      { label: "Costo base",      value: fmt(q.baseCost) },
+                      { label: "Horas estimadas", value: fmtHours(q.estimatedHours) },
+                      { label: "Tipo",            value: q.quotationType || "—" },
+                    ].map((f, i) => (
+                      <div key={i}>
+                        <p className="text-[11px] text-slate-400 uppercase tracking-wide">{f.label}</p>
+                        <p className={`text-sm font-semibold mt-0.5 capitalize ${f.value === "—" ? "text-slate-300" : "text-slate-700"}`}>{f.value}</p>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
-            <div className="p-4 grid grid-cols-2 gap-3">
-              {[
-                { label: "Horas totales",   value: fmtHours(effectiveHours) },
-                { label: "Horas estimadas", value: fmtHours(estimatedHours) },
-                { label: "Desvío",          value: estimatedHours > 0 ? `${hoursDeviation > 0 ? "+" : ""}${hoursDeviation.toFixed(0)}%` : "—" },
-                { label: "Equipo",          value: `${enrichedTeam.length} personas` },
-              ].map((kpi, i) => (
-                <div key={i} className="rounded-xl bg-slate-50 px-3 py-2.5">
-                  <p className="text-[10px] text-slate-400 uppercase tracking-wide">{kpi.label}</p>
-                  <p className="text-base font-semibold text-slate-800 mt-0.5">{kpi.value}</p>
-                </div>
-              ))}
+          ) : (
+            <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+              <div className="px-4 py-2.5 border-b border-slate-100">
+                <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wide flex items-center gap-2">
+                  <TrendingUp className="h-3.5 w-3.5" /> Resumen
+                </h3>
+              </div>
+              <div className="p-4 grid grid-cols-2 gap-3">
+                {[
+                  { label: "Horas totales",   value: fmtHours(effectiveHours) },
+                  { label: "Horas estimadas", value: fmtHours(estimatedHours) },
+                  { label: "Desvío",          value: estimatedHours > 0 ? `${hoursDeviation > 0 ? "+" : ""}${hoursDeviation.toFixed(0)}%` : "—" },
+                  { label: "Equipo",          value: `${enrichedTeam.length} personas` },
+                ].map((kpi, i) => (
+                  <div key={i} className="rounded-xl bg-slate-50 px-3 py-2.5">
+                    <p className="text-[10px] text-slate-400 uppercase tracking-wide">{kpi.label}</p>
+                    <p className="text-base font-semibold text-slate-800 mt-0.5">{kpi.value}</p>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Team — QUIET */}
-        <div id="section-equipo">
-          <TeamPerformance
-            team={enrichedTeam}
-            canSeeCosts={canSeeCosts}
-          />
+          {/* Team Performance */}
+          <div id="section-equipo">
+            <TeamPerformance
+              team={enrichedTeam}
+              canSeeCosts={canSeeCosts}
+            />
+          </div>
         </div>
       </div>
     </div>

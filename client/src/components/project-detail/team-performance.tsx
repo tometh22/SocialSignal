@@ -91,9 +91,9 @@ function EfficiencyBadge({ score, color }: { score?: number; color?: string }) {
   if (score == null) return <span className="text-slate-300 text-xs">—</span>;
 
   const cls =
-    color === "green" || score >= 70 ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200"
-    : color === "amber" || score >= 40 ? "bg-amber-50 text-amber-700 ring-1 ring-amber-200"
-    : "bg-red-50 text-red-700 ring-1 ring-red-200";
+    color === "green" || score >= 70 ? "bg-emerald-100 text-emerald-700"
+    : color === "amber" || score >= 40 ? "bg-amber-100 text-amber-700"
+    : "bg-red-100 text-red-700";
 
   const label =
     score >= 80 ? "Excelente"
@@ -102,8 +102,8 @@ function EfficiencyBadge({ score, color }: { score?: number; color?: string }) {
     : "Bajo";
 
   return (
-    <span className={`text-[11px] font-semibold rounded-full px-2 py-0.5 ${cls}`}>
-      {label} {score.toFixed(0)}
+    <span className={`text-[11px] font-semibold rounded-full px-2.5 py-0.5 ${cls}`}>
+      {label}
     </span>
   );
 }
@@ -294,7 +294,7 @@ export default function TeamPerformance({ team, canSeeCosts }: TeamPerformancePr
                 </td>
 
                 {/* Deviation badge */}
-                <td className="py-2.5 px-2.5 text-center">
+                <td className="py-2.5 px-3 text-center">
                   <DeviationBadge actual={m.actualHours} target={m.target} />
                 </td>
 
