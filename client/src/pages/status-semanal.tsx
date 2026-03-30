@@ -173,13 +173,13 @@ function shortDateTime(s: string) {
   const d = new Date(s);
   const now = new Date();
   const diffMs = now.getTime() - d.getTime();
-  const time = d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
-  if (diffMs < 86400000 && d.getDate() === now.getDate()) return time; // today: just time
+  const time = d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false });
+  if (diffMs < 86400000 && d.getDate() === now.getDate()) return time; // today: "14:35"
   if (diffMs < 86400000 * 7) {
-    const day = d.toLocaleDateString('es-AR', { weekday: 'short' });
-    return `${day} ${time}`;
+    const day = d.toLocaleDateString('es-AR', { weekday: 'short' }).replace('.', '');
+    return `${day} ${time}`; // "Lun 14:35"
   }
-  return `${d.toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })} ${time}`;
+  return d.toLocaleDateString('es-AR', { day: 'numeric', month: 'short' }).replace('.', ''); // "10 mar"
 }
 
 function fullDateTime(s: string) {
@@ -295,6 +295,204 @@ function InlineText({ value, placeholder, onSave, multiline = false, className =
       title="Click para editar">
       {value || placeholder}
     </span>
+  );
+}
+
+// ─── Update Timeline (accumulating update entries) ───────────────────────────
+
+type UpdateEntry = { id: number; content: string; authorId: number | null; authorName: string | null; createdAt: string };
+
+function UpdateTimeline({ projectId, customId, currentAction, currentUserId, onActionUpdated }: {
+  projectId?: number; customId?: number; currentAction: string | null; currentUserId?: number | null;
+  onActionUpdated?: () => void;
+}) {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const [draft, setDraft] = useState('');
+  const [showAll, setShowAll] = useState(false);
+
+  const updatesUrl = projectId
+    ? `/api/status-semanal/${projectId}/updates`
+    : `/api/status-semanal/custom/${customId}/updates`;
+  const cacheKey = projectId
+    ? ['/api/status-semanal', projectId, 'updates']
+    : ['/api/status-semanal/custom', customId, 'updates'];
+
+  const { data: entries = [] } = useQuery<UpdateEntry[]>({
+    queryKey: cacheKey,
+    queryFn: async () => { const r = await authFetch(updatesUrl); return r.json(); },
+  });
+
+  const addMutation = useMutation({
+    mutationFn: (content: string) => mutationFetch(updatesUrl, 'POST', { content }),
+    onSuccess: () => {
+      queryClient.refetchQueries({ queryKey: cacheKey });
+      queryClient.refetchQueries({ queryKey: ['/api/status-semanal'] });
+      if (customId) queryClient.refetchQueries({ queryKey: ['/api/status-semanal/custom'] });
+      onActionUpdated?.();
+    },
+    onError: (err: Error) => toast({ title: 'Error', description: err.message, variant: 'destructive' }),
+  });
+
+  const submit = () => {
+    const t = draft.trim();
+    if (!t) return;
+    setDraft('');
+    addMutation.mutate(t);
+  };
+
+  const visibleEntries = showAll ? entries : entries.slice(0, 3);
+  const hasMore = entries.length > 3;
+
+  return (
+    <div>
+      <p className="text-[10px] text-slate-400 font-semibold mb-1">Update</p>
+      {/* Add new update input */}
+      <div className="flex gap-1.5 mb-1.5">
+        <input
+          value={draft}
+          onChange={e => setDraft(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); submit(); } }}
+          placeholder="Escribir update..."
+          className="flex-1 text-xs border border-slate-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-400 bg-white"
+        />
+        <button onClick={submit} disabled={!draft.trim() || addMutation.isPending}
+          className={cn("px-2 py-1 rounded text-xs font-medium transition-colors",
+            draft.trim() ? "bg-indigo-600 text-white hover:bg-indigo-700" : "bg-slate-100 text-slate-300")}>
+          {addMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
+        </button>
+      </div>
+      {/* Entries list */}
+      {visibleEntries.length > 0 ? (
+        <div className="space-y-1">
+          {visibleEntries.map(entry => {
+            const isOwn = entry.authorId != null && entry.authorId === currentUserId;
+            const firstName = entry.authorName?.split(' ')[0] || 'Usuario';
+            return (
+              <div key={entry.id} className={cn("rounded px-2 py-1 text-xs", isOwn ? "bg-slate-50" : "bg-indigo-50/60")}>
+                <div className="flex items-center gap-1 mb-0.5">
+                  <span className={cn("font-medium text-[10px]", isOwn ? "text-slate-500" : "text-indigo-600")}>{firstName}</span>
+                  <span className="text-[9px] text-slate-400">{shortDateTime(entry.createdAt)}</span>
+                </div>
+                <p className="text-slate-700 leading-snug whitespace-pre-wrap">{entry.content}</p>
+              </div>
+            );
+          })}
+          {hasMore && !showAll && (
+            <button onClick={() => setShowAll(true)} className="text-[10px] text-indigo-500 hover:text-indigo-700 font-medium">
+              Ver {entries.length - 3} más...
+            </button>
+          )}
+          {showAll && hasMore && (
+            <button onClick={() => setShowAll(false)} className="text-[10px] text-slate-400 hover:text-slate-600 font-medium">
+              Ver menos
+            </button>
+          )}
+        </div>
+      ) : currentAction ? (
+        <p className="text-xs text-slate-500 italic px-1">{currentAction}</p>
+      ) : (
+        <p className="text-xs text-slate-400 italic px-1">Sin updates todavía</p>
+      )}
+    </div>
+  );
+}
+
+// ─── Inline Chat (last messages + quick reply) ───────────────────────────────
+
+function InlineChat({ projectId, customId, currentUserId, onOpenFullChat }: {
+  projectId?: number; customId?: number; currentUserId?: number | null; onOpenFullChat?: () => void;
+}) {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const [msg, setMsg] = useState('');
+  const [sent, setSent] = useState(false);
+
+  const notesUrl = projectId
+    ? `/api/status-semanal/${projectId}/notes`
+    : `/api/status-semanal/custom/${customId}/notes`;
+  const notesCacheKey = projectId
+    ? ['/api/status-semanal', projectId, 'notes']
+    : ['/api/status-semanal/custom', customId, 'notes'];
+  const activityCacheKey = projectId
+    ? ['/api/status-semanal', projectId, 'activity']
+    : ['/api/status-semanal/custom', customId, 'activity'];
+
+  const { data: allNotes = [] } = useQuery<Note[]>({
+    queryKey: notesCacheKey,
+    queryFn: async () => { const r = await authFetch(notesUrl); return r.json(); },
+  });
+
+  const recentNotes = allNotes.slice(-3); // last 3 messages
+
+  const addMutation = useMutation({
+    mutationFn: (content: string) => mutationFetch(notesUrl, 'POST', { content }),
+    onSuccess: () => {
+      queryClient.refetchQueries({ queryKey: notesCacheKey });
+      queryClient.refetchQueries({ queryKey: activityCacheKey });
+      queryClient.refetchQueries({ queryKey: ['/api/status-semanal'] });
+      if (customId) queryClient.refetchQueries({ queryKey: ['/api/status-semanal/custom'] });
+      setSent(true);
+      setTimeout(() => setSent(false), 2000);
+    },
+    onError: (err: Error) => toast({ title: 'Error', description: err.message, variant: 'destructive' }),
+  });
+
+  const submit = () => {
+    const t = msg.trim();
+    if (!t) return;
+    setMsg('');
+    addMutation.mutate(t);
+  };
+
+  return (
+    <div className="pt-2 border-t border-slate-100">
+      <div className="flex items-center justify-between mb-1">
+        <p className="text-[10px] text-slate-400 font-semibold flex items-center gap-1">
+          <MessageSquare className="h-3 w-3" /> Chat
+        </p>
+        {onOpenFullChat && (
+          <button onClick={onOpenFullChat} className="text-[10px] text-indigo-500 hover:text-indigo-700 font-medium flex items-center gap-0.5">
+            Ver todo <ArrowRight className="h-2.5 w-2.5" />
+          </button>
+        )}
+      </div>
+      {/* Recent messages */}
+      {recentNotes.length > 0 ? (
+        <div className="space-y-1 mb-1.5">
+          {recentNotes.map(note => {
+            const isOwn = note.authorId != null && note.authorId === currentUserId;
+            const firstName = note.authorName?.split(' ')[0] || 'Usuario';
+            return (
+              <div key={note.id} className={cn("rounded px-2 py-1 text-[11px]", isOwn ? "bg-slate-50" : "bg-teal-50/60")}>
+                <span className={cn("font-medium", isOwn ? "text-slate-500" : "text-teal-600")}>{firstName}</span>
+                <span className="text-slate-400 ml-1 text-[9px]">{shortDateTime(note.createdAt)}</span>
+                <p className="text-slate-700 leading-snug mt-0.5">{note.content}</p>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <p className="text-[11px] text-slate-300 italic mb-1.5">Sin mensajes</p>
+      )}
+      {/* Quick reply */}
+      <div className="flex gap-1">
+        <input
+          value={msg}
+          onChange={e => setMsg(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); submit(); } }}
+          placeholder="Escribir mensaje..."
+          className="flex-1 text-[11px] border border-slate-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-400 bg-white"
+        />
+        <button onClick={submit} disabled={!msg.trim() || addMutation.isPending}
+          className={cn("p-1 rounded transition-colors",
+            msg.trim() ? "bg-indigo-600 text-white hover:bg-indigo-700" : "bg-slate-100 text-slate-300")}>
+          {addMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> :
+           sent ? <CheckCircle2 className="h-3 w-3 text-emerald-500" /> : <Send className="h-3 w-3" />}
+        </button>
+      </div>
+      {sent && <p className="text-[9px] text-emerald-500 mt-0.5 font-medium">Enviado</p>}
+    </div>
   );
 }
 
@@ -679,10 +877,12 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
               )}
 
               <div className="grid grid-cols-2 gap-2 mb-2">
-                <div>
-                  <p className="text-[10px] text-slate-400 font-semibold mb-0.5">Update</p>
-                  <InlineText value={item.currentAction} placeholder="Estado actual" onSave={v => onUpdate({ currentAction: v })} multiline className="text-xs" />
-                </div>
+                <UpdateTimeline
+                  projectId={item.projectId}
+                  customId={item.customId}
+                  currentAction={item.currentAction}
+                  currentUserId={currentUserId}
+                />
                 <div>
                   <p className="text-[10px] text-slate-400 font-semibold mb-0.5">Próximo paso</p>
                   <InlineText value={item.nextMilestone} placeholder="Acción esta semana" onSave={v => onUpdate({ nextMilestone: v })} multiline className="text-xs" />
@@ -694,12 +894,6 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
                 <LevelBadge value={item.teamStrain} onChange={v => onUpdate({ teamStrain: v })} label="Carga equipo" type="team" />
                 <DecisionBadge value={item.decisionNeeded} onChange={v => onUpdate({ decisionNeeded: v })} />
                 <div className="flex-1" />
-                {onOpenNotes && (
-                  <button onClick={onOpenNotes}
-                    className={cn("text-xs text-slate-400 hover:text-indigo-600 transition-colors")}>
-                    <MessageSquare className="h-3 w-3" />
-                  </button>
-                )}
                 {(hasPrev || hasNext) && (
                   <div className="flex items-center gap-0.5">
                     <button onClick={onPrev} disabled={!hasPrev}
@@ -713,6 +907,14 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
                   </div>
                 )}
               </div>
+
+              {/* Inline chat */}
+              <InlineChat
+                projectId={item.projectId}
+                customId={item.customId}
+                currentUserId={currentUserId}
+                onOpenFullChat={onOpenNotes}
+              />
             </div>
           </motion.div>
         )}

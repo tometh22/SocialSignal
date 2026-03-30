@@ -100,6 +100,7 @@ import {
   projectReviewNotes,
   weeklyStatusItems,
   statusChangeLog,
+  statusUpdateEntries,
   holidays,
   insertHolidaySchema,
   monthlyClosings,
@@ -17411,6 +17412,137 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('GET /api/status-semanal/:projectId/activity error:', error);
       res.status(500).json({ message: "Error al obtener actividad" });
+    }
+  });
+
+  // GET /api/status-semanal/:projectId/updates — update entries for a project
+  app.get("/api/status-semanal/:projectId/updates", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) return res.status(400).json({ message: "projectId inválido" });
+      try {
+        const entries = await db.select({
+          id: statusUpdateEntries.id,
+          content: statusUpdateEntries.content,
+          authorId: statusUpdateEntries.authorId,
+          authorName: sql<string>`COALESCE(${users.firstName} || ' ' || ${users.lastName}, 'Usuario')`,
+          createdAt: statusUpdateEntries.createdAt,
+        }).from(statusUpdateEntries)
+          .leftJoin(users, eq(users.id, statusUpdateEntries.authorId))
+          .where(eq(statusUpdateEntries.projectId, projectId))
+          .orderBy(desc(statusUpdateEntries.createdAt));
+        res.json(entries);
+      } catch {
+        // Table doesn't exist yet — return empty
+        res.json([]);
+      }
+    } catch (error) {
+      console.error('GET /api/status-semanal/:projectId/updates error:', error);
+      res.status(500).json({ message: "Error al obtener updates" });
+    }
+  });
+
+  // POST /api/status-semanal/:projectId/updates — add an update entry for a project
+  app.post("/api/status-semanal/:projectId/updates", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) return res.status(400).json({ message: "projectId inválido" });
+      const { content } = req.body;
+      if (!content?.trim()) return res.status(400).json({ message: "Contenido vacío" });
+      const userId = req.user?.id ?? null;
+      try {
+        const [entry] = await db.insert(statusUpdateEntries)
+          .values({ projectId, content: content.trim(), authorId: userId })
+          .returning();
+        // Also update the currentAction field on the review so collapsed row shows latest
+        try {
+          const [existing] = await db.select({ id: projectStatusReviews.id })
+            .from(projectStatusReviews).where(eq(projectStatusReviews.projectId, projectId));
+          if (existing) {
+            await db.update(projectStatusReviews)
+              .set({ currentAction: content.trim(), updatedAt: new Date() })
+              .where(eq(projectStatusReviews.projectId, projectId));
+          } else {
+            await db.insert(projectStatusReviews)
+              .values({ projectId, currentAction: content.trim(), updatedAt: new Date() });
+          }
+        } catch {}
+        res.status(201).json(entry);
+      } catch (e: any) {
+        // Table doesn't exist — fall back to just updating currentAction
+        try {
+          const [existing] = await db.select({ id: projectStatusReviews.id })
+            .from(projectStatusReviews).where(eq(projectStatusReviews.projectId, projectId));
+          if (existing) {
+            await db.update(projectStatusReviews)
+              .set({ currentAction: content.trim(), updatedAt: new Date() })
+              .where(eq(projectStatusReviews.projectId, projectId));
+          }
+        } catch {}
+        res.status(201).json({ id: 0, content: content.trim(), authorId: userId, createdAt: new Date().toISOString() });
+      }
+    } catch (error) {
+      console.error('POST /api/status-semanal/:projectId/updates error:', error);
+      res.status(500).json({ message: "Error al guardar update" });
+    }
+  });
+
+  // GET /api/status-semanal/custom/:itemId/updates — update entries for a custom item
+  app.get("/api/status-semanal/custom/:itemId/updates", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const itemId = parseInt(req.params.itemId);
+      if (isNaN(itemId)) return res.status(400).json({ message: "itemId inválido" });
+      try {
+        const entries = await db.select({
+          id: statusUpdateEntries.id,
+          content: statusUpdateEntries.content,
+          authorId: statusUpdateEntries.authorId,
+          authorName: sql<string>`COALESCE(${users.firstName} || ' ' || ${users.lastName}, 'Usuario')`,
+          createdAt: statusUpdateEntries.createdAt,
+        }).from(statusUpdateEntries)
+          .leftJoin(users, eq(users.id, statusUpdateEntries.authorId))
+          .where(eq(statusUpdateEntries.weeklyStatusItemId, itemId))
+          .orderBy(desc(statusUpdateEntries.createdAt));
+        res.json(entries);
+      } catch {
+        res.json([]);
+      }
+    } catch (error) {
+      console.error('GET /api/status-semanal/custom/:itemId/updates error:', error);
+      res.status(500).json({ message: "Error al obtener updates" });
+    }
+  });
+
+  // POST /api/status-semanal/custom/:itemId/updates — add an update entry for a custom item
+  app.post("/api/status-semanal/custom/:itemId/updates", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const itemId = parseInt(req.params.itemId);
+      if (isNaN(itemId)) return res.status(400).json({ message: "itemId inválido" });
+      const { content } = req.body;
+      if (!content?.trim()) return res.status(400).json({ message: "Contenido vacío" });
+      const userId = req.user?.id ?? null;
+      try {
+        const [entry] = await db.insert(statusUpdateEntries)
+          .values({ weeklyStatusItemId: itemId, content: content.trim(), authorId: userId })
+          .returning();
+        // Also update the currentAction field so collapsed row shows latest
+        try {
+          await db.update(weeklyStatusItems)
+            .set({ currentAction: content.trim(), updatedAt: new Date() })
+            .where(eq(weeklyStatusItems.id, itemId));
+        } catch {}
+        res.status(201).json(entry);
+      } catch (e: any) {
+        try {
+          await db.update(weeklyStatusItems)
+            .set({ currentAction: content.trim(), updatedAt: new Date() })
+            .where(eq(weeklyStatusItems.id, itemId));
+        } catch {}
+        res.status(201).json({ id: 0, content: content.trim(), authorId: userId, createdAt: new Date().toISOString() });
+      }
+    } catch (error) {
+      console.error('POST /api/status-semanal/custom/:itemId/updates error:', error);
+      res.status(500).json({ message: "Error al guardar update" });
     }
   });
 
