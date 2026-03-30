@@ -1,8 +1,9 @@
 /**
- * Team Performance — tabla de equipo con efficiency scores, desvíos visuales
- * y distribución de costos. Visible solo para Ops/Admin (canSeeCosts).
+ * Team Performance — redesigned with wider bars, interactive sorting,
+ * avatar status indicators, and improved visual hierarchy.
  */
-import { Users } from "lucide-react";
+import { useState } from "react";
+import { Users, ArrowUpDown, ChevronUp, ChevronDown } from "lucide-react";
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip as RTooltip } from "recharts";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -18,14 +19,17 @@ export interface TeamMember {
   hoursAsana?: number;
   costUSD?: number;
   cost?: number;
-  efficiencyScore?: number;   // from rankings.economicMetrics (0-100)
-  performanceColor?: string;  // "green" | "amber" | "red" from rankings
+  efficiencyScore?: number;
+  performanceColor?: string;
 }
 
 interface TeamPerformanceProps {
   team: TeamMember[];
   canSeeCosts: boolean;
 }
+
+type SortField = "name" | "hours" | "deviation" | "cost" | "efficiency";
+type SortDir = "asc" | "desc";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -55,26 +59,27 @@ const AVATAR_COLORS = [
 
 const PIE_COLORS = ["#6366f1", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4", "#ec4899", "#84cc16"];
 
-// ─── Mini Hours Bar ───────────────────────────────────────────────────────────
+// ─── Enhanced Hours Bar ─────────────────────────────────────────────────────
 
 function HoursBar({ actual, target }: { actual: number; target: number }) {
   if (target <= 0) {
-    return <span className="text-sm tabular-nums text-slate-600">{actual.toFixed(0)}h</span>;
+    return <span className="text-sm tabular-nums text-slate-600 font-medium">{actual.toFixed(0)}h</span>;
   }
   const pct = Math.min(150, (actual / target) * 100);
   const over = actual > target;
-  const barColor = pct >= 125 ? "bg-red-500" : pct >= 105 ? "bg-amber-400" : "bg-emerald-500";
+  const barColor = pct >= 125 ? "bg-gradient-to-r from-red-400 to-red-500" : pct >= 105 ? "bg-gradient-to-r from-amber-300 to-amber-400" : "bg-gradient-to-r from-emerald-400 to-emerald-500";
+  const trackBg = pct >= 125 ? "bg-red-100" : pct >= 105 ? "bg-amber-100" : "bg-slate-100";
 
   return (
-    <div className="space-y-1 min-w-[80px]">
+    <div className="space-y-1.5 min-w-[100px]">
       <div className="flex justify-between text-[11px]">
         <span className={`font-semibold tabular-nums ${over ? "text-red-600" : "text-slate-700"}`}>
           {actual.toFixed(0)}h
         </span>
         <span className="text-slate-400">/{target.toFixed(0)}h</span>
       </div>
-      <div className="h-1.5 rounded-full bg-slate-100 overflow-hidden">
-        <div className={`h-full rounded-full ${barColor} transition-all`} style={{ width: `${Math.min(100, pct)}%` }} />
+      <div className={`h-2 rounded-full ${trackBg} overflow-hidden`}>
+        <div className={`h-full rounded-full ${barColor} transition-all duration-500`} style={{ width: `${Math.min(100, pct)}%` }} />
       </div>
     </div>
   );
@@ -117,25 +122,63 @@ function DeviationBadge({ actual, target }: { actual: number; target: number }) 
 
   return (
     <span className={`text-[11px] font-semibold rounded-full px-2 py-0.5 ${cls}`}>
-      {dev > 0 ? "+" : ""}{abs}%
+      {dev > 0 ? "+" : dev < 0 ? "-" : ""}{abs}%
     </span>
+  );
+}
+
+// ─── Sort Header ─────────────────────────────────────────────────────────────
+
+function SortHeader({
+  label, field, currentField, currentDir, onSort, className = "",
+}: {
+  label: string;
+  field: SortField;
+  currentField: SortField;
+  currentDir: SortDir;
+  onSort: (f: SortField) => void;
+  className?: string;
+}) {
+  const active = currentField === field;
+  return (
+    <th className={`py-2.5 px-3 text-[11px] font-semibold text-slate-400 uppercase tracking-wide cursor-pointer hover:text-slate-600 transition-colors select-none ${className}`}
+        onClick={() => onSort(field)}>
+      <span className="flex items-center gap-1">
+        {label}
+        {active ? (
+          currentDir === "asc" ? <ChevronUp className="h-3 w-3 text-indigo-500" /> : <ChevronDown className="h-3 w-3 text-indigo-500" />
+        ) : (
+          <ArrowUpDown className="h-3 w-3 opacity-30" />
+        )}
+      </span>
+    </th>
   );
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function TeamPerformance({ team, canSeeCosts }: TeamPerformanceProps) {
+  const [sortField, setSortField] = useState<SortField>("hours");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
+
   if (!team || team.length === 0) {
     return (
-      <div className="rounded-2xl border border-slate-200 p-8 text-center text-slate-400">
-        <Users className="h-8 w-8 mx-auto mb-2 opacity-30" />
-        <p className="text-sm">Sin datos de equipo para este período.</p>
-        <p className="text-xs mt-1 text-slate-300">Las horas aparecen cuando el equipo las carga en Tareas.</p>
+      <div className="rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+        <div className="flex items-center gap-2 px-5 py-3.5 border-b border-slate-100 bg-slate-50">
+          <Users className="h-4 w-4 text-slate-500" />
+          <span className="text-sm font-semibold text-slate-800">Equipo</span>
+        </div>
+        <div className="p-10 text-center">
+          <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-3">
+            <Users className="h-6 w-6 text-slate-300" />
+          </div>
+          <p className="text-sm font-medium text-slate-500">Sin datos de equipo para este período</p>
+          <p className="text-xs mt-1 text-slate-400">Las horas aparecen cuando el equipo las carga en Tareas.</p>
+        </div>
       </div>
     );
   }
 
-  // Normalize member data
   const members = team.map((m, i) => ({
     ...m,
     actualHours: m.hoursAsana ?? m.hours ?? 0,
@@ -148,16 +191,31 @@ export default function TeamPerformance({ team, canSeeCosts }: TeamPerformancePr
   const totalCost = members.reduce((s, m) => s + m.costVal, 0);
   const totalHours = members.reduce((s, m) => s + m.actualHours, 0);
 
-  // Sort: overrun first, then by hours desc
+  const handleSort = (field: SortField) => {
+    if (field === sortField) {
+      setSortDir(d => d === "asc" ? "desc" : "asc");
+    } else {
+      setSortField(field);
+      setSortDir("desc");
+    }
+  };
+
   const sorted = [...members].sort((a, b) => {
-    const devA = a.target > 0 ? (a.actualHours - a.target) / a.target : 0;
-    const devB = b.target > 0 ? (b.actualHours - b.target) / b.target : 0;
-    if (devA > 0.05 && devB <= 0.05) return -1;
-    if (devB > 0.05 && devA <= 0.05) return 1;
-    return b.actualHours - a.actualHours;
+    const dir = sortDir === "asc" ? 1 : -1;
+    switch (sortField) {
+      case "name": return dir * a.name.localeCompare(b.name);
+      case "hours": return dir * (a.actualHours - b.actualHours);
+      case "deviation": {
+        const devA = a.target > 0 ? (a.actualHours - a.target) / a.target : 0;
+        const devB = b.target > 0 ? (b.actualHours - b.target) / b.target : 0;
+        return dir * (devA - devB);
+      }
+      case "cost": return dir * (a.costVal - b.costVal);
+      case "efficiency": return dir * ((a.efficiencyScore ?? 0) - (b.efficiencyScore ?? 0));
+      default: return 0;
+    }
   });
 
-  // Pie data for cost distribution
   const pieData = members
     .filter(m => m.costVal > 0)
     .map((m, i) => ({
@@ -166,6 +224,22 @@ export default function TeamPerformance({ team, canSeeCosts }: TeamPerformancePr
       color: PIE_COLORS[i % PIE_COLORS.length],
     }));
 
+  // Performance indicator dot color
+  const getStatusDot = (m: typeof members[0]) => {
+    if (m.efficiencyScore != null) {
+      if (m.efficiencyScore >= 70) return "bg-emerald-500";
+      if (m.efficiencyScore >= 40) return "bg-amber-400";
+      return "bg-red-500";
+    }
+    if (m.target > 0) {
+      const dev = (m.actualHours - m.target) / m.target;
+      if (dev > 0.2) return "bg-red-500";
+      if (dev > 0.05) return "bg-amber-400";
+      return "bg-emerald-500";
+    }
+    return "bg-slate-300";
+  };
+
   return (
     <div className="rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
       {/* Header */}
@@ -173,7 +247,7 @@ export default function TeamPerformance({ team, canSeeCosts }: TeamPerformancePr
         <div className="flex items-center gap-2">
           <Users className="h-4 w-4 text-slate-500" />
           <span className="text-sm font-semibold text-slate-800">Equipo</span>
-          <span className="text-xs text-slate-400">{members.length} personas</span>
+          <span className="text-xs text-slate-400 bg-slate-200/60 rounded-full px-2 py-0.5">{members.length}</span>
         </div>
         {canSeeCosts && totalCost > 0 && (
           <span className="text-xs text-slate-500">
@@ -186,23 +260,26 @@ export default function TeamPerformance({ team, canSeeCosts }: TeamPerformancePr
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-slate-100 bg-white">
-              <th className="py-2.5 pl-5 pr-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Persona</th>
-              <th className="py-2.5 px-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Horas</th>
-              <th className="py-2.5 px-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Desvío</th>
+              <SortHeader label="Persona" field="name" currentField={sortField} currentDir={sortDir} onSort={handleSort} className="pl-5 pr-3 text-left" />
+              <SortHeader label="Horas" field="hours" currentField={sortField} currentDir={sortDir} onSort={handleSort} className="text-left" />
+              <SortHeader label="Desvío" field="deviation" currentField={sortField} currentDir={sortDir} onSort={handleSort} className="text-center" />
               {canSeeCosts && (
-                <th className="py-2.5 px-3 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Costo</th>
+                <SortHeader label="Costo" field="cost" currentField={sortField} currentDir={sortDir} onSort={handleSort} className="text-right" />
               )}
-              <th className="py-2.5 px-3 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Eficiencia</th>
+              <SortHeader label="Eficiencia" field="efficiency" currentField={sortField} currentDir={sortDir} onSort={handleSort} className="text-center" />
             </tr>
           </thead>
           <tbody>
             {sorted.map((m, i) => (
               <tr key={m.personnelId ?? i} className="border-b border-slate-50 hover:bg-slate-50/60 transition-colors">
-                {/* Avatar + Name */}
+                {/* Avatar + Name with status dot */}
                 <td className="py-3 pl-5 pr-3">
                   <div className="flex items-center gap-3">
-                    <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${m.gradient} flex items-center justify-center text-white text-xs font-bold flex-shrink-0`}>
-                      {initials(m.name)}
+                    <div className="relative">
+                      <div className={`w-9 h-9 rounded-full bg-gradient-to-br ${m.gradient} flex items-center justify-center text-white text-xs font-bold flex-shrink-0`}>
+                        {initials(m.name)}
+                      </div>
+                      <span className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white ${getStatusDot(m)}`} />
                     </div>
                     <div>
                       <p className="text-sm font-medium text-slate-800 leading-tight">{m.name}</p>
@@ -262,14 +339,14 @@ export default function TeamPerformance({ team, canSeeCosts }: TeamPerformancePr
         </table>
       </div>
 
-      {/* Cost distribution pie (ops only, 2+ people with costs) */}
+      {/* Cost distribution pie */}
       {canSeeCosts && pieData.length >= 2 && (
         <div className="border-t border-slate-100 px-5 py-4">
           <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-3">Distribución de costos</p>
           <div className="flex items-center gap-4">
             <ResponsiveContainer width={130} height={100}>
               <PieChart>
-                <Pie data={pieData} cx="50%" cy="50%" outerRadius={46} dataKey="value" paddingAngle={2}>
+                <Pie data={pieData} cx="50%" cy="50%" outerRadius={46} innerRadius={20} dataKey="value" paddingAngle={2}>
                   {pieData.map((e, i) => <Cell key={i} fill={e.color} />)}
                 </Pie>
                 <RTooltip formatter={(v: number) => [`$${v.toLocaleString("es-AR")}`, ""]} />
