@@ -3259,11 +3259,13 @@ export const projectStatusReviews = pgTable("project_status_reviews", {
   decisionNeeded: varchar("decision_needed", { length: 30 }).default('ninguna'), // ninguna | priorizacion | recursos | reprecio | salida
   hiddenFromWeekly: boolean("hidden_from_weekly").default(false),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  updatedBy: integer("updated_by").references(() => users.id),
 });
 
 export const insertProjectStatusReviewSchema = createInsertSchema(projectStatusReviews).omit({
   id: true,
   updatedAt: true,
+  updatedBy: true,
 }).extend({
   healthStatus: z.enum(['verde', 'amarillo', 'rojo']).default('verde'),
   marginStatus: z.enum(['alto', 'medio', 'bajo']).default('medio'),
@@ -3307,12 +3309,14 @@ export const weeklyStatusItems = pgTable("weekly_status_items", {
   decisionNeeded: varchar("decision_needed", { length: 30 }).default('ninguna'),
   hiddenFromWeekly: boolean("hidden_from_weekly").default(false),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  updatedBy: integer("updated_by").references(() => users.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
 export const insertWeeklyStatusItemSchema = createInsertSchema(weeklyStatusItems).omit({
   id: true,
   updatedAt: true,
+  updatedBy: true,
   createdAt: true,
 }).extend({
   healthStatus: z.enum(['verde', 'amarillo', 'rojo']).default('verde'),
@@ -3323,3 +3327,16 @@ export const insertWeeklyStatusItemSchema = createInsertSchema(weeklyStatusItems
 });
 export type WeeklyStatusItem = typeof weeklyStatusItems.$inferSelect;
 export type InsertWeeklyStatusItem = z.infer<typeof insertWeeklyStatusItemSchema>;
+
+// ─── Status Change Log (audit trail for status changes) ─────────────────────
+export const statusChangeLog = pgTable("status_change_log", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").references(() => activeProjects.id, { onDelete: 'cascade' }),
+  weeklyStatusItemId: integer("weekly_status_item_id").references(() => weeklyStatusItems.id, { onDelete: 'cascade' }),
+  userId: integer("user_id").references(() => users.id),
+  fieldName: varchar("field_name", { length: 30 }).notNull(),
+  oldValue: text("old_value"),
+  newValue: text("new_value"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+export type StatusChangeLog = typeof statusChangeLog.$inferSelect;

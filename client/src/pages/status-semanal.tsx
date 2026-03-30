@@ -42,6 +42,8 @@ type StatusRow = {
   decisionNeeded: string | null;
   hiddenFromWeekly: boolean | null;
   reviewUpdatedAt: string | null;
+  reviewUpdatedBy: number | null;
+  reviewUpdatedByName: string | null;
   noteCount: number;
 };
 
@@ -61,6 +63,8 @@ type CustomItem = {
   decisionNeeded: string | null;
   hiddenFromWeekly: boolean | null;
   updatedAt: string | null;
+  updatedBy: number | null;
+  updatedByName: string | null;
   noteCount?: number;
 };
 
@@ -107,7 +111,13 @@ type Item = {
   noteCount: number;
   isOverdue: boolean;
   updatedAt: string | null;
+  updatedById: number | null;
+  updatedByName: string | null;
 };
+
+type ActivityEntry =
+  | { type: 'note'; id: number; content: string; authorId: number | null; authorName: string | null; createdAt: string }
+  | { type: 'change'; id: number; userId: number | null; userName: string | null; fieldName: string; oldValue: string | null; newValue: string | null; createdAt: string };
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -159,6 +169,23 @@ function relTime(s: string) {
   return new Date(s).toLocaleDateString('es-AR', { day: 'numeric', month: 'short' });
 }
 
+function shortDateTime(s: string) {
+  const d = new Date(s);
+  const now = new Date();
+  const diffMs = now.getTime() - d.getTime();
+  const time = d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+  if (diffMs < 86400000 && d.getDate() === now.getDate()) return time; // today: just time
+  if (diffMs < 86400000 * 7) {
+    const day = d.toLocaleDateString('es-AR', { weekday: 'short' });
+    return `${day} ${time}`;
+  }
+  return `${d.toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })} ${time}`;
+}
+
+function fullDateTime(s: string) {
+  return new Date(s).toLocaleString('es-AR', { dateStyle: 'long', timeStyle: 'short' });
+}
+
 function initials(name: string | null) {
   if (!name) return '?';
   return name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
@@ -179,21 +206,33 @@ function isStale(dateStr: string | null): boolean {
   return diff > 5 * 86400 * 1000; // >5 days
 }
 
-function FreshnessIndicator({ updatedAt }: { updatedAt: string | null }) {
+function FreshnessIndicator({ updatedAt, updatedByName, updatedById, currentUserId }: {
+  updatedAt: string | null; updatedByName?: string | null; updatedById?: number | null; currentUserId?: number | null;
+}) {
   if (!updatedAt) return <span className="text-[9px] text-red-400 font-semibold bg-red-50 px-1.5 py-0.5 rounded">Sin actualizar</span>;
-  const fresh = isThisWeek(updatedAt);
   const stale = isStale(updatedAt);
+  const isOther = updatedById != null && currentUserId != null && updatedById !== currentUserId;
+  const firstName = updatedByName?.split(' ')[0];
+  const timeStr = shortDateTime(updatedAt);
+  const tooltip = `${updatedByName || 'Usuario'} · ${fullDateTime(updatedAt)}`;
+
   if (stale) {
     return (
-      <span className="text-[9px] font-semibold text-red-500 bg-red-50 px-1.5 py-0.5 rounded border border-red-100">
-        {relTime(updatedAt)}
-      </span>
+      <TooltipProvider><Tooltip><TooltipTrigger asChild>
+        <span className={cn("text-[9px] font-semibold px-1.5 py-0.5 rounded border",
+          isOther ? "text-indigo-600 bg-indigo-50 border-indigo-200" : "text-red-500 bg-red-50 border-red-100")}>
+          {isOther && firstName ? `${firstName} · ` : ''}{timeStr}
+        </span>
+      </TooltipTrigger><TooltipContent className="text-xs">{tooltip}</TooltipContent></Tooltip></TooltipProvider>
     );
   }
   return (
-    <span className={cn("text-[9px] font-medium", fresh ? "text-emerald-500" : "text-amber-500")}>
-      {fresh ? "Actualizado" : relTime(updatedAt)}
-    </span>
+    <TooltipProvider><Tooltip><TooltipTrigger asChild>
+      <span className={cn("text-[9px] font-medium px-1.5 py-0.5 rounded",
+        isOther ? "text-indigo-600 bg-indigo-50 font-semibold" : "text-slate-400")}>
+        {isOther && firstName ? `${firstName} · ` : ''}{timeStr}
+      </span>
+    </TooltipTrigger><TooltipContent className="text-xs">{tooltip}</TooltipContent></Tooltip></TooltipProvider>
   );
 }
 
@@ -434,8 +473,8 @@ function DeadlinePicker({ value, isOverdue, onChange }: {
 
 // ─── Alert card (Rojo / Amarillo or urgent decision) ─────────────────────────
 
-function AlertCard({ item, users, isSelected, onOpenNotes, onUpdate, onRemove }: {
-  item: Item; users: AppUser[]; isSelected: boolean;
+function AlertCard({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, currentUserId }: {
+  item: Item; users: AppUser[]; isSelected: boolean; currentUserId?: number | null;
   onOpenNotes?: () => void; onUpdate: (d: Record<string, any>) => void; onRemove: () => void;
 }) {
   const [expanded, setExpanded] = useState(true);
@@ -457,7 +496,7 @@ function AlertCard({ item, users, isSelected, onOpenNotes, onUpdate, onRemove }:
             {item.isCustom && <Tag className="h-3 w-3 text-indigo-400 shrink-0" />}
             <p className="font-semibold text-sm text-foreground leading-tight truncate">{item.title}</p>
             {item.subtitle && <span className="text-xs text-muted-foreground truncate hidden sm:inline">· {item.subtitle}</span>}
-            <span className="shrink-0 hidden sm:inline"><FreshnessIndicator updatedAt={item.updatedAt} /></span>
+            <span className="shrink-0 hidden sm:inline"><FreshnessIndicator updatedAt={item.updatedAt} updatedByName={item.updatedByName} updatedById={item.updatedById} currentUserId={currentUserId} /></span>
             <ChevronDown className={cn("h-3 w-3 text-slate-300 shrink-0 transition-transform ml-0.5", !expanded && "-rotate-90")} />
           </div>
           <div className="flex items-center gap-1.5 shrink-0" onClick={e => e.stopPropagation()}>
@@ -552,8 +591,8 @@ function AlertCard({ item, users, isSelected, onOpenNotes, onUpdate, onRemove }:
 
 // ─── Compact row (Verde) ──────────────────────────────────────────────────────
 
-function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, expanded, onToggle, onNext, onPrev, hasNext, hasPrev }: {
-  item: Item; users: AppUser[]; isSelected: boolean;
+function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, expanded, onToggle, onNext, onPrev, hasNext, hasPrev, currentUserId }: {
+  item: Item; users: AppUser[]; isSelected: boolean; currentUserId?: number | null;
   onOpenNotes?: () => void; onUpdate: (d: Record<string, any>) => void; onRemove: () => void;
   expanded: boolean; onToggle: () => void; onNext?: () => void; onPrev?: () => void; hasNext?: boolean; hasPrev?: boolean;
 }) {
@@ -577,6 +616,7 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
             {item.isCustom && <Tag className="h-3 w-3 text-indigo-400 shrink-0" />}
             <span className="font-medium text-[13px] text-slate-800 truncate">{item.title}</span>
             {item.subtitle && <span className="text-slate-400 text-xs truncate hidden sm:inline"> · {item.subtitle}</span>}
+            <span className="shrink-0 hidden sm:inline"><FreshnessIndicator updatedAt={item.updatedAt} updatedByName={item.updatedByName} updatedById={item.updatedById} currentUserId={currentUserId} /></span>
             <span className="hidden lg:inline text-xs text-slate-400 truncate max-w-[300px] ml-1">
               {item.currentAction && `— ${item.currentAction}`}
             </span>
@@ -927,31 +967,62 @@ function AISummaryPanel({ summary, isLoading, onGenerate, itemCount, cooldown = 
   );
 }
 
-// ─── Notes panel ─────────────────────────────────────────────────────────────
+// ─── Field labels for change log ─────────────────────────────────────────────
 
-function NotesPanel({ projectId, customItemId, projectName, onClose }: { projectId?: number; customItemId?: number; projectName: string; onClose: () => void }) {
+const FIELD_LABELS: Record<string, string> = {
+  healthStatus: 'Estado',
+  marginStatus: 'Rentabilidad',
+  teamStrain: 'Carga equipo',
+  mainRisk: 'Riesgo principal',
+  currentAction: 'Update',
+  nextMilestone: 'Próximo paso',
+  deadline: 'Deadline',
+  ownerId: 'Owner',
+  decisionNeeded: 'Decisión',
+};
+
+function formatChangeValue(fieldName: string, value: string | null): string {
+  if (value == null) return '(vacío)';
+  if (fieldName === 'deadline') {
+    try { return new Date(value).toLocaleDateString('es-AR', { day: 'numeric', month: 'short' }); } catch { return value; }
+  }
+  if (value.length > 60) return value.slice(0, 57) + '...';
+  return value;
+}
+
+// ─── Activity panel (unified timeline: notes + changes) ─────────────────────
+
+function ActivityPanel({ projectId, customItemId, projectName, onClose }: { projectId?: number; customItemId?: number; projectName: string; onClose: () => void }) {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const { toast } = useToast();
   const [newNote, setNewNote] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
+  const currentUserId = (user as any)?.id;
 
   const notesUrl = projectId
     ? `/api/status-semanal/${projectId}/notes`
     : `/api/status-semanal/custom/${customItemId}/notes`;
-  const cacheKey = projectId
+  const notesCacheKey = projectId
     ? ['/api/status-semanal', projectId, 'notes']
     : ['/api/status-semanal/custom', customItemId, 'notes'];
+  const activityUrl = projectId
+    ? `/api/status-semanal/${projectId}/activity`
+    : `/api/status-semanal/custom/${customItemId}/activity`;
+  const activityCacheKey = projectId
+    ? ['/api/status-semanal', projectId, 'activity']
+    : ['/api/status-semanal/custom', customItemId, 'activity'];
 
-  const { data: notes = [], isLoading } = useQuery<Note[]>({
-    queryKey: cacheKey,
-    queryFn: async () => { const r = await authFetch(notesUrl); return r.json(); },
+  const { data: timeline = [], isLoading } = useQuery<ActivityEntry[]>({
+    queryKey: activityCacheKey,
+    queryFn: async () => { const r = await authFetch(activityUrl); return r.json(); },
   });
 
   const addMutation = useMutation({
     mutationFn: (content: string) => mutationFetch(notesUrl, 'POST', { content }),
     onSuccess: () => {
-      queryClient.refetchQueries({ queryKey: cacheKey });
+      queryClient.refetchQueries({ queryKey: activityCacheKey });
+      queryClient.refetchQueries({ queryKey: notesCacheKey });
       queryClient.refetchQueries({ queryKey: ['/api/status-semanal'] });
       if (customItemId) queryClient.refetchQueries({ queryKey: ['/api/status-semanal/custom'] });
     },
@@ -961,60 +1032,91 @@ function NotesPanel({ projectId, customItemId, projectName, onClose }: { project
   const deleteMutation = useMutation({
     mutationFn: (noteId: number) => mutationFetch(`/api/status-semanal/notes/${noteId}`, 'DELETE'),
     onSuccess: () => {
-      queryClient.refetchQueries({ queryKey: cacheKey });
+      queryClient.refetchQueries({ queryKey: activityCacheKey });
+      queryClient.refetchQueries({ queryKey: notesCacheKey });
       queryClient.refetchQueries({ queryKey: ['/api/status-semanal'] });
       if (customItemId) queryClient.refetchQueries({ queryKey: ['/api/status-semanal/custom'] });
     },
     onError: (err: Error) => toast({ title: 'Error al eliminar comentario', description: err.message, variant: 'destructive' }),
   });
 
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [notes.length]);
+  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [timeline.length]);
 
   return (
     <div className="flex flex-col h-full">
       <div className="flex items-center justify-between px-3 py-2 border-b border-border shrink-0 bg-slate-50/80">
         <div className="flex items-center gap-1.5 min-w-0">
-          <MessageSquare className="h-3.5 w-3.5 text-indigo-500 shrink-0" />
+          <ClipboardList className="h-3.5 w-3.5 text-indigo-500 shrink-0" />
           <p className="text-xs font-semibold truncate">{projectName}</p>
-          <span className="text-[10px] text-muted-foreground shrink-0">({notes.length})</span>
+          <span className="text-[10px] text-muted-foreground shrink-0">Actividad</span>
         </div>
         <button onClick={onClose} className="p-0.5 hover:bg-accent rounded text-muted-foreground shrink-0"><X className="h-3.5 w-3.5" /></button>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-3 py-2 space-y-2.5">
+      <div className="flex-1 overflow-y-auto px-3 py-2 space-y-1.5">
         {isLoading && <div className="flex justify-center py-6"><Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /></div>}
-        {!isLoading && notes.length === 0 && (
+        {!isLoading && timeline.length === 0 && (
           <div className="flex flex-col items-center justify-center py-8 text-center">
-            <MessageSquare className="h-6 w-6 text-muted-foreground/20 mb-1.5" />
-            <p className="text-xs text-muted-foreground">Sin comentarios todavía</p>
+            <ClipboardList className="h-6 w-6 text-muted-foreground/20 mb-1.5" />
+            <p className="text-xs text-muted-foreground">Sin actividad todavía</p>
           </div>
         )}
-        {notes.map(note => {
-          const isOwn = note.authorId === (user as any)?.id;
+        {timeline.map((entry, idx) => {
+          if (entry.type === 'note') {
+            const isOwn = entry.authorId === currentUserId;
+            return (
+              <div key={`n_${entry.id}`} className="group flex gap-2 py-1">
+                <div className={cn("h-6 w-6 rounded-full flex items-center justify-center text-[9px] font-bold shrink-0 mt-0.5", isOwn ? "bg-indigo-100 text-indigo-700" : "bg-teal-100 text-teal-700")}>
+                  {initials(entry.authorName)}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1 mb-0.5">
+                    <span className={cn("text-[11px] font-medium", isOwn ? "text-slate-700" : "text-teal-700")}>{entry.authorName || 'Usuario'}</span>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="text-[10px] text-muted-foreground cursor-default">{relTime(entry.createdAt)}</span>
+                        </TooltipTrigger>
+                        <TooltipContent className="text-xs">{fullDateTime(entry.createdAt)}</TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
+                  <div className="text-[11px] bg-white border border-slate-100 rounded-md px-2.5 py-1.5 leading-relaxed whitespace-pre-wrap">{entry.content}</div>
+                </div>
+                {isOwn && (
+                  <button onClick={() => deleteMutation.mutate(entry.id)} className="opacity-0 group-hover:opacity-100 p-0.5 text-slate-300 hover:text-red-400 transition-opacity shrink-0 mt-0.5">
+                    <Trash2 className="h-3 w-3" />
+                  </button>
+                )}
+              </div>
+            );
+          }
+          // type === 'change'
+          const isOwn = entry.userId === currentUserId;
+          const label = FIELD_LABELS[entry.fieldName] || entry.fieldName;
+          const newVal = formatChangeValue(entry.fieldName, entry.newValue);
           return (
-            <div key={note.id} className="group flex gap-2">
-              <div className={cn("h-6 w-6 rounded-full flex items-center justify-center text-[9px] font-bold shrink-0 mt-0.5", isOwn ? "bg-indigo-100 text-indigo-700" : "bg-slate-100 text-slate-600")}>
-                {initials(note.authorName)}
+            <div key={`c_${entry.id}`} className={cn("flex items-start gap-2 py-1 px-2 rounded-md", isOwn ? "bg-slate-50" : "bg-indigo-50/60")}>
+              <div className={cn("h-4 w-4 rounded-full flex items-center justify-center text-[7px] font-bold shrink-0 mt-0.5", isOwn ? "bg-slate-200 text-slate-500" : "bg-indigo-200 text-indigo-600")}>
+                {initials(entry.userName)}
               </div>
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-1 mb-0.5">
-                  <span className="text-[11px] font-medium">{note.authorName || 'Usuario'}</span>
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <span className="text-[10px] text-muted-foreground cursor-default">{relTime(note.noteDate)}</span>
-                      </TooltipTrigger>
-                      <TooltipContent>{new Date(note.noteDate).toLocaleString('es-AR', { dateStyle: 'long', timeStyle: 'short' })}</TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                </div>
-                <div className="text-[11px] bg-white border border-slate-100 rounded-md px-2.5 py-1.5 leading-relaxed whitespace-pre-wrap">{note.content}</div>
+                <span className={cn("text-[10px]", isOwn ? "text-slate-500" : "text-indigo-600")}>
+                  <span className="font-medium">{entry.userName?.split(' ')[0] || 'Usuario'}</span>
+                  {' cambió '}
+                  <span className="font-semibold">{label}</span>
+                  {' → '}
+                  <span className="font-medium">{newVal}</span>
+                </span>
               </div>
-              {isOwn && (
-                <button onClick={() => deleteMutation.mutate(note.id)} className="opacity-0 group-hover:opacity-100 p-0.5 text-slate-300 hover:text-red-400 transition-opacity shrink-0 mt-0.5">
-                  <Trash2 className="h-3 w-3" />
-                </button>
-              )}
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="text-[9px] text-muted-foreground shrink-0 cursor-default">{relTime(entry.createdAt)}</span>
+                  </TooltipTrigger>
+                  <TooltipContent className="text-xs">{fullDateTime(entry.createdAt)}</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </div>
           );
         })}
@@ -1043,6 +1145,8 @@ function NotesPanel({ projectId, customItemId, projectName, onClose }: { project
 export default function StatusSemanalPage() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { user } = useAuth();
+  const currentUserId = (user as any)?.id ?? null;
   const [notesOpen, setNotesOpen] = useState<{ type: 'project' | 'custom'; id: number } | null>(null);
   const [showHidden, setShowHidden] = useState(false);
   const [alertCollapsed, setAlertCollapsed] = useState<boolean | null>(null);
@@ -1239,6 +1343,8 @@ export default function StatusSemanalPage() {
     noteCount: r.noteCount,
     isOverdue: isOverdue(r.deadline),
     updatedAt: r.reviewUpdatedAt,
+    updatedById: r.reviewUpdatedBy,
+    updatedByName: r.reviewUpdatedByName,
   });
 
   const toCustomItem = (c: CustomItem): Item => ({
@@ -1261,6 +1367,8 @@ export default function StatusSemanalPage() {
     noteCount: c.noteCount ?? 0,
     isOverdue: isOverdue(c.deadline),
     updatedAt: c.updatedAt,
+    updatedById: c.updatedBy,
+    updatedByName: c.updatedByName,
   });
 
   const allItems: Item[] = [
@@ -1550,7 +1658,7 @@ export default function StatusSemanalPage() {
                           transition={{ duration: 0.15, ease: 'easeOut' }}
                           className={cn("border-l-[3px]",
                             item.isOverdue ? "border-l-red-500" : item.healthStatus === 'rojo' ? "border-l-red-500" : "border-l-amber-400")}>
-                          <CompactRow item={item} users={appUsers}
+                          <CompactRow item={item} users={appUsers} currentUserId={currentUserId}
                             isSelected={notesOpen !== null && ((notesOpen.type === 'project' && item.projectId === notesOpen.id) || (notesOpen.type === 'custom' && item.customId === notesOpen.id))}
                             onOpenNotes={h.onOpenNotes} onUpdate={h.onUpdate} onRemove={h.onRemove}
                             expanded={expandedAlertKey === item.key}
@@ -1588,7 +1696,7 @@ export default function StatusSemanalPage() {
                           exit={{ opacity: 0, x: -8 }}
                           transition={{ duration: 0.15, ease: 'easeOut' }}
                           className="border-l-[3px] border-l-amber-400">
-                          <CompactRow item={item} users={appUsers}
+                          <CompactRow item={item} users={appUsers} currentUserId={currentUserId}
                             isSelected={notesOpen !== null && ((notesOpen.type === 'project' && item.projectId === notesOpen.id) || (notesOpen.type === 'custom' && item.customId === notesOpen.id))}
                             onOpenNotes={h.onOpenNotes} onUpdate={h.onUpdate} onRemove={h.onRemove}
                             expanded={expandedDecisionKey === item.key}
@@ -1631,7 +1739,7 @@ export default function StatusSemanalPage() {
                             animate={{ opacity: 1, x: 0 }}
                             exit={{ opacity: 0, x: -8 }}
                             transition={{ duration: 0.15, ease: 'easeOut' }}>
-                            <CompactRow item={item} users={appUsers}
+                            <CompactRow item={item} users={appUsers} currentUserId={currentUserId}
                               isSelected={notesOpen !== null && ((notesOpen.type === 'project' && item.projectId === notesOpen.id) || (notesOpen.type === 'custom' && item.customId === notesOpen.id))}
                               onOpenNotes={h.onOpenNotes} onUpdate={h.onUpdate} onRemove={h.onRemove}
                               expanded={expandedRowKey === item.key}
@@ -1690,11 +1798,11 @@ export default function StatusSemanalPage() {
         </div>
       </div>
 
-      {/* ── Notes panel ─────────────────────────────────────────── */}
+      {/* ── Activity panel (notes + change log) ─────────────────── */}
       {notesOpen !== null && (
         <div className="fixed top-0 right-0 h-full w-[320px] border-l border-border bg-background shadow-xl z-20 flex flex-col">
           {(openNotesProject || openNotesCustom) && (
-            <NotesPanel
+            <ActivityPanel
               projectId={notesOpen.type === 'project' ? notesOpen.id : undefined}
               customItemId={notesOpen.type === 'custom' ? notesOpen.id : undefined}
               projectName={notesItemName}

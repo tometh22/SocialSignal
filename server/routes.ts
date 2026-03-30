@@ -99,6 +99,7 @@ import {
   projectStatusReviews,
   projectReviewNotes,
   weeklyStatusItems,
+  statusChangeLog,
   holidays,
   insertHolidaySchema,
   monthlyClosings,
@@ -17003,6 +17004,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           decisionNeeded: projectStatusReviews.decisionNeeded,
           hiddenFromWeekly: projectStatusReviews.hiddenFromWeekly,
           reviewUpdatedAt: projectStatusReviews.updatedAt,
+          reviewUpdatedBy: projectStatusReviews.updatedBy,
         })
         .from(activeProjects)
         .leftJoin(clients, eq(clients.id, activeProjects.clientId))
@@ -17022,17 +17024,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         : [];
       const noteCountMap = new Map(noteCounts.map(n => [n.projectId, n.count]));
 
-      // Get owner names
-      const ownerIds = [...new Set(rows.map(r => r.ownerId).filter(Boolean))] as number[];
-      const owners = ownerIds.length > 0
-        ? await db.select({ id: users.id, firstName: users.firstName, lastName: users.lastName }).from(users).where(inArray(users.id, ownerIds))
+      // Get owner + updatedBy names (combine all user IDs we need to resolve)
+      const allUserIds = [...new Set([
+        ...rows.map(r => r.ownerId).filter(Boolean),
+        ...rows.map(r => r.reviewUpdatedBy).filter(Boolean),
+      ])] as number[];
+      const userRows = allUserIds.length > 0
+        ? await db.select({ id: users.id, firstName: users.firstName, lastName: users.lastName }).from(users).where(inArray(users.id, allUserIds))
         : [];
-      const ownerMap = new Map(owners.map((u: any) => [u.id, `${u.firstName} ${u.lastName}`]));
+      const userNameMap = new Map(userRows.map((u: any) => [u.id, `${u.firstName} ${u.lastName}`]));
 
       const result = rows.map(r => ({
         ...r,
         noteCount: noteCountMap.get(r.projectId) ?? 0,
-        ownerName: r.ownerId ? ownerMap.get(r.ownerId) ?? null : null,
+        ownerName: r.ownerId ? userNameMap.get(r.ownerId) ?? null : null,
+        reviewUpdatedByName: r.reviewUpdatedBy ? userNameMap.get(r.reviewUpdatedBy) ?? null : null,
       }));
 
       res.setHeader('Cache-Control', 'no-store');
@@ -17075,7 +17081,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: `decisionNeeded inválido. Debe ser: ${validDecision.join(', ')}` });
       }
 
-      const update: Record<string, any> = { updatedAt: new Date() };
+      const userId = req.user?.id ?? null;
+      const update: Record<string, any> = { updatedAt: new Date(), updatedBy: userId };
       if (healthStatus !== undefined) update.healthStatus = healthStatus;
       if (marginStatus !== undefined) update.marginStatus = marginStatus;
       if (teamStrain !== undefined) update.teamStrain = teamStrain;
@@ -17088,10 +17095,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (decisionNeeded !== undefined) update.decisionNeeded = decisionNeeded;
       if (hiddenFromWeekly !== undefined) update.hiddenFromWeekly = hiddenFromWeekly;
 
-      // Check if review already exists
-      const [existing] = await db.select({ id: projectStatusReviews.id })
+      // Check if review already exists and read current values for change log
+      const [existing] = await db.select()
         .from(projectStatusReviews)
         .where(eq(projectStatusReviews.projectId, projectId));
+
+      // Track changed fields for the activity log
+      const trackFields = ['healthStatus', 'marginStatus', 'teamStrain', 'mainRisk', 'currentAction', 'nextMilestone', 'deadline', 'ownerId', 'decisionNeeded'] as const;
+      const changeLogs: { fieldName: string; oldValue: string | null; newValue: string | null }[] = [];
+      if (existing) {
+        for (const field of trackFields) {
+          if (update[field] !== undefined) {
+            const oldVal = existing[field as keyof typeof existing];
+            const newVal = update[field];
+            const oldStr = oldVal != null ? String(oldVal) : null;
+            const newStr = newVal != null ? String(newVal) : null;
+            if (oldStr !== newStr) {
+              changeLogs.push({ fieldName: field, oldValue: oldStr, newValue: newStr });
+            }
+          }
+        }
+      }
 
       let result;
       if (existing) {
@@ -17104,6 +17128,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .values({ projectId, ...update })
           .returning();
       }
+
+      // Insert change log entries (fire-and-forget)
+      if (changeLogs.length > 0) {
+        db.insert(statusChangeLog)
+          .values(changeLogs.map(cl => ({ projectId, userId, ...cl })))
+          .catch(err => console.error('Error logging status changes:', err));
+      }
+
       console.log(`PATCH /api/status-semanal/${projectId} OK`, result?.id);
       res.json(result);
     } catch (error) {
@@ -17238,6 +17270,99 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // GET /api/status-semanal/custom/:itemId/activity — unified timeline for custom items
+  app.get("/api/status-semanal/custom/:itemId/activity", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const itemId = parseInt(req.params.itemId);
+
+      // Fetch notes
+      const notes = await db
+        .select({
+          id: projectReviewNotes.id,
+          content: projectReviewNotes.content,
+          authorId: projectReviewNotes.authorId,
+          authorName: sql<string>`${users.firstName} || ' ' || ${users.lastName}`,
+          createdAt: projectReviewNotes.noteDate,
+        })
+        .from(projectReviewNotes)
+        .leftJoin(users, eq(users.id, projectReviewNotes.authorId))
+        .where(eq(projectReviewNotes.weeklyStatusItemId, itemId));
+
+      // Fetch change log
+      const changes = await db
+        .select({
+          id: statusChangeLog.id,
+          userId: statusChangeLog.userId,
+          userName: sql<string>`${users.firstName} || ' ' || ${users.lastName}`,
+          fieldName: statusChangeLog.fieldName,
+          oldValue: statusChangeLog.oldValue,
+          newValue: statusChangeLog.newValue,
+          createdAt: statusChangeLog.createdAt,
+        })
+        .from(statusChangeLog)
+        .leftJoin(users, eq(users.id, statusChangeLog.userId))
+        .where(eq(statusChangeLog.weeklyStatusItemId, itemId));
+
+      // Merge into unified timeline sorted by date
+      const timeline = [
+        ...notes.map(n => ({ type: 'note' as const, id: n.id, content: n.content, authorId: n.authorId, authorName: n.authorName, createdAt: n.createdAt })),
+        ...changes.map(c => ({ type: 'change' as const, id: c.id, userId: c.userId, userName: c.userName, fieldName: c.fieldName, oldValue: c.oldValue, newValue: c.newValue, createdAt: c.createdAt })),
+      ].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+
+      res.json(timeline);
+    } catch (error) {
+      console.error('GET /api/status-semanal/custom/:itemId/activity error:', error);
+      res.status(500).json({ message: "Error al obtener actividad" });
+    }
+  });
+
+  // GET /api/status-semanal/:projectId/activity — unified timeline for project items
+  app.get("/api/status-semanal/:projectId/activity", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) return res.status(400).json({ message: "projectId inválido" });
+
+      // Fetch notes
+      const notes = await db
+        .select({
+          id: projectReviewNotes.id,
+          content: projectReviewNotes.content,
+          authorId: projectReviewNotes.authorId,
+          authorName: sql<string>`${users.firstName} || ' ' || ${users.lastName}`,
+          createdAt: projectReviewNotes.noteDate,
+        })
+        .from(projectReviewNotes)
+        .leftJoin(users, eq(users.id, projectReviewNotes.authorId))
+        .where(eq(projectReviewNotes.projectId, projectId));
+
+      // Fetch change log
+      const changes = await db
+        .select({
+          id: statusChangeLog.id,
+          userId: statusChangeLog.userId,
+          userName: sql<string>`${users.firstName} || ' ' || ${users.lastName}`,
+          fieldName: statusChangeLog.fieldName,
+          oldValue: statusChangeLog.oldValue,
+          newValue: statusChangeLog.newValue,
+          createdAt: statusChangeLog.createdAt,
+        })
+        .from(statusChangeLog)
+        .leftJoin(users, eq(users.id, statusChangeLog.userId))
+        .where(eq(statusChangeLog.projectId, projectId));
+
+      // Merge into unified timeline sorted by date
+      const timeline = [
+        ...notes.map(n => ({ type: 'note' as const, id: n.id, content: n.content, authorId: n.authorId, authorName: n.authorName, createdAt: n.createdAt })),
+        ...changes.map(c => ({ type: 'change' as const, id: c.id, userId: c.userId, userName: c.userName, fieldName: c.fieldName, oldValue: c.oldValue, newValue: c.newValue, createdAt: c.createdAt })),
+      ].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+
+      res.json(timeline);
+    } catch (error) {
+      console.error('GET /api/status-semanal/:projectId/activity error:', error);
+      res.status(500).json({ message: "Error al obtener actividad" });
+    }
+  });
+
   // GET /api/status-semanal/users — all users for owner dropdown
   app.get("/api/status-semanal/users", requireAuth, async (_req: Request, res: Response) => {
     try {
@@ -17341,6 +17466,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         decisionNeeded: weeklyStatusItems.decisionNeeded,
         hiddenFromWeekly: weeklyStatusItems.hiddenFromWeekly,
         updatedAt: weeklyStatusItems.updatedAt,
+        updatedBy: weeklyStatusItems.updatedBy,
       }).from(weeklyStatusItems)
         .leftJoin(users, eq(users.id, weeklyStatusItems.ownerId))
         .orderBy(desc(weeklyStatusItems.createdAt));
@@ -17356,9 +17482,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         : [];
       const noteCountMap = new Map(noteCounts.map(n => [n.weeklyStatusItemId, n.count]));
 
+      // Resolve updatedBy names
+      const updatedByIds = [...new Set(items.map(i => i.updatedBy).filter(Boolean))] as number[];
+      const updaterRows = updatedByIds.length > 0
+        ? await db.select({ id: users.id, firstName: users.firstName, lastName: users.lastName }).from(users).where(inArray(users.id, updatedByIds))
+        : [];
+      const updaterMap = new Map(updaterRows.map((u: any) => [u.id, `${u.firstName} ${u.lastName}`]));
+
       const result = items.map(item => ({
         ...item,
         noteCount: noteCountMap.get(item.id) ?? 0,
+        updatedByName: item.updatedBy ? updaterMap.get(item.updatedBy) ?? null : null,
       }));
 
       res.setHeader('Cache-Control', 'no-store');
@@ -17415,7 +17549,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: `decisionNeeded inválido. Debe ser: ${validDecision.join(', ')}` });
       }
 
-      const update: Record<string, any> = { updatedAt: new Date() };
+      const userId = req.user?.id ?? null;
+      const update: Record<string, any> = { updatedAt: new Date(), updatedBy: userId };
       if (title !== undefined) update.title = title;
       if (subtitle !== undefined) update.subtitle = subtitle;
       if (healthStatus !== undefined) update.healthStatus = healthStatus;
@@ -17428,9 +17563,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (ownerId !== undefined) update.ownerId = ownerId || null;
       if (decisionNeeded !== undefined) update.decisionNeeded = decisionNeeded;
       if (hiddenFromWeekly !== undefined) update.hiddenFromWeekly = hiddenFromWeekly;
+
+      // Read current values for change log
+      const [currentItem] = await db.select().from(weeklyStatusItems).where(eq(weeklyStatusItems.id, id));
+      const trackFields = ['healthStatus', 'marginStatus', 'teamStrain', 'mainRisk', 'currentAction', 'nextMilestone', 'deadline', 'ownerId', 'decisionNeeded'] as const;
+      const changeLogs: { fieldName: string; oldValue: string | null; newValue: string | null }[] = [];
+      if (currentItem) {
+        for (const field of trackFields) {
+          if (update[field] !== undefined) {
+            const oldVal = currentItem[field as keyof typeof currentItem];
+            const newVal = update[field];
+            const oldStr = oldVal != null ? String(oldVal) : null;
+            const newStr = newVal != null ? String(newVal) : null;
+            if (oldStr !== newStr) {
+              changeLogs.push({ fieldName: field, oldValue: oldStr, newValue: newStr });
+            }
+          }
+        }
+      }
+
       const [item] = await db.update(weeklyStatusItems).set(update).where(eq(weeklyStatusItems.id, id)).returning();
       if (!item) {
         return res.status(404).json({ message: "Ítem no encontrado" });
+      }
+
+      // Insert change log entries (fire-and-forget)
+      if (changeLogs.length > 0) {
+        db.insert(statusChangeLog)
+          .values(changeLogs.map(cl => ({ weeklyStatusItemId: id, userId, ...cl })))
+          .catch(err => console.error('Error logging custom item changes:', err));
       }
       console.log(`PATCH /api/status-semanal/custom/${id} OK`);
       res.json(item);
