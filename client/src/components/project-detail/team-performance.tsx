@@ -243,7 +243,7 @@ export default function TeamPerformance({ team, canSeeCosts }: TeamPerformancePr
   return (
     <div className="rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
       {/* Header */}
-      <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100 bg-slate-50">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-slate-50">
         <div className="flex items-center gap-2">
           <Users className="h-4 w-4 text-slate-500" />
           <span className="text-sm font-semibold text-slate-800">Equipo</span>
@@ -260,7 +260,7 @@ export default function TeamPerformance({ team, canSeeCosts }: TeamPerformancePr
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-slate-100 bg-white">
-              <SortHeader label="Persona" field="name" currentField={sortField} currentDir={sortDir} onSort={handleSort} className="pl-5 pr-3 text-left" />
+              <SortHeader label="Persona" field="name" currentField={sortField} currentDir={sortDir} onSort={handleSort} className="pl-4 pr-3 text-left" />
               <SortHeader label="Horas" field="hours" currentField={sortField} currentDir={sortDir} onSort={handleSort} className="text-left" />
               <SortHeader label="Desvío" field="deviation" currentField={sortField} currentDir={sortDir} onSort={handleSort} className="text-center" />
               {canSeeCosts && (
@@ -273,10 +273,10 @@ export default function TeamPerformance({ team, canSeeCosts }: TeamPerformancePr
             {sorted.map((m, i) => (
               <tr key={m.personnelId ?? i} className="border-b border-slate-50 hover:bg-slate-50/60 transition-colors">
                 {/* Avatar + Name with status dot */}
-                <td className="py-3 pl-5 pr-3">
-                  <div className="flex items-center gap-3">
+                <td className="py-2.5 pl-4 pr-3">
+                  <div className="flex items-center gap-2.5">
                     <div className="relative">
-                      <div className={`w-9 h-9 rounded-full bg-gradient-to-br ${m.gradient} flex items-center justify-center text-white text-xs font-bold flex-shrink-0`}>
+                      <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${m.gradient} flex items-center justify-center text-white text-xs font-bold flex-shrink-0`}>
                         {initials(m.name)}
                       </div>
                       <span className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white ${getStatusDot(m)}`} />
@@ -289,18 +289,18 @@ export default function TeamPerformance({ team, canSeeCosts }: TeamPerformancePr
                 </td>
 
                 {/* Hours bar */}
-                <td className="py-3 px-3">
+                <td className="py-2.5 px-2.5">
                   <HoursBar actual={m.actualHours} target={m.target} />
                 </td>
 
                 {/* Deviation badge */}
-                <td className="py-3 px-3 text-center">
+                <td className="py-2.5 px-2.5 text-center">
                   <DeviationBadge actual={m.actualHours} target={m.target} />
                 </td>
 
                 {/* Cost */}
                 {canSeeCosts && (
-                  <td className="py-3 px-3 text-right tabular-nums text-sm text-slate-600 font-medium">
+                  <td className="py-2.5 px-2.5 text-right tabular-nums text-sm text-slate-600 font-medium">
                     {usd(m.costVal)}
                     {totalCost > 0 && m.costVal > 0 && (
                       <div className="text-[10px] text-slate-400">
@@ -311,7 +311,7 @@ export default function TeamPerformance({ team, canSeeCosts }: TeamPerformancePr
                 )}
 
                 {/* Efficiency */}
-                <td className="py-3 px-3 text-center">
+                <td className="py-2.5 px-2.5 text-center">
                   <EfficiencyBadge score={m.efficiencyScore} color={m.performanceColor} />
                 </td>
               </tr>
@@ -322,17 +322,17 @@ export default function TeamPerformance({ team, canSeeCosts }: TeamPerformancePr
           {(totalHours > 0 || (canSeeCosts && totalCost > 0)) && (
             <tfoot>
               <tr className="border-t-2 border-slate-200 bg-slate-50/80">
-                <td className="py-3 pl-5 pr-3 text-sm font-semibold text-slate-700">Total</td>
-                <td className="py-3 px-3 text-sm font-semibold text-slate-700 tabular-nums">
+                <td className="py-2.5 pl-4 pr-3 text-sm font-semibold text-slate-700">Total</td>
+                <td className="py-2.5 px-2.5 text-sm font-semibold text-slate-700 tabular-nums">
                   {totalHours.toFixed(0)}h
                 </td>
-                <td className="py-3 px-3" />
+                <td className="py-2.5 px-2.5" />
                 {canSeeCosts && (
-                  <td className="py-3 px-3 text-right text-sm font-semibold text-slate-700 tabular-nums">
+                  <td className="py-2.5 px-2.5 text-right text-sm font-semibold text-slate-700 tabular-nums">
                     {usd(totalCost)}
                   </td>
                 )}
-                <td className="py-3 px-3" />
+                <td className="py-2.5 px-2.5" />
               </tr>
             </tfoot>
           )}
@@ -341,7 +341,7 @@ export default function TeamPerformance({ team, canSeeCosts }: TeamPerformancePr
 
       {/* Cost distribution pie */}
       {canSeeCosts && pieData.length >= 2 && (
-        <div className="border-t border-slate-100 px-5 py-4">
+        <div className="border-t border-slate-100 px-4 py-3">
           <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-3">Distribución de costos</p>
           <div className="flex items-center gap-4">
             <ResponsiveContainer width={130} height={100}>

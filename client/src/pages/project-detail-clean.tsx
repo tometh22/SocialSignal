@@ -45,7 +45,7 @@ function CollapsibleSection({
     <div className="rounded-2xl border border-slate-200 overflow-hidden shadow-sm animate-fadeIn">
       <button
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center gap-2 px-5 py-3.5 border-b border-slate-100 bg-slate-50 hover:bg-slate-100/60 transition-colors"
+        className="w-full flex items-center gap-2 px-4 py-3 border-b border-slate-100 bg-slate-50 hover:bg-slate-100/60 transition-colors"
       >
         {icon}
         <h3 className="text-sm font-semibold text-slate-800">{title}</h3>
@@ -73,7 +73,7 @@ function PLBreakdown({
 
   return (
     <div className="rounded-2xl border border-slate-200 overflow-hidden shadow-sm animate-fadeIn">
-      <div className="px-5 py-3.5 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
+      <div className="px-4 py-3 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
         <h3 className="text-sm font-semibold text-slate-800 flex items-center gap-2">
           <BarChart3 className="h-4 w-4 text-slate-400" /> P&L del Proyecto
         </h3>
@@ -84,9 +84,9 @@ function PLBreakdown({
         )}
       </div>
 
-      <div className="p-5 space-y-3">
+      <div className="p-4 space-y-3">
         {/* Waterfall-style visualization */}
-        <div className="space-y-4">
+        <div className="space-y-3">
           {/* Revenue */}
           <div>
             <div className="flex justify-between items-baseline mb-1.5">
@@ -194,12 +194,12 @@ function QuotationInfo({ quotation }: { quotation: any }) {
   ];
   return (
     <div className="rounded-2xl border border-slate-200 overflow-hidden shadow-sm animate-fadeIn">
-      <div className="px-5 py-3.5 border-b border-slate-100 bg-slate-50">
+      <div className="px-4 py-3 border-b border-slate-100 bg-slate-50">
         <h3 className="text-sm font-semibold text-slate-800 flex items-center gap-2">
           <Target className="h-4 w-4 text-slate-500" /> Cotización
         </h3>
       </div>
-      <div className="p-5 grid grid-cols-2 gap-4">
+      <div className="p-4 grid grid-cols-2 gap-3">
         {fields.map((f, i) => (
           <div key={i}>
             <p className="text-[11px] text-slate-400 uppercase tracking-wide">{f.label}</p>
@@ -349,7 +349,7 @@ export default function ProjectDetailClean() {
   const effectiveBudgetUtil = budget > 0 && effectiveCost > 0 ? (effectiveCost / budget) * 100 : budgetUtil;
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-6 space-y-5">
+    <div className="w-full px-3 py-4 space-y-4">
 
       {/* ── Hero Header ───────────────────────────────────────────────── */}
       <div className="animate-fadeIn">
@@ -394,7 +394,7 @@ export default function ProjectDetailClean() {
       )}
 
       {/* ── Main content grid ──────────────────────────────────────────── */}
-      <div className="grid md:grid-cols-2 gap-5 animate-fadeIn" style={{ animationDelay: "200ms" }}>
+      <div className="grid md:grid-cols-2 gap-4 animate-fadeIn" style={{ animationDelay: "200ms" }}>
         {/* Team Performance */}
         <TeamPerformance
           team={enrichedTeam}

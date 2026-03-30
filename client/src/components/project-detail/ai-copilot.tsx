@@ -229,9 +229,9 @@ export default function AICopilot(props: AICopilotProps) {
   return (
     <div className={`bg-white rounded-2xl border border-slate-200 border-l-4 ${headerBorder} shadow-sm overflow-hidden`}>
       {/* Header */}
-      <div className="flex items-center gap-3 px-5 py-3.5 border-b border-slate-100 bg-slate-50">
-        <div className="w-7 h-7 rounded-lg bg-indigo-100 flex items-center justify-center">
-          <Zap className="h-3.5 w-3.5 text-indigo-600" />
+      <div className="flex items-center gap-2.5 px-4 py-3 border-b border-slate-100 bg-slate-50">
+        <div className="w-6 h-6 rounded-lg bg-indigo-100 flex items-center justify-center">
+          <Zap className="h-3 w-3 text-indigo-600" />
         </div>
         <span className="text-sm font-semibold text-slate-800">AI Copilot</span>
         <span className="text-[11px] text-slate-400">Epical Intelligence</span>
@@ -245,7 +245,7 @@ export default function AICopilot(props: AICopilotProps) {
         </div>
       </div>
 
-      <div className="p-5 grid md:grid-cols-2 gap-6">
+      <div className="p-4 grid md:grid-cols-2 gap-4">
         {/* Signals */}
         <div>
           <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
@@ -324,7 +324,7 @@ export default function AICopilot(props: AICopilotProps) {
         <div className="border-t border-slate-100">
           <button
             onClick={() => setShowWhatIf(!showWhatIf)}
-            className="w-full flex items-center gap-2 px-5 py-3 bg-slate-50/60 hover:bg-slate-100/60 transition-colors"
+            className="w-full flex items-center gap-2 px-4 py-2.5 bg-slate-50/60 hover:bg-slate-100/60 transition-colors"
           >
             <FlaskConical className="h-3.5 w-3.5 text-indigo-500" />
             <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Escenarios What-If</p>
@@ -332,7 +332,7 @@ export default function AICopilot(props: AICopilotProps) {
             <ChevronRight className={`h-3.5 w-3.5 text-slate-400 ml-auto transition-transform ${showWhatIf ? "rotate-90" : ""}`} />
           </button>
           {showWhatIf && (
-            <div className="px-5 pb-4 bg-slate-50/60">
+            <div className="px-4 pb-3 bg-slate-50/60">
               <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
                 {whatIfScenarios.map((sc, i) => (
                   <div key={i} className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm hover:shadow-md transition-shadow">
