@@ -3328,6 +3328,17 @@ export const insertWeeklyStatusItemSchema = createInsertSchema(weeklyStatusItems
 export type WeeklyStatusItem = typeof weeklyStatusItems.$inferSelect;
 export type InsertWeeklyStatusItem = z.infer<typeof insertWeeklyStatusItemSchema>;
 
+// ─── Status Update Entries (accumulating update history) ─────────────────────
+export const statusUpdateEntries = pgTable("status_update_entries", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").references(() => activeProjects.id, { onDelete: 'cascade' }),
+  weeklyStatusItemId: integer("weekly_status_item_id").references(() => weeklyStatusItems.id, { onDelete: 'cascade' }),
+  content: text("content").notNull(),
+  authorId: integer("author_id").references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+export type StatusUpdateEntry = typeof statusUpdateEntries.$inferSelect;
+
 // ─── Status Change Log (audit trail for status changes) ─────────────────────
 export const statusChangeLog = pgTable("status_change_log", {
   id: serial("id").primaryKey(),
