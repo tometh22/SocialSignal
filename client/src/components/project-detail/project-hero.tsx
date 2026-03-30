@@ -1,9 +1,9 @@
 /**
- * Project Hero — redesigned with individual KPI cards, gradient health accent,
- * prominent budget bar, and sticky scroll header support.
+ * Project Hero — V3: Hero metric at 2x size, compact supporting KPIs,
+ * no duplicate HealthBadge, white card on gray page background.
  */
 import { useState, useEffect, useRef } from "react";
-import { ArrowLeft, TrendingUp, TrendingDown, Activity, DollarSign, Clock, Target, PieChart, ArrowUpRight, ArrowDownRight } from "lucide-react";
+import { ArrowLeft, TrendingUp, TrendingDown, Activity, Target, Clock, ArrowUpRight, ArrowDownRight } from "lucide-react";
 import { Link } from "wouter";
 import { computeHealthScore, healthLabel, healthGrade } from "./health-score";
 
@@ -49,12 +49,45 @@ const STATUS_STYLES: Record<string, string> = {
   "on-hold": "bg-amber-50 text-amber-700 border-amber-200",
 };
 
-// ─── KPI Card (individual card style) ────────────────────────────────────────
+// ─── Hero Metric (2x size, primary anchor) ───────────────────────────────────
+
+function HeroMetric({ score, label, grade }: { score: number; label: string; grade: string }) {
+  const ringColor =
+    score >= 70 ? "text-emerald-500"
+    : score >= 50 ? "text-amber-400"
+    : score >= 30 ? "text-orange-500"
+    : "text-red-500";
+
+  const bgColor =
+    score >= 70 ? "bg-emerald-50 border-emerald-200"
+    : score >= 50 ? "bg-amber-50 border-amber-200"
+    : score >= 30 ? "bg-orange-50 border-orange-200"
+    : "bg-red-50 border-red-200";
+
+  return (
+    <div className={`rounded-xl border ${bgColor} px-4 py-3 min-w-[130px] flex flex-col items-center justify-center`}>
+      <div className="relative w-14 h-14 flex items-center justify-center">
+        <svg className="absolute inset-0 w-full h-full -rotate-90" viewBox="0 0 36 36">
+          <circle cx="18" cy="18" r="15" fill="none" stroke="currentColor" strokeWidth="3" className="text-slate-200" />
+          <circle cx="18" cy="18" r="15" fill="none" stroke="currentColor" strokeWidth="3"
+            className={ringColor}
+            strokeDasharray={`${score * 0.94} 100`}
+            strokeLinecap="round"
+          />
+        </svg>
+        <span className="text-lg font-bold text-slate-900 tabular-nums">{score}</span>
+      </div>
+      <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mt-1.5">{label}</p>
+      <p className="text-[11px] font-semibold text-slate-600">Grado {grade}</p>
+    </div>
+  );
+}
+
+// ─── Supporting KPI Card ─────────────────────────────────────────────────────
 
 function KPICard({
-  icon, label, value, sub, highlight, trend,
+  label, value, sub, highlight, trend,
 }: {
-  icon: React.ReactNode;
   label: string;
   value: string;
   sub?: string;
@@ -62,10 +95,10 @@ function KPICard({
   trend?: { value: string; positive: boolean } | null;
 }) {
   const borderColor =
-    highlight === "green"  ? "border-emerald-200 bg-emerald-50/30"
-    : highlight === "amber" ? "border-amber-200 bg-amber-50/30"
-    : highlight === "red"   ? "border-red-200 bg-red-50/30"
-    : "border-slate-200 bg-white";
+    highlight === "green"  ? "border-l-emerald-500"
+    : highlight === "amber" ? "border-l-amber-400"
+    : highlight === "red"   ? "border-l-red-500"
+    : "border-l-slate-200";
 
   const valColor =
     highlight === "green"  ? "text-emerald-700"
@@ -73,116 +106,52 @@ function KPICard({
     : highlight === "red"   ? "text-red-600"
     : "text-slate-900";
 
-  const iconBg =
-    highlight === "green"  ? "bg-emerald-100 text-emerald-600"
-    : highlight === "amber" ? "bg-amber-100 text-amber-600"
-    : highlight === "red"   ? "bg-red-100 text-red-600"
-    : "bg-slate-100 text-slate-500";
-
   return (
-    <div className={`rounded-xl border ${borderColor} px-3 py-2 min-w-[100px] max-w-[180px] flex-1 transition-all hover:shadow-sm`}>
-      <div className="flex items-center gap-1.5 mb-1.5">
-        <div className={`w-5 h-5 rounded ${iconBg} flex items-center justify-center`}>
-          {icon}
-        </div>
-        <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">{label}</p>
-      </div>
-      <div className="flex items-baseline gap-1.5">
-        <p className={`text-lg font-bold tabular-nums leading-tight ${valColor}`}>{value}</p>
+    <div className={`rounded-lg bg-slate-50 border border-slate-100 border-l-4 ${borderColor} px-3 py-2 flex-1 min-w-[90px]`}>
+      <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">{label}</p>
+      <div className="flex items-baseline gap-1.5 mt-0.5">
+        <p className={`text-base font-bold tabular-nums leading-tight ${valColor}`}>{value}</p>
         {trend && (
-          <span className={`text-[11px] font-semibold flex items-center gap-0.5 ${trend.positive ? "text-emerald-600" : "text-red-500"}`}>
-            {trend.positive ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
+          <span className={`text-[10px] font-semibold flex items-center gap-0.5 ${trend.positive ? "text-emerald-600" : "text-red-500"}`}>
+            {trend.positive ? <ArrowUpRight className="h-2.5 w-2.5" /> : <ArrowDownRight className="h-2.5 w-2.5" />}
             {trend.value}
           </span>
         )}
       </div>
-      {sub && <p className="text-[11px] text-slate-400 mt-1 leading-snug">{sub}</p>}
+      {sub && <p className="text-[10px] text-slate-400 mt-0.5">{sub}</p>}
     </div>
   );
 }
 
-// ─── Budget bar (enhanced - more prominent) ──────────────────────────────────
+// ─── Budget bar ──────────────────────────────────────────────────────────────
 
-function BudgetStrip({
-  cost, budget, utilization,
-}: {
-  cost: number; budget: number; utilization: number;
-}) {
+function BudgetStrip({ cost, budget, utilization }: { cost: number; budget: number; utilization: number }) {
   const barColor =
     utilization >= 90 ? "bg-gradient-to-r from-red-400 to-red-500"
     : utilization >= 75 ? "bg-gradient-to-r from-amber-400 to-amber-500"
     : "bg-gradient-to-r from-emerald-400 to-emerald-500";
 
-  const textColor =
-    utilization >= 90 ? "text-red-600 font-semibold"
-    : utilization >= 75 ? "text-amber-600"
-    : "text-slate-500";
-
-  const bgTrack =
-    utilization >= 90 ? "bg-red-100"
-    : utilization >= 75 ? "bg-amber-100"
-    : "bg-slate-200";
+  const bgTrack = utilization >= 90 ? "bg-red-100" : utilization >= 75 ? "bg-amber-100" : "bg-slate-200";
 
   return (
-    <div className="border-t border-slate-100 px-4 py-3 bg-slate-50/60">
-      <div className="flex items-center justify-between mb-2">
-        <span className="text-xs font-medium text-slate-500">Presupuesto</span>
-        <span className={`text-xs ${textColor}`}>
-          {usd(cost)} / {usd(budget)} · {utilization.toFixed(0)}%
+    <div className="border-t border-slate-100 px-4 py-2.5 bg-slate-50/60">
+      <div className="flex items-center justify-between mb-1.5">
+        <span className="text-[11px] font-medium text-slate-400">Presupuesto</span>
+        <span className="text-[11px] text-slate-500">
+          {usd(cost)} / {usd(budget)} · <span className="font-semibold">{utilization.toFixed(0)}%</span>
         </span>
       </div>
-      <div className={`h-3 ${bgTrack} rounded-full overflow-hidden relative`}>
-        <div
-          className={`h-full rounded-full transition-all duration-700 ${barColor}`}
-          style={{ width: `${Math.min(100, utilization)}%` }}
-        />
-        {/* Percentage label inside bar when enough space */}
-        {utilization >= 20 && (
-          <span className="absolute inset-0 flex items-center justify-center text-[9px] font-bold text-white/80 mix-blend-normal">
-            {utilization.toFixed(0)}%
-          </span>
-        )}
+      <div className={`h-2 ${bgTrack} rounded-full overflow-hidden`}>
+        <div className={`h-full rounded-full transition-all duration-700 ${barColor}`} style={{ width: `${Math.min(100, utilization)}%` }} />
       </div>
-      <div className="flex items-center justify-between mt-1.5">
-        <span className={`text-[11px] font-medium ${
+      <div className="flex items-center justify-between mt-1">
+        <span className={`text-[10px] font-medium ${
           utilization >= 90 ? "text-red-500" : utilization >= 75 ? "text-amber-500" : "text-emerald-500"
         }`}>
           {utilization >= 90 ? "Budget casi agotado" : utilization >= 75 ? "Zona de atención" : "Budget disponible"}
         </span>
-        <span className="text-[11px] text-slate-400 font-medium">Quedan {usd(budget - cost)}</span>
+        <span className="text-[10px] text-slate-400">Quedan {usd(budget - cost)}</span>
       </div>
-    </div>
-  );
-}
-
-// ─── Health Badge ─────────────────────────────────────────────────────────────
-
-function HealthBadge({ score }: { score: number }) {
-  const info  = healthLabel(score);
-  const grade = healthGrade(score);
-
-  const styles =
-    score >= 70 ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-    : score >= 50 ? "bg-amber-50 text-amber-700 border-amber-200"
-    : score >= 30 ? "bg-orange-50 text-orange-700 border-orange-200"
-    : "bg-red-50 text-red-700 border-red-200";
-
-  const dot =
-    score >= 70 ? "bg-emerald-500"
-    : score >= 50 ? "bg-amber-400"
-    : score >= 30 ? "bg-orange-500"
-    : "bg-red-500";
-
-  return (
-    <div className="flex flex-col items-end gap-1">
-      <div className={`flex items-center gap-1.5 border rounded-lg px-3 py-1.5 text-sm font-semibold ${styles}`}>
-        <span className={`w-2 h-2 rounded-full ${dot} ${score < 50 ? "animate-pulse" : ""}`} />
-        {info.text}
-      </div>
-      <p className="text-[11px] text-slate-400 flex items-center gap-1">
-        <Activity className="h-3 w-3" />
-        Score {score}/100 · Grado {grade}
-      </p>
     </div>
   );
 }
@@ -192,24 +161,17 @@ function HealthBadge({ score }: { score: number }) {
 function StickyHeader({
   visible, projectName, score, markup, canSeeCosts,
 }: {
-  visible: boolean;
-  projectName: string;
-  score: number;
-  markup: number;
-  canSeeCosts: boolean;
+  visible: boolean; projectName: string; score: number; markup: number; canSeeCosts: boolean;
 }) {
   const dotColor =
-    score >= 70 ? "bg-emerald-500"
-    : score >= 50 ? "bg-amber-400"
-    : score >= 30 ? "bg-orange-500"
-    : "bg-red-500";
+    score >= 70 ? "bg-emerald-500" : score >= 50 ? "bg-amber-400" : score >= 30 ? "bg-orange-500" : "bg-red-500";
 
   return (
     <div className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
       visible ? "translate-y-0 opacity-100" : "-translate-y-full opacity-0"
     }`}>
       <div className="bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-sm">
-        <div className="w-full px-4 py-2.5 flex items-center justify-between">
+        <div className="w-full px-4 py-2 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Link href="/active-projects">
               <button className="text-slate-400 hover:text-slate-700 transition-colors">
@@ -218,17 +180,17 @@ function StickyHeader({
             </Link>
             <h2 className="text-sm font-bold text-slate-800 truncate max-w-[300px]">{projectName}</h2>
             <div className="flex items-center gap-1.5">
-              <span className={`w-2 h-2 rounded-full ${dotColor} ${score < 50 ? "animate-pulse" : ""}`} />
+              <span className={`w-2 h-2 rounded-full ${dotColor}`} />
               <span className="text-xs text-slate-500 font-medium">{score}/100</span>
             </div>
           </div>
           {canSeeCosts && markup > 0 && (
-            <span className={`text-xs font-semibold rounded-md px-2.5 py-1 border ${
+            <span className={`text-xs font-semibold rounded-md px-2 py-0.5 border ${
               markup >= 2.5 ? "bg-emerald-50 text-emerald-700 border-emerald-200"
               : markup >= 2.0 ? "bg-amber-50 text-amber-700 border-amber-200"
               : "bg-red-50 text-red-700 border-red-200"
             }`}>
-              Markup {markup.toFixed(2)}x
+              {markup.toFixed(2)}x
             </span>
           )}
         </div>
@@ -266,13 +228,6 @@ export default function ProjectHero(props: ProjectHeroProps) {
     hasHoursEstimate: estimatedHours > 0,
   });
 
-  // Gradient accent based on health score
-  const gradientBg =
-    score >= 70 ? "from-emerald-500/5 via-transparent to-transparent"
-    : score >= 50 ? "from-amber-500/5 via-transparent to-transparent"
-    : score >= 30 ? "from-orange-500/5 via-transparent to-transparent"
-    : "from-red-500/5 via-transparent to-transparent";
-
   const leftBorder =
     score >= 70 ? "border-l-emerald-500"
     : score >= 50 ? "border-l-amber-400"
@@ -280,7 +235,6 @@ export default function ProjectHero(props: ProjectHeroProps) {
     : "border-l-red-500";
 
   const markupTrend = prevMarkup != null && prevMarkup > 0 ? markup - prevMarkup : null;
-  const profit = revenue - cost;
 
   const periodLabel = (() => {
     if (!period) return "";
@@ -294,20 +248,11 @@ export default function ProjectHero(props: ProjectHeroProps) {
 
   return (
     <>
-      <StickyHeader
-        visible={showSticky}
-        projectName={projectName}
-        score={score}
-        markup={markup}
-        canSeeCosts={canSeeCosts}
-      />
+      <StickyHeader visible={showSticky} projectName={projectName} score={score} markup={markup} canSeeCosts={canSeeCosts} />
 
-      <div
-        ref={heroRef}
-        className={`bg-gradient-to-r ${gradientBg} bg-white rounded-2xl border border-slate-200 border-l-4 ${leftBorder} shadow-sm overflow-hidden`}
-      >
-        {/* ── Title row ── */}
-        <div className="px-4 pt-3 pb-4">
+      <div ref={heroRef} className={`bg-white rounded-2xl border border-slate-200 border-l-4 ${leftBorder} shadow-sm overflow-hidden`}>
+        <div className="px-4 pt-3 pb-3">
+          {/* Title row */}
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1">
@@ -316,9 +261,7 @@ export default function ProjectHero(props: ProjectHeroProps) {
                     <ArrowLeft className="h-3.5 w-3.5" />
                   </button>
                 </Link>
-                {hasClient && (
-                  <p className="text-xs font-medium text-slate-400 truncate max-w-[200px]">{clientName}</p>
-                )}
+                {hasClient && <p className="text-xs font-medium text-slate-400 truncate max-w-[200px]">{clientName}</p>}
                 {period && (
                   <>
                     <span className="text-slate-200 text-xs">·</span>
@@ -326,98 +269,57 @@ export default function ProjectHero(props: ProjectHeroProps) {
                   </>
                 )}
               </div>
-              <h1 className="text-xl font-bold text-slate-900 leading-tight tracking-tight truncate">
-                {projectName}
-              </h1>
-              <div className="flex items-center gap-2 mt-2 flex-wrap">
-                <span className={`text-[11px] font-medium rounded-md px-2.5 py-1 border ${STATUS_STYLES[projectStatus] ?? "bg-slate-100 text-slate-600 border-slate-200"}`}>
+              <h1 className="text-xl font-bold text-slate-900 leading-tight tracking-tight truncate">{projectName}</h1>
+              <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                <span className={`text-[11px] font-medium rounded-md px-2 py-0.5 border ${STATUS_STYLES[projectStatus] ?? "bg-slate-100 text-slate-600 border-slate-200"}`}>
                   {STATUS_LABEL[projectStatus] ?? projectStatus}
                 </span>
-                {canSeeCosts && markup > 0 && (
-                  <span className={`text-[11px] font-semibold rounded-md px-2.5 py-1 border inline-flex items-center gap-1.5 ${
-                    markup >= 2.5 ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                    : markup >= 2.0 ? "bg-amber-50 text-amber-700 border-amber-200"
-                    : "bg-red-50 text-red-700 border-red-200"
-                  }`}>
-                    Markup {markup.toFixed(2)}x
-                    {markupTrend != null && Math.abs(markupTrend) >= 0.1 && (
-                      <span className={`inline-flex items-center gap-0.5 text-[10px] font-semibold ${markupTrend > 0 ? "text-emerald-600" : "text-red-600"}`}>
-                        {markupTrend > 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-                        {markupTrend > 0 ? "+" : ""}{markupTrend.toFixed(1)}x
-                      </span>
-                    )}
-                  </span>
-                )}
               </div>
             </div>
-            {canSeeCosts && <HealthBadge score={score} />}
           </div>
 
-          {/* ── KPI Cards Grid ── */}
+          {/* KPI row: Hero metric + supporting cards */}
           {canSeeCosts && (
-            <div className="mt-3 pt-3 border-t border-slate-100 flex flex-wrap gap-2">
-              {revenue > 0 && (
-                <KPICard
-                  icon={<DollarSign className="h-3.5 w-3.5" />}
-                  label="Revenue"
-                  value={usd(revenue)}
-                  highlight="green"
-                />
-              )}
-              {cost > 0 && (
-                <KPICard
-                  icon={<DollarSign className="h-3.5 w-3.5" />}
-                  label="Costo"
-                  value={usd(cost)}
-                  sub={revenue === 0 ? "sin facturación" : undefined}
-                  highlight="neutral"
-                />
-              )}
-              {markup > 0 && (
-                <KPICard
-                  icon={<Target className="h-3.5 w-3.5" />}
-                  label="Markup"
-                  value={`${markup.toFixed(2)}x`}
-                  sub="meta: 2.5x"
-                  highlight={markup >= 2.5 ? "green" : markup >= 2.0 ? "amber" : "red"}
-                  trend={markupTrend != null && Math.abs(markupTrend) >= 0.1 ? {
-                    value: `${markupTrend > 0 ? "+" : ""}${markupTrend.toFixed(1)}x`,
-                    positive: markupTrend > 0,
-                  } : null}
-                />
-              )}
-              {revenue > 0 && (
-                <KPICard
-                  icon={<PieChart className="h-3.5 w-3.5" />}
-                  label="Margen"
-                  value={`${margin.toFixed(1)}%`}
-                  sub={profit !== 0 ? usd(profit) : undefined}
-                  highlight={margin >= 25 ? "green" : margin >= 10 ? "amber" : "red"}
-                />
-              )}
-              {(totalHours > 0 || estimatedHours > 0) && (
-                <KPICard
-                  icon={<Clock className="h-3.5 w-3.5" />}
-                  label="Horas"
-                  value={`${Math.round(totalHours)}h`}
-                  sub={estimatedHours > 0 ? `de ${Math.round(estimatedHours)}h est.` : undefined}
-                  highlight={estimatedHours > 0 && totalHours > estimatedHours * 1.2 ? "red" : estimatedHours > 0 && totalHours > estimatedHours * 1.05 ? "amber" : "neutral"}
-                />
-              )}
-              {budget > 0 && (
-                <KPICard
-                  icon={<Target className="h-3.5 w-3.5" />}
-                  label="Budget"
-                  value={`${budgetUtilization.toFixed(0)}%`}
-                  sub={`quedan ${usd(budget - cost)}`}
-                  highlight={budgetUtilization >= 90 ? "red" : budgetUtilization >= 75 ? "amber" : "green"}
-                />
-              )}
+            <div className="mt-3 pt-3 border-t border-slate-100 flex flex-col sm:flex-row gap-3 items-start">
+              {/* Hero metric — Health Score */}
+              <HeroMetric score={score} label={healthLabel(score).text} grade={healthGrade(score)} />
+
+              {/* Supporting KPIs — max 3 */}
+              <div className="flex flex-wrap gap-2 flex-1">
+                {markup > 0 && (
+                  <KPICard
+                    label="Markup"
+                    value={`${markup.toFixed(2)}x`}
+                    sub="meta: 2.5x"
+                    highlight={markup >= 2.5 ? "green" : markup >= 2.0 ? "amber" : "red"}
+                    trend={markupTrend != null && Math.abs(markupTrend) >= 0.1 ? {
+                      value: `${markupTrend > 0 ? "+" : ""}${markupTrend.toFixed(1)}x`,
+                      positive: markupTrend > 0,
+                    } : null}
+                  />
+                )}
+                {(totalHours > 0 || estimatedHours > 0) && (
+                  <KPICard
+                    label="Horas"
+                    value={`${Math.round(totalHours)}h`}
+                    sub={estimatedHours > 0 ? `de ${Math.round(estimatedHours)}h est.` : undefined}
+                    highlight={estimatedHours > 0 && totalHours > estimatedHours * 1.2 ? "red" : estimatedHours > 0 && totalHours > estimatedHours * 1.05 ? "amber" : "neutral"}
+                  />
+                )}
+                {budget > 0 && (
+                  <KPICard
+                    label="Budget"
+                    value={`${budgetUtilization.toFixed(0)}%`}
+                    sub={`quedan ${usd(budget - cost)}`}
+                    highlight={budgetUtilization >= 90 ? "red" : budgetUtilization >= 75 ? "amber" : "green"}
+                  />
+                )}
+              </div>
             </div>
           )}
 
           {!canSeeCosts && (totalHours > 0 || estimatedHours > 0) && (
-            <div className="mt-4 pt-4 border-t border-slate-100 flex items-center gap-2 text-sm text-slate-600">
+            <div className="mt-3 pt-3 border-t border-slate-100 flex items-center gap-2 text-sm text-slate-600">
               <span className="font-semibold text-slate-900">{Math.round(totalHours)}h</span>
               {estimatedHours > 0 && <span className="text-slate-400">de {Math.round(estimatedHours)}h estimadas</span>}
               {hoursDeviation !== 0 && estimatedHours > 0 && (

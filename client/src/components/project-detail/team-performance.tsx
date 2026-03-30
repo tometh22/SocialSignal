@@ -163,10 +163,10 @@ export default function TeamPerformance({ team, canSeeCosts }: TeamPerformancePr
 
   if (!team || team.length === 0) {
     return (
-      <div className="rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
-        <div className="flex items-center gap-2 px-5 py-3.5 border-b border-slate-100 bg-slate-50">
-          <Users className="h-4 w-4 text-slate-500" />
-          <span className="text-sm font-semibold text-slate-800">Equipo</span>
+      <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
+        <div className="flex items-center gap-2 px-4 py-2.5 border-b border-slate-50 bg-slate-50/50">
+          <Users className="h-3.5 w-3.5 text-slate-400" />
+          <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Equipo</span>
         </div>
         <div className="p-10 text-center">
           <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-3">
@@ -241,12 +241,12 @@ export default function TeamPerformance({ team, canSeeCosts }: TeamPerformancePr
   };
 
   return (
-    <div className="rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+    <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-slate-50">
+      <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-50 bg-slate-50/50">
         <div className="flex items-center gap-2">
-          <Users className="h-4 w-4 text-slate-500" />
-          <span className="text-sm font-semibold text-slate-800">Equipo</span>
+          <Users className="h-3.5 w-3.5 text-slate-400" />
+          <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Equipo</span>
           <span className="text-xs text-slate-400 bg-slate-200/60 rounded-full px-2 py-0.5">{members.length}</span>
         </div>
         {canSeeCosts && totalCost > 0 && (
