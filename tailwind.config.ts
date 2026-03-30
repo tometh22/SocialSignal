@@ -95,6 +95,14 @@ export default {
           from: { opacity: "0" },
           to: { opacity: "1" },
         },
+        "fadeIn": {
+          from: { opacity: "0", transform: "translateY(8px)" },
+          to: { opacity: "1", transform: "translateY(0)" },
+        },
+        "slideDown": {
+          from: { opacity: "0", maxHeight: "0" },
+          to: { opacity: "1", maxHeight: "2000px" },
+        },
         "slide-in": {
           from: { transform: "translateY(10px)", opacity: "0" },
           to: { transform: "translateY(0)", opacity: "1" },
@@ -104,6 +112,8 @@ export default {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
         "fade-in": "fade-in 0.4s ease-out",
+        "fadeIn": "fadeIn 0.4s ease-out both",
+        "slideDown": "slideDown 0.3s ease-out both",
         "slide-in": "slide-in 0.5s ease-out",
       },
       boxShadow: {

@@ -1,10 +1,9 @@
 /**
- * AI Copilot — Project Intelligence Engine
- * Genera insights predictivos, comparativos y accionables con números exactos.
- * Solo visible para Ops/Admin (canSeeCosts).
+ * AI Copilot — Project Intelligence Engine (Redesigned)
+ * Smart collapse for signals, action buttons, improved visual hierarchy.
  */
-import { useMemo } from "react";
-import { Zap, TrendingUp, TrendingDown, AlertTriangle, CheckCircle, ChevronRight, FlaskConical } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Zap, TrendingUp, TrendingDown, AlertTriangle, CheckCircle, ChevronDown, ChevronRight, FlaskConical, Eye, Lightbulb } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -95,7 +94,7 @@ function useProjectIntelligence(props: AICopilotProps) {
       const gapTo25x = cost * 2.5 - revenue;
       const costCutNeeded = cost > 0 ? ((cost - revenue / 2.5) / cost) * 100 : 0;
       if (markup < 2.0) {
-        signals.push({ level: "critical", headline: `Markup CRÍTICO: ${markup.toFixed(2)}x`, detail: `Por debajo de 2.0x — el proyecto genera pérdida de eficiencia. Necesita ${usd(Math.abs(gapTo25x))} más de revenue o reducir costos un ${costCutNeeded.toFixed(0)}% para llegar al estándar Epical (2.5x).` });
+        signals.push({ level: "critical", headline: `Markup CRITICO: ${markup.toFixed(2)}x`, detail: `Por debajo de 2.0x — el proyecto genera pérdida de eficiencia. Necesita ${usd(Math.abs(gapTo25x))} más de revenue o reducir costos un ${costCutNeeded.toFixed(0)}% para llegar al estándar Epical (2.5x).` });
         recommendations.push({ rank: recRank++, impact: "high", text: `Renegociar precio o reducir scope para subir markup de ${markup.toFixed(1)}x → 2.5x (faltan ${usd(gapTo25x)}).` });
       } else if (markup < 2.5) {
         signals.push({ level: "warning", headline: `Markup bajo el estándar: ${markup.toFixed(2)}x`, detail: `Meta Epical: 2.5x. Faltan ${usd(gapTo25x)} de revenue o reducir costos un ${costCutNeeded.toFixed(0)}% para alcanzarla.` });
@@ -165,10 +164,10 @@ function useProjectIntelligence(props: AICopilotProps) {
       const avgRate = totalHours > 0 ? cost / totalHours : 0;
       const rev10 = revenue * 1.1; const markup10 = rev10 / cost;
       whatIfScenarios.push({ label: "+10% precio", change: `Revenue ${usd(revenue)} → ${usd(rev10)}`, newMarkup: markup10, newRevenue: rev10, delta: markup10 - markup, positive: markup10 > markup });
-      if (avgRate > 0) { const costSaved = 10 * avgRate; const newCostB = Math.max(0, cost - costSaved); const markupB = newCostB > 0 ? revenue / newCostB : 0; whatIfScenarios.push({ label: "−10h de equipo", change: `Ahorro ~${usd(costSaved)} (a ${usd(avgRate)}/h)`, newMarkup: markupB, newCost: newCostB, delta: markupB - markup, positive: markupB > markup }); }
+      if (avgRate > 0) { const costSaved = 10 * avgRate; const newCostB = Math.max(0, cost - costSaved); const markupB = newCostB > 0 ? revenue / newCostB : 0; whatIfScenarios.push({ label: "-10h de equipo", change: `Ahorro ~${usd(costSaved)} (a ${usd(avgRate)}/h)`, newMarkup: markupB, newCost: newCostB, delta: markupB - markup, positive: markupB > markup }); }
       if (estimatedHours > 0 && totalHours > estimatedHours && avgRate > 0) { const costAtTarget = estimatedHours * avgRate; const markupTarget = revenue / costAtTarget; const savings = cost - costAtTarget; if (savings > 0) whatIfScenarios.push({ label: "Llegar a horas estimadas", change: `${totalHours.toFixed(0)}h → ${estimatedHours.toFixed(0)}h, ahorro ${usd(savings)}`, newMarkup: markupTarget, newCost: costAtTarget, delta: markupTarget - markup, positive: markupTarget > markup }); }
       const costMinus5 = cost * 0.95; const markupMinus5 = revenue / costMinus5;
-      whatIfScenarios.push({ label: "−5% costos generales", change: `Costo ${usd(cost)} → ${usd(costMinus5)}`, newMarkup: markupMinus5, newCost: costMinus5, delta: markupMinus5 - markup, positive: markupMinus5 > markup });
+      whatIfScenarios.push({ label: "-5% costos generales", change: `Costo ${usd(cost)} → ${usd(costMinus5)}`, newMarkup: markupMinus5, newCost: costMinus5, delta: markupMinus5 - markup, positive: markupMinus5 > markup });
     }
 
     const diagnosis = hasCritical ? "critical" : hasWarning ? "warning" : "healthy";
@@ -186,20 +185,30 @@ function SignalIcon({ level }: { level: SignalLevel }) {
 }
 
 const SIGNAL_BG: Record<SignalLevel, string> = {
-  critical: "bg-red-50 border-red-200", warning: "bg-amber-50 border-amber-200",
-  good: "bg-emerald-50 border-emerald-200", info: "bg-indigo-50 border-indigo-100",
+  critical: "bg-red-50 border-red-200 border-l-4 border-l-red-500",
+  warning: "bg-amber-50 border-amber-200 border-l-4 border-l-amber-400",
+  good: "bg-emerald-50 border-emerald-200 border-l-4 border-l-emerald-500",
+  info: "bg-indigo-50 border-indigo-100 border-l-4 border-l-indigo-300",
 };
 
 const IMPACT_BADGE: Record<string, string> = {
-  high: "bg-red-50 text-red-700 border border-red-200",
-  medium: "bg-amber-50 text-amber-700 border border-amber-200",
-  low: "bg-green-50 text-green-700 border border-green-200",
+  high: "bg-red-100 text-red-700 border border-red-200",
+  medium: "bg-amber-100 text-amber-700 border border-amber-200",
+  low: "bg-emerald-100 text-emerald-700 border border-emerald-200",
+};
+
+const IMPACT_LABEL: Record<string, string> = {
+  high: "URGENTE",
+  medium: "MEDIO",
+  low: "OK",
 };
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function AICopilot(props: AICopilotProps) {
   const { signals, recommendations, whatIfScenarios, diagnosis } = useProjectIntelligence(props);
+  const [showAllSignals, setShowAllSignals] = useState(false);
+  const [showWhatIf, setShowWhatIf] = useState(false);
 
   const headerBorder = diagnosis === "critical" ? "border-l-red-500" : diagnosis === "warning" ? "border-l-amber-400" : "border-l-emerald-500";
   const diagnosisMeta = {
@@ -211,14 +220,23 @@ export default function AICopilot(props: AICopilotProps) {
   const criticalCount = signals.filter(s => s.level === "critical").length;
   const warningCount  = signals.filter(s => s.level === "warning").length;
 
+  // Smart collapse: show critical/warning expanded, collapse good/info by default
+  const prioritySignals = signals.filter(s => s.level === "critical" || s.level === "warning");
+  const secondarySignals = signals.filter(s => s.level === "good" || s.level === "info");
+  const visibleSignals = showAllSignals ? signals : (prioritySignals.length > 0 ? prioritySignals : signals.slice(0, 2));
+  const hiddenCount = signals.length - visibleSignals.length;
+
   return (
     <div className={`bg-white rounded-2xl border border-slate-200 border-l-4 ${headerBorder} shadow-sm overflow-hidden`}>
+      {/* Header */}
       <div className="flex items-center gap-3 px-5 py-3.5 border-b border-slate-100 bg-slate-50">
-        <Zap className="h-3.5 w-3.5 text-indigo-500 flex-shrink-0" />
+        <div className="w-7 h-7 rounded-lg bg-indigo-100 flex items-center justify-center">
+          <Zap className="h-3.5 w-3.5 text-indigo-600" />
+        </div>
         <span className="text-sm font-semibold text-slate-800">AI Copilot</span>
-        <span className="text-[11px] text-slate-400">· Epical Intelligence</span>
+        <span className="text-[11px] text-slate-400">Epical Intelligence</span>
         <div className="ml-auto flex items-center gap-2">
-          {criticalCount > 0 && <span className="text-[11px] font-semibold bg-red-50 text-red-700 border border-red-200 rounded-full px-2.5 py-0.5">{criticalCount} crítico{criticalCount > 1 ? "s" : ""}</span>}
+          {criticalCount > 0 && <span className="text-[11px] font-semibold bg-red-50 text-red-700 border border-red-200 rounded-full px-2.5 py-0.5">{criticalCount} critico{criticalCount > 1 ? "s" : ""}</span>}
           {warningCount > 0 && <span className="text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 rounded-full px-2.5 py-0.5">{warningCount} atención</span>}
           <span className={`flex items-center gap-1.5 text-[11px] font-semibold rounded-full px-2.5 py-0.5 border ${diagnosisMeta.bg} ${diagnosisMeta.text}`}>
             <span className={`w-1.5 h-1.5 rounded-full ${diagnosisMeta.dot} ${diagnosis !== "healthy" ? "animate-pulse" : ""}`} />
@@ -228,11 +246,15 @@ export default function AICopilot(props: AICopilotProps) {
       </div>
 
       <div className="p-5 grid md:grid-cols-2 gap-6">
+        {/* Signals */}
         <div>
-          <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-3">Señales detectadas</p>
+          <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+            <Eye className="h-3 w-3" />
+            Señales detectadas
+          </p>
           <div className="space-y-2">
-            {signals.map((s, i) => (
-              <div key={i} className={`rounded-xl border px-3.5 py-2.5 ${SIGNAL_BG[s.level]}`}>
+            {visibleSignals.map((s, i) => (
+              <div key={i} className={`rounded-xl border px-3.5 py-2.5 transition-all ${SIGNAL_BG[s.level]}`}>
                 <div className="flex items-start gap-2.5">
                   <SignalIcon level={s.level} />
                   <div className="min-w-0">
@@ -248,54 +270,93 @@ export default function AICopilot(props: AICopilotProps) {
                 <p className="text-sm text-emerald-700 font-medium">Sin señales de riesgo detectadas.</p>
               </div>
             )}
+            {/* Show more / less toggle */}
+            {hiddenCount > 0 && !showAllSignals && (
+              <button
+                onClick={() => setShowAllSignals(true)}
+                className="w-full text-center py-2 text-xs font-medium text-slate-400 hover:text-slate-600 transition-colors flex items-center justify-center gap-1 rounded-lg hover:bg-slate-50"
+              >
+                <ChevronDown className="h-3 w-3" />
+                Ver {hiddenCount} señal{hiddenCount > 1 ? "es" : ""} más
+              </button>
+            )}
+            {showAllSignals && secondarySignals.length > 0 && prioritySignals.length > 0 && (
+              <button
+                onClick={() => setShowAllSignals(false)}
+                className="w-full text-center py-2 text-xs font-medium text-slate-400 hover:text-slate-600 transition-colors flex items-center justify-center gap-1 rounded-lg hover:bg-slate-50"
+              >
+                <ChevronDown className="h-3 w-3 rotate-180" />
+                Mostrar solo alertas
+              </button>
+            )}
           </div>
         </div>
+
+        {/* Recommendations */}
         <div>
-          <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-3">Acciones recomendadas</p>
+          <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+            <Lightbulb className="h-3 w-3" />
+            Acciones recomendadas
+          </p>
           <div className="space-y-2">
             {recommendations.map((r) => (
-              <div key={r.rank} className="flex items-start gap-3 rounded-xl border border-slate-100 bg-slate-50/80 px-3.5 py-2.5">
-                <span className="flex-shrink-0 w-5 h-5 rounded-full bg-slate-700 text-white text-[10px] font-bold flex items-center justify-center mt-0.5">{r.rank}</span>
-                <p className="text-sm text-slate-600 leading-relaxed flex-1">{r.text}</p>
-                <span className={`flex-shrink-0 text-[10px] font-semibold rounded-md px-2 py-0.5 mt-0.5 border ${IMPACT_BADGE[r.impact]}`}>
-                  {r.impact === "high" ? "URGENTE" : r.impact === "medium" ? "MEDIO" : "OK"}
+              <div key={r.rank} className="flex items-start gap-3 rounded-xl border border-slate-100 bg-slate-50/80 px-3.5 py-3 hover:bg-slate-100/60 transition-colors group">
+                <span className="flex-shrink-0 w-6 h-6 rounded-full bg-slate-700 text-white text-[11px] font-bold flex items-center justify-center mt-0.5">{r.rank}</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-slate-600 leading-relaxed">{r.text}</p>
+                </div>
+                <span className={`flex-shrink-0 text-[10px] font-semibold rounded-md px-2 py-0.5 mt-0.5 ${IMPACT_BADGE[r.impact]}`}>
+                  {IMPACT_LABEL[r.impact]}
                 </span>
               </div>
             ))}
-            {recommendations.length === 0 && <div className="rounded-xl border border-slate-100 bg-slate-50 px-3.5 py-2.5"><p className="text-sm text-slate-400 italic">Sin acciones requeridas por ahora.</p></div>}
+            {recommendations.length === 0 && (
+              <div className="rounded-xl border border-slate-100 bg-slate-50 px-3.5 py-2.5">
+                <p className="text-sm text-slate-400 italic">Sin acciones requeridas por ahora.</p>
+              </div>
+            )}
           </div>
         </div>
       </div>
 
+      {/* What-If Scenarios (collapsible) */}
       {whatIfScenarios.length > 0 && (
-        <div className="border-t border-slate-100 bg-slate-50/60 px-5 py-4">
-          <div className="flex items-center gap-2 mb-3">
+        <div className="border-t border-slate-100">
+          <button
+            onClick={() => setShowWhatIf(!showWhatIf)}
+            className="w-full flex items-center gap-2 px-5 py-3 bg-slate-50/60 hover:bg-slate-100/60 transition-colors"
+          >
             <FlaskConical className="h-3.5 w-3.5 text-indigo-500" />
             <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Escenarios What-If</p>
             <span className="text-[10px] text-slate-300 ml-0.5">— simulación instantánea</span>
-          </div>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            {whatIfScenarios.map((sc, i) => (
-              <div key={i} className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">{sc.label}</p>
-                <p className="text-[11px] text-slate-400 leading-snug mb-2.5">{sc.change}</p>
-                <div className="flex items-baseline gap-1.5">
-                  <span className="text-xl font-bold text-slate-900 tabular-nums">{sc.newMarkup.toFixed(2)}x</span>
-                  <span className={`text-xs font-semibold flex items-center gap-0.5 ${sc.positive ? "text-emerald-600" : "text-red-500"}`}>
-                    {sc.positive ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-                    {sc.delta > 0 ? "+" : ""}{sc.delta.toFixed(2)}x
-                  </span>
-                </div>
-                <span className={`mt-2 text-[10px] font-semibold rounded-md px-2 py-0.5 inline-block border ${
-                  sc.newMarkup >= 2.5 ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                  : sc.newMarkup >= 2.0 ? "bg-amber-50 text-amber-700 border-amber-200"
-                  : "bg-red-50 text-red-700 border-red-200"
-                }`}>
-                  {sc.newMarkup >= 2.5 ? "✓ En target" : sc.newMarkup >= 2.0 ? "⚠ Bajo estándar" : "✗ Crítico"}
-                </span>
+            <ChevronRight className={`h-3.5 w-3.5 text-slate-400 ml-auto transition-transform ${showWhatIf ? "rotate-90" : ""}`} />
+          </button>
+          {showWhatIf && (
+            <div className="px-5 pb-4 bg-slate-50/60">
+              <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                {whatIfScenarios.map((sc, i) => (
+                  <div key={i} className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm hover:shadow-md transition-shadow">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">{sc.label}</p>
+                    <p className="text-[11px] text-slate-400 leading-snug mb-2.5">{sc.change}</p>
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-xl font-bold text-slate-900 tabular-nums">{sc.newMarkup.toFixed(2)}x</span>
+                      <span className={`text-xs font-semibold flex items-center gap-0.5 ${sc.positive ? "text-emerald-600" : "text-red-500"}`}>
+                        {sc.positive ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                        {sc.delta > 0 ? "+" : ""}{sc.delta.toFixed(2)}x
+                      </span>
+                    </div>
+                    <span className={`mt-2 text-[10px] font-semibold rounded-md px-2 py-0.5 inline-block border ${
+                      sc.newMarkup >= 2.5 ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                      : sc.newMarkup >= 2.0 ? "bg-amber-50 text-amber-700 border-amber-200"
+                      : "bg-red-50 text-red-700 border-red-200"
+                    }`}>
+                      {sc.newMarkup >= 2.5 ? "En target" : sc.newMarkup >= 2.0 ? "Bajo estándar" : "Critico"}
+                    </span>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+            </div>
+          )}
         </div>
       )}
     </div>
