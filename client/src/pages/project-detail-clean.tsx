@@ -394,7 +394,7 @@ export default function ProjectDetailClean() {
       )}
 
       {/* ── Main content grid ──────────────────────────────────────────── */}
-      <div className="grid md:grid-cols-2 gap-4 animate-fadeIn" style={{ animationDelay: "200ms" }}>
+      <div className="grid md:grid-cols-2 gap-4 items-start animate-fadeIn" style={{ animationDelay: "200ms" }}>
         {/* Team Performance */}
         <TeamPerformance
           team={enrichedTeam}
