@@ -17145,7 +17145,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updateWithUser = { ...update };
       try { updateWithUser.updatedBy = userId; } catch {}
 
-      let result;
+      let result: any;
       try {
         if (existing) {
           [result] = await db.update(projectStatusReviews)
@@ -17159,16 +17159,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       } catch (e: any) {
         // Fallback without updatedBy if column doesn't exist
+        // Note: .returning() also fails because Drizzle includes updated_by in RETURNING clause
         if (String(e).includes('updated_by')) {
-          if (existing) {
-            [result] = await db.update(projectStatusReviews)
-              .set(update)
-              .where(eq(projectStatusReviews.projectId, projectId))
-              .returning();
-          } else {
-            [result] = await db.insert(projectStatusReviews)
-              .values({ projectId, ...update })
-              .returning();
+          try {
+            if (existing) {
+              await db.update(projectStatusReviews)
+                .set(update)
+                .where(eq(projectStatusReviews.projectId, projectId));
+            } else {
+              await db.insert(projectStatusReviews)
+                .values({ projectId, ...update });
+            }
+            result = { projectId, ...update };
+          } catch (e2: any) {
+            throw e2;
           }
         } else {
           throw e;
@@ -17791,13 +17795,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Try to include updatedBy (column may not exist if migration hasn't run)
       const updateWithUser = { ...update };
-      let item;
+      let item: any;
       try {
         updateWithUser.updatedBy = userId;
         [item] = await db.update(weeklyStatusItems).set(updateWithUser).where(eq(weeklyStatusItems.id, id)).returning();
       } catch (e: any) {
+        // Fallback: .returning() also includes updated_by in RETURNING clause, so skip it
         if (String(e).includes('updated_by')) {
-          [item] = await db.update(weeklyStatusItems).set(update).where(eq(weeklyStatusItems.id, id)).returning();
+          try {
+            await db.update(weeklyStatusItems).set(update).where(eq(weeklyStatusItems.id, id));
+            item = { id, ...update };
+          } catch (e2: any) {
+            throw e2;
+          }
         } else {
           throw e;
         }
