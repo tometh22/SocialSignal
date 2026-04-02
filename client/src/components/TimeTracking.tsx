@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { authFetch } from '@/lib/queryClient';
 import { 
   Clock, 
   Users, 
@@ -79,7 +80,7 @@ export default function TimeTracking({ projectId, timeFilter }: TimeTrackingProp
 
   const { data: timeData, isLoading, error } = useQuery<TimeTrackingData>({
     queryKey: [`/api/projects/${projectId}/time-tracking`, period],
-    queryFn: () => fetch(`/api/projects/${projectId}/time-tracking?period=${period}`).then(res => res.json()),
+    queryFn: () => authFetch(`/api/projects/${projectId}/time-tracking?period=${period}`).then(res => res.json()),
     enabled: !!projectId && !!period
   });
 
