@@ -118,6 +118,12 @@ export default function TimeTracking({ projectId, timeFilter }: TimeTrackingProp
   const members = Array.isArray(timeData?.members) ? timeData.members : [];
 
   // Función para obtener color según status
+  const statusColorMap: Record<string, { bg100: string; text600: string; text800: string; progressBg: string }> = {
+    red: { bg100: 'bg-red-100', text600: 'text-red-600', text800: 'text-red-800', progressBg: '[&>div]:bg-red-500' },
+    emerald: { bg100: 'bg-emerald-100', text600: 'text-emerald-600', text800: 'text-emerald-800', progressBg: '[&>div]:bg-emerald-500' },
+    blue: { bg100: 'bg-blue-100', text600: 'text-blue-600', text800: 'text-blue-800', progressBg: '[&>div]:bg-blue-500' },
+  };
+
   const getStatusColor = (status: string) => {
     if (status === 'exceso') return { color: 'red', icon: AlertTriangle };
     if (status === 'cumplido') return { color: 'emerald', icon: CheckCircle };
@@ -310,9 +316,10 @@ export default function TimeTracking({ projectId, timeFilter }: TimeTrackingProp
             {miembrosOrdenados.map((m, index) => {
               const statusInfo = getStatusColor(m.status);
               const StatusIcon = statusInfo.icon;
+              const sc = statusColorMap[statusInfo.color] || statusColorMap.blue;
               const porcentaje = m.targetHours > 0 ? (m.hoursAsana / m.targetHours) * 100 : 0;
               const brecha = m.hoursAsana - m.targetHours;
-              
+
               return (
                 <div
                   key={`${m.personId}-${index}`}
@@ -320,8 +327,8 @@ export default function TimeTracking({ projectId, timeFilter }: TimeTrackingProp
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3 flex-1">
-                      <div className={`p-2 rounded-full bg-${statusInfo.color}-100`}>
-                        <StatusIcon className={`w-4 h-4 text-${statusInfo.color}-600`} />
+                      <div className={`p-2 rounded-full ${sc.bg100}`}>
+                        <StatusIcon className={`w-4 h-4 ${sc.text600}`} />
                       </div>
                       <div className="flex-1">
                         <div className="flex items-center justify-between mb-2">
@@ -336,27 +343,27 @@ export default function TimeTracking({ projectId, timeFilter }: TimeTrackingProp
                             <div className="text-xs text-gray-500">trabajadas</div>
                           </div>
                         </div>
-                        
+
                         <div className="space-y-2">
                           <div className="flex items-center justify-between text-sm">
                             <span className="text-gray-600">
                               {m.hoursAsana}h de {m.targetHours}h objetivo
                             </span>
-                            <span className={`font-bold text-${statusInfo.color}-600`}>
+                            <span className={`font-bold ${sc.text600}`}>
                               {porcentaje.toFixed(1)}%
                             </span>
                           </div>
-                          <Progress 
+                          <Progress
                             value={Math.min(porcentaje, 100)}
-                            className={`h-2 bg-gray-200 [&>div]:bg-${statusInfo.color}-500`}
+                            className={`h-2 bg-gray-200 ${sc.progressBg}`}
                           />
-                          
+
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
                               {m.badges.map((badge, i) => (
-                                <Badge 
+                                <Badge
                                   key={i}
-                                  className={`bg-${statusInfo.color}-100 text-${statusInfo.color}-800`}
+                                  className={`${sc.bg100} ${sc.text800}`}
                                 >
                                   {badge}
                                 </Badge>

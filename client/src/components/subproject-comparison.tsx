@@ -80,26 +80,35 @@ export function SubprojectComparison({
       textColor: "text-green-700",
       icon: Award 
     },
-    good: { 
-      label: "Bueno", 
-      color: "blue", 
-      bgColor: "bg-blue-50", 
+    good: {
+      label: "Bueno",
+      color: "blue",
+      bgColor: "bg-blue-50",
       textColor: "text-blue-700",
-      icon: TrendingUp 
+      borderColor: "border-blue-200",
+      iconColor: "text-blue-600",
+      textSmColor: "text-blue-600",
+      icon: TrendingUp
     },
-    average: { 
-      label: "Promedio", 
-      color: "yellow", 
-      bgColor: "bg-yellow-50", 
+    average: {
+      label: "Promedio",
+      color: "yellow",
+      bgColor: "bg-yellow-50",
       textColor: "text-yellow-700",
-      icon: Target 
+      borderColor: "border-yellow-200",
+      iconColor: "text-yellow-600",
+      textSmColor: "text-yellow-600",
+      icon: Target
     },
-    needs_improvement: { 
-      label: "Mejorable", 
-      color: "red", 
-      bgColor: "bg-red-50", 
+    needs_improvement: {
+      label: "Mejorable",
+      color: "red",
+      bgColor: "bg-red-50",
       textColor: "text-red-700",
-      icon: TrendingDown 
+      borderColor: "border-red-200",
+      iconColor: "text-red-600",
+      textSmColor: "text-red-600",
+      icon: TrendingDown
     }
   };
 
@@ -116,14 +125,14 @@ export function SubprojectComparison({
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Estado General */}
-        <div className={`${config.bgColor} p-4 rounded-lg border border-${config.color}-200`}>
+        <div className={`${config.bgColor} p-4 rounded-lg border ${config.borderColor}`}>
           <div className="flex items-center gap-3">
-            <StatusIcon className={`h-6 w-6 text-${config.color}-600`} />
+            <StatusIcon className={`h-6 w-6 ${config.iconColor}`} />
             <div>
               <div className={`font-medium ${config.textColor}`}>
                 Performance: {config.label}
               </div>
-              <div className={`text-sm text-${config.color}-600`}>
+              <div className={`text-sm ${config.textSmColor}`}>
                 Basado en eficiencia y costo vs otros subproyectos
               </div>
             </div>

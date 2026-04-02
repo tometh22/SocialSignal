@@ -13,6 +13,7 @@ const ReviewFinalFormat: React.FC = () => {
     availableRoles,
     availablePersonnel,
     updateTeamMember,
+    updateQuotationData,
     baseCost,
     complexityAdjustment,
     markupAmount,

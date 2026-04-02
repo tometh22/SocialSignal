@@ -124,7 +124,7 @@ export const ApplyTeamFromWarnerTemplate: React.FC = () => {
         // Agregar la cantidad especificada de este rol
         for (let i = 0; i < teamMember.count; i++) {
           // Buscar personal disponible para este rol (si hay)
-          const availablePersonnel = availablePersonnel.filter(p => p.roleId === roleId);
+          const matchingPersonnel = availablePersonnel.filter(p => p.roleId === roleId);
           
           // Crear nuevo miembro del equipo
           const member: TeamMember = {

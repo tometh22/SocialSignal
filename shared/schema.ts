@@ -73,7 +73,7 @@ export const indirectCostCategories = pgTable("indirect_cost_categories", {
 // Tabla de costos indirectos
 export const indirectCosts = pgTable("indirect_costs", {
   id: serial("id").primaryKey(),
-  categoryId: integer("category_id").notNull().references(() => indirectCostCategories.id),
+  categoryId: integer("category_id").notNull().references(() => indirectCostCategories.id, { onDelete: 'cascade' }),
   name: varchar("name", { length: 200 }).notNull(),
   description: text("description"),
   amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
@@ -82,7 +82,7 @@ export const indirectCosts = pgTable("indirect_costs", {
   startDate: timestamp("start_date").notNull(),
   endDate: timestamp("end_date"),
   isActive: boolean("is_active").notNull().default(true),
-  createdBy: integer("created_by").notNull().references(() => users.id),
+  createdBy: integer("created_by").notNull().references(() => users.id, { onDelete: 'cascade' }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
@@ -90,13 +90,13 @@ export const indirectCosts = pgTable("indirect_costs", {
 // Tabla de horas no asignables (reuniones internas, presentaciones comerciales, etc)
 export const nonBillableHours = pgTable("non_billable_hours", {
   id: serial("id").primaryKey(),
-  personnelId: integer("personnel_id").notNull().references(() => personnel.id),
-  categoryId: integer("category_id").notNull().references(() => indirectCostCategories.id),
+  personnelId: integer("personnel_id").notNull().references(() => personnel.id, { onDelete: 'cascade' }),
+  categoryId: integer("category_id").notNull().references(() => indirectCostCategories.id, { onDelete: 'cascade' }),
   date: timestamp("date").notNull(),
   endDate: timestamp("end_date"), // Optional end date for date ranges
   hours: numeric("hours", { precision: 5, scale: 2 }).notNull(),
   description: text("description"),
-  createdBy: integer("created_by").notNull().references(() => users.id),
+  createdBy: integer("created_by").notNull().references(() => users.id, { onDelete: 'cascade' }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
@@ -180,7 +180,7 @@ export const clients = pgTable("clients", {
   contactEmail: text("contact_email"),
   contactPhone: text("contact_phone"),
   logoUrl: varchar("logo_url", { length: 255 }),
-  createdBy: integer("created_by").references(() => users.id),
+  createdBy: integer("created_by").references(() => users.id, { onDelete: 'set null' }),
 });
 
 export const insertClientSchema = createInsertSchema(clients).pick({
@@ -417,7 +417,7 @@ export const quotations = pgTable("quotations", {
   leadId: integer("lead_id").references(() => crmLeads.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  createdBy: integer("created_by").references(() => users.id),
+  createdBy: integer("created_by").references(() => users.id, { onDelete: 'set null' }),
 });
 
 // Esquema base generado por drizzle-zod
@@ -456,7 +456,7 @@ export const negotiationHistory = pgTable("negotiation_history", {
   adjustmentPercentage: doublePrecision("adjustment_percentage"), // Percentage change in price
   proposalLink: text("proposal_link"), // Link to the new proposal document
   createdAt: timestamp("created_at").notNull().defaultNow(),
-  createdBy: integer("created_by").references(() => users.id),
+  createdBy: integer("created_by").references(() => users.id, { onDelete: 'set null' }),
 });
 
 export const insertNegotiationHistorySchema = createInsertSchema(negotiationHistory).omit({
@@ -527,8 +527,8 @@ export type InsertQuotationTeamMember = z.infer<typeof insertQuotationTeamMember
 // Template Role Assignments table
 export const templateRoleAssignments = pgTable("template_role_assignments", {
   id: serial("id").primaryKey(),
-  templateId: integer("template_id").notNull().references(() => reportTemplates.id),
-  roleId: integer("role_id").notNull().references(() => roles.id),
+  templateId: integer("template_id").notNull().references(() => reportTemplates.id, { onDelete: 'cascade' }),
+  roleId: integer("role_id").notNull().references(() => roles.id, { onDelete: 'cascade' }),
   hours: numeric("hours", { precision: 8, scale: 2 }).notNull().default("0"),
 });
 
@@ -548,7 +548,7 @@ export const costMultipliers = pgTable("cost_multipliers", {
   isActive: boolean("is_active").notNull().default(true), // para desactivar sin eliminar
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  updatedBy: integer("updated_by").references(() => users.id),
+  updatedBy: integer("updated_by").references(() => users.id, { onDelete: 'set null' }),
 });
 
 export const insertCostMultiplierSchema = createInsertSchema(costMultipliers).omit({
@@ -570,7 +570,7 @@ export const monthlyInflation = pgTable("monthly_inflation", {
   source: text("source"), // Fuente del dato (INDEC, etc.)
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  updatedBy: integer("updated_by").references(() => users.id),
+  updatedBy: integer("updated_by").references(() => users.id, { onDelete: 'set null' }),
 });
 
 export const insertMonthlyInflationSchema = createInsertSchema(monthlyInflation).omit({
@@ -590,7 +590,7 @@ export const systemConfig = pgTable("system_config", {
   configValue: doublePrecision("config_value").notNull(),
   description: text("description"),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  updatedBy: integer("updated_by").references(() => users.id),
+  updatedBy: integer("updated_by").references(() => users.id, { onDelete: 'set null' }),
 });
 
 export const insertSystemConfigSchema = createInsertSchema(systemConfig).omit({
@@ -616,7 +616,7 @@ export const exchangeRates = pgTable("exchange_rates", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
   createdBy: integer("created_by").notNull().references(() => users.id),
-  updatedBy: integer("updated_by").references(() => users.id),
+  updatedBy: integer("updated_by").references(() => users.id, { onDelete: 'set null' }),
 });
 
 export const insertExchangeRateSchema = createInsertSchema(exchangeRates).omit({
@@ -663,7 +663,7 @@ export const monthlyClosings = pgTable("monthly_closings", {
   hourlyRate: doublePrecision("hourly_rate").notNull(), // valor hora al cierre
   totalCost: doublePrecision("total_cost").notNull(), // adjustedHours * hourlyRate
   notes: text("notes"),
-  closedBy: integer("closed_by").references(() => users.id),
+  closedBy: integer("closed_by").references(() => users.id, { onDelete: 'set null' }),
   closedAt: timestamp("closed_at").notNull().defaultNow(),
 }, (table) => ({
   uniquePersonMonth: unique("unique_person_month_closing").on(table.personnelId, table.year, table.month),
@@ -687,7 +687,7 @@ export const estimatedRates = pgTable("estimated_rates", {
   adjustmentPct: doublePrecision("adjustment_pct"), // ej: 8.5 para ajuste trimestral
   notes: text("notes"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-  createdBy: integer("created_by").references(() => users.id),
+  createdBy: integer("created_by").references(() => users.id, { onDelete: 'set null' }),
 }, (table) => ({
   uniquePersonMonthRate: unique("unique_person_month_rate").on(table.personnelId, table.year, table.month),
 }));
@@ -714,7 +714,7 @@ export const activeProjects = pgTable("active_projects", {
   notes: text("notes"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  createdBy: integer("created_by").references(() => users.id),
+  createdBy: integer("created_by").references(() => users.id, { onDelete: 'set null' }),
 
   // Campos para proyectos macro y subproyectos
   parentProjectId: integer("parent_project_id"), // Referencia al proyecto padre (para subproyectos)
@@ -791,7 +791,7 @@ export const projectAliases = pgTable("project_aliases", {
   isActive: boolean("is_active").notNull().default(true),
   notes: text("notes"), // Optional notes about this mapping
   createdAt: timestamp("created_at").notNull().defaultNow(),
-  createdBy: integer("created_by").references(() => users.id),
+  createdBy: integer("created_by").references(() => users.id, { onDelete: 'set null' }),
   lastMatchedAt: timestamp("last_matched_at"), // When this alias was last used for matching
   matchCount: integer("match_count").notNull().default(0), // How many times this alias has been used
 }, (table) => ({
@@ -925,7 +925,7 @@ export const recurringProjectTemplates = pgTable("recurring_project_templates", 
   isActive: boolean("is_active").default(true),
   autoCreateDaysInAdvance: integer("auto_create_days_in_advance").default(7), // Crear X días antes
   createdAt: timestamp("created_at").notNull().defaultNow(),
-  createdBy: integer("created_by").references(() => users.id),
+  createdBy: integer("created_by").references(() => users.id, { onDelete: 'set null' }),
 });
 
 export const insertRecurringProjectTemplateSchema = createInsertSchema(recurringProjectTemplates).omit({
@@ -1073,7 +1073,7 @@ export const quickTimeEntries = pgTable("quick_time_entries", {
   totalCost: doublePrecision("total_cost").notNull().default(0),
   notes: text("notes"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-  createdBy: integer("created_by").references(() => users.id),
+  createdBy: integer("created_by").references(() => users.id, { onDelete: 'set null' }),
   submittedAt: timestamp("submitted_at"),
   approvedAt: timestamp("approved_at"),
   approvedBy: integer("approved_by").references(() => users.id),
@@ -1144,7 +1144,7 @@ export const projectComponents = pgTable("project_components", {
   isDefault: boolean("is_default").default(false), // Para identificar un componente por defecto
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  createdBy: integer("created_by").references(() => users.id),
+  createdBy: integer("created_by").references(() => users.id, { onDelete: 'set null' }),
 });
 
 export const insertProjectComponentSchema = createInsertSchema(projectComponents).omit({
@@ -1178,7 +1178,7 @@ export const timeEntries = pgTable("time_entries", {
   approvedDate: timestamp("approved_date"),
   billable: boolean("billable").default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-  createdBy: integer("created_by").references(() => users.id),
+  createdBy: integer("created_by").references(() => users.id, { onDelete: 'set null' }),
 });
 
 // Esquema base generado por drizzle-zod
@@ -1286,7 +1286,7 @@ export const chatConversations = pgTable("chat_conversations", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
   lastMessageAt: timestamp("last_message_at").notNull().defaultNow(),
-  createdBy: integer("created_by").references(() => users.id),
+  createdBy: integer("created_by").references(() => users.id, { onDelete: 'set null' }),
   projectId: integer("project_id").references(() => activeProjects.id),
 });
 
@@ -1348,7 +1348,7 @@ export const tasks = pgTable("tasks", {
   parentTaskId: integer("parent_task_id"),
   position: integer("position").default(0),
   completedAt: timestamp("completed_at"),
-  createdBy: integer("created_by").references(() => users.id),
+  createdBy: integer("created_by").references(() => users.id, { onDelete: 'set null' }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
@@ -1378,7 +1378,7 @@ export const taskTimeEntries = pgTable("task_time_entries", {
   date: timestamp("date").notNull(),
   hours: doublePrecision("hours").notNull(),
   description: text("description"),
-  createdBy: integer("created_by").references(() => users.id),
+  createdBy: integer("created_by").references(() => users.id, { onDelete: 'set null' }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -1692,7 +1692,7 @@ export const deliverables = pgTable("deliverables", {
   briefCompliance: numeric("brief_compliance", { precision: 3, scale: 2 }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  createdBy: integer("created_by").references(() => users.id),
+  createdBy: integer("created_by").references(() => users.id, { onDelete: 'set null' }),
   project_id: integer("project_id").references(() => activeProjects.id), // Vinculación con proyecto
   delivery_date: timestamp("delivery_date"), // Fecha real de entrega
   due_date: timestamp("due_date"), // Fecha límite de entrega
@@ -1738,7 +1738,7 @@ export const clientModoComments = pgTable("client_modo_comments", {
   comments: text("comments"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  createdBy: integer("created_by").references(() => users.id),
+  createdBy: integer("created_by").references(() => users.id, { onDelete: 'set null' }),
 });
 
 // Relaciones de comentarios MODO
@@ -1885,7 +1885,7 @@ export const projectFinancialSummary = pgTable("project_financial_summary", {
   pendingCollectionUsd: numeric("pending_collection_usd", { precision: 12, scale: 2 }).default('0'),
   
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  updatedBy: integer("updated_by").references(() => users.id),
+  updatedBy: integer("updated_by").references(() => users.id, { onDelete: 'set null' }),
 });
 
 // ==================== IMPORTACIÓN VENTAS GOOGLE SHEETS ====================
@@ -2129,7 +2129,7 @@ export const quarterlyNpsSurveys = pgTable("quarterly_nps_surveys", {
   // Metadatos
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  createdBy: integer("created_by").references(() => users.id),
+  createdBy: integer("created_by").references(() => users.id, { onDelete: 'set null' }),
 });
 
 // Relaciones de plantillas recurrentes
@@ -2202,8 +2202,8 @@ export const personnelHistoricalCosts = pgTable("personnel_historical_costs", {
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  createdBy: integer("created_by").references(() => users.id),
-  updatedBy: integer("updated_by").references(() => users.id),
+  createdBy: integer("created_by").references(() => users.id, { onDelete: 'set null' }),
+  updatedBy: integer("updated_by").references(() => users.id, { onDelete: 'set null' }),
 });
 
 export const insertPersonnelHistoricalCostSchema = createInsertSchema(personnelHistoricalCosts).omit({
@@ -2222,7 +2222,7 @@ export const exchangeRateHistory = pgTable("exchange_rate_history", {
   rate: numeric("rate", { precision: 8, scale: 4 }).notNull(),
   effectiveFrom: timestamp("effective_from").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-  createdBy: integer("created_by").references(() => users.id),
+  createdBy: integer("created_by").references(() => users.id, { onDelete: 'set null' }),
 });
 
 export const insertExchangeRateHistorySchema = createInsertSchema(exchangeRateHistory).omit({
@@ -3148,7 +3148,7 @@ export const crmLeads = pgTable("crm_leads", {
   lostAt: timestamp("lost_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  createdBy: integer("created_by").references(() => users.id),
+  createdBy: integer("created_by").references(() => users.id, { onDelete: 'set null' }),
 });
 
 export const crmContacts = pgTable("crm_contacts", {
@@ -3171,7 +3171,7 @@ export const crmActivities = pgTable("crm_activities", {
   activityDate: timestamp("activity_date").notNull().defaultNow(),
   quotationId: integer("quotation_id").references(() => quotations.id),
   emailMetadata: json("email_metadata"), // { subject, to, body, sentAt }
-  createdBy: integer("created_by").references(() => users.id),
+  createdBy: integer("created_by").references(() => users.id, { onDelete: 'set null' }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -3183,7 +3183,7 @@ export const crmReminders = pgTable("crm_reminders", {
   completed: boolean("completed").default(false),
   completedAt: timestamp("completed_at"),
   notifiedAt: timestamp("notified_at"),
-  createdBy: integer("created_by").references(() => users.id),
+  createdBy: integer("created_by").references(() => users.id, { onDelete: 'set null' }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -3259,7 +3259,7 @@ export const projectStatusReviews = pgTable("project_status_reviews", {
   decisionNeeded: varchar("decision_needed", { length: 30 }).default('ninguna'), // ninguna | priorizacion | recursos | reprecio | salida
   hiddenFromWeekly: boolean("hidden_from_weekly").default(false),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  updatedBy: integer("updated_by").references(() => users.id),
+  updatedBy: integer("updated_by").references(() => users.id, { onDelete: 'set null' }),
 });
 
 export const insertProjectStatusReviewSchema = createInsertSchema(projectStatusReviews).omit({
@@ -3309,7 +3309,7 @@ export const weeklyStatusItems = pgTable("weekly_status_items", {
   decisionNeeded: varchar("decision_needed", { length: 30 }).default('ninguna'),
   hiddenFromWeekly: boolean("hidden_from_weekly").default(false),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  updatedBy: integer("updated_by").references(() => users.id),
+  updatedBy: integer("updated_by").references(() => users.id, { onDelete: 'set null' }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

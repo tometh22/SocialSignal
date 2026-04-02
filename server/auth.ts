@@ -46,7 +46,7 @@ async function comparePasswords(supplied: string, stored: string) {
       return timingSafeEqual(hashedBuf, suppliedBuf);
     } catch (error) {
       console.error("Error en timingSafeEqual:", error);
-      return Buffer.compare(hashedBuf, suppliedBuf) === 0;
+      return false;
     }
   } catch (error) {
     console.error("Error al comparar contraseñas:", error);
@@ -66,12 +66,12 @@ function getUserIdFromStore(store: session.Store, sessionId: string): Promise<nu
 
 export function setupAuth(app: Express, storage: IStorage) {
   const sessionConfig = {
-    secret: process.env.SESSION_SECRET || "epical-secret-key-enhanced-2025",
+    secret: process.env.SESSION_SECRET || (() => { console.warn("⚠️ SESSION_SECRET not set — using random secret (sessions won't persist across restarts)"); return randomBytes(32).toString('hex'); })(),
     resave: false,
     saveUninitialized: false,
     rolling: true,
     cookie: {
-      secure: false,
+      secure: process.env.NODE_ENV === 'production',
       maxAge: 1000 * 60 * 60 * 24 * 30,
       sameSite: 'lax' as const,
       httpOnly: true,
@@ -253,11 +253,10 @@ export function setupAuth(app: Express, storage: IStorage) {
 
       await storage.createPasswordResetToken(email, resetToken, expiresAt);
 
-      console.log(`🔑 Password reset token for ${email}: ${resetToken}`);
+      console.log(`🔑 Password reset token generated for ${email}`);
 
-      res.status(200).json({ 
-        message: "Si el correo existe en nuestro sistema, recibirás un enlace de recuperación.",
-        token: resetToken 
+      res.status(200).json({
+        message: "Si el correo existe en nuestro sistema, recibirás un enlace de recuperación."
       });
     } catch (error) {
       console.error("Error en forgot-password:", error);
