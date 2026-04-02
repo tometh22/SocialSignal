@@ -1065,8 +1065,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`🔒 STATUS UPDATE: ${clientName}|${projectName}, status=${status}, end=${endMonthKey}`);
 
-      // TODO: Implement actual status update in database
-      console.warn('⚠️ STATUS UPDATE: Stub implementation - not persisting to database');
+      // Find and update the project status
+      const validStatuses = ['active', 'completed', 'cancelled', 'on-hold'];
+      if (!validStatuses.includes(status)) {
+        return res.status(400).json({ error: 'Invalid status', message: `Status must be one of: ${validStatuses.join(', ')}` });
+      }
+      const [project] = await db.select({ id: activeProjects.id })
+        .from(activeProjects)
+        .innerJoin(quotations, eq(quotations.id, activeProjects.quotationId))
+        .innerJoin(clients, eq(clients.id, activeProjects.clientId))
+        .where(and(
+          sql`LOWER(${clients.name}) = LOWER(${clientName})`,
+          sql`LOWER(${quotations.name}) = LOWER(${projectName})`
+        ));
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+      const updateData: Record<string, any> = { status, updatedAt: new Date() };
+      if (status === 'completed' && endMonthKey) {
+        updateData.actualEndDate = new Date(endMonthKey + '-01');
+      }
+      await db.update(activeProjects).set(updateData).where(eq(activeProjects.id, project.id));
 
       return res.json({
         success: true,
@@ -1240,16 +1259,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     next();
   });
 
-  // TEST ENDPOINT DIRECTO - JUSTO DESPUÉS DEL MIDDLEWARE DE DEBUG
-  app.get('/api/projects/:id/test-simple', (req, res) => {
-    console.log(`🔥🔥🔥 SIMPLE TEST ENDPOINT HIT - ID: ${req.params.id}`);
-    res.json({ 
-      message: 'Test endpoint working', 
-      id: req.params.id, 
-      query: req.query,
-      timestamp: new Date().toISOString()
-    });
-  });
+  // Test endpoint removed — was publicly accessible without auth
 
   // TEMPORARY FORCE SYNC ENDPOINT
   app.get('/api/debug/force-sync', requireAuth, async (req, res) => {
@@ -11019,11 +11029,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     };
   }
 
-  // Endpoint TEST sin auth para diagnosis
-  app.get('/api/projects/:id/deviation-analysis-test', async (req, res) => {
-    console.log(`🟢🟢🟢 TEST ENDPOINT HIT - ID: ${req.params.id}, Query:`, req.query);
-    res.json({ test: 'working', params: req.params, query: req.query });
-  });
+  // Test endpoint removed — was publicly accessible without auth
 
   // 🏢 ENDPOINT UNIVERSAL: Análisis de desviaciones del equipo
   // Integra completamente con Excel MAESTRO usando motor único
@@ -11083,12 +11089,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });*/
 
-  // Endpoint para recomendaciones
-  app.get('/api/projects/:id/recommendations', requireAuth, async (req, res) => {
+  // DUPLICATE: recommendations endpoint (dead code — first definition at ~10393 is the active one)
+  app.get('/api/projects/:id/recommendations-dup1', requireAuth, async (req, res) => {
     try {
       const projectId = parseInt(req.params.id);
       const { startDate, endDate, timeFilter } = req.query;
-      
+
       console.log(`🔍🔍🔍 RECOMMENDATIONS CALLED - ProjectId: ${projectId}, TimeFilter: ${timeFilter}, StartDate: ${startDate}, EndDate: ${endDate}`);
       
       const project = await storage.getActiveProject(projectId);
@@ -11356,12 +11362,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Endpoint para recomendaciones
-  app.get('/api/projects/:id/recommendations', requireAuth, async (req, res) => {
+  // DUPLICATE: recommendations endpoint (dead code — first definition at ~10393 is the active one)
+  app.get('/api/projects/:id/recommendations-dup2', requireAuth, async (req, res) => {
     try {
       const projectId = parseInt(req.params.id);
       const { startDate, endDate, timeFilter } = req.query;
-      
+
       console.log(`🔍🔍🔍 RECOMMENDATIONS CALLED - ProjectId: ${projectId}, TimeFilter: ${timeFilter}, StartDate: ${startDate}, EndDate: ${endDate}`);
       
       const project = await storage.getActiveProject(projectId);
@@ -17183,7 +17189,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (changeLogs.length > 0) {
         db.insert(statusChangeLog)
           .values(changeLogs.map(cl => ({ projectId, userId, ...cl })))
-          .catch(() => {});
+          .catch((err: any) => console.error('statusChangeLog insert error (project):', err));
       }
 
       console.log(`PATCH /api/status-semanal/${projectId} OK`, result?.id);
@@ -17419,6 +17425,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // GET /api/status-semanal/custom/:itemId/updates — update entries for a custom item
+  // NOTE: custom/ routes MUST be registered before :projectId routes to avoid Express matching "custom" as a projectId
+  app.get("/api/status-semanal/custom/:itemId/updates", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const itemId = parseInt(req.params.itemId);
+      if (isNaN(itemId)) return res.status(400).json({ message: "itemId inválido" });
+      try {
+        const entries = await db.select({
+          id: statusUpdateEntries.id,
+          content: statusUpdateEntries.content,
+          authorId: statusUpdateEntries.authorId,
+          authorName: sql<string>`COALESCE(${users.firstName} || ' ' || ${users.lastName}, 'Usuario')`,
+          createdAt: statusUpdateEntries.createdAt,
+        }).from(statusUpdateEntries)
+          .leftJoin(users, eq(users.id, statusUpdateEntries.authorId))
+          .where(eq(statusUpdateEntries.weeklyStatusItemId, itemId))
+          .orderBy(desc(statusUpdateEntries.createdAt));
+        res.json(entries);
+      } catch {
+        res.json([]);
+      }
+    } catch (error) {
+      console.error('GET /api/status-semanal/custom/:itemId/updates error:', error);
+      res.status(500).json({ message: "Error al obtener updates" });
+    }
+  });
+
+  // POST /api/status-semanal/custom/:itemId/updates — add an update entry for a custom item
+  app.post("/api/status-semanal/custom/:itemId/updates", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const itemId = parseInt(req.params.itemId);
+      if (isNaN(itemId)) return res.status(400).json({ message: "itemId inválido" });
+      const { content } = req.body;
+      if (!content?.trim()) return res.status(400).json({ message: "Contenido vacío" });
+      const userId = req.user?.id ?? null;
+      try {
+        const [entry] = await db.insert(statusUpdateEntries)
+          .values({ weeklyStatusItemId: itemId, content: content.trim(), authorId: userId })
+          .returning();
+        // Also update the currentAction field so collapsed row shows latest
+        try {
+          await db.update(weeklyStatusItems)
+            .set({ currentAction: content.trim(), updatedAt: new Date() })
+            .where(eq(weeklyStatusItems.id, itemId));
+        } catch {}
+        res.status(201).json(entry);
+      } catch (e: any) {
+        try {
+          await db.update(weeklyStatusItems)
+            .set({ currentAction: content.trim(), updatedAt: new Date() })
+            .where(eq(weeklyStatusItems.id, itemId));
+        } catch {}
+        res.status(201).json({ id: 0, content: content.trim(), authorId: userId, createdAt: new Date().toISOString() });
+      }
+    } catch (error) {
+      console.error('POST /api/status-semanal/custom/:itemId/updates error:', error);
+      res.status(500).json({ message: "Error al guardar update" });
+    }
+  });
+
   // GET /api/status-semanal/:projectId/updates — update entries for a project
   app.get("/api/status-semanal/:projectId/updates", requireAuth, async (req: Request, res: Response) => {
     try {
@@ -17487,65 +17553,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     } catch (error) {
       console.error('POST /api/status-semanal/:projectId/updates error:', error);
-      res.status(500).json({ message: "Error al guardar update" });
-    }
-  });
-
-  // GET /api/status-semanal/custom/:itemId/updates — update entries for a custom item
-  app.get("/api/status-semanal/custom/:itemId/updates", requireAuth, async (req: Request, res: Response) => {
-    try {
-      const itemId = parseInt(req.params.itemId);
-      if (isNaN(itemId)) return res.status(400).json({ message: "itemId inválido" });
-      try {
-        const entries = await db.select({
-          id: statusUpdateEntries.id,
-          content: statusUpdateEntries.content,
-          authorId: statusUpdateEntries.authorId,
-          authorName: sql<string>`COALESCE(${users.firstName} || ' ' || ${users.lastName}, 'Usuario')`,
-          createdAt: statusUpdateEntries.createdAt,
-        }).from(statusUpdateEntries)
-          .leftJoin(users, eq(users.id, statusUpdateEntries.authorId))
-          .where(eq(statusUpdateEntries.weeklyStatusItemId, itemId))
-          .orderBy(desc(statusUpdateEntries.createdAt));
-        res.json(entries);
-      } catch {
-        res.json([]);
-      }
-    } catch (error) {
-      console.error('GET /api/status-semanal/custom/:itemId/updates error:', error);
-      res.status(500).json({ message: "Error al obtener updates" });
-    }
-  });
-
-  // POST /api/status-semanal/custom/:itemId/updates — add an update entry for a custom item
-  app.post("/api/status-semanal/custom/:itemId/updates", requireAuth, async (req: Request, res: Response) => {
-    try {
-      const itemId = parseInt(req.params.itemId);
-      if (isNaN(itemId)) return res.status(400).json({ message: "itemId inválido" });
-      const { content } = req.body;
-      if (!content?.trim()) return res.status(400).json({ message: "Contenido vacío" });
-      const userId = req.user?.id ?? null;
-      try {
-        const [entry] = await db.insert(statusUpdateEntries)
-          .values({ weeklyStatusItemId: itemId, content: content.trim(), authorId: userId })
-          .returning();
-        // Also update the currentAction field so collapsed row shows latest
-        try {
-          await db.update(weeklyStatusItems)
-            .set({ currentAction: content.trim(), updatedAt: new Date() })
-            .where(eq(weeklyStatusItems.id, itemId));
-        } catch {}
-        res.status(201).json(entry);
-      } catch (e: any) {
-        try {
-          await db.update(weeklyStatusItems)
-            .set({ currentAction: content.trim(), updatedAt: new Date() })
-            .where(eq(weeklyStatusItems.id, itemId));
-        } catch {}
-        res.status(201).json({ id: 0, content: content.trim(), authorId: userId, createdAt: new Date().toISOString() });
-      }
-    } catch (error) {
-      console.error('POST /api/status-semanal/custom/:itemId/updates error:', error);
       res.status(500).json({ message: "Error al guardar update" });
     }
   });
@@ -17820,7 +17827,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (changeLogs.length > 0) {
         db.insert(statusChangeLog)
           .values(changeLogs.map(cl => ({ weeklyStatusItemId: id, userId, ...cl })))
-          .catch(() => {});
+          .catch((err: any) => console.error('statusChangeLog insert error (custom):', err));
       }
       console.log(`PATCH /api/status-semanal/custom/${id} OK`);
       res.json(item);

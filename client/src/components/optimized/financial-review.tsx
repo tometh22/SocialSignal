@@ -366,7 +366,7 @@ const OptimizedFinancialReview: React.FC = () => {
                 </div>
                 <div className="flex items-center justify-between pt-1 border-t">
                   <span>Porcentaje de Ajuste:</span>
-                  <span className="font-medium">{((complexityAdjustment / baseCost) * 100).toFixed(1)}%</span>
+                  <span className="font-medium">{baseCost !== 0 ? ((complexityAdjustment / baseCost) * 100).toFixed(1) : '0.0'}%</span>
                 </div>
               </div>
             </div>
