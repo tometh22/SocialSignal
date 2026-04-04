@@ -145,7 +145,7 @@ const TeamMemberSelector: React.FC<TeamMemberSelectorProps> = ({
       
       try {
         // Obtener los datos más recientes directamente de la API para este ID específico
-        const response = await fetch(`/api/personnel/${personnelId}`);
+        const response = await authFetch(`/api/personnel/${personnelId}`);
         if (!response.ok) {
           throw new Error(`Error al obtener datos del personal: ${response.status}`);
         }
