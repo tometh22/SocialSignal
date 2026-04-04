@@ -55,7 +55,8 @@ export async function loadCostMultipliers(forceReload = false): Promise<void> {
 
   try {
     console.log('🔄 Loading cost multipliers from API...');
-    const response = await fetch('/api/cost-multipliers');
+    const { authFetch } = await import('./queryClient');
+    const response = await authFetch('/api/cost-multipliers');
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }

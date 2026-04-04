@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { authFetch } from '@/lib/queryClient';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { ArrowRightLeft, TrendingUp, Calendar, DollarSign } from 'lucide-react';
@@ -35,7 +36,7 @@ export function CurrencyConverter({ className }: CurrencyConverterProps) {
 
   const fetchExchangeRates = async () => {
     try {
-      const response = await fetch('/api/exchange-rates');
+      const response = await authFetch('/api/exchange-rates');
       if (response.ok) {
         const rates = await response.json();
         setExchangeRates(rates);

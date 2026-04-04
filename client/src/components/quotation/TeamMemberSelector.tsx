@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { UserPlus, Users, Info } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { v4 as uuidv4 } from 'uuid';
+import { authFetch } from '@/lib/queryClient';
 
 // Interfaces para los datos
 interface Role {
@@ -75,7 +76,7 @@ const TeamMemberSelector: React.FC<TeamMemberSelectorProps> = ({
       
       try {
         // Cargar roles
-        const rolesResponse = await fetch('/api/roles');
+        const rolesResponse = await authFetch('/api/roles');
         if (!rolesResponse.ok) {
           throw new Error(`Error al cargar roles: ${rolesResponse.status}`);
         }
@@ -83,7 +84,7 @@ const TeamMemberSelector: React.FC<TeamMemberSelectorProps> = ({
         setRoles(rolesData);
         
         // Cargar personal
-        const personnelResponse = await fetch('/api/personnel');
+        const personnelResponse = await authFetch('/api/personnel');
         if (!personnelResponse.ok) {
           throw new Error(`Error al cargar personal: ${personnelResponse.status}`);
         }

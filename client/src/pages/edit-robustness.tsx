@@ -411,7 +411,7 @@ const EditRobustnessPage = () => {
                         
                         {/* Mostrar chips o badges para los analistas seleccionados */}
                         <div className="flex flex-wrap gap-2 mt-2">
-                          {formData.analysts.split(',').map((analyst, index) => (
+                          {(formData.analysts || '').split(',').map((analyst, index) => (
                             analyst.trim() && (
                               <Badge 
                                 key={index} 

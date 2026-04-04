@@ -2762,7 +2762,7 @@ const ProjectDetailsPage = () => {
                           <div className="flex items-start gap-4">
                             <Avatar className="h-14 w-14 border-2 border-green-400">
                               <AvatarFallback className="bg-green-500 text-white text-lg font-bold">
-                                {topPerformer.name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)}
+                                {(topPerformer.name || '').split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)}
                               </AvatarFallback>
                             </Avatar>
                             <div className="flex-1">
@@ -2830,7 +2830,7 @@ const ProjectDetailsPage = () => {
                                 <div className="flex items-center gap-3">
                                   <Avatar className="h-8 w-8 flex-shrink-0">
                                     <AvatarFallback className="bg-slate-200 text-slate-700 text-xs font-semibold">
-                                      {member.name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)}
+                                      {(member.name || '').split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)}
                                     </AvatarFallback>
                                   </Avatar>
                                   
@@ -3932,7 +3932,7 @@ const ProjectDetailsPage = () => {
                       <div key={index} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border hover:bg-gray-100 transition-colors">
                         <Avatar className="h-10 w-10 border-2 border-white shadow-sm">
                           <AvatarFallback className="text-xs bg-indigo-100 text-indigo-700 font-semibold">
-                            {entry.personnelName.split(' ').map((n: string) => n[0]).join('').toUpperCase()}
+                            {(entry.personnelName || '').split(' ').map((n: string) => n[0]).join('').toUpperCase()}
                           </AvatarFallback>
                         </Avatar>
                         <div className="flex-1 min-w-0">

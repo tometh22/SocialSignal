@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { authFetch } from "@/lib/queryClient";
 import { Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -27,13 +28,13 @@ export default function HomeDashboard() {
 
   const { data: projectCount } = useQuery<number>({
     queryKey: ["/api/active-projects/count"],
-    queryFn: () => fetch("/api/active-projects/count", { credentials: "include" })
+    queryFn: () => authFetch("/api/active-projects/count")
       .then(r => r.json()).then(d => d.count || 0).catch(() => 0),
   });
 
   const { data: quotationStats } = useQuery<any>({
     queryKey: ["/api/quotations/stats"],
-    queryFn: () => fetch("/api/quotations", { credentials: "include" })
+    queryFn: () => authFetch("/api/quotations")
       .then(r => r.json()).then((qs: any[]) => ({
         total: qs?.length || 0,
         pending: qs?.filter((q: any) => q.status === 'pending').length || 0,
@@ -45,7 +46,7 @@ export default function HomeDashboard() {
   // Fetch projects for smart alerts
   const { data: projectsRaw } = useQuery<any>({
     queryKey: ["/api/projects/alerts-data"],
-    queryFn: () => fetch("/api/active-projects", { credentials: "include" })
+    queryFn: () => authFetch("/api/active-projects")
       .then(r => r.ok ? r.json() : []).catch(() => []),
     enabled: hasPermission('projects'),
   });

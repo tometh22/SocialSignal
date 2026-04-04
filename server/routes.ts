@@ -1108,8 +1108,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.log(`📊 Query params:`, req.query);
     
     const projectId = parseInt(req.params.id);
+    if (isNaN(projectId)) return res.status(400).json({ message: "Invalid project ID" });
     const { timeFilter, basis } = req.query as { timeFilter?: string; basis?: 'EXEC' | 'ECON' };
-    
+
     try {
       // Get project using existing storage functions
       const project = await storage.getActiveProject(projectId);
@@ -1399,6 +1400,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Debug endpoint - Verificar mapeo de costos directos 
   app.get('/api/debug/costs-mapping/:projectId', requireAuth, async (req, res) => {
     const projectId = parseInt(req.params.projectId);
+    if (isNaN(projectId)) return res.status(400).json({ message: "Invalid project ID" });
     console.log(`🔍 DEBUG - Verificando mapeo de costos para proyecto ${projectId}`);
     
     try {
@@ -1430,6 +1432,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Debug endpoint para investigar discrepancia de costos
   app.get('/api/debug/costs-filtered/:projectId', requireAuth, async (req, res) => {
     const projectId = parseInt(req.params.projectId);
+    if (isNaN(projectId)) return res.status(400).json({ message: "Invalid project ID" });
     const timeFilter = req.query.timeFilter as string || '2025-05-01_to_2025-08-31';
     
     try {
@@ -13167,7 +13170,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ==================== DEBUG ENDPOINT (TEMPORARY) ====================
   // DEBUG: Endpoint temporal para buscar agosto 2025
-  app.get('/api/debug/august-sales', async (req, res) => {
+  app.get('/api/debug/august-sales', requireAuth, async (req, res) => {
     try {
       const allSales = await storage.getGoogleSheetsSales();
       
@@ -13357,7 +13360,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // GET /api/debug/cost-headers - NUEVO: Inspect Excel MAESTRO headers RAW  
-  app.get('/api/debug/cost-headers', async (req, res) => {
+  app.get('/api/debug/cost-headers', requireAuth, async (req, res) => {
     try {
       console.log(`🔍 EXCEL HEADERS: Fetching raw headers from Google Sheets...`);
       
@@ -15409,7 +15412,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // DEBUG: Test provision extraction from Activo
-  app.get("/api/debug/provision-test", async (req, res) => {
+  app.get("/api/debug/provision-test", requireAuth, async (req, res) => {
     try {
       const period = req.query.period?.toString() || '2025-10';
       const { googleSheetsWorkingService } = await import('./services/googleSheetsWorking');
@@ -15431,7 +15434,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // DEBUG: Diagnóstico de credenciales Google Sheets
-  app.get("/api/debug/google-credentials", async (req, res) => {
+  app.get("/api/debug/google-credentials", requireAuth, async (req, res) => {
     try {
       const pk = process.env.GOOGLE_PRIVATE_KEY || '';
       const email = process.env.GOOGLE_CLIENT_EMAIL || '';
@@ -15497,7 +15500,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // DEBUG: Verificar estructura de hoja Activo con montos de Warner
-  app.get("/api/debug/sheets-activo", async (req, res) => {
+  app.get("/api/debug/sheets-activo", requireAuth, async (req, res) => {
     try {
       const { googleSheetsWorkingService } = await import('./services/googleSheetsWorking');
       const sheets = googleSheetsWorkingService.createSheetsClientFromJSON();
@@ -15690,7 +15693,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // DEBUG: Ver datos raw de Google Sheets para Warner
-  app.get("/api/debug/sheets-warner", async (req, res) => {
+  app.get("/api/debug/sheets-warner", requireAuth, async (req, res) => {
     try {
       const { googleSheetsWorking } = await import('./services/googleSheetsWorking');
       const rcData = await googleSheetsWorking.getRendimientoCliente();

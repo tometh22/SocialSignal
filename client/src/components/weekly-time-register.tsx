@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
+import { authFetch } from '@/lib/queryClient';
 import { format, startOfWeek, addDays, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -273,9 +274,8 @@ export default function WeeklyTimeRegister({ projectId, onSuccess, onCancel }: W
 
   const createTimeEntry = useMutation({
     mutationFn: async (data: any) => {
-      const response = await fetch('/api/time-entries', { credentials: 'include',
+      const response = await authFetch('/api/time-entries', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       });
 

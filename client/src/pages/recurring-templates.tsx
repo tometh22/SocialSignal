@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useParams, useLocation } from 'wouter';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { authFetch } from '@/lib/queryClient';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -140,9 +141,8 @@ export default function RecurringTemplatesPage() {
   // Mutations
   const createTemplateMutation = useMutation({
     mutationFn: async (data: any) => {
-      const response = await fetch('/api/recurring-templates', { credentials: 'include',
+      const response = await authFetch('/api/recurring-templates', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
       });
       if (!response.ok) throw new Error('Failed to create template');

@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { authFetch } from '@/lib/queryClient';
 import { Loader2, Download, Upload, Eye, Trash2 } from 'lucide-react';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
@@ -46,7 +47,7 @@ export default function SalesImport() {
   // Obtener ventas importadas
   const { data: salesData, isLoading: loadingSales, refetch: refetchSales } = useQuery({
     queryKey: ['/api/google-sheets/sales'],
-    queryFn: () => fetch('/api/google-sheets/sales').then(res => res.json()),
+    queryFn: () => authFetch('/api/google-sheets/sales').then(res => res.json()),
     enabled: true
   });
 

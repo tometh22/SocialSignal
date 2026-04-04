@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { UserPlus, Users, AlertCircle } from 'lucide-react';
+import { authFetch } from '@/lib/queryClient';
 import { parseDecimalInput } from '@/lib/number-utils';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -58,7 +59,7 @@ const DirectTeamSelector: React.FC<DirectTeamSelectorProps> = ({ onAddMember, ex
       
       try {
         // Cargar roles
-        const rolesResponse = await fetch('/api/roles');
+        const rolesResponse = await authFetch('/api/roles');
         if (!rolesResponse.ok) {
           throw new Error(`Error al cargar roles: ${rolesResponse.status}`);
         }
@@ -66,7 +67,7 @@ const DirectTeamSelector: React.FC<DirectTeamSelectorProps> = ({ onAddMember, ex
         setRoles(rolesData);
         
         // Cargar personal
-        const personnelResponse = await fetch('/api/personnel');
+        const personnelResponse = await authFetch('/api/personnel');
         if (!personnelResponse.ok) {
           throw new Error(`Error al cargar personal: ${personnelResponse.status}`);
         }
