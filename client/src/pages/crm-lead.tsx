@@ -143,7 +143,8 @@ export default function CRMLeadPage({ params }: { params: { id: string } }) {
       try {
         const formData = new FormData();
         formData.append('file', attachmentFile);
-        const res = await fetch('/api/crm/attachments', { method: 'POST', body: formData, credentials: 'include' });
+        const { getAuthHeader } = await import('@/lib/queryClient');
+        const res = await fetch('/api/crm/attachments', { method: 'POST', body: formData, credentials: 'include', headers: getAuthHeader() });
         if (!res.ok) throw new Error('Error al subir archivo');
         const data = await res.json();
         emailMetadata = { attachment: { name: data.name, url: data.url, size: data.size, mimeType: data.mimeType } };

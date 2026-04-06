@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { authFetch } from "@/lib/queryClient";
 
 type Summary = {
   revenueUSD: number;
@@ -50,7 +51,7 @@ export function useProjectSummary(
       // 1. Try complete-data endpoint with SoT integration
       try {
         const completeDataUrl = `/api/projects/${projectId}/complete-data?period=${period}&basis=${basis}`;
-        const completeDataRes = await fetch(completeDataUrl);
+        const completeDataRes = await authFetch(completeDataUrl);
         
         if (completeDataRes.ok) {
           const data: ProjectSummaryResponse = await completeDataRes.json();
@@ -78,7 +79,7 @@ export function useProjectSummary(
       console.log(`📋 FALLBACK: Using /api/projects?period=${period} for project ${projectKey}`);
       
       const listUrl = `/api/projects?period=${period}`;
-      const listRes = await fetch(listUrl);
+      const listRes = await authFetch(listUrl);
       
       if (!listRes.ok) {
         throw new Error(`Failed to fetch projects list: ${listRes.statusText}`);

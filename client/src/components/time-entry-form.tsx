@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { authFetch } from "@/lib/queryClient";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,14 +33,13 @@ export default function TimeEntryForm({ projectId, open, onOpenChange }: TimeEnt
 
   const { data: personnel = [] } = useQuery({
     queryKey: ["/api/personnel"],
-    queryFn: () => fetch("/api/personnel").then(res => res.json()),
+    queryFn: () => authFetch("/api/personnel").then(res => res.json()),
   });
 
   const createTimeEntry = useMutation({
     mutationFn: async (data: any) => {
-      const response = await fetch("/api/time-entries", { credentials: 'include',
+      const response = await authFetch("/api/time-entries", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
       if (!response.ok) throw new Error("Error al registrar horas");

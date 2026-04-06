@@ -22,11 +22,11 @@ const ToolsAndPricing: React.FC = () => {
     updateManualPrice
   } = useOptimizedQuote();
 
-  const { convertFromUSD } = useCurrency();
+  const { convertFromUSD, exchangeRate } = useCurrency();
   const subtotalBeforeTools = baseCost + complexityAdjustment;
   // Convert tools cost from USD to ARS for display
   const toolsCostUSD = quotationData.financials.toolsCost || 0;
-  const toolsCostARS = convertFromUSD(toolsCostUSD, 'ARS');
+  const toolsCostARS = exchangeRate ? convertFromUSD(toolsCostUSD, 'ARS') : 0;
   const subtotalWithTools = subtotalBeforeTools + toolsCostARS;
   
   const isManualMode = quotationData.financials.priceMode === 'manual';

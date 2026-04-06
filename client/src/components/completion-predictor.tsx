@@ -75,6 +75,12 @@ export function CompletionPredictor({
   const remainingHours = Math.max(0, estimatedHours - currentHours);
 
   // Determinar estado del proyecto
+  const colorMap: Record<string, { icon: string; bg: string; text: string; textSm: string }> = {
+    green: { icon: 'text-green-500', bg: 'bg-green-50', text: 'text-green-600', textSm: 'text-green-600' },
+    orange: { icon: 'text-orange-500', bg: 'bg-orange-50', text: 'text-orange-600', textSm: 'text-orange-600' },
+    blue: { icon: 'text-blue-500', bg: 'bg-blue-50', text: 'text-blue-600', textSm: 'text-blue-600' },
+  };
+
   const getProjectStatus = () => {
     if (progress >= 100) return { status: "completed", color: "green", icon: CheckCircle };
     if (progress >= 80) return { status: "warning", color: "orange", icon: AlertTriangle };
@@ -82,12 +88,13 @@ export function CompletionPredictor({
   };
 
   const projectStatus = getProjectStatus();
+  const statusColors = colorMap[projectStatus.color] || colorMap.blue;
 
   return (
     <Card className="mb-6">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <projectStatus.icon className={`h-5 w-5 text-${projectStatus.color}-500`} />
+          <projectStatus.icon className={`h-5 w-5 ${statusColors.icon}`} />
           Predicción de Finalización
         </CardTitle>
       </CardHeader>
@@ -108,11 +115,11 @@ export function CompletionPredictor({
             <div className="text-sm text-blue-600">Restantes</div>
           </div>
           
-          <div className={`bg-${projectStatus.color}-50 p-4 rounded-lg text-center`}>
-            <div className={`text-2xl font-bold text-${projectStatus.color}-600`}>
+          <div className={`${statusColors.bg} p-4 rounded-lg text-center`}>
+            <div className={`text-2xl font-bold ${statusColors.text}`}>
               {predictedDate ? Math.ceil((predictedDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) : '?'}
             </div>
-            <div className={`text-sm text-${projectStatus.color}-600`}>Días estimados</div>
+            <div className={`text-sm ${statusColors.textSm}`}>Días estimados</div>
           </div>
         </div>
 

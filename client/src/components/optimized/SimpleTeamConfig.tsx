@@ -3,6 +3,7 @@ import { useOptimizedQuote } from '@/context/optimized-quote-context';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { authFetch } from '@/lib/queryClient';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Personnel, Role } from '@shared/schema';
@@ -49,12 +50,12 @@ const SimpleTeamConfig: React.FC = () => {
         loadPersonnel();
 
         // Como respaldo, hacemos llamadas directas a la API
-        const rolesResponse = await fetch('/api/roles');
+        const rolesResponse = await authFetch('/api/roles');
         if (rolesResponse.ok) {
           const rolesData = await rolesResponse.json();
         }
 
-        const personnelResponse = await fetch('/api/personnel');
+        const personnelResponse = await authFetch('/api/personnel');
         if (personnelResponse.ok) {
           const personnelData = await personnelResponse.json();
         }

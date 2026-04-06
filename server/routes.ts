@@ -1065,8 +1065,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`🔒 STATUS UPDATE: ${clientName}|${projectName}, status=${status}, end=${endMonthKey}`);
 
-      // TODO: Implement actual status update in database
-      console.warn('⚠️ STATUS UPDATE: Stub implementation - not persisting to database');
+      // Find and update the project status
+      const validStatuses = ['active', 'completed', 'cancelled', 'on-hold'];
+      if (!validStatuses.includes(status)) {
+        return res.status(400).json({ error: 'Invalid status', message: `Status must be one of: ${validStatuses.join(', ')}` });
+      }
+      const [project] = await db.select({ id: activeProjects.id })
+        .from(activeProjects)
+        .innerJoin(quotations, eq(quotations.id, activeProjects.quotationId))
+        .innerJoin(clients, eq(clients.id, activeProjects.clientId))
+        .where(and(
+          sql`LOWER(${clients.name}) = LOWER(${clientName})`,
+          sql`LOWER(${quotations.name}) = LOWER(${projectName})`
+        ));
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+      const updateData: Record<string, any> = { status, updatedAt: new Date() };
+      if (status === 'completed' && endMonthKey) {
+        updateData.actualEndDate = new Date(endMonthKey + '-01');
+      }
+      await db.update(activeProjects).set(updateData).where(eq(activeProjects.id, project.id));
 
       return res.json({
         success: true,
@@ -1089,8 +1108,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.log(`📊 Query params:`, req.query);
     
     const projectId = parseInt(req.params.id);
+    if (isNaN(projectId)) return res.status(400).json({ message: "Invalid project ID" });
     const { timeFilter, basis } = req.query as { timeFilter?: string; basis?: 'EXEC' | 'ECON' };
-    
+
     try {
       // Get project using existing storage functions
       const project = await storage.getActiveProject(projectId);
@@ -1240,16 +1260,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     next();
   });
 
-  // TEST ENDPOINT DIRECTO - JUSTO DESPUÉS DEL MIDDLEWARE DE DEBUG
-  app.get('/api/projects/:id/test-simple', (req, res) => {
-    console.log(`🔥🔥🔥 SIMPLE TEST ENDPOINT HIT - ID: ${req.params.id}`);
-    res.json({ 
-      message: 'Test endpoint working', 
-      id: req.params.id, 
-      query: req.query,
-      timestamp: new Date().toISOString()
-    });
-  });
+  // Test endpoint removed — was publicly accessible without auth
 
   // TEMPORARY FORCE SYNC ENDPOINT
   app.get('/api/debug/force-sync', requireAuth, async (req, res) => {
@@ -1389,6 +1400,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Debug endpoint - Verificar mapeo de costos directos 
   app.get('/api/debug/costs-mapping/:projectId', requireAuth, async (req, res) => {
     const projectId = parseInt(req.params.projectId);
+    if (isNaN(projectId)) return res.status(400).json({ message: "Invalid project ID" });
     console.log(`🔍 DEBUG - Verificando mapeo de costos para proyecto ${projectId}`);
     
     try {
@@ -1420,6 +1432,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Debug endpoint para investigar discrepancia de costos
   app.get('/api/debug/costs-filtered/:projectId', requireAuth, async (req, res) => {
     const projectId = parseInt(req.params.projectId);
+    if (isNaN(projectId)) return res.status(400).json({ message: "Invalid project ID" });
     const timeFilter = req.query.timeFilter as string || '2025-05-01_to_2025-08-31';
     
     try {
@@ -2897,73 +2910,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Revenue desde Google Sheets filtrado temporalmente - CORRECCIÓN: usar ambos campos CON TIPO DE CAMBIO REAL
       const salesData = await getFilteredGoogleSheetsSales(id, timeFilter, dateRange);
-      const totalRealRevenue = salesData.length > 0 
-        ? await salesData.reduce(async (sumPromise, sale) => {
-            const sum = await sumPromise;
-            // Priorizar amountUsd, si no existe usar amountLocal con conversión según currency
-            const usdAmount = Number(sale.amountUsd ?? 0) || 0;
-            const localAmount = Number(sale.amountLocal ?? 0) || 0;
-            const isARS = sale.currency === 'ARS';
-            
-            if (usdAmount > 0) {
-              console.log(`💰 USD Sale: $${usdAmount} for ${sale.clientName}-${sale.projectName} (${sale.month}/${sale.year})`);
-              return sum + usdAmount;
-            } else if (isARS && localAmount > 0) {
-              // Obtener tipo de cambio real del Excel MAESTRO con normalización robusta
-              try {
-                const tiposCambio = await googleSheetsWorkingService.getTiposCambio();
-                
-                // Función para normalizar nombres de meses (español/inglés/abreviado)
-                const normalizeMonth = (month: string): string => {
-                  const monthLower = month.toLowerCase().trim();
-                  const monthMap: Record<string, string> = {
-                    // Español completo
-                    'enero': 'ene', 'febrero': 'feb', 'marzo': 'mar', 'abril': 'abr', 
-                    'mayo': 'may', 'junio': 'jun', 'julio': 'jul', 'agosto': 'ago',
-                    'septiembre': 'sep', 'octubre': 'oct', 'noviembre': 'nov', 'diciembre': 'dic',
-                    // Inglés completo  
-                    'january': 'ene', 'february': 'feb', 'march': 'mar', 'april': 'abr',
-                    'may': 'may', 'june': 'jun', 'july': 'jul', 'august': 'ago',
-                    'september': 'sep', 'october': 'oct', 'november': 'nov', 'december': 'dic',
-                    // Abreviaciones inglesas
-                    'jan': 'ene', 'feb': 'feb', 'mar': 'mar', 'apr': 'abr', 'jul': 'jul', 
-                    'aug': 'ago', 'sep': 'sep', 'oct': 'oct', 'nov': 'nov', 'dec': 'dic'
-                  };
-                  return monthMap[monthLower] || monthLower.slice(0, 3);
-                };
-                
-                const normalizedSaleMonth = normalizeMonth(sale.month);
-                const monthExchangeRate = tiposCambio.find(tc => {
-                  const normalizedTcMonth = normalizeMonth(tc.mes);
-                  return normalizedTcMonth === normalizedSaleMonth && tc.año === sale.year;
-                });
-                
-                let realExchangeRate = monthExchangeRate?.tipoCambio;
-                
-                // Si no se encuentra para el año exacto, buscar el más reciente
-                if (!realExchangeRate) {
-                  const fallbackRate = tiposCambio
-                    .filter(tc => normalizeMonth(tc.mes) === normalizedSaleMonth)
-                    .sort((a, b) => b.año - a.año)[0];
-                  realExchangeRate = fallbackRate?.tipoCambio || 1300;
-                  console.log(`⚠️ Using fallback exchange rate for ${sale.month}/${sale.year}: ${realExchangeRate} (from ${fallbackRate?.año || 'default'})`);
-                }
-                
-                const convertedUsd = localAmount / realExchangeRate;
-                console.log(`💱 ARS Sale: ARS $${localAmount} → USD $${convertedUsd.toFixed(2)} (rate: ${realExchangeRate}) for ${sale.clientName}-${sale.projectName} (${sale.month}/${sale.year})`);
-                return sum + convertedUsd;
-              } catch (error) {
-                console.warn(`⚠️ Error getting exchange rate for ${sale.month}/${sale.year}, using fallback 1300:`, error);
-                const fallbackUsd = localAmount / 1300;
-                console.log(`💱 ARS Sale (fallback): ARS $${localAmount} → USD $${fallbackUsd.toFixed(2)} for ${sale.clientName}-${sale.projectName}`);
-                return sum + fallbackUsd;
-              }
-            } else {
-              console.log(`⚠️ Sale has no valid amount: ${sale.clientName}-${sale.projectName} (${sale.month}/${sale.year}) - USD: ${usdAmount}, Local: ${localAmount}, Currency: ${sale.currency}`);
+      let totalRealRevenue = 0;
+
+      // Función para normalizar nombres de meses (español/inglés/abreviado)
+      const normalizeMonth = (month: string): string => {
+        const monthLower = month.toLowerCase().trim();
+        const monthMap: Record<string, string> = {
+          'enero': 'ene', 'febrero': 'feb', 'marzo': 'mar', 'abril': 'abr',
+          'mayo': 'may', 'junio': 'jun', 'julio': 'jul', 'agosto': 'ago',
+          'septiembre': 'sep', 'octubre': 'oct', 'noviembre': 'nov', 'diciembre': 'dic',
+          'january': 'ene', 'february': 'feb', 'march': 'mar', 'april': 'abr',
+          'may': 'may', 'june': 'jun', 'july': 'jul', 'august': 'ago',
+          'september': 'sep', 'october': 'oct', 'november': 'nov', 'december': 'dic',
+          'jan': 'ene', 'feb': 'feb', 'mar': 'mar', 'apr': 'abr', 'jul': 'jul',
+          'aug': 'ago', 'sep': 'sep', 'oct': 'oct', 'nov': 'nov', 'dec': 'dic'
+        };
+        return monthMap[monthLower] || monthLower.slice(0, 3);
+      };
+
+      for (const sale of salesData) {
+        const usdAmount = Number(sale.amountUsd ?? 0) || 0;
+        const localAmount = Number(sale.amountLocal ?? 0) || 0;
+        const isARS = sale.currency === 'ARS';
+
+        if (usdAmount > 0) {
+          console.log(`💰 USD Sale: $${usdAmount} for ${sale.clientName}-${sale.projectName} (${sale.month}/${sale.year})`);
+          totalRealRevenue += usdAmount;
+        } else if (isARS && localAmount > 0) {
+          try {
+            const tiposCambio = await googleSheetsWorkingService.getTiposCambio();
+            const normalizedSaleMonth = normalizeMonth(sale.month);
+            const monthExchangeRate = tiposCambio.find(tc => {
+              const normalizedTcMonth = normalizeMonth(tc.mes);
+              return normalizedTcMonth === normalizedSaleMonth && tc.año === sale.year;
+            });
+
+            let realExchangeRate = monthExchangeRate?.tipoCambio;
+
+            if (!realExchangeRate) {
+              const fallbackRate = tiposCambio
+                .filter(tc => normalizeMonth(tc.mes) === normalizedSaleMonth)
+                .sort((a, b) => b.año - a.año)[0];
+              realExchangeRate = fallbackRate?.tipoCambio || 1300;
+              console.log(`⚠️ Using fallback exchange rate for ${sale.month}/${sale.year}: ${realExchangeRate} (from ${fallbackRate?.año || 'default'})`);
             }
-            return sum;
-          }, Promise.resolve(0))
-        : 0; // NO usar fallback de cotización para métricas de período
+
+            const convertedUsd = localAmount / realExchangeRate;
+            console.log(`💱 ARS Sale: ARS $${localAmount} → USD $${convertedUsd.toFixed(2)} (rate: ${realExchangeRate}) for ${sale.clientName}-${sale.projectName} (${sale.month}/${sale.year})`);
+            totalRealRevenue += convertedUsd;
+          } catch (error) {
+            console.warn(`⚠️ Error getting exchange rate for ${sale.month}/${sale.year}, using fallback 1300:`, error);
+            const fallbackUsd = localAmount / 1300;
+            console.log(`💱 ARS Sale (fallback): ARS $${localAmount} → USD $${fallbackUsd.toFixed(2)} for ${sale.clientName}-${sale.projectName}`);
+            totalRealRevenue += fallbackUsd;
+          }
+        } else {
+          console.log(`⚠️ Sale has no valid amount: ${sale.clientName}-${sale.projectName} (${sale.month}/${sale.year}) - USD: ${usdAmount}, Local: ${localAmount}, Currency: ${sale.currency}`);
+        }
+      }
       
       console.log(`🎯 CORRECTED METRICS CALCULATION for project ${id} (${timeFilter}):`);
       console.log(`   Excel Target Hours: ${excelTargetHours}`);
@@ -4820,39 +4824,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Option lists
-  app.get("/api/options/analysis-types", async (_, res) => {
+  app.get("/api/options/analysis-types", requireAuth, async (_, res) => {
     const types = await storage.getAnalysisTypes();
     res.json(types);
   });
 
-  app.get("/api/options/project-types", async (_, res) => {
+  app.get("/api/options/project-types", requireAuth, async (_, res) => {
     const types = await storage.getProjectTypes();
     res.json(types);
   });
 
-  app.get("/api/options/project-duration/:projectType", async (req, res) => {
+  app.get("/api/options/project-duration/:projectType", requireAuth, async (req, res) => {
     const projectType = req.params.projectType;
     const options = await storage.getProjectDurationOptions(projectType);
     res.json(options);
   });
 
-  app.get("/api/options/mentions-volume", async (_, res) => {
+  app.get("/api/options/mentions-volume", requireAuth, async (_, res) => {
     const options = await storage.getMentionsVolumeOptions();
     res.json(options);
   });
 
-  app.get("/api/options/countries-covered", async (_, res) => {
+  app.get("/api/options/countries-covered", requireAuth, async (_, res) => {
     const options = await storage.getCountriesCoveredOptions();
     res.json(options);
   });
 
-  app.get("/api/options/client-engagement", async (_, res) => {
+  app.get("/api/options/client-engagement", requireAuth, async (_, res) => {
     const options = await storage.getClientEngagementOptions();
     res.json(options);
   });
 
   // Template role assignments routes
-  app.get("/api/template-roles/:templateId", async (req, res) => {
+  app.get("/api/template-roles/:templateId", requireAuth, async (req, res) => {
     const templateId = parseInt(req.params.templateId);
     if (isNaN(templateId)) return res.status(400).json({ message: "Invalid template ID" });
 
@@ -4861,7 +4865,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Ruta alternativa para asignaciones de roles (para compatibilidad con roles recomendados)
-  app.get("/api/report-templates/:templateId/role-assignments", async (req, res) => {
+  app.get("/api/report-templates/:templateId/role-assignments", requireAuth, async (req, res) => {
     const templateId = parseInt(req.params.templateId);
     if (isNaN(templateId)) return res.status(400).json({ message: "Invalid template ID" });
 
@@ -4869,7 +4873,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(assignments);
   });
 
-  app.get("/api/template-roles/:templateId/with-roles", async (req, res) => {
+  app.get("/api/template-roles/:templateId/with-roles", requireAuth, async (req, res) => {
     const templateId = parseInt(req.params.templateId);
     if (isNaN(templateId)) return res.status(400).json({ message: "Invalid template ID" });
 
@@ -5065,20 +5069,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     try {
       console.log(`🎯 Selecting variant ${variantId} for quotation ${quotationId}`);
-      
-      // First, unselect all variants for this quotation
-      await db.update(quotationVariants)
-        .set({ isSelected: false })
-        .where(eq(quotationVariants.quotationId, quotationId));
 
-      // Then select the chosen variant and return it
-      const [selectedVariant] = await db.update(quotationVariants)
-        .set({ isSelected: true })
-        .where(and(
-          eq(quotationVariants.id, variantId),
-          eq(quotationVariants.quotationId, quotationId)
-        ))
-        .returning();
+      // Use transaction to prevent race condition with concurrent variant selection
+      const selectedVariant = await db.transaction(async (tx) => {
+        // First, unselect all variants for this quotation
+        await tx.update(quotationVariants)
+          .set({ isSelected: false })
+          .where(eq(quotationVariants.quotationId, quotationId));
+
+        // Then select the chosen variant and return it
+        const [variant] = await tx.update(quotationVariants)
+          .set({ isSelected: true })
+          .where(and(
+            eq(quotationVariants.id, variantId),
+            eq(quotationVariants.quotationId, quotationId)
+          ))
+          .returning();
+        return variant;
+      });
 
       console.log(`✅ Variant ${variantId} selected for quotation ${quotationId}`);
       res.json({ success: true, message: "Variant selected successfully", variant: selectedVariant });
@@ -5162,8 +5170,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // 📊 DIRECT SHEETS DASHBOARD - reads from Google Sheets in real-time (like Looker Studio)
   app.get("/api/v2/executive/dashboard", requireAuth, async (req, res) => {
     try {
-      const year = req.query.year ? parseInt(req.query.year as string) : undefined;
-      const month = req.query.month ? parseInt(req.query.month as string) : undefined;
+      const yearParsed = req.query.year ? parseInt(req.query.year as string) : undefined;
+      const monthParsed = req.query.month ? parseInt(req.query.month as string) : undefined;
+      const year = yearParsed !== undefined && !isNaN(yearParsed) ? yearParsed : undefined;
+      const month = monthParsed !== undefined && !isNaN(monthParsed) ? monthParsed : undefined;
       const { fetchResumenEjecutivoDirectly } = await import('./services/direct-sheets-dashboard');
       const result = await fetchResumenEjecutivoDirectly(year, month);
       res.json(result);
@@ -11019,11 +11029,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     };
   }
 
-  // Endpoint TEST sin auth para diagnosis
-  app.get('/api/projects/:id/deviation-analysis-test', async (req, res) => {
-    console.log(`🟢🟢🟢 TEST ENDPOINT HIT - ID: ${req.params.id}, Query:`, req.query);
-    res.json({ test: 'working', params: req.params, query: req.query });
-  });
+  // Test endpoint removed — was publicly accessible without auth
 
   // 🏢 ENDPOINT UNIVERSAL: Análisis de desviaciones del equipo
   // Integra completamente con Excel MAESTRO usando motor único
@@ -11083,12 +11089,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });*/
 
-  // Endpoint para recomendaciones
-  app.get('/api/projects/:id/recommendations', requireAuth, async (req, res) => {
+  // DUPLICATE: recommendations endpoint (dead code — first definition at ~10393 is the active one)
+  app.get('/api/projects/:id/recommendations-dup1', requireAuth, async (req, res) => {
     try {
       const projectId = parseInt(req.params.id);
       const { startDate, endDate, timeFilter } = req.query;
-      
+
       console.log(`🔍🔍🔍 RECOMMENDATIONS CALLED - ProjectId: ${projectId}, TimeFilter: ${timeFilter}, StartDate: ${startDate}, EndDate: ${endDate}`);
       
       const project = await storage.getActiveProject(projectId);
@@ -11356,12 +11362,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Endpoint para recomendaciones
-  app.get('/api/projects/:id/recommendations', requireAuth, async (req, res) => {
+  // DUPLICATE: recommendations endpoint (dead code — first definition at ~10393 is the active one)
+  app.get('/api/projects/:id/recommendations-dup2', requireAuth, async (req, res) => {
     try {
       const projectId = parseInt(req.params.id);
       const { startDate, endDate, timeFilter } = req.query;
-      
+
       console.log(`🔍🔍🔍 RECOMMENDATIONS CALLED - ProjectId: ${projectId}, TimeFilter: ${timeFilter}, StartDate: ${startDate}, EndDate: ${endDate}`);
       
       const project = await storage.getActiveProject(projectId);
@@ -13164,7 +13170,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ==================== DEBUG ENDPOINT (TEMPORARY) ====================
   // DEBUG: Endpoint temporal para buscar agosto 2025
-  app.get('/api/debug/august-sales', async (req, res) => {
+  app.get('/api/debug/august-sales', requireAuth, async (req, res) => {
     try {
       const allSales = await storage.getGoogleSheetsSales();
       
@@ -13354,7 +13360,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // GET /api/debug/cost-headers - NUEVO: Inspect Excel MAESTRO headers RAW  
-  app.get('/api/debug/cost-headers', async (req, res) => {
+  app.get('/api/debug/cost-headers', requireAuth, async (req, res) => {
     try {
       console.log(`🔍 EXCEL HEADERS: Fetching raw headers from Google Sheets...`);
       
@@ -15406,7 +15412,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // DEBUG: Test provision extraction from Activo
-  app.get("/api/debug/provision-test", async (req, res) => {
+  app.get("/api/debug/provision-test", requireAuth, async (req, res) => {
     try {
       const period = req.query.period?.toString() || '2025-10';
       const { googleSheetsWorkingService } = await import('./services/googleSheetsWorking');
@@ -15428,7 +15434,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // DEBUG: Diagnóstico de credenciales Google Sheets
-  app.get("/api/debug/google-credentials", async (req, res) => {
+  app.get("/api/debug/google-credentials", requireAuth, async (req, res) => {
     try {
       const pk = process.env.GOOGLE_PRIVATE_KEY || '';
       const email = process.env.GOOGLE_CLIENT_EMAIL || '';
@@ -15494,7 +15500,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // DEBUG: Verificar estructura de hoja Activo con montos de Warner
-  app.get("/api/debug/sheets-activo", async (req, res) => {
+  app.get("/api/debug/sheets-activo", requireAuth, async (req, res) => {
     try {
       const { googleSheetsWorkingService } = await import('./services/googleSheetsWorking');
       const sheets = googleSheetsWorkingService.createSheetsClientFromJSON();
@@ -15687,7 +15693,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // DEBUG: Ver datos raw de Google Sheets para Warner
-  app.get("/api/debug/sheets-warner", async (req, res) => {
+  app.get("/api/debug/sheets-warner", requireAuth, async (req, res) => {
     try {
       const { googleSheetsWorking } = await import('./services/googleSheetsWorking');
       const rcData = await googleSheetsWorking.getRendimientoCliente();
@@ -17183,7 +17189,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (changeLogs.length > 0) {
         db.insert(statusChangeLog)
           .values(changeLogs.map(cl => ({ projectId, userId, ...cl })))
-          .catch(() => {});
+          .catch((err: any) => console.error('statusChangeLog insert error (project):', err));
       }
 
       console.log(`PATCH /api/status-semanal/${projectId} OK`, result?.id);
@@ -17419,6 +17425,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // GET /api/status-semanal/custom/:itemId/updates — update entries for a custom item
+  // NOTE: custom/ routes MUST be registered before :projectId routes to avoid Express matching "custom" as a projectId
+  app.get("/api/status-semanal/custom/:itemId/updates", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const itemId = parseInt(req.params.itemId);
+      if (isNaN(itemId)) return res.status(400).json({ message: "itemId inválido" });
+      try {
+        const entries = await db.select({
+          id: statusUpdateEntries.id,
+          content: statusUpdateEntries.content,
+          authorId: statusUpdateEntries.authorId,
+          authorName: sql<string>`COALESCE(${users.firstName} || ' ' || ${users.lastName}, 'Usuario')`,
+          createdAt: statusUpdateEntries.createdAt,
+        }).from(statusUpdateEntries)
+          .leftJoin(users, eq(users.id, statusUpdateEntries.authorId))
+          .where(eq(statusUpdateEntries.weeklyStatusItemId, itemId))
+          .orderBy(desc(statusUpdateEntries.createdAt));
+        res.json(entries);
+      } catch {
+        res.json([]);
+      }
+    } catch (error) {
+      console.error('GET /api/status-semanal/custom/:itemId/updates error:', error);
+      res.status(500).json({ message: "Error al obtener updates" });
+    }
+  });
+
+  // POST /api/status-semanal/custom/:itemId/updates — add an update entry for a custom item
+  app.post("/api/status-semanal/custom/:itemId/updates", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const itemId = parseInt(req.params.itemId);
+      if (isNaN(itemId)) return res.status(400).json({ message: "itemId inválido" });
+      const { content } = req.body;
+      if (!content?.trim()) return res.status(400).json({ message: "Contenido vacío" });
+      const userId = req.user?.id ?? null;
+      try {
+        const [entry] = await db.insert(statusUpdateEntries)
+          .values({ weeklyStatusItemId: itemId, content: content.trim(), authorId: userId })
+          .returning();
+        // Also update the currentAction field so collapsed row shows latest
+        try {
+          await db.update(weeklyStatusItems)
+            .set({ currentAction: content.trim(), updatedAt: new Date() })
+            .where(eq(weeklyStatusItems.id, itemId));
+        } catch {}
+        res.status(201).json(entry);
+      } catch (e: any) {
+        try {
+          await db.update(weeklyStatusItems)
+            .set({ currentAction: content.trim(), updatedAt: new Date() })
+            .where(eq(weeklyStatusItems.id, itemId));
+        } catch {}
+        res.status(201).json({ id: 0, content: content.trim(), authorId: userId, createdAt: new Date().toISOString() });
+      }
+    } catch (error) {
+      console.error('POST /api/status-semanal/custom/:itemId/updates error:', error);
+      res.status(500).json({ message: "Error al guardar update" });
+    }
+  });
+
   // GET /api/status-semanal/:projectId/updates — update entries for a project
   app.get("/api/status-semanal/:projectId/updates", requireAuth, async (req: Request, res: Response) => {
     try {
@@ -17487,65 +17553,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     } catch (error) {
       console.error('POST /api/status-semanal/:projectId/updates error:', error);
-      res.status(500).json({ message: "Error al guardar update" });
-    }
-  });
-
-  // GET /api/status-semanal/custom/:itemId/updates — update entries for a custom item
-  app.get("/api/status-semanal/custom/:itemId/updates", requireAuth, async (req: Request, res: Response) => {
-    try {
-      const itemId = parseInt(req.params.itemId);
-      if (isNaN(itemId)) return res.status(400).json({ message: "itemId inválido" });
-      try {
-        const entries = await db.select({
-          id: statusUpdateEntries.id,
-          content: statusUpdateEntries.content,
-          authorId: statusUpdateEntries.authorId,
-          authorName: sql<string>`COALESCE(${users.firstName} || ' ' || ${users.lastName}, 'Usuario')`,
-          createdAt: statusUpdateEntries.createdAt,
-        }).from(statusUpdateEntries)
-          .leftJoin(users, eq(users.id, statusUpdateEntries.authorId))
-          .where(eq(statusUpdateEntries.weeklyStatusItemId, itemId))
-          .orderBy(desc(statusUpdateEntries.createdAt));
-        res.json(entries);
-      } catch {
-        res.json([]);
-      }
-    } catch (error) {
-      console.error('GET /api/status-semanal/custom/:itemId/updates error:', error);
-      res.status(500).json({ message: "Error al obtener updates" });
-    }
-  });
-
-  // POST /api/status-semanal/custom/:itemId/updates — add an update entry for a custom item
-  app.post("/api/status-semanal/custom/:itemId/updates", requireAuth, async (req: Request, res: Response) => {
-    try {
-      const itemId = parseInt(req.params.itemId);
-      if (isNaN(itemId)) return res.status(400).json({ message: "itemId inválido" });
-      const { content } = req.body;
-      if (!content?.trim()) return res.status(400).json({ message: "Contenido vacío" });
-      const userId = req.user?.id ?? null;
-      try {
-        const [entry] = await db.insert(statusUpdateEntries)
-          .values({ weeklyStatusItemId: itemId, content: content.trim(), authorId: userId })
-          .returning();
-        // Also update the currentAction field so collapsed row shows latest
-        try {
-          await db.update(weeklyStatusItems)
-            .set({ currentAction: content.trim(), updatedAt: new Date() })
-            .where(eq(weeklyStatusItems.id, itemId));
-        } catch {}
-        res.status(201).json(entry);
-      } catch (e: any) {
-        try {
-          await db.update(weeklyStatusItems)
-            .set({ currentAction: content.trim(), updatedAt: new Date() })
-            .where(eq(weeklyStatusItems.id, itemId));
-        } catch {}
-        res.status(201).json({ id: 0, content: content.trim(), authorId: userId, createdAt: new Date().toISOString() });
-      }
-    } catch (error) {
-      console.error('POST /api/status-semanal/custom/:itemId/updates error:', error);
       res.status(500).json({ message: "Error al guardar update" });
     }
   });
@@ -17820,7 +17827,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (changeLogs.length > 0) {
         db.insert(statusChangeLog)
           .values(changeLogs.map(cl => ({ weeklyStatusItemId: id, userId, ...cl })))
-          .catch(() => {});
+          .catch((err: any) => console.error('statusChangeLog insert error (custom):', err));
       }
       console.log(`PATCH /api/status-semanal/custom/${id} OK`);
       res.json(item);

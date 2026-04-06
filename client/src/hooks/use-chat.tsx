@@ -1,7 +1,7 @@
 import { createContext, ReactNode, useContext, useEffect, useState, useCallback, useRef } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest, queryClient, authFetch } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
 // Tipos de mensajes y conversaciones
@@ -97,6 +97,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const [isConnected, setIsConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const webSocketRef = useRef<WebSocket | null>(null);
+  const handleWebSocketMessageRef = useRef<(data: WebSocketResponse) => void>(() => {});
   const { toast } = useToast();
 
   // Obtener todas las conversaciones
@@ -110,7 +111,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     if (activeConversationId && user) {
       const fetchConversation = async () => {
         try {
-          const response = await fetch(`/api/conversations/${activeConversationId}`);
+          const response = await authFetch(`/api/conversations/${activeConversationId}`);
           if (response.ok) {
             const data = await response.json();
             setActiveConversation(data);
@@ -157,7 +158,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       ws.onmessage = (event) => {
         try {
           const data: WebSocketResponse = JSON.parse(event.data);
-          handleWebSocketMessage(data);
+          handleWebSocketMessageRef.current(data);
         } catch (error) {
           console.error("Error al procesar mensaje WebSocket:", error);
         }
@@ -243,6 +244,9 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         break;
     }
   }, [activeConversationId, toast, user?.id]);
+
+  // Keep ref always up-to-date so WebSocket onmessage uses latest closure
+  handleWebSocketMessageRef.current = handleWebSocketMessage;
 
   // Crear nueva conversación
   const createConversation = useCallback((data: NewConversationPayload) => {

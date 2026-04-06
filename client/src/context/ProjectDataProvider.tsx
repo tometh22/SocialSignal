@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
 import { useCompleteProjectData } from '@/hooks/useCompleteProjectData';
 import { useQuery } from '@tanstack/react-query';
+import { authFetch } from '@/lib/queryClient';
 
 interface ProjectDataContextType {
   // Global state
@@ -63,7 +64,7 @@ export const ProjectDataProvider: React.FC<ProjectDataProviderProps> = ({
   } = useQuery({
     queryKey: ['projects', projectId, 'performance-rankings', period],
     queryFn: async () => {
-      const response = await fetch(`/api/projects/${projectId}/performance-rankings?timeFilter=${period}`);
+      const response = await authFetch(`/api/projects/${projectId}/performance-rankings?timeFilter=${period}`);
       if (!response.ok) throw new Error('Failed to fetch rankings');
       return response.json();
     },
@@ -81,7 +82,7 @@ export const ProjectDataProvider: React.FC<ProjectDataProviderProps> = ({
   } = useQuery({
     queryKey: ['projects', projectId, 'incomes', period],
     queryFn: async () => {
-      const response = await fetch(`/api/projects/${projectId}/incomes?timeFilter=${period}`);
+      const response = await authFetch(`/api/projects/${projectId}/incomes?timeFilter=${period}`);
       if (!response.ok) throw new Error('Failed to fetch incomes');
       return response.json();
     },
@@ -99,7 +100,7 @@ export const ProjectDataProvider: React.FC<ProjectDataProviderProps> = ({
   } = useQuery({
     queryKey: ['projects', projectId, 'costs', period],
     queryFn: async () => {
-      const response = await fetch(`/api/projects/${projectId}/costs?timeFilter=${period}`);
+      const response = await authFetch(`/api/projects/${projectId}/costs?timeFilter=${period}`);
       if (!response.ok) throw new Error('Failed to fetch costs');
       return response.json();
     },

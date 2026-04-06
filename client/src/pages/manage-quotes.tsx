@@ -46,7 +46,7 @@ interface Client {
 
 export default function ManageQuotes() {
   const [, navigate] = useLocation();
-  const { formatCurrency: formatCurrencyWithConversion, convertFromUSD } = useCurrency();
+  const { formatCurrency: formatCurrencyWithConversion, convertFromUSD, exchangeRate } = useCurrency();
 
   console.log('[QUOTES] 🚀 Inicializando página de gestión de cotizaciones');
 

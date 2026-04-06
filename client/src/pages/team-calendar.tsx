@@ -172,7 +172,7 @@ export default function TeamCalendarPage() {
                         {getInitials(person.name)}
                       </AvatarFallback>
                     </Avatar>
-                    <span>{person.name.split(" ")[0]}</span>
+                    <span>{(person.name || '').split(" ")[0]}</span>
                     <Badge variant="secondary" className="h-3.5 px-1 text-[9px]">{taskCount}</Badge>
                   </button>
                 );
@@ -341,7 +341,7 @@ export default function TeamCalendarPage() {
               const style = getPersonStyle(aid);
               return (
                 <div key={aid} className={cn("flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] border-l-2", style.bg, style.border, style.text)}>
-                  <span className="font-medium">{person.name.split(" ")[0]}</span>
+                  <span className="font-medium">{(person.name || '').split(" ")[0]}</span>
                 </div>
               );
             })}

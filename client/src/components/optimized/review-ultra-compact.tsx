@@ -62,10 +62,10 @@ const ReviewUltraCompact: React.FC = () => {
     const person = availablePersonnel.find(p => p.id === personnelId);
     return person ? person.name : "Sin asignar";
   };
-  const getRoleName = (roleId: number) => {
+  const getRoleName = (roleId: number): string => {
     if (!availableRoles) return "Rol desconocido";
     const role = availableRoles.find(r => r.id === roleId);
-    return role ? role.name : "Rol desconocido";
+    return role?.name ?? "Rol desconocido";
   };
 
   const handleAdjustedAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {

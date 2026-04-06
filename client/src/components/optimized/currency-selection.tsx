@@ -8,12 +8,14 @@ import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
 import { useLocation } from 'wouter';
+import { useAuth } from '@/hooks/use-auth';
 
 const CurrencySelection: React.FC = () => {
   const { quotationData, updateQuotationData, totalAmount, nextStep, baseCost, complexityAdjustment, markupAmount } = useOptimizedQuote();
   const { exchangeRate, formatCurrency } = useCurrency();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
+  const { user } = useAuth();
   const [isFinalizingDirect, setIsFinalizingDirect] = useState(false);
 
   const handleCurrencyChange = (currency: 'ARS' | 'USD') => {
@@ -89,7 +91,7 @@ const CurrencySelection: React.FC = () => {
         quotationCurrency: quotationData.quotationCurrency,
         exchangeRateAtQuote: exchangeRate,
         usdExchangeRate: exchangeRate,
-        createdBy: 3 // TODO: Get actual user ID
+        createdBy: user?.id ?? 1
       };
 
       console.log('🚀 Sending quotation data:', finalQuotationData);
