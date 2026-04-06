@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/u
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
-  ClipboardList, MessageSquare, X, Send, Trash2,
+  ClipboardList, MessageSquare, X, Send, Trash2, Pencil,
   AlertTriangle, Loader2, User, EyeOff, Eye,
   ChevronDown, ChevronRight, ChevronLeft, Zap, CheckCircle2,
   Circle, MoreHorizontal, Plus, Tag,
@@ -812,10 +812,10 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5">
             {item.isCustom && <Tag className="h-3 w-3 text-indigo-400 shrink-0" />}
-            <span className="font-medium text-[13px] text-slate-800 truncate">{item.title}</span>
-            {item.subtitle && <span className="text-slate-400 text-xs truncate hidden sm:inline"> · {item.subtitle}</span>}
+            <span className="font-medium text-[13px] text-slate-800 truncate" title={item.title}>{item.title}</span>
+            {item.subtitle && <span className="text-slate-400 text-xs truncate hidden sm:inline" title={item.subtitle}> · {item.subtitle}</span>}
             <span className="shrink-0 hidden sm:inline"><FreshnessIndicator updatedAt={item.updatedAt} updatedByName={item.updatedByName} updatedById={item.updatedById} currentUserId={currentUserId} /></span>
-            <span className="hidden lg:inline text-xs text-slate-400 truncate max-w-[300px] ml-1">
+            <span className="hidden lg:inline text-xs text-slate-400 truncate max-w-[300px] ml-1" title={item.currentAction ?? undefined}>
               {item.currentAction && `— ${item.currentAction}`}
             </span>
           </div>
@@ -1199,6 +1199,8 @@ function ActivityPanel({ projectId, customItemId, projectName, onClose }: { proj
   const { user } = useAuth();
   const { toast } = useToast();
   const [newNote, setNewNote] = useState('');
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editText, setEditText] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
   const currentUserId = (user as any)?.id;
 
@@ -1242,6 +1244,17 @@ function ActivityPanel({ projectId, customItemId, projectName, onClose }: { proj
     onError: (err: Error) => toast({ title: 'Error al eliminar comentario', description: err.message, variant: 'destructive' }),
   });
 
+  const editMutation = useMutation({
+    mutationFn: ({ noteId, content }: { noteId: number; content: string }) =>
+      mutationFetch(`/api/status-semanal/notes/${noteId}`, 'PATCH', { content }),
+    onSuccess: () => {
+      setEditingId(null);
+      queryClient.refetchQueries({ queryKey: activityCacheKey });
+      queryClient.refetchQueries({ queryKey: notesCacheKey });
+    },
+    onError: (err: Error) => toast({ title: 'Error al editar comentario', description: err.message, variant: 'destructive' }),
+  });
+
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [timeline.length]);
 
   return (
@@ -1283,12 +1296,39 @@ function ActivityPanel({ projectId, customItemId, projectName, onClose }: { proj
                       </Tooltip>
                     </TooltipProvider>
                   </div>
-                  <div className="text-[11px] bg-white border border-slate-100 rounded-md px-2.5 py-1.5 leading-relaxed whitespace-pre-wrap">{entry.content}</div>
+                  {editingId === entry.id ? (
+                    <div className="space-y-1">
+                      <Textarea
+                        value={editText}
+                        onChange={e => setEditText(e.target.value)}
+                        autoFocus
+                        className="resize-none text-[11px] min-h-[40px] max-h-[120px] bg-white px-2.5 py-1.5"
+                      />
+                      <div className="flex gap-1">
+                        <Button size="sm" className="h-6 px-2 text-[10px] bg-indigo-600 hover:bg-indigo-700 text-white"
+                          disabled={!editText.trim() || editMutation.isPending}
+                          onClick={() => editMutation.mutate({ noteId: entry.id, content: editText })}>
+                          {editMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Guardar'}
+                        </Button>
+                        <Button size="sm" variant="ghost" className="h-6 px-2 text-[10px]"
+                          onClick={() => setEditingId(null)}>
+                          Cancelar
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-[11px] bg-white border border-slate-100 rounded-md px-2.5 py-1.5 leading-relaxed whitespace-pre-wrap">{entry.content}</div>
+                  )}
                 </div>
-                {isOwn && (
-                  <button onClick={() => deleteMutation.mutate(entry.id)} className="opacity-0 group-hover:opacity-100 p-0.5 text-slate-300 hover:text-red-400 transition-opacity shrink-0 mt-0.5">
-                    <Trash2 className="h-3 w-3" />
-                  </button>
+                {isOwn && editingId !== entry.id && (
+                  <div className="flex flex-col gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-0.5">
+                    <button onClick={() => { setEditingId(entry.id); setEditText(entry.content); }} className="p-0.5 text-slate-300 hover:text-indigo-400">
+                      <Pencil className="h-3 w-3" />
+                    </button>
+                    <button onClick={() => deleteMutation.mutate(entry.id)} className="p-0.5 text-slate-300 hover:text-red-400">
+                      <Trash2 className="h-3 w-3" />
+                    </button>
+                  </div>
                 )}
               </div>
             );

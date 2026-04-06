@@ -17326,6 +17326,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // PATCH /api/status-semanal/notes/:noteId — edit a note
+  app.patch("/api/status-semanal/notes/:noteId", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const noteId = parseInt(req.params.noteId);
+      const { content } = req.body;
+      if (!content?.trim()) return res.status(400).json({ message: "El contenido es requerido" });
+      const [updated] = await db
+        .update(projectReviewNotes)
+        .set({ content: content.trim() })
+        .where(eq(projectReviewNotes.id, noteId))
+        .returning();
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ message: "Error al editar nota" });
+    }
+  });
+
   // GET /api/status-semanal/custom/:itemId/activity — unified timeline for custom items
   app.get("/api/status-semanal/custom/:itemId/activity", requireAuth, async (req: Request, res: Response) => {
     try {
