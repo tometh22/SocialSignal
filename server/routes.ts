@@ -17598,6 +17598,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // DELETE /api/status-semanal/updates/:entryId — delete an update entry
+  app.delete("/api/status-semanal/updates/:entryId", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const entryId = parseInt(req.params.entryId);
+      if (isNaN(entryId) || entryId === 0) return res.status(400).json({ message: "ID inválido" });
+      await db.delete(statusUpdateEntries).where(eq(statusUpdateEntries.id, entryId));
+      res.json({ ok: true });
+    } catch (error) {
+      res.status(500).json({ message: "Error al eliminar update" });
+    }
+  });
+
+  // PATCH /api/status-semanal/updates/:entryId — edit an update entry (owner only)
+  app.patch("/api/status-semanal/updates/:entryId", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const entryId = parseInt(req.params.entryId);
+      if (isNaN(entryId) || entryId === 0) return res.status(400).json({ message: "ID inválido" });
+      const { content } = req.body;
+      if (!content?.trim()) return res.status(400).json({ message: "Contenido vacío" });
+
+      let userId = (req.session as any)?.userId ?? null;
+      if (!userId) {
+        const authHeader = req.headers.authorization;
+        if (authHeader?.startsWith('Session ')) {
+          const tokenId = authHeader.slice(8).trim();
+          if (tokenId) {
+            userId = await new Promise<number | null>((resolve) => {
+              storage.sessionStore.get(tokenId, (err: any, data: any) => {
+                resolve(err || !data ? null : data.userId ?? null);
+              });
+            });
+          }
+        }
+      }
+      if (!userId) return res.status(401).json({ message: "No autenticado" });
+
+      const [entry] = await db
+        .select({ authorId: statusUpdateEntries.authorId })
+        .from(statusUpdateEntries)
+        .where(eq(statusUpdateEntries.id, entryId));
+      if (!entry) return res.status(404).json({ message: "Update no encontrado" });
+      if (entry.authorId !== userId) return res.status(403).json({ message: "No autorizado" });
+
+      const [updated] = await db
+        .update(statusUpdateEntries)
+        .set({ content: content.trim() })
+        .where(eq(statusUpdateEntries.id, entryId))
+        .returning();
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ message: "Error al editar update" });
+    }
+  });
+
   // GET /api/status-semanal/users — all users for owner dropdown
   app.get("/api/status-semanal/users", requireAuth, async (_req: Request, res: Response) => {
     try {

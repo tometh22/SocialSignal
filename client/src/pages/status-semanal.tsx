@@ -310,6 +310,8 @@ function UpdateTimeline({ projectId, customId, currentAction, currentUserId, onA
   const { toast } = useToast();
   const [draft, setDraft] = useState('');
   const [showAll, setShowAll] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editText, setEditText] = useState('');
 
   const updatesUrl = projectId
     ? `/api/status-semanal/${projectId}/updates`
@@ -332,6 +334,19 @@ function UpdateTimeline({ projectId, customId, currentAction, currentUserId, onA
       onActionUpdated?.();
     },
     onError: (err: Error) => toast({ title: 'Error', description: err.message, variant: 'destructive' }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (entryId: number) => mutationFetch(`/api/status-semanal/updates/${entryId}`, 'DELETE'),
+    onSuccess: () => { queryClient.refetchQueries({ queryKey: cacheKey }); queryClient.refetchQueries({ queryKey: ['/api/status-semanal'] }); },
+    onError: (err: Error) => toast({ title: 'Error al eliminar update', description: err.message, variant: 'destructive' }),
+  });
+
+  const editMutation = useMutation({
+    mutationFn: ({ entryId, content }: { entryId: number; content: string }) =>
+      mutationFetch(`/api/status-semanal/updates/${entryId}`, 'PATCH', { content }),
+    onSuccess: () => { setEditingId(null); queryClient.refetchQueries({ queryKey: cacheKey }); queryClient.refetchQueries({ queryKey: ['/api/status-semanal'] }); },
+    onError: (err: Error) => toast({ title: 'Error al editar update', description: err.message, variant: 'destructive' }),
   });
 
   const submit = () => {
@@ -369,12 +384,40 @@ function UpdateTimeline({ projectId, customId, currentAction, currentUserId, onA
             const isOwn = entry.authorId != null && entry.authorId === currentUserId;
             const firstName = entry.authorName?.split(' ')[0] || 'Usuario';
             return (
-              <div key={entry.id} className={cn("rounded px-2 py-1 text-xs", isOwn ? "bg-slate-50" : "bg-indigo-50/60")}>
-                <div className="flex items-center gap-1 mb-0.5">
-                  <span className={cn("font-medium text-[10px]", isOwn ? "text-slate-500" : "text-indigo-600")}>{firstName}</span>
-                  <span className="text-[9px] text-slate-400">{shortDateTime(entry.createdAt)}</span>
+              <div key={entry.id} className={cn("group flex gap-1.5 items-start rounded px-2 py-1 text-xs", isOwn ? "bg-slate-50" : "bg-indigo-50/60")}>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1 mb-0.5">
+                    <span className={cn("font-medium text-[10px]", isOwn ? "text-slate-500" : "text-indigo-600")}>{firstName}</span>
+                    <span className="text-[9px] text-slate-400">{shortDateTime(entry.createdAt)}</span>
+                  </div>
+                  {editingId === entry.id ? (
+                    <div className="space-y-1">
+                      <textarea value={editText} onChange={e => setEditText(e.target.value)} autoFocus
+                        onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (editText.trim()) editMutation.mutate({ entryId: entry.id, content: editText }); } else if (e.key === 'Escape') setEditingId(null); }}
+                        className="w-full text-xs border border-indigo-300 rounded px-2 py-1 focus:outline-none resize-none" rows={2} />
+                      <div className="flex gap-1">
+                        <button disabled={!editText.trim() || editMutation.isPending}
+                          onClick={() => editMutation.mutate({ entryId: entry.id, content: editText })}
+                          className="text-[10px] bg-indigo-600 hover:bg-indigo-700 text-white rounded px-2 py-0.5 disabled:opacity-50">
+                          {editMutation.isPending ? '...' : 'Guardar'}
+                        </button>
+                        <button onClick={() => setEditingId(null)} className="text-[10px] text-slate-500 rounded px-2 py-0.5 hover:bg-slate-100">Cancelar</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-slate-700 leading-snug whitespace-pre-wrap">{entry.content}</p>
+                  )}
                 </div>
-                <p className="text-slate-700 leading-snug whitespace-pre-wrap">{entry.content}</p>
+                {isOwn && entry.id !== 0 && editingId !== entry.id && (
+                  <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-0.5">
+                    <button onClick={() => { setEditingId(entry.id); setEditText(entry.content); }} className="p-0.5 text-slate-300 hover:text-indigo-400">
+                      <Pencil className="h-3 w-3" />
+                    </button>
+                    <button onClick={() => deleteMutation.mutate(entry.id)} className="p-0.5 text-slate-300 hover:text-red-400">
+                      <Trash2 className="h-3 w-3" />
+                    </button>
+                  </div>
+                )}
               </div>
             );
           })}
@@ -407,6 +450,8 @@ function InlineChat({ projectId, customId, currentUserId, onOpenFullChat }: {
   const { toast } = useToast();
   const [msg, setMsg] = useState('');
   const [sent, setSent] = useState(false);
+  const [editingNoteId, setEditingNoteId] = useState<number | null>(null);
+  const [editNoteText, setEditNoteText] = useState('');
 
   const notesUrl = projectId
     ? `/api/status-semanal/${projectId}/notes`
@@ -438,6 +483,28 @@ function InlineChat({ projectId, customId, currentUserId, onOpenFullChat }: {
     onError: (err: Error) => toast({ title: 'Error', description: err.message, variant: 'destructive' }),
   });
 
+  const deleteNoteMutation = useMutation({
+    mutationFn: (noteId: number) => mutationFetch(`/api/status-semanal/notes/${noteId}`, 'DELETE'),
+    onSuccess: () => {
+      queryClient.refetchQueries({ queryKey: notesCacheKey });
+      queryClient.refetchQueries({ queryKey: activityCacheKey });
+      queryClient.refetchQueries({ queryKey: ['/api/status-semanal'] });
+      if (customId) queryClient.refetchQueries({ queryKey: ['/api/status-semanal/custom'] });
+    },
+    onError: (err: Error) => toast({ title: 'Error al eliminar', description: err.message, variant: 'destructive' }),
+  });
+
+  const editNoteMutation = useMutation({
+    mutationFn: ({ noteId, content }: { noteId: number; content: string }) =>
+      mutationFetch(`/api/status-semanal/notes/${noteId}`, 'PATCH', { content }),
+    onSuccess: () => {
+      setEditingNoteId(null);
+      queryClient.refetchQueries({ queryKey: notesCacheKey });
+      queryClient.refetchQueries({ queryKey: activityCacheKey });
+    },
+    onError: (err: Error) => toast({ title: 'Error al editar', description: err.message, variant: 'destructive' }),
+  });
+
   const submit = () => {
     const t = msg.trim();
     if (!t) return;
@@ -464,10 +531,40 @@ function InlineChat({ projectId, customId, currentUserId, onOpenFullChat }: {
             const isOwn = note.authorId != null && note.authorId === currentUserId;
             const firstName = note.authorName?.split(' ')[0] || 'Usuario';
             return (
-              <div key={note.id} className={cn("rounded px-2 py-1 text-[11px]", isOwn ? "bg-slate-50" : "bg-teal-50/60")}>
-                <span className={cn("font-medium", isOwn ? "text-slate-500" : "text-teal-600")}>{firstName}</span>
-                <span className="text-slate-400 ml-1 text-[9px]">{shortDateTime(note.createdAt)}</span>
-                <p className="text-slate-700 leading-snug mt-0.5">{note.content}</p>
+              <div key={note.id} className={cn("group flex gap-1.5 items-start rounded px-2 py-1 text-[11px]", isOwn ? "bg-slate-50" : "bg-teal-50/60")}>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1">
+                    <span className={cn("font-medium", isOwn ? "text-slate-500" : "text-teal-600")}>{firstName}</span>
+                    <span className="text-slate-400 text-[9px]">{shortDateTime(note.createdAt)}</span>
+                  </div>
+                  {editingNoteId === note.id ? (
+                    <div className="space-y-1 mt-0.5">
+                      <textarea value={editNoteText} onChange={e => setEditNoteText(e.target.value)} autoFocus
+                        onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (editNoteText.trim()) editNoteMutation.mutate({ noteId: note.id, content: editNoteText }); } else if (e.key === 'Escape') setEditingNoteId(null); }}
+                        className="w-full text-[11px] border border-indigo-300 rounded px-2 py-1 focus:outline-none resize-none" rows={2} />
+                      <div className="flex gap-1">
+                        <button disabled={!editNoteText.trim() || editNoteMutation.isPending}
+                          onClick={() => editNoteMutation.mutate({ noteId: note.id, content: editNoteText })}
+                          className="text-[10px] bg-indigo-600 hover:bg-indigo-700 text-white rounded px-2 py-0.5 disabled:opacity-50">
+                          {editNoteMutation.isPending ? '...' : 'Guardar'}
+                        </button>
+                        <button onClick={() => setEditingNoteId(null)} className="text-[10px] text-slate-500 rounded px-2 py-0.5 hover:bg-slate-100">Cancelar</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-slate-700 leading-snug mt-0.5">{note.content}</p>
+                  )}
+                </div>
+                {isOwn && editingNoteId !== note.id && (
+                  <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-0.5">
+                    <button onClick={() => { setEditingNoteId(note.id); setEditNoteText(note.content); }} className="p-0.5 text-slate-300 hover:text-indigo-400">
+                      <Pencil className="h-3 w-3" />
+                    </button>
+                    <button onClick={() => deleteNoteMutation.mutate(note.id)} className="p-0.5 text-slate-300 hover:text-red-400">
+                      <Trash2 className="h-3 w-3" />
+                    </button>
+                  </div>
+                )}
               </div>
             );
           })}
@@ -815,10 +912,10 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
             <span className="font-medium text-[13px] text-slate-800 truncate" title={item.title}>{item.title}</span>
             {item.subtitle && <span className="text-slate-400 text-xs truncate hidden sm:inline" title={item.subtitle}> · {item.subtitle}</span>}
             <span className="shrink-0 hidden sm:inline"><FreshnessIndicator updatedAt={item.updatedAt} updatedByName={item.updatedByName} updatedById={item.updatedById} currentUserId={currentUserId} /></span>
-            <span className="hidden lg:inline text-xs text-slate-400 truncate max-w-[300px] ml-1" title={item.currentAction ?? undefined}>
-              {item.currentAction && `— ${item.currentAction}`}
-            </span>
           </div>
+          {item.currentAction && (
+            <p className="hidden lg:block text-xs text-slate-400 line-clamp-2 mt-0.5 ml-0.5">— {item.currentAction}</p>
+          )}
           {decMeta.urgent && (item.mainRisk || item.currentAction) && !expanded && (
             <p className="text-[11px] text-slate-400 truncate mt-0.5 ml-0.5">
               {item.mainRisk || item.currentAction}
