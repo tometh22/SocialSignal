@@ -985,11 +985,13 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
           </div>
           {!expanded && (
             <p
-              className="text-[11px] text-slate-400 truncate mt-0.5 hover:text-indigo-500 cursor-pointer"
+              className="text-[11px] text-slate-500 truncate mt-0.5 hover:text-indigo-600 cursor-pointer transition-colors"
               title={item.currentAction ? `${item.currentAction} — click para editar` : "Click para agregar update"}
               onClick={e => { e.stopPropagation(); onToggle(); }}
             >
-              {item.currentAction ? `— ${item.currentAction}` : <span className="italic text-slate-300">+ agregar update</span>}
+              {item.currentAction
+                ? item.currentAction
+                : <span className="italic text-slate-300">+ agregar update</span>}
             </p>
           )}
         </div>
@@ -1032,44 +1034,56 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.2, ease: 'easeOut' }}
+            transition={{ duration: 0.18, ease: 'easeOut' }}
             className="overflow-hidden">
-            <div className="px-4 pb-3 pt-1 ml-5 border-l-2 border-slate-200/80">
+            <div className="px-4 pb-3 pt-2 ml-5 border-l-2 border-slate-200/80 space-y-2">
+              {/* Custom item: title + description in a grid */}
               {item.isCustom && (
-                <div className="mb-2 space-y-1.5">
-                  <div>
-                    <p className="text-[10px] text-slate-400 font-semibold mb-0.5">Título</p>
-                    <InlineText value={item.title} placeholder="Título del ítem" onSave={v => onUpdate({ title: v })} className="text-xs font-medium" />
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="rounded-lg bg-indigo-50/60 px-2.5 py-2 border border-indigo-100">
+                    <p className="text-[9px] font-bold tracking-wider uppercase text-indigo-400 mb-1">Título</p>
+                    <InlineText value={item.title} placeholder="Título del ítem" onSave={v => onUpdate({ title: v })} className="text-xs font-semibold" />
                   </div>
-                  <div>
-                    <p className="text-[10px] text-slate-400 font-semibold mb-0.5">Descripción</p>
-                    <InlineText value={item.subtitle} placeholder="Descripción o contexto del ítem..." onSave={v => onUpdate({ subtitle: v })} multiline className="text-xs" />
+                  <div className="rounded-lg bg-indigo-50/60 px-2.5 py-2 border border-indigo-100">
+                    <p className="text-[9px] font-bold tracking-wider uppercase text-indigo-400 mb-1">Descripción</p>
+                    <InlineText value={item.subtitle} placeholder="Contexto del ítem..." onSave={v => onUpdate({ subtitle: v })} multiline className="text-xs" />
                   </div>
                 </div>
               )}
 
-              <div className="mb-2">
-                <p className="text-[10px] text-slate-400 font-semibold mb-0.5">Riesgo principal</p>
-                <InlineText value={item.mainRisk} placeholder="Agregar riesgo..." onSave={v => onUpdate({ mainRisk: v })} className="text-xs" />
-              </div>
-
-              <div className="grid grid-cols-2 gap-2 mb-2">
-                <UpdateTimeline
-                  projectId={item.projectId}
-                  customId={item.customId}
-                  currentAction={item.currentAction}
-                  currentUserId={currentUserId}
-                  users={users}
-                />
-                <div>
-                  <p className="text-[10px] text-slate-400 font-semibold mb-0.5">Próximo paso</p>
-                  <InlineText value={item.nextMilestone} placeholder="Acción esta semana" onSave={v => onUpdate({ nextMilestone: v })} multiline className="text-xs" />
+              {/* Estado actual + Próximo paso — the two most important fields */}
+              <div className="grid grid-cols-2 gap-2">
+                <div className={cn("rounded-lg px-2.5 py-2 border",
+                  item.healthStatus === 'rojo' ? "bg-red-50 border-red-100" :
+                  item.healthStatus === 'amarillo' ? "bg-amber-50 border-amber-100" :
+                  "bg-slate-50 border-slate-100")}>
+                  <p className="text-[9px] font-bold tracking-wider uppercase text-slate-400 mb-1">Estado actual</p>
+                  <InlineText value={item.currentAction} placeholder="¿Qué está pasando ahora?" onSave={v => onUpdate({ currentAction: v })} multiline className="text-xs" />
+                </div>
+                <div className="rounded-lg bg-slate-50 px-2.5 py-2 border border-slate-100">
+                  <p className="text-[9px] font-bold tracking-wider uppercase text-slate-400 mb-1">Próximo paso</p>
+                  <InlineText value={item.nextMilestone} placeholder="Acción concreta esta semana" onSave={v => onUpdate({ nextMilestone: v })} multiline className="text-xs" />
                 </div>
               </div>
 
-              <div className="flex items-center gap-3 pt-2 border-t border-slate-100">
+              {/* Riesgo — always editable, orange when populated, dashed when empty */}
+              <div className={cn("flex items-start gap-1.5 rounded-lg px-2.5 py-2 border transition-colors",
+                item.mainRisk ? "bg-orange-50 border-orange-100" : "bg-slate-50 border-dashed border-slate-200")}>
+                <Shield className={cn("h-3 w-3 shrink-0 mt-0.5", item.mainRisk ? "text-orange-500" : "text-slate-300")} />
+                <div className="flex-1 min-w-0">
+                  <p className={cn("text-[9px] font-bold tracking-wider uppercase mb-1", item.mainRisk ? "text-orange-500" : "text-slate-400")}>Riesgo principal</p>
+                  <InlineText value={item.mainRisk} placeholder="¿Cuál es el riesgo principal?" onSave={v => onUpdate({ mainRisk: v })} className="text-xs" />
+                </div>
+              </div>
+
+              {/* Footer: owner, deadline, badges, nav, notes */}
+              <div className="flex items-center gap-1.5 pt-1.5 border-t border-slate-100 flex-wrap">
+                <OwnerSelect value={item.ownerId} name={item.ownerName} onChange={v => onUpdate({ ownerId: v })} users={users} />
+                <DeadlinePicker value={item.deadline} isOverdue={item.isOverdue} onChange={v => onUpdate({ deadline: v })} />
+                <div className="h-3 w-px bg-slate-200 mx-0.5 shrink-0" />
                 <LevelBadge value={item.marginStatus} onChange={v => onUpdate({ marginStatus: v })} label="Rentabilidad" type="margin" />
                 <LevelBadge value={item.teamStrain} onChange={v => onUpdate({ teamStrain: v })} label="Carga equipo" type="team" />
+                <DecisionBadge value={item.decisionNeeded} onChange={v => onUpdate({ decisionNeeded: v })} />
                 <div className="flex-1" />
                 {(hasPrev || hasNext) && (
                   <div className="flex items-center gap-0.5">
@@ -1083,16 +1097,19 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
                     </button>
                   </div>
                 )}
+                {onOpenNotes && (
+                  <button onClick={onOpenNotes}
+                    className={cn("flex items-center gap-1 text-[11px] rounded-md px-2 py-1 transition-colors font-medium",
+                      isSelected ? "text-indigo-600 bg-indigo-50" :
+                      item.noteCount > 0 ? "text-indigo-500 hover:bg-indigo-50" :
+                      "text-slate-400 hover:text-slate-600 hover:bg-slate-100")}>
+                    <MessageSquare className="h-3 w-3" />
+                    {item.noteCount > 0
+                      ? <span className="text-[10px]">{item.noteCount}</span>
+                      : <span className="text-[10px]">Notas</span>}
+                  </button>
+                )}
               </div>
-
-              {/* Inline chat */}
-              <InlineChat
-                projectId={item.projectId}
-                customId={item.customId}
-                currentUserId={currentUserId}
-                onOpenFullChat={onOpenNotes}
-                users={users}
-              />
             </div>
           </motion.div>
         )}
@@ -2286,6 +2303,39 @@ export default function StatusSemanalPage() {
             })()
           ) : (
             <div className="max-w-6xl mx-auto px-6 py-3 space-y-3">
+
+              {/* ── Executive pulse bar ─────────────────────────────── */}
+              {(criticalCount > 0 || decisionCount > 0 || normalItems.some(i => isStale(i.updatedAt))) && (
+                <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-white border border-slate-100 shadow-sm text-[11px] flex-wrap">
+                  {criticalCount > 0 && (
+                    <span className="flex items-center gap-1.5 text-red-600 font-semibold">
+                      <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse inline-block" />
+                      {criticalCount} {criticalCount === 1 ? 'crítico' : 'críticos'}
+                    </span>
+                  )}
+                  {criticalCount > 0 && decisionCount > 0 && <span className="text-slate-200">·</span>}
+                  {decisionCount > 0 && (
+                    <span className="flex items-center gap-1.5 text-amber-600 font-semibold">
+                      <Zap className="h-3 w-3" />
+                      {decisionCount} {decisionCount === 1 ? 'decisión pendiente' : 'decisiones pendientes'}
+                    </span>
+                  )}
+                  {(() => {
+                    const staleCount = normalItems.filter(i => isStale(i.updatedAt)).length;
+                    return staleCount > 0 ? (
+                      <>
+                        <span className="text-slate-200">·</span>
+                        <span className="flex items-center gap-1.5 text-slate-500 font-medium">
+                          <Clock className="h-3 w-3" />
+                          {staleCount} sin update reciente
+                        </span>
+                      </>
+                    ) : null;
+                  })()}
+                  <div className="flex-1" />
+                  <span className="text-slate-400">{normalItems.length} en curso · {visible.length} total</span>
+                </div>
+              )}
 
               {/* ── Requieren atención (hidden when empty) ──────────── */}
               {alertItems.length > 0 && (
