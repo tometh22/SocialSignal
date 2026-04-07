@@ -18,8 +18,17 @@ import {
   Circle, MoreHorizontal, Plus, Tag,
   Sparkles, Brain, TrendingUp, TrendingDown,
   Shield, Target, RefreshCw, Lightbulb, ArrowRight,
-  Calendar, Clock, Search, Filter
+  Calendar, Clock, Search, Filter, GripVertical,
+  Printer, List, LayoutList, HelpCircle, CheckSquare, Square
 } from "lucide-react";
+import {
+  DndContext, closestCenter, DragOverlay,
+  type DragStartEvent, type DragEndEvent
+} from "@dnd-kit/core";
+import {
+  SortableContext, verticalListSortingStrategy, useSortable, arrayMove
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -262,6 +271,92 @@ async function mutationFetch(url: string, method: string, body?: any) {
   return text ? JSON.parse(text) : null;
 }
 
+// ─── MentionInput ────────────────────────────────────────────────────────────
+
+function MentionInput({ value, onChange, onKeyDown, placeholder, className, users = [] }: {
+  value: string;
+  onChange: (v: string) => void;
+  onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
+  placeholder?: string;
+  className?: string;
+  users?: AppUser[];
+}) {
+  const [showMentions, setShowMentions] = useState(false);
+  const [mentionFilter, setMentionFilter] = useState('');
+  const [mentionStart, setMentionStart] = useState(-1);
+  const [menuIdx, setMenuIdx] = useState(0);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const filtered = users.filter(u =>
+    !mentionFilter || u.name.toLowerCase().startsWith(mentionFilter.toLowerCase())
+  ).slice(0, 6);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const v = e.target.value;
+    onChange(v);
+    const pos = e.target.selectionStart ?? v.length;
+    const lastAt = v.lastIndexOf('@', pos - 1);
+    if (lastAt >= 0) {
+      const fragment = v.slice(lastAt + 1, pos);
+      if (!fragment.includes(' ')) {
+        setMentionStart(lastAt);
+        setMentionFilter(fragment);
+        setShowMentions(true);
+        setMenuIdx(0);
+        return;
+      }
+    }
+    setShowMentions(false);
+  };
+
+  const selectUser = (user: AppUser) => {
+    const before = value.slice(0, mentionStart);
+    const after = value.slice(mentionStart + 1 + mentionFilter.length);
+    const firstName = user.name.split(' ')[0];
+    onChange(`${before}@${firstName} ${after}`);
+    setShowMentions(false);
+    setTimeout(() => inputRef.current?.focus(), 0);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (showMentions && filtered.length > 0) {
+      if (e.key === 'ArrowDown') { e.preventDefault(); setMenuIdx(i => Math.min(i + 1, filtered.length - 1)); return; }
+      if (e.key === 'ArrowUp') { e.preventDefault(); setMenuIdx(i => Math.max(i - 1, 0)); return; }
+      if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); selectUser(filtered[menuIdx]); return; }
+      if (e.key === 'Escape') { setShowMentions(false); return; }
+    }
+    onKeyDown?.(e);
+  };
+
+  return (
+    <div className="relative flex-1">
+      <input
+        ref={inputRef}
+        value={value}
+        onChange={handleChange}
+        onKeyDown={handleKeyDown}
+        onBlur={() => setTimeout(() => setShowMentions(false), 150)}
+        placeholder={placeholder}
+        className={className}
+      />
+      {showMentions && filtered.length > 0 && (
+        <div className="absolute bottom-full left-0 mb-1 z-50 bg-white border border-slate-200 rounded-lg shadow-lg min-w-[140px] py-1 overflow-hidden">
+          {filtered.map((u, i) => (
+            <button key={u.id} onMouseDown={() => selectUser(u)}
+              className={cn("w-full flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-indigo-50 text-left",
+                i === menuIdx && "bg-indigo-50")}>
+              <div className="h-5 w-5 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-[9px] font-bold shrink-0">
+                {initials(u.name)}
+              </div>
+              {u.name.split(' ')[0]}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Inline editor ────────────────────────────────────────────────────────────
 
 function InlineText({ value, placeholder, onSave, multiline = false, className = '' }: {
@@ -313,9 +408,9 @@ function InlineText({ value, placeholder, onSave, multiline = false, className =
 
 type UpdateEntry = { id: number; content: string; authorId: number | null; authorName: string | null; createdAt: string };
 
-function UpdateTimeline({ projectId, customId, currentAction, currentUserId, onActionUpdated }: {
+function UpdateTimeline({ projectId, customId, currentAction, currentUserId, onActionUpdated, users = [] }: {
   projectId?: number; customId?: number; currentAction: string | null; currentUserId?: number | null;
-  onActionUpdated?: () => void;
+  onActionUpdated?: () => void; users?: AppUser[];
 }) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -375,12 +470,13 @@ function UpdateTimeline({ projectId, customId, currentAction, currentUserId, onA
       <p className="text-[10px] text-slate-400 font-semibold mb-1">Update</p>
       {/* Add new update input */}
       <div className="flex gap-1.5 mb-1.5">
-        <input
+        <MentionInput
           value={draft}
-          onChange={e => setDraft(e.target.value)}
+          onChange={setDraft}
           onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); submit(); } }}
           placeholder="Escribir update..."
           className="flex-1 text-xs border border-slate-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-400 bg-white"
+          users={users}
         />
         <button onClick={submit} disabled={!draft.trim() || addMutation.isPending}
           className={cn("px-2 py-1 rounded text-xs font-medium transition-colors",
@@ -457,8 +553,8 @@ function UpdateTimeline({ projectId, customId, currentAction, currentUserId, onA
 
 // ─── Inline Chat (last messages + quick reply) ───────────────────────────────
 
-function InlineChat({ projectId, customId, currentUserId, onOpenFullChat }: {
-  projectId?: number; customId?: number; currentUserId?: number | null; onOpenFullChat?: () => void;
+function InlineChat({ projectId, customId, currentUserId, onOpenFullChat, users = [] }: {
+  projectId?: number; customId?: number; currentUserId?: number | null; onOpenFullChat?: () => void; users?: AppUser[];
 }) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -534,12 +630,13 @@ function InlineChat({ projectId, customId, currentUserId, onOpenFullChat }: {
       )}
       {/* Quick reply */}
       <div className="flex gap-1">
-        <input
+        <MentionInput
           value={msg}
-          onChange={e => setMsg(e.target.value)}
+          onChange={setMsg}
           onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); submit(); } }}
           placeholder="Escribir mensaje..."
           className="flex-1 text-[11px] border border-slate-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-400 bg-white"
+          users={users}
         />
         <button onClick={submit} disabled={!msg.trim() || addMutation.isPending}
           className={cn("p-1 rounded transition-colors",
@@ -845,10 +942,11 @@ function AlertCard({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, c
 
 // ─── Compact row (Verde) ──────────────────────────────────────────────────────
 
-function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, expanded, onToggle, onNext, onPrev, hasNext, hasPrev, currentUserId }: {
+function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, expanded, onToggle, onNext, onPrev, hasNext, hasPrev, currentUserId, kbFocused, dragHandleProps, bulkMode, checked, onCheck }: {
   item: Item; users: AppUser[]; isSelected: boolean; currentUserId?: number | null;
   onOpenNotes?: () => void; onUpdate: (d: Record<string, any>) => void; onRemove: () => void;
   expanded: boolean; onToggle: () => void; onNext?: () => void; onPrev?: () => void; hasNext?: boolean; hasPrev?: boolean;
+  kbFocused?: boolean; dragHandleProps?: Record<string, any>; bulkMode?: boolean; checked?: boolean; onCheck?: (v: boolean) => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const decMeta = dm(item.decisionNeeded);
@@ -857,10 +955,23 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
     <div className={cn(
       "border-b border-slate-100 last:border-0 transition-all",
       isSelected ? "bg-indigo-50/70" : "hover:bg-slate-50/60",
-      expanded && "bg-slate-50/40"
+      expanded && "bg-slate-50/40",
+      kbFocused && "ring-2 ring-inset ring-indigo-400"
     )}>
       {/* Main row — minimal: dot + name + owner + deadline */}
       <div className="flex items-center gap-2.5 px-4 py-2 cursor-pointer" onClick={onToggle}>
+        {dragHandleProps && (
+          <div {...dragHandleProps} className="shrink-0 cursor-grab text-slate-300 hover:text-slate-500 touch-none" onClick={e => e.stopPropagation()}>
+            <GripVertical className="h-3.5 w-3.5" />
+          </div>
+        )}
+        {bulkMode && (
+          <div className="shrink-0" onClick={e => { e.stopPropagation(); onCheck?.(!checked); }}>
+            {checked
+              ? <CheckSquare className="h-4 w-4 text-indigo-500" />
+              : <Square className="h-4 w-4 text-slate-300" />}
+          </div>
+        )}
         <div className="shrink-0" onClick={e => e.stopPropagation()}>
           <HealthDot value={item.healthStatus} onChange={v => onUpdate({ healthStatus: v })} compact />
         </div>
@@ -942,6 +1053,7 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
                   customId={item.customId}
                   currentAction={item.currentAction}
                   currentUserId={currentUserId}
+                  users={users}
                 />
                 <div>
                   <p className="text-[10px] text-slate-400 font-semibold mb-0.5">Próximo paso</p>
@@ -973,6 +1085,7 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
                 customId={item.customId}
                 currentUserId={currentUserId}
                 onOpenFullChat={onOpenNotes}
+                users={users}
               />
             </div>
           </motion.div>
