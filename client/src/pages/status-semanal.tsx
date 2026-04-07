@@ -280,9 +280,17 @@ function InlineText({ value, placeholder, onSave, multiline = false, className =
   if (editing) {
     const cls = `w-full text-sm border border-indigo-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-400 bg-white resize-none ${className}`;
     return multiline
-      ? <textarea ref={ref} value={draft} onChange={e => setDraft(e.target.value)} onBlur={save}
-          onKeyDown={e => e.key === 'Escape' && (setDraft(value ?? ''), setEditing(false))}
-          className={cls} rows={2} />
+      ? (
+        <>
+          <textarea ref={ref} value={draft} onChange={e => setDraft(e.target.value)} onBlur={save}
+            onKeyDown={e => {
+              if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); save(); }
+              if (e.key === 'Escape') { setDraft(value ?? ''); setEditing(false); }
+            }}
+            className={cls} rows={2} />
+          <p className="text-[9px] text-slate-400 mt-0.5">Ctrl+Enter para guardar · Esc para cancelar</p>
+        </>
+      )
       : <input ref={ref} value={draft} onChange={e => setDraft(e.target.value)} onBlur={save}
           onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); save(); } if (e.key === 'Escape') { setDraft(value ?? ''); setEditing(false); } }}
           className={cls} />;
@@ -591,8 +599,8 @@ function LevelBadge({ value, onChange, label, type, showLabel = false }: { value
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button title={tooltipLabel}>
-          <Badge variant="outline" className={cn("text-[10px] h-4 cursor-pointer border font-semibold hover:opacity-80", meta.color)}>
-            <span className="opacity-60 mr-0.5">{type === 'margin' ? '$' : 'Eq.'}</span>{meta.label}
+          <Badge variant="outline" className={cn("text-[10px] h-5 cursor-pointer border font-semibold hover:opacity-80 px-1.5", meta.color)}>
+            <span className="opacity-70 mr-1">{type === 'margin' ? 'Margen' : 'Equipo'}</span>{meta.label}
           </Badge>
         </button>
       </PopoverTrigger>
@@ -647,10 +655,9 @@ function OwnerSelect({ value, name, onChange, users }: {
               <span className="text-xs font-medium truncate">{name.split(' ')[0]}</span>
             </>
           ) : (
-            <>
-              <div className="h-5 w-5 rounded-full bg-slate-100 flex items-center justify-center shrink-0"><User className="h-3 w-3 text-slate-400" /></div>
-              <span className="text-xs text-slate-400">Owner</span>
-            </>
+            <div className="h-5 w-5 rounded-full bg-slate-100 flex items-center justify-center shrink-0" title="Asignar owner">
+              <User className="h-3 w-3 text-slate-400" />
+            </div>
           )}
         </div>
       </SelectTrigger>
@@ -689,9 +696,9 @@ function DeadlinePicker({ value, isOverdue, onChange }: {
   if (!value) {
     return (
       <button onClick={() => inputRef.current?.showPicker()}
-        className="flex items-center gap-1 text-[11px] text-slate-400 hover:text-indigo-600 transition-colors relative">
+        className="flex items-center gap-1 text-[11px] text-slate-400 hover:text-indigo-600 transition-colors relative"
+        title="Agregar fecha límite">
         <Calendar className="h-3 w-3" />
-        <span>Deadline</span>
         <input ref={inputRef} type="date"
           className="absolute inset-0 opacity-0 cursor-pointer w-full"
           onChange={e => e.target.value && onChange(new Date(e.target.value).toISOString())} />
@@ -871,9 +878,7 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
 
         <div className="flex items-center gap-1 shrink-0" onClick={e => e.stopPropagation()}>
           {decMeta.urgent && (
-            <Badge variant="outline" className={cn("text-[9px] h-4 border font-semibold", decMeta.color)}>
-              <span className="opacity-60 mr-0.5">Dec.</span>{decMeta.label}
-            </Badge>
+            <DecisionBadge value={item.decisionNeeded} onChange={v => onUpdate({ decisionNeeded: v })} />
           )}
           <OwnerSelect value={item.ownerId} name={item.ownerName} onChange={v => onUpdate({ ownerId: v })} users={users} />
           <DeadlinePicker value={item.deadline} isOverdue={item.isOverdue} onChange={v => onUpdate({ deadline: v })} />
@@ -912,12 +917,17 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
             transition={{ duration: 0.2, ease: 'easeOut' }}
             className="overflow-hidden">
             <div className="px-4 pb-3 pt-1 ml-5 border-l-2 border-slate-200/80">
-              {item.mainRisk && (
+              {item.isCustom && (
                 <div className="mb-2">
-                  <p className="text-[10px] text-slate-400 font-semibold mb-0.5">Riesgo</p>
-                  <InlineText value={item.mainRisk} placeholder="Riesgo principal" onSave={v => onUpdate({ mainRisk: v })} className="text-xs" />
+                  <p className="text-[10px] text-slate-400 font-semibold mb-0.5">Título</p>
+                  <InlineText value={item.title} placeholder="Título del ítem" onSave={v => onUpdate({ title: v })} className="text-xs font-medium" />
                 </div>
               )}
+
+              <div className="mb-2">
+                <p className="text-[10px] text-slate-400 font-semibold mb-0.5">Riesgo principal</p>
+                <InlineText value={item.mainRisk} placeholder="Agregar riesgo..." onSave={v => onUpdate({ mainRisk: v })} className="text-xs" />
+              </div>
 
               <div className="grid grid-cols-2 gap-2 mb-2">
                 <UpdateTimeline
@@ -932,10 +942,9 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
+              <div className="flex items-center gap-3 pt-2 border-t border-slate-100">
                 <LevelBadge value={item.marginStatus} onChange={v => onUpdate({ marginStatus: v })} label="Rentabilidad" type="margin" />
                 <LevelBadge value={item.teamStrain} onChange={v => onUpdate({ teamStrain: v })} label="Carga equipo" type="team" />
-                <DecisionBadge value={item.decisionNeeded} onChange={v => onUpdate({ decisionNeeded: v })} />
                 <div className="flex-1" />
                 {(hasPrev || hasNext) && (
                   <div className="flex items-center gap-0.5">
