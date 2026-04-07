@@ -298,9 +298,12 @@ function InlineText({ value, placeholder, onSave, multiline = false, className =
 
   return (
     <span onClick={() => setEditing(true)}
-      className={cn("group cursor-text rounded hover:bg-slate-100 px-1 py-0.5 transition-colors min-h-[22px] inline-flex items-center gap-1",
-        value ? "text-slate-800" : "text-slate-400 italic", className)}>
-      <span>{value || placeholder}</span>
+      className={cn(
+        "group cursor-text rounded px-2 py-1 transition-colors min-h-[28px] inline-flex items-center gap-1 w-full",
+        "border border-dashed border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/40",
+        value ? "text-slate-800" : "text-slate-400 italic", className
+      )}>
+      <span className="flex-1">{value || placeholder}</span>
       <Pencil className="h-2.5 w-2.5 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
     </span>
   );
@@ -869,9 +872,13 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
             {item.subtitle && <span className="text-slate-400 text-xs truncate" title={item.subtitle}> · {item.subtitle}</span>}
             <span className="shrink-0"><FreshnessIndicator updatedAt={item.updatedAt} updatedByName={item.updatedByName} updatedById={item.updatedById} currentUserId={currentUserId} /></span>
           </div>
-          {item.currentAction && !expanded && (
-            <p className="text-[11px] text-slate-400 truncate mt-0.5" title={item.currentAction}>
-              — {item.currentAction}
+          {!expanded && (
+            <p
+              className="text-[11px] text-slate-400 truncate mt-0.5 hover:text-indigo-500 cursor-pointer"
+              title={item.currentAction ? `${item.currentAction} — click para editar` : "Click para agregar update"}
+              onClick={e => { e.stopPropagation(); onToggle(); }}
+            >
+              {item.currentAction ? `— ${item.currentAction}` : <span className="italic text-slate-300">+ agregar update</span>}
             </p>
           )}
         </div>
@@ -2024,7 +2031,17 @@ export default function StatusSemanalPage() {
                     normalItems.length > 0 ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-slate-100 text-slate-400 border-slate-200")}>
                     {normalItems.length}
                   </span>
+                  {(() => { const staleCount = normalItems.filter(i => isStale(i.updatedAt)).length; return staleCount > 0 ? (
+                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full border bg-amber-50 text-amber-600 border-amber-200" title={`${staleCount} ítems sin actualizar en 5+ días`}>
+                      ⚠ {staleCount} sin update
+                    </span>
+                  ) : null; })()}
                   <AddItemButton variant="inline" onAdd={(title, subtitle) => createCustom.mutate({ title, subtitle })} />
+                  {expandedRowKey && (
+                    <button onClick={() => setExpandedRowKey(null)} className="ml-auto text-[10px] text-slate-400 hover:text-slate-600 font-medium">
+                      Colapsar todo
+                    </button>
+                  )}
                 </div>
                 {normalItems.length === 0 ? (
                   <div className="flex items-center gap-2 py-2.5 px-3 rounded-lg border border-dashed border-slate-200 bg-slate-50 text-slate-400">
