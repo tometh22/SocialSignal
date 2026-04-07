@@ -290,10 +290,10 @@ function InlineText({ value, placeholder, onSave, multiline = false, className =
 
   return (
     <span onClick={() => setEditing(true)}
-      className={cn("cursor-text rounded hover:bg-slate-100 px-1 py-0.5 transition-colors min-h-[22px] inline-block",
-        value ? "text-slate-800" : "text-slate-400 italic", className)}
-      title="Click para editar">
-      {value || placeholder}
+      className={cn("group cursor-text rounded hover:bg-slate-100 px-1 py-0.5 transition-colors min-h-[22px] inline-flex items-center gap-1",
+        value ? "text-slate-800" : "text-slate-400 italic", className)}>
+      <span>{value || placeholder}</span>
+      <Pencil className="h-2.5 w-2.5 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
     </span>
   );
 }
@@ -310,6 +310,8 @@ function UpdateTimeline({ projectId, customId, currentAction, currentUserId, onA
   const { toast } = useToast();
   const [draft, setDraft] = useState('');
   const [showAll, setShowAll] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editText, setEditText] = useState('');
 
   const updatesUrl = projectId
     ? `/api/status-semanal/${projectId}/updates`
@@ -332,6 +334,19 @@ function UpdateTimeline({ projectId, customId, currentAction, currentUserId, onA
       onActionUpdated?.();
     },
     onError: (err: Error) => toast({ title: 'Error', description: err.message, variant: 'destructive' }),
+  });
+
+  const editMutation = useMutation({
+    mutationFn: ({ entryId, content }: { entryId: number; content: string }) =>
+      mutationFetch(`/api/status-semanal/updates/${entryId}`, 'PATCH', { content }),
+    onSuccess: () => {
+      setEditingId(null);
+      queryClient.refetchQueries({ queryKey: cacheKey });
+      queryClient.refetchQueries({ queryKey: ['/api/status-semanal'] });
+      if (customId) queryClient.refetchQueries({ queryKey: ['/api/status-semanal/custom'] });
+      onActionUpdated?.();
+    },
+    onError: (err: Error) => toast({ title: 'Error al editar', description: err.message, variant: 'destructive' }),
   });
 
   const submit = () => {
@@ -369,12 +384,43 @@ function UpdateTimeline({ projectId, customId, currentAction, currentUserId, onA
             const isOwn = entry.authorId != null && entry.authorId === currentUserId;
             const firstName = entry.authorName?.split(' ')[0] || 'Usuario';
             return (
-              <div key={entry.id} className={cn("rounded px-2 py-1 text-xs", isOwn ? "bg-slate-50" : "bg-indigo-50/60")}>
+              <div key={entry.id} className={cn("group rounded px-2 py-1 text-xs", isOwn ? "bg-slate-50" : "bg-indigo-50/60")}>
                 <div className="flex items-center gap-1 mb-0.5">
                   <span className={cn("font-medium text-[10px]", isOwn ? "text-slate-500" : "text-indigo-600")}>{firstName}</span>
                   <span className="text-[9px] text-slate-400">{shortDateTime(entry.createdAt)}</span>
+                  {isOwn && editingId !== entry.id && (
+                    <button onClick={() => { setEditingId(entry.id); setEditText(entry.content); }}
+                      className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity p-0.5 text-slate-300 hover:text-indigo-400">
+                      <Pencil className="h-2.5 w-2.5" />
+                    </button>
+                  )}
                 </div>
-                <p className="text-slate-700 leading-snug whitespace-pre-wrap">{entry.content}</p>
+                {editingId === entry.id ? (
+                  <div className="space-y-1">
+                    <input
+                      value={editText}
+                      autoFocus
+                      onChange={e => setEditText(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') { e.preventDefault(); if (editText.trim()) editMutation.mutate({ entryId: entry.id, content: editText }); }
+                        if (e.key === 'Escape') setEditingId(null);
+                      }}
+                      className="w-full text-xs border border-indigo-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-400 bg-white"
+                    />
+                    <div className="flex gap-1">
+                      <button onClick={() => { if (editText.trim()) editMutation.mutate({ entryId: entry.id, content: editText }); }}
+                        disabled={!editText.trim() || editMutation.isPending}
+                        className="px-2 py-0.5 bg-indigo-600 text-white rounded text-[10px] hover:bg-indigo-700 disabled:opacity-40">
+                        {editMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Guardar'}
+                      </button>
+                      <button onClick={() => setEditingId(null)} className="px-2 py-0.5 bg-slate-100 text-slate-500 rounded text-[10px] hover:bg-slate-200">
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-slate-700 leading-snug whitespace-pre-wrap">{entry.content}</p>
+                )}
               </div>
             );
           })}
@@ -810,18 +856,15 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
         </div>
 
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 min-w-0">
             {item.isCustom && <Tag className="h-3 w-3 text-indigo-400 shrink-0" />}
             <span className="font-medium text-[13px] text-slate-800 truncate" title={item.title}>{item.title}</span>
-            {item.subtitle && <span className="text-slate-400 text-xs truncate hidden sm:inline" title={item.subtitle}> · {item.subtitle}</span>}
-            <span className="shrink-0 hidden sm:inline"><FreshnessIndicator updatedAt={item.updatedAt} updatedByName={item.updatedByName} updatedById={item.updatedById} currentUserId={currentUserId} /></span>
-            <span className="hidden lg:inline text-xs text-slate-400 truncate max-w-[300px] ml-1" title={item.currentAction ?? undefined}>
-              {item.currentAction && `— ${item.currentAction}`}
-            </span>
+            {item.subtitle && <span className="text-slate-400 text-xs truncate" title={item.subtitle}> · {item.subtitle}</span>}
+            <span className="shrink-0"><FreshnessIndicator updatedAt={item.updatedAt} updatedByName={item.updatedByName} updatedById={item.updatedById} currentUserId={currentUserId} /></span>
           </div>
-          {decMeta.urgent && (item.mainRisk || item.currentAction) && !expanded && (
-            <p className="text-[11px] text-slate-400 truncate mt-0.5 ml-0.5">
-              {item.mainRisk || item.currentAction}
+          {item.currentAction && !expanded && (
+            <p className="text-[11px] text-slate-400 truncate mt-0.5" title={item.currentAction}>
+              — {item.currentAction}
             </p>
           )}
         </div>
