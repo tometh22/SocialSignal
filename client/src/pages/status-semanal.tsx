@@ -1097,6 +1097,14 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
 
 // ─── Add custom item dialog ───────────────────────────────────────────────────
 
+const ITEM_TEMPLATES = [
+  { label: 'Reunión de cierre', subtitle: 'Seguimiento comercial' },
+  { label: 'Propuesta comercial', subtitle: '' },
+  { label: 'Demo de producto', subtitle: '' },
+  { label: 'Negociación contrato', subtitle: '' },
+  { label: 'Seguimiento cliente', subtitle: '' },
+];
+
 function AddItemButton({ onAdd, variant = 'header' }: { onAdd: (title: string, subtitle: string) => void; variant?: 'header' | 'inline' }) {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState('');
@@ -1123,7 +1131,19 @@ function AddItemButton({ onAdd, variant = 'header' }: { onAdd: (title: string, s
         )}
       </PopoverTrigger>
       <PopoverContent className="w-72 p-3" align={variant === 'inline' ? 'start' : 'end'}>
-        <p className="text-sm font-semibold mb-3">Nuevo ítem de seguimiento</p>
+        <p className="text-sm font-semibold mb-2">Nuevo ítem de seguimiento</p>
+        {/* Templates */}
+        <div className="mb-3">
+          <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wide mb-1.5">Plantillas</p>
+          <div className="flex flex-wrap gap-1">
+            {ITEM_TEMPLATES.map(t => (
+              <button key={t.label} onClick={() => { setTitle(t.label); setSubtitle(t.subtitle); }}
+                className="text-[11px] px-2 py-1 rounded-md border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition-colors font-medium">
+                {t.label}
+              </button>
+            ))}
+          </div>
+        </div>
         <div className="space-y-2">
           <div>
             <label className="text-[10px] text-slate-400 uppercase font-bold tracking-wide mb-1 block">Título *</label>
@@ -1150,6 +1170,23 @@ function AddItemButton({ onAdd, variant = 'header' }: { onAdd: (title: string, s
         </div>
       </PopoverContent>
     </Popover>
+  );
+}
+
+// ─── SortableCompactRow wrapper for DnD ──────────────────────────────────────
+
+function SortableCompactRow(props: React.ComponentProps<typeof CompactRow>) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: props.item.key });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.4 : 1,
+    zIndex: isDragging ? 1 : 0,
+  };
+  return (
+    <div ref={setNodeRef} style={style}>
+      <CompactRow {...props} dragHandleProps={{ ...attributes, ...listeners }} />
+    </div>
   );
 }
 
@@ -1587,19 +1624,58 @@ export default function StatusSemanalPage() {
   const [confirmDelete, setConfirmDelete] = useState<Item | null>(null);
   const [aiCooldown, setAiCooldown] = useState(false);
 
+  // ── New feature state ───────────────────────────────────────────────────────
+  const [kbFocusKey, setKbFocusKey] = useState<string | null>(null);
+  const [bulkMode, setBulkMode] = useState(false);
+  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
+  const [normalOrder, setNormalOrder] = useState<string[]>([]);
+  const [dragActiveId, setDragActiveId] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<'list' | 'timeline'>('list');
+  const [showExport, setShowExport] = useState(false);
+  const [showKbHelp, setShowKbHelp] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
   // ── AI Summary mutation ─────────────────────────────────────────────────────
 
-  // Close notes panel with Esc key
+  // Keyboard shortcuts + Esc handler
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      const tag = (document.activeElement as HTMLElement)?.tagName;
+      const isInput = tag === 'INPUT' || tag === 'TEXTAREA' || (document.activeElement as HTMLElement)?.isContentEditable;
+
       if (e.key === 'Escape') {
         if (confirmDelete) { setConfirmDelete(null); return; }
+        if (showExport) { setShowExport(false); return; }
+        if (kbFocusKey) {
+          // If a row is expanded, collapse it first
+          setExpandedRowKey(null);
+          setExpandedAlertKey(null);
+          setExpandedDecisionKey(null);
+          setKbFocusKey(null);
+          return;
+        }
         if (notesOpen) { setNotesOpen(null); return; }
+        return;
+      }
+
+      if (isInput) return;
+
+      // Navigation shortcuts
+      if (e.key === '/' || e.key === 'f') {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+        return;
+      }
+
+      if (e.key === '?') {
+        e.preventDefault();
+        setShowKbHelp(v => !v);
+        return;
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [notesOpen, confirmDelete]);
+  }, [notesOpen, confirmDelete, kbFocusKey, showExport]);
 
   const aiMutation = useMutation({
     mutationFn: () => mutationFetch('/api/status-semanal/ai-summary', 'POST'),
@@ -1831,6 +1907,63 @@ export default function StatusSemanalPage() {
   const isAlertCollapsed = alertCollapsed ?? (alertItems.length === 0);
   const isDecisionCollapsed = decisionCollapsed ?? (decisionItems.length === 0);
 
+  // Flat list for keyboard navigation (alert + decision + normal)
+  const flatNavItems = [...alertItems, ...decisionItems, ...normalItems];
+
+  // Sync normalOrder when normalItems changes (keep existing order, add new items at end)
+  useEffect(() => {
+    const currentKeys = normalItems.map(i => i.key);
+    setNormalOrder(prev => {
+      const existing = prev.filter(k => currentKeys.includes(k));
+      const added = currentKeys.filter(k => !prev.includes(k));
+      return [...existing, ...added];
+    });
+  }, [normalItems.map(i => i.key).join(',')]);
+
+  // Keyboard navigation effect (depends on flatNavItems, so inside render)
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const tag = (document.activeElement as HTMLElement)?.tagName;
+      const isInput = tag === 'INPUT' || tag === 'TEXTAREA' || (document.activeElement as HTMLElement)?.isContentEditable;
+      if (isInput) return;
+
+      const navKeys = ['j', 'k', 'J', 'K', 'ArrowDown', 'ArrowUp', 'e', 'E'];
+      if (!navKeys.includes(e.key)) return;
+
+      e.preventDefault();
+      const currentIdx = kbFocusKey ? flatNavItems.findIndex(i => i.key === kbFocusKey) : -1;
+
+      if (e.key === 'j' || e.key === 'J' || e.key === 'ArrowDown') {
+        const next = flatNavItems[currentIdx + 1];
+        if (next) setKbFocusKey(next.key);
+        else if (flatNavItems.length > 0) setKbFocusKey(flatNavItems[0].key);
+      } else if (e.key === 'k' || e.key === 'K' || e.key === 'ArrowUp') {
+        const prev = flatNavItems[currentIdx - 1];
+        if (prev) setKbFocusKey(prev.key);
+        else if (flatNavItems.length > 0) setKbFocusKey(flatNavItems[flatNavItems.length - 1].key);
+      } else if (e.key === 'e' || e.key === 'E') {
+        if (!kbFocusKey) return;
+        const item = flatNavItems.find(i => i.key === kbFocusKey);
+        if (!item) return;
+        if (alertKeys.has(kbFocusKey)) {
+          setExpandedAlertKey(expandedAlertKey === kbFocusKey ? null : kbFocusKey);
+        } else if (decisionKeys.has(kbFocusKey)) {
+          setExpandedDecisionKey(expandedDecisionKey === kbFocusKey ? null : kbFocusKey);
+        } else {
+          setExpandedRowKey(expandedRowKey === kbFocusKey ? null : kbFocusKey);
+        }
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [kbFocusKey, flatNavItems, alertKeys, decisionKeys, expandedAlertKey, expandedDecisionKey, expandedRowKey]);
+
+  // Sorted normal items with drag-and-drop order
+  const sortedNormalItems = normalOrder.length > 0
+    ? [...normalOrder.map(k => normalItems.find(i => i.key === k)).filter(Boolean) as Item[],
+       ...normalItems.filter(i => !normalOrder.includes(i.key))]
+    : normalItems;
+
   const getItemHandlers = (item: Item) => ({
     onUpdate: (data: Record<string, any>) => {
       if (item.isCustom && item.customId) updateCustom(item.customId, data);
@@ -1884,6 +2017,7 @@ export default function StatusSemanalPage() {
               <div className="relative flex-1 max-w-md">
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-indigo-300" />
                 <input
+                  ref={searchInputRef}
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
                   placeholder="Buscar proyecto, owner..."
@@ -1899,6 +2033,32 @@ export default function StatusSemanalPage() {
               {/* Right: badges & actions */}
               <div className="flex items-center gap-1 shrink-0">
                 <span className="text-[11px] text-indigo-200 font-medium mr-1">{visible.length} ítems</span>
+                {/* View toggle */}
+                <button onClick={() => setViewMode(v => v === 'list' ? 'timeline' : 'list')}
+                  title={viewMode === 'list' ? 'Ver timeline' : 'Ver lista'}
+                  className={cn("p-1.5 rounded-full border transition-colors backdrop-blur-sm",
+                    viewMode === 'timeline'
+                      ? "bg-white/25 text-white border-white/30"
+                      : "bg-white/10 text-indigo-200 border-white/15 hover:bg-white/20 hover:text-white")}>
+                  {viewMode === 'list' ? <LayoutList className="h-3 w-3" /> : <List className="h-3 w-3" />}
+                </button>
+                {/* Export */}
+                <button onClick={() => setShowExport(true)} title="Exportar semana"
+                  className="p-1.5 rounded-full border transition-colors backdrop-blur-sm bg-white/10 text-indigo-200 border-white/15 hover:bg-white/20 hover:text-white">
+                  <Printer className="h-3 w-3" />
+                </button>
+                {/* Bulk select */}
+                <button onClick={() => { setBulkMode(v => !v); setSelectedKeys(new Set()); }}
+                  title="Selección masiva"
+                  className={cn("p-1.5 rounded-full border transition-colors backdrop-blur-sm",
+                    bulkMode ? "bg-white/25 text-white border-white/30" : "bg-white/10 text-indigo-200 border-white/15 hover:bg-white/20 hover:text-white")}>
+                  <CheckSquare className="h-3 w-3" />
+                </button>
+                {/* Keyboard help */}
+                <button onClick={() => setShowKbHelp(v => !v)} title="Atajos de teclado (?)"
+                  className="p-1.5 rounded-full border transition-colors backdrop-blur-sm bg-white/10 text-indigo-200 border-white/15 hover:bg-white/20 hover:text-white">
+                  <HelpCircle className="h-3 w-3" />
+                </button>
                 <button onClick={() => setShowFilters(v => !v)}
                   className={cn("p-1.5 rounded-full border transition-colors backdrop-blur-sm",
                     showFilters || filterHealth || filterOwner !== null
@@ -2054,6 +2214,70 @@ export default function StatusSemanalPage() {
         <div className="flex-1 overflow-auto">
           {isLoading ? (
             <div className="flex items-center justify-center h-64"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+          ) : viewMode === 'timeline' ? (
+            /* ── Timeline View ── */
+            (() => {
+              const now = new Date();
+              now.setHours(0, 0, 0, 0);
+              const monday = new Date(now);
+              monday.setDate(now.getDate() - ((now.getDay() + 6) % 7));
+              // Build 8 week buckets
+              const weeks: { label: string; start: Date; end: Date; items: Item[] }[] = [];
+              for (let w = 0; w < 8; w++) {
+                const start = new Date(monday);
+                start.setDate(monday.getDate() + w * 7);
+                const end = new Date(start);
+                end.setDate(start.getDate() + 6);
+                const label = start.toLocaleDateString('es-AR', { day: 'numeric', month: 'short' });
+                weeks.push({ label, start, end, items: [] });
+              }
+              const noDateItems: Item[] = [];
+              visible.forEach(item => {
+                if (!item.deadline) { noDateItems.push(item); return; }
+                const d = new Date(item.deadline);
+                const bucket = weeks.find(w => d >= w.start && d <= w.end);
+                if (bucket) bucket.items.push(item);
+                else if (d > weeks[weeks.length - 1].end) weeks[weeks.length - 1].items.push(item);
+                else noDateItems.push(item);
+              });
+              const allBuckets = [...weeks.filter(w => w.items.length > 0), ...(noDateItems.length > 0 ? [{ label: 'Sin fecha', start: new Date(0), end: new Date(0), items: noDateItems }] : [])];
+              return (
+                <div className="max-w-6xl mx-auto px-6 py-4">
+                  <div className="flex gap-3 overflow-x-auto pb-4">
+                    {allBuckets.map((bucket, bi) => (
+                      <div key={bi} className="min-w-[180px] flex-shrink-0">
+                        <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-2 px-1">{bucket.label}</div>
+                        <div className="space-y-2">
+                          {bucket.items.map(item => {
+                            const dot = hm(item.healthStatus).dot;
+                            return (
+                              <div key={item.key} className="bg-white border border-slate-200 rounded-lg px-3 py-2 shadow-sm hover:border-indigo-300 transition-colors cursor-pointer"
+                                onClick={() => setExpandedRowKey(expandedRowKey === item.key ? null : item.key)}>
+                                <div className="flex items-center gap-1.5 mb-1">
+                                  <div className={cn("w-2 h-2 rounded-full shrink-0", dot)} />
+                                  <span className="text-xs font-medium text-slate-800 truncate flex-1">{item.title}</span>
+                                </div>
+                                {item.ownerName && (
+                                  <div className="flex items-center gap-1">
+                                    <div className="h-4 w-4 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-[8px] font-bold shrink-0">
+                                      {initials(item.ownerName)}
+                                    </div>
+                                    <span className="text-[10px] text-slate-400">{item.ownerName.split(' ')[0]}</span>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                    {allBuckets.length === 0 && (
+                      <p className="text-sm text-slate-400 italic">Sin ítems para mostrar</p>
+                    )}
+                  </div>
+                </div>
+              );
+            })()
           ) : (
             <div className="max-w-6xl mx-auto px-6 py-3 space-y-3">
 
@@ -2088,7 +2312,11 @@ export default function StatusSemanalPage() {
                             hasPrev={idx > 0}
                             hasNext={idx < alertItems.length - 1}
                             onPrev={() => { if (idx > 0) setExpandedAlertKey(alertItems[idx - 1].key); }}
-                            onNext={() => { if (idx < alertItems.length - 1) setExpandedAlertKey(alertItems[idx + 1].key); }} />
+                            onNext={() => { if (idx < alertItems.length - 1) setExpandedAlertKey(alertItems[idx + 1].key); }}
+                            kbFocused={kbFocusKey === item.key}
+                            bulkMode={bulkMode}
+                            checked={selectedKeys.has(item.key)}
+                            onCheck={v => setSelectedKeys(prev => { const n = new Set(prev); v ? n.add(item.key) : n.delete(item.key); return n; })} />
                         </motion.div>
                       );
                     })}
@@ -2126,7 +2354,11 @@ export default function StatusSemanalPage() {
                             hasPrev={idx > 0}
                             hasNext={idx < decisionItems.length - 1}
                             onPrev={() => { if (idx > 0) setExpandedDecisionKey(decisionItems[idx - 1].key); }}
-                            onNext={() => { if (idx < decisionItems.length - 1) setExpandedDecisionKey(decisionItems[idx + 1].key); }} />
+                            onNext={() => { if (idx < decisionItems.length - 1) setExpandedDecisionKey(decisionItems[idx + 1].key); }}
+                            kbFocused={kbFocusKey === item.key}
+                            bulkMode={bulkMode}
+                            checked={selectedKeys.has(item.key)}
+                            onCheck={v => setSelectedKeys(prev => { const n = new Set(prev); v ? n.add(item.key) : n.delete(item.key); return n; })} />
                         </motion.div>
                       );
                     })}
@@ -2161,30 +2393,56 @@ export default function StatusSemanalPage() {
                     <span className="text-xs">Sin ítems en curso</span>
                   </div>
                 ) : (
-                  <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-                    <AnimatePresence initial={false}>
-                      {normalItems.map((item, idx) => {
-                        const h = getItemHandlers(item);
-                        return (
-                          <motion.div key={item.key} layout
-                            initial={{ opacity: 0, x: -8 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            exit={{ opacity: 0, x: -8 }}
-                            transition={{ duration: 0.15, ease: 'easeOut' }}>
-                            <CompactRow item={item} users={appUsers} currentUserId={currentUserId}
+                  <DndContext
+                    collisionDetection={closestCenter}
+                    onDragStart={(event: DragStartEvent) => setDragActiveId(event.active.id as string)}
+                    onDragEnd={(event: DragEndEvent) => {
+                      setDragActiveId(null);
+                      const { active, over } = event;
+                      if (over && active.id !== over.id) {
+                        setNormalOrder(prev => {
+                          const keys = sortedNormalItems.map(i => i.key);
+                          const oldIdx = keys.indexOf(active.id as string);
+                          const newIdx = keys.indexOf(over.id as string);
+                          return arrayMove(oldIdx >= 0 ? keys : prev, oldIdx >= 0 ? oldIdx : prev.indexOf(active.id as string), newIdx >= 0 ? newIdx : prev.indexOf(over.id as string));
+                        });
+                      }
+                    }}
+                  >
+                    <SortableContext items={sortedNormalItems.map(i => i.key)} strategy={verticalListSortingStrategy}>
+                      <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+                        {sortedNormalItems.map((item, idx) => {
+                          const h = getItemHandlers(item);
+                          return (
+                            <SortableCompactRow key={item.key} item={item} users={appUsers} currentUserId={currentUserId}
                               isSelected={notesOpen !== null && ((notesOpen.type === 'project' && item.projectId === notesOpen.id) || (notesOpen.type === 'custom' && item.customId === notesOpen.id))}
                               onOpenNotes={h.onOpenNotes} onUpdate={h.onUpdate} onRemove={h.onRemove}
                               expanded={expandedRowKey === item.key}
                               onToggle={() => setExpandedRowKey(expandedRowKey === item.key ? null : item.key)}
                               hasPrev={idx > 0}
-                              hasNext={idx < normalItems.length - 1}
-                              onPrev={() => { if (idx > 0) setExpandedRowKey(normalItems[idx - 1].key); }}
-                              onNext={() => { if (idx < normalItems.length - 1) setExpandedRowKey(normalItems[idx + 1].key); }} />
-                          </motion.div>
+                              hasNext={idx < sortedNormalItems.length - 1}
+                              onPrev={() => { if (idx > 0) setExpandedRowKey(sortedNormalItems[idx - 1].key); }}
+                              onNext={() => { if (idx < sortedNormalItems.length - 1) setExpandedRowKey(sortedNormalItems[idx + 1].key); }}
+                              kbFocused={kbFocusKey === item.key}
+                              bulkMode={bulkMode}
+                              checked={selectedKeys.has(item.key)}
+                              onCheck={v => setSelectedKeys(prev => { const n = new Set(prev); v ? n.add(item.key) : n.delete(item.key); return n; })} />
+                          );
+                        })}
+                      </div>
+                    </SortableContext>
+                    <DragOverlay>
+                      {dragActiveId && (() => {
+                        const item = sortedNormalItems.find(i => i.key === dragActiveId);
+                        if (!item) return null;
+                        return (
+                          <div className="bg-white border border-indigo-300 shadow-lg rounded-lg px-4 py-2 opacity-90">
+                            <span className="text-sm font-medium text-slate-700">{item.title}</span>
+                          </div>
                         );
-                      })}
-                    </AnimatePresence>
-                  </div>
+                      })()}
+                    </DragOverlay>
+                  </DndContext>
                 )}
               </div>
 
@@ -2229,6 +2487,180 @@ export default function StatusSemanalPage() {
           )}
         </div>
       </div>
+
+      {/* ── Bulk Action Bar ───────────────────────────────────────── */}
+      {bulkMode && selectedKeys.size > 0 && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 bg-slate-900 text-white rounded-2xl shadow-2xl px-4 py-2.5 flex items-center gap-3 min-w-[340px]">
+          <span className="text-sm font-semibold">{selectedKeys.size} seleccionados</span>
+          <div className="w-px h-4 bg-slate-600" />
+          {/* Change health for selected */}
+          <div className="flex items-center gap-1">
+            {Object.entries(HEALTH).map(([k, m]) => (
+              <button key={k} title={`Cambiar a ${m.label}`}
+                onClick={() => {
+                  selectedKeys.forEach(key => {
+                    const item = visible.find(i => i.key === key);
+                    if (!item) return;
+                    const h = getItemHandlers(item);
+                    h.onUpdate({ healthStatus: k });
+                  });
+                }}
+                className={cn("w-4 h-4 rounded-full border-2 border-white/30 hover:scale-110 transition-transform", m.dot)} />
+            ))}
+          </div>
+          {/* Change owner for selected */}
+          <select className="text-xs bg-slate-700 border border-slate-600 rounded px-2 py-1 text-white focus:outline-none"
+            defaultValue=""
+            onChange={e => {
+              const ownerId = e.target.value ? parseInt(e.target.value) : null;
+              const ownerName = ownerId ? appUsers.find(u => u.id === ownerId)?.name ?? null : null;
+              selectedKeys.forEach(key => {
+                const item = visible.find(i => i.key === key);
+                if (!item) return;
+                const h = getItemHandlers(item);
+                h.onUpdate({ ownerId, ownerName });
+              });
+              e.target.value = '';
+            }}>
+            <option value="" disabled>Asignar owner...</option>
+            {appUsers.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+          </select>
+          {/* Hide selected */}
+          <button onClick={() => {
+            selectedKeys.forEach(key => {
+              const item = visible.find(i => i.key === key);
+              if (!item) return;
+              const h = getItemHandlers(item);
+              h.onUpdate({ hiddenFromWeekly: true });
+            });
+            setSelectedKeys(new Set());
+          }} className="text-xs px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 transition-colors flex items-center gap-1">
+            <EyeOff className="h-3 w-3" /> Ocultar
+          </button>
+          <button onClick={() => { setBulkMode(false); setSelectedKeys(new Set()); }}
+            className="text-xs px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 transition-colors ml-1">
+            Cancelar
+          </button>
+        </div>
+      )}
+
+      {/* ── Export Modal ──────────────────────────────────────────── */}
+      {showExport && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center" onClick={() => setShowExport(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full mx-4 max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
+              <h2 className="font-bold text-lg">Exportar Status Semanal</h2>
+              <div className="flex items-center gap-2">
+                <button onClick={() => window.print()}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition-colors">
+                  <Printer className="h-4 w-4" /> Imprimir
+                </button>
+                <button onClick={() => setShowExport(false)} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+            <div className="px-6 py-4 space-y-4 print:px-0">
+              <div className="text-center mb-4">
+                <h3 className="text-xl font-bold text-slate-800">Status Semanal</h3>
+                <p className="text-sm text-slate-500">{weekLabel()}</p>
+              </div>
+              {alertItems.length > 0 && (
+                <div>
+                  <h4 className="font-bold text-sm text-red-700 mb-2 flex items-center gap-1.5"><AlertTriangle className="h-3.5 w-3.5" /> Requieren atención ({alertItems.length})</h4>
+                  <div className="space-y-1">
+                    {alertItems.map(item => (
+                      <div key={item.key} className="flex items-start gap-3 py-2 border-b border-slate-100 last:border-0">
+                        <div className={cn("w-2.5 h-2.5 rounded-full mt-1 shrink-0", hm(item.healthStatus).dot)} />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-semibold text-sm">{item.title}</span>
+                            {item.subtitle && <span className="text-xs text-slate-400">· {item.subtitle}</span>}
+                            {item.ownerName && <span className="text-xs text-indigo-600 font-medium">{item.ownerName.split(' ')[0]}</span>}
+                            {item.deadline && <span className="text-xs text-slate-500">{deadlineLabel(item.deadline)}</span>}
+                          </div>
+                          {item.currentAction && <p className="text-xs text-slate-600 mt-0.5">{item.currentAction}</p>}
+                          {item.nextMilestone && <p className="text-xs text-slate-500 mt-0.5">→ {item.nextMilestone}</p>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {decisionItems.length > 0 && (
+                <div>
+                  <h4 className="font-bold text-sm text-amber-700 mb-2 flex items-center gap-1.5"><Zap className="h-3.5 w-3.5" /> Decisiones pendientes ({decisionItems.length})</h4>
+                  <div className="space-y-1">
+                    {decisionItems.map(item => (
+                      <div key={item.key} className="flex items-start gap-3 py-2 border-b border-slate-100 last:border-0">
+                        <div className={cn("w-2.5 h-2.5 rounded-full mt-1 shrink-0", hm(item.healthStatus).dot)} />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-semibold text-sm">{item.title}</span>
+                            {item.ownerName && <span className="text-xs text-indigo-600 font-medium">{item.ownerName.split(' ')[0]}</span>}
+                            {item.deadline && <span className="text-xs text-slate-500">{deadlineLabel(item.deadline)}</span>}
+                          </div>
+                          {item.currentAction && <p className="text-xs text-slate-600 mt-0.5">{item.currentAction}</p>}
+                          {item.nextMilestone && <p className="text-xs text-slate-500 mt-0.5">→ {item.nextMilestone}</p>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {normalItems.length > 0 && (
+                <div>
+                  <h4 className="font-bold text-sm text-emerald-700 mb-2 flex items-center gap-1.5"><Circle className="h-3.5 w-3.5 fill-current" /> En curso ({normalItems.length})</h4>
+                  <div className="space-y-1">
+                    {sortedNormalItems.map(item => (
+                      <div key={item.key} className="flex items-start gap-3 py-2 border-b border-slate-100 last:border-0">
+                        <div className={cn("w-2.5 h-2.5 rounded-full mt-1 shrink-0", hm(item.healthStatus).dot)} />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-semibold text-sm">{item.title}</span>
+                            {item.subtitle && <span className="text-xs text-slate-400">· {item.subtitle}</span>}
+                            {item.ownerName && <span className="text-xs text-indigo-600 font-medium">{item.ownerName.split(' ')[0]}</span>}
+                            {item.deadline && <span className="text-xs text-slate-500">{deadlineLabel(item.deadline)}</span>}
+                          </div>
+                          {item.currentAction && <p className="text-xs text-slate-600 mt-0.5">{item.currentAction}</p>}
+                          {item.nextMilestone && <p className="text-xs text-slate-500 mt-0.5">→ {item.nextMilestone}</p>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Keyboard Shortcuts Help ───────────────────────────────── */}
+      {showKbHelp && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center" onClick={() => setShowKbHelp(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl p-5 max-w-xs w-full mx-4" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-bold text-sm">Atajos de teclado</h3>
+              <button onClick={() => setShowKbHelp(false)} className="text-slate-400 hover:text-slate-600"><X className="h-4 w-4" /></button>
+            </div>
+            <div className="space-y-1.5 text-xs">
+              {[
+                ['J / ↓', 'Siguiente ítem'],
+                ['K / ↑', 'Ítem anterior'],
+                ['E', 'Expandir / colapsar'],
+                ['/', 'Enfocar búsqueda'],
+                ['Esc', 'Colapsar / cerrar'],
+                ['?', 'Mostrar esta ayuda'],
+              ].map(([key, desc]) => (
+                <div key={key} className="flex items-center justify-between">
+                  <kbd className="px-2 py-0.5 rounded bg-slate-100 border border-slate-200 font-mono text-[11px] font-semibold">{key}</kbd>
+                  <span className="text-slate-600">{desc}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Activity panel (notes + change log) ─────────────────── */}
       {notesOpen !== null && (
