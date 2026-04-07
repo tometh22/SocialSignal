@@ -17326,12 +17326,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // PATCH /api/status-semanal/notes/:noteId — edit a note
+  // PATCH /api/status-semanal/notes/:noteId — edit a note (owner only)
   app.patch("/api/status-semanal/notes/:noteId", requireAuth, async (req: Request, res: Response) => {
     try {
       const noteId = parseInt(req.params.noteId);
       const { content } = req.body;
       if (!content?.trim()) return res.status(400).json({ message: "El contenido es requerido" });
+
+      let userId = (req.session as any)?.userId ?? null;
+      if (!userId) {
+        const authHeader = req.headers.authorization;
+        if (authHeader?.startsWith('Session ')) {
+          const tokenId = authHeader.slice(8).trim();
+          if (tokenId) {
+            userId = await new Promise<number | null>((resolve) => {
+              storage.sessionStore.get(tokenId, (err: any, data: any) => {
+                resolve(err || !data ? null : data.userId ?? null);
+              });
+            });
+          }
+        }
+      }
+      if (!userId) return res.status(401).json({ message: "No autenticado" });
+
+      const [note] = await db
+        .select({ authorId: projectReviewNotes.authorId })
+        .from(projectReviewNotes)
+        .where(eq(projectReviewNotes.id, noteId));
+      if (!note) return res.status(404).json({ message: "Nota no encontrada" });
+      if (note.authorId !== userId) return res.status(403).json({ message: "No autorizado" });
+
       const [updated] = await db
         .update(projectReviewNotes)
         .set({ content: content.trim() })

@@ -1302,6 +1302,14 @@ function ActivityPanel({ projectId, customItemId, projectName, onClose }: { proj
                         value={editText}
                         onChange={e => setEditText(e.target.value)}
                         autoFocus
+                        onKeyDown={e => {
+                          if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();
+                            if (editText.trim()) editMutation.mutate({ noteId: entry.id, content: editText });
+                          } else if (e.key === 'Escape') {
+                            setEditingId(null);
+                          }
+                        }}
                         className="resize-none text-[11px] min-h-[40px] max-h-[120px] bg-white px-2.5 py-1.5"
                       />
                       <div className="flex gap-1">
