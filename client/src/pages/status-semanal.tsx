@@ -1036,9 +1036,15 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
             className="overflow-hidden">
             <div className="px-4 pb-3 pt-1 ml-5 border-l-2 border-slate-200/80">
               {item.isCustom && (
-                <div className="mb-2">
-                  <p className="text-[10px] text-slate-400 font-semibold mb-0.5">Título</p>
-                  <InlineText value={item.title} placeholder="Título del ítem" onSave={v => onUpdate({ title: v })} className="text-xs font-medium" />
+                <div className="mb-2 space-y-1.5">
+                  <div>
+                    <p className="text-[10px] text-slate-400 font-semibold mb-0.5">Título</p>
+                    <InlineText value={item.title} placeholder="Título del ítem" onSave={v => onUpdate({ title: v })} className="text-xs font-medium" />
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-slate-400 font-semibold mb-0.5">Descripción</p>
+                    <InlineText value={item.subtitle} placeholder="Descripción o contexto del ítem..." onSave={v => onUpdate({ subtitle: v })} multiline className="text-xs" />
+                  </div>
                 </div>
               )}
 
