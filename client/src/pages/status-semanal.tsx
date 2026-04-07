@@ -6,6 +6,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
@@ -570,7 +571,10 @@ function InlineChat({ projectId, customId, currentUserId, onOpenFullChat }: {
           })}
         </div>
       ) : (
-        <p className="text-[11px] text-slate-300 italic mb-1.5">Sin mensajes</p>
+        <div className="flex items-center gap-1.5 py-1.5 mb-1 text-[11px] text-slate-400 italic">
+          <MessageSquare className="h-3 w-3 text-slate-300 shrink-0" />
+          <span>Aún no hay mensajes — escribí el primero</span>
+        </div>
       )}
       {/* Quick reply */}
       <div className="flex gap-1">
@@ -626,7 +630,7 @@ function MiniLevelDot({ value, type }: { value: string | null; type: 'margin' | 
   return (
     <span className="inline-flex items-center gap-1 text-[10px] text-slate-400" title={`${label}: ${meta.label}`}>
       <span className={cn("w-1.5 h-1.5 rounded-full", dotColor)} />
-      <span className="font-medium">{type === 'margin' ? '$' : '~'}</span>
+      <span className="font-medium">{type === 'margin' ? '$' : 'Eq.'}</span>
     </span>
   );
 }
@@ -1298,7 +1302,10 @@ function ActivityPanel({ projectId, customItemId, projectName, onClose }: { proj
   const [newNote, setNewNote] = useState('');
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editText, setEditText] = useState('');
+  const [sent, setSent] = useState(false);
+  const [showScrollDown, setShowScrollDown] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const currentUserId = (user as any)?.id;
 
   const notesUrl = projectId
@@ -1322,6 +1329,8 @@ function ActivityPanel({ projectId, customItemId, projectName, onClose }: { proj
   const addMutation = useMutation({
     mutationFn: (content: string) => mutationFetch(notesUrl, 'POST', { content }),
     onSuccess: () => {
+      setSent(true);
+      setTimeout(() => setSent(false), 2000);
       queryClient.refetchQueries({ queryKey: activityCacheKey });
       queryClient.refetchQueries({ queryKey: notesCacheKey });
       queryClient.refetchQueries({ queryKey: ['/api/status-semanal'] });
@@ -1352,7 +1361,12 @@ function ActivityPanel({ projectId, customItemId, projectName, onClose }: { proj
     onError: (err: Error) => toast({ title: 'Error al editar comentario', description: err.message, variant: 'destructive' }),
   });
 
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [timeline.length]);
+  useEffect(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    if (distFromBottom < 150) bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [timeline.length]);
 
   return (
     <div className="flex flex-col h-full">
@@ -1365,7 +1379,11 @@ function ActivityPanel({ projectId, customItemId, projectName, onClose }: { proj
         <button onClick={onClose} className="p-0.5 hover:bg-accent rounded text-muted-foreground shrink-0"><X className="h-3.5 w-3.5" /></button>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-3 py-2 space-y-1.5">
+      <div ref={scrollContainerRef} onScroll={() => {
+          const el = scrollContainerRef.current;
+          if (!el) return;
+          setShowScrollDown(el.scrollHeight - el.scrollTop - el.clientHeight > 100);
+        }} className="flex-1 overflow-y-auto px-3 py-2 space-y-1.5">
         {isLoading && <div className="flex justify-center py-6"><Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /></div>}
         {!isLoading && timeline.length === 0 && (
           <div className="flex flex-col items-center justify-center py-8 text-center">
@@ -1467,6 +1485,12 @@ function ActivityPanel({ projectId, customItemId, projectName, onClose }: { proj
             </div>
           );
         })}
+        {showScrollDown && (
+          <button onClick={() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' })}
+            className="sticky bottom-2 mx-auto flex items-center gap-1 bg-indigo-600 text-white text-[10px] font-medium rounded-full px-3 py-1 shadow-md hover:bg-indigo-700 transition-colors">
+            Nueva actividad <ChevronDown className="h-3 w-3" />
+          </button>
+        )}
         <div ref={bottomRef} />
       </div>
 
@@ -1482,6 +1506,7 @@ function ActivityPanel({ projectId, customItemId, projectName, onClose }: { proj
           </Button>
         </div>
         <p className="text-[9px] text-muted-foreground mt-0.5">Enter para enviar · Shift+Enter nueva línea</p>
+        {sent && <p className="text-[9px] text-emerald-500 mt-0.5 font-medium">Comentario guardado ✓</p>}
       </div>
     </div>
   );
@@ -1749,6 +1774,9 @@ export default function StatusSemanalPage() {
   const decisionKeys  = new Set(decisionItems.map(i => i.key));
   const normalItems   = visible.filter(i => !alertKeys.has(i.key) && !decisionKeys.has(i.key));
 
+  const allVisibleItems = [...alertItems, ...decisionItems, ...normalItems];
+  const hasActiveFilters = !!(searchQuery || filterHealth || filterOwner !== null);
+
   const criticalCount = alertItems.length;
   const decisionCount = visible.filter(i => dm(i.decisionNeeded).urgent).length;
 
@@ -1785,7 +1813,7 @@ export default function StatusSemanalPage() {
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
-      <div className={cn("flex flex-col flex-1 min-w-0 transition-all duration-200", notesOpen !== null ? "mr-[320px]" : "")}>
+      <div className={cn("flex flex-col flex-1 min-w-0 transition-all duration-200", notesOpen !== null ? "sm:mr-[320px]" : "")}>
 
         {/* ── Header ────────────────────────────────────────────── */}
         {/* ── Header (compact with integrated search) ──────────── */}
@@ -1811,7 +1839,7 @@ export default function StatusSemanalPage() {
                 <input
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
-                  placeholder="Buscar proyecto, owner..."
+                  placeholder="Buscar proyecto, owner, update, riesgo..."
                   className="w-full pl-8 pr-3 py-1.5 text-xs border border-white/20 rounded-lg bg-white/10 backdrop-blur-sm text-white placeholder:text-indigo-300 focus:outline-none focus:ring-1 focus:ring-white/30 focus:bg-white/15"
                 />
                 {searchQuery && (
@@ -1943,23 +1971,24 @@ export default function StatusSemanalPage() {
 
         {/* ── Confirm Delete Dialog ──────────────────────────────── */}
         {confirmDelete && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm" onClick={() => setConfirmDelete(null)}>
-            <div className="bg-white rounded-xl shadow-2xl border border-slate-200 p-5 max-w-sm w-full mx-4" onClick={e => e.stopPropagation()}>
+          <div role="dialog" aria-modal="true" aria-labelledby="confirm-delete-title" aria-describedby="confirm-delete-desc"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
+            <div className="bg-white rounded-xl shadow-2xl border border-slate-200 p-5 max-w-sm w-full mx-4">
               <div className="flex items-center gap-2 mb-3">
                 <div className="h-8 w-8 rounded-full bg-red-100 flex items-center justify-center">
                   <Trash2 className="h-4 w-4 text-red-600" />
                 </div>
-                <h3 className="font-semibold text-sm">
+                <h3 id="confirm-delete-title" className="font-semibold text-sm">
                   {confirmDelete.isCustom ? 'Eliminar ítem' : 'Quitar del status'}
                 </h3>
               </div>
-              <p className="text-xs text-slate-600 mb-1">
+              <p id="confirm-delete-desc" className="text-xs text-slate-600 mb-1">
                 {confirmDelete.isCustom
                   ? <>Vas a eliminar permanentemente <strong>{confirmDelete.title}</strong>. Esta acción no se puede deshacer.</>
                   : <>Vas a quitar <strong>{confirmDelete.title}</strong> del status semanal. Podés restaurarlo después.</>}
               </p>
               <div className="flex gap-2 mt-4">
-                <Button size="sm" variant="outline" onClick={() => setConfirmDelete(null)} className="flex-1 h-8 text-xs">
+                <Button autoFocus size="sm" variant="outline" onClick={() => setConfirmDelete(null)} className="flex-1 h-8 text-xs">
                   Cancelar
                 </Button>
                 <Button size="sm" onClick={() => {
@@ -1978,9 +2007,39 @@ export default function StatusSemanalPage() {
         {/* ── Content ───────────────────────────────────────────── */}
         <div className="flex-1 overflow-auto">
           {isLoading ? (
-            <div className="flex items-center justify-center h-64"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+            <div className="max-w-6xl mx-auto px-6 py-3 space-y-3">
+              {/* Skeleton: alert section */}
+              <div className="rounded-xl border border-red-200/60 bg-white shadow-sm p-3 space-y-2">
+                <div className="flex items-center gap-2 mb-2">
+                  <Skeleton className="h-3.5 w-3.5 rounded-full" />
+                  <Skeleton className="h-4 w-40" />
+                </div>
+                {[1,2].map(i => <Skeleton key={i} className="h-10 w-full rounded-lg" />)}
+              </div>
+              {/* Skeleton: en curso section */}
+              <div className="rounded-xl border border-slate-200 bg-white shadow-sm p-3 space-y-2">
+                <div className="flex items-center gap-2 mb-2">
+                  <Skeleton className="h-3.5 w-3.5 rounded-full" />
+                  <Skeleton className="h-4 w-24" />
+                </div>
+                {[1,2,3,4,5].map(i => <Skeleton key={i} className="h-9 w-full rounded-lg" />)}
+              </div>
+            </div>
           ) : (
             <div className="max-w-6xl mx-auto px-6 py-3 space-y-3">
+
+              {/* ── Global empty/no-results state ───────────────────── */}
+              {allVisibleItems.length === 0 && hasActiveFilters && (
+                <div className="flex flex-col items-center justify-center py-16 text-center">
+                  <Search className="h-8 w-8 text-slate-200 mb-3" />
+                  <p className="text-sm font-medium text-slate-500">Sin resultados</p>
+                  <p className="text-xs text-slate-400 mt-1">Ningún proyecto coincide con los filtros activos</p>
+                  <button onClick={() => { setSearchQuery(''); setFilterHealth(null); setFilterOwner(null); }}
+                    className="mt-3 text-xs text-indigo-500 hover:text-indigo-700 font-medium underline">
+                    Limpiar filtros
+                  </button>
+                </div>
+              )}
 
               {/* ── Requieren atención (hidden when empty) ──────────── */}
               {alertItems.length > 0 && (
@@ -2147,16 +2206,20 @@ export default function StatusSemanalPage() {
 
       {/* ── Activity panel (notes + change log) ─────────────────── */}
       {notesOpen !== null && (
-        <div className="fixed top-0 right-0 h-full w-[320px] border-l border-border bg-background shadow-xl z-20 flex flex-col">
-          {(openNotesProject || openNotesCustom) && (
-            <ActivityPanel
-              projectId={notesOpen.type === 'project' ? notesOpen.id : undefined}
-              customItemId={notesOpen.type === 'custom' ? notesOpen.id : undefined}
-              projectName={notesItemName}
-              onClose={() => setNotesOpen(null)}
-            />
-          )}
-        </div>
+        <>
+          {/* Mobile backdrop */}
+          <div className="fixed inset-0 bg-black/40 z-10 sm:hidden" onClick={() => setNotesOpen(null)} />
+          <div className="fixed top-0 right-0 h-full w-full sm:w-[320px] border-l border-border bg-background shadow-xl z-20 flex flex-col">
+            {(openNotesProject || openNotesCustom) && (
+              <ActivityPanel
+                projectId={notesOpen.type === 'project' ? notesOpen.id : undefined}
+                customItemId={notesOpen.type === 'custom' ? notesOpen.id : undefined}
+                projectName={notesItemName}
+                onClose={() => setNotesOpen(null)}
+              />
+            )}
+          </div>
+        </>
       )}
     </div>
   );
