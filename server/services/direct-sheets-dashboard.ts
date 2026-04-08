@@ -199,18 +199,27 @@ export async function fetchResumenEjecutivoDirectly(
 
     const periodKey = `${year}-${String(month).padStart(2, '0')}`;
 
+    const ventasDelMes = parseMoney(row[COL.VENTAS]);
+    const ebitOperativo = parseMoney(row[COL.EBIT]);
+    const sheetMarkup = parseMoney(row[COL.MARKUP]);
+    // Fallback: derive markup from ventas and implicit costs when sheet value is missing
+    const impliedCosts = ventasDelMes != null && ebitOperativo != null ? ventasDelMes - ebitOperativo : null;
+    const markup = sheetMarkup ?? (ventasDelMes != null && impliedCosts != null && impliedCosts > 0
+      ? Math.round((ventasDelMes / impliedCosts) * 100) / 100
+      : null);
+
     allData.push({
       periodKey,
       year,
       month,
       monthLabel: mesLabel,
       // P&L
-      ventasDelMes: parseMoney(row[COL.VENTAS]),
-      ebitOperativo: parseMoney(row[COL.EBIT]),
+      ventasDelMes,
+      ebitOperativo,
       beneficioNeto: parseMoney(row[COL.BENEFICIO_NETO]),
       margenOperativo: parsePercent(row[COL.MARGEN_OP]),
       margenNeto: parsePercent(row[COL.MARGEN_NETO]),
-      markup: parseMoney(row[COL.MARKUP]),
+      markup,
       proyeccionResultado: parseMoney(row[COL.PROYECCION]),
       // Balance
       activoLiquido: parseMoney(row[COL.ACTIVO_LIQUIDO]),
