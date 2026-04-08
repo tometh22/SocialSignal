@@ -5176,8 +5176,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const year = yearParsed !== undefined && !isNaN(yearParsed) ? yearParsed : undefined;
       const month = monthParsed !== undefined && !isNaN(monthParsed) ? monthParsed : undefined;
       const quarter = quarterParsed !== undefined && !isNaN(quarterParsed) ? quarterParsed : undefined;
+      const yearTotal = req.query.yearTotal === 'true';
       const { fetchResumenEjecutivoDirectly } = await import('./services/direct-sheets-dashboard');
-      const result = await fetchResumenEjecutivoDirectly(year, month, quarter);
+      const result = await fetchResumenEjecutivoDirectly(year, month, quarter, yearTotal);
       res.json(result);
     } catch (error: any) {
       console.error('❌ Direct sheets dashboard error:', error?.message || error);
