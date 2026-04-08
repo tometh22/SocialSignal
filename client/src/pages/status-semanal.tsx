@@ -373,7 +373,7 @@ function InlineText({ value, placeholder, onSave, multiline = false, className =
   const save = () => { setEditing(false); if (draft !== (value ?? '')) onSave(draft); };
 
   if (editing) {
-    const cls = `w-full text-sm border border-indigo-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-400 bg-white resize-none ${className}`;
+    const cls = `w-full text-sm border border-indigo-300 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-400/25 bg-white shadow-sm resize-none ${className}`;
     return multiline
       ? (
         <>
@@ -394,12 +394,13 @@ function InlineText({ value, placeholder, onSave, multiline = false, className =
   return (
     <span onClick={() => setEditing(true)}
       className={cn(
-        "group cursor-text rounded px-2 py-1 transition-colors min-h-[28px] inline-flex items-center gap-1 w-full",
-        "border border-dashed border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/40",
-        value ? "text-slate-800" : "text-slate-400 italic", className
+        "group cursor-text rounded-md px-1.5 py-1 transition-all min-h-[26px] inline-flex items-center gap-1 w-full",
+        "hover:bg-slate-100/80",
+        value ? "text-slate-800" : "text-slate-400/70 italic",
+        className
       )}>
-      <span className="flex-1">{value || placeholder}</span>
-      <Pencil className="h-2.5 w-2.5 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+      <span className="flex-1 leading-snug">{value || placeholder}</span>
+      <Pencil className="h-2.5 w-2.5 text-slate-400 opacity-0 group-hover:opacity-50 transition-opacity shrink-0" />
     </span>
   );
 }
@@ -985,7 +986,7 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
           </div>
           {!expanded && (
             <p
-              className="text-[11px] text-slate-500 truncate mt-0.5 hover:text-indigo-600 cursor-pointer transition-colors"
+              className="text-xs text-slate-500 truncate mt-0.5 hover:text-indigo-600 cursor-pointer transition-colors"
               title={item.currentAction ? `${item.currentAction} — click para editar` : "Click para agregar update"}
               onClick={e => { e.stopPropagation(); onToggle(); }}
             >
@@ -1036,40 +1037,43 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.18, ease: 'easeOut' }}
             className="overflow-hidden">
-            <div className="px-4 pb-3 pt-2 ml-5 border-l-2 border-slate-200/80 space-y-2.5">
+            <div className="px-5 pb-4 pt-3 ml-5 border-l-2 border-slate-100 space-y-4">
               {/* Custom item: title + description */}
               {item.isCustom && (
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="rounded-lg bg-indigo-50/60 px-2.5 py-2 border border-indigo-100">
-                    <p className="text-[9px] font-bold tracking-wider uppercase text-indigo-400 mb-1">Título</p>
-                    <InlineText value={item.title} placeholder="Título del ítem" onSave={v => onUpdate({ title: v })} className="text-xs font-semibold" />
+                <div className="grid grid-cols-2 gap-x-6 gap-y-1 pb-1">
+                  <div>
+                    <p className="text-[10px] font-semibold text-indigo-400 uppercase tracking-wide mb-1">Título</p>
+                    <InlineText value={item.title} placeholder="Título del ítem" onSave={v => onUpdate({ title: v })} className="text-sm font-semibold text-slate-800" />
                   </div>
-                  <div className="rounded-lg bg-indigo-50/60 px-2.5 py-2 border border-indigo-100">
-                    <p className="text-[9px] font-bold tracking-wider uppercase text-indigo-400 mb-1">Descripción</p>
-                    <InlineText value={item.subtitle} placeholder="Contexto del ítem..." onSave={v => onUpdate({ subtitle: v })} multiline className="text-xs" />
+                  <div>
+                    <p className="text-[10px] font-semibold text-indigo-400 uppercase tracking-wide mb-1">Descripción</p>
+                    <InlineText value={item.subtitle} placeholder="Contexto del ítem..." onSave={v => onUpdate({ subtitle: v })} multiline className="text-sm text-slate-700" />
                   </div>
                 </div>
               )}
 
-              {/* Estado actual + Próximo paso */}
-              <div className="grid grid-cols-2 gap-2">
-                <div className={cn("rounded-lg px-2.5 py-2 border",
-                  item.healthStatus === 'rojo' ? "bg-red-50 border-red-100" :
-                  item.healthStatus === 'amarillo' ? "bg-amber-50 border-amber-100" :
-                  "bg-slate-50 border-slate-100")}>
-                  <p className="text-[9px] font-bold tracking-wider uppercase text-slate-400 mb-1">Estado actual</p>
-                  <InlineText value={item.currentAction} placeholder="¿Qué está pasando ahora?" onSave={v => onUpdate({ currentAction: v })} multiline className="text-xs" />
+              {/* Estado actual + Próximo paso — the two most important fields */}
+              <div className="grid grid-cols-2 gap-x-6 gap-y-1">
+                <div>
+                  <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1 flex items-center gap-1.5">
+                    <span className={cn("w-1.5 h-1.5 rounded-full shrink-0",
+                      item.healthStatus === 'rojo' ? "bg-red-500" :
+                      item.healthStatus === 'amarillo' ? "bg-amber-400" : "bg-emerald-400")} />
+                    Estado actual
+                  </p>
+                  <InlineText value={item.currentAction} placeholder="¿Qué está pasando ahora?" onSave={v => onUpdate({ currentAction: v })} multiline className="text-sm leading-snug text-slate-700" />
                 </div>
-                <div className="rounded-lg bg-slate-50 px-2.5 py-2 border border-slate-100">
-                  <p className="text-[9px] font-bold tracking-wider uppercase text-slate-400 mb-1">Próximo paso</p>
-                  <InlineText value={item.nextMilestone} placeholder="Acción concreta esta semana" onSave={v => onUpdate({ nextMilestone: v })} multiline className="text-xs" />
+                <div>
+                  <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1">Próximo paso</p>
+                  <InlineText value={item.nextMilestone} placeholder="Acción concreta esta semana" onSave={v => onUpdate({ nextMilestone: v })} multiline className="text-sm leading-snug text-slate-700" />
                 </div>
               </div>
 
               {/* Unified activity thread */}
-              <div className="border-t border-slate-100 pt-2.5">
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-[9px] font-bold tracking-wider uppercase text-slate-400">Actividad</p>
+              <div className="border-t border-slate-100 pt-3">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Actividad</span>
+                  <div className="flex-1 h-px bg-slate-100" />
                   {onOpenNotes && (
                     <button onClick={onOpenNotes}
                       className="text-[10px] text-indigo-500 hover:text-indigo-700 font-medium flex items-center gap-0.5">
@@ -1243,12 +1247,9 @@ function ItemThread({ projectId, customId, currentUserId, users = [], onOpenFull
                 <div className="flex items-center gap-1.5 mb-0.5">
                   <span className="text-[10px] font-semibold text-slate-700">{entry.authorName?.split(' ')[0] ?? 'Usuario'}</span>
                   <span className="text-[9px] text-slate-400">{shortDateTime(entry.createdAt)}</span>
-                  <span className={cn("text-[8px] font-bold uppercase tracking-wide px-1 rounded border",
-                    entry.kind === 'update'
-                      ? "text-emerald-700 bg-emerald-50 border-emerald-100"
-                      : "text-slate-500 bg-slate-50 border-slate-100")}>
-                    {entry.kind === 'update' ? 'update' : 'nota'}
-                  </span>
+                  <span className={cn("w-1.5 h-1.5 rounded-full shrink-0",
+                    entry.kind === 'update' ? "bg-emerald-400" : "bg-indigo-300")}
+                    title={entry.kind === 'update' ? 'Update de estado' : 'Nota'} />
                   {canEdit && editingId !== edKey && (
                     <button onClick={() => { setEditingId(edKey); setEditText(entry.content); }}
                       className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity p-0.5 text-slate-300 hover:text-indigo-400">
@@ -1288,40 +1289,43 @@ function ItemThread({ projectId, customId, currentUserId, users = [], onOpenFull
       </div>
 
       {/* Compose input */}
-      <div className="flex items-center gap-1.5 bg-slate-50 rounded-lg border border-slate-200 px-2 py-1.5">
-        <div className="flex gap-0.5 shrink-0">
+      <div className="mt-1">
+        <div className="flex gap-1 mb-1.5">
           <button onClick={() => setPostAs('note')}
-            className={cn("text-[9px] px-1.5 py-0.5 rounded font-semibold transition-colors",
+            className={cn("text-[10px] px-2.5 py-1 rounded-full font-medium transition-all",
               postAs === 'note'
-                ? "bg-white border border-slate-200 text-slate-700 shadow-sm"
-                : "text-slate-400 hover:text-slate-600")}>
-            Nota
+                ? "bg-indigo-100 text-indigo-700"
+                : "text-slate-400 hover:text-slate-600 hover:bg-slate-100")}>
+            💬 Nota
           </button>
           <button onClick={() => setPostAs('update')}
-            className={cn("text-[9px] px-1.5 py-0.5 rounded font-semibold transition-colors",
+            className={cn("text-[10px] px-2.5 py-1 rounded-full font-medium transition-all",
               postAs === 'update'
-                ? "bg-white border border-emerald-200 text-emerald-700 shadow-sm"
-                : "text-slate-400 hover:text-slate-600")}>
-            Update
+                ? "bg-emerald-100 text-emerald-700"
+                : "text-slate-400 hover:text-slate-600 hover:bg-slate-100")}>
+            ↑ Update
           </button>
         </div>
-        <div className="w-px h-3 bg-slate-200 shrink-0" />
-        <MentionInput
-          value={draft}
-          onChange={setDraft}
-          onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(); } }}
-          placeholder={postAs === 'note' ? "Pregunta o comentario..." : "¿Qué avanzó?"}
-          className="flex-1 text-xs bg-transparent focus:outline-none min-w-0 py-0"
-          users={users}
-        />
-        <button onClick={submit}
-          disabled={!draft.trim() || addNoteMutation.isPending || addUpdateMutation.isPending}
-          className={cn("shrink-0 p-1 rounded transition-colors",
-            draft.trim() ? "text-indigo-600 hover:bg-indigo-100" : "text-slate-300")}>
-          {(addNoteMutation.isPending || addUpdateMutation.isPending)
-            ? <Loader2 className="h-3 w-3 animate-spin" />
-            : <ArrowRight className="h-3 w-3" />}
-        </button>
+        <div className="flex items-center gap-2 bg-white rounded-xl border border-slate-200 px-3 py-2 shadow-sm focus-within:border-indigo-300 focus-within:shadow-indigo-50 transition-all">
+          <MentionInput
+            value={draft}
+            onChange={setDraft}
+            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(); } }}
+            placeholder={postAs === 'note' ? "Escribir comentario o pregunta..." : "¿Qué avanzó este ítem?"}
+            className="flex-1 text-sm bg-transparent focus:outline-none min-w-0"
+            users={users}
+          />
+          <button onClick={submit}
+            disabled={!draft.trim() || addNoteMutation.isPending || addUpdateMutation.isPending}
+            className={cn("shrink-0 w-7 h-7 rounded-full flex items-center justify-center transition-all",
+              draft.trim()
+                ? "bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm"
+                : "bg-slate-100 text-slate-300")}>
+            {(addNoteMutation.isPending || addUpdateMutation.isPending)
+              ? <Loader2 className="h-3 w-3 animate-spin" />
+              : <ArrowRight className="h-3 w-3" />}
+          </button>
+        </div>
       </div>
     </div>
   );
