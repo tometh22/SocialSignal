@@ -14,7 +14,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import {
   ClipboardList, MessageSquare, X, Send, Trash2, Pencil,
   AlertTriangle, Loader2, User, EyeOff, Eye,
-  ChevronDown, ChevronRight, ChevronLeft, Zap, CheckCircle2,
+  ChevronDown, ChevronRight, ChevronLeft, ChevronUp, Zap, CheckCircle2,
   Circle, MoreHorizontal, Plus, Tag,
   Sparkles, Brain, TrendingUp, TrendingDown,
   Shield, Target, RefreshCw, Lightbulb, ArrowRight,
@@ -1036,8 +1036,8 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.18, ease: 'easeOut' }}
             className="overflow-hidden">
-            <div className="px-4 pb-3 pt-2 ml-5 border-l-2 border-slate-200/80 space-y-2">
-              {/* Custom item: title + description in a grid */}
+            <div className="px-4 pb-3 pt-2 ml-5 border-l-2 border-slate-200/80 space-y-2.5">
+              {/* Custom item: title + description */}
               {item.isCustom && (
                 <div className="grid grid-cols-2 gap-2">
                   <div className="rounded-lg bg-indigo-50/60 px-2.5 py-2 border border-indigo-100">
@@ -1051,7 +1051,7 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
                 </div>
               )}
 
-              {/* Estado actual + Próximo paso — the two most important fields */}
+              {/* Estado actual + Próximo paso */}
               <div className="grid grid-cols-2 gap-2">
                 <div className={cn("rounded-lg px-2.5 py-2 border",
                   item.healthStatus === 'rojo' ? "bg-red-50 border-red-100" :
@@ -1066,17 +1066,27 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
                 </div>
               </div>
 
-              {/* Riesgo — always editable, orange when populated, dashed when empty */}
-              <div className={cn("flex items-start gap-1.5 rounded-lg px-2.5 py-2 border transition-colors",
-                item.mainRisk ? "bg-orange-50 border-orange-100" : "bg-slate-50 border-dashed border-slate-200")}>
-                <Shield className={cn("h-3 w-3 shrink-0 mt-0.5", item.mainRisk ? "text-orange-500" : "text-slate-300")} />
-                <div className="flex-1 min-w-0">
-                  <p className={cn("text-[9px] font-bold tracking-wider uppercase mb-1", item.mainRisk ? "text-orange-500" : "text-slate-400")}>Riesgo principal</p>
-                  <InlineText value={item.mainRisk} placeholder="¿Cuál es el riesgo principal?" onSave={v => onUpdate({ mainRisk: v })} className="text-xs" />
+              {/* Unified activity thread */}
+              <div className="border-t border-slate-100 pt-2.5">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-[9px] font-bold tracking-wider uppercase text-slate-400">Actividad</p>
+                  {onOpenNotes && (
+                    <button onClick={onOpenNotes}
+                      className="text-[10px] text-indigo-500 hover:text-indigo-700 font-medium flex items-center gap-0.5">
+                      Ver todo <ArrowRight className="h-2.5 w-2.5" />
+                    </button>
+                  )}
                 </div>
+                <ItemThread
+                  projectId={item.projectId}
+                  customId={item.customId}
+                  currentUserId={currentUserId}
+                  users={users}
+                  onOpenFull={onOpenNotes}
+                />
               </div>
 
-              {/* Footer: owner, deadline, badges, nav, notes */}
+              {/* Footer: metadata */}
               <div className="flex items-center gap-1.5 pt-1.5 border-t border-slate-100 flex-wrap">
                 <OwnerSelect value={item.ownerId} name={item.ownerName} onChange={v => onUpdate({ ownerId: v })} users={users} />
                 <DeadlinePicker value={item.deadline} isOverdue={item.isOverdue} onChange={v => onUpdate({ deadline: v })} />
@@ -1084,6 +1094,12 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
                 <LevelBadge value={item.marginStatus} onChange={v => onUpdate({ marginStatus: v })} label="Rentabilidad" type="margin" />
                 <LevelBadge value={item.teamStrain} onChange={v => onUpdate({ teamStrain: v })} label="Carga equipo" type="team" />
                 <DecisionBadge value={item.decisionNeeded} onChange={v => onUpdate({ decisionNeeded: v })} />
+                {item.mainRisk && (
+                  <div className="flex items-center gap-1 text-[10px] text-orange-600 bg-orange-50 border border-orange-100 rounded px-1.5 py-0.5">
+                    <Shield className="h-2.5 w-2.5" />
+                    <span className="truncate max-w-[100px]">{item.mainRisk}</span>
+                  </div>
+                )}
                 <div className="flex-1" />
                 {(hasPrev || hasNext) && (
                   <div className="flex items-center gap-0.5">
@@ -1097,23 +1113,216 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
                     </button>
                   </div>
                 )}
-                {onOpenNotes && (
-                  <button onClick={onOpenNotes}
-                    className={cn("flex items-center gap-1 text-[11px] rounded-md px-2 py-1 transition-colors font-medium",
-                      isSelected ? "text-indigo-600 bg-indigo-50" :
-                      item.noteCount > 0 ? "text-indigo-500 hover:bg-indigo-50" :
-                      "text-slate-400 hover:text-slate-600 hover:bg-slate-100")}>
-                    <MessageSquare className="h-3 w-3" />
-                    {item.noteCount > 0
-                      ? <span className="text-[10px]">{item.noteCount}</span>
-                      : <span className="text-[10px]">Notas</span>}
-                  </button>
-                )}
               </div>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
+    </div>
+  );
+}
+
+// ─── Unified activity thread (updates + notes merged) ────────────────────────
+
+type ThreadEntry = {
+  kind: 'update' | 'note';
+  id: number;
+  content: string;
+  authorId: number | null;
+  authorName: string | null;
+  createdAt: string;
+};
+
+function ItemThread({ projectId, customId, currentUserId, users = [], onOpenFull }: {
+  projectId?: number; customId?: number; currentUserId?: number | null;
+  users?: AppUser[]; onOpenFull?: () => void;
+}) {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const [draft, setDraft] = useState('');
+  const [postAs, setPostAs] = useState<'note' | 'update'>('note');
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editText, setEditText] = useState('');
+
+  const updatesUrl = projectId
+    ? `/api/status-semanal/${projectId}/updates`
+    : `/api/status-semanal/custom/${customId}/updates`;
+  const updatesCacheKey = projectId
+    ? ['/api/status-semanal', projectId, 'updates']
+    : ['/api/status-semanal/custom', customId, 'updates'];
+
+  const notesUrl = projectId
+    ? `/api/status-semanal/${projectId}/notes`
+    : `/api/status-semanal/custom/${customId}/notes`;
+  const notesCacheKey = projectId
+    ? ['/api/status-semanal', projectId, 'notes']
+    : ['/api/status-semanal/custom', customId, 'notes'];
+
+  const { data: updateEntries = [] } = useQuery<UpdateEntry[]>({
+    queryKey: updatesCacheKey,
+    queryFn: async () => { const r = await authFetch(updatesUrl); return r.json(); },
+  });
+
+  const { data: notes = [] } = useQuery<Note[]>({
+    queryKey: notesCacheKey,
+    queryFn: async () => { const r = await authFetch(notesUrl); return r.json(); },
+  });
+
+  const thread: ThreadEntry[] = [
+    ...updateEntries.map(e => ({ kind: 'update' as const, ...e })),
+    ...notes.map(n => ({ kind: 'note' as const, id: n.id, content: n.content, authorId: n.authorId, authorName: n.authorName, createdAt: n.createdAt })),
+  ].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+
+  const addNoteMutation = useMutation({
+    mutationFn: (content: string) => mutationFetch(notesUrl, 'POST', { content }),
+    onSuccess: () => {
+      queryClient.refetchQueries({ queryKey: notesCacheKey });
+      queryClient.refetchQueries({ queryKey: ['/api/status-semanal'] });
+      if (customId) queryClient.refetchQueries({ queryKey: ['/api/status-semanal/custom'] });
+    },
+    onError: (err: Error) => toast({ title: 'Error', description: err.message, variant: 'destructive' }),
+  });
+
+  const addUpdateMutation = useMutation({
+    mutationFn: (content: string) => mutationFetch(updatesUrl, 'POST', { content }),
+    onSuccess: () => {
+      queryClient.refetchQueries({ queryKey: updatesCacheKey });
+      queryClient.refetchQueries({ queryKey: ['/api/status-semanal'] });
+      if (customId) queryClient.refetchQueries({ queryKey: ['/api/status-semanal/custom'] });
+    },
+    onError: (err: Error) => toast({ title: 'Error', description: err.message, variant: 'destructive' }),
+  });
+
+  const editUpdateMutation = useMutation({
+    mutationFn: ({ entryId, content }: { entryId: number; content: string }) =>
+      mutationFetch(`/api/status-semanal/updates/${entryId}`, 'PATCH', { content }),
+    onSuccess: () => {
+      setEditingId(null);
+      queryClient.refetchQueries({ queryKey: updatesCacheKey });
+    },
+    onError: (err: Error) => toast({ title: 'Error al editar', description: err.message, variant: 'destructive' }),
+  });
+
+  const submit = () => {
+    const t = draft.trim();
+    if (!t) return;
+    setDraft('');
+    if (postAs === 'note') addNoteMutation.mutate(t);
+    else addUpdateMutation.mutate(t);
+  };
+
+  const SHOW_RECENT = 5;
+  const visibleThread = thread.slice(-SHOW_RECENT);
+  const hiddenCount = thread.length - SHOW_RECENT;
+
+  return (
+    <div>
+      {/* Thread entries */}
+      <div className="space-y-2.5 mb-2.5">
+        {hiddenCount > 0 && (
+          <button onClick={onOpenFull}
+            className="flex items-center gap-1 text-[10px] text-indigo-500 hover:text-indigo-700 font-medium">
+            <ChevronUp className="h-3 w-3" />
+            Ver {hiddenCount} entradas anteriores
+          </button>
+        )}
+        {thread.length === 0 && (
+          <p className="text-[11px] text-slate-400 italic text-center py-1">Sin actividad — agregá un update o dejá un comentario</p>
+        )}
+        {visibleThread.map(entry => {
+          const isOwn = entry.authorId != null && entry.authorId === currentUserId;
+          const edKey = `${entry.kind}-${entry.id}`;
+          const canEdit = isOwn && entry.kind === 'update';
+          return (
+            <div key={edKey} className="flex items-start gap-2 group">
+              <div className={cn("h-5 w-5 rounded-full flex items-center justify-center text-[8px] font-bold shrink-0 mt-0.5",
+                isOwn ? "bg-indigo-100 text-indigo-700" : "bg-slate-100 text-slate-600")}>
+                {initials(entry.authorName ?? '?')}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5 mb-0.5">
+                  <span className="text-[10px] font-semibold text-slate-700">{entry.authorName?.split(' ')[0] ?? 'Usuario'}</span>
+                  <span className="text-[9px] text-slate-400">{shortDateTime(entry.createdAt)}</span>
+                  <span className={cn("text-[8px] font-bold uppercase tracking-wide px-1 rounded border",
+                    entry.kind === 'update'
+                      ? "text-emerald-700 bg-emerald-50 border-emerald-100"
+                      : "text-slate-500 bg-slate-50 border-slate-100")}>
+                    {entry.kind === 'update' ? 'update' : 'nota'}
+                  </span>
+                  {canEdit && editingId !== edKey && (
+                    <button onClick={() => { setEditingId(edKey); setEditText(entry.content); }}
+                      className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity p-0.5 text-slate-300 hover:text-indigo-400">
+                      <Pencil className="h-2.5 w-2.5" />
+                    </button>
+                  )}
+                </div>
+                {editingId === edKey ? (
+                  <div className="space-y-1">
+                    <input value={editText} autoFocus
+                      onChange={e => setEditText(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') { e.preventDefault(); if (editText.trim()) editUpdateMutation.mutate({ entryId: entry.id, content: editText }); }
+                        if (e.key === 'Escape') setEditingId(null);
+                      }}
+                      className="w-full text-xs border border-indigo-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-400 bg-white"
+                    />
+                    <div className="flex gap-1">
+                      <button onClick={() => { if (editText.trim()) editUpdateMutation.mutate({ entryId: entry.id, content: editText }); }}
+                        disabled={!editText.trim() || editUpdateMutation.isPending}
+                        className="px-2 py-0.5 bg-indigo-600 text-white rounded text-[10px] hover:bg-indigo-700 disabled:opacity-40">
+                        {editUpdateMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Guardar'}
+                      </button>
+                      <button onClick={() => setEditingId(null)}
+                        className="px-2 py-0.5 bg-slate-100 text-slate-500 rounded text-[10px] hover:bg-slate-200">
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-wrap">{entry.content}</p>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Compose input */}
+      <div className="flex items-center gap-1.5 bg-slate-50 rounded-lg border border-slate-200 px-2 py-1.5">
+        <div className="flex gap-0.5 shrink-0">
+          <button onClick={() => setPostAs('note')}
+            className={cn("text-[9px] px-1.5 py-0.5 rounded font-semibold transition-colors",
+              postAs === 'note'
+                ? "bg-white border border-slate-200 text-slate-700 shadow-sm"
+                : "text-slate-400 hover:text-slate-600")}>
+            Nota
+          </button>
+          <button onClick={() => setPostAs('update')}
+            className={cn("text-[9px] px-1.5 py-0.5 rounded font-semibold transition-colors",
+              postAs === 'update'
+                ? "bg-white border border-emerald-200 text-emerald-700 shadow-sm"
+                : "text-slate-400 hover:text-slate-600")}>
+            Update
+          </button>
+        </div>
+        <div className="w-px h-3 bg-slate-200 shrink-0" />
+        <MentionInput
+          value={draft}
+          onChange={setDraft}
+          onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(); } }}
+          placeholder={postAs === 'note' ? "Pregunta o comentario..." : "¿Qué avanzó?"}
+          className="flex-1 text-xs bg-transparent focus:outline-none min-w-0 py-0"
+          users={users}
+        />
+        <button onClick={submit}
+          disabled={!draft.trim() || addNoteMutation.isPending || addUpdateMutation.isPending}
+          className={cn("shrink-0 p-1 rounded transition-colors",
+            draft.trim() ? "text-indigo-600 hover:bg-indigo-100" : "text-slate-300")}>
+          {(addNoteMutation.isPending || addUpdateMutation.isPending)
+            ? <Loader2 className="h-3 w-3 animate-spin" />
+            : <ArrowRight className="h-3 w-3" />}
+        </button>
+      </div>
     </div>
   );
 }
