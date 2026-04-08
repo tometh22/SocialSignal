@@ -93,9 +93,58 @@ function createSheetsClient() {
   return google.sheets({ version: 'v4', auth });
 }
 
+function aggregateQuarter(months: MonthData[], year: number, quarter: number): MonthData | null {
+  if (months.length === 0) return null;
+
+  const sorted = [...months].sort((a, b) => a.periodKey.localeCompare(b.periodKey));
+  const last = sorted[sorted.length - 1];
+
+  const sumField = (key: keyof MonthData): number | null => {
+    const vals = sorted.map(m => m[key] as number | null).filter((v): v is number => v != null);
+    return vals.length > 0 ? vals.reduce((a, b) => a + b, 0) : null;
+  };
+
+  const ventasDelMes = sumField('ventasDelMes');
+  const ebitOperativo = sumField('ebitOperativo');
+  const beneficioNeto = sumField('beneficioNeto');
+  const cashflow = sumField('cashflow');
+
+  const margenOperativo = ventasDelMes && ebitOperativo != null ? (ebitOperativo / ventasDelMes) * 100 : null;
+  const margenNeto = ventasDelMes && beneficioNeto != null ? (beneficioNeto / ventasDelMes) * 100 : null;
+
+  const markupVals = sorted.map(m => m.markup).filter((v): v is number => v != null);
+  const markup = markupVals.length > 0 ? markupVals.reduce((a, b) => a + b, 0) / markupVals.length : null;
+
+  return {
+    periodKey: `${year}-Q${quarter}`,
+    year,
+    month: (quarter - 1) * 3 + 1,
+    monthLabel: `Q${quarter} ${year}`,
+    ventasDelMes,
+    ebitOperativo,
+    beneficioNeto,
+    margenOperativo,
+    margenNeto,
+    markup,
+    proyeccionResultado: last.proyeccionResultado,
+    // Balance fields are snapshots — use last available month in the quarter
+    activoLiquido: last.activoLiquido,
+    activoMedPlazo: last.activoMedPlazo,
+    clientesACobrar: last.clientesACobrar,
+    activoTotal: last.activoTotal,
+    pasivoImpuestosUSA: last.pasivoImpuestosUSA,
+    pasivoFacturacionAdelantada: last.pasivoFacturacionAdelantada,
+    pasivoProveedores: last.pasivoProveedores,
+    pasivoTotal: last.pasivoTotal,
+    balanceNeto: last.balanceNeto,
+    cashflow60Dias: last.cashflow60Dias,
+  };
+}
+
 export async function fetchResumenEjecutivoDirectly(
   filterYear?: number,
-  filterMonth?: number
+  filterMonth?: number,
+  filterQuarter?: number
 ): Promise<{ data: MonthData[]; filtered: MonthData | null; available: string[] }> {
   const sheets = createSheetsClient();
   const response = await sheets.spreadsheets.values.get({
@@ -174,7 +223,11 @@ export async function fetchResumenEjecutivoDirectly(
   const available = allData.map(d => d.periodKey);
   let filtered: MonthData | null = null;
 
-  if (filterYear && filterMonth) {
+  if (filterYear && filterQuarter && filterQuarter >= 1 && filterQuarter <= 4) {
+    const q0 = (filterQuarter - 1) * 3 + 1;
+    const quarterMonths = allData.filter(d => d.year === filterYear && d.month >= q0 && d.month <= q0 + 2);
+    filtered = aggregateQuarter(quarterMonths, filterYear, filterQuarter);
+  } else if (filterYear && filterMonth) {
     const key = `${filterYear}-${String(filterMonth).padStart(2, '0')}`;
     filtered = allData.find(d => d.periodKey === key) || null;
   }

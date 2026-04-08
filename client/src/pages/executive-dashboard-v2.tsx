@@ -12,6 +12,12 @@ import { RefreshCw, TrendingUp, TrendingDown, DollarSign, BarChart3, Wallet, Arr
 import { ResponsiveContainer, AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RTooltip, Legend, ReferenceLine, ComposedChart, Line } from "recharts";
 
 const MONTHS = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
+const QUARTERS = [
+  { label: "Q1 — Ene·Feb·Mar", value: 1 },
+  { label: "Q2 — Abr·May·Jun", value: 2 },
+  { label: "Q3 — Jul·Ago·Sep", value: 3 },
+  { label: "Q4 — Oct·Nov·Dic", value: 4 },
+];
 
 const fmt = (n: number | null | undefined) =>
   n == null ? "—" : `$${n.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -24,15 +30,19 @@ const fmtPct = (n: number | null | undefined) =>
 
 export default function ExecutiveDashboardV2() {
   const now = new Date();
+  const [viewMode, setViewMode] = useState<"month" | "quarter">("month");
   const [selectedYear, setSelectedYear] = useState(now.getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1);
+  const [selectedQuarter, setSelectedQuarter] = useState(Math.ceil((now.getMonth() + 1) / 3));
+
+  const queryUrl = viewMode === "quarter"
+    ? `/api/v2/executive/dashboard?year=${selectedYear}&quarter=${selectedQuarter}`
+    : `/api/v2/executive/dashboard?year=${selectedYear}&month=${selectedMonth}`;
 
   const { data, isLoading, refetch, isFetching } = useQuery<any>({
-    queryKey: ["/api/v2/executive/dashboard", selectedYear, selectedMonth],
+    queryKey: ["/api/v2/executive/dashboard", viewMode, selectedYear, viewMode === "month" ? selectedMonth : selectedQuarter],
     queryFn: () =>
-      fetch(`/api/v2/executive/dashboard?year=${selectedYear}&month=${selectedMonth}`, {
-        credentials: "include",
-      }).then((r) => {
+      fetch(queryUrl, { credentials: "include" }).then((r) => {
         if (!r.ok) throw new Error("Error al cargar datos");
         return r.json();
       }),
@@ -63,12 +73,39 @@ export default function ExecutiveDashboardV2() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Select value={String(selectedMonth)} onValueChange={(v) => setSelectedMonth(parseInt(v))}>
-            <SelectTrigger className="w-24"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {MONTHS.map((m, i) => <SelectItem key={i} value={String(i + 1)}>{m}</SelectItem>)}
-            </SelectContent>
-          </Select>
+          {/* Mode toggle */}
+          <div className="flex rounded-md border overflow-hidden text-sm">
+            <button
+              className={`px-3 py-1.5 font-medium transition-colors ${viewMode === "month" ? "bg-indigo-600 text-white" : "bg-white text-slate-600 hover:bg-slate-50"}`}
+              onClick={() => setViewMode("month")}
+            >
+              Mes
+            </button>
+            <button
+              className={`px-3 py-1.5 font-medium transition-colors ${viewMode === "quarter" ? "bg-indigo-600 text-white" : "bg-white text-slate-600 hover:bg-slate-50"}`}
+              onClick={() => setViewMode("quarter")}
+            >
+              Trimestre
+            </button>
+          </div>
+
+          {/* Month OR Quarter selector */}
+          {viewMode === "month" ? (
+            <Select value={String(selectedMonth)} onValueChange={(v) => setSelectedMonth(parseInt(v))}>
+              <SelectTrigger className="w-24"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {MONTHS.map((m, i) => <SelectItem key={i} value={String(i + 1)}>{m}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          ) : (
+            <Select value={String(selectedQuarter)} onValueChange={(v) => setSelectedQuarter(parseInt(v))}>
+              <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {QUARTERS.map(q => <SelectItem key={q.value} value={String(q.value)}>{q.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          )}
+
           <Select value={String(selectedYear)} onValueChange={(v) => setSelectedYear(parseInt(v))}>
             <SelectTrigger className="w-20"><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -92,7 +129,7 @@ export default function ExecutiveDashboardV2() {
         <Card>
           <CardContent className="p-8 text-center">
             <AlertTriangle className="h-10 w-10 text-amber-500 mx-auto mb-3" />
-            <p className="font-medium">No hay datos para {MONTHS[selectedMonth - 1]} {selectedYear}</p>
+            <p className="font-medium">No hay datos para {viewMode === "quarter" ? `Q${selectedQuarter} ${selectedYear}` : `${MONTHS[selectedMonth - 1]} ${selectedYear}`}</p>
             <p className="text-sm text-muted-foreground mt-1">Verificá que el Excel tenga datos para este período.</p>
           </CardContent>
         </Card>
@@ -100,9 +137,14 @@ export default function ExecutiveDashboardV2() {
         <>
           {/* Period indicator */}
           <div className="flex items-center gap-2">
-            <Badge variant="outline" className="text-sm px-3 py-1">
-              {d.monthLabel} — {d.year}
+            <Badge variant="outline" className={`text-sm px-3 py-1 ${viewMode === "quarter" ? "border-indigo-300 text-indigo-700 bg-indigo-50" : ""}`}>
+              {viewMode === "quarter" ? `Q${selectedQuarter} ${selectedYear}` : `${d.monthLabel} — ${d.year}`}
             </Badge>
+            {viewMode === "quarter" && (
+              <Badge className="text-[10px] bg-indigo-100 text-indigo-700 border border-indigo-200">
+                Trimestral · suma 3 meses
+              </Badge>
+            )}
             <span className="text-xs text-muted-foreground">Period key: {d.periodKey}</span>
           </div>
 
@@ -110,7 +152,7 @@ export default function ExecutiveDashboardV2() {
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
             {[
               { label: "EBIT Operativo", value: fmt(d.ebitOperativo), pct: fmtPct(d.margenOperativo), color: kpiColor(d.ebitOperativo, 0), icon: TrendingUp },
-              { label: "Ventas del Mes", value: fmt(d.ventasDelMes), pct: null, color: "text-emerald-700", icon: DollarSign },
+              { label: viewMode === "quarter" ? "Ventas del Trimestre" : "Ventas del Mes", value: fmt(d.ventasDelMes), pct: null, color: "text-emerald-700", icon: DollarSign },
               { label: "Cashflow", value: fmt(d.cashflow), pct: null, color: kpiColor(d.cashflow, 0), icon: d.cashflow && d.cashflow >= 0 ? ArrowUp : ArrowDown },
               { label: "Margen Neto", value: fmtPct(d.margenNeto), pct: null, color: kpiColor(d.margenNeto, 15), icon: BarChart3 },
               { label: "Markup", value: d.markup != null ? d.markup.toFixed(2) : "—", pct: null, color: kpiColor(d.markup, 2.5), icon: TrendingUp },
@@ -140,7 +182,7 @@ export default function ExecutiveDashboardV2() {
               </CardHeader>
               <CardContent className="space-y-2">
                 {[
-                  { label: "Ventas del mes", value: d.ventasDelMes, bold: false, pct: 100 },
+                  { label: viewMode === "quarter" ? "Ventas del trimestre" : "Ventas del mes", value: d.ventasDelMes, bold: false, pct: 100 },
                   { label: "– Costos (implícito)", value: d.ventasDelMes != null && d.ebitOperativo != null ? -(d.ventasDelMes - d.ebitOperativo) : null, bold: false, pct: d.ventasDelMes ? ((d.ventasDelMes - (d.ebitOperativo || 0)) / d.ventasDelMes * 100) : null, negative: true },
                   { label: "= EBIT Operativo", value: d.ebitOperativo, bold: true, pct: d.margenOperativo },
                   { label: "– Impuestos (impl.)", value: d.ebitOperativo != null && d.beneficioNeto != null ? -(d.ebitOperativo - d.beneficioNeto) : null, bold: false, negative: true },
