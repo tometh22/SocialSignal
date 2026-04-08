@@ -2,7 +2,7 @@
  * Executive Dashboard V2 - Reads directly from Google Sheets
  * No ETL, no DB intermediary. Same data source as Looker Studio.
  */
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -34,6 +34,26 @@ export default function ExecutiveDashboardV2() {
   const [selectedYear, setSelectedYear] = useState(now.getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1);
   const [selectedQuarter, setSelectedQuarter] = useState(Math.ceil((now.getMonth() + 1) / 3));
+  const [autoSelected, setAutoSelected] = useState(false);
+
+  // On first load, query the backend without a specific month so it returns
+  // the latest period that actually has data (avoids defaulting to an incomplete current month).
+  const { data: initData } = useQuery<any>({
+    queryKey: ["init-period"],
+    queryFn: () =>
+      fetch("/api/v2/executive/dashboard", { credentials: "include" }).then(r => r.ok ? r.json() : null),
+    staleTime: Infinity,
+    enabled: !autoSelected,
+  });
+
+  useEffect(() => {
+    if (!autoSelected && initData?.filtered?.month && initData?.filtered?.year) {
+      setAutoSelected(true);
+      setSelectedYear(initData.filtered.year);
+      setSelectedMonth(initData.filtered.month);
+      setSelectedQuarter(Math.ceil(initData.filtered.month / 3));
+    }
+  }, [initData, autoSelected]);
 
   const queryUrl = viewMode === "quarter"
     ? `/api/v2/executive/dashboard?year=${selectedYear}&quarter=${selectedQuarter}`

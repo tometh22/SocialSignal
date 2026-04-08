@@ -104,7 +104,12 @@ function aggregateMonths(
   if (months.length === 0) return null;
 
   const sorted = [...months].sort((a, b) => a.periodKey.localeCompare(b.periodKey));
-  const last = sorted[sorted.length - 1];
+
+  // For snapshot fields (balance), use the LAST month that actually has data,
+  // not just the last chronological month (which may be a future empty row).
+  const lastWithBalance = [...sorted].reverse().find(m => m.activoLiquido != null) ?? sorted[sorted.length - 1];
+  const lastWithProjection = [...sorted].reverse().find(m => m.proyeccionResultado != null) ?? sorted[sorted.length - 1];
+  const lastWithCashflow60 = [...sorted].reverse().find(m => m.cashflow60Dias != null) ?? sorted[sorted.length - 1];
 
   const sumField = (key: 'ventasDelMes' | 'ebitOperativo' | 'beneficioNeto' | 'cashflow'): number | null => {
     const vals = sorted.map(m => m[key]).filter((v): v is number => v != null);
@@ -133,19 +138,19 @@ function aggregateMonths(
     margenOperativo,
     margenNeto,
     markup,
-    proyeccionResultado: last.proyeccionResultado,
-    // Balance fields are snapshots — use last available month
-    activoLiquido: last.activoLiquido,
-    activoMedPlazo: last.activoMedPlazo,
-    clientesACobrar: last.clientesACobrar,
-    activoTotal: last.activoTotal,
-    pasivoImpuestosUSA: last.pasivoImpuestosUSA,
-    pasivoFacturacionAdelantada: last.pasivoFacturacionAdelantada,
-    pasivoProveedores: last.pasivoProveedores,
-    pasivoTotal: last.pasivoTotal,
-    balanceNeto: last.balanceNeto,
+    proyeccionResultado: lastWithProjection.proyeccionResultado,
+    // Balance snapshots: use last month that actually has data (avoids future empty rows)
+    activoLiquido: lastWithBalance.activoLiquido,
+    activoMedPlazo: lastWithBalance.activoMedPlazo,
+    clientesACobrar: lastWithBalance.clientesACobrar,
+    activoTotal: lastWithBalance.activoTotal,
+    pasivoImpuestosUSA: lastWithBalance.pasivoImpuestosUSA,
+    pasivoFacturacionAdelantada: lastWithBalance.pasivoFacturacionAdelantada,
+    pasivoProveedores: lastWithBalance.pasivoProveedores,
+    pasivoTotal: lastWithBalance.pasivoTotal,
+    balanceNeto: lastWithBalance.balanceNeto,
     cashflow,
-    cashflow60Dias: last.cashflow60Dias,
+    cashflow60Dias: lastWithCashflow60.cashflow60Dias,
   };
 }
 
