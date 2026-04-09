@@ -943,35 +943,36 @@ function AlertCard({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, c
 
 // ─── Compact row (Verde) ──────────────────────────────────────────────────────
 
-function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, expanded, onToggle, onNext, onPrev, hasNext, hasPrev, currentUserId, kbFocused, dragHandleProps, bulkMode, checked, onCheck, alertMode }: {
+function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, expanded, onToggle, onNext, onPrev, hasNext, hasPrev, currentUserId, kbFocused, dragHandleProps, bulkMode, checked, onCheck, accent }: {
   item: Item; users: AppUser[]; isSelected: boolean; currentUserId?: number | null;
   onOpenNotes?: () => void; onUpdate: (d: Record<string, any>) => void; onRemove: () => void;
   expanded: boolean; onToggle: () => void; onNext?: () => void; onPrev?: () => void; hasNext?: boolean; hasPrev?: boolean;
   kbFocused?: boolean; dragHandleProps?: Record<string, any>; bulkMode?: boolean; checked?: boolean; onCheck?: (v: boolean) => void;
-  alertMode?: boolean; staleMode?: boolean;
+  accent?: 'red' | 'amber' | 'none'; staleMode?: boolean;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const decMeta = dm(item.decisionNeeded);
 
+  const accentBorder = accent === 'red' ? 'border-l-red-500' : accent === 'amber' ? 'border-l-amber-400' : 'border-l-transparent';
+
   return (
     <div className={cn(
-      "transition-colors duration-100",
-      isSelected ? "bg-indigo-50/60" : "hover:bg-slate-50/70",
-      expanded && "bg-slate-50/50",
-      kbFocused && "ring-2 ring-inset ring-indigo-300"
+      "border-l-[3px] transition-colors duration-100 group",
+      accentBorder,
+      isSelected ? "bg-indigo-50/40" : "hover:bg-slate-50/60",
+      expanded && "bg-slate-50/40",
+      kbFocused && "outline outline-2 outline-indigo-300 outline-offset-[-2px]"
     )}>
       {/* Main row */}
-      <div className="flex items-center gap-3 px-5 py-3 cursor-pointer" onClick={onToggle}>
+      <div className="flex items-center gap-3 pl-4 pr-5 py-3.5 cursor-pointer" onClick={onToggle}>
         {dragHandleProps && (
-          <div {...dragHandleProps} className="shrink-0 cursor-grab text-slate-300 hover:text-slate-500 touch-none" onClick={e => e.stopPropagation()}>
+          <div {...dragHandleProps} className="shrink-0 cursor-grab text-slate-200 hover:text-slate-400 touch-none opacity-0 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
             <GripVertical className="h-3.5 w-3.5" />
           </div>
         )}
         {bulkMode && (
           <div className="shrink-0" onClick={e => { e.stopPropagation(); onCheck?.(!checked); }}>
-            {checked
-              ? <CheckSquare className="h-4 w-4 text-indigo-500" />
-              : <Square className="h-4 w-4 text-slate-300" />}
+            {checked ? <CheckSquare className="h-4 w-4 text-indigo-500" /> : <Square className="h-4 w-4 text-slate-300" />}
           </div>
         )}
         <div className="shrink-0" onClick={e => e.stopPropagation()}>
@@ -979,29 +980,24 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
         </div>
 
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 min-w-0">
-            {item.isCustom && <Tag className="h-3 w-3 text-slate-400 shrink-0" />}
-            <span className="font-medium text-[14px] text-slate-900 truncate leading-tight" title={item.title}>{item.title}</span>
-            {item.subtitle && <span className="text-slate-400 text-xs truncate hidden sm:block" title={item.subtitle}>{item.subtitle}</span>}
-            <span className="shrink-0"><FreshnessIndicator updatedAt={item.updatedAt} updatedByName={item.updatedByName} updatedById={item.updatedById} currentUserId={currentUserId} /></span>
+          <div className="flex items-baseline gap-2 min-w-0">
+            {item.isCustom && <Tag className="h-3 w-3 text-slate-300 shrink-0 self-center" />}
+            <span className="font-medium text-[14px] tracking-tight text-slate-900 truncate" title={item.title}>{item.title}</span>
+            {item.subtitle && <span className="text-slate-400 text-[12px] truncate hidden md:block shrink-0" title={item.subtitle}>{item.subtitle}</span>}
+            <span className="shrink-0 self-center"><FreshnessIndicator updatedAt={item.updatedAt} updatedByName={item.updatedByName} updatedById={item.updatedById} currentUserId={currentUserId} /></span>
           </div>
-          {!expanded && item.currentAction && (
+          {!expanded && (
             <p
-              className="text-[13px] text-slate-500 truncate mt-0.5 leading-tight"
-              title={`${item.currentAction} — click para editar`}
+              className={cn("text-[12px] truncate mt-0.5 leading-snug",
+                item.currentAction ? "text-slate-400" : "text-slate-300 italic")}
               onClick={e => { e.stopPropagation(); onToggle(); }}
             >
-              {item.currentAction}
-            </p>
-          )}
-          {!expanded && !item.currentAction && (
-            <p className="text-[13px] text-slate-300 mt-0.5 italic" onClick={e => { e.stopPropagation(); onToggle(); }}>
-              Agregar estado actual...
+              {item.currentAction || "Agregar estado actual..."}
             </p>
           )}
         </div>
 
-        <div className="flex items-center gap-1 shrink-0" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center gap-1.5 shrink-0 ml-2" onClick={e => e.stopPropagation()}>
           {decMeta.urgent && (
             <DecisionBadge value={item.decisionNeeded} onChange={v => onUpdate({ decisionNeeded: v })} />
           )}
@@ -1009,15 +1005,14 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
           <DeadlinePicker value={item.deadline} isOverdue={item.isOverdue} onChange={v => onUpdate({ deadline: v })} />
           {onOpenNotes && item.noteCount > 0 && (
             <button onClick={onOpenNotes}
-              className={cn("flex items-center gap-0.5 p-1 rounded transition-colors",
-                isSelected ? "text-indigo-600" : "text-slate-400 hover:text-slate-600")}>
+              className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
               <MessageSquare className="h-3 w-3" />
               <span className="text-[10px] font-medium">{item.noteCount}</span>
             </button>
           )}
           <Popover open={menuOpen} onOpenChange={setMenuOpen}>
             <PopoverTrigger asChild>
-              <button className="p-1 rounded hover:bg-slate-100 text-slate-300 hover:text-slate-500">
+              <button className="p-1 rounded hover:bg-slate-100 text-slate-300 hover:text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity">
                 <MoreHorizontal className="h-3.5 w-3.5" />
               </button>
             </PopoverTrigger>
@@ -1032,88 +1027,76 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
         </div>
       </div>
 
-      {/* Expanded detail panel */}
+      {/* Expanded panel — focused, no activity inline */}
       <AnimatePresence>
         {expanded && (
           <motion.div
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.18, ease: 'easeOut' }}
+            transition={{ duration: 0.16, ease: [0.4, 0, 0.2, 1] }}
             className="overflow-hidden">
-            <div className="mx-5 mb-4 mt-1 rounded-xl bg-slate-50 border border-slate-100 overflow-hidden">
-              {/* Estado actual + Próximo paso */}
-              <div className="grid grid-cols-2 divide-x divide-slate-100">
-                <div className="px-4 py-3">
-                  <p className="text-[11px] font-semibold text-slate-400 mb-1.5 flex items-center gap-1.5">
-                    <span className={cn("w-1.5 h-1.5 rounded-full shrink-0",
-                      item.healthStatus === 'rojo' ? "bg-red-500" :
-                      item.healthStatus === 'amarillo' ? "bg-amber-400" : "bg-emerald-400")} />
-                    Estado actual
-                  </p>
-                  <InlineText value={item.currentAction} placeholder="¿Qué está pasando ahora?" onSave={v => onUpdate({ currentAction: v })} multiline className="text-[13px] leading-relaxed text-slate-700" />
-                </div>
-                <div className="px-4 py-3">
-                  <p className="text-[11px] font-semibold text-slate-400 mb-1.5">Próximo paso</p>
-                  <InlineText value={item.nextMilestone} placeholder="Acción concreta esta semana" onSave={v => onUpdate({ nextMilestone: v })} multiline className="text-[13px] leading-relaxed text-slate-700" />
-                </div>
-              </div>
-
-              {/* Custom item extra fields */}
-              {item.isCustom && (
-                <div className="grid grid-cols-2 divide-x divide-slate-100 border-t border-slate-100">
-                  <div className="px-4 py-3">
-                    <p className="text-[11px] font-semibold text-slate-400 mb-1.5">Título</p>
-                    <InlineText value={item.title} placeholder="Título del ítem" onSave={v => onUpdate({ title: v })} className="text-[13px] font-medium text-slate-800" />
+            <div className="pl-4 pr-5 pb-4">
+              <div className="rounded-xl border border-slate-200/80 bg-white shadow-sm overflow-hidden">
+                {/* Two-column: Estado actual | Próximo paso */}
+                <div className="grid grid-cols-2 divide-x divide-slate-100">
+                  <div className="px-5 py-4">
+                    <p className="text-[10px] font-semibold text-slate-400 tracking-widest uppercase mb-2 flex items-center gap-1.5">
+                      <span className={cn("w-1.5 h-1.5 rounded-full shrink-0 inline-block",
+                        item.healthStatus === 'rojo' ? "bg-red-500" :
+                        item.healthStatus === 'amarillo' ? "bg-amber-400" : "bg-emerald-400")} />
+                      Estado actual
+                    </p>
+                    <InlineText value={item.currentAction} placeholder="¿Qué está pasando ahora?" onSave={v => onUpdate({ currentAction: v })} multiline className="text-[13px] leading-relaxed text-slate-700" />
                   </div>
-                  <div className="px-4 py-3">
-                    <p className="text-[11px] font-semibold text-slate-400 mb-1.5">Descripción</p>
-                    <InlineText value={item.subtitle} placeholder="Contexto del ítem..." onSave={v => onUpdate({ subtitle: v })} multiline className="text-[13px] text-slate-700" />
+                  <div className="px-5 py-4">
+                    <p className="text-[10px] font-semibold text-slate-400 tracking-widest uppercase mb-2">Próximo paso</p>
+                    <InlineText value={item.nextMilestone} placeholder="Acción concreta esta semana" onSave={v => onUpdate({ nextMilestone: v })} multiline className="text-[13px] leading-relaxed text-slate-700" />
                   </div>
                 </div>
-              )}
 
-              {/* Metadata strip */}
-              <div className="flex items-center gap-1.5 px-4 py-2.5 border-t border-slate-100 bg-white/60 flex-wrap">
-                <OwnerSelect value={item.ownerId} name={item.ownerName} onChange={v => onUpdate({ ownerId: v })} users={users} />
-                <DeadlinePicker value={item.deadline} isOverdue={item.isOverdue} onChange={v => onUpdate({ deadline: v })} />
-                <div className="h-3 w-px bg-slate-200 mx-0.5 shrink-0" />
-                <LevelBadge value={item.marginStatus} onChange={v => onUpdate({ marginStatus: v })} label="Rentabilidad" type="margin" />
-                <LevelBadge value={item.teamStrain} onChange={v => onUpdate({ teamStrain: v })} label="Carga equipo" type="team" />
-                <DecisionBadge value={item.decisionNeeded} onChange={v => onUpdate({ decisionNeeded: v })} />
-                {item.mainRisk && (
-                  <div className="flex items-center gap-1 text-[10px] text-orange-600 bg-orange-50 border border-orange-100 rounded px-1.5 py-0.5">
-                    <Shield className="h-2.5 w-2.5" />
-                    <span className="truncate max-w-[120px]">{item.mainRisk}</span>
+                {/* Custom: editable title + subtitle */}
+                {item.isCustom && (
+                  <div className="grid grid-cols-2 divide-x divide-slate-100 border-t border-slate-100 bg-slate-50/40">
+                    <div className="px-5 py-3">
+                      <p className="text-[10px] font-semibold text-slate-400 tracking-widest uppercase mb-1.5">Título</p>
+                      <InlineText value={item.title} placeholder="Título del ítem" onSave={v => onUpdate({ title: v })} className="text-[13px] font-medium text-slate-800" />
+                    </div>
+                    <div className="px-5 py-3">
+                      <p className="text-[10px] font-semibold text-slate-400 tracking-widest uppercase mb-1.5">Descripción</p>
+                      <InlineText value={item.subtitle} placeholder="Contexto del ítem..." onSave={v => onUpdate({ subtitle: v })} multiline className="text-[13px] text-slate-700" />
+                    </div>
                   </div>
                 )}
-                <div className="flex-1" />
-                {(hasPrev || hasNext) && (
-                  <div className="flex items-center gap-0.5">
-                    <button onClick={onPrev} disabled={!hasPrev} className={cn("p-0.5 rounded", hasPrev ? "text-slate-400 hover:bg-slate-100" : "text-slate-200")}><ChevronLeft className="h-3 w-3" /></button>
-                    <button onClick={onNext} disabled={!hasNext} className={cn("p-0.5 rounded", hasNext ? "text-slate-400 hover:bg-slate-100" : "text-slate-200")}><ChevronRight className="h-3 w-3" /></button>
-                  </div>
-                )}
-              </div>
 
-              {/* Activity thread */}
-              <div className="border-t border-slate-100">
-                <div className="flex items-center gap-2 px-4 pt-3 pb-1">
-                  <span className="text-[11px] font-semibold text-slate-400">Actividad</span>
+                {/* Footer: metadata + nav + open full panel */}
+                <div className="flex items-center gap-1.5 px-5 py-2.5 border-t border-slate-100 bg-slate-50/60 flex-wrap">
+                  <OwnerSelect value={item.ownerId} name={item.ownerName} onChange={v => onUpdate({ ownerId: v })} users={users} />
+                  <DeadlinePicker value={item.deadline} isOverdue={item.isOverdue} onChange={v => onUpdate({ deadline: v })} />
+                  <div className="h-3 w-px bg-slate-200 mx-0.5 shrink-0" />
+                  <LevelBadge value={item.marginStatus} onChange={v => onUpdate({ marginStatus: v })} label="Rentabilidad" type="margin" />
+                  <LevelBadge value={item.teamStrain} onChange={v => onUpdate({ teamStrain: v })} label="Carga equipo" type="team" />
+                  <DecisionBadge value={item.decisionNeeded} onChange={v => onUpdate({ decisionNeeded: v })} />
+                  {item.mainRisk && (
+                    <div className="flex items-center gap-1 text-[10px] text-orange-600 bg-orange-50 border border-orange-100 rounded-md px-1.5 py-0.5">
+                      <Shield className="h-2.5 w-2.5" /><span className="truncate max-w-[120px]">{item.mainRisk}</span>
+                    </div>
+                  )}
+                  <div className="flex-1" />
                   {onOpenNotes && (
-                    <button onClick={onOpenNotes} className="ml-auto text-[11px] text-indigo-500 hover:text-indigo-700 font-medium flex items-center gap-0.5">
-                      Ver todo <ArrowRight className="h-2.5 w-2.5" />
+                    <button onClick={onOpenNotes}
+                      className="flex items-center gap-1 text-[11px] font-medium text-indigo-500 hover:text-indigo-700 transition-colors">
+                      <MessageSquare className="h-3 w-3" />
+                      Ver actividad{item.noteCount > 0 && ` · ${item.noteCount}`}
+                      <ArrowRight className="h-3 w-3" />
                     </button>
                   )}
-                </div>
-                <div className="px-4 pb-3">
-                  <ItemThread
-                    projectId={item.projectId}
-                    customId={item.customId}
-                    currentUserId={currentUserId}
-                    users={users}
-                    onOpenFull={onOpenNotes}
-                  />
+                  {(hasPrev || hasNext) && (
+                    <div className="flex items-center gap-0.5 ml-2">
+                      <button onClick={onPrev} disabled={!hasPrev} className={cn("p-0.5 rounded", hasPrev ? "text-slate-400 hover:bg-slate-100" : "text-slate-200")}><ChevronLeft className="h-3 w-3" /></button>
+                      <button onClick={onNext} disabled={!hasNext} className={cn("p-0.5 rounded", hasNext ? "text-slate-400 hover:bg-slate-100" : "text-slate-200")}><ChevronRight className="h-3 w-3" /></button>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -2546,28 +2529,26 @@ export default function StatusSemanalPage() {
 
               {/* ── Requieren atención (hidden when empty) ──────────── */}
               {alertItems.length > 0 && (
-              <div className="space-y-1">
-                <div className="flex items-center gap-2 px-1 mb-2">
-                  <div className="w-2 h-2 rounded-full bg-red-500 shrink-0" />
-                  <h2 className="text-sm font-semibold text-slate-800">Requieren atención</h2>
-                  <span className="text-xs font-semibold text-red-600 bg-red-50 border border-red-200 px-1.5 py-0.5 rounded-full">{alertItems.length}</span>
+              <div>
+                <div className="flex items-center gap-2 mb-3 px-0.5">
+                  <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">Requieren atención</span>
+                  <span className="text-[11px] font-bold text-red-500">· {alertItems.length}</span>
                   <div className="flex-1" />
                   <AddItemButton variant="inline" onAdd={(title, subtitle) => createCustom.mutate({ title, subtitle })} />
                 </div>
-                <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden ring-1 ring-red-500/10">
-                  <div className="h-[3px] bg-red-500" />
+                <div className="rounded-2xl border border-slate-200/70 bg-white shadow-[0_1px_4px_rgba(0,0,0,0.06)] overflow-hidden">
                   <AnimatePresence initial={false}>
                     {alertItems.map((item, idx) => {
                       const h = getItemHandlers(item);
-                      const isRojo = item.healthStatus === 'rojo';
+                      const rowAccent: 'red' | 'amber' = (item.isOverdue || item.healthStatus === 'rojo') ? 'red' : 'amber';
                       return (
                         <motion.div key={item.key} layout
                           initial={{ opacity: 0, y: -4 }}
                           animate={{ opacity: 1, y: 0 }}
                           exit={{ opacity: 0, y: -4 }}
-                          transition={{ duration: 0.15, ease: 'easeOut' }}
-                          className="border-b border-slate-100 last:border-b-0">
-                          <CompactRow item={item} users={appUsers} currentUserId={currentUserId} alertMode
+                          transition={{ duration: 0.14, ease: [0.4, 0, 0.2, 1] }}
+                          className="border-b border-slate-100/80 last:border-b-0">
+                          <CompactRow item={item} users={appUsers} currentUserId={currentUserId} accent={rowAccent}
                             isSelected={notesOpen !== null && ((notesOpen.type === 'project' && item.projectId === notesOpen.id) || (notesOpen.type === 'custom' && item.customId === notesOpen.id))}
                             onOpenNotes={h.onOpenNotes} onUpdate={h.onUpdate} onRemove={h.onRemove}
                             expanded={expandedAlertKey === item.key}
@@ -2590,14 +2571,12 @@ export default function StatusSemanalPage() {
 
               {/* ── Decisiones pendientes (hidden when empty) ─────── */}
               {decisionItems.length > 0 && (
-              <div className="space-y-1">
-                <div className="flex items-center gap-2 px-1 mb-2">
-                  <Zap className="h-3.5 w-3.5 text-amber-500 shrink-0" />
-                  <h2 className="text-sm font-semibold text-slate-800">Decisiones pendientes</h2>
-                  <span className="text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-full">{decisionItems.length}</span>
+              <div>
+                <div className="flex items-center gap-2 mb-3 px-0.5">
+                  <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">Decisiones pendientes</span>
+                  <span className="text-[11px] font-bold text-amber-500">· {decisionItems.length}</span>
                 </div>
-                <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden ring-1 ring-amber-400/10">
-                  <div className="h-[3px] bg-amber-400" />
+                <div className="rounded-2xl border border-slate-200/70 bg-white shadow-[0_1px_4px_rgba(0,0,0,0.06)] overflow-hidden">
                   <AnimatePresence initial={false}>
                     {decisionItems.map((item, idx) => {
                       const h = getItemHandlers(item);
@@ -2606,9 +2585,9 @@ export default function StatusSemanalPage() {
                           initial={{ opacity: 0, y: -4 }}
                           animate={{ opacity: 1, y: 0 }}
                           exit={{ opacity: 0, y: -4 }}
-                          transition={{ duration: 0.15, ease: 'easeOut' }}
-                          className="border-b border-slate-100 last:border-b-0">
-                          <CompactRow item={item} users={appUsers} currentUserId={currentUserId}
+                          transition={{ duration: 0.14, ease: [0.4, 0, 0.2, 1] }}
+                          className="border-b border-slate-100/80 last:border-b-0">
+                          <CompactRow item={item} users={appUsers} currentUserId={currentUserId} accent="amber"
                             isSelected={notesOpen !== null && ((notesOpen.type === 'project' && item.projectId === notesOpen.id) || (notesOpen.type === 'custom' && item.customId === notesOpen.id))}
                             onOpenNotes={h.onOpenNotes} onUpdate={h.onUpdate} onRemove={h.onRemove}
                             expanded={expandedDecisionKey === item.key}
@@ -2630,20 +2609,17 @@ export default function StatusSemanalPage() {
               )}
 
               {/* ── En curso ───────────────────────────────────────── */}
-              <div className="space-y-1">
-                <div className="flex items-center gap-2 px-1 mb-2">
-                  <div className={cn("w-2 h-2 rounded-full shrink-0", normalItems.length > 0 ? "bg-emerald-500" : "bg-slate-300")} />
-                  <h2 className="text-sm font-semibold text-slate-800">En curso</h2>
-                  <span className="text-xs font-semibold text-slate-500 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded-full">{normalItems.length}</span>
-                  {(() => { const staleCount = normalItems.filter(i => isStale(i.updatedAt)).length; return staleCount > 0 ? (
-                    <span className="text-xs text-amber-600 font-medium">· {staleCount} sin update</span>
+              <div>
+                <div className="flex items-center gap-2 mb-3 px-0.5">
+                  <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">En curso</span>
+                  <span className="text-[11px] font-bold text-slate-500">· {normalItems.length}</span>
+                  {(() => { const sc = normalItems.filter(i => isStale(i.updatedAt)).length; return sc > 0 ? (
+                    <span className="text-[11px] font-semibold text-amber-500">{sc} sin update</span>
                   ) : null; })()}
                   <div className="flex-1" />
                   <AddItemButton variant="inline" onAdd={(title, subtitle) => createCustom.mutate({ title, subtitle })} />
                   {expandedRowKey && (
-                    <button onClick={() => setExpandedRowKey(null)} className="text-[10px] text-slate-400 hover:text-slate-600 font-medium">
-                      Colapsar todo
-                    </button>
+                    <button onClick={() => setExpandedRowKey(null)} className="text-[10px] text-slate-400 hover:text-slate-600 font-medium">Colapsar</button>
                   )}
                 </div>
                 {normalItems.length === 0 ? (
@@ -2687,33 +2663,31 @@ export default function StatusSemanalPage() {
                             bulkMode={bulkMode}
                             checked={selectedKeys.has(item.key)}
                             onCheck={v => setSelectedKeys(prev => { const n = new Set(prev); v ? n.add(item.key) : n.delete(item.key); return n; })}
-                            staleMode={isStaleGroup} />
+                            accent={isStaleGroup ? 'amber' : 'none'} />
                         );
                       };
                       return (
                         <SortableContext items={sortedNormalItems.map(i => i.key)} strategy={verticalListSortingStrategy}>
-                          <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+                          <div className="rounded-2xl border border-slate-200/70 bg-white shadow-[0_1px_4px_rgba(0,0,0,0.06)] overflow-hidden">
                             {staleItems.length > 0 && (
                               <>
-                                <div className="flex items-center gap-2 px-4 py-1.5 bg-amber-50 border-b border-amber-100">
-                                  <span className="text-[11px] font-bold text-amber-700 uppercase tracking-wide">⚠ Sin update · {staleItems.length}</span>
-                                  <div className="flex-1 h-px bg-amber-100" />
+                                <div className="flex items-center gap-2 px-5 py-1.5 border-b border-slate-100/80">
+                                  <span className="text-[10px] font-semibold text-amber-500 uppercase tracking-widest">Sin update · {staleItems.length}</span>
                                 </div>
                                 {staleItems.map((item, idx) => (
-                                  <div key={item.key} className="border-l-[3px] border-l-amber-300 border-b border-slate-100 last:border-b-0 bg-amber-50/20">
+                                  <div key={item.key} className="border-b border-slate-100/80 last:border-b-0">
                                     {renderRow(item, idx, staleItems, true)}
                                   </div>
                                 ))}
                               </>
                             )}
                             {staleItems.length > 0 && freshItems.length > 0 && (
-                              <div className="flex items-center gap-2 px-4 py-1.5 bg-slate-50 border-b border-slate-100">
-                                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wide">Al día · {freshItems.length}</span>
-                                <div className="flex-1 h-px bg-slate-100" />
+                              <div className="flex items-center gap-2 px-5 py-1.5 border-b border-slate-100/80 border-t border-t-slate-100">
+                                <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Al día · {freshItems.length}</span>
                               </div>
                             )}
                             {freshItems.map((item, idx) => (
-                              <div key={item.key} className="border-b border-slate-100 last:border-b-0">
+                              <div key={item.key} className="border-b border-slate-100/80 last:border-b-0">
                                 {renderRow(item, idx, freshItems, false)}
                               </div>
                             ))}
