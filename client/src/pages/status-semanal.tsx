@@ -1083,20 +1083,36 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
                     </div>
                   )}
                   <div className="flex-1" />
-                  {onOpenNotes && (
-                    <button onClick={onOpenNotes}
-                      className="flex items-center gap-1 text-[11px] font-medium text-indigo-500 hover:text-indigo-700 transition-colors">
-                      <MessageSquare className="h-3 w-3" />
-                      Ver actividad{item.noteCount > 0 && ` · ${item.noteCount}`}
-                      <ArrowRight className="h-3 w-3" />
-                    </button>
-                  )}
                   {(hasPrev || hasNext) && (
                     <div className="flex items-center gap-0.5 ml-2">
                       <button onClick={onPrev} disabled={!hasPrev} className={cn("p-0.5 rounded", hasPrev ? "text-slate-400 hover:bg-slate-100" : "text-slate-200")}><ChevronLeft className="h-3 w-3" /></button>
                       <button onClick={onNext} disabled={!hasNext} className={cn("p-0.5 rounded", hasNext ? "text-slate-400 hover:bg-slate-100" : "text-slate-200")}><ChevronRight className="h-3 w-3" /></button>
                     </div>
                   )}
+                </div>
+
+                {/* Quick activity — last update + input */}
+                <div className="border-t border-slate-100">
+                  <div className="flex items-center gap-2 px-5 pt-3 pb-1">
+                    <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Actividad</span>
+                    {onOpenNotes && (
+                      <button onClick={onOpenNotes}
+                        className="ml-auto flex items-center gap-1 text-[11px] font-medium text-indigo-500 hover:text-indigo-700 transition-colors">
+                        Ver historial{item.noteCount > 0 && ` · ${item.noteCount}`}
+                        <ArrowRight className="h-2.5 w-2.5" />
+                      </button>
+                    )}
+                  </div>
+                  <div className="px-5 pb-4">
+                    <ItemThread
+                      projectId={item.projectId}
+                      customId={item.customId}
+                      currentUserId={currentUserId}
+                      users={users}
+                      onOpenFull={onOpenNotes}
+                      compact
+                    />
+                  </div>
                 </div>
               </div>
             </div>
@@ -1118,9 +1134,9 @@ type ThreadEntry = {
   createdAt: string;
 };
 
-function ItemThread({ projectId, customId, currentUserId, users = [], onOpenFull }: {
+function ItemThread({ projectId, customId, currentUserId, users = [], onOpenFull, compact = false }: {
   projectId?: number; customId?: number; currentUserId?: number | null;
-  users?: AppUser[]; onOpenFull?: () => void;
+  users?: AppUser[]; onOpenFull?: () => void; compact?: boolean;
 }) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -1196,23 +1212,23 @@ function ItemThread({ projectId, customId, currentUserId, users = [], onOpenFull
     else addUpdateMutation.mutate(t);
   };
 
-  const SHOW_RECENT = 5;
+  const SHOW_RECENT = compact ? 1 : 5;
   const visibleThread = thread.slice(-SHOW_RECENT);
   const hiddenCount = thread.length - SHOW_RECENT;
 
   return (
     <div>
       {/* Thread entries */}
-      <div className="space-y-2.5 mb-2.5">
+      <div className={cn("mb-2.5", compact ? "space-y-1.5" : "space-y-2.5")}>
         {hiddenCount > 0 && (
           <button onClick={onOpenFull}
             className="flex items-center gap-1 text-[10px] text-indigo-500 hover:text-indigo-700 font-medium">
             <ChevronUp className="h-3 w-3" />
-            Ver {hiddenCount} entradas anteriores
+            {compact ? `Ver ${thread.length} entradas` : `Ver ${hiddenCount} entradas anteriores`}
           </button>
         )}
         {thread.length === 0 && (
-          <p className="text-[11px] text-slate-400 italic text-center py-1">Sin actividad — agregá un update o dejá un comentario</p>
+          <p className="text-[11px] text-slate-400 italic py-0.5">{compact ? 'Sin actividad aún' : 'Sin actividad — agregá un update o dejá un comentario'}</p>
         )}
         {visibleThread.map(entry => {
           const isOwn = entry.authorId != null && entry.authorId === currentUserId;
@@ -1403,6 +1419,212 @@ function SortableCompactRow(props: React.ComponentProps<typeof CompactRow>) {
   return (
     <div ref={setNodeRef} style={style}>
       <CompactRow {...props} dragHandleProps={{ ...attributes, ...listeners }} />
+    </div>
+  );
+}
+
+// ─── FocusBlock — CEO command center ─────────────────────────────────────────
+
+function FocusBlock({ items, onFocusItem }: {
+  items: Item[];
+  onFocusItem: (item: Item) => void;
+}) {
+  if (items.length === 0) return null;
+  return (
+    <div className="rounded-2xl bg-slate-900 overflow-hidden">
+      <div className="flex items-center gap-3 px-5 pt-4 pb-3">
+        <div className="flex flex-col flex-1 min-w-0">
+          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-0.5">Centro de decisiones</span>
+          <span className="text-[15px] font-semibold text-white tracking-tight">Hoy tenés que resolver</span>
+        </div>
+        <span className="text-[11px] font-semibold text-slate-600 bg-slate-800 px-2 py-0.5 rounded-full">{items.length} pendientes</span>
+      </div>
+      <div className="px-3 pb-3 space-y-1">
+        {items.map((item, i) => {
+          const isUrgent = item.isOverdue || item.healthStatus === 'rojo';
+          const decMeta = dm(item.decisionNeeded);
+          const daysSince = item.updatedAt
+            ? Math.floor((Date.now() - new Date(item.updatedAt).getTime()) / 86400000)
+            : null;
+          return (
+            <button key={item.key} onClick={() => onFocusItem(item)}
+              className="w-full flex items-center gap-3 text-left hover:bg-slate-800/70 rounded-xl px-3 py-2.5 transition-colors group/focus">
+              <span className="text-[11px] font-bold text-slate-600 w-4 shrink-0 text-center">{i + 1}</span>
+              <span className={cn("w-2 h-2 rounded-full shrink-0",
+                isUrgent ? "bg-red-500" : "bg-amber-400")} />
+              <div className="flex-1 min-w-0">
+                <p className="text-[13px] font-medium text-white truncate">{item.title}</p>
+                {item.currentAction
+                  ? <p className="text-[11px] text-slate-500 truncate mt-0.5">{item.currentAction}</p>
+                  : decMeta.urgent
+                    ? <p className="text-[11px] text-amber-600/80 truncate mt-0.5">Decisión de {decMeta.label.toLowerCase()} requerida</p>
+                    : null
+                }
+              </div>
+              <div className="shrink-0 flex items-center gap-2">
+                {item.ownerName && (
+                  <span className="text-[11px] text-slate-500 hidden group-hover/focus:block">{item.ownerName.split(' ')[0]}</span>
+                )}
+                {isUrgent && (
+                  <span className="text-[10px] font-bold text-red-500 bg-red-500/10 px-1.5 py-0.5 rounded-md">
+                    {item.isOverdue ? 'vencido' : 'crítico'}
+                  </span>
+                )}
+                {!isUrgent && daysSince && daysSince > 1 && (
+                  <span className="text-[10px] text-slate-600">{daysSince}d esperando</span>
+                )}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── DecisionRow — decision-first display ────────────────────────────────────
+
+function DecisionRow({ item, users, onUpdate, onRemove, onOpenNotes, expanded, onToggle, hasPrev, hasNext, onPrev, onNext, isSelected, currentUserId, kbFocused, bulkMode, checked, onCheck }: {
+  item: Item; users: AppUser[]; currentUserId?: number | null;
+  onUpdate: (d: Record<string, any>) => void; onRemove: () => void;
+  onOpenNotes?: () => void; expanded: boolean; onToggle: () => void;
+  hasPrev?: boolean; hasNext?: boolean; onPrev?: () => void; onNext?: () => void;
+  isSelected?: boolean; kbFocused?: boolean;
+  bulkMode?: boolean; checked?: boolean; onCheck?: (v: boolean) => void;
+}) {
+  const decMeta = dm(item.decisionNeeded);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const daysSince = item.updatedAt
+    ? Math.floor((Date.now() - new Date(item.updatedAt).getTime()) / 86400000)
+    : null;
+
+  return (
+    <div className={cn(
+      "border-l-[3px] border-l-amber-400 transition-colors duration-100 group",
+      isSelected ? "bg-indigo-50/40" : "hover:bg-amber-50/20",
+      expanded && "bg-amber-50/20",
+      kbFocused && "outline outline-2 outline-indigo-300 outline-offset-[-2px]"
+    )}>
+      <div className="flex items-start gap-3 pl-4 pr-5 py-4 cursor-pointer" onClick={onToggle}>
+        {bulkMode && (
+          <div className="shrink-0 mt-0.5" onClick={e => { e.stopPropagation(); onCheck?.(!checked); }}>
+            {checked ? <CheckSquare className="h-4 w-4 text-indigo-500" /> : <Square className="h-4 w-4 text-slate-300" />}
+          </div>
+        )}
+        <div className="flex-1 min-w-0">
+          {/* Decision type badge */}
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-[10px] font-bold text-amber-600 uppercase tracking-widest">{decMeta.label}</span>
+            {daysSince !== null && daysSince > 0 && (
+              <span className="text-[10px] text-slate-400">{daysSince === 1 ? '1 día esperando' : `${daysSince} días esperando`}</span>
+            )}
+          </div>
+          {/* Title — the decision subject */}
+          <p className="text-[14px] font-semibold tracking-tight text-slate-900 mb-0.5">{item.title}</p>
+          {/* Context */}
+          {item.currentAction && !expanded && (
+            <p className="text-[12px] text-slate-500 leading-snug line-clamp-2">{item.currentAction}</p>
+          )}
+          {!item.currentAction && !expanded && (
+            <p className="text-[12px] text-slate-300 italic">Sin contexto — agregar estado actual</p>
+          )}
+        </div>
+        <div className="flex items-center gap-1.5 shrink-0 mt-0.5" onClick={e => e.stopPropagation()}>
+          <OwnerSelect value={item.ownerId} name={item.ownerName} onChange={v => onUpdate({ ownerId: v })} users={users} />
+          <DeadlinePicker value={item.deadline} isOverdue={item.isOverdue} onChange={v => onUpdate({ deadline: v })} />
+          {onOpenNotes && item.noteCount > 0 && (
+            <button onClick={onOpenNotes}
+              className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
+              <MessageSquare className="h-3 w-3" /><span className="text-[10px] font-medium">{item.noteCount}</span>
+            </button>
+          )}
+          <Popover open={menuOpen} onOpenChange={setMenuOpen}>
+            <PopoverTrigger asChild>
+              <button className="p-1 rounded hover:bg-slate-100 text-slate-300 hover:text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                <MoreHorizontal className="h-3.5 w-3.5" />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent className="w-44 p-1" align="end">
+              <button onClick={() => { onRemove(); setMenuOpen(false); }}
+                className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs hover:bg-red-50 text-slate-600 hover:text-red-600">
+                <Trash2 className="h-3.5 w-3.5" />{item.isCustom ? "Eliminar ítem" : "Quitar del status"}
+              </button>
+            </PopoverContent>
+          </Popover>
+        </div>
+      </div>
+
+      {/* Expanded panel */}
+      <AnimatePresence>
+        {expanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.16, ease: [0.4, 0, 0.2, 1] }}
+            className="overflow-hidden">
+            <div className="pl-4 pr-5 pb-4">
+              <div className="rounded-xl border border-slate-200/80 bg-white shadow-sm overflow-hidden">
+                <div className="grid grid-cols-2 divide-x divide-slate-100">
+                  <div className="px-5 py-4">
+                    <p className="text-[10px] font-semibold text-slate-400 tracking-widest uppercase mb-2">Estado actual</p>
+                    <InlineText value={item.currentAction} placeholder="¿Qué está pasando ahora?" onSave={v => onUpdate({ currentAction: v })} multiline className="text-[13px] leading-relaxed text-slate-700" />
+                  </div>
+                  <div className="px-5 py-4">
+                    <p className="text-[10px] font-semibold text-slate-400 tracking-widest uppercase mb-2">Próximo paso</p>
+                    <InlineText value={item.nextMilestone} placeholder="Acción concreta esta semana" onSave={v => onUpdate({ nextMilestone: v })} multiline className="text-[13px] leading-relaxed text-slate-700" />
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5 px-5 py-2.5 border-t border-slate-100 bg-slate-50/60 flex-wrap">
+                  <OwnerSelect value={item.ownerId} name={item.ownerName} onChange={v => onUpdate({ ownerId: v })} users={users} />
+                  <DeadlinePicker value={item.deadline} isOverdue={item.isOverdue} onChange={v => onUpdate({ deadline: v })} />
+                  <div className="h-3 w-px bg-slate-200 mx-0.5 shrink-0" />
+                  <DecisionBadge value={item.decisionNeeded} onChange={v => onUpdate({ decisionNeeded: v })} />
+                  <LevelBadge value={item.marginStatus} onChange={v => onUpdate({ marginStatus: v })} label="Rentabilidad" type="margin" />
+                  <LevelBadge value={item.teamStrain} onChange={v => onUpdate({ teamStrain: v })} label="Carga equipo" type="team" />
+                  <div className="flex-1" />
+                  {onOpenNotes && (
+                    <button onClick={onOpenNotes}
+                      className="flex items-center gap-1 text-[11px] font-medium text-indigo-500 hover:text-indigo-700">
+                      <MessageSquare className="h-3 w-3" />Ver actividad{item.noteCount > 0 && ` · ${item.noteCount}`}<ArrowRight className="h-3 w-3" />
+                    </button>
+                  )}
+                  {(hasPrev || hasNext) && (
+                    <div className="flex items-center gap-0.5 ml-2">
+                      <button onClick={onPrev} disabled={!hasPrev} className={cn("p-0.5 rounded", hasPrev ? "text-slate-400 hover:bg-slate-100" : "text-slate-200")}><ChevronLeft className="h-3 w-3" /></button>
+                      <button onClick={onNext} disabled={!hasNext} className={cn("p-0.5 rounded", hasNext ? "text-slate-400 hover:bg-slate-100" : "text-slate-200")}><ChevronRight className="h-3 w-3" /></button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Quick activity */}
+                <div className="border-t border-slate-100">
+                  <div className="flex items-center gap-2 px-5 pt-3 pb-1">
+                    <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Actividad</span>
+                    {onOpenNotes && (
+                      <button onClick={onOpenNotes}
+                        className="ml-auto flex items-center gap-1 text-[11px] font-medium text-indigo-500 hover:text-indigo-700 transition-colors">
+                        Ver historial{item.noteCount > 0 && ` · ${item.noteCount}`}
+                        <ArrowRight className="h-2.5 w-2.5" />
+                      </button>
+                    )}
+                  </div>
+                  <div className="px-5 pb-4">
+                    <ItemThread
+                      projectId={item.projectId}
+                      customId={item.customId}
+                      currentUserId={currentUserId}
+                      users={users}
+                      onOpenFull={onOpenNotes}
+                      compact
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -2496,36 +2718,26 @@ export default function StatusSemanalPage() {
               );
             })()
           ) : (
-            <div className="max-w-6xl mx-auto px-6 py-4 space-y-5">
+            <div className="max-w-6xl mx-auto px-6 py-4 space-y-6">
 
-              {/* ── Executive pulse bar ─────────────────────────────── */}
-              {(criticalCount > 0 || decisionCount > 0 || normalItems.some(i => isStale(i.updatedAt))) && (
-                <div className="flex items-center gap-2 flex-wrap">
-                  {criticalCount > 0 && (
-                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-red-50 border border-red-200 text-red-700 shadow-sm">
-                      <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse shrink-0" />
-                      <span className="text-xs font-bold">{criticalCount} {criticalCount === 1 ? 'crítico' : 'críticos'}</span>
-                    </div>
-                  )}
-                  {decisionCount > 0 && (
-                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 shadow-sm">
-                      <Zap className="h-3.5 w-3.5 shrink-0" />
-                      <span className="text-xs font-bold">{decisionCount} {decisionCount === 1 ? 'decisión pendiente' : 'decisiones pendientes'}</span>
-                    </div>
-                  )}
-                  {(() => {
-                    const staleCount = normalItems.filter(i => isStale(i.updatedAt)).length;
-                    return staleCount > 0 ? (
-                      <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-100 border border-slate-200 text-slate-600 shadow-sm">
-                        <Clock className="h-3.5 w-3.5 shrink-0" />
-                        <span className="text-xs font-medium">{staleCount} sin update reciente</span>
-                      </div>
-                    ) : null;
-                  })()}
-                  <div className="flex-1" />
-                  <span className="text-xs text-slate-400 font-medium">{normalItems.length} en curso · {visible.length} total</span>
-                </div>
-              )}
+              {/* ── Focus block — decision command center ──────────── */}
+              {(() => {
+                const focusItems = [...alertItems, ...decisionItems].slice(0, 5);
+                return focusItems.length > 0 ? (
+                  <FocusBlock
+                    items={focusItems}
+                    onFocusItem={item => {
+                      if (alertItems.some(a => a.key === item.key)) {
+                        setExpandedAlertKey(item.key);
+                        document.getElementById(`row-${item.key}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                      } else {
+                        setExpandedDecisionKey(item.key);
+                        document.getElementById(`row-${item.key}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                      }
+                    }}
+                  />
+                ) : null;
+              })()}
 
               {/* ── Requieren atención (hidden when empty) ──────────── */}
               {alertItems.length > 0 && (
@@ -2542,7 +2754,7 @@ export default function StatusSemanalPage() {
                       const h = getItemHandlers(item);
                       const rowAccent: 'red' | 'amber' = (item.isOverdue || item.healthStatus === 'rojo') ? 'red' : 'amber';
                       return (
-                        <motion.div key={item.key} layout
+                        <motion.div key={item.key} id={`row-${item.key}`} layout
                           initial={{ opacity: 0, y: -4 }}
                           animate={{ opacity: 1, y: 0 }}
                           exit={{ opacity: 0, y: -4 }}
@@ -2581,13 +2793,13 @@ export default function StatusSemanalPage() {
                     {decisionItems.map((item, idx) => {
                       const h = getItemHandlers(item);
                       return (
-                        <motion.div key={item.key} layout
+                        <motion.div key={item.key} id={`row-${item.key}`} layout
                           initial={{ opacity: 0, y: -4 }}
                           animate={{ opacity: 1, y: 0 }}
                           exit={{ opacity: 0, y: -4 }}
                           transition={{ duration: 0.14, ease: [0.4, 0, 0.2, 1] }}
                           className="border-b border-slate-100/80 last:border-b-0">
-                          <CompactRow item={item} users={appUsers} currentUserId={currentUserId} accent="amber"
+                          <DecisionRow item={item} users={appUsers} currentUserId={currentUserId}
                             isSelected={notesOpen !== null && ((notesOpen.type === 'project' && item.projectId === notesOpen.id) || (notesOpen.type === 'custom' && item.customId === notesOpen.id))}
                             onOpenNotes={h.onOpenNotes} onUpdate={h.onUpdate} onRemove={h.onRemove}
                             expanded={expandedDecisionKey === item.key}
