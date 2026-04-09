@@ -955,13 +955,13 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
 
   return (
     <div className={cn(
-      "transition-all",
-      isSelected ? "bg-indigo-50/80" : alertMode ? "hover:bg-white/40" : "hover:bg-slate-50",
-      expanded && (alertMode ? "bg-white/30" : "bg-slate-50/40"),
-      kbFocused && "ring-2 ring-inset ring-indigo-400"
+      "transition-colors duration-100",
+      isSelected ? "bg-indigo-50/60" : "hover:bg-slate-50/70",
+      expanded && "bg-slate-50/50",
+      kbFocused && "ring-2 ring-inset ring-indigo-300"
     )}>
-      {/* Main row — minimal: dot + name + owner + deadline */}
-      <div className={cn("flex items-center gap-2.5 px-4 cursor-pointer", alertMode ? "py-3" : "py-2.5")} onClick={onToggle}>
+      {/* Main row */}
+      <div className="flex items-center gap-3 px-5 py-3 cursor-pointer" onClick={onToggle}>
         {dragHandleProps && (
           <div {...dragHandleProps} className="shrink-0 cursor-grab text-slate-300 hover:text-slate-500 touch-none" onClick={e => e.stopPropagation()}>
             <GripVertical className="h-3.5 w-3.5" />
@@ -979,24 +979,24 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
         </div>
 
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1.5 min-w-0">
-            {item.isCustom && <Tag className="h-3 w-3 text-indigo-400 shrink-0" />}
-            <span className={cn("font-semibold truncate", alertMode ? "text-[15px] text-slate-900" : "text-sm text-slate-800")} title={item.title}>{item.title}</span>
-            {item.subtitle && <span className="text-slate-400 text-xs truncate" title={item.subtitle}> · {item.subtitle}</span>}
+          <div className="flex items-center gap-2 min-w-0">
+            {item.isCustom && <Tag className="h-3 w-3 text-slate-400 shrink-0" />}
+            <span className="font-medium text-[14px] text-slate-900 truncate leading-tight" title={item.title}>{item.title}</span>
+            {item.subtitle && <span className="text-slate-400 text-xs truncate hidden sm:block" title={item.subtitle}>{item.subtitle}</span>}
             <span className="shrink-0"><FreshnessIndicator updatedAt={item.updatedAt} updatedByName={item.updatedByName} updatedById={item.updatedById} currentUserId={currentUserId} /></span>
           </div>
-          {!expanded && (
+          {!expanded && item.currentAction && (
             <p
-              className={cn(
-                "truncate hover:text-indigo-600 cursor-pointer transition-colors",
-                alertMode ? "text-sm text-slate-600 mt-0.5 font-medium" : "text-xs text-slate-500 mt-0.5"
-              )}
-              title={item.currentAction ? `${item.currentAction} — click para editar` : "Click para agregar update"}
+              className="text-[13px] text-slate-500 truncate mt-0.5 leading-tight"
+              title={`${item.currentAction} — click para editar`}
               onClick={e => { e.stopPropagation(); onToggle(); }}
             >
-              {item.currentAction
-                ? item.currentAction
-                : <span className={cn("italic", alertMode ? "text-slate-400" : "text-slate-300")}>+ agregar update</span>}
+              {item.currentAction}
+            </p>
+          )}
+          {!expanded && !item.currentAction && (
+            <p className="text-[13px] text-slate-300 mt-0.5 italic" onClick={e => { e.stopPropagation(); onToggle(); }}>
+              Agregar estado actual...
             </p>
           )}
         </div>
@@ -1041,61 +1041,40 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.18, ease: 'easeOut' }}
             className="overflow-hidden">
-            <div className="px-5 pb-4 pt-3 ml-5 border-l-2 border-slate-200 space-y-4">
-              {/* Custom item: title + description */}
-              {item.isCustom && (
-                <div className="grid grid-cols-2 gap-x-6 gap-y-1 pb-1">
-                  <div>
-                    <p className="text-[11px] font-semibold text-indigo-500 uppercase tracking-wide mb-1">Título</p>
-                    <InlineText value={item.title} placeholder="Título del ítem" onSave={v => onUpdate({ title: v })} className="text-sm font-semibold text-slate-800" />
-                  </div>
-                  <div>
-                    <p className="text-[11px] font-semibold text-indigo-500 uppercase tracking-wide mb-1">Descripción</p>
-                    <InlineText value={item.subtitle} placeholder="Contexto del ítem..." onSave={v => onUpdate({ subtitle: v })} multiline className="text-sm text-slate-700" />
-                  </div>
-                </div>
-              )}
-
-              {/* Estado actual + Próximo paso — the two most important fields */}
-              <div className="grid grid-cols-2 gap-x-6 gap-y-1">
-                <div>
-                  <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1 flex items-center gap-1.5">
-                    <span className={cn("w-2 h-2 rounded-full shrink-0",
+            <div className="mx-5 mb-4 mt-1 rounded-xl bg-slate-50 border border-slate-100 overflow-hidden">
+              {/* Estado actual + Próximo paso */}
+              <div className="grid grid-cols-2 divide-x divide-slate-100">
+                <div className="px-4 py-3">
+                  <p className="text-[11px] font-semibold text-slate-400 mb-1.5 flex items-center gap-1.5">
+                    <span className={cn("w-1.5 h-1.5 rounded-full shrink-0",
                       item.healthStatus === 'rojo' ? "bg-red-500" :
                       item.healthStatus === 'amarillo' ? "bg-amber-400" : "bg-emerald-400")} />
                     Estado actual
                   </p>
-                  <InlineText value={item.currentAction} placeholder="¿Qué está pasando ahora?" onSave={v => onUpdate({ currentAction: v })} multiline className="text-sm leading-snug text-slate-700" />
+                  <InlineText value={item.currentAction} placeholder="¿Qué está pasando ahora?" onSave={v => onUpdate({ currentAction: v })} multiline className="text-[13px] leading-relaxed text-slate-700" />
                 </div>
-                <div>
-                  <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1">Próximo paso</p>
-                  <InlineText value={item.nextMilestone} placeholder="Acción concreta esta semana" onSave={v => onUpdate({ nextMilestone: v })} multiline className="text-sm leading-snug text-slate-700" />
+                <div className="px-4 py-3">
+                  <p className="text-[11px] font-semibold text-slate-400 mb-1.5">Próximo paso</p>
+                  <InlineText value={item.nextMilestone} placeholder="Acción concreta esta semana" onSave={v => onUpdate({ nextMilestone: v })} multiline className="text-[13px] leading-relaxed text-slate-700" />
                 </div>
               </div>
 
-              {/* Unified activity thread */}
-              <div className="border-t border-slate-100 pt-3">
-                <div className="flex items-center gap-2 mb-3">
-                  <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">Actividad</span>
-                  <div className="flex-1 h-px bg-slate-100" />
-                  {onOpenNotes && (
-                    <button onClick={onOpenNotes}
-                      className="text-[10px] text-indigo-500 hover:text-indigo-700 font-medium flex items-center gap-0.5">
-                      Ver todo <ArrowRight className="h-2.5 w-2.5" />
-                    </button>
-                  )}
+              {/* Custom item extra fields */}
+              {item.isCustom && (
+                <div className="grid grid-cols-2 divide-x divide-slate-100 border-t border-slate-100">
+                  <div className="px-4 py-3">
+                    <p className="text-[11px] font-semibold text-slate-400 mb-1.5">Título</p>
+                    <InlineText value={item.title} placeholder="Título del ítem" onSave={v => onUpdate({ title: v })} className="text-[13px] font-medium text-slate-800" />
+                  </div>
+                  <div className="px-4 py-3">
+                    <p className="text-[11px] font-semibold text-slate-400 mb-1.5">Descripción</p>
+                    <InlineText value={item.subtitle} placeholder="Contexto del ítem..." onSave={v => onUpdate({ subtitle: v })} multiline className="text-[13px] text-slate-700" />
+                  </div>
                 </div>
-                <ItemThread
-                  projectId={item.projectId}
-                  customId={item.customId}
-                  currentUserId={currentUserId}
-                  users={users}
-                  onOpenFull={onOpenNotes}
-                />
-              </div>
+              )}
 
-              {/* Footer: metadata */}
-              <div className="flex items-center gap-1.5 pt-1.5 border-t border-slate-100 flex-wrap">
+              {/* Metadata strip */}
+              <div className="flex items-center gap-1.5 px-4 py-2.5 border-t border-slate-100 bg-white/60 flex-wrap">
                 <OwnerSelect value={item.ownerId} name={item.ownerName} onChange={v => onUpdate({ ownerId: v })} users={users} />
                 <DeadlinePicker value={item.deadline} isOverdue={item.isOverdue} onChange={v => onUpdate({ deadline: v })} />
                 <div className="h-3 w-px bg-slate-200 mx-0.5 shrink-0" />
@@ -1105,22 +1084,37 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
                 {item.mainRisk && (
                   <div className="flex items-center gap-1 text-[10px] text-orange-600 bg-orange-50 border border-orange-100 rounded px-1.5 py-0.5">
                     <Shield className="h-2.5 w-2.5" />
-                    <span className="truncate max-w-[100px]">{item.mainRisk}</span>
+                    <span className="truncate max-w-[120px]">{item.mainRisk}</span>
                   </div>
                 )}
                 <div className="flex-1" />
                 {(hasPrev || hasNext) && (
                   <div className="flex items-center gap-0.5">
-                    <button onClick={onPrev} disabled={!hasPrev}
-                      className={cn("p-0.5 rounded", hasPrev ? "text-slate-400 hover:bg-slate-100" : "text-slate-200")}>
-                      <ChevronLeft className="h-3 w-3" />
-                    </button>
-                    <button onClick={onNext} disabled={!hasNext}
-                      className={cn("p-0.5 rounded", hasNext ? "text-slate-400 hover:bg-slate-100" : "text-slate-200")}>
-                      <ChevronRight className="h-3 w-3" />
-                    </button>
+                    <button onClick={onPrev} disabled={!hasPrev} className={cn("p-0.5 rounded", hasPrev ? "text-slate-400 hover:bg-slate-100" : "text-slate-200")}><ChevronLeft className="h-3 w-3" /></button>
+                    <button onClick={onNext} disabled={!hasNext} className={cn("p-0.5 rounded", hasNext ? "text-slate-400 hover:bg-slate-100" : "text-slate-200")}><ChevronRight className="h-3 w-3" /></button>
                   </div>
                 )}
+              </div>
+
+              {/* Activity thread */}
+              <div className="border-t border-slate-100">
+                <div className="flex items-center gap-2 px-4 pt-3 pb-1">
+                  <span className="text-[11px] font-semibold text-slate-400">Actividad</span>
+                  {onOpenNotes && (
+                    <button onClick={onOpenNotes} className="ml-auto text-[11px] text-indigo-500 hover:text-indigo-700 font-medium flex items-center gap-0.5">
+                      Ver todo <ArrowRight className="h-2.5 w-2.5" />
+                    </button>
+                  )}
+                </div>
+                <div className="px-4 pb-3">
+                  <ItemThread
+                    projectId={item.projectId}
+                    customId={item.customId}
+                    currentUserId={currentUserId}
+                    users={users}
+                    onOpenFull={onOpenNotes}
+                  />
+                </div>
               </div>
             </div>
           </motion.div>
@@ -2552,31 +2546,27 @@ export default function StatusSemanalPage() {
 
               {/* ── Requieren atención (hidden when empty) ──────────── */}
               {alertItems.length > 0 && (
-              <div>
-                <div className="flex items-center gap-3 mb-2 px-4 py-3 rounded-xl bg-red-50 border border-red-300 shadow-md">
-                  <div className="p-1.5 rounded-lg bg-red-500/20 shrink-0">
-                    <AlertTriangle className="h-4 w-4 text-red-600" />
-                  </div>
-                  <h2 className="text-[15px] font-bold text-red-900 tracking-tight flex-1">Requieren atención</h2>
-                  <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-red-500 text-white shadow-sm">
-                    {alertItems.length}
-                  </span>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 px-1 mb-2">
+                  <div className="w-2 h-2 rounded-full bg-red-500 shrink-0" />
+                  <h2 className="text-sm font-semibold text-slate-800">Requieren atención</h2>
+                  <span className="text-xs font-semibold text-red-600 bg-red-50 border border-red-200 px-1.5 py-0.5 rounded-full">{alertItems.length}</span>
+                  <div className="flex-1" />
                   <AddItemButton variant="inline" onAdd={(title, subtitle) => createCustom.mutate({ title, subtitle })} />
                 </div>
-                <div className="rounded-xl border border-red-300 bg-red-50/60 shadow-md overflow-hidden">
+                <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden ring-1 ring-red-500/10">
+                  <div className="h-[3px] bg-red-500" />
                   <AnimatePresence initial={false}>
                     {alertItems.map((item, idx) => {
                       const h = getItemHandlers(item);
                       const isRojo = item.healthStatus === 'rojo';
-                      const borderColor = item.isOverdue || isRojo ? "border-l-red-500" : "border-l-amber-400";
-                      const rowBg = item.isOverdue || isRojo ? "bg-red-50/40" : "bg-amber-50/30";
                       return (
                         <motion.div key={item.key} layout
-                          initial={{ opacity: 0, x: -8 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          exit={{ opacity: 0, x: -8 }}
+                          initial={{ opacity: 0, y: -4 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -4 }}
                           transition={{ duration: 0.15, ease: 'easeOut' }}
-                          className={cn("border-l-[5px] border-b border-red-100/60 last:border-b-0", borderColor, rowBg)}>
+                          className="border-b border-slate-100 last:border-b-0">
                           <CompactRow item={item} users={appUsers} currentUserId={currentUserId} alertMode
                             isSelected={notesOpen !== null && ((notesOpen.type === 'project' && item.projectId === notesOpen.id) || (notesOpen.type === 'custom' && item.customId === notesOpen.id))}
                             onOpenNotes={h.onOpenNotes} onUpdate={h.onUpdate} onRemove={h.onRemove}
@@ -2600,27 +2590,24 @@ export default function StatusSemanalPage() {
 
               {/* ── Decisiones pendientes (hidden when empty) ─────── */}
               {decisionItems.length > 0 && (
-              <div>
-                <div className="flex items-center gap-3 mb-2 px-4 py-3 rounded-xl bg-amber-50 border border-amber-300 shadow">
-                  <div className="p-1.5 rounded-lg bg-amber-500/20 shrink-0">
-                    <Zap className="h-4 w-4 text-amber-600" />
-                  </div>
-                  <h2 className="text-[15px] font-bold text-amber-900 tracking-tight flex-1">Decisiones pendientes</h2>
-                  <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-amber-500 text-white shadow-sm">
-                    {decisionItems.length}
-                  </span>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 px-1 mb-2">
+                  <Zap className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                  <h2 className="text-sm font-semibold text-slate-800">Decisiones pendientes</h2>
+                  <span className="text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-full">{decisionItems.length}</span>
                 </div>
-                <div className="rounded-xl border border-amber-200 bg-amber-50/40 shadow overflow-hidden">
+                <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden ring-1 ring-amber-400/10">
+                  <div className="h-[3px] bg-amber-400" />
                   <AnimatePresence initial={false}>
                     {decisionItems.map((item, idx) => {
                       const h = getItemHandlers(item);
                       return (
                         <motion.div key={item.key} layout
-                          initial={{ opacity: 0, x: -8 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          exit={{ opacity: 0, x: -8 }}
+                          initial={{ opacity: 0, y: -4 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -4 }}
                           transition={{ duration: 0.15, ease: 'easeOut' }}
-                          className="border-l-[5px] border-l-amber-400 border-b border-amber-100/60 last:border-b-0">
+                          className="border-b border-slate-100 last:border-b-0">
                           <CompactRow item={item} users={appUsers} currentUserId={currentUserId}
                             isSelected={notesOpen !== null && ((notesOpen.type === 'project' && item.projectId === notesOpen.id) || (notesOpen.type === 'custom' && item.customId === notesOpen.id))}
                             onOpenNotes={h.onOpenNotes} onUpdate={h.onUpdate} onRemove={h.onRemove}
@@ -2643,20 +2630,13 @@ export default function StatusSemanalPage() {
               )}
 
               {/* ── En curso ───────────────────────────────────────── */}
-              <div>
-                <div className="flex items-center gap-3 mb-3 px-4 py-3 rounded-xl bg-gradient-to-r from-slate-50 to-slate-50/20 border border-slate-200/80 shadow-sm">
-                  <div className={cn("p-1.5 rounded-lg shrink-0", normalItems.length > 0 ? "bg-emerald-500/15" : "bg-slate-100")}>
-                    <Circle className={cn("h-4 w-4 fill-current", normalItems.length > 0 ? "text-emerald-600" : "text-slate-300")} />
-                  </div>
-                  <h2 className="text-[15px] font-bold text-slate-800 tracking-tight">En curso</h2>
-                  <span className={cn("text-xs font-bold px-2.5 py-1 rounded-full text-white shadow-sm",
-                    normalItems.length > 0 ? "bg-emerald-500" : "bg-slate-300")}>
-                    {normalItems.length}
-                  </span>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 px-1 mb-2">
+                  <div className={cn("w-2 h-2 rounded-full shrink-0", normalItems.length > 0 ? "bg-emerald-500" : "bg-slate-300")} />
+                  <h2 className="text-sm font-semibold text-slate-800">En curso</h2>
+                  <span className="text-xs font-semibold text-slate-500 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded-full">{normalItems.length}</span>
                   {(() => { const staleCount = normalItems.filter(i => isStale(i.updatedAt)).length; return staleCount > 0 ? (
-                    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-50 border border-amber-200 text-amber-700" title={`${staleCount} ítems sin actualizar en 5+ días`}>
-                      <span className="text-xs font-semibold">⚠ {staleCount} sin update</span>
-                    </div>
+                    <span className="text-xs text-amber-600 font-medium">· {staleCount} sin update</span>
                   ) : null; })()}
                   <div className="flex-1" />
                   <AddItemButton variant="inline" onAdd={(title, subtitle) => createCustom.mutate({ title, subtitle })} />
@@ -2712,7 +2692,7 @@ export default function StatusSemanalPage() {
                       };
                       return (
                         <SortableContext items={sortedNormalItems.map(i => i.key)} strategy={verticalListSortingStrategy}>
-                          <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+                          <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
                             {staleItems.length > 0 && (
                               <>
                                 <div className="flex items-center gap-2 px-4 py-1.5 bg-amber-50 border-b border-amber-100">
