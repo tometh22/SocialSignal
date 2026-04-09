@@ -1040,8 +1040,8 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
               <div className="rounded-xl border border-slate-200/80 bg-white shadow-sm overflow-hidden">
                 {/* Two-column: Estado actual | Próximo paso */}
                 <div className="grid grid-cols-2 divide-x divide-slate-100">
-                  <div className="px-5 py-4">
-                    <p className="text-[10px] font-semibold text-slate-400 tracking-widest uppercase mb-2 flex items-center gap-1.5">
+                  <div className="px-4 py-3">
+                    <p className="text-[10px] font-semibold text-slate-400 tracking-wide uppercase mb-1.5 flex items-center gap-1.5">
                       <span className={cn("w-1.5 h-1.5 rounded-full shrink-0 inline-block",
                         item.healthStatus === 'rojo' ? "bg-red-500" :
                         item.healthStatus === 'amarillo' ? "bg-amber-400" : "bg-emerald-400")} />
@@ -1049,22 +1049,22 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
                     </p>
                     <InlineText value={item.currentAction} placeholder="¿Qué está pasando ahora?" onSave={v => onUpdate({ currentAction: v })} multiline className="text-[13px] leading-relaxed text-slate-700" />
                   </div>
-                  <div className="px-5 py-4">
-                    <p className="text-[10px] font-semibold text-slate-400 tracking-widest uppercase mb-2">Próximo paso</p>
+                  <div className="px-4 py-3">
+                    <p className="text-[10px] font-semibold text-slate-400 tracking-wide uppercase mb-1.5">Próximo paso</p>
                     <InlineText value={item.nextMilestone} placeholder="Acción concreta esta semana" onSave={v => onUpdate({ nextMilestone: v })} multiline className="text-[13px] leading-relaxed text-slate-700" />
                   </div>
                 </div>
 
                 {/* Custom: editable title + subtitle */}
                 {item.isCustom && (
-                  <div className="grid grid-cols-2 divide-x divide-slate-100 border-t border-slate-100 bg-slate-50/40">
-                    <div className="px-5 py-3">
-                      <p className="text-[10px] font-semibold text-slate-400 tracking-widest uppercase mb-1.5">Título</p>
-                      <InlineText value={item.title} placeholder="Título del ítem" onSave={v => onUpdate({ title: v })} className="text-[13px] font-medium text-slate-800" />
-                    </div>
-                    <div className="px-5 py-3">
-                      <p className="text-[10px] font-semibold text-slate-400 tracking-widest uppercase mb-1.5">Descripción</p>
-                      <InlineText value={item.subtitle} placeholder="Contexto del ítem..." onSave={v => onUpdate({ subtitle: v })} multiline className="text-[13px] text-slate-700" />
+                  <div className="flex items-center gap-3 px-5 py-2 border-t border-slate-100 bg-slate-50/30">
+                    <Tag className="h-3 w-3 text-slate-300 shrink-0" />
+                    <div className="flex-1 min-w-0 flex items-center gap-2">
+                      <InlineText value={item.title} placeholder="Título" onSave={v => onUpdate({ title: v })} className="text-[12px] font-medium text-slate-600 truncate" />
+                      {item.subtitle !== null && item.subtitle !== undefined && (
+                        <><span className="text-slate-200 shrink-0">·</span>
+                        <InlineText value={item.subtitle} placeholder="Descripción opcional..." onSave={v => onUpdate({ subtitle: v })} className="text-[12px] text-slate-400 truncate flex-1" /></>
+                      )}
                     </div>
                   </div>
                 )}
@@ -1562,12 +1562,12 @@ function DecisionRow({ item, users, onUpdate, onRemove, onOpenNotes, expanded, o
             <div className="pl-4 pr-5 pb-4">
               <div className="rounded-xl border border-slate-200/80 bg-white shadow-sm overflow-hidden">
                 <div className="grid grid-cols-2 divide-x divide-slate-100">
-                  <div className="px-5 py-4">
-                    <p className="text-[10px] font-semibold text-slate-400 tracking-widest uppercase mb-2">Estado actual</p>
+                  <div className="px-4 py-3">
+                    <p className="text-[10px] font-semibold text-slate-400 tracking-wide uppercase mb-1.5">Estado actual</p>
                     <InlineText value={item.currentAction} placeholder="¿Qué está pasando ahora?" onSave={v => onUpdate({ currentAction: v })} multiline className="text-[13px] leading-relaxed text-slate-700" />
                   </div>
-                  <div className="px-5 py-4">
-                    <p className="text-[10px] font-semibold text-slate-400 tracking-widest uppercase mb-2">Próximo paso</p>
+                  <div className="px-4 py-3">
+                    <p className="text-[10px] font-semibold text-slate-400 tracking-wide uppercase mb-1.5">Próximo paso</p>
                     <InlineText value={item.nextMilestone} placeholder="Acción concreta esta semana" onSave={v => onUpdate({ nextMilestone: v })} multiline className="text-[13px] leading-relaxed text-slate-700" />
                   </div>
                 </div>
