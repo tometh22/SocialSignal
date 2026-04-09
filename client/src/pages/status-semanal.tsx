@@ -2716,27 +2716,8 @@ export default function StatusSemanalPage() {
           ) : (
             <div className="max-w-7xl mx-auto px-6 py-4 space-y-4">
 
-              {/* ── Focus block — decision command center ──────────── */}
-              {(() => {
-                const focusItems = [...alertItems, ...decisionItems].slice(0, 5);
-                return focusItems.length > 0 ? (
-                  <FocusBlock
-                    items={focusItems}
-                    onFocusItem={item => {
-                      if (alertItems.some(a => a.key === item.key)) {
-                        setExpandedAlertKey(item.key);
-                        document.getElementById(`row-${item.key}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                      } else {
-                        setExpandedDecisionKey(item.key);
-                        document.getElementById(`row-${item.key}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                      }
-                    }}
-                  />
-                ) : null;
-              })()}
-
               {/* ── Two-column dashboard layout ──────────────────────── */}
-              <div className={cn("grid gap-4 items-start", (alertItems.length > 0 || decisionItems.length > 0) ? "grid-cols-2" : "grid-cols-1")}>
+              <div className={cn("grid gap-4 items-start", (alertItems.length > 0 || decisionItems.length > 0) ? "grid-cols-[5fr_8fr]" : "grid-cols-1")}>
 
               {/* Left column: Requieren atención + Decisiones pendientes */}
               <div className="space-y-4 sticky top-4">
@@ -2745,8 +2726,9 @@ export default function StatusSemanalPage() {
               {alertItems.length > 0 && (
               <div>
                 <div className="flex items-center gap-2 mb-3 px-0.5">
-                  <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">Requieren atención</span>
-                  <span className="text-[11px] font-bold text-red-500">· {alertItems.length}</span>
+                  <span className="w-2 h-2 rounded-full bg-red-500 shrink-0" />
+                  <span className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Requieren atención</span>
+                  <span className="text-xs font-bold text-red-500">{alertItems.length}</span>
                   <div className="flex-1" />
                   <AddItemButton variant="inline" onAdd={(title, subtitle) => createCustom.mutate({ title, subtitle })} />
                 </div>
@@ -2787,8 +2769,9 @@ export default function StatusSemanalPage() {
               {decisionItems.length > 0 && (
               <div>
                 <div className="flex items-center gap-2 mb-3 px-0.5">
-                  <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">Decisiones pendientes</span>
-                  <span className="text-[11px] font-bold text-amber-500">· {decisionItems.length}</span>
+                  <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
+                  <span className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Decisiones pendientes</span>
+                  <span className="text-xs font-bold text-amber-500">{decisionItems.length}</span>
                 </div>
                 <div className="rounded-2xl border border-slate-200/70 bg-white shadow-[0_1px_4px_rgba(0,0,0,0.06)] overflow-hidden">
                   <AnimatePresence initial={false}>
@@ -2830,10 +2813,10 @@ export default function StatusSemanalPage() {
               {/* ── En curso ───────────────────────────────────────── */}
               <div>
                 <div className="flex items-center gap-2 mb-3 px-0.5">
-                  <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">En curso</span>
-                  <span className="text-[11px] font-bold text-slate-500">· {normalItems.length}</span>
+                  <span className="text-xs font-semibold text-slate-600 uppercase tracking-wide">En curso</span>
+                  <span className="text-xs font-bold text-slate-500">{normalItems.length}</span>
                   {(() => { const sc = normalItems.filter(i => isStale(i.updatedAt)).length; return sc > 0 ? (
-                    <span className="text-[11px] font-semibold text-amber-500">{sc} sin update</span>
+                    <span className="text-[11px] font-semibold text-amber-500 ml-1">{sc} sin update</span>
                   ) : null; })()}
                   <div className="flex-1" />
                   <AddItemButton variant="inline" onAdd={(title, subtitle) => createCustom.mutate({ title, subtitle })} />
