@@ -933,12 +933,12 @@ function AlertCard({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, c
 
 // ─── Compact row (Verde) ──────────────────────────────────────────────────────
 
-function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, expanded, onToggle, onNext, onPrev, hasNext, hasPrev, currentUserId, kbFocused, dragHandleProps, bulkMode, checked, onCheck, accent }: {
+function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, expanded, onToggle, onNext, onPrev, hasNext, hasPrev, currentUserId, kbFocused, dragHandleProps, bulkMode, checked, onCheck, accent, hideSubtitle }: {
   item: Item; users: AppUser[]; isSelected: boolean; currentUserId?: number | null;
   onOpenNotes?: () => void; onUpdate: (d: Record<string, any>) => void; onRemove: () => void;
   expanded: boolean; onToggle: () => void; onNext?: () => void; onPrev?: () => void; hasNext?: boolean; hasPrev?: boolean;
   kbFocused?: boolean; dragHandleProps?: Record<string, any>; bulkMode?: boolean; checked?: boolean; onCheck?: (v: boolean) => void;
-  accent?: 'red' | 'amber' | 'none'; staleMode?: boolean;
+  accent?: 'red' | 'amber' | 'none'; staleMode?: boolean; hideSubtitle?: boolean;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const decMeta = dm(item.decisionNeeded);
@@ -954,7 +954,7 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
       kbFocused && "outline outline-2 outline-indigo-300 outline-offset-[-2px]"
     )}>
       {/* Main row */}
-      <div className="flex items-center gap-3 pl-4 pr-5 py-3.5 cursor-pointer" onClick={onToggle}>
+      <div className={cn("flex items-center gap-3 pl-4 pr-5 cursor-pointer", hideSubtitle ? "py-2.5" : "py-3.5")} onClick={onToggle}>
         {dragHandleProps && (
           <div {...dragHandleProps} className="shrink-0 cursor-grab text-slate-200 hover:text-slate-400 touch-none opacity-0 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
             <GripVertical className="h-3.5 w-3.5" />
@@ -976,13 +976,12 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
             {item.subtitle && <span className="text-slate-400 text-[12px] truncate hidden md:block shrink-0" title={item.subtitle}>{item.subtitle}</span>}
             <span className="shrink-0 self-center"><FreshnessIndicator updatedAt={item.updatedAt} updatedByName={item.updatedByName} updatedById={item.updatedById} currentUserId={currentUserId} /></span>
           </div>
-          {!expanded && (
+          {!expanded && !hideSubtitle && item.currentAction && (
             <p
-              className={cn("text-[12px] truncate mt-0.5 leading-snug",
-                item.currentAction ? "text-slate-400" : "text-slate-300 italic")}
+              className="text-[12px] truncate mt-0.5 leading-snug text-slate-400"
               onClick={e => { e.stopPropagation(); onToggle(); }}
             >
-              {item.currentAction || "Agregar estado actual..."}
+              {item.currentAction}
             </p>
           )}
         </div>
@@ -2713,7 +2712,7 @@ export default function StatusSemanalPage() {
               <div className={cn("grid gap-4 items-start", (alertItems.length > 0 || decisionItems.length > 0) ? "grid-cols-2" : "grid-cols-1")}>
 
               {/* Left column: Requieren atención + Decisiones pendientes */}
-              <div className="space-y-4">
+              <div className="space-y-4 sticky top-4">
 
               {/* ── Requieren atención (hidden when empty) ──────────── */}
               {alertItems.length > 0 && (
@@ -2856,7 +2855,8 @@ export default function StatusSemanalPage() {
                             bulkMode={bulkMode}
                             checked={selectedKeys.has(item.key)}
                             onCheck={v => setSelectedKeys(prev => { const n = new Set(prev); v ? n.add(item.key) : n.delete(item.key); return n; })}
-                            accent={isStaleGroup ? 'amber' : 'none'} />
+                            accent={isStaleGroup ? 'amber' : 'none'}
+                            hideSubtitle />
                         );
                       };
                       return (
