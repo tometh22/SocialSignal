@@ -943,24 +943,25 @@ function AlertCard({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, c
 
 // ─── Compact row (Verde) ──────────────────────────────────────────────────────
 
-function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, expanded, onToggle, onNext, onPrev, hasNext, hasPrev, currentUserId, kbFocused, dragHandleProps, bulkMode, checked, onCheck }: {
+function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, expanded, onToggle, onNext, onPrev, hasNext, hasPrev, currentUserId, kbFocused, dragHandleProps, bulkMode, checked, onCheck, alertMode }: {
   item: Item; users: AppUser[]; isSelected: boolean; currentUserId?: number | null;
   onOpenNotes?: () => void; onUpdate: (d: Record<string, any>) => void; onRemove: () => void;
   expanded: boolean; onToggle: () => void; onNext?: () => void; onPrev?: () => void; hasNext?: boolean; hasPrev?: boolean;
   kbFocused?: boolean; dragHandleProps?: Record<string, any>; bulkMode?: boolean; checked?: boolean; onCheck?: (v: boolean) => void;
+  alertMode?: boolean; staleMode?: boolean;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const decMeta = dm(item.decisionNeeded);
 
   return (
     <div className={cn(
-      "border-b border-slate-100 last:border-0 transition-all",
-      isSelected ? "bg-indigo-50/80" : "hover:bg-slate-50",
-      expanded && "bg-slate-50/40",
+      "transition-all",
+      isSelected ? "bg-indigo-50/80" : alertMode ? "hover:bg-white/40" : "hover:bg-slate-50",
+      expanded && (alertMode ? "bg-white/30" : "bg-slate-50/40"),
       kbFocused && "ring-2 ring-inset ring-indigo-400"
     )}>
       {/* Main row — minimal: dot + name + owner + deadline */}
-      <div className="flex items-center gap-2.5 px-4 py-2.5 cursor-pointer" onClick={onToggle}>
+      <div className={cn("flex items-center gap-2.5 px-4 cursor-pointer", alertMode ? "py-3" : "py-2.5")} onClick={onToggle}>
         {dragHandleProps && (
           <div {...dragHandleProps} className="shrink-0 cursor-grab text-slate-300 hover:text-slate-500 touch-none" onClick={e => e.stopPropagation()}>
             <GripVertical className="h-3.5 w-3.5" />
@@ -980,19 +981,22 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5 min-w-0">
             {item.isCustom && <Tag className="h-3 w-3 text-indigo-400 shrink-0" />}
-            <span className="font-medium text-sm text-slate-800 truncate" title={item.title}>{item.title}</span>
+            <span className={cn("font-semibold truncate", alertMode ? "text-[15px] text-slate-900" : "text-sm text-slate-800")} title={item.title}>{item.title}</span>
             {item.subtitle && <span className="text-slate-400 text-xs truncate" title={item.subtitle}> · {item.subtitle}</span>}
             <span className="shrink-0"><FreshnessIndicator updatedAt={item.updatedAt} updatedByName={item.updatedByName} updatedById={item.updatedById} currentUserId={currentUserId} /></span>
           </div>
           {!expanded && (
             <p
-              className="text-xs text-slate-500 truncate mt-0.5 hover:text-indigo-600 cursor-pointer transition-colors"
+              className={cn(
+                "truncate hover:text-indigo-600 cursor-pointer transition-colors",
+                alertMode ? "text-sm text-slate-600 mt-0.5 font-medium" : "text-xs text-slate-500 mt-0.5"
+              )}
               title={item.currentAction ? `${item.currentAction} — click para editar` : "Click para agregar update"}
               onClick={e => { e.stopPropagation(); onToggle(); }}
             >
               {item.currentAction
                 ? item.currentAction
-                : <span className="italic text-slate-300">+ agregar update</span>}
+                : <span className={cn("italic", alertMode ? "text-slate-400" : "text-slate-300")}>+ agregar update</span>}
             </p>
           )}
         </div>
@@ -2549,8 +2553,8 @@ export default function StatusSemanalPage() {
               {/* ── Requieren atención (hidden when empty) ──────────── */}
               {alertItems.length > 0 && (
               <div>
-                <div className="flex items-center gap-3 mb-3 px-4 py-3 rounded-xl bg-gradient-to-r from-red-50 to-red-50/20 border border-red-200/60 shadow-sm">
-                  <div className="p-1.5 rounded-lg bg-red-500/15 shrink-0">
+                <div className="flex items-center gap-3 mb-2 px-4 py-3 rounded-xl bg-red-50 border border-red-300 shadow-md">
+                  <div className="p-1.5 rounded-lg bg-red-500/20 shrink-0">
                     <AlertTriangle className="h-4 w-4 text-red-600" />
                   </div>
                   <h2 className="text-[15px] font-bold text-red-900 tracking-tight flex-1">Requieren atención</h2>
@@ -2559,19 +2563,21 @@ export default function StatusSemanalPage() {
                   </span>
                   <AddItemButton variant="inline" onAdd={(title, subtitle) => createCustom.mutate({ title, subtitle })} />
                 </div>
-                <div className="rounded-xl border border-red-200/70 bg-red-50/20 shadow-sm overflow-hidden">
+                <div className="rounded-xl border border-red-300 bg-red-50/60 shadow-md overflow-hidden">
                   <AnimatePresence initial={false}>
                     {alertItems.map((item, idx) => {
                       const h = getItemHandlers(item);
+                      const isRojo = item.healthStatus === 'rojo';
+                      const borderColor = item.isOverdue || isRojo ? "border-l-red-500" : "border-l-amber-400";
+                      const rowBg = item.isOverdue || isRojo ? "bg-red-50/40" : "bg-amber-50/30";
                       return (
                         <motion.div key={item.key} layout
                           initial={{ opacity: 0, x: -8 }}
                           animate={{ opacity: 1, x: 0 }}
                           exit={{ opacity: 0, x: -8 }}
                           transition={{ duration: 0.15, ease: 'easeOut' }}
-                          className={cn("border-l-4",
-                            item.isOverdue ? "border-l-red-500" : item.healthStatus === 'rojo' ? "border-l-red-500" : "border-l-amber-400")}>
-                          <CompactRow item={item} users={appUsers} currentUserId={currentUserId}
+                          className={cn("border-l-[5px] border-b border-red-100/60 last:border-b-0", borderColor, rowBg)}>
+                          <CompactRow item={item} users={appUsers} currentUserId={currentUserId} alertMode
                             isSelected={notesOpen !== null && ((notesOpen.type === 'project' && item.projectId === notesOpen.id) || (notesOpen.type === 'custom' && item.customId === notesOpen.id))}
                             onOpenNotes={h.onOpenNotes} onUpdate={h.onUpdate} onRemove={h.onRemove}
                             expanded={expandedAlertKey === item.key}
@@ -2595,8 +2601,8 @@ export default function StatusSemanalPage() {
               {/* ── Decisiones pendientes (hidden when empty) ─────── */}
               {decisionItems.length > 0 && (
               <div>
-                <div className="flex items-center gap-3 mb-3 px-4 py-3 rounded-xl bg-gradient-to-r from-amber-50 to-amber-50/20 border border-amber-200/60 shadow-sm">
-                  <div className="p-1.5 rounded-lg bg-amber-500/15 shrink-0">
+                <div className="flex items-center gap-3 mb-2 px-4 py-3 rounded-xl bg-amber-50 border border-amber-300 shadow">
+                  <div className="p-1.5 rounded-lg bg-amber-500/20 shrink-0">
                     <Zap className="h-4 w-4 text-amber-600" />
                   </div>
                   <h2 className="text-[15px] font-bold text-amber-900 tracking-tight flex-1">Decisiones pendientes</h2>
@@ -2604,7 +2610,7 @@ export default function StatusSemanalPage() {
                     {decisionItems.length}
                   </span>
                 </div>
-                <div className="rounded-xl border border-amber-200/70 bg-amber-50/20 shadow-sm overflow-hidden">
+                <div className="rounded-xl border border-amber-200 bg-amber-50/40 shadow overflow-hidden">
                   <AnimatePresence initial={false}>
                     {decisionItems.map((item, idx) => {
                       const h = getItemHandlers(item);
@@ -2614,7 +2620,7 @@ export default function StatusSemanalPage() {
                           animate={{ opacity: 1, x: 0 }}
                           exit={{ opacity: 0, x: -8 }}
                           transition={{ duration: 0.15, ease: 'easeOut' }}
-                          className="border-l-4 border-l-amber-400">
+                          className="border-l-[5px] border-l-amber-400 border-b border-amber-100/60 last:border-b-0">
                           <CompactRow item={item} users={appUsers} currentUserId={currentUserId}
                             isSelected={notesOpen !== null && ((notesOpen.type === 'project' && item.projectId === notesOpen.id) || (notesOpen.type === 'custom' && item.customId === notesOpen.id))}
                             onOpenNotes={h.onOpenNotes} onUpdate={h.onUpdate} onRemove={h.onRemove}
@@ -2681,28 +2687,60 @@ export default function StatusSemanalPage() {
                       }
                     }}
                   >
-                    <SortableContext items={sortedNormalItems.map(i => i.key)} strategy={verticalListSortingStrategy}>
-                      <div className="rounded-xl border border-slate-200/80 bg-white shadow-sm overflow-hidden">
-                        {sortedNormalItems.map((item, idx) => {
-                          const h = getItemHandlers(item);
-                          return (
-                            <SortableCompactRow key={item.key} item={item} users={appUsers} currentUserId={currentUserId}
-                              isSelected={notesOpen !== null && ((notesOpen.type === 'project' && item.projectId === notesOpen.id) || (notesOpen.type === 'custom' && item.customId === notesOpen.id))}
-                              onOpenNotes={h.onOpenNotes} onUpdate={h.onUpdate} onRemove={h.onRemove}
-                              expanded={expandedRowKey === item.key}
-                              onToggle={() => setExpandedRowKey(expandedRowKey === item.key ? null : item.key)}
-                              hasPrev={idx > 0}
-                              hasNext={idx < sortedNormalItems.length - 1}
-                              onPrev={() => { if (idx > 0) setExpandedRowKey(sortedNormalItems[idx - 1].key); }}
-                              onNext={() => { if (idx < sortedNormalItems.length - 1) setExpandedRowKey(sortedNormalItems[idx + 1].key); }}
-                              kbFocused={kbFocusKey === item.key}
-                              bulkMode={bulkMode}
-                              checked={selectedKeys.has(item.key)}
-                              onCheck={v => setSelectedKeys(prev => { const n = new Set(prev); v ? n.add(item.key) : n.delete(item.key); return n; })} />
-                          );
-                        })}
-                      </div>
-                    </SortableContext>
+                    {(() => {
+                      const staleItems = sortedNormalItems.filter(i => isStale(i.updatedAt));
+                      const freshItems = sortedNormalItems.filter(i => !isStale(i.updatedAt));
+                      const renderRow = (item: Item, idx: number, allInSection: Item[], isStaleGroup: boolean) => {
+                        const h = getItemHandlers(item);
+                        const globalIdx = sortedNormalItems.indexOf(item);
+                        return (
+                          <SortableCompactRow key={item.key} item={item} users={appUsers} currentUserId={currentUserId}
+                            isSelected={notesOpen !== null && ((notesOpen.type === 'project' && item.projectId === notesOpen.id) || (notesOpen.type === 'custom' && item.customId === notesOpen.id))}
+                            onOpenNotes={h.onOpenNotes} onUpdate={h.onUpdate} onRemove={h.onRemove}
+                            expanded={expandedRowKey === item.key}
+                            onToggle={() => setExpandedRowKey(expandedRowKey === item.key ? null : item.key)}
+                            hasPrev={globalIdx > 0}
+                            hasNext={globalIdx < sortedNormalItems.length - 1}
+                            onPrev={() => { if (globalIdx > 0) setExpandedRowKey(sortedNormalItems[globalIdx - 1].key); }}
+                            onNext={() => { if (globalIdx < sortedNormalItems.length - 1) setExpandedRowKey(sortedNormalItems[globalIdx + 1].key); }}
+                            kbFocused={kbFocusKey === item.key}
+                            bulkMode={bulkMode}
+                            checked={selectedKeys.has(item.key)}
+                            onCheck={v => setSelectedKeys(prev => { const n = new Set(prev); v ? n.add(item.key) : n.delete(item.key); return n; })}
+                            staleMode={isStaleGroup} />
+                        );
+                      };
+                      return (
+                        <SortableContext items={sortedNormalItems.map(i => i.key)} strategy={verticalListSortingStrategy}>
+                          <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+                            {staleItems.length > 0 && (
+                              <>
+                                <div className="flex items-center gap-2 px-4 py-1.5 bg-amber-50 border-b border-amber-100">
+                                  <span className="text-[11px] font-bold text-amber-700 uppercase tracking-wide">⚠ Sin update · {staleItems.length}</span>
+                                  <div className="flex-1 h-px bg-amber-100" />
+                                </div>
+                                {staleItems.map((item, idx) => (
+                                  <div key={item.key} className="border-l-[3px] border-l-amber-300 border-b border-slate-100 last:border-b-0 bg-amber-50/20">
+                                    {renderRow(item, idx, staleItems, true)}
+                                  </div>
+                                ))}
+                              </>
+                            )}
+                            {staleItems.length > 0 && freshItems.length > 0 && (
+                              <div className="flex items-center gap-2 px-4 py-1.5 bg-slate-50 border-b border-slate-100">
+                                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wide">Al día · {freshItems.length}</span>
+                                <div className="flex-1 h-px bg-slate-100" />
+                              </div>
+                            )}
+                            {freshItems.map((item, idx) => (
+                              <div key={item.key} className="border-b border-slate-100 last:border-b-0">
+                                {renderRow(item, idx, freshItems, false)}
+                              </div>
+                            ))}
+                          </div>
+                        </SortableContext>
+                      );
+                    })()}
                     <DragOverlay>
                       {dragActiveId && (() => {
                         const item = sortedNormalItems.find(i => i.key === dragActiveId);
