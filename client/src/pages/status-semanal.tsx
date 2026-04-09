@@ -955,7 +955,7 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
   return (
     <div className={cn(
       "border-b border-slate-100 last:border-0 transition-all",
-      isSelected ? "bg-indigo-50/70" : "hover:bg-slate-50/60",
+      isSelected ? "bg-indigo-50/80" : "hover:bg-slate-50",
       expanded && "bg-slate-50/40",
       kbFocused && "ring-2 ring-inset ring-indigo-400"
     )}>
@@ -2515,55 +2515,51 @@ export default function StatusSemanalPage() {
               );
             })()
           ) : (
-            <div className="max-w-6xl mx-auto px-6 py-3 space-y-3">
+            <div className="max-w-6xl mx-auto px-6 py-4 space-y-5">
 
               {/* ── Executive pulse bar ─────────────────────────────── */}
               {(criticalCount > 0 || decisionCount > 0 || normalItems.some(i => isStale(i.updatedAt))) && (
-                <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-white border border-slate-200/80 shadow-sm text-[11px] flex-wrap">
+                <div className="flex items-center gap-2 flex-wrap">
                   {criticalCount > 0 && (
-                    <span className="flex items-center gap-1.5 text-red-600 font-semibold">
-                      <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse inline-block" />
-                      {criticalCount} {criticalCount === 1 ? 'crítico' : 'críticos'}
-                    </span>
+                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-red-50 border border-red-200 text-red-700 shadow-sm">
+                      <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse shrink-0" />
+                      <span className="text-xs font-bold">{criticalCount} {criticalCount === 1 ? 'crítico' : 'críticos'}</span>
+                    </div>
                   )}
-                  {criticalCount > 0 && decisionCount > 0 && <span className="text-slate-200">·</span>}
                   {decisionCount > 0 && (
-                    <span className="flex items-center gap-1.5 text-amber-600 font-semibold">
-                      <Zap className="h-3 w-3" />
-                      {decisionCount} {decisionCount === 1 ? 'decisión pendiente' : 'decisiones pendientes'}
-                    </span>
+                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 shadow-sm">
+                      <Zap className="h-3.5 w-3.5 shrink-0" />
+                      <span className="text-xs font-bold">{decisionCount} {decisionCount === 1 ? 'decisión pendiente' : 'decisiones pendientes'}</span>
+                    </div>
                   )}
                   {(() => {
                     const staleCount = normalItems.filter(i => isStale(i.updatedAt)).length;
                     return staleCount > 0 ? (
-                      <>
-                        <span className="text-slate-200">·</span>
-                        <span className="flex items-center gap-1.5 text-slate-500 font-medium">
-                          <Clock className="h-3 w-3" />
-                          {staleCount} sin update reciente
-                        </span>
-                      </>
+                      <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-100 border border-slate-200 text-slate-600 shadow-sm">
+                        <Clock className="h-3.5 w-3.5 shrink-0" />
+                        <span className="text-xs font-medium">{staleCount} sin update reciente</span>
+                      </div>
                     ) : null;
                   })()}
                   <div className="flex-1" />
-                  <span className="text-slate-400">{normalItems.length} en curso · {visible.length} total</span>
+                  <span className="text-xs text-slate-400 font-medium">{normalItems.length} en curso · {visible.length} total</span>
                 </div>
               )}
 
               {/* ── Requieren atención (hidden when empty) ──────────── */}
               {alertItems.length > 0 && (
               <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="p-1 rounded-md bg-red-100 shrink-0">
-                    <AlertTriangle className="h-3 w-3 text-red-600" />
+                <div className="flex items-center gap-3 mb-3 px-4 py-3 rounded-xl bg-gradient-to-r from-red-50 to-red-50/20 border border-red-200/60 shadow-sm">
+                  <div className="p-1.5 rounded-lg bg-red-500/15 shrink-0">
+                    <AlertTriangle className="h-4 w-4 text-red-600" />
                   </div>
-                  <h2 className="text-sm font-semibold text-slate-700">Requieren atención</h2>
-                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-600">
+                  <h2 className="text-[15px] font-bold text-red-900 tracking-tight flex-1">Requieren atención</h2>
+                  <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-red-500 text-white shadow-sm">
                     {alertItems.length}
                   </span>
                   <AddItemButton variant="inline" onAdd={(title, subtitle) => createCustom.mutate({ title, subtitle })} />
                 </div>
-                <div className="rounded-xl border border-red-200/70 bg-white shadow-sm overflow-hidden">
+                <div className="rounded-xl border border-red-200/70 bg-red-50/20 shadow-sm overflow-hidden">
                   <AnimatePresence initial={false}>
                     {alertItems.map((item, idx) => {
                       const h = getItemHandlers(item);
@@ -2573,7 +2569,7 @@ export default function StatusSemanalPage() {
                           animate={{ opacity: 1, x: 0 }}
                           exit={{ opacity: 0, x: -8 }}
                           transition={{ duration: 0.15, ease: 'easeOut' }}
-                          className={cn("border-l-[3px]",
+                          className={cn("border-l-4",
                             item.isOverdue ? "border-l-red-500" : item.healthStatus === 'rojo' ? "border-l-red-500" : "border-l-amber-400")}>
                           <CompactRow item={item} users={appUsers} currentUserId={currentUserId}
                             isSelected={notesOpen !== null && ((notesOpen.type === 'project' && item.projectId === notesOpen.id) || (notesOpen.type === 'custom' && item.customId === notesOpen.id))}
@@ -2599,16 +2595,16 @@ export default function StatusSemanalPage() {
               {/* ── Decisiones pendientes (hidden when empty) ─────── */}
               {decisionItems.length > 0 && (
               <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="p-1 rounded-md bg-amber-100 shrink-0">
-                    <Zap className="h-3 w-3 text-amber-600" />
+                <div className="flex items-center gap-3 mb-3 px-4 py-3 rounded-xl bg-gradient-to-r from-amber-50 to-amber-50/20 border border-amber-200/60 shadow-sm">
+                  <div className="p-1.5 rounded-lg bg-amber-500/15 shrink-0">
+                    <Zap className="h-4 w-4 text-amber-600" />
                   </div>
-                  <h2 className="text-sm font-semibold text-slate-700">Decisiones pendientes</h2>
-                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-600">
+                  <h2 className="text-[15px] font-bold text-amber-900 tracking-tight flex-1">Decisiones pendientes</h2>
+                  <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-amber-500 text-white shadow-sm">
                     {decisionItems.length}
                   </span>
                 </div>
-                <div className="rounded-xl border border-amber-200/70 bg-white shadow-sm overflow-hidden">
+                <div className="rounded-xl border border-amber-200/70 bg-amber-50/20 shadow-sm overflow-hidden">
                   <AnimatePresence initial={false}>
                     {decisionItems.map((item, idx) => {
                       const h = getItemHandlers(item);
@@ -2618,7 +2614,7 @@ export default function StatusSemanalPage() {
                           animate={{ opacity: 1, x: 0 }}
                           exit={{ opacity: 0, x: -8 }}
                           transition={{ duration: 0.15, ease: 'easeOut' }}
-                          className="border-l-[3px] border-l-amber-400">
+                          className="border-l-4 border-l-amber-400">
                           <CompactRow item={item} users={appUsers} currentUserId={currentUserId}
                             isSelected={notesOpen !== null && ((notesOpen.type === 'project' && item.projectId === notesOpen.id) || (notesOpen.type === 'custom' && item.customId === notesOpen.id))}
                             onOpenNotes={h.onOpenNotes} onUpdate={h.onUpdate} onRemove={h.onRemove}
@@ -2642,23 +2638,24 @@ export default function StatusSemanalPage() {
 
               {/* ── En curso ───────────────────────────────────────── */}
               <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <div className={cn("p-1 rounded-md shrink-0", normalItems.length > 0 ? "bg-emerald-100" : "bg-slate-100")}>
-                    <Circle className={cn("h-3 w-3 fill-current", normalItems.length > 0 ? "text-emerald-600" : "text-slate-300")} />
+                <div className="flex items-center gap-3 mb-3 px-4 py-3 rounded-xl bg-gradient-to-r from-slate-50 to-slate-50/20 border border-slate-200/80 shadow-sm">
+                  <div className={cn("p-1.5 rounded-lg shrink-0", normalItems.length > 0 ? "bg-emerald-500/15" : "bg-slate-100")}>
+                    <Circle className={cn("h-4 w-4 fill-current", normalItems.length > 0 ? "text-emerald-600" : "text-slate-300")} />
                   </div>
-                  <h2 className="text-sm font-semibold text-slate-700">En curso</h2>
-                  <span className={cn("text-[11px] font-bold px-2 py-0.5 rounded-full",
-                    normalItems.length > 0 ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-400")}>
+                  <h2 className="text-[15px] font-bold text-slate-800 tracking-tight">En curso</h2>
+                  <span className={cn("text-xs font-bold px-2.5 py-1 rounded-full text-white shadow-sm",
+                    normalItems.length > 0 ? "bg-emerald-500" : "bg-slate-300")}>
                     {normalItems.length}
                   </span>
                   {(() => { const staleCount = normalItems.filter(i => isStale(i.updatedAt)).length; return staleCount > 0 ? (
-                    <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-600 border border-amber-200" title={`${staleCount} ítems sin actualizar en 5+ días`}>
-                      ⚠ {staleCount} sin update
-                    </span>
+                    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-50 border border-amber-200 text-amber-700" title={`${staleCount} ítems sin actualizar en 5+ días`}>
+                      <span className="text-xs font-semibold">⚠ {staleCount} sin update</span>
+                    </div>
                   ) : null; })()}
+                  <div className="flex-1" />
                   <AddItemButton variant="inline" onAdd={(title, subtitle) => createCustom.mutate({ title, subtitle })} />
                   {expandedRowKey && (
-                    <button onClick={() => setExpandedRowKey(null)} className="ml-auto text-[10px] text-slate-400 hover:text-slate-600 font-medium">
+                    <button onClick={() => setExpandedRowKey(null)} className="text-[10px] text-slate-400 hover:text-slate-600 font-medium">
                       Colapsar todo
                     </button>
                   )}
