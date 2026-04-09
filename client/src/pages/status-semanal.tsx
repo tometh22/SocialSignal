@@ -2646,9 +2646,9 @@ export default function StatusSemanalPage() {
         )}
 
         {/* ── Content ───────────────────────────────────────────── */}
-        <div className="flex-1 overflow-auto">
+        <div className="flex-1 overflow-hidden flex min-h-0">
           {isLoading ? (
-            <div className="flex items-center justify-center h-64"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+            <div className="flex-1 flex items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-slate-300" /></div>
           ) : viewMode === 'timeline' ? (
             /* ── Timeline View ── */
             (() => {
@@ -2677,6 +2677,7 @@ export default function StatusSemanalPage() {
               });
               const allBuckets = [...weeks.filter(w => w.items.length > 0), ...(noDateItems.length > 0 ? [{ label: 'Sin fecha', start: new Date(0), end: new Date(0), items: noDateItems }] : [])];
               return (
+                <div className="flex-1 overflow-auto">
                 <div className="max-w-6xl mx-auto px-6 py-4">
                   <div className="flex gap-3 overflow-x-auto pb-4">
                     {allBuckets.map((bucket, bi) => (
@@ -2711,28 +2712,26 @@ export default function StatusSemanalPage() {
                     )}
                   </div>
                 </div>
+                </div>
               );
             })()
           ) : (
-            <div className="max-w-7xl mx-auto px-6 py-4 space-y-4">
+            <>
 
-              {/* ── Two-column dashboard layout ──────────────────────── */}
-              <div className={cn("grid gap-4 items-start", (alertItems.length > 0 || decisionItems.length > 0) ? "grid-cols-[5fr_8fr]" : "grid-cols-1")}>
-
-              {/* Left column: Requieren atención + Decisiones pendientes */}
-              <div className="space-y-4 sticky top-4">
+              {/* ── Left panel: urgency items ─────────────────────────── */}
+              {(alertItems.length > 0 || decisionItems.length > 0) && (
+              <div className="w-[272px] shrink-0 border-r border-slate-100 overflow-y-auto bg-slate-50/40 flex flex-col">
+              <div className="p-4 space-y-4 flex-1">
 
               {/* ── Requieren atención (hidden when empty) ──────────── */}
               {alertItems.length > 0 && (
               <div>
-                <div className="flex items-center gap-2 mb-3 px-0.5">
-                  <span className="w-2 h-2 rounded-full bg-red-500 shrink-0" />
-                  <span className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Requieren atención</span>
-                  <span className="text-xs font-bold text-red-500">{alertItems.length}</span>
-                  <div className="flex-1" />
+                <div className="flex items-center gap-1.5 mb-2">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex-1">Requieren atención</span>
+                  <span className="text-[10px] font-bold text-red-400">{alertItems.length}</span>
                   <AddItemButton variant="inline" onAdd={(title, subtitle) => createCustom.mutate({ title, subtitle })} />
                 </div>
-                <div className="rounded-2xl border border-slate-200/70 bg-white shadow-[0_1px_4px_rgba(0,0,0,0.06)] overflow-hidden">
+                <div className="rounded-xl border border-slate-200/60 bg-white overflow-hidden">
                   <AnimatePresence initial={false}>
                     {alertItems.map((item, idx) => {
                       const h = getItemHandlers(item);
@@ -2768,12 +2767,11 @@ export default function StatusSemanalPage() {
               {/* ── Decisiones pendientes (hidden when empty) ─────── */}
               {decisionItems.length > 0 && (
               <div>
-                <div className="flex items-center gap-2 mb-3 px-0.5">
-                  <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
-                  <span className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Decisiones pendientes</span>
-                  <span className="text-xs font-bold text-amber-500">{decisionItems.length}</span>
+                <div className="flex items-center gap-1.5 mb-2">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex-1">Decisiones pendientes</span>
+                  <span className="text-[10px] font-bold text-amber-400">{decisionItems.length}</span>
                 </div>
-                <div className="rounded-2xl border border-slate-200/70 bg-white shadow-[0_1px_4px_rgba(0,0,0,0.06)] overflow-hidden">
+                <div className="rounded-xl border border-slate-200/60 bg-white overflow-hidden">
                   <AnimatePresence initial={false}>
                     {decisionItems.map((item, idx) => {
                       const h = getItemHandlers(item);
@@ -2805,23 +2803,26 @@ export default function StatusSemanalPage() {
               </div>
               )}
 
-              </div>{/* end left column */}
+              </div>
+              </div>
+              )}
 
-              {/* Right column: En curso */}
-              <div>
+              {/* ── Right panel: En curso ─────────────────────────────── */}
+              <div className="flex-1 overflow-y-auto min-w-0">
+              <div className="px-5 py-4 space-y-4">
 
               {/* ── En curso ───────────────────────────────────────── */}
               <div>
-                <div className="flex items-center gap-2 mb-3 px-0.5">
-                  <span className="text-xs font-semibold text-slate-600 uppercase tracking-wide">En curso</span>
-                  <span className="text-xs font-bold text-slate-500">{normalItems.length}</span>
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-sm font-semibold text-slate-700">En curso</span>
+                  <span className="text-sm font-bold text-slate-400">{normalItems.length}</span>
                   {(() => { const sc = normalItems.filter(i => isStale(i.updatedAt)).length; return sc > 0 ? (
-                    <span className="text-[11px] font-semibold text-amber-500 ml-1">{sc} sin update</span>
+                    <span className="text-xs font-medium text-amber-500 bg-amber-50 border border-amber-100 rounded-full px-2 py-0.5">{sc} sin update</span>
                   ) : null; })()}
                   <div className="flex-1" />
                   <AddItemButton variant="inline" onAdd={(title, subtitle) => createCustom.mutate({ title, subtitle })} />
                   {expandedRowKey && (
-                    <button onClick={() => setExpandedRowKey(null)} className="text-[10px] text-slate-400 hover:text-slate-600 font-medium">Colapsar</button>
+                    <button onClick={() => setExpandedRowKey(null)} className="text-[10px] text-slate-400 hover:text-slate-600 font-medium">colapsar</button>
                   )}
                 </div>
                 {normalItems.length === 0 ? (
@@ -2871,11 +2872,11 @@ export default function StatusSemanalPage() {
                       };
                       return (
                         <SortableContext items={sortedNormalItems.map(i => i.key)} strategy={verticalListSortingStrategy}>
-                          <div className="rounded-2xl border border-slate-200/70 bg-white shadow-[0_1px_4px_rgba(0,0,0,0.06)] overflow-hidden">
+                          <div className="rounded-xl border border-slate-200/60 bg-white overflow-hidden">
                             {staleItems.length > 0 && (
                               <>
-                                <div className="flex items-center gap-2 px-5 py-1.5 border-b border-slate-100/80">
-                                  <span className="text-[10px] font-semibold text-amber-500 uppercase tracking-widest">Sin update · {staleItems.length}</span>
+                                <div className="flex items-center gap-2 px-5 py-1.5 border-b border-slate-100/80 bg-amber-50/40">
+                                  <span className="text-[10px] font-semibold text-amber-500 tracking-wide">Sin update · {staleItems.length}</span>
                                 </div>
                                 {staleItems.map((item, idx) => (
                                   <div key={item.key} className="border-b border-slate-100/80 last:border-b-0">
@@ -2885,8 +2886,8 @@ export default function StatusSemanalPage() {
                               </>
                             )}
                             {staleItems.length > 0 && freshItems.length > 0 && (
-                              <div className="flex items-center gap-2 px-5 py-1.5 border-b border-slate-100/80 border-t border-t-slate-100">
-                                <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Al día · {freshItems.length}</span>
+                              <div className="flex items-center gap-2 px-5 py-1.5 border-b border-slate-100/80 border-t border-t-slate-100 bg-emerald-50/30">
+                                <span className="text-[10px] font-semibold text-emerald-600 tracking-wide">Al día · {freshItems.length}</span>
                               </div>
                             )}
                             {freshItems.map((item, idx) => (
@@ -2913,8 +2914,6 @@ export default function StatusSemanalPage() {
                 )}
               </div>
 
-              </div>{/* end right column */}
-              </div>{/* end two-column grid */}
 
               {/* ── Quitados ───────────────────────────────────────── */}
               {showHidden && hiddenCount > 0 && (
@@ -2953,7 +2952,9 @@ export default function StatusSemanalPage() {
                   </div>
                 </div>
               )}
-            </div>
+              </div>
+              </div>
+            </>
           )}
         </div>
       </div>
