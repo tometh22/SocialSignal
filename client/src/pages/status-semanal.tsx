@@ -218,27 +218,17 @@ function isStale(dateStr: string | null): boolean {
 function FreshnessIndicator({ updatedAt, updatedByName, updatedById, currentUserId }: {
   updatedAt: string | null; updatedByName?: string | null; updatedById?: number | null; currentUserId?: number | null;
 }) {
-  if (!updatedAt) return <span className="text-[9px] text-red-400 font-semibold bg-red-50 px-1.5 py-0.5 rounded">Sin actualizar</span>;
+  if (!updatedAt) return null;
   const stale = isStale(updatedAt);
   const isOther = updatedById != null && currentUserId != null && updatedById !== currentUserId;
   const firstName = updatedByName?.split(' ')[0];
   const timeStr = shortDateTime(updatedAt);
   const tooltip = `${updatedByName || 'Usuario'} · ${fullDateTime(updatedAt)}`;
 
-  if (stale) {
-    return (
-      <TooltipProvider><Tooltip><TooltipTrigger asChild>
-        <span className={cn("text-[9px] font-semibold px-1.5 py-0.5 rounded border",
-          isOther ? "text-indigo-600 bg-indigo-50 border-indigo-200" : "text-red-500 bg-red-50 border-red-100")}>
-          {isOther && firstName ? `${firstName} · ` : ''}{timeStr}
-        </span>
-      </TooltipTrigger><TooltipContent className="text-xs">{tooltip}</TooltipContent></Tooltip></TooltipProvider>
-    );
-  }
   return (
     <TooltipProvider><Tooltip><TooltipTrigger asChild>
-      <span className={cn("text-[9px] font-medium px-1.5 py-0.5 rounded",
-        isOther ? "text-indigo-600 bg-indigo-50 font-semibold" : "text-slate-400")}>
+      <span className={cn("text-[10px]",
+        isOther ? "text-indigo-400 font-medium" : stale ? "text-amber-400" : "text-slate-400")}>
         {isOther && firstName ? `${firstName} · ` : ''}{timeStr}
       </span>
     </TooltipTrigger><TooltipContent className="text-xs">{tooltip}</TooltipContent></Tooltip></TooltipProvider>
@@ -1431,49 +1421,32 @@ function FocusBlock({ items, onFocusItem }: {
 }) {
   if (items.length === 0) return null;
   return (
-    <div className="rounded-2xl bg-slate-900 overflow-hidden">
-      <div className="flex items-center gap-3 px-5 pt-4 pb-3">
-        <div className="flex flex-col flex-1 min-w-0">
-          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-0.5">Centro de decisiones</span>
-          <span className="text-[15px] font-semibold text-white tracking-tight">Hoy tenés que resolver</span>
-        </div>
-        <span className="text-[11px] font-semibold text-slate-600 bg-slate-800 px-2 py-0.5 rounded-full">{items.length} pendientes</span>
+    <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+      <div className="flex items-center gap-2 px-5 py-2.5 border-b border-slate-100">
+        <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-widest flex-1">Para resolver hoy</span>
+        <span className="flex items-center gap-1 text-[11px] font-semibold text-red-500">
+          <span className="w-1.5 h-1.5 rounded-full bg-red-500 inline-block" />
+          {items.length} pendiente{items.length !== 1 ? 's' : ''}
+        </span>
       </div>
-      <div className="px-3 pb-3 space-y-1">
+      <div className="divide-y divide-slate-50">
         {items.map((item, i) => {
           const isUrgent = item.isOverdue || item.healthStatus === 'rojo';
           const decMeta = dm(item.decisionNeeded);
-          const daysSince = item.updatedAt
-            ? Math.floor((Date.now() - new Date(item.updatedAt).getTime()) / 86400000)
-            : null;
           return (
             <button key={item.key} onClick={() => onFocusItem(item)}
-              className="w-full flex items-center gap-3 text-left hover:bg-slate-800/70 rounded-xl px-3 py-2.5 transition-colors group/focus">
-              <span className="text-[11px] font-bold text-slate-600 w-4 shrink-0 text-center">{i + 1}</span>
-              <span className={cn("w-2 h-2 rounded-full shrink-0",
+              className="w-full flex items-center gap-3 text-left hover:bg-slate-50 px-5 py-2.5 transition-colors">
+              <span className="text-[11px] text-slate-300 w-3 shrink-0">{i + 1}</span>
+              <span className={cn("w-1.5 h-1.5 rounded-full shrink-0",
                 isUrgent ? "bg-red-500" : "bg-amber-400")} />
-              <div className="flex-1 min-w-0">
-                <p className="text-[13px] font-medium text-white truncate">{item.title}</p>
-                {item.currentAction
-                  ? <p className="text-[11px] text-slate-500 truncate mt-0.5">{item.currentAction}</p>
-                  : decMeta.urgent
-                    ? <p className="text-[11px] text-amber-600/80 truncate mt-0.5">Decisión de {decMeta.label.toLowerCase()} requerida</p>
-                    : null
-                }
-              </div>
-              <div className="shrink-0 flex items-center gap-2">
-                {item.ownerName && (
-                  <span className="text-[11px] text-slate-500 hidden group-hover/focus:block">{item.ownerName.split(' ')[0]}</span>
-                )}
-                {isUrgent && (
-                  <span className="text-[10px] font-bold text-red-500 bg-red-500/10 px-1.5 py-0.5 rounded-md">
-                    {item.isOverdue ? 'vencido' : 'crítico'}
-                  </span>
-                )}
-                {!isUrgent && daysSince && daysSince > 1 && (
-                  <span className="text-[10px] text-slate-600">{daysSince}d esperando</span>
-                )}
-              </div>
+              <span className="flex-1 text-[13px] font-medium text-slate-800 truncate">{item.title}</span>
+              {item.ownerName && (
+                <span className="text-[11px] text-slate-400 shrink-0">{item.ownerName.split(' ')[0]}</span>
+              )}
+              <span className={cn("shrink-0 text-[10px] font-medium",
+                isUrgent ? "text-red-500" : "text-amber-500")}>
+                {isUrgent ? (item.isOverdue ? 'Vencido' : 'Crítico') : decMeta.label}
+              </span>
             </button>
           );
         })}
@@ -1505,31 +1478,28 @@ function DecisionRow({ item, users, onUpdate, onRemove, onOpenNotes, expanded, o
       expanded && "bg-amber-50/20",
       kbFocused && "outline outline-2 outline-indigo-300 outline-offset-[-2px]"
     )}>
-      <div className="flex items-start gap-3 pl-4 pr-5 py-4 cursor-pointer" onClick={onToggle}>
+      <div className="flex items-center gap-3 pl-4 pr-5 py-3.5 cursor-pointer" onClick={onToggle}>
         {bulkMode && (
-          <div className="shrink-0 mt-0.5" onClick={e => { e.stopPropagation(); onCheck?.(!checked); }}>
+          <div className="shrink-0" onClick={e => { e.stopPropagation(); onCheck?.(!checked); }}>
             {checked ? <CheckSquare className="h-4 w-4 text-indigo-500" /> : <Square className="h-4 w-4 text-slate-300" />}
           </div>
         )}
         <div className="flex-1 min-w-0">
-          {/* Decision type badge */}
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-[10px] font-bold text-amber-600 uppercase tracking-widest">{decMeta.label}</span>
-            {daysSince !== null && daysSince > 0 && (
-              <span className="text-[10px] text-slate-400">{daysSince === 1 ? '1 día esperando' : `${daysSince} días esperando`}</span>
-            )}
+          <div className="flex items-baseline gap-2 min-w-0">
+            <span className="font-medium text-[14px] tracking-tight text-slate-900 truncate">{item.title}</span>
           </div>
-          {/* Title — the decision subject */}
-          <p className="text-[14px] font-semibold tracking-tight text-slate-900 mb-0.5">{item.title}</p>
-          {/* Context */}
-          {item.currentAction && !expanded && (
-            <p className="text-[12px] text-slate-500 leading-snug line-clamp-2">{item.currentAction}</p>
-          )}
-          {!item.currentAction && !expanded && (
-            <p className="text-[12px] text-slate-300 italic">Sin contexto — agregar estado actual</p>
+          {!expanded && (
+            <p className={cn("text-[12px] truncate mt-0.5 leading-snug",
+              item.currentAction ? "text-slate-400" : "text-slate-300 italic")}>
+              {item.currentAction || "Agregar estado actual..."}
+            </p>
           )}
         </div>
-        <div className="flex items-center gap-1.5 shrink-0 mt-0.5" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center gap-1.5 shrink-0" onClick={e => e.stopPropagation()}>
+          <span className="text-[10px] font-medium text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-100/80">{decMeta.label}</span>
+          {daysSince !== null && daysSince > 1 && (
+            <span className="text-[10px] text-slate-400">{daysSince}d</span>
+          )}
           <OwnerSelect value={item.ownerId} name={item.ownerName} onChange={v => onUpdate({ ownerId: v })} users={users} />
           <DeadlinePicker value={item.deadline} isOverdue={item.isOverdue} onChange={v => onUpdate({ deadline: v })} />
           {onOpenNotes && item.noteCount > 0 && (
@@ -2740,7 +2710,7 @@ export default function StatusSemanalPage() {
               })()}
 
               {/* ── Two-column dashboard layout ──────────────────────── */}
-              <div className={cn("grid gap-4 items-start", (alertItems.length > 0 || decisionItems.length > 0) ? "grid-cols-[1fr_1.5fr]" : "grid-cols-1")}>
+              <div className={cn("grid gap-4 items-start", (alertItems.length > 0 || decisionItems.length > 0) ? "grid-cols-2" : "grid-cols-1")}>
 
               {/* Left column: Requieren atención + Decisiones pendientes */}
               <div className="space-y-4">
