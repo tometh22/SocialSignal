@@ -714,10 +714,8 @@ function DecisionBadge({ value, onChange }: { value: string | null; onChange: (v
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <button>
-          <Badge variant="outline" className={cn("text-[10px] h-5 cursor-pointer border font-semibold hover:opacity-80 max-w-[110px] truncate", meta.color)}>
-            <span className="opacity-60 mr-0.5">Dec.</span>{meta.label}
-          </Badge>
+        <button className="text-[10px] font-medium text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-100 hover:bg-amber-100 transition-colors whitespace-nowrap max-w-[90px] truncate">
+          {meta.label}
         </button>
       </PopoverTrigger>
       <PopoverContent className="w-44 p-1.5" align="end">
@@ -765,14 +763,7 @@ function OwnerSelect({ value, name, onChange, users }: {
 function deadlineLabel(d: string | null): string {
   if (!d) return '';
   const date = new Date(d);
-  const now = new Date();
-  now.setHours(0, 0, 0, 0);
-  const diff = Math.ceil((date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-  const fmt = date.toLocaleDateString('es-AR', { day: 'numeric', month: 'short' });
-  if (diff < 0) return `${fmt} (${Math.abs(diff)}d atrás)`;
-  if (diff === 0) return `${fmt} (hoy)`;
-  if (diff <= 7) return `${fmt} (${diff}d)`;
-  return fmt;
+  return date.toLocaleDateString('es-AR', { day: 'numeric', month: 'short' });
 }
 
 function DeadlinePicker({ value, isOverdue, onChange }: {
@@ -798,12 +789,12 @@ function DeadlinePicker({ value, isOverdue, onChange }: {
   }
 
   return (
-    <div className={cn("inline-flex items-center gap-1 text-[11px] font-medium rounded-md px-1.5 py-0.5 relative group whitespace-nowrap",
-      isOverdue ? "bg-red-100 text-red-700" : "bg-slate-100 text-slate-600")}>
-      {isOverdue ? <Clock className="h-3 w-3 shrink-0" /> : <Calendar className="h-3 w-3 shrink-0" />}
-      <span className="whitespace-nowrap">{deadlineLabel(value)}</span>
+    <div className={cn("inline-flex items-center gap-1 text-[10px] font-medium relative group/dl whitespace-nowrap cursor-pointer",
+      isOverdue ? "text-red-500" : "text-slate-400")}>
+      {isOverdue && <Clock className="h-3 w-3 shrink-0" />}
+      <span>{deadlineLabel(value)}</span>
       <button onClick={e => { e.stopPropagation(); onChange(null); }}
-        className="inline-flex opacity-0 group-hover:opacity-100 ml-0.5 text-slate-400 hover:text-red-500 shrink-0 transition-opacity">
+        className="inline-flex opacity-0 group-hover/dl:opacity-100 text-slate-400 hover:text-red-500 shrink-0 transition-opacity">
         <X className="h-2.5 w-2.5" />
       </button>
       <input type="date" value={toDateStr(value)}
@@ -933,12 +924,12 @@ function AlertCard({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, c
 
 // ─── Compact row (Verde) ──────────────────────────────────────────────────────
 
-function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, expanded, onToggle, onNext, onPrev, hasNext, hasPrev, currentUserId, kbFocused, dragHandleProps, bulkMode, checked, onCheck, accent }: {
+function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, expanded, onToggle, onNext, onPrev, hasNext, hasPrev, currentUserId, kbFocused, dragHandleProps, bulkMode, checked, onCheck, accent, hideSubtitle }: {
   item: Item; users: AppUser[]; isSelected: boolean; currentUserId?: number | null;
   onOpenNotes?: () => void; onUpdate: (d: Record<string, any>) => void; onRemove: () => void;
   expanded: boolean; onToggle: () => void; onNext?: () => void; onPrev?: () => void; hasNext?: boolean; hasPrev?: boolean;
   kbFocused?: boolean; dragHandleProps?: Record<string, any>; bulkMode?: boolean; checked?: boolean; onCheck?: (v: boolean) => void;
-  accent?: 'red' | 'amber' | 'none'; staleMode?: boolean;
+  accent?: 'red' | 'amber' | 'none'; staleMode?: boolean; hideSubtitle?: boolean;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const decMeta = dm(item.decisionNeeded);
@@ -954,7 +945,7 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
       kbFocused && "outline outline-2 outline-indigo-300 outline-offset-[-2px]"
     )}>
       {/* Main row */}
-      <div className="flex items-center gap-3 pl-4 pr-5 py-3.5 cursor-pointer" onClick={onToggle}>
+      <div className={cn("flex items-center gap-3 pl-4 pr-5 cursor-pointer", hideSubtitle ? "py-2.5" : "py-3.5")} onClick={onToggle}>
         {dragHandleProps && (
           <div {...dragHandleProps} className="shrink-0 cursor-grab text-slate-200 hover:text-slate-400 touch-none opacity-0 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
             <GripVertical className="h-3.5 w-3.5" />
@@ -976,44 +967,63 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
             {item.subtitle && <span className="text-slate-400 text-[12px] truncate hidden md:block shrink-0" title={item.subtitle}>{item.subtitle}</span>}
             <span className="shrink-0 self-center"><FreshnessIndicator updatedAt={item.updatedAt} updatedByName={item.updatedByName} updatedById={item.updatedById} currentUserId={currentUserId} /></span>
           </div>
-          {!expanded && (
+          {!expanded && !hideSubtitle && item.currentAction && (
             <p
-              className={cn("text-[12px] truncate mt-0.5 leading-snug",
-                item.currentAction ? "text-slate-400" : "text-slate-300 italic")}
+              className="text-[12px] truncate mt-0.5 leading-snug text-slate-400"
               onClick={e => { e.stopPropagation(); onToggle(); }}
             >
-              {item.currentAction || "Agregar estado actual..."}
+              {item.currentAction}
             </p>
           )}
         </div>
 
-        <div className="flex items-center gap-1.5 shrink-0 ml-2" onClick={e => e.stopPropagation()}>
-          {decMeta.urgent && (
-            <DecisionBadge value={item.decisionNeeded} onChange={v => onUpdate({ decisionNeeded: v })} />
-          )}
-          <OwnerSelect value={item.ownerId} name={item.ownerName} onChange={v => onUpdate({ ownerId: v })} users={users} />
-          <DeadlinePicker value={item.deadline} isOverdue={item.isOverdue} onChange={v => onUpdate({ deadline: v })} />
-          {onOpenNotes && item.noteCount > 0 && (
-            <button onClick={onOpenNotes}
-              className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
-              <MessageSquare className="h-3 w-3" />
-              <span className="text-[10px] font-medium">{item.noteCount}</span>
-            </button>
-          )}
-          <Popover open={menuOpen} onOpenChange={setMenuOpen}>
-            <PopoverTrigger asChild>
-              <button className="p-1 rounded hover:bg-slate-100 text-slate-300 hover:text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity">
-                <MoreHorizontal className="h-3.5 w-3.5" />
+        <div className="flex items-center gap-2 shrink-0 ml-2" onClick={e => e.stopPropagation()}>
+          {/* At rest: compact essentials — deadline + notes + owner avatar */}
+          <div className="flex items-center gap-2 group-hover:hidden">
+            {item.deadline && (
+              <span className={cn("text-[10px]", item.isOverdue ? "text-red-500 font-medium" : "text-slate-400")}>
+                {deadlineLabel(item.deadline)}
+              </span>
+            )}
+            {item.noteCount > 0 && (
+              <span className="flex items-center gap-0.5 text-[10px] text-slate-400">
+                <MessageSquare className="h-2.5 w-2.5" />{item.noteCount}
+              </span>
+            )}
+            {item.ownerName && (
+              <div className="h-5 w-5 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-[8px] font-bold shrink-0" title={item.ownerName}>
+                {initials(item.ownerName)}
+              </div>
+            )}
+          </div>
+          {/* On hover: full interactive controls */}
+          <div className="hidden group-hover:flex items-center gap-1.5">
+            {decMeta.urgent && (
+              <DecisionBadge value={item.decisionNeeded} onChange={v => onUpdate({ decisionNeeded: v })} />
+            )}
+            <OwnerSelect value={item.ownerId} name={item.ownerName} onChange={v => onUpdate({ ownerId: v })} users={users} />
+            <DeadlinePicker value={item.deadline} isOverdue={item.isOverdue} onChange={v => onUpdate({ deadline: v })} />
+            {onOpenNotes && item.noteCount > 0 && (
+              <button onClick={onOpenNotes}
+                className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
+                <MessageSquare className="h-3 w-3" /><span className="text-[10px] font-medium">{item.noteCount}</span>
               </button>
-            </PopoverTrigger>
-            <PopoverContent className="w-44 p-1" align="end">
-              <button onClick={() => { onRemove(); setMenuOpen(false); }}
-                className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs hover:bg-red-50 text-slate-600 hover:text-red-600">
-                <Trash2 className="h-3.5 w-3.5" />
-                {item.isCustom ? "Eliminar ítem" : "Quitar del status"}
-              </button>
-            </PopoverContent>
-          </Popover>
+            )}
+            <Popover open={menuOpen} onOpenChange={setMenuOpen}>
+              <PopoverTrigger asChild>
+                <button className="p-1 rounded hover:bg-slate-100 text-slate-300 hover:text-slate-500 transition-colors">
+                  <MoreHorizontal className="h-3.5 w-3.5" />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-44 p-1" align="end">
+                <button onClick={() => { onRemove(); setMenuOpen(false); }}
+                  className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs hover:bg-red-50 text-slate-600 hover:text-red-600">
+                  <Trash2 className="h-3.5 w-3.5" />
+                  {item.isCustom ? "Eliminar ítem" : "Quitar del status"}
+                </button>
+              </PopoverContent>
+            </Popover>
+          </div>
         </div>
       </div>
 
@@ -1495,32 +1505,48 @@ function DecisionRow({ item, users, onUpdate, onRemove, onOpenNotes, expanded, o
             </p>
           )}
         </div>
-        <div className="flex items-center gap-1.5 shrink-0" onClick={e => e.stopPropagation()}>
-          <span className="text-[10px] font-medium text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-100/80">{decMeta.label}</span>
-          {daysSince !== null && daysSince > 1 && (
-            <span className="text-[10px] text-slate-400">{daysSince}d</span>
-          )}
-          <OwnerSelect value={item.ownerId} name={item.ownerName} onChange={v => onUpdate({ ownerId: v })} users={users} />
-          <DeadlinePicker value={item.deadline} isOverdue={item.isOverdue} onChange={v => onUpdate({ deadline: v })} />
-          {onOpenNotes && item.noteCount > 0 && (
-            <button onClick={onOpenNotes}
-              className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
-              <MessageSquare className="h-3 w-3" /><span className="text-[10px] font-medium">{item.noteCount}</span>
-            </button>
-          )}
-          <Popover open={menuOpen} onOpenChange={setMenuOpen}>
-            <PopoverTrigger asChild>
-              <button className="p-1 rounded hover:bg-slate-100 text-slate-300 hover:text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity">
-                <MoreHorizontal className="h-3.5 w-3.5" />
+        <div className="flex items-center gap-2 shrink-0" onClick={e => e.stopPropagation()}>
+          {/* At rest: compact */}
+          <div className="flex items-center gap-2 group-hover:hidden">
+            <span className="text-[10px] font-medium text-amber-600">{decMeta.label}</span>
+            {daysSince !== null && daysSince > 1 && (
+              <span className="text-[10px] text-slate-400">{daysSince}d</span>
+            )}
+            {item.deadline && (
+              <span className={cn("text-[10px]", item.isOverdue ? "text-red-500 font-medium" : "text-slate-400")}>
+                {deadlineLabel(item.deadline)}
+              </span>
+            )}
+            {item.ownerName && (
+              <div className="h-5 w-5 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-[8px] font-bold shrink-0" title={item.ownerName}>
+                {initials(item.ownerName)}
+              </div>
+            )}
+          </div>
+          {/* On hover: full controls */}
+          <div className="hidden group-hover:flex items-center gap-1.5">
+            <OwnerSelect value={item.ownerId} name={item.ownerName} onChange={v => onUpdate({ ownerId: v })} users={users} />
+            <DeadlinePicker value={item.deadline} isOverdue={item.isOverdue} onChange={v => onUpdate({ deadline: v })} />
+            {onOpenNotes && item.noteCount > 0 && (
+              <button onClick={onOpenNotes}
+                className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
+                <MessageSquare className="h-3 w-3" /><span className="text-[10px] font-medium">{item.noteCount}</span>
               </button>
-            </PopoverTrigger>
-            <PopoverContent className="w-44 p-1" align="end">
-              <button onClick={() => { onRemove(); setMenuOpen(false); }}
-                className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs hover:bg-red-50 text-slate-600 hover:text-red-600">
-                <Trash2 className="h-3.5 w-3.5" />{item.isCustom ? "Eliminar ítem" : "Quitar del status"}
-              </button>
-            </PopoverContent>
-          </Popover>
+            )}
+            <Popover open={menuOpen} onOpenChange={setMenuOpen}>
+              <PopoverTrigger asChild>
+                <button className="p-1 rounded hover:bg-slate-100 text-slate-300 hover:text-slate-500 transition-colors">
+                  <MoreHorizontal className="h-3.5 w-3.5" />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-44 p-1" align="end">
+                <button onClick={() => { onRemove(); setMenuOpen(false); }}
+                  className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs hover:bg-red-50 text-slate-600 hover:text-red-600">
+                  <Trash2 className="h-3.5 w-3.5" />{item.isCustom ? "Eliminar ítem" : "Quitar del status"}
+                </button>
+              </PopoverContent>
+            </Popover>
+          </div>
         </div>
       </div>
 
@@ -2713,7 +2739,7 @@ export default function StatusSemanalPage() {
               <div className={cn("grid gap-4 items-start", (alertItems.length > 0 || decisionItems.length > 0) ? "grid-cols-2" : "grid-cols-1")}>
 
               {/* Left column: Requieren atención + Decisiones pendientes */}
-              <div className="space-y-4">
+              <div className="space-y-4 sticky top-4">
 
               {/* ── Requieren atención (hidden when empty) ──────────── */}
               {alertItems.length > 0 && (
@@ -2856,7 +2882,8 @@ export default function StatusSemanalPage() {
                             bulkMode={bulkMode}
                             checked={selectedKeys.has(item.key)}
                             onCheck={v => setSelectedKeys(prev => { const n = new Set(prev); v ? n.add(item.key) : n.delete(item.key); return n; })}
-                            accent={isStaleGroup ? 'amber' : 'none'} />
+                            accent={isStaleGroup ? 'amber' : 'none'}
+                            hideSubtitle />
                         );
                       };
                       return (
