@@ -2718,7 +2718,7 @@ export default function StatusSemanalPage() {
               );
             })()
           ) : (
-            <div className="max-w-6xl mx-auto px-6 py-4 space-y-6">
+            <div className="max-w-7xl mx-auto px-6 py-4 space-y-4">
 
               {/* ── Focus block — decision command center ──────────── */}
               {(() => {
@@ -2738,6 +2738,12 @@ export default function StatusSemanalPage() {
                   />
                 ) : null;
               })()}
+
+              {/* ── Two-column dashboard layout ──────────────────────── */}
+              <div className={cn("grid gap-4 items-start", (alertItems.length > 0 || decisionItems.length > 0) ? "grid-cols-[1fr_1.5fr]" : "grid-cols-1")}>
+
+              {/* Left column: Requieren atención + Decisiones pendientes */}
+              <div className="space-y-4">
 
               {/* ── Requieren atención (hidden when empty) ──────────── */}
               {alertItems.length > 0 && (
@@ -2819,6 +2825,11 @@ export default function StatusSemanalPage() {
                 </div>
               </div>
               )}
+
+              </div>{/* end left column */}
+
+              {/* Right column: En curso */}
+              <div>
 
               {/* ── En curso ───────────────────────────────────────── */}
               <div>
@@ -2921,6 +2932,9 @@ export default function StatusSemanalPage() {
                   </DndContext>
                 )}
               </div>
+
+              </div>{/* end right column */}
+              </div>{/* end two-column grid */}
 
               {/* ── Quitados ───────────────────────────────────────── */}
               {showHidden && hiddenCount > 0 && (
