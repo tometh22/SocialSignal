@@ -1083,20 +1083,36 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
                     </div>
                   )}
                   <div className="flex-1" />
-                  {onOpenNotes && (
-                    <button onClick={onOpenNotes}
-                      className="flex items-center gap-1 text-[11px] font-medium text-indigo-500 hover:text-indigo-700 transition-colors">
-                      <MessageSquare className="h-3 w-3" />
-                      Ver actividad{item.noteCount > 0 && ` · ${item.noteCount}`}
-                      <ArrowRight className="h-3 w-3" />
-                    </button>
-                  )}
                   {(hasPrev || hasNext) && (
                     <div className="flex items-center gap-0.5 ml-2">
                       <button onClick={onPrev} disabled={!hasPrev} className={cn("p-0.5 rounded", hasPrev ? "text-slate-400 hover:bg-slate-100" : "text-slate-200")}><ChevronLeft className="h-3 w-3" /></button>
                       <button onClick={onNext} disabled={!hasNext} className={cn("p-0.5 rounded", hasNext ? "text-slate-400 hover:bg-slate-100" : "text-slate-200")}><ChevronRight className="h-3 w-3" /></button>
                     </div>
                   )}
+                </div>
+
+                {/* Quick activity — last update + input */}
+                <div className="border-t border-slate-100">
+                  <div className="flex items-center gap-2 px-5 pt-3 pb-1">
+                    <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Actividad</span>
+                    {onOpenNotes && (
+                      <button onClick={onOpenNotes}
+                        className="ml-auto flex items-center gap-1 text-[11px] font-medium text-indigo-500 hover:text-indigo-700 transition-colors">
+                        Ver historial{item.noteCount > 0 && ` · ${item.noteCount}`}
+                        <ArrowRight className="h-2.5 w-2.5" />
+                      </button>
+                    )}
+                  </div>
+                  <div className="px-5 pb-4">
+                    <ItemThread
+                      projectId={item.projectId}
+                      customId={item.customId}
+                      currentUserId={currentUserId}
+                      users={users}
+                      onOpenFull={onOpenNotes}
+                      compact
+                    />
+                  </div>
                 </div>
               </div>
             </div>
@@ -1118,9 +1134,9 @@ type ThreadEntry = {
   createdAt: string;
 };
 
-function ItemThread({ projectId, customId, currentUserId, users = [], onOpenFull }: {
+function ItemThread({ projectId, customId, currentUserId, users = [], onOpenFull, compact = false }: {
   projectId?: number; customId?: number; currentUserId?: number | null;
-  users?: AppUser[]; onOpenFull?: () => void;
+  users?: AppUser[]; onOpenFull?: () => void; compact?: boolean;
 }) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -1196,23 +1212,23 @@ function ItemThread({ projectId, customId, currentUserId, users = [], onOpenFull
     else addUpdateMutation.mutate(t);
   };
 
-  const SHOW_RECENT = 5;
+  const SHOW_RECENT = compact ? 1 : 5;
   const visibleThread = thread.slice(-SHOW_RECENT);
   const hiddenCount = thread.length - SHOW_RECENT;
 
   return (
     <div>
       {/* Thread entries */}
-      <div className="space-y-2.5 mb-2.5">
+      <div className={cn("mb-2.5", compact ? "space-y-1.5" : "space-y-2.5")}>
         {hiddenCount > 0 && (
           <button onClick={onOpenFull}
             className="flex items-center gap-1 text-[10px] text-indigo-500 hover:text-indigo-700 font-medium">
             <ChevronUp className="h-3 w-3" />
-            Ver {hiddenCount} entradas anteriores
+            {compact ? `Ver ${thread.length} entradas` : `Ver ${hiddenCount} entradas anteriores`}
           </button>
         )}
         {thread.length === 0 && (
-          <p className="text-[11px] text-slate-400 italic text-center py-1">Sin actividad — agregá un update o dejá un comentario</p>
+          <p className="text-[11px] text-slate-400 italic py-0.5">{compact ? 'Sin actividad aún' : 'Sin actividad — agregá un update o dejá un comentario'}</p>
         )}
         {visibleThread.map(entry => {
           const isOwn = entry.authorId != null && entry.authorId === currentUserId;
@@ -1579,6 +1595,30 @@ function DecisionRow({ item, users, onUpdate, onRemove, onOpenNotes, expanded, o
                       <button onClick={onNext} disabled={!hasNext} className={cn("p-0.5 rounded", hasNext ? "text-slate-400 hover:bg-slate-100" : "text-slate-200")}><ChevronRight className="h-3 w-3" /></button>
                     </div>
                   )}
+                </div>
+
+                {/* Quick activity */}
+                <div className="border-t border-slate-100">
+                  <div className="flex items-center gap-2 px-5 pt-3 pb-1">
+                    <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Actividad</span>
+                    {onOpenNotes && (
+                      <button onClick={onOpenNotes}
+                        className="ml-auto flex items-center gap-1 text-[11px] font-medium text-indigo-500 hover:text-indigo-700 transition-colors">
+                        Ver historial{item.noteCount > 0 && ` · ${item.noteCount}`}
+                        <ArrowRight className="h-2.5 w-2.5" />
+                      </button>
+                    )}
+                  </div>
+                  <div className="px-5 pb-4">
+                    <ItemThread
+                      projectId={item.projectId}
+                      customId={item.customId}
+                      currentUserId={currentUserId}
+                      users={users}
+                      onOpenFull={onOpenNotes}
+                      compact
+                    />
+                  </div>
                 </div>
               </div>
             </div>
