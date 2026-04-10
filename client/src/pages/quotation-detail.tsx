@@ -99,6 +99,7 @@ const QuotationDetail: React.FC = () => {
   const [template, setTemplate] = useState<Template | null>(null);
   const [personnel, setPersonnel] = useState<Personnel[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   // Cargar los datos de la cotización
   useEffect(() => {
@@ -182,7 +183,7 @@ const QuotationDetail: React.FC = () => {
     };
 
     fetchData();
-  }, [quotationId, toast]);
+  }, [quotationId, toast, refreshKey]);
 
   // Si no hay ID válido, redireccionar
   if (!quotationId) {
@@ -725,8 +726,7 @@ const QuotationDetail: React.FC = () => {
             quotationCurrency={quotation.quotationCurrency || 'ARS'}
             baseTotal={quotation.totalAmount}
             onVariantApproved={() => {
-              // Recargar los datos de la cotización después de aprobar una variante
-              window.location.reload();
+              setRefreshKey(k => k + 1);
             }}
           />
         </div>
