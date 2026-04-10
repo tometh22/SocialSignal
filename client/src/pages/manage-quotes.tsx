@@ -61,6 +61,11 @@ export default function ManageQuotes() {
     queryKey: ["/api/clients"]
   });
 
+  const { data: teamCounts = {} } = useQuery<Record<number, number>>({
+    queryKey: ["/api/quotations/team-counts"],
+    staleTime: 30000,
+  });
+
   // Query to check which quotations have negotiation history
   const { data: negotiationData = {} } = useQuery<Record<number, boolean>>({
     queryKey: ["/api/quotations/negotiation-status"],
@@ -827,9 +832,7 @@ export default function ManageQuotes() {
                       .toUpperCase()
                       .slice(0, 2) || quote.projectName.slice(0, 2).toUpperCase();
 
-                    // Calculate team members from quote data - for now, set to 0
-                    // TODO: Fetch team members from quotationTeamMembers table
-                    let teamMembersCount = 0;
+                    const teamMembersCount = teamCounts[quote.id] ?? 0;
 
                     return (
                       <Card key={quote.id} className="group bg-white border border-gray-200 hover:border-blue-300 hover:shadow-lg transition-all duration-200 overflow-hidden relative">

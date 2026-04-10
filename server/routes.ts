@@ -4182,6 +4182,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(result);
   });
 
+  // GET /api/quotations/team-counts — team member count per quotation (single query)
+  app.get("/api/quotations/team-counts", requireAuth, async (req, res) => {
+    const rows = await db
+      .select({
+        quotationId: quotationTeamMembers.quotationId,
+        count: sql<number>`count(*)::int`,
+      })
+      .from(quotationTeamMembers)
+      .groupBy(quotationTeamMembers.quotationId);
+    const result: Record<number, number> = {};
+    for (const row of rows) result[row.quotationId] = row.count;
+    res.json(result);
+  });
+
   app.get("/api/quotations/client/:clientId", requireAuth, async (req, res) => {
     const clientId = parseInt(req.params.clientId);
     if (isNaN(clientId)) return res.status(400).json({ message: "Invalid client ID" });

@@ -1039,12 +1039,8 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
         console.log(`🔄 Updating existing quotation ID: ${quotationData.id}`);
 
         // Eliminar miembros del equipo existentes antes de agregar nuevos
-        try {
-          await apiRequest(`/api/quotation-team/${quotationData.id}`, 'DELETE');
-          console.log('🗑️ Existing team members cleared');
-        } catch (deleteError) {
-          console.warn('⚠️ Could not clear existing team members:', deleteError);
-        }
+        await apiRequest(`/api/quotation-team/${quotationData.id}`, 'DELETE');
+        console.log('🗑️ Existing team members cleared');
 
         savedQuotation = await apiRequest(`/api/quotations/${quotationData.id}`, 'PUT', quotationPayload);
         console.log('✅ Quotation updated:', savedQuotation);
