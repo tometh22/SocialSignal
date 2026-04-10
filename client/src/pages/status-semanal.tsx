@@ -929,7 +929,7 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
   onOpenNotes?: () => void; onUpdate: (d: Record<string, any>) => void; onRemove: () => void;
   expanded: boolean; onToggle: () => void; onNext?: () => void; onPrev?: () => void; hasNext?: boolean; hasPrev?: boolean;
   kbFocused?: boolean; dragHandleProps?: Record<string, any>; bulkMode?: boolean; checked?: boolean; onCheck?: (v: boolean) => void;
-  accent?: 'red' | 'amber' | 'none'; staleMode?: boolean; hideSubtitle?: boolean;
+  accent?: 'red' | 'amber' | 'none'; hideSubtitle?: boolean;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const decMeta = dm(item.decisionNeeded);
@@ -2721,6 +2721,10 @@ export default function StatusSemanalPage() {
               {/* ── Left panel: urgency items ─────────────────────────── */}
               {(alertItems.length > 0 || decisionItems.length > 0) && (
               <div className="w-[272px] shrink-0 border-r border-slate-100 overflow-y-auto bg-slate-50/40 flex flex-col">
+              <div className="px-4 py-2.5 border-b border-slate-100 flex items-center gap-2 shrink-0">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex-1">Para atender</span>
+                <span className="text-[10px] font-bold text-slate-400">{alertItems.length + decisionItems.length}</span>
+              </div>
               <div className="p-4 space-y-4 flex-1">
 
               {/* ── Requieren atención (hidden when empty) ──────────── */}
@@ -2837,11 +2841,12 @@ export default function StatusSemanalPage() {
                       setDragActiveId(null);
                       const { active, over } = event;
                       if (over && active.id !== over.id) {
-                        setNormalOrder(prev => {
+                        setNormalOrder(() => {
                           const keys = sortedNormalItems.map(i => i.key);
                           const oldIdx = keys.indexOf(active.id as string);
                           const newIdx = keys.indexOf(over.id as string);
-                          return arrayMove(oldIdx >= 0 ? keys : prev, oldIdx >= 0 ? oldIdx : prev.indexOf(active.id as string), newIdx >= 0 ? newIdx : prev.indexOf(over.id as string));
+                          if (oldIdx < 0 || newIdx < 0) return keys;
+                          return arrayMove(keys, oldIdx, newIdx);
                         });
                       }
                     }}
@@ -2849,7 +2854,7 @@ export default function StatusSemanalPage() {
                     {(() => {
                       const staleItems = sortedNormalItems.filter(i => isStale(i.updatedAt));
                       const freshItems = sortedNormalItems.filter(i => !isStale(i.updatedAt));
-                      const renderRow = (item: Item, idx: number, allInSection: Item[], isStaleGroup: boolean) => {
+                      const renderRow = (item: Item, isStaleGroup: boolean) => {
                         const h = getItemHandlers(item);
                         const globalIdx = sortedNormalItems.indexOf(item);
                         return (
@@ -2867,7 +2872,7 @@ export default function StatusSemanalPage() {
                             checked={selectedKeys.has(item.key)}
                             onCheck={v => setSelectedKeys(prev => { const n = new Set(prev); v ? n.add(item.key) : n.delete(item.key); return n; })}
                             accent={isStaleGroup ? 'amber' : 'none'}
-                            hideSubtitle />
+                            hideSubtitle={!isStaleGroup} />
                         );
                       };
                       return (
@@ -2878,9 +2883,9 @@ export default function StatusSemanalPage() {
                                 <div className="flex items-center gap-2 px-5 py-1.5 border-b border-slate-100/80 bg-amber-50/40">
                                   <span className="text-[10px] font-semibold text-amber-500 tracking-wide">Sin update · {staleItems.length}</span>
                                 </div>
-                                {staleItems.map((item, idx) => (
+                                {staleItems.map((item) => (
                                   <div key={item.key} className="border-b border-slate-100/80 last:border-b-0">
-                                    {renderRow(item, idx, staleItems, true)}
+                                    {renderRow(item, true)}
                                   </div>
                                 ))}
                               </>
@@ -2890,9 +2895,9 @@ export default function StatusSemanalPage() {
                                 <span className="text-[10px] font-semibold text-emerald-600 tracking-wide">Al día · {freshItems.length}</span>
                               </div>
                             )}
-                            {freshItems.map((item, idx) => (
+                            {freshItems.map((item) => (
                               <div key={item.key} className="border-b border-slate-100/80 last:border-b-0">
-                                {renderRow(item, idx, freshItems, false)}
+                                {renderRow(item, false)}
                               </div>
                             ))}
                           </div>

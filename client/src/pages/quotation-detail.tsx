@@ -6,11 +6,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { 
-  ArrowLeft, Download, Printer, Edit, FileCheck, 
-  FileClock, Loader2, Building, Calendar, Clock, 
+import {
+  ArrowLeft, Download, Printer, Edit, FileCheck,
+  FileClock, Loader2, Building, Calendar, Clock,
   Mail, Phone, Briefcase, Users, Globe, DollarSign,
-  MessageSquare, FileText, Layers, PieChart 
+  MessageSquare, FileText, Layers, PieChart, TrendingUp
 } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
@@ -99,6 +99,8 @@ const QuotationDetail: React.FC = () => {
   const [template, setTemplate] = useState<Template | null>(null);
   const [personnel, setPersonnel] = useState<Personnel[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [profitability, setProfitability] = useState<any>(null);
 
   // Cargar los datos de la cotización
   useEffect(() => {
@@ -182,7 +184,16 @@ const QuotationDetail: React.FC = () => {
     };
 
     fetchData();
-  }, [quotationId, toast]);
+  }, [quotationId, toast, refreshKey]);
+
+  // Cargar datos de rentabilidad cuando esté disponible el quotationId
+  useEffect(() => {
+    if (!quotationId) return;
+    authFetch(`/api/quotations/${quotationId}/profitability`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data?.profitability) setProfitability(data); })
+      .catch(() => {});
+  }, [quotationId, refreshKey]);
 
   // Si no hay ID válido, redireccionar
   if (!quotationId) {
@@ -377,6 +388,22 @@ const QuotationDetail: React.FC = () => {
                   #{quotation.id} • {formatShortDate(quotation.createdAt)}
                 </span>
               </div>
+              {quotation.expiresAt && quotation.status === 'pending' && (() => {
+                const exp = new Date(quotation.expiresAt);
+                const now = new Date();
+                const daysLeft = Math.ceil((exp.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+                return (
+                  <span className={`flex items-center gap-1 text-xs px-2 py-0.5 rounded-full border ${daysLeft < 0 ? 'bg-red-50 border-red-200 text-red-600' : 'bg-amber-50 border-amber-200 text-amber-600'}`}>
+                    <Clock className="h-3 w-3" />
+                    {daysLeft < 0 ? 'Vencida' : `Vence en ${daysLeft}d`}
+                  </span>
+                );
+              })()}
+              {quotation.lossReason && (
+                <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-slate-100 border border-slate-200 text-slate-500">
+                  Perdida: {quotation.lossReason.split(' — ')[0]}
+                </span>
+              )}
               
               {client && (
                 <div className="flex items-center bg-amber-50 rounded-full px-2 py-0.5 text-xs gap-1">
@@ -718,6 +745,34 @@ const QuotationDetail: React.FC = () => {
             </div>
           )}
 
+          {/* Rentabilidad real vs cotizada */}
+          {profitability?.profitability && (
+            <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
+              <div className="flex items-center gap-2 px-5 py-3 border-b border-slate-100 bg-slate-50/50">
+                <TrendingUp className="h-4 w-4 text-slate-500" />
+                <span className="text-sm font-semibold text-slate-700">Rentabilidad real vs cotizada</span>
+              </div>
+              <div className="grid grid-cols-3 divide-x divide-slate-100 px-2 py-4">
+                <div className="px-4 text-center">
+                  <p className="text-xs text-slate-400 mb-1">Horas cotizadas</p>
+                  <p className="text-xl font-bold text-slate-900">{profitability.profitability.quotedHours}h</p>
+                </div>
+                <div className="px-4 text-center">
+                  <p className="text-xs text-slate-400 mb-1">Horas reales</p>
+                  <p className={`text-xl font-bold ${profitability.profitability.realHours > profitability.profitability.quotedHours ? 'text-red-600' : 'text-emerald-600'}`}>
+                    {Math.round(profitability.profitability.realHours)}h
+                  </p>
+                </div>
+                <div className="px-4 text-center">
+                  <p className="text-xs text-slate-400 mb-1">Delta margen</p>
+                  <p className={`text-xl font-bold ${profitability.profitability.marginDelta >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                    {profitability.profitability.marginDelta > 0 ? '+' : ''}{profitability.profitability.marginDelta}%
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Componente de Variantes de Cotización */}
           <QuotationVariantsDisplay
             quotationId={parseInt(quotationId!)}
@@ -725,8 +780,7 @@ const QuotationDetail: React.FC = () => {
             quotationCurrency={quotation.quotationCurrency || 'ARS'}
             baseTotal={quotation.totalAmount}
             onVariantApproved={() => {
-              // Recargar los datos de la cotización después de aprobar una variante
-              window.location.reload();
+              setRefreshKey(k => k + 1);
             }}
           />
         </div>
