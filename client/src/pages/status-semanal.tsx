@@ -2854,7 +2854,7 @@ export default function StatusSemanalPage() {
                     {(() => {
                       const staleItems = sortedNormalItems.filter(i => isStale(i.updatedAt));
                       const freshItems = sortedNormalItems.filter(i => !isStale(i.updatedAt));
-                      const renderRow = (item: Item, idx: number, isStaleGroup: boolean) => {
+                      const renderRow = (item: Item, isStaleGroup: boolean) => {
                         const h = getItemHandlers(item);
                         const globalIdx = sortedNormalItems.indexOf(item);
                         return (
@@ -2883,9 +2883,9 @@ export default function StatusSemanalPage() {
                                 <div className="flex items-center gap-2 px-5 py-1.5 border-b border-slate-100/80 bg-amber-50/40">
                                   <span className="text-[10px] font-semibold text-amber-500 tracking-wide">Sin update · {staleItems.length}</span>
                                 </div>
-                                {staleItems.map((item, idx) => (
+                                {staleItems.map((item) => (
                                   <div key={item.key} className="border-b border-slate-100/80 last:border-b-0">
-                                    {renderRow(item, idx, true)}
+                                    {renderRow(item, true)}
                                   </div>
                                 ))}
                               </>
@@ -2895,9 +2895,9 @@ export default function StatusSemanalPage() {
                                 <span className="text-[10px] font-semibold text-emerald-600 tracking-wide">Al día · {freshItems.length}</span>
                               </div>
                             )}
-                            {freshItems.map((item, idx) => (
+                            {freshItems.map((item) => (
                               <div key={item.key} className="border-b border-slate-100/80 last:border-b-0">
-                                {renderRow(item, idx, false)}
+                                {renderRow(item, false)}
                               </div>
                             ))}
                           </div>
