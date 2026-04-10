@@ -929,7 +929,7 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
   onOpenNotes?: () => void; onUpdate: (d: Record<string, any>) => void; onRemove: () => void;
   expanded: boolean; onToggle: () => void; onNext?: () => void; onPrev?: () => void; hasNext?: boolean; hasPrev?: boolean;
   kbFocused?: boolean; dragHandleProps?: Record<string, any>; bulkMode?: boolean; checked?: boolean; onCheck?: (v: boolean) => void;
-  accent?: 'red' | 'amber' | 'none'; staleMode?: boolean; hideSubtitle?: boolean;
+  accent?: 'red' | 'amber' | 'none'; hideSubtitle?: boolean;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const decMeta = dm(item.decisionNeeded);
@@ -2841,11 +2841,12 @@ export default function StatusSemanalPage() {
                       setDragActiveId(null);
                       const { active, over } = event;
                       if (over && active.id !== over.id) {
-                        setNormalOrder(prev => {
+                        setNormalOrder(() => {
                           const keys = sortedNormalItems.map(i => i.key);
                           const oldIdx = keys.indexOf(active.id as string);
                           const newIdx = keys.indexOf(over.id as string);
-                          return arrayMove(oldIdx >= 0 ? keys : prev, oldIdx >= 0 ? oldIdx : prev.indexOf(active.id as string), newIdx >= 0 ? newIdx : prev.indexOf(over.id as string));
+                          if (oldIdx < 0 || newIdx < 0) return keys;
+                          return arrayMove(keys, oldIdx, newIdx);
                         });
                       }
                     }}
@@ -2853,7 +2854,7 @@ export default function StatusSemanalPage() {
                     {(() => {
                       const staleItems = sortedNormalItems.filter(i => isStale(i.updatedAt));
                       const freshItems = sortedNormalItems.filter(i => !isStale(i.updatedAt));
-                      const renderRow = (item: Item, idx: number, allInSection: Item[], isStaleGroup: boolean) => {
+                      const renderRow = (item: Item, idx: number, isStaleGroup: boolean) => {
                         const h = getItemHandlers(item);
                         const globalIdx = sortedNormalItems.indexOf(item);
                         return (
@@ -2884,7 +2885,7 @@ export default function StatusSemanalPage() {
                                 </div>
                                 {staleItems.map((item, idx) => (
                                   <div key={item.key} className="border-b border-slate-100/80 last:border-b-0">
-                                    {renderRow(item, idx, staleItems, true)}
+                                    {renderRow(item, idx, true)}
                                   </div>
                                 ))}
                               </>
@@ -2896,7 +2897,7 @@ export default function StatusSemanalPage() {
                             )}
                             {freshItems.map((item, idx) => (
                               <div key={item.key} className="border-b border-slate-100/80 last:border-b-0">
-                                {renderRow(item, idx, freshItems, false)}
+                                {renderRow(item, idx, false)}
                               </div>
                             ))}
                           </div>
