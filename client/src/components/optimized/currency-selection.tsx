@@ -19,7 +19,8 @@ const CurrencySelection: React.FC = () => {
   const [isFinalizingDirect, setIsFinalizingDirect] = useState(false);
 
   const handleCurrencyChange = (currency: 'ARS' | 'USD') => {
-    updateQuotationData({ quotationCurrency: currency });
+    // Snapshot del tipo de cambio al momento de seleccionar la moneda
+    updateQuotationData({ quotationCurrency: currency, exchangeRateSnapshot: exchangeRate });
   };
 
   const handleDirectFinalize = async () => {

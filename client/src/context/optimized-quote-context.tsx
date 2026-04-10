@@ -62,6 +62,7 @@ export interface QuotationData {
   };
   proposalLink?: string; // Link a la propuesta original
   leadId?: number; // Lead CRM de origen (para integración CRM-Cotizaciones)
+  exchangeRateSnapshot?: number; // Tipo de cambio al momento de cotizar (snapshot)
 }
 
 interface OptimizedQuoteContextType {
@@ -126,6 +127,9 @@ interface OptimizedQuoteContextType {
 
   // General update function
   updateQuotationData: (data: Partial<QuotationData>) => void;
+  // Templates
+  saveAsTemplate: (name: string, description?: string) => Promise<void>;
+  loadFromTemplate: (template: any) => void;
 }
 
 const OptimizedQuoteContext = createContext<OptimizedQuoteContextType | undefined>(undefined);
@@ -614,7 +618,7 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
 
   // Navigation functions
   const nextStep = useCallback(() => {
-    const maxStep = quotationData.project.type === 'always-on' ? 8 : 7;
+    const maxStep = quotationData.project.type === 'always-on' ? 9 : 8;
     if (currentStep < maxStep) {
       setCurrentStep(currentStep + 1);
     }
@@ -627,7 +631,7 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
   }, [currentStep]);
 
   const goToStep = useCallback((step: number) => {
-    const maxStep = quotationData.project.type === 'always-on' ? 8 : 7;
+    const maxStep = quotationData.project.type === 'always-on' ? 9 : 8;
     if (step >= 1 && step <= maxStep) {
       setCurrentStep(step);
     }
@@ -999,6 +1003,7 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
         manualInflationRate: quotationData.inflation.manualInflationRate || 0,
         projectStartDate: quotationData.inflation.projectStartDate ? new Date(quotationData.inflation.projectStartDate) : undefined,
         quotationCurrency: quotationData.quotationCurrency || 'ARS',
+        exchangeRateAtQuote: quotationData.exchangeRateSnapshot || null,
         proposalLink: quotationData.proposalLink || null,
         leadId: quotationData.leadId || null,
         status: status
@@ -1241,6 +1246,34 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
     }
   }, [forceRecalculate]);
 
+  // ── Template save/load ───────────────────────────────────────────────────────
+  const saveAsTemplate = useCallback(async (name: string, description?: string) => {
+    const payload = {
+      name,
+      description: description || null,
+      projectType: quotationData.project.type,
+      analysisType: quotationData.analysisType,
+      mentionsVolume: quotationData.mentionsVolume,
+      countriesCovered: quotationData.countriesCovered,
+      clientEngagement: quotationData.clientEngagement,
+      teamConfig: JSON.stringify(quotationData.teamMembers),
+    };
+    await apiRequest('/api/quotation-templates', 'POST', payload);
+  }, [quotationData]);
+
+  const loadFromTemplate = useCallback((template: { projectType: string; analysisType: string; mentionsVolume: string; countriesCovered: string; clientEngagement: string; teamConfig: string }) => {
+    setQuotationData(prev => ({
+      ...prev,
+      project: { ...prev.project, type: template.projectType },
+      analysisType: template.analysisType,
+      mentionsVolume: template.mentionsVolume,
+      countriesCovered: template.countriesCovered,
+      clientEngagement: template.clientEngagement,
+      teamMembers: (() => { try { return JSON.parse(template.teamConfig); } catch { return []; } })(),
+    }));
+    forceRecalculate();
+  }, [forceRecalculate]);
+
   const value = {
     quotationData,
     baseCost,
@@ -1293,7 +1326,10 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
     // General update function
     updateQuotationData,
     // Currency conversion helper
-    getPersonnelRate
+    getPersonnelRate,
+    // Templates
+    saveAsTemplate,
+    loadFromTemplate,
   };
 
   return (

@@ -415,6 +415,8 @@ export const quotations = pgTable("quotations", {
   proposalLink: text("proposal_link"), // Link to the proposal document
   quotationType: text("quotation_type").default("recurring"), // 'one-time' | 'recurring' | 'fee'
   leadId: integer("lead_id").references(() => crmLeads.id),
+  expiresAt: timestamp("expires_at"), // Fecha de expiración (default: 30 días desde creación)
+  lossReason: text("loss_reason"), // Motivo de pérdida cuando status='rejected'
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
   createdBy: integer("created_by").references(() => users.id, { onDelete: 'set null' }),
@@ -522,6 +524,28 @@ export const insertQuotationTeamMemberSchema = createInsertSchema(quotationTeamM
 
 export type QuotationTeamMember = typeof quotationTeamMembers.$inferSelect;
 export type InsertQuotationTeamMember = z.infer<typeof insertQuotationTeamMemberSchema>;
+
+// ==================== TEMPLATES DE COTIZACIÓN ====================
+// Quotation templates — configuraciones reutilizables de equipo + scope
+export const quotationTemplates = pgTable("quotation_templates", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  projectType: text("project_type").notNull(),
+  analysisType: text("analysis_type").notNull(),
+  mentionsVolume: text("mentions_volume").notNull().default("medium"),
+  countriesCovered: text("countries_covered").notNull().default("1"),
+  clientEngagement: text("client_engagement").notNull().default("medium"),
+  teamConfig: text("team_config").notNull(), // JSON: array de { roleId, hours, rate, personnelId }
+  complexityConfig: text("complexity_config"), // JSON: complexity factor overrides
+  createdBy: integer("created_by").references(() => users.id, { onDelete: 'set null' }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertQuotationTemplateSchema = createInsertSchema(quotationTemplates).omit({ id: true, createdAt: true, updatedAt: true });
+export type QuotationTemplate = typeof quotationTemplates.$inferSelect;
+export type InsertQuotationTemplate = z.infer<typeof insertQuotationTemplateSchema>;
 
 // ==================== ASIGNACIÓN DE ROLES EN PLANTILLAS ====================
 // Template Role Assignments table

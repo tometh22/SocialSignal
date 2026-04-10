@@ -10,7 +10,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Search, FileText, CheckCircle, AlertCircle, Clock, Edit, Eye, Trash2, PenLine, Plus, X, MessageCircle, Filter, Loader2, Building2, Calendar, DollarSign, TrendingUp, Zap, Users, Handshake, Briefcase, Target } from "lucide-react";
+import { Search, FileText, CheckCircle, AlertCircle, Clock, Edit, Eye, Trash2, PenLine, Plus, X, MessageCircle, Filter, Loader2, Building2, Calendar, DollarSign, TrendingUp, Zap, Users, Handshake, Briefcase, Target, ThumbsDown, TrendingDown, AlertOctagon } from "lucide-react";
+import { LossReasonDialog } from "@/components/quotation/loss-reason-dialog";
 import { PageLayout } from "@/components/ui/page-layout";
 import { Loader } from "@/components/ui/loader";
 import {
@@ -177,6 +178,8 @@ export default function ManageQuotes() {
   const [checkingProjects, setCheckingProjects] = useState(false);
   const [deletingQuoteId, setDeletingQuoteId] = useState<number | null>(null);
   const [showTeamConfiguration, setShowTeamConfiguration] = useState(false);
+  const [lossReasonQuote, setLossReasonQuote] = useState<Quotation | null>(null);
+  const [markingLost, setMarkingLost] = useState(false);
   const [teamConfigurationData, setTeamConfigurationData] = useState<any[]>([]);
   const { toast } = useToast();
 
@@ -543,6 +546,28 @@ export default function ManageQuotes() {
     }
   };
 
+  const getExpiryBadge = (quote: Quotation) => {
+    if (!quote.expiresAt || quote.status !== 'pending') return null;
+    const exp = new Date(quote.expiresAt);
+    const now = new Date();
+    const daysLeft = Math.ceil((exp.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    if (daysLeft < 0) {
+      return (
+        <Badge variant="outline" className="bg-red-50 text-red-600 border-red-200 text-xs inline-flex items-center gap-1 px-2 py-0.5">
+          <AlertOctagon className="h-3 w-3" /> Vencida
+        </Badge>
+      );
+    }
+    if (daysLeft <= 7) {
+      return (
+        <Badge variant="outline" className="bg-amber-50 text-amber-600 border-amber-200 text-xs inline-flex items-center gap-1 px-2 py-0.5">
+          <Clock className="h-3 w-3" /> Vence en {daysLeft}d
+        </Badge>
+      );
+    }
+    return null;
+  };
+
   const getStatusBadge = (status: string) => {
     const statusConfig = {
       'approved': {
@@ -608,19 +633,48 @@ export default function ManageQuotes() {
   };
 
   // Calculate statistics
+  // Helpers para expiración
+  const isExpired = (quote: Quotation) =>
+    !!quote.expiresAt && new Date(quote.expiresAt) < new Date() && quote.status === 'pending';
+
   const stats = {
     total: filteredQuotations.length,
     approved: filteredQuotations.filter(q => q.status === 'approved').length,
     pending: filteredQuotations.filter(q => q.status === 'pending').length,
     rejected: filteredQuotations.filter(q => q.status === 'rejected').length,
+    expired: filteredQuotations.filter(isExpired).length,
     inNegotiation: filteredQuotations.filter(q => q.status === 'in-negotiation').length,
     totalValue: filteredQuotations.reduce((sum, q) => sum + q.totalAmount, 0),
-    conversionRate: filteredQuotations.length > 0 
-      ? (filteredQuotations.filter(q => q.status === 'approved').length / filteredQuotations.length) * 100 
+    conversionRate: filteredQuotations.length > 0
+      ? (filteredQuotations.filter(q => q.status === 'approved').length / filteredQuotations.length) * 100
       : 0,
-    rejectionRate: filteredQuotations.length > 0 
-      ? (filteredQuotations.filter(q => q.status === 'rejected').length / filteredQuotations.length) * 100 
+    rejectionRate: filteredQuotations.length > 0
+      ? (filteredQuotations.filter(q => q.status === 'rejected').length / filteredQuotations.length) * 100
       : 0,
+  };
+
+  // Win/Loss reasons breakdown
+  const lossReasonBreakdown = (quotations || [])
+    .filter(q => q.status === 'rejected' && q.lossReason)
+    .reduce((acc: Record<string, number>, q) => {
+      const key = (q.lossReason as string).split(' — ')[0];
+      acc[key] = (acc[key] || 0) + 1;
+      return acc;
+    }, {});
+
+  const handleMarkAsLost = async (lossReason: string) => {
+    if (!lossReasonQuote) return;
+    setMarkingLost(true);
+    try {
+      await apiRequest(`/api/quotations/${lossReasonQuote.id}/status`, { method: 'PATCH', body: { status: 'rejected', lossReason } });
+      toast({ title: "Cotización marcada como perdida", description: `Motivo: ${lossReason}` });
+      refetch();
+    } catch (e) {
+      toast({ title: "Error", description: "No se pudo actualizar el estado", variant: "destructive" });
+    } finally {
+      setMarkingLost(false);
+      setLossReasonQuote(null);
+    }
   };
 
     const formatCurrency = (amount: number, curr: string = 'ARS') => {
@@ -768,6 +822,30 @@ export default function ManageQuotes() {
             </Card>
           </div>
 
+          {/* Win/Loss insights bar */}
+          {Object.keys(lossReasonBreakdown).length > 0 && (
+            <div className="mb-4 rounded-xl border border-red-100 bg-red-50/60 px-4 py-3 flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-red-500 uppercase tracking-wide shrink-0">
+                <TrendingDown className="h-3.5 w-3.5" /> Motivos de pérdida
+              </div>
+              {Object.entries(lossReasonBreakdown).sort((a, b) => b[1] - a[1]).map(([reason, count]) => (
+                <span key={reason} className="inline-flex items-center gap-1 text-xs bg-white border border-red-200 text-red-600 rounded-full px-2.5 py-1">
+                  {reason} <span className="font-semibold">{count}</span>
+                </span>
+              ))}
+            </div>
+          )}
+
+          {/* Expired quotes alert */}
+          {stats.expired > 0 && (
+            <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50/60 px-4 py-3 flex items-center gap-3">
+              <AlertOctagon className="h-4 w-4 text-amber-500 shrink-0" />
+              <span className="text-sm text-amber-700">
+                <span className="font-semibold">{stats.expired}</span> cotización{stats.expired !== 1 ? 'es' : ''} vencida{stats.expired !== 1 ? 's' : ''} sin respuesta del cliente
+              </span>
+            </div>
+          )}
+
           {/* Filters mejorados */}
           <Card className="bg-white shadow-lg border-0 mb-6">
             <CardContent className="p-4 lg:p-6">
@@ -839,6 +917,7 @@ export default function ManageQuotes() {
                         {/* Status badges - NEW LOCATION: Top right corner */}
                         <div className="absolute top-3 right-3 flex flex-col items-end gap-2 z-10">
                           {getStatusBadge(quote.status)}
+                          {getExpiryBadge(quote)}
                           {(quote as any).leadId && (
                             <Link href={`/crm/${(quote as any).leadId}`}>
                               <Badge
@@ -967,7 +1046,7 @@ export default function ManageQuotes() {
                                         const currency = quote.quotationCurrency || 'ARS';
                                         // If currency is USD but totalAmount looks like ARS (saved before conversion),
                                         // divide by the exchange rate at quote time
-                                        const fxAtQuote = quote.exchangeRateAtQuote || quote.usdExchangeRate || exchangeRate || 1;
+                                        const fxAtQuote = Number(quote.exchangeRateAtQuote) || quote.usdExchangeRate || exchangeRate || 1;
                                         const displayAmount = currency === 'USD'
                                           ? quote.totalAmount / fxAtQuote
                                           : quote.totalAmount;
@@ -983,7 +1062,7 @@ export default function ManageQuotes() {
                                       <span className="font-medium text-gray-700">
                                         {(() => {
                                           const currency = quote.quotationCurrency || 'ARS';
-                                          const fxAtQuote = quote.exchangeRateAtQuote || quote.usdExchangeRate || exchangeRate || 1;
+                                          const fxAtQuote = Number(quote.exchangeRateAtQuote) || quote.usdExchangeRate || exchangeRate || 1;
                                           const displayAmount = currency === 'USD'
                                             ? quote.baseCost / fxAtQuote
                                             : quote.baseCost;
@@ -1053,7 +1132,18 @@ export default function ManageQuotes() {
                                     </Button>
                                   )}
                                   
-                                  <div className="ml-2 border-l border-gray-200 pl-2">
+                                  <div className="ml-2 border-l border-gray-200 pl-2 flex items-center">
+                                    {['pending', 'in-negotiation'].includes(quote.status) && (
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => setLossReasonQuote(quote)}
+                                        title="Marcar como perdida"
+                                        className="h-8 w-8 p-0 text-gray-400 hover:text-red-500"
+                                      >
+                                        <ThumbsDown className="h-3.5 w-3.5" />
+                                      </Button>
+                                    )}
                                     <Button
                                       variant="ghost"
                                       size="sm"
@@ -1344,6 +1434,15 @@ const baseCostTotal = approvedQuote.baseCost + (approvedQuote.complexityAdjustme
           onCancel={handleTeamConfigurationCancel}
         />
       )}
+
+      {/* Loss Reason Dialog */}
+      <LossReasonDialog
+        open={!!lossReasonQuote}
+        onOpenChange={(open) => { if (!open) setLossReasonQuote(null); }}
+        quotationName={lossReasonQuote?.projectName || ''}
+        onConfirm={handleMarkAsLost}
+        isLoading={markingLost}
+      />
     </>
   );
 }

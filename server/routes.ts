@@ -108,6 +108,7 @@ import {
   estimatedRates,
   insertEstimatedRateSchema,
   quotationTeamMembers,
+  quotationTemplates,
 } from "@shared/schema";
 import { ActiveProjectsAggregator } from "./domain/projectsActive";
 import { resolveTimeFilter } from "./services/time";
@@ -4233,7 +4234,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const validatedData = insertQuotationSchema.parse(req.body);
         console.log('✅ Validation successful:', JSON.stringify(validatedData, null, 2));
 
-        // Crear cotización
+        // Crear cotización — expiresAt default = ahora + 30 días si no viene en payload
+        if (!validatedData.expiresAt) {
+          const exp = new Date();
+          exp.setDate(exp.getDate() + 30);
+          (validatedData as any).expiresAt = exp;
+        }
         const quotation = await storage.createQuotation(validatedData);
 
         // Si viene de un lead CRM, registrar actividad automáticamente
@@ -4343,7 +4349,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (isNaN(id)) return res.status(400).json({ message: "Invalid quotation ID" });
 
     try {
-      const { status } = req.body;
+      const { status, lossReason } = req.body;
 
       if (!status) return res.status(400).json({ message: "Status is required" });
 
@@ -4375,7 +4381,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       let updateData: any = { status };
-      
+
+      // Guardar motivo de pérdida al rechazar
+      if (status === 'rejected' && lossReason) {
+        updateData.lossReason = lossReason;
+      }
+
       if (currentQuotation.status === 'in-negotiation' && status === 'approved') {
         // Get the last negotiation entry
         const negotiationHistory = await storage.getNegotiationHistory(id);
@@ -4420,6 +4431,84 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error(`[API] Error actualizando estado de cotización ID ${id}:`, error);
       res.status(500).json({ message: "Failed to update quotation status", error: error instanceof Error ? error.message : 'Unknown error' });
     }
+  });
+
+  // GET /api/quotations/:id/profitability — cotización vs horas reales del proyecto
+  app.get("/api/quotations/:id/profitability", requireAuth, async (req, res) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ message: "Invalid ID" });
+    try {
+      const quotation = await storage.getQuotation(id);
+      if (!quotation) return res.status(404).json({ message: "Quotation not found" });
+
+      // Buscar proyecto asociado
+      const [project] = await db.select().from(activeProjects).where(eq(activeProjects.quotationId, id));
+      if (!project) return res.json({ quotation, project: null, profitability: null });
+
+      // Sumar horas y costos reales del proyecto
+      const entries = await db.select({
+        hours: timeEntries.hours,
+        totalCost: timeEntries.totalCost,
+      }).from(timeEntries).where(eq(timeEntries.projectId, project.id));
+
+      const realHours = entries.reduce((s, e) => s + (e.hours || 0), 0);
+      const realCost = entries.reduce((s, e) => s + (e.totalCost || 0), 0);
+
+      // Horas cotizadas
+      const quotedTeam = await storage.getQuotationTeamMembers(id);
+      const quotedHours = quotedTeam.reduce((s, m) => s + (m.hours || 0), 0);
+      const quotedCost = quotation.baseCost || 0;
+
+      const margin = quotedCost > 0 ? ((quotedCost - realCost) / quotedCost) * 100 : 0;
+
+      res.json({
+        quotation: { totalAmount: quotation.totalAmount, baseCost: quotedCost, quotedHours },
+        project: { id: project.id, name: project.projectName || project.id },
+        profitability: { realHours, realCost, quotedHours, quotedCost, marginDelta: parseFloat(margin.toFixed(1)) },
+      });
+    } catch (e) {
+      res.status(500).json({ message: "Error fetching profitability", error: String(e) });
+    }
+  });
+
+  // ─── Quotation Templates CRUD ────────────────────────────────────────────────
+
+  // GET /api/quotation-templates
+  app.get("/api/quotation-templates", requireAuth, async (req, res) => {
+    try {
+      const templates = await db.select().from(quotationTemplates).orderBy(desc(quotationTemplates.createdAt));
+      res.json(templates);
+    } catch (e) { res.status(500).json({ message: String(e) }); }
+  });
+
+  // POST /api/quotation-templates
+  app.post("/api/quotation-templates", requireAuth, async (req, res) => {
+    try {
+      const userId = (req.session as any)?.userId;
+      const { name, description, projectType, analysisType, mentionsVolume, countriesCovered, clientEngagement, teamConfig, complexityConfig } = req.body;
+      if (!name || !projectType || !analysisType || !teamConfig) {
+        return res.status(400).json({ message: "name, projectType, analysisType y teamConfig son requeridos" });
+      }
+      const [tmpl] = await db.insert(quotationTemplates).values({
+        name, description: description || null, projectType, analysisType,
+        mentionsVolume: mentionsVolume || 'medium', countriesCovered: countriesCovered || '1',
+        clientEngagement: clientEngagement || 'medium',
+        teamConfig: typeof teamConfig === 'string' ? teamConfig : JSON.stringify(teamConfig),
+        complexityConfig: complexityConfig ? (typeof complexityConfig === 'string' ? complexityConfig : JSON.stringify(complexityConfig)) : null,
+        createdBy: userId || null,
+      }).returning();
+      res.status(201).json(tmpl);
+    } catch (e) { res.status(500).json({ message: String(e) }); }
+  });
+
+  // DELETE /api/quotation-templates/:id
+  app.delete("/api/quotation-templates/:id", requireAuth, async (req, res) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ message: "Invalid ID" });
+    try {
+      await db.delete(quotationTemplates).where(eq(quotationTemplates.id, id));
+      res.json({ success: true });
+    } catch (e) { res.status(500).json({ message: String(e) }); }
   });
 
   // Eliminar una cotización
