@@ -20,6 +20,7 @@ import QuotationErrorBoundary from '@/components/quotation-error-boundary';
 import { QuotationVariants } from '@/components/optimized/QuotationVariants';
 import CurrencySelection from '@/components/optimized/currency-selection';
 import { ExecutiveSummary } from '@/components/quotation/executive-summary';
+import { QuotationTemplatesPicker } from '@/components/quotation/quotation-templates-picker';
 
 interface OptimizedQuoteProps {
   quotationId?: number;
@@ -365,6 +366,12 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
 
       {/* Main content */}
       <div className="space-y-6">
+        {/* Template picker — solo visible en step 1 y 3 */}
+        {(currentStep === 1 || currentStep === 3) && !isEditing && (
+          <div className="flex justify-end px-1">
+            <QuotationTemplatesPicker />
+          </div>
+        )}
         <div className="standard-card">
           <div className="card-content">
             {currentStep === 1 && <OptimizedBasicInfo />}
