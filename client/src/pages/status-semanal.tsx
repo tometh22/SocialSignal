@@ -2736,6 +2736,7 @@ export default function StatusSemanalPage() {
                   <AddItemButton variant="inline" onAdd={(title, subtitle) => createCustom.mutate({ title, subtitle })} />
                 </div>
                 <div className="rounded-xl border border-slate-200/60 bg-white overflow-hidden">
+                  <div className="overflow-y-auto max-h-[220px]">
                   <AnimatePresence initial={false}>
                     {alertItems.map((item, idx) => {
                       const h = getItemHandlers(item);
@@ -2764,6 +2765,7 @@ export default function StatusSemanalPage() {
                       );
                     })}
                   </AnimatePresence>
+                  </div>
                 </div>
               </div>
               )}
@@ -2776,6 +2778,7 @@ export default function StatusSemanalPage() {
                   <span className="text-[10px] font-bold text-amber-400">{decisionItems.length}</span>
                 </div>
                 <div className="rounded-xl border border-slate-200/60 bg-white overflow-hidden">
+                  <div className="overflow-y-auto max-h-[220px]">
                   <AnimatePresence initial={false}>
                     {decisionItems.map((item, idx) => {
                       const h = getItemHandlers(item);
@@ -2803,6 +2806,7 @@ export default function StatusSemanalPage() {
                       );
                     })}
                   </AnimatePresence>
+                  </div>
                 </div>
               </div>
               )}
