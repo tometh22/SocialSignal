@@ -1626,70 +1626,80 @@ function DecisionRow({ item, users, onUpdate, onRemove, onOpenNotes, expanded, o
   );
 }
 
-// ─── AlertSidebarCard — scannable card for CEO/COO attention sidebar ─────────
-// Collapsed: full title + context + owner/deadline always visible, no hover-hide.
-// Expanded: single-column Estado actual + Próximo paso panel.
-function AlertSidebarCard({ item, accent, currentUserId, onUpdate, onToggle, expanded }: {
+// ─── AlertSidebarCard — pure-display scan card for CEO/COO sidebar ───────────
+// No expand panels, no forms. Just the key info at a glance.
+function AlertSidebarCard({ item, accent, currentUserId, onUpdate }: {
   item: Item; accent: 'red' | 'amber'; currentUserId?: number | null;
-  onUpdate: (d: Record<string, any>) => void; onToggle: () => void; expanded: boolean;
+  onUpdate: (d: Record<string, any>) => void;
 }) {
   const accentBorder = accent === 'red' ? 'border-l-red-500' : 'border-l-amber-400';
   return (
-    <div className={cn("border-l-[3px] transition-colors", accentBorder, expanded ? "bg-slate-50/50" : "hover:bg-slate-50/60")}>
-      {/* Collapsed header — always readable */}
-      <div className="px-3 py-3 cursor-pointer" onClick={onToggle}>
-        <div className="flex items-start gap-2.5">
-          <div className="shrink-0 mt-0.5" onClick={e => e.stopPropagation()}>
-            <HealthDot value={item.healthStatus} onChange={v => onUpdate({ healthStatus: v })} compact />
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="font-semibold text-[13px] leading-snug text-slate-900 break-words">{item.title}</p>
-            {item.currentAction && !expanded && (
-              <p className="text-[11px] text-slate-500 mt-0.5 leading-snug line-clamp-2">{item.currentAction}</p>
-            )}
-            <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-              {item.ownerName && (
-                <div className="flex items-center gap-1">
-                  <div className="h-4 w-4 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-[8px] font-bold shrink-0">
-                    {initials(item.ownerName)}
-                  </div>
-                  <span className="text-[10px] text-slate-400">{item.ownerName.split(' ')[0]}</span>
+    <div className={cn("border-l-[3px] px-3 py-2.5 hover:bg-slate-50/60 transition-colors", accentBorder)}>
+      <div className="flex items-start gap-2">
+        <div className="shrink-0 mt-0.5">
+          <HealthDot value={item.healthStatus} onChange={v => onUpdate({ healthStatus: v })} compact />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="font-semibold text-[13px] leading-snug text-slate-900 break-words">{item.title}</p>
+          {item.currentAction && (
+            <p className="text-[11px] text-slate-500 mt-0.5 leading-snug line-clamp-2">{item.currentAction}</p>
+          )}
+          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+            {item.ownerName && (
+              <div className="flex items-center gap-1">
+                <div className="h-4 w-4 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-[8px] font-bold shrink-0">
+                  {initials(item.ownerName)}
                 </div>
-              )}
-              {item.deadline && (
-                <span className={cn("text-[10px] font-medium", item.isOverdue ? "text-red-500" : "text-slate-400")}>
-                  {deadlineLabel(item.deadline)}
-                </span>
-              )}
-              <FreshnessIndicator updatedAt={item.updatedAt} updatedByName={item.updatedByName} updatedById={item.updatedById} currentUserId={currentUserId} />
-            </div>
+                <span className="text-[10px] text-slate-400">{item.ownerName.split(' ')[0]}</span>
+              </div>
+            )}
+            {item.deadline && (
+              <span className={cn("text-[10px] font-medium", item.isOverdue ? "text-red-500" : "text-slate-400")}>
+                {deadlineLabel(item.deadline)}
+              </span>
+            )}
+            <FreshnessIndicator updatedAt={item.updatedAt} updatedByName={item.updatedByName} updatedById={item.updatedById} currentUserId={currentUserId} />
           </div>
         </div>
       </div>
-      {/* Expanded detail — single column, no cramping */}
-      <AnimatePresence initial={false}>
-        {expanded && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.15, ease: [0.4, 0, 0.2, 1] }}
-            className="overflow-hidden">
-            <div className="px-3 pb-3">
-              <div className="rounded-xl border border-slate-200/80 bg-white overflow-hidden shadow-sm">
-                <div className="divide-y divide-slate-100">
-                  <div className="px-4 py-3">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-1.5">Estado actual</p>
-                    <InlineText value={item.currentAction} placeholder="¿Qué está pasando?" onSave={v => onUpdate({ currentAction: v })} multiline className="text-[12px] leading-relaxed text-slate-700" />
-                  </div>
-                  <div className="px-4 py-3">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-1.5">Próximo paso</p>
-                    <InlineText value={item.nextMilestone} placeholder="Acción concreta esta semana" onSave={v => onUpdate({ nextMilestone: v })} multiline className="text-[12px] leading-relaxed text-slate-700" />
-                  </div>
-                </div>
-              </div>
-            </div>
-          </motion.div>
+    </div>
+  );
+}
+
+// ─── DecisionSidebarCard — pure-display scan card for decisions sidebar ───────
+// No expand panels, no forms. Decision type badge + days waiting at a glance.
+function DecisionSidebarCard({ item, currentUserId }: {
+  item: Item; currentUserId?: number | null;
+}) {
+  const decMeta = dm(item.decisionNeeded);
+  const daysSince = item.updatedAt
+    ? Math.floor((Date.now() - new Date(item.updatedAt).getTime()) / 86400000)
+    : null;
+  return (
+    <div className="border-l-[3px] border-l-amber-400 px-3 py-2.5 hover:bg-amber-50/20 transition-colors">
+      <p className="font-semibold text-[13px] leading-snug text-slate-900 break-words">{item.title}</p>
+      {item.currentAction && (
+        <p className="text-[11px] text-slate-500 mt-0.5 leading-snug line-clamp-2">{item.currentAction}</p>
+      )}
+      <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+        <span className="text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 leading-none">{decMeta.label}</span>
+        {daysSince !== null && daysSince > 1 && (
+          <span className="text-[10px] text-slate-400">{daysSince}d sin resolución</span>
         )}
-      </AnimatePresence>
+        {item.ownerName && (
+          <div className="flex items-center gap-1">
+            <div className="h-4 w-4 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-[8px] font-bold shrink-0">
+              {initials(item.ownerName)}
+            </div>
+            <span className="text-[10px] text-slate-400">{item.ownerName.split(' ')[0]}</span>
+          </div>
+        )}
+        {item.deadline && (
+          <span className={cn("text-[10px] font-medium", item.isOverdue ? "text-red-500" : "text-slate-400")}>
+            {deadlineLabel(item.deadline)}
+          </span>
+        )}
+      </div>
     </div>
   );
 }
@@ -2818,9 +2828,7 @@ export default function StatusSemanalPage() {
                           transition={{ duration: 0.14, ease: [0.4, 0, 0.2, 1] }}
                           className="border-b border-slate-100/80 last:border-b-0">
                           <AlertSidebarCard item={item} accent={rowAccent} currentUserId={currentUserId}
-                            expanded={expandedAlertKey === item.key}
-                            onUpdate={h.onUpdate}
-                            onToggle={() => setExpandedAlertKey(expandedAlertKey === item.key ? null : item.key)} />
+                            onUpdate={h.onUpdate} />
                         </motion.div>
                       );
                     })}
@@ -2849,19 +2857,7 @@ export default function StatusSemanalPage() {
                           exit={{ opacity: 0, y: -4 }}
                           transition={{ duration: 0.14, ease: [0.4, 0, 0.2, 1] }}
                           className="border-b border-slate-100/80 last:border-b-0">
-                          <DecisionRow item={item} users={appUsers} currentUserId={currentUserId} compact
-                            isSelected={notesOpen !== null && ((notesOpen.type === 'project' && item.projectId === notesOpen.id) || (notesOpen.type === 'custom' && item.customId === notesOpen.id))}
-                            onOpenNotes={h.onOpenNotes} onUpdate={h.onUpdate} onRemove={h.onRemove}
-                            expanded={expandedDecisionKey === item.key}
-                            onToggle={() => setExpandedDecisionKey(expandedDecisionKey === item.key ? null : item.key)}
-                            hasPrev={idx > 0}
-                            hasNext={idx < decisionItems.length - 1}
-                            onPrev={() => { if (idx > 0) setExpandedDecisionKey(decisionItems[idx - 1].key); }}
-                            onNext={() => { if (idx < decisionItems.length - 1) setExpandedDecisionKey(decisionItems[idx + 1].key); }}
-                            kbFocused={kbFocusKey === item.key}
-                            bulkMode={bulkMode}
-                            checked={selectedKeys.has(item.key)}
-                            onCheck={v => setSelectedKeys(prev => { const n = new Set(prev); v ? n.add(item.key) : n.delete(item.key); return n; })} />
+                          <DecisionSidebarCard item={item} currentUserId={currentUserId} />
                         </motion.div>
                       );
                     })}
