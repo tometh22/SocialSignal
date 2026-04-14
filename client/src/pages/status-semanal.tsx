@@ -924,12 +924,12 @@ function AlertCard({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, c
 
 // ─── Compact row (Verde) ──────────────────────────────────────────────────────
 
-function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, expanded, onToggle, onNext, onPrev, hasNext, hasPrev, currentUserId, kbFocused, dragHandleProps, bulkMode, checked, onCheck, accent, hideSubtitle }: {
+function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, expanded, onToggle, onNext, onPrev, hasNext, hasPrev, currentUserId, kbFocused, dragHandleProps, bulkMode, checked, onCheck, accent, hideSubtitle, wrapTitle }: {
   item: Item; users: AppUser[]; isSelected: boolean; currentUserId?: number | null;
   onOpenNotes?: () => void; onUpdate: (d: Record<string, any>) => void; onRemove: () => void;
   expanded: boolean; onToggle: () => void; onNext?: () => void; onPrev?: () => void; hasNext?: boolean; hasPrev?: boolean;
   kbFocused?: boolean; dragHandleProps?: Record<string, any>; bulkMode?: boolean; checked?: boolean; onCheck?: (v: boolean) => void;
-  accent?: 'red' | 'amber' | 'none'; hideSubtitle?: boolean;
+  accent?: 'red' | 'amber' | 'none'; hideSubtitle?: boolean; wrapTitle?: boolean;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const decMeta = dm(item.decisionNeeded);
@@ -961,12 +961,15 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
         </div>
 
         <div className="flex-1 min-w-0">
-          <div className="flex items-baseline gap-2 min-w-0">
+          <div className={cn("flex gap-2 min-w-0", wrapTitle ? "items-start flex-wrap" : "items-baseline")}>
             {item.isCustom && <Tag className="h-3 w-3 text-slate-300 shrink-0 self-center" />}
-            <span className="font-medium text-[14px] tracking-tight text-slate-900 truncate" title={item.title}>{item.title}</span>
-            {item.subtitle && <span className="text-slate-400 text-[12px] truncate hidden md:block shrink-0" title={item.subtitle}>{item.subtitle}</span>}
-            <span className="shrink-0 self-center"><FreshnessIndicator updatedAt={item.updatedAt} updatedByName={item.updatedByName} updatedById={item.updatedById} currentUserId={currentUserId} /></span>
+            <span className={cn("font-medium text-[14px] tracking-tight text-slate-900", wrapTitle ? "line-clamp-2 break-words" : "truncate")} title={item.title}>{item.title}</span>
+            {!wrapTitle && item.subtitle && <span className="text-slate-400 text-[12px] truncate hidden md:block shrink-0" title={item.subtitle}>{item.subtitle}</span>}
+            {!wrapTitle && <span className="shrink-0 self-center"><FreshnessIndicator updatedAt={item.updatedAt} updatedByName={item.updatedByName} updatedById={item.updatedById} currentUserId={currentUserId} /></span>}
           </div>
+          {wrapTitle && (
+            <span className="inline-flex shrink-0 mt-0.5"><FreshnessIndicator updatedAt={item.updatedAt} updatedByName={item.updatedByName} updatedById={item.updatedById} currentUserId={currentUserId} /></span>
+          )}
           {!expanded && !hideSubtitle && item.currentAction && (
             <p
               className="text-[12px] truncate mt-0.5 leading-snug text-slate-400"
@@ -2720,7 +2723,7 @@ export default function StatusSemanalPage() {
 
               {/* ── Left panel: urgency items ─────────────────────────── */}
               {(alertItems.length > 0 || decisionItems.length > 0) && (
-              <div className="w-[272px] shrink-0 border-r border-slate-100 overflow-y-auto bg-slate-50/40 flex flex-col">
+              <div className="w-[300px] shrink-0 border-r border-slate-100 overflow-y-auto bg-slate-50/40 flex flex-col">
               <div className="px-4 py-2.5 border-b border-slate-100 flex items-center gap-2 shrink-0">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex-1">Para atender</span>
                 <span className="text-[10px] font-bold text-slate-400">{alertItems.length + decisionItems.length}</span>
@@ -2748,7 +2751,7 @@ export default function StatusSemanalPage() {
                           exit={{ opacity: 0, y: -4 }}
                           transition={{ duration: 0.14, ease: [0.4, 0, 0.2, 1] }}
                           className="border-b border-slate-100/80 last:border-b-0">
-                          <CompactRow item={item} users={appUsers} currentUserId={currentUserId} accent={rowAccent}
+                          <CompactRow item={item} users={appUsers} currentUserId={currentUserId} accent={rowAccent} wrapTitle
                             isSelected={notesOpen !== null && ((notesOpen.type === 'project' && item.projectId === notesOpen.id) || (notesOpen.type === 'custom' && item.customId === notesOpen.id))}
                             onOpenNotes={h.onOpenNotes} onUpdate={h.onUpdate} onRemove={h.onRemove}
                             expanded={expandedAlertKey === item.key}
