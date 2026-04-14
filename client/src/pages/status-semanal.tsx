@@ -924,12 +924,12 @@ function AlertCard({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, c
 
 // ─── Compact row (Verde) ──────────────────────────────────────────────────────
 
-function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, expanded, onToggle, onNext, onPrev, hasNext, hasPrev, currentUserId, kbFocused, dragHandleProps, bulkMode, checked, onCheck, accent, hideSubtitle, wrapTitle }: {
+function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, expanded, onToggle, onNext, onPrev, hasNext, hasPrev, currentUserId, kbFocused, dragHandleProps, bulkMode, checked, onCheck, accent, hideSubtitle }: {
   item: Item; users: AppUser[]; isSelected: boolean; currentUserId?: number | null;
   onOpenNotes?: () => void; onUpdate: (d: Record<string, any>) => void; onRemove: () => void;
   expanded: boolean; onToggle: () => void; onNext?: () => void; onPrev?: () => void; hasNext?: boolean; hasPrev?: boolean;
   kbFocused?: boolean; dragHandleProps?: Record<string, any>; bulkMode?: boolean; checked?: boolean; onCheck?: (v: boolean) => void;
-  accent?: 'red' | 'amber' | 'none'; hideSubtitle?: boolean; wrapTitle?: boolean;
+  accent?: 'red' | 'amber' | 'none'; hideSubtitle?: boolean;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const decMeta = dm(item.decisionNeeded);
@@ -961,15 +961,12 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
         </div>
 
         <div className="flex-1 min-w-0">
-          <div className={cn("flex gap-2 min-w-0", wrapTitle ? "items-start flex-wrap" : "items-baseline")}>
+          <div className="flex items-baseline gap-2 min-w-0">
             {item.isCustom && <Tag className="h-3 w-3 text-slate-300 shrink-0 self-center" />}
-            <span className={cn("font-medium text-[14px] tracking-tight text-slate-900", wrapTitle ? "line-clamp-2 break-words" : "truncate")} title={item.title}>{item.title}</span>
-            {!wrapTitle && item.subtitle && <span className="text-slate-400 text-[12px] truncate hidden md:block shrink-0" title={item.subtitle}>{item.subtitle}</span>}
-            {!wrapTitle && <span className="shrink-0 self-center"><FreshnessIndicator updatedAt={item.updatedAt} updatedByName={item.updatedByName} updatedById={item.updatedById} currentUserId={currentUserId} /></span>}
+            <span className="font-medium text-[14px] tracking-tight text-slate-900 truncate" title={item.title}>{item.title}</span>
+            {item.subtitle && <span className="text-slate-400 text-[12px] truncate hidden md:block shrink-0" title={item.subtitle}>{item.subtitle}</span>}
+            <span className="shrink-0 self-center"><FreshnessIndicator updatedAt={item.updatedAt} updatedByName={item.updatedByName} updatedById={item.updatedById} currentUserId={currentUserId} /></span>
           </div>
-          {wrapTitle && (
-            <span className="inline-flex shrink-0 mt-0.5"><FreshnessIndicator updatedAt={item.updatedAt} updatedByName={item.updatedByName} updatedById={item.updatedById} currentUserId={currentUserId} /></span>
-          )}
           {!expanded && !hideSubtitle && item.currentAction && (
             <p
               className="text-[12px] truncate mt-0.5 leading-snug text-slate-400"
@@ -1470,13 +1467,14 @@ function FocusBlock({ items, onFocusItem }: {
 
 // ─── DecisionRow — decision-first display ────────────────────────────────────
 
-function DecisionRow({ item, users, onUpdate, onRemove, onOpenNotes, expanded, onToggle, hasPrev, hasNext, onPrev, onNext, isSelected, currentUserId, kbFocused, bulkMode, checked, onCheck }: {
+function DecisionRow({ item, users, onUpdate, onRemove, onOpenNotes, expanded, onToggle, hasPrev, hasNext, onPrev, onNext, isSelected, currentUserId, kbFocused, bulkMode, checked, onCheck, compact }: {
   item: Item; users: AppUser[]; currentUserId?: number | null;
   onUpdate: (d: Record<string, any>) => void; onRemove: () => void;
   onOpenNotes?: () => void; expanded: boolean; onToggle: () => void;
   hasPrev?: boolean; hasNext?: boolean; onPrev?: () => void; onNext?: () => void;
   isSelected?: boolean; kbFocused?: boolean;
   bulkMode?: boolean; checked?: boolean; onCheck?: (v: boolean) => void;
+  compact?: boolean;
 }) {
   const decMeta = dm(item.decisionNeeded);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -1491,7 +1489,7 @@ function DecisionRow({ item, users, onUpdate, onRemove, onOpenNotes, expanded, o
       expanded && "bg-amber-50/20",
       kbFocused && "outline outline-2 outline-indigo-300 outline-offset-[-2px]"
     )}>
-      <div className="flex items-center gap-3 pl-4 pr-5 py-3.5 cursor-pointer" onClick={onToggle}>
+      <div className={cn("flex items-center gap-3 pl-4 pr-5 cursor-pointer", compact ? "py-2.5" : "py-3.5")} onClick={onToggle}>
         {bulkMode && (
           <div className="shrink-0" onClick={e => { e.stopPropagation(); onCheck?.(!checked); }}>
             {checked ? <CheckSquare className="h-4 w-4 text-indigo-500" /> : <Square className="h-4 w-4 text-slate-300" />}
@@ -1624,6 +1622,49 @@ function DecisionRow({ item, users, onUpdate, onRemove, onOpenNotes, expanded, o
           </motion.div>
         )}
       </AnimatePresence>
+    </div>
+  );
+}
+
+// ─── AlertSidebarCard — scannable card for CEO/COO attention sidebar ─────────
+// Purpose-built: title never truncates, no hover-hide, always shows context.
+function AlertSidebarCard({ item, accent, currentUserId, onUpdate, onToggle }: {
+  item: Item; accent: 'red' | 'amber'; currentUserId?: number | null;
+  onUpdate: (d: Record<string, any>) => void; onToggle: () => void;
+}) {
+  const accentBorder = accent === 'red' ? 'border-l-red-500' : 'border-l-amber-400';
+  return (
+    <div
+      className={cn("border-l-[3px] px-3 py-3 cursor-pointer transition-colors hover:bg-slate-50/70", accentBorder)}
+      onClick={onToggle}
+    >
+      <div className="flex items-start gap-2.5">
+        <div className="shrink-0 mt-0.5" onClick={e => e.stopPropagation()}>
+          <HealthDot value={item.healthStatus} onChange={v => onUpdate({ healthStatus: v })} compact />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="font-semibold text-[13px] leading-snug text-slate-900 break-words">{item.title}</p>
+          {item.currentAction && (
+            <p className="text-[11px] text-slate-500 mt-0.5 leading-snug line-clamp-2">{item.currentAction}</p>
+          )}
+          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+            {item.ownerName && (
+              <div className="flex items-center gap-1">
+                <div className="h-4 w-4 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-[8px] font-bold shrink-0">
+                  {initials(item.ownerName)}
+                </div>
+                <span className="text-[10px] text-slate-400">{item.ownerName.split(' ')[0]}</span>
+              </div>
+            )}
+            {item.deadline && (
+              <span className={cn("text-[10px] font-medium", item.isOverdue ? "text-red-500" : "text-slate-400")}>
+                {deadlineLabel(item.deadline)}
+              </span>
+            )}
+            <FreshnessIndicator updatedAt={item.updatedAt} updatedByName={item.updatedByName} updatedById={item.updatedById} currentUserId={currentUserId} />
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -2751,19 +2792,9 @@ export default function StatusSemanalPage() {
                           exit={{ opacity: 0, y: -4 }}
                           transition={{ duration: 0.14, ease: [0.4, 0, 0.2, 1] }}
                           className="border-b border-slate-100/80 last:border-b-0">
-                          <CompactRow item={item} users={appUsers} currentUserId={currentUserId} accent={rowAccent} wrapTitle
-                            isSelected={notesOpen !== null && ((notesOpen.type === 'project' && item.projectId === notesOpen.id) || (notesOpen.type === 'custom' && item.customId === notesOpen.id))}
-                            onOpenNotes={h.onOpenNotes} onUpdate={h.onUpdate} onRemove={h.onRemove}
-                            expanded={expandedAlertKey === item.key}
-                            onToggle={() => setExpandedAlertKey(expandedAlertKey === item.key ? null : item.key)}
-                            hasPrev={idx > 0}
-                            hasNext={idx < alertItems.length - 1}
-                            onPrev={() => { if (idx > 0) setExpandedAlertKey(alertItems[idx - 1].key); }}
-                            onNext={() => { if (idx < alertItems.length - 1) setExpandedAlertKey(alertItems[idx + 1].key); }}
-                            kbFocused={kbFocusKey === item.key}
-                            bulkMode={bulkMode}
-                            checked={selectedKeys.has(item.key)}
-                            onCheck={v => setSelectedKeys(prev => { const n = new Set(prev); v ? n.add(item.key) : n.delete(item.key); return n; })} />
+                          <AlertSidebarCard item={item} accent={rowAccent} currentUserId={currentUserId}
+                            onUpdate={h.onUpdate}
+                            onToggle={() => setExpandedAlertKey(expandedAlertKey === item.key ? null : item.key)} />
                         </motion.div>
                       );
                     })}
@@ -2792,7 +2823,7 @@ export default function StatusSemanalPage() {
                           exit={{ opacity: 0, y: -4 }}
                           transition={{ duration: 0.14, ease: [0.4, 0, 0.2, 1] }}
                           className="border-b border-slate-100/80 last:border-b-0">
-                          <DecisionRow item={item} users={appUsers} currentUserId={currentUserId}
+                          <DecisionRow item={item} users={appUsers} currentUserId={currentUserId} compact
                             isSelected={notesOpen !== null && ((notesOpen.type === 'project' && item.projectId === notesOpen.id) || (notesOpen.type === 'custom' && item.customId === notesOpen.id))}
                             onOpenNotes={h.onOpenNotes} onUpdate={h.onUpdate} onRemove={h.onRemove}
                             expanded={expandedDecisionKey === item.key}
