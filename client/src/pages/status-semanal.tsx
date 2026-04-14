@@ -1562,7 +1562,7 @@ function DecisionRow({ item, users, onUpdate, onRemove, onOpenNotes, expanded, o
             className="overflow-hidden">
             <div className="pl-4 pr-5 pb-4">
               <div className="rounded-xl border border-slate-200/80 bg-white shadow-sm overflow-hidden">
-                <div className="grid grid-cols-2 divide-x divide-slate-100">
+                <div className={compact ? "flex flex-col divide-y divide-slate-100" : "grid grid-cols-2 divide-x divide-slate-100"}>
                   <div className="px-4 py-3">
                     <p className="text-[10px] font-semibold text-slate-400 tracking-wide uppercase mb-1.5">Estado actual</p>
                     <InlineText value={item.currentAction} placeholder="¿Qué está pasando ahora?" onSave={v => onUpdate({ currentAction: v })} multiline className="text-[13px] leading-relaxed text-slate-700" />
@@ -1627,44 +1627,69 @@ function DecisionRow({ item, users, onUpdate, onRemove, onOpenNotes, expanded, o
 }
 
 // ─── AlertSidebarCard — scannable card for CEO/COO attention sidebar ─────────
-// Purpose-built: title never truncates, no hover-hide, always shows context.
-function AlertSidebarCard({ item, accent, currentUserId, onUpdate, onToggle }: {
+// Collapsed: full title + context + owner/deadline always visible, no hover-hide.
+// Expanded: single-column Estado actual + Próximo paso panel.
+function AlertSidebarCard({ item, accent, currentUserId, onUpdate, onToggle, expanded }: {
   item: Item; accent: 'red' | 'amber'; currentUserId?: number | null;
-  onUpdate: (d: Record<string, any>) => void; onToggle: () => void;
+  onUpdate: (d: Record<string, any>) => void; onToggle: () => void; expanded: boolean;
 }) {
   const accentBorder = accent === 'red' ? 'border-l-red-500' : 'border-l-amber-400';
   return (
-    <div
-      className={cn("border-l-[3px] px-3 py-3 cursor-pointer transition-colors hover:bg-slate-50/70", accentBorder)}
-      onClick={onToggle}
-    >
-      <div className="flex items-start gap-2.5">
-        <div className="shrink-0 mt-0.5" onClick={e => e.stopPropagation()}>
-          <HealthDot value={item.healthStatus} onChange={v => onUpdate({ healthStatus: v })} compact />
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="font-semibold text-[13px] leading-snug text-slate-900 break-words">{item.title}</p>
-          {item.currentAction && (
-            <p className="text-[11px] text-slate-500 mt-0.5 leading-snug line-clamp-2">{item.currentAction}</p>
-          )}
-          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-            {item.ownerName && (
-              <div className="flex items-center gap-1">
-                <div className="h-4 w-4 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-[8px] font-bold shrink-0">
-                  {initials(item.ownerName)}
+    <div className={cn("border-l-[3px] transition-colors", accentBorder, expanded ? "bg-slate-50/50" : "hover:bg-slate-50/60")}>
+      {/* Collapsed header — always readable */}
+      <div className="px-3 py-3 cursor-pointer" onClick={onToggle}>
+        <div className="flex items-start gap-2.5">
+          <div className="shrink-0 mt-0.5" onClick={e => e.stopPropagation()}>
+            <HealthDot value={item.healthStatus} onChange={v => onUpdate({ healthStatus: v })} compact />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold text-[13px] leading-snug text-slate-900 break-words">{item.title}</p>
+            {item.currentAction && !expanded && (
+              <p className="text-[11px] text-slate-500 mt-0.5 leading-snug line-clamp-2">{item.currentAction}</p>
+            )}
+            <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+              {item.ownerName && (
+                <div className="flex items-center gap-1">
+                  <div className="h-4 w-4 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-[8px] font-bold shrink-0">
+                    {initials(item.ownerName)}
+                  </div>
+                  <span className="text-[10px] text-slate-400">{item.ownerName.split(' ')[0]}</span>
                 </div>
-                <span className="text-[10px] text-slate-400">{item.ownerName.split(' ')[0]}</span>
-              </div>
-            )}
-            {item.deadline && (
-              <span className={cn("text-[10px] font-medium", item.isOverdue ? "text-red-500" : "text-slate-400")}>
-                {deadlineLabel(item.deadline)}
-              </span>
-            )}
-            <FreshnessIndicator updatedAt={item.updatedAt} updatedByName={item.updatedByName} updatedById={item.updatedById} currentUserId={currentUserId} />
+              )}
+              {item.deadline && (
+                <span className={cn("text-[10px] font-medium", item.isOverdue ? "text-red-500" : "text-slate-400")}>
+                  {deadlineLabel(item.deadline)}
+                </span>
+              )}
+              <FreshnessIndicator updatedAt={item.updatedAt} updatedByName={item.updatedByName} updatedById={item.updatedById} currentUserId={currentUserId} />
+            </div>
           </div>
         </div>
       </div>
+      {/* Expanded detail — single column, no cramping */}
+      <AnimatePresence initial={false}>
+        {expanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.15, ease: [0.4, 0, 0.2, 1] }}
+            className="overflow-hidden">
+            <div className="px-3 pb-3">
+              <div className="rounded-xl border border-slate-200/80 bg-white overflow-hidden shadow-sm">
+                <div className="divide-y divide-slate-100">
+                  <div className="px-4 py-3">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-1.5">Estado actual</p>
+                    <InlineText value={item.currentAction} placeholder="¿Qué está pasando?" onSave={v => onUpdate({ currentAction: v })} multiline className="text-[12px] leading-relaxed text-slate-700" />
+                  </div>
+                  <div className="px-4 py-3">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-1.5">Próximo paso</p>
+                    <InlineText value={item.nextMilestone} placeholder="Acción concreta esta semana" onSave={v => onUpdate({ nextMilestone: v })} multiline className="text-[12px] leading-relaxed text-slate-700" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -2764,7 +2789,7 @@ export default function StatusSemanalPage() {
 
               {/* ── Left panel: urgency items ─────────────────────────── */}
               {(alertItems.length > 0 || decisionItems.length > 0) && (
-              <div className="w-[300px] shrink-0 border-r border-slate-100 overflow-y-auto bg-slate-50/40 flex flex-col">
+              <div className="w-[360px] shrink-0 border-r border-slate-100 overflow-y-auto bg-slate-50/40 flex flex-col">
               <div className="px-4 py-2.5 border-b border-slate-100 flex items-center gap-2 shrink-0">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex-1">Para atender</span>
                 <span className="text-[10px] font-bold text-slate-400">{alertItems.length + decisionItems.length}</span>
@@ -2793,6 +2818,7 @@ export default function StatusSemanalPage() {
                           transition={{ duration: 0.14, ease: [0.4, 0, 0.2, 1] }}
                           className="border-b border-slate-100/80 last:border-b-0">
                           <AlertSidebarCard item={item} accent={rowAccent} currentUserId={currentUserId}
+                            expanded={expandedAlertKey === item.key}
                             onUpdate={h.onUpdate}
                             onToggle={() => setExpandedAlertKey(expandedAlertKey === item.key ? null : item.key)} />
                         </motion.div>
