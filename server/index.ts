@@ -46,6 +46,16 @@ async function applyPendingMigrations() {
 
 // Note: Session types are declared in server/auth.ts
 
+// Prevent unhandled async rejections from crashing the process.
+// Individual route handlers should still have their own try/catch for
+// user-facing error responses, but this is the last-resort safety net.
+process.on('unhandledRejection', (reason) => {
+  console.error('⚠️ Unhandled promise rejection (process kept alive):', reason);
+});
+process.on('uncaughtException', (err) => {
+  console.error('⚠️ Uncaught exception (process kept alive):', err);
+});
+
 const app = express();
 
 // Trust Replit's reverse proxy so express-session sets Secure cookies correctly

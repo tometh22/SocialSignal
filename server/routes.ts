@@ -4172,15 +4172,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Quotations routes
   app.get("/api/quotations", requireAuth, async (req, res) => {
-    const leadIdParam = req.query.leadId;
-    if (leadIdParam) {
-      const leadId = parseInt(leadIdParam as string);
-      if (isNaN(leadId)) return res.status(400).json({ message: "Invalid leadId" });
-      const result = await db.select().from(quotations).where(eq(quotations.leadId, leadId)).orderBy(desc(quotations.createdAt));
-      return res.json(result);
+    try {
+      const leadIdParam = req.query.leadId;
+      if (leadIdParam) {
+        const leadId = parseInt(leadIdParam as string);
+        if (isNaN(leadId)) return res.status(400).json({ message: "Invalid leadId" });
+        const result = await db.select().from(quotations).where(eq(quotations.leadId, leadId)).orderBy(desc(quotations.createdAt));
+        return res.json(result);
+      }
+      const result = await storage.getQuotations();
+      res.json(result);
+    } catch (err) {
+      console.error('GET /api/quotations error:', err);
+      res.status(500).json({ message: 'Error fetching quotations' });
     }
-    const result = await storage.getQuotations();
-    res.json(result);
   });
 
   // GET /api/quotations/team-counts — team member count per quotation (single query)
@@ -4198,30 +4203,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.get("/api/quotations/client/:clientId", requireAuth, async (req, res) => {
-    const clientId = parseInt(req.params.clientId);
-    if (isNaN(clientId)) return res.status(400).json({ message: "Invalid client ID" });
-
-    const quotations = await storage.getQuotationsByClient(clientId);
-    res.json(quotations);
+    try {
+      const clientId = parseInt(req.params.clientId);
+      if (isNaN(clientId)) return res.status(400).json({ message: "Invalid client ID" });
+      const result = await storage.getQuotationsByClient(clientId);
+      res.json(result);
+    } catch (err) {
+      console.error('GET /api/quotations/client error:', err);
+      res.status(500).json({ message: 'Error fetching quotations' });
+    }
   });
 
   app.get("/api/quotations/:id", requireAuth, async (req, res) => {
-    const id = parseInt(req.params.id);
-    console.log('🔍 Getting quotation with ID:', req.params.id, 'parsed:', id);
-    
-    if (isNaN(id)) {
-      console.error('❌ Invalid quotation ID:', req.params.id);
-      return res.status(400).json({ message: "Invalid quotation ID" });
+    try {
+      const id = parseInt(req.params.id);
+      console.log('🔍 Getting quotation with ID:', req.params.id, 'parsed:', id);
+      if (isNaN(id)) {
+        console.error('❌ Invalid quotation ID:', req.params.id);
+        return res.status(400).json({ message: "Invalid quotation ID" });
+      }
+      const quotation = await storage.getQuotation(id);
+      if (!quotation) {
+        console.error('❌ Quotation not found for ID:', id);
+        return res.status(404).json({ message: "Quotation not found" });
+      }
+      console.log('✅ Quotation found:', quotation.id, quotation.projectName);
+      res.json(quotation);
+    } catch (err) {
+      console.error('GET /api/quotations/:id error:', err);
+      res.status(500).json({ message: 'Error fetching quotation' });
     }
-
-    const quotation = await storage.getQuotation(id);
-    if (!quotation) {
-      console.error('❌ Quotation not found for ID:', id);
-      return res.status(404).json({ message: "Quotation not found" });
-    }
-
-    console.log('✅ Quotation found:', quotation.id, quotation.projectName);
-    res.json(quotation);
   });
 
   app.post("/api/quotations", requireAuth, async (req, res) => {
