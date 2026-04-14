@@ -8,6 +8,42 @@ import { pool } from "./db";
 import cors from 'cors';
 import { execSync } from 'child_process';
 
+/** Applies any DDL that may be missing from the production database.
+ *  All statements are idempotent (IF NOT EXISTS / ADD COLUMN IF NOT EXISTS)
+ *  so re-running on an already-migrated DB is always safe.
+ */
+async function applyPendingMigrations() {
+  const client = await pool.connect();
+  try {
+    // 0009: expires_at, loss_reason, quotation_templates
+    await client.query(`
+      ALTER TABLE "quotations" ADD COLUMN IF NOT EXISTS "expires_at" timestamp;
+      ALTER TABLE "quotations" ADD COLUMN IF NOT EXISTS "loss_reason" text;
+      CREATE TABLE IF NOT EXISTS "quotation_templates" (
+        "id" serial PRIMARY KEY NOT NULL,
+        "name" text NOT NULL,
+        "description" text,
+        "project_type" text NOT NULL,
+        "analysis_type" text NOT NULL,
+        "mentions_volume" text NOT NULL DEFAULT 'medium',
+        "countries_covered" text NOT NULL DEFAULT '1',
+        "client_engagement" text NOT NULL DEFAULT 'medium',
+        "team_config" text NOT NULL,
+        "complexity_config" text,
+        "created_by" integer REFERENCES "users"("id") ON DELETE SET NULL,
+        "created_at" timestamp NOT NULL DEFAULT now(),
+        "updated_at" timestamp NOT NULL DEFAULT now()
+      );
+      CREATE INDEX IF NOT EXISTS "idx_quotation_templates_created_by" ON "quotation_templates"("created_by");
+    `);
+    console.log('✅ DB migrations applied successfully');
+  } catch (err) {
+    console.error('❌ Migration error (non-fatal):', err);
+  } finally {
+    client.release();
+  }
+}
+
 // Note: Session types are declared in server/auth.ts
 
 const app = express();
@@ -92,6 +128,9 @@ const port = Number(process.env.PORT || 5000);
     console.log("🔄 Starting application...");
     console.log(`Environment: ${isProduction ? 'PRODUCTION' : 'DEVELOPMENT'}`);
     
+    // Apply any pending schema migrations before initializing data
+    await applyPendingMigrations();
+
     // Initialize database connection and data
     await initializeDatabase();
     console.log("💾 Database initialized successfully");
