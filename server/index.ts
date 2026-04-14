@@ -9,36 +9,154 @@ import cors from 'cors';
 import { execSync } from 'child_process';
 
 /** Applies any DDL that may be missing from the production database.
- *  All statements are idempotent (IF NOT EXISTS / ADD COLUMN IF NOT EXISTS)
- *  so re-running on an already-migrated DB is always safe.
+ *  All statements are idempotent (IF NOT EXISTS / ADD COLUMN IF NOT EXISTS).
+ *  Each migration runs independently so one failure doesn't block the rest.
  */
 async function applyPendingMigrations() {
   const client = await pool.connect();
+
+  const run = async (name: string, sql: string) => {
+    try {
+      await client.query(sql);
+      console.log(`✅ Migration OK: ${name}`);
+    } catch (err: any) {
+      console.error(`⚠️  Migration skipped (${name}): ${err.message}`);
+    }
+  };
+
   try {
-    // 0009: expires_at, loss_reason, quotation_templates
-    await client.query(`
-      ALTER TABLE "quotations" ADD COLUMN IF NOT EXISTS "expires_at" timestamp;
-      ALTER TABLE "quotations" ADD COLUMN IF NOT EXISTS "loss_reason" text;
+    // 0003: deadline columns on status tables
+    await run('0003 deadline columns', `
+      ALTER TABLE "project_status_reviews" ADD COLUMN IF NOT EXISTS "deadline" timestamp;
+      ALTER TABLE "weekly_status_items"    ADD COLUMN IF NOT EXISTS "deadline" timestamp;
+    `);
+
+    // 0005: margen/proyeccion/balance columns on monthly_financial_summary
+    await run('0005 margen_operativo columns', `
+      ALTER TABLE monthly_financial_summary
+        ADD COLUMN IF NOT EXISTS margen_operativo    numeric(8,  4),
+        ADD COLUMN IF NOT EXISTS margen_neto         numeric(8,  4),
+        ADD COLUMN IF NOT EXISTS proyeccion_resultado numeric(14, 2),
+        ADD COLUMN IF NOT EXISTS balance_60_dias     numeric(14, 2);
+    `);
+
+    // 0006: operations module — new columns + tables
+    await run('0006 selected_variant_id', `
+      ALTER TABLE active_projects ADD COLUMN IF NOT EXISTS selected_variant_id INTEGER REFERENCES quotation_variants(id);
+    `);
+    await run('0006 project_category', `
+      ALTER TABLE active_projects ADD COLUMN IF NOT EXISTS project_category TEXT NOT NULL DEFAULT 'billable';
+    `);
+    await run('0006 holidays table', `
+      CREATE TABLE IF NOT EXISTS holidays (
+        id          SERIAL PRIMARY KEY,
+        date        TIMESTAMP NOT NULL,
+        name        TEXT NOT NULL,
+        is_national BOOLEAN NOT NULL DEFAULT TRUE,
+        year        INTEGER NOT NULL,
+        created_at  TIMESTAMP NOT NULL DEFAULT NOW()
+      );
+    `);
+    await run('0006 monthly_closings table', `
+      CREATE TABLE IF NOT EXISTS monthly_closings (
+        id            SERIAL PRIMARY KEY,
+        personnel_id  INTEGER NOT NULL REFERENCES personnel(id),
+        year          INTEGER NOT NULL,
+        month         INTEGER NOT NULL,
+        actual_hours  DOUBLE PRECISION NOT NULL,
+        adjusted_hours DOUBLE PRECISION NOT NULL,
+        hourly_rate   DOUBLE PRECISION NOT NULL,
+        total_cost    DOUBLE PRECISION NOT NULL,
+        notes         TEXT,
+        closed_by     INTEGER REFERENCES users(id),
+        closed_at     TIMESTAMP NOT NULL DEFAULT NOW(),
+        CONSTRAINT unique_person_month_closing UNIQUE(personnel_id, year, month)
+      );
+    `);
+    await run('0006 estimated_rates table', `
+      CREATE TABLE IF NOT EXISTS estimated_rates (
+        id                  SERIAL PRIMARY KEY,
+        personnel_id        INTEGER NOT NULL REFERENCES personnel(id),
+        year                INTEGER NOT NULL,
+        month               INTEGER NOT NULL,
+        estimated_rate_ars  DOUBLE PRECISION NOT NULL,
+        adjustment_pct      DOUBLE PRECISION,
+        notes               TEXT,
+        created_at          TIMESTAMP NOT NULL DEFAULT NOW(),
+        created_by          INTEGER REFERENCES users(id),
+        CONSTRAINT unique_person_month_rate UNIQUE(personnel_id, year, month)
+      );
+    `);
+    await run('0006 personnel_aliases table', `
+      CREATE TABLE IF NOT EXISTS personnel_aliases (
+        id           SERIAL PRIMARY KEY,
+        personnel_id INTEGER NOT NULL REFERENCES personnel(id),
+        excel_name   VARCHAR(255) NOT NULL UNIQUE,
+        source       VARCHAR(50) NOT NULL DEFAULT 'manual',
+        is_active    BOOLEAN NOT NULL DEFAULT TRUE,
+        created_at   TIMESTAMP NOT NULL DEFAULT NOW()
+      );
+    `);
+
+    // 0007: status_change_log + updated_by columns
+    await run('0007 updated_by columns', `
+      ALTER TABLE "project_status_reviews" ADD COLUMN IF NOT EXISTS "updated_by" integer REFERENCES "users"("id");
+      ALTER TABLE "weekly_status_items"    ADD COLUMN IF NOT EXISTS "updated_by" integer REFERENCES "users"("id");
+    `);
+    await run('0007 status_change_log table', `
+      CREATE TABLE IF NOT EXISTS "status_change_log" (
+        "id"                    serial PRIMARY KEY,
+        "project_id"            integer REFERENCES "active_projects"("id") ON DELETE CASCADE,
+        "weekly_status_item_id" integer REFERENCES "weekly_status_items"("id") ON DELETE CASCADE,
+        "user_id"               integer REFERENCES "users"("id"),
+        "field_name"            varchar(30) NOT NULL,
+        "old_value"             text,
+        "new_value"             text,
+        "created_at"            timestamp DEFAULT now() NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS "idx_status_change_log_project"     ON "status_change_log" ("project_id")            WHERE "project_id" IS NOT NULL;
+      CREATE INDEX IF NOT EXISTS "idx_status_change_log_custom_item" ON "status_change_log" ("weekly_status_item_id") WHERE "weekly_status_item_id" IS NOT NULL;
+    `);
+
+    // 0008: status_update_entries table
+    await run('0008 status_update_entries table', `
+      CREATE TABLE IF NOT EXISTS status_update_entries (
+        id                    SERIAL PRIMARY KEY,
+        project_id            INTEGER REFERENCES active_projects(id) ON DELETE CASCADE,
+        weekly_status_item_id INTEGER REFERENCES weekly_status_items(id) ON DELETE CASCADE,
+        content               TEXT NOT NULL,
+        author_id             INTEGER REFERENCES users(id),
+        created_at            TIMESTAMP NOT NULL DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_sue_project  ON status_update_entries(project_id);
+      CREATE INDEX IF NOT EXISTS idx_sue_custom   ON status_update_entries(weekly_status_item_id);
+      CREATE INDEX IF NOT EXISTS idx_sue_created  ON status_update_entries(created_at DESC);
+    `);
+
+    // 0009: quotation expires_at, loss_reason, quotation_templates
+    await run('0009 quotation columns', `
+      ALTER TABLE "quotations" ADD COLUMN IF NOT EXISTS "expires_at"   timestamp;
+      ALTER TABLE "quotations" ADD COLUMN IF NOT EXISTS "loss_reason"  text;
+    `);
+    await run('0009 quotation_templates table', `
       CREATE TABLE IF NOT EXISTS "quotation_templates" (
-        "id" serial PRIMARY KEY NOT NULL,
-        "name" text NOT NULL,
-        "description" text,
-        "project_type" text NOT NULL,
-        "analysis_type" text NOT NULL,
-        "mentions_volume" text NOT NULL DEFAULT 'medium',
+        "id"               serial PRIMARY KEY NOT NULL,
+        "name"             text NOT NULL,
+        "description"      text,
+        "project_type"     text NOT NULL,
+        "analysis_type"    text NOT NULL,
+        "mentions_volume"  text NOT NULL DEFAULT 'medium',
         "countries_covered" text NOT NULL DEFAULT '1',
         "client_engagement" text NOT NULL DEFAULT 'medium',
-        "team_config" text NOT NULL,
+        "team_config"      text NOT NULL,
         "complexity_config" text,
-        "created_by" integer REFERENCES "users"("id") ON DELETE SET NULL,
-        "created_at" timestamp NOT NULL DEFAULT now(),
-        "updated_at" timestamp NOT NULL DEFAULT now()
+        "created_by"       integer REFERENCES "users"("id") ON DELETE SET NULL,
+        "created_at"       timestamp NOT NULL DEFAULT now(),
+        "updated_at"       timestamp NOT NULL DEFAULT now()
       );
       CREATE INDEX IF NOT EXISTS "idx_quotation_templates_created_by" ON "quotation_templates"("created_by");
     `);
-    console.log('✅ DB migrations applied successfully');
-  } catch (err) {
-    console.error('❌ Migration error (non-fatal):', err);
+
   } finally {
     client.release();
   }
