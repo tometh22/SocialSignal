@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest, authFetch } from "@/lib/queryClient";
@@ -19,7 +19,8 @@ import {
   Sparkles, Brain, TrendingUp, TrendingDown,
   Shield, Target, RefreshCw, Lightbulb, ArrowRight,
   Calendar, Clock, Search, Filter, GripVertical,
-  Printer, List, LayoutList, HelpCircle, CheckSquare, Square
+  Printer, List, LayoutList, HelpCircle, CheckSquare, Square,
+  PanelLeftOpen, PanelLeftClose
 } from "lucide-react";
 import {
   DndContext, closestCenter, DragOverlay,
@@ -395,251 +396,11 @@ function InlineText({ value, placeholder, onSave, multiline = false, className =
   );
 }
 
-// ─── Update Timeline (accumulating update entries) ───────────────────────────
+// ─── Types for activity thread ──────────────────────────────────────────────
 
 type UpdateEntry = { id: number; content: string; authorId: number | null; authorName: string | null; createdAt: string };
 
-function UpdateTimeline({ projectId, customId, currentAction, currentUserId, onActionUpdated, users = [] }: {
-  projectId?: number; customId?: number; currentAction: string | null; currentUserId?: number | null;
-  onActionUpdated?: () => void; users?: AppUser[];
-}) {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-  const [draft, setDraft] = useState('');
-  const [showAll, setShowAll] = useState(false);
-  const [editingId, setEditingId] = useState<number | null>(null);
-  const [editText, setEditText] = useState('');
-
-  const updatesUrl = projectId
-    ? `/api/status-semanal/${projectId}/updates`
-    : `/api/status-semanal/custom/${customId}/updates`;
-  const cacheKey = projectId
-    ? ['/api/status-semanal', projectId, 'updates']
-    : ['/api/status-semanal/custom', customId, 'updates'];
-
-  const { data: entries = [] } = useQuery<UpdateEntry[]>({
-    queryKey: cacheKey,
-    queryFn: async () => { const r = await authFetch(updatesUrl); return r.json(); },
-  });
-
-  const addMutation = useMutation({
-    mutationFn: (content: string) => mutationFetch(updatesUrl, 'POST', { content }),
-    onSuccess: () => {
-      queryClient.refetchQueries({ queryKey: cacheKey });
-      queryClient.refetchQueries({ queryKey: ['/api/status-semanal'] });
-      if (customId) queryClient.refetchQueries({ queryKey: ['/api/status-semanal/custom'] });
-      onActionUpdated?.();
-    },
-    onError: (err: Error) => toast({ title: 'Error', description: err.message, variant: 'destructive' }),
-  });
-
-  const editMutation = useMutation({
-    mutationFn: ({ entryId, content }: { entryId: number; content: string }) =>
-      mutationFetch(`/api/status-semanal/updates/${entryId}`, 'PATCH', { content }),
-    onSuccess: () => {
-      setEditingId(null);
-      queryClient.refetchQueries({ queryKey: cacheKey });
-      queryClient.refetchQueries({ queryKey: ['/api/status-semanal'] });
-      if (customId) queryClient.refetchQueries({ queryKey: ['/api/status-semanal/custom'] });
-      onActionUpdated?.();
-    },
-    onError: (err: Error) => toast({ title: 'Error al editar', description: err.message, variant: 'destructive' }),
-  });
-
-  const submit = () => {
-    const t = draft.trim();
-    if (!t) return;
-    setDraft('');
-    addMutation.mutate(t);
-  };
-
-  const visibleEntries = showAll ? entries : entries.slice(0, 3);
-  const hasMore = entries.length > 3;
-
-  return (
-    <div>
-      <p className="text-[10px] text-slate-400 font-semibold mb-1">Update</p>
-      {/* Add new update input */}
-      <div className="flex gap-1.5 mb-1.5">
-        <MentionInput
-          value={draft}
-          onChange={setDraft}
-          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); submit(); } }}
-          placeholder="Escribir update..."
-          className="flex-1 text-xs border border-slate-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-400 bg-white"
-          users={users}
-        />
-        <button onClick={submit} disabled={!draft.trim() || addMutation.isPending}
-          className={cn("px-2 py-1 rounded text-xs font-medium transition-colors",
-            draft.trim() ? "bg-indigo-600 text-white hover:bg-indigo-700" : "bg-slate-100 text-slate-300")}>
-          {addMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
-        </button>
-      </div>
-      {/* Entries list */}
-      {visibleEntries.length > 0 ? (
-        <div className="space-y-1">
-          {visibleEntries.map(entry => {
-            const isOwn = entry.authorId != null && entry.authorId === currentUserId;
-            const firstName = entry.authorName?.split(' ')[0] || 'Usuario';
-            return (
-              <div key={entry.id} className={cn("group rounded px-2 py-1 text-xs", isOwn ? "bg-slate-50" : "bg-indigo-50/60")}>
-                <div className="flex items-center gap-1 mb-0.5">
-                  <span className={cn("font-medium text-[10px]", isOwn ? "text-slate-500" : "text-indigo-600")}>{firstName}</span>
-                  <span className="text-[9px] text-slate-400">{shortDateTime(entry.createdAt)}</span>
-                  {isOwn && editingId !== entry.id && (
-                    <button onClick={() => { setEditingId(entry.id); setEditText(entry.content); }}
-                      className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity p-0.5 text-slate-300 hover:text-indigo-400">
-                      <Pencil className="h-2.5 w-2.5" />
-                    </button>
-                  )}
-                </div>
-                {editingId === entry.id ? (
-                  <div className="space-y-1">
-                    <input
-                      value={editText}
-                      autoFocus
-                      onChange={e => setEditText(e.target.value)}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter') { e.preventDefault(); if (editText.trim()) editMutation.mutate({ entryId: entry.id, content: editText }); }
-                        if (e.key === 'Escape') setEditingId(null);
-                      }}
-                      className="w-full text-xs border border-indigo-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-400 bg-white"
-                    />
-                    <div className="flex gap-1">
-                      <button onClick={() => { if (editText.trim()) editMutation.mutate({ entryId: entry.id, content: editText }); }}
-                        disabled={!editText.trim() || editMutation.isPending}
-                        className="px-2 py-0.5 bg-indigo-600 text-white rounded text-[10px] hover:bg-indigo-700 disabled:opacity-40">
-                        {editMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Guardar'}
-                      </button>
-                      <button onClick={() => setEditingId(null)} className="px-2 py-0.5 bg-slate-100 text-slate-500 rounded text-[10px] hover:bg-slate-200">
-                        Cancelar
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-slate-700 leading-snug whitespace-pre-wrap">{entry.content}</p>
-                )}
-              </div>
-            );
-          })}
-          {hasMore && !showAll && (
-            <button onClick={() => setShowAll(true)} className="text-[10px] text-indigo-500 hover:text-indigo-700 font-medium">
-              Ver {entries.length - 3} más...
-            </button>
-          )}
-          {showAll && hasMore && (
-            <button onClick={() => setShowAll(false)} className="text-[10px] text-slate-400 hover:text-slate-600 font-medium">
-              Ver menos
-            </button>
-          )}
-        </div>
-      ) : currentAction ? (
-        <p className="text-xs text-slate-500 italic px-1">{currentAction}</p>
-      ) : (
-        <p className="text-xs text-slate-400 italic px-1">Sin updates todavía</p>
-      )}
-    </div>
-  );
-}
-
-// ─── Inline Chat (last messages + quick reply) ───────────────────────────────
-
-function InlineChat({ projectId, customId, currentUserId, onOpenFullChat, users = [] }: {
-  projectId?: number; customId?: number; currentUserId?: number | null; onOpenFullChat?: () => void; users?: AppUser[];
-}) {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-  const [msg, setMsg] = useState('');
-  const [sent, setSent] = useState(false);
-
-  const notesUrl = projectId
-    ? `/api/status-semanal/${projectId}/notes`
-    : `/api/status-semanal/custom/${customId}/notes`;
-  const notesCacheKey = projectId
-    ? ['/api/status-semanal', projectId, 'notes']
-    : ['/api/status-semanal/custom', customId, 'notes'];
-  const activityCacheKey = projectId
-    ? ['/api/status-semanal', projectId, 'activity']
-    : ['/api/status-semanal/custom', customId, 'activity'];
-
-  const { data: allNotes = [] } = useQuery<Note[]>({
-    queryKey: notesCacheKey,
-    queryFn: async () => { const r = await authFetch(notesUrl); return r.json(); },
-  });
-
-  const recentNotes = allNotes.slice(-3); // last 3 messages
-
-  const addMutation = useMutation({
-    mutationFn: (content: string) => mutationFetch(notesUrl, 'POST', { content }),
-    onSuccess: () => {
-      queryClient.refetchQueries({ queryKey: notesCacheKey });
-      queryClient.refetchQueries({ queryKey: activityCacheKey });
-      queryClient.refetchQueries({ queryKey: ['/api/status-semanal'] });
-      if (customId) queryClient.refetchQueries({ queryKey: ['/api/status-semanal/custom'] });
-      setSent(true);
-      setTimeout(() => setSent(false), 2000);
-    },
-    onError: (err: Error) => toast({ title: 'Error', description: err.message, variant: 'destructive' }),
-  });
-
-  const submit = () => {
-    const t = msg.trim();
-    if (!t) return;
-    setMsg('');
-    addMutation.mutate(t);
-  };
-
-  return (
-    <div className="pt-2 border-t border-slate-100">
-      <div className="flex items-center justify-between mb-1">
-        <p className="text-[10px] text-slate-400 font-semibold flex items-center gap-1">
-          <MessageSquare className="h-3 w-3" /> Chat
-        </p>
-        {onOpenFullChat && (
-          <button onClick={onOpenFullChat} className="text-[10px] text-indigo-500 hover:text-indigo-700 font-medium flex items-center gap-0.5">
-            Ver todo <ArrowRight className="h-2.5 w-2.5" />
-          </button>
-        )}
-      </div>
-      {/* Recent messages */}
-      {recentNotes.length > 0 ? (
-        <div className="space-y-1 mb-1.5">
-          {recentNotes.map(note => {
-            const isOwn = note.authorId != null && note.authorId === currentUserId;
-            const firstName = note.authorName?.split(' ')[0] || 'Usuario';
-            return (
-              <div key={note.id} className={cn("rounded px-2 py-1 text-[11px]", isOwn ? "bg-slate-50" : "bg-teal-50/60")}>
-                <span className={cn("font-medium", isOwn ? "text-slate-500" : "text-teal-600")}>{firstName}</span>
-                <span className="text-slate-400 ml-1 text-[9px]">{shortDateTime(note.createdAt)}</span>
-                <p className="text-slate-700 leading-snug mt-0.5">{note.content}</p>
-              </div>
-            );
-          })}
-        </div>
-      ) : (
-        <p className="text-[11px] text-slate-300 italic mb-1.5">Sin mensajes</p>
-      )}
-      {/* Quick reply */}
-      <div className="flex gap-1">
-        <MentionInput
-          value={msg}
-          onChange={setMsg}
-          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); submit(); } }}
-          placeholder="Escribir mensaje..."
-          className="flex-1 text-[11px] border border-slate-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-400 bg-white"
-          users={users}
-        />
-        <button onClick={submit} disabled={!msg.trim() || addMutation.isPending}
-          className={cn("p-1 rounded transition-colors",
-            msg.trim() ? "bg-indigo-600 text-white hover:bg-indigo-700" : "bg-slate-100 text-slate-300")}>
-          {addMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> :
-           sent ? <CheckCircle2 className="h-3 w-3 text-emerald-500" /> : <Send className="h-3 w-3" />}
-        </button>
-      </div>
-      {sent && <p className="text-[9px] text-emerald-500 mt-0.5 font-medium">Enviado</p>}
-    </div>
-  );
-}
+// (UpdateTimeline + InlineChat removed — superseded by ItemThread)
 
 // ─── Mini pickers ─────────────────────────────────────────────────────────────
 
@@ -663,19 +424,6 @@ function HealthDot({ value, onChange, compact = false }: { value: string | null;
         ))}
       </PopoverContent>
     </Popover>
-  );
-}
-
-function MiniLevelDot({ value, type }: { value: string | null; type: 'margin' | 'team' }) {
-  const resolver = type === 'margin' ? mlm : tlm;
-  const meta = resolver(value);
-  const label = type === 'margin' ? 'Impacto $' : 'Esfuerzo equipo';
-  const dotColor = value === 'alto' ? 'bg-red-400' : value === 'bajo' ? 'bg-emerald-400' : 'bg-amber-400';
-  return (
-    <span className="inline-flex items-center gap-1 text-[10px] text-slate-400" title={`${label}: ${meta.label}`}>
-      <span className={cn("w-1.5 h-1.5 rounded-full", dotColor)} />
-      <span className="font-medium">{type === 'margin' ? '$' : '~'}</span>
-    </span>
   );
 }
 
@@ -804,124 +552,6 @@ function DeadlinePicker({ value, isOverdue, onChange }: {
   );
 }
 
-// ─── Alert card (Rojo / Amarillo or urgent decision) ─────────────────────────
-
-function AlertCard({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, currentUserId }: {
-  item: Item; users: AppUser[]; isSelected: boolean; currentUserId?: number | null;
-  onOpenNotes?: () => void; onUpdate: (d: Record<string, any>) => void; onRemove: () => void;
-}) {
-  const [expanded, setExpanded] = useState(true);
-  const decMeta = dm(item.decisionNeeded);
-  const isUrgentDec = decMeta.urgent;
-  const barColor = item.isOverdue ? 'bg-red-500' : ({ verde: 'bg-emerald-500', amarillo: 'bg-amber-400', rojo: 'bg-red-500' }[item.healthStatus ?? 'verde'] ?? 'bg-emerald-500');
-
-  return (
-    <div className={cn(
-      "rounded-xl border bg-white shadow-sm transition-all overflow-hidden",
-      item.isOverdue ? "border-red-300" : item.healthStatus === 'rojo' ? "border-red-200" : item.healthStatus === 'amarillo' ? "border-amber-200" : "border-indigo-200",
-      isSelected && "ring-2 ring-indigo-400"
-    )}>
-      <div className={cn("h-1 w-full", barColor)} />
-      <div className="px-4 py-3">
-        {/* Header — click to expand */}
-        <button className="w-full flex items-center justify-between gap-2 mb-2 text-left" onClick={() => setExpanded(v => !v)}>
-          <div className="min-w-0 flex-1 flex items-center gap-1.5">
-            {item.isCustom && <Tag className="h-3 w-3 text-indigo-400 shrink-0" />}
-            <p className="font-semibold text-sm text-foreground leading-tight truncate">{item.title}</p>
-            {item.subtitle && <span className="text-xs text-muted-foreground truncate hidden sm:inline">· {item.subtitle}</span>}
-            <span className="shrink-0 hidden sm:inline"><FreshnessIndicator updatedAt={item.updatedAt} updatedByName={item.updatedByName} updatedById={item.updatedById} currentUserId={currentUserId} /></span>
-            <ChevronDown className={cn("h-3 w-3 text-slate-300 shrink-0 transition-transform ml-0.5", !expanded && "-rotate-90")} />
-          </div>
-          <div className="flex items-center gap-1.5 shrink-0" onClick={e => e.stopPropagation()}>
-            <HealthDot value={item.healthStatus} onChange={v => onUpdate({ healthStatus: v })} />
-            <button onClick={onRemove}
-              className="p-1 rounded text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors"
-              title={item.isCustom ? "Eliminar ítem" : "Quitar del status"}>
-              <Trash2 className="h-3 w-3" />
-            </button>
-          </div>
-        </button>
-
-        {/* Compact always-visible summary */}
-        <div className="flex items-center gap-2 flex-wrap" onClick={e => e.stopPropagation()}>
-          <LevelBadge value={item.marginStatus} onChange={v => onUpdate({ marginStatus: v })} label="Rentabilidad" type="margin" showLabel />
-          <LevelBadge value={item.teamStrain} onChange={v => onUpdate({ teamStrain: v })} label="Carga equipo" type="team" showLabel />
-          {!isUrgentDec && <DecisionBadge value={item.decisionNeeded} onChange={v => onUpdate({ decisionNeeded: v })} />}
-          {onOpenNotes && (
-            <button onClick={onOpenNotes}
-              className={cn("flex items-center gap-0.5 rounded-full px-1.5 py-0.5 transition-colors ml-auto",
-                isSelected ? "text-indigo-600" : item.noteCount > 0 ? "text-indigo-500" : "text-slate-300 hover:text-slate-500")}>
-              <MessageSquare className="h-3 w-3" />
-              {item.noteCount > 0 && <span className="text-[10px] font-semibold">{item.noteCount}</span>}
-            </button>
-          )}
-        </div>
-
-        {/* Expandable detail */}
-        {expanded && (
-          <div className="mt-3 space-y-2" onClick={e => e.stopPropagation()}>
-            {/* Decision alert */}
-            {isUrgentDec && (
-              <div className={cn("flex items-center gap-1.5 rounded-md px-2 py-1.5 border text-xs font-semibold", decMeta.color)}>
-                <Zap className="h-3 w-3 shrink-0" />
-                Decisión:
-                <DecisionBadge value={item.decisionNeeded} onChange={v => onUpdate({ decisionNeeded: v })} />
-              </div>
-            )}
-
-            {/* Overdue alert */}
-            {item.isOverdue && (
-              <div className="flex items-center gap-1.5 rounded-md px-2 py-1.5 bg-red-100 border border-red-200 text-red-700 text-xs font-semibold">
-                <Clock className="h-3 w-3 shrink-0" />
-                Demorado — {deadlineLabel(item.deadline)}
-              </div>
-            )}
-
-            {/* Riesgo principal — only shown if there's actual risk text */}
-            {item.mainRisk && (
-              <div className="flex items-start gap-1.5 rounded-md px-2.5 py-1.5 bg-orange-50 border border-orange-100">
-                <Shield className="h-3 w-3 text-orange-500 shrink-0 mt-0.5" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-[9px] text-orange-500 uppercase font-bold tracking-wide mb-0.5">Riesgo principal</p>
-                  <InlineText value={item.mainRisk} placeholder="¿Cuál es el riesgo principal?" onSave={v => onUpdate({ mainRisk: v })} className="text-xs" />
-                </div>
-              </div>
-            )}
-
-            {/* Update + Próximo paso */}
-            <div className="grid grid-cols-2 gap-2">
-              <div className={cn("rounded-md px-2.5 py-2", item.healthStatus === 'rojo' ? "bg-red-50" : item.healthStatus === 'amarillo' ? "bg-amber-50" : "bg-slate-50")}>
-                <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wide mb-0.5">Update</p>
-                <InlineText value={item.currentAction} placeholder="Resumen en 1 línea del estado actual" onSave={v => onUpdate({ currentAction: v })} multiline className="text-xs" />
-              </div>
-              <div className={cn("rounded-md px-2.5 py-2", "bg-slate-50")}>
-                <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wide mb-0.5">Próximo paso</p>
-                <InlineText value={item.nextMilestone} placeholder="Acción concreta esta semana" onSave={v => onUpdate({ nextMilestone: v })} multiline className="text-xs" />
-              </div>
-            </div>
-
-            {/* Footer */}
-            <div className="flex items-center justify-between pt-1.5 border-t border-slate-100">
-              <div className="flex items-center gap-2">
-                <OwnerSelect value={item.ownerId} name={item.ownerName} onChange={v => onUpdate({ ownerId: v })} users={users} />
-                <DeadlinePicker value={item.deadline} isOverdue={item.isOverdue} onChange={v => onUpdate({ deadline: v })} />
-              </div>
-              {onOpenNotes && (
-                <button onClick={onOpenNotes}
-                  className={cn("flex items-center gap-1 text-xs rounded-md px-2 py-1 transition-colors",
-                    isSelected ? "text-indigo-600 bg-indigo-50" : item.noteCount > 0 ? "text-indigo-500 hover:bg-indigo-50" : "text-slate-400 hover:text-slate-600 hover:bg-slate-100")}>
-                  <MessageSquare className="h-3 w-3" />
-                  {item.noteCount > 0 && <span className="text-[10px] font-semibold">{item.noteCount}</span>}
-                </button>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
 // ─── Compact row (Verde) ──────────────────────────────────────────────────────
 
 function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, expanded, onToggle, onNext, onPrev, hasNext, hasPrev, currentUserId, kbFocused, dragHandleProps, bulkMode, checked, onCheck, accent, hideSubtitle }: {
@@ -977,55 +607,35 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
           )}
         </div>
 
-        <div className="flex items-center gap-2 shrink-0 ml-2" onClick={e => e.stopPropagation()}>
-          {/* At rest: compact essentials — deadline + notes + owner avatar */}
-          <div className="flex items-center gap-2 group-hover:hidden">
-            {item.deadline && (
-              <span className={cn("text-[10px]", item.isOverdue ? "text-red-500 font-medium" : "text-slate-400")}>
-                {deadlineLabel(item.deadline)}
-              </span>
-            )}
-            {item.noteCount > 0 && (
-              <span className="flex items-center gap-0.5 text-[10px] text-slate-400">
-                <MessageSquare className="h-2.5 w-2.5" />{item.noteCount}
-              </span>
-            )}
-            {item.ownerName && (
-              <div className="h-5 w-5 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-[8px] font-bold shrink-0" title={item.ownerName}>
-                {initials(item.ownerName)}
-              </div>
-            )}
-          </div>
-          {/* On hover: full interactive controls */}
-          <div className="hidden group-hover:flex items-center gap-1.5">
-            {decMeta.urgent && (
-              <DecisionBadge value={item.decisionNeeded} onChange={v => onUpdate({ decisionNeeded: v })} />
-            )}
-            <OwnerSelect value={item.ownerId} name={item.ownerName} onChange={v => onUpdate({ ownerId: v })} users={users} />
-            <DeadlinePicker value={item.deadline} isOverdue={item.isOverdue} onChange={v => onUpdate({ deadline: v })} />
-            {onOpenNotes && item.noteCount > 0 && (
-              <button onClick={onOpenNotes}
-                className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
-                <MessageSquare className="h-3 w-3" /><span className="text-[10px] font-medium">{item.noteCount}</span>
+        <div className="flex items-center gap-1.5 shrink-0 ml-2" onClick={e => e.stopPropagation()}>
+          {/* Always-visible controls — accessible on touch devices */}
+          {decMeta.urgent && (
+            <DecisionBadge value={item.decisionNeeded} onChange={v => onUpdate({ decisionNeeded: v })} />
+          )}
+          <OwnerSelect value={item.ownerId} name={item.ownerName} onChange={v => onUpdate({ ownerId: v })} users={users} />
+          <DeadlinePicker value={item.deadline} isOverdue={item.isOverdue} onChange={v => onUpdate({ deadline: v })} />
+          {onOpenNotes && item.noteCount > 0 && (
+            <button onClick={onOpenNotes}
+              className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
+              <MessageSquare className="h-3 w-3" /><span className="text-[10px] font-medium">{item.noteCount}</span>
+            </button>
+          )}
+          <Popover open={menuOpen} onOpenChange={setMenuOpen}>
+            <PopoverTrigger asChild>
+              <button className="p-1 rounded hover:bg-slate-100 text-slate-300 hover:text-slate-500 transition-colors">
+                <MoreHorizontal className="h-3.5 w-3.5" />
               </button>
-            )}
-            <Popover open={menuOpen} onOpenChange={setMenuOpen}>
-              <PopoverTrigger asChild>
-                <button className="p-1 rounded hover:bg-slate-100 text-slate-300 hover:text-slate-500 transition-colors">
-                  <MoreHorizontal className="h-3.5 w-3.5" />
-                </button>
-              </PopoverTrigger>
-              <PopoverContent className="w-44 p-1" align="end">
-                <button onClick={() => { onRemove(); setMenuOpen(false); }}
-                  className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs hover:bg-red-50 text-slate-600 hover:text-red-600">
-                  <Trash2 className="h-3.5 w-3.5" />
-                  {item.isCustom ? "Eliminar ítem" : "Quitar del status"}
-                </button>
-              </PopoverContent>
-            </Popover>
+            </PopoverTrigger>
+            <PopoverContent className="w-44 p-1" align="end">
+              <button onClick={() => { onRemove(); setMenuOpen(false); }}
+                className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs hover:bg-red-50 text-slate-600 hover:text-red-600">
+                <Trash2 className="h-3.5 w-3.5" />
+                {item.isCustom ? "Eliminar ítem" : "Quitar del status"}
+              </button>
+            </PopoverContent>
+          </Popover>
           </div>
         </div>
-      </div>
 
       {/* Expanded panel — focused, no activity inline */}
       <AnimatePresence>
@@ -1178,8 +788,8 @@ function ItemThread({ projectId, customId, currentUserId, users = [], onOpenFull
     mutationFn: (content: string) => mutationFetch(notesUrl, 'POST', { content }),
     onSuccess: () => {
       queryClient.refetchQueries({ queryKey: notesCacheKey });
-      queryClient.refetchQueries({ queryKey: ['/api/status-semanal'] });
-      if (customId) queryClient.refetchQueries({ queryKey: ['/api/status-semanal/custom'] });
+      queryClient.refetchQueries({ queryKey: ['/api/status-semanal?includeHidden=true'] });
+      if (customId) queryClient.refetchQueries({ queryKey: ['/api/status-semanal/custom?includeHidden=true'] });
     },
     onError: (err: Error) => toast({ title: 'Error', description: err.message, variant: 'destructive' }),
   });
@@ -1188,8 +798,8 @@ function ItemThread({ projectId, customId, currentUserId, users = [], onOpenFull
     mutationFn: (content: string) => mutationFetch(updatesUrl, 'POST', { content }),
     onSuccess: () => {
       queryClient.refetchQueries({ queryKey: updatesCacheKey });
-      queryClient.refetchQueries({ queryKey: ['/api/status-semanal'] });
-      if (customId) queryClient.refetchQueries({ queryKey: ['/api/status-semanal/custom'] });
+      queryClient.refetchQueries({ queryKey: ['/api/status-semanal?includeHidden=true'] });
+      if (customId) queryClient.refetchQueries({ queryKey: ['/api/status-semanal/custom?includeHidden=true'] });
     },
     onError: (err: Error) => toast({ title: 'Error', description: err.message, variant: 'destructive' }),
   });
@@ -1419,209 +1029,6 @@ function SortableCompactRow(props: React.ComponentProps<typeof CompactRow>) {
   return (
     <div ref={setNodeRef} style={style}>
       <CompactRow {...props} dragHandleProps={{ ...attributes, ...listeners }} />
-    </div>
-  );
-}
-
-// ─── FocusBlock — CEO command center ─────────────────────────────────────────
-
-function FocusBlock({ items, onFocusItem }: {
-  items: Item[];
-  onFocusItem: (item: Item) => void;
-}) {
-  if (items.length === 0) return null;
-  return (
-    <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-      <div className="flex items-center gap-2 px-5 py-2.5 border-b border-slate-100">
-        <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-widest flex-1">Para resolver hoy</span>
-        <span className="flex items-center gap-1 text-[11px] font-semibold text-red-500">
-          <span className="w-1.5 h-1.5 rounded-full bg-red-500 inline-block" />
-          {items.length} pendiente{items.length !== 1 ? 's' : ''}
-        </span>
-      </div>
-      <div className="divide-y divide-slate-50">
-        {items.map((item, i) => {
-          const isUrgent = item.isOverdue || item.healthStatus === 'rojo';
-          const decMeta = dm(item.decisionNeeded);
-          return (
-            <button key={item.key} onClick={() => onFocusItem(item)}
-              className="w-full flex items-center gap-3 text-left hover:bg-slate-50 px-5 py-2.5 transition-colors">
-              <span className="text-[11px] text-slate-300 w-3 shrink-0">{i + 1}</span>
-              <span className={cn("w-1.5 h-1.5 rounded-full shrink-0",
-                isUrgent ? "bg-red-500" : "bg-amber-400")} />
-              <span className="flex-1 text-[13px] font-medium text-slate-800 truncate">{item.title}</span>
-              {item.ownerName && (
-                <span className="text-[11px] text-slate-400 shrink-0">{item.ownerName.split(' ')[0]}</span>
-              )}
-              <span className={cn("shrink-0 text-[10px] font-medium",
-                isUrgent ? "text-red-500" : "text-amber-500")}>
-                {isUrgent ? (item.isOverdue ? 'Vencido' : 'Crítico') : decMeta.label}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-// ─── DecisionRow — decision-first display ────────────────────────────────────
-
-function DecisionRow({ item, users, onUpdate, onRemove, onOpenNotes, expanded, onToggle, hasPrev, hasNext, onPrev, onNext, isSelected, currentUserId, kbFocused, bulkMode, checked, onCheck, compact }: {
-  item: Item; users: AppUser[]; currentUserId?: number | null;
-  onUpdate: (d: Record<string, any>) => void; onRemove: () => void;
-  onOpenNotes?: () => void; expanded: boolean; onToggle: () => void;
-  hasPrev?: boolean; hasNext?: boolean; onPrev?: () => void; onNext?: () => void;
-  isSelected?: boolean; kbFocused?: boolean;
-  bulkMode?: boolean; checked?: boolean; onCheck?: (v: boolean) => void;
-  compact?: boolean;
-}) {
-  const decMeta = dm(item.decisionNeeded);
-  const [menuOpen, setMenuOpen] = useState(false);
-  const daysSince = item.updatedAt
-    ? Math.floor((Date.now() - new Date(item.updatedAt).getTime()) / 86400000)
-    : null;
-
-  return (
-    <div className={cn(
-      "border-l-[3px] border-l-amber-400 transition-colors duration-100 group",
-      isSelected ? "bg-indigo-50/40" : "hover:bg-amber-50/20",
-      expanded && "bg-amber-50/20",
-      kbFocused && "outline outline-2 outline-indigo-300 outline-offset-[-2px]"
-    )}>
-      <div className={cn("flex items-center gap-3 pl-4 pr-5 cursor-pointer", compact ? "py-2.5" : "py-3.5")} onClick={onToggle}>
-        {bulkMode && (
-          <div className="shrink-0" onClick={e => { e.stopPropagation(); onCheck?.(!checked); }}>
-            {checked ? <CheckSquare className="h-4 w-4 text-indigo-500" /> : <Square className="h-4 w-4 text-slate-300" />}
-          </div>
-        )}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-baseline gap-2 min-w-0">
-            <span className="font-medium text-[14px] tracking-tight text-slate-900 truncate">{item.title}</span>
-          </div>
-          {!expanded && (
-            <p className={cn("text-[12px] truncate mt-0.5 leading-snug",
-              item.currentAction ? "text-slate-400" : "text-slate-300 italic")}>
-              {item.currentAction || "Agregar estado actual..."}
-            </p>
-          )}
-        </div>
-        <div className="flex items-center gap-2 shrink-0" onClick={e => e.stopPropagation()}>
-          {/* At rest: compact */}
-          <div className="flex items-center gap-2 group-hover:hidden">
-            <span className="text-[10px] font-medium text-amber-600">{decMeta.label}</span>
-            {daysSince !== null && daysSince > 1 && (
-              <span className="text-[10px] text-slate-400">{daysSince}d</span>
-            )}
-            {item.deadline && (
-              <span className={cn("text-[10px]", item.isOverdue ? "text-red-500 font-medium" : "text-slate-400")}>
-                {deadlineLabel(item.deadline)}
-              </span>
-            )}
-            {item.ownerName && (
-              <div className="h-5 w-5 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-[8px] font-bold shrink-0" title={item.ownerName}>
-                {initials(item.ownerName)}
-              </div>
-            )}
-          </div>
-          {/* On hover: full controls */}
-          <div className="hidden group-hover:flex items-center gap-1.5">
-            <OwnerSelect value={item.ownerId} name={item.ownerName} onChange={v => onUpdate({ ownerId: v })} users={users} />
-            <DeadlinePicker value={item.deadline} isOverdue={item.isOverdue} onChange={v => onUpdate({ deadline: v })} />
-            {onOpenNotes && item.noteCount > 0 && (
-              <button onClick={onOpenNotes}
-                className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
-                <MessageSquare className="h-3 w-3" /><span className="text-[10px] font-medium">{item.noteCount}</span>
-              </button>
-            )}
-            <Popover open={menuOpen} onOpenChange={setMenuOpen}>
-              <PopoverTrigger asChild>
-                <button className="p-1 rounded hover:bg-slate-100 text-slate-300 hover:text-slate-500 transition-colors">
-                  <MoreHorizontal className="h-3.5 w-3.5" />
-                </button>
-              </PopoverTrigger>
-              <PopoverContent className="w-44 p-1" align="end">
-                <button onClick={() => { onRemove(); setMenuOpen(false); }}
-                  className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs hover:bg-red-50 text-slate-600 hover:text-red-600">
-                  <Trash2 className="h-3.5 w-3.5" />{item.isCustom ? "Eliminar ítem" : "Quitar del status"}
-                </button>
-              </PopoverContent>
-            </Popover>
-          </div>
-        </div>
-      </div>
-
-      {/* Expanded panel */}
-      <AnimatePresence>
-        {expanded && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.16, ease: [0.4, 0, 0.2, 1] }}
-            className="overflow-hidden">
-            <div className="pl-4 pr-5 pb-4">
-              <div className="rounded-xl border border-slate-200/80 bg-white shadow-sm overflow-hidden">
-                <div className={compact ? "flex flex-col divide-y divide-slate-100" : "grid grid-cols-2 divide-x divide-slate-100"}>
-                  <div className="px-4 py-3">
-                    <p className="text-[10px] font-semibold text-slate-400 tracking-wide uppercase mb-1.5">Estado actual</p>
-                    <InlineText value={item.currentAction} placeholder="¿Qué está pasando ahora?" onSave={v => onUpdate({ currentAction: v })} multiline className="text-[13px] leading-relaxed text-slate-700" />
-                  </div>
-                  <div className="px-4 py-3">
-                    <p className="text-[10px] font-semibold text-slate-400 tracking-wide uppercase mb-1.5">Próximo paso</p>
-                    <InlineText value={item.nextMilestone} placeholder="Acción concreta esta semana" onSave={v => onUpdate({ nextMilestone: v })} multiline className="text-[13px] leading-relaxed text-slate-700" />
-                  </div>
-                </div>
-                <div className="flex items-center gap-1.5 px-5 py-2.5 border-t border-slate-100 bg-slate-50/60 flex-wrap">
-                  <OwnerSelect value={item.ownerId} name={item.ownerName} onChange={v => onUpdate({ ownerId: v })} users={users} />
-                  <DeadlinePicker value={item.deadline} isOverdue={item.isOverdue} onChange={v => onUpdate({ deadline: v })} />
-                  <div className="h-3 w-px bg-slate-200 mx-0.5 shrink-0" />
-                  <DecisionBadge value={item.decisionNeeded} onChange={v => onUpdate({ decisionNeeded: v })} />
-                  <LevelBadge value={item.marginStatus} onChange={v => onUpdate({ marginStatus: v })} label="Rentabilidad" type="margin" />
-                  <LevelBadge value={item.teamStrain} onChange={v => onUpdate({ teamStrain: v })} label="Carga equipo" type="team" />
-                  <div className="flex-1" />
-                  {onOpenNotes && (
-                    <button onClick={onOpenNotes}
-                      className="flex items-center gap-1 text-[11px] font-medium text-indigo-500 hover:text-indigo-700">
-                      <MessageSquare className="h-3 w-3" />Ver actividad{item.noteCount > 0 && ` · ${item.noteCount}`}<ArrowRight className="h-3 w-3" />
-                    </button>
-                  )}
-                  {(hasPrev || hasNext) && (
-                    <div className="flex items-center gap-0.5 ml-2">
-                      <button onClick={onPrev} disabled={!hasPrev} className={cn("p-0.5 rounded", hasPrev ? "text-slate-400 hover:bg-slate-100" : "text-slate-200")}><ChevronLeft className="h-3 w-3" /></button>
-                      <button onClick={onNext} disabled={!hasNext} className={cn("p-0.5 rounded", hasNext ? "text-slate-400 hover:bg-slate-100" : "text-slate-200")}><ChevronRight className="h-3 w-3" /></button>
-                    </div>
-                  )}
-                </div>
-
-                {/* Quick activity */}
-                <div className="border-t border-slate-100">
-                  <div className="flex items-center gap-2 px-5 pt-3 pb-1">
-                    <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Actividad</span>
-                    {onOpenNotes && (
-                      <button onClick={onOpenNotes}
-                        className="ml-auto flex items-center gap-1 text-[11px] font-medium text-indigo-500 hover:text-indigo-700 transition-colors">
-                        Ver historial{item.noteCount > 0 && ` · ${item.noteCount}`}
-                        <ArrowRight className="h-2.5 w-2.5" />
-                      </button>
-                    )}
-                  </div>
-                  <div className="px-5 pb-4">
-                    <ItemThread
-                      projectId={item.projectId}
-                      customId={item.customId}
-                      currentUserId={currentUserId}
-                      users={users}
-                      onOpenFull={onOpenNotes}
-                      compact
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   );
 }
@@ -1872,194 +1279,6 @@ function DecisionSidebarCard({ item, currentUserId, expanded, onToggle, users, o
   );
 }
 
-// ─── Health Score Ring ────────────────────────────────────────────────────────
-
-function HealthScoreRing({ score, size = 80 }: { score: number; size?: number }) {
-  const radius = (size - 8) / 2;
-  const circumference = 2 * Math.PI * radius;
-  const offset = circumference - (score / 100) * circumference;
-  const color = score >= 75 ? '#10b981' : score >= 50 ? '#f59e0b' : '#ef4444';
-
-  return (
-    <div className="relative" style={{ width: size, height: size }}>
-      <svg width={size} height={size} className="-rotate-90">
-        <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="currentColor"
-          className="text-slate-100" strokeWidth={6} />
-        <motion.circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke={color}
-          strokeWidth={6} strokeLinecap="round" strokeDasharray={circumference}
-          initial={{ strokeDashoffset: circumference }}
-          animate={{ strokeDashoffset: offset }}
-          transition={{ duration: 1.2, ease: 'easeOut' }} />
-      </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <motion.span className="text-xl font-black" style={{ color }}
-          initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }}>
-          {score}
-        </motion.span>
-        <span className="text-[8px] font-bold text-slate-400 uppercase tracking-wider">Score</span>
-      </div>
-    </div>
-  );
-}
-
-// ─── AI Highlight Chip ───────────────────────────────────────────────────────
-
-const highlightConfig = {
-  risk: { icon: Shield, bg: 'bg-red-50 border-red-200', text: 'text-red-700', iconColor: 'text-red-500' },
-  win: { icon: TrendingUp, bg: 'bg-emerald-50 border-emerald-200', text: 'text-emerald-700', iconColor: 'text-emerald-500' },
-  action: { icon: Target, bg: 'bg-blue-50 border-blue-200', text: 'text-blue-700', iconColor: 'text-blue-500' },
-  decision: { icon: Zap, bg: 'bg-amber-50 border-amber-200', text: 'text-amber-700', iconColor: 'text-amber-500' },
-};
-
-function HighlightChip({ type, text }: { type: 'risk' | 'win' | 'action' | 'decision'; text: string }) {
-  const cfg = highlightConfig[type];
-  const Icon = cfg.icon;
-  return (
-    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-      className={cn("inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-semibold", cfg.bg, cfg.text)}>
-      <Icon className={cn("h-3 w-3 shrink-0", cfg.iconColor)} />
-      <span>{text}</span>
-    </motion.div>
-  );
-}
-
-// ─── AI Summary Panel ────────────────────────────────────────────────────────
-
-function AISummaryPanel({ summary, isLoading, onGenerate, itemCount, cooldown = false }: {
-  summary: AISummary | null;
-  isLoading: boolean;
-  onGenerate: () => void;
-  itemCount: number;
-  cooldown?: boolean;
-}) {
-  const [expanded, setExpanded] = useState(false);
-
-  if (!summary && !isLoading) {
-    return (
-      <div className="flex items-center justify-between px-3 py-1.5 rounded-lg border border-indigo-100 bg-indigo-50/30">
-        <div className="flex items-center gap-2">
-          <Sparkles className="h-3.5 w-3.5 text-indigo-400" />
-          <span className="text-[11px] text-slate-400">Resumen IA disponible</span>
-        </div>
-        <Button onClick={onGenerate} size="sm" variant="ghost"
-          className="h-6 text-[11px] text-indigo-600 hover:bg-indigo-100 gap-1 font-semibold px-2">
-          <Sparkles className="h-3 w-3" />
-          Generar
-        </Button>
-      </div>
-    );
-  }
-
-  if (isLoading) {
-    return (
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-        className="relative overflow-hidden rounded-2xl border border-indigo-200/60 bg-gradient-to-br from-indigo-50/80 via-white to-violet-50/50 shadow-sm">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-indigo-100/30 via-transparent to-transparent" />
-        <div className="relative flex items-center gap-4 px-6 py-8 justify-center">
-          <div className="relative">
-            <Loader2 className="h-8 w-8 animate-spin text-indigo-400" />
-            <Sparkles className="h-3.5 w-3.5 text-violet-500 absolute -top-1 -right-1 animate-pulse" />
-          </div>
-          <div>
-            <p className="text-sm font-semibold text-indigo-700">Analizando {itemCount} proyectos...</p>
-            <p className="text-xs text-indigo-400 mt-0.5">Claude está generando el resumen ejecutivo</p>
-          </div>
-        </div>
-      </motion.div>
-    );
-  }
-
-  if (!summary) return null;
-
-  return (
-    <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
-      className="relative overflow-hidden rounded-2xl border border-indigo-200/60 bg-gradient-to-br from-indigo-50/80 via-white to-violet-50/50 shadow-sm">
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-indigo-100/30 via-transparent to-transparent" />
-
-      {/* Header */}
-      <div className="relative flex items-center justify-between px-6 py-4 border-b border-indigo-100/60">
-        <button onClick={() => setExpanded(!expanded)} className="flex items-center gap-3 group">
-          <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-md shadow-indigo-200/50">
-            <Brain className="h-4 w-4 text-white" />
-          </div>
-          <div className="text-left">
-            <div className="flex items-center gap-2">
-              <h3 className="text-sm font-bold text-slate-800">Análisis IA</h3>
-              <Badge variant="outline" className="text-[9px] h-4 bg-indigo-100 text-indigo-700 border-indigo-200 font-bold">
-                Claude
-              </Badge>
-            </div>
-            <p className="text-[10px] text-slate-400 mt-0.5">{expanded ? 'Click para colapsar' : 'Click para expandir'}</p>
-          </div>
-          <ChevronDown className={cn("h-4 w-4 text-slate-400 transition-transform ml-1", !expanded && "-rotate-90")} />
-        </button>
-
-        <div className="flex items-center gap-3">
-          <HealthScoreRing score={summary.weeklyScore} size={56} />
-          <Button onClick={onGenerate} variant="ghost" size="sm" disabled={cooldown}
-            className={cn("h-8 text-xs gap-1.5", cooldown ? "text-slate-400 cursor-not-allowed" : "text-indigo-600 hover:text-indigo-700 hover:bg-indigo-100")}>
-            <RefreshCw className={cn("h-3 w-3", cooldown && "animate-spin")} />
-            {cooldown ? 'Esperá...' : 'Regenerar'}
-          </Button>
-        </div>
-      </div>
-
-      {/* Content */}
-      <AnimatePresence>
-        {expanded && (
-          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }}
-            className="overflow-hidden">
-            <div className="relative px-6 py-4 space-y-4">
-              {/* Executive Summary */}
-              <div className="bg-white/70 rounded-xl border border-slate-100 p-4">
-                <p className="text-sm text-slate-700 leading-relaxed">{summary.executiveSummary}</p>
-              </div>
-
-              {/* Highlights */}
-              {summary.highlights.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {summary.highlights.map((h, i) => (
-                    <HighlightChip key={i} type={h.type} text={h.text} />
-                  ))}
-                </div>
-              )}
-
-              {/* Project Insights */}
-              {summary.projectInsights.length > 0 && (
-                <div>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-2 flex items-center gap-1.5">
-                    <Lightbulb className="h-3 w-3" />
-                    Insights por proyecto
-                  </p>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                    {summary.projectInsights.map((pi, i) => (
-                      <motion.div key={i} initial={{ opacity: 0, x: -4 }} animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: i * 0.05 }}
-                        className="flex items-start gap-2 bg-white/60 rounded-lg border border-slate-100 px-3 py-2">
-                        <ArrowRight className="h-3 w-3 text-indigo-400 shrink-0 mt-0.5" />
-                        <div className="min-w-0">
-                          <p className="text-[10px] font-bold text-indigo-600">{pi.clientName}</p>
-                          <p className="text-xs text-slate-600 leading-snug">{pi.insight}</p>
-                          {pi.suggestedRisk && (
-                            <p className="text-[10px] text-amber-600 mt-1 flex items-center gap-1">
-                              <Shield className="h-2.5 w-2.5" /> Riesgo sugerido: {pi.suggestedRisk}
-                            </p>
-                          )}
-                        </div>
-                      </motion.div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </motion.div>
-  );
-}
-
 // ─── Field labels for change log ─────────────────────────────────────────────
 
 const FIELD_LABELS: Record<string, string> = {
@@ -2118,8 +1337,8 @@ function ActivityPanel({ projectId, customItemId, projectName, onClose }: { proj
     onSuccess: () => {
       queryClient.refetchQueries({ queryKey: activityCacheKey });
       queryClient.refetchQueries({ queryKey: notesCacheKey });
-      queryClient.refetchQueries({ queryKey: ['/api/status-semanal'] });
-      if (customItemId) queryClient.refetchQueries({ queryKey: ['/api/status-semanal/custom'] });
+      queryClient.refetchQueries({ queryKey: ['/api/status-semanal?includeHidden=true'] });
+      if (customItemId) queryClient.refetchQueries({ queryKey: ['/api/status-semanal/custom?includeHidden=true'] });
     },
     onError: (err: Error) => toast({ title: 'Error al guardar comentario', description: err.message, variant: 'destructive' }),
   });
@@ -2129,8 +1348,8 @@ function ActivityPanel({ projectId, customItemId, projectName, onClose }: { proj
     onSuccess: () => {
       queryClient.refetchQueries({ queryKey: activityCacheKey });
       queryClient.refetchQueries({ queryKey: notesCacheKey });
-      queryClient.refetchQueries({ queryKey: ['/api/status-semanal'] });
-      if (customItemId) queryClient.refetchQueries({ queryKey: ['/api/status-semanal/custom'] });
+      queryClient.refetchQueries({ queryKey: ['/api/status-semanal?includeHidden=true'] });
+      if (customItemId) queryClient.refetchQueries({ queryKey: ['/api/status-semanal/custom?includeHidden=true'] });
     },
     onError: (err: Error) => toast({ title: 'Error al eliminar comentario', description: err.message, variant: 'destructive' }),
   });
@@ -2290,14 +1509,12 @@ export default function StatusSemanalPage() {
   const currentUserId = (user as any)?.id ?? null;
   const [notesOpen, setNotesOpen] = useState<{ type: 'project' | 'custom'; id: number } | null>(null);
   const [showHidden, setShowHidden] = useState(false);
-  const [alertCollapsed, setAlertCollapsed] = useState<boolean | null>(null);
-  const [decisionCollapsed, setDecisionCollapsed] = useState<boolean | null>(null);
   const [aiSummary, setAiSummary] = useState<AISummary | null>(() => {
     try { const s = localStorage.getItem('status-semanal-ai-summary'); return s ? JSON.parse(s) : null; } catch { return null; }
   });
-  const [expandedRowKey, setExpandedRowKey] = useState<string | null>(null);
-  const [expandedAlertKey, setExpandedAlertKey] = useState<string | null>(null);
-  const [expandedDecisionKey, setExpandedDecisionKey] = useState<string | null>(null);
+  // Unified expanded state — one item expanded at a time across all sections
+  const [expandedKey, setExpandedKey] = useState<string | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [aiPopoverOpen, setAiPopoverOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterHealth, setFilterHealth] = useState<string | null>(null);
@@ -2329,10 +1546,7 @@ export default function StatusSemanalPage() {
         if (confirmDelete) { setConfirmDelete(null); return; }
         if (showExport) { setShowExport(false); return; }
         if (kbFocusKey) {
-          // If a row is expanded, collapse it first
-          setExpandedRowKey(null);
-          setExpandedAlertKey(null);
-          setExpandedDecisionKey(null);
+          setExpandedKey(null);
           setKbFocusKey(null);
           return;
         }
@@ -2377,12 +1591,12 @@ export default function StatusSemanalPage() {
   // ── Queries ──────────────────────────────────────────────────────────────────
 
   const { data: projectRows = [], isLoading: loadingProjects } = useQuery<StatusRow[]>({
-    queryKey: ['/api/status-semanal'],
+    queryKey: ['/api/status-semanal?includeHidden=true'],
     staleTime: 0,
   });
 
   const { data: customRows = [], isLoading: loadingCustom } = useQuery<CustomItem[]>({
-    queryKey: ['/api/status-semanal/custom'],
+    queryKey: ['/api/status-semanal/custom?includeHidden=true'],
     staleTime: 0,
   });
 
@@ -2398,19 +1612,19 @@ export default function StatusSemanalPage() {
     mutationFn: ({ projectId, data }: { projectId: number; data: Record<string, any> }) =>
       mutationFetch(`/api/status-semanal/${projectId}`, 'PATCH', data),
     onMutate: async ({ projectId, data }) => {
-      await queryClient.cancelQueries({ queryKey: ['/api/status-semanal'] });
-      const previous = queryClient.getQueryData<StatusRow[]>(['/api/status-semanal']);
-      queryClient.setQueryData<StatusRow[]>(['/api/status-semanal'], prev =>
+      await queryClient.cancelQueries({ queryKey: ['/api/status-semanal?includeHidden=true'] });
+      const previous = queryClient.getQueryData<StatusRow[]>(['/api/status-semanal?includeHidden=true']);
+      queryClient.setQueryData<StatusRow[]>(['/api/status-semanal?includeHidden=true'], prev =>
         prev ? prev.map(r => r.projectId === projectId ? { ...r, ...data } : r) : prev
       );
       return { previous };
     },
     onError: (err: Error, _vars, ctx: any) => {
-      if (ctx?.previous) queryClient.setQueryData(['/api/status-semanal'], ctx.previous);
+      if (ctx?.previous) queryClient.setQueryData(['/api/status-semanal?includeHidden=true'], ctx.previous);
       toast({ title: 'Error al guardar', description: err.message, variant: 'destructive' });
     },
     onSettled: () => {
-      queryClient.refetchQueries({ queryKey: ['/api/status-semanal'], exact: true });
+      queryClient.refetchQueries({ queryKey: ['/api/status-semanal?includeHidden=true'], exact: true });
     },
   });
 
@@ -2418,19 +1632,19 @@ export default function StatusSemanalPage() {
     mutationFn: (projectId: number) =>
       mutationFetch(`/api/status-semanal/${projectId}`, 'DELETE'),
     onMutate: async (projectId) => {
-      await queryClient.cancelQueries({ queryKey: ['/api/status-semanal'] });
-      const previous = queryClient.getQueryData<StatusRow[]>(['/api/status-semanal']);
-      queryClient.setQueryData<StatusRow[]>(['/api/status-semanal'], prev =>
+      await queryClient.cancelQueries({ queryKey: ['/api/status-semanal?includeHidden=true'] });
+      const previous = queryClient.getQueryData<StatusRow[]>(['/api/status-semanal?includeHidden=true']);
+      queryClient.setQueryData<StatusRow[]>(['/api/status-semanal?includeHidden=true'], prev =>
         prev ? prev.map(r => r.projectId === projectId ? { ...r, hiddenFromWeekly: true } : r) : prev
       );
       return { previous };
     },
     onError: (err: Error, _vars, ctx: any) => {
-      if (ctx?.previous) queryClient.setQueryData(['/api/status-semanal'], ctx.previous);
+      if (ctx?.previous) queryClient.setQueryData(['/api/status-semanal?includeHidden=true'], ctx.previous);
       toast({ title: 'Error al quitar proyecto', description: err.message, variant: 'destructive' });
     },
     onSettled: () => {
-      queryClient.refetchQueries({ queryKey: ['/api/status-semanal'], exact: true });
+      queryClient.refetchQueries({ queryKey: ['/api/status-semanal?includeHidden=true'], exact: true });
     },
   });
 
@@ -2439,7 +1653,7 @@ export default function StatusSemanalPage() {
       mutationFetch('/api/status-semanal/custom', 'POST', { title, subtitle: subtitle || null }),
     onError: (err: Error) => toast({ title: 'Error al crear ítem', description: err.message, variant: 'destructive' }),
     onSettled: () => {
-      queryClient.refetchQueries({ queryKey: ['/api/status-semanal/custom'], exact: true });
+      queryClient.refetchQueries({ queryKey: ['/api/status-semanal/custom?includeHidden=true'], exact: true });
     },
   });
 
@@ -2447,19 +1661,19 @@ export default function StatusSemanalPage() {
     mutationFn: ({ id, data }: { id: number; data: Record<string, any> }) =>
       mutationFetch(`/api/status-semanal/custom/${id}`, 'PATCH', data),
     onMutate: async ({ id, data }) => {
-      await queryClient.cancelQueries({ queryKey: ['/api/status-semanal/custom'] });
-      const previous = queryClient.getQueryData<CustomItem[]>(['/api/status-semanal/custom']);
-      queryClient.setQueryData<CustomItem[]>(['/api/status-semanal/custom'], prev =>
+      await queryClient.cancelQueries({ queryKey: ['/api/status-semanal/custom?includeHidden=true'] });
+      const previous = queryClient.getQueryData<CustomItem[]>(['/api/status-semanal/custom?includeHidden=true']);
+      queryClient.setQueryData<CustomItem[]>(['/api/status-semanal/custom?includeHidden=true'], prev =>
         prev ? prev.map(c => c.id === id ? { ...c, ...data } : c) : prev
       );
       return { previous };
     },
     onError: (err: Error, _vars, ctx: any) => {
-      if (ctx?.previous) queryClient.setQueryData(['/api/status-semanal/custom'], ctx.previous);
+      if (ctx?.previous) queryClient.setQueryData(['/api/status-semanal/custom?includeHidden=true'], ctx.previous);
       toast({ title: 'Error al guardar', description: err.message, variant: 'destructive' });
     },
     onSettled: () => {
-      queryClient.refetchQueries({ queryKey: ['/api/status-semanal/custom'], exact: true });
+      queryClient.refetchQueries({ queryKey: ['/api/status-semanal/custom?includeHidden=true'], exact: true });
     },
   });
 
@@ -2467,19 +1681,19 @@ export default function StatusSemanalPage() {
     mutationFn: (id: number) =>
       mutationFetch(`/api/status-semanal/custom/${id}`, 'DELETE'),
     onMutate: async (id) => {
-      await queryClient.cancelQueries({ queryKey: ['/api/status-semanal/custom'] });
-      const previous = queryClient.getQueryData<CustomItem[]>(['/api/status-semanal/custom']);
-      queryClient.setQueryData<CustomItem[]>(['/api/status-semanal/custom'], prev =>
+      await queryClient.cancelQueries({ queryKey: ['/api/status-semanal/custom?includeHidden=true'] });
+      const previous = queryClient.getQueryData<CustomItem[]>(['/api/status-semanal/custom?includeHidden=true']);
+      queryClient.setQueryData<CustomItem[]>(['/api/status-semanal/custom?includeHidden=true'], prev =>
         prev ? prev.filter(c => c.id !== id) : prev
       );
       return { previous };
     },
     onError: (err: Error, _vars, ctx: any) => {
-      if (ctx?.previous) queryClient.setQueryData(['/api/status-semanal/custom'], ctx.previous);
+      if (ctx?.previous) queryClient.setQueryData(['/api/status-semanal/custom?includeHidden=true'], ctx.previous);
       toast({ title: 'Error al eliminar', description: err.message, variant: 'destructive' });
     },
     onSettled: () => {
-      queryClient.refetchQueries({ queryKey: ['/api/status-semanal/custom'], exact: true });
+      queryClient.refetchQueries({ queryKey: ['/api/status-semanal/custom?includeHidden=true'], exact: true });
     },
   });
 
@@ -2551,13 +1765,14 @@ export default function StatusSemanalPage() {
     updatedByName: c.updatedByName,
   });
 
-  const allItems: Item[] = [
+  const allItems = useMemo<Item[]>(() => [
     ...projectRows.map(toItem),
     ...customRows.map(toCustomItem),
-  ];
+  ], [projectRows, customRows]);
 
-  const hiddenCount = allItems.filter(i => i.hiddenFromWeekly).length;
-  const visible = allItems.filter(i => {
+  const hiddenCount = useMemo(() => allItems.filter(i => i.hiddenFromWeekly).length, [allItems]);
+
+  const visible = useMemo(() => allItems.filter(i => {
     if (!showHidden && i.hiddenFromWeekly) return false;
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
@@ -2571,26 +1786,20 @@ export default function StatusSemanalPage() {
     if (filterHealth && i.healthStatus !== filterHealth) return false;
     if (filterOwner !== null && i.ownerId !== filterOwner) return false;
     return true;
-  });
+  }), [allItems, showHidden, searchQuery, filterHealth, filterOwner]);
 
-  const rojoItems     = visible.filter(i => i.healthStatus === 'rojo');
-  const amarilloItems = visible.filter(i => i.healthStatus === 'amarillo' && !i.isOverdue);
-  const overdueItems  = visible.filter(i => i.isOverdue && i.healthStatus !== 'rojo');
-  const alertItems    = [...rojoItems, ...overdueItems, ...amarilloItems];
-  const alertKeys     = new Set(alertItems.map(i => i.key));
-  const decisionItems = visible.filter(i => dm(i.decisionNeeded).urgent && !alertKeys.has(i.key));
-  const decisionKeys  = new Set(decisionItems.map(i => i.key));
-  const normalItems   = visible.filter(i => !alertKeys.has(i.key) && !decisionKeys.has(i.key));
-
-  const criticalCount = alertItems.length;
-  const decisionCount = visible.filter(i => dm(i.decisionNeeded).urgent).length;
-
-  // Auto-collapse empty sections unless user has manually toggled
-  const isAlertCollapsed = alertCollapsed ?? (alertItems.length === 0);
-  const isDecisionCollapsed = decisionCollapsed ?? (decisionItems.length === 0);
-
-  // Flat list for keyboard navigation (alert + decision + normal)
-  const flatNavItems = [...alertItems, ...decisionItems, ...normalItems];
+  const { alertItems, decisionItems, normalItems, alertKeys, decisionKeys, flatNavItems } = useMemo(() => {
+    const rojoItems     = visible.filter(i => i.healthStatus === 'rojo');
+    const amarilloItems = visible.filter(i => i.healthStatus === 'amarillo' && !i.isOverdue);
+    const overdueItems  = visible.filter(i => i.isOverdue && i.healthStatus !== 'rojo');
+    const alertItems    = [...rojoItems, ...overdueItems, ...amarilloItems];
+    const alertKeys     = new Set(alertItems.map(i => i.key));
+    const decisionItems = visible.filter(i => dm(i.decisionNeeded).urgent && !alertKeys.has(i.key));
+    const decisionKeys  = new Set(decisionItems.map(i => i.key));
+    const normalItems   = visible.filter(i => !alertKeys.has(i.key) && !decisionKeys.has(i.key));
+    const flatNavItems  = [...alertItems, ...decisionItems, ...normalItems];
+    return { alertItems, decisionItems, normalItems, alertKeys, decisionKeys, flatNavItems };
+  }, [visible]);
 
   // Sync normalOrder when normalItems changes (keep existing order, add new items at end)
   useEffect(() => {
@@ -2625,20 +1834,12 @@ export default function StatusSemanalPage() {
         else if (flatNavItems.length > 0) setKbFocusKey(flatNavItems[flatNavItems.length - 1].key);
       } else if (e.key === 'e' || e.key === 'E') {
         if (!kbFocusKey) return;
-        const item = flatNavItems.find(i => i.key === kbFocusKey);
-        if (!item) return;
-        if (alertKeys.has(kbFocusKey)) {
-          setExpandedAlertKey(expandedAlertKey === kbFocusKey ? null : kbFocusKey);
-        } else if (decisionKeys.has(kbFocusKey)) {
-          setExpandedDecisionKey(expandedDecisionKey === kbFocusKey ? null : kbFocusKey);
-        } else {
-          setExpandedRowKey(expandedRowKey === kbFocusKey ? null : kbFocusKey);
-        }
+        setExpandedKey(expandedKey === kbFocusKey ? null : kbFocusKey);
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [kbFocusKey, flatNavItems, alertKeys, decisionKeys, expandedAlertKey, expandedDecisionKey, expandedRowKey]);
+  }, [kbFocusKey, flatNavItems, expandedKey]);
 
   // Sorted normal items with drag-and-drop order
   const sortedNormalItems = normalOrder.length > 0
@@ -2678,7 +1879,6 @@ export default function StatusSemanalPage() {
       <div className={cn("flex flex-col flex-1 min-w-0 transition-all duration-200", notesOpen !== null ? "mr-[320px]" : "")}>
 
         {/* ── Header ────────────────────────────────────────────── */}
-        {/* ── Header (compact with integrated search) ──────────── */}
         <div className="relative overflow-hidden border-b border-border shrink-0">
           <div className="absolute inset-0 bg-gradient-to-r from-indigo-600 via-indigo-700 to-violet-700" />
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,_var(--tw-gradient-stops))] from-white/10 via-transparent to-transparent" />
@@ -2695,8 +1895,19 @@ export default function StatusSemanalPage() {
                 </div>
               </div>
 
+              {/* Sidebar toggle (visible when sidebar has items) */}
+              {(alertItems.length > 0 || decisionItems.length > 0) && viewMode === 'list' && (
+                <button
+                  onClick={() => setSidebarOpen(v => !v)}
+                  title={sidebarOpen ? "Ocultar panel lateral" : "Mostrar panel lateral"}
+                  className={cn("p-1.5 rounded-full border transition-colors backdrop-blur-sm shrink-0",
+                    sidebarOpen ? "bg-white/25 text-white border-white/30" : "bg-white/10 text-indigo-200 border-white/15 hover:bg-white/20 hover:text-white")}>
+                  {sidebarOpen ? <PanelLeftClose className="h-3.5 w-3.5" /> : <PanelLeftOpen className="h-3.5 w-3.5" />}
+                </button>
+              )}
+
               {/* Center: search */}
-              <div className="relative flex-1 max-w-md">
+              <div className="relative flex-1 max-w-md max-md:hidden">
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-indigo-300" />
                 <input
                   ref={searchInputRef}
@@ -2712,49 +1923,55 @@ export default function StatusSemanalPage() {
                 )}
               </div>
 
-              {/* Right: badges & actions */}
+              {/* Right: actions */}
               <div className="flex items-center gap-1 shrink-0">
-                <span className="text-[11px] text-indigo-200 font-medium mr-1">{visible.length} ítems</span>
-                {/* View toggle */}
-                <button onClick={() => setViewMode(v => v === 'list' ? 'timeline' : 'list')}
-                  title={viewMode === 'list' ? 'Ver timeline' : 'Ver lista'}
-                  className={cn("p-1.5 rounded-full border transition-colors backdrop-blur-sm",
-                    viewMode === 'timeline'
-                      ? "bg-white/25 text-white border-white/30"
-                      : "bg-white/10 text-indigo-200 border-white/15 hover:bg-white/20 hover:text-white")}>
-                  {viewMode === 'list' ? <LayoutList className="h-3 w-3" /> : <List className="h-3 w-3" />}
-                </button>
-                {/* Export */}
-                <button onClick={() => setShowExport(true)} title="Exportar semana"
-                  className="p-1.5 rounded-full border transition-colors backdrop-blur-sm bg-white/10 text-indigo-200 border-white/15 hover:bg-white/20 hover:text-white">
-                  <Printer className="h-3 w-3" />
-                </button>
-                {/* Bulk select */}
-                <button onClick={() => { setBulkMode(v => !v); setSelectedKeys(new Set()); }}
-                  title="Selección masiva"
-                  className={cn("p-1.5 rounded-full border transition-colors backdrop-blur-sm",
-                    bulkMode ? "bg-white/25 text-white border-white/30" : "bg-white/10 text-indigo-200 border-white/15 hover:bg-white/20 hover:text-white")}>
-                  <CheckSquare className="h-3 w-3" />
-                </button>
-                {/* Keyboard help */}
-                <button onClick={() => setShowKbHelp(v => !v)} title="Atajos de teclado (?)"
-                  className="p-1.5 rounded-full border transition-colors backdrop-blur-sm bg-white/10 text-indigo-200 border-white/15 hover:bg-white/20 hover:text-white">
-                  <HelpCircle className="h-3 w-3" />
-                </button>
+                <span className="text-[11px] text-indigo-200 font-medium mr-1 max-md:hidden">{visible.length} ítems</span>
+                {/* Filter */}
                 <button onClick={() => setShowFilters(v => !v)}
+                  title="Filtros"
                   className={cn("p-1.5 rounded-full border transition-colors backdrop-blur-sm",
                     showFilters || filterHealth || filterOwner !== null
                       ? "bg-white/25 text-white border-white/30"
                       : "bg-white/10 text-indigo-200 border-white/15 hover:bg-white/20 hover:text-white")}>
                   <Filter className="h-3 w-3" />
                 </button>
+                {/* Hidden toggle */}
                 {hiddenCount > 0 && (
                   <button onClick={() => setShowHidden(v => !v)}
+                    title={showHidden ? `Ocultar ${hiddenCount} ocultos` : `Mostrar ${hiddenCount} ocultos`}
                     className={cn("p-1.5 rounded-full border transition-colors backdrop-blur-sm",
                       showHidden ? "bg-white/25 text-white border-white/30" : "bg-white/10 text-indigo-200 border-white/15 hover:bg-white/20 hover:text-white")}>
                     {showHidden ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
                   </button>
                 )}
+                {/* More actions menu */}
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button title="Más acciones"
+                      className="p-1.5 rounded-full border transition-colors backdrop-blur-sm bg-white/10 text-indigo-200 border-white/15 hover:bg-white/20 hover:text-white">
+                      <MoreHorizontal className="h-3 w-3" />
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-48 p-1" align="end">
+                    <button onClick={() => setViewMode(v => v === 'list' ? 'timeline' : 'list')}
+                      className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded text-xs text-slate-700 hover:bg-slate-100">
+                      {viewMode === 'list' ? <LayoutList className="h-3.5 w-3.5 text-slate-400" /> : <List className="h-3.5 w-3.5 text-slate-400" />}
+                      {viewMode === 'list' ? 'Ver timeline' : 'Ver lista'}
+                    </button>
+                    <button onClick={() => setShowExport(true)}
+                      className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded text-xs text-slate-700 hover:bg-slate-100">
+                      <Printer className="h-3.5 w-3.5 text-slate-400" /> Exportar semana
+                    </button>
+                    <button onClick={() => { setBulkMode(v => !v); setSelectedKeys(new Set()); }}
+                      className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded text-xs text-slate-700 hover:bg-slate-100">
+                      <CheckSquare className="h-3.5 w-3.5 text-slate-400" /> {bulkMode ? 'Salir de selección' : 'Selección masiva'}
+                    </button>
+                    <button onClick={() => setShowKbHelp(v => !v)}
+                      className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded text-xs text-slate-700 hover:bg-slate-100">
+                      <HelpCircle className="h-3.5 w-3.5 text-slate-400" /> Atajos de teclado
+                    </button>
+                  </PopoverContent>
+                </Popover>
                 <Popover open={aiPopoverOpen} onOpenChange={setAiPopoverOpen}>
                   <PopoverTrigger asChild>
                     <button
@@ -2935,7 +2152,7 @@ export default function StatusSemanalPage() {
                             const dot = hm(item.healthStatus).dot;
                             return (
                               <div key={item.key} className="bg-white border border-slate-200 rounded-lg px-3 py-2 shadow-sm hover:border-indigo-300 transition-colors cursor-pointer"
-                                onClick={() => setExpandedRowKey(expandedRowKey === item.key ? null : item.key)}>
+                                onClick={() => setExpandedKey(expandedKey === item.key ? null : item.key)}>
                                 <div className="flex items-center gap-1.5 mb-1">
                                   <div className={cn("w-2 h-2 rounded-full shrink-0", dot)} />
                                   <span className="text-xs font-medium text-slate-800 truncate flex-1">{item.title}</span>
@@ -2965,9 +2182,18 @@ export default function StatusSemanalPage() {
           ) : (
             <>
 
+              {/* ── Mobile backdrop for sidebar overlay ─────────────── */}
+              {sidebarOpen && (alertItems.length > 0 || decisionItems.length > 0) && (
+                <div className="hidden max-md:block fixed inset-0 z-20 bg-black/40 backdrop-blur-[2px]"
+                  onClick={() => setSidebarOpen(false)} />
+              )}
+
               {/* ── Left panel: urgency items ─────────────────────────── */}
               {(alertItems.length > 0 || decisionItems.length > 0) && (
-              <div className="w-[420px] shrink-0 border-r border-slate-200 overflow-y-auto bg-slate-50/40 flex flex-col">
+              <div className={cn(
+                "shrink-0 border-r border-slate-200 overflow-y-auto bg-slate-50/40 flex flex-col transition-all duration-200",
+                sidebarOpen ? "w-[420px] max-lg:w-[340px] max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:z-30 max-md:w-[85vw] max-md:max-w-[420px] max-md:shadow-2xl max-md:border-r-0" : "w-0 overflow-hidden"
+              )}>
               <div className="px-4 py-3 border-b border-slate-200 flex items-center gap-2 shrink-0 bg-white/60">
                 <AlertTriangle className="h-3.5 w-3.5 text-slate-400" />
                 <span className="text-xs font-bold text-slate-600 flex-1">Para atender</span>
@@ -2997,8 +2223,8 @@ export default function StatusSemanalPage() {
                           className="border-b border-slate-100/80 last:border-b-0">
                           <AlertSidebarCard item={item} accent={rowAccent} currentUserId={currentUserId}
                             onUpdate={h.onUpdate}
-                            expanded={expandedAlertKey === item.key}
-                            onToggle={() => setExpandedAlertKey(expandedAlertKey === item.key ? null : item.key)}
+                            expanded={expandedKey === item.key}
+                            onToggle={() => setExpandedKey(expandedKey === item.key ? null : item.key)}
                             users={appUsers}
                             onOpenNotes={h.onOpenNotes}
                             onRemove={h.onRemove} />
@@ -3029,8 +2255,8 @@ export default function StatusSemanalPage() {
                           transition={{ duration: 0.14, ease: [0.4, 0, 0.2, 1] }}
                           className="border-b border-slate-100/80 last:border-b-0">
                           <DecisionSidebarCard item={item} currentUserId={currentUserId}
-                            expanded={expandedDecisionKey === item.key}
-                            onToggle={() => setExpandedDecisionKey(expandedDecisionKey === item.key ? null : item.key)}
+                            expanded={expandedKey === item.key}
+                            onToggle={() => setExpandedKey(expandedKey === item.key ? null : item.key)}
                             users={appUsers}
                             onUpdate={h.onUpdate}
                             onOpenNotes={h.onOpenNotes}
@@ -3061,8 +2287,8 @@ export default function StatusSemanalPage() {
                   ) : null; })()}
                   <div className="flex-1" />
                   <AddItemButton variant="inline" onAdd={(title, subtitle) => createCustom.mutate({ title, subtitle })} />
-                  {expandedRowKey && (
-                    <button onClick={() => setExpandedRowKey(null)} className="text-[10px] text-slate-400 hover:text-slate-600 font-medium">colapsar</button>
+                  {expandedKey && (
+                    <button onClick={() => setExpandedKey(null)} className="text-[10px] text-slate-400 hover:text-slate-600 font-medium">colapsar</button>
                   )}
                 </div>
                 {normalItems.length === 0 ? (
@@ -3097,12 +2323,12 @@ export default function StatusSemanalPage() {
                           <SortableCompactRow key={item.key} item={item} users={appUsers} currentUserId={currentUserId}
                             isSelected={notesOpen !== null && ((notesOpen.type === 'project' && item.projectId === notesOpen.id) || (notesOpen.type === 'custom' && item.customId === notesOpen.id))}
                             onOpenNotes={h.onOpenNotes} onUpdate={h.onUpdate} onRemove={h.onRemove}
-                            expanded={expandedRowKey === item.key}
-                            onToggle={() => setExpandedRowKey(expandedRowKey === item.key ? null : item.key)}
+                            expanded={expandedKey === item.key}
+                            onToggle={() => setExpandedKey(expandedKey === item.key ? null : item.key)}
                             hasPrev={globalIdx > 0}
                             hasNext={globalIdx < sortedNormalItems.length - 1}
-                            onPrev={() => { if (globalIdx > 0) setExpandedRowKey(sortedNormalItems[globalIdx - 1].key); }}
-                            onNext={() => { if (globalIdx < sortedNormalItems.length - 1) setExpandedRowKey(sortedNormalItems[globalIdx + 1].key); }}
+                            onPrev={() => { if (globalIdx > 0) setExpandedKey(sortedNormalItems[globalIdx - 1].key); }}
+                            onNext={() => { if (globalIdx < sortedNormalItems.length - 1) setExpandedKey(sortedNormalItems[globalIdx + 1].key); }}
                             kbFocused={kbFocusKey === item.key}
                             bulkMode={bulkMode}
                             checked={selectedKeys.has(item.key)}
