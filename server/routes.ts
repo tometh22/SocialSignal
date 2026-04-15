@@ -17103,80 +17103,104 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // GET /api/status-semanal — all active projects with client, quotation, status review and note count
   app.get("/api/status-semanal", requireAuth, async (req: Request, res: Response) => {
     try {
-      const rows = await db
-        .select({
-          projectId: activeProjects.id,
-          status: activeProjects.status,
-          quotationId: activeProjects.quotationId,
-          clientId: activeProjects.clientId,
-          clientName: clients.name,
-          quotationName: quotations.projectName,
-          trackingFrequency: activeProjects.trackingFrequency,
-          startDate: activeProjects.startDate,
-          expectedEndDate: activeProjects.expectedEndDate,
-          // status review fields
-          reviewId: projectStatusReviews.id,
-          healthStatus: projectStatusReviews.healthStatus,
-          marginStatus: projectStatusReviews.marginStatus,
-          teamStrain: projectStatusReviews.teamStrain,
-          mainRisk: projectStatusReviews.mainRisk,
-          currentAction: projectStatusReviews.currentAction,
-          nextMilestone: projectStatusReviews.nextMilestone,
-          nextMilestoneDate: projectStatusReviews.nextMilestoneDate,
-          deadline: projectStatusReviews.deadline,
-          ownerId: projectStatusReviews.ownerId,
-          decisionNeeded: projectStatusReviews.decisionNeeded,
-          hiddenFromWeekly: projectStatusReviews.hiddenFromWeekly,
-          reviewUpdatedAt: projectStatusReviews.updatedAt,
-        })
-        .from(activeProjects)
-        .leftJoin(clients, eq(clients.id, activeProjects.clientId))
-        .leftJoin(quotations, eq(quotations.id, activeProjects.quotationId))
-        .leftJoin(projectStatusReviews, eq(projectStatusReviews.projectId, activeProjects.id))
-        .where(and(eq(activeProjects.status, 'active'), eq(activeProjects.isFinished, false)))
-        .orderBy(asc(clients.name));
+      const includeHidden = req.query.includeHidden === 'true';
 
-      // Get note counts per project
-      const projectIds = rows.map(r => r.projectId);
-      const noteCounts = projectIds.length > 0
-        ? await db
-            .select({ projectId: projectReviewNotes.projectId, count: sql<number>`COUNT(*)::int` })
-            .from(projectReviewNotes)
-            .where(inArray(projectReviewNotes.projectId, projectIds))
-            .groupBy(projectReviewNotes.projectId)
-        : [];
-      const noteCountMap = new Map(noteCounts.map(n => [n.projectId, n.count]));
+      // Build WHERE conditions: always filter active + not finished
+      const baseConditions = [eq(activeProjects.status, 'active'), eq(activeProjects.isFinished, false)];
+      // Unless includeHidden=true, exclude items where hiddenFromWeekly is true
+      if (!includeHidden) {
+        // hiddenFromWeekly lives on the LEFT-JOINed projectStatusReviews; NULL (no review) means visible
+        baseConditions.push(sql`(${projectStatusReviews.hiddenFromWeekly} IS NOT TRUE)`);
+      }
 
-      // Safely fetch updatedBy data (column may not exist if migration hasn't run)
-      let updatedByMap = new Map<number, number | null>();
+      // Try consolidated query with updatedBy + user name subqueries + note count subquery
+      let result: any[];
       try {
-        const updatedByRows = await db
-          .select({ projectId: projectStatusReviews.projectId, updatedBy: projectStatusReviews.updatedBy })
-          .from(projectStatusReviews)
-          .where(inArray(projectStatusReviews.projectId, projectIds.length > 0 ? projectIds : [0]));
-        updatedByMap = new Map(updatedByRows.map(r => [r.projectId, r.updatedBy]));
-      } catch { /* column doesn't exist yet — migration pending */ }
+        const rows = await db
+          .select({
+            projectId: activeProjects.id,
+            status: activeProjects.status,
+            quotationId: activeProjects.quotationId,
+            clientId: activeProjects.clientId,
+            clientName: clients.name,
+            quotationName: quotations.projectName,
+            trackingFrequency: activeProjects.trackingFrequency,
+            startDate: activeProjects.startDate,
+            expectedEndDate: activeProjects.expectedEndDate,
+            // status review fields
+            reviewId: projectStatusReviews.id,
+            healthStatus: projectStatusReviews.healthStatus,
+            marginStatus: projectStatusReviews.marginStatus,
+            teamStrain: projectStatusReviews.teamStrain,
+            mainRisk: projectStatusReviews.mainRisk,
+            currentAction: projectStatusReviews.currentAction,
+            nextMilestone: projectStatusReviews.nextMilestone,
+            nextMilestoneDate: projectStatusReviews.nextMilestoneDate,
+            deadline: projectStatusReviews.deadline,
+            ownerId: projectStatusReviews.ownerId,
+            decisionNeeded: projectStatusReviews.decisionNeeded,
+            hiddenFromWeekly: projectStatusReviews.hiddenFromWeekly,
+            reviewUpdatedAt: projectStatusReviews.updatedAt,
+            // Consolidated: updatedBy from already-joined projectStatusReviews
+            reviewUpdatedBy: projectStatusReviews.updatedBy,
+            // Consolidated: note count via subquery
+            noteCount: sql<number>`COALESCE((SELECT COUNT(*)::int FROM ${projectReviewNotes} WHERE ${projectReviewNotes.projectId} = ${activeProjects.id}), 0)`,
+            // Consolidated: owner name via subquery
+            ownerName: sql<string | null>`(SELECT ${users.firstName} || ' ' || ${users.lastName} FROM ${users} WHERE ${users.id} = ${projectStatusReviews.ownerId})`,
+            // Consolidated: updatedBy name via subquery
+            reviewUpdatedByName: sql<string | null>`(SELECT ${users.firstName} || ' ' || ${users.lastName} FROM ${users} WHERE ${users.id} = ${projectStatusReviews.updatedBy})`,
+          })
+          .from(activeProjects)
+          .leftJoin(clients, eq(clients.id, activeProjects.clientId))
+          .leftJoin(quotations, eq(quotations.id, activeProjects.quotationId))
+          .leftJoin(projectStatusReviews, eq(projectStatusReviews.projectId, activeProjects.id))
+          .where(and(...baseConditions))
+          .orderBy(asc(clients.name));
 
-      // Get owner + updatedBy names
-      const allUserIds = [...new Set([
-        ...rows.map(r => r.ownerId).filter(Boolean),
-        ...[...updatedByMap.values()].filter(Boolean),
-      ])] as number[];
-      const userRows = allUserIds.length > 0
-        ? await db.select({ id: users.id, firstName: users.firstName, lastName: users.lastName }).from(users).where(inArray(users.id, allUserIds))
-        : [];
-      const userNameMap = new Map(userRows.map((u: any) => [u.id, `${u.firstName} ${u.lastName}`]));
+        result = rows;
+      } catch {
+        // Fallback: updatedBy column may not exist yet (migration pending)
+        const rows = await db
+          .select({
+            projectId: activeProjects.id,
+            status: activeProjects.status,
+            quotationId: activeProjects.quotationId,
+            clientId: activeProjects.clientId,
+            clientName: clients.name,
+            quotationName: quotations.projectName,
+            trackingFrequency: activeProjects.trackingFrequency,
+            startDate: activeProjects.startDate,
+            expectedEndDate: activeProjects.expectedEndDate,
+            reviewId: projectStatusReviews.id,
+            healthStatus: projectStatusReviews.healthStatus,
+            marginStatus: projectStatusReviews.marginStatus,
+            teamStrain: projectStatusReviews.teamStrain,
+            mainRisk: projectStatusReviews.mainRisk,
+            currentAction: projectStatusReviews.currentAction,
+            nextMilestone: projectStatusReviews.nextMilestone,
+            nextMilestoneDate: projectStatusReviews.nextMilestoneDate,
+            deadline: projectStatusReviews.deadline,
+            ownerId: projectStatusReviews.ownerId,
+            decisionNeeded: projectStatusReviews.decisionNeeded,
+            hiddenFromWeekly: projectStatusReviews.hiddenFromWeekly,
+            reviewUpdatedAt: projectStatusReviews.updatedAt,
+            // Note count subquery still works without updatedBy
+            noteCount: sql<number>`COALESCE((SELECT COUNT(*)::int FROM ${projectReviewNotes} WHERE ${projectReviewNotes.projectId} = ${activeProjects.id}), 0)`,
+            ownerName: sql<string | null>`(SELECT ${users.firstName} || ' ' || ${users.lastName} FROM ${users} WHERE ${users.id} = ${projectStatusReviews.ownerId})`,
+          })
+          .from(activeProjects)
+          .leftJoin(clients, eq(clients.id, activeProjects.clientId))
+          .leftJoin(quotations, eq(quotations.id, activeProjects.quotationId))
+          .leftJoin(projectStatusReviews, eq(projectStatusReviews.projectId, activeProjects.id))
+          .where(and(...baseConditions))
+          .orderBy(asc(clients.name));
 
-      const result = rows.map(r => {
-        const updById = updatedByMap.get(r.projectId) ?? null;
-        return {
+        result = rows.map(r => ({
           ...r,
-          noteCount: noteCountMap.get(r.projectId) ?? 0,
-          ownerName: r.ownerId ? userNameMap.get(r.ownerId) ?? null : null,
-          reviewUpdatedBy: updById,
-          reviewUpdatedByName: updById ? userNameMap.get(updById) ?? null : null,
-        };
-      });
+          reviewUpdatedBy: null,
+          reviewUpdatedByName: null,
+        }));
+      }
 
       res.setHeader('Cache-Control', 'no-store');
       res.json(result);
@@ -17840,65 +17864,76 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ── Weekly status custom items ─────────────────────────────────────────────
 
   // GET /api/status-semanal/custom — all custom (non-project) items
-  app.get("/api/status-semanal/custom", requireAuth, async (_req: Request, res: Response) => {
+  app.get("/api/status-semanal/custom", requireAuth, async (req: Request, res: Response) => {
     try {
-      const items = await db.select({
-        id: weeklyStatusItems.id,
-        title: weeklyStatusItems.title,
-        subtitle: weeklyStatusItems.subtitle,
-        healthStatus: weeklyStatusItems.healthStatus,
-        marginStatus: weeklyStatusItems.marginStatus,
-        teamStrain: weeklyStatusItems.teamStrain,
-        mainRisk: weeklyStatusItems.mainRisk,
-        currentAction: weeklyStatusItems.currentAction,
-        nextMilestone: weeklyStatusItems.nextMilestone,
-        deadline: weeklyStatusItems.deadline,
-        ownerId: weeklyStatusItems.ownerId,
-        ownerName: sql<string>`${users.firstName} || ' ' || ${users.lastName}`,
-        decisionNeeded: weeklyStatusItems.decisionNeeded,
-        hiddenFromWeekly: weeklyStatusItems.hiddenFromWeekly,
-        updatedAt: weeklyStatusItems.updatedAt,
-      }).from(weeklyStatusItems)
-        .leftJoin(users, eq(users.id, weeklyStatusItems.ownerId))
-        .orderBy(desc(weeklyStatusItems.createdAt));
+      const includeHidden = req.query.includeHidden === 'true';
 
-      // Get note counts for custom items
-      const itemIds = items.map(i => i.id);
-      const noteCounts = itemIds.length > 0
-        ? await db
-            .select({ weeklyStatusItemId: projectReviewNotes.weeklyStatusItemId, count: sql<number>`COUNT(*)::int` })
-            .from(projectReviewNotes)
-            .where(inArray(projectReviewNotes.weeklyStatusItemId, itemIds))
-            .groupBy(projectReviewNotes.weeklyStatusItemId)
-        : [];
-      const noteCountMap = new Map(noteCounts.map(n => [n.weeklyStatusItemId, n.count]));
+      // Build WHERE conditions for hidden filter
+      const whereConditions = !includeHidden
+        ? sql`(${weeklyStatusItems.hiddenFromWeekly} IS NOT TRUE)`
+        : undefined;
 
-      // Safely fetch updatedBy data (column may not exist if migration hasn't run)
-      let customUpdatedByMap = new Map<number, number | null>();
+      // Try consolidated query with updatedBy + updatedByName subquery + note count subquery
+      let result: any[];
       try {
-        const ubRows = await db
-          .select({ id: weeklyStatusItems.id, updatedBy: weeklyStatusItems.updatedBy })
-          .from(weeklyStatusItems)
-          .where(inArray(weeklyStatusItems.id, itemIds.length > 0 ? itemIds : [0]));
-        customUpdatedByMap = new Map(ubRows.map(r => [r.id, r.updatedBy]));
-      } catch { /* column doesn't exist yet — migration pending */ }
+        const items = await db.select({
+          id: weeklyStatusItems.id,
+          title: weeklyStatusItems.title,
+          subtitle: weeklyStatusItems.subtitle,
+          healthStatus: weeklyStatusItems.healthStatus,
+          marginStatus: weeklyStatusItems.marginStatus,
+          teamStrain: weeklyStatusItems.teamStrain,
+          mainRisk: weeklyStatusItems.mainRisk,
+          currentAction: weeklyStatusItems.currentAction,
+          nextMilestone: weeklyStatusItems.nextMilestone,
+          deadline: weeklyStatusItems.deadline,
+          ownerId: weeklyStatusItems.ownerId,
+          ownerName: sql<string>`${users.firstName} || ' ' || ${users.lastName}`,
+          decisionNeeded: weeklyStatusItems.decisionNeeded,
+          hiddenFromWeekly: weeklyStatusItems.hiddenFromWeekly,
+          updatedAt: weeklyStatusItems.updatedAt,
+          // Consolidated: updatedBy directly from the table
+          updatedBy: weeklyStatusItems.updatedBy,
+          // Consolidated: note count via subquery
+          noteCount: sql<number>`COALESCE((SELECT COUNT(*)::int FROM ${projectReviewNotes} WHERE ${projectReviewNotes.weeklyStatusItemId} = ${weeklyStatusItems.id}), 0)`,
+          // Consolidated: updatedBy name via subquery
+          updatedByName: sql<string | null>`(SELECT ${users.firstName} || ' ' || ${users.lastName} FROM ${users} WHERE ${users.id} = ${weeklyStatusItems.updatedBy})`,
+        }).from(weeklyStatusItems)
+          .leftJoin(users, eq(users.id, weeklyStatusItems.ownerId))
+          .where(whereConditions)
+          .orderBy(desc(weeklyStatusItems.createdAt));
 
-      // Resolve updatedBy names
-      const updatedByIds = [...new Set([...customUpdatedByMap.values()].filter(Boolean))] as number[];
-      const updaterRows = updatedByIds.length > 0
-        ? await db.select({ id: users.id, firstName: users.firstName, lastName: users.lastName }).from(users).where(inArray(users.id, updatedByIds))
-        : [];
-      const updaterMap = new Map(updaterRows.map((u: any) => [u.id, `${u.firstName} ${u.lastName}`]));
+        result = items;
+      } catch {
+        // Fallback: updatedBy column may not exist yet (migration pending)
+        const items = await db.select({
+          id: weeklyStatusItems.id,
+          title: weeklyStatusItems.title,
+          subtitle: weeklyStatusItems.subtitle,
+          healthStatus: weeklyStatusItems.healthStatus,
+          marginStatus: weeklyStatusItems.marginStatus,
+          teamStrain: weeklyStatusItems.teamStrain,
+          mainRisk: weeklyStatusItems.mainRisk,
+          currentAction: weeklyStatusItems.currentAction,
+          nextMilestone: weeklyStatusItems.nextMilestone,
+          deadline: weeklyStatusItems.deadline,
+          ownerId: weeklyStatusItems.ownerId,
+          ownerName: sql<string>`${users.firstName} || ' ' || ${users.lastName}`,
+          decisionNeeded: weeklyStatusItems.decisionNeeded,
+          hiddenFromWeekly: weeklyStatusItems.hiddenFromWeekly,
+          updatedAt: weeklyStatusItems.updatedAt,
+          noteCount: sql<number>`COALESCE((SELECT COUNT(*)::int FROM ${projectReviewNotes} WHERE ${projectReviewNotes.weeklyStatusItemId} = ${weeklyStatusItems.id}), 0)`,
+        }).from(weeklyStatusItems)
+          .leftJoin(users, eq(users.id, weeklyStatusItems.ownerId))
+          .where(whereConditions)
+          .orderBy(desc(weeklyStatusItems.createdAt));
 
-      const result = items.map(item => {
-        const updById = customUpdatedByMap.get(item.id) ?? null;
-        return {
+        result = items.map(item => ({
           ...item,
-          updatedBy: updById,
-          noteCount: noteCountMap.get(item.id) ?? 0,
-          updatedByName: updById ? updaterMap.get(updById) ?? null : null,
-        };
-      });
+          updatedBy: null,
+          updatedByName: null,
+        }));
+      }
 
       res.setHeader('Cache-Control', 'no-store');
       res.json(result);
