@@ -15971,6 +15971,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // GET /api/crm/diagnostic — diagnóstico completo de leads (para investigar datos faltantes)
+  app.get("/api/crm/diagnostic", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const allLeads = await db.select().from(crmLeads);
+      const allContacts = await db.select().from(crmContacts);
+      const allActivities = await db.select().from(crmActivities);
+      const allReminders = await db.select().from(crmReminders);
+
+      const byStage: Record<string, number> = {};
+      const bySource: Record<string, number> = {};
+      let minId = Infinity, maxId = -Infinity;
+      let oldestCreated: Date | null = null;
+      let newestCreated: Date | null = null;
+
+      for (const lead of allLeads) {
+        byStage[lead.stage] = (byStage[lead.stage] || 0) + 1;
+        bySource[lead.source || 'sin_fuente'] = (bySource[lead.source || 'sin_fuente'] || 0) + 1;
+        if (lead.id < minId) minId = lead.id;
+        if (lead.id > maxId) maxId = lead.id;
+        const created = lead.createdAt ? new Date(lead.createdAt) : null;
+        if (created) {
+          if (!oldestCreated || created < oldestCreated) oldestCreated = created;
+          if (!newestCreated || created > newestCreated) newestCreated = created;
+        }
+      }
+
+      // Detectar huecos en IDs (señal de leads eliminados)
+      const ids = allLeads.map(l => l.id).sort((a, b) => a - b);
+      const missingIds: number[] = [];
+      if (ids.length > 1) {
+        for (let i = ids[0]; i <= ids[ids.length - 1]; i++) {
+          if (!ids.includes(i)) missingIds.push(i);
+        }
+      }
+
+      res.json({
+        totalLeadsInDB: allLeads.length,
+        totalContacts: allContacts.length,
+        totalActivities: allActivities.length,
+        totalReminders: allReminders.length,
+        byStage,
+        bySource,
+        idRange: { min: minId === Infinity ? null : minId, max: maxId === -Infinity ? null : maxId },
+        missingIdCount: missingIds.length,
+        missingIdsSample: missingIds.slice(0, 50),
+        dateRange: { oldest: oldestCreated, newest: newestCreated },
+      });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+    }
+  });
+
   // GET /api/crm/leads — lista de leads
   app.get("/api/crm/leads", requireAuth, async (req: Request, res: Response) => {
     try {
