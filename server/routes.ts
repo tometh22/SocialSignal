@@ -15959,6 +15959,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const overdueReminders = remindersResult.filter(r => new Date(r.dueDate) < now);
 
       res.json({
+        totalLeads: leadsResult.length,
         totalActive: leadsResult.filter(l => !['won', 'lost'].includes(l.stage)).length,
         totalPipelineUsd,
         wonThisMonth,

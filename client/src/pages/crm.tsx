@@ -106,6 +106,7 @@ interface Lead {
 }
 
 interface Stats {
+  totalLeads: number;
   totalActive: number;
   totalPipelineUsd: number;
   wonThisMonth: number;
@@ -1055,7 +1056,12 @@ export default function CRMPage() {
             </div>
             <div>
               <p className="text-xs text-slate-500 font-medium">Leads Activos</p>
-              <p className="text-2xl font-bold text-slate-800">{statsLoading ? '—' : (stats?.totalActive ?? 0)}</p>
+              <p className="text-2xl font-bold text-slate-800">
+                {statsLoading ? '—' : (stats?.totalActive ?? 0)}
+                {!statsLoading && stats?.totalLeads != null && (
+                  <span className="text-sm font-normal text-slate-400 ml-1">/ {stats.totalLeads} total</span>
+                )}
+              </p>
             </div>
           </CardContent>
         </Card>
