@@ -631,6 +631,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Setup authentication with storage
   const { requireAuth } = setupAuth(app, storage);
 
+  // ── Temporary: one-time password reset (remove after use) ──
+  app.get('/api/reset-admin-pw-temp', async (_req, res) => {
+    try {
+      const newHash = await hashPassword('admin123');
+      await db.update(users).set({ password: newHash }).where(eq(users.email, 'tomas@epical.digital'));
+      res.json({ ok: true, message: 'Password reset to admin123 for tomas@epical.digital' });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
   // ==================== UNIFIED ACTIVE PROJECTS ENDPOINT ====================
   // Single source of truth for "Proyectos Activos" page according to blueprint
 
