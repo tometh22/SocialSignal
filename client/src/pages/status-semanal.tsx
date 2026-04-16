@@ -554,9 +554,9 @@ function DeadlinePicker({ value, isOverdue, onChange }: {
 
 // ─── Compact row (Verde) ──────────────────────────────────────────────────────
 
-function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, expanded, onToggle, onNext, onPrev, hasNext, hasPrev, currentUserId, kbFocused, dragHandleProps, bulkMode, checked, onCheck, accent, hideSubtitle }: {
+function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, onResolve, expanded, onToggle, onNext, onPrev, hasNext, hasPrev, currentUserId, kbFocused, dragHandleProps, bulkMode, checked, onCheck, accent, hideSubtitle }: {
   item: Item; users: AppUser[]; isSelected: boolean; currentUserId?: number | null;
-  onOpenNotes?: () => void; onUpdate: (d: Record<string, any>) => void; onRemove: () => void;
+  onOpenNotes?: () => void; onUpdate: (d: Record<string, any>) => void; onRemove: () => void; onResolve: () => void;
   expanded: boolean; onToggle: () => void; onNext?: () => void; onPrev?: () => void; hasNext?: boolean; hasPrev?: boolean;
   kbFocused?: boolean; dragHandleProps?: Record<string, any>; bulkMode?: boolean; checked?: boolean; onCheck?: (v: boolean) => void;
   accent?: 'red' | 'amber' | 'none'; hideSubtitle?: boolean;
@@ -620,9 +620,15 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
               <MessageSquare className="h-3 w-3" /><span className="text-[10px] font-medium">{item.noteCount}</span>
             </button>
           )}
+          <TooltipProvider><Tooltip><TooltipTrigger asChild>
+            <button onClick={onResolve}
+              className="p-1 rounded text-slate-200 hover:text-emerald-600 hover:bg-emerald-50 transition-colors opacity-0 group-hover:opacity-100">
+              <CheckCircle2 className="h-3.5 w-3.5" />
+            </button>
+          </TooltipTrigger><TooltipContent className="text-xs">Resolver y quitar</TooltipContent></Tooltip></TooltipProvider>
           <Popover open={menuOpen} onOpenChange={setMenuOpen}>
             <PopoverTrigger asChild>
-              <button className="p-1 rounded hover:bg-slate-100 text-slate-300 hover:text-slate-500 transition-colors">
+              <button className="p-1 rounded hover:bg-slate-100 text-slate-300 hover:text-slate-500 transition-colors opacity-0 group-hover:opacity-100">
                 <MoreHorizontal className="h-3.5 w-3.5" />
               </button>
             </PopoverTrigger>
@@ -679,19 +685,37 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
                   </div>
                 )}
 
-                {/* Footer: metadata + nav + open full panel */}
+                {/* Footer: decision + secondary indicators + nav */}
                 <div className="flex items-center gap-1.5 px-5 py-2.5 border-t border-slate-100 bg-slate-50/60 flex-wrap">
-                  <OwnerSelect value={item.ownerId} name={item.ownerName} onChange={v => onUpdate({ ownerId: v })} users={users} />
-                  <DeadlinePicker value={item.deadline} isOverdue={item.isOverdue} onChange={v => onUpdate({ deadline: v })} />
-                  <div className="h-3 w-px bg-slate-200 mx-0.5 shrink-0" />
-                  <LevelBadge value={item.marginStatus} onChange={v => onUpdate({ marginStatus: v })} label="Rentabilidad" type="margin" />
-                  <LevelBadge value={item.teamStrain} onChange={v => onUpdate({ teamStrain: v })} label="Carga equipo" type="team" />
                   <DecisionBadge value={item.decisionNeeded} onChange={v => onUpdate({ decisionNeeded: v })} />
                   {item.mainRisk && (
                     <div className="flex items-center gap-1 text-[10px] text-orange-600 bg-orange-50 border border-orange-100 rounded-md px-1.5 py-0.5">
                       <Shield className="h-2.5 w-2.5" /><span className="truncate max-w-[120px]">{item.mainRisk}</span>
                     </div>
                   )}
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <button className="text-[10px] text-slate-400 hover:text-slate-600 hover:bg-slate-100 px-1.5 py-0.5 rounded transition-colors flex items-center gap-1">
+                        <MoreHorizontal className="h-3 w-3" />
+                        <span>Indicadores</span>
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-56 p-3 space-y-2.5" align="start">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Indicadores secundarios</p>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-slate-500">Rentabilidad</span>
+                        <LevelBadge value={item.marginStatus} onChange={v => onUpdate({ marginStatus: v })} label="Rentabilidad" type="margin" />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-slate-500">Carga equipo</span>
+                        <LevelBadge value={item.teamStrain} onChange={v => onUpdate({ teamStrain: v })} label="Carga equipo" type="team" />
+                      </div>
+                      <div className="pt-1.5 border-t border-slate-100">
+                        <p className="text-[10px] text-slate-400 mb-1">Riesgo principal</p>
+                        <InlineText value={item.mainRisk} placeholder="Describir riesgo..." onSave={v => onUpdate({ mainRisk: v })} className="text-[11px]" />
+                      </div>
+                    </PopoverContent>
+                  </Popover>
                   <div className="flex-1" />
                   {(hasPrev || hasNext) && (
                     <div className="flex items-center gap-0.5 ml-2">
@@ -751,7 +775,6 @@ function ItemThread({ projectId, customId, currentUserId, users = [], onOpenFull
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [draft, setDraft] = useState('');
-  const [postAs, setPostAs] = useState<'note' | 'update'>('note');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState('');
 
@@ -818,8 +841,7 @@ function ItemThread({ projectId, customId, currentUserId, users = [], onOpenFull
     const t = draft.trim();
     if (!t) return;
     setDraft('');
-    if (postAs === 'note') addNoteMutation.mutate(t);
-    else addUpdateMutation.mutate(t);
+    addNoteMutation.mutate(t);
   };
 
   const SHOW_RECENT = compact ? 1 : 5;
@@ -838,7 +860,7 @@ function ItemThread({ projectId, customId, currentUserId, users = [], onOpenFull
           </button>
         )}
         {thread.length === 0 && (
-          <p className="text-[11px] text-slate-400 italic py-0.5">{compact ? 'Sin actividad aún' : 'Sin actividad — agregá un update o dejá un comentario'}</p>
+          <p className="text-[11px] text-slate-400 italic py-0.5">{compact ? 'Sin actividad aún' : 'Sin actividad — dejá un comentario'}</p>
         )}
         {visibleThread.map(entry => {
           const isOwn = entry.authorId != null && entry.authorId === currentUserId;
@@ -854,9 +876,6 @@ function ItemThread({ projectId, customId, currentUserId, users = [], onOpenFull
                 <div className="flex items-center gap-1.5 mb-0.5">
                   <span className="text-[10px] font-semibold text-slate-700">{entry.authorName?.split(' ')[0] ?? 'Usuario'}</span>
                   <span className="text-[9px] text-slate-400">{shortDateTime(entry.createdAt)}</span>
-                  <span className={cn("w-1.5 h-1.5 rounded-full shrink-0",
-                    entry.kind === 'update' ? "bg-emerald-400" : "bg-indigo-300")}
-                    title={entry.kind === 'update' ? 'Update de estado' : 'Nota'} />
                   {canEdit && editingId !== edKey && (
                     <button onClick={() => { setEditingId(edKey); setEditText(entry.content); }}
                       className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity p-0.5 text-slate-300 hover:text-indigo-400">
@@ -897,38 +916,22 @@ function ItemThread({ projectId, customId, currentUserId, users = [], onOpenFull
 
       {/* Compose input */}
       <div className="mt-1">
-        <div className="flex gap-1 mb-1.5">
-          <button onClick={() => setPostAs('note')}
-            className={cn("text-[10px] px-2.5 py-1 rounded-full font-medium transition-all",
-              postAs === 'note'
-                ? "bg-indigo-100 text-indigo-700"
-                : "text-slate-400 hover:text-slate-600 hover:bg-slate-100")}>
-            💬 Nota
-          </button>
-          <button onClick={() => setPostAs('update')}
-            className={cn("text-[10px] px-2.5 py-1 rounded-full font-medium transition-all",
-              postAs === 'update'
-                ? "bg-emerald-100 text-emerald-700"
-                : "text-slate-400 hover:text-slate-600 hover:bg-slate-100")}>
-            ↑ Update
-          </button>
-        </div>
         <div className="flex items-center gap-2 bg-white rounded-xl border border-slate-200 px-3 py-2 shadow-sm focus-within:border-indigo-300 focus-within:shadow-indigo-50 transition-all">
           <MentionInput
             value={draft}
             onChange={setDraft}
             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(); } }}
-            placeholder={postAs === 'note' ? "Escribir comentario o pregunta..." : "¿Qué avanzó este ítem?"}
+            placeholder="Escribir comentario..."
             className="flex-1 text-sm bg-transparent focus:outline-none min-w-0"
             users={users}
           />
           <button onClick={submit}
-            disabled={!draft.trim() || addNoteMutation.isPending || addUpdateMutation.isPending}
+            disabled={!draft.trim() || addNoteMutation.isPending}
             className={cn("shrink-0 w-7 h-7 rounded-full flex items-center justify-center transition-all",
               draft.trim()
                 ? "bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm"
                 : "bg-slate-100 text-slate-300")}>
-            {(addNoteMutation.isPending || addUpdateMutation.isPending)
+            {addNoteMutation.isPending
               ? <Loader2 className="h-3 w-3 animate-spin" />
               : <ArrowRight className="h-3 w-3" />}
           </button>
@@ -1124,25 +1127,19 @@ function AlertSidebarCard({ item, accent, currentUserId, onUpdate, expanded, onT
                 <InlineText value={item.nextMilestone} placeholder="Acción concreta" onSave={v => onUpdate({ nextMilestone: v })} multiline className="text-[11px]" />
               </div>
 
-              {/* Badges row */}
-              <div className="flex items-center gap-1.5 flex-wrap">
+              {/* Actions footer */}
+              <div className="flex items-center gap-1.5 pt-1 border-t border-slate-100 flex-wrap">
                 {users && <OwnerSelect value={item.ownerId} name={item.ownerName} onChange={v => onUpdate({ ownerId: v })} users={users} />}
                 <DeadlinePicker value={item.deadline} isOverdue={item.isOverdue} onChange={v => onUpdate({ deadline: v })} />
-                <LevelBadge value={item.marginStatus} onChange={v => onUpdate({ marginStatus: v })} label="Rentabilidad" type="margin" />
-                <LevelBadge value={item.teamStrain} onChange={v => onUpdate({ teamStrain: v })} label="Carga equipo" type="team" />
                 <DecisionBadge value={item.decisionNeeded} onChange={v => onUpdate({ decisionNeeded: v })} />
-              </div>
-
-              {/* Actions footer */}
-              <div className="flex items-center gap-2 pt-1 border-t border-slate-100">
+                <div className="flex-1" />
                 {onOpenNotes && (
                   <button onClick={onOpenNotes}
                     className="flex items-center gap-1 text-[10px] font-medium text-indigo-500 hover:text-indigo-700 transition-colors">
                     <MessageSquare className="h-3 w-3" />
-                    Actividad{item.noteCount > 0 && ` · ${item.noteCount}`}
+                    {item.noteCount > 0 && item.noteCount}
                   </button>
                 )}
-                <div className="flex-1" />
                 {onRemove && (
                   <button onClick={onRemove}
                     className="p-1 rounded text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors"
@@ -1242,27 +1239,19 @@ function DecisionSidebarCard({ item, currentUserId, expanded, onToggle, users, o
                 )}
               </div>
 
-              {/* Badges row */}
-              {onUpdate && users && (
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <OwnerSelect value={item.ownerId} name={item.ownerName} onChange={v => onUpdate({ ownerId: v })} users={users} />
-                  <DeadlinePicker value={item.deadline} isOverdue={item.isOverdue} onChange={v => onUpdate({ deadline: v })} />
-                  <HealthDot value={item.healthStatus} onChange={v => onUpdate({ healthStatus: v })} />
-                  <LevelBadge value={item.marginStatus} onChange={v => onUpdate({ marginStatus: v })} label="Rentabilidad" type="margin" />
-                  <LevelBadge value={item.teamStrain} onChange={v => onUpdate({ teamStrain: v })} label="Carga equipo" type="team" />
-                </div>
-              )}
-
               {/* Actions footer */}
-              <div className="flex items-center gap-2 pt-1 border-t border-slate-100">
+              <div className="flex items-center gap-1.5 pt-1 border-t border-slate-100 flex-wrap">
+                {onUpdate && users && <OwnerSelect value={item.ownerId} name={item.ownerName} onChange={v => onUpdate({ ownerId: v })} users={users} />}
+                {onUpdate && <DeadlinePicker value={item.deadline} isOverdue={item.isOverdue} onChange={v => onUpdate({ deadline: v })} />}
+                {onUpdate && <HealthDot value={item.healthStatus} onChange={v => onUpdate({ healthStatus: v })} />}
+                <div className="flex-1" />
                 {onOpenNotes && (
                   <button onClick={onOpenNotes}
                     className="flex items-center gap-1 text-[10px] font-medium text-indigo-500 hover:text-indigo-700 transition-colors">
                     <MessageSquare className="h-3 w-3" />
-                    Actividad{item.noteCount > 0 && ` · ${item.noteCount}`}
+                    {item.noteCount > 0 && item.noteCount}
                   </button>
                 )}
-                <div className="flex-1" />
                 {onRemove && (
                   <button onClick={onRemove}
                     className="p-1 rounded text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors"
@@ -1855,6 +1844,14 @@ export default function StatusSemanalPage() {
     onRemove: () => {
       setConfirmDelete(item);
     },
+    onResolve: () => {
+      if (item.isCustom && item.customId) {
+        updateCustom(item.customId, { hiddenFromWeekly: true });
+      } else if (item.projectId) {
+        updateProject(item.projectId, { hiddenFromWeekly: true });
+      }
+      toast({ title: 'Tema resuelto', description: `"${item.title}" se quitó del review.` });
+    },
     onOpenNotes: (() => {
       if (item.projectId) {
         const isSame = notesOpen?.type === 'project' && notesOpen.id === item.projectId;
@@ -1890,7 +1887,7 @@ export default function StatusSemanalPage() {
                   <ClipboardList className="h-4 w-4 text-white" />
                 </div>
                 <div>
-                  <h1 className="text-base font-bold leading-tight text-white tracking-tight">Status Semanal</h1>
+                  <h1 className="text-base font-bold leading-tight text-white tracking-tight">Review</h1>
                   <p className="text-[9px] text-indigo-200 font-medium">{weekLabel()}</p>
                 </div>
               </div>
@@ -2090,7 +2087,7 @@ export default function StatusSemanalPage() {
               <p className="text-xs text-slate-600 mb-1">
                 {confirmDelete.isCustom
                   ? <>Vas a eliminar permanentemente <strong>{confirmDelete.title}</strong>. Esta acción no se puede deshacer.</>
-                  : <>Vas a quitar <strong>{confirmDelete.title}</strong> del status semanal. Podés restaurarlo después.</>}
+                  : <>Vas a quitar <strong>{confirmDelete.title}</strong> del review. Podés restaurarlo después.</>}
               </p>
               <div className="flex gap-2 mt-4">
                 <Button size="sm" variant="outline" onClick={() => setConfirmDelete(null)} className="flex-1 h-8 text-xs">
@@ -2322,7 +2319,7 @@ export default function StatusSemanalPage() {
                         return (
                           <SortableCompactRow key={item.key} item={item} users={appUsers} currentUserId={currentUserId}
                             isSelected={notesOpen !== null && ((notesOpen.type === 'project' && item.projectId === notesOpen.id) || (notesOpen.type === 'custom' && item.customId === notesOpen.id))}
-                            onOpenNotes={h.onOpenNotes} onUpdate={h.onUpdate} onRemove={h.onRemove}
+                            onOpenNotes={h.onOpenNotes} onUpdate={h.onUpdate} onRemove={h.onRemove} onResolve={h.onResolve}
                             expanded={expandedKey === item.key}
                             onToggle={() => setExpandedKey(expandedKey === item.key ? null : item.key)}
                             hasPrev={globalIdx > 0}
@@ -2487,7 +2484,7 @@ export default function StatusSemanalPage() {
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center" onClick={() => setShowExport(false)}>
           <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full mx-4 max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
-              <h2 className="font-bold text-lg">Exportar Status Semanal</h2>
+              <h2 className="font-bold text-lg">Exportar Review Semanal</h2>
               <div className="flex items-center gap-2">
                 <button onClick={() => window.print()}
                   className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition-colors">
@@ -2500,7 +2497,7 @@ export default function StatusSemanalPage() {
             </div>
             <div className="px-6 py-4 space-y-4 print:px-0">
               <div className="text-center mb-4">
-                <h3 className="text-xl font-bold text-slate-800">Status Semanal</h3>
+                <h3 className="text-xl font-bold text-slate-800">Review Semanal</h3>
                 <p className="text-sm text-slate-500">{weekLabel()}</p>
               </div>
               {alertItems.length > 0 && (

@@ -8,7 +8,7 @@ export const SECTION_LABELS: Record<AppSection, string> = {
   crm: 'CRM Ventas',
   quotations: 'Cotizaciones',
   projects: 'Proyectos y Operación',
-  status: 'Status Semanal',
+  status: 'Review',
   dashboard: 'Dashboard Ejecutivo',
   finance: 'Finanzas y Analytics',
   admin: 'Administración',
