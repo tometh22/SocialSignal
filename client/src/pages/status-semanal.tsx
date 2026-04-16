@@ -1071,6 +1071,13 @@ function AlertSidebarCard({ item, accent, currentUserId, onUpdate, expanded, onT
             <div className="flex items-center gap-1.5">
               {item.isCustom && <Tag className="h-3 w-3 text-indigo-400 shrink-0" />}
               <p className="font-semibold text-[13px] leading-snug text-slate-900 break-words flex-1">{item.title}</p>
+              {onResolve && (
+                <button onClick={e => { e.stopPropagation(); onResolve(); }}
+                  className="p-0.5 rounded text-slate-300 hover:text-emerald-600 hover:bg-emerald-50 transition-colors shrink-0"
+                  title="Resolver">
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                </button>
+              )}
               <ChevronDown className={cn("h-3 w-3 text-slate-300 shrink-0 transition-transform", !expanded && "-rotate-90")} />
             </div>
             {!expanded && item.currentAction && (
@@ -1193,6 +1200,13 @@ function DecisionSidebarCard({ item, currentUserId, expanded, onToggle, users, o
       <div className="px-3 py-2.5 cursor-pointer" onClick={onToggle}>
         <div className="flex items-center gap-1.5">
           <p className="font-semibold text-[13px] leading-snug text-slate-900 break-words flex-1">{item.title}</p>
+          {onResolve && (
+            <button onClick={e => { e.stopPropagation(); onResolve(); }}
+              className="p-0.5 rounded text-slate-300 hover:text-emerald-600 hover:bg-emerald-50 transition-colors shrink-0"
+              title="Resolver">
+              <CheckCircle2 className="h-3.5 w-3.5" />
+            </button>
+          )}
           <ChevronDown className={cn("h-3 w-3 text-slate-300 shrink-0 transition-transform", !expanded && "-rotate-90")} />
         </div>
         {!expanded && item.currentAction && (
