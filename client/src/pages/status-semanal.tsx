@@ -622,7 +622,7 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
           )}
           <TooltipProvider><Tooltip><TooltipTrigger asChild>
             <button onClick={onResolve}
-              className="p-1 rounded text-slate-200 hover:text-emerald-600 hover:bg-emerald-50 transition-colors opacity-0 group-hover:opacity-100">
+              className="p-1 rounded text-slate-300 hover:text-emerald-600 hover:bg-emerald-50 transition-colors">
               <CheckCircle2 className="h-3.5 w-3.5" />
             </button>
           </TooltipTrigger><TooltipContent className="text-xs">Resolver y quitar</TooltipContent></Tooltip></TooltipProvider>
@@ -633,6 +633,11 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
               </button>
             </PopoverTrigger>
             <PopoverContent className="w-44 p-1" align="end">
+              <button onClick={() => { onResolve(); setMenuOpen(false); }}
+                className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs hover:bg-emerald-50 text-slate-600 hover:text-emerald-700">
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                Resolver tema
+              </button>
               <button onClick={() => { onRemove(); setMenuOpen(false); }}
                 className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs hover:bg-red-50 text-slate-600 hover:text-red-600">
                 <Trash2 className="h-3.5 w-3.5" />
@@ -717,8 +722,13 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
                     </PopoverContent>
                   </Popover>
                   <div className="flex-1" />
+                  <button onClick={onResolve}
+                    className="flex items-center gap-1.5 text-[11px] font-medium text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg px-2.5 py-1 transition-colors">
+                    <CheckCircle2 className="h-3 w-3" />
+                    Resolver tema
+                  </button>
                   {(hasPrev || hasNext) && (
-                    <div className="flex items-center gap-0.5 ml-2">
+                    <div className="flex items-center gap-0.5 ml-1">
                       <button onClick={onPrev} disabled={!hasPrev} className={cn("p-0.5 rounded", hasPrev ? "text-slate-400 hover:bg-slate-100" : "text-slate-200")}><ChevronLeft className="h-3 w-3" /></button>
                       <button onClick={onNext} disabled={!hasNext} className={cn("p-0.5 rounded", hasNext ? "text-slate-400 hover:bg-slate-100" : "text-slate-200")}><ChevronRight className="h-3 w-3" /></button>
                     </div>
@@ -1037,10 +1047,10 @@ function SortableCompactRow(props: React.ComponentProps<typeof CompactRow>) {
 }
 
 // ─── AlertSidebarCard — expandable card for CEO/COO sidebar ─────────────────
-function AlertSidebarCard({ item, accent, currentUserId, onUpdate, expanded, onToggle, users, onOpenNotes, onRemove }: {
+function AlertSidebarCard({ item, accent, currentUserId, onUpdate, expanded, onToggle, users, onOpenNotes, onRemove, onResolve }: {
   item: Item; accent: 'red' | 'amber'; currentUserId?: number | null;
   onUpdate: (d: Record<string, any>) => void;
-  expanded?: boolean; onToggle?: () => void;
+  expanded?: boolean; onToggle?: () => void; onResolve?: () => void;
   users?: AppUser[]; onOpenNotes?: () => void; onRemove?: () => void;
 }) {
   const accentBorder = accent === 'red' ? 'border-l-red-500' : 'border-l-amber-400';
@@ -1128,11 +1138,18 @@ function AlertSidebarCard({ item, accent, currentUserId, onUpdate, expanded, onT
               </div>
 
               {/* Actions footer */}
-              <div className="flex items-center gap-1.5 pt-1 border-t border-slate-100 flex-wrap">
+              <div className="flex items-center gap-1.5 pt-1.5 border-t border-slate-100 flex-wrap">
                 {users && <OwnerSelect value={item.ownerId} name={item.ownerName} onChange={v => onUpdate({ ownerId: v })} users={users} />}
                 <DeadlinePicker value={item.deadline} isOverdue={item.isOverdue} onChange={v => onUpdate({ deadline: v })} />
                 <DecisionBadge value={item.decisionNeeded} onChange={v => onUpdate({ decisionNeeded: v })} />
                 <div className="flex-1" />
+                {onResolve && (
+                  <button onClick={onResolve}
+                    className="flex items-center gap-1 text-[10px] font-medium text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-md px-2 py-0.5 transition-colors">
+                    <CheckCircle2 className="h-3 w-3" />
+                    Resolver
+                  </button>
+                )}
                 {onOpenNotes && (
                   <button onClick={onOpenNotes}
                     className="flex items-center gap-1 text-[10px] font-medium text-indigo-500 hover:text-indigo-700 transition-colors">
@@ -1157,11 +1174,11 @@ function AlertSidebarCard({ item, accent, currentUserId, onUpdate, expanded, onT
 }
 
 // ─── DecisionSidebarCard — expandable card for decisions sidebar ─────────────
-function DecisionSidebarCard({ item, currentUserId, expanded, onToggle, users, onUpdate, onOpenNotes, onRemove }: {
+function DecisionSidebarCard({ item, currentUserId, expanded, onToggle, users, onUpdate, onOpenNotes, onRemove, onResolve }: {
   item: Item; currentUserId?: number | null;
   expanded?: boolean; onToggle?: () => void;
   users?: AppUser[]; onUpdate?: (d: Record<string, any>) => void;
-  onOpenNotes?: () => void; onRemove?: () => void;
+  onOpenNotes?: () => void; onRemove?: () => void; onResolve?: () => void;
 }) {
   const decMeta = dm(item.decisionNeeded);
   const daysSince = item.updatedAt
@@ -1240,11 +1257,18 @@ function DecisionSidebarCard({ item, currentUserId, expanded, onToggle, users, o
               </div>
 
               {/* Actions footer */}
-              <div className="flex items-center gap-1.5 pt-1 border-t border-slate-100 flex-wrap">
+              <div className="flex items-center gap-1.5 pt-1.5 border-t border-slate-100 flex-wrap">
                 {onUpdate && users && <OwnerSelect value={item.ownerId} name={item.ownerName} onChange={v => onUpdate({ ownerId: v })} users={users} />}
                 {onUpdate && <DeadlinePicker value={item.deadline} isOverdue={item.isOverdue} onChange={v => onUpdate({ deadline: v })} />}
                 {onUpdate && <HealthDot value={item.healthStatus} onChange={v => onUpdate({ healthStatus: v })} />}
                 <div className="flex-1" />
+                {onResolve && (
+                  <button onClick={onResolve}
+                    className="flex items-center gap-1 text-[10px] font-medium text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-md px-2 py-0.5 transition-colors">
+                    <CheckCircle2 className="h-3 w-3" />
+                    Resolver
+                  </button>
+                )}
                 {onOpenNotes && (
                   <button onClick={onOpenNotes}
                     className="flex items-center gap-1 text-[10px] font-medium text-indigo-500 hover:text-indigo-700 transition-colors">
@@ -2224,7 +2248,8 @@ export default function StatusSemanalPage() {
                             onToggle={() => setExpandedKey(expandedKey === item.key ? null : item.key)}
                             users={appUsers}
                             onOpenNotes={h.onOpenNotes}
-                            onRemove={h.onRemove} />
+                            onRemove={h.onRemove}
+                            onResolve={h.onResolve} />
                         </motion.div>
                       );
                     })}
@@ -2257,7 +2282,8 @@ export default function StatusSemanalPage() {
                             users={appUsers}
                             onUpdate={h.onUpdate}
                             onOpenNotes={h.onOpenNotes}
-                            onRemove={h.onRemove} />
+                            onRemove={h.onRemove}
+                            onResolve={h.onResolve} />
                         </motion.div>
                       );
                     })}
