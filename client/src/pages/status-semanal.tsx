@@ -622,8 +622,8 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
           )}
           <TooltipProvider><Tooltip><TooltipTrigger asChild>
             <button onClick={onResolve}
-              className="p-1 rounded text-slate-300 hover:text-emerald-600 hover:bg-emerald-50 transition-colors">
-              <CheckCircle2 className="h-3.5 w-3.5" />
+              className="p-1 rounded text-emerald-300 hover:text-emerald-600 hover:bg-emerald-50 transition-colors">
+              <CheckCircle2 className="h-4 w-4" />
             </button>
           </TooltipTrigger><TooltipContent className="text-xs">Resolver y quitar</TooltipContent></Tooltip></TooltipProvider>
           <Popover open={menuOpen} onOpenChange={setMenuOpen}>
@@ -1073,9 +1073,9 @@ function AlertSidebarCard({ item, accent, currentUserId, onUpdate, expanded, onT
               <p className="font-semibold text-[13px] leading-snug text-slate-900 break-words flex-1">{item.title}</p>
               {onResolve && (
                 <button onClick={e => { e.stopPropagation(); onResolve(); }}
-                  className="p-0.5 rounded text-slate-300 hover:text-emerald-600 hover:bg-emerald-50 transition-colors shrink-0"
+                  className="p-0.5 rounded text-emerald-300 hover:text-emerald-600 hover:bg-emerald-50 transition-colors shrink-0"
                   title="Resolver">
-                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  <CheckCircle2 className="h-4 w-4" />
                 </button>
               )}
               <ChevronDown className={cn("h-3 w-3 text-slate-300 shrink-0 transition-transform", !expanded && "-rotate-90")} />
