@@ -99,7 +99,7 @@ export default function HomeDashboard() {
 
   const projectLinks: QuickLink[] = [
     { href: "/active-projects", title: "Rentabilidad", description: `${projectCount || 0} proyectos activos`, icon: Briefcase, color: "bg-orange-500", permission: "projects" },
-    { href: "/status-semanal", title: "Status Semanal", description: "Revisión ejecutiva", icon: ClipboardList, color: "bg-teal-500", permission: "status" },
+    { href: "/status-semanal", title: "Review", description: "Revisión semanal en equipo", icon: ClipboardList, color: "bg-teal-500", permission: "status" },
     { href: "/tasks", title: "Tareas", description: "Gestión de tareas", icon: CheckSquare, color: "bg-cyan-500", permission: "projects" },
     { href: "/tasks/hours-dashboard", title: "Panel de Horas", description: "Horas por persona", icon: BarChart2, color: "bg-amber-500", permission: "projects" },
   ];
