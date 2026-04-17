@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
-import { Users, Settings, ArrowLeft } from "lucide-react";
+import { Users, Settings, ArrowLeft, FolderPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { roomColor, type ReviewRoomDetail } from "@/lib/review-api";
 import MembersDialog from "./MembersDialog";
+import AddProjectDialog from "./AddProjectDialog";
 import { initials as userInitials } from "./utils";
 
 interface Props {
@@ -16,6 +17,7 @@ interface Props {
 export default function RoomHeader({ room, myRole }: Props) {
   const [, navigate] = useLocation();
   const [membersOpen, setMembersOpen] = useState(false);
+  const [addProjectOpen, setAddProjectOpen] = useState(false);
   const color = roomColor(room.colorIndex);
   const isOwner = myRole === 'owner';
   const visibleMembers = room.members.slice(0, 5);
@@ -64,6 +66,11 @@ export default function RoomHeader({ room, myRole }: Props) {
           )}
         </button>
 
+        <Button variant="outline" size="sm" onClick={() => setAddProjectOpen(true)}>
+          <FolderPlus className="h-4 w-4 mr-1" />
+          Agregar proyecto
+        </Button>
+
         {isOwner && (
           <Button variant="outline" size="sm" onClick={() => setMembersOpen(true)}>
             <Users className="h-4 w-4 mr-1" />
@@ -77,6 +84,11 @@ export default function RoomHeader({ room, myRole }: Props) {
         onClose={() => setMembersOpen(false)}
         room={room}
         myRole={myRole}
+      />
+      <AddProjectDialog
+        open={addProjectOpen}
+        onClose={() => setAddProjectOpen(false)}
+        roomId={room.id}
       />
     </>
   );

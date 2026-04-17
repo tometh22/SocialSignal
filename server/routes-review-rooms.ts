@@ -355,6 +355,33 @@ export function createReviewRoomsRouter(requireAuth: RequireAuth): Router {
     }
   });
 
+  // GET /api/reviews/:roomId/available-projects — active projects NOT yet in this room
+  router.get('/:roomId/available-projects', requireAuth, requireRoomMember(), async (req: Request, res: Response) => {
+    try {
+      const roomId = req.roomMember!.roomId;
+      const rows = await db
+        .select({
+          projectId: activeProjects.id,
+          clientName: clients.name,
+          quotationName: quotations.projectName,
+        })
+        .from(activeProjects)
+        .leftJoin(clients, eq(clients.id, activeProjects.clientId))
+        .leftJoin(quotations, eq(quotations.id, activeProjects.quotationId))
+        .where(and(
+          eq(activeProjects.status, 'active'),
+          eq(activeProjects.isFinished, false),
+          sql`NOT EXISTS (SELECT 1 FROM ${projectStatusReviews} WHERE ${projectStatusReviews.projectId} = ${activeProjects.id} AND ${projectStatusReviews.roomId} = ${roomId})`,
+        ))
+        .orderBy(asc(clients.name));
+      res.setHeader('Cache-Control', 'no-store');
+      res.json(rows);
+    } catch (error) {
+      console.error('GET /available-projects error:', error);
+      res.status(500).json({ message: "Error al obtener proyectos disponibles" });
+    }
+  });
+
   // POST /api/reviews/:roomId/items/project — add a project to the room
   router.post('/:roomId/items/project', requireAuth, requireRoomMember(), async (req: Request, res: Response) => {
     try {

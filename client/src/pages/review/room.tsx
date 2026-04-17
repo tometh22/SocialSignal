@@ -1,12 +1,13 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { Loader2, AlertTriangle } from "lucide-react";
+import { Loader2, AlertTriangle, FolderPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { reviewApi, reviewKeys, type ReviewRoomDetail } from "@/lib/review-api";
 import { setCurrentReviewRoomId } from "@/lib/queryClient";
 import { ReviewRoomContext, setLastReviewRoomId } from "@/hooks/use-review-room";
 import RoomHeader from "@/components/review/RoomHeader";
+import AddProjectDialog from "@/components/review/AddProjectDialog";
 import StatusSemanalPage from "@/pages/status-semanal";
 
 export default function ReviewRoomPage() {
@@ -79,9 +80,51 @@ export default function ReviewRoomPage() {
       <div className="px-6 pt-4">
         <RoomHeader room={room} myRole={ctxValue.myRole} />
       </div>
-      {/* StatusSemanalPage uses legacy /api/status-semanal/* URLs; queryClient rewrites
-          them to /api/reviews/:roomId/* because we set the current room id above. */}
-      <StatusSemanalPage />
+      <RoomBody roomId={roomId} />
     </ReviewRoomContext.Provider>
+  );
+}
+
+// Renders either an empty-state banner or the full board, based on whether the
+// room has any items. Uses the SAME cache keys as StatusSemanalPage so the
+// queries are shared (no duplicate fetches).
+function RoomBody({ roomId }: { roomId: number }) {
+  const [addProjectOpen, setAddProjectOpen] = useState(false);
+
+  const { data: projects = [], isLoading: l1 } = useQuery<unknown[]>({
+    queryKey: ['/api/status-semanal?includeHidden=true'],
+    staleTime: 0,
+  });
+  const { data: custom = [], isLoading: l2 } = useQuery<unknown[]>({
+    queryKey: ['/api/status-semanal/custom?includeHidden=true'],
+    staleTime: 0,
+  });
+
+  const loading = l1 || l2;
+  const isEmpty = !loading && projects.length === 0 && custom.length === 0;
+
+  return (
+    <>
+      {isEmpty && (
+        <div className="px-6 pt-6">
+          <div className="max-w-2xl mx-auto border border-dashed border-indigo-200 rounded-xl bg-indigo-50/40 p-6 text-center">
+            <div className="text-3xl mb-2">📋</div>
+            <h2 className="text-lg font-semibold text-slate-900 mb-1">Esta sala está vacía</h2>
+            <p className="text-sm text-slate-600 mb-4">
+              Agregá proyectos para empezar el seguimiento semanal — o creá un tema custom
+              desde el botón de abajo.
+            </p>
+            <Button onClick={() => setAddProjectOpen(true)}>
+              <FolderPlus className="h-4 w-4 mr-1.5" />
+              Agregar proyecto
+            </Button>
+          </div>
+        </div>
+      )}
+      {/* StatusSemanalPage uses legacy /api/status-semanal/* URLs; queryClient rewrites
+          them to /api/reviews/:roomId/* because the room context is set above. */}
+      <StatusSemanalPage />
+      <AddProjectDialog open={addProjectOpen} onClose={() => setAddProjectOpen(false)} roomId={roomId} />
+    </>
   );
 }
