@@ -3266,10 +3266,14 @@ export type InsertCrmActivity = z.infer<typeof insertCrmActivitySchema>;
 export type CrmReminder = typeof crmReminders.$inferSelect;
 export type InsertCrmReminder = z.infer<typeof insertCrmReminderSchema>;
 
-// ─── Status Semanal ───────────────────────────────────────────────────────────
+// ─── Status Semanal / Review Rooms ────────────────────────────────────────────
 
+// Note: reviewRooms is declared after the status tables below but referenced here
+// via a forward `sql` reference in the SQL migration. Drizzle handles the FK
+// at the DB level, so the TS column declaration here only needs `integer`.
 export const projectStatusReviews = pgTable("project_status_reviews", {
   id: serial("id").primaryKey(),
+  roomId: integer("room_id").notNull(),
   projectId: integer("project_id").notNull().references(() => activeProjects.id, { onDelete: 'cascade' }),
   healthStatus: varchar("health_status", { length: 20 }).default('verde'), // verde | amarillo | rojo
   marginStatus: varchar("margin_status", { length: 20 }).default('medio'), // alto | medio | bajo
@@ -3284,7 +3288,10 @@ export const projectStatusReviews = pgTable("project_status_reviews", {
   hiddenFromWeekly: boolean("hidden_from_weekly").default(false),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
   updatedBy: integer("updated_by").references(() => users.id, { onDelete: 'set null' }),
-});
+}, (t) => ({
+  uqRoomProject: unique("project_status_reviews_room_project_unique").on(t.roomId, t.projectId),
+  idxRoom: index("idx_psr_room").on(t.roomId),
+}));
 
 export const insertProjectStatusReviewSchema = createInsertSchema(projectStatusReviews).omit({
   id: true,
@@ -3303,13 +3310,16 @@ export type InsertProjectStatusReview = z.infer<typeof insertProjectStatusReview
 
 export const projectReviewNotes = pgTable("project_review_notes", {
   id: serial("id").primaryKey(),
+  roomId: integer("room_id").notNull(),
   projectId: integer("project_id").references(() => activeProjects.id, { onDelete: 'cascade' }),
   weeklyStatusItemId: integer("weekly_status_item_id").references(() => weeklyStatusItems.id, { onDelete: 'cascade' }),
   content: text("content").notNull(),
   noteDate: timestamp("note_date").notNull().defaultNow(),
   authorId: integer("author_id").references(() => users.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+}, (t) => ({
+  idxRoom: index("idx_prn_room").on(t.roomId),
+}));
 
 export const insertProjectReviewNoteSchema = createInsertSchema(projectReviewNotes).omit({
   id: true,
@@ -3320,6 +3330,7 @@ export type InsertProjectReviewNote = z.infer<typeof insertProjectReviewNoteSche
 
 export const weeklyStatusItems = pgTable("weekly_status_items", {
   id: serial("id").primaryKey(),
+  roomId: integer("room_id").notNull(),
   title: text("title").notNull(),
   subtitle: text("subtitle"),
   healthStatus: varchar("health_status", { length: 20 }).default('verde'),
@@ -3335,7 +3346,9 @@ export const weeklyStatusItems = pgTable("weekly_status_items", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
   updatedBy: integer("updated_by").references(() => users.id, { onDelete: 'set null' }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+}, (t) => ({
+  idxRoom: index("idx_wsi_room").on(t.roomId),
+}));
 
 export const insertWeeklyStatusItemSchema = createInsertSchema(weeklyStatusItems).omit({
   id: true,
@@ -3355,17 +3368,21 @@ export type InsertWeeklyStatusItem = z.infer<typeof insertWeeklyStatusItemSchema
 // ─── Status Update Entries (accumulating update history) ─────────────────────
 export const statusUpdateEntries = pgTable("status_update_entries", {
   id: serial("id").primaryKey(),
+  roomId: integer("room_id").notNull(),
   projectId: integer("project_id").references(() => activeProjects.id, { onDelete: 'cascade' }),
   weeklyStatusItemId: integer("weekly_status_item_id").references(() => weeklyStatusItems.id, { onDelete: 'cascade' }),
   content: text("content").notNull(),
   authorId: integer("author_id").references(() => users.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+}, (t) => ({
+  idxRoom: index("idx_sue_room").on(t.roomId),
+}));
 export type StatusUpdateEntry = typeof statusUpdateEntries.$inferSelect;
 
 // ─── Status Change Log (audit trail for status changes) ─────────────────────
 export const statusChangeLog = pgTable("status_change_log", {
   id: serial("id").primaryKey(),
+  roomId: integer("room_id").notNull(),
   projectId: integer("project_id").references(() => activeProjects.id, { onDelete: 'cascade' }),
   weeklyStatusItemId: integer("weekly_status_item_id").references(() => weeklyStatusItems.id, { onDelete: 'cascade' }),
   userId: integer("user_id").references(() => users.id),
@@ -3373,5 +3390,62 @@ export const statusChangeLog = pgTable("status_change_log", {
   oldValue: text("old_value"),
   newValue: text("new_value"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+}, (t) => ({
+  idxRoom: index("idx_scl_room").on(t.roomId),
+}));
 export type StatusChangeLog = typeof statusChangeLog.$inferSelect;
+
+// ─── Review Rooms ─────────────────────────────────────────────────────────────
+
+export const reviewRooms = pgTable("review_rooms", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 120 }).notNull(),
+  description: text("description"),
+  colorIndex: integer("color_index").notNull().default(0),
+  emoji: varchar("emoji", { length: 16 }),
+  privacy: varchar("privacy", { length: 20 }).notNull().default('members'),
+  createdBy: integer("created_by").references(() => users.id, { onDelete: 'set null' }),
+  archivedAt: timestamp("archived_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertReviewRoomSchema = createInsertSchema(reviewRooms).omit({
+  id: true,
+  createdBy: true,
+  archivedAt: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  name: z.string().trim().min(1, "Nombre requerido").max(120),
+  description: z.string().trim().max(2000).nullable().optional(),
+  colorIndex: z.number().int().min(0).max(20).default(0),
+  emoji: z.string().trim().max(16).nullable().optional(),
+});
+export type ReviewRoom = typeof reviewRooms.$inferSelect;
+export type InsertReviewRoom = z.infer<typeof insertReviewRoomSchema>;
+
+export const reviewRoomMembers = pgTable("review_room_members", {
+  id: serial("id").primaryKey(),
+  roomId: integer("room_id").notNull().references(() => reviewRooms.id, { onDelete: 'cascade' }),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  role: varchar("role", { length: 20 }).notNull().default('editor'),
+  addedBy: integer("added_by").references(() => users.id, { onDelete: 'set null' }),
+  addedAt: timestamp("added_at").notNull().defaultNow(),
+  lastVisitedAt: timestamp("last_visited_at"),
+}, (t) => ({
+  uqRoomUser: unique("review_room_members_room_user_unique").on(t.roomId, t.userId),
+  idxUser: index("idx_rrm_user").on(t.userId),
+  idxRoom: index("idx_rrm_room").on(t.roomId),
+}));
+
+export const insertReviewRoomMemberSchema = createInsertSchema(reviewRoomMembers).omit({
+  id: true,
+  addedBy: true,
+  addedAt: true,
+  lastVisitedAt: true,
+}).extend({
+  role: z.enum(['owner', 'editor']).default('editor'),
+});
+export type ReviewRoomMember = typeof reviewRoomMembers.$inferSelect;
+export type InsertReviewRoomMember = z.infer<typeof insertReviewRoomMemberSchema>;

@@ -118,6 +118,8 @@ import { reinitializeDatabase } from "./reinit-data";
 import { upload, uploadDocument, deleteOldFile } from "./upload";
 import { sanitizeInput } from "./input-sanitization";
 import { setupAuth, hashPassword } from "./auth";
+import { createReviewRoomsRouter } from "./routes-review-rooms";
+import { reviewRooms, reviewRoomMembers } from "@shared/schema";
 import path from 'path';
 import { setupChat } from "./chat";
 // import { googleSheetsService } from "./services/googleSheetsService"; // Temporalmente deshabilitado
@@ -630,6 +632,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Setup authentication with storage
   const { requireAuth } = setupAuth(app, storage);
+
+  // ═══ Review Rooms (multi-sala) ═══════════════════════════════════════════
+  app.use('/api/reviews', createReviewRoomsRouter(requireAuth));
+
+  // Legacy aliases: resuelven /api/status-semanal/* → /api/reviews/:miReviewId/*
+  // para no romper bookmarks/clientes stale mientras migran. Borrar en v1.1.
+  let cachedMiReviewId: number | null = null;
+  const resolveMiReview = async (): Promise<number | null> => {
+    if (cachedMiReviewId !== null) return cachedMiReviewId;
+    try {
+      const [row] = await db.select({ id: reviewRooms.id }).from(reviewRooms)
+        .where(eq(reviewRooms.name, 'Mi Review')).orderBy(asc(reviewRooms.id)).limit(1);
+      cachedMiReviewId = row?.id ?? null;
+      return cachedMiReviewId;
+    } catch { return null; }
+  };
+  const legacyRewrite = (mapper: (roomId: number, req: Request) => string) =>
+    async (req: Request, res: Response, next: NextFunction) => {
+      const roomId = await resolveMiReview();
+      if (!roomId) return res.status(503).json({ message: "Mi Review no encontrada — corré la migración 0010" });
+      const qsIdx = req.url.indexOf('?');
+      const qs = qsIdx >= 0 ? req.url.slice(qsIdx) : '';
+      req.url = mapper(roomId, req) + qs;
+      (app as any)._router.handle(req, res, next);
+    };
+  app.all('/api/status-semanal', legacyRewrite((r) => `/api/reviews/${r}/items`));
+  app.all('/api/status-semanal/custom', legacyRewrite((r) => `/api/reviews/${r}/items/custom`));
+  app.all('/api/status-semanal/custom/:id', legacyRewrite((r, req) => `/api/reviews/${r}/items/custom/${req.params.id}`));
+  app.all('/api/status-semanal/custom/:itemId/notes', legacyRewrite((r, req) => `/api/reviews/${r}/items/custom/${req.params.itemId}/notes`));
+  app.all('/api/status-semanal/custom/:itemId/updates', legacyRewrite((r, req) => `/api/reviews/${r}/items/custom/${req.params.itemId}/updates`));
+  app.all('/api/status-semanal/custom/:itemId/activity', legacyRewrite((r, req) => `/api/reviews/${r}/items/custom/${req.params.itemId}/activity`));
+  app.all('/api/status-semanal/notes/:noteId', legacyRewrite((r, req) => `/api/reviews/${r}/notes/${req.params.noteId}`));
+  app.all('/api/status-semanal/updates/:entryId', legacyRewrite((r, req) => `/api/reviews/${r}/updates/${req.params.entryId}`));
+  // Note: /api/status-semanal/users is left as-is (old handler still registered below) — it's
+  // used by CreateReviewDialog to list ALL users (no room membership implied).
+  app.all('/api/status-semanal/ai-summary', legacyRewrite((r) => `/api/reviews/${r}/ai-summary`));
+  app.all('/api/status-semanal/:projectId', async (req, res, next) => {
+    if (!Number.isFinite(parseInt(req.params.projectId, 10))) return next();
+    return legacyRewrite((r, rq) => `/api/reviews/${r}/items/project/${rq.params.projectId}`)(req, res, next);
+  });
+  app.all('/api/status-semanal/:projectId/notes', legacyRewrite((r, req) => `/api/reviews/${r}/items/project/${req.params.projectId}/notes`));
+  app.all('/api/status-semanal/:projectId/updates', legacyRewrite((r, req) => `/api/reviews/${r}/items/project/${req.params.projectId}/updates`));
+  app.all('/api/status-semanal/:projectId/activity', legacyRewrite((r, req) => `/api/reviews/${r}/items/project/${req.params.projectId}/activity`));
 
   // ==================== UNIFIED ACTIVE PROJECTS ENDPOINT ====================
   // Single source of truth for "Proyectos Activos" page according to blueprint
