@@ -140,7 +140,8 @@ export default function Topbar() {
       'temp-helpers': 'Herramientas Temporales',
       'apply-warner-team': 'Aplicar Equipo Warner',
       'new': 'Nuevo',
-      'history': 'Historial'
+      'history': 'Historial',
+      'status-semanal': 'Review'
     };
 
     // Casos especiales para páginas principales que no necesitan "Dashboard" como padre
