@@ -141,7 +141,8 @@ export default function Topbar() {
       'apply-warner-team': 'Aplicar Equipo Warner',
       'new': 'Nuevo',
       'history': 'Historial',
-      'status-semanal': 'Review'
+      'status-semanal': 'Review',
+      'review': 'Review',
     };
 
     // Casos especiales para páginas principales que no necesitan "Dashboard" como padre

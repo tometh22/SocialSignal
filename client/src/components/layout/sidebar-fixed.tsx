@@ -11,6 +11,8 @@ import { usePermissions, AppSection } from "@/hooks/use-permissions";
 import { Badge } from "@/components/ui/badge";
 import { authFetch } from "@/lib/queryClient";
 import NewProjectDialog from "@/components/tasks/NewProjectDialog";
+import CreateReviewDialog from "@/components/review/CreateReviewDialog";
+import { reviewApi, reviewKeys, roomColor, type ReviewRoomSummary } from "@/lib/review-api";
 
 import {
   ChevronRight,
@@ -93,6 +95,8 @@ export default function SidebarFixed() {
   const [bellOpen, setBellOpen] = useState(false);
   const [newProjectOpen, setNewProjectOpen] = useState(false);
   const [projectsExpanded, setProjectsExpanded] = useState(false);
+  const [reviewsExpanded, setReviewsExpanded] = useState(true);
+  const [newReviewOpen, setNewReviewOpen] = useState(false);
 
   const fetchProjectCount = async () => {
     try {
@@ -154,6 +158,22 @@ export default function SidebarFixed() {
   const MAX_SIDEBAR_PROJECTS = 8;
   const sidebarProjects = taskProjects.slice(0, MAX_SIDEBAR_PROJECTS);
 
+  const { data: rawReviewRooms } = useQuery<ReviewRoomSummary[]>({
+    queryKey: reviewKeys.list(),
+    queryFn: reviewApi.listRooms,
+    staleTime: 60000,
+    enabled: hasPermission('status'),
+  });
+  const reviewRooms: ReviewRoomSummary[] = Array.isArray(rawReviewRooms) ? rawReviewRooms : [];
+  const MAX_SIDEBAR_ROOMS = 5;
+  const sidebarRooms = [...reviewRooms]
+    .sort((a, b) => {
+      const av = a.lastVisitedAt ? new Date(a.lastVisitedAt).getTime() : 0;
+      const bv = b.lastVisitedAt ? new Date(b.lastVisitedAt).getTime() : 0;
+      return bv - av;
+    })
+    .slice(0, MAX_SIDEBAR_ROOMS);
+
   const navSections = [
     {
       title: "",
@@ -174,7 +194,7 @@ export default function SidebarFixed() {
       title: "Proyectos",
       items: [
         { href: "/active-projects", title: "Vista de Proyectos", icon: Briefcase, badge: projectCount > 0 ? projectCount.toString() : undefined, description: "Proyectos activos y rentabilidad", permission: 'projects' as AppSection },
-        { href: "/status-semanal", title: "Review", icon: ClipboardList, description: "Revisión semanal de temas en equipo", permission: 'status' as AppSection },
+        { href: "/review", title: "Review", icon: ClipboardList, description: "Salas colaborativas de seguimiento semanal", permission: 'status' as AppSection },
         { href: "/tasks", title: "Tareas", icon: CheckSquare, description: "Gestión de tareas", permission: 'projects' as AppSection },
         { href: "/tasks/hours-dashboard", title: "Panel de Horas", icon: BarChart2, description: "Horas por persona y proyecto", permission: 'projects' as AppSection },
       ]
@@ -495,6 +515,103 @@ export default function SidebarFixed() {
                     )}
                   </div>
                 )}
+
+                {/* Collapsible Review rooms — under Proyectos section */}
+                {section.items.some((i) => i.href === '/review') && hasPermission('status') && (
+                  <div className="mt-1">
+                    {!isCollapsed ? (
+                      <>
+                        <div className="flex items-center justify-between px-3 py-1">
+                          <button
+                            onClick={() => setReviewsExpanded((v) => !v)}
+                            className="flex items-center gap-1 text-[10px] font-semibold text-indigo-500/70 uppercase tracking-widest hover:text-indigo-600 transition-colors flex-1"
+                          >
+                            <span>Salas</span>
+                            {reviewsExpanded ? <ChevronDown className="h-3 w-3 ml-1" /> : <ChevronRight className="h-3 w-3 ml-1" />}
+                          </button>
+                          <button
+                            className="h-4 w-4 flex items-center justify-center rounded hover:bg-accent text-muted-foreground hover:text-indigo-600 transition-colors"
+                            onClick={() => setNewReviewOpen(true)}
+                            title="Nueva sala de Review"
+                          >
+                            <Plus className="h-3 w-3" />
+                          </button>
+                        </div>
+
+                        {reviewsExpanded && (
+                          <div className="space-y-0.5 mt-0.5 ml-1">
+                            {sidebarRooms.length === 0 && (
+                              <div className="px-2 py-1 text-[10px] text-muted-foreground/60 italic">
+                                Sin salas. Creá la primera con +
+                              </div>
+                            )}
+                            {sidebarRooms.map((room) => {
+                              const color = roomColor(room.colorIndex);
+                              const isActive = currentPath === `/review/${room.id}`;
+                              return (
+                                <Link
+                                  key={room.id}
+                                  href={`/review/${room.id}`}
+                                  className={cn(
+                                    "flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs transition-all duration-150",
+                                    isActive
+                                      ? "bg-indigo-500/10 text-indigo-700 font-semibold"
+                                      : "text-muted-foreground hover:text-foreground hover:bg-accent/50",
+                                  )}
+                                >
+                                  <span
+                                    className={cn(
+                                      "inline-flex flex-shrink-0 items-center justify-center rounded-md text-white font-bold w-5 h-5 text-[10px]",
+                                      color.chip,
+                                    )}
+                                  >
+                                    {room.emoji || room.name.charAt(0).toUpperCase()}
+                                  </span>
+                                  <span className="truncate flex-1 font-medium">{room.name}</span>
+                                  {room.pendingCount > 0 && (
+                                    <span
+                                      className={cn(
+                                        "h-4 min-w-[16px] px-1 rounded-full text-[9px] font-bold flex items-center justify-center flex-shrink-0",
+                                        isActive ? "bg-indigo-600 text-white" : "bg-amber-100 text-amber-800",
+                                      )}
+                                    >
+                                      {room.pendingCount}
+                                    </span>
+                                  )}
+                                </Link>
+                              );
+                            })}
+                            {reviewRooms.length > MAX_SIDEBAR_ROOMS && (
+                              <Link
+                                href="/review"
+                                className="flex items-center gap-2 px-2 py-1 rounded-lg text-xs text-muted-foreground/50 hover:text-indigo-600 transition-colors"
+                              >
+                                <ClipboardList className="h-3.5 w-3.5 flex-shrink-0" />
+                                <span>Ver todas ({reviewRooms.length})</span>
+                              </Link>
+                            )}
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-full justify-center p-0 hover:bg-accent text-muted-foreground"
+                              onClick={() => setNewReviewOpen(true)}
+                            >
+                              <Plus className="h-3.5 w-3.5" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent side="right">Nueva sala de Review</TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    )}
+                  </div>
+                )}
               </div>
             ))}
           </nav>
@@ -544,6 +661,7 @@ export default function SidebarFixed() {
       </div>
 
       <NewProjectDialog open={newProjectOpen} onClose={() => setNewProjectOpen(false)} />
+      <CreateReviewDialog open={newReviewOpen} onClose={() => setNewReviewOpen(false)} />
     </TooltipProvider>
   );
 }

@@ -10,14 +10,68 @@ export function getAuthHeader(): Record<string, string> {
   return token ? { 'Authorization': `Session ${token}` } : {};
 }
 
+// ───────────────────────────────────────────────────────────────────────────
+// Review Room context (for room-scoped API calls).
+// When a room is active, legacy /api/status-semanal/* URLs are rewritten to
+// the room-scoped /api/reviews/:roomId/* equivalents.
+// ───────────────────────────────────────────────────────────────────────────
+
+let _currentReviewRoomId: number | null = null;
+
+export function setCurrentReviewRoomId(roomId: number | null) {
+  if (_currentReviewRoomId === roomId) return;
+  _currentReviewRoomId = roomId;
+  // Changing room invalidates all status-semanal cache entries (they may live under different URLs now).
+  try { queryClient.invalidateQueries(); } catch {}
+}
+
+export function getCurrentReviewRoomId(): number | null {
+  return _currentReviewRoomId;
+}
+
+export function rewriteReviewUrl(url: string): string {
+  const roomId = _currentReviewRoomId;
+  if (!roomId) return url;
+  if (!url.startsWith('/api/status-semanal')) return url;
+
+  // Split off the query string so we can analyze only the path.
+  const qIdx = url.indexOf('?');
+  const path = qIdx >= 0 ? url.slice(0, qIdx) : url;
+  const qs = qIdx >= 0 ? url.slice(qIdx) : '';
+  const base = `/api/reviews/${roomId}`;
+
+  // Exact matches
+  if (path === '/api/status-semanal') return `${base}/items${qs}`;
+  if (path === '/api/status-semanal/custom') return `${base}/items/custom${qs}`;
+  if (path === '/api/status-semanal/users') return `${base}/assignable-users?scope=all${qs ? `&${qs.slice(1)}` : ''}`;
+  if (path === '/api/status-semanal/ai-summary') return `${base}/ai-summary${qs}`;
+
+  // notes/:id, updates/:id
+  let m = path.match(/^\/api\/status-semanal\/notes\/(\d+)$/);
+  if (m) return `${base}/notes/${m[1]}${qs}`;
+  m = path.match(/^\/api\/status-semanal\/updates\/(\d+)$/);
+  if (m) return `${base}/updates/${m[1]}${qs}`;
+
+  // custom sub-routes
+  m = path.match(/^\/api\/status-semanal\/custom\/(\d+)(\/notes|\/updates|\/activity)?$/);
+  if (m) return `${base}/items/custom/${m[1]}${m[2] ?? ''}${qs}`;
+
+  // project sub-routes
+  m = path.match(/^\/api\/status-semanal\/(\d+)(\/notes|\/updates|\/activity)?$/);
+  if (m) return `${base}/items/project/${m[1]}${m[2] ?? ''}${qs}`;
+
+  return url;
+}
+
 // Wrapper over fetch that always includes credentials + auth header
 export function authFetch(url: string, options: RequestInit = {}): Promise<Response> {
+  const rewritten = rewriteReviewUrl(url);
   const existingHeaders = options.headers
     ? (options.headers instanceof Headers
         ? Object.fromEntries((options.headers as Headers).entries())
         : (options.headers as Record<string, string>))
     : {};
-  return fetch(url, {
+  return fetch(rewritten, {
     ...options,
     credentials: 'include',
     headers: {
@@ -30,8 +84,9 @@ export function authFetch(url: string, options: RequestInit = {}): Promise<Respo
 
 // Default query function that will be used by react-query
 export const defaultQueryFn = async ({ queryKey }: { queryKey: readonly unknown[] }) => {
-  const url = Array.isArray(queryKey) ? queryKey[0] : queryKey;
-  
+  const rawUrl = Array.isArray(queryKey) ? queryKey[0] : queryKey;
+  const url = rewriteReviewUrl(rawUrl as string);
+
   const response = await fetch(url as string, {
     credentials: "include",
     headers: {
@@ -79,8 +134,9 @@ export const queryClient = new QueryClient({
 // Function to get a query function with custom error handling
 export function getQueryFn({ on401 = "throw" }: FetcherOptions = {}) {
   return async ({ queryKey }: { queryKey: readonly unknown[] }) => {
-    const url = Array.isArray(queryKey) ? queryKey[0] : queryKey;
-    
+    const rawUrl = Array.isArray(queryKey) ? queryKey[0] : queryKey;
+    const url = rewriteReviewUrl(rawUrl as string);
+
     const response = await fetch(url as string, {
       credentials: "include",
       headers: {
@@ -88,7 +144,7 @@ export function getQueryFn({ on401 = "throw" }: FetcherOptions = {}) {
         ...getAuthHeader(),
       }
     });
-    
+
     if (!response.ok) {
       if (response.status === 401 && on401 === "returnNull") {
         return null;
@@ -142,8 +198,8 @@ export async function apiRequest(
     method = methodOrOptions.method;
     requestData = methodOrOptions.body;
   }
-  const url = endpoint;
-  
+  const url = rewriteReviewUrl(endpoint);
+
   try {
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
