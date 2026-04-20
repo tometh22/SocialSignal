@@ -208,6 +208,14 @@ async function applyPendingMigrations() {
           VALUES ('Mi Review', 'Sala personal con el historial heredado.', 0, NULL, 'members', v_admin_id)
           RETURNING id INTO v_room_id;
 
+          -- Add all admins as owners so nobody loses access (fallback to any user if no admins)
+          INSERT INTO review_room_members (room_id, user_id, role, added_by)
+          SELECT v_room_id, u.id, 'owner', v_admin_id
+          FROM users u
+          WHERE u.is_admin = true
+          ON CONFLICT (room_id, user_id) DO NOTHING;
+
+          -- If no admins existed, at least add the fallback user
           IF v_admin_id IS NOT NULL THEN
             INSERT INTO review_room_members (room_id, user_id, role, added_by)
             VALUES (v_room_id, v_admin_id, 'owner', v_admin_id)
@@ -219,6 +227,24 @@ async function applyPendingMigrations() {
           UPDATE project_review_notes   SET room_id = v_room_id WHERE room_id IS NULL;
           UPDATE status_update_entries  SET room_id = v_room_id WHERE room_id IS NULL;
           UPDATE status_change_log      SET room_id = v_room_id WHERE room_id IS NULL;
+        END IF;
+      END $$;
+    `);
+
+    // 0010b: retroactive fix for environments where only the first admin was added as member.
+    // Add any missing admins as owners of Mi Review (idempotent).
+    await run('0010b backfill admin members', `
+      DO $$
+      DECLARE
+        v_room_id INTEGER;
+      BEGIN
+        SELECT id INTO v_room_id FROM review_rooms WHERE name = 'Mi Review' ORDER BY id ASC LIMIT 1;
+        IF v_room_id IS NOT NULL THEN
+          INSERT INTO review_room_members (room_id, user_id, role, added_by)
+          SELECT v_room_id, u.id, 'owner', u.id
+          FROM users u
+          WHERE u.is_admin = true
+          ON CONFLICT (room_id, user_id) DO NOTHING;
         END IF;
       END $$;
     `);
