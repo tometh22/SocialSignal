@@ -136,9 +136,12 @@ export function createReviewRoomsRouter(requireAuth: RequireAuth): Router {
       }
 
       res.status(201).json(room);
-    } catch (error) {
-      console.error('POST /api/reviews error:', error);
-      res.status(500).json({ message: "Error al crear sala" });
+    } catch (error: any) {
+      console.error(`POST /api/reviews error (userId=${req.user?.id}, body=${JSON.stringify(req.body)}):`, error);
+      const msg = error?.message?.includes('unique') ? 'Ya existe una sala con ese nombre' :
+                  error?.message?.includes('violates') ? `Error de BD: ${error.message}` :
+                  'Error al crear sala';
+      res.status(500).json({ message: msg });
     }
   });
 

@@ -64,7 +64,10 @@ export default function CreateReviewDialog({ open, onClose }: Props) {
       onClose();
       navigate(`/review/${room.id}`);
     },
-    onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+    onError: (err: Error) => {
+      console.error('[CreateReview] Failed:', err);
+      toast({ title: "Error al crear sala", description: err.message || "Error desconocido. Revisá la conexión.", variant: "destructive" });
+    },
   });
 
   const canSubmit = name.trim().length > 0 && !createMut.isPending;

@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { reviewApi, reviewKeys, type ReviewRoomDetail } from "@/lib/review-api";
 import { setCurrentReviewRoomId } from "@/lib/queryClient";
 import { ReviewRoomContext, setLastReviewRoomId } from "@/hooks/use-review-room";
-import RoomHeader from "@/components/review/RoomHeader";
 import AddProjectDialog from "@/components/review/AddProjectDialog";
 import StatusSemanalPage from "@/pages/status-semanal";
 
@@ -77,9 +76,6 @@ export default function ReviewRoomPage() {
 
   return (
     <ReviewRoomContext.Provider value={ctxValue}>
-      <div className="px-6 pt-4">
-        <RoomHeader room={room} myRole={ctxValue.myRole} />
-      </div>
       <RoomBody roomId={roomId} />
     </ReviewRoomContext.Provider>
   );

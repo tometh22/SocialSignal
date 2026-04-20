@@ -3,6 +3,10 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest, authFetch } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
+import { useMaybeReviewRoom } from "@/hooks/use-review-room";
+import MemberAvatarsStack from "@/components/review/MemberAvatarsStack";
+import MembersDialog from "@/components/review/MembersDialog";
+import AddProjectDialog from "@/components/review/AddProjectDialog";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -1534,6 +1538,9 @@ export default function StatusSemanalPage() {
   const { toast } = useToast();
   const { user } = useAuth();
   const currentUserId = (user as any)?.id ?? null;
+  const roomCtx = useMaybeReviewRoom();
+  const [membersDialogOpen, setMembersDialogOpen] = useState(false);
+  const [addProjectDialogOpen, setAddProjectDialogOpen] = useState(false);
   const [notesOpen, setNotesOpen] = useState<{ type: 'project' | 'custom'; id: number } | null>(null);
   const [showHidden, setShowHidden] = useState(false);
   const [aiSummary, setAiSummary] = useState<AISummary | null>(() => {
@@ -1919,15 +1926,35 @@ export default function StatusSemanalPage() {
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,_var(--tw-gradient-stops))] from-white/10 via-transparent to-transparent" />
           <div className="relative px-6 py-2.5">
             <div className="flex items-center justify-between gap-4">
-              {/* Left: title */}
+              {/* Left: title (room-aware) */}
               <div className="flex items-center gap-2.5 shrink-0">
-                <div className="h-8 w-8 rounded-lg bg-white/15 backdrop-blur-sm flex items-center justify-center shrink-0 border border-white/20">
-                  <ClipboardList className="h-4 w-4 text-white" />
-                </div>
-                <div>
-                  <h1 className="text-base font-bold leading-tight text-white tracking-tight">Review</h1>
-                  <p className="text-[9px] text-indigo-200 font-medium">{weekLabel()}</p>
-                </div>
+                {roomCtx ? (
+                  <>
+                    <a href="/review" className="p-1 rounded-full hover:bg-white/20 text-white/70 hover:text-white transition-colors shrink-0" title="Volver a Reviews">
+                      <ChevronLeft className="h-4 w-4" />
+                    </a>
+                    <div className="h-8 w-8 rounded-lg bg-white/15 backdrop-blur-sm flex items-center justify-center shrink-0 border border-white/20 text-sm">
+                      {roomCtx.room?.emoji || roomCtx.room?.name?.charAt(0) || 'R'}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h1 className="text-base font-bold leading-tight text-white tracking-tight">{roomCtx.room?.name || 'Review'}</h1>
+                        <span className="text-[9px] font-semibold bg-white/20 text-white px-1.5 py-0.5 rounded">{roomCtx.myRole === 'owner' ? 'Owner' : 'Editor'}</span>
+                      </div>
+                      <p className="text-[9px] text-indigo-200 font-medium">{weekLabel()}</p>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="h-8 w-8 rounded-lg bg-white/15 backdrop-blur-sm flex items-center justify-center shrink-0 border border-white/20">
+                      <ClipboardList className="h-4 w-4 text-white" />
+                    </div>
+                    <div>
+                      <h1 className="text-base font-bold leading-tight text-white tracking-tight">Review</h1>
+                      <p className="text-[9px] text-indigo-200 font-medium">{weekLabel()}</p>
+                    </div>
+                  </>
+                )}
               </div>
 
               {/* Sidebar toggle (visible when sidebar has items) */}
@@ -1960,6 +1987,21 @@ export default function StatusSemanalPage() {
 
               {/* Right: actions */}
               <div className="flex items-center gap-1 shrink-0">
+                {roomCtx?.room?.members && roomCtx.room.members.length > 0 && (
+                  <MemberAvatarsStack
+                    members={roomCtx.room.members}
+                    max={4}
+                    onClick={() => setMembersDialogOpen(true)}
+                    showPlus={roomCtx.isOwner}
+                    className="mr-1.5"
+                  />
+                )}
+                {roomCtx?.isOwner && (
+                  <button onClick={() => setAddProjectDialogOpen(true)}
+                    className="text-[11px] font-medium text-indigo-200 hover:text-white bg-white/10 hover:bg-white/20 border border-white/15 rounded-lg px-2 py-1 transition-colors mr-1 max-md:hidden">
+                    + Proyecto
+                  </button>
+                )}
                 <span className="text-[11px] text-indigo-200 font-medium mr-1 max-md:hidden">{visible.length} ítems</span>
                 {/* Filter */}
                 <button onClick={() => setShowFilters(v => !v)}
@@ -2649,6 +2691,14 @@ export default function StatusSemanalPage() {
             />
           )}
         </div>
+      )}
+
+      {/* ── Room dialogs (only when inside a review room) ──────── */}
+      {roomCtx && (
+        <>
+          {roomCtx.room && <MembersDialog open={membersDialogOpen} onClose={() => setMembersDialogOpen(false)} room={roomCtx.room} myRole={roomCtx.myRole} />}
+          <AddProjectDialog open={addProjectDialogOpen} onClose={() => setAddProjectDialogOpen(false)} roomId={roomCtx.roomId} />
+        </>
       )}
     </div>
   );
