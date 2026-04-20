@@ -62,15 +62,15 @@ export default function MembersDialog({ open, onClose, room, myRole }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={v => !v && onClose()}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>Miembros de {room.name}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-3">
-          <div className="max-h-64 overflow-y-auto divide-y border rounded-md">
+          <div className="max-h-64 overflow-auto divide-y border rounded-md">
             {room.members.map(m => (
-              <div key={m.userId} className="flex items-center gap-3 px-3 py-2 text-sm">
+              <div key={m.userId} className="flex items-center gap-2 px-3 py-2 text-sm">
                 <div className="h-8 w-8 rounded-full bg-slate-200 flex items-center justify-center text-xs font-medium text-slate-700">
                   {initials(`${m.firstName ?? ''} ${m.lastName ?? ''}`.trim())}
                 </div>
@@ -78,22 +78,22 @@ export default function MembersDialog({ open, onClose, room, myRole }: Props) {
                   <div className="font-medium truncate">{`${m.firstName ?? ''} ${m.lastName ?? ''}`.trim()}</div>
                   <div className="text-xs text-slate-500 truncate">{m.email}</div>
                 </div>
-                <Badge variant={m.role === 'owner' ? 'default' : 'outline'} className="text-xs">
+                <Badge variant={m.role === 'owner' ? 'default' : 'outline'} className="text-xs shrink-0">
                   {m.role === 'owner' && <Crown className="h-3 w-3 mr-1" />}
                   {m.role === 'owner' ? 'Owner' : 'Editor'}
                 </Badge>
                 {isOwner && (
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-0.5 shrink-0">
                     {m.role === 'editor' ? (
-                      <Button size="sm" variant="ghost" onClick={() => promoteMut.mutate({ userId: m.userId, role: 'owner' })} title="Promover a owner">
+                      <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => promoteMut.mutate({ userId: m.userId, role: 'owner' })} title="Promover a owner">
                         <Crown className="h-4 w-4" />
                       </Button>
                     ) : (
-                      <Button size="sm" variant="ghost" onClick={() => promoteMut.mutate({ userId: m.userId, role: 'editor' })} title="Degradar a editor">
+                      <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => promoteMut.mutate({ userId: m.userId, role: 'editor' })} title="Degradar a editor">
                         <Crown className="h-4 w-4 text-amber-400" />
                       </Button>
                     )}
-                    <Button size="sm" variant="ghost" onClick={() => removeMut.mutate(m.userId)} title="Quitar">
+                    <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => removeMut.mutate(m.userId)} title="Quitar">
                       <Trash2 className="h-4 w-4 text-rose-500" />
                     </Button>
                   </div>
