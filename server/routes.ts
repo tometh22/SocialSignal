@@ -3889,42 +3889,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const validatedData = insertPersonnelSchema.partial().parse(data);
       console.log(`🔧 [${personName}] PATCH /api/personnel/${id} - Validated data:`, validatedData);
-      
-      // Si se están actualizando horas mensuales y hay sueldo fijo, recalcular tarifa por hora
-      if (validatedData.monthlyHours !== undefined) {
-        console.log(`🔧 [${personName}] Monthly hours update detected: ${validatedData.monthlyHours}h`);
-        
-        if (currentPerson && currentPerson.monthlyFixedSalary && validatedData.monthlyHours > 0) {
-          const newHourlyRate = Math.round(currentPerson.monthlyFixedSalary / validatedData.monthlyHours);
+
+      // Detectar si el usuario modificó manualmente la tarifa por hora, las horas
+      // o el sueldo fijo. El cliente envía siempre los tres valores actuales, así
+      // que solo tratamos como "cambio" los que difieren del valor actual en DB.
+      const hourlyRateExplicitlyChanged =
+        validatedData.hourlyRate !== undefined &&
+        currentPerson !== undefined &&
+        validatedData.hourlyRate !== currentPerson.hourlyRate;
+      const monthlyHoursChanged =
+        validatedData.monthlyHours !== undefined &&
+        currentPerson !== undefined &&
+        validatedData.monthlyHours !== currentPerson.monthlyHours;
+      const monthlyFixedSalaryChanged =
+        validatedData.monthlyFixedSalary !== undefined &&
+        currentPerson !== undefined &&
+        validatedData.monthlyFixedSalary !== currentPerson.monthlyFixedSalary;
+
+      // Recalcular la tarifa por hora solo si el usuario NO cambió hourlyRate
+      // manualmente y sí cambió monthlyHours o monthlyFixedSalary.
+      if (!hourlyRateExplicitlyChanged && (monthlyHoursChanged || monthlyFixedSalaryChanged)) {
+        const effectiveHours = validatedData.monthlyHours ?? currentPerson?.monthlyHours ?? 0;
+        const effectiveSalary = validatedData.monthlyFixedSalary ?? currentPerson?.monthlyFixedSalary ?? 0;
+        if (effectiveHours > 0 && effectiveSalary > 0) {
+          const newHourlyRate = Math.round(effectiveSalary / effectiveHours);
           validatedData.hourlyRate = newHourlyRate;
-          console.log(`🔧 Auto-calculating hourlyRate: ${currentPerson.monthlyFixedSalary} ÷ ${validatedData.monthlyHours} = ${newHourlyRate}`);
-          
-          // También actualizar el campo histórico del mes actual si existe
+          console.log(`🔧 [${personName}] Auto-calculating hourlyRate: ${effectiveSalary} ÷ ${effectiveHours} = ${newHourlyRate}`);
+
+          // Replicar la tarifa en el campo histórico del mes actual si existe.
           const currentDate = new Date();
           const currentYear = currentDate.getFullYear();
-          const currentMonth = currentDate.getMonth(); // 0-based
-          
+          const currentMonth = currentDate.getMonth();
           const monthNames = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
-          const historicalField = `${monthNames[currentMonth]}${currentYear}HourlyRateARS` as keyof typeof validatedData;
-          
-          // Si el campo histórico existe y tiene un valor, actualizarlo también
-          if (currentPerson[historicalField as keyof typeof currentPerson] !== null && currentPerson[historicalField as keyof typeof currentPerson] !== undefined) {
+          const historicalField = `${monthNames[currentMonth]}${currentYear}HourlyRateARS` as keyof typeof currentPerson;
+          if (currentPerson && currentPerson[historicalField] !== null && currentPerson[historicalField] !== undefined) {
             (validatedData as any)[historicalField] = newHourlyRate;
-            console.log(`🔧 Also updating historical field ${historicalField} to ${newHourlyRate}`);
+            console.log(`🔧 [${personName}] Also updating historical field ${String(historicalField)} to ${newHourlyRate}`);
           }
-        } else {
-          console.log(`📝 Monthly hours updated to ${validatedData.monthlyHours}h (no salary recalculation needed)`);
         }
-      }
-      
-      // Si se actualiza el sueldo fijo y hay horas mensuales, recalcular tarifa por hora
-      if (validatedData.monthlyFixedSalary !== undefined) {
-        const monthlyHours = validatedData.monthlyHours || currentPerson?.monthlyHours || 0;
-        if (validatedData.monthlyFixedSalary > 0 && monthlyHours > 0) {
-          const newHourlyRate = Math.round(validatedData.monthlyFixedSalary / monthlyHours);
-          validatedData.hourlyRate = newHourlyRate;
-          console.log(`🔧 Auto-calculating hourlyRate from salary: ${validatedData.monthlyFixedSalary} ÷ ${monthlyHours} = ${newHourlyRate}`);
-        }
+      } else if (hourlyRateExplicitlyChanged) {
+        console.log(`🔧 [${personName}] Respecting manually-entered hourlyRate: ${validatedData.hourlyRate}`);
       }
       
       const updatedPerson = await storage.updatePersonnel(id, validatedData);
