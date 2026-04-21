@@ -118,6 +118,7 @@ import { reinitializeDatabase } from "./reinit-data";
 import { upload, uploadDocument, deleteOldFile } from "./upload";
 import { sanitizeInput } from "./input-sanitization";
 import { setupAuth, hashPassword } from "./auth";
+import { requireProjectUnlocked, projectIdFromTimeEntry } from "./middleware/projectLocked";
 import { createReviewRoomsRouter } from "./routes-review-rooms";
 import { reviewRooms, reviewRoomMembers } from "@shared/schema";
 import path from 'path';
@@ -7519,8 +7520,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const updatedProject = await storage.updateActiveProject(id, {
         isFinished: true,
-        actualEndDate: new Date()
-      });
+        actualEndDate: new Date(),
+        closedAt: new Date(),
+        closedBy: req.user?.id ?? null,
+        status: "completed",
+      } as any);
 
       if (!updatedProject) {
         return res.status(404).json({ message: "Project not found" });
@@ -7530,6 +7534,92 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error marking project as finished:", error);
       res.status(500).json({ message: "Failed to mark project as finished" });
+    }
+  });
+
+  // Reabrir proyecto (admin only). Desbloquea carga de horas/costos.
+  app.patch("/api/active-projects/:id/reopen", requireAuth, async (req, res) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ message: "Invalid project ID" });
+    if (!req.user?.isAdmin) {
+      return res.status(403).json({ message: "Solo administradores pueden reabrir proyectos" });
+    }
+
+    try {
+      const updatedProject = await storage.updateActiveProject(id, {
+        isFinished: false,
+        closedAt: null,
+        closedBy: null,
+        status: "active",
+      } as any);
+
+      if (!updatedProject) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+
+      res.json(updatedProject);
+    } catch (error) {
+      console.error("Error reopening project:", error);
+      res.status(500).json({ message: "Failed to reopen project" });
+    }
+  });
+
+  // Marcar como entregado al cliente.
+  app.patch("/api/active-projects/:id/deliver", requireAuth, async (req, res) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ message: "Invalid project ID" });
+
+    try {
+      const updatedProject = await storage.updateActiveProject(id, {
+        status: "delivered",
+        deliveredAt: new Date(),
+      } as any);
+      if (!updatedProject) return res.status(404).json({ message: "Project not found" });
+      res.json(updatedProject);
+    } catch (error) {
+      console.error("Error marking project as delivered:", error);
+      res.status(500).json({ message: "Failed to mark as delivered" });
+    }
+  });
+
+  // Marcar como facturado.
+  app.patch("/api/active-projects/:id/invoice", requireAuth, async (req, res) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ message: "Invalid project ID" });
+
+    try {
+      const updatedProject = await storage.updateActiveProject(id, {
+        status: "invoiced",
+        invoicedAt: new Date(),
+      } as any);
+      if (!updatedProject) return res.status(404).json({ message: "Project not found" });
+      res.json(updatedProject);
+    } catch (error) {
+      console.error("Error marking project as invoiced:", error);
+      res.status(500).json({ message: "Failed to mark as invoiced" });
+    }
+  });
+
+  // Anular proyecto (void). No borra datos, sólo cambia estado.
+  app.patch("/api/active-projects/:id/void", requireAuth, async (req, res) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ message: "Invalid project ID" });
+    if (!req.user?.isAdmin) {
+      return res.status(403).json({ message: "Solo administradores pueden anular proyectos" });
+    }
+
+    try {
+      const updatedProject = await storage.updateActiveProject(id, {
+        status: "voided",
+        closedAt: new Date(),
+        closedBy: req.user?.id ?? null,
+        isFinished: true,
+      } as any);
+      if (!updatedProject) return res.status(404).json({ message: "Project not found" });
+      res.json(updatedProject);
+    } catch (error) {
+      console.error("Error voiding project:", error);
+      res.status(500).json({ message: "Failed to void project" });
     }
   });
 
@@ -7798,7 +7888,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Crear un nuevo registro de horas
-  app.post("/api/time-entries", requireAuth, async (req, res) => {
+  app.post("/api/time-entries", requireAuth, requireProjectUnlocked(), async (req, res) => {
     try {
       // Adaptar fechas si vienen como strings ISO
       const processedData = {
@@ -7942,7 +8032,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Actualizar un registro de horas
-  app.patch("/api/time-entries/:id", requireAuth, async (req, res) => {
+  app.patch("/api/time-entries/:id", requireAuth, requireProjectUnlocked(projectIdFromTimeEntry), async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "Invalid time entry ID" });
 
@@ -7986,7 +8076,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Eliminar un registro de horas
-  app.delete("/api/time-entries/:id", requireAuth, async (req, res) => {
+  app.delete("/api/time-entries/:id", requireAuth, requireProjectUnlocked(projectIdFromTimeEntry), async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "Invalid time entry ID" });
 
