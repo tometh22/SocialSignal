@@ -7533,6 +7533,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Reabrir proyecto cerrado
+  app.patch("/api/active-projects/:id/reopen", requireAuth, async (req, res) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ message: "Invalid project ID" });
+
+    try {
+      const updatedProject = await storage.updateActiveProject(id, {
+        isFinished: false,
+        actualEndDate: null,
+      });
+
+      if (!updatedProject) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+
+      res.json(updatedProject);
+    } catch (error) {
+      console.error("Error reopening project:", error);
+      res.status(500).json({ message: "Failed to reopen project" });
+    }
+  });
+
   // ---------- RUTAS PARA COMPONENTES DE PROYECTO ----------
 
   // Obtener todos los componentes de un proyecto
@@ -15553,6 +15575,99 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Error updating exchange rate:", error);
       return res.status(500).json({ 
         message: error instanceof Error ? error.message : "Failed to update exchange rate" 
+      });
+    }
+  });
+
+  // ==================== ASANA API INTEGRATION ====================
+  // GET /api/integrations/asana/preview-hours?workspaceGid=X&from=YYYY-MM-DD&to=YYYY-MM-DD
+  app.get("/api/integrations/asana/preview-hours", requireAuth, async (req, res) => {
+    try {
+      const workspaceGid = String(req.query.workspaceGid ?? "").trim();
+      const from = String(req.query.from ?? "").trim();
+      const to = String(req.query.to ?? "").trim();
+      if (!workspaceGid || !from || !to) {
+        return res.status(400).json({ message: "Faltan workspaceGid, from y/o to" });
+      }
+      const { previewAsanaHours } = await import('./services/asanaSync');
+      const result = await previewAsanaHours({
+        workspaceGid,
+        startedOnAfter: from,
+        startedOnBefore: to,
+      });
+      return res.json(result);
+    } catch (error) {
+      console.error("Error previewing Asana hours:", error);
+      return res.status(502).json({
+        message: error instanceof Error ? error.message : "Failed to preview Asana hours",
+      });
+    }
+  });
+
+  // POST /api/integrations/asana/import-hours
+  // Body: { workspaceGid, from: "YYYY-MM-DD", to: "YYYY-MM-DD" }
+  app.post("/api/integrations/asana/import-hours", requireAuth, async (req, res) => {
+    try {
+      const { workspaceGid, from, to } = req.body ?? {};
+      if (!workspaceGid || !from || !to) {
+        return res.status(400).json({ message: "Body requiere workspaceGid, from y to" });
+      }
+      const { importAsanaHours } = await import('./services/asanaSync');
+      const result = await importAsanaHours({
+        workspaceGid: String(workspaceGid),
+        startedOnAfter: String(from),
+        startedOnBefore: String(to),
+      });
+      return res.json(result);
+    } catch (error) {
+      console.error("Error importing Asana hours:", error);
+      return res.status(502).json({
+        message: error instanceof Error ? error.message : "Failed to import Asana hours",
+      });
+    }
+  });
+
+  // POST /api/exchange-rates/sync-blue - Sincroniza dólar blue del día desde dolarapi.com
+  app.post("/api/exchange-rates/sync-blue", requireAuth, async (req, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ message: "No autenticado" });
+
+      const { syncBlueToday } = await import('./services/fxSync');
+      const result = await syncBlueToday(userId);
+      return res.json({
+        success: true,
+        rate: result.rate,
+        fetchedAt: result.fetchedAt,
+        record: result.saved,
+      });
+    } catch (error) {
+      console.error("Error syncing blue rate:", error);
+      return res.status(502).json({
+        message: error instanceof Error ? error.message : "Failed to sync blue rate",
+      });
+    }
+  });
+
+  // POST /api/exchange-rates/import-rem - Importa estimaciones REM BCRA en bloque
+  // Body: { estimates: Array<{ year: number, month: number, rate: number }> }
+  app.post("/api/exchange-rates/import-rem", requireAuth, async (req, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ message: "No autenticado" });
+
+      const estimates = Array.isArray(req.body?.estimates) ? req.body.estimates : null;
+      if (!estimates || estimates.length === 0) {
+        return res.status(400).json({ message: "Body requiere un array 'estimates' no vacío" });
+      }
+
+      const { importRemEstimates } = await import('./services/fxSync');
+      const saved = await importRemEstimates(estimates, userId);
+      return res.json({ success: true, count: saved.length, records: saved });
+    } catch (error) {
+      console.error("Error importing REM estimates:", error);
+      return res.status(500).json({
+        message: error instanceof Error ? error.message : "Failed to import REM",
       });
     }
   });

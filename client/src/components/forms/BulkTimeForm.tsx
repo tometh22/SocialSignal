@@ -17,6 +17,7 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
+import { roundToQuarterHour } from "@shared/utils/num";
 
 interface Personnel {
   id: number;
@@ -292,11 +293,17 @@ export default function BulkTimeForm({
                       <Input
                         type="number"
                         min="0"
-                        step="0.1"
+                        step="0.25"
                         value={entry.hours}
                         onChange={(e) => updateEntry(person.id, 'hours', parseFloat(e.target.value) || 0)}
+                        onBlur={(e) => {
+                          const raw = parseFloat(e.target.value) || 0;
+                          const rounded = roundToQuarterHour(raw);
+                          if (rounded !== raw) updateEntry(person.id, 'hours', rounded);
+                        }}
                         className="w-24"
                         placeholder="0"
+                        title="Bloques de 15 minutos (0.25h)"
                       />
                     </td>
                     <td className="px-4 py-3">

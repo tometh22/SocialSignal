@@ -58,6 +58,15 @@ export const parseDec = (v: unknown): number => {
 };
 
 /**
+ * Redondea horas al múltiplo de 15 minutos más cercano (0.25h).
+ * Garantiza que el registro mínimo sea un cuarto de hora.
+ */
+export const roundToQuarterHour = (hours: number): number => {
+  if (!Number.isFinite(hours) || hours <= 0) return 0;
+  return Math.round(hours * 4) / 4;
+};
+
+/**
  * Normaliza mes desde string/número a número 1-12
  * Ejemplos: "jul" → 7, "ene" → 1, "01 ene" → 1, "08 ago" → 8, 7 → 7
  */

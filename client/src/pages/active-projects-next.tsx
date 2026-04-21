@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useMemo, useState, useEffect, useCallback } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { authFetch } from "@/lib/queryClient";
 import PortfolioAnalytics from "@/components/portfolio-analytics";
 import { usePermissions } from "@/hooks/use-permissions";
@@ -318,6 +318,8 @@ function Controls({
   setSearch,
   activeOnly,
   setActiveOnly,
+  statusFilter,
+  setStatusFilter,
 }: {
   period: string;
   setPeriod: (p: string) => void;
@@ -327,6 +329,8 @@ function Controls({
   setSearch: (s: string) => void;
   activeOnly: boolean;
   setActiveOnly: (v: boolean) => void;
+  statusFilter: "open" | "closed" | "all";
+  setStatusFilter: (s: "open" | "closed" | "all") => void;
 }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -385,6 +389,23 @@ function Controls({
         />
       </div>
 
+      {/* Open/closed filter */}
+      <div className="flex rounded-lg border border-slate-200 overflow-hidden text-xs">
+        {(["open", "closed", "all"] as const).map((opt) => (
+          <button
+            key={opt}
+            onClick={() => setStatusFilter(opt)}
+            className={`px-2.5 py-1.5 transition-colors ${
+              statusFilter === opt
+                ? "bg-indigo-50 text-indigo-700 font-medium"
+                : "bg-white text-slate-500 hover:bg-slate-50"
+            }`}
+          >
+            {opt === "open" ? "Abiertos" : opt === "closed" ? "Cerrados" : "Todos"}
+          </button>
+        ))}
+      </div>
+
       {/* Active filter */}
       <button
         onClick={() => setActiveOnly(!activeOnly)}
@@ -395,7 +416,7 @@ function Controls({
         }`}
       >
         <Filter className="h-3.5 w-3.5" />
-        {activeOnly ? "Solo activos" : "Todos"}
+        {activeOnly ? "Solo con actividad" : "Todos"}
       </button>
 
       {/* Refresh */}
@@ -447,6 +468,48 @@ function TableHeader({ isOperations }: { isOperations: boolean }) {
 }
 
 // ─── Project Row ──────────────────────────────────────────────────────────────
+
+function ProjectStatusToggle({
+  projectId,
+  isFinished,
+}: {
+  projectId: number;
+  isFinished: boolean;
+}) {
+  const queryClient = useQueryClient();
+  const mutation = useMutation({
+    mutationFn: async () => {
+      const path = isFinished ? "reopen" : "finish";
+      const res = await authFetch(`/api/active-projects/${projectId}/${path}`, {
+        method: "PATCH",
+      });
+      if (!res.ok) throw new Error(`API ${res.status}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
+    },
+  });
+
+  return (
+    <button
+      type="button"
+      disabled={mutation.isPending}
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const msg = isFinished
+          ? "¿Reabrir este proyecto?"
+          : "¿Marcar este proyecto como cerrado?";
+        if (window.confirm(msg)) mutation.mutate();
+      }}
+      title={isFinished ? "Reabrir proyecto" : "Marcar como cerrado"}
+      className="text-[10px] text-slate-400 hover:text-indigo-600 underline disabled:opacity-50"
+    >
+      {mutation.isPending ? "…" : isFinished ? "reabrir" : "cerrar"}
+    </button>
+  );
+}
 
 function ProjectRow({
   p,
@@ -504,15 +567,26 @@ function ProjectRow({
 
       {/* Status */}
       <td className="py-2.5 px-3">
-        <span
-          className={`text-[11px] rounded-full px-2 py-0.5 ${
-            p.status === "Active"
-              ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200"
-              : "bg-slate-100 text-slate-400"
-          }`}
-        >
-          {p.status === "Active" ? "Activo" : "Inactivo"}
-        </span>
+        <div className="flex items-center gap-1.5">
+          {p.isFinished ? (
+            <span className="text-[11px] rounded-full px-2 py-0.5 bg-slate-200 text-slate-600 ring-1 ring-slate-300">
+              Cerrado
+            </span>
+          ) : (
+            <span
+              className={`text-[11px] rounded-full px-2 py-0.5 ${
+                p.status === "Active"
+                  ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200"
+                  : "bg-slate-100 text-slate-500"
+              }`}
+            >
+              {p.status === "Active" ? "Activo" : "Inactivo"}
+            </span>
+          )}
+          {isOperations && p.projectId != null && (
+            <ProjectStatusToggle projectId={p.projectId} isFinished={!!p.isFinished} />
+          )}
+        </div>
       </td>
 
       {/* Revenue */}
@@ -674,6 +748,7 @@ export default function ActiveProjectsNext() {
   const [freshToggle, setFreshToggle] = useState(false);
   const [search, setSearch] = useState("");
   const [activeOnly, setActiveOnly] = useState(true);
+  const [statusFilter, setStatusFilter] = useState<"open" | "closed" | "all">("open");
 
   useEffect(() => {
     if (typeof window !== "undefined") window.localStorage.setItem("ap.period", period);
@@ -699,6 +774,8 @@ export default function ActiveProjectsNext() {
     const q = search.trim().toLowerCase();
     return (data?.projects ?? [])
       .filter(p => {
+        if (statusFilter === "open" && p.isFinished) return false;
+        if (statusFilter === "closed" && !p.isFinished) return false;
         if (activeOnly && !isRecentlyActive(p, period)) return false;
         if (q && !`${p.clientName} ${p.projectName}`.toLowerCase().includes(q)) return false;
         return true;
@@ -711,7 +788,7 @@ export default function ActiveProjectsNext() {
         const rb = b.metrics.revenueUSDNormalized ?? b.metrics.revenueDisplay ?? 0;
         return rb - ra;
       });
-  }, [data?.projects, search, activeOnly, period]);
+  }, [data?.projects, search, activeOnly, statusFilter, period]);
 
   // Group by client — clients with worst health bubble up
   const clientGroups = useMemo(() => {
@@ -774,6 +851,8 @@ export default function ActiveProjectsNext() {
           setSearch={setSearch}
           activeOnly={activeOnly}
           setActiveOnly={setActiveOnly}
+          statusFilter={statusFilter}
+          setStatusFilter={setStatusFilter}
         />
 
         {/* KPI Bar */}

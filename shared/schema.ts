@@ -408,6 +408,7 @@ export const quotations = pgTable("quotations", {
   applyInflationAdjustment: boolean("apply_inflation_adjustment").default(false), // Si aplicar ajuste inflacionario
   inflationMethod: text("inflation_method").default("automatic"), // 'automatic' o 'manual'
   manualInflationRate: doublePrecision("manual_inflation_rate"), // Tasa manual si method = 'manual'
+  rateProjectionMode: text("rate_projection_mode").default("current"), // 'current' | 'projected' | 'annual_avg' — modo de proyección del valor hora
   projectedCostARS: doublePrecision("projected_cost_ars"), // Costo proyectado en pesos argentinos
   usdExchangeRate: doublePrecision("usd_exchange_rate"), // Tipo de cambio USD/ARS al momento de cotización
   quotationCurrency: text("quotation_currency").default("ARS"), // 'ARS' o 'USD'
