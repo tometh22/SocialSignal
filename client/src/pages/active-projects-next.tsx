@@ -15,12 +15,25 @@ import { Link } from "wouter";
 
 export type Currency = "ARS" | "USD";
 
+export type LifecycleStatus =
+  | "active"
+  | "on-hold"
+  | "delivered"
+  | "invoiced"
+  | "completed"
+  | "cancelled"
+  | "voided";
+
 export type ProjectItem = {
   projectId?: number;
   clientName: string;
   projectName: string;
   projectKey?: string;
   status?: "Active" | "Inactive";
+  lifecycleStatus?: LifecycleStatus;
+  deliveredAt?: string | null;
+  invoicedAt?: string | null;
+  closedAt?: string | null;
   tags?: string[];
   currencyNative?: Currency;
   isOneShot?: boolean;
@@ -44,6 +57,26 @@ export type ProjectItem = {
   isFinished?: boolean;
   supportsRollup?: boolean;
   allowFinish?: boolean;
+};
+
+export const LIFECYCLE_LABELS: Record<LifecycleStatus, string> = {
+  "active": "Activo",
+  "on-hold": "En espera",
+  "delivered": "Entregado",
+  "invoiced": "Facturado",
+  "completed": "Finalizado",
+  "cancelled": "Cancelado",
+  "voided": "Anulado",
+};
+
+export const LIFECYCLE_BADGE_CLASS: Record<LifecycleStatus, string> = {
+  "active":    "bg-emerald-100 text-emerald-800 border-emerald-200",
+  "on-hold":   "bg-amber-100 text-amber-800 border-amber-200",
+  "delivered": "bg-sky-100 text-sky-800 border-sky-200",
+  "invoiced":  "bg-indigo-100 text-indigo-800 border-indigo-200",
+  "completed": "bg-slate-100 text-slate-700 border-slate-200",
+  "cancelled": "bg-rose-100 text-rose-800 border-rose-200",
+  "voided":    "bg-red-100 text-red-800 border-red-200",
 };
 
 export type ProjectsApi = {
@@ -155,7 +188,14 @@ function transformBackendResponse(backendData: any): ProjectsApi {
       clientName.toLowerCase().includes("warner") ||
       clientName.toLowerCase().includes("kimberly");
     const currencyNative: Currency = isUSDClient ? "USD" : "ARS";
-    const status = p.status === "active" || p.status === "Active" ? "Active" : "Inactive";
+    const lifecycleStatus: LifecycleStatus = (
+      ["active", "on-hold", "delivered", "invoiced", "completed", "cancelled", "voided"].includes(p.status)
+        ? p.status
+        : "active"
+    ) as LifecycleStatus;
+    // Back-compat: los filtros/legacy siguen usando Active/Inactive — los estados "terminales" cuentan como inactivos.
+    const inactiveLifecycle = ["completed", "cancelled", "voided"];
+    const status: "Active" | "Inactive" = inactiveLifecycle.includes(lifecycleStatus) ? "Inactive" : "Active";
     const tags: string[] = [];
     if (p.type === "fee" || p.type === "Fee") tags.push("Fee");
     if (p.type === "one-shot" || p.type === "One-Shot") tags.push("One-Shot");
@@ -177,6 +217,10 @@ function transformBackendResponse(backendData: any): ProjectsApi {
       projectName: p.name || p.projectName || "",
       projectKey: `${clientName.toLowerCase()}|${(p.name || "").toLowerCase()}`,
       status,
+      lifecycleStatus,
+      deliveredAt: p.deliveredAt ?? null,
+      invoicedAt: p.invoicedAt ?? null,
+      closedAt: p.closedAt ?? null,
       tags,
       currencyNative,
       isOneShot: p.isOneShot,
@@ -318,6 +362,8 @@ function Controls({
   setSearch,
   activeOnly,
   setActiveOnly,
+  statusFilter,
+  setStatusFilter,
 }: {
   period: string;
   setPeriod: (p: string) => void;
@@ -327,6 +373,8 @@ function Controls({
   setSearch: (s: string) => void;
   activeOnly: boolean;
   setActiveOnly: (v: boolean) => void;
+  statusFilter: LifecycleStatus | "all";
+  setStatusFilter: (s: LifecycleStatus | "all") => void;
 }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -384,6 +432,22 @@ function Controls({
           className="w-52 rounded-lg border border-slate-200 pl-8 pr-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white"
         />
       </div>
+
+      {/* Status filter (granular lifecycle) */}
+      <select
+        value={statusFilter}
+        onChange={e => setStatusFilter(e.target.value as LifecycleStatus | "all")}
+        className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+      >
+        <option value="all">Todos los estados</option>
+        <option value="active">Activos</option>
+        <option value="on-hold">En espera</option>
+        <option value="delivered">Entregados</option>
+        <option value="invoiced">Facturados</option>
+        <option value="completed">Finalizados</option>
+        <option value="cancelled">Cancelados</option>
+        <option value="voided">Anulados</option>
+      </select>
 
       {/* Active filter */}
       <button
@@ -504,15 +568,17 @@ function ProjectRow({
 
       {/* Status */}
       <td className="py-2.5 px-3">
-        <span
-          className={`text-[11px] rounded-full px-2 py-0.5 ${
-            p.status === "Active"
-              ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200"
-              : "bg-slate-100 text-slate-400"
-          }`}
-        >
-          {p.status === "Active" ? "Activo" : "Inactivo"}
-        </span>
+        {(() => {
+          const ls = p.lifecycleStatus ?? (p.status === "Active" ? "active" : "completed");
+          return (
+            <span
+              className={`text-[11px] rounded-full px-2 py-0.5 border ${LIFECYCLE_BADGE_CLASS[ls]}`}
+              title={p.closedAt ? `Cerrado ${new Date(p.closedAt).toLocaleDateString('es-AR')}` : undefined}
+            >
+              {LIFECYCLE_LABELS[ls]}
+            </span>
+          );
+        })()}
       </td>
 
       {/* Revenue */}
@@ -674,6 +740,7 @@ export default function ActiveProjectsNext() {
   const [freshToggle, setFreshToggle] = useState(false);
   const [search, setSearch] = useState("");
   const [activeOnly, setActiveOnly] = useState(true);
+  const [statusFilter, setStatusFilter] = useState<LifecycleStatus | "all">("all");
 
   useEffect(() => {
     if (typeof window !== "undefined") window.localStorage.setItem("ap.period", period);
@@ -700,6 +767,7 @@ export default function ActiveProjectsNext() {
     return (data?.projects ?? [])
       .filter(p => {
         if (activeOnly && !isRecentlyActive(p, period)) return false;
+        if (statusFilter !== "all" && (p.lifecycleStatus ?? "active") !== statusFilter) return false;
         if (q && !`${p.clientName} ${p.projectName}`.toLowerCase().includes(q)) return false;
         return true;
       })
@@ -711,7 +779,7 @@ export default function ActiveProjectsNext() {
         const rb = b.metrics.revenueUSDNormalized ?? b.metrics.revenueDisplay ?? 0;
         return rb - ra;
       });
-  }, [data?.projects, search, activeOnly, period]);
+  }, [data?.projects, search, activeOnly, period, statusFilter]);
 
   // Group by client — clients with worst health bubble up
   const clientGroups = useMemo(() => {
@@ -774,6 +842,8 @@ export default function ActiveProjectsNext() {
           setSearch={setSearch}
           activeOnly={activeOnly}
           setActiveOnly={setActiveOnly}
+          statusFilter={statusFilter}
+          setStatusFilter={setStatusFilter}
         />
 
         {/* KPI Bar */}

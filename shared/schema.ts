@@ -2443,7 +2443,9 @@ export const activeProjectItemSchema = z.object({
   clientId: z.number(),
   name: z.string(),
   type: z.enum(['fee', 'one-shot', 'other']),
-  status: z.enum(['active', 'paused', 'completed']),
+  // Nota: el enum legado de la lista era 'active|paused|completed'.
+  // Ampliamos a los estados reales del ciclo de vida (ver PROJECT_STATUSES).
+  status: z.enum(PROJECT_STATUSES),
   client: z.object({
     id: z.number(),
     name: z.string(),
@@ -2471,7 +2473,11 @@ export const activeProjectItemSchema = z.object({
   lastActivity: z.string().optional(),   // YYYY-MM
   isFinished: z.boolean().optional(),
   supportsRollup: z.boolean().optional(),
-  allowFinish: z.boolean().optional()
+  allowFinish: z.boolean().optional(),
+  // Lifecycle timestamps (null si no ocurrió todavía)
+  deliveredAt: z.string().nullable().optional(),
+  invoicedAt: z.string().nullable().optional(),
+  closedAt: z.string().nullable().optional(),
 });
 
 export type ActiveProjectItem = z.infer<typeof activeProjectItemSchema>;
