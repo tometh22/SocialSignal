@@ -15,9 +15,15 @@ export const users = pgTable("users", {
   isAdmin: boolean("is_admin").default(false),
   isActive: boolean("is_active").default(true),
   permissions: text("permissions").array().default([]),
+  // Paralelo a isAdmin/permissions para soportar el rol "external_provider" sin romper
+  // checks existentes basados en isAdmin. Valores: 'admin' | 'manager' | 'member' | 'external_provider'.
+  role: text("role").notNull().default("member"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
+
+export const USER_ROLES = ["admin", "manager", "member", "external_provider"] as const;
+export type UserRole = typeof USER_ROLES[number];
 
 // Esquema para crear usuarios
 export const insertUserSchema = createInsertSchema(users).omit({
@@ -730,7 +736,7 @@ export const activeProjects = pgTable("active_projects", {
   id: serial("id").primaryKey(),
   quotationId: integer("quotation_id").notNull().references(() => quotations.id),
   clientId: integer("client_id").notNull().references(() => clients.id),
-  status: text("status").notNull().default("active"), // active, completed, cancelled, on-hold
+  status: text("status").notNull().default("active"), // active, completed, cancelled, on-hold, delivered, invoiced, voided
   startDate: timestamp("start_date").notNull(),
   expectedEndDate: timestamp("expected_end_date"),
   actualEndDate: timestamp("actual_end_date"),
@@ -766,7 +772,24 @@ export const activeProjects = pgTable("active_projects", {
 
   // Campo para marcar proyectos como terminados/archivados
   isFinished: boolean("is_finished").default(false), // indica si el proyecto ha sido marcado como terminado
+
+  // Estados granulares del ciclo de vida (replica de abejita)
+  deliveredAt: timestamp("delivered_at"), // fecha en que se entregó al cliente
+  invoicedAt: timestamp("invoiced_at"), // fecha en que se facturó
+  closedAt: timestamp("closed_at"), // fecha en que se cerró formalmente (bloquea costos/horas)
+  closedBy: integer("closed_by").references(() => users.id, { onDelete: 'set null' }), // quién cerró
 });
+
+export const PROJECT_STATUSES = [
+  "active",
+  "on-hold",
+  "delivered",
+  "invoiced",
+  "completed",
+  "cancelled",
+  "voided",
+] as const;
+export type ProjectStatus = typeof PROJECT_STATUSES[number];
 
 // Esquema base generado por drizzle-zod
 const baseInsertActiveProjectSchema = createInsertSchema(activeProjects).omit({
@@ -800,6 +823,13 @@ export const insertActiveProjectSchema = baseInsertActiveProjectSchema.extend({
   budget: z.number().nullable().optional(),
   selectedVariantId: z.number().nullable().optional(),
   projectCategory: z.enum(["billable", "internal"]).default("billable"),
+
+  // Estados granulares + campos de cierre
+  status: z.enum(PROJECT_STATUSES).default("active").optional(),
+  deliveredAt: z.union([z.date(), z.string().transform((str) => new Date(str))]).nullable().optional(),
+  invoicedAt: z.union([z.date(), z.string().transform((str) => new Date(str))]).nullable().optional(),
+  closedAt: z.union([z.date(), z.string().transform((str) => new Date(str))]).nullable().optional(),
+  closedBy: z.number().nullable().optional(),
 });
 
 // ==================== PROJECT ALIASES FOR EXCEL MAPPING ====================
@@ -3449,3 +3479,98 @@ export const insertReviewRoomMemberSchema = createInsertSchema(reviewRoomMembers
 });
 export type ReviewRoomMember = typeof reviewRoomMembers.$inferSelect;
 export type InsertReviewRoomMember = z.infer<typeof insertReviewRoomMemberSchema>;
+
+// ==================== FACTURA MENSUAL PERSONAL ====================
+// Cada usuario (interno o external_provider) sube una factura por mes.
+// La última subida reemplaza la anterior (UNIQUE userId+period). El historial se
+// consulta ordenando por period DESC. Totales son snapshot al momento de subir.
+export const personalMonthlyInvoices = pgTable("personal_monthly_invoices", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  personnelId: integer("personnel_id").references(() => personnel.id, { onDelete: 'set null' }),
+  period: varchar("period", { length: 7 }).notNull(), // YYYY-MM
+  fileUrl: text("file_url").notNull(),
+  fileName: text("file_name").notNull(),
+  fileSize: integer("file_size").notNull(),
+  mimeType: varchar("mime_type", { length: 100 }).notNull(),
+  computedTotalCostARS: doublePrecision("computed_total_cost_ars"),
+  computedTotalCostUSD: doublePrecision("computed_total_cost_usd"),
+  hoursTotal: doublePrecision("hours_total"),
+  notes: text("notes"),
+  uploadedAt: timestamp("uploaded_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (t) => ({
+  uqUserPeriod: unique("personal_monthly_invoices_user_period_unique").on(t.userId, t.period),
+  idxUser: index("idx_pmi_user").on(t.userId),
+  idxPeriod: index("idx_pmi_period").on(t.period),
+}));
+
+export const insertPersonalMonthlyInvoiceSchema = createInsertSchema(personalMonthlyInvoices).omit({
+  id: true,
+  uploadedAt: true,
+  updatedAt: true,
+}).extend({
+  period: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, "Formato YYYY-MM"),
+});
+
+export type PersonalMonthlyInvoice = typeof personalMonthlyInvoices.$inferSelect;
+export type InsertPersonalMonthlyInvoice = z.infer<typeof insertPersonalMonthlyInvoiceSchema>;
+
+// ==================== PROVEEDORES EXTERNOS ====================
+// Un proveedor externo es un usuario con role='external_provider' que accede sólo
+// a proyectos explícitamente asignados vía providerProjectAccess. Un proveedor
+// puede mapearse opcionalmente a una fila de personnel (si la empresa ya lo tiene
+// cargado como recurso).
+export const externalProviders = pgTable("external_providers", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }).unique(),
+  personnelId: integer("personnel_id").references(() => personnel.id, { onDelete: 'set null' }),
+  companyName: varchar("company_name", { length: 255 }).notNull(),
+  taxId: varchar("tax_id", { length: 50 }),
+  contactEmail: varchar("contact_email", { length: 255 }),
+  contactPhone: varchar("contact_phone", { length: 50 }),
+  hourlyRate: doublePrecision("hourly_rate"), // USD
+  hourlyRateARS: doublePrecision("hourly_rate_ars"),
+  active: boolean("active").notNull().default(true),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  createdBy: integer("created_by").references(() => users.id, { onDelete: 'set null' }),
+}, (t) => ({
+  idxCompany: index("idx_external_providers_company").on(t.companyName),
+}));
+
+export const insertExternalProviderSchema = createInsertSchema(externalProviders).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  companyName: z.string().trim().min(1).max(255),
+  contactEmail: z.string().email().nullable().optional(),
+});
+
+export type ExternalProvider = typeof externalProviders.$inferSelect;
+export type InsertExternalProvider = z.infer<typeof insertExternalProviderSchema>;
+
+// Acceso granular de proveedor a proyectos (m:n).
+export const providerProjectAccess = pgTable("provider_project_access", {
+  id: serial("id").primaryKey(),
+  providerId: integer("provider_id").notNull().references(() => externalProviders.id, { onDelete: 'cascade' }),
+  projectId: integer("project_id").notNull().references(() => activeProjects.id, { onDelete: 'cascade' }),
+  canLogHours: boolean("can_log_hours").notNull().default(true),
+  canUploadCosts: boolean("can_upload_costs").notNull().default(true),
+  grantedAt: timestamp("granted_at").notNull().defaultNow(),
+  grantedBy: integer("granted_by").references(() => users.id, { onDelete: 'set null' }),
+}, (t) => ({
+  uqProviderProject: unique("provider_project_access_unique").on(t.providerId, t.projectId),
+  idxProvider: index("idx_ppa_provider").on(t.providerId),
+  idxProject: index("idx_ppa_project").on(t.projectId),
+}));
+
+export const insertProviderProjectAccessSchema = createInsertSchema(providerProjectAccess).omit({
+  id: true,
+  grantedAt: true,
+});
+
+export type ProviderProjectAccess = typeof providerProjectAccess.$inferSelect;
+export type InsertProviderProjectAccess = z.infer<typeof insertProviderProjectAccessSchema>;
