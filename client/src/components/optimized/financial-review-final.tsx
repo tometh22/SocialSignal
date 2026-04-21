@@ -160,46 +160,43 @@ export default function FinancialReviewFinal() {
   let totalInflationPercentage = 0;
   let monthsToProject = 0;
 
-  if (quotationData.inflation.applyInflationAdjustment && quotationData.inflation.projectStartDate) {
-    const startDate = new Date(quotationData.inflation.projectStartDate);
-    const currentDate = new Date();
-    monthsToProject = (startDate.getFullYear() - currentDate.getFullYear()) * 12 + 
-                     (startDate.getMonth() - currentDate.getMonth());
+  const rateMode = quotationData.inflation.rateProjectionMode ??
+    (quotationData.inflation.applyInflationAdjustment ? "projected" : "current");
 
-    if (monthsToProject > 0) {
-      // Get annual inflation rate
-      let annualInflationRate;
-      if (quotationData.inflation.inflationMethod === 'manual') {
-        annualInflationRate = quotationData.inflation.manualInflationRate || 25;
-      } else {
-        annualInflationRate = 25; // Default automatic
+  if (rateMode !== "current" && quotationData.inflation.applyInflationAdjustment) {
+    const annualInflationRate = quotationData.inflation.inflationMethod === 'manual'
+      ? (quotationData.inflation.manualInflationRate || 25)
+      : 25;
+    const monthlyRateDecimal = Math.pow(1 + (annualInflationRate / 100), 1/12) - 1;
+    monthlyInflationRate = monthlyRateDecimal * 100;
+
+    let inflationFactor = 1;
+
+    if (rateMode === "projected" && quotationData.inflation.projectStartDate) {
+      const startDate = new Date(quotationData.inflation.projectStartDate);
+      const currentDate = new Date();
+      monthsToProject = (startDate.getFullYear() - currentDate.getFullYear()) * 12 +
+                       (startDate.getMonth() - currentDate.getMonth());
+      if (monthsToProject > 0) {
+        inflationFactor = Math.pow(1 + monthlyRateDecimal, monthsToProject);
       }
-
-      // Calculate monthly compound rate: (1 + annual_rate)^(1/12) - 1
-      const monthlyRateDecimal = Math.pow(1 + (annualInflationRate / 100), 1/12) - 1;
-      monthlyInflationRate = monthlyRateDecimal * 100;
-
-      // Compound inflation factor for N months
-      const inflationFactor = Math.pow(1 + monthlyRateDecimal, monthsToProject);
-      totalInflationPercentage = (inflationFactor - 1) * 100;
-
-      // Apply inflation directly to base cost in ARS
-      inflationProjectedCostARS = baseForInflation * inflationFactor;
-      inflationAdjustmentARS = inflationProjectedCostARS - baseForInflation;
-
-      console.log('🏦 Inflation calculation in ARS:');
-      console.log('💰 Base:', baseForInflation, 'ARS');
-      console.log('📊 Inflation factor:', inflationFactor.toFixed(4));
-      console.log('💰 Projected:', inflationProjectedCostARS.toFixed(2), 'ARS');
-      console.log('💰 Adjustment:', inflationAdjustmentARS.toFixed(2), 'ARS');
+    } else if (rateMode === "annual_avg") {
+      // Promedio anual: factor compuesto evaluado al punto medio del año (mes 6).
+      // Aproxima el valor hora "promedio" de una persona durante los 12 meses del proyecto.
+      monthsToProject = 6;
+      inflationFactor = Math.pow(1 + monthlyRateDecimal, 6);
     }
+
+    totalInflationPercentage = (inflationFactor - 1) * 100;
+    inflationProjectedCostARS = baseForInflation * inflationFactor;
+    inflationAdjustmentARS = inflationProjectedCostARS - baseForInflation;
   }
 
   // Calculate final base after inflation (if any)
   let finalBaseAfterInflationARS = inflationProjectedCostARS;
 
-  // If inflation wasn't applied, use the original subtotal
-  if (!quotationData.inflation.applyInflationAdjustment) {
+  // If inflation wasn't applied (mode "current" or toggle off), use the original subtotal
+  if (!quotationData.inflation.applyInflationAdjustment || rateMode === "current") {
     finalBaseAfterInflationARS = subtotalWithComplexityARS;
   }
 
@@ -239,6 +236,7 @@ export default function FinancialReviewFinal() {
   const subtotalWithMarginUSD = convertToUSD(subtotalWithMarginARS, 'ARS');
   const finalTotalUSD = convertToUSD(finalTotalARS, 'ARS');
   const inflationAdjustmentUSD = convertToUSD(inflationAdjustmentARS, 'ARS');
+  const toolsCostUSD = convertToUSD(toolsCostARS, 'ARS');
   
   // All values are already in ARS - no conversion needed for display
   const teamBaseCostDisplay = teamBaseCostARS;
@@ -1056,6 +1054,28 @@ export default function FinancialReviewFinal() {
                     </Badge>
                   </div>
 
+                  <div className="space-y-2">
+                    <Label className="font-medium">Modo de proyección del valor hora</Label>
+                    <Select
+                      value={quotationData.inflation.rateProjectionMode ?? "projected"}
+                      onValueChange={(value) =>
+                        updateInflation({ rateProjectionMode: value as "current" | "projected" | "annual_avg" })
+                      }
+                    >
+                      <SelectTrigger className="border-orange-200 focus:border-orange-400">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="current">Valor actual (foto del mes)</SelectItem>
+                        <SelectItem value="projected">Proyectado al mes del proyecto</SelectItem>
+                        <SelectItem value="annual_avg">Promedio anual</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-[11px] text-orange-700/80">
+                      Seleccioná si el valor hora debe ser el actual, el proyectado al mes de arranque, o el promedio anual estimado del equipo.
+                    </p>
+                  </div>
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label className="font-medium">Fecha de inicio del proyecto</Label>
@@ -1065,7 +1085,11 @@ export default function FinancialReviewFinal() {
                         onChange={(e) => updateInflation({ projectStartDate: e.target.value })}
                         min={new Date().toISOString().split('T')[0]}
                         className="border-orange-200 focus:border-orange-400"
+                        disabled={quotationData.inflation.rateProjectionMode === "annual_avg"}
                       />
+                      {quotationData.inflation.rateProjectionMode === "annual_avg" && (
+                        <p className="text-[11px] text-orange-600/80">No aplica en modo promedio anual.</p>
+                      )}
                     </div>
 
                     <div className="space-y-2">

@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useActiveTimer, formatElapsed } from "@/hooks/useActiveTimer";
+import { roundToQuarterHour } from "@shared/utils/num";
 
 type Task = {
   id: number;
@@ -251,12 +252,17 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
   };
 
   const handleLogTime = () => {
-    const hours = parseHoursInput(logHours);
-    if (!hours || hours <= 0) {
-      toast({ variant: "destructive", title: "Error", description: "Ingresá un valor válido: ej. 1.5, 1h30" });
+    const parsed = parseHoursInput(logHours);
+    if (!parsed || parsed <= 0) {
+      toast({ variant: "destructive", title: "Error", description: "Ingresá un valor válido: ej. 1.5, 1h30, 1:15" });
       return;
     }
-    logTimeMutation.mutate({ personnelId: task?.assigneeId, date: logDate, hours: Math.round(hours * 100) / 100, description: logDesc });
+    const hours = roundToQuarterHour(parsed);
+    if (hours <= 0) {
+      toast({ variant: "destructive", title: "Mínimo 15 min", description: "El registro mínimo es 0.25h (15 min)." });
+      return;
+    }
+    logTimeMutation.mutate({ personnelId: task?.assigneeId, date: logDate, hours, description: logDesc });
   };
 
   const handleDescBlur = (value: string) => {
@@ -730,14 +736,14 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
                       <div className="px-3 py-3 border-b border-border bg-accent/10 space-y-2.5">
                         <div className="grid grid-cols-2 gap-2">
                           <div>
-                            <p className="text-[10px] text-muted-foreground mb-1">Horas *</p>
+                            <p className="text-[10px] text-muted-foreground mb-1">Horas * <span className="text-muted-foreground/70">(múltiplos de 15 min)</span></p>
                             <Input
                               autoFocus
                               value={logHours}
                               onChange={e => setLogHours(e.target.value)}
                               onKeyDown={e => { if (e.key === "Enter") handleLogTime(); }}
                               className="h-8 text-sm"
-                              placeholder="ej: 1.5 · 1h30"
+                              placeholder="ej: 0.25 · 1.5 · 1h30"
                             />
                           </div>
                           <div>

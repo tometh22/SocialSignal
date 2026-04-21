@@ -59,6 +59,7 @@ export interface QuotationData {
     inflationMethod: string;
     manualInflationRate: number;
     projectStartDate: string;
+    rateProjectionMode?: "current" | "projected" | "annual_avg";
   };
   proposalLink?: string; // Link a la propuesta original
   leadId?: number; // Lead CRM de origen (para integración CRM-Cotizaciones)
@@ -167,7 +168,8 @@ const initialQuotationData: QuotationData = {
     applyInflationAdjustment: false,
     inflationMethod: "manual",
     manualInflationRate: 25,
-    projectStartDate: ""
+    projectStartDate: "",
+    rateProjectionMode: "current"
   }
 };
 
@@ -927,7 +929,8 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
           applyInflationAdjustment: Boolean(quotation.applyInflationAdjustment),
           inflationMethod: quotation.inflationMethod || "manual",
           manualInflationRate: Number(quotation.manualInflationRate || 0),
-          projectStartDate: quotation.projectStartDate ? new Date(quotation.projectStartDate).toISOString().split('T')[0] : ""
+          projectStartDate: quotation.projectStartDate ? new Date(quotation.projectStartDate).toISOString().split('T')[0] : "",
+          rateProjectionMode: ((quotation as any).rateProjectionMode as "current" | "projected" | "annual_avg") || (quotation.applyInflationAdjustment ? "projected" : "current"),
         },
         proposalLink: quotation.proposalLink || undefined
       };
@@ -1002,6 +1005,7 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
         inflationMethod: quotationData.inflation.inflationMethod || 'manual',
         manualInflationRate: quotationData.inflation.manualInflationRate || 0,
         projectStartDate: quotationData.inflation.projectStartDate ? new Date(quotationData.inflation.projectStartDate) : undefined,
+        rateProjectionMode: quotationData.inflation.rateProjectionMode || 'current',
         quotationCurrency: quotationData.quotationCurrency || 'ARS',
         exchangeRateAtQuote: quotationData.exchangeRateSnapshot || null,
         proposalLink: quotationData.proposalLink || null,
