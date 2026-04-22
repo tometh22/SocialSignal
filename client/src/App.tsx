@@ -27,6 +27,7 @@ import NewProjectWithTooltips from "@/pages/new-project-with-tooltips";
 import TimeEntries from "@/pages/time-entries";
 import MyInvoices from "@/pages/my-invoices";
 import AdminProviders from "@/pages/admin-providers";
+import ProviderDashboard from "@/pages/provider/dashboard";
 import EditProject from "@/pages/edit-project";
 import ProjectFinancialManagement from "@/pages/project-financial-management";
 
@@ -191,6 +192,10 @@ function AppRoutes() {
 
                   {/* Admin: gestión de proveedores externos */}
                   <ProtectedRoute path="/admin/providers" component={AdminProviders} requiredPermission="admin" />
+
+                  {/* Proveedor externo: vista propia */}
+                  <ProtectedRoute path="/provider/dashboard" component={ProviderDashboard} />
+                  <ProtectedRoute path="/provider" component={() => <Redirect to="/provider/dashboard" />} />
 
                   {/* Analytics & Reports */}
                   <ProtectedRoute path="/project-analytics/:projectId" component={ProjectAnalyticsView} requiredPermission="finance" />

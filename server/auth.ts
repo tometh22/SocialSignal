@@ -168,6 +168,7 @@ export function setupAuth(app: Express, storage: IStorage) {
         isAdmin: user.isAdmin,
         isActive: user.isActive,
         permissions: (user as any).permissions || [],
+        role: (user as any).role || (user.isAdmin ? 'admin' : 'member'),
         sessionToken: req.sessionID,
       };
 
