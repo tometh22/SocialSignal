@@ -39,6 +39,7 @@ import {
   CalendarCheck,
   TrendingUp,
   Calendar,
+  Receipt,
 } from "lucide-react";
 
 const PROJECT_ICON_COLORS = [
@@ -206,6 +207,12 @@ export default function SidebarFixed() {
         { href: "/operations/monthly-closing", title: "Cierre Mensual", icon: CalendarCheck, description: "Cierre de horas del mes", permission: 'operations' as AppSection },
         { href: "/operations/estimated-rates", title: "Valor Hora", icon: TrendingUp, description: "Proyección de valor hora", permission: 'operations' as AppSection },
         { href: "/operations/holidays", title: "Feriados", icon: Calendar, description: "Gestión de feriados", permission: 'operations' as AppSection },
+      ]
+    },
+    {
+      title: "Mi cuenta",
+      items: [
+        { href: "/my-invoices", title: "Mis facturas", icon: Receipt, description: "Subí tu factura mensual" },
       ]
     },
     {

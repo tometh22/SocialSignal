@@ -115,7 +115,8 @@ import { resolveTimeFilter } from "./services/time";
 import { CoverageCalculator } from "./domain/coverage";
 import { eq, and, isNull, isNotNull, desc, sql, asc, gte, lte, inArray } from "drizzle-orm";
 import { reinitializeDatabase } from "./reinit-data";
-import { upload, uploadDocument, deleteOldFile } from "./upload";
+import { upload, uploadDocument, uploadInvoice, deleteOldFile } from "./upload";
+import { personalMonthlyInvoices, externalProviders as externalProvidersTable, providerProjectAccess as providerProjectAccessTable } from "@shared/schema";
 import { sanitizeInput } from "./input-sanitization";
 import { setupAuth, hashPassword } from "./auth";
 import { requireProjectUnlocked, projectIdFromTimeEntry } from "./middleware/projectLocked";
@@ -8595,6 +8596,184 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error reinitializing database:", error);
       res.status(500).json({ message: "Failed to reinitialize database" });
+    }
+  });
+
+  // =========== FACTURA MENSUAL PERSONAL ===========
+  // Endpoints para que cada usuario gestione su factura del mes (una por mes).
+
+  // Helper: suma horas/costos del mes a partir de timeEntries
+  async function getMonthlyPersonalSummary(userId: number, period: string) {
+    // Period is YYYY-MM. First look up the personnel row that maps to this user (if any)
+    // via the users.email match. Si no existe personnel, devuelve ceros.
+    const user = await storage.getUser(userId);
+    if (!user) return null;
+    const personnelRow = user.email
+      ? (await storage.getPersonnel()).find(p => p.email === user.email)
+      : null;
+
+    if (!personnelRow) {
+      return {
+        period,
+        userId,
+        personnelId: null,
+        hours: 0,
+        totalCostARS: 0,
+        totalCostUSD: 0,
+        entryCount: 0,
+      };
+    }
+
+    const [yyyy, mm] = period.split("-").map(Number);
+    const start = new Date(yyyy, mm - 1, 1);
+    const end = new Date(yyyy, mm, 1);
+
+    const rows = await db
+      .select({
+        hours: timeEntries.hours,
+        totalCost: timeEntries.totalCost,
+      })
+      .from(timeEntries)
+      .where(and(
+        eq(timeEntries.personnelId, personnelRow.id),
+        gte(timeEntries.date, start),
+        lte(timeEntries.date, end),
+      ));
+
+    let hours = 0;
+    let totalCostARS = 0;
+    for (const r of rows) {
+      hours += Number(r.hours) || 0;
+      totalCostARS += Number(r.totalCost) || 0;
+    }
+
+    return {
+      period,
+      userId,
+      personnelId: personnelRow.id,
+      hours,
+      totalCostARS,
+      totalCostUSD: 0, // podría calcularse con exchange rate del mes; por ahora ARS puro
+      entryCount: rows.length,
+    };
+  }
+
+  // Historial de facturas del usuario logueado
+  app.get("/api/me/invoices", requireAuth, async (req, res) => {
+    try {
+      const rows = await db
+        .select()
+        .from(personalMonthlyInvoices)
+        .where(eq(personalMonthlyInvoices.userId, req.user!.id))
+        .orderBy(desc(personalMonthlyInvoices.period));
+      res.json(rows);
+    } catch (error) {
+      console.error("Error obteniendo facturas personales:", error);
+      res.status(500).json({ message: "Error al obtener facturas" });
+    }
+  });
+
+  // Resumen del mes (horas + costo calculado) a facturar
+  app.get("/api/me/invoices/summary", requireAuth, async (req, res) => {
+    try {
+      const period = typeof req.query.period === "string" ? req.query.period : "";
+      if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(period)) {
+        return res.status(400).json({ message: "Formato de período inválido (YYYY-MM)" });
+      }
+      const summary = await getMonthlyPersonalSummary(req.user!.id, period);
+      res.json(summary);
+    } catch (error) {
+      console.error("Error calculando resumen mensual personal:", error);
+      res.status(500).json({ message: "Error al calcular resumen" });
+    }
+  });
+
+  // Subir/reemplazar factura del mes
+  app.post("/api/me/invoices", requireAuth, uploadInvoice.single("file"), async (req, res) => {
+    try {
+      const period = String(req.body?.period ?? "");
+      if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(period)) {
+        return res.status(400).json({ message: "Formato de período inválido (YYYY-MM)" });
+      }
+      if (!req.file) {
+        return res.status(400).json({ message: "No se recibió el archivo" });
+      }
+
+      const summary = await getMonthlyPersonalSummary(req.user!.id, period);
+      const relPath = `/uploads/invoices/${req.user!.id}/${req.file.filename}`;
+
+      // Check if an invoice already exists for this user+period — delete the old file first
+      const [existing] = await db
+        .select()
+        .from(personalMonthlyInvoices)
+        .where(and(
+          eq(personalMonthlyInvoices.userId, req.user!.id),
+          eq(personalMonthlyInvoices.period, period),
+        ));
+
+      if (existing) {
+        if (existing.fileUrl) deleteOldFile(existing.fileUrl);
+        const [updated] = await db
+          .update(personalMonthlyInvoices)
+          .set({
+            fileUrl: relPath,
+            fileName: req.file.originalname,
+            fileSize: req.file.size,
+            mimeType: req.file.mimetype,
+            computedTotalCostARS: summary?.totalCostARS ?? null,
+            computedTotalCostUSD: summary?.totalCostUSD ?? null,
+            hoursTotal: summary?.hours ?? null,
+            personnelId: summary?.personnelId ?? null,
+            updatedAt: new Date(),
+            notes: req.body?.notes ?? existing.notes,
+          })
+          .where(eq(personalMonthlyInvoices.id, existing.id))
+          .returning();
+        return res.json(updated);
+      }
+
+      const [created] = await db
+        .insert(personalMonthlyInvoices)
+        .values({
+          userId: req.user!.id,
+          personnelId: summary?.personnelId ?? null,
+          period,
+          fileUrl: relPath,
+          fileName: req.file.originalname,
+          fileSize: req.file.size,
+          mimeType: req.file.mimetype,
+          computedTotalCostARS: summary?.totalCostARS ?? null,
+          computedTotalCostUSD: summary?.totalCostUSD ?? null,
+          hoursTotal: summary?.hours ?? null,
+          notes: req.body?.notes ?? null,
+        })
+        .returning();
+      res.status(201).json(created);
+    } catch (error: any) {
+      console.error("Error subiendo factura personal:", error);
+      res.status(500).json({ message: error?.message ?? "Error al subir factura" });
+    }
+  });
+
+  // Borrar factura propia
+  app.delete("/api/me/invoices/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) return res.status(400).json({ message: "ID inválido" });
+      const [row] = await db
+        .select()
+        .from(personalMonthlyInvoices)
+        .where(eq(personalMonthlyInvoices.id, id));
+      if (!row) return res.status(404).json({ message: "Factura no encontrada" });
+      if (row.userId !== req.user!.id && !req.user!.isAdmin) {
+        return res.status(403).json({ message: "No podés borrar esta factura" });
+      }
+      if (row.fileUrl) deleteOldFile(row.fileUrl);
+      await db.delete(personalMonthlyInvoices).where(eq(personalMonthlyInvoices.id, id));
+      res.json({ ok: true });
+    } catch (error) {
+      console.error("Error borrando factura personal:", error);
+      res.status(500).json({ message: "Error al borrar factura" });
     }
   });
 

@@ -25,6 +25,7 @@ import ProjectSingle from "@/pages/project-single";
 import ProjectSettings from "@/pages/project-settings";
 import NewProjectWithTooltips from "@/pages/new-project-with-tooltips";
 import TimeEntries from "@/pages/time-entries";
+import MyInvoices from "@/pages/my-invoices";
 import EditProject from "@/pages/edit-project";
 import ProjectFinancialManagement from "@/pages/project-financial-management";
 
@@ -183,7 +184,10 @@ function AppRoutes() {
                   <ProtectedRoute path="/projects/:id" component={({ params }: { params: { id: string } }) => <Redirect to={`/active-projects/${params.id}`} />} />
                   <ProtectedRoute path="/project-settings/:id" component={ProjectSettings} requiredPermission="projects" />
                   <ProtectedRoute path="/time-entries/project/:projectId" component={TimeEntries} requiredPermission="projects" />
-                  
+
+                  {/* Facturación personal (acceso para todo usuario autenticado) */}
+                  <ProtectedRoute path="/my-invoices" component={MyInvoices} />
+
                   {/* Analytics & Reports */}
                   <ProtectedRoute path="/project-analytics/:projectId" component={ProjectAnalyticsView} requiredPermission="finance" />
                   <ProtectedRoute path="/client-summary/:clientId" component={ClientSummaryCompact} requiredPermission="projects" />
