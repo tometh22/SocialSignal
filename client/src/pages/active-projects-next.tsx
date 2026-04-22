@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useMemo, useState, useEffect, useCallback } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { authFetch } from "@/lib/queryClient";
 import PortfolioAnalytics from "@/components/portfolio-analytics";
 import { usePermissions } from "@/hooks/use-permissions";
@@ -459,7 +459,7 @@ function Controls({
         }`}
       >
         <Filter className="h-3.5 w-3.5" />
-        {activeOnly ? "Solo activos" : "Todos"}
+        {activeOnly ? "Solo con actividad" : "Todos"}
       </button>
 
       {/* Export */}
@@ -523,6 +523,48 @@ function TableHeader({ isOperations }: { isOperations: boolean }) {
 
 // ─── Project Row ──────────────────────────────────────────────────────────────
 
+function ProjectStatusToggle({
+  projectId,
+  isFinished,
+}: {
+  projectId: number;
+  isFinished: boolean;
+}) {
+  const queryClient = useQueryClient();
+  const mutation = useMutation({
+    mutationFn: async () => {
+      const path = isFinished ? "reopen" : "finish";
+      const res = await authFetch(`/api/active-projects/${projectId}/${path}`, {
+        method: "PATCH",
+      });
+      if (!res.ok) throw new Error(`API ${res.status}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
+    },
+  });
+
+  return (
+    <button
+      type="button"
+      disabled={mutation.isPending}
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const msg = isFinished
+          ? "¿Reabrir este proyecto?"
+          : "¿Marcar este proyecto como cerrado?";
+        if (window.confirm(msg)) mutation.mutate();
+      }}
+      title={isFinished ? "Reabrir proyecto" : "Marcar como cerrado"}
+      className="text-[10px] text-slate-400 hover:text-indigo-600 underline disabled:opacity-50"
+    >
+      {mutation.isPending ? "…" : isFinished ? "reabrir" : "cerrar"}
+    </button>
+  );
+}
+
 function ProjectRow({
   p,
   isOperations,
@@ -579,17 +621,22 @@ function ProjectRow({
 
       {/* Status */}
       <td className="py-2.5 px-3">
-        {(() => {
-          const ls = p.lifecycleStatus ?? (p.status === "Active" ? "active" : "completed");
-          return (
-            <span
-              className={`text-[11px] rounded-full px-2 py-0.5 border ${LIFECYCLE_BADGE_CLASS[ls]}`}
-              title={p.closedAt ? `Cerrado ${new Date(p.closedAt).toLocaleDateString('es-AR')}` : undefined}
-            >
-              {LIFECYCLE_LABELS[ls]}
-            </span>
-          );
-        })()}
+        <div className="flex items-center gap-1.5">
+          {(() => {
+            const ls = p.lifecycleStatus ?? (p.status === "Active" ? "active" : "completed");
+            return (
+              <span
+                className={`text-[11px] rounded-full px-2 py-0.5 border ${LIFECYCLE_BADGE_CLASS[ls]}`}
+                title={p.closedAt ? `Cerrado ${new Date(p.closedAt).toLocaleDateString('es-AR')}` : undefined}
+              >
+                {LIFECYCLE_LABELS[ls]}
+              </span>
+            );
+          })()}
+          {isOperations && p.projectId != null && (
+            <ProjectStatusToggle projectId={p.projectId} isFinished={!!p.isFinished} />
+          )}
+        </div>
       </td>
 
       {/* Revenue */}
