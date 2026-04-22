@@ -110,14 +110,16 @@ import {
   quotationTeamMembers,
   quotationTemplates,
 } from "@shared/schema";
-import { ActiveProjectsAggregator } from "./domain/projectsActive";
-import { resolveTimeFilter } from "./services/time";
+import { ActiveProjectsAggregator } from "./domain/projectsActive";import { resolveTimeFilter } from "./services/time";
 import { CoverageCalculator } from "./domain/coverage";
 import { eq, and, isNull, isNotNull, desc, sql, asc, gte, lte, inArray } from "drizzle-orm";
 import { reinitializeDatabase } from "./reinit-data";
-import { upload, uploadDocument, deleteOldFile } from "./upload";
+import { upload, uploadDocument, uploadInvoice, deleteOldFile } from "./upload";
+import { personalMonthlyInvoices, externalProviders as externalProvidersTable, providerProjectAccess as providerProjectAccessTable } from "@shared/schema";
 import { sanitizeInput } from "./input-sanitization";
 import { setupAuth, hashPassword } from "./auth";
+import { requireProjectUnlocked, projectIdFromTimeEntry } from "./middleware/projectLocked";
+import { requireRole, requireProvider, requireProviderCanAccessProject } from "./middleware/requireRole";
 import { createReviewRoomsRouter } from "./routes-review-rooms";
 import { reviewRooms, reviewRoomMembers } from "@shared/schema";
 import path from 'path';
@@ -930,9 +932,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Main endpoint
   app.get('/api/projects', requireAuth, handleProjectsRequest);
-  
+
   // V2 alias endpoint
   app.get('/api/active-projects/v2', requireAuth, handleProjectsRequest);
+
+  // XLSX export — reusa el aggregator; respeta el filtro de estado y período del cliente.
+  app.get('/api/projects/export', requireAuth, async (req, res) => {
+    try {
+      const XLSX = await import('xlsx');
+      const period = typeof req.query.period === 'string' ? req.query.period : undefined;
+      const statusFilter = typeof req.query.status === 'string' ? req.query.status : 'all';
+      const q = typeof req.query.q === 'string' ? req.query.q.toLowerCase() : '';
+
+      const timeFilter: any = period ? { type: 'month', value: period } : { type: 'month', value: new Date().toISOString().slice(0, 7) };
+      const aggregator = new ActiveProjectsAggregator(storage);
+      const response = await aggregator.getActiveProjectsUnified(timeFilter, false);
+
+      const allowed = ['active','on-hold','delivered','invoiced','completed','cancelled','voided'];
+      const rows = (response.projects ?? [])
+        .filter(p => statusFilter === 'all' || p.status === statusFilter)
+        .filter(p => !q || `${p.client?.name ?? ''} ${p.name}`.toLowerCase().includes(q))
+        .map(p => ({
+          'Cliente': p.client?.name ?? '',
+          'Proyecto': p.name,
+          'Estado': p.status,
+          'Tipo': p.projectType ?? p.type,
+          'Inicio': (p as any).startMonthKey ?? '',
+          'Fin': (p as any).endMonthKey ?? '',
+          'Entregado': (p as any).deliveredAt ? new Date((p as any).deliveredAt).toISOString().slice(0, 10) : '',
+          'Facturado': (p as any).invoicedAt ? new Date((p as any).invoicedAt).toISOString().slice(0, 10) : '',
+          'Cerrado': (p as any).closedAt ? new Date((p as any).closedAt).toISOString().slice(0, 10) : '',
+          'Ingresos USD': p.periodRevenueUSD ?? p.revenue ?? 0,
+          'Costos USD': p.periodCostUSD ?? p.cost ?? 0,
+          'Margen USD': p.periodProfitUSD ?? p.profit ?? 0,
+          'Horas': (p.metrics as any)?.totalHours ?? 0,
+        }));
+
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.json_to_sheet(rows);
+      XLSX.utils.book_append_sheet(wb, ws, 'Proyectos');
+      const buf: Buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+
+      const filename = `proyectos-${period ?? 'current'}${statusFilter !== 'all' ? '-' + statusFilter : ''}.xlsx`;
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.send(buf);
+    } catch (error: any) {
+      console.error('Error exportando proyectos:', error);
+      res.status(500).json({ message: error?.message ?? 'Error al exportar' });
+    }
+  });
 
   // ==================== OPTIONAL ROLLUP ENDPOINT ====================
   // GET /api/projects/:key/rollup?scope=acum|total&thru=YYYY-MM
@@ -7519,8 +7568,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const updatedProject = await storage.updateActiveProject(id, {
         isFinished: true,
-        actualEndDate: new Date()
-      });
+        actualEndDate: new Date(),
+        closedAt: new Date(),
+        closedBy: req.user?.id ?? null,
+        status: "completed",
+      } as any);
 
       if (!updatedProject) {
         return res.status(404).json({ message: "Project not found" });
@@ -7533,16 +7585,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Reabrir proyecto cerrado
+  // Reabrir proyecto (admin only). Desbloquea carga de horas/costos.
   app.patch("/api/active-projects/:id/reopen", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "Invalid project ID" });
+    if (!req.user?.isAdmin) {
+      return res.status(403).json({ message: "Solo administradores pueden reabrir proyectos" });
+    }
 
     try {
       const updatedProject = await storage.updateActiveProject(id, {
         isFinished: false,
         actualEndDate: null,
-      });
+        closedAt: null,
+        closedBy: null,
+        status: "active",
+      } as any);
 
       if (!updatedProject) {
         return res.status(404).json({ message: "Project not found" });
@@ -7552,6 +7610,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error reopening project:", error);
       res.status(500).json({ message: "Failed to reopen project" });
+    }
+  });
+
+  // Marcar como entregado al cliente.
+  app.patch("/api/active-projects/:id/deliver", requireAuth, async (req, res) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ message: "Invalid project ID" });
+
+    try {
+      const updatedProject = await storage.updateActiveProject(id, {
+        status: "delivered",
+        deliveredAt: new Date(),
+      } as any);
+      if (!updatedProject) return res.status(404).json({ message: "Project not found" });
+      res.json(updatedProject);
+    } catch (error) {
+      console.error("Error marking project as delivered:", error);
+      res.status(500).json({ message: "Failed to mark as delivered" });
+    }
+  });
+
+  // Marcar como facturado.
+  app.patch("/api/active-projects/:id/invoice", requireAuth, async (req, res) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ message: "Invalid project ID" });
+
+    try {
+      const updatedProject = await storage.updateActiveProject(id, {
+        status: "invoiced",
+        invoicedAt: new Date(),
+      } as any);
+      if (!updatedProject) return res.status(404).json({ message: "Project not found" });
+      res.json(updatedProject);
+    } catch (error) {
+      console.error("Error marking project as invoiced:", error);
+      res.status(500).json({ message: "Failed to mark as invoiced" });
+    }
+  });
+
+  // Anular proyecto (void). No borra datos, sólo cambia estado.
+  app.patch("/api/active-projects/:id/void", requireAuth, async (req, res) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ message: "Invalid project ID" });
+    if (!req.user?.isAdmin) {
+      return res.status(403).json({ message: "Solo administradores pueden anular proyectos" });
+    }
+
+    try {
+      const updatedProject = await storage.updateActiveProject(id, {
+        status: "voided",
+        closedAt: new Date(),
+        closedBy: req.user?.id ?? null,
+        isFinished: true,
+      } as any);
+      if (!updatedProject) return res.status(404).json({ message: "Project not found" });
+      res.json(updatedProject);
+    } catch (error) {
+      console.error("Error voiding project:", error);
+      res.status(500).json({ message: "Failed to void project" });
     }
   });
 
@@ -7820,7 +7937,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Crear un nuevo registro de horas
-  app.post("/api/time-entries", requireAuth, async (req, res) => {
+  app.post("/api/time-entries", requireAuth, requireProjectUnlocked(), async (req, res) => {
     try {
       // Adaptar fechas si vienen como strings ISO
       const processedData = {
@@ -7964,7 +8081,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Actualizar un registro de horas
-  app.patch("/api/time-entries/:id", requireAuth, async (req, res) => {
+  app.patch("/api/time-entries/:id", requireAuth, requireProjectUnlocked(projectIdFromTimeEntry), async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "Invalid time entry ID" });
 
@@ -8008,7 +8125,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Eliminar un registro de horas
-  app.delete("/api/time-entries/:id", requireAuth, async (req, res) => {
+  app.delete("/api/time-entries/:id", requireAuth, requireProjectUnlocked(projectIdFromTimeEntry), async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "Invalid time entry ID" });
 
@@ -8529,6 +8646,438 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to reinitialize database" });
     }
   });
+
+  // =========== FACTURA MENSUAL PERSONAL ===========
+  // Endpoints para que cada usuario gestione su factura del mes (una por mes).
+
+  // Helper: suma horas/costos del mes a partir de timeEntries
+  async function getMonthlyPersonalSummary(userId: number, period: string) {
+    // Period is YYYY-MM. First look up the personnel row that maps to this user (if any)
+    // via the users.email match. Si no existe personnel, devuelve ceros.
+    const user = await storage.getUser(userId);
+    if (!user) return null;
+    const personnelRow = user.email
+      ? (await storage.getPersonnel()).find(p => p.email === user.email)
+      : null;
+
+    if (!personnelRow) {
+      return {
+        period,
+        userId,
+        personnelId: null,
+        hours: 0,
+        totalCostARS: 0,
+        totalCostUSD: 0,
+        entryCount: 0,
+      };
+    }
+
+    const [yyyy, mm] = period.split("-").map(Number);
+    const start = new Date(yyyy, mm - 1, 1);
+    const end = new Date(yyyy, mm, 1);
+
+    const rows = await db
+      .select({
+        hours: timeEntries.hours,
+        totalCost: timeEntries.totalCost,
+      })
+      .from(timeEntries)
+      .where(and(
+        eq(timeEntries.personnelId, personnelRow.id),
+        gte(timeEntries.date, start),
+        lte(timeEntries.date, end),
+      ));
+
+    let hours = 0;
+    let totalCostARS = 0;
+    for (const r of rows) {
+      hours += Number(r.hours) || 0;
+      totalCostARS += Number(r.totalCost) || 0;
+    }
+
+    return {
+      period,
+      userId,
+      personnelId: personnelRow.id,
+      hours,
+      totalCostARS,
+      totalCostUSD: 0, // podría calcularse con exchange rate del mes; por ahora ARS puro
+      entryCount: rows.length,
+    };
+  }
+
+  // Historial de facturas del usuario logueado
+  app.get("/api/me/invoices", requireAuth, async (req, res) => {
+    try {
+      const rows = await db
+        .select()
+        .from(personalMonthlyInvoices)
+        .where(eq(personalMonthlyInvoices.userId, req.user!.id))
+        .orderBy(desc(personalMonthlyInvoices.period));
+      res.json(rows);
+    } catch (error) {
+      console.error("Error obteniendo facturas personales:", error);
+      res.status(500).json({ message: "Error al obtener facturas" });
+    }
+  });
+
+  // Resumen del mes (horas + costo calculado) a facturar
+  app.get("/api/me/invoices/summary", requireAuth, async (req, res) => {
+    try {
+      const period = typeof req.query.period === "string" ? req.query.period : "";
+      if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(period)) {
+        return res.status(400).json({ message: "Formato de período inválido (YYYY-MM)" });
+      }
+      const summary = await getMonthlyPersonalSummary(req.user!.id, period);
+      res.json(summary);
+    } catch (error) {
+      console.error("Error calculando resumen mensual personal:", error);
+      res.status(500).json({ message: "Error al calcular resumen" });
+    }
+  });
+
+  // Subir/reemplazar factura del mes
+  app.post("/api/me/invoices", requireAuth, uploadInvoice.single("file"), async (req, res) => {
+    try {
+      const period = String(req.body?.period ?? "");
+      if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(period)) {
+        return res.status(400).json({ message: "Formato de período inválido (YYYY-MM)" });
+      }
+      if (!req.file) {
+        return res.status(400).json({ message: "No se recibió el archivo" });
+      }
+
+      const summary = await getMonthlyPersonalSummary(req.user!.id, period);
+      const relPath = `/uploads/invoices/${req.user!.id}/${req.file.filename}`;
+
+      // Check if an invoice already exists for this user+period — delete the old file first
+      const [existing] = await db
+        .select()
+        .from(personalMonthlyInvoices)
+        .where(and(
+          eq(personalMonthlyInvoices.userId, req.user!.id),
+          eq(personalMonthlyInvoices.period, period),
+        ));
+
+      if (existing) {
+        if (existing.fileUrl) deleteOldFile(existing.fileUrl);
+        const [updated] = await db
+          .update(personalMonthlyInvoices)
+          .set({
+            fileUrl: relPath,
+            fileName: req.file.originalname,
+            fileSize: req.file.size,
+            mimeType: req.file.mimetype,
+            computedTotalCostARS: summary?.totalCostARS ?? null,
+            computedTotalCostUSD: summary?.totalCostUSD ?? null,
+            hoursTotal: summary?.hours ?? null,
+            personnelId: summary?.personnelId ?? null,
+            updatedAt: new Date(),
+            notes: req.body?.notes ?? existing.notes,
+          })
+          .where(eq(personalMonthlyInvoices.id, existing.id))
+          .returning();
+        return res.json(updated);
+      }
+
+      const [created] = await db
+        .insert(personalMonthlyInvoices)
+        .values({
+          userId: req.user!.id,
+          personnelId: summary?.personnelId ?? null,
+          period,
+          fileUrl: relPath,
+          fileName: req.file.originalname,
+          fileSize: req.file.size,
+          mimeType: req.file.mimetype,
+          computedTotalCostARS: summary?.totalCostARS ?? null,
+          computedTotalCostUSD: summary?.totalCostUSD ?? null,
+          hoursTotal: summary?.hours ?? null,
+          notes: req.body?.notes ?? null,
+        })
+        .returning();
+      res.status(201).json(created);
+    } catch (error: any) {
+      console.error("Error subiendo factura personal:", error);
+      res.status(500).json({ message: error?.message ?? "Error al subir factura" });
+    }
+  });
+
+  // Borrar factura propia
+  app.delete("/api/me/invoices/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) return res.status(400).json({ message: "ID inválido" });
+      const [row] = await db
+        .select()
+        .from(personalMonthlyInvoices)
+        .where(eq(personalMonthlyInvoices.id, id));
+      if (!row) return res.status(404).json({ message: "Factura no encontrada" });
+      if (row.userId !== req.user!.id && !req.user!.isAdmin) {
+        return res.status(403).json({ message: "No podés borrar esta factura" });
+      }
+      if (row.fileUrl) deleteOldFile(row.fileUrl);
+      await db.delete(personalMonthlyInvoices).where(eq(personalMonthlyInvoices.id, id));
+      res.json({ ok: true });
+    } catch (error) {
+      console.error("Error borrando factura personal:", error);
+      res.status(500).json({ message: "Error al borrar factura" });
+    }
+  });
+
+  // =========== PROVEEDORES EXTERNOS (ADMIN) ===========
+
+  // Listar todos los proveedores
+  app.get("/api/admin/external-providers", requireAuth, requireRole("admin"), async (req, res) => {
+    try {
+      const rows = await db
+        .select({
+          provider: externalProvidersTable,
+          user: {
+            id: users.id,
+            firstName: users.firstName,
+            lastName: users.lastName,
+            email: users.email,
+            isActive: users.isActive,
+          },
+        })
+        .from(externalProvidersTable)
+        .leftJoin(users, eq(externalProvidersTable.userId, users.id))
+        .orderBy(desc(externalProvidersTable.createdAt));
+      res.json(rows);
+    } catch (error) {
+      console.error("Error listando proveedores:", error);
+      res.status(500).json({ message: "Error al listar proveedores" });
+    }
+  });
+
+  // Crear proveedor (crea user + externalProvider en una transacción lógica)
+  app.post("/api/admin/external-providers", requireAuth, requireRole("admin"), async (req, res) => {
+    try {
+      const {
+        firstName, lastName, email, password,
+        companyName, taxId, contactEmail, contactPhone,
+        hourlyRate, hourlyRateARS, personnelId, notes,
+      } = req.body;
+
+      if (!firstName || !lastName || !email || !password || !companyName) {
+        return res.status(400).json({ message: "Campos requeridos: firstName, lastName, email, password, companyName" });
+      }
+
+      const existing = await storage.getUserByEmail(email);
+      if (existing) return res.status(409).json({ message: "Ya existe un usuario con ese email" });
+
+      const hashed = await hashPassword(password);
+      const newUser = await storage.createUser({
+        firstName, lastName, email, password: hashed,
+        isAdmin: false, isActive: true, permissions: [],
+        role: "external_provider",
+      } as any);
+
+      const [provider] = await db
+        .insert(externalProvidersTable)
+        .values({
+          userId: newUser.id,
+          personnelId: personnelId ?? null,
+          companyName,
+          taxId: taxId ?? null,
+          contactEmail: contactEmail ?? email,
+          contactPhone: contactPhone ?? null,
+          hourlyRate: hourlyRate ?? null,
+          hourlyRateARS: hourlyRateARS ?? null,
+          notes: notes ?? null,
+          createdBy: req.user!.id,
+        })
+        .returning();
+
+      res.status(201).json({ provider, user: { id: newUser.id, email: newUser.email } });
+    } catch (error: any) {
+      console.error("Error creando proveedor:", error);
+      res.status(500).json({ message: error?.message ?? "Error al crear proveedor" });
+    }
+  });
+
+  // Editar proveedor
+  app.patch("/api/admin/external-providers/:id", requireAuth, requireRole("admin"), async (req, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) return res.status(400).json({ message: "ID inválido" });
+      const allowed: any = {};
+      for (const k of ["companyName","taxId","contactEmail","contactPhone","hourlyRate","hourlyRateARS","active","notes","personnelId"]) {
+        if (k in req.body) allowed[k] = req.body[k];
+      }
+      allowed.updatedAt = new Date();
+      const [updated] = await db
+        .update(externalProvidersTable)
+        .set(allowed)
+        .where(eq(externalProvidersTable.id, id))
+        .returning();
+      if (!updated) return res.status(404).json({ message: "Proveedor no encontrado" });
+      res.json(updated);
+    } catch (error) {
+      console.error("Error editando proveedor:", error);
+      res.status(500).json({ message: "Error al editar proveedor" });
+    }
+  });
+
+  // Listar proyectos asignados a un proveedor
+  app.get("/api/admin/external-providers/:id/access", requireAuth, requireRole("admin"), async (req, res) => {
+    try {
+      const providerId = parseInt(req.params.id, 10);
+      if (isNaN(providerId)) return res.status(400).json({ message: "ID inválido" });
+      const rows = await db
+        .select()
+        .from(providerProjectAccessTable)
+        .where(eq(providerProjectAccessTable.providerId, providerId));
+      res.json(rows);
+    } catch (error) {
+      console.error("Error listando accesos:", error);
+      res.status(500).json({ message: "Error al listar accesos" });
+    }
+  });
+
+  // Asignar proyecto a proveedor
+  app.post("/api/admin/external-providers/:id/access", requireAuth, requireRole("admin"), async (req, res) => {
+    try {
+      const providerId = parseInt(req.params.id, 10);
+      const { projectId, canLogHours = true, canUploadCosts = true } = req.body;
+      if (isNaN(providerId) || !projectId) return res.status(400).json({ message: "providerId/projectId inválido" });
+      const [row] = await db
+        .insert(providerProjectAccessTable)
+        .values({
+          providerId,
+          projectId,
+          canLogHours,
+          canUploadCosts,
+          grantedBy: req.user!.id,
+        })
+        .onConflictDoUpdate({
+          target: [providerProjectAccessTable.providerId, providerProjectAccessTable.projectId],
+          set: { canLogHours, canUploadCosts, grantedBy: req.user!.id, grantedAt: new Date() },
+        })
+        .returning();
+      res.status(201).json(row);
+    } catch (error) {
+      console.error("Error asignando proyecto a proveedor:", error);
+      res.status(500).json({ message: "Error al asignar proyecto" });
+    }
+  });
+
+  // Revocar acceso
+  app.delete("/api/admin/external-providers/:id/access/:projectId", requireAuth, requireRole("admin"), async (req, res) => {
+    try {
+      const providerId = parseInt(req.params.id, 10);
+      const projectId = parseInt(req.params.projectId, 10);
+      if (isNaN(providerId) || isNaN(projectId)) return res.status(400).json({ message: "IDs inválidos" });
+      await db
+        .delete(providerProjectAccessTable)
+        .where(and(
+          eq(providerProjectAccessTable.providerId, providerId),
+          eq(providerProjectAccessTable.projectId, projectId),
+        ));
+      res.json({ ok: true });
+    } catch (error) {
+      console.error("Error revocando acceso:", error);
+      res.status(500).json({ message: "Error al revocar acceso" });
+    }
+  });
+
+  // =========== PROVEEDOR (SCOPE RESTRINGIDO) ===========
+
+  // Perfil y proyectos asignados
+  app.get("/api/provider/me", requireAuth, requireProvider, async (req, res) => {
+    try {
+      const accesses = await db
+        .select()
+        .from(providerProjectAccessTable)
+        .where(eq(providerProjectAccessTable.providerId, req.provider!.id));
+
+      const projectIds = accesses.map(a => a.projectId);
+      const projects = projectIds.length
+        ? await db.select().from(activeProjects).where(inArray(activeProjects.id, projectIds))
+        : [];
+
+      res.json({ provider: req.provider, accesses, projects });
+    } catch (error) {
+      console.error("Error obteniendo perfil proveedor:", error);
+      res.status(500).json({ message: "Error al obtener perfil" });
+    }
+  });
+
+  // Lista de proyectos del proveedor (lightweight)
+  app.get("/api/provider/projects", requireAuth, requireProvider, async (req, res) => {
+    try {
+      const accesses = await db
+        .select()
+        .from(providerProjectAccessTable)
+        .where(eq(providerProjectAccessTable.providerId, req.provider!.id));
+      if (accesses.length === 0) return res.json([]);
+
+      const projects = await db
+        .select()
+        .from(activeProjects)
+        .where(inArray(activeProjects.id, accesses.map(a => a.projectId)));
+
+      const accessMap = new Map(accesses.map(a => [a.projectId, a]));
+      res.json(projects.map(p => ({ ...p, access: accessMap.get(p.id) })));
+    } catch (error) {
+      console.error("Error listando proyectos de proveedor:", error);
+      res.status(500).json({ message: "Error al listar proyectos" });
+    }
+  });
+
+  // Cargar horas (sujeto a canLogHours + proyecto no cerrado)
+  app.post(
+    "/api/provider/time-entries",
+    requireAuth,
+    requireProvider,
+    requireProviderCanAccessProject("body"),
+    requireProjectUnlocked(),
+    async (req, res) => {
+      try {
+        const access: any = (req as any).providerAccess;
+        if (!access?.canLogHours) {
+          return res.status(403).json({ message: "No tenés permiso para cargar horas en este proyecto" });
+        }
+        // Si el proveedor tiene personnelId mapeado, usarlo; si no, rechazar.
+        const [provRow] = await db.select({ personnelId: externalProvidersTable.personnelId, hourlyRate: externalProvidersTable.hourlyRate, hourlyRateARS: externalProvidersTable.hourlyRateARS })
+          .from(externalProvidersTable)
+          .where(eq(externalProvidersTable.id, req.provider!.id));
+        if (!provRow?.personnelId) {
+          return res.status(400).json({ message: "El proveedor no está mapeado a un recurso de personal" });
+        }
+
+        const { projectId, date, hours, description } = req.body;
+        if (!projectId || !date || !hours) {
+          return res.status(400).json({ message: "Campos requeridos: projectId, date, hours" });
+        }
+        const rate = Number(provRow.hourlyRate ?? provRow.hourlyRateARS ?? 0);
+        const totalCost = Number(hours) * rate;
+
+        const [created] = await db
+          .insert(timeEntries)
+          .values({
+            projectId,
+            personnelId: provRow.personnelId,
+            date: new Date(date),
+            hours: Number(hours),
+            totalCost,
+            hourlyRateAtTime: rate,
+            entryType: "hours",
+            description: description ?? null,
+            createdBy: req.user!.id,
+          })
+          .returning();
+        res.status(201).json(created);
+      } catch (error: any) {
+        console.error("Error cargando hora de proveedor:", error);
+        res.status(500).json({ message: error?.message ?? "Error al cargar hora" });
+      }
+    }
+  );
+
+  // Subir factura propia (reusa el mismo endpoint de factura personal — ya requiere auth)
+  // No se duplica aquí; el proveedor entra por /api/me/invoices igual que cualquier usuario.
 
   // =========== GESTIÓN DE USUARIOS (ADMIN-ONLY) ===========
 

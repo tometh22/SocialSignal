@@ -39,6 +39,7 @@ import {
   CalendarCheck,
   TrendingUp,
   Calendar,
+  Receipt,
 } from "lucide-react";
 
 const PROJECT_ICON_COLORS = [
@@ -174,7 +175,21 @@ export default function SidebarFixed() {
     })
     .slice(0, MAX_SIDEBAR_ROOMS);
 
-  const navSections = [
+  // Si el usuario es un proveedor externo, mostramos un sidebar restringido
+  // con solo el panel del proveedor y sus facturas.
+  const isProvider = (user as any)?.role === 'external_provider';
+
+  const providerSections = [
+    {
+      title: "Proveedor",
+      items: [
+        { href: "/provider/dashboard", title: "Mi panel", icon: Briefcase, description: "Tus proyectos asignados" },
+        { href: "/my-invoices", title: "Mis facturas", icon: Receipt, description: "Subí tu factura mensual" },
+      ]
+    },
+  ];
+
+  const navSections = isProvider ? providerSections : [
     {
       title: "",
       items: [
@@ -209,9 +224,16 @@ export default function SidebarFixed() {
       ]
     },
     {
+      title: "Mi cuenta",
+      items: [
+        { href: "/my-invoices", title: "Mis facturas", icon: Receipt, description: "Subí tu factura mensual" },
+      ]
+    },
+    {
       title: "Admin",
       items: [
         { href: "/admin/users", title: "Usuarios", icon: Users, description: "Usuarios y permisos", permission: 'admin' as AppSection },
+        { href: "/admin/providers", title: "Proveedores", icon: Building2, description: "Proveedores externos y su acceso a proyectos", permission: 'admin' as AppSection },
         { href: "/admin", title: "Configuración", icon: Settings, description: "Administración", permission: 'admin' as AppSection }
       ]
     }

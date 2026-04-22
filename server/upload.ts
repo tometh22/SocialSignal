@@ -86,6 +86,46 @@ export const uploadDocument = multer({
   limits: { fileSize: 20 * 1024 * 1024 },
 });
 
+// Multer para facturas mensuales personales
+const invoicesDir = path.join(process.cwd(), 'public/uploads/invoices');
+if (!fs.existsSync(invoicesDir)) {
+  fs.mkdirSync(invoicesDir, { recursive: true });
+}
+
+const invoiceStorage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    // Subcarpeta por usuario
+    const userId = (req as any).user?.id ?? 'anon';
+    const userDir = path.join(invoicesDir, String(userId));
+    if (!fs.existsSync(userDir)) fs.mkdirSync(userDir, { recursive: true });
+    cb(null, userDir);
+  },
+  filename: function (req, file, cb) {
+    const period = (req.body?.period ?? 'unknown').replace(/[^0-9-]/g, '');
+    const uniqueSuffix = randomUUID();
+    const ext = path.extname(file.originalname);
+    cb(null, `${period}-${uniqueSuffix}${ext}`);
+  },
+});
+
+const invoiceFileFilter = (req: Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
+  const allowed = [
+    'application/pdf',
+    'image/jpeg', 'image/png', 'image/webp',
+  ];
+  if (allowed.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error('Tipo de archivo no permitido. Se aceptan PDF e imágenes (JPG/PNG/WEBP).'));
+  }
+};
+
+export const uploadInvoice = multer({
+  storage: invoiceStorage,
+  fileFilter: invoiceFileFilter,
+  limits: { fileSize: 20 * 1024 * 1024 },
+});
+
 // Función auxiliar para eliminar un archivo antiguo
 export const deleteOldFile = (filePath: string) => {
   if (!filePath) return;

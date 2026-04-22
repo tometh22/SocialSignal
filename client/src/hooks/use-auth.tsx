@@ -116,6 +116,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
 
       const getFirstRoute = (user: any): string => {
+        if (user.role === 'external_provider') return '/provider/dashboard';
         if (user.isAdmin) return '/';
         const perms: string[] = user.permissions || [];
         if (perms.includes('dashboard')) return '/';
@@ -123,7 +124,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (perms.includes('quotations')) return '/quotations';
         if (perms.includes('projects')) return '/active-projects';
         if (perms.includes('finance')) return '/statistics';
-        return '/unauthorized';
+        return '/my-invoices';
       };
 
       setTimeout(() => {

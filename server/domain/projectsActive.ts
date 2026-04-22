@@ -91,6 +91,14 @@ interface ProjectData {
   sales: SalesRecord[];
   costs: CostRecord[];
   quotation?: any; // Include quotation data for project type mapping
+  // Lifecycle fields tomados directamente de active_projects
+  lifecycle?: {
+    status?: string;
+    isFinished?: boolean;
+    deliveredAt?: Date | string | null;
+    invoicedAt?: Date | string | null;
+    closedAt?: Date | string | null;
+  };
 }
 
 // ==================== DATA AGGREGATION ENGINE ====================
@@ -465,7 +473,14 @@ export class ActiveProjectsAggregator {
         projectKey: canonicalFields.projectKey,
         sales: [],
         costs: [],
-        quotation: project.quotation // Include quotation for project type mapping
+        quotation: project.quotation, // Include quotation for project type mapping
+        lifecycle: {
+          status: project.status,
+          isFinished: project.isFinished,
+          deliveredAt: project.deliveredAt ?? null,
+          invoicedAt: project.invoicedAt ?? null,
+          closedAt: project.closedAt ?? null,
+        },
       });
     }
 
@@ -793,9 +808,13 @@ export class ActiveProjectsAggregator {
         ? projectData.quotation.endDate.substring(0, 7) 
         : undefined;
       
-      // Determine if finished (inactive status or explicitly marked)
-      const isFinished = projectData.quotation?.status === 'completed' || false;
-      
+      // Lifecycle viene ahora de activeProjects, no de quotation
+      const lifecycle = projectData.lifecycle ?? {};
+      const rawStatus = (lifecycle.status ?? 'active') as string;
+      const validStatuses = ['active', 'on-hold', 'delivered', 'invoiced', 'completed', 'cancelled', 'voided'];
+      const resolvedStatus = validStatuses.includes(rawStatus) ? rawStatus : 'active';
+      const isFinished = Boolean(lifecycle.isFinished) || rawStatus === 'completed' || rawStatus === 'voided';
+
       // Determine if one-shot project
       const isOneShot = quotationType === 'one-time' || mappedType === 'one-shot';
 
@@ -804,7 +823,7 @@ export class ActiveProjectsAggregator {
         clientId: projectData.clientId,
         name: projectData.projectName,
         type: mappedType,
-        status: 'active', // Could be enhanced with actual status
+        status: resolvedStatus as any,
         client: {
           id: projectData.clientId,
           name: projectData.clientName || client?.name || 'Unknown',
@@ -833,7 +852,10 @@ export class ActiveProjectsAggregator {
         lastActivity,
         isFinished,
         supportsRollup: true,  // All projects support rollup queries
-        allowFinish: !isFinished  // Can mark as finished if not already finished
+        allowFinish: !isFinished,  // Can mark as finished if not already finished
+        deliveredAt: lifecycle.deliveredAt ? new Date(lifecycle.deliveredAt as any).toISOString() : null,
+        invoicedAt: lifecycle.invoicedAt ? new Date(lifecycle.invoicedAt as any).toISOString() : null,
+        closedAt: lifecycle.closedAt ? new Date(lifecycle.closedAt as any).toISOString() : null,
       });
       
       // 🔍 DEBUG: Verificar objeto period ANTES del return

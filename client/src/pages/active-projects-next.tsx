@@ -7,7 +7,7 @@ import PortfolioAnalytics from "@/components/portfolio-analytics";
 import { usePermissions } from "@/hooks/use-permissions";
 import {
   RefreshCcw, Search, ChevronDown, ChevronRight,
-  Filter, DollarSign, TrendingUp, Clock, BriefcaseBusiness, ExternalLink,
+  Filter, DollarSign, TrendingUp, Clock, BriefcaseBusiness, ExternalLink, Download,
 } from "lucide-react";
 import { Link } from "wouter";
 
@@ -15,12 +15,25 @@ import { Link } from "wouter";
 
 export type Currency = "ARS" | "USD";
 
+export type LifecycleStatus =
+  | "active"
+  | "on-hold"
+  | "delivered"
+  | "invoiced"
+  | "completed"
+  | "cancelled"
+  | "voided";
+
 export type ProjectItem = {
   projectId?: number;
   clientName: string;
   projectName: string;
   projectKey?: string;
   status?: "Active" | "Inactive";
+  lifecycleStatus?: LifecycleStatus;
+  deliveredAt?: string | null;
+  invoicedAt?: string | null;
+  closedAt?: string | null;
   tags?: string[];
   currencyNative?: Currency;
   isOneShot?: boolean;
@@ -44,6 +57,26 @@ export type ProjectItem = {
   isFinished?: boolean;
   supportsRollup?: boolean;
   allowFinish?: boolean;
+};
+
+export const LIFECYCLE_LABELS: Record<LifecycleStatus, string> = {
+  "active": "Activo",
+  "on-hold": "En espera",
+  "delivered": "Entregado",
+  "invoiced": "Facturado",
+  "completed": "Finalizado",
+  "cancelled": "Cancelado",
+  "voided": "Anulado",
+};
+
+export const LIFECYCLE_BADGE_CLASS: Record<LifecycleStatus, string> = {
+  "active":    "bg-emerald-100 text-emerald-800 border-emerald-200",
+  "on-hold":   "bg-amber-100 text-amber-800 border-amber-200",
+  "delivered": "bg-sky-100 text-sky-800 border-sky-200",
+  "invoiced":  "bg-indigo-100 text-indigo-800 border-indigo-200",
+  "completed": "bg-slate-100 text-slate-700 border-slate-200",
+  "cancelled": "bg-rose-100 text-rose-800 border-rose-200",
+  "voided":    "bg-red-100 text-red-800 border-red-200",
 };
 
 export type ProjectsApi = {
@@ -155,7 +188,14 @@ function transformBackendResponse(backendData: any): ProjectsApi {
       clientName.toLowerCase().includes("warner") ||
       clientName.toLowerCase().includes("kimberly");
     const currencyNative: Currency = isUSDClient ? "USD" : "ARS";
-    const status = p.status === "active" || p.status === "Active" ? "Active" : "Inactive";
+    const lifecycleStatus: LifecycleStatus = (
+      ["active", "on-hold", "delivered", "invoiced", "completed", "cancelled", "voided"].includes(p.status)
+        ? p.status
+        : "active"
+    ) as LifecycleStatus;
+    // Back-compat: los filtros/legacy siguen usando Active/Inactive — los estados "terminales" cuentan como inactivos.
+    const inactiveLifecycle = ["completed", "cancelled", "voided"];
+    const status: "Active" | "Inactive" = inactiveLifecycle.includes(lifecycleStatus) ? "Inactive" : "Active";
     const tags: string[] = [];
     if (p.type === "fee" || p.type === "Fee") tags.push("Fee");
     if (p.type === "one-shot" || p.type === "One-Shot") tags.push("One-Shot");
@@ -177,6 +217,10 @@ function transformBackendResponse(backendData: any): ProjectsApi {
       projectName: p.name || p.projectName || "",
       projectKey: `${clientName.toLowerCase()}|${(p.name || "").toLowerCase()}`,
       status,
+      lifecycleStatus,
+      deliveredAt: p.deliveredAt ?? null,
+      invoicedAt: p.invoicedAt ?? null,
+      closedAt: p.closedAt ?? null,
       tags,
       currencyNative,
       isOneShot: p.isOneShot,
@@ -329,8 +373,8 @@ function Controls({
   setSearch: (s: string) => void;
   activeOnly: boolean;
   setActiveOnly: (v: boolean) => void;
-  statusFilter: "open" | "closed" | "all";
-  setStatusFilter: (s: "open" | "closed" | "all") => void;
+  statusFilter: LifecycleStatus | "all";
+  setStatusFilter: (s: LifecycleStatus | "all") => void;
 }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -389,22 +433,21 @@ function Controls({
         />
       </div>
 
-      {/* Open/closed filter */}
-      <div className="flex rounded-lg border border-slate-200 overflow-hidden text-xs">
-        {(["open", "closed", "all"] as const).map((opt) => (
-          <button
-            key={opt}
-            onClick={() => setStatusFilter(opt)}
-            className={`px-2.5 py-1.5 transition-colors ${
-              statusFilter === opt
-                ? "bg-indigo-50 text-indigo-700 font-medium"
-                : "bg-white text-slate-500 hover:bg-slate-50"
-            }`}
-          >
-            {opt === "open" ? "Abiertos" : opt === "closed" ? "Cerrados" : "Todos"}
-          </button>
-        ))}
-      </div>
+      {/* Status filter (granular lifecycle) */}
+      <select
+        value={statusFilter}
+        onChange={e => setStatusFilter(e.target.value as LifecycleStatus | "all")}
+        className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+      >
+        <option value="all">Todos los estados</option>
+        <option value="active">Activos</option>
+        <option value="on-hold">En espera</option>
+        <option value="delivered">Entregados</option>
+        <option value="invoiced">Facturados</option>
+        <option value="completed">Finalizados</option>
+        <option value="cancelled">Cancelados</option>
+        <option value="voided">Anulados</option>
+      </select>
 
       {/* Active filter */}
       <button
@@ -418,6 +461,17 @@ function Controls({
         <Filter className="h-3.5 w-3.5" />
         {activeOnly ? "Solo con actividad" : "Todos"}
       </button>
+
+      {/* Export */}
+      <a
+        href={`/api/projects/export?period=${encodeURIComponent(period)}&status=${encodeURIComponent(statusFilter)}${search ? `&q=${encodeURIComponent(search)}` : ""}`}
+        className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-50 transition-colors"
+        download
+        title="Descargar Excel con los filtros actuales"
+      >
+        <Download className="h-3.5 w-3.5" />
+        Exportar
+      </a>
 
       {/* Refresh */}
       <button
@@ -568,21 +622,17 @@ function ProjectRow({
       {/* Status */}
       <td className="py-2.5 px-3">
         <div className="flex items-center gap-1.5">
-          {p.isFinished ? (
-            <span className="text-[11px] rounded-full px-2 py-0.5 bg-slate-200 text-slate-600 ring-1 ring-slate-300">
-              Cerrado
-            </span>
-          ) : (
-            <span
-              className={`text-[11px] rounded-full px-2 py-0.5 ${
-                p.status === "Active"
-                  ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200"
-                  : "bg-slate-100 text-slate-500"
-              }`}
-            >
-              {p.status === "Active" ? "Activo" : "Inactivo"}
-            </span>
-          )}
+          {(() => {
+            const ls = p.lifecycleStatus ?? (p.status === "Active" ? "active" : "completed");
+            return (
+              <span
+                className={`text-[11px] rounded-full px-2 py-0.5 border ${LIFECYCLE_BADGE_CLASS[ls]}`}
+                title={p.closedAt ? `Cerrado ${new Date(p.closedAt).toLocaleDateString('es-AR')}` : undefined}
+              >
+                {LIFECYCLE_LABELS[ls]}
+              </span>
+            );
+          })()}
           {isOperations && p.projectId != null && (
             <ProjectStatusToggle projectId={p.projectId} isFinished={!!p.isFinished} />
           )}
@@ -748,7 +798,7 @@ export default function ActiveProjectsNext() {
   const [freshToggle, setFreshToggle] = useState(false);
   const [search, setSearch] = useState("");
   const [activeOnly, setActiveOnly] = useState(true);
-  const [statusFilter, setStatusFilter] = useState<"open" | "closed" | "all">("open");
+  const [statusFilter, setStatusFilter] = useState<LifecycleStatus | "all">("all");
 
   useEffect(() => {
     if (typeof window !== "undefined") window.localStorage.setItem("ap.period", period);
@@ -774,9 +824,8 @@ export default function ActiveProjectsNext() {
     const q = search.trim().toLowerCase();
     return (data?.projects ?? [])
       .filter(p => {
-        if (statusFilter === "open" && p.isFinished) return false;
-        if (statusFilter === "closed" && !p.isFinished) return false;
         if (activeOnly && !isRecentlyActive(p, period)) return false;
+        if (statusFilter !== "all" && (p.lifecycleStatus ?? "active") !== statusFilter) return false;
         if (q && !`${p.clientName} ${p.projectName}`.toLowerCase().includes(q)) return false;
         return true;
       })
@@ -788,7 +837,7 @@ export default function ActiveProjectsNext() {
         const rb = b.metrics.revenueUSDNormalized ?? b.metrics.revenueDisplay ?? 0;
         return rb - ra;
       });
-  }, [data?.projects, search, activeOnly, statusFilter, period]);
+  }, [data?.projects, search, activeOnly, period, statusFilter]);
 
   // Group by client — clients with worst health bubble up
   const clientGroups = useMemo(() => {
