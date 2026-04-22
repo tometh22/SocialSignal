@@ -7,7 +7,7 @@ import PortfolioAnalytics from "@/components/portfolio-analytics";
 import { usePermissions } from "@/hooks/use-permissions";
 import {
   RefreshCcw, Search, ChevronDown, ChevronRight,
-  Filter, DollarSign, TrendingUp, Clock, BriefcaseBusiness, ExternalLink,
+  Filter, DollarSign, TrendingUp, Clock, BriefcaseBusiness, ExternalLink, Download,
 } from "lucide-react";
 import { Link } from "wouter";
 
@@ -461,6 +461,17 @@ function Controls({
         <Filter className="h-3.5 w-3.5" />
         {activeOnly ? "Solo activos" : "Todos"}
       </button>
+
+      {/* Export */}
+      <a
+        href={`/api/projects/export?period=${encodeURIComponent(period)}&status=${encodeURIComponent(statusFilter)}${search ? `&q=${encodeURIComponent(search)}` : ""}`}
+        className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-50 transition-colors"
+        download
+        title="Descargar Excel con los filtros actuales"
+      >
+        <Download className="h-3.5 w-3.5" />
+        Exportar
+      </a>
 
       {/* Refresh */}
       <button

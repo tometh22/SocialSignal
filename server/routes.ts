@@ -110,8 +110,7 @@ import {
   quotationTeamMembers,
   quotationTemplates,
 } from "@shared/schema";
-import { ActiveProjectsAggregator } from "./domain/projectsActive";
-import { resolveTimeFilter } from "./services/time";
+import { ActiveProjectsAggregator } from "./domain/projectsActive";import { resolveTimeFilter } from "./services/time";
 import { CoverageCalculator } from "./domain/coverage";
 import { eq, and, isNull, isNotNull, desc, sql, asc, gte, lte, inArray } from "drizzle-orm";
 import { reinitializeDatabase } from "./reinit-data";
@@ -933,9 +932,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Main endpoint
   app.get('/api/projects', requireAuth, handleProjectsRequest);
-  
+
   // V2 alias endpoint
   app.get('/api/active-projects/v2', requireAuth, handleProjectsRequest);
+
+  // XLSX export — reusa el aggregator; respeta el filtro de estado y período del cliente.
+  app.get('/api/projects/export', requireAuth, async (req, res) => {
+    try {
+      const XLSX = await import('xlsx');
+      const period = typeof req.query.period === 'string' ? req.query.period : undefined;
+      const statusFilter = typeof req.query.status === 'string' ? req.query.status : 'all';
+      const q = typeof req.query.q === 'string' ? req.query.q.toLowerCase() : '';
+
+      const timeFilter: any = period ? { type: 'month', value: period } : { type: 'month', value: new Date().toISOString().slice(0, 7) };
+      const aggregator = new ActiveProjectsAggregator(storage);
+      const response = await aggregator.getActiveProjectsUnified(timeFilter, false);
+
+      const allowed = ['active','on-hold','delivered','invoiced','completed','cancelled','voided'];
+      const rows = (response.projects ?? [])
+        .filter(p => statusFilter === 'all' || p.status === statusFilter)
+        .filter(p => !q || `${p.client?.name ?? ''} ${p.name}`.toLowerCase().includes(q))
+        .map(p => ({
+          'Cliente': p.client?.name ?? '',
+          'Proyecto': p.name,
+          'Estado': p.status,
+          'Tipo': p.projectType ?? p.type,
+          'Inicio': (p as any).startMonthKey ?? '',
+          'Fin': (p as any).endMonthKey ?? '',
+          'Entregado': (p as any).deliveredAt ? new Date((p as any).deliveredAt).toISOString().slice(0, 10) : '',
+          'Facturado': (p as any).invoicedAt ? new Date((p as any).invoicedAt).toISOString().slice(0, 10) : '',
+          'Cerrado': (p as any).closedAt ? new Date((p as any).closedAt).toISOString().slice(0, 10) : '',
+          'Ingresos USD': p.periodRevenueUSD ?? p.revenue ?? 0,
+          'Costos USD': p.periodCostUSD ?? p.cost ?? 0,
+          'Margen USD': p.periodProfitUSD ?? p.profit ?? 0,
+          'Horas': (p.metrics as any)?.totalHours ?? 0,
+        }));
+
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.json_to_sheet(rows);
+      XLSX.utils.book_append_sheet(wb, ws, 'Proyectos');
+      const buf: Buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+
+      const filename = `proyectos-${period ?? 'current'}${statusFilter !== 'all' ? '-' + statusFilter : ''}.xlsx`;
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.send(buf);
+    } catch (error: any) {
+      console.error('Error exportando proyectos:', error);
+      res.status(500).json({ message: error?.message ?? 'Error al exportar' });
+    }
+  });
 
   // ==================== OPTIONAL ROLLUP ENDPOINT ====================
   // GET /api/projects/:key/rollup?scope=acum|total&thru=YYYY-MM
