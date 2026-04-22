@@ -120,6 +120,7 @@ import { personalMonthlyInvoices, externalProviders as externalProvidersTable, p
 import { sanitizeInput } from "./input-sanitization";
 import { setupAuth, hashPassword } from "./auth";
 import { requireProjectUnlocked, projectIdFromTimeEntry } from "./middleware/projectLocked";
+import { requireRole, requireProvider, requireProviderCanAccessProject } from "./middleware/requireRole";
 import { createReviewRoomsRouter } from "./routes-review-rooms";
 import { reviewRooms, reviewRoomMembers } from "@shared/schema";
 import path from 'path';
@@ -8776,6 +8777,260 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Error al borrar factura" });
     }
   });
+
+  // =========== PROVEEDORES EXTERNOS (ADMIN) ===========
+
+  // Listar todos los proveedores
+  app.get("/api/admin/external-providers", requireAuth, requireRole("admin"), async (req, res) => {
+    try {
+      const rows = await db
+        .select({
+          provider: externalProvidersTable,
+          user: {
+            id: users.id,
+            firstName: users.firstName,
+            lastName: users.lastName,
+            email: users.email,
+            isActive: users.isActive,
+          },
+        })
+        .from(externalProvidersTable)
+        .leftJoin(users, eq(externalProvidersTable.userId, users.id))
+        .orderBy(desc(externalProvidersTable.createdAt));
+      res.json(rows);
+    } catch (error) {
+      console.error("Error listando proveedores:", error);
+      res.status(500).json({ message: "Error al listar proveedores" });
+    }
+  });
+
+  // Crear proveedor (crea user + externalProvider en una transacción lógica)
+  app.post("/api/admin/external-providers", requireAuth, requireRole("admin"), async (req, res) => {
+    try {
+      const {
+        firstName, lastName, email, password,
+        companyName, taxId, contactEmail, contactPhone,
+        hourlyRate, hourlyRateARS, personnelId, notes,
+      } = req.body;
+
+      if (!firstName || !lastName || !email || !password || !companyName) {
+        return res.status(400).json({ message: "Campos requeridos: firstName, lastName, email, password, companyName" });
+      }
+
+      const existing = await storage.getUserByEmail(email);
+      if (existing) return res.status(409).json({ message: "Ya existe un usuario con ese email" });
+
+      const hashed = await hashPassword(password);
+      const newUser = await storage.createUser({
+        firstName, lastName, email, password: hashed,
+        isAdmin: false, isActive: true, permissions: [],
+        role: "external_provider",
+      } as any);
+
+      const [provider] = await db
+        .insert(externalProvidersTable)
+        .values({
+          userId: newUser.id,
+          personnelId: personnelId ?? null,
+          companyName,
+          taxId: taxId ?? null,
+          contactEmail: contactEmail ?? email,
+          contactPhone: contactPhone ?? null,
+          hourlyRate: hourlyRate ?? null,
+          hourlyRateARS: hourlyRateARS ?? null,
+          notes: notes ?? null,
+          createdBy: req.user!.id,
+        })
+        .returning();
+
+      res.status(201).json({ provider, user: { id: newUser.id, email: newUser.email } });
+    } catch (error: any) {
+      console.error("Error creando proveedor:", error);
+      res.status(500).json({ message: error?.message ?? "Error al crear proveedor" });
+    }
+  });
+
+  // Editar proveedor
+  app.patch("/api/admin/external-providers/:id", requireAuth, requireRole("admin"), async (req, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) return res.status(400).json({ message: "ID inválido" });
+      const allowed: any = {};
+      for (const k of ["companyName","taxId","contactEmail","contactPhone","hourlyRate","hourlyRateARS","active","notes","personnelId"]) {
+        if (k in req.body) allowed[k] = req.body[k];
+      }
+      allowed.updatedAt = new Date();
+      const [updated] = await db
+        .update(externalProvidersTable)
+        .set(allowed)
+        .where(eq(externalProvidersTable.id, id))
+        .returning();
+      if (!updated) return res.status(404).json({ message: "Proveedor no encontrado" });
+      res.json(updated);
+    } catch (error) {
+      console.error("Error editando proveedor:", error);
+      res.status(500).json({ message: "Error al editar proveedor" });
+    }
+  });
+
+  // Listar proyectos asignados a un proveedor
+  app.get("/api/admin/external-providers/:id/access", requireAuth, requireRole("admin"), async (req, res) => {
+    try {
+      const providerId = parseInt(req.params.id, 10);
+      if (isNaN(providerId)) return res.status(400).json({ message: "ID inválido" });
+      const rows = await db
+        .select()
+        .from(providerProjectAccessTable)
+        .where(eq(providerProjectAccessTable.providerId, providerId));
+      res.json(rows);
+    } catch (error) {
+      console.error("Error listando accesos:", error);
+      res.status(500).json({ message: "Error al listar accesos" });
+    }
+  });
+
+  // Asignar proyecto a proveedor
+  app.post("/api/admin/external-providers/:id/access", requireAuth, requireRole("admin"), async (req, res) => {
+    try {
+      const providerId = parseInt(req.params.id, 10);
+      const { projectId, canLogHours = true, canUploadCosts = true } = req.body;
+      if (isNaN(providerId) || !projectId) return res.status(400).json({ message: "providerId/projectId inválido" });
+      const [row] = await db
+        .insert(providerProjectAccessTable)
+        .values({
+          providerId,
+          projectId,
+          canLogHours,
+          canUploadCosts,
+          grantedBy: req.user!.id,
+        })
+        .onConflictDoUpdate({
+          target: [providerProjectAccessTable.providerId, providerProjectAccessTable.projectId],
+          set: { canLogHours, canUploadCosts, grantedBy: req.user!.id, grantedAt: new Date() },
+        })
+        .returning();
+      res.status(201).json(row);
+    } catch (error) {
+      console.error("Error asignando proyecto a proveedor:", error);
+      res.status(500).json({ message: "Error al asignar proyecto" });
+    }
+  });
+
+  // Revocar acceso
+  app.delete("/api/admin/external-providers/:id/access/:projectId", requireAuth, requireRole("admin"), async (req, res) => {
+    try {
+      const providerId = parseInt(req.params.id, 10);
+      const projectId = parseInt(req.params.projectId, 10);
+      if (isNaN(providerId) || isNaN(projectId)) return res.status(400).json({ message: "IDs inválidos" });
+      await db
+        .delete(providerProjectAccessTable)
+        .where(and(
+          eq(providerProjectAccessTable.providerId, providerId),
+          eq(providerProjectAccessTable.projectId, projectId),
+        ));
+      res.json({ ok: true });
+    } catch (error) {
+      console.error("Error revocando acceso:", error);
+      res.status(500).json({ message: "Error al revocar acceso" });
+    }
+  });
+
+  // =========== PROVEEDOR (SCOPE RESTRINGIDO) ===========
+
+  // Perfil y proyectos asignados
+  app.get("/api/provider/me", requireAuth, requireProvider, async (req, res) => {
+    try {
+      const accesses = await db
+        .select()
+        .from(providerProjectAccessTable)
+        .where(eq(providerProjectAccessTable.providerId, req.provider!.id));
+
+      const projectIds = accesses.map(a => a.projectId);
+      const projects = projectIds.length
+        ? await db.select().from(activeProjects).where(inArray(activeProjects.id, projectIds))
+        : [];
+
+      res.json({ provider: req.provider, accesses, projects });
+    } catch (error) {
+      console.error("Error obteniendo perfil proveedor:", error);
+      res.status(500).json({ message: "Error al obtener perfil" });
+    }
+  });
+
+  // Lista de proyectos del proveedor (lightweight)
+  app.get("/api/provider/projects", requireAuth, requireProvider, async (req, res) => {
+    try {
+      const accesses = await db
+        .select()
+        .from(providerProjectAccessTable)
+        .where(eq(providerProjectAccessTable.providerId, req.provider!.id));
+      if (accesses.length === 0) return res.json([]);
+
+      const projects = await db
+        .select()
+        .from(activeProjects)
+        .where(inArray(activeProjects.id, accesses.map(a => a.projectId)));
+
+      const accessMap = new Map(accesses.map(a => [a.projectId, a]));
+      res.json(projects.map(p => ({ ...p, access: accessMap.get(p.id) })));
+    } catch (error) {
+      console.error("Error listando proyectos de proveedor:", error);
+      res.status(500).json({ message: "Error al listar proyectos" });
+    }
+  });
+
+  // Cargar horas (sujeto a canLogHours + proyecto no cerrado)
+  app.post(
+    "/api/provider/time-entries",
+    requireAuth,
+    requireProvider,
+    requireProviderCanAccessProject("body"),
+    requireProjectUnlocked(),
+    async (req, res) => {
+      try {
+        const access: any = (req as any).providerAccess;
+        if (!access?.canLogHours) {
+          return res.status(403).json({ message: "No tenés permiso para cargar horas en este proyecto" });
+        }
+        // Si el proveedor tiene personnelId mapeado, usarlo; si no, rechazar.
+        const [provRow] = await db.select({ personnelId: externalProvidersTable.personnelId, hourlyRate: externalProvidersTable.hourlyRate, hourlyRateARS: externalProvidersTable.hourlyRateARS })
+          .from(externalProvidersTable)
+          .where(eq(externalProvidersTable.id, req.provider!.id));
+        if (!provRow?.personnelId) {
+          return res.status(400).json({ message: "El proveedor no está mapeado a un recurso de personal" });
+        }
+
+        const { projectId, date, hours, description } = req.body;
+        if (!projectId || !date || !hours) {
+          return res.status(400).json({ message: "Campos requeridos: projectId, date, hours" });
+        }
+        const rate = Number(provRow.hourlyRate ?? provRow.hourlyRateARS ?? 0);
+        const totalCost = Number(hours) * rate;
+
+        const [created] = await db
+          .insert(timeEntries)
+          .values({
+            projectId,
+            personnelId: provRow.personnelId,
+            date: new Date(date),
+            hours: Number(hours),
+            totalCost,
+            hourlyRateAtTime: rate,
+            entryType: "hours",
+            description: description ?? null,
+            createdBy: req.user!.id,
+          })
+          .returning();
+        res.status(201).json(created);
+      } catch (error: any) {
+        console.error("Error cargando hora de proveedor:", error);
+        res.status(500).json({ message: error?.message ?? "Error al cargar hora" });
+      }
+    }
+  );
+
+  // Subir factura propia (reusa el mismo endpoint de factura personal — ya requiere auth)
+  // No se duplica aquí; el proveedor entra por /api/me/invoices igual que cualquier usuario.
 
   // =========== GESTIÓN DE USUARIOS (ADMIN-ONLY) ===========
 
