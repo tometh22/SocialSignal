@@ -219,6 +219,7 @@ export default function SidebarFixed() {
       title: "Admin",
       items: [
         { href: "/admin/users", title: "Usuarios", icon: Users, description: "Usuarios y permisos", permission: 'admin' as AppSection },
+        { href: "/admin/providers", title: "Proveedores", icon: Building2, description: "Proveedores externos y su acceso a proyectos", permission: 'admin' as AppSection },
         { href: "/admin", title: "Configuración", icon: Settings, description: "Administración", permission: 'admin' as AppSection }
       ]
     }
