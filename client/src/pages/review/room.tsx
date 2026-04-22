@@ -90,10 +90,14 @@ function RoomBody({ roomId }: { roomId: number }) {
   const { data: projects = [], isLoading: l1 } = useQuery<unknown[]>({
     queryKey: ['/api/status-semanal?includeHidden=true'],
     staleTime: 0,
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: true,
   });
   const { data: custom = [], isLoading: l2 } = useQuery<unknown[]>({
     queryKey: ['/api/status-semanal/custom?includeHidden=true'],
     staleTime: 0,
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: true,
   });
 
   const loading = l1 || l2;

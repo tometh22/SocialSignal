@@ -1624,14 +1624,20 @@ export default function StatusSemanalPage() {
 
   // ── Queries ──────────────────────────────────────────────────────────────────
 
+  // Poll + refetch on focus so that changes made by another member of the same
+  // review room (e.g. archiving a project) appear without a manual reload.
   const { data: projectRows = [], isLoading: loadingProjects } = useQuery<StatusRow[]>({
     queryKey: ['/api/status-semanal?includeHidden=true'],
     staleTime: 0,
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: true,
   });
 
   const { data: customRows = [], isLoading: loadingCustom } = useQuery<CustomItem[]>({
     queryKey: ['/api/status-semanal/custom?includeHidden=true'],
     staleTime: 0,
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: true,
   });
 
   const { data: rawUsers } = useQuery<AppUser[]>({
