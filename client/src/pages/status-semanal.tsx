@@ -603,7 +603,7 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
           <div className="flex items-baseline gap-2 min-w-0">
             {item.isCustom && <Tag className="h-3 w-3 text-slate-300 shrink-0 self-center" />}
             <span className="font-medium text-[14px] tracking-tight text-slate-900 truncate" title={item.title}>{item.title}</span>
-            {item.subtitle && <span className="text-slate-400 text-[12px] truncate hidden md:block shrink-0" title={item.subtitle}>{item.subtitle}</span>}
+            {item.subtitle && <span className="text-slate-400 text-[12px] truncate hidden md:block min-w-0" title={item.subtitle}>{item.subtitle}</span>}
             <span className="shrink-0 self-center"><FreshnessIndicator updatedAt={item.updatedAt} updatedByName={item.updatedByName} updatedById={item.updatedById} currentUserId={currentUserId} /></span>
           </div>
           {!expanded && !hideSubtitle && item.currentAction && (
