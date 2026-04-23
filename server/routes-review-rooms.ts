@@ -583,10 +583,13 @@ export function createReviewRoomsRouter(requireAuth: RequireAuth): Router {
       if (marginStatus !== undefined && !VALID_LEVEL.includes(marginStatus)) return res.status(400).json({ message: "marginStatus inválido" });
       if (teamStrain !== undefined && !VALID_LEVEL.includes(teamStrain)) return res.status(400).json({ message: "teamStrain inválido" });
       if (decisionNeeded !== undefined && !VALID_DECISION.includes(decisionNeeded)) return res.status(400).json({ message: "decisionNeeded inválido" });
+      if (title !== undefined && (typeof title !== 'string' || !title.trim())) {
+        return res.status(400).json({ message: "El título no puede estar vacío" });
+      }
 
       const userId = req.user!.id;
       const update: Record<string, any> = { updatedAt: new Date(), updatedBy: userId };
-      if (title !== undefined) update.title = title;
+      if (title !== undefined) update.title = title.trim();
       if (subtitle !== undefined) update.subtitle = subtitle;
       if (healthStatus !== undefined) update.healthStatus = healthStatus;
       if (marginStatus !== undefined) update.marginStatus = marginStatus;

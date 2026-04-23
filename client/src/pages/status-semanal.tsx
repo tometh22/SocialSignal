@@ -354,9 +354,9 @@ function MentionInput({ value, onChange, onKeyDown, placeholder, className, user
 
 // ─── Inline editor ────────────────────────────────────────────────────────────
 
-function InlineText({ value, placeholder, onSave, multiline = false, className = '' }: {
+function InlineText({ value, placeholder, onSave, multiline = false, className = '', required = false }: {
   value: string | null; placeholder: string; onSave: (v: string) => void;
-  multiline?: boolean; className?: string;
+  multiline?: boolean; className?: string; required?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value ?? '');
@@ -365,7 +365,12 @@ function InlineText({ value, placeholder, onSave, multiline = false, className =
   useEffect(() => { setDraft(value ?? ''); }, [value]);
   useEffect(() => { if (editing) ref.current?.focus(); }, [editing]);
 
-  const save = () => { setEditing(false); if (draft !== (value ?? '')) onSave(draft); };
+  const save = () => {
+    setEditing(false);
+    // Required fields never commit an empty value — revert to previous instead.
+    if (required && !draft.trim()) { setDraft(value ?? ''); return; }
+    if (draft !== (value ?? '')) onSave(draft);
+  };
 
   if (editing) {
     const cls = `w-full text-sm border border-indigo-300 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-400/25 bg-white shadow-sm resize-none ${className}`;
@@ -685,7 +690,7 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
                   <div className="flex items-center gap-3 px-5 py-2 border-t border-slate-100 bg-slate-50/30">
                     <Tag className="h-3 w-3 text-slate-300 shrink-0" />
                     <div className="flex-1 min-w-0 flex items-center gap-2">
-                      <InlineText value={item.title} placeholder="Título" onSave={v => onUpdate({ title: v })} className="text-[12px] font-medium text-slate-600 truncate" />
+                      <InlineText value={item.title} placeholder="Título" onSave={v => onUpdate({ title: v })} required className="text-[12px] font-medium text-slate-600 truncate" />
                       {item.subtitle !== null && item.subtitle !== undefined && (
                         <><span className="text-slate-200 shrink-0">·</span>
                         <InlineText value={item.subtitle} placeholder="Descripción opcional..." onSave={v => onUpdate({ subtitle: v })} className="text-[12px] text-slate-400 truncate flex-1" /></>
