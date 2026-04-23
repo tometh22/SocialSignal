@@ -18702,9 +18702,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: `decisionNeeded inválido. Debe ser: ${validDecision.join(', ')}` });
       }
 
+      if (title !== undefined && (typeof title !== 'string' || !title.trim())) {
+        return res.status(400).json({ message: "El título no puede estar vacío" });
+      }
+
       const userId = req.user?.id ?? null;
       const update: Record<string, any> = { updatedAt: new Date() };
-      if (title !== undefined) update.title = title;
+      if (title !== undefined) update.title = title.trim();
       if (subtitle !== undefined) update.subtitle = subtitle;
       if (healthStatus !== undefined) update.healthStatus = healthStatus;
       if (marginStatus !== undefined) update.marginStatus = marginStatus;
@@ -18757,7 +18761,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (String(e).includes('updated_by')) {
           try {
             await db.update(weeklyStatusItems).set(update).where(eq(weeklyStatusItems.id, id));
-            item = { id, ...update };
+            // Re-fetch the full row — don't return a partial object built from `update`,
+            // callers (and the React Query cache in other clients) expect every column.
+            [item] = await db.select().from(weeklyStatusItems).where(eq(weeklyStatusItems.id, id));
           } catch (e2: any) {
             throw e2;
           }
