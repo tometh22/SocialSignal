@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { 
@@ -27,6 +28,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
+import { reviewApi, reviewKeys, type ReviewRoomSummary } from "@/lib/review-api";
 
 // Importación de los componentes de funcionalidades
 import { GlobalSearch } from "@/components/features/global-search";
@@ -105,13 +107,21 @@ export default function Topbar() {
     setNotifications(notifications.map(n => ({ ...n, read: true })));
   };
 
+  // Cached rooms list (already fetched by the sidebar). We use it to replace
+  // numeric room IDs in /review/:id with the room's name in the breadcrumb.
+  const { data: reviewRooms = [] } = useQuery<ReviewRoomSummary[]>({
+    queryKey: reviewKeys.list(),
+    queryFn: reviewApi.listRooms,
+    staleTime: 60_000,
+  });
+
   // Función para generar la ruta de migas de pan
   const generateBreadcrumbs = () => {
     if (location === '/') return [{ name: 'Dashboard', path: '/' }];
-    
+
     // Dividir la ruta actual
     const paths = location.split('/').filter(Boolean);
-    
+
     // Mapear los segmentos de ruta a nombres legibles
     const routeLabels: Record<string, string> = {
       'optimized-quote': 'Nueva Cotización',
@@ -141,32 +151,39 @@ export default function Topbar() {
       'apply-warner-team': 'Aplicar Equipo Warner',
       'new': 'Nuevo',
       'history': 'Historial',
-      'status-semanal': 'Review',
-      'review': 'Review',
+      'status-semanal': 'Status',
+      'review': 'Status',
     };
 
     // Casos especiales para páginas principales que no necesitan "Dashboard" como padre
     const standalonePages = [
-      'quotations', 'manage-quotes', 'optimized-quote', 'active-projects', 
+      'quotations', 'manage-quotes', 'optimized-quote', 'active-projects',
       'clients', 'statistics', 'admin', 'recurring-templates'
     ];
-    
+
     // Si es una página principal, no incluir Dashboard en el breadcrumb
     if (paths.length === 1 && standalonePages.includes(paths[0])) {
       const name = routeLabels[paths[0]] || paths[0].charAt(0).toUpperCase() + paths[0].slice(1);
       return [{ name, path: location }];
     }
-    
+
     // Generar las migas de pan normales para rutas complejas
     const breadcrumbs = [{ name: 'Dashboard', path: '/' }];
     let currentPath = '';
-    
+
     paths.forEach((path, index) => {
       currentPath += `/${path}`;
+      // Replace numeric room IDs under /review/:id with the room name when known.
+      const prev = paths[index - 1];
+      if (prev === 'review' && /^\d+$/.test(path)) {
+        const room = reviewRooms.find(r => r.id === parseInt(path, 10));
+        breadcrumbs.push({ name: room?.name ?? path, path: currentPath });
+        return;
+      }
       const name = routeLabels[path] || path.charAt(0).toUpperCase() + path.slice(1);
       breadcrumbs.push({ name, path: currentPath });
     });
-    
+
     return breadcrumbs;
   };
   

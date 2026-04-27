@@ -7,6 +7,7 @@ import { useMaybeReviewRoom } from "@/hooks/use-review-room";
 import MemberAvatarsStack from "@/components/review/MemberAvatarsStack";
 import MembersDialog from "@/components/review/MembersDialog";
 import AddProjectDialog from "@/components/review/AddProjectDialog";
+import RoomTitleEditor from "@/components/review/RoomTitleEditor";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -1941,17 +1942,19 @@ export default function StatusSemanalPage() {
               <div className="flex items-center gap-2.5 shrink-0">
                 {roomCtx ? (
                   <>
-                    <a href="/review" className="p-1 rounded-full hover:bg-white/20 text-white/70 hover:text-white transition-colors shrink-0" title="Volver a Reviews">
+                    <a href="/review" className="p-1 rounded-full hover:bg-white/20 text-white/70 hover:text-white transition-colors shrink-0" title="Volver a Status">
                       <ChevronLeft className="h-4 w-4" />
                     </a>
                     <div className="h-8 w-8 rounded-lg bg-white/15 backdrop-blur-sm flex items-center justify-center shrink-0 border border-white/20 text-sm">
-                      {roomCtx.room?.emoji || roomCtx.room?.name?.charAt(0) || 'R'}
+                      {roomCtx.room?.emoji || roomCtx.room?.name?.charAt(0) || 'S'}
                     </div>
                     <div>
-                      <div className="flex items-center gap-2">
-                        <h1 className="text-base font-bold leading-tight text-white tracking-tight">{roomCtx.room?.name || 'Review'}</h1>
-                        <span className="text-[9px] font-semibold bg-white/20 text-white px-1.5 py-0.5 rounded">{roomCtx.myRole === 'owner' ? 'Owner' : 'Editor'}</span>
-                      </div>
+                      <RoomTitleEditor
+                        roomId={roomCtx.roomId}
+                        name={roomCtx.room?.name || 'Status'}
+                        privacy={roomCtx.room?.privacy || 'members'}
+                        myRole={roomCtx.myRole}
+                      />
                       <p className="text-[9px] text-indigo-200 font-medium">{weekLabel()}</p>
                     </div>
                   </>
@@ -1961,7 +1964,7 @@ export default function StatusSemanalPage() {
                       <ClipboardList className="h-4 w-4 text-white" />
                     </div>
                     <div>
-                      <h1 className="text-base font-bold leading-tight text-white tracking-tight">Review</h1>
+                      <h1 className="text-base font-bold leading-tight text-white tracking-tight">Status</h1>
                       <p className="text-[9px] text-indigo-200 font-medium">{weekLabel()}</p>
                     </div>
                   </>
