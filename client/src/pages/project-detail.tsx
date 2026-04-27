@@ -156,7 +156,7 @@ function LoadingSkeleton() {
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
-export default function ProjectDetailClean() {
+export default function ProjectDetail() {
   const [location] = useLocation();
   const projectId = location.split("/")[2];
   const pid = parseInt(projectId || "0", 10);
