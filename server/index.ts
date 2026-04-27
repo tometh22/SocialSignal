@@ -324,6 +324,13 @@ async function applyPendingMigrations() {
       CREATE INDEX IF NOT EXISTS idx_ppa_project  ON provider_project_access(project_id);
     `);
 
+    // 0012: rate_projection_mode column on quotations (schema drift fix).
+    // The column was declared in shared/schema.ts but never had a migration,
+    // so SELECT * on quotations was failing with "column does not exist".
+    await run('0012 quotations.rate_projection_mode', `
+      ALTER TABLE "quotations" ADD COLUMN IF NOT EXISTS "rate_projection_mode" text DEFAULT 'current';
+    `);
+
   } finally {
     client.release();
   }
