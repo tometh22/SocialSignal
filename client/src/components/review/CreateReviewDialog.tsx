@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Check, Loader2 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Check, Loader2, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
 import { authFetch } from "@/lib/queryClient";
@@ -29,6 +30,7 @@ export default function CreateReviewDialog({ open, onClose }: Props) {
   const [colorIndex, setColorIndex] = useState(1);
   const [emoji, setEmoji] = useState("");
   const [memberIds, setMemberIds] = useState<number[]>([]);
+  const [isPrivate, setIsPrivate] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -37,6 +39,7 @@ export default function CreateReviewDialog({ open, onClose }: Props) {
     setColorIndex(1);
     setEmoji("");
     setMemberIds([]);
+    setIsPrivate(false);
   }, [open]);
 
   const { data: users = [] } = useQuery<AppUser[]>({
@@ -55,7 +58,8 @@ export default function CreateReviewDialog({ open, onClose }: Props) {
       description: description.trim() || null,
       colorIndex,
       emoji: emoji.trim() || null,
-      memberIds,
+      memberIds: isPrivate ? [] : memberIds,
+      privacy: isPrivate ? 'private' : 'members',
     }),
     onSuccess: (room: any) => {
       qc.invalidateQueries({ queryKey: reviewKeys.all });
@@ -78,18 +82,18 @@ export default function CreateReviewDialog({ open, onClose }: Props) {
     <Dialog open={open} onOpenChange={v => !v && onClose()}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Crear Review</DialogTitle>
+          <DialogTitle>Crear sala de status</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
           <div>
             <Label htmlFor="rname">Nombre</Label>
-            <Input id="rname" value={name} onChange={e => setName(e.target.value)} placeholder="Ej: Review con COO" autoFocus />
+            <Input id="rname" value={name} onChange={e => setName(e.target.value)} placeholder="Ej: Status con COO" autoFocus />
           </div>
 
           <div>
             <Label htmlFor="rdesc">Descripción (opcional)</Label>
-            <Textarea id="rdesc" value={description} onChange={e => setDescription(e.target.value)} rows={2} placeholder="Ej: Review semanal con el equipo de liderazgo" />
+            <Textarea id="rdesc" value={description} onChange={e => setDescription(e.target.value)} rows={2} placeholder="Ej: Status semanal con el equipo de liderazgo" />
           </div>
 
           <div className="grid grid-cols-[1fr_auto] gap-3">
@@ -125,35 +129,52 @@ export default function CreateReviewDialog({ open, onClose }: Props) {
             </div>
           </div>
 
-          <div>
-            <Label>Participantes ({memberIds.length})</Label>
-            <p className="text-xs text-slate-500 mb-2">Podrán ver y editar el board. Vos quedás como <strong>owner</strong>.</p>
-            <div className="max-h-52 overflow-y-auto border rounded-md divide-y">
-              {sortedUsers.map(u => {
-                const checked = memberIds.includes(u.id);
-                return (
-                  <button
-                    key={u.id}
-                    type="button"
-                    className={cn(
-                      "w-full flex items-center justify-between px-3 py-2 text-sm hover:bg-slate-50",
-                      checked && "bg-indigo-50",
-                    )}
-                    onClick={() => setMemberIds(prev => prev.includes(u.id) ? prev.filter(x => x !== u.id) : [...prev, u.id])}
-                  >
-                    <span>
-                      <span className="font-medium">{u.name}</span>
-                      <span className="text-slate-500 ml-2 text-xs">{u.email}</span>
-                    </span>
-                    {checked && <Check className="h-4 w-4 text-indigo-600" />}
-                  </button>
-                );
-              })}
-              {sortedUsers.length === 0 && (
-                <div className="text-sm text-slate-500 text-center py-4">Cargando usuarios…</div>
-              )}
+          <div className="flex items-start gap-3 rounded-lg border border-slate-200 bg-slate-50/60 px-3 py-3">
+            <Lock className="h-4 w-4 text-slate-500 mt-0.5 flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between gap-3">
+                <Label htmlFor="rprivate" className="text-sm font-medium text-slate-800 cursor-pointer">
+                  Solo para mí
+                </Label>
+                <Switch id="rprivate" checked={isPrivate} onCheckedChange={setIsPrivate} />
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Tu vista personal. Nadie más la ve. Podés invitar gente después.
+              </p>
             </div>
           </div>
+
+          {!isPrivate && (
+            <div>
+              <Label>Participantes ({memberIds.length})</Label>
+              <p className="text-xs text-slate-500 mb-2">Podrán ver y editar el board. Vos quedás como <strong>owner</strong>.</p>
+              <div className="max-h-52 overflow-y-auto border rounded-md divide-y">
+                {sortedUsers.map(u => {
+                  const checked = memberIds.includes(u.id);
+                  return (
+                    <button
+                      key={u.id}
+                      type="button"
+                      className={cn(
+                        "w-full flex items-center justify-between px-3 py-2 text-sm hover:bg-slate-50",
+                        checked && "bg-indigo-50",
+                      )}
+                      onClick={() => setMemberIds(prev => prev.includes(u.id) ? prev.filter(x => x !== u.id) : [...prev, u.id])}
+                    >
+                      <span>
+                        <span className="font-medium">{u.name}</span>
+                        <span className="text-slate-500 ml-2 text-xs">{u.email}</span>
+                      </span>
+                      {checked && <Check className="h-4 w-4 text-indigo-600" />}
+                    </button>
+                  );
+                })}
+                {sortedUsers.length === 0 && (
+                  <div className="text-sm text-slate-500 text-center py-4">Cargando usuarios…</div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         <DialogFooter>

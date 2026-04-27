@@ -3458,6 +3458,7 @@ export const insertReviewRoomSchema = createInsertSchema(reviewRooms).omit({
   description: z.string().trim().max(2000).nullable().optional(),
   colorIndex: z.number().int().min(0).max(20).default(0),
   emoji: z.string().trim().max(16).nullable().optional(),
+  privacy: z.enum(['members', 'private']).default('members'),
 });
 export type ReviewRoom = typeof reviewRooms.$inferSelect;
 export type InsertReviewRoom = z.infer<typeof insertReviewRoomSchema>;

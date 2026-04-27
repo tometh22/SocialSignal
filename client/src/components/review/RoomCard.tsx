@@ -1,7 +1,7 @@
 import { useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
-import { Users, Clock, AlertCircle } from "lucide-react";
+import { Users, Clock, AlertCircle, Lock } from "lucide-react";
 import { roomColor, type ReviewRoomSummary } from "@/lib/review-api";
 import { setLastReviewRoomId } from "@/hooks/use-review-room";
 
@@ -50,13 +50,29 @@ export default function RoomCard({ room }: Props) {
             <p className="text-xs text-slate-500 line-clamp-2 mt-0.5">{room.description}</p>
           )}
         </div>
-        <Badge variant="outline" className="text-[10px]">{room.myRole === 'owner' ? 'Owner' : 'Editor'}</Badge>
+        {room.privacy === 'private' ? (
+          <Badge variant="outline" className="text-[10px] gap-1 border-slate-300 text-slate-600">
+            <Lock className="h-2.5 w-2.5" />
+            Personal
+          </Badge>
+        ) : (
+          <Badge variant="outline" className="text-[10px]">{room.myRole === 'owner' ? 'Owner' : 'Editor'}</Badge>
+        )}
       </div>
 
       <div className="flex items-center justify-between text-xs text-slate-500">
         <span className="flex items-center gap-1">
-          <Users className="h-3.5 w-3.5" />
-          {room.memberCount} {room.memberCount === 1 ? 'miembro' : 'miembros'}
+          {room.privacy === 'private' ? (
+            <>
+              <Lock className="h-3.5 w-3.5" />
+              Solo vos
+            </>
+          ) : (
+            <>
+              <Users className="h-3.5 w-3.5" />
+              {room.memberCount} {room.memberCount === 1 ? 'miembro' : 'miembros'}
+            </>
+          )}
         </span>
         {room.pendingCount > 0 ? (
           <span className="flex items-center gap-1 text-amber-700 font-medium">
