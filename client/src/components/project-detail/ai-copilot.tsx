@@ -209,7 +209,9 @@ export default function AICopilot(props: AICopilotProps) {
   const { signals, recommendations, whatIfScenarios, diagnosis } = useProjectIntelligence(props);
   const [showAllSignals, setShowAllSignals] = useState(false);
   const [showWhatIf, setShowWhatIf] = useState(false);
-  const [isExpanded, setIsExpanded] = useState(false);
+  // Default expanded — the AI Copilot is the centerpiece of the Resumen tab,
+  // so collapsing it by default left the page looking empty.
+  const [isExpanded, setIsExpanded] = useState(true);
 
   const headerBorder = diagnosis === "critical" ? "border-l-red-500" : diagnosis === "warning" ? "border-l-amber-400" : "border-l-emerald-500";
   const diagnosisMeta = {

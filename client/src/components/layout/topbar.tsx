@@ -167,8 +167,10 @@ export default function Topbar() {
       return [{ name, path: location }];
     }
 
-    // Generar las migas de pan normales para rutas complejas
-    const breadcrumbs = [{ name: 'Dashboard', path: '/' }];
+    // Para rutas que entran a una página standalone (ej. /active-projects/:id),
+    // omitimos el "Dashboard" inicial: la cabecera queda más limpia.
+    const startsInStandalone = standalonePages.includes(paths[0]);
+    const breadcrumbs = startsInStandalone ? [] : [{ name: 'Dashboard', path: '/' }];
     let currentPath = '';
 
     paths.forEach((path, index) => {
@@ -178,6 +180,12 @@ export default function Topbar() {
       if (prev === 'review' && /^\d+$/.test(path)) {
         const room = reviewRooms.find(r => r.id === parseInt(path, 10));
         breadcrumbs.push({ name: room?.name ?? path, path: currentPath });
+        return;
+      }
+      // IDs numéricos (proyectos, leads, etc.) — los mostramos con prefijo #
+      // para que no aparezcan como un número suelto en el breadcrumb.
+      if (/^\d+$/.test(path)) {
+        breadcrumbs.push({ name: `#${path}`, path: currentPath });
         return;
       }
       const name = routeLabels[path] || path.charAt(0).toUpperCase() + path.slice(1);

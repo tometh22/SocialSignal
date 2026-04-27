@@ -128,7 +128,8 @@ function PLBreakdown({
 
 function LoadingSkeleton() {
   return (
-    <div className="w-full px-3 py-6 space-y-6 bg-slate-100 min-h-screen">
+    <div className="w-full bg-slate-100 min-h-screen">
+     <div className="mx-auto w-full max-w-[1280px] px-3 py-6 space-y-6">
       <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm animate-pulse">
         <div className="px-4 py-4 space-y-3">
           <div className="h-5 w-48 bg-slate-200 rounded" />
@@ -150,6 +151,7 @@ function LoadingSkeleton() {
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm animate-pulse h-56" />
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm animate-pulse h-56" />
       </div>
+     </div>
     </div>
   );
 }
@@ -258,7 +260,8 @@ export default function ProjectDetail() {
   const showAICopilot = canSeeCosts && (effectiveCost > 0 || budget > 0);
 
   return (
-    <div className="w-full px-3 py-5 bg-slate-100 min-h-screen">
+    <div className="w-full bg-slate-100 min-h-screen">
+     <div className="mx-auto w-full max-w-[1280px] px-3 py-5">
       {/* ── Hero — always visible above tabs ─────────────────────── */}
       <div className="mb-4 animate-fadeIn">
         <ProjectHero
@@ -415,6 +418,7 @@ export default function ProjectDetail() {
           </div>
         </TabsContent>
       </Tabs>
+     </div>
     </div>
   );
 }
