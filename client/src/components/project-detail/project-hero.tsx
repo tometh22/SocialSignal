@@ -107,7 +107,7 @@ function KPICard({
     : "text-slate-900";
 
   return (
-    <div className={`rounded-lg bg-slate-50 border border-slate-100 border-l-4 ${borderColor} px-4 py-3 flex-1 min-w-[120px]`}>
+    <div className={`rounded-lg bg-slate-50 border border-slate-100 border-l-4 ${borderColor} px-4 py-3 flex-1 min-w-[140px] max-w-[240px]`}>
       <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">{label}</p>
       <div className="flex items-baseline gap-1.5 mt-1">
         <p className={`text-lg font-bold tabular-nums leading-tight ${valColor}`}>{value}</p>
