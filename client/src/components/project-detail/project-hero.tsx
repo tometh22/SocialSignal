@@ -107,7 +107,7 @@ function KPICard({
     : "text-slate-900";
 
   return (
-    <div className={`rounded-lg bg-slate-50 border border-slate-100 border-l-4 ${borderColor} px-4 py-3 flex-1 min-w-[140px] max-w-[240px]`}>
+    <div className={`rounded-lg bg-slate-50 border border-slate-100 border-l-4 ${borderColor} px-4 py-3 w-[170px] flex-shrink-0`}>
       <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">{label}</p>
       <div className="flex items-baseline gap-1.5 mt-1">
         <p className={`text-lg font-bold tabular-nums leading-tight ${valColor}`}>{value}</p>
@@ -246,84 +246,73 @@ export default function ProjectHero(props: ProjectHeroProps) {
       <StickyHeader visible={showSticky} projectName={projectName} score={score} markup={markup} canSeeCosts={canSeeCosts} />
 
       <div ref={heroRef} className={`bg-white rounded-2xl border border-slate-200 border-l-4 ${leftBorder} shadow-sm overflow-hidden`}>
-        <div className="px-4 pt-3 pb-3">
-          {/* Title row */}
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1">
-                <Link href="/active-projects">
-                  <button className="text-slate-400 hover:text-slate-700 transition-colors">
-                    <ArrowLeft className="h-3.5 w-3.5" />
-                  </button>
-                </Link>
-                {hasClient && <p className="text-xs font-medium text-slate-400 truncate max-w-[200px]">{clientName}</p>}
-                {period && (
-                  <>
-                    <span className="text-slate-200 text-xs">·</span>
-                    <span className="text-slate-400 text-xs capitalize">{periodLabel}</span>
-                  </>
+        <div className="px-5 py-4 flex flex-col lg:flex-row lg:items-center gap-5">
+          {/* LEFT — Title block */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1.5 text-xs text-slate-400">
+              <Link href="/active-projects">
+                <button className="text-slate-400 hover:text-slate-700 transition-colors">
+                  <ArrowLeft className="h-3.5 w-3.5" />
+                </button>
+              </Link>
+              {hasClient && <span className="font-medium truncate max-w-[200px]">{clientName}</span>}
+              {hasClient && period && <span className="text-slate-200">·</span>}
+              {period && <span className="capitalize">{periodLabel}</span>}
+            </div>
+            <div className="flex items-center gap-3 flex-wrap">
+              <h1 className="text-2xl font-bold text-slate-900 leading-tight tracking-tight truncate">
+                {projectName}
+              </h1>
+              <span className={`text-[11px] font-medium rounded-md px-2 py-0.5 border ${STATUS_STYLES[projectStatus] ?? "bg-slate-100 text-slate-600 border-slate-200"}`}>
+                {STATUS_LABEL[projectStatus] ?? projectStatus}
+              </span>
+            </div>
+
+            {/* Inline secondary stats for non-cost roles */}
+            {!canSeeCosts && (totalHours > 0 || estimatedHours > 0) && (
+              <div className="mt-3 flex items-center gap-2 text-sm text-slate-600">
+                <span className="font-semibold text-slate-900">{Math.round(totalHours)}h</span>
+                {estimatedHours > 0 && <span className="text-slate-400">de {Math.round(estimatedHours)}h estimadas</span>}
+                {hoursDeviation !== 0 && estimatedHours > 0 && (
+                  <span className={`text-xs font-medium rounded-full px-2 py-0.5 ${hoursDeviation > 20 ? "bg-red-50 text-red-600" : hoursDeviation > 5 ? "bg-amber-50 text-amber-600" : "bg-emerald-50 text-emerald-600"}`}>
+                    {hoursDeviation > 0 ? "+" : ""}{hoursDeviation.toFixed(0)}%
+                  </span>
                 )}
               </div>
-              <h1 className="text-xl font-bold text-slate-900 leading-tight tracking-tight truncate">{projectName}</h1>
-              <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                <span className={`text-[11px] font-medium rounded-md px-2 py-0.5 border ${STATUS_STYLES[projectStatus] ?? "bg-slate-100 text-slate-600 border-slate-200"}`}>
-                  {STATUS_LABEL[projectStatus] ?? projectStatus}
-                </span>
-              </div>
-            </div>
+            )}
           </div>
 
-          {/* KPI row: Hero metric + supporting cards */}
+          {/* RIGHT — KPIs */}
           {canSeeCosts && (
-            <div className="mt-3 pt-3 border-t border-slate-100 flex flex-col sm:flex-row gap-3 items-start">
-              {/* Hero metric — Health Score */}
+            <div className="flex flex-wrap gap-2 items-stretch shrink-0 lg:justify-end">
               <HeroMetric score={score} label={healthLabel(score).text} grade={healthGrade(score)} />
-
-              {/* Divider */}
-              <div className="hidden sm:block self-stretch border-r border-slate-200" />
-
-              {/* Supporting KPIs — max 3 */}
-              <div className="flex flex-wrap gap-2 flex-1">
-                {markup > 0 && (
-                  <KPICard
-                    label="Markup"
-                    value={`${markup.toFixed(2)}x`}
-                    sub="meta: 2.5x"
-                    highlight={markup >= 2.5 ? "green" : markup >= 2.0 ? "amber" : "red"}
-                    trend={markupTrend != null && Math.abs(markupTrend) >= 0.1 ? {
-                      value: `${markupTrend > 0 ? "+" : ""}${markupTrend.toFixed(1)}x`,
-                      positive: markupTrend > 0,
-                    } : null}
-                  />
-                )}
-                {(totalHours > 0 || estimatedHours > 0) && (
-                  <KPICard
-                    label="Horas"
-                    value={`${Math.round(totalHours)}h`}
-                    sub={estimatedHours > 0 ? `de ${Math.round(estimatedHours)}h est.` : undefined}
-                    highlight={estimatedHours > 0 && totalHours > estimatedHours * 1.2 ? "red" : estimatedHours > 0 && totalHours > estimatedHours * 1.05 ? "amber" : "neutral"}
-                  />
-                )}
-                {budget > 0 && (
-                  <KPICard
-                    label="Budget"
-                    value={`${budgetUtilization.toFixed(0)}%`}
-                    sub={`quedan ${usd(budget - cost)}`}
-                    highlight={budgetUtilization >= 90 ? "red" : budgetUtilization >= 75 ? "amber" : "green"}
-                  />
-                )}
-              </div>
-            </div>
-          )}
-
-          {!canSeeCosts && (totalHours > 0 || estimatedHours > 0) && (
-            <div className="mt-3 pt-3 border-t border-slate-100 flex items-center gap-2 text-sm text-slate-600">
-              <span className="font-semibold text-slate-900">{Math.round(totalHours)}h</span>
-              {estimatedHours > 0 && <span className="text-slate-400">de {Math.round(estimatedHours)}h estimadas</span>}
-              {hoursDeviation !== 0 && estimatedHours > 0 && (
-                <span className={`text-xs font-medium rounded-full px-2 py-0.5 ${hoursDeviation > 20 ? "bg-red-50 text-red-600" : hoursDeviation > 5 ? "bg-amber-50 text-amber-600" : "bg-emerald-50 text-emerald-600"}`}>
-                  {hoursDeviation > 0 ? "+" : ""}{hoursDeviation.toFixed(0)}%
-                </span>
+              {markup > 0 && (
+                <KPICard
+                  label="Markup"
+                  value={`${markup.toFixed(2)}x`}
+                  sub="meta: 2.5x"
+                  highlight={markup >= 2.5 ? "green" : markup >= 2.0 ? "amber" : "red"}
+                  trend={markupTrend != null && Math.abs(markupTrend) >= 0.1 ? {
+                    value: `${markupTrend > 0 ? "+" : ""}${markupTrend.toFixed(1)}x`,
+                    positive: markupTrend > 0,
+                  } : null}
+                />
+              )}
+              {(totalHours > 0 || estimatedHours > 0) && (
+                <KPICard
+                  label="Horas"
+                  value={`${Math.round(totalHours)}h`}
+                  sub={estimatedHours > 0 ? `de ${Math.round(estimatedHours)}h est.` : undefined}
+                  highlight={estimatedHours > 0 && totalHours > estimatedHours * 1.2 ? "red" : estimatedHours > 0 && totalHours > estimatedHours * 1.05 ? "amber" : "neutral"}
+                />
+              )}
+              {budget > 0 && (
+                <KPICard
+                  label="Budget"
+                  value={`${budgetUtilization.toFixed(0)}%`}
+                  sub={`quedan ${usd(budget - cost)}`}
+                  highlight={budgetUtilization >= 90 ? "red" : budgetUtilization >= 75 ? "amber" : "green"}
+                />
               )}
             </div>
           )}
