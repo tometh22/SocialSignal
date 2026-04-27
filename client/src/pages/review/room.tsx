@@ -50,7 +50,7 @@ export default function ReviewRoomPage() {
       <div className="p-6 max-w-xl mx-auto text-center">
         <AlertTriangle className="h-10 w-10 text-amber-500 mx-auto mb-3" />
         <p className="text-slate-600">ID de sala inválido.</p>
-        <Button className="mt-4" onClick={() => navigate('/review')}>Ver salas</Button>
+        <Button className="mt-4" onClick={() => navigate('/review')}>Ver Status</Button>
       </div>
     );
   }
@@ -69,7 +69,7 @@ export default function ReviewRoomPage() {
       <div className="p-6 max-w-xl mx-auto text-center">
         <AlertTriangle className="h-10 w-10 text-rose-500 mx-auto mb-3" />
         <p className="text-slate-700 mb-1">{msg}</p>
-        <Button className="mt-4" onClick={() => navigate('/review')}>Volver a Reviews</Button>
+        <Button className="mt-4" onClick={() => navigate('/review')}>Volver a Status</Button>
       </div>
     );
   }
