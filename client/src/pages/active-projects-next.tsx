@@ -8,6 +8,7 @@ import { usePermissions } from "@/hooks/use-permissions";
 import {
   RefreshCcw, Search, ChevronDown, ChevronRight,
   Filter, DollarSign, TrendingUp, Clock, BriefcaseBusiness, ExternalLink, Download,
+  Plus, Database,
 } from "lucide-react";
 import { Link } from "wouter";
 
@@ -863,7 +864,7 @@ export default function ActiveProjectsNext() {
         <div className="mb-4 flex items-start justify-between gap-4">
           <div>
             <div className="flex items-center gap-3 flex-wrap">
-              <h1 className="text-2xl font-semibold text-slate-900">Proyectos</h1>
+              <h1 className="text-2xl font-semibold text-slate-900">Vista de Proyectos</h1>
               {hasCritical && (
                 <span className="inline-flex items-center gap-1.5 rounded-full bg-red-50 px-2.5 py-1 text-[11px] font-medium text-red-700 ring-1 ring-red-200">
                   <span className="h-1.5 w-1.5 rounded-full bg-red-500 inline-block animate-pulse" />
@@ -874,20 +875,38 @@ export default function ActiveProjectsNext() {
             <p className="text-sm text-slate-400 mt-0.5">
               {filtered.length} proyecto{filtered.length !== 1 ? "s" : ""} •{" "}
               <span className="capitalize">{periodToLabel(period)}</span>
+              {typeof data?.summary?.periodAvgMarginPercent === "number" && filtered.length > 0 && (
+                <>
+                  {" • "}
+                  Margen promedio{" "}
+                  <span className="font-medium text-slate-600 tabular-nums">
+                    {data.summary.periodAvgMarginPercent.toFixed(1)}%
+                  </span>
+                </>
+              )}
             </p>
           </div>
 
-          {data?.summary?.dataFreshness && (
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-medium text-emerald-700 ring-1 ring-emerald-200 flex-shrink-0">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse inline-block" />
-              {new Date(data.summary.dataFreshness).toLocaleDateString("es", {
-                day: "numeric",
-                month: "short",
-                hour: "2-digit",
-                minute: "2-digit",
-              })}
-            </span>
-          )}
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {data?.summary?.dataFreshness && (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-medium text-emerald-700 ring-1 ring-emerald-200">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse inline-block" />
+                {new Date(data.summary.dataFreshness).toLocaleDateString("es", {
+                  day: "numeric",
+                  month: "short",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </span>
+            )}
+            <Link
+              href="/active-projects/new"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-sm font-medium px-3 py-1.5 transition-colors shadow-sm"
+            >
+              <Plus className="h-4 w-4" />
+              Nuevo proyecto
+            </Link>
+          </div>
         </div>
 
         {/* Controls */}
@@ -957,18 +976,58 @@ export default function ActiveProjectsNext() {
             Error al cargar proyectos.
           </div>
         ) : clientGroups.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-slate-300 p-12 text-center text-slate-400">
-            <BriefcaseBusiness className="h-8 w-8 mx-auto mb-3 opacity-40" />
-            <p className="font-medium text-slate-500">No hay proyectos para este período.</p>
-            {activeOnly && (
-              <button
-                onClick={() => setActiveOnly(false)}
-                className="mt-2 text-indigo-600 hover:underline text-sm"
-              >
-                Ver todos los proyectos →
-              </button>
-            )}
-          </div>
+          (data?.projects?.length ?? 0) === 0 ? (
+            <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/40 p-10 text-center">
+              <Database className="h-8 w-8 mx-auto mb-3 text-slate-400" />
+              <p className="font-medium text-slate-700 mb-1">
+                Sin datos cargados para {periodToLabel(period)}
+              </p>
+              <p className="text-sm text-slate-500 max-w-md mx-auto mb-4">
+                Esta vista se alimenta del cierre mensual. Si el período no fue cargado todavía,
+                no hay proyectos que mostrar.
+              </p>
+              <div className="flex items-center justify-center gap-2 flex-wrap">
+                <Link
+                  href="/operations/monthly-closing"
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-sm font-medium px-3 py-1.5 transition-colors"
+                >
+                  Ir a Cierre Mensual
+                  <ExternalLink className="h-3.5 w-3.5" />
+                </Link>
+                <Link
+                  href="/active-projects/new"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 hover:bg-slate-100 text-slate-700 text-sm font-medium px-3 py-1.5 transition-colors"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Crear proyecto
+                </Link>
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-xl border border-dashed border-slate-300 p-12 text-center text-slate-400">
+              <BriefcaseBusiness className="h-8 w-8 mx-auto mb-3 opacity-40" />
+              <p className="font-medium text-slate-500">Ningún proyecto coincide con los filtros.</p>
+              {activeOnly && (
+                <button
+                  onClick={() => setActiveOnly(false)}
+                  className="mt-2 text-indigo-600 hover:underline text-sm"
+                >
+                  Ver todos los proyectos →
+                </button>
+              )}
+              {(search || statusFilter !== "all") && (
+                <button
+                  onClick={() => {
+                    setSearch("");
+                    setStatusFilter("all");
+                  }}
+                  className="mt-2 ml-3 text-indigo-600 hover:underline text-sm"
+                >
+                  Limpiar filtros →
+                </button>
+              )}
+            </div>
+          )
         ) : (
           <div>
             {clientGroups.map(([client, projects], i) => (
