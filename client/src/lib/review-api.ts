@@ -6,7 +6,7 @@ export type ReviewRoomSummary = {
   description: string | null;
   colorIndex: number;
   emoji: string | null;
-  privacy: string;
+  privacy: 'members' | 'private';
   createdBy: number | null;
   archivedAt: string | null;
   createdAt: string;
@@ -56,7 +56,7 @@ export const reviewApi = {
     if (!r.ok) throw new Error(await r.text());
     return r.json();
   },
-  createRoom(payload: { name: string; description?: string | null; colorIndex?: number; emoji?: string | null; memberIds?: number[] }) {
+  createRoom(payload: { name: string; description?: string | null; colorIndex?: number; emoji?: string | null; memberIds?: number[]; privacy?: 'members' | 'private' }) {
     return apiRequest('/api/reviews', 'POST', payload);
   },
   updateRoom(id: number, payload: Partial<{ name: string; description: string | null; colorIndex: number; emoji: string | null }>) {

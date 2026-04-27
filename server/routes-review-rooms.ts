@@ -103,9 +103,10 @@ export function createReviewRoomsRouter(requireAuth: RequireAuth): Router {
       if (!parsed.success) {
         return res.status(400).json({ message: "Datos inválidos", details: parsed.error.issues });
       }
-      const memberIds: number[] = Array.isArray(req.body?.memberIds)
-        ? req.body.memberIds.filter((n: any) => Number.isFinite(n) && n !== req.user!.id)
-        : [];
+      const privacy = parsed.data.privacy ?? 'members';
+      const memberIds: number[] = privacy === 'private' || !Array.isArray(req.body?.memberIds)
+        ? []
+        : req.body.memberIds.filter((n: any) => Number.isFinite(n) && n !== req.user!.id);
 
       const userId = req.user!.id;
       const [room] = await db.insert(reviewRooms).values({
@@ -113,7 +114,7 @@ export function createReviewRoomsRouter(requireAuth: RequireAuth): Router {
         description: parsed.data.description ?? null,
         colorIndex: parsed.data.colorIndex ?? 0,
         emoji: parsed.data.emoji ?? null,
-        privacy: 'members',
+        privacy,
         createdBy: userId,
       }).returning();
 

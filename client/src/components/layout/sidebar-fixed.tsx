@@ -174,6 +174,8 @@ export default function SidebarFixed() {
       return bv - av;
     })
     .slice(0, MAX_SIDEBAR_ROOMS);
+  const totalReviewPending = reviewRooms.reduce((acc, r) => acc + (r.pendingCount || 0), 0);
+  const isStatusActive = currentPath === '/review' || currentPath.startsWith('/review/');
 
   // Si el usuario es un proveedor externo, mostramos un sidebar restringido
   // con solo el panel del proveedor y sus facturas.
@@ -209,7 +211,6 @@ export default function SidebarFixed() {
       title: "Proyectos",
       items: [
         { href: "/active-projects", title: "Vista de Proyectos", icon: Briefcase, badge: projectCount > 0 ? projectCount.toString() : undefined, description: "Proyectos activos y rentabilidad", permission: 'projects' as AppSection },
-        { href: "/review", title: "Review", icon: ClipboardList, description: "Salas colaborativas de seguimiento semanal", permission: 'status' as AppSection },
         { href: "/tasks", title: "Tareas", icon: CheckSquare, description: "Gestión de tareas", permission: 'projects' as AppSection },
         { href: "/tasks/hours-dashboard", title: "Panel de Horas", icon: BarChart2, description: "Horas por persona y proyecto", permission: 'projects' as AppSection },
       ]
@@ -538,38 +539,61 @@ export default function SidebarFixed() {
                   </div>
                 )}
 
-                {/* Collapsible Review rooms — under Proyectos section */}
-                {section.items.some((i) => i.href === '/review') && hasPermission('status') && (
+                {/* Status group — single collapsible nav with rooms + create CTA */}
+                {section.title === 'Proyectos' && hasPermission('status') && (
                   <div className="mt-1">
                     {!isCollapsed ? (
                       <>
-                        <div className="flex items-center justify-between px-3 py-1">
+                        <div
+                          className={cn(
+                            "flex items-stretch rounded-xl text-sm transition-all duration-200 group",
+                            isStatusActive && !currentPath.includes('/')
+                              ? "bg-primary text-primary-foreground shadow-lg"
+                              : "text-muted-foreground hover:text-white hover:bg-gradient-to-r hover:from-purple-500 hover:to-purple-600",
+                          )}
+                        >
+                          <Link
+                            href="/review"
+                            className="flex items-center flex-1 min-w-0 px-3 py-2.5 rounded-l-xl"
+                          >
+                            <ClipboardList className="h-4 w-4 flex-shrink-0 mr-3" />
+                            <span className="truncate font-medium flex-1">Status</span>
+                            {totalReviewPending > 0 && (
+                              <Badge
+                                variant="secondary"
+                                className={cn(
+                                  "h-4 px-1.5 text-xs font-medium ml-2",
+                                  currentPath === '/review'
+                                    ? "bg-primary-foreground/20 text-primary-foreground"
+                                    : "bg-amber-100 text-amber-800",
+                                )}
+                              >
+                                {totalReviewPending}
+                              </Badge>
+                            )}
+                          </Link>
                           <button
                             onClick={() => setReviewsExpanded((v) => !v)}
-                            className="flex items-center gap-1 text-[10px] font-semibold text-indigo-500/70 uppercase tracking-widest hover:text-indigo-600 transition-colors flex-1"
+                            className="flex items-center justify-center px-2 rounded-r-xl hover:bg-black/10 transition-colors"
+                            aria-label={reviewsExpanded ? 'Colapsar salas' : 'Expandir salas'}
                           >
-                            <span>Salas</span>
-                            {reviewsExpanded ? <ChevronDown className="h-3 w-3 ml-1" /> : <ChevronRight className="h-3 w-3 ml-1" />}
-                          </button>
-                          <button
-                            className="h-4 w-4 flex items-center justify-center rounded hover:bg-accent text-muted-foreground hover:text-indigo-600 transition-colors"
-                            onClick={() => setNewReviewOpen(true)}
-                            title="Nueva sala de Review"
-                          >
-                            <Plus className="h-3 w-3" />
+                            {reviewsExpanded
+                              ? <ChevronDown className="h-3.5 w-3.5" />
+                              : <ChevronRight className="h-3.5 w-3.5" />}
                           </button>
                         </div>
 
                         {reviewsExpanded && (
-                          <div className="space-y-0.5 mt-0.5 ml-1">
+                          <div className="space-y-0.5 mt-1 ml-2 pl-2 border-l border-border/60">
                             {sidebarRooms.length === 0 && (
                               <div className="px-2 py-1 text-[10px] text-muted-foreground/60 italic">
-                                Sin salas. Creá la primera con +
+                                Sin salas todavía
                               </div>
                             )}
                             {sidebarRooms.map((room) => {
                               const color = roomColor(room.colorIndex);
                               const isActive = currentPath === `/review/${room.id}`;
+                              const isPrivate = room.privacy === 'private';
                               return (
                                 <Link
                                   key={room.id}
@@ -590,6 +614,14 @@ export default function SidebarFixed() {
                                     {room.emoji || room.name.charAt(0).toUpperCase()}
                                   </span>
                                   <span className="truncate flex-1 font-medium">{room.name}</span>
+                                  {isPrivate && (
+                                    <span
+                                      className="text-[9px] font-semibold uppercase tracking-wide text-slate-500 flex-shrink-0"
+                                      title="Sala personal"
+                                    >
+                                      Tú
+                                    </span>
+                                  )}
                                   {room.pendingCount > 0 && (
                                     <span
                                       className={cn(
@@ -608,10 +640,19 @@ export default function SidebarFixed() {
                                 href="/review"
                                 className="flex items-center gap-2 px-2 py-1 rounded-lg text-xs text-muted-foreground/50 hover:text-indigo-600 transition-colors"
                               >
-                                <ClipboardList className="h-3.5 w-3.5 flex-shrink-0" />
+                                <FolderOpen className="h-3.5 w-3.5 flex-shrink-0" />
                                 <span>Ver todas ({reviewRooms.length})</span>
                               </Link>
                             )}
+                            <button
+                              onClick={() => setNewReviewOpen(true)}
+                              className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 transition-colors font-medium"
+                            >
+                              <span className="inline-flex flex-shrink-0 items-center justify-center rounded-md w-5 h-5 border border-dashed border-indigo-300 text-indigo-500">
+                                <Plus className="h-3 w-3" />
+                              </span>
+                              <span>Nueva sala de status</span>
+                            </button>
                           </div>
                         )}
                       </>
@@ -619,16 +660,24 @@ export default function SidebarFixed() {
                       <TooltipProvider>
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-8 w-full justify-center p-0 hover:bg-accent text-muted-foreground"
-                              onClick={() => setNewReviewOpen(true)}
+                            <Link
+                              href="/review"
+                              className={cn(
+                                "flex items-center justify-center px-2 py-2.5 rounded-xl transition-all duration-200 relative",
+                                isStatusActive
+                                  ? "bg-primary text-primary-foreground shadow-lg"
+                                  : "text-muted-foreground hover:text-white hover:bg-gradient-to-r hover:from-purple-500 hover:to-purple-600",
+                              )}
                             >
-                              <Plus className="h-3.5 w-3.5" />
-                            </Button>
+                              <ClipboardList className="h-4 w-4" />
+                              {totalReviewPending > 0 && (
+                                <span className="absolute -top-0.5 -right-0.5 h-3.5 min-w-[14px] px-1 rounded-full bg-amber-500 text-white text-[9px] font-bold flex items-center justify-center">
+                                  {totalReviewPending}
+                                </span>
+                              )}
+                            </Link>
                           </TooltipTrigger>
-                          <TooltipContent side="right">Nueva sala de Review</TooltipContent>
+                          <TooltipContent side="right">Status{totalReviewPending > 0 ? ` (${totalReviewPending})` : ''}</TooltipContent>
                         </Tooltip>
                       </TooltipProvider>
                     )}

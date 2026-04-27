@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ClipboardList, FolderKanban, CheckSquare, X } from "lucide-react";
 
-const LS_KEY = "review-hub-banner-dismissed";
+const LS_KEY = "review-hub-banner-dismissed-v2";
 
 export default function WhatIsReviewBanner() {
   const [dismissed, setDismissed] = useState<boolean>(() => {
@@ -30,9 +30,9 @@ export default function WhatIsReviewBanner() {
         <Column
           icon={<ClipboardList className="h-5 w-5 text-indigo-600" />}
           accent="text-indigo-700"
-          title="Review"
+          title="Status"
           subtitle="Seguimiento semanal con participantes"
-          bullets={["Salas por audiencia", "Temas ≠ proyectos"]}
+          bullets={["Salas por audiencia", "Temas ≠ proyectos", "Personal o compartida"]}
           question="¿Cómo está esto?"
         />
         <Column
