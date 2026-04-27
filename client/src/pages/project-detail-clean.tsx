@@ -1,13 +1,17 @@
 /**
- * Project Intelligence View — V3 redesign
- * Gray page background, section reordering (tasks elevated), sticky section nav,
- * three-level emphasis (LOUD/NORMAL/QUIET), muted section headers.
+ * Project Detail — V4: Hero + Tabs.
+ * Optimized for "5-second diagnosis" by Management/CEO and Ops/PMs.
+ * Hero is always visible; tabs (Resumen / Equipo / Finanzas / Tareas)
+ * keep the page focused without an infinite scroll.
+ * Active tab persists in the URL via ?tab=<name>.
  */
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 import { useLocation } from "wouter";
 import { Link } from "wouter";
-import { AlertTriangle, BarChart3, TrendingUp, ListTodo, LayoutDashboard, Users, Receipt } from "lucide-react";
+import { AlertTriangle, BarChart3, TrendingUp, Receipt, ListTodo, Users, LayoutDashboard } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { cn } from "@/lib/utils";
 
 import { useCompleteProjectData } from "@/hooks/useCompleteProjectData";
 import { toProjectVM } from "@/selectors/projectVM";
@@ -24,45 +28,21 @@ const fmt = (n: number | null | undefined, prefix = "$") =>
   n == null || !Number.isFinite(n) ? "—"
   : `${prefix}${Math.abs(Math.round(n)).toLocaleString("es-AR")}`;
 
-const fmtPct = (n: number | null | undefined) =>
-  n == null || !Number.isFinite(n) ? "—" : `${n.toFixed(1)}%`;
-
 const fmtHours = (n: number | null | undefined) =>
   n == null || !Number.isFinite(n) ? "—" : `${n.toFixed(1)}h`;
 
-// ─── Sticky Section Nav ──────────────────────────────────────────────────────
+// ─── Tab definitions ──────────────────────────────────────────────────────────
 
-const NAV_ITEMS = [
-  { id: "section-overview", label: "Overview", icon: <LayoutDashboard className="h-3.5 w-3.5" /> },
-  { id: "section-tareas", label: "Tareas", icon: <ListTodo className="h-3.5 w-3.5" /> },
-  { id: "section-finanzas", label: "Finanzas", icon: <BarChart3 className="h-3.5 w-3.5" /> },
-  { id: "section-equipo", label: "Equipo", icon: <Users className="h-3.5 w-3.5" /> },
+type TabValue = "resumen" | "equipo" | "finanzas" | "tareas";
+const TABS: { value: TabValue; label: string; icon: React.ReactNode }[] = [
+  { value: "resumen",  label: "Resumen",  icon: <LayoutDashboard className="h-3.5 w-3.5" /> },
+  { value: "equipo",   label: "Equipo",   icon: <Users className="h-3.5 w-3.5" /> },
+  { value: "finanzas", label: "Finanzas", icon: <BarChart3 className="h-3.5 w-3.5" /> },
+  { value: "tareas",   label: "Tareas",   icon: <ListTodo className="h-3.5 w-3.5" /> },
 ];
 
-function SectionNav({ activeSection }: { activeSection: string }) {
-  return (
-    <nav className="sticky top-0 z-40 bg-slate-100/95 backdrop-blur-sm border-b border-slate-200/80 -mx-3 px-3">
-      <div className="flex gap-1 py-1.5">
-        {NAV_ITEMS.map((item) => {
-          const isActive = activeSection === item.id;
-          return (
-            <button
-              key={item.id}
-              onClick={() => document.getElementById(item.id)?.scrollIntoView({ behavior: "smooth", block: "start" })}
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
-                isActive
-                  ? "bg-white text-slate-900 shadow-sm border border-slate-200"
-                  : "text-slate-500 hover:text-slate-700 hover:bg-white/50"
-              }`}
-            >
-              {item.icon}
-              {item.label}
-            </button>
-          );
-        })}
-      </div>
-    </nav>
-  );
+function isTabValue(v: string | null): v is TabValue {
+  return v === "resumen" || v === "equipo" || v === "finanzas" || v === "tareas";
 }
 
 // ─── P&L Breakdown ───────────────────────────────────────────────────────────
@@ -144,35 +124,6 @@ function PLBreakdown({
   );
 }
 
-// ─── Quotation Info (QUIET treatment) ────────────────────────────────────────
-
-function QuotationInfo({ quotation }: { quotation: any }) {
-  if (!quotation) return null;
-  const fields = [
-    { label: "Precio cotizado", value: fmt(quotation.totalAmount) },
-    { label: "Costo base",      value: fmt(quotation.baseCost) },
-    { label: "Horas estimadas", value: fmtHours(quotation.estimatedHours) },
-    { label: "Tipo",            value: quotation.quotationType || "—" },
-  ];
-  return (
-    <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
-      <div className="px-4 py-2.5 border-b border-slate-50">
-        <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wide flex items-center gap-2">
-          <Receipt className="h-3.5 w-3.5" /> Cotización
-        </h3>
-      </div>
-      <div className="p-4 grid grid-cols-2 gap-3">
-        {fields.map((f, i) => (
-          <div key={i}>
-            <p className="text-[11px] text-slate-400 uppercase tracking-wide">{f.label}</p>
-            <p className={`text-sm font-semibold mt-0.5 capitalize ${f.value === "—" ? "text-slate-300" : "text-slate-700"}`}>{f.value}</p>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 // ─── Loading Skeleton ────────────────────────────────────────────────────────
 
 function LoadingSkeleton() {
@@ -219,30 +170,19 @@ export default function ProjectDetailClean() {
     pid, "current_month", periodFromUrl, "operativa"
   );
 
-  // ── Sticky nav: track active section ──
-  const [activeSection, setActiveSection] = useState("section-overview");
-  const sectionRefs = useRef<Record<string, IntersectionObserverEntry>>({});
+  // ── Active tab — persists in URL via ?tab=<value> so it's shareable ──
+  const tabFromUrl = urlParams.get("tab");
+  const [activeTab, setActiveTabState] = useState<TabValue>(
+    isTabValue(tabFromUrl) ? tabFromUrl : "resumen"
+  );
 
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach(e => {
-          sectionRefs.current[e.target.id] = e;
-        });
-        const visible = Object.values(sectionRefs.current)
-          .filter(e => e.isIntersecting)
-          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
-        if (visible.length > 0) setActiveSection(visible[0].target.id);
-      },
-      { threshold: 0.1, rootMargin: "-80px 0px -60% 0px" }
-    );
-    const ids = NAV_ITEMS.map(n => n.id);
-    ids.forEach(id => {
-      const el = document.getElementById(id);
-      if (el) observer.observe(el);
-    });
-    return () => observer.disconnect();
-  }, [isLoading]);
+  const setActiveTab = (next: string) => {
+    if (!isTabValue(next)) return;
+    setActiveTabState(next);
+    const params = new URLSearchParams(window.location.search);
+    params.set("tab", next);
+    window.history.replaceState(null, "", `${window.location.pathname}?${params.toString()}`);
+  };
 
   if (isLoading) return <LoadingSkeleton />;
 
@@ -315,11 +255,12 @@ export default function ProjectDetailClean() {
       }, 0) / enrichedTeam.filter((m: any) => (m.targetHours ?? m.estimatedHours ?? 0) > 0).length || 0
     : 0;
 
-  return (
-    <div className="w-full px-3 py-5 space-y-8 bg-slate-100 min-h-screen">
+  const showAICopilot = canSeeCosts && (effectiveCost > 0 || budget > 0);
 
-      {/* ── 1. Hero Header ─────────────────────────────────────────── */}
-      <div id="section-overview" className="animate-fadeIn">
+  return (
+    <div className="w-full px-3 py-5 bg-slate-100 min-h-screen">
+      {/* ── Hero — always visible above tabs ─────────────────────── */}
+      <div className="mb-4 animate-fadeIn">
         <ProjectHero
           clientName={clientName}
           projectName={projectName}
@@ -339,47 +280,67 @@ export default function ProjectDetailClean() {
         />
       </div>
 
-      {/* ── Sticky Section Nav ─────────────────────────────────────── */}
-      <SectionNav activeSection={activeSection} />
+      {/* ── Tabs ─────────────────────────────────────────────────── */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList
+          className={cn(
+            "sticky top-0 z-30 mb-4 h-auto bg-white/80 backdrop-blur-md border border-slate-200 rounded-xl p-1 shadow-sm",
+            "inline-flex flex-wrap items-center justify-start gap-0.5"
+          )}
+        >
+          {TABS.map(t => (
+            <TabsTrigger
+              key={t.value}
+              value={t.value}
+              className={cn(
+                "flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-all",
+                "data-[state=active]:bg-slate-900 data-[state=active]:text-white data-[state=active]:shadow-sm",
+                "data-[state=inactive]:text-slate-500 hover:data-[state=inactive]:text-slate-800 hover:data-[state=inactive]:bg-slate-100"
+              )}
+            >
+              {t.icon}
+              {t.label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
 
-      {/* ── 2. AI Copilot — collapsed by default (ops only) ────────── */}
-      {canSeeCosts && (effectiveCost > 0 || budget > 0) && (
-        <div className="animate-fadeIn" style={{ animationDelay: "100ms" }}>
-          <AICopilot
-            revenue={revenue}
-            cost={effectiveCost}
-            markup={effectiveMarkup}
-            margin={effectiveMargin}
-            budget={budget}
-            budgetUtilization={effectiveBudgetUtil}
-            totalHours={effectiveHours}
-            estimatedHours={estimatedHours}
-            hoursDeviation={hoursDeviation}
-            costDeviation={costDeviation}
-            teamBreakdown={enrichedTeam}
-            previousPeriod={unifiedData.previousPeriod}
-            period={periodFromUrl}
-          />
-        </div>
-      )}
+        {/* ── Resumen — diagnostic insights ─────────────────────── */}
+        <TabsContent value="resumen" className="space-y-4 animate-fadeIn">
+          {showAICopilot ? (
+            <AICopilot
+              revenue={revenue}
+              cost={effectiveCost}
+              markup={effectiveMarkup}
+              margin={effectiveMargin}
+              budget={budget}
+              budgetUtilization={effectiveBudgetUtil}
+              totalHours={effectiveHours}
+              estimatedHours={estimatedHours}
+              hoursDeviation={hoursDeviation}
+              costDeviation={costDeviation}
+              teamBreakdown={enrichedTeam}
+              previousPeriod={unifiedData.previousPeriod}
+              period={periodFromUrl}
+            />
+          ) : (
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 text-center text-sm text-slate-500">
+              <LayoutDashboard className="h-6 w-6 mx-auto mb-2 text-slate-300" />
+              {canSeeCosts
+                ? "Sin datos suficientes para generar un diagnóstico de este período."
+                : "Tu rol no tiene visibilidad financiera para ver el diagnóstico."}
+            </div>
+          )}
+        </TabsContent>
 
-      {/* ── 3. Tasks — Compact Summary ─────────────────────────────── */}
-      <div id="section-tareas" className="animate-fadeIn" style={{ animationDelay: "200ms" }}>
-        <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Tareas</p>
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="p-1">
-            <ProjectTaskList projectId={pid} />
-          </div>
-        </div>
-      </div>
+        {/* ── Equipo — TeamPerformance ──────────────────────────── */}
+        <TabsContent value="equipo" className="animate-fadeIn">
+          <TeamPerformance team={enrichedTeam} canSeeCosts={canSeeCosts} />
+        </TabsContent>
 
-      {/* ── 4. Finances — P&L + Quotation merged ──────────────────── */}
-      <div id="section-finanzas" className="animate-fadeIn" style={{ animationDelay: "300ms" }}>
-        <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Finanzas</p>
-        <div className="grid md:grid-cols-2 gap-4 items-start">
+        {/* ── Finanzas — P&L + Quotation ────────────────────────── */}
+        <TabsContent value="finanzas" className="animate-fadeIn">
           {canSeeCosts ? (
             <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
-              {/* P&L Section */}
               <div className="px-4 py-2.5 border-b border-slate-100 flex items-center justify-between">
                 <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wide flex items-center gap-2">
                   <BarChart3 className="h-3.5 w-3.5" /> P&L del Proyecto
@@ -398,7 +359,6 @@ export default function ProjectDetailClean() {
                 totalHours={effectiveHours}
                 markup={effectiveMarkup}
               />
-              {/* Quotation — merged with internal divider */}
               {q && (
                 <>
                   <div className="border-t border-slate-100 px-4 py-2.5">
@@ -444,16 +404,17 @@ export default function ProjectDetailClean() {
               </div>
             </div>
           )}
+        </TabsContent>
 
-          {/* Team Performance */}
-          <div id="section-equipo">
-            <TeamPerformance
-              team={enrichedTeam}
-              canSeeCosts={canSeeCosts}
-            />
+        {/* ── Tareas — full task list ───────────────────────────── */}
+        <TabsContent value="tareas" className="animate-fadeIn">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="p-1">
+              <ProjectTaskList projectId={pid} />
+            </div>
           </div>
-        </div>
-      </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
