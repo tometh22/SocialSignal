@@ -254,16 +254,16 @@ export default function AICopilot(props: AICopilotProps) {
         </div>
       </button>
 
-      {!isExpanded ? null : <><div className="p-4 grid md:grid-cols-2 gap-4 bg-white/50">
-        {/* Recommendations (LEFT — actionable) */}
+      {!isExpanded ? null : <><div className="p-4 space-y-4 bg-white/50">
+        {/* Recommendations — primary action area, full width */}
         <div>
-          <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+          <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
             <Lightbulb className="h-3 w-3" />
             Acciones recomendadas
           </p>
-          <div className="space-y-2">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
             {recommendations.map((r) => (
-              <div key={r.rank} className="flex items-start gap-3 rounded-xl border border-slate-100 bg-slate-50/80 px-3 py-2 hover:bg-slate-100/60 transition-colors group">
+              <div key={r.rank} className="flex items-start gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2.5 hover:border-slate-300 transition-colors">
                 <span className="flex-shrink-0 w-6 h-6 rounded-full bg-slate-700 text-white text-[11px] font-bold flex items-center justify-center mt-0.5">{r.rank}</span>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm text-slate-600 leading-relaxed">{r.text}</p>
@@ -274,22 +274,42 @@ export default function AICopilot(props: AICopilotProps) {
               </div>
             ))}
             {recommendations.length === 0 && (
-              <div className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2">
+              <div className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2 sm:col-span-2 lg:col-span-3">
                 <p className="text-sm text-slate-400 italic">Sin acciones requeridas por ahora.</p>
               </div>
             )}
           </div>
         </div>
 
-        {/* Signals (RIGHT — diagnostic) */}
-        <div>
-          <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
-            <Eye className="h-3 w-3" />
-            Señales detectadas
-          </p>
-          <div className="space-y-2">
+        {/* Signals — diagnostic, compact horizontal grid */}
+        <div className="border-t border-slate-100 pt-3">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+              <Eye className="h-3 w-3" />
+              Señales detectadas
+            </p>
+            {hiddenCount > 0 && !showAllSignals && (
+              <button
+                onClick={() => setShowAllSignals(true)}
+                className="text-[11px] font-medium text-indigo-500 hover:text-indigo-700 transition-colors flex items-center gap-1"
+              >
+                Ver {hiddenCount} más
+                <ChevronDown className="h-3 w-3" />
+              </button>
+            )}
+            {showAllSignals && secondarySignals.length > 0 && prioritySignals.length > 0 && (
+              <button
+                onClick={() => setShowAllSignals(false)}
+                className="text-[11px] font-medium text-slate-400 hover:text-slate-600 transition-colors flex items-center gap-1"
+              >
+                Solo alertas
+                <ChevronDown className="h-3 w-3 rotate-180" />
+              </button>
+            )}
+          </div>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
             {visibleSignals.map((s, i) => (
-              <div key={i} className={`rounded-xl border px-3 py-2 transition-all ${SIGNAL_BG[s.level]}`}>
+              <div key={i} className={`rounded-xl border px-3 py-2.5 ${SIGNAL_BG[s.level]}`}>
                 <div className="flex items-start gap-2.5">
                   <SignalIcon level={s.level} />
                   <div className="min-w-0">
@@ -300,28 +320,10 @@ export default function AICopilot(props: AICopilotProps) {
               </div>
             ))}
             {signals.length === 0 && (
-              <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 flex items-center gap-2">
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 flex items-center gap-2 sm:col-span-2 lg:col-span-3">
                 <CheckCircle className="h-4 w-4 text-emerald-500 flex-shrink-0" />
                 <p className="text-sm text-emerald-700 font-medium">Sin señales de riesgo detectadas.</p>
               </div>
-            )}
-            {hiddenCount > 0 && !showAllSignals && (
-              <button
-                onClick={() => setShowAllSignals(true)}
-                className="w-full text-center py-2 text-xs font-medium text-slate-400 hover:text-slate-600 transition-colors flex items-center justify-center gap-1 rounded-lg hover:bg-slate-50"
-              >
-                <ChevronDown className="h-3 w-3" />
-                Ver {hiddenCount} señal{hiddenCount > 1 ? "es" : ""} más
-              </button>
-            )}
-            {showAllSignals && secondarySignals.length > 0 && prioritySignals.length > 0 && (
-              <button
-                onClick={() => setShowAllSignals(false)}
-                className="w-full text-center py-2 text-xs font-medium text-slate-400 hover:text-slate-600 transition-colors flex items-center justify-center gap-1 rounded-lg hover:bg-slate-50"
-              >
-                <ChevronDown className="h-3 w-3 rotate-180" />
-                Mostrar solo alertas
-              </button>
             )}
           </div>
         </div>

@@ -306,12 +306,12 @@ export default function ProjectHero(props: ProjectHeroProps) {
                   highlight={estimatedHours > 0 && totalHours > estimatedHours * 1.2 ? "red" : estimatedHours > 0 && totalHours > estimatedHours * 1.05 ? "amber" : "neutral"}
                 />
               )}
-              {budget > 0 && (
+              {revenue > 0 && (
                 <KPICard
-                  label="Budget"
-                  value={`${budgetUtilization.toFixed(0)}%`}
-                  sub={`quedan ${usd(budget - cost)}`}
-                  highlight={budgetUtilization >= 90 ? "red" : budgetUtilization >= 75 ? "amber" : "green"}
+                  label="Revenue"
+                  value={usd(revenue)}
+                  sub={margin !== 0 ? `margen ${margin.toFixed(0)}%` : undefined}
+                  highlight={margin >= 50 ? "green" : margin >= 30 ? "amber" : margin > 0 ? "red" : "neutral"}
                 />
               )}
             </div>
