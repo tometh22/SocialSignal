@@ -8,7 +8,7 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { Link } from "wouter";
-import { AlertTriangle, BarChart3, TrendingUp, Receipt, ListTodo, Users, LayoutDashboard } from "lucide-react";
+import { AlertTriangle, BarChart3, TrendingUp, Receipt, ListTodo, Users, LayoutDashboard, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
@@ -124,12 +124,158 @@ function PLBreakdown({
   );
 }
 
+// ─── Resumen secondary cards ─────────────────────────────────────────────────
+// Compact summary tiles shown under the AI Copilot so the Resumen tab doesn't
+// collapse to a single panel when the Copilot is short.
+
+function TeamSummaryCard({
+  team, canSeeCosts, onSeeMore,
+}: {
+  team: any[];
+  canSeeCosts: boolean;
+  onSeeMore: () => void;
+}) {
+  const sorted = [...team]
+    .map(m => ({
+      ...m,
+      _hours: m.hoursAsana ?? m.hours ?? 0,
+      _target: m.targetHours ?? m.estimatedHours ?? 0,
+    }))
+    .sort((a, b) => b._hours - a._hours);
+  const top = sorted.slice(0, 4);
+  const remaining = Math.max(0, sorted.length - top.length);
+  const totalHours = sorted.reduce((s, m) => s + m._hours, 0);
+
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="px-4 py-2.5 border-b border-slate-100 flex items-center justify-between">
+        <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wide flex items-center gap-2">
+          <Users className="h-3.5 w-3.5" /> Equipo · {sorted.length}
+        </h3>
+        <button
+          onClick={onSeeMore}
+          className="text-[11px] font-medium text-indigo-500 hover:text-indigo-700 transition-colors flex items-center gap-1"
+        >
+          Ver detalle <ArrowRight className="h-3 w-3" />
+        </button>
+      </div>
+      <div className="p-4">
+        {top.length === 0 ? (
+          <p className="text-sm text-slate-400 italic">Sin equipo asignado en este período.</p>
+        ) : (
+          <ul className="space-y-2">
+            {top.map((m, i) => {
+              const pctOfTotal = totalHours > 0 ? (m._hours / totalHours) * 100 : 0;
+              const overrun = m._target > 0 && m._hours > m._target * 1.15;
+              return (
+                <li key={m.personnelId ?? m.name ?? i} className="flex items-center gap-3">
+                  <div className="w-7 h-7 rounded-full bg-slate-100 text-slate-600 text-[11px] font-semibold flex items-center justify-center flex-shrink-0">
+                    {(m.name ?? "?").split(" ").map((p: string) => p[0]).slice(0, 2).join("").toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <p className="text-sm font-medium text-slate-700 truncate">{m.name ?? "—"}</p>
+                      <span className={`text-xs font-semibold tabular-nums ${overrun ? "text-red-600" : "text-slate-700"}`}>
+                        {m._hours.toFixed(0)}h
+                        {m._target > 0 && <span className="text-slate-300 font-normal"> / {m._target.toFixed(0)}h</span>}
+                      </span>
+                    </div>
+                    <div className="h-1 mt-1 rounded-full bg-slate-100 overflow-hidden">
+                      <div className={`h-full rounded-full ${overrun ? "bg-red-400" : "bg-slate-300"}`} style={{ width: `${Math.min(100, pctOfTotal)}%` }} />
+                    </div>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        {remaining > 0 && (
+          <p className="text-[11px] text-slate-400 mt-3">+ {remaining} {remaining === 1 ? "persona más" : "personas más"}</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function QuotationSummaryCard({
+  quotation, revenue, cost, totalHours, estimatedHours, canSeeCosts,
+}: {
+  quotation: any;
+  revenue: number;
+  cost: number;
+  totalHours: number;
+  estimatedHours: number;
+  canSeeCosts: boolean;
+}) {
+  const hasQuotation = !!quotation;
+  const hoursDelta = estimatedHours > 0 ? totalHours - estimatedHours : null;
+  const hoursPctDelta = estimatedHours > 0 ? ((totalHours - estimatedHours) / estimatedHours) * 100 : null;
+
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="px-4 py-2.5 border-b border-slate-100">
+        <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wide flex items-center gap-2">
+          <Receipt className="h-3.5 w-3.5" /> {hasQuotation ? "Cotización" : "Snapshot del período"}
+        </h3>
+      </div>
+      <div className="p-4 grid grid-cols-2 gap-3">
+        {hasQuotation && canSeeCosts && (
+          <>
+            <Stat label="Precio cotizado" value={fmt(quotation.totalAmount)} />
+            <Stat label="Costo base" value={fmt(quotation.baseCost)} />
+          </>
+        )}
+        {hasQuotation && (
+          <>
+            <Stat label="Horas estimadas" value={fmtHours(quotation.estimatedHours)} />
+            <Stat label="Tipo" value={(quotation.quotationType || "—").toString()} capitalize />
+          </>
+        )}
+        {!hasQuotation && (
+          <>
+            {canSeeCosts && <Stat label="Revenue" value={fmt(revenue)} />}
+            {canSeeCosts && <Stat label="Costo" value={fmt(cost)} />}
+            <Stat label="Horas reales" value={fmtHours(totalHours)} />
+            <Stat
+              label="Desvío horas"
+              value={hoursPctDelta != null ? `${hoursPctDelta > 0 ? "+" : ""}${hoursPctDelta.toFixed(0)}%` : "—"}
+              tone={hoursPctDelta != null && hoursPctDelta > 20 ? "red" : hoursPctDelta != null && hoursPctDelta > 5 ? "amber" : "neutral"}
+            />
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function Stat({
+  label, value, tone, capitalize,
+}: {
+  label: string;
+  value: string;
+  tone?: "red" | "amber" | "green" | "neutral";
+  capitalize?: boolean;
+}) {
+  const color =
+    tone === "red"   ? "text-red-600"
+    : tone === "amber" ? "text-amber-600"
+    : tone === "green" ? "text-emerald-700"
+    : value === "—"   ? "text-slate-300"
+    : "text-slate-700";
+  return (
+    <div className="rounded-xl bg-slate-50 px-3 py-2.5">
+      <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">{label}</p>
+      <p className={`text-sm font-semibold mt-0.5 ${color} ${capitalize ? "capitalize" : ""}`}>{value}</p>
+    </div>
+  );
+}
+
 // ─── Loading Skeleton ────────────────────────────────────────────────────────
 
 function LoadingSkeleton() {
   return (
     <div className="w-full bg-slate-100 min-h-screen">
-     <div className="mx-auto w-full max-w-[1280px] px-3 py-6 space-y-6">
+     <div className="mx-auto w-full max-w-[1440px] px-3 py-6 space-y-6">
       <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm animate-pulse">
         <div className="px-4 py-4 space-y-3">
           <div className="h-5 w-48 bg-slate-200 rounded" />
@@ -261,7 +407,7 @@ export default function ProjectDetail() {
 
   return (
     <div className="w-full bg-slate-100 min-h-screen">
-     <div className="mx-auto w-full max-w-[1280px] px-3 py-5">
+     <div className="mx-auto w-full max-w-[1440px] px-3 py-5">
       {/* ── Hero — always visible above tabs ─────────────────────── */}
       <div className="mb-4 animate-fadeIn">
         <ProjectHero
@@ -333,6 +479,23 @@ export default function ProjectDetail() {
                 : "Tu rol no tiene visibilidad financiera para ver el diagnóstico."}
             </div>
           )}
+
+          {/* Secondary summaries — equipo + cotización/snapshot */}
+          <div className="grid md:grid-cols-2 gap-4">
+            <TeamSummaryCard
+              team={enrichedTeam}
+              canSeeCosts={canSeeCosts}
+              onSeeMore={() => setActiveTab("equipo")}
+            />
+            <QuotationSummaryCard
+              quotation={q}
+              revenue={revenue}
+              cost={effectiveCost}
+              totalHours={effectiveHours}
+              estimatedHours={estimatedHours}
+              canSeeCosts={canSeeCosts}
+            />
+          </div>
         </TabsContent>
 
         {/* ── Equipo — TeamPerformance ──────────────────────────── */}
