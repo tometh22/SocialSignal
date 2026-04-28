@@ -9,6 +9,8 @@ import {
   weeklyStatusItems,
   statusChangeLog,
   statusUpdateEntries,
+  statusItemProposals,
+  statusItemProposalAttachments,
   activeProjects,
   clients,
   quotations,
@@ -17,6 +19,7 @@ import {
 } from "@shared/schema";
 import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { requireRoomMember } from "./middleware/requireRoomMember";
+import { uploadPostProposal, deleteOldFile } from "./upload";
 
 type RequireAuth = (req: Request, res: Response, next: NextFunction) => any;
 
@@ -890,6 +893,301 @@ export function createReviewRoomsRouter(requireAuth: RequireAuth): Router {
       res.json(updated);
     } catch (error) {
       res.status(500).json({ message: "Error al editar update" });
+    }
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Proposals (versioned content for approval — e.g. social posts)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  type ProposalTarget = { roomId: number; projectId: number | null; itemId: number | null };
+
+  async function listProposalsFor(target: ProposalTarget) {
+    const where = target.projectId != null
+      ? and(eq(statusItemProposals.roomId, target.roomId), eq(statusItemProposals.projectId, target.projectId))
+      : and(eq(statusItemProposals.roomId, target.roomId), eq(statusItemProposals.weeklyStatusItemId, target.itemId!));
+    const proposals = await db.select({
+      id: statusItemProposals.id,
+      version: statusItemProposals.version,
+      content: statusItemProposals.content,
+      status: statusItemProposals.status,
+      submittedById: statusItemProposals.submittedById,
+      submittedByName: sql<string | null>`(SELECT ${users.firstName} || ' ' || ${users.lastName} FROM ${users} WHERE ${users.id} = ${statusItemProposals.submittedById})`,
+      submittedAt: statusItemProposals.submittedAt,
+      decidedById: statusItemProposals.decidedById,
+      decidedByName: sql<string | null>`(SELECT ${users.firstName} || ' ' || ${users.lastName} FROM ${users} WHERE ${users.id} = ${statusItemProposals.decidedById})`,
+      decidedAt: statusItemProposals.decidedAt,
+      decisionReason: statusItemProposals.decisionReason,
+    }).from(statusItemProposals).where(where).orderBy(desc(statusItemProposals.version));
+
+    if (proposals.length === 0) return [];
+
+    const ids = proposals.map(p => p.id);
+    const attachments = await db.select().from(statusItemProposalAttachments)
+      .where(inArray(statusItemProposalAttachments.proposalId, ids))
+      .orderBy(asc(statusItemProposalAttachments.id));
+    const byProposal = new Map<number, typeof attachments>();
+    for (const a of attachments) {
+      const arr = byProposal.get(a.proposalId) ?? [];
+      arr.push(a);
+      byProposal.set(a.proposalId, arr);
+    }
+    return proposals.map(p => ({ ...p, attachments: byProposal.get(p.id) ?? [] }));
+  }
+
+  function logProposalEvent(roomId: number, target: ProposalTarget, userId: number, action: string) {
+    // Fire-and-forget; surface in the activity timeline through statusChangeLog.
+    db.insert(statusChangeLog).values({
+      roomId,
+      projectId: target.projectId ?? null,
+      weeklyStatusItemId: target.itemId ?? null,
+      userId,
+      fieldName: 'proposal',
+      oldValue: null,
+      newValue: action,
+    }).catch((e) => console.error('proposal change log failed', e));
+  }
+
+  async function nextProposalVersion(target: ProposalTarget): Promise<number> {
+    const where = target.projectId != null
+      ? and(eq(statusItemProposals.projectId, target.projectId))
+      : and(eq(statusItemProposals.weeklyStatusItemId, target.itemId!));
+    const [row] = await db.select({ max: sql<number | null>`MAX(${statusItemProposals.version})` })
+      .from(statusItemProposals).where(where);
+    return (row?.max ?? 0) + 1;
+  }
+
+  async function supersedePending(target: ProposalTarget) {
+    const where = target.projectId != null
+      ? and(
+          eq(statusItemProposals.roomId, target.roomId),
+          eq(statusItemProposals.projectId, target.projectId),
+          eq(statusItemProposals.status, 'pending'),
+        )
+      : and(
+          eq(statusItemProposals.roomId, target.roomId),
+          eq(statusItemProposals.weeklyStatusItemId, target.itemId!),
+          eq(statusItemProposals.status, 'pending'),
+        );
+    await db.update(statusItemProposals)
+      .set({ status: 'superseded', updatedAt: new Date() })
+      .where(where);
+  }
+
+  function targetFromProject(req: Request): ProposalTarget {
+    return { roomId: req.roomMember!.roomId, projectId: parseInt(req.params.projectId, 10), itemId: null };
+  }
+  function targetFromCustom(req: Request): ProposalTarget {
+    return { roomId: req.roomMember!.roomId, projectId: null, itemId: parseInt(req.params.itemId, 10) };
+  }
+
+  // GET — list versions for a project item
+  router.get('/:roomId/items/project/:projectId/proposals', requireAuth, requireRoomMember(), async (req, res) => {
+    try {
+      res.json(await listProposalsFor(targetFromProject(req)));
+    } catch (e) {
+      console.error('GET project proposals error:', e);
+      res.status(500).json({ message: "Error al obtener propuestas" });
+    }
+  });
+
+  // GET — list versions for a custom item
+  router.get('/:roomId/items/custom/:itemId/proposals', requireAuth, requireRoomMember(), async (req, res) => {
+    try {
+      res.json(await listProposalsFor(targetFromCustom(req)));
+    } catch (e) {
+      console.error('GET custom proposals error:', e);
+      res.status(500).json({ message: "Error al obtener propuestas" });
+    }
+  });
+
+  // POST — create a new version (auto-bumps; supersedes prior pending)
+  async function createProposalHandler(target: ProposalTarget, req: Request, res: Response) {
+    const userId = req.user!.id;
+    const { content } = req.body ?? {};
+    if (!content?.trim()) return res.status(400).json({ message: "El contenido es requerido" });
+    await supersedePending(target);
+    const version = await nextProposalVersion(target);
+    const [proposal] = await db.insert(statusItemProposals).values({
+      roomId: target.roomId,
+      projectId: target.projectId,
+      weeklyStatusItemId: target.itemId,
+      version,
+      content: content.trim(),
+      status: 'pending',
+      submittedById: userId,
+    }).returning();
+    logProposalEvent(target.roomId, target, userId, `submitted_v${version}`);
+    res.status(201).json({ ...proposal, attachments: [] });
+  }
+
+  router.post('/:roomId/items/project/:projectId/proposals', requireAuth, requireRoomMember(), async (req, res) => {
+    try { await createProposalHandler(targetFromProject(req), req, res); }
+    catch (e) { console.error('POST project proposal error:', e); res.status(500).json({ message: "Error al crear propuesta" }); }
+  });
+  router.post('/:roomId/items/custom/:itemId/proposals', requireAuth, requireRoomMember(), async (req, res) => {
+    try { await createProposalHandler(targetFromCustom(req), req, res); }
+    catch (e) { console.error('POST custom proposal error:', e); res.status(500).json({ message: "Error al crear propuesta" }); }
+  });
+
+  // POST — attach a file (multipart) or a link (json) to a proposal
+  router.post('/:roomId/proposals/:proposalId/attachments', requireAuth, requireRoomMember(),
+    (req, res, next) => {
+      const ct = req.headers['content-type'] || '';
+      if (ct.toString().startsWith('multipart/form-data')) {
+        return uploadPostProposal.single('file')(req, res, next);
+      }
+      next();
+    },
+    async (req: Request, res: Response) => {
+      try {
+        const proposalId = parseInt(req.params.proposalId, 10);
+        const roomId = req.roomMember!.roomId;
+        const userId = req.user!.id;
+        const [proposal] = await db.select().from(statusItemProposals)
+          .where(and(eq(statusItemProposals.id, proposalId), eq(statusItemProposals.roomId, roomId)));
+        if (!proposal) return res.status(404).json({ message: "Propuesta no encontrada" });
+        if (proposal.status !== 'pending') return res.status(409).json({ message: "Solo se puede modificar una propuesta pendiente" });
+        if (proposal.submittedById !== userId && req.roomMember!.role !== 'owner') {
+          return res.status(403).json({ message: "Solo el autor o el owner pueden adjuntar" });
+        }
+
+        const file = (req as any).file as Express.Multer.File | undefined;
+        if (file) {
+          const fileUrl = `/uploads/post-proposals/${file.filename}`;
+          const [att] = await db.insert(statusItemProposalAttachments).values({
+            proposalId,
+            kind: 'file',
+            fileUrl,
+            fileName: file.originalname,
+            fileSize: file.size,
+            mimeType: file.mimetype,
+          }).returning();
+          return res.status(201).json(att);
+        }
+        const linkUrl = (req.body?.linkUrl ?? '').toString().trim();
+        if (!linkUrl) return res.status(400).json({ message: "Falta archivo o linkUrl" });
+        if (!/^https?:\/\//i.test(linkUrl)) return res.status(400).json({ message: "El link debe empezar con http(s)://" });
+        const [att] = await db.insert(statusItemProposalAttachments).values({
+          proposalId, kind: 'link', linkUrl, fileName: req.body?.fileName?.toString().trim() || null,
+        }).returning();
+        res.status(201).json(att);
+      } catch (e) {
+        console.error('POST proposal attachment error:', e);
+        res.status(500).json({ message: "Error al adjuntar" });
+      }
+    }
+  );
+
+  // DELETE — remove an attachment (author + pending only)
+  router.delete('/:roomId/proposals/:proposalId/attachments/:attachmentId', requireAuth, requireRoomMember(), async (req, res) => {
+    try {
+      const proposalId = parseInt(req.params.proposalId, 10);
+      const attachmentId = parseInt(req.params.attachmentId, 10);
+      const roomId = req.roomMember!.roomId;
+      const userId = req.user!.id;
+      const [proposal] = await db.select().from(statusItemProposals)
+        .where(and(eq(statusItemProposals.id, proposalId), eq(statusItemProposals.roomId, roomId)));
+      if (!proposal) return res.status(404).json({ message: "Propuesta no encontrada" });
+      if (proposal.status !== 'pending') return res.status(409).json({ message: "Solo se puede modificar una propuesta pendiente" });
+      if (proposal.submittedById !== userId && req.roomMember!.role !== 'owner') {
+        return res.status(403).json({ message: "No autorizado" });
+      }
+      const [att] = await db.select().from(statusItemProposalAttachments)
+        .where(and(eq(statusItemProposalAttachments.id, attachmentId), eq(statusItemProposalAttachments.proposalId, proposalId)));
+      if (!att) return res.status(404).json({ message: "Adjunto no encontrado" });
+      if (att.kind === 'file' && att.fileUrl) deleteOldFile(att.fileUrl);
+      await db.delete(statusItemProposalAttachments).where(eq(statusItemProposalAttachments.id, attachmentId));
+      res.json({ ok: true });
+    } catch (e) {
+      console.error('DELETE proposal attachment error:', e);
+      res.status(500).json({ message: "Error al eliminar adjunto" });
+    }
+  });
+
+  // PATCH — approve / reject (owner del room o admin)
+  router.patch('/:roomId/proposals/:proposalId/decision', requireAuth, requireRoomMember(), async (req, res) => {
+    try {
+      const proposalId = parseInt(req.params.proposalId, 10);
+      const roomId = req.roomMember!.roomId;
+      const userId = req.user!.id;
+      if (req.roomMember!.role !== 'owner' && !req.roomMember!.isAdminBypass) {
+        return res.status(403).json({ message: "Solo los owners pueden aprobar o rechazar" });
+      }
+      const status = (req.body?.status ?? '').toString();
+      if (status !== 'approved' && status !== 'rejected') {
+        return res.status(400).json({ message: "status debe ser 'approved' o 'rejected'" });
+      }
+      const reason = (req.body?.reason ?? '').toString().trim() || null;
+      if (status === 'rejected' && !reason) {
+        return res.status(400).json({ message: "Para rechazar es necesario un motivo" });
+      }
+      const [proposal] = await db.select().from(statusItemProposals)
+        .where(and(eq(statusItemProposals.id, proposalId), eq(statusItemProposals.roomId, roomId)));
+      if (!proposal) return res.status(404).json({ message: "Propuesta no encontrada" });
+      if (proposal.status !== 'pending') return res.status(409).json({ message: "La propuesta ya fue decidida" });
+      if (proposal.submittedById === userId) {
+        return res.status(403).json({ message: "No podés aprobar tu propia propuesta" });
+      }
+
+      const [updated] = await db.update(statusItemProposals).set({
+        status,
+        decidedById: userId,
+        decidedAt: new Date(),
+        decisionReason: reason,
+        updatedAt: new Date(),
+      }).where(eq(statusItemProposals.id, proposalId)).returning();
+      logProposalEvent(roomId, {
+        roomId, projectId: proposal.projectId, itemId: proposal.weeklyStatusItemId,
+      }, userId, `${status}_v${proposal.version}`);
+      res.json(updated);
+    } catch (e) {
+      console.error('PATCH proposal decision error:', e);
+      res.status(500).json({ message: "Error al decidir propuesta" });
+    }
+  });
+
+  // DELETE — author may delete a pending proposal
+  router.delete('/:roomId/proposals/:proposalId', requireAuth, requireRoomMember(), async (req, res) => {
+    try {
+      const proposalId = parseInt(req.params.proposalId, 10);
+      const roomId = req.roomMember!.roomId;
+      const userId = req.user!.id;
+      const [proposal] = await db.select().from(statusItemProposals)
+        .where(and(eq(statusItemProposals.id, proposalId), eq(statusItemProposals.roomId, roomId)));
+      if (!proposal) return res.status(404).json({ message: "Propuesta no encontrada" });
+      if (proposal.status !== 'pending') return res.status(409).json({ message: "Solo se puede borrar una propuesta pendiente" });
+      if (proposal.submittedById !== userId && req.roomMember!.role !== 'owner') {
+        return res.status(403).json({ message: "No autorizado" });
+      }
+      const atts = await db.select().from(statusItemProposalAttachments)
+        .where(eq(statusItemProposalAttachments.proposalId, proposalId));
+      for (const a of atts) if (a.kind === 'file' && a.fileUrl) deleteOldFile(a.fileUrl);
+      await db.delete(statusItemProposals).where(eq(statusItemProposals.id, proposalId));
+      res.json({ ok: true });
+    } catch (e) {
+      console.error('DELETE proposal error:', e);
+      res.status(500).json({ message: "Error al eliminar propuesta" });
+    }
+  });
+
+  // GET — pending proposal counts for the whole room (lightweight; for badges)
+  router.get('/:roomId/proposals/pending', requireAuth, requireRoomMember(), async (req, res) => {
+    try {
+      const roomId = req.roomMember!.roomId;
+      const rows = await db.select({
+        projectId: statusItemProposals.projectId,
+        weeklyStatusItemId: statusItemProposals.weeklyStatusItemId,
+        version: statusItemProposals.version,
+        proposalId: statusItemProposals.id,
+        submittedAt: statusItemProposals.submittedAt,
+      }).from(statusItemProposals)
+        .where(and(eq(statusItemProposals.roomId, roomId), eq(statusItemProposals.status, 'pending')));
+      res.setHeader('Cache-Control', 'no-store');
+      res.json(rows);
+    } catch (e) {
+      console.error('GET pending proposals error:', e);
+      res.status(500).json({ message: "Error al obtener propuestas pendientes" });
     }
   });
 
