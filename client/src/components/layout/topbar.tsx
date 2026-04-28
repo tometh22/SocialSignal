@@ -14,7 +14,7 @@ import {
 import {
   AlertTriangle,
   Bell,
-  CheckCircle, 
+  CheckCircle,
   ChevronsRight,
   Search,
   Settings,
@@ -24,7 +24,8 @@ import {
   BarChart,
   FileWarning,
   MessageSquare,
-  Loader2
+  Loader2,
+  Menu
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
@@ -45,7 +46,11 @@ type Notification = {
   projectId?: number;
 };
 
-export default function Topbar() {
+interface TopbarProps {
+  onMenuClick?: () => void;
+}
+
+export default function Topbar({ onMenuClick }: TopbarProps = {}) {
   const [location, navigate] = useLocation();
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const { user, logoutMutation, isLoading } = useAuth();
@@ -207,27 +212,47 @@ export default function Topbar() {
 
   return (
     <>
-      <div className="topbar h-12 px-4 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 flex items-center justify-between sticky top-0 z-20 w-full shadow-sm">
-        {/* Breadcrumbs minimalistas */}
-        <div className="flex items-center">
-          <div className="flex items-center text-sm text-foreground">
-            {breadcrumbs.map((crumb, i) => (
-              <div key={i} className="flex items-center">
-                {i > 0 && <ChevronRight className="h-3 w-3 mx-1.5 text-muted-foreground" />}
-                {i < breadcrumbs.length - 1 ? (
-                  <Link href={crumb.path} className="hover:text-foreground transition-colors font-medium text-muted-foreground">
-                    {crumb.name}
-                  </Link>
-                ) : (
-                  <span className="font-semibold text-foreground">{crumb.name}</span>
-                )}
-              </div>
-            ))}
+      <div className="topbar h-12 px-2 sm:px-4 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 flex items-center justify-between sticky top-0 z-20 w-full shadow-sm gap-2">
+        {/* Botón hamburguesa - sólo en mobile */}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 lg:hidden text-muted-foreground hover:text-foreground hover:bg-accent flex-shrink-0"
+          onClick={onMenuClick}
+          aria-label="Abrir menú"
+        >
+          <Menu className="h-5 w-5" />
+        </Button>
+
+        {/* Breadcrumbs minimalistas - en mobile sólo el último */}
+        <div className="flex items-center min-w-0 flex-1">
+          <div className="flex items-center text-sm text-foreground min-w-0">
+            {/* Desktop: breadcrumb completo */}
+            <div className="hidden sm:flex items-center min-w-0">
+              {breadcrumbs.map((crumb, i) => (
+                <div key={i} className="flex items-center min-w-0">
+                  {i > 0 && <ChevronRight className="h-3 w-3 mx-1.5 text-muted-foreground flex-shrink-0" />}
+                  {i < breadcrumbs.length - 1 ? (
+                    <Link href={crumb.path} className="hover:text-foreground transition-colors font-medium text-muted-foreground truncate">
+                      {crumb.name}
+                    </Link>
+                  ) : (
+                    <span className="font-semibold text-foreground truncate">{crumb.name}</span>
+                  )}
+                </div>
+              ))}
+            </div>
+            {/* Mobile: sólo la página actual */}
+            <div className="sm:hidden min-w-0">
+              <span className="font-semibold text-foreground truncate block">
+                {breadcrumbs[breadcrumbs.length - 1]?.name}
+              </span>
+            </div>
           </div>
         </div>
-        
+
         {/* Acciones compactas */}
-        <div className="flex items-center space-x-1">
+        <div className="flex items-center space-x-1 flex-shrink-0">
           {/* Búsqueda global */}
           <Button 
             variant="ghost" 
@@ -238,11 +263,15 @@ export default function Topbar() {
             <Search className="h-4 w-4" />
           </Button>
           
-          {/* Chat / Mensajes */}
-          <MessagesPopup />
+          {/* Chat / Mensajes - oculto en mobile chico */}
+          <div className="hidden sm:flex">
+            <MessagesPopup />
+          </div>
 
-          {/* Ayuda */}
-          <HelpPopup />
+          {/* Ayuda - oculto en mobile chico */}
+          <div className="hidden sm:flex">
+            <HelpPopup />
+          </div>
           
           {/* Notificaciones */}
           <DropdownMenu>
@@ -333,13 +362,13 @@ export default function Topbar() {
             </DropdownMenuContent>
           </DropdownMenu>
           
-          {/* Separador vertical */}
-          <div className="h-4 w-px bg-border mx-2"></div>
-          
+          {/* Separador vertical - oculto en mobile */}
+          <div className="hidden sm:block h-4 w-px bg-border mx-2"></div>
+
           {/* Menu de usuario */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="h-8 pl-2 pr-3 gap-2 hover:bg-accent text-foreground">
+              <Button variant="ghost" className="h-8 pl-1 sm:pl-2 sm:pr-3 gap-2 hover:bg-accent text-foreground">
                 {isLoading ? (
                   <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                 ) : (
@@ -350,7 +379,7 @@ export default function Topbar() {
                       </AvatarFallback>
                       {user?.avatar && <AvatarImage src={user.avatar} />}
                     </Avatar>
-                    <span className="text-sm font-medium text-foreground">
+                    <span className="hidden sm:inline text-sm font-medium text-foreground">
                       {user ? user.firstName : 'Usuario'}
                     </span>
                   </>

@@ -438,7 +438,7 @@ const QuotationDetail: React.FC = () => {
         {/* Columna izquierda */}
         <div className="lg:col-span-2 space-y-6">
           {/* Grid de información principal del proyecto - estilo minimalista */}
-          <div className="grid grid-cols-3 gap-3 text-sm">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
             <div className="flex flex-col bg-white p-4 rounded-md border border-slate-200">
               <div className="flex items-center gap-2 mb-2">
                 <div className="rounded-full p-1.5 bg-blue-50">

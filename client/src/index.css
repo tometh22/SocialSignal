@@ -1189,11 +1189,6 @@ body.dark::before {
     max-width: 70ch; /* Mejora la legibilidad limitando el ancho */
   }
 
-  /* Fix para el problema de scroll en los contenedores */
-  .overflow-hidden {
-    overflow: auto !important;
-  }
-
   /* Clases de Texto Especiales */
   .text-truncate {
     overflow: hidden;

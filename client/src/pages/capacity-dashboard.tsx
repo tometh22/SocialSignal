@@ -59,7 +59,7 @@ export default function CapacityDashboard() {
       )}
 
       {isOperations && data?.totals && (
-        <div className="grid grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           <Card>
             <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Capacidad Total</CardTitle></CardHeader>
             <CardContent><span className="text-2xl font-bold">{data.totals.totalMaxCapacity.toFixed(0)}h</span></CardContent>

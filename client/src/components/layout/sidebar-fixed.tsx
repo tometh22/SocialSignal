@@ -85,11 +85,17 @@ type DueReminder = {
   daysSince?: number;
 };
 
-export default function SidebarFixed() {
+interface SidebarFixedProps {
+  mobileMode?: boolean;
+}
+
+export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps = {}) {
   const { user, logoutMutation } = useAuth();
   const { hasPermission } = usePermissions();
   const [currentPath] = useLocation();
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  // En mobile (dentro del drawer) nunca está colapsado - el cierre se hace cerrando el drawer
+  const [isCollapsedState, setIsCollapsed] = useState(false);
+  const isCollapsed = mobileMode ? false : isCollapsedState;
   const [projectCount, setProjectCount] = useState(0);
   const [crmOverdue, setCrmOverdue] = useState(0);
   const [dueReminders, setDueReminders] = useState<DueReminder[]>([]);
@@ -314,8 +320,11 @@ export default function SidebarFixed() {
   return (
     <TooltipProvider>
       <div className={cn(
-        "flex flex-col h-screen bg-background border-r border-border transition-all duration-300 shadow-sm",
-        isCollapsed ? "w-16" : "w-56"
+        "flex flex-col bg-background shadow-sm",
+        mobileMode
+          ? "h-full w-full"
+          : "h-screen border-r border-border transition-all duration-300",
+        !mobileMode && (isCollapsed ? "w-16" : "w-56")
       )}>
         {/* Header */}
         <div className="flex items-center justify-between p-2.5 border-b border-border">
@@ -424,14 +433,16 @@ export default function SidebarFixed() {
               </PopoverContent>
             </Popover>
 
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setIsCollapsed(!isCollapsed)}
-              className="h-6 w-6 p-0 hover:bg-accent"
-            >
-              <ChevronRight className={cn("h-3 w-3 transition-transform text-muted-foreground", isCollapsed ? "" : "rotate-180")} />
-            </Button>
+            {!mobileMode && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsCollapsed(!isCollapsed)}
+                className="h-6 w-6 p-0 hover:bg-accent"
+              >
+                <ChevronRight className={cn("h-3 w-3 transition-transform text-muted-foreground", isCollapsed ? "" : "rotate-180")} />
+              </Button>
+            )}
           </div>
         </div>
 

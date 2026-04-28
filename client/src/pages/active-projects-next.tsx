@@ -388,7 +388,7 @@ function Controls({
   }, [period, setPeriod]);
 
   return (
-    <div className="sticky top-0 z-20 -mx-5 sm:-mx-8 px-5 sm:px-8 py-3 mb-6 bg-white/90 backdrop-blur border-b border-slate-100 flex flex-wrap gap-2 items-center">
+    <div className="sticky top-0 z-20 -mx-3 sm:-mx-5 lg:-mx-8 px-3 sm:px-5 lg:px-8 py-3 mb-6 bg-white/90 backdrop-blur border-b border-slate-100 flex flex-wrap gap-2 items-center">
       {/* Period navigation */}
       <div className="flex items-center gap-1">
         <button
@@ -859,7 +859,7 @@ export default function ActiveProjectsNext() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
-      <div className="mx-auto max-w-7xl p-5 sm:p-8">
+      <div className="mx-auto max-w-7xl p-3 sm:p-5 lg:p-8">
         {/* Header */}
         <div className="mb-4 flex items-start justify-between gap-4">
           <div>
