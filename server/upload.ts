@@ -126,6 +126,42 @@ export const uploadInvoice = multer({
   limits: { fileSize: 20 * 1024 * 1024 },
 });
 
+// Multer para attachments de propuestas de posteos en status review
+const postProposalDir = path.join(process.cwd(), 'public/uploads/post-proposals');
+if (!fs.existsSync(postProposalDir)) {
+  fs.mkdirSync(postProposalDir, { recursive: true });
+}
+
+const postProposalStorage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, postProposalDir);
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = randomUUID();
+    const ext = path.extname(file.originalname);
+    cb(null, `pp-${uniqueSuffix}${ext}`);
+  },
+});
+
+const postProposalFileFilter = (req: Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
+  const allowed = [
+    'image/jpeg', 'image/png', 'image/gif', 'image/webp',
+    'application/pdf',
+    'video/mp4', 'video/quicktime', 'video/webm',
+  ];
+  if (allowed.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error('Tipo de archivo no permitido. Se aceptan imágenes, PDF y videos cortos (MP4/MOV/WEBM).'));
+  }
+};
+
+export const uploadPostProposal = multer({
+  storage: postProposalStorage,
+  fileFilter: postProposalFileFilter,
+  limits: { fileSize: 25 * 1024 * 1024 }, // 25MB
+});
+
 // Función auxiliar para eliminar un archivo antiguo
 export const deleteOldFile = (filePath: string) => {
   if (!filePath) return;

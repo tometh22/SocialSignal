@@ -71,11 +71,13 @@ export function authFetch(url: string, options: RequestInit = {}): Promise<Respo
         ? Object.fromEntries((options.headers as Headers).entries())
         : (options.headers as Record<string, string>))
     : {};
+  // When sending FormData, let the browser set the multipart boundary itself.
+  const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
   return fetch(rewritten, {
     ...options,
     credentials: 'include',
     headers: {
-      'Content-Type': 'application/json',
+      ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
       ...getAuthHeader(),
       ...existingHeaders,
     },

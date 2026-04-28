@@ -25,7 +25,8 @@ import {
   Shield, Target, RefreshCw, Lightbulb, ArrowRight,
   Calendar, Clock, Search, Filter, GripVertical,
   Printer, List, LayoutList, HelpCircle, CheckSquare, Square,
-  PanelLeftOpen, PanelLeftClose
+  PanelLeftOpen, PanelLeftClose,
+  Paperclip, FileText, Link2, XCircle, Film, FileCheck2,
 } from "lucide-react";
 import {
   DndContext, closestCenter, DragOverlay,
@@ -128,6 +129,7 @@ type Item = {
   updatedAt: string | null;
   updatedById: number | null;
   updatedByName: string | null;
+  pendingProposalVersion?: number | null;
 };
 
 type ActivityEntry =
@@ -355,6 +357,24 @@ function MentionInput({ value, onChange, onKeyDown, placeholder, className, user
 
 // ─── Inline editor ────────────────────────────────────────────────────────────
 
+// Grows a textarea to fit its content, capped at maxPx; scrolls beyond that.
+function useAutoResize(
+  ref: React.RefObject<HTMLTextAreaElement | null>,
+  value: string,
+  enabled: boolean = true,
+  maxPx: number = 320,
+) {
+  useEffect(() => {
+    if (!enabled) return;
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    const next = Math.min(el.scrollHeight, maxPx);
+    el.style.height = `${next}px`;
+    el.style.overflowY = el.scrollHeight > maxPx ? 'auto' : 'hidden';
+  }, [ref, value, enabled, maxPx]);
+}
+
 function InlineText({ value, placeholder, onSave, multiline = false, className = '', required = false }: {
   value: string | null; placeholder: string; onSave: (v: string) => void;
   multiline?: boolean; className?: string; required?: boolean;
@@ -365,6 +385,7 @@ function InlineText({ value, placeholder, onSave, multiline = false, className =
 
   useEffect(() => { setDraft(value ?? ''); }, [value]);
   useEffect(() => { if (editing) ref.current?.focus(); }, [editing]);
+  useAutoResize(ref, draft, editing && multiline);
 
   const save = () => {
     setEditing(false);
@@ -383,7 +404,7 @@ function InlineText({ value, placeholder, onSave, multiline = false, className =
               if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); save(); }
               if (e.key === 'Escape') { setDraft(value ?? ''); setEditing(false); }
             }}
-            className={cls} rows={2} />
+            className={cls} rows={1} />
           <p className="text-[9px] text-slate-400 mt-0.5">Ctrl+Enter para guardar · Esc para cancelar</p>
         </>
       )
@@ -395,14 +416,451 @@ function InlineText({ value, placeholder, onSave, multiline = false, className =
   return (
     <span onClick={() => setEditing(true)}
       className={cn(
-        "group cursor-text rounded-md px-1.5 py-1 transition-all min-h-[26px] inline-flex items-center gap-1 w-full",
+        "group cursor-text rounded-md px-1.5 py-1 transition-all min-h-[26px] gap-1 w-full",
+        multiline ? "flex items-start" : "inline-flex items-center",
         "hover:bg-slate-100/80",
         value ? "text-slate-800" : "text-slate-400/70 italic",
         className
       )}>
-      <span className="flex-1 leading-snug">{value || placeholder}</span>
-      <Pencil className="h-2.5 w-2.5 text-slate-400 opacity-0 group-hover:opacity-50 transition-opacity shrink-0" />
+      <span className={cn("flex-1 leading-snug", multiline && "whitespace-pre-wrap break-words")}>{value || placeholder}</span>
+      <Pencil className={cn("h-2.5 w-2.5 text-slate-400 opacity-0 group-hover:opacity-50 transition-opacity shrink-0", multiline && "mt-1")} />
     </span>
+  );
+}
+
+// ─── Proposal types + helpers ───────────────────────────────────────────────
+
+type ProposalAttachment = {
+  id: number;
+  proposalId: number;
+  kind: 'file' | 'link';
+  fileUrl: string | null;
+  fileName: string | null;
+  fileSize: number | null;
+  mimeType: string | null;
+  linkUrl: string | null;
+  createdAt: string;
+};
+
+type Proposal = {
+  id: number;
+  version: number;
+  content: string;
+  status: 'pending' | 'approved' | 'rejected' | 'superseded';
+  submittedById: number | null;
+  submittedByName: string | null;
+  submittedAt: string;
+  decidedById: number | null;
+  decidedByName: string | null;
+  decidedAt: string | null;
+  decisionReason: string | null;
+  attachments: ProposalAttachment[];
+};
+
+const PROPOSAL_STATUS: Record<Proposal['status'], { label: string; cls: string; dot: string }> = {
+  pending:    { label: 'Pendiente',   cls: 'bg-violet-50 text-violet-700 border-violet-200',     dot: 'bg-violet-500' },
+  approved:   { label: 'Aprobada',    cls: 'bg-emerald-50 text-emerald-700 border-emerald-200', dot: 'bg-emerald-500' },
+  rejected:   { label: 'Rechazada',   cls: 'bg-red-50 text-red-700 border-red-200',             dot: 'bg-red-500' },
+  superseded: { label: 'Reemplazada', cls: 'bg-slate-100 text-slate-500 border-slate-200',      dot: 'bg-slate-400' },
+};
+
+function formatBytes(n: number | null | undefined): string {
+  if (!n) return '';
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`;
+  return `${(n / 1024 / 1024).toFixed(1)} MB`;
+}
+
+// ─── Proposal section ───────────────────────────────────────────────────────
+
+function ProposalSection({ projectId, customId, currentUserId }: {
+  projectId?: number; customId?: number; currentUserId?: number | null;
+}) {
+  const room = useMaybeReviewRoom();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const [showForm, setShowForm] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+
+  const target = projectId != null ? `project/${projectId}` : `custom/${customId}`;
+  const baseUrl = room ? `/api/reviews/${room.roomId}/items/${target}/proposals` : '';
+  const queryKey = ['proposals', room?.roomId, target] as const;
+
+  const { data: proposals = [] } = useQuery<Proposal[]>({
+    queryKey,
+    queryFn: async () => {
+      if (!room) return [];
+      const r = await authFetch(baseUrl);
+      return r.ok ? r.json() : [];
+    },
+    enabled: !!room,
+  });
+
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey });
+    if (room) queryClient.invalidateQueries({ queryKey: ['proposals-pending', room.roomId] });
+    const activityKey = projectId
+      ? ['/api/status-semanal', projectId, 'activity']
+      : ['/api/status-semanal/custom', customId, 'activity'];
+    queryClient.invalidateQueries({ queryKey: activityKey });
+  };
+
+  const createMutation = useMutation({
+    mutationFn: (content: string) => mutationFetch(baseUrl, 'POST', { content }),
+    onError: (err: Error) => toast({ title: 'No se pudo crear la propuesta', description: err.message, variant: 'destructive' }),
+    onSuccess: () => { invalidate(); setShowForm(false); },
+  });
+
+  if (!room) return null;
+
+  const latest = proposals[0];
+  const history = proposals.slice(1);
+  const hasAnyPending = proposals.some(p => p.status === 'pending');
+
+  return (
+    <div className="border-t border-slate-100">
+      <div className="px-5 py-3">
+        <div className="flex items-center gap-2 mb-2">
+          <FileCheck2 className="h-3.5 w-3.5 text-violet-500" />
+          <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Propuesta a aprobar</span>
+          {!hasAnyPending && (
+            <button onClick={() => setShowForm(s => !s)}
+              className="ml-auto flex items-center gap-1 text-[11px] font-medium text-violet-600 hover:text-violet-700 bg-violet-50 hover:bg-violet-100 border border-violet-200 rounded-md px-2 py-0.5 transition-colors">
+              <Plus className="h-3 w-3" />
+              {proposals.length === 0 ? 'Compartir propuesta' : 'Nueva versión'}
+            </button>
+          )}
+        </div>
+
+        {showForm && (
+          <NewProposalForm
+            disabled={createMutation.isPending}
+            onCancel={() => setShowForm(false)}
+            onSubmit={async (content) => { await createMutation.mutateAsync(content); }}
+          />
+        )}
+
+        {!showForm && proposals.length === 0 && (
+          <p className="text-[11px] text-slate-400 italic">Aún no hay nada para aprobar. Cuando compartas un texto o archivo aparecerá acá.</p>
+        )}
+
+        {latest && (
+          <ProposalCard
+            proposal={latest}
+            currentUserId={currentUserId ?? null}
+            isOwner={room.isOwner}
+            roomId={room.roomId}
+            invalidate={invalidate}
+            isLatest
+          />
+        )}
+
+        {history.length > 0 && (
+          <div className="mt-2">
+            <button onClick={() => setShowHistory(s => !s)}
+              className="flex items-center gap-1 text-[10px] font-medium text-slate-400 hover:text-slate-600 transition-colors">
+              {showHistory ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+              Historial · {history.length} {history.length === 1 ? 'versión anterior' : 'versiones anteriores'}
+            </button>
+            {showHistory && (
+              <div className="mt-2 space-y-2">
+                {history.map(p => (
+                  <ProposalCard key={p.id}
+                    proposal={p}
+                    currentUserId={currentUserId ?? null}
+                    isOwner={room.isOwner}
+                    roomId={room.roomId}
+                    invalidate={invalidate}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function NewProposalForm({ onCancel, onSubmit, disabled }: {
+  onCancel: () => void; onSubmit: (content: string) => Promise<void>; disabled: boolean;
+}) {
+  const [content, setContent] = useState('');
+  const ref = useRef<HTMLTextAreaElement>(null);
+  useAutoResize(ref, content);
+  return (
+    <div className="rounded-lg border border-violet-200 bg-violet-50/40 p-2.5 mb-2">
+      <textarea ref={ref} value={content} onChange={e => setContent(e.target.value)} autoFocus
+        placeholder="Pegá el texto del posteo, descripción de la propuesta, link, etc."
+        className="w-full text-[13px] leading-relaxed bg-white border border-violet-200 rounded-md px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-violet-300/40 resize-none min-h-[64px]" />
+      <p className="text-[10px] text-slate-400 mt-1">Después de crear la propuesta podrás adjuntar imágenes, video, PDF o links.</p>
+      <div className="flex items-center gap-1.5 mt-1.5">
+        <Button size="sm" disabled={!content.trim() || disabled}
+          onClick={async () => { const t = content.trim(); if (!t) return; await onSubmit(t); setContent(''); }}
+          className="h-7 px-2.5 text-[11px] bg-violet-600 hover:bg-violet-700 text-white">
+          {disabled ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Crear propuesta'}
+        </Button>
+        <Button size="sm" variant="ghost" className="h-7 px-2 text-[11px]" onClick={onCancel}>Cancelar</Button>
+      </div>
+    </div>
+  );
+}
+
+function ProposalCard({ proposal, currentUserId, isOwner, roomId, invalidate, isLatest = false }: {
+  proposal: Proposal; currentUserId: number | null; isOwner: boolean; roomId: number;
+  invalidate: () => void; isLatest?: boolean;
+}) {
+  const meta = PROPOSAL_STATUS[proposal.status];
+  const { toast } = useToast();
+  const [rejecting, setRejecting] = useState(false);
+  const [rejectReason, setRejectReason] = useState('');
+  const isAuthor = currentUserId != null && proposal.submittedById === currentUserId;
+  const canDecide = isOwner && !isAuthor && proposal.status === 'pending';
+  const canEditAttachments = proposal.status === 'pending' && (isAuthor || isOwner);
+
+  const decisionMutation = useMutation({
+    mutationFn: (body: { status: 'approved' | 'rejected'; reason?: string }) =>
+      mutationFetch(`/api/reviews/${roomId}/proposals/${proposal.id}/decision`, 'PATCH', body),
+    onError: (err: Error) => toast({ title: 'No se pudo decidir la propuesta', description: err.message, variant: 'destructive' }),
+    onSuccess: () => { invalidate(); setRejecting(false); setRejectReason(''); },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: () => mutationFetch(`/api/reviews/${roomId}/proposals/${proposal.id}`, 'DELETE'),
+    onError: (err: Error) => toast({ title: 'No se pudo eliminar', description: err.message, variant: 'destructive' }),
+    onSuccess: invalidate,
+  });
+
+  const linkAttachMutation = useMutation({
+    mutationFn: (linkUrl: string) =>
+      mutationFetch(`/api/reviews/${roomId}/proposals/${proposal.id}/attachments`, 'POST', { linkUrl }),
+    onError: (err: Error) => toast({ title: 'No se pudo agregar el link', description: err.message, variant: 'destructive' }),
+    onSuccess: invalidate,
+  });
+
+  const fileAttachMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const fd = new FormData();
+      fd.append('file', file);
+      const res = await authFetch(`/api/reviews/${roomId}/proposals/${proposal.id}/attachments`, { method: 'POST', body: fd });
+      if (!res.ok) {
+        const t = await res.text().catch(() => '');
+        let msg = t;
+        try { msg = JSON.parse(t)?.message || t; } catch {}
+        throw new Error(msg || `Error ${res.status}`);
+      }
+      return res.json();
+    },
+    onError: (err: Error) => toast({ title: 'No se pudo adjuntar', description: err.message, variant: 'destructive' }),
+    onSuccess: invalidate,
+  });
+
+  const detachMutation = useMutation({
+    mutationFn: (attachmentId: number) =>
+      mutationFetch(`/api/reviews/${roomId}/proposals/${proposal.id}/attachments/${attachmentId}`, 'DELETE'),
+    onError: (err: Error) => toast({ title: 'No se pudo eliminar el adjunto', description: err.message, variant: 'destructive' }),
+    onSuccess: invalidate,
+  });
+
+  return (
+    <div className={cn(
+      "rounded-lg border bg-white",
+      isLatest && proposal.status === 'pending' ? "border-violet-300 shadow-sm" : "border-slate-200",
+    )}>
+      <div className="flex items-center gap-2 px-3 py-2 border-b border-slate-100">
+        <span className="text-[11px] font-semibold text-slate-700">v{proposal.version}</span>
+        <span className={cn("inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-md border", meta.cls)}>
+          <span className={cn("w-1.5 h-1.5 rounded-full", meta.dot)} />
+          {meta.label}
+        </span>
+        <span className="text-[10px] text-slate-400 truncate">
+          {proposal.submittedByName || 'Usuario'} · {relTime(proposal.submittedAt)}
+        </span>
+        {isAuthor && proposal.status === 'pending' && (
+          <button onClick={() => deleteMutation.mutate()}
+            className="ml-auto p-0.5 text-slate-300 hover:text-red-500 transition-colors" title="Eliminar propuesta">
+            <Trash2 className="h-3 w-3" />
+          </button>
+        )}
+      </div>
+
+      <div className="px-3 py-2.5">
+        <p className="text-[13px] leading-relaxed text-slate-700 whitespace-pre-wrap break-words">{proposal.content}</p>
+      </div>
+
+      {proposal.attachments.length > 0 && (
+        <div className="px-3 pb-2.5 grid grid-cols-2 md:grid-cols-3 gap-2">
+          {proposal.attachments.map(a => (
+            <AttachmentTile key={a.id} a={a}
+              onRemove={canEditAttachments ? () => detachMutation.mutate(a.id) : undefined} />
+          ))}
+        </div>
+      )}
+
+      {canEditAttachments && (
+        <AttachmentBar
+          onPickFile={(f) => fileAttachMutation.mutate(f)}
+          onAddLink={(u) => linkAttachMutation.mutate(u)}
+          uploading={fileAttachMutation.isPending}
+        />
+      )}
+
+      {(proposal.decidedById || proposal.decisionReason) && proposal.status !== 'pending' && (
+        <div className={cn(
+          "px-3 py-2 border-t text-[11px]",
+          proposal.status === 'approved' ? "border-emerald-100 bg-emerald-50/40 text-emerald-700"
+          : proposal.status === 'rejected' ? "border-red-100 bg-red-50/40 text-red-700"
+          : "border-slate-100 bg-slate-50 text-slate-500",
+        )}>
+          <div className="flex items-center gap-1.5">
+            {proposal.status === 'approved' ? <CheckCircle2 className="h-3 w-3" />
+              : proposal.status === 'rejected' ? <XCircle className="h-3 w-3" />
+              : <Circle className="h-3 w-3" />}
+            <span className="font-medium">
+              {proposal.status === 'approved' ? 'Aprobada' : proposal.status === 'rejected' ? 'Rechazada' : 'Reemplazada'}
+              {proposal.decidedByName ? ` por ${proposal.decidedByName}` : ''}
+              {proposal.decidedAt ? ` · ${relTime(proposal.decidedAt)}` : ''}
+            </span>
+          </div>
+          {proposal.decisionReason && (
+            <p className="mt-1 text-[11px] whitespace-pre-wrap break-words">{proposal.decisionReason}</p>
+          )}
+        </div>
+      )}
+
+      {canDecide && (
+        <div className="px-3 py-2 border-t border-slate-100 bg-slate-50/40">
+          {!rejecting ? (
+            <div className="flex gap-1.5">
+              <Button size="sm"
+                onClick={() => decisionMutation.mutate({ status: 'approved' })}
+                disabled={decisionMutation.isPending}
+                className="h-7 px-2.5 text-[11px] bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1">
+                <CheckCircle2 className="h-3 w-3" /> Aprobar
+              </Button>
+              <Button size="sm" variant="outline"
+                onClick={() => setRejecting(true)}
+                disabled={decisionMutation.isPending}
+                className="h-7 px-2.5 text-[11px] border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 flex items-center gap-1">
+                <XCircle className="h-3 w-3" /> Rechazar
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-1.5">
+              <textarea value={rejectReason} onChange={e => setRejectReason(e.target.value)} autoFocus rows={2}
+                placeholder="Motivo del rechazo (qué cambiar para v+1)"
+                className="w-full text-[12px] bg-white border border-red-200 rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-red-300/40 resize-none" />
+              <div className="flex gap-1.5">
+                <Button size="sm"
+                  disabled={!rejectReason.trim() || decisionMutation.isPending}
+                  onClick={() => decisionMutation.mutate({ status: 'rejected', reason: rejectReason.trim() })}
+                  className="h-7 px-2.5 text-[11px] bg-red-600 hover:bg-red-700 text-white">
+                  Confirmar rechazo
+                </Button>
+                <Button size="sm" variant="ghost" className="h-7 px-2 text-[11px]"
+                  onClick={() => { setRejecting(false); setRejectReason(''); }}>
+                  Cancelar
+                </Button>
+              </div>
+            </div>
+          )}
+          {isAuthor && (
+            <p className="text-[10px] text-slate-400 mt-1.5">No podés aprobar tu propia propuesta — esperá a un owner del room.</p>
+          )}
+        </div>
+      )}
+      {proposal.status === 'pending' && !canDecide && isAuthor && (
+        <div className="px-3 py-2 border-t border-slate-100 text-[10px] text-slate-400">
+          Esperando aprobación del owner del room.
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AttachmentTile({ a, onRemove }: { a: ProposalAttachment; onRemove?: () => void }) {
+  const isImage = a.kind === 'file' && a.mimeType?.startsWith('image/');
+  const isVideo = a.kind === 'file' && a.mimeType?.startsWith('video/');
+  const fileLabel = a.fileName || (a.fileUrl ?? '').split('/').pop() || 'Archivo';
+  const linkLabel = a.fileName || a.linkUrl || 'Enlace';
+
+  return (
+    <div className="relative group rounded-md border border-slate-200 bg-slate-50/40 overflow-hidden">
+      {onRemove && (
+        <button onClick={onRemove}
+          className="absolute top-1 right-1 z-10 p-0.5 rounded-full bg-white/90 text-slate-500 hover:text-red-600 hover:bg-white shadow-sm opacity-0 group-hover:opacity-100 transition-opacity">
+          <X className="h-3 w-3" />
+        </button>
+      )}
+      {isImage && a.fileUrl && (
+        <a href={a.fileUrl} target="_blank" rel="noreferrer" className="block">
+          <img src={a.fileUrl} alt={fileLabel} className="w-full h-28 object-cover" />
+          <div className="px-2 py-1 text-[10px] text-slate-500 truncate">{fileLabel} · {formatBytes(a.fileSize)}</div>
+        </a>
+      )}
+      {isVideo && a.fileUrl && (
+        <div>
+          <video src={a.fileUrl} controls className="w-full h-28 object-cover bg-black" />
+          <div className="px-2 py-1 text-[10px] text-slate-500 truncate flex items-center gap-1">
+            <Film className="h-3 w-3" />{fileLabel} · {formatBytes(a.fileSize)}
+          </div>
+        </div>
+      )}
+      {a.kind === 'file' && !isImage && !isVideo && a.fileUrl && (
+        <a href={a.fileUrl} target="_blank" rel="noreferrer"
+          className="flex items-center gap-2 px-2 py-2.5 text-[11px] text-slate-600 hover:text-violet-700">
+          <FileText className="h-4 w-4 text-slate-400 shrink-0" />
+          <div className="min-w-0">
+            <div className="truncate font-medium">{fileLabel}</div>
+            <div className="text-[10px] text-slate-400">{formatBytes(a.fileSize)}</div>
+          </div>
+        </a>
+      )}
+      {a.kind === 'link' && a.linkUrl && (
+        <a href={a.linkUrl} target="_blank" rel="noreferrer"
+          className="flex items-center gap-2 px-2 py-2.5 text-[11px] text-violet-700 hover:text-violet-900">
+          <Link2 className="h-4 w-4 shrink-0" />
+          <span className="truncate underline-offset-2 hover:underline">{linkLabel}</span>
+        </a>
+      )}
+    </div>
+  );
+}
+
+function AttachmentBar({ onPickFile, onAddLink, uploading }: {
+  onPickFile: (f: File) => void; onAddLink: (url: string) => void; uploading: boolean;
+}) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [linkOpen, setLinkOpen] = useState(false);
+  const [link, setLink] = useState('');
+  return (
+    <div className="px-3 pb-2 flex items-center gap-1.5">
+      <input ref={fileRef} type="file" hidden
+        accept="image/*,application/pdf,video/mp4,video/quicktime,video/webm"
+        onChange={e => { const f = e.target.files?.[0]; if (f) { onPickFile(f); e.target.value = ''; } }} />
+      <Button size="sm" variant="outline" disabled={uploading} onClick={() => fileRef.current?.click()}
+        className="h-6 px-2 text-[10px] gap-1">
+        {uploading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Paperclip className="h-3 w-3" />}
+        Adjuntar
+      </Button>
+      {!linkOpen ? (
+        <Button size="sm" variant="ghost" onClick={() => setLinkOpen(true)} className="h-6 px-2 text-[10px] gap-1 text-slate-500">
+          <Link2 className="h-3 w-3" /> Link
+        </Button>
+      ) : (
+        <div className="flex items-center gap-1.5 flex-1">
+          <input value={link} onChange={e => setLink(e.target.value)} autoFocus
+            placeholder="https://..."
+            className="flex-1 text-[11px] border border-slate-200 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-violet-300/40" />
+          <Button size="sm" disabled={!/^https?:\/\//i.test(link.trim())}
+            onClick={() => { onAddLink(link.trim()); setLink(''); setLinkOpen(false); }}
+            className="h-6 px-2 text-[10px] bg-violet-600 hover:bg-violet-700 text-white">Agregar</Button>
+          <button onClick={() => { setLink(''); setLinkOpen(false); }} className="text-slate-400 hover:text-slate-600">
+            <X className="h-3 w-3" />
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -605,6 +1063,12 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
             {item.isCustom && <Tag className="h-3 w-3 text-slate-300 shrink-0 self-center" />}
             <span className="font-medium text-[14px] tracking-tight text-slate-900 truncate" title={item.title}>{item.title}</span>
             {item.subtitle && <span className="text-slate-400 text-[12px] truncate hidden md:block min-w-0" title={item.subtitle}>{item.subtitle}</span>}
+            {item.pendingProposalVersion != null && (
+              <span className="shrink-0 self-center inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-md border bg-violet-50 text-violet-700 border-violet-200" title="Hay una propuesta pendiente de aprobación">
+                <FileCheck2 className="h-2.5 w-2.5" />
+                Propuesta v{item.pendingProposalVersion}
+              </span>
+            )}
             <span className="shrink-0 self-center"><FreshnessIndicator updatedAt={item.updatedAt} updatedByName={item.updatedByName} updatedById={item.updatedById} currentUserId={currentUserId} /></span>
           </div>
           {!expanded && !hideSubtitle && item.currentAction && (
@@ -699,6 +1163,9 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
                     </div>
                   </div>
                 )}
+
+                {/* Propuesta a aprobar (texto + adjuntos, versionado) */}
+                <ProposalSection projectId={item.projectId} customId={item.customId} currentUserId={currentUserId} />
 
                 {/* Footer: decision + secondary indicators + nav */}
                 <div className="flex items-center gap-1.5 px-5 py-2.5 border-t border-slate-100 bg-slate-50/60 flex-wrap">
@@ -1328,12 +1795,21 @@ const FIELD_LABELS: Record<string, string> = {
   deadline: 'Deadline',
   ownerId: 'Owner',
   decisionNeeded: 'Decisión',
+  proposal: 'Propuesta',
 };
 
 function formatChangeValue(fieldName: string, value: string | null): string {
   if (value == null) return '(vacío)';
   if (fieldName === 'deadline') {
     try { return new Date(value).toLocaleDateString('es-AR', { day: 'numeric', month: 'short' }); } catch { return value; }
+  }
+  if (fieldName === 'proposal') {
+    const m = value.match(/^(submitted|approved|rejected)_v(\d+)$/);
+    if (m) {
+      const labels: Record<string, string> = { submitted: 'enviada', approved: 'aprobada', rejected: 'rechazada' };
+      return `v${m[2]} ${labels[m[1]]}`;
+    }
+    return value;
   }
   if (value.length > 60) return value.slice(0, 57) + '...';
   return value;
@@ -1349,6 +1825,10 @@ function ActivityPanel({ projectId, customItemId, projectName, onClose }: { proj
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editText, setEditText] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
+  const newNoteRef = useRef<HTMLTextAreaElement>(null);
+  const editNoteRef = useRef<HTMLTextAreaElement>(null);
+  useAutoResize(newNoteRef, newNote);
+  useAutoResize(editNoteRef, editText, editingId !== null);
   const currentUserId = (user as any)?.id;
 
   const notesUrl = projectId
@@ -1446,9 +1926,11 @@ function ActivityPanel({ projectId, customItemId, projectName, onClose }: { proj
                   {editingId === entry.id ? (
                     <div className="space-y-1">
                       <Textarea
+                        ref={editNoteRef}
                         value={editText}
                         onChange={e => setEditText(e.target.value)}
                         autoFocus
+                        rows={1}
                         onKeyDown={e => {
                           if (e.key === 'Enter' && !e.shiftKey) {
                             e.preventDefault();
@@ -1457,7 +1939,7 @@ function ActivityPanel({ projectId, customItemId, projectName, onClose }: { proj
                             setEditingId(null);
                           }
                         }}
-                        className="resize-none text-[11px] min-h-[40px] max-h-[120px] bg-white px-2.5 py-1.5"
+                        className="resize-none text-[11px] min-h-[32px] bg-white px-2.5 py-1.5 leading-relaxed"
                       />
                       <div className="flex gap-1">
                         <Button size="sm" className="h-6 px-2 text-[10px] bg-indigo-600 hover:bg-indigo-700 text-white"
@@ -1522,9 +2004,10 @@ function ActivityPanel({ projectId, customItemId, projectName, onClose }: { proj
 
       <div className="px-3 py-2 border-t border-border shrink-0 bg-slate-50/80">
         <div className="flex gap-1.5 items-end">
-          <Textarea value={newNote} onChange={e => setNewNote(e.target.value)}
+          <Textarea ref={newNoteRef} value={newNote} onChange={e => setNewNote(e.target.value)}
+            rows={1}
             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); const t = newNote.trim(); if (t) { setNewNote(''); addMutation.mutate(t); } } }}
-            placeholder="Escribí un comentario..." className="resize-none text-[11px] min-h-[40px] max-h-[80px] flex-1 bg-white px-2.5 py-1.5" />
+            placeholder="Escribí un comentario..." className="resize-none text-[11px] min-h-[32px] flex-1 bg-white px-2.5 py-1.5 leading-relaxed" />
           <Button size="sm" onClick={() => { const t = newNote.trim(); if (t) { setNewNote(''); addMutation.mutate(t); } }}
             disabled={!newNote.trim() || addMutation.isPending}
             className="bg-indigo-600 hover:bg-indigo-700 text-white h-7 w-7 p-0 shrink-0">
@@ -1651,6 +2134,26 @@ export default function StatusSemanalPage() {
     staleTime: 60000,
   });
   const appUsers: AppUser[] = Array.isArray(rawUsers) ? rawUsers : [];
+
+  type PendingProposalRow = { projectId: number | null; weeklyStatusItemId: number | null; version: number; proposalId: number; submittedAt: string };
+  const { data: pendingProposals = [] } = useQuery<PendingProposalRow[]>({
+    queryKey: ['proposals-pending', roomCtx?.roomId],
+    queryFn: async () => {
+      if (!roomCtx) return [];
+      const r = await authFetch(`/api/reviews/${roomCtx.roomId}/proposals/pending`);
+      return r.ok ? r.json() : [];
+    },
+    enabled: !!roomCtx,
+    refetchInterval: 30_000,
+  });
+  const pendingByItem = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const p of pendingProposals) {
+      const key = p.projectId != null ? `p_${p.projectId}` : `c_${p.weeklyStatusItemId}`;
+      m.set(key, p.version);
+    }
+    return m;
+  }, [pendingProposals]);
 
   // ── Mutations ─────────────────────────────────────────────────────────────────
 
@@ -1814,7 +2317,8 @@ export default function StatusSemanalPage() {
   const allItems = useMemo<Item[]>(() => [
     ...projectRows.map(toItem),
     ...customRows.map(toCustomItem),
-  ], [projectRows, customRows]);
+  ].map(it => ({ ...it, pendingProposalVersion: pendingByItem.get(it.key) ?? null })),
+  [projectRows, customRows, pendingByItem]);
 
   const hiddenCount = useMemo(() => allItems.filter(i => i.hiddenFromWeekly).length, [allItems]);
 

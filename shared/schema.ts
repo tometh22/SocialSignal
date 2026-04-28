@@ -3402,6 +3402,43 @@ export const insertWeeklyStatusItemSchema = createInsertSchema(weeklyStatusItems
 export type WeeklyStatusItem = typeof weeklyStatusItems.$inferSelect;
 export type InsertWeeklyStatusItem = z.infer<typeof insertWeeklyStatusItemSchema>;
 
+// ─── Status Item Proposals (versioned approval flow for content) ────────────
+export const statusItemProposals = pgTable("status_item_proposals", {
+  id: serial("id").primaryKey(),
+  roomId: integer("room_id").notNull(),
+  projectId: integer("project_id").references(() => activeProjects.id, { onDelete: 'cascade' }),
+  weeklyStatusItemId: integer("weekly_status_item_id").references(() => weeklyStatusItems.id, { onDelete: 'cascade' }),
+  version: integer("version").notNull(),
+  content: text("content").notNull(),
+  status: varchar("status", { length: 20 }).notNull().default('pending'), // pending | approved | rejected | superseded
+  submittedById: integer("submitted_by_id").references(() => users.id, { onDelete: 'set null' }),
+  submittedAt: timestamp("submitted_at").notNull().defaultNow(),
+  decidedById: integer("decided_by_id").references(() => users.id, { onDelete: 'set null' }),
+  decidedAt: timestamp("decided_at"),
+  decisionReason: text("decision_reason"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (t) => ({
+  idxRoomProject: index("idx_sip_room_project").on(t.roomId, t.projectId),
+  idxRoomItem: index("idx_sip_room_item").on(t.roomId, t.weeklyStatusItemId),
+}));
+export type StatusItemProposal = typeof statusItemProposals.$inferSelect;
+
+export const statusItemProposalAttachments = pgTable("status_item_proposal_attachments", {
+  id: serial("id").primaryKey(),
+  proposalId: integer("proposal_id").notNull().references(() => statusItemProposals.id, { onDelete: 'cascade' }),
+  kind: varchar("kind", { length: 10 }).notNull().default('file'), // file | link
+  fileUrl: text("file_url"),
+  fileName: text("file_name"),
+  fileSize: integer("file_size"),
+  mimeType: varchar("mime_type", { length: 120 }),
+  linkUrl: text("link_url"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => ({
+  idxProposal: index("idx_sipa_proposal").on(t.proposalId),
+}));
+export type StatusItemProposalAttachment = typeof statusItemProposalAttachments.$inferSelect;
+
 // ─── Status Update Entries (accumulating update history) ─────────────────────
 export const statusUpdateEntries = pgTable("status_update_entries", {
   id: serial("id").primaryKey(),
