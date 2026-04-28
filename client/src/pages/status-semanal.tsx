@@ -355,6 +355,24 @@ function MentionInput({ value, onChange, onKeyDown, placeholder, className, user
 
 // ─── Inline editor ────────────────────────────────────────────────────────────
 
+// Grows a textarea to fit its content, capped at maxPx; scrolls beyond that.
+function useAutoResize(
+  ref: React.RefObject<HTMLTextAreaElement | null>,
+  value: string,
+  enabled: boolean = true,
+  maxPx: number = 320,
+) {
+  useEffect(() => {
+    if (!enabled) return;
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    const next = Math.min(el.scrollHeight, maxPx);
+    el.style.height = `${next}px`;
+    el.style.overflowY = el.scrollHeight > maxPx ? 'auto' : 'hidden';
+  }, [ref, value, enabled, maxPx]);
+}
+
 function InlineText({ value, placeholder, onSave, multiline = false, className = '', required = false }: {
   value: string | null; placeholder: string; onSave: (v: string) => void;
   multiline?: boolean; className?: string; required?: boolean;
@@ -365,6 +383,7 @@ function InlineText({ value, placeholder, onSave, multiline = false, className =
 
   useEffect(() => { setDraft(value ?? ''); }, [value]);
   useEffect(() => { if (editing) ref.current?.focus(); }, [editing]);
+  useAutoResize(ref, draft, editing && multiline);
 
   const save = () => {
     setEditing(false);
@@ -383,7 +402,7 @@ function InlineText({ value, placeholder, onSave, multiline = false, className =
               if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); save(); }
               if (e.key === 'Escape') { setDraft(value ?? ''); setEditing(false); }
             }}
-            className={cls} rows={2} />
+            className={cls} rows={1} />
           <p className="text-[9px] text-slate-400 mt-0.5">Ctrl+Enter para guardar · Esc para cancelar</p>
         </>
       )
@@ -395,13 +414,14 @@ function InlineText({ value, placeholder, onSave, multiline = false, className =
   return (
     <span onClick={() => setEditing(true)}
       className={cn(
-        "group cursor-text rounded-md px-1.5 py-1 transition-all min-h-[26px] inline-flex items-center gap-1 w-full",
+        "group cursor-text rounded-md px-1.5 py-1 transition-all min-h-[26px] gap-1 w-full",
+        multiline ? "flex items-start" : "inline-flex items-center",
         "hover:bg-slate-100/80",
         value ? "text-slate-800" : "text-slate-400/70 italic",
         className
       )}>
-      <span className="flex-1 leading-snug">{value || placeholder}</span>
-      <Pencil className="h-2.5 w-2.5 text-slate-400 opacity-0 group-hover:opacity-50 transition-opacity shrink-0" />
+      <span className={cn("flex-1 leading-snug", multiline && "whitespace-pre-wrap break-words")}>{value || placeholder}</span>
+      <Pencil className={cn("h-2.5 w-2.5 text-slate-400 opacity-0 group-hover:opacity-50 transition-opacity shrink-0", multiline && "mt-1")} />
     </span>
   );
 }
@@ -1349,6 +1369,10 @@ function ActivityPanel({ projectId, customItemId, projectName, onClose }: { proj
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editText, setEditText] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
+  const newNoteRef = useRef<HTMLTextAreaElement>(null);
+  const editNoteRef = useRef<HTMLTextAreaElement>(null);
+  useAutoResize(newNoteRef, newNote);
+  useAutoResize(editNoteRef, editText, editingId !== null);
   const currentUserId = (user as any)?.id;
 
   const notesUrl = projectId
@@ -1446,9 +1470,11 @@ function ActivityPanel({ projectId, customItemId, projectName, onClose }: { proj
                   {editingId === entry.id ? (
                     <div className="space-y-1">
                       <Textarea
+                        ref={editNoteRef}
                         value={editText}
                         onChange={e => setEditText(e.target.value)}
                         autoFocus
+                        rows={1}
                         onKeyDown={e => {
                           if (e.key === 'Enter' && !e.shiftKey) {
                             e.preventDefault();
@@ -1457,7 +1483,7 @@ function ActivityPanel({ projectId, customItemId, projectName, onClose }: { proj
                             setEditingId(null);
                           }
                         }}
-                        className="resize-none text-[11px] min-h-[40px] max-h-[120px] bg-white px-2.5 py-1.5"
+                        className="resize-none text-[11px] min-h-[32px] bg-white px-2.5 py-1.5 leading-relaxed"
                       />
                       <div className="flex gap-1">
                         <Button size="sm" className="h-6 px-2 text-[10px] bg-indigo-600 hover:bg-indigo-700 text-white"
@@ -1522,9 +1548,10 @@ function ActivityPanel({ projectId, customItemId, projectName, onClose }: { proj
 
       <div className="px-3 py-2 border-t border-border shrink-0 bg-slate-50/80">
         <div className="flex gap-1.5 items-end">
-          <Textarea value={newNote} onChange={e => setNewNote(e.target.value)}
+          <Textarea ref={newNoteRef} value={newNote} onChange={e => setNewNote(e.target.value)}
+            rows={1}
             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); const t = newNote.trim(); if (t) { setNewNote(''); addMutation.mutate(t); } } }}
-            placeholder="Escribí un comentario..." className="resize-none text-[11px] min-h-[40px] max-h-[80px] flex-1 bg-white px-2.5 py-1.5" />
+            placeholder="Escribí un comentario..." className="resize-none text-[11px] min-h-[32px] flex-1 bg-white px-2.5 py-1.5 leading-relaxed" />
           <Button size="sm" onClick={() => { const t = newNote.trim(); if (t) { setNewNote(''); addMutation.mutate(t); } }}
             disabled={!newNote.trim() || addMutation.isPending}
             className="bg-indigo-600 hover:bg-indigo-700 text-white h-7 w-7 p-0 shrink-0">
