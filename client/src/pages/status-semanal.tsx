@@ -16,6 +16,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import {
   ClipboardList, MessageSquare, X, Send, Trash2, Pencil,
   AlertTriangle, Loader2, User, EyeOff, Eye,
@@ -778,11 +779,48 @@ function ProposalCard({ proposal, currentUserId, isOwner, roomId, invalidate, is
   );
 }
 
+function ImageLightbox({ src, alt, open, onOpenChange }: {
+  src: string; alt?: string; open: boolean; onOpenChange: (open: boolean) => void;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-[92vw] sm:max-w-[92vw] w-auto max-h-[92vh] p-0 bg-black/95 border-0 overflow-hidden flex items-center justify-center">
+        <img src={src} alt={alt} className="block max-w-[92vw] max-h-[92vh] w-auto h-auto object-contain" />
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function useUnreadComments(itemKey: string | undefined, noteCount: number, userId?: number | null) {
+  const storageKey = itemKey ? `commentsSeen:${userId ?? 'anon'}:${itemKey}` : null;
+  const [seenCount, setSeenCount] = useState<number>(() => {
+    if (!storageKey || typeof window === 'undefined') return noteCount;
+    const v = window.localStorage.getItem(storageKey);
+    if (v === null) {
+      window.localStorage.setItem(storageKey, String(noteCount));
+      return noteCount;
+    }
+    const parsed = parseInt(v, 10);
+    return Number.isFinite(parsed) ? parsed : noteCount;
+  });
+
+  const hasUnread = noteCount > seenCount;
+
+  const markAsRead = useCallback(() => {
+    if (!storageKey || typeof window === 'undefined') return;
+    window.localStorage.setItem(storageKey, String(noteCount));
+    setSeenCount(noteCount);
+  }, [storageKey, noteCount]);
+
+  return { hasUnread, unreadCount: Math.max(0, noteCount - seenCount), markAsRead };
+}
+
 function AttachmentTile({ a, onRemove }: { a: ProposalAttachment; onRemove?: () => void }) {
   const isImage = a.kind === 'file' && a.mimeType?.startsWith('image/');
   const isVideo = a.kind === 'file' && a.mimeType?.startsWith('video/');
   const fileLabel = a.fileName || (a.fileUrl ?? '').split('/').pop() || 'Archivo';
   const linkLabel = a.fileName || a.linkUrl || 'Enlace';
+  const [lightboxOpen, setLightboxOpen] = useState(false);
 
   return (
     <div className="relative group rounded-md border border-slate-200 bg-slate-50/40 overflow-hidden">
@@ -793,10 +831,13 @@ function AttachmentTile({ a, onRemove }: { a: ProposalAttachment; onRemove?: () 
         </button>
       )}
       {isImage && a.fileUrl && (
-        <a href={a.fileUrl} target="_blank" rel="noreferrer" className="block">
-          <img src={a.fileUrl} alt={fileLabel} className="w-full h-28 object-cover" />
-          <div className="px-2 py-1 text-[10px] text-slate-500 truncate">{fileLabel} · {formatBytes(a.fileSize)}</div>
-        </a>
+        <>
+          <button type="button" onClick={() => setLightboxOpen(true)} className="block w-full text-left cursor-zoom-in">
+            <img src={a.fileUrl} alt={fileLabel} className="w-full h-28 object-cover" />
+            <div className="px-2 py-1 text-[10px] text-slate-500 truncate">{fileLabel} · {formatBytes(a.fileSize)}</div>
+          </button>
+          <ImageLightbox src={a.fileUrl} alt={fileLabel} open={lightboxOpen} onOpenChange={setLightboxOpen} />
+        </>
       )}
       {isVideo && a.fileUrl && (
         <div>
@@ -1031,6 +1072,9 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const decMeta = dm(item.decisionNeeded);
+  const { hasUnread, markAsRead } = useUnreadComments(item.key, item.noteCount, currentUserId);
+  useEffect(() => { if (expanded && hasUnread) markAsRead(); }, [expanded, hasUnread, markAsRead]);
+  const handleOpenNotes = onOpenNotes ? () => { markAsRead(); onOpenNotes(); } : undefined;
 
   const accentBorder = accent === 'red' ? 'border-l-red-500' : accent === 'amber' ? 'border-l-amber-400' : 'border-l-transparent';
 
@@ -1088,10 +1132,16 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
           )}
           <OwnerSelect value={item.ownerId} name={item.ownerName} onChange={v => onUpdate({ ownerId: v })} users={users} />
           <DeadlinePicker value={item.deadline} isOverdue={item.isOverdue} onChange={v => onUpdate({ deadline: v })} />
-          {onOpenNotes && item.noteCount > 0 && (
-            <button onClick={onOpenNotes}
-              className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
+          {handleOpenNotes && item.noteCount > 0 && (
+            <button onClick={handleOpenNotes}
+              className={cn(
+                "relative flex items-center gap-0.5 px-1.5 py-0.5 rounded-md transition-colors",
+                hasUnread
+                  ? "text-indigo-700 bg-indigo-50 hover:bg-indigo-100"
+                  : "text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+              )}>
               <MessageSquare className="h-3 w-3" /><span className="text-[10px] font-medium">{item.noteCount}</span>
+              {hasUnread && <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-red-500 ring-1 ring-white" />}
             </button>
           )}
           <TooltipProvider><Tooltip><TooltipTrigger asChild>
@@ -1216,8 +1266,8 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
                 <div className="border-t border-slate-100">
                   <div className="flex items-center gap-2 px-5 pt-3 pb-1">
                     <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Actividad</span>
-                    {onOpenNotes && (
-                      <button onClick={onOpenNotes}
+                    {handleOpenNotes && (
+                      <button onClick={handleOpenNotes}
                         className="ml-auto flex items-center gap-1 text-[11px] font-medium text-indigo-500 hover:text-indigo-700 transition-colors">
                         Ver historial{item.noteCount > 0 && ` · ${item.noteCount}`}
                         <ArrowRight className="h-2.5 w-2.5" />
@@ -1230,7 +1280,7 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
                       customId={item.customId}
                       currentUserId={currentUserId}
                       users={users}
-                      onOpenFull={onOpenNotes}
+                      onOpenFull={handleOpenNotes}
                       compact
                     />
                   </div>
@@ -1532,6 +1582,9 @@ function AlertSidebarCard({ item, accent, currentUserId, onUpdate, expanded, onT
 }) {
   const accentBorder = accent === 'red' ? 'border-l-red-500' : 'border-l-amber-400';
   const accentBg = accent === 'red' ? 'bg-red-50/40' : 'bg-amber-50/40';
+  const { hasUnread, markAsRead } = useUnreadComments(item.key, item.noteCount, currentUserId);
+  useEffect(() => { if (expanded && hasUnread) markAsRead(); }, [expanded, hasUnread, markAsRead]);
+  const handleOpenNotes = onOpenNotes ? () => { markAsRead(); onOpenNotes(); } : undefined;
   return (
     <div className={cn(
       "border-l-[3px] transition-colors",
@@ -1575,6 +1628,15 @@ function AlertSidebarCard({ item, accent, currentUserId, onUpdate, expanded, onT
                 </span>
               )}
               <FreshnessIndicator updatedAt={item.updatedAt} updatedByName={item.updatedByName} updatedById={item.updatedById} currentUserId={currentUserId} />
+              {item.noteCount > 0 && (
+                <span className={cn(
+                  "relative inline-flex items-center gap-0.5 text-[10px] font-medium px-1 py-0.5 rounded",
+                  hasUnread ? "text-indigo-700 bg-indigo-50" : "text-slate-400"
+                )}>
+                  <MessageSquare className="h-3 w-3" />{item.noteCount}
+                  {hasUnread && <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-red-500 ring-1 ring-white" />}
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -1621,6 +1683,11 @@ function AlertSidebarCard({ item, accent, currentUserId, onUpdate, expanded, onT
                 <InlineText value={item.nextMilestone} placeholder="Acción concreta" onSave={v => onUpdate({ nextMilestone: v })} multiline className="text-[11px]" />
               </div>
 
+              {/* Proposal + attachments (images, videos, files, links) */}
+              <div className="rounded-md bg-white border border-slate-100 overflow-hidden">
+                <ProposalSection projectId={item.projectId} customId={item.customId} currentUserId={currentUserId} />
+              </div>
+
               {/* Actions footer */}
               <div className="flex items-center gap-1.5 pt-1.5 border-t border-slate-100 flex-wrap">
                 {users && <OwnerSelect value={item.ownerId} name={item.ownerName} onChange={v => onUpdate({ ownerId: v })} users={users} />}
@@ -1634,11 +1701,17 @@ function AlertSidebarCard({ item, accent, currentUserId, onUpdate, expanded, onT
                     Resolver
                   </button>
                 )}
-                {onOpenNotes && (
-                  <button onClick={onOpenNotes}
-                    className="flex items-center gap-1 text-[10px] font-medium text-indigo-500 hover:text-indigo-700 transition-colors">
+                {handleOpenNotes && (
+                  <button onClick={handleOpenNotes}
+                    className={cn(
+                      "relative flex items-center gap-1 text-[10px] font-medium transition-colors",
+                      hasUnread
+                        ? "text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-md px-2 py-0.5"
+                        : "text-indigo-500 hover:text-indigo-700"
+                    )}>
                     <MessageSquare className="h-3 w-3" />
                     {item.noteCount > 0 && item.noteCount}
+                    {hasUnread && <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-red-500 ring-1 ring-white" />}
                   </button>
                 )}
                 {onRemove && (
@@ -1668,6 +1741,9 @@ function DecisionSidebarCard({ item, currentUserId, expanded, onToggle, users, o
   const daysSince = item.updatedAt
     ? Math.floor((Date.now() - new Date(item.updatedAt).getTime()) / 86400000)
     : null;
+  const { hasUnread, markAsRead } = useUnreadComments(item.key, item.noteCount, currentUserId);
+  useEffect(() => { if (expanded && hasUnread) markAsRead(); }, [expanded, hasUnread, markAsRead]);
+  const handleOpenNotes = onOpenNotes ? () => { markAsRead(); onOpenNotes(); } : undefined;
   return (
     <div className={cn(
       "border-l-[3px] border-l-amber-400 transition-colors",
@@ -1705,6 +1781,15 @@ function DecisionSidebarCard({ item, currentUserId, expanded, onToggle, users, o
           {item.deadline && (
             <span className={cn("text-[10px] font-medium", item.isOverdue ? "text-red-500" : "text-slate-400")}>
               {deadlineLabel(item.deadline)}
+            </span>
+          )}
+          {item.noteCount > 0 && (
+            <span className={cn(
+              "relative inline-flex items-center gap-0.5 text-[10px] font-medium px-1 py-0.5 rounded",
+              hasUnread ? "text-indigo-700 bg-indigo-50" : "text-slate-400"
+            )}>
+              <MessageSquare className="h-3 w-3" />{item.noteCount}
+              {hasUnread && <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-red-500 ring-1 ring-white" />}
             </span>
           )}
         </div>
@@ -1747,6 +1832,11 @@ function DecisionSidebarCard({ item, currentUserId, expanded, onToggle, users, o
                 )}
               </div>
 
+              {/* Proposal + attachments (images, videos, files, links) */}
+              <div className="rounded-md bg-white border border-slate-100 overflow-hidden">
+                <ProposalSection projectId={item.projectId} customId={item.customId} currentUserId={currentUserId} />
+              </div>
+
               {/* Actions footer */}
               <div className="flex items-center gap-1.5 pt-1.5 border-t border-slate-100 flex-wrap">
                 {onUpdate && users && <OwnerSelect value={item.ownerId} name={item.ownerName} onChange={v => onUpdate({ ownerId: v })} users={users} />}
@@ -1760,11 +1850,17 @@ function DecisionSidebarCard({ item, currentUserId, expanded, onToggle, users, o
                     Resolver
                   </button>
                 )}
-                {onOpenNotes && (
-                  <button onClick={onOpenNotes}
-                    className="flex items-center gap-1 text-[10px] font-medium text-indigo-500 hover:text-indigo-700 transition-colors">
+                {handleOpenNotes && (
+                  <button onClick={handleOpenNotes}
+                    className={cn(
+                      "relative flex items-center gap-1 text-[10px] font-medium transition-colors",
+                      hasUnread
+                        ? "text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-md px-2 py-0.5"
+                        : "text-indigo-500 hover:text-indigo-700"
+                    )}>
                     <MessageSquare className="h-3 w-3" />
                     {item.noteCount > 0 && item.noteCount}
+                    {hasUnread && <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-red-500 ring-1 ring-white" />}
                   </button>
                 )}
                 {onRemove && (
