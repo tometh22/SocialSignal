@@ -58,9 +58,57 @@ interface InlineEditPersonnelProps {
     oct2025MonthlySalaryARS?: number;
     nov2025MonthlySalaryARS?: number;
     dec2025MonthlySalaryARS?: number;
+    // Historical contract types 2026
+    jan2026ContractType?: string;
+    feb2026ContractType?: string;
+    mar2026ContractType?: string;
+    apr2026ContractType?: string;
+    may2026ContractType?: string;
+    jun2026ContractType?: string;
+    jul2026ContractType?: string;
+    aug2026ContractType?: string;
+    sep2026ContractType?: string;
+    oct2026ContractType?: string;
+    nov2026ContractType?: string;
+    dec2026ContractType?: string;
+    // Historical hourly rates 2026
+    jan2026HourlyRateARS?: number;
+    feb2026HourlyRateARS?: number;
+    mar2026HourlyRateARS?: number;
+    apr2026HourlyRateARS?: number;
+    may2026HourlyRateARS?: number;
+    jun2026HourlyRateARS?: number;
+    jul2026HourlyRateARS?: number;
+    aug2026HourlyRateARS?: number;
+    sep2026HourlyRateARS?: number;
+    oct2026HourlyRateARS?: number;
+    nov2026HourlyRateARS?: number;
+    dec2026HourlyRateARS?: number;
+    // Historical monthly salaries 2026
+    jan2026MonthlySalaryARS?: number;
+    feb2026MonthlySalaryARS?: number;
+    mar2026MonthlySalaryARS?: number;
+    apr2026MonthlySalaryARS?: number;
+    may2026MonthlySalaryARS?: number;
+    jun2026MonthlySalaryARS?: number;
+    jul2026MonthlySalaryARS?: number;
+    aug2026MonthlySalaryARS?: number;
+    sep2026MonthlySalaryARS?: number;
+    oct2026MonthlySalaryARS?: number;
+    nov2026MonthlySalaryARS?: number;
+    dec2026MonthlySalaryARS?: number;
   };
   roles: any[];
 }
+
+// Order: newest → oldest. Used for "find latest historical value" lookups
+// and for "future month" detection in the costs grid.
+const HISTORICAL_MONTHS_DESC = [
+  'dec2026', 'nov2026', 'oct2026', 'sep2026', 'aug2026', 'jul2026',
+  'jun2026', 'may2026', 'apr2026', 'mar2026', 'feb2026', 'jan2026',
+  'dec2025', 'nov2025', 'oct2025', 'sep2025', 'aug2025', 'jul2025',
+  'jun2025', 'may2025', 'apr2025', 'mar2025', 'feb2025', 'jan2025',
+];
 
 export default function InlineEditPersonnel({ person, roles }: InlineEditPersonnelProps) {
   // DEBUG: Log person data on every render
@@ -93,27 +141,15 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
   const [editedEmail, setEditedEmail] = useState(person.email);
   const [editedRoleId, setEditedRoleId] = useState(person.roleId.toString());
   const getInitialHourlyRate = () => {
-    const fields = [
-      'dec2025HourlyRateARS', 'nov2025HourlyRateARS', 'oct2025HourlyRateARS',
-      'sep2025HourlyRateARS', 'aug2025HourlyRateARS', 'jul2025HourlyRateARS',
-      'jun2025HourlyRateARS', 'may2025HourlyRateARS', 'apr2025HourlyRateARS',
-      'mar2025HourlyRateARS', 'feb2025HourlyRateARS', 'jan2025HourlyRateARS'
-    ];
-    for (const field of fields) {
-      const value = (person as any)[field];
+    for (const month of HISTORICAL_MONTHS_DESC) {
+      const value = (person as any)[`${month}HourlyRateARS`];
       if (value && value > 0) return value.toString();
     }
     return person.hourlyRate.toString();
   };
   const getInitialSalary = () => {
-    const fields = [
-      'dec2025MonthlySalaryARS', 'nov2025MonthlySalaryARS', 'oct2025MonthlySalaryARS',
-      'sep2025MonthlySalaryARS', 'aug2025MonthlySalaryARS', 'jul2025MonthlySalaryARS',
-      'jun2025MonthlySalaryARS', 'may2025MonthlySalaryARS', 'apr2025MonthlySalaryARS',
-      'mar2025MonthlySalaryARS', 'feb2025MonthlySalaryARS', 'jan2025MonthlySalaryARS'
-    ];
-    for (const field of fields) {
-      const value = (person as any)[field];
+    for (const month of HISTORICAL_MONTHS_DESC) {
+      const value = (person as any)[`${month}MonthlySalaryARS`];
       if (value && value > 0) return value.toString();
     }
     return person.monthlyFixedSalary?.toString() || '';
@@ -142,38 +178,18 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
 
   // Función para obtener el último sueldo histórico
   const getLatestHistoricalSalary = (): number | null => {
-    const salaryFields = [
-      'dec2025MonthlySalaryARS', 'nov2025MonthlySalaryARS', 'oct2025MonthlySalaryARS',
-      'sep2025MonthlySalaryARS', 'aug2025MonthlySalaryARS', 'jul2025MonthlySalaryARS',
-      'jun2025MonthlySalaryARS', 'may2025MonthlySalaryARS', 'apr2025MonthlySalaryARS',
-      'mar2025MonthlySalaryARS', 'feb2025MonthlySalaryARS', 'jan2025MonthlySalaryARS'
-    ];
-
-    // Buscar el último valor histórico no nulo, comenzando desde diciembre hacia atrás
-    for (const field of salaryFields) {
-      const value = (person as any)[field];
-      if (value && value > 0) {
-        return value;
-      }
+    for (const month of HISTORICAL_MONTHS_DESC) {
+      const value = (person as any)[`${month}MonthlySalaryARS`];
+      if (value && value > 0) return value;
     }
     return null;
   };
 
   // Función para obtener la última tarifa por hora histórica
   const getLatestHistoricalHourlyRate = (): number | null => {
-    const hourlyRateFields = [
-      'dec2025HourlyRateARS', 'nov2025HourlyRateARS', 'oct2025HourlyRateARS',
-      'sep2025HourlyRateARS', 'aug2025HourlyRateARS', 'jul2025HourlyRateARS',
-      'jun2025HourlyRateARS', 'may2025HourlyRateARS', 'apr2025HourlyRateARS',
-      'mar2025HourlyRateARS', 'feb2025HourlyRateARS', 'jan2025HourlyRateARS'
-    ];
-
-    // Buscar el último valor histórico no nulo, comenzando desde diciembre hacia atrás
-    for (const field of hourlyRateFields) {
-      const value = (person as any)[field];
-      if (value && value > 0) {
-        return value;
-      }
+    for (const month of HISTORICAL_MONTHS_DESC) {
+      const value = (person as any)[`${month}HourlyRateARS`];
+      if (value && value > 0) return value;
     }
     return null;
   };
@@ -196,13 +212,19 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
     }
   };
 
-  const months = [
-    { key: "jan2025", label: "Ene" }, { key: "feb2025", label: "Feb" },
-    { key: "mar2025", label: "Mar" }, { key: "apr2025", label: "Abr" },
-    { key: "may2025", label: "May" }, { key: "jun2025", label: "Jun" },
-    { key: "jul2025", label: "Jul" }, { key: "aug2025", label: "Ago" },
-    { key: "sep2025", label: "Sep" }, { key: "oct2025", label: "Oct" },
-    { key: "nov2025", label: "Nov" }, { key: "dec2025", label: "Dic" },
+  const months: { key: string; label: string; year: number }[] = [
+    { key: "jan2025", label: "Ene", year: 2025 }, { key: "feb2025", label: "Feb", year: 2025 },
+    { key: "mar2025", label: "Mar", year: 2025 }, { key: "apr2025", label: "Abr", year: 2025 },
+    { key: "may2025", label: "May", year: 2025 }, { key: "jun2025", label: "Jun", year: 2025 },
+    { key: "jul2025", label: "Jul", year: 2025 }, { key: "aug2025", label: "Ago", year: 2025 },
+    { key: "sep2025", label: "Sep", year: 2025 }, { key: "oct2025", label: "Oct", year: 2025 },
+    { key: "nov2025", label: "Nov", year: 2025 }, { key: "dec2025", label: "Dic", year: 2025 },
+    { key: "jan2026", label: "Ene", year: 2026 }, { key: "feb2026", label: "Feb", year: 2026 },
+    { key: "mar2026", label: "Mar", year: 2026 }, { key: "apr2026", label: "Abr", year: 2026 },
+    { key: "may2026", label: "May", year: 2026 }, { key: "jun2026", label: "Jun", year: 2026 },
+    { key: "jul2026", label: "Jul", year: 2026 }, { key: "aug2026", label: "Ago", year: 2026 },
+    { key: "sep2026", label: "Sep", year: 2026 }, { key: "oct2026", label: "Oct", year: 2026 },
+    { key: "nov2026", label: "Nov", year: 2026 }, { key: "dec2026", label: "Dic", year: 2026 },
   ];
 
   const updatePersonnelMutation = useMutation({
@@ -402,22 +424,20 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
     const now = new Date();
     const currentMonth = now.getMonth() + 1; // 1-12
     const currentYear = now.getFullYear();
-    
-    // Si estamos en 2025, usar el mes actual
-    if (currentYear === 2025) {
-      const monthNames = [
-        'jan', 'feb', 'mar', 'apr', 'may', 'jun',
-        'jul', 'aug', 'sep', 'oct', 'nov', 'dec'
-      ];
-      return monthNames[currentMonth - 1] + '2025';
+    const monthNames = [
+      'jan', 'feb', 'mar', 'apr', 'may', 'jun',
+      'jul', 'aug', 'sep', 'oct', 'nov', 'dec'
+    ];
+
+    if (currentYear === 2025 || currentYear === 2026) {
+      return monthNames[currentMonth - 1] + currentYear;
     }
-    
-    // Si estamos después de 2025, considerar todos los meses de 2025
-    if (currentYear > 2025) {
-      return 'dec2025';
+
+    if (currentYear > 2026) {
+      return 'dec2026';
     }
-    
-    // Si estamos antes de 2025, no hay datos "actuales" aún
+
+    // Antes de 2025: no hay datos "actuales" aún
     return null;
   };
 
@@ -441,10 +461,7 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
           
           // Determinar el mes más reciente con tipo de contrato (solo hasta el mes actual)
           const currentMonth = getCurrentMonth();
-          const allMonths = [
-            'dec2025', 'nov2025', 'oct2025', 'sep2025', 'aug2025', 'jul2025',
-            'jun2025', 'may2025', 'apr2025', 'mar2025', 'feb2025', 'jan2025'
-          ];
+          const allMonths = HISTORICAL_MONTHS_DESC;
           
           // Filtrar solo los meses hasta el actual (inclusive)
           let months = allMonths;
@@ -528,10 +545,7 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
       if (isRateField || isSalaryField) {
         // Determinar el mes más reciente con datos de tarifa/salario (solo hasta el mes actual)
         const currentMonth = getCurrentMonth();
-        const allMonths = [
-          'dec2025', 'nov2025', 'oct2025', 'sep2025', 'aug2025', 'jul2025',
-          'jun2025', 'may2025', 'apr2025', 'mar2025', 'feb2025', 'jan2025'
-        ];
+        const allMonths = HISTORICAL_MONTHS_DESC;
         
         // Filtrar solo los meses hasta el actual (inclusive)
         let months = allMonths;
@@ -1243,10 +1257,7 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
                     const fieldName = `${month.key}ContractType`;
                     const currentMonth = getCurrentMonth();
                     const isCurrentMonth = currentMonth === month.key;
-                    const allMonths = [
-                      'dec2025', 'nov2025', 'oct2025', 'sep2025', 'aug2025', 'jul2025',
-                      'jun2025', 'may2025', 'apr2025', 'mar2025', 'feb2025', 'jan2025'
-                    ];
+                    const allMonths = HISTORICAL_MONTHS_DESC;
                     const currentIndex = currentMonth ? allMonths.indexOf(currentMonth) : -1;
                     const monthIndex = allMonths.indexOf(month.key);
                     const isAfterCurrent = currentIndex !== -1 && monthIndex < currentIndex;
@@ -1257,7 +1268,7 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
                           isCurrentMonth ? 'text-blue-600 font-bold' : 
                           isAfterCurrent ? 'text-gray-400' : 'text-gray-600'
                         }`}>
-                          {month.label} 2025
+                          {month.label} {month.year}
                           {isCurrentMonth && <span className="block text-[10px] text-blue-500">• ACTUAL</span>}
                           {isAfterCurrent && <span className="block text-[10px] text-gray-400">• FUTURO</span>}
                         </label>
@@ -1313,10 +1324,7 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
                     const fieldName = `${month.key}HourlyRateARS`;
                     const currentMonth = getCurrentMonth();
                     const isCurrentMonth = currentMonth === month.key;
-                    const allMonths = [
-                      'dec2025', 'nov2025', 'oct2025', 'sep2025', 'aug2025', 'jul2025',
-                      'jun2025', 'may2025', 'apr2025', 'mar2025', 'feb2025', 'jan2025'
-                    ];
+                    const allMonths = HISTORICAL_MONTHS_DESC;
                     const currentIndex = currentMonth ? allMonths.indexOf(currentMonth) : -1;
                     const monthIndex = allMonths.indexOf(month.key);
                     const isAfterCurrent = currentIndex !== -1 && monthIndex < currentIndex;
@@ -1327,7 +1335,7 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
                           isCurrentMonth ? 'text-blue-600 font-bold' : 
                           isAfterCurrent ? 'text-gray-400' : 'text-gray-600'
                         }`}>
-                          {month.label} 2025
+                          {month.label} {month.year}
                           {isCurrentMonth && <span className="block text-[10px] text-blue-500">• ACTUAL</span>}
                           {isAfterCurrent && <span className="block text-[10px] text-gray-400">• FUTURO</span>}
                         </label>
@@ -1372,10 +1380,7 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
                     
                     const currentMonth = getCurrentMonth();
                     const isCurrentMonth = currentMonth === month.key;
-                    const allMonths = [
-                      'dec2025', 'nov2025', 'oct2025', 'sep2025', 'aug2025', 'jul2025',
-                      'jun2025', 'may2025', 'apr2025', 'mar2025', 'feb2025', 'jan2025'
-                    ];
+                    const allMonths = HISTORICAL_MONTHS_DESC;
                     const currentIndex = currentMonth ? allMonths.indexOf(currentMonth) : -1;
                     const monthIndex = allMonths.indexOf(month.key);
                     const isAfterCurrent = currentIndex !== -1 && monthIndex < currentIndex;
@@ -1386,7 +1391,7 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
                           isCurrentMonth ? 'text-blue-600 font-bold' : 
                           isAfterCurrent ? 'text-gray-400' : 'text-gray-600'
                         }`}>
-                          {month.label} 2025
+                          {month.label} {month.year}
                           {isCurrentMonth && <span className="block text-[10px] text-blue-500">• ACTUAL</span>}
                           {isAfterCurrent && <span className="block text-[10px] text-gray-400">• FUTURO</span>}
                         </label>

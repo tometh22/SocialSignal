@@ -64,6 +64,9 @@ export interface QuotationData {
   proposalLink?: string; // Link a la propuesta original
   leadId?: number; // Lead CRM de origen (para integración CRM-Cotizaciones)
   exchangeRateSnapshot?: number; // Tipo de cambio al momento de cotizar (snapshot)
+  // Mes histórico (formato 'mmmYYYY', ej. 'aug2025') a usar como tarifa
+  // por defecto al agregar personal y al recalcular tarifas. null = "más reciente disponible".
+  salaryMonth?: string | null;
 }
 
 interface OptimizedQuoteContextType {
@@ -117,7 +120,9 @@ interface OptimizedQuoteContextType {
   loadRoles: () => void;
   loadPersonnel: () => void;
   forceRecalculate: () => void;
-  getPersonnelRate: (personnelId: number, targetCurrency?: string) => number;
+  getPersonnelRate: (personnelId: number, targetCurrency?: string, targetMonth?: string | null) => number;
+  // Mes histórico a considerar para tarifas al agregar personal a la cotización.
+  updateSalaryMonth: (salaryMonth: string | null) => void;
 
   // Deliverables
   updateDeliverables: (deliverables: any[]) => void;
@@ -170,7 +175,8 @@ const initialQuotationData: QuotationData = {
     manualInflationRate: 25,
     projectStartDate: "",
     rateProjectionMode: "current"
-  }
+  },
+  salaryMonth: null
 };
 
 // Helper functions for complexity calculation
@@ -283,7 +289,17 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
     staleTime: 0, // Force fresh data after fixes
   });
 
-  const getPersonnelRate = useCallback((personnelId: number, targetCurrency?: string) => {
+  // Meses históricos en orden descendente (más reciente → más antiguo).
+  // Se usa como fallback cuando no hay un targetMonth explícito o el targetMonth
+  // no tiene valor cargado.
+  const HISTORICAL_MONTHS_DESC = [
+    'dec2026', 'nov2026', 'oct2026', 'sep2026', 'aug2026', 'jul2026',
+    'jun2026', 'may2026', 'apr2026', 'mar2026', 'feb2026', 'jan2026',
+    'dec2025', 'nov2025', 'oct2025', 'sep2025', 'aug2025', 'jul2025',
+    'jun2025', 'may2025', 'apr2025', 'mar2025', 'feb2025', 'jan2025'
+  ];
+
+  const getPersonnelRate = useCallback((personnelId: number, targetCurrency?: string, targetMonth?: string | null) => {
     if (!personnel || personnel.length === 0) return 0;
     const person = personnel.find(p => p.id === personnelId);
     if (!person) return 0;
@@ -296,22 +312,24 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
       return 50;
     }
 
-    const hourlyRateFields = [
-      'dec2025HourlyRateARS', 'nov2025HourlyRateARS', 'oct2025HourlyRateARS',
-      'sep2025HourlyRateARS', 'aug2025HourlyRateARS', 'jul2025HourlyRateARS',
-      'jun2025HourlyRateARS', 'may2025HourlyRateARS', 'apr2025HourlyRateARS',
-      'mar2025HourlyRateARS', 'feb2025HourlyRateARS', 'jan2025HourlyRateARS'
-    ];
+    const month = targetMonth ?? quotationData.salaryMonth;
 
-    for (const field of hourlyRateFields) {
-      const value = (person as any)[field];
+    // 1) Si la cotización fija un mes específico, intentar ese mes primero.
+    if (month) {
+      const exact = (person as any)[`${month}HourlyRateARS`];
+      if (exact && exact > 0) return exact;
+    }
+
+    // 2) Caer al valor más reciente disponible.
+    for (const m of HISTORICAL_MONTHS_DESC) {
+      const value = (person as any)[`${m}HourlyRateARS`];
       if (value && value > 0) return value;
     }
 
     if (person.hourlyRateARS && person.hourlyRateARS > 0) return person.hourlyRateARS;
 
     return 5000;
-  }, [personnel, quotationData.quotationCurrency]);
+  }, [personnel, quotationData.quotationCurrency, quotationData.salaryMonth]);
 
   // Force recalculation function with debouncing
   const forceRecalculate = useCallback(() => {
@@ -677,15 +695,17 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
             if (newCurrency === 'USD') {
               newRate = (person.hourlyRate && person.hourlyRate > 0) ? person.hourlyRate : 50;
             } else {
-              const hourlyRateFields = [
-                'dec2025HourlyRateARS', 'nov2025HourlyRateARS', 'oct2025HourlyRateARS',
-                'sep2025HourlyRateARS', 'aug2025HourlyRateARS', 'jul2025HourlyRateARS',
-                'jun2025HourlyRateARS', 'may2025HourlyRateARS', 'apr2025HourlyRateARS',
-                'mar2025HourlyRateARS', 'feb2025HourlyRateARS', 'jan2025HourlyRateARS'
-              ];
-              for (const field of hourlyRateFields) {
-                const value = (person as any)[field];
-                if (value && value > 0) { newRate = value; break; }
+              if (prev.salaryMonth) {
+                const exact = (person as any)[`${prev.salaryMonth}HourlyRateARS`];
+                if (exact && exact > 0) {
+                  newRate = exact;
+                }
+              }
+              if (newRate === member.rate) {
+                for (const m of HISTORICAL_MONTHS_DESC) {
+                  const value = (person as any)[`${m}HourlyRateARS`];
+                  if (value && value > 0) { newRate = value; break; }
+                }
               }
               if (newRate === member.rate && person.hourlyRateARS && person.hourlyRateARS > 0) {
                 newRate = person.hourlyRateARS;
@@ -695,7 +715,7 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
         } else if (member.roleId) {
           const role = roles?.find(r => r.id === member.roleId);
           if (role) {
-            newRate = newCurrency === 'USD' 
+            newRate = newCurrency === 'USD'
               ? ((role as any).defaultRateUsd || 50)
               : (role.defaultRate || 5000);
           }
@@ -706,6 +726,15 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
     });
     forceRecalculate();
   }, [forceRecalculate, personnel, roles]);
+
+  // Cambia el mes histórico a considerar para tarifas. No re-aplica
+  // tarifas a miembros ya agregados — el usuario ajusta manualmente
+  // si es necesario, igual que con cambios de moneda. Solo afecta el
+  // valor por defecto al agregar nuevo personal.
+  const updateSalaryMonth = useCallback((salaryMonth: string | null) => {
+    console.log('📅 Updating salaryMonth to:', salaryMonth);
+    setQuotationData(prev => ({ ...prev, salaryMonth }));
+  }, []);
 
   const updateAnalysisType = useCallback((analysisType: string) => {
     console.log('📝 Updating analysis type:', analysisType);
@@ -932,7 +961,8 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
           projectStartDate: quotation.projectStartDate ? new Date(quotation.projectStartDate).toISOString().split('T')[0] : "",
           rateProjectionMode: ((quotation as any).rateProjectionMode as "current" | "projected" | "annual_avg") || (quotation.applyInflationAdjustment ? "projected" : "current"),
         },
-        proposalLink: quotation.proposalLink || undefined
+        proposalLink: quotation.proposalLink || undefined,
+        salaryMonth: quotation.salaryMonth ?? null
       };
 
       console.log('📊 Final quotation data to set:', loadedQuotationData);
@@ -1010,6 +1040,7 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
         exchangeRateAtQuote: quotationData.exchangeRateSnapshot || null,
         proposalLink: quotationData.proposalLink || null,
         leadId: quotationData.leadId || null,
+        salaryMonth: quotationData.salaryMonth ?? null,
         status: status
       };
 
@@ -1331,6 +1362,7 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
     updateQuotationData,
     // Currency conversion helper
     getPersonnelRate,
+    updateSalaryMonth,
     // Templates
     saveAsTemplate,
     loadFromTemplate,

@@ -291,6 +291,67 @@ export const personnel = pgTable("personnel", {
   dec2025ContractType: text("dec_2025_contract_type"), // 'full-time', 'part-time', 'freelance'
   dec2025HourlyRateARS: doublePrecision("dec_2025_hourly_rate_ars"),
   dec2025MonthlySalaryARS: doublePrecision("dec_2025_monthly_salary_ars"),
+
+  // ==================== COSTOS HISTÓRICOS 2026 ====================
+  // Enero 2026
+  jan2026ContractType: text("jan_2026_contract_type"),
+  jan2026HourlyRateARS: doublePrecision("jan_2026_hourly_rate_ars"),
+  jan2026MonthlySalaryARS: doublePrecision("jan_2026_monthly_salary_ars"),
+
+  // Febrero 2026
+  feb2026ContractType: text("feb_2026_contract_type"),
+  feb2026HourlyRateARS: doublePrecision("feb_2026_hourly_rate_ars"),
+  feb2026MonthlySalaryARS: doublePrecision("feb_2026_monthly_salary_ars"),
+
+  // Marzo 2026
+  mar2026ContractType: text("mar_2026_contract_type"),
+  mar2026HourlyRateARS: doublePrecision("mar_2026_hourly_rate_ars"),
+  mar2026MonthlySalaryARS: doublePrecision("mar_2026_monthly_salary_ars"),
+
+  // Abril 2026
+  apr2026ContractType: text("apr_2026_contract_type"),
+  apr2026HourlyRateARS: doublePrecision("apr_2026_hourly_rate_ars"),
+  apr2026MonthlySalaryARS: doublePrecision("apr_2026_monthly_salary_ars"),
+
+  // Mayo 2026
+  may2026ContractType: text("may_2026_contract_type"),
+  may2026HourlyRateARS: doublePrecision("may_2026_hourly_rate_ars"),
+  may2026MonthlySalaryARS: doublePrecision("may_2026_monthly_salary_ars"),
+
+  // Junio 2026
+  jun2026ContractType: text("jun_2026_contract_type"),
+  jun2026HourlyRateARS: doublePrecision("jun_2026_hourly_rate_ars"),
+  jun2026MonthlySalaryARS: doublePrecision("jun_2026_monthly_salary_ars"),
+
+  // Julio 2026
+  jul2026ContractType: text("jul_2026_contract_type"),
+  jul2026HourlyRateARS: doublePrecision("jul_2026_hourly_rate_ars"),
+  jul2026MonthlySalaryARS: doublePrecision("jul_2026_monthly_salary_ars"),
+
+  // Agosto 2026
+  aug2026ContractType: text("aug_2026_contract_type"),
+  aug2026HourlyRateARS: doublePrecision("aug_2026_hourly_rate_ars"),
+  aug2026MonthlySalaryARS: doublePrecision("aug_2026_monthly_salary_ars"),
+
+  // Septiembre 2026
+  sep2026ContractType: text("sep_2026_contract_type"),
+  sep2026HourlyRateARS: doublePrecision("sep_2026_hourly_rate_ars"),
+  sep2026MonthlySalaryARS: doublePrecision("sep_2026_monthly_salary_ars"),
+
+  // Octubre 2026
+  oct2026ContractType: text("oct_2026_contract_type"),
+  oct2026HourlyRateARS: doublePrecision("oct_2026_hourly_rate_ars"),
+  oct2026MonthlySalaryARS: doublePrecision("oct_2026_monthly_salary_ars"),
+
+  // Noviembre 2026
+  nov2026ContractType: text("nov_2026_contract_type"),
+  nov2026HourlyRateARS: doublePrecision("nov_2026_hourly_rate_ars"),
+  nov2026MonthlySalaryARS: doublePrecision("nov_2026_monthly_salary_ars"),
+
+  // Diciembre 2026
+  dec2026ContractType: text("dec_2026_contract_type"),
+  dec2026HourlyRateARS: doublePrecision("dec_2026_hourly_rate_ars"),
+  dec2026MonthlySalaryARS: doublePrecision("dec_2026_monthly_salary_ars"),
 });
 
 export const insertPersonnelSchema = createInsertSchema(personnel).pick({
@@ -341,6 +402,44 @@ export const insertPersonnelSchema = createInsertSchema(personnel).pick({
   nov2025MonthlySalaryARS: true,
   dec2025HourlyRateARS: true,
   dec2025MonthlySalaryARS: true,
+  // Costos históricos 2026 - Contract Types
+  jan2026ContractType: true,
+  feb2026ContractType: true,
+  mar2026ContractType: true,
+  apr2026ContractType: true,
+  may2026ContractType: true,
+  jun2026ContractType: true,
+  jul2026ContractType: true,
+  aug2026ContractType: true,
+  sep2026ContractType: true,
+  oct2026ContractType: true,
+  nov2026ContractType: true,
+  dec2026ContractType: true,
+  // Costos históricos 2026 - Rates and Salaries
+  jan2026HourlyRateARS: true,
+  jan2026MonthlySalaryARS: true,
+  feb2026HourlyRateARS: true,
+  feb2026MonthlySalaryARS: true,
+  mar2026HourlyRateARS: true,
+  mar2026MonthlySalaryARS: true,
+  apr2026HourlyRateARS: true,
+  apr2026MonthlySalaryARS: true,
+  may2026HourlyRateARS: true,
+  may2026MonthlySalaryARS: true,
+  jun2026HourlyRateARS: true,
+  jun2026MonthlySalaryARS: true,
+  jul2026HourlyRateARS: true,
+  jul2026MonthlySalaryARS: true,
+  aug2026HourlyRateARS: true,
+  aug2026MonthlySalaryARS: true,
+  sep2026HourlyRateARS: true,
+  sep2026MonthlySalaryARS: true,
+  oct2026HourlyRateARS: true,
+  oct2026MonthlySalaryARS: true,
+  nov2026HourlyRateARS: true,
+  nov2026MonthlySalaryARS: true,
+  dec2026HourlyRateARS: true,
+  dec2026MonthlySalaryARS: true,
 }).extend({
   name: z.string().min(2, "El nombre debe tener al menos 2 caracteres").max(100, "El nombre no puede exceder 100 caracteres"),
   email: z.string().email("Email inválido").optional().or(z.literal("")),
@@ -420,6 +519,9 @@ export const quotations = pgTable("quotations", {
   quotationCurrency: text("quotation_currency").default("ARS"), // 'ARS' o 'USD'
   exchangeRateAtQuote: numeric("exchange_rate_at_quote", { precision: 10, scale: 4 }), // Tipo de cambio al momento de cotizar
   proposalLink: text("proposal_link"), // Link to the proposal document
+  // Mes histórico (formato 'mmmYYYY', ej. 'aug2025') a usar como tarifa
+  // por defecto al agregar personal. NULL = "más reciente disponible".
+  salaryMonth: text("salary_month"),
   quotationType: text("quotation_type").default("recurring"), // 'one-time' | 'recurring' | 'fee'
   leadId: integer("lead_id").references(() => crmLeads.id),
   expiresAt: timestamp("expires_at"), // Fecha de expiración (default: 30 días desde creación)

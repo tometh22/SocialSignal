@@ -40,15 +40,18 @@ export default function EstimatedRates() {
     rates?.find((r: any) => r.personnelId === personnelId && r.month === month);
 
   const getCurrentRate = (person: any): number => {
-    // Get current ARS rate from latest historical or hourlyRate
-    const fields = [
-      'dec2025HourlyRateARS', 'nov2025HourlyRateARS', 'oct2025HourlyRateARS',
-      'sep2025HourlyRateARS', 'aug2025HourlyRateARS', 'jul2025HourlyRateARS',
-      'jun2025HourlyRateARS', 'may2025HourlyRateARS', 'apr2025HourlyRateARS',
-      'mar2025HourlyRateARS', 'feb2025HourlyRateARS', 'jan2025HourlyRateARS'
+    // Get current ARS rate from latest historical or hourlyRate.
+    // Newest → oldest; debe incluir 2026 para que las tarifas recientes
+    // se reflejen acá también.
+    const months = [
+      'dec2026', 'nov2026', 'oct2026', 'sep2026', 'aug2026', 'jul2026',
+      'jun2026', 'may2026', 'apr2026', 'mar2026', 'feb2026', 'jan2026',
+      'dec2025', 'nov2025', 'oct2025', 'sep2025', 'aug2025', 'jul2025',
+      'jun2025', 'may2025', 'apr2025', 'mar2025', 'feb2025', 'jan2025'
     ];
-    for (const f of fields) {
-      if ((person as any)[f] && (person as any)[f] > 0) return (person as any)[f];
+    for (const m of months) {
+      const value = (person as any)[`${m}HourlyRateARS`];
+      if (value && value > 0) return value;
     }
     return person.hourlyRate || 0;
   };

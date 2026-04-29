@@ -35,6 +35,24 @@ interface DragDropTeamMember {
   cost: number;
 }
 
+// Meses históricos de salarios disponibles (más reciente → más antiguo).
+// Se mantiene sincronizado con HISTORICAL_MONTHS_DESC en optimized-quote-context.
+const SALARY_MONTH_OPTIONS: { value: string; label: string }[] = [
+  { value: 'dec2026', label: 'Dic 2026' }, { value: 'nov2026', label: 'Nov 2026' },
+  { value: 'oct2026', label: 'Oct 2026' }, { value: 'sep2026', label: 'Sep 2026' },
+  { value: 'aug2026', label: 'Ago 2026' }, { value: 'jul2026', label: 'Jul 2026' },
+  { value: 'jun2026', label: 'Jun 2026' }, { value: 'may2026', label: 'May 2026' },
+  { value: 'apr2026', label: 'Abr 2026' }, { value: 'mar2026', label: 'Mar 2026' },
+  { value: 'feb2026', label: 'Feb 2026' }, { value: 'jan2026', label: 'Ene 2026' },
+  { value: 'dec2025', label: 'Dic 2025' }, { value: 'nov2025', label: 'Nov 2025' },
+  { value: 'oct2025', label: 'Oct 2025' }, { value: 'sep2025', label: 'Sep 2025' },
+  { value: 'aug2025', label: 'Ago 2025' }, { value: 'jul2025', label: 'Jul 2025' },
+  { value: 'jun2025', label: 'Jun 2025' }, { value: 'may2025', label: 'May 2025' },
+  { value: 'apr2025', label: 'Abr 2025' }, { value: 'mar2025', label: 'Mar 2025' },
+  { value: 'feb2025', label: 'Feb 2025' }, { value: 'jan2025', label: 'Ene 2025' },
+];
+const SALARY_MONTH_AUTO = '__auto__';
+
 const EnhancedTeamConfig: React.FC = () => {
   const {
     quotationData,
@@ -47,7 +65,8 @@ const EnhancedTeamConfig: React.FC = () => {
     availableRoles,
     availablePersonnel,
     recommendedRoleIds,
-    getPersonnelRate
+    getPersonnelRate,
+    updateSalaryMonth
   } = useOptimizedQuote();
 
   // Estados para la nueva UI
@@ -304,19 +323,45 @@ const EnhancedTeamConfig: React.FC = () => {
         </CardContent>
       </Card>
 
+      {/* Mes de salarios a considerar */}
+      <Card className="border-amber-200 bg-amber-50/40">
+        <CardContent className="py-3 px-4 flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+          <div>
+            <Label className="text-sm font-medium text-amber-900">Mes de salarios a considerar</Label>
+            <p className="text-xs text-amber-700">
+              Se usará como tarifa por defecto al agregar personas. Podés ajustar manualmente cada fila después.
+            </p>
+          </div>
+          <Select
+            value={quotationData.salaryMonth ?? SALARY_MONTH_AUTO}
+            onValueChange={(value) => updateSalaryMonth(value === SALARY_MONTH_AUTO ? null : value)}
+          >
+            <SelectTrigger className="w-full md:w-56 bg-white">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={SALARY_MONTH_AUTO}>Más reciente disponible</SelectItem>
+              {SALARY_MONTH_OPTIONS.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </CardContent>
+      </Card>
+
       {/* Botones de acción */}
       <div className="flex flex-wrap gap-3">
-        <Button 
+        <Button
           onClick={() => setQuickAddMode(!quickAddMode)}
-          variant="outline" 
+          variant="outline"
           className="flex items-center gap-2"
         >
           <Plus className="h-4 w-4" />
           Agregar por Rol
         </Button>
-        <Button 
+        <Button
           onClick={() => setQuickPersonnelMode(!quickPersonnelMode)}
-          variant="outline" 
+          variant="outline"
           className="flex items-center gap-2"
         >
           <User className="h-4 w-4" />
@@ -614,10 +659,7 @@ const EnhancedTeamConfig: React.FC = () => {
                                   </div>
                                   <div className="text-center">
                                     <div className="font-medium text-sm">
-                                      ${(member.personnelId ? 
-                                        getPersonnelRate(member.personnelId, currency) : 
-                                        member.rate
-                                      ).toLocaleString('es-AR')}
+                                      ${member.rate.toLocaleString('es-AR')}
                                     </div>
                                     <div className="text-xs text-gray-500">{currencyLabel}/hora</div>
                                   </div>
@@ -629,23 +671,17 @@ const EnhancedTeamConfig: React.FC = () => {
                                 <div className="font-bold text-lg text-primary">
                                   ${(() => {
                                     if (!isEditing) {
-                                      const correctRate = member.personnelId ? 
-                                        getPersonnelRate(member.personnelId, currency) : 
-                                        member.rate;
-                                      return (member.hours * correctRate).toLocaleString('es-AR');
+                                      return (member.hours * member.rate).toLocaleString('es-AR');
                                     }
-                                    
+
                                     const tempValues = tempEditValues[member.id];
                                     if (!tempValues) {
-                                      const correctRate = member.personnelId ? 
-                                        getPersonnelRate(member.personnelId, currency) : 
-                                        member.rate;
-                                      return (member.hours * correctRate).toLocaleString();
+                                      return (member.hours * member.rate).toLocaleString();
                                     }
-                                    
+
                                     const hours = tempValues.hours === '' ? member.hours : parseFloat(tempValues.hours) || 0;
                                     const rate = tempValues.rate === '' ? member.rate : parseFloat(tempValues.rate) || 0;
-                                      
+
                                     return (hours * rate).toLocaleString();
                                   })()}
                                 </div>

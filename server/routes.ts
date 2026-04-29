@@ -3839,7 +3839,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
         sep2025ContractType: personnel.sep2025ContractType,
         oct2025ContractType: personnel.oct2025ContractType,
         nov2025ContractType: personnel.nov2025ContractType,
-        dec2025ContractType: personnel.dec2025ContractType
+        dec2025ContractType: personnel.dec2025ContractType,
+        // Historical hourly rates (ARS) 2026
+        jan2026HourlyRateARS: personnel.jan2026HourlyRateARS,
+        feb2026HourlyRateARS: personnel.feb2026HourlyRateARS,
+        mar2026HourlyRateARS: personnel.mar2026HourlyRateARS,
+        apr2026HourlyRateARS: personnel.apr2026HourlyRateARS,
+        may2026HourlyRateARS: personnel.may2026HourlyRateARS,
+        jun2026HourlyRateARS: personnel.jun2026HourlyRateARS,
+        jul2026HourlyRateARS: personnel.jul2026HourlyRateARS,
+        aug2026HourlyRateARS: personnel.aug2026HourlyRateARS,
+        sep2026HourlyRateARS: personnel.sep2026HourlyRateARS,
+        oct2026HourlyRateARS: personnel.oct2026HourlyRateARS,
+        nov2026HourlyRateARS: personnel.nov2026HourlyRateARS,
+        dec2026HourlyRateARS: personnel.dec2026HourlyRateARS,
+        // Historical monthly salaries (ARS) 2026
+        jan2026MonthlySalaryARS: personnel.jan2026MonthlySalaryARS,
+        feb2026MonthlySalaryARS: personnel.feb2026MonthlySalaryARS,
+        mar2026MonthlySalaryARS: personnel.mar2026MonthlySalaryARS,
+        apr2026MonthlySalaryARS: personnel.apr2026MonthlySalaryARS,
+        may2026MonthlySalaryARS: personnel.may2026MonthlySalaryARS,
+        jun2026MonthlySalaryARS: personnel.jun2026MonthlySalaryARS,
+        jul2026MonthlySalaryARS: personnel.jul2026MonthlySalaryARS,
+        aug2026MonthlySalaryARS: personnel.aug2026MonthlySalaryARS,
+        sep2026MonthlySalaryARS: personnel.sep2026MonthlySalaryARS,
+        oct2026MonthlySalaryARS: personnel.oct2026MonthlySalaryARS,
+        nov2026MonthlySalaryARS: personnel.nov2026MonthlySalaryARS,
+        dec2026MonthlySalaryARS: personnel.dec2026MonthlySalaryARS,
+        // Historical contract types by month 2026
+        jan2026ContractType: personnel.jan2026ContractType,
+        feb2026ContractType: personnel.feb2026ContractType,
+        mar2026ContractType: personnel.mar2026ContractType,
+        apr2026ContractType: personnel.apr2026ContractType,
+        may2026ContractType: personnel.may2026ContractType,
+        jun2026ContractType: personnel.jun2026ContractType,
+        jul2026ContractType: personnel.jul2026ContractType,
+        aug2026ContractType: personnel.aug2026ContractType,
+        sep2026ContractType: personnel.sep2026ContractType,
+        oct2026ContractType: personnel.oct2026ContractType,
+        nov2026ContractType: personnel.nov2026ContractType,
+        dec2026ContractType: personnel.dec2026ContractType
       })
       .from(personnel)
       .leftJoin(roles, eq(personnel.roleId, roles.id))

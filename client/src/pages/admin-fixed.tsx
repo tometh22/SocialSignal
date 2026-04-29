@@ -920,43 +920,31 @@ export default function Admin() {
 
   const currentExchangeRate = systemConfig.find(c => c.configKey === 'usd_exchange_rate')?.configValue || 1100;
 
+  // Meses históricos en orden descendente. Mantener sincronizado con
+  // HISTORICAL_MONTHS_DESC en optimized-quote-context.tsx e
+  // inline-edit-personnel.tsx.
+  const HISTORICAL_MONTHS_DESC = [
+    'dec2026', 'nov2026', 'oct2026', 'sep2026', 'aug2026', 'jul2026',
+    'jun2026', 'may2026', 'apr2026', 'mar2026', 'feb2026', 'jan2026',
+    'dec2025', 'nov2025', 'oct2025', 'sep2025', 'aug2025', 'jul2025',
+    'jun2025', 'may2025', 'apr2025', 'mar2025', 'feb2025', 'jan2025'
+  ];
+
   // Función para obtener la tarifa actual (último valor histórico o base)
   const getCurrentHourlyRate = (person: any) => {
-    const months = [
-      'dec2025', 'nov2025', 'oct2025', 'sep2025', 'aug2025', 'jul2025',
-      'jun2025', 'may2025', 'apr2025', 'mar2025', 'feb2025', 'jan2025'
-    ];
-
-    // Buscar el último valor histórico disponible (del más reciente al más antiguo)
-    for (const month of months) {
-      const fieldName = `${month}HourlyRateARS`;
-      const value = person[fieldName];
-      if (value && value > 0) {
-        return value;
-      }
+    for (const month of HISTORICAL_MONTHS_DESC) {
+      const value = person[`${month}HourlyRateARS`];
+      if (value && value > 0) return value;
     }
-
-    // Si no hay valores históricos, usar la tarifa base
     return person.hourlyRate || 0;
   };
 
   // Función para obtener el sueldo mensual actual (último valor histórico o base)
   const getCurrentMonthlySalary = (person: any) => {
-    const months = [
-      'dec2025', 'nov2025', 'oct2025', 'sep2025', 'aug2025', 'jul2025',
-      'jun2025', 'may2025', 'apr2025', 'mar2025', 'feb2025', 'jan2025'
-    ];
-
-    // Buscar el último valor histórico disponible (del más reciente al más antiguo)
-    for (const month of months) {
-      const fieldName = `${month}MonthlySalaryARS`;
-      const value = person[fieldName];
-      if (value && value > 0) {
-        return value;
-      }
+    for (const month of HISTORICAL_MONTHS_DESC) {
+      const value = person[`${month}MonthlySalaryARS`];
+      if (value && value > 0) return value;
     }
-
-    // Si no hay valores históricos, usar el sueldo base
     return person.monthlyFixedSalary || 0;
   };
 
@@ -1231,8 +1219,47 @@ export default function Admin() {
                             sep2025MonthlySalaryARS: person.sep2025MonthlySalaryARS,
                             oct2025MonthlySalaryARS: person.oct2025MonthlySalaryARS,
                             nov2025MonthlySalaryARS: person.nov2025MonthlySalaryARS,
-                            dec2025MonthlySalaryARS: person.dec2025MonthlySalaryARS
-                          }} 
+                            dec2025MonthlySalaryARS: person.dec2025MonthlySalaryARS,
+                            // Historical contract types 2026
+                            jan2026ContractType: person.jan2026ContractType,
+                            feb2026ContractType: person.feb2026ContractType,
+                            mar2026ContractType: person.mar2026ContractType,
+                            apr2026ContractType: person.apr2026ContractType,
+                            may2026ContractType: person.may2026ContractType,
+                            jun2026ContractType: person.jun2026ContractType,
+                            jul2026ContractType: person.jul2026ContractType,
+                            aug2026ContractType: person.aug2026ContractType,
+                            sep2026ContractType: person.sep2026ContractType,
+                            oct2026ContractType: person.oct2026ContractType,
+                            nov2026ContractType: person.nov2026ContractType,
+                            dec2026ContractType: person.dec2026ContractType,
+                            // Historical hourly rates 2026
+                            jan2026HourlyRateARS: person.jan2026HourlyRateARS,
+                            feb2026HourlyRateARS: person.feb2026HourlyRateARS,
+                            mar2026HourlyRateARS: person.mar2026HourlyRateARS,
+                            apr2026HourlyRateARS: person.apr2026HourlyRateARS,
+                            may2026HourlyRateARS: person.may2026HourlyRateARS,
+                            jun2026HourlyRateARS: person.jun2026HourlyRateARS,
+                            jul2026HourlyRateARS: person.jul2026HourlyRateARS,
+                            aug2026HourlyRateARS: person.aug2026HourlyRateARS,
+                            sep2026HourlyRateARS: person.sep2026HourlyRateARS,
+                            oct2026HourlyRateARS: person.oct2026HourlyRateARS,
+                            nov2026HourlyRateARS: person.nov2026HourlyRateARS,
+                            dec2026HourlyRateARS: person.dec2026HourlyRateARS,
+                            // Historical monthly salaries 2026
+                            jan2026MonthlySalaryARS: person.jan2026MonthlySalaryARS,
+                            feb2026MonthlySalaryARS: person.feb2026MonthlySalaryARS,
+                            mar2026MonthlySalaryARS: person.mar2026MonthlySalaryARS,
+                            apr2026MonthlySalaryARS: person.apr2026MonthlySalaryARS,
+                            may2026MonthlySalaryARS: person.may2026MonthlySalaryARS,
+                            jun2026MonthlySalaryARS: person.jun2026MonthlySalaryARS,
+                            jul2026MonthlySalaryARS: person.jul2026MonthlySalaryARS,
+                            aug2026MonthlySalaryARS: person.aug2026MonthlySalaryARS,
+                            sep2026MonthlySalaryARS: person.sep2026MonthlySalaryARS,
+                            oct2026MonthlySalaryARS: person.oct2026MonthlySalaryARS,
+                            nov2026MonthlySalaryARS: person.nov2026MonthlySalaryARS,
+                            dec2026MonthlySalaryARS: person.dec2026MonthlySalaryARS
+                          }}
                           roles={roles || []} 
                         />
                       ))}
