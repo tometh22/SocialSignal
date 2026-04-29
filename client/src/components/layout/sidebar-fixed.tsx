@@ -226,7 +226,7 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
       items: [
         { href: "/operations/capacity", title: "Capacidad Semanal", icon: Gauge, description: "Capacidad operativa por persona", permission: 'operations' as AppSection },
         { href: "/operations/monthly-closing", title: "Cierre Mensual", icon: CalendarCheck, description: "Cierre de horas del mes", permission: 'operations' as AppSection },
-        { href: "/operations/estimated-rates", title: "Valor Hora", icon: TrendingUp, description: "Proyección de valor hora", permission: 'operations' as AppSection },
+        { href: "/operations/estimated-rates", title: "Valor Hora Estimada", icon: TrendingUp, description: "Proyección de tarifas (no afecta cotizaciones)", permission: 'operations' as AppSection },
         { href: "/operations/holidays", title: "Feriados", icon: Calendar, description: "Gestión de feriados", permission: 'operations' as AppSection },
       ]
     },
