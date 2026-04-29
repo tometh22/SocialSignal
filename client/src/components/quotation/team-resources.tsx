@@ -68,41 +68,34 @@ export default function TeamResources({ onPrevious, onNext }: { onPrevious: () =
   };
 
   // Helper to get personnel hourly rate - uses most recent historical rate
+  // (incluye 2026 → 2025 como fallback). Mantener sincronizado con
+  // HISTORICAL_MONTHS_DESC en optimized-quote-context.tsx.
   const getPersonnelRate = (personnelId: number, targetCurrency: string = 'ARS') => {
     if (!allPersonnel) return 0;
     const person = allPersonnel.find(p => p.id === personnelId);
     if (!person) return 0;
 
-    // Get the most recent ARS hourly rate from historical data
-    const currentDate = new Date();
-    const currentYear = currentDate.getFullYear();
-    const currentMonth = currentDate.getMonth(); // 0-based (0 = January)
-    
-    const monthNames = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
-    
-    // Try to find the most recent rate starting from current month and going backwards
+    const HISTORICAL_MONTHS_DESC = [
+      'dec2026', 'nov2026', 'oct2026', 'sep2026', 'aug2026', 'jul2026',
+      'jun2026', 'may2026', 'apr2026', 'mar2026', 'feb2026', 'jan2026',
+      'dec2025', 'nov2025', 'oct2025', 'sep2025', 'aug2025', 'jul2025',
+      'jun2025', 'may2025', 'apr2025', 'mar2025', 'feb2025', 'jan2025'
+    ];
+
     let rateInARS = 0;
-    for (let i = currentMonth; i >= 0; i--) {
-      const monthName = monthNames[i];
-      const rateField = `${monthName}${currentYear}HourlyRateARS` as keyof typeof person;
-      const rate = person[rateField] as number;
-      
-      if (rate && rate > 0) {
-        rateInARS = rate;
-        break;
-      }
+    for (const m of HISTORICAL_MONTHS_DESC) {
+      const value = (person as any)[`${m}HourlyRateARS`];
+      if (value && value > 0) { rateInARS = value; break; }
     }
-    
-    // If no historical rate found, fall back to hourlyRateARS or hourlyRate
+
     if (rateInARS === 0) {
       rateInARS = person.hourlyRateARS || person.hourlyRate || 0;
     }
 
-    // Convert to target currency if needed
     if (targetCurrency === 'USD' && rateInARS > 0) {
       return convertToUSD(rateInARS, 'ARS');
     }
-    
+
     return rateInARS;
   };
 
