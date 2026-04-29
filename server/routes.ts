@@ -109,7 +109,9 @@ import {
   insertEstimatedRateSchema,
   quotationTeamMembers,
   quotationTemplates,
+  sheetPersonnelAliases,
 } from "@shared/schema";
+import { fetchValorHora2026, HISTORICAL_RATE_FIELDS_2026 } from "./services/personnelSheetsSync";
 import { ActiveProjectsAggregator } from "./domain/projectsActive";import { resolveTimeFilter } from "./services/time";
 import { CoverageCalculator } from "./domain/coverage";
 import { eq, and, isNull, isNotNull, desc, sql, asc, gte, lte, inArray } from "drizzle-orm";
@@ -4036,6 +4038,149 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid personnel data", errors: error.errors });
       }
       res.status(500).json({ message: "Failed to update personnel" });
+    }
+  });
+
+  // ==================== SYNC TARIFAS DESDE GOOGLE SHEETS ====================
+  // Lee la pestaña "Valor Hora Real y Estimada" del master, sección 2026, y
+  // devuelve un preview con las filas que matchean (por nombre exacto o por
+  // alias persistido), las que no matchean (para que el usuario las mapee), y
+  // los valores que se aplicarían a cada {mmm}2026HourlyRateARS.
+  app.get("/api/personnel/sheets-sync/preview", requireAuth, async (_req, res) => {
+    try {
+      const [sheetRows, allPersonnel, aliasRows] = await Promise.all([
+        fetchValorHora2026(),
+        db.select().from(personnel).orderBy(personnel.name),
+        db.select().from(sheetPersonnelAliases),
+      ]);
+
+      const aliasBySheetName = new Map<string, number | null>();
+      for (const a of aliasRows) {
+        aliasBySheetName.set(a.sheetName, a.personnelId);
+      }
+      const personnelByName = new Map<string, number>();
+      for (const p of allPersonnel) {
+        personnelByName.set(p.name.trim().toLowerCase(), p.id);
+      }
+
+      type PreviewRow = {
+        sheetName: string;
+        match: { personnelId: number; source: "exact" | "alias" } | { ignored: true } | null;
+        proposedChanges: Array<{ field: string; current: number | null; next: number }>;
+        monthlyRates: Record<string, number>;
+      };
+
+      const matched: PreviewRow[] = [];
+      const unmatched: PreviewRow[] = [];
+
+      for (const row of sheetRows) {
+        let match: PreviewRow["match"] = null;
+        if (aliasBySheetName.has(row.sheetName)) {
+          const pid = aliasBySheetName.get(row.sheetName);
+          match = pid === null ? { ignored: true } : { personnelId: pid as number, source: "alias" };
+        } else {
+          const exactPid = personnelByName.get(row.sheetName.trim().toLowerCase());
+          if (exactPid !== undefined) {
+            match = { personnelId: exactPid, source: "exact" };
+          }
+        }
+
+        const proposedChanges: PreviewRow["proposedChanges"] = [];
+        if (match && "personnelId" in match) {
+          const person = allPersonnel.find((p) => p.id === match.personnelId);
+          if (person) {
+            for (const field of HISTORICAL_RATE_FIELDS_2026) {
+              const next = row.monthlyRates[field.replace("HourlyRateARS", "")];
+              if (next === undefined) continue;
+              const current = (person as any)[field] as number | null;
+              if (current !== next) {
+                proposedChanges.push({ field, current: current ?? null, next });
+              }
+            }
+          }
+        }
+
+        const entry: PreviewRow = { sheetName: row.sheetName, match, proposedChanges, monthlyRates: row.monthlyRates };
+        if (match && "personnelId" in match) {
+          matched.push(entry);
+        } else {
+          unmatched.push(entry);
+        }
+      }
+
+      res.json({
+        matched,
+        unmatched,
+        availablePersonnel: allPersonnel.map((p) => ({ id: p.id, name: p.name })),
+      });
+    } catch (error) {
+      console.error("Error en sheets-sync preview:", error);
+      res.status(500).json({ message: (error as Error).message || "Error obteniendo preview" });
+    }
+  });
+
+  // Aplica el sync. Body: { aliases?: { [sheetName]: number | null }, applyTo: string[] }
+  // - aliases: nuevos mapeos a persistir (number = personnel id; null = ignorar para siempre).
+  // - applyTo: lista de sheetNames cuyas tarifas se van a escribir en personnel.
+  app.post("/api/personnel/sheets-sync/apply", requireAuth, async (req, res) => {
+    try {
+      const aliases = (req.body?.aliases ?? {}) as Record<string, number | null>;
+      const applyTo = new Set<string>(Array.isArray(req.body?.applyTo) ? req.body.applyTo : []);
+
+      // Persistir aliases nuevos / actualizados.
+      for (const [sheetName, personnelId] of Object.entries(aliases)) {
+        await db
+          .insert(sheetPersonnelAliases)
+          .values({ sheetName, personnelId: personnelId as any })
+          .onConflictDoUpdate({
+            target: sheetPersonnelAliases.sheetName,
+            set: { personnelId: personnelId as any, updatedAt: new Date() },
+          });
+      }
+
+      const sheetRows = await fetchValorHora2026();
+      const aliasRows = await db.select().from(sheetPersonnelAliases);
+      const aliasBySheetName = new Map<string, number | null>();
+      for (const a of aliasRows) aliasBySheetName.set(a.sheetName, a.personnelId);
+      const allPersonnel = await db.select().from(personnel);
+      const personnelByName = new Map<string, number>();
+      for (const p of allPersonnel) personnelByName.set(p.name.trim().toLowerCase(), p.id);
+
+      let updatedPersonnel = 0;
+      let cellsUpdated = 0;
+      const skipped: string[] = [];
+
+      for (const row of sheetRows) {
+        if (!applyTo.has(row.sheetName)) continue;
+
+        let pid: number | null = null;
+        if (aliasBySheetName.has(row.sheetName)) {
+          pid = aliasBySheetName.get(row.sheetName) ?? null;
+        } else {
+          pid = personnelByName.get(row.sheetName.trim().toLowerCase()) ?? null;
+        }
+        if (pid === null) {
+          skipped.push(row.sheetName);
+          continue;
+        }
+
+        const updates: Record<string, number> = {};
+        for (const field of HISTORICAL_RATE_FIELDS_2026) {
+          const next = row.monthlyRates[field.replace("HourlyRateARS", "")];
+          if (next === undefined) continue;
+          updates[field] = next;
+        }
+        if (Object.keys(updates).length === 0) continue;
+
+        await db.update(personnel).set(updates as any).where(eq(personnel.id, pid));
+        updatedPersonnel += 1;
+        cellsUpdated += Object.keys(updates).length;
+      }
+
+      res.json({ updatedPersonnel, cellsUpdated, skipped });
+    } catch (error) {
+      console.error("Error en sheets-sync apply:", error);
+      res.status(500).json({ message: (error as Error).message || "Error aplicando sync" });
     }
   });
 

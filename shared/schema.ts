@@ -453,6 +453,26 @@ export const insertPersonnelSchema = createInsertSchema(personnel).pick({
   contractType: z.enum(["full-time", "part-time", "freelance"]).default("full-time")
 });
 
+// ==================== ALIASES DE NOMBRES EN GOOGLE SHEETS ====================
+// Mapea cómo aparece el nombre de una persona en la pestaña "Valor Hora Real
+// y Estimada" del master a un row de personnel. personnel_id = null indica
+// que ese sheet_name debe ignorarse en futuras sincronizaciones.
+export const sheetPersonnelAliases = pgTable("sheet_personnel_aliases", {
+  id: serial("id").primaryKey(),
+  sheetName: text("sheet_name").notNull().unique(),
+  personnelId: integer("personnel_id").references(() => personnel.id, { onDelete: 'cascade' }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertSheetPersonnelAliasSchema = createInsertSchema(sheetPersonnelAliases).pick({
+  sheetName: true,
+  personnelId: true,
+});
+
+export type SheetPersonnelAlias = typeof sheetPersonnelAliases.$inferSelect;
+export type InsertSheetPersonnelAlias = z.infer<typeof insertSheetPersonnelAliasSchema>;
+
 
 
 // ==================== PLANTILLAS DE REPORTES ====================

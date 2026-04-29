@@ -77,6 +77,7 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { default as InlineEditRole } from "@/components/admin/inline-edit-role";
 import { default as InlineEditPersonnel } from "@/components/admin/inline-edit-personnel";
+import { SheetsSyncDialog } from "@/components/admin/SheetsSyncDialog";
 import { RoleSummary } from "@/components/admin/role-summary";
 import { TemplateCost } from "@/components/admin/template-cost";
 import { CostMultipliersManager } from "@/components/cost-multipliers-manager";
@@ -1069,10 +1070,13 @@ export default function Admin() {
                   <CardTitle className="heading-card">Personal del Equipo</CardTitle>
                   <CardDescription>Gestiona el personal y sus tarifas por defecto</CardDescription>
                 </div>
-                <Button onClick={openNewPersonnelDialog} disabled={!roles || roles.length === 0}>
-                  <PlusCircle className="mr-2 h-4 w-4" />
-                  Añadir Personal
-                </Button>
+                <div className="flex items-center gap-2">
+                  <SheetsSyncDialog />
+                  <Button onClick={openNewPersonnelDialog} disabled={!roles || roles.length === 0}>
+                    <PlusCircle className="mr-2 h-4 w-4" />
+                    Añadir Personal
+                  </Button>
+                </div>
               </div>
             </CardHeader>
             <CardContent className="card-content">
