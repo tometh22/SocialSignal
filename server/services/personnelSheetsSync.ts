@@ -89,13 +89,18 @@ export function parseMoney(raw: unknown): number | null {
 
 export function parseValorHoraSection(rows: string[][], year: number): ParsedSheetRow[] {
   const yearStr = String(year);
+  // Buscar la celda que contiene el label del año en cualquiera de las primeras
+  // dos columnas. La columna donde aparece "2026" es la misma donde luego
+  // viven los nombres de las personas — esa es la pista clave para nameCol.
   let yearRowIdx = -1;
-  for (let i = 0; i < rows.length; i++) {
-    const a = String(rows[i]?.[0] ?? "").trim();
-    const b = String(rows[i]?.[1] ?? "").trim();
-    if (a === yearStr || b === yearStr) {
-      yearRowIdx = i;
-      break;
+  let yearCol = -1;
+  for (let i = 0; i < rows.length && yearRowIdx < 0; i++) {
+    for (let c = 0; c < Math.min(2, rows[i]?.length ?? 0); c++) {
+      if (String(rows[i]?.[c] ?? "").trim() === yearStr) {
+        yearRowIdx = i;
+        yearCol = c;
+        break;
+      }
     }
   }
   if (yearRowIdx < 0) {
@@ -123,16 +128,12 @@ export function parseValorHoraSection(rows: string[][], year: number): ParsedShe
     throw new Error(`No se encontraron columnas "Valor Hora Ajustada" para ${yearStr}.`);
   }
 
-  // Detectar la columna de nombres entre A y B.
+  // Los nombres viven en la misma columna donde se encontró el label del año.
+  // Antes detectábamos esto mirando contenido en col A vs col B, pero rompía
+  // cuando la primera persona del listado tenía un valor en "Ajuste" — el
+  // detector confundía el % con el nombre.
+  const nameCol = yearCol;
   const peopleStart = yearRowIdx + 2;
-  let nameCol = 0;
-  for (let r = peopleStart; r < Math.min(peopleStart + 40, rows.length); r++) {
-    const a = String(rows[r]?.[0] ?? "").trim();
-    const b = String(rows[r]?.[1] ?? "").trim();
-    if (a && !b) { nameCol = 0; break; }
-    if (b && !a) { nameCol = 1; break; }
-    if (a && b) { nameCol = 1; break; }
-  }
 
   // Detectar fin de sección: 2 filas consecutivas sin nombre y sin valores.
   const result: ParsedSheetRow[] = [];
