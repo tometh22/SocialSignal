@@ -727,14 +727,46 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
     forceRecalculate();
   }, [forceRecalculate, personnel, roles]);
 
-  // Cambia el mes histórico a considerar para tarifas. No re-aplica
-  // tarifas a miembros ya agregados — el usuario ajusta manualmente
-  // si es necesario, igual que con cambios de moneda. Solo afecta el
-  // valor por defecto al agregar nuevo personal.
+  // Cambia el mes histórico a considerar y re-aplica tarifas a los
+  // miembros del equipo que tengan personnelId, usando el rate del mes
+  // elegido (con fallback al más reciente disponible). No toca filas
+  // sin personnelId — esas usan el defaultRate del rol y se ajustan a
+  // mano. Solo aplica para cotizaciones en ARS; en USD el mes histórico
+  // no se usa.
   const updateSalaryMonth = useCallback((salaryMonth: string | null) => {
     console.log('📅 Updating salaryMonth to:', salaryMonth);
-    setQuotationData(prev => ({ ...prev, salaryMonth }));
-  }, []);
+    setQuotationData(prev => {
+      const currency = prev.quotationCurrency || 'ARS';
+      if (currency !== 'ARS') {
+        return { ...prev, salaryMonth };
+      }
+      const updatedMembers = prev.teamMembers.map(member => {
+        if (!member.personnelId) return member;
+        const person = personnel?.find(p => p.id === member.personnelId);
+        if (!person) return member;
+
+        let newRate: number | null = null;
+        if (salaryMonth) {
+          const exact = (person as any)[`${salaryMonth}HourlyRateARS`];
+          if (exact && exact > 0) newRate = exact;
+        }
+        if (newRate === null) {
+          for (const m of HISTORICAL_MONTHS_DESC) {
+            const value = (person as any)[`${m}HourlyRateARS`];
+            if (value && value > 0) { newRate = value; break; }
+          }
+        }
+        if (newRate === null && person.hourlyRateARS && person.hourlyRateARS > 0) {
+          newRate = person.hourlyRateARS;
+        }
+        if (newRate === null) return member;
+
+        return { ...member, rate: newRate, cost: member.hours * newRate };
+      });
+      return { ...prev, salaryMonth, teamMembers: updatedMembers };
+    });
+    forceRecalculate();
+  }, [personnel, forceRecalculate]);
 
   const updateAnalysisType = useCallback((analysisType: string) => {
     console.log('📝 Updating analysis type:', analysisType);
