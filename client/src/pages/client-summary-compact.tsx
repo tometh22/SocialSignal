@@ -202,7 +202,7 @@ export default function ClientSummaryCompact() {
           </div>
 
           {/* Metrics row */}
-          <div className="grid grid-cols-6 gap-2 mb-2">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 mb-2">
             <div className="bg-gradient-to-r from-blue-50 to-blue-100 rounded px-3 py-2 border border-blue-200">
               <div className="flex items-center justify-between">
                 <div>
@@ -508,7 +508,7 @@ export default function ClientSummaryCompact() {
                           </div>
                           <Badge variant="outline">{project?.status || 'Activo'}</Badge>
                         </div>
-                        <div className="grid grid-cols-4 gap-4 text-xs">
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
                           <div>
                             <div className="font-medium text-gray-700">Progreso</div>
                             <div className="flex items-center space-x-2 mt-1">
@@ -699,7 +699,7 @@ export default function ClientSummaryCompact() {
                   <CardDescription>Distribución de horas y costos por rol del equipo</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-4 gap-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                     <div className="bg-blue-50 rounded-lg p-4 text-center">
                       <div className="text-lg font-bold text-blue-900">45h</div>
                       <div className="text-sm text-blue-700">Estrategia</div>

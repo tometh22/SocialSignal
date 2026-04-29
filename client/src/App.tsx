@@ -67,12 +67,13 @@ import HomeDashboard from "@/pages/home-dashboard";
 import UnauthorizedPage from "@/pages/unauthorized";
 import SidebarFixed from "@/components/layout/sidebar-fixed";
 import Topbar from "@/components/layout/topbar";
+import { Sheet, SheetContent, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { AuthProvider } from "@/hooks/use-auth";
 import { ChatProvider } from "@/hooks/use-chat";
 import { ProtectedRoute } from "@/lib/protected-route";
 import { ImageRefreshProvider } from "@/contexts/ImageRefreshContext";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 // Wrapper para procesar parámetros de consulta para OptimizedQuote
 function OptimizedQuoteWrapper() {
@@ -114,7 +115,9 @@ function OptimizedQuotePathWrapper({ params }: { params: { id: string } }) {
 
 function AppRoutes() {
   // Set document title - permite modo claro para contenido principal pero mantiene sidebar oscura
-  const setLocation = useLocation()[1];
+  const [location] = useLocation();
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+
   useEffect(() => {
     document.title = "Mind | Epical";
     // Remover dark mode del documento general (para contenido principal)
@@ -124,15 +127,38 @@ function AppRoutes() {
     document.body.classList.add('sidebar-dark');
   }, []);
 
+  // Cerrar el sidebar mobile cuando cambia la ruta
+  useEffect(() => {
+    setMobileSidebarOpen(false);
+  }, [location]);
+
   return (
     <Switch>
       <Route path="/auth" component={AuthPage} />
 
       <Route path="*">
-        <div className="flex h-screen overflow-hidden bg-background">
-          <SidebarFixed />
-          <div className="flex flex-col flex-1 overflow-hidden">
-            <Topbar />
+        <div className="flex h-[100dvh] overflow-hidden bg-background">
+          {/* Sidebar permanente en desktop */}
+          <div className="hidden lg:flex">
+            <SidebarFixed />
+          </div>
+
+          {/* Sidebar como drawer en mobile */}
+          <Sheet open={mobileSidebarOpen} onOpenChange={setMobileSidebarOpen}>
+            <SheetContent
+              side="left"
+              className="p-0 w-[260px] max-w-[85vw] border-r-0 lg:hidden"
+            >
+              <SheetTitle className="sr-only">Menú de navegación</SheetTitle>
+              <SheetDescription className="sr-only">
+                Acceso a las secciones de la aplicación
+              </SheetDescription>
+              <SidebarFixed mobileMode />
+            </SheetContent>
+          </Sheet>
+
+          <div className="flex flex-col flex-1 overflow-hidden min-w-0">
+            <Topbar onMenuClick={() => setMobileSidebarOpen(true)} />
             <main className="flex-1 overflow-y-auto overflow-x-hidden">
               <div className="max-w-full p-3 sm:p-4">
                 <Switch>

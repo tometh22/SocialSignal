@@ -1025,7 +1025,7 @@ const TimeEntries: React.FC = () => {
             <div className="bg-white rounded-lg shadow-sm border">
               {/* Estadísticas */}
               <div className="border-b border-gray-200 p-6">
-                <div className="grid grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
                   <div className="text-center">
                     <div className="text-3xl font-bold text-gray-900">{totalHours.toFixed(1)}h</div>
                     <div className="text-sm text-gray-500 mt-1">Total Horas</div>
