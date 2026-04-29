@@ -82,8 +82,6 @@ import { RoleSummary } from "@/components/admin/role-summary";
 import { TemplateCost } from "@/components/admin/template-cost";
 import { CostMultipliersManager } from "@/components/cost-multipliers-manager";
 import { ExchangeRateManager } from "@/components/admin/ExchangeRateManager";
-import { PersonnelHistoricalCostsManager } from "@/components/admin/PersonnelHistoricalCostsManager";
-
 
 
 import { 

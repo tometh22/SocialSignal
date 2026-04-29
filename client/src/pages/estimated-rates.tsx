@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { Loader2, Wand2 } from "lucide-react";
+import { Loader2, Wand2, Info } from "lucide-react";
+import { Link } from "wouter";
 
 const MONTHS = [
   "Ene", "Feb", "Mar", "Abr", "May", "Jun",
@@ -93,9 +94,9 @@ export default function EstimatedRates() {
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Valor Hora Real y Estimado</h1>
+          <h1 className="text-2xl font-bold">Valor Hora Estimada</h1>
           <p className="text-muted-foreground">
-            Proyección de valor hora con ajuste trimestral para cotizaciones futuras
+            Proyección de valor hora con ajuste trimestral, solo para análisis interno
           </p>
         </div>
         <div className="flex gap-2 items-center">
@@ -114,6 +115,20 @@ export default function EstimatedRates() {
             onChange={(e) => setYear(parseInt(e.target.value) || now.getFullYear())}
             className="w-24"
           />
+        </div>
+      </div>
+
+      <div className="flex items-start gap-3 rounded-md border border-amber-200 bg-amber-50 p-3">
+        <Info className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
+        <div className="text-sm text-amber-900">
+          <strong>Esta pantalla es solo proyección.</strong> Los valores hora "reales" que
+          usan las cotizaciones se editan en{" "}
+          <Link href="/admin" className="underline font-medium">
+            Admin → Personal
+          </Link>{" "}
+          (grilla de Costos Históricos por mes). Lo que cargues acá no afecta las
+          cotizaciones — sirve para análisis y para usar como base al generar la próxima
+          tabla de Valor Hora Real.
         </div>
       </div>
 
