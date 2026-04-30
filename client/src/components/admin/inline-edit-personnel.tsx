@@ -110,6 +110,24 @@ const HISTORICAL_MONTHS_DESC = [
   'jun2025', 'may2025', 'apr2025', 'mar2025', 'feb2025', 'jan2025',
 ];
 
+// Subconjunto de HISTORICAL_MONTHS_DESC desde el mes actual hacia atrás.
+// Usado para las "summary cards" del personal — no queremos que muestren
+// como tarifa vigente un valor de un mes futuro (ej. proyección de Dic 2026
+// cuando estamos en Abril 2026).
+function currentOrPastMonths(): string[] {
+  const now = new Date();
+  const monthNames = [
+    'jan', 'feb', 'mar', 'apr', 'may', 'jun',
+    'jul', 'aug', 'sep', 'oct', 'nov', 'dec',
+  ];
+  const currentKey = `${monthNames[now.getMonth()]}${now.getFullYear()}`;
+  const idx = HISTORICAL_MONTHS_DESC.indexOf(currentKey);
+  // Si el mes actual no está en la lista (ej. estamos en 2027 y sólo hay
+  // hasta dec2026), devolver toda la lista — todo es "pasado".
+  if (idx === -1) return HISTORICAL_MONTHS_DESC;
+  return HISTORICAL_MONTHS_DESC.slice(idx);
+}
+
 export default function InlineEditPersonnel({ person, roles }: InlineEditPersonnelProps) {
   // DEBUG: Log person data on every render
   console.log(`🔍 [${person.name}] RENDER - monthlyHours from props:`, person.monthlyHours, `(type: ${typeof person.monthlyHours})`);
@@ -176,21 +194,48 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
     setEditedMonthlyHours(person.monthlyHours?.toString() || '0');
   }, [person.id, person.name, person.email, person.roleId, person.hourlyRate, person.contractType, person.monthlyFixedSalary, person.includeInRealCosts, person.monthlyHours]);
 
-  // Función para obtener el último sueldo histórico
-  const getLatestHistoricalSalary = (): number | null => {
-    for (const month of HISTORICAL_MONTHS_DESC) {
-      const value = (person as any)[`${month}MonthlySalaryARS`];
+  // Buscamos sueldo / tarifa "vigente" — sólo mes actual hacia atrás.
+  // Los meses futuros con valores cargados son proyecciones, no la realidad
+  // operativa actual.
+  const getLatestHistoricalHourlyRate = (): number | null => {
+    for (const month of currentOrPastMonths()) {
+      const value = (person as any)[`${month}HourlyRateARS`];
       if (value && value > 0) return value;
     }
     return null;
   };
 
-  // Función para obtener la última tarifa por hora histórica
-  const getLatestHistoricalHourlyRate = (): number | null => {
-    for (const month of HISTORICAL_MONTHS_DESC) {
-      const value = (person as any)[`${month}HourlyRateARS`];
-      if (value && value > 0) return value;
+  // Si la tarifa más reciente es de un mes posterior al último sueldo
+  // explícitamente cargado, derivamos sueldo = tarifa × horas. Esto es
+  // importante después del sync con el master, que actualiza la tarifa pero
+  // no el sueldo — sin esto la summary card mostraba un sueldo viejo.
+  const getLatestHistoricalSalary = (): number | null => {
+    const months = currentOrPastMonths();
+    let rateIdx = -1;
+    let salaryIdx = -1;
+    for (let i = 0; i < months.length; i++) {
+      const m = months[i];
+      if (rateIdx === -1 && ((person as any)[`${m}HourlyRateARS`] || 0) > 0) {
+        rateIdx = i;
+      }
+      if (salaryIdx === -1 && ((person as any)[`${m}MonthlySalaryARS`] || 0) > 0) {
+        salaryIdx = i;
+      }
+      if (rateIdx !== -1 && salaryIdx !== -1) break;
     }
+
+    // Sueldo más nuevo o igual de nuevo que la tarifa → usar stored.
+    if (salaryIdx !== -1 && (rateIdx === -1 || salaryIdx <= rateIdx)) {
+      return (person as any)[`${months[salaryIdx]}MonthlySalaryARS`];
+    }
+
+    // Tarifa más nueva → derivar.
+    if (rateIdx !== -1) {
+      const rate = (person as any)[`${months[rateIdx]}HourlyRateARS`];
+      const hours = person.monthlyHours || 160;
+      return rate * hours;
+    }
+
     return null;
   };
 

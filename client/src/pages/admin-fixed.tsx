@@ -929,20 +929,47 @@ export default function Admin() {
     'jun2025', 'may2025', 'apr2025', 'mar2025', 'feb2025', 'jan2025'
   ];
 
-  // Función para obtener la tarifa actual (último valor histórico o base)
+  // Subset desde el mes actual hacia atrás. Para las "summary cards" sólo
+  // queremos considerar valores vigentes — no proyecciones de meses futuros
+  // que el sync deja cargadas.
+  const currentOrPastMonths = (): string[] => {
+    const now = new Date();
+    const monthNames = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
+    const currentKey = `${monthNames[now.getMonth()]}${now.getFullYear()}`;
+    const idx = HISTORICAL_MONTHS_DESC.indexOf(currentKey);
+    if (idx === -1) return HISTORICAL_MONTHS_DESC;
+    return HISTORICAL_MONTHS_DESC.slice(idx);
+  };
+
+  // Tarifa vigente: último valor del mes actual hacia atrás.
   const getCurrentHourlyRate = (person: any) => {
-    for (const month of HISTORICAL_MONTHS_DESC) {
+    for (const month of currentOrPastMonths()) {
       const value = person[`${month}HourlyRateARS`];
       if (value && value > 0) return value;
     }
     return person.hourlyRate || 0;
   };
 
-  // Función para obtener el sueldo mensual actual (último valor histórico o base)
+  // Sueldo vigente: si la tarifa más reciente es de un mes posterior al
+  // último sueldo cargado, derivamos sueldo = tarifa × horas. Sin esto, la
+  // summary mostraba un sueldo viejo después de un sync que sólo actualiza
+  // la tarifa.
   const getCurrentMonthlySalary = (person: any) => {
-    for (const month of HISTORICAL_MONTHS_DESC) {
-      const value = person[`${month}MonthlySalaryARS`];
-      if (value && value > 0) return value;
+    const months = currentOrPastMonths();
+    let rateIdx = -1;
+    let salaryIdx = -1;
+    for (let i = 0; i < months.length; i++) {
+      const m = months[i];
+      if (rateIdx === -1 && (person[`${m}HourlyRateARS`] || 0) > 0) rateIdx = i;
+      if (salaryIdx === -1 && (person[`${m}MonthlySalaryARS`] || 0) > 0) salaryIdx = i;
+      if (rateIdx !== -1 && salaryIdx !== -1) break;
+    }
+    if (salaryIdx !== -1 && (rateIdx === -1 || salaryIdx <= rateIdx)) {
+      return person[`${months[salaryIdx]}MonthlySalaryARS`];
+    }
+    if (rateIdx !== -1) {
+      const hours = person.monthlyHours || 160;
+      return person[`${months[rateIdx]}HourlyRateARS`] * hours;
     }
     return person.monthlyFixedSalary || 0;
   };
