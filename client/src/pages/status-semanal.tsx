@@ -615,9 +615,17 @@ function ProposalCard({ proposal, currentUserId, isOwner, roomId, invalidate, is
   const { toast } = useToast();
   const [rejecting, setRejecting] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
+  const [lightbox, setLightbox] = useState<{ open: boolean; index: number }>({ open: false, index: 0 });
   const isAuthor = currentUserId != null && proposal.submittedById === currentUserId;
   const canDecide = isOwner && !isAuthor && proposal.status === 'pending';
   const canEditAttachments = proposal.status === 'pending' && (isAuthor || isOwner);
+
+  const imageAttachments = useMemo<LightboxImage[]>(
+    () => proposal.attachments
+      .filter(a => a.kind === 'file' && !!a.mimeType?.startsWith('image/') && !!a.fileUrl)
+      .map(a => ({ id: a.id, src: a.fileUrl!, fileName: a.fileName || undefined, fileSize: a.fileSize })),
+    [proposal.attachments],
+  );
 
   const decisionMutation = useMutation({
     mutationFn: (body: { status: 'approved' | 'rejected'; reason?: string }) =>
@@ -691,12 +699,28 @@ function ProposalCard({ proposal, currentUserId, isOwner, roomId, invalidate, is
 
       {proposal.attachments.length > 0 && (
         <div className="px-3 pb-2.5 grid grid-cols-2 md:grid-cols-3 gap-2">
-          {proposal.attachments.map(a => (
-            <AttachmentTile key={a.id} a={a}
-              onRemove={canEditAttachments ? () => detachMutation.mutate(a.id) : undefined} />
-          ))}
+          {proposal.attachments.map(a => {
+            const isImage = a.kind === 'file' && !!a.mimeType?.startsWith('image/') && !!a.fileUrl;
+            const galleryIndex = isImage
+              ? proposal.attachments.filter(x => x.kind === 'file' && x.mimeType?.startsWith('image/') && x.fileUrl).findIndex(x => x.id === a.id)
+              : -1;
+            return (
+              <AttachmentTile key={a.id} a={a}
+                onRemove={canEditAttachments ? () => detachMutation.mutate(a.id) : undefined}
+                onOpenImage={isImage ? () => setLightbox({ open: true, index: galleryIndex }) : undefined} />
+            );
+          })}
         </div>
       )}
+
+      <ImageLightbox
+        images={imageAttachments}
+        initialIndex={lightbox.index}
+        open={lightbox.open}
+        onOpenChange={(open) => setLightbox(s => ({ ...s, open }))}
+        onUploadReply={canEditAttachments ? (f) => fileAttachMutation.mutate(f) : undefined}
+        replyUploading={fileAttachMutation.isPending}
+      />
 
       {canEditAttachments && (
         <AttachmentBar
@@ -779,13 +803,106 @@ function ProposalCard({ proposal, currentUserId, isOwner, roomId, invalidate, is
   );
 }
 
-function ImageLightbox({ src, alt, open, onOpenChange }: {
-  src: string; alt?: string; open: boolean; onOpenChange: (open: boolean) => void;
+type LightboxImage = { id: number | string; src: string; fileName?: string; fileSize?: number | null };
+
+function ImageLightbox({ images, initialIndex, open, onOpenChange, onUploadReply, replyUploading }: {
+  images: LightboxImage[];
+  initialIndex: number;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onUploadReply?: (file: File) => void;
+  replyUploading?: boolean;
 }) {
+  const [index, setIndex] = useState(initialIndex);
+  const replyInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => { if (open) setIndex(initialIndex); }, [open, initialIndex]);
+
+  const total = images.length;
+  const safeIndex = total === 0 ? 0 : Math.min(Math.max(index, 0), total - 1);
+  const current = images[safeIndex];
+
+  const go = useCallback((delta: number) => {
+    if (total <= 1) return;
+    setIndex(i => (i + delta + total) % total);
+  }, [total]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft') { e.preventDefault(); go(-1); }
+      else if (e.key === 'ArrowRight') { e.preventDefault(); go(1); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open, go]);
+
+  if (!current) return null;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[92vw] sm:max-w-[92vw] w-auto max-h-[92vh] p-0 bg-black/95 border-0 overflow-hidden flex items-center justify-center">
-        <img src={src} alt={alt} className="block max-w-[92vw] max-h-[92vh] w-auto h-auto object-contain" />
+      <DialogContent
+        className="max-w-[96vw] sm:max-w-[96vw] w-[96vw] h-[92vh] max-h-[92vh] p-0 bg-black/95 border-0 overflow-hidden flex flex-col"
+        onOpenAutoFocus={(e) => e.preventDefault()}
+      >
+        <div className="flex items-center gap-2 px-3 py-2 text-white/90 text-[12px] bg-black/40">
+          <div className="min-w-0 flex-1 truncate">
+            <span className="font-medium">{current.fileName || 'Imagen'}</span>
+            {current.fileSize ? <span className="text-white/50 ml-1.5">· {formatBytes(current.fileSize)}</span> : null}
+          </div>
+          {total > 1 && (
+            <span className="shrink-0 tabular-nums text-white/70">{safeIndex + 1} / {total}</span>
+          )}
+          <a href={current.src} target="_blank" rel="noreferrer"
+            className="shrink-0 px-2 py-0.5 rounded-md text-[11px] text-white/80 hover:text-white hover:bg-white/10 transition-colors">
+            Abrir original
+          </a>
+          {onUploadReply && (
+            <>
+              <input ref={replyInputRef} type="file" hidden accept="image/*"
+                onChange={e => { const f = e.target.files?.[0]; if (f) { onUploadReply(f); e.target.value = ''; } }} />
+              <Button size="sm" variant="ghost" disabled={replyUploading}
+                onClick={() => replyInputRef.current?.click()}
+                className="h-6 px-2 text-[11px] gap-1 text-white/85 hover:text-white hover:bg-white/10">
+                {replyUploading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Paperclip className="h-3 w-3" />}
+                Responder con imagen
+              </Button>
+            </>
+          )}
+          <button onClick={() => onOpenChange(false)} aria-label="Cerrar"
+            className="shrink-0 p-1 rounded-md text-white/70 hover:text-white hover:bg-white/10 transition-colors">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="relative flex-1 min-h-0 flex items-center justify-center">
+          <img src={current.src} alt={current.fileName || 'Imagen'}
+            className="block max-w-full max-h-full w-auto h-auto object-contain select-none" />
+          {total > 1 && (
+            <>
+              <button onClick={() => go(-1)} aria-label="Anterior"
+                className="absolute left-2 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/40 text-white/80 hover:bg-black/70 hover:text-white transition-colors">
+                <ChevronLeft className="h-5 w-5" />
+              </button>
+              <button onClick={() => go(1)} aria-label="Siguiente"
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/40 text-white/80 hover:bg-black/70 hover:text-white transition-colors">
+                <ChevronRight className="h-5 w-5" />
+              </button>
+            </>
+          )}
+        </div>
+        {total > 1 && (
+          <div className="px-3 py-2 bg-black/40 flex items-center gap-1.5 overflow-x-auto">
+            {images.map((img, i) => (
+              <button key={img.id} onClick={() => setIndex(i)} title={img.fileName}
+                className={cn(
+                  "shrink-0 w-12 h-12 rounded-md overflow-hidden border-2 transition-all",
+                  i === safeIndex ? "border-white" : "border-transparent opacity-60 hover:opacity-100",
+                )}>
+                <img src={img.src} alt="" className="w-full h-full object-cover" />
+              </button>
+            ))}
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );
@@ -815,12 +932,12 @@ function useUnreadComments(itemKey: string | undefined, noteCount: number, userI
   return { hasUnread, unreadCount: Math.max(0, noteCount - seenCount), markAsRead };
 }
 
-function AttachmentTile({ a, onRemove }: { a: ProposalAttachment; onRemove?: () => void }) {
+function AttachmentTile({ a, onRemove, onOpenImage }: { a: ProposalAttachment; onRemove?: () => void; onOpenImage?: () => void }) {
   const isImage = a.kind === 'file' && a.mimeType?.startsWith('image/');
   const isVideo = a.kind === 'file' && a.mimeType?.startsWith('video/');
   const fileLabel = a.fileName || (a.fileUrl ?? '').split('/').pop() || 'Archivo';
   const linkLabel = a.fileName || a.linkUrl || 'Enlace';
-  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [imgError, setImgError] = useState(false);
 
   return (
     <div className="relative group rounded-md border border-slate-200 bg-slate-50/40 overflow-hidden">
@@ -831,13 +948,18 @@ function AttachmentTile({ a, onRemove }: { a: ProposalAttachment; onRemove?: () 
         </button>
       )}
       {isImage && a.fileUrl && (
-        <>
-          <button type="button" onClick={() => setLightboxOpen(true)} className="block w-full text-left cursor-zoom-in">
-            <img src={a.fileUrl} alt={fileLabel} className="w-full h-28 object-cover" />
-            <div className="px-2 py-1 text-[10px] text-slate-500 truncate">{fileLabel} · {formatBytes(a.fileSize)}</div>
-          </button>
-          <ImageLightbox src={a.fileUrl} alt={fileLabel} open={lightboxOpen} onOpenChange={setLightboxOpen} />
-        </>
+        <button type="button" onClick={() => onOpenImage?.()} className="block w-full text-left cursor-zoom-in">
+          {imgError ? (
+            <div className="w-full h-28 flex flex-col items-center justify-center gap-1 bg-slate-100 text-slate-400">
+              <FileText className="h-5 w-5" />
+              <span className="text-[10px]">No se pudo cargar la miniatura</span>
+            </div>
+          ) : (
+            <img src={a.fileUrl} alt={fileLabel} loading="lazy" onError={() => setImgError(true)}
+              className="w-full h-28 object-cover bg-slate-100" />
+          )}
+          <div className="px-2 py-1 text-[10px] text-slate-500 truncate">{fileLabel} · {formatBytes(a.fileSize)}</div>
+        </button>
       )}
       {isVideo && a.fileUrl && (
         <div>
