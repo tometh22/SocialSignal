@@ -341,6 +341,10 @@ export function createReviewRoomsRouter(requireAuth: RequireAuth): Router {
           reviewUpdatedAt: projectStatusReviews.updatedAt,
           reviewUpdatedBy: projectStatusReviews.updatedBy,
           noteCount: sql<number>`COALESCE((SELECT COUNT(*)::int FROM ${projectReviewNotes} WHERE ${projectReviewNotes.projectId} = ${activeProjects.id} AND ${projectReviewNotes.roomId} = ${roomId}), 0)`,
+          lastNoteContent: sql<string | null>`(SELECT content FROM ${projectReviewNotes} WHERE ${projectReviewNotes.projectId} = ${activeProjects.id} AND ${projectReviewNotes.roomId} = ${roomId} ORDER BY ${projectReviewNotes.noteDate} DESC LIMIT 1)`,
+          lastNoteAt: sql<string | null>`(SELECT ${projectReviewNotes.noteDate} FROM ${projectReviewNotes} WHERE ${projectReviewNotes.projectId} = ${activeProjects.id} AND ${projectReviewNotes.roomId} = ${roomId} ORDER BY ${projectReviewNotes.noteDate} DESC LIMIT 1)`,
+          lastNoteAuthorId: sql<number | null>`(SELECT ${projectReviewNotes.authorId} FROM ${projectReviewNotes} WHERE ${projectReviewNotes.projectId} = ${activeProjects.id} AND ${projectReviewNotes.roomId} = ${roomId} ORDER BY ${projectReviewNotes.noteDate} DESC LIMIT 1)`,
+          lastNoteAuthorName: sql<string | null>`(SELECT ${users.firstName} || ' ' || ${users.lastName} FROM ${projectReviewNotes} LEFT JOIN ${users} ON ${users.id} = ${projectReviewNotes.authorId} WHERE ${projectReviewNotes.projectId} = ${activeProjects.id} AND ${projectReviewNotes.roomId} = ${roomId} ORDER BY ${projectReviewNotes.noteDate} DESC LIMIT 1)`,
           ownerName: sql<string | null>`(SELECT ${users.firstName} || ' ' || ${users.lastName} FROM ${users} WHERE ${users.id} = ${projectStatusReviews.ownerId})`,
           reviewUpdatedByName: sql<string | null>`(SELECT ${users.firstName} || ' ' || ${users.lastName} FROM ${users} WHERE ${users.id} = ${projectStatusReviews.updatedBy})`,
         })
@@ -547,6 +551,10 @@ export function createReviewRoomsRouter(requireAuth: RequireAuth): Router {
         updatedBy: weeklyStatusItems.updatedBy,
         updatedByName: sql<string | null>`(SELECT ${users.firstName} || ' ' || ${users.lastName} FROM ${users} WHERE ${users.id} = ${weeklyStatusItems.updatedBy})`,
         noteCount: sql<number>`COALESCE((SELECT COUNT(*)::int FROM ${projectReviewNotes} WHERE ${projectReviewNotes.weeklyStatusItemId} = ${weeklyStatusItems.id}), 0)`,
+        lastNoteContent: sql<string | null>`(SELECT content FROM ${projectReviewNotes} WHERE ${projectReviewNotes.weeklyStatusItemId} = ${weeklyStatusItems.id} ORDER BY ${projectReviewNotes.noteDate} DESC LIMIT 1)`,
+        lastNoteAt: sql<string | null>`(SELECT ${projectReviewNotes.noteDate} FROM ${projectReviewNotes} WHERE ${projectReviewNotes.weeklyStatusItemId} = ${weeklyStatusItems.id} ORDER BY ${projectReviewNotes.noteDate} DESC LIMIT 1)`,
+        lastNoteAuthorId: sql<number | null>`(SELECT ${projectReviewNotes.authorId} FROM ${projectReviewNotes} WHERE ${projectReviewNotes.weeklyStatusItemId} = ${weeklyStatusItems.id} ORDER BY ${projectReviewNotes.noteDate} DESC LIMIT 1)`,
+        lastNoteAuthorName: sql<string | null>`(SELECT ${users.firstName} || ' ' || ${users.lastName} FROM ${projectReviewNotes} LEFT JOIN ${users} ON ${users.id} = ${projectReviewNotes.authorId} WHERE ${projectReviewNotes.weeklyStatusItemId} = ${weeklyStatusItems.id} ORDER BY ${projectReviewNotes.noteDate} DESC LIMIT 1)`,
       }).from(weeklyStatusItems)
         .where(and(
           eq(weeklyStatusItems.roomId, roomId),
