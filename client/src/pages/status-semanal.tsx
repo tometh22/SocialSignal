@@ -923,14 +923,11 @@ function ImageLightbox({ images, initialIndex, open, onOpenChange, onUploadReply
 function useUnreadComments(itemKey: string | undefined, noteCount: number, userId?: number | null) {
   const storageKey = itemKey ? `commentsSeen:${userId ?? 'anon'}:${itemKey}` : null;
   const [seenCount, setSeenCount] = useState<number>(() => {
-    if (!storageKey || typeof window === 'undefined') return noteCount;
+    if (!storageKey || typeof window === 'undefined') return 0;
     const v = window.localStorage.getItem(storageKey);
-    if (v === null) {
-      window.localStorage.setItem(storageKey, String(noteCount));
-      return noteCount;
-    }
+    if (v === null) return 0;
     const parsed = parseInt(v, 10);
-    return Number.isFinite(parsed) ? parsed : noteCount;
+    return Number.isFinite(parsed) ? parsed : 0;
   });
 
   const hasUnread = noteCount > seenCount;
