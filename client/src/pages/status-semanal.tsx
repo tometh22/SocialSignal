@@ -62,6 +62,10 @@ type StatusRow = {
   reviewUpdatedBy: number | null;
   reviewUpdatedByName: string | null;
   noteCount: number;
+  lastNoteContent: string | null;
+  lastNoteAt: string | null;
+  lastNoteAuthorId: number | null;
+  lastNoteAuthorName: string | null;
 };
 
 type CustomItem = {
@@ -83,6 +87,10 @@ type CustomItem = {
   updatedBy: number | null;
   updatedByName: string | null;
   noteCount?: number;
+  lastNoteContent?: string | null;
+  lastNoteAt?: string | null;
+  lastNoteAuthorId?: number | null;
+  lastNoteAuthorName?: string | null;
 };
 
 type Note = {
@@ -131,6 +139,10 @@ type Item = {
   updatedById: number | null;
   updatedByName: string | null;
   pendingProposalVersion?: number | null;
+  lastNoteContent: string | null;
+  lastNoteAt: string | null;
+  lastNoteAuthorId: number | null;
+  lastNoteAuthorName: string | null;
 };
 
 type ActivityEntry =
@@ -1199,12 +1211,17 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
   const handleOpenNotes = onOpenNotes ? () => { markAsRead(); onOpenNotes(); } : undefined;
 
   const accentBorder = accent === 'red' ? 'border-l-red-500' : accent === 'amber' ? 'border-l-amber-400' : 'border-l-transparent';
+  const unreadBorder = hasUnread && accent !== 'red' && accent !== 'amber';
 
   return (
     <div className={cn(
       "border-l-[3px] transition-colors duration-100 group",
-      accentBorder,
-      isSelected ? "bg-indigo-50/40" : "hover:bg-slate-50/60",
+      unreadBorder ? "border-l-indigo-500" : accentBorder,
+      isSelected
+        ? "bg-indigo-50/40"
+        : hasUnread
+          ? "bg-indigo-50/40 hover:bg-indigo-50/70"
+          : "hover:bg-slate-50/60",
       expanded && "bg-slate-50/40",
       kbFocused && "outline outline-2 outline-indigo-300 outline-offset-[-2px]"
     )}>
@@ -1245,6 +1262,25 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
               {item.currentAction}
             </p>
           )}
+          {!expanded && hasUnread && item.lastNoteContent && (
+            <button
+              type="button"
+              onClick={e => { e.stopPropagation(); handleOpenNotes?.(); }}
+              className="mt-1.5 flex items-center gap-1.5 w-full text-left rounded-md px-2 py-1 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 transition-colors"
+              title="Ver comentarios"
+            >
+              <MessageSquare className="h-3 w-3 text-indigo-600 shrink-0" />
+              <span className="text-[11px] font-semibold text-indigo-700 shrink-0">
+                {item.lastNoteAuthorName?.split(' ')[0] ?? 'Comentario'}:
+              </span>
+              <span className="text-[12px] text-indigo-900/80 italic truncate flex-1 min-w-0">
+                {item.lastNoteContent}
+              </span>
+              {item.lastNoteAt && (
+                <span className="text-[10px] text-indigo-400 shrink-0">{relTime(item.lastNoteAt)}</span>
+              )}
+            </button>
+          )}
         </div>
 
         <div className="flex items-center gap-1.5 shrink-0 ml-2" onClick={e => e.stopPropagation()}>
@@ -1257,13 +1293,17 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
           {handleOpenNotes && item.noteCount > 0 && (
             <button onClick={handleOpenNotes}
               className={cn(
-                "relative flex items-center gap-0.5 px-1.5 py-0.5 rounded-md transition-colors",
+                "relative flex items-center gap-1 rounded-md transition-colors",
                 hasUnread
-                  ? "text-indigo-700 bg-indigo-50 hover:bg-indigo-100"
-                  : "text-slate-400 hover:text-slate-600 hover:bg-slate-100"
-              )}>
-              <MessageSquare className="h-3 w-3" /><span className="text-[10px] font-medium">{item.noteCount}</span>
-              {hasUnread && <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-red-500 ring-1 ring-white" />}
+                  ? "px-2 py-1 bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm font-medium"
+                  : "px-1.5 py-0.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+              )}
+              title={hasUnread ? "Comentarios sin leer" : "Ver historial de comentarios"}>
+              <MessageSquare className={cn(hasUnread ? "h-3.5 w-3.5" : "h-3 w-3")} />
+              <span className={cn("font-medium", hasUnread ? "text-[11px]" : "text-[10px]")}>
+                {hasUnread ? `Nuevo · ${item.noteCount}` : item.noteCount}
+              </span>
+              {hasUnread && <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-red-500 ring-2 ring-white animate-pulse" />}
             </button>
           )}
           <TooltipProvider><Tooltip><TooltipTrigger asChild>
@@ -1711,7 +1751,7 @@ function AlertSidebarCard({ item, accent, currentUserId, onUpdate, expanded, onT
     <div className={cn(
       "border-l-[3px] transition-colors",
       accentBorder,
-      expanded ? accentBg : "hover:bg-slate-50/60"
+      expanded ? accentBg : hasUnread ? "bg-indigo-50/30 hover:bg-indigo-50/60" : "hover:bg-slate-50/60"
     )}>
       {/* Clickable header */}
       <div className={cn("px-3 py-2.5 cursor-pointer")} onClick={onToggle}>
@@ -1752,14 +1792,36 @@ function AlertSidebarCard({ item, accent, currentUserId, onUpdate, expanded, onT
               <FreshnessIndicator updatedAt={item.updatedAt} updatedByName={item.updatedByName} updatedById={item.updatedById} currentUserId={currentUserId} />
               {item.noteCount > 0 && (
                 <span className={cn(
-                  "relative inline-flex items-center gap-0.5 text-[10px] font-medium px-1 py-0.5 rounded",
-                  hasUnread ? "text-indigo-700 bg-indigo-50" : "text-slate-400"
+                  "relative inline-flex items-center gap-1 font-medium rounded",
+                  hasUnread
+                    ? "text-white bg-indigo-600 px-1.5 py-0.5 text-[10px] shadow-sm"
+                    : "text-slate-400 px-1 py-0.5 text-[10px]"
                 )}>
-                  <MessageSquare className="h-3 w-3" />{item.noteCount}
-                  {hasUnread && <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-red-500 ring-1 ring-white" />}
+                  <MessageSquare className="h-3 w-3" />
+                  {hasUnread ? `Nuevo · ${item.noteCount}` : item.noteCount}
+                  {hasUnread && <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-red-500 ring-2 ring-white animate-pulse" />}
                 </span>
               )}
             </div>
+            {!expanded && hasUnread && item.lastNoteContent && (
+              <button
+                type="button"
+                onClick={e => { e.stopPropagation(); handleOpenNotes?.(); }}
+                className="mt-1.5 flex items-center gap-1.5 w-full text-left rounded-md px-2 py-1 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 transition-colors"
+                title="Ver comentarios"
+              >
+                <MessageSquare className="h-3 w-3 text-indigo-600 shrink-0" />
+                <span className="text-[10px] font-semibold text-indigo-700 shrink-0">
+                  {item.lastNoteAuthorName?.split(' ')[0] ?? 'Comentario'}:
+                </span>
+                <span className="text-[11px] text-indigo-900/80 italic truncate flex-1 min-w-0">
+                  {item.lastNoteContent}
+                </span>
+                {item.lastNoteAt && (
+                  <span className="text-[10px] text-indigo-400 shrink-0">{relTime(item.lastNoteAt)}</span>
+                )}
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -1869,7 +1931,7 @@ function DecisionSidebarCard({ item, currentUserId, expanded, onToggle, users, o
   return (
     <div className={cn(
       "border-l-[3px] border-l-amber-400 transition-colors",
-      expanded ? "bg-amber-50/30" : "hover:bg-amber-50/20"
+      expanded ? "bg-amber-50/30" : hasUnread ? "bg-indigo-50/30 hover:bg-indigo-50/60" : "hover:bg-amber-50/20"
     )}>
       {/* Clickable header */}
       <div className="px-3 py-2.5 cursor-pointer" onClick={onToggle}>
@@ -1907,14 +1969,36 @@ function DecisionSidebarCard({ item, currentUserId, expanded, onToggle, users, o
           )}
           {item.noteCount > 0 && (
             <span className={cn(
-              "relative inline-flex items-center gap-0.5 text-[10px] font-medium px-1 py-0.5 rounded",
-              hasUnread ? "text-indigo-700 bg-indigo-50" : "text-slate-400"
+              "relative inline-flex items-center gap-1 font-medium rounded",
+              hasUnread
+                ? "text-white bg-indigo-600 px-1.5 py-0.5 text-[10px] shadow-sm"
+                : "text-slate-400 px-1 py-0.5 text-[10px]"
             )}>
-              <MessageSquare className="h-3 w-3" />{item.noteCount}
-              {hasUnread && <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-red-500 ring-1 ring-white" />}
+              <MessageSquare className="h-3 w-3" />
+              {hasUnread ? `Nuevo · ${item.noteCount}` : item.noteCount}
+              {hasUnread && <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-red-500 ring-2 ring-white animate-pulse" />}
             </span>
           )}
         </div>
+        {!expanded && hasUnread && item.lastNoteContent && (
+          <button
+            type="button"
+            onClick={e => { e.stopPropagation(); handleOpenNotes?.(); }}
+            className="mt-1.5 flex items-center gap-1.5 w-full text-left rounded-md px-2 py-1 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 transition-colors"
+            title="Ver comentarios"
+          >
+            <MessageSquare className="h-3 w-3 text-indigo-600 shrink-0" />
+            <span className="text-[10px] font-semibold text-indigo-700 shrink-0">
+              {item.lastNoteAuthorName?.split(' ')[0] ?? 'Comentario'}:
+            </span>
+            <span className="text-[11px] text-indigo-900/80 italic truncate flex-1 min-w-0">
+              {item.lastNoteContent}
+            </span>
+            {item.lastNoteAt && (
+              <span className="text-[10px] text-indigo-400 shrink-0">{relTime(item.lastNoteAt)}</span>
+            )}
+          </button>
+        )}
       </div>
 
       {/* Expanded detail panel */}
@@ -2506,6 +2590,10 @@ export default function StatusSemanalPage() {
     updatedAt: r.reviewUpdatedAt,
     updatedById: r.reviewUpdatedBy,
     updatedByName: r.reviewUpdatedByName,
+    lastNoteContent: r.lastNoteContent ?? null,
+    lastNoteAt: r.lastNoteAt ?? null,
+    lastNoteAuthorId: r.lastNoteAuthorId ?? null,
+    lastNoteAuthorName: r.lastNoteAuthorName ?? null,
   });
 
   const toCustomItem = (c: CustomItem): Item => ({
@@ -2530,6 +2618,10 @@ export default function StatusSemanalPage() {
     updatedAt: c.updatedAt,
     updatedById: c.updatedBy,
     updatedByName: c.updatedByName,
+    lastNoteContent: c.lastNoteContent ?? null,
+    lastNoteAt: c.lastNoteAt ?? null,
+    lastNoteAuthorId: c.lastNoteAuthorId ?? null,
+    lastNoteAuthorName: c.lastNoteAuthorName ?? null,
   });
 
   const allItems = useMemo<Item[]>(() => [
