@@ -1359,6 +1359,29 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
                   </div>
                 </div>
 
+                {/* Comentario al equipo — composer + última actividad */}
+                <div className="px-4 py-3 border-t border-slate-100 bg-indigo-50/20">
+                  <div className="flex items-center gap-2 mb-2">
+                    <MessageSquare className="h-3 w-3 text-indigo-500" />
+                    <span className="text-[10px] font-semibold text-indigo-700 uppercase tracking-wide">Comentario al equipo</span>
+                    {handleOpenNotes && (
+                      <button onClick={handleOpenNotes}
+                        className="ml-auto flex items-center gap-1 text-[10px] font-medium text-indigo-500 hover:text-indigo-700 transition-colors">
+                        Ver historial{item.noteCount > 0 && ` · ${item.noteCount}`}
+                        <ArrowRight className="h-2.5 w-2.5" />
+                      </button>
+                    )}
+                  </div>
+                  <ItemThread
+                    projectId={item.projectId}
+                    customId={item.customId}
+                    currentUserId={currentUserId}
+                    users={users}
+                    onOpenFull={handleOpenNotes}
+                    compact
+                  />
+                </div>
+
                 {/* Custom: editable title + subtitle */}
                 {item.isCustom && (
                   <div className="flex items-center gap-3 px-5 py-2 border-t border-slate-100 bg-slate-50/30">
@@ -1421,29 +1444,6 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
                   )}
                 </div>
 
-                {/* Quick activity — last update + input */}
-                <div className="border-t border-slate-100">
-                  <div className="flex items-center gap-2 px-5 pt-3 pb-1">
-                    <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Actividad</span>
-                    {handleOpenNotes && (
-                      <button onClick={handleOpenNotes}
-                        className="ml-auto flex items-center gap-1 text-[11px] font-medium text-indigo-500 hover:text-indigo-700 transition-colors">
-                        Ver historial{item.noteCount > 0 && ` · ${item.noteCount}`}
-                        <ArrowRight className="h-2.5 w-2.5" />
-                      </button>
-                    )}
-                  </div>
-                  <div className="px-5 pb-4">
-                    <ItemThread
-                      projectId={item.projectId}
-                      customId={item.customId}
-                      currentUserId={currentUserId}
-                      users={users}
-                      onOpenFull={handleOpenNotes}
-                      compact
-                    />
-                  </div>
-                </div>
               </div>
             </div>
           </motion.div>
