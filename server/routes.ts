@@ -18042,6 +18042,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             reviewUpdatedBy: projectStatusReviews.updatedBy,
             // Consolidated: note count via subquery
             noteCount: sql<number>`COALESCE((SELECT COUNT(*)::int FROM ${projectReviewNotes} WHERE ${projectReviewNotes.projectId} = ${activeProjects.id}), 0)`,
+            // Most recent note content/author/date (for inline preview)
+            lastNoteContent: sql<string | null>`(SELECT content FROM ${projectReviewNotes} WHERE ${projectReviewNotes.projectId} = ${activeProjects.id} ORDER BY ${projectReviewNotes.noteDate} DESC LIMIT 1)`,
+            lastNoteAt: sql<string | null>`(SELECT ${projectReviewNotes.noteDate} FROM ${projectReviewNotes} WHERE ${projectReviewNotes.projectId} = ${activeProjects.id} ORDER BY ${projectReviewNotes.noteDate} DESC LIMIT 1)`,
+            lastNoteAuthorId: sql<number | null>`(SELECT ${projectReviewNotes.authorId} FROM ${projectReviewNotes} WHERE ${projectReviewNotes.projectId} = ${activeProjects.id} ORDER BY ${projectReviewNotes.noteDate} DESC LIMIT 1)`,
+            lastNoteAuthorName: sql<string | null>`(SELECT ${users.firstName} || ' ' || ${users.lastName} FROM ${projectReviewNotes} LEFT JOIN ${users} ON ${users.id} = ${projectReviewNotes.authorId} WHERE ${projectReviewNotes.projectId} = ${activeProjects.id} ORDER BY ${projectReviewNotes.noteDate} DESC LIMIT 1)`,
             // Consolidated: owner name via subquery
             ownerName: sql<string | null>`(SELECT ${users.firstName} || ' ' || ${users.lastName} FROM ${users} WHERE ${users.id} = ${projectStatusReviews.ownerId})`,
             // Consolidated: updatedBy name via subquery
@@ -18083,6 +18088,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             reviewUpdatedAt: projectStatusReviews.updatedAt,
             // Note count subquery still works without updatedBy
             noteCount: sql<number>`COALESCE((SELECT COUNT(*)::int FROM ${projectReviewNotes} WHERE ${projectReviewNotes.projectId} = ${activeProjects.id}), 0)`,
+            lastNoteContent: sql<string | null>`(SELECT content FROM ${projectReviewNotes} WHERE ${projectReviewNotes.projectId} = ${activeProjects.id} ORDER BY ${projectReviewNotes.noteDate} DESC LIMIT 1)`,
+            lastNoteAt: sql<string | null>`(SELECT ${projectReviewNotes.noteDate} FROM ${projectReviewNotes} WHERE ${projectReviewNotes.projectId} = ${activeProjects.id} ORDER BY ${projectReviewNotes.noteDate} DESC LIMIT 1)`,
+            lastNoteAuthorId: sql<number | null>`(SELECT ${projectReviewNotes.authorId} FROM ${projectReviewNotes} WHERE ${projectReviewNotes.projectId} = ${activeProjects.id} ORDER BY ${projectReviewNotes.noteDate} DESC LIMIT 1)`,
+            lastNoteAuthorName: sql<string | null>`(SELECT ${users.firstName} || ' ' || ${users.lastName} FROM ${projectReviewNotes} LEFT JOIN ${users} ON ${users.id} = ${projectReviewNotes.authorId} WHERE ${projectReviewNotes.projectId} = ${activeProjects.id} ORDER BY ${projectReviewNotes.noteDate} DESC LIMIT 1)`,
             ownerName: sql<string | null>`(SELECT ${users.firstName} || ' ' || ${users.lastName} FROM ${users} WHERE ${users.id} = ${projectStatusReviews.ownerId})`,
           })
           .from(activeProjects)
@@ -18793,6 +18802,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           updatedBy: weeklyStatusItems.updatedBy,
           // Consolidated: note count via subquery
           noteCount: sql<number>`COALESCE((SELECT COUNT(*)::int FROM ${projectReviewNotes} WHERE ${projectReviewNotes.weeklyStatusItemId} = ${weeklyStatusItems.id}), 0)`,
+          // Most recent note content/author/date (for inline preview)
+          lastNoteContent: sql<string | null>`(SELECT content FROM ${projectReviewNotes} WHERE ${projectReviewNotes.weeklyStatusItemId} = ${weeklyStatusItems.id} ORDER BY ${projectReviewNotes.noteDate} DESC LIMIT 1)`,
+          lastNoteAt: sql<string | null>`(SELECT ${projectReviewNotes.noteDate} FROM ${projectReviewNotes} WHERE ${projectReviewNotes.weeklyStatusItemId} = ${weeklyStatusItems.id} ORDER BY ${projectReviewNotes.noteDate} DESC LIMIT 1)`,
+          lastNoteAuthorId: sql<number | null>`(SELECT ${projectReviewNotes.authorId} FROM ${projectReviewNotes} WHERE ${projectReviewNotes.weeklyStatusItemId} = ${weeklyStatusItems.id} ORDER BY ${projectReviewNotes.noteDate} DESC LIMIT 1)`,
+          lastNoteAuthorName: sql<string | null>`(SELECT ${users.firstName} || ' ' || ${users.lastName} FROM ${projectReviewNotes} LEFT JOIN ${users} ON ${users.id} = ${projectReviewNotes.authorId} WHERE ${projectReviewNotes.weeklyStatusItemId} = ${weeklyStatusItems.id} ORDER BY ${projectReviewNotes.noteDate} DESC LIMIT 1)`,
           // Consolidated: updatedBy name via subquery
           updatedByName: sql<string | null>`(SELECT ${users.firstName} || ' ' || ${users.lastName} FROM ${users} WHERE ${users.id} = ${weeklyStatusItems.updatedBy})`,
         }).from(weeklyStatusItems)
@@ -18820,6 +18834,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           hiddenFromWeekly: weeklyStatusItems.hiddenFromWeekly,
           updatedAt: weeklyStatusItems.updatedAt,
           noteCount: sql<number>`COALESCE((SELECT COUNT(*)::int FROM ${projectReviewNotes} WHERE ${projectReviewNotes.weeklyStatusItemId} = ${weeklyStatusItems.id}), 0)`,
+          lastNoteContent: sql<string | null>`(SELECT content FROM ${projectReviewNotes} WHERE ${projectReviewNotes.weeklyStatusItemId} = ${weeklyStatusItems.id} ORDER BY ${projectReviewNotes.noteDate} DESC LIMIT 1)`,
+          lastNoteAt: sql<string | null>`(SELECT ${projectReviewNotes.noteDate} FROM ${projectReviewNotes} WHERE ${projectReviewNotes.weeklyStatusItemId} = ${weeklyStatusItems.id} ORDER BY ${projectReviewNotes.noteDate} DESC LIMIT 1)`,
+          lastNoteAuthorId: sql<number | null>`(SELECT ${projectReviewNotes.authorId} FROM ${projectReviewNotes} WHERE ${projectReviewNotes.weeklyStatusItemId} = ${weeklyStatusItems.id} ORDER BY ${projectReviewNotes.noteDate} DESC LIMIT 1)`,
+          lastNoteAuthorName: sql<string | null>`(SELECT ${users.firstName} || ' ' || ${users.lastName} FROM ${projectReviewNotes} LEFT JOIN ${users} ON ${users.id} = ${projectReviewNotes.authorId} WHERE ${projectReviewNotes.weeklyStatusItemId} = ${weeklyStatusItems.id} ORDER BY ${projectReviewNotes.noteDate} DESC LIMIT 1)`,
         }).from(weeklyStatusItems)
           .leftJoin(users, eq(users.id, weeklyStatusItems.ownerId))
           .where(whereConditions)
