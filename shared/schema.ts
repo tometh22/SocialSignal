@@ -3487,18 +3487,6 @@ export const insertProjectReviewNoteSchema = createInsertSchema(projectReviewNot
 export type ProjectReviewNote = typeof projectReviewNotes.$inferSelect;
 export type InsertProjectReviewNote = z.infer<typeof insertProjectReviewNoteSchema>;
 
-// Per-user read state for items in a review room. Tracks the timestamp the user
-// last opened/read the item; unread comment count = notes created after this.
-export const itemReadState = pgTable("item_read_state", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
-  roomId: integer("room_id").notNull(),
-  projectId: integer("project_id").references(() => activeProjects.id, { onDelete: 'cascade' }),
-  weeklyStatusItemId: integer("weekly_status_item_id").references(() => weeklyStatusItems.id, { onDelete: 'cascade' }),
-  lastReadAt: timestamp("last_read_at").notNull().defaultNow(),
-});
-export type ItemReadState = typeof itemReadState.$inferSelect;
-
 export const weeklyStatusItems = pgTable("weekly_status_items", {
   id: serial("id").primaryKey(),
   roomId: integer("room_id").notNull(),
