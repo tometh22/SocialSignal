@@ -3275,6 +3275,18 @@ export default function StatusSemanalPage() {
                 )}
               </div>
 
+              {/* Toggle visible cuando hay items resueltos — fácil acceso para
+                   recuperar algo si lo resolviste sin querer */}
+              {hiddenCount > 0 && (
+                <div className="flex justify-center pt-1">
+                  <button onClick={() => setShowHidden(v => !v)}
+                    className="flex items-center gap-1.5 text-[11px] text-slate-400 hover:text-slate-700 transition-colors">
+                    {showHidden ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                    {showHidden ? 'Ocultar' : 'Ver'} {hiddenCount} resuelto{hiddenCount === 1 ? '' : 's'}
+                  </button>
+                </div>
+              )}
+
 
               {/* ── Quitados ───────────────────────────────────────── */}
               {showHidden && hiddenCount > 0 && (
