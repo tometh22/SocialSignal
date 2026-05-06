@@ -531,67 +531,71 @@ function ProposalSection({ projectId, customId, currentUserId }: {
   const history = proposals.slice(1);
   const hasAnyPending = proposals.some(p => p.status === 'pending');
 
+  // Empty state: just an inline link, no caja
+  if (proposals.length === 0 && !showForm) {
+    return (
+      <button onClick={() => setShowForm(true)}
+        className="flex items-center gap-1.5 text-[11px] text-slate-400 hover:text-slate-700 transition-colors">
+        <Plus className="h-3 w-3" />
+        Adjuntar propuesta
+      </button>
+    );
+  }
+
   return (
-    <div className="border-t border-slate-100">
-      <div className="px-5 py-3">
-        <div className="flex items-center gap-2 mb-2">
-          <FileCheck2 className="h-3.5 w-3.5 text-violet-500" />
-          <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Propuesta a aprobar</span>
-          {!hasAnyPending && (
-            <button onClick={() => setShowForm(s => !s)}
-              className="ml-auto flex items-center gap-1 text-[11px] font-medium text-violet-600 hover:text-violet-700 bg-violet-50 hover:bg-violet-100 border border-violet-200 rounded-md px-2 py-0.5 transition-colors">
-              <Plus className="h-3 w-3" />
-              {proposals.length === 0 ? 'Compartir propuesta' : 'Nueva versión'}
-            </button>
-          )}
-        </div>
-
-        {showForm && (
-          <NewProposalForm
-            disabled={createMutation.isPending}
-            onCancel={() => setShowForm(false)}
-            onSubmit={async (content) => { await createMutation.mutateAsync(content); }}
-          />
-        )}
-
-        {!showForm && proposals.length === 0 && (
-          <p className="text-[11px] text-slate-400 italic">Aún no hay nada para aprobar. Cuando compartas un texto o archivo aparecerá acá.</p>
-        )}
-
-        {latest && (
-          <ProposalCard
-            proposal={latest}
-            currentUserId={currentUserId ?? null}
-            isOwner={room.isOwner}
-            roomId={room.roomId}
-            invalidate={invalidate}
-            isLatest
-          />
-        )}
-
-        {history.length > 0 && (
-          <div className="mt-2">
-            <button onClick={() => setShowHistory(s => !s)}
-              className="flex items-center gap-1 text-[10px] font-medium text-slate-400 hover:text-slate-600 transition-colors">
-              {showHistory ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-              Historial · {history.length} {history.length === 1 ? 'versión anterior' : 'versiones anteriores'}
-            </button>
-            {showHistory && (
-              <div className="mt-2 space-y-2">
-                {history.map(p => (
-                  <ProposalCard key={p.id}
-                    proposal={p}
-                    currentUserId={currentUserId ?? null}
-                    isOwner={room.isOwner}
-                    roomId={room.roomId}
-                    invalidate={invalidate}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
+    <div>
+      <div className="flex items-center gap-2 mb-1.5">
+        <span className="text-[10px] text-slate-400">Propuesta a aprobar</span>
+        {!hasAnyPending && (
+          <button onClick={() => setShowForm(s => !s)}
+            className="ml-auto flex items-center gap-1 text-[11px] text-slate-500 hover:text-slate-700 transition-colors">
+            <Plus className="h-3 w-3" />
+            {proposals.length === 0 ? 'Compartir' : 'Nueva versión'}
+          </button>
         )}
       </div>
+
+      {showForm && (
+        <NewProposalForm
+          disabled={createMutation.isPending}
+          onCancel={() => setShowForm(false)}
+          onSubmit={async (content) => { await createMutation.mutateAsync(content); }}
+        />
+      )}
+
+      {latest && (
+        <ProposalCard
+          proposal={latest}
+          currentUserId={currentUserId ?? null}
+          isOwner={room.isOwner}
+          roomId={room.roomId}
+          invalidate={invalidate}
+          isLatest
+        />
+      )}
+
+      {history.length > 0 && (
+        <div className="mt-2">
+          <button onClick={() => setShowHistory(s => !s)}
+            className="flex items-center gap-1 text-[10px] text-slate-400 hover:text-slate-600 transition-colors">
+            {showHistory ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+            Historial · {history.length} {history.length === 1 ? 'versión anterior' : 'versiones anteriores'}
+          </button>
+          {showHistory && (
+            <div className="mt-2 space-y-2">
+              {history.map(p => (
+                <ProposalCard key={p.id}
+                  proposal={p}
+                  currentUserId={currentUserId ?? null}
+                  isOwner={room.isOwner}
+                  roomId={room.roomId}
+                  invalidate={invalidate}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -1353,37 +1357,21 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
             transition={{ duration: 0.16, ease: [0.4, 0, 0.2, 1] }}
             className="overflow-hidden">
             <div className="pl-4 pr-5 pb-4">
-              <div className="rounded-xl border border-slate-200/80 bg-white shadow-sm overflow-hidden">
-                {/* Two-column: Estado actual | Próximo paso */}
-                <div className="grid grid-cols-2 divide-x divide-slate-100">
-                  <div className="px-4 py-3">
-                    <p className="text-[10px] font-semibold text-slate-400 tracking-wide uppercase mb-1.5 flex items-center gap-1.5">
-                      <span className={cn("w-1.5 h-1.5 rounded-full shrink-0 inline-block",
-                        item.healthStatus === 'rojo' ? "bg-red-500" :
-                        item.healthStatus === 'amarillo' ? "bg-amber-400" : "bg-emerald-400")} />
-                      Estado actual
-                    </p>
-                    <InlineText value={item.currentAction} placeholder="¿Qué está pasando ahora?" onSave={v => onUpdate({ currentAction: v })} multiline className="text-[13px] leading-relaxed text-slate-700" />
+              <div className="space-y-3.5 pt-1">
+                {/* Two-column: Estado actual | Próximo paso, no boxes */}
+                <div className="grid grid-cols-2 gap-x-6">
+                  <div>
+                    <p className="text-[10px] text-slate-400 mb-0.5">Estado actual</p>
+                    <InlineText value={item.currentAction} placeholder="¿Qué está pasando ahora?" onSave={v => onUpdate({ currentAction: v })} multiline className="text-[12px] leading-relaxed text-slate-700" />
                   </div>
-                  <div className="px-4 py-3">
-                    <p className="text-[10px] font-semibold text-slate-400 tracking-wide uppercase mb-1.5">Próximo paso</p>
-                    <InlineText value={item.nextMilestone} placeholder="Acción concreta esta semana" onSave={v => onUpdate({ nextMilestone: v })} multiline className="text-[13px] leading-relaxed text-slate-700" />
+                  <div>
+                    <p className="text-[10px] text-slate-400 mb-0.5">Próximo paso</p>
+                    <InlineText value={item.nextMilestone} placeholder="Acción concreta esta semana" onSave={v => onUpdate({ nextMilestone: v })} multiline className="text-[12px] leading-relaxed text-slate-700" />
                   </div>
                 </div>
 
-                {/* Comentario al equipo — composer + última actividad */}
-                <div className="px-4 py-3 border-t border-slate-100 bg-indigo-50/20">
-                  <div className="flex items-center gap-2 mb-2">
-                    <MessageSquare className="h-3 w-3 text-indigo-500" />
-                    <span className="text-[10px] font-semibold text-indigo-700 uppercase tracking-wide">Comentario al equipo</span>
-                    {handleOpenNotes && (
-                      <button onClick={handleOpenNotes}
-                        className="ml-auto flex items-center gap-1 text-[10px] font-medium text-indigo-500 hover:text-indigo-700 transition-colors">
-                        Ver historial{item.noteCount > 0 && ` · ${item.noteCount}`}
-                        <ArrowRight className="h-2.5 w-2.5" />
-                      </button>
-                    )}
-                  </div>
+                {/* Comentarios — flat */}
+                <div>
                   <ItemThread
                     projectId={item.projectId}
                     customId={item.customId}
@@ -1392,42 +1380,49 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
                     onOpenFull={handleOpenNotes}
                     compact
                   />
+                  {handleOpenNotes && item.noteCount > 1 && (
+                    <button onClick={handleOpenNotes}
+                      className="mt-1 flex items-center gap-0.5 text-[10px] text-slate-400 hover:text-slate-600 transition-colors">
+                      Ver historial · {item.noteCount}
+                      <ChevronRight className="h-2.5 w-2.5" />
+                    </button>
+                  )}
                 </div>
 
                 {/* Custom: editable title + subtitle */}
                 {item.isCustom && (
-                  <div className="flex items-center gap-3 px-5 py-2 border-t border-slate-100 bg-slate-50/30">
+                  <div className="flex items-center gap-2 text-[12px] text-slate-500">
                     <Tag className="h-3 w-3 text-slate-300 shrink-0" />
-                    <div className="flex-1 min-w-0 flex items-center gap-2">
-                      <InlineText value={item.title} placeholder="Título" onSave={v => onUpdate({ title: v })} required className="text-[12px] font-medium text-slate-600 truncate" />
-                      {item.subtitle !== null && item.subtitle !== undefined && (
-                        <><span className="text-slate-200 shrink-0">·</span>
-                        <InlineText value={item.subtitle} placeholder="Descripción opcional..." onSave={v => onUpdate({ subtitle: v })} className="text-[12px] text-slate-400 truncate flex-1" /></>
-                      )}
-                    </div>
+                    <InlineText value={item.title} placeholder="Título" onSave={v => onUpdate({ title: v })} required className="font-medium text-slate-600 truncate" />
+                    {item.subtitle !== null && item.subtitle !== undefined && (
+                      <><span className="text-slate-200 shrink-0">·</span>
+                      <InlineText value={item.subtitle} placeholder="Descripción opcional..." onSave={v => onUpdate({ subtitle: v })} className="text-slate-400 truncate flex-1" /></>
+                    )}
                   </div>
                 )}
 
-                {/* Propuesta a aprobar (texto + adjuntos, versionado) */}
+                {/* Propuesta */}
                 <ProposalSection projectId={item.projectId} customId={item.customId} currentUserId={currentUserId} />
 
-                {/* Footer: decision + secondary indicators + nav */}
-                <div className="flex items-center gap-1.5 px-5 py-2.5 border-t border-slate-100 bg-slate-50/60 flex-wrap">
-                  <DecisionBadge value={item.decisionNeeded} onChange={v => onUpdate({ decisionNeeded: v })} />
+                {/* Footer */}
+                <div className="flex items-center gap-2 flex-wrap pt-1">
+                  {item.decisionNeeded && item.decisionNeeded !== 'ninguna' && (
+                    <DecisionBadge value={item.decisionNeeded} onChange={v => onUpdate({ decisionNeeded: v })} />
+                  )}
                   {item.mainRisk && (
-                    <div className="flex items-center gap-1 text-[10px] text-slate-500 bg-slate-100 border border-slate-200 rounded-md px-1.5 py-0.5">
-                      <Shield className="h-2.5 w-2.5" /><span className="truncate max-w-[120px]">{item.mainRisk}</span>
+                    <div className="flex items-center gap-1 text-[11px] text-slate-500">
+                      <Shield className="h-2.5 w-2.5 text-slate-400" /><span className="truncate max-w-[120px]">{item.mainRisk}</span>
                     </div>
                   )}
                   <Popover>
                     <PopoverTrigger asChild>
-                      <button className="text-[10px] text-slate-400 hover:text-slate-600 hover:bg-slate-100 px-1.5 py-0.5 rounded transition-colors flex items-center gap-1">
+                      <button className="text-[11px] text-slate-400 hover:text-slate-600 transition-colors flex items-center gap-1">
                         <MoreHorizontal className="h-3 w-3" />
-                        <span>Indicadores</span>
+                        Indicadores
                       </button>
                     </PopoverTrigger>
                     <PopoverContent className="w-56 p-3 space-y-2.5" align="start">
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Indicadores secundarios</p>
+                      <p className="text-[10px] text-slate-400">Indicadores secundarios</p>
                       <div className="flex items-center justify-between">
                         <span className="text-xs text-slate-500">Rentabilidad</span>
                         <LevelBadge value={item.marginStatus} onChange={v => onUpdate({ marginStatus: v })} label="Rentabilidad" type="margin" />
@@ -1444,7 +1439,7 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
                   </Popover>
                   <div className="flex-1" />
                   <button onClick={onResolve}
-                    className="flex items-center gap-1.5 text-[11px] font-medium text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg px-2.5 py-1 transition-colors">
+                    className="flex items-center gap-1 text-[11px] text-emerald-600 hover:text-emerald-700 transition-colors">
                     <CheckCircle2 className="h-3 w-3" />
                     Resolver tema
                   </button>
@@ -1455,7 +1450,6 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
                     </div>
                   )}
                 </div>
-
               </div>
             </div>
           </motion.div>
@@ -1622,23 +1616,23 @@ function ItemThread({ projectId, customId, currentUserId, users = [], onOpenFull
         })}
       </div>
 
-      {/* Compose input */}
+      {/* Compose input — quiet by default, accent on focus */}
       <div className="mt-1">
-        <div className="flex items-center gap-2 bg-white rounded-xl border border-slate-200 px-3 py-2 shadow-sm focus-within:border-indigo-300 focus-within:shadow-indigo-50 transition-all">
+        <div className="flex items-center gap-2 rounded-md bg-slate-50 px-3 py-1.5 border border-transparent focus-within:bg-white focus-within:border-slate-200 transition-all">
           <MentionInput
             value={draft}
             onChange={setDraft}
             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(); } }}
-            placeholder="Escribir comentario..."
-            className="flex-1 text-sm bg-transparent focus:outline-none min-w-0"
+            placeholder="Escribir comentario…"
+            className="flex-1 text-[12px] bg-transparent focus:outline-none min-w-0 placeholder:text-slate-400"
             users={users}
           />
           <button onClick={submit}
             disabled={!draft.trim() || addNoteMutation.isPending}
-            className={cn("shrink-0 w-7 h-7 rounded-full flex items-center justify-center transition-all",
+            className={cn("shrink-0 w-6 h-6 rounded-full flex items-center justify-center transition-all",
               draft.trim()
-                ? "bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm"
-                : "bg-slate-100 text-slate-300")}>
+                ? "bg-indigo-600 text-white hover:bg-indigo-700"
+                : "text-slate-300")}>
             {addNoteMutation.isPending
               ? <Loader2 className="h-3 w-3 animate-spin" />
               : <ArrowRight className="h-3 w-3" />}
@@ -1801,14 +1795,11 @@ function AlertSidebarCard({ item, accent, currentUserId, roomId, onUpdate, expan
               <FreshnessIndicator updatedAt={item.updatedAt} updatedByName={item.updatedByName} updatedById={item.updatedById} currentUserId={currentUserId} />
               {item.noteCount > 0 && (
                 <span className={cn(
-                  "relative inline-flex items-center gap-1 font-medium rounded",
-                  hasUnread
-                    ? "text-white bg-indigo-600 px-1.5 py-0.5 text-[10px] shadow-sm"
-                    : "text-slate-400 px-1 py-0.5 text-[10px]"
+                  "inline-flex items-center gap-1 text-[10px]",
+                  hasUnread ? "text-indigo-600 font-medium" : "text-slate-400"
                 )}>
                   <MessageSquare className="h-3 w-3" />
                   {hasUnread ? `Nuevo · ${item.noteCount}` : item.noteCount}
-                  {hasUnread && <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-red-500 ring-2 ring-white animate-pulse" />}
                 </span>
               )}
             </div>
@@ -1844,44 +1835,29 @@ function AlertSidebarCard({ item, accent, currentUserId, roomId, onUpdate, expan
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.16, ease: [0.4, 0, 0.2, 1] }}
             className="overflow-hidden">
-            <div className="px-3 pb-3 space-y-2" onClick={e => e.stopPropagation()}>
-              {/* Risk (only the most important secondary signal — overdue is already
-                   communicated by the red border + header deadline in red) */}
+            <div className="px-3 pb-3 space-y-3.5" onClick={e => e.stopPropagation()}>
+              {/* Risk — present only when set, kept neutral */}
               {item.mainRisk && (
-                <div className="flex items-start gap-1.5 rounded-md px-2 py-1.5 bg-slate-50 border border-slate-100">
+                <div className="flex items-start gap-1.5">
                   <Shield className="h-3 w-3 text-slate-400 shrink-0 mt-0.5" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wide mb-0.5">Riesgo</p>
-                    <InlineText value={item.mainRisk} placeholder="Riesgo principal" onSave={v => onUpdate({ mainRisk: v })} className="text-[11px]" />
-                  </div>
+                  <InlineText value={item.mainRisk} placeholder="Riesgo principal" onSave={v => onUpdate({ mainRisk: v })} className="text-[12px] text-slate-600 leading-snug" />
                 </div>
               )}
 
-              {/* Current action */}
-              <div className="rounded-md px-2.5 py-2 bg-white border border-slate-100">
-                <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wide mb-0.5">Estado actual</p>
-                <InlineText value={item.currentAction} placeholder="¿Qué está pasando?" onSave={v => onUpdate({ currentAction: v })} multiline className="text-[11px]" />
+              {/* Estado actual */}
+              <div>
+                <p className="text-[10px] text-slate-400 mb-0.5">Estado actual</p>
+                <InlineText value={item.currentAction} placeholder="¿Qué está pasando?" onSave={v => onUpdate({ currentAction: v })} multiline className="text-[12px] text-slate-700 leading-relaxed" />
               </div>
 
-              {/* Next step */}
-              <div className="rounded-md px-2.5 py-2 bg-white border border-slate-100">
-                <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wide mb-0.5">Próximo paso</p>
-                <InlineText value={item.nextMilestone} placeholder="Acción concreta" onSave={v => onUpdate({ nextMilestone: v })} multiline className="text-[11px]" />
+              {/* Próximo paso */}
+              <div>
+                <p className="text-[10px] text-slate-400 mb-0.5">Próximo paso</p>
+                <InlineText value={item.nextMilestone} placeholder="Acción concreta" onSave={v => onUpdate({ nextMilestone: v })} multiline className="text-[12px] text-slate-700 leading-relaxed" />
               </div>
 
-              {/* Inline comment composer + last activity */}
-              <div className="rounded-md px-2.5 py-2 bg-indigo-50/30 border border-indigo-100/70">
-                <div className="flex items-center gap-1.5 mb-1.5">
-                  <MessageSquare className="h-2.5 w-2.5 text-indigo-500" />
-                  <span className="text-[9px] font-bold text-indigo-700 uppercase tracking-wide">Comentario al equipo</span>
-                  {handleOpenNotes && item.noteCount > 0 && (
-                    <button onClick={handleOpenNotes}
-                      className="ml-auto flex items-center gap-0.5 text-[9px] font-medium text-indigo-500 hover:text-indigo-700 transition-colors">
-                      Ver historial · {item.noteCount}
-                      <ArrowRight className="h-2 w-2" />
-                    </button>
-                  )}
-                </div>
+              {/* Comentarios — flat composer, no eyebrow, no colored bg */}
+              <div>
                 <ItemThread
                   projectId={item.projectId}
                   customId={item.customId}
@@ -1890,37 +1866,31 @@ function AlertSidebarCard({ item, accent, currentUserId, roomId, onUpdate, expan
                   onOpenFull={handleOpenNotes}
                   compact
                 />
+                {handleOpenNotes && item.noteCount > 1 && (
+                  <button onClick={handleOpenNotes}
+                    className="mt-1 flex items-center gap-0.5 text-[10px] text-slate-400 hover:text-slate-600 transition-colors">
+                    Ver historial · {item.noteCount}
+                    <ChevronRight className="h-2.5 w-2.5" />
+                  </button>
+                )}
               </div>
 
-              {/* Proposal + attachments (images, videos, files, links) */}
-              <div className="rounded-md bg-white border border-slate-100 overflow-hidden">
-                <ProposalSection projectId={item.projectId} customId={item.customId} currentUserId={currentUserId} />
-              </div>
+              {/* Proposal */}
+              <ProposalSection projectId={item.projectId} customId={item.customId} currentUserId={currentUserId} />
 
-              {/* Actions footer */}
-              <div className="flex items-center gap-1.5 pt-1.5 border-t border-slate-100 flex-wrap">
+              {/* Footer — minimal */}
+              <div className="flex items-center gap-2 flex-wrap">
                 {users && <OwnerSelect value={item.ownerId} name={item.ownerName} onChange={v => onUpdate({ ownerId: v })} users={users} />}
                 <DeadlinePicker value={item.deadline} isOverdue={item.isOverdue} onChange={v => onUpdate({ deadline: v })} />
-                <DecisionBadge value={item.decisionNeeded} onChange={v => onUpdate({ decisionNeeded: v })} />
+                {item.decisionNeeded && item.decisionNeeded !== 'ninguna' && (
+                  <DecisionBadge value={item.decisionNeeded} onChange={v => onUpdate({ decisionNeeded: v })} />
+                )}
                 <div className="flex-1" />
                 {onResolve && (
                   <button onClick={onResolve}
-                    className="flex items-center gap-1 text-[10px] font-medium text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-md px-2 py-0.5 transition-colors">
+                    className="flex items-center gap-1 text-[11px] text-emerald-600 hover:text-emerald-700 transition-colors">
                     <CheckCircle2 className="h-3 w-3" />
                     Resolver
-                  </button>
-                )}
-                {handleOpenNotes && (
-                  <button onClick={handleOpenNotes}
-                    className={cn(
-                      "relative flex items-center gap-1 text-[10px] font-medium transition-colors",
-                      hasUnread
-                        ? "text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-md px-2 py-0.5"
-                        : "text-indigo-500 hover:text-indigo-700"
-                    )}>
-                    <MessageSquare className="h-3 w-3" />
-                    {item.noteCount > 0 && item.noteCount}
-                    {hasUnread && <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-red-500 ring-1 ring-white" />}
                   </button>
                 )}
                 {onRemove && (
@@ -1994,14 +1964,11 @@ function DecisionSidebarCard({ item, currentUserId, roomId, expanded, onToggle, 
           )}
           {item.noteCount > 0 && (
             <span className={cn(
-              "relative inline-flex items-center gap-1 font-medium rounded",
-              hasUnread
-                ? "text-white bg-indigo-600 px-1.5 py-0.5 text-[10px] shadow-sm"
-                : "text-slate-400 px-1 py-0.5 text-[10px]"
+              "inline-flex items-center gap-1 text-[10px]",
+              hasUnread ? "text-indigo-600 font-medium" : "text-slate-400"
             )}>
               <MessageSquare className="h-3 w-3" />
               {hasUnread ? `Nuevo · ${item.noteCount}` : item.noteCount}
-              {hasUnread && <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-red-500 ring-2 ring-white animate-pulse" />}
             </span>
           )}
         </div>
@@ -2035,47 +2002,36 @@ function DecisionSidebarCard({ item, currentUserId, roomId, expanded, onToggle, 
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.16, ease: [0.4, 0, 0.2, 1] }}
             className="overflow-hidden">
-            <div className="px-3 pb-3 space-y-2" onClick={e => e.stopPropagation()}>
-              {/* Decision alert */}
-              <div className={cn("flex items-center gap-1.5 rounded-md px-2 py-1.5 border text-[11px] font-semibold", decMeta.color)}>
+            <div className="px-3 pb-3 space-y-3.5" onClick={e => e.stopPropagation()}>
+              {/* Decision needed — single subtle line */}
+              <div className="flex items-center gap-1.5 text-[11px] text-amber-700">
                 <Zap className="h-3 w-3 shrink-0" />
-                Decisión requerida:
+                <span>Decisión:</span>
                 {onUpdate && <DecisionBadge value={item.decisionNeeded} onChange={v => onUpdate({ decisionNeeded: v })} />}
               </div>
 
-              {/* Current action */}
-              <div className="rounded-md px-2.5 py-2 bg-white border border-slate-100">
-                <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wide mb-0.5">Estado actual</p>
+              {/* Estado actual */}
+              <div>
+                <p className="text-[10px] text-slate-400 mb-0.5">Estado actual</p>
                 {onUpdate ? (
-                  <InlineText value={item.currentAction} placeholder="¿Qué está pasando?" onSave={v => onUpdate({ currentAction: v })} multiline className="text-[11px]" />
+                  <InlineText value={item.currentAction} placeholder="¿Qué está pasando?" onSave={v => onUpdate({ currentAction: v })} multiline className="text-[12px] text-slate-700 leading-relaxed" />
                 ) : (
-                  <p className="text-[11px] text-slate-600">{item.currentAction || 'Sin update'}</p>
+                  <p className="text-[12px] text-slate-600 leading-relaxed">{item.currentAction || 'Sin update'}</p>
                 )}
               </div>
 
-              {/* Next step */}
-              <div className="rounded-md px-2.5 py-2 bg-white border border-slate-100">
-                <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wide mb-0.5">Próximo paso</p>
+              {/* Próximo paso */}
+              <div>
+                <p className="text-[10px] text-slate-400 mb-0.5">Próximo paso</p>
                 {onUpdate ? (
-                  <InlineText value={item.nextMilestone} placeholder="Acción concreta" onSave={v => onUpdate({ nextMilestone: v })} multiline className="text-[11px]" />
+                  <InlineText value={item.nextMilestone} placeholder="Acción concreta" onSave={v => onUpdate({ nextMilestone: v })} multiline className="text-[12px] text-slate-700 leading-relaxed" />
                 ) : (
-                  <p className="text-[11px] text-slate-600">{item.nextMilestone || 'Sin definir'}</p>
+                  <p className="text-[12px] text-slate-600 leading-relaxed">{item.nextMilestone || 'Sin definir'}</p>
                 )}
               </div>
 
-              {/* Inline comment composer + last activity */}
-              <div className="rounded-md px-2.5 py-2 bg-indigo-50/30 border border-indigo-100/70">
-                <div className="flex items-center gap-1.5 mb-1.5">
-                  <MessageSquare className="h-2.5 w-2.5 text-indigo-500" />
-                  <span className="text-[9px] font-bold text-indigo-700 uppercase tracking-wide">Comentario al equipo</span>
-                  {handleOpenNotes && item.noteCount > 0 && (
-                    <button onClick={handleOpenNotes}
-                      className="ml-auto flex items-center gap-0.5 text-[9px] font-medium text-indigo-500 hover:text-indigo-700 transition-colors">
-                      Ver historial · {item.noteCount}
-                      <ArrowRight className="h-2 w-2" />
-                    </button>
-                  )}
-                </div>
+              {/* Comentarios — flat */}
+              <div>
                 <ItemThread
                   projectId={item.projectId}
                   customId={item.customId}
@@ -2084,37 +2040,29 @@ function DecisionSidebarCard({ item, currentUserId, roomId, expanded, onToggle, 
                   onOpenFull={handleOpenNotes}
                   compact
                 />
+                {handleOpenNotes && item.noteCount > 1 && (
+                  <button onClick={handleOpenNotes}
+                    className="mt-1 flex items-center gap-0.5 text-[10px] text-slate-400 hover:text-slate-600 transition-colors">
+                    Ver historial · {item.noteCount}
+                    <ChevronRight className="h-2.5 w-2.5" />
+                  </button>
+                )}
               </div>
 
-              {/* Proposal + attachments (images, videos, files, links) */}
-              <div className="rounded-md bg-white border border-slate-100 overflow-hidden">
-                <ProposalSection projectId={item.projectId} customId={item.customId} currentUserId={currentUserId} />
-              </div>
+              {/* Proposal */}
+              <ProposalSection projectId={item.projectId} customId={item.customId} currentUserId={currentUserId} />
 
-              {/* Actions footer */}
-              <div className="flex items-center gap-1.5 pt-1.5 border-t border-slate-100 flex-wrap">
+              {/* Footer */}
+              <div className="flex items-center gap-2 flex-wrap">
                 {onUpdate && users && <OwnerSelect value={item.ownerId} name={item.ownerName} onChange={v => onUpdate({ ownerId: v })} users={users} />}
                 {onUpdate && <DeadlinePicker value={item.deadline} isOverdue={item.isOverdue} onChange={v => onUpdate({ deadline: v })} />}
                 {onUpdate && <HealthDot value={item.healthStatus} onChange={v => onUpdate({ healthStatus: v })} />}
                 <div className="flex-1" />
                 {onResolve && (
                   <button onClick={onResolve}
-                    className="flex items-center gap-1 text-[10px] font-medium text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-md px-2 py-0.5 transition-colors">
+                    className="flex items-center gap-1 text-[11px] text-emerald-600 hover:text-emerald-700 transition-colors">
                     <CheckCircle2 className="h-3 w-3" />
                     Resolver
-                  </button>
-                )}
-                {handleOpenNotes && (
-                  <button onClick={handleOpenNotes}
-                    className={cn(
-                      "relative flex items-center gap-1 text-[10px] font-medium transition-colors",
-                      hasUnread
-                        ? "text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-md px-2 py-0.5"
-                        : "text-indigo-500 hover:text-indigo-700"
-                    )}>
-                    <MessageSquare className="h-3 w-3" />
-                    {item.noteCount > 0 && item.noteCount}
-                    {hasUnread && <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-red-500 ring-1 ring-white" />}
                   </button>
                 )}
                 {onRemove && (
@@ -3290,7 +3238,7 @@ export default function StatusSemanalPage() {
                             bulkMode={bulkMode}
                             checked={selectedKeys.has(item.key)}
                             onCheck={v => setSelectedKeys(prev => { const n = new Set(prev); v ? n.add(item.key) : n.delete(item.key); return n; })}
-                            accent={isStaleGroup ? 'amber' : 'none'}
+                            accent={'none'}
                             hideSubtitle={!isStaleGroup} />
                         );
                       };
@@ -3299,8 +3247,8 @@ export default function StatusSemanalPage() {
                           <div className="rounded-xl border border-slate-200/60 bg-white overflow-hidden">
                             {staleItems.length > 0 && (
                               <>
-                                <div className="flex items-center gap-2 px-5 py-1.5 border-b border-slate-100/80 bg-amber-50/40">
-                                  <span className="text-[10px] font-semibold text-amber-500 tracking-wide">Sin update · {staleItems.length}</span>
+                                <div className="flex items-center gap-2 px-5 py-1.5 border-b border-slate-100/80">
+                                  <span className="text-[10px] text-amber-600">Sin update · {staleItems.length}</span>
                                 </div>
                                 {staleItems.map((item) => (
                                   <div key={item.key} className="border-b border-slate-100/80 last:border-b-0">
@@ -3310,8 +3258,8 @@ export default function StatusSemanalPage() {
                               </>
                             )}
                             {staleItems.length > 0 && freshItems.length > 0 && (
-                              <div className="flex items-center gap-2 px-5 py-1.5 border-b border-slate-100/80 border-t border-t-slate-100 bg-emerald-50/30">
-                                <span className="text-[10px] font-semibold text-emerald-600 tracking-wide">Al día · {freshItems.length}</span>
+                              <div className="flex items-center gap-2 px-5 py-1.5 border-b border-slate-100/80 border-t border-t-slate-100">
+                                <span className="text-[10px] text-slate-400">Al día · {freshItems.length}</span>
                               </div>
                             )}
                             {freshItems.map((item) => (
