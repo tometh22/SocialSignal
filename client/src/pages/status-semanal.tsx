@@ -2611,7 +2611,10 @@ export default function StatusSemanalPage() {
   const hiddenCount = useMemo(() => allItems.filter(i => i.hiddenFromWeekly).length, [allItems]);
 
   const visible = useMemo(() => allItems.filter(i => {
-    if (!showHidden && i.hiddenFromWeekly) return false;
+    // Hidden (resolved) items never appear in the main columns. The eye toggle
+    // (showHidden) only reveals the dedicated "Quitados del status" section
+    // below, where each item has its own Restaurar button.
+    if (i.hiddenFromWeekly) return false;
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       const matches = (i.title?.toLowerCase().includes(q)) ||
@@ -2624,7 +2627,7 @@ export default function StatusSemanalPage() {
     if (filterHealth && i.healthStatus !== filterHealth) return false;
     if (filterOwner !== null && i.ownerId !== filterOwner) return false;
     return true;
-  }), [allItems, showHidden, searchQuery, filterHealth, filterOwner]);
+  }), [allItems, searchQuery, filterHealth, filterOwner]);
 
   const { alertItems, decisionItems, normalItems, alertKeys, decisionKeys, flatNavItems } = useMemo(() => {
     const rojoItems     = visible.filter(i => i.healthStatus === 'rojo');
