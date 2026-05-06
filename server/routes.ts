@@ -98,6 +98,7 @@ import {
   insertTaskTimeEntrySchema,
   projectStatusReviews,
   projectReviewNotes,
+  reviewItemReadState,
   weeklyStatusItems,
   statusChangeLog,
   statusUpdateEntries,
@@ -18001,6 +18002,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/status-semanal", requireAuth, async (req: Request, res: Response) => {
     try {
       const includeHidden = req.query.includeHidden === 'true';
+      const userId = req.user!.id;
 
       // Build WHERE conditions: always filter active + not finished
       const baseConditions = [eq(activeProjects.status, 'active'), eq(activeProjects.isFinished, false)];
@@ -18047,6 +18049,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
             lastNoteAt: sql<string | null>`(SELECT ${projectReviewNotes.noteDate} FROM ${projectReviewNotes} WHERE ${projectReviewNotes.projectId} = ${activeProjects.id} ORDER BY ${projectReviewNotes.noteDate} DESC LIMIT 1)`,
             lastNoteAuthorId: sql<number | null>`(SELECT ${projectReviewNotes.authorId} FROM ${projectReviewNotes} WHERE ${projectReviewNotes.projectId} = ${activeProjects.id} ORDER BY ${projectReviewNotes.noteDate} DESC LIMIT 1)`,
             lastNoteAuthorName: sql<string | null>`(SELECT ${users.firstName} || ' ' || ${users.lastName} FROM ${projectReviewNotes} LEFT JOIN ${users} ON ${users.id} = ${projectReviewNotes.authorId} WHERE ${projectReviewNotes.projectId} = ${activeProjects.id} ORDER BY ${projectReviewNotes.noteDate} DESC LIMIT 1)`,
+            // Per-user unread count (notes after this user's last_seen_at, excluding own).
+            unreadCount: sql<number>`COALESCE((
+              SELECT COUNT(*)::int FROM ${projectReviewNotes} prn
+              WHERE prn.project_id = ${activeProjects.id}
+                AND prn.author_id IS DISTINCT FROM ${userId}
+                AND prn.created_at > COALESCE(
+                  (SELECT last_seen_at FROM ${reviewItemReadState}
+                   WHERE user_id = ${userId} AND target_kind = 'project' AND target_id = ${activeProjects.id}),
+                  'epoch'::timestamp
+                )
+            ), 0)`,
             // Consolidated: owner name via subquery
             ownerName: sql<string | null>`(SELECT ${users.firstName} || ' ' || ${users.lastName} FROM ${users} WHERE ${users.id} = ${projectStatusReviews.ownerId})`,
             // Consolidated: updatedBy name via subquery
@@ -18105,6 +18118,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ...r,
           reviewUpdatedBy: null,
           reviewUpdatedByName: null,
+          unreadCount: 0,
         }));
       }
 
@@ -18773,6 +18787,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/status-semanal/custom", requireAuth, async (req: Request, res: Response) => {
     try {
       const includeHidden = req.query.includeHidden === 'true';
+      const userId = req.user!.id;
 
       // Build WHERE conditions for hidden filter
       const whereConditions = !includeHidden
@@ -18807,6 +18822,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
           lastNoteAt: sql<string | null>`(SELECT ${projectReviewNotes.noteDate} FROM ${projectReviewNotes} WHERE ${projectReviewNotes.weeklyStatusItemId} = ${weeklyStatusItems.id} ORDER BY ${projectReviewNotes.noteDate} DESC LIMIT 1)`,
           lastNoteAuthorId: sql<number | null>`(SELECT ${projectReviewNotes.authorId} FROM ${projectReviewNotes} WHERE ${projectReviewNotes.weeklyStatusItemId} = ${weeklyStatusItems.id} ORDER BY ${projectReviewNotes.noteDate} DESC LIMIT 1)`,
           lastNoteAuthorName: sql<string | null>`(SELECT ${users.firstName} || ' ' || ${users.lastName} FROM ${projectReviewNotes} LEFT JOIN ${users} ON ${users.id} = ${projectReviewNotes.authorId} WHERE ${projectReviewNotes.weeklyStatusItemId} = ${weeklyStatusItems.id} ORDER BY ${projectReviewNotes.noteDate} DESC LIMIT 1)`,
+          // Per-user unread count.
+          unreadCount: sql<number>`COALESCE((
+            SELECT COUNT(*)::int FROM ${projectReviewNotes} prn
+            WHERE prn.weekly_status_item_id = ${weeklyStatusItems.id}
+              AND prn.author_id IS DISTINCT FROM ${userId}
+              AND prn.created_at > COALESCE(
+                (SELECT last_seen_at FROM ${reviewItemReadState}
+                 WHERE user_id = ${userId} AND target_kind = 'custom' AND target_id = ${weeklyStatusItems.id}),
+                'epoch'::timestamp
+              )
+          ), 0)`,
           // Consolidated: updatedBy name via subquery
           updatedByName: sql<string | null>`(SELECT ${users.firstName} || ' ' || ${users.lastName} FROM ${users} WHERE ${users.id} = ${weeklyStatusItems.updatedBy})`,
         }).from(weeklyStatusItems)
@@ -18847,6 +18873,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ...item,
           updatedBy: null,
           updatedByName: null,
+          unreadCount: 0,
         }));
       }
 

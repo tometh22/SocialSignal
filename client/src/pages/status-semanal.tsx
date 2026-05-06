@@ -134,6 +134,7 @@ type Item = {
   decisionNeeded: string | null;
   hiddenFromWeekly: boolean | null;
   noteCount: number;
+  unreadCount: number;
   isOverdue: boolean;
   updatedAt: string | null;
   updatedById: number | null;
@@ -920,25 +921,36 @@ function ImageLightbox({ images, initialIndex, open, onOpenChange, onUploadReply
   );
 }
 
-function useUnreadComments(itemKey: string | undefined, noteCount: number, userId?: number | null) {
-  const storageKey = itemKey ? `commentsSeen:${userId ?? 'anon'}:${itemKey}` : null;
-  const [seenCount, setSeenCount] = useState<number>(() => {
-    if (!storageKey || typeof window === 'undefined') return 0;
-    const v = window.localStorage.getItem(storageKey);
-    if (v === null) return 0;
-    const parsed = parseInt(v, 10);
-    return Number.isFinite(parsed) ? parsed : 0;
-  });
+// Server-driven unread tracking. The Item carries unreadCount from the API
+// (notes after this user's last_seen_at, excluding own). markAsRead posts to
+// /seen and optimistically zeros the count until the refetch lands.
+function useUnreadComments(item: Item, roomId: number | undefined) {
+  const queryClient = useQueryClient();
+  const [markedRead, setMarkedRead] = useState(false);
 
-  const hasUnread = noteCount > seenCount;
+  // If a fresh comment came in (server count went up), drop the optimistic flag
+  // so the new unread shows up.
+  useEffect(() => { setMarkedRead(false); }, [item.unreadCount]);
+
+  const hasUnread = item.unreadCount > 0 && !markedRead;
+  const unreadCount = markedRead ? 0 : item.unreadCount;
 
   const markAsRead = useCallback(() => {
-    if (!storageKey || typeof window === 'undefined') return;
-    window.localStorage.setItem(storageKey, String(noteCount));
-    setSeenCount(noteCount);
-  }, [storageKey, noteCount]);
+    if (!roomId || item.unreadCount === 0) return;
+    const kind = item.isCustom ? 'custom' : 'project';
+    const targetId = item.isCustom ? item.customId : item.projectId;
+    if (!targetId) return;
+    setMarkedRead(true);
+    mutationFetch(`/api/reviews/${roomId}/items/${kind}/${targetId}/seen`, 'POST')
+      .then(() => {
+        queryClient.invalidateQueries({ queryKey: ['/api/status-semanal?includeHidden=true'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/status-semanal/custom?includeHidden=true'] });
+        queryClient.invalidateQueries({ queryKey: ['reviews'] });
+      })
+      .catch(() => { setMarkedRead(false); });
+  }, [roomId, item.isCustom, item.customId, item.projectId, item.unreadCount, queryClient]);
 
-  return { hasUnread, unreadCount: Math.max(0, noteCount - seenCount), markAsRead };
+  return { hasUnread, unreadCount, markAsRead };
 }
 
 function AttachmentTile({ a, onRemove, onOpenImage }: { a: ProposalAttachment; onRemove?: () => void; onOpenImage?: () => void }) {
@@ -1194,8 +1206,8 @@ function DeadlinePicker({ value, isOverdue, onChange }: {
 
 // ─── Compact row (Verde) ──────────────────────────────────────────────────────
 
-function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, onResolve, expanded, onToggle, onNext, onPrev, hasNext, hasPrev, currentUserId, kbFocused, dragHandleProps, bulkMode, checked, onCheck, accent, hideSubtitle }: {
-  item: Item; users: AppUser[]; isSelected: boolean; currentUserId?: number | null;
+function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, onResolve, expanded, onToggle, onNext, onPrev, hasNext, hasPrev, currentUserId, roomId, kbFocused, dragHandleProps, bulkMode, checked, onCheck, accent, hideSubtitle }: {
+  item: Item; users: AppUser[]; isSelected: boolean; currentUserId?: number | null; roomId?: number;
   onOpenNotes?: () => void; onUpdate: (d: Record<string, any>) => void; onRemove: () => void; onResolve: () => void;
   expanded: boolean; onToggle: () => void; onNext?: () => void; onPrev?: () => void; hasNext?: boolean; hasPrev?: boolean;
   kbFocused?: boolean; dragHandleProps?: Record<string, any>; bulkMode?: boolean; checked?: boolean; onCheck?: (v: boolean) => void;
@@ -1203,7 +1215,7 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const decMeta = dm(item.decisionNeeded);
-  const { hasUnread, markAsRead } = useUnreadComments(item.key, item.noteCount, currentUserId);
+  const { hasUnread, markAsRead } = useUnreadComments(item, roomId);
   useEffect(() => { if (expanded && hasUnread) markAsRead(); }, [expanded, hasUnread, markAsRead]);
   const handleOpenNotes = onOpenNotes ? () => { markAsRead(); onOpenNotes(); } : undefined;
 
@@ -1733,15 +1745,15 @@ function SortableCompactRow(props: React.ComponentProps<typeof CompactRow>) {
 }
 
 // ─── AlertSidebarCard — expandable card for CEO/COO sidebar ─────────────────
-function AlertSidebarCard({ item, accent, currentUserId, onUpdate, expanded, onToggle, users, onOpenNotes, onRemove, onResolve }: {
-  item: Item; accent: 'red' | 'amber'; currentUserId?: number | null;
+function AlertSidebarCard({ item, accent, currentUserId, roomId, onUpdate, expanded, onToggle, users, onOpenNotes, onRemove, onResolve }: {
+  item: Item; accent: 'red' | 'amber'; currentUserId?: number | null; roomId?: number;
   onUpdate: (d: Record<string, any>) => void;
   expanded?: boolean; onToggle?: () => void; onResolve?: () => void;
   users?: AppUser[]; onOpenNotes?: () => void; onRemove?: () => void;
 }) {
   const accentBorder = accent === 'red' ? 'border-l-red-500' : 'border-l-amber-400';
   const accentBg = accent === 'red' ? 'bg-red-50/40' : 'bg-amber-50/40';
-  const { hasUnread, markAsRead } = useUnreadComments(item.key, item.noteCount, currentUserId);
+  const { hasUnread, markAsRead } = useUnreadComments(item, roomId);
   useEffect(() => { if (expanded && hasUnread) markAsRead(); }, [expanded, hasUnread, markAsRead]);
   const handleOpenNotes = onOpenNotes ? () => { markAsRead(); onOpenNotes(); } : undefined;
   return (
@@ -1928,8 +1940,8 @@ function AlertSidebarCard({ item, accent, currentUserId, onUpdate, expanded, onT
 }
 
 // ─── DecisionSidebarCard — expandable card for decisions sidebar ─────────────
-function DecisionSidebarCard({ item, currentUserId, expanded, onToggle, users, onUpdate, onOpenNotes, onRemove, onResolve }: {
-  item: Item; currentUserId?: number | null;
+function DecisionSidebarCard({ item, currentUserId, roomId, expanded, onToggle, users, onUpdate, onOpenNotes, onRemove, onResolve }: {
+  item: Item; currentUserId?: number | null; roomId?: number;
   expanded?: boolean; onToggle?: () => void;
   users?: AppUser[]; onUpdate?: (d: Record<string, any>) => void;
   onOpenNotes?: () => void; onRemove?: () => void; onResolve?: () => void;
@@ -1938,7 +1950,7 @@ function DecisionSidebarCard({ item, currentUserId, expanded, onToggle, users, o
   const daysSince = item.updatedAt
     ? Math.floor((Date.now() - new Date(item.updatedAt).getTime()) / 86400000)
     : null;
-  const { hasUnread, markAsRead } = useUnreadComments(item.key, item.noteCount, currentUserId);
+  const { hasUnread, markAsRead } = useUnreadComments(item, roomId);
   useEffect(() => { if (expanded && hasUnread) markAsRead(); }, [expanded, hasUnread, markAsRead]);
   const handleOpenNotes = onOpenNotes ? () => { markAsRead(); onOpenNotes(); } : undefined;
   return (
@@ -2622,6 +2634,7 @@ export default function StatusSemanalPage() {
     decisionNeeded: r.decisionNeeded,
     hiddenFromWeekly: r.hiddenFromWeekly,
     noteCount: r.noteCount,
+    unreadCount: (r as any).unreadCount ?? 0,
     isOverdue: isOverdue(r.deadline),
     updatedAt: r.reviewUpdatedAt,
     updatedById: r.reviewUpdatedBy,
@@ -2650,6 +2663,7 @@ export default function StatusSemanalPage() {
     decisionNeeded: c.decisionNeeded,
     hiddenFromWeekly: c.hiddenFromWeekly,
     noteCount: c.noteCount ?? 0,
+    unreadCount: (c as any).unreadCount ?? 0,
     isOverdue: isOverdue(c.deadline),
     updatedAt: c.updatedAt,
     updatedById: c.updatedBy,
@@ -3162,7 +3176,7 @@ export default function StatusSemanalPage() {
                           exit={{ opacity: 0, y: -4 }}
                           transition={{ duration: 0.14, ease: [0.4, 0, 0.2, 1] }}
                           className="border-b border-slate-100/80 last:border-b-0">
-                          <AlertSidebarCard item={item} accent={rowAccent} currentUserId={currentUserId}
+                          <AlertSidebarCard item={item} accent={rowAccent} currentUserId={currentUserId} roomId={roomCtx?.roomId}
                             onUpdate={h.onUpdate}
                             expanded={expandedKey === item.key}
                             onToggle={() => setExpandedKey(expandedKey === item.key ? null : item.key)}
@@ -3196,7 +3210,7 @@ export default function StatusSemanalPage() {
                           exit={{ opacity: 0, y: -4 }}
                           transition={{ duration: 0.14, ease: [0.4, 0, 0.2, 1] }}
                           className="border-b border-slate-100/80 last:border-b-0">
-                          <DecisionSidebarCard item={item} currentUserId={currentUserId}
+                          <DecisionSidebarCard item={item} currentUserId={currentUserId} roomId={roomCtx?.roomId}
                             expanded={expandedKey === item.key}
                             onToggle={() => setExpandedKey(expandedKey === item.key ? null : item.key)}
                             users={appUsers}
@@ -3263,7 +3277,7 @@ export default function StatusSemanalPage() {
                         const h = getItemHandlers(item);
                         const globalIdx = sortedNormalItems.indexOf(item);
                         return (
-                          <SortableCompactRow key={item.key} item={item} users={appUsers} currentUserId={currentUserId}
+                          <SortableCompactRow key={item.key} item={item} users={appUsers} currentUserId={currentUserId} roomId={roomCtx?.roomId}
                             isSelected={notesOpen !== null && ((notesOpen.type === 'project' && item.projectId === notesOpen.id) || (notesOpen.type === 'custom' && item.customId === notesOpen.id))}
                             onOpenNotes={h.onOpenNotes} onUpdate={h.onUpdate} onRemove={h.onRemove} onResolve={h.onResolve}
                             expanded={expandedKey === item.key}
