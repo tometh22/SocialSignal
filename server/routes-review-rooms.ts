@@ -15,6 +15,7 @@ import {
   clients,
   quotations,
   users,
+  itemReadState,
   insertReviewRoomSchema,
 } from "@shared/schema";
 import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
@@ -313,6 +314,7 @@ export function createReviewRoomsRouter(requireAuth: RequireAuth): Router {
   router.get('/:roomId/items', requireAuth, requireRoomMember(), async (req: Request, res: Response) => {
     try {
       const roomId = req.roomMember!.roomId;
+      const userId = req.roomMember!.userId;
       const includeHidden = req.query.includeHidden === 'true';
 
       const rows = await db
@@ -341,6 +343,7 @@ export function createReviewRoomsRouter(requireAuth: RequireAuth): Router {
           reviewUpdatedAt: projectStatusReviews.updatedAt,
           reviewUpdatedBy: projectStatusReviews.updatedBy,
           noteCount: sql<number>`COALESCE((SELECT COUNT(*)::int FROM ${projectReviewNotes} WHERE ${projectReviewNotes.projectId} = ${activeProjects.id} AND ${projectReviewNotes.roomId} = ${roomId}), 0)`,
+          unreadCount: sql<number>`COALESCE((SELECT COUNT(*)::int FROM ${projectReviewNotes} WHERE ${projectReviewNotes.projectId} = ${activeProjects.id} AND ${projectReviewNotes.roomId} = ${roomId} AND ${projectReviewNotes.noteDate} > COALESCE((SELECT ${itemReadState.lastReadAt} FROM ${itemReadState} WHERE ${itemReadState.userId} = ${userId} AND ${itemReadState.roomId} = ${roomId} AND ${itemReadState.projectId} = ${activeProjects.id}), '1970-01-01'::timestamp)), 0)`,
           ownerName: sql<string | null>`(SELECT ${users.firstName} || ' ' || ${users.lastName} FROM ${users} WHERE ${users.id} = ${projectStatusReviews.ownerId})`,
           reviewUpdatedByName: sql<string | null>`(SELECT ${users.firstName} || ' ' || ${users.lastName} FROM ${users} WHERE ${users.id} = ${projectStatusReviews.updatedBy})`,
         })
@@ -498,6 +501,46 @@ export function createReviewRoomsRouter(requireAuth: RequireAuth): Router {
     }
   });
 
+  // POST /api/reviews/:roomId/items/project/:projectId/read — mark project item as read for current user
+  router.post('/:roomId/items/project/:projectId/read', requireAuth, requireRoomMember(), async (req: Request, res: Response) => {
+    try {
+      const roomId = req.roomMember!.roomId;
+      const userId = req.roomMember!.userId;
+      const projectId = parseInt(req.params.projectId, 10);
+      if (!Number.isFinite(projectId)) return res.status(400).json({ message: "projectId inválido" });
+      await db.execute(sql`
+        INSERT INTO ${itemReadState} (user_id, room_id, project_id, last_read_at)
+        VALUES (${userId}, ${roomId}, ${projectId}, NOW())
+        ON CONFLICT (user_id, room_id, project_id) WHERE project_id IS NOT NULL
+        DO UPDATE SET last_read_at = NOW()
+      `);
+      res.json({ ok: true });
+    } catch (error) {
+      console.error('POST mark project read error:', error);
+      res.status(500).json({ message: "Error al marcar como leído" });
+    }
+  });
+
+  // POST /api/reviews/:roomId/items/custom/:itemId/read — mark custom item as read for current user
+  router.post('/:roomId/items/custom/:itemId/read', requireAuth, requireRoomMember(), async (req: Request, res: Response) => {
+    try {
+      const roomId = req.roomMember!.roomId;
+      const userId = req.roomMember!.userId;
+      const itemId = parseInt(req.params.itemId, 10);
+      if (!Number.isFinite(itemId)) return res.status(400).json({ message: "itemId inválido" });
+      await db.execute(sql`
+        INSERT INTO ${itemReadState} (user_id, room_id, weekly_status_item_id, last_read_at)
+        VALUES (${userId}, ${roomId}, ${itemId}, NOW())
+        ON CONFLICT (user_id, room_id, weekly_status_item_id) WHERE weekly_status_item_id IS NOT NULL
+        DO UPDATE SET last_read_at = NOW()
+      `);
+      res.json({ ok: true });
+    } catch (error) {
+      console.error('POST mark custom read error:', error);
+      res.status(500).json({ message: "Error al marcar como leído" });
+    }
+  });
+
   // GET /api/reviews/:roomId/assignable-users — members of the room (for owner picker)
   router.get('/:roomId/assignable-users', requireAuth, requireRoomMember(), async (req: Request, res: Response) => {
     try {
@@ -527,6 +570,7 @@ export function createReviewRoomsRouter(requireAuth: RequireAuth): Router {
   router.get('/:roomId/items/custom', requireAuth, requireRoomMember(), async (req: Request, res: Response) => {
     try {
       const roomId = req.roomMember!.roomId;
+      const userId = req.roomMember!.userId;
       const includeHidden = req.query.includeHidden === 'true';
       const items = await db.select({
         id: weeklyStatusItems.id,
@@ -547,6 +591,7 @@ export function createReviewRoomsRouter(requireAuth: RequireAuth): Router {
         updatedBy: weeklyStatusItems.updatedBy,
         updatedByName: sql<string | null>`(SELECT ${users.firstName} || ' ' || ${users.lastName} FROM ${users} WHERE ${users.id} = ${weeklyStatusItems.updatedBy})`,
         noteCount: sql<number>`COALESCE((SELECT COUNT(*)::int FROM ${projectReviewNotes} WHERE ${projectReviewNotes.weeklyStatusItemId} = ${weeklyStatusItems.id}), 0)`,
+        unreadCount: sql<number>`COALESCE((SELECT COUNT(*)::int FROM ${projectReviewNotes} WHERE ${projectReviewNotes.weeklyStatusItemId} = ${weeklyStatusItems.id} AND ${projectReviewNotes.noteDate} > COALESCE((SELECT ${itemReadState.lastReadAt} FROM ${itemReadState} WHERE ${itemReadState.userId} = ${userId} AND ${itemReadState.roomId} = ${roomId} AND ${itemReadState.weeklyStatusItemId} = ${weeklyStatusItems.id}), '1970-01-01'::timestamp)), 0)`,
       }).from(weeklyStatusItems)
         .where(and(
           eq(weeklyStatusItems.roomId, roomId),
