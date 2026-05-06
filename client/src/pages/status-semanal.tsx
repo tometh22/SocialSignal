@@ -9,6 +9,7 @@ import MembersDialog from "@/components/review/MembersDialog";
 import AddProjectDialog from "@/components/review/AddProjectDialog";
 import RoomTitleEditor from "@/components/review/RoomTitleEditor";
 import { useToast } from "@/hooks/use-toast";
+import { ToastAction } from "@/components/ui/toast";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -1319,12 +1320,6 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
               {hasUnread && <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-red-500 ring-2 ring-white animate-pulse" />}
             </button>
           )}
-          <TooltipProvider><Tooltip><TooltipTrigger asChild>
-            <button onClick={onResolve}
-              className="p-1 rounded text-emerald-300 hover:text-emerald-600 hover:bg-emerald-50 transition-colors">
-              <CheckCircle2 className="h-4 w-4" />
-            </button>
-          </TooltipTrigger><TooltipContent className="text-xs">Resolver y quitar</TooltipContent></Tooltip></TooltipProvider>
           <Popover open={menuOpen} onOpenChange={setMenuOpen}>
             <PopoverTrigger asChild>
               <button className="p-1 rounded hover:bg-slate-100 text-slate-300 hover:text-slate-500 transition-colors opacity-0 group-hover:opacity-100">
@@ -1766,13 +1761,6 @@ function AlertSidebarCard({ item, accent, currentUserId, roomId, onUpdate, expan
             <div className="flex items-center gap-1.5">
               {item.isCustom && <Tag className="h-3 w-3 text-indigo-400 shrink-0" />}
               <p className="font-semibold text-[13px] leading-snug text-slate-900 break-words flex-1">{item.title}</p>
-              {onResolve && (
-                <button onClick={e => { e.stopPropagation(); onResolve(); }}
-                  className="p-0.5 rounded text-emerald-300 hover:text-emerald-600 hover:bg-emerald-50 transition-colors shrink-0"
-                  title="Resolver">
-                  <CheckCircle2 className="h-4 w-4" />
-                </button>
-              )}
               <ChevronDown className={cn("h-3 w-3 text-slate-300 shrink-0 transition-transform", !expanded && "-rotate-90")} />
             </div>
             {!expanded && item.currentAction && (
@@ -1792,7 +1780,6 @@ function AlertSidebarCard({ item, accent, currentUserId, roomId, onUpdate, expan
                   {deadlineLabel(item.deadline)}
                 </span>
               )}
-              <FreshnessIndicator updatedAt={item.updatedAt} updatedByName={item.updatedByName} updatedById={item.updatedById} currentUserId={currentUserId} />
               {item.noteCount > 0 && (
                 <span className={cn(
                   "inline-flex items-center gap-1 text-[10px]",
@@ -1932,13 +1919,6 @@ function DecisionSidebarCard({ item, currentUserId, roomId, expanded, onToggle, 
       <div className="px-3 py-2.5 cursor-pointer" onClick={onToggle}>
         <div className="flex items-center gap-1.5">
           <p className="font-semibold text-[13px] leading-snug text-slate-900 break-words flex-1">{item.title}</p>
-          {onResolve && (
-            <button onClick={e => { e.stopPropagation(); onResolve(); }}
-              className="p-0.5 rounded text-slate-300 hover:text-emerald-600 hover:bg-emerald-50 transition-colors shrink-0"
-              title="Resolver">
-              <CheckCircle2 className="h-3.5 w-3.5" />
-            </button>
-          )}
           <ChevronDown className={cn("h-3 w-3 text-slate-300 shrink-0 transition-transform", !expanded && "-rotate-90")} />
         </div>
         {!expanded && item.currentAction && (
@@ -2714,12 +2694,20 @@ export default function StatusSemanalPage() {
       setConfirmDelete(item);
     },
     onResolve: () => {
+      const undo = () => {
+        if (item.isCustom && item.customId) updateCustom(item.customId, { hiddenFromWeekly: false });
+        else if (item.projectId) updateProject(item.projectId, { hiddenFromWeekly: false });
+      };
       if (item.isCustom && item.customId) {
         updateCustom(item.customId, { hiddenFromWeekly: true });
       } else if (item.projectId) {
         updateProject(item.projectId, { hiddenFromWeekly: true });
       }
-      toast({ title: 'Tema resuelto', description: `"${item.title}" se quitó del review.` });
+      toast({
+        title: 'Tema resuelto',
+        description: `"${item.title}" se quitó del review.`,
+        action: <ToastAction altText="Deshacer" onClick={undo}>Deshacer</ToastAction>,
+      });
     },
     onOpenNotes: (() => {
       if (item.projectId) {
@@ -3285,6 +3273,18 @@ export default function StatusSemanalPage() {
                   </DndContext>
                 )}
               </div>
+
+              {/* Toggle visible cuando hay items resueltos — fácil acceso para
+                   recuperar algo si lo resolviste sin querer */}
+              {hiddenCount > 0 && (
+                <div className="flex justify-center pt-1">
+                  <button onClick={() => setShowHidden(v => !v)}
+                    className="flex items-center gap-1.5 text-[11px] text-slate-400 hover:text-slate-700 transition-colors">
+                    {showHidden ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                    {showHidden ? 'Ocultar' : 'Ver'} {hiddenCount} resuelto{hiddenCount === 1 ? '' : 's'}
+                  </button>
+                </div>
+              )}
 
 
               {/* ── Quitados ───────────────────────────────────────── */}
