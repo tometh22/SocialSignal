@@ -1141,7 +1141,7 @@ function OwnerSelect({ value, name, onChange, users }: {
 }) {
   return (
     <Select value={value?.toString() ?? '__none__'} onValueChange={v => onChange(v === '__none__' ? null : parseInt(v))}>
-      <SelectTrigger className="h-6 border-0 bg-transparent hover:bg-slate-100 px-1.5 gap-1 focus:ring-0 max-w-[120px] rounded transition-all">
+      <SelectTrigger className="group h-6 border-0 bg-transparent hover:bg-slate-100 px-1.5 gap-1 focus:ring-0 max-w-[120px] rounded transition-all [&>svg]:opacity-0 [&>svg]:transition-opacity hover:[&>svg]:opacity-50 focus:[&>svg]:opacity-50">
         <div className="flex items-center gap-1.5 min-w-0">
           {name ? (
             <>
@@ -1557,7 +1557,7 @@ function ItemThread({ projectId, customId, currentUserId, users = [], onOpenFull
           </button>
         )}
         {thread.length === 0 && (
-          <p className="text-[11px] text-slate-400 italic py-0.5">{compact ? 'Sin actividad aún' : 'Sin actividad — dejá un comentario'}</p>
+          <p className="text-[11px] text-slate-400 py-0.5">{compact ? 'Sin actividad aún' : 'Sin actividad — dejá un comentario'}</p>
         )}
         {visibleThread.map(entry => {
           const isOwn = entry.authorId != null && entry.authorId === currentUserId;
@@ -1766,30 +1766,35 @@ function AlertSidebarCard({ item, accent, currentUserId, roomId, onUpdate, expan
             {!expanded && item.currentAction && (
               <p className="text-[11px] text-slate-500 mt-0.5 leading-snug line-clamp-2">{item.currentAction}</p>
             )}
-            <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-              {item.ownerName && (
-                <div className="flex items-center gap-1">
-                  <div className="h-4 w-4 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-[8px] font-bold shrink-0">
-                    {initials(item.ownerName)}
+            {/* Owner + deadline + notes meta row — only shown collapsed; the
+                 expanded view has owner/deadline editable in the footer, so
+                 repeating them here is redundant. */}
+            {!expanded && (
+              <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                {item.ownerName && (
+                  <div className="flex items-center gap-1">
+                    <div className="h-4 w-4 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-[8px] font-bold shrink-0">
+                      {initials(item.ownerName)}
+                    </div>
+                    <span className="text-[10px] text-slate-400">{item.ownerName.split(' ')[0]}</span>
                   </div>
-                  <span className="text-[10px] text-slate-400">{item.ownerName.split(' ')[0]}</span>
-                </div>
-              )}
-              {item.deadline && (
-                <span className={cn("text-[10px] font-medium", item.isOverdue ? "text-red-500" : "text-slate-400")}>
-                  {deadlineLabel(item.deadline)}
-                </span>
-              )}
-              {item.noteCount > 0 && (
-                <span className={cn(
-                  "inline-flex items-center gap-1 text-[10px]",
-                  hasUnread ? "text-indigo-600 font-medium" : "text-slate-400"
-                )}>
-                  <MessageSquare className="h-3 w-3" />
-                  {hasUnread ? `Nuevo · ${item.noteCount}` : item.noteCount}
-                </span>
-              )}
-            </div>
+                )}
+                {item.deadline && (
+                  <span className={cn("text-[10px] font-medium", item.isOverdue ? "text-red-500" : "text-slate-400")}>
+                    {deadlineLabel(item.deadline)}
+                  </span>
+                )}
+                {item.noteCount > 0 && (
+                  <span className={cn(
+                    "inline-flex items-center gap-1 text-[10px]",
+                    hasUnread ? "text-indigo-600 font-medium" : "text-slate-400"
+                  )}>
+                    <MessageSquare className="h-3 w-3" />
+                    {hasUnread ? `Nuevo · ${item.noteCount}` : item.noteCount}
+                  </span>
+                )}
+              </div>
+            )}
             {!expanded && hasUnread && item.lastNoteContent && (
               <button
                 type="button"
@@ -1924,34 +1929,36 @@ function DecisionSidebarCard({ item, currentUserId, roomId, expanded, onToggle, 
         {!expanded && item.currentAction && (
           <p className="text-[11px] text-slate-500 mt-0.5 leading-snug line-clamp-2">{item.currentAction}</p>
         )}
-        <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-          <span className="text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 leading-none">{decMeta.label}</span>
-          {daysSince !== null && daysSince > 1 && (
-            <span className="text-[10px] text-slate-400">{daysSince}d sin resolución</span>
-          )}
-          {item.ownerName && (
-            <div className="flex items-center gap-1">
-              <div className="h-4 w-4 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-[8px] font-bold shrink-0">
-                {initials(item.ownerName)}
+        {!expanded && (
+          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+            <span className="text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 leading-none">{decMeta.label}</span>
+            {daysSince !== null && daysSince > 1 && (
+              <span className="text-[10px] text-slate-400">{daysSince}d sin resolución</span>
+            )}
+            {item.ownerName && (
+              <div className="flex items-center gap-1">
+                <div className="h-4 w-4 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-[8px] font-bold shrink-0">
+                  {initials(item.ownerName)}
+                </div>
+                <span className="text-[10px] text-slate-400">{item.ownerName.split(' ')[0]}</span>
               </div>
-              <span className="text-[10px] text-slate-400">{item.ownerName.split(' ')[0]}</span>
-            </div>
-          )}
-          {item.deadline && (
-            <span className={cn("text-[10px] font-medium", item.isOverdue ? "text-red-500" : "text-slate-400")}>
-              {deadlineLabel(item.deadline)}
-            </span>
-          )}
-          {item.noteCount > 0 && (
-            <span className={cn(
-              "inline-flex items-center gap-1 text-[10px]",
-              hasUnread ? "text-indigo-600 font-medium" : "text-slate-400"
-            )}>
-              <MessageSquare className="h-3 w-3" />
-              {hasUnread ? `Nuevo · ${item.noteCount}` : item.noteCount}
-            </span>
-          )}
-        </div>
+            )}
+            {item.deadline && (
+              <span className={cn("text-[10px] font-medium", item.isOverdue ? "text-red-500" : "text-slate-400")}>
+                {deadlineLabel(item.deadline)}
+              </span>
+            )}
+            {item.noteCount > 0 && (
+              <span className={cn(
+                "inline-flex items-center gap-1 text-[10px]",
+                hasUnread ? "text-indigo-600 font-medium" : "text-slate-400"
+              )}>
+                <MessageSquare className="h-3 w-3" />
+                {hasUnread ? `Nuevo · ${item.noteCount}` : item.noteCount}
+              </span>
+            )}
+          </div>
+        )}
         {!expanded && hasUnread && item.lastNoteContent && (
           <button
             type="button"
@@ -3099,8 +3106,7 @@ export default function StatusSemanalPage() {
               {alertItems.length > 0 && (
               <div>
                 <div className="flex items-center gap-1.5 mb-2 px-1">
-                  <span className="text-[10px] font-bold text-red-500 uppercase tracking-widest flex-1">Requieren atención</span>
-                  <span className="text-[10px] font-bold text-red-400 bg-red-50 rounded-full px-1.5 py-0.5">{alertItems.length}</span>
+                  <span className="text-[11px] text-slate-500 flex-1">Requieren atención · {alertItems.length}</span>
                   <AddItemButton variant="inline" onAdd={(title, subtitle) => createCustom.mutate({ title, subtitle })} />
                 </div>
                 <div className="rounded-xl border border-slate-200/60 bg-white overflow-hidden">
@@ -3135,8 +3141,7 @@ export default function StatusSemanalPage() {
               {decisionItems.length > 0 && (
               <div>
                 <div className="flex items-center gap-1.5 mb-2 px-1">
-                  <span className="text-[10px] font-bold text-amber-600 uppercase tracking-widest flex-1">Decisiones pendientes</span>
-                  <span className="text-[10px] font-bold text-amber-500 bg-amber-50 rounded-full px-1.5 py-0.5">{decisionItems.length}</span>
+                  <span className="text-[11px] text-slate-500 flex-1">Decisiones pendientes · {decisionItems.length}</span>
                 </div>
                 <div className="rounded-xl border border-slate-200/60 bg-white overflow-hidden">
                   <AnimatePresence initial={false}>
