@@ -53,11 +53,11 @@ export function rewriteReviewUrl(url: string): string {
   if (m) return `${base}/updates/${m[1]}${qs}`;
 
   // custom sub-routes
-  m = path.match(/^\/api\/status-semanal\/custom\/(\d+)(\/notes|\/updates|\/activity|\/read)?$/);
+  m = path.match(/^\/api\/status-semanal\/custom\/(\d+)(\/notes|\/updates|\/activity)?$/);
   if (m) return `${base}/items/custom/${m[1]}${m[2] ?? ''}${qs}`;
 
   // project sub-routes
-  m = path.match(/^\/api\/status-semanal\/(\d+)(\/notes|\/updates|\/activity|\/read)?$/);
+  m = path.match(/^\/api\/status-semanal\/(\d+)(\/notes|\/updates|\/activity)?$/);
   if (m) return `${base}/items/project/${m[1]}${m[2] ?? ''}${qs}`;
 
   return url;

@@ -679,8 +679,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.all('/api/status-semanal/:projectId/notes', legacyRewrite((r, req) => `/api/reviews/${r}/items/project/${req.params.projectId}/notes`));
   app.all('/api/status-semanal/:projectId/updates', legacyRewrite((r, req) => `/api/reviews/${r}/items/project/${req.params.projectId}/updates`));
   app.all('/api/status-semanal/:projectId/activity', legacyRewrite((r, req) => `/api/reviews/${r}/items/project/${req.params.projectId}/activity`));
-  app.all('/api/status-semanal/:projectId/read', legacyRewrite((r, req) => `/api/reviews/${r}/items/project/${req.params.projectId}/read`));
-  app.all('/api/status-semanal/custom/:itemId/read', legacyRewrite((r, req) => `/api/reviews/${r}/items/custom/${req.params.itemId}/read`));
 
   // ==================== UNIFIED ACTIVE PROJECTS ENDPOINT ====================
   // Single source of truth for "Proyectos Activos" page according to blueprint
