@@ -62,6 +62,7 @@ type StatusRow = {
   reviewUpdatedBy: number | null;
   reviewUpdatedByName: string | null;
   noteCount: number;
+  unreadCount?: number;
   lastNoteContent: string | null;
   lastNoteAt: string | null;
   lastNoteAuthorId: number | null;
@@ -87,6 +88,7 @@ type CustomItem = {
   updatedBy: number | null;
   updatedByName: string | null;
   noteCount?: number;
+  unreadCount?: number;
   lastNoteContent?: string | null;
   lastNoteAt?: string | null;
   lastNoteAuthorId?: number | null;
@@ -134,6 +136,7 @@ type Item = {
   decisionNeeded: string | null;
   hiddenFromWeekly: boolean | null;
   noteCount: number;
+  unreadCount: number;
   isOverdue: boolean;
   updatedAt: string | null;
   updatedById: number | null;
@@ -920,25 +923,37 @@ function ImageLightbox({ images, initialIndex, open, onOpenChange, onUploadReply
   );
 }
 
-function useUnreadComments(itemKey: string | undefined, noteCount: number, userId?: number | null) {
-  const storageKey = itemKey ? `commentsSeen:${userId ?? 'anon'}:${itemKey}` : null;
-  const [seenCount, setSeenCount] = useState<number>(() => {
-    if (!storageKey || typeof window === 'undefined') return 0;
-    const v = window.localStorage.getItem(storageKey);
-    if (v === null) return 0;
-    const parsed = parseInt(v, 10);
-    return Number.isFinite(parsed) ? parsed : 0;
-  });
+function useUnreadComments(item: { projectId?: number; customId?: number; unreadCount: number }) {
+  const queryClient = useQueryClient();
+  const [optimisticRead, setOptimisticRead] = useState(false);
 
-  const hasUnread = noteCount > seenCount;
+  const unreadCount = optimisticRead ? 0 : (item.unreadCount ?? 0);
+  const hasUnread = unreadCount > 0;
+
+  const url = item.projectId
+    ? `/api/status-semanal/${item.projectId}/read`
+    : item.customId
+      ? `/api/status-semanal/custom/${item.customId}/read`
+      : null;
 
   const markAsRead = useCallback(() => {
-    if (!storageKey || typeof window === 'undefined') return;
-    window.localStorage.setItem(storageKey, String(noteCount));
-    setSeenCount(noteCount);
-  }, [storageKey, noteCount]);
+    if (!url) return;
+    if (!hasUnread) return;
+    setOptimisticRead(true);
+    mutationFetch(url, 'POST').then(() => {
+      queryClient.refetchQueries({ queryKey: ['/api/status-semanal?includeHidden=true'] });
+      queryClient.refetchQueries({ queryKey: ['/api/status-semanal/custom?includeHidden=true'] });
+    }).catch(() => {
+      setOptimisticRead(false);
+    });
+  }, [url, hasUnread, queryClient]);
 
-  return { hasUnread, unreadCount: Math.max(0, noteCount - seenCount), markAsRead };
+  // Reset optimistic flag once the server-side count actually drops to 0
+  useEffect(() => {
+    if (optimisticRead && (item.unreadCount ?? 0) === 0) setOptimisticRead(false);
+  }, [item.unreadCount, optimisticRead]);
+
+  return { hasUnread, unreadCount, markAsRead };
 }
 
 function AttachmentTile({ a, onRemove, onOpenImage }: { a: ProposalAttachment; onRemove?: () => void; onOpenImage?: () => void }) {
@@ -1203,7 +1218,7 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const decMeta = dm(item.decisionNeeded);
-  const { hasUnread, markAsRead } = useUnreadComments(item.key, item.noteCount, currentUserId);
+  const { hasUnread, markAsRead } = useUnreadComments({ projectId: item.projectId, customId: item.customId, unreadCount: item.unreadCount });
   useEffect(() => { if (expanded && hasUnread) markAsRead(); }, [expanded, hasUnread, markAsRead]);
   const handleOpenNotes = onOpenNotes ? () => { markAsRead(); onOpenNotes(); } : undefined;
 
@@ -1741,7 +1756,7 @@ function AlertSidebarCard({ item, accent, currentUserId, onUpdate, expanded, onT
 }) {
   const accentBorder = accent === 'red' ? 'border-l-red-500' : 'border-l-amber-400';
   const accentBg = accent === 'red' ? 'bg-red-50/40' : 'bg-amber-50/40';
-  const { hasUnread, markAsRead } = useUnreadComments(item.key, item.noteCount, currentUserId);
+  const { hasUnread, markAsRead } = useUnreadComments({ projectId: item.projectId, customId: item.customId, unreadCount: item.unreadCount });
   useEffect(() => { if (expanded && hasUnread) markAsRead(); }, [expanded, hasUnread, markAsRead]);
   const handleOpenNotes = onOpenNotes ? () => { markAsRead(); onOpenNotes(); } : undefined;
   return (
@@ -1922,7 +1937,7 @@ function DecisionSidebarCard({ item, currentUserId, expanded, onToggle, users, o
   const daysSince = item.updatedAt
     ? Math.floor((Date.now() - new Date(item.updatedAt).getTime()) / 86400000)
     : null;
-  const { hasUnread, markAsRead } = useUnreadComments(item.key, item.noteCount, currentUserId);
+  const { hasUnread, markAsRead } = useUnreadComments({ projectId: item.projectId, customId: item.customId, unreadCount: item.unreadCount });
   useEffect(() => { if (expanded && hasUnread) markAsRead(); }, [expanded, hasUnread, markAsRead]);
   const handleOpenNotes = onOpenNotes ? () => { markAsRead(); onOpenNotes(); } : undefined;
   return (
@@ -2583,6 +2598,7 @@ export default function StatusSemanalPage() {
     decisionNeeded: r.decisionNeeded,
     hiddenFromWeekly: r.hiddenFromWeekly,
     noteCount: r.noteCount,
+    unreadCount: r.unreadCount ?? 0,
     isOverdue: isOverdue(r.deadline),
     updatedAt: r.reviewUpdatedAt,
     updatedById: r.reviewUpdatedBy,
@@ -2611,6 +2627,7 @@ export default function StatusSemanalPage() {
     decisionNeeded: c.decisionNeeded,
     hiddenFromWeekly: c.hiddenFromWeekly,
     noteCount: c.noteCount ?? 0,
+    unreadCount: c.unreadCount ?? 0,
     isOverdue: isOverdue(c.deadline),
     updatedAt: c.updatedAt,
     updatedById: c.updatedBy,
