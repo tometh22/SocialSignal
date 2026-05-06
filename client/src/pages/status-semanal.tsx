@@ -1780,7 +1780,6 @@ function AlertSidebarCard({ item, accent, currentUserId, roomId, onUpdate, expan
                   {deadlineLabel(item.deadline)}
                 </span>
               )}
-              <FreshnessIndicator updatedAt={item.updatedAt} updatedByName={item.updatedByName} updatedById={item.updatedById} currentUserId={currentUserId} />
               {item.noteCount > 0 && (
                 <span className={cn(
                   "inline-flex items-center gap-1 text-[10px]",
