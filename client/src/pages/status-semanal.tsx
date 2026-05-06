@@ -1403,7 +1403,7 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
                 <div className="flex items-center gap-1.5 px-5 py-2.5 border-t border-slate-100 bg-slate-50/60 flex-wrap">
                   <DecisionBadge value={item.decisionNeeded} onChange={v => onUpdate({ decisionNeeded: v })} />
                   {item.mainRisk && (
-                    <div className="flex items-center gap-1 text-[10px] text-orange-600 bg-orange-50 border border-orange-100 rounded-md px-1.5 py-0.5">
+                    <div className="flex items-center gap-1 text-[10px] text-slate-500 bg-slate-100 border border-slate-200 rounded-md px-1.5 py-0.5">
                       <Shield className="h-2.5 w-2.5" /><span className="truncate max-w-[120px]">{item.mainRisk}</span>
                     </div>
                   )}
@@ -1833,20 +1833,13 @@ function AlertSidebarCard({ item, accent, currentUserId, onUpdate, expanded, onT
             transition={{ duration: 0.16, ease: [0.4, 0, 0.2, 1] }}
             className="overflow-hidden">
             <div className="px-3 pb-3 space-y-2" onClick={e => e.stopPropagation()}>
-              {/* Overdue alert */}
-              {item.isOverdue && (
-                <div className="flex items-center gap-1.5 rounded-md px-2 py-1.5 bg-red-100 border border-red-200 text-red-700 text-[11px] font-semibold">
-                  <Clock className="h-3 w-3 shrink-0" />
-                  Demorado — {deadlineLabel(item.deadline)}
-                </div>
-              )}
-
-              {/* Risk */}
+              {/* Risk (only the most important secondary signal — overdue is already
+                   communicated by the red border + header deadline in red) */}
               {item.mainRisk && (
-                <div className="flex items-start gap-1.5 rounded-md px-2 py-1.5 bg-orange-50 border border-orange-100">
-                  <Shield className="h-3 w-3 text-orange-500 shrink-0 mt-0.5" />
+                <div className="flex items-start gap-1.5 rounded-md px-2 py-1.5 bg-slate-50 border border-slate-100">
+                  <Shield className="h-3 w-3 text-slate-400 shrink-0 mt-0.5" />
                   <div className="flex-1 min-w-0">
-                    <p className="text-[9px] text-orange-500 uppercase font-bold tracking-wide mb-0.5">Riesgo</p>
+                    <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wide mb-0.5">Riesgo</p>
                     <InlineText value={item.mainRisk} placeholder="Riesgo principal" onSave={v => onUpdate({ mainRisk: v })} className="text-[11px]" />
                   </div>
                 </div>
@@ -1862,6 +1855,29 @@ function AlertSidebarCard({ item, accent, currentUserId, onUpdate, expanded, onT
               <div className="rounded-md px-2.5 py-2 bg-white border border-slate-100">
                 <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wide mb-0.5">Próximo paso</p>
                 <InlineText value={item.nextMilestone} placeholder="Acción concreta" onSave={v => onUpdate({ nextMilestone: v })} multiline className="text-[11px]" />
+              </div>
+
+              {/* Inline comment composer + last activity */}
+              <div className="rounded-md px-2.5 py-2 bg-indigo-50/30 border border-indigo-100/70">
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <MessageSquare className="h-2.5 w-2.5 text-indigo-500" />
+                  <span className="text-[9px] font-bold text-indigo-700 uppercase tracking-wide">Comentario al equipo</span>
+                  {handleOpenNotes && item.noteCount > 0 && (
+                    <button onClick={handleOpenNotes}
+                      className="ml-auto flex items-center gap-0.5 text-[9px] font-medium text-indigo-500 hover:text-indigo-700 transition-colors">
+                      Ver historial · {item.noteCount}
+                      <ArrowRight className="h-2 w-2" />
+                    </button>
+                  )}
+                </div>
+                <ItemThread
+                  projectId={item.projectId}
+                  customId={item.customId}
+                  currentUserId={currentUserId}
+                  users={users}
+                  onOpenFull={handleOpenNotes}
+                  compact
+                />
               </div>
 
               {/* Proposal + attachments (images, videos, files, links) */}
@@ -2033,6 +2049,29 @@ function DecisionSidebarCard({ item, currentUserId, expanded, onToggle, users, o
                 ) : (
                   <p className="text-[11px] text-slate-600">{item.nextMilestone || 'Sin definir'}</p>
                 )}
+              </div>
+
+              {/* Inline comment composer + last activity */}
+              <div className="rounded-md px-2.5 py-2 bg-indigo-50/30 border border-indigo-100/70">
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <MessageSquare className="h-2.5 w-2.5 text-indigo-500" />
+                  <span className="text-[9px] font-bold text-indigo-700 uppercase tracking-wide">Comentario al equipo</span>
+                  {handleOpenNotes && item.noteCount > 0 && (
+                    <button onClick={handleOpenNotes}
+                      className="ml-auto flex items-center gap-0.5 text-[9px] font-medium text-indigo-500 hover:text-indigo-700 transition-colors">
+                      Ver historial · {item.noteCount}
+                      <ArrowRight className="h-2 w-2" />
+                    </button>
+                  )}
+                </div>
+                <ItemThread
+                  projectId={item.projectId}
+                  customId={item.customId}
+                  currentUserId={currentUserId}
+                  users={users}
+                  onOpenFull={handleOpenNotes}
+                  compact
+                />
               </div>
 
               {/* Proposal + attachments (images, videos, files, links) */}

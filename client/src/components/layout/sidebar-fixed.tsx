@@ -40,6 +40,7 @@ import {
   TrendingUp,
   Calendar,
   Receipt,
+  MessageSquare,
 } from "lucide-react";
 
 const PROJECT_ICON_COLORS = [
@@ -633,12 +634,25 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
                                       Tú
                                     </span>
                                   )}
+                                  {room.unreadCommentsCount > 0 && (
+                                    <span
+                                      className={cn(
+                                        "inline-flex items-center gap-0.5 h-4 px-1.5 rounded-full text-[9px] font-bold flex-shrink-0",
+                                        isActive ? "bg-indigo-600 text-white" : "bg-indigo-100 text-indigo-700",
+                                      )}
+                                      title={`${room.unreadCommentsCount} comentario${room.unreadCommentsCount === 1 ? '' : 's'} nuevo${room.unreadCommentsCount === 1 ? '' : 's'}`}
+                                    >
+                                      <MessageSquare className="h-2.5 w-2.5" />
+                                      {room.unreadCommentsCount}
+                                    </span>
+                                  )}
                                   {room.pendingCount > 0 && (
                                     <span
                                       className={cn(
                                         "h-4 min-w-[16px] px-1 rounded-full text-[9px] font-bold flex items-center justify-center flex-shrink-0",
                                         isActive ? "bg-indigo-600 text-white" : "bg-amber-100 text-amber-800",
                                       )}
+                                      title={`${room.pendingCount} decisión${room.pendingCount === 1 ? '' : 'es'} pendiente${room.pendingCount === 1 ? '' : 's'}`}
                                     >
                                       {room.pendingCount}
                                     </span>

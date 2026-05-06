@@ -1,7 +1,7 @@
 import { useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
-import { Users, Clock, AlertCircle, Lock } from "lucide-react";
+import { Users, Clock, AlertCircle, Lock, MessageSquare } from "lucide-react";
 import { roomColor, type ReviewRoomSummary } from "@/lib/review-api";
 import { setLastReviewRoomId } from "@/hooks/use-review-room";
 
@@ -74,17 +74,25 @@ export default function RoomCard({ room }: Props) {
             </>
           )}
         </span>
-        {room.pendingCount > 0 ? (
-          <span className="flex items-center gap-1 text-amber-700 font-medium">
-            <AlertCircle className="h-3.5 w-3.5" />
-            {room.pendingCount} pendiente{room.pendingCount > 1 ? 's' : ''}
-          </span>
-        ) : (
-          <span className="flex items-center gap-1">
-            <Clock className="h-3.5 w-3.5" />
-            {relTime(room.lastActivityAt)}
-          </span>
-        )}
+        <span className="flex items-center gap-2">
+          {room.unreadCommentsCount > 0 && (
+            <span className="flex items-center gap-1 text-indigo-700 font-medium">
+              <MessageSquare className="h-3.5 w-3.5" />
+              {room.unreadCommentsCount} nuevo{room.unreadCommentsCount > 1 ? 's' : ''}
+            </span>
+          )}
+          {room.pendingCount > 0 ? (
+            <span className="flex items-center gap-1 text-amber-700 font-medium">
+              <AlertCircle className="h-3.5 w-3.5" />
+              {room.pendingCount} pendiente{room.pendingCount > 1 ? 's' : ''}
+            </span>
+          ) : room.unreadCommentsCount === 0 && (
+            <span className="flex items-center gap-1">
+              <Clock className="h-3.5 w-3.5" />
+              {relTime(room.lastActivityAt)}
+            </span>
+          )}
+        </span>
       </div>
     </button>
   );

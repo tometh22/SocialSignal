@@ -15,6 +15,7 @@ export type ReviewRoomSummary = {
   lastVisitedAt: string | null;
   memberCount: number;
   pendingCount: number;
+  unreadCommentsCount: number;
   lastActivityAt: string | null;
 };
 

@@ -74,6 +74,12 @@ export function createReviewRoomsRouter(requireAuth: RequireAuth): Router {
             COALESCE((SELECT COUNT(*)::int FROM ${projectStatusReviews} WHERE room_id = ${reviewRooms.id} AND decision_needed <> 'ninguna'), 0)
             + COALESCE((SELECT COUNT(*)::int FROM ${weeklyStatusItems} WHERE room_id = ${reviewRooms.id} AND decision_needed <> 'ninguna'), 0)
           )`,
+          unreadCommentsCount: sql<number>`COALESCE((
+            SELECT COUNT(*)::int FROM ${projectReviewNotes}
+            WHERE room_id = ${reviewRooms.id}
+              AND author_id IS DISTINCT FROM ${userId}
+              AND (${reviewRoomMembers.lastVisitedAt} IS NULL OR created_at > ${reviewRoomMembers.lastVisitedAt})
+          ), 0)`,
           lastActivityAt: sql<string | null>`GREATEST(
             ${reviewRooms.updatedAt},
             COALESCE((SELECT MAX(updated_at) FROM ${projectStatusReviews} WHERE room_id = ${reviewRooms.id}), ${reviewRooms.createdAt}),
