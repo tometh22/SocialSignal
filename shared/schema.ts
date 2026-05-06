@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, doublePrecision, json, numeric, varchar, unique, pgEnum, jsonb, index } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, doublePrecision, json, numeric, varchar, unique, pgEnum, jsonb, index, primaryKey } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations } from "drizzle-orm";
@@ -3486,6 +3486,21 @@ export const insertProjectReviewNoteSchema = createInsertSchema(projectReviewNot
 });
 export type ProjectReviewNote = typeof projectReviewNotes.$inferSelect;
 export type InsertProjectReviewNote = z.infer<typeof insertProjectReviewNoteSchema>;
+
+// Per-user, per-item read receipts. Powers unread-comment counts in the
+// status review section. last_seen_at is updated when the user opens an item;
+// unread = notes(item).created_at > last_seen_at AND author <> user.
+export const reviewItemReadState = pgTable("review_item_read_state", {
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  roomId: integer("room_id").notNull(),
+  targetKind: varchar("target_kind", { length: 10 }).notNull(),
+  targetId: integer("target_id").notNull(),
+  lastSeenAt: timestamp("last_seen_at").notNull().defaultNow(),
+}, (t) => ({
+  pk: primaryKey({ columns: [t.userId, t.targetKind, t.targetId] }),
+  idxUserRoom: index("idx_riras_user_room").on(t.userId, t.roomId),
+}));
+export type ReviewItemReadState = typeof reviewItemReadState.$inferSelect;
 
 export const weeklyStatusItems = pgTable("weekly_status_items", {
   id: serial("id").primaryKey(),

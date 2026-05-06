@@ -381,6 +381,41 @@ async function applyPendingMigrations() {
       CREATE INDEX IF NOT EXISTS idx_sipa_proposal ON status_item_proposal_attachments(proposal_id);
     `);
 
+    // 0016: per-user, per-item read state for review comments. Each row says
+    // "user X considers item Y read up to last_seen_at". Unread count =
+    // notes(item) where created_at > last_seen_at AND author_id <> user.
+    await run('0016 review_item_read_state table', `
+      CREATE TABLE IF NOT EXISTS review_item_read_state (
+        user_id     INTEGER     NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        room_id     INTEGER     NOT NULL REFERENCES review_rooms(id) ON DELETE CASCADE,
+        target_kind VARCHAR(10) NOT NULL CHECK (target_kind IN ('project','custom')),
+        target_id   INTEGER     NOT NULL,
+        last_seen_at TIMESTAMP  NOT NULL DEFAULT NOW(),
+        PRIMARY KEY (user_id, target_kind, target_id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_riras_user_room ON review_item_read_state(user_id, room_id);
+    `);
+
+    // 0016 backfill: seed receipts so existing users don't see all old comments
+    // as new. last_seen_at = COALESCE(member.last_visited_at, NOW()).
+    // Idempotent via ON CONFLICT DO NOTHING.
+    await run('0016 backfill from last_visited_at (project items)', `
+      INSERT INTO review_item_read_state (user_id, room_id, target_kind, target_id, last_seen_at)
+      SELECT rrm.user_id, rrm.room_id, 'project', psr.project_id,
+             COALESCE(rrm.last_visited_at, NOW())
+      FROM review_room_members rrm
+      JOIN project_status_reviews psr ON psr.room_id = rrm.room_id
+      ON CONFLICT (user_id, target_kind, target_id) DO NOTHING;
+    `);
+    await run('0016 backfill from last_visited_at (custom items)', `
+      INSERT INTO review_item_read_state (user_id, room_id, target_kind, target_id, last_seen_at)
+      SELECT rrm.user_id, rrm.room_id, 'custom', wsi.id,
+             COALESCE(rrm.last_visited_at, NOW())
+      FROM review_room_members rrm
+      JOIN weekly_status_items wsi ON wsi.room_id = rrm.room_id
+      ON CONFLICT (user_id, target_kind, target_id) DO NOTHING;
+    `);
+
   } finally {
     client.release();
   }

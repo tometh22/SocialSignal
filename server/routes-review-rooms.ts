@@ -11,6 +11,7 @@ import {
   statusUpdateEntries,
   statusItemProposals,
   statusItemProposalAttachments,
+  reviewItemReadState,
   activeProjects,
   clients,
   quotations,
@@ -74,6 +75,48 @@ export function createReviewRoomsRouter(requireAuth: RequireAuth): Router {
             COALESCE((SELECT COUNT(*)::int FROM ${projectStatusReviews} WHERE room_id = ${reviewRooms.id} AND decision_needed <> 'ninguna'), 0)
             + COALESCE((SELECT COUNT(*)::int FROM ${weeklyStatusItems} WHERE room_id = ${reviewRooms.id} AND decision_needed <> 'ninguna'), 0)
           )`,
+          // Per-item unread = notes whose created_at > the user's last_seen_at
+          // for that item (default 'epoch' when no receipt exists). Sum across
+          // both project items and custom items in the room. Excludes notes the
+          // user wrote themselves.
+          unreadCommentsCount: sql<number>`COALESCE((
+            SELECT
+              COALESCE((
+                SELECT SUM(c)::int FROM (
+                  SELECT (
+                    SELECT COUNT(*)::int FROM ${projectReviewNotes} prn
+                    WHERE prn.room_id = ${reviewRooms.id}
+                      AND prn.project_id = psr.project_id
+                      AND prn.author_id IS DISTINCT FROM ${userId}
+                      AND prn.created_at > COALESCE(
+                        (SELECT last_seen_at FROM ${reviewItemReadState}
+                         WHERE user_id = ${userId} AND target_kind = 'project' AND target_id = psr.project_id),
+                        'epoch'::timestamp
+                      )
+                  ) AS c
+                  FROM ${projectStatusReviews} psr
+                  WHERE psr.room_id = ${reviewRooms.id}
+                ) sub
+              ), 0)
+              +
+              COALESCE((
+                SELECT SUM(c)::int FROM (
+                  SELECT (
+                    SELECT COUNT(*)::int FROM ${projectReviewNotes} prn
+                    WHERE prn.room_id = ${reviewRooms.id}
+                      AND prn.weekly_status_item_id = wsi.id
+                      AND prn.author_id IS DISTINCT FROM ${userId}
+                      AND prn.created_at > COALESCE(
+                        (SELECT last_seen_at FROM ${reviewItemReadState}
+                         WHERE user_id = ${userId} AND target_kind = 'custom' AND target_id = wsi.id),
+                        'epoch'::timestamp
+                      )
+                  ) AS c
+                  FROM ${weeklyStatusItems} wsi
+                  WHERE wsi.room_id = ${reviewRooms.id}
+                ) sub
+              ), 0)
+          ), 0)`,
           lastActivityAt: sql<string | null>`GREATEST(
             ${reviewRooms.updatedAt},
             COALESCE((SELECT MAX(updated_at) FROM ${projectStatusReviews} WHERE room_id = ${reviewRooms.id}), ${reviewRooms.createdAt}),
@@ -218,6 +261,34 @@ export function createReviewRoomsRouter(requireAuth: RequireAuth): Router {
       res.json({ ok: true });
     } catch (error) {
       res.status(500).json({ message: "Error al marcar visita" });
+    }
+  });
+
+  // POST /api/reviews/:roomId/items/:kind/:targetId/seen — mark item as read
+  // up to NOW. UPSERT with GREATEST so concurrent calls don't regress the timestamp.
+  router.post('/:roomId/items/:kind/:targetId/seen', requireAuth, requireRoomMember(), async (req: Request, res: Response) => {
+    try {
+      const { kind, targetId } = req.params;
+      if (kind !== 'project' && kind !== 'custom') {
+        return res.status(400).json({ message: "kind debe ser 'project' o 'custom'" });
+      }
+      const targetIdNum = parseInt(targetId, 10);
+      if (!Number.isFinite(targetIdNum)) {
+        return res.status(400).json({ message: "targetId inválido" });
+      }
+      const roomId = req.roomMember!.roomId;
+      const userId = req.user!.id;
+      await db.execute(sql`
+        INSERT INTO review_item_read_state (user_id, room_id, target_kind, target_id, last_seen_at)
+        VALUES (${userId}, ${roomId}, ${kind}, ${targetIdNum}, NOW())
+        ON CONFLICT (user_id, target_kind, target_id) DO UPDATE
+          SET last_seen_at = GREATEST(review_item_read_state.last_seen_at, EXCLUDED.last_seen_at),
+              room_id = EXCLUDED.room_id
+      `);
+      res.json({ ok: true });
+    } catch (error) {
+      console.error('POST /api/reviews/:roomId/items/:kind/:targetId/seen error:', error);
+      res.status(500).json({ message: "Error al marcar como leído" });
     }
   });
 

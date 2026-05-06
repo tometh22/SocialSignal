@@ -134,6 +134,7 @@ type Item = {
   decisionNeeded: string | null;
   hiddenFromWeekly: boolean | null;
   noteCount: number;
+  unreadCount: number;
   isOverdue: boolean;
   updatedAt: string | null;
   updatedById: number | null;
@@ -920,25 +921,36 @@ function ImageLightbox({ images, initialIndex, open, onOpenChange, onUploadReply
   );
 }
 
-function useUnreadComments(itemKey: string | undefined, noteCount: number, userId?: number | null) {
-  const storageKey = itemKey ? `commentsSeen:${userId ?? 'anon'}:${itemKey}` : null;
-  const [seenCount, setSeenCount] = useState<number>(() => {
-    if (!storageKey || typeof window === 'undefined') return 0;
-    const v = window.localStorage.getItem(storageKey);
-    if (v === null) return 0;
-    const parsed = parseInt(v, 10);
-    return Number.isFinite(parsed) ? parsed : 0;
-  });
+// Server-driven unread tracking. The Item carries unreadCount from the API
+// (notes after this user's last_seen_at, excluding own). markAsRead posts to
+// /seen and optimistically zeros the count until the refetch lands.
+function useUnreadComments(item: Item, roomId: number | undefined) {
+  const queryClient = useQueryClient();
+  const [markedRead, setMarkedRead] = useState(false);
 
-  const hasUnread = noteCount > seenCount;
+  // If a fresh comment came in (server count went up), drop the optimistic flag
+  // so the new unread shows up.
+  useEffect(() => { setMarkedRead(false); }, [item.unreadCount]);
+
+  const hasUnread = item.unreadCount > 0 && !markedRead;
+  const unreadCount = markedRead ? 0 : item.unreadCount;
 
   const markAsRead = useCallback(() => {
-    if (!storageKey || typeof window === 'undefined') return;
-    window.localStorage.setItem(storageKey, String(noteCount));
-    setSeenCount(noteCount);
-  }, [storageKey, noteCount]);
+    if (!roomId || item.unreadCount === 0) return;
+    const kind = item.isCustom ? 'custom' : 'project';
+    const targetId = item.isCustom ? item.customId : item.projectId;
+    if (!targetId) return;
+    setMarkedRead(true);
+    mutationFetch(`/api/reviews/${roomId}/items/${kind}/${targetId}/seen`, 'POST')
+      .then(() => {
+        queryClient.invalidateQueries({ queryKey: ['/api/status-semanal?includeHidden=true'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/status-semanal/custom?includeHidden=true'] });
+        queryClient.invalidateQueries({ queryKey: ['reviews'] });
+      })
+      .catch(() => { setMarkedRead(false); });
+  }, [roomId, item.isCustom, item.customId, item.projectId, item.unreadCount, queryClient]);
 
-  return { hasUnread, unreadCount: Math.max(0, noteCount - seenCount), markAsRead };
+  return { hasUnread, unreadCount, markAsRead };
 }
 
 function AttachmentTile({ a, onRemove, onOpenImage }: { a: ProposalAttachment; onRemove?: () => void; onOpenImage?: () => void }) {
@@ -1194,8 +1206,8 @@ function DeadlinePicker({ value, isOverdue, onChange }: {
 
 // ─── Compact row (Verde) ──────────────────────────────────────────────────────
 
-function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, onResolve, expanded, onToggle, onNext, onPrev, hasNext, hasPrev, currentUserId, kbFocused, dragHandleProps, bulkMode, checked, onCheck, accent, hideSubtitle }: {
-  item: Item; users: AppUser[]; isSelected: boolean; currentUserId?: number | null;
+function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, onResolve, expanded, onToggle, onNext, onPrev, hasNext, hasPrev, currentUserId, roomId, kbFocused, dragHandleProps, bulkMode, checked, onCheck, accent, hideSubtitle }: {
+  item: Item; users: AppUser[]; isSelected: boolean; currentUserId?: number | null; roomId?: number;
   onOpenNotes?: () => void; onUpdate: (d: Record<string, any>) => void; onRemove: () => void; onResolve: () => void;
   expanded: boolean; onToggle: () => void; onNext?: () => void; onPrev?: () => void; hasNext?: boolean; hasPrev?: boolean;
   kbFocused?: boolean; dragHandleProps?: Record<string, any>; bulkMode?: boolean; checked?: boolean; onCheck?: (v: boolean) => void;
@@ -1203,7 +1215,7 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const decMeta = dm(item.decisionNeeded);
-  const { hasUnread, markAsRead } = useUnreadComments(item.key, item.noteCount, currentUserId);
+  const { hasUnread, markAsRead } = useUnreadComments(item, roomId);
   useEffect(() => { if (expanded && hasUnread) markAsRead(); }, [expanded, hasUnread, markAsRead]);
   const handleOpenNotes = onOpenNotes ? () => { markAsRead(); onOpenNotes(); } : undefined;
 
@@ -1403,7 +1415,7 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
                 <div className="flex items-center gap-1.5 px-5 py-2.5 border-t border-slate-100 bg-slate-50/60 flex-wrap">
                   <DecisionBadge value={item.decisionNeeded} onChange={v => onUpdate({ decisionNeeded: v })} />
                   {item.mainRisk && (
-                    <div className="flex items-center gap-1 text-[10px] text-orange-600 bg-orange-50 border border-orange-100 rounded-md px-1.5 py-0.5">
+                    <div className="flex items-center gap-1 text-[10px] text-slate-500 bg-slate-100 border border-slate-200 rounded-md px-1.5 py-0.5">
                       <Shield className="h-2.5 w-2.5" /><span className="truncate max-w-[120px]">{item.mainRisk}</span>
                     </div>
                   )}
@@ -1733,15 +1745,15 @@ function SortableCompactRow(props: React.ComponentProps<typeof CompactRow>) {
 }
 
 // ─── AlertSidebarCard — expandable card for CEO/COO sidebar ─────────────────
-function AlertSidebarCard({ item, accent, currentUserId, onUpdate, expanded, onToggle, users, onOpenNotes, onRemove, onResolve }: {
-  item: Item; accent: 'red' | 'amber'; currentUserId?: number | null;
+function AlertSidebarCard({ item, accent, currentUserId, roomId, onUpdate, expanded, onToggle, users, onOpenNotes, onRemove, onResolve }: {
+  item: Item; accent: 'red' | 'amber'; currentUserId?: number | null; roomId?: number;
   onUpdate: (d: Record<string, any>) => void;
   expanded?: boolean; onToggle?: () => void; onResolve?: () => void;
   users?: AppUser[]; onOpenNotes?: () => void; onRemove?: () => void;
 }) {
   const accentBorder = accent === 'red' ? 'border-l-red-500' : 'border-l-amber-400';
   const accentBg = accent === 'red' ? 'bg-red-50/40' : 'bg-amber-50/40';
-  const { hasUnread, markAsRead } = useUnreadComments(item.key, item.noteCount, currentUserId);
+  const { hasUnread, markAsRead } = useUnreadComments(item, roomId);
   useEffect(() => { if (expanded && hasUnread) markAsRead(); }, [expanded, hasUnread, markAsRead]);
   const handleOpenNotes = onOpenNotes ? () => { markAsRead(); onOpenNotes(); } : undefined;
   return (
@@ -1833,20 +1845,13 @@ function AlertSidebarCard({ item, accent, currentUserId, onUpdate, expanded, onT
             transition={{ duration: 0.16, ease: [0.4, 0, 0.2, 1] }}
             className="overflow-hidden">
             <div className="px-3 pb-3 space-y-2" onClick={e => e.stopPropagation()}>
-              {/* Overdue alert */}
-              {item.isOverdue && (
-                <div className="flex items-center gap-1.5 rounded-md px-2 py-1.5 bg-red-100 border border-red-200 text-red-700 text-[11px] font-semibold">
-                  <Clock className="h-3 w-3 shrink-0" />
-                  Demorado — {deadlineLabel(item.deadline)}
-                </div>
-              )}
-
-              {/* Risk */}
+              {/* Risk (only the most important secondary signal — overdue is already
+                   communicated by the red border + header deadline in red) */}
               {item.mainRisk && (
-                <div className="flex items-start gap-1.5 rounded-md px-2 py-1.5 bg-orange-50 border border-orange-100">
-                  <Shield className="h-3 w-3 text-orange-500 shrink-0 mt-0.5" />
+                <div className="flex items-start gap-1.5 rounded-md px-2 py-1.5 bg-slate-50 border border-slate-100">
+                  <Shield className="h-3 w-3 text-slate-400 shrink-0 mt-0.5" />
                   <div className="flex-1 min-w-0">
-                    <p className="text-[9px] text-orange-500 uppercase font-bold tracking-wide mb-0.5">Riesgo</p>
+                    <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wide mb-0.5">Riesgo</p>
                     <InlineText value={item.mainRisk} placeholder="Riesgo principal" onSave={v => onUpdate({ mainRisk: v })} className="text-[11px]" />
                   </div>
                 </div>
@@ -1862,6 +1867,29 @@ function AlertSidebarCard({ item, accent, currentUserId, onUpdate, expanded, onT
               <div className="rounded-md px-2.5 py-2 bg-white border border-slate-100">
                 <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wide mb-0.5">Próximo paso</p>
                 <InlineText value={item.nextMilestone} placeholder="Acción concreta" onSave={v => onUpdate({ nextMilestone: v })} multiline className="text-[11px]" />
+              </div>
+
+              {/* Inline comment composer + last activity */}
+              <div className="rounded-md px-2.5 py-2 bg-indigo-50/30 border border-indigo-100/70">
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <MessageSquare className="h-2.5 w-2.5 text-indigo-500" />
+                  <span className="text-[9px] font-bold text-indigo-700 uppercase tracking-wide">Comentario al equipo</span>
+                  {handleOpenNotes && item.noteCount > 0 && (
+                    <button onClick={handleOpenNotes}
+                      className="ml-auto flex items-center gap-0.5 text-[9px] font-medium text-indigo-500 hover:text-indigo-700 transition-colors">
+                      Ver historial · {item.noteCount}
+                      <ArrowRight className="h-2 w-2" />
+                    </button>
+                  )}
+                </div>
+                <ItemThread
+                  projectId={item.projectId}
+                  customId={item.customId}
+                  currentUserId={currentUserId}
+                  users={users}
+                  onOpenFull={handleOpenNotes}
+                  compact
+                />
               </div>
 
               {/* Proposal + attachments (images, videos, files, links) */}
@@ -1912,8 +1940,8 @@ function AlertSidebarCard({ item, accent, currentUserId, onUpdate, expanded, onT
 }
 
 // ─── DecisionSidebarCard — expandable card for decisions sidebar ─────────────
-function DecisionSidebarCard({ item, currentUserId, expanded, onToggle, users, onUpdate, onOpenNotes, onRemove, onResolve }: {
-  item: Item; currentUserId?: number | null;
+function DecisionSidebarCard({ item, currentUserId, roomId, expanded, onToggle, users, onUpdate, onOpenNotes, onRemove, onResolve }: {
+  item: Item; currentUserId?: number | null; roomId?: number;
   expanded?: boolean; onToggle?: () => void;
   users?: AppUser[]; onUpdate?: (d: Record<string, any>) => void;
   onOpenNotes?: () => void; onRemove?: () => void; onResolve?: () => void;
@@ -1922,7 +1950,7 @@ function DecisionSidebarCard({ item, currentUserId, expanded, onToggle, users, o
   const daysSince = item.updatedAt
     ? Math.floor((Date.now() - new Date(item.updatedAt).getTime()) / 86400000)
     : null;
-  const { hasUnread, markAsRead } = useUnreadComments(item.key, item.noteCount, currentUserId);
+  const { hasUnread, markAsRead } = useUnreadComments(item, roomId);
   useEffect(() => { if (expanded && hasUnread) markAsRead(); }, [expanded, hasUnread, markAsRead]);
   const handleOpenNotes = onOpenNotes ? () => { markAsRead(); onOpenNotes(); } : undefined;
   return (
@@ -2033,6 +2061,29 @@ function DecisionSidebarCard({ item, currentUserId, expanded, onToggle, users, o
                 ) : (
                   <p className="text-[11px] text-slate-600">{item.nextMilestone || 'Sin definir'}</p>
                 )}
+              </div>
+
+              {/* Inline comment composer + last activity */}
+              <div className="rounded-md px-2.5 py-2 bg-indigo-50/30 border border-indigo-100/70">
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <MessageSquare className="h-2.5 w-2.5 text-indigo-500" />
+                  <span className="text-[9px] font-bold text-indigo-700 uppercase tracking-wide">Comentario al equipo</span>
+                  {handleOpenNotes && item.noteCount > 0 && (
+                    <button onClick={handleOpenNotes}
+                      className="ml-auto flex items-center gap-0.5 text-[9px] font-medium text-indigo-500 hover:text-indigo-700 transition-colors">
+                      Ver historial · {item.noteCount}
+                      <ArrowRight className="h-2 w-2" />
+                    </button>
+                  )}
+                </div>
+                <ItemThread
+                  projectId={item.projectId}
+                  customId={item.customId}
+                  currentUserId={currentUserId}
+                  users={users}
+                  onOpenFull={handleOpenNotes}
+                  compact
+                />
               </div>
 
               {/* Proposal + attachments (images, videos, files, links) */}
@@ -2583,6 +2634,7 @@ export default function StatusSemanalPage() {
     decisionNeeded: r.decisionNeeded,
     hiddenFromWeekly: r.hiddenFromWeekly,
     noteCount: r.noteCount,
+    unreadCount: (r as any).unreadCount ?? 0,
     isOverdue: isOverdue(r.deadline),
     updatedAt: r.reviewUpdatedAt,
     updatedById: r.reviewUpdatedBy,
@@ -2611,6 +2663,7 @@ export default function StatusSemanalPage() {
     decisionNeeded: c.decisionNeeded,
     hiddenFromWeekly: c.hiddenFromWeekly,
     noteCount: c.noteCount ?? 0,
+    unreadCount: (c as any).unreadCount ?? 0,
     isOverdue: isOverdue(c.deadline),
     updatedAt: c.updatedAt,
     updatedById: c.updatedBy,
@@ -3123,7 +3176,7 @@ export default function StatusSemanalPage() {
                           exit={{ opacity: 0, y: -4 }}
                           transition={{ duration: 0.14, ease: [0.4, 0, 0.2, 1] }}
                           className="border-b border-slate-100/80 last:border-b-0">
-                          <AlertSidebarCard item={item} accent={rowAccent} currentUserId={currentUserId}
+                          <AlertSidebarCard item={item} accent={rowAccent} currentUserId={currentUserId} roomId={roomCtx?.roomId}
                             onUpdate={h.onUpdate}
                             expanded={expandedKey === item.key}
                             onToggle={() => setExpandedKey(expandedKey === item.key ? null : item.key)}
@@ -3157,7 +3210,7 @@ export default function StatusSemanalPage() {
                           exit={{ opacity: 0, y: -4 }}
                           transition={{ duration: 0.14, ease: [0.4, 0, 0.2, 1] }}
                           className="border-b border-slate-100/80 last:border-b-0">
-                          <DecisionSidebarCard item={item} currentUserId={currentUserId}
+                          <DecisionSidebarCard item={item} currentUserId={currentUserId} roomId={roomCtx?.roomId}
                             expanded={expandedKey === item.key}
                             onToggle={() => setExpandedKey(expandedKey === item.key ? null : item.key)}
                             users={appUsers}
@@ -3224,7 +3277,7 @@ export default function StatusSemanalPage() {
                         const h = getItemHandlers(item);
                         const globalIdx = sortedNormalItems.indexOf(item);
                         return (
-                          <SortableCompactRow key={item.key} item={item} users={appUsers} currentUserId={currentUserId}
+                          <SortableCompactRow key={item.key} item={item} users={appUsers} currentUserId={currentUserId} roomId={roomCtx?.roomId}
                             isSelected={notesOpen !== null && ((notesOpen.type === 'project' && item.projectId === notesOpen.id) || (notesOpen.type === 'custom' && item.customId === notesOpen.id))}
                             onOpenNotes={h.onOpenNotes} onUpdate={h.onUpdate} onRemove={h.onRemove} onResolve={h.onResolve}
                             expanded={expandedKey === item.key}
