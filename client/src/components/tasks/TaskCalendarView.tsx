@@ -64,7 +64,7 @@ export default function TaskCalendarView({ projectId }: Props) {
   }
 
   const getTasksForDay = (d: Date) =>
-    tasksWithDate.filter(t => isSameDay(new Date(t.dueDate! + "T00:00:00"), d));
+    tasksWithDate.filter(t => isSameDay(new Date(t.dueDate!.slice(0, 10) + "T00:00:00"), d));
 
   const today = new Date();
 

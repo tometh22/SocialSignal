@@ -17719,7 +17719,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const totalResult = await db.execute(sql`SELECT COALESCE(SUM(hours), 0) as total FROM task_time_entries WHERE task_id = ${taskId}`);
       const total = (totalResult.rows[0] as any).total;
       await db.update(tasks).set({ loggedHours: parseFloat(total), updatedAt: new Date() }).where(eq(tasks.id, taskId));
-      
+
+      // If this is a subtask, roll up hours to the parent task too
+      if (task.parentTaskId) {
+        const parentTotal = await db.execute(sql`
+          SELECT COALESCE(SUM(tte.hours), 0) as total
+          FROM task_time_entries tte
+          JOIN tasks t ON t.id = tte.task_id
+          WHERE t.id = ${task.parentTaskId} OR t.parent_task_id = ${task.parentTaskId}
+        `);
+        const parentHours = parseFloat((parentTotal.rows[0] as any).total);
+        await db.update(tasks).set({ loggedHours: parentHours, updatedAt: new Date() }).where(eq(tasks.id, task.parentTaskId));
+      }
+
       res.json(created);
     } catch (error: any) {
       if (error.name === "ZodError") return res.status(400).json({ message: "Datos inválidos", errors: error.errors });
@@ -17731,10 +17743,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/tasks/:taskId/time/:entryId", requireAuth, async (req: Request, res: Response) => {
     try {
       const { taskId, entryId } = req.params;
+      const tid = parseInt(taskId);
+      const [task] = await db.select().from(tasks).where(eq(tasks.id, tid));
       await db.delete(taskTimeEntries).where(eq(taskTimeEntries.id, parseInt(entryId)));
-      const totalResult = await db.execute(sql`SELECT COALESCE(SUM(hours), 0) as total FROM task_time_entries WHERE task_id = ${parseInt(taskId)}`);
+      const totalResult = await db.execute(sql`SELECT COALESCE(SUM(hours), 0) as total FROM task_time_entries WHERE task_id = ${tid}`);
       const total = (totalResult.rows[0] as any).total;
-      await db.update(tasks).set({ loggedHours: parseFloat(total), updatedAt: new Date() }).where(eq(tasks.id, parseInt(taskId)));
+      await db.update(tasks).set({ loggedHours: parseFloat(total), updatedAt: new Date() }).where(eq(tasks.id, tid));
+
+      // Roll up to parent task if this was a subtask
+      if (task?.parentTaskId) {
+        const parentTotal = await db.execute(sql`
+          SELECT COALESCE(SUM(tte.hours), 0) as total
+          FROM task_time_entries tte
+          JOIN tasks t ON t.id = tte.task_id
+          WHERE t.id = ${task.parentTaskId} OR t.parent_task_id = ${task.parentTaskId}
+        `);
+        const parentHours = parseFloat((parentTotal.rows[0] as any).total);
+        await db.update(tasks).set({ loggedHours: parentHours, updatedAt: new Date() }).where(eq(tasks.id, task.parentTaskId));
+      }
+
       res.json({ message: "Entrada eliminada" });
     } catch (error) {
       res.status(500).json({ message: "Error al eliminar entrada" });
