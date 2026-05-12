@@ -11,6 +11,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { FolderOpen, Clock, ChevronRight, CalendarIcon, Check, Plus, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
+import { usePermissions } from "@/hooks/use-permissions";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 
@@ -268,6 +269,7 @@ function TabBar({
 // ── Main page ─────────────────────────────────────────────────────────
 export default function TasksHomePage() {
   const { user } = useAuth();
+  const { isOperations } = usePermissions();
   const [myTab, setMyTab] = useState<"upcoming" | "overdue" | "done">("upcoming");
   const [assignedTab, setAssignedTab] = useState<"upcoming" | "overdue" | "done">("upcoming");
   const [showAllMy, setShowAllMy] = useState(false);
@@ -613,8 +615,8 @@ export default function TasksHomePage() {
         </div>
       </div>
 
-      {/* Assigned by me widget */}
-      <div className="bg-card rounded-xl border shadow-sm overflow-hidden">
+      {/* Assigned by me widget — only visible to operations/admin */}
+      {isOperations && <div className="bg-card rounded-xl border shadow-sm overflow-hidden">
         <div className="flex items-center justify-between px-4 pt-4 pb-1">
           <div className="flex items-center gap-2">
             <Clock className="h-4 w-4 text-primary" />
@@ -692,7 +694,7 @@ export default function TasksHomePage() {
             </>
           )}
         </div>
-      </div>
+      </div>}
     </div>
   );
 }
