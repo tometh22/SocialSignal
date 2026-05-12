@@ -177,8 +177,14 @@ function CommentsSection({ taskId, allPersonnel }: { taskId: number; allPersonne
     ? allPersonnel.filter(p => p.name.toLowerCase().includes(mentionQuery))
     : [];
 
-  const renderContent = (content: string) =>
-    content.replace(/@([\w\s]+)/g, (match) => `<strong class="text-primary">${match}</strong>`);
+  const renderMentions = (content: string): React.ReactNode[] => {
+    const parts = content.split(/(@[\w ]+)/g);
+    return parts.map((part, i) =>
+      /^@[\w ]/.test(part)
+        ? <strong key={i} className="text-primary">{part}</strong>
+        : part
+    );
+  };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && text.trim()) {
@@ -209,10 +215,9 @@ function CommentsSection({ taskId, allPersonnel }: { taskId: number; allPersonne
             </Avatar>
             <div className="flex-1 min-w-0">
               <p className="font-medium text-foreground text-[11px]">{c.author_name || "Sistema"}</p>
-              <p
-                className="text-muted-foreground mt-0.5 whitespace-pre-wrap"
-                dangerouslySetInnerHTML={{ __html: renderContent(c.content) }}
-              />
+              <p className="text-muted-foreground mt-0.5 whitespace-pre-wrap">
+                {renderMentions(c.content)}
+              </p>
             </div>
             <div className="flex-shrink-0 flex items-center gap-1 opacity-0 group-hover:opacity-100">
               <span className="text-muted-foreground/50 text-[10px]">
