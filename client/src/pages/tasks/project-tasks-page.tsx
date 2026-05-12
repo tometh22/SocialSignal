@@ -15,12 +15,13 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
   DropdownMenuLabel
 } from "@/components/ui/dropdown-menu";
-import { Loader2, Users, Trash2, Plus, ChevronRight, List, LayoutGrid, Share2, Filter, ArrowUpDown, Layers, MoreHorizontal, Search, X, Check, BarChart2, TrendingUp } from "lucide-react";
+import { Loader2, Users, Trash2, Plus, ChevronRight, List, LayoutGrid, Share2, Filter, ArrowUpDown, Layers, MoreHorizontal, Search, X, Check, BarChart2, TrendingUp, CalendarDays } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
 import { usePermissions } from "@/hooks/use-permissions";
 import ProjectTaskList from "@/components/tasks/ProjectTaskList";
 import ProjectOverviewPanel from "@/components/tasks/ProjectOverviewPanel";
+import TaskCalendarView from "@/components/tasks/TaskCalendarView";
 
 type ProjectMember = { personnelId: number; name: string; role: string };
 type TaskProject = {
@@ -58,7 +59,7 @@ export default function ProjectTasksPage({ params }: Props) {
   const [membersOpen, setMembersOpen] = useState(false);
   const [addPersonnelId, setAddPersonnelId] = useState<string>("none");
   const [addRole, setAddRole] = useState("member");
-  const [view, setView] = useState<"list" | "board" | "panel">("list");
+  const [view, setView] = useState<"list" | "board" | "panel" | "calendar">("list");
   const [quickAddTrigger, setQuickAddTrigger] = useState(0);
   const [showFilter, setShowFilter] = useState(false);
   const [filterText, setFilterText] = useState("");
@@ -325,12 +326,24 @@ export default function ProjectTasksPage({ params }: Props) {
                 <BarChart2 className="h-3.5 w-3.5" />
                 Panel
               </button>
+              <button
+                className={cn(
+                  "flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 transition-colors",
+                  view === "calendar"
+                    ? "border-primary text-primary"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
+                )}
+                onClick={() => setView("calendar")}
+              >
+                <CalendarDays className="h-3.5 w-3.5" />
+                Calendario
+              </button>
             </div>
           </div>
         </div>
 
         {/* Toolbar */}
-        {view !== "panel" && (
+        {view !== "panel" && view !== "calendar" && (
         <div className="flex items-center justify-between py-2 border-b border-border gap-2">
           {view === "list" ? (
             <Button
@@ -491,8 +504,13 @@ export default function ProjectTasksPage({ params }: Props) {
           />
         )}
 
+        {/* Calendar view */}
+        {view === "calendar" && (
+          <TaskCalendarView projectId={projectId} />
+        )}
+
         {/* Task list / board */}
-        {view !== "panel" && (
+        {view !== "panel" && view !== "calendar" && (
           <div className="pt-4">
             <ProjectTaskList
               projectId={projectId}

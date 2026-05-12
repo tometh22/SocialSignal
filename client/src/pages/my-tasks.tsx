@@ -445,6 +445,15 @@ export default function MyTasksPage() {
                     ))}
                   </SelectContent>
                 </Select>
+                {newTaskProjectId !== "none" && (() => {
+                  const proj = allProjects.find(p => p.id === parseInt(newTaskProjectId));
+                  return proj?.client_name ? (
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <span>Cliente:</span>
+                      <Badge variant="outline" className="text-xs px-1.5 py-0 font-normal">{proj.client_name}</Badge>
+                    </div>
+                  ) : null;
+                })()}
                 {createDate && (
                   <p className="text-xs text-muted-foreground">Fecha: {format(new Date(createDate), "dd MMMM yyyy", { locale: es })}</p>
                 )}
