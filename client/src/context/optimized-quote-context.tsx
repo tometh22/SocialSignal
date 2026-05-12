@@ -289,15 +289,25 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
     staleTime: 0, // Force fresh data after fixes
   });
 
-  // Meses históricos en orden descendente (más reciente → más antiguo).
-  // Se usa como fallback cuando no hay un targetMonth explícito o el targetMonth
-  // no tiene valor cargado.
+  // All historical months, newest → oldest. Used for explicit month lookups (when a
+  // specific month is selected — including future projections).
   const HISTORICAL_MONTHS_DESC = [
     'dec2026', 'nov2026', 'oct2026', 'sep2026', 'aug2026', 'jul2026',
     'jun2026', 'may2026', 'apr2026', 'mar2026', 'feb2026', 'jan2026',
     'dec2025', 'nov2025', 'oct2025', 'sep2025', 'aug2025', 'jul2025',
     'jun2025', 'may2025', 'apr2025', 'mar2025', 'feb2025', 'jan2025'
   ];
+
+  // Months up to and including the current calendar month (newest first).
+  // Used when salaryMonth is null ("más reciente disponible") so that future
+  // projected rates don't override the real most-recent value.
+  const CURRENT_OR_PAST_MONTHS_DESC = (() => {
+    const now = new Date();
+    const MONTH_NAMES = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
+    const currentKey = `${MONTH_NAMES[now.getMonth()]}${now.getFullYear()}`;
+    const idx = HISTORICAL_MONTHS_DESC.indexOf(currentKey);
+    return idx === -1 ? HISTORICAL_MONTHS_DESC : HISTORICAL_MONTHS_DESC.slice(idx);
+  })();
 
   const getPersonnelRate = useCallback((personnelId: number, targetCurrency?: string, targetMonth?: string | null) => {
     if (!personnel || personnel.length === 0) return 0;
@@ -306,7 +316,10 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
 
     const currency = targetCurrency || quotationData.quotationCurrency || 'ARS';
 
-    if (currency === 'USD') {
+    // Personnel who bill in USD always return their USD rate regardless of quotation currency,
+    // so their cost is always denominated in USD and converted to ARS by the caller.
+    const personBillingCurrency = (person as any).billingCurrency ?? 'ARS';
+    if (currency === 'USD' || personBillingCurrency === 'USD' || personBillingCurrency === 'mixed') {
       const usdRate = person.hourlyRate;
       if (usdRate && usdRate > 0) return usdRate;
       return 50;
@@ -318,12 +331,19 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
     if (month) {
       const exact = (person as any)[`${month}HourlyRateARS`];
       if (exact && exact > 0) return exact;
-    }
-
-    // 2) Caer al valor más reciente disponible.
-    for (const m of HISTORICAL_MONTHS_DESC) {
-      const value = (person as any)[`${m}HourlyRateARS`];
-      if (value && value > 0) return value;
+      // If the explicit month has no data, fall through to the full list
+      // (includes future projections since the user explicitly chose that month).
+      for (const m of HISTORICAL_MONTHS_DESC) {
+        const value = (person as any)[`${m}HourlyRateARS`];
+        if (value && value > 0) return value;
+      }
+    } else {
+      // 2) Auto mode: use only current or past months so that future projected
+      // rates don't override the real most-recent value.
+      for (const m of CURRENT_OR_PAST_MONTHS_DESC) {
+        const value = (person as any)[`${m}HourlyRateARS`];
+        if (value && value > 0) return value;
+      }
     }
 
     if (person.hourlyRateARS && person.hourlyRateARS > 0) return person.hourlyRateARS;

@@ -225,6 +225,10 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
     onSuccess: () => {
       refetchTask();
       queryClient.invalidateQueries({ queryKey: ["/api/tasks/hours-summary"] });
+      // Also refresh the project task list so the logged hours appear in the row summary
+      if (task?.projectId) {
+        queryClient.invalidateQueries({ queryKey: ["/api/tasks/project", task.projectId] });
+      }
       setLogHours(""); setLogDesc(""); setShowTimeLog(false);
       toast({ title: "Horas registradas" });
     },
@@ -232,7 +236,12 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
 
   const deleteTimeMutation = useMutation({
     mutationFn: (entryId: number) => apiRequest(`/api/tasks/${taskId}/time/${entryId}`, "DELETE"),
-    onSuccess: () => refetchTask(),
+    onSuccess: () => {
+      refetchTask();
+      if (task?.projectId) {
+        queryClient.invalidateQueries({ queryKey: ["/api/tasks/project", task.projectId] });
+      }
+    },
   });
 
   const deleteMutation = useMutation({

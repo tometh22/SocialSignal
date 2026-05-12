@@ -3881,13 +3881,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         sep2026ContractType: personnel.sep2026ContractType,
         oct2026ContractType: personnel.oct2026ContractType,
         nov2026ContractType: personnel.nov2026ContractType,
-        dec2026ContractType: personnel.dec2026ContractType
+        dec2026ContractType: personnel.dec2026ContractType,
+        billingCurrency: personnel.billingCurrency,
+        usdBillingFraction: personnel.usdBillingFraction,
+        activeUntil: personnel.activeUntil
       })
       .from(personnel)
       .leftJoin(roles, eq(personnel.roleId, roles.id))
       .orderBy(personnel.name);
 
-      res.json(personnelData);
+      // Filter out inactive personnel and those whose active period has ended.
+      // We filter in JS (not SQL WHERE) so existing quotations that reference them still load;
+      // only new selector lists exclude them.
+      const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+      const activePersonnel = personnelData.filter((p: any) => {
+        if (!p.activeUntil) return true;
+        return p.activeUntil >= today;
+      });
+
+      res.json(activePersonnel);
     } catch (error) {
       console.error("Error fetching personnel:", error);
       res.status(500).json({ error: "Error fetching personnel" });
@@ -7641,33 +7653,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const validatedData = insertActiveProjectSchema.parse(processedData);
 
-      // Verificar que la cotización existe
-      const quotation = validatedData.quotationId ? await storage.getQuotation(Number(validatedData.quotationId)) : null;
-      if (!quotation) {
+      // Quotation is optional — projects can be created without one (demos, internal, etc.)
+      const quotation = validatedData.quotationId
+        ? await storage.getQuotation(Number(validatedData.quotationId))
+        : null;
+
+      if (validatedData.quotationId && !quotation) {
         return res.status(404).json({ message: "Cotización no encontrada" });
       }
 
-      // Verificar que la cotización está aprobada
-      if (quotation.status !== "approved") {
-        return res.status(400).json({ 
+      if (quotation && quotation.status !== "approved") {
+        return res.status(400).json({
           message: "No se puede crear un proyecto a partir de una cotización no aprobada",
           currentStatus: quotation.status
         });
       }
 
-      // Sync budget and selected variant from quotation
-      if (quotation.totalAmount && !validatedData.budget) {
+      // Sync budget and selected variant from quotation (only if linked)
+      if (quotation && quotation.totalAmount && !validatedData.budget) {
         (validatedData as any).budget = quotation.totalAmount;
       }
       // Find and preserve the selected variant
-      const selectedVariant = await db.select().from(quotationVariants)
-        .where(and(
-          eq(quotationVariants.quotationId, Number(validatedData.quotationId)),
-          eq(quotationVariants.isSelected, true)
-        ))
-        .limit(1);
-      if (selectedVariant.length > 0 && !validatedData.selectedVariantId) {
-        (validatedData as any).selectedVariantId = selectedVariant[0].id;
+      if (validatedData.quotationId) {
+        const selectedVariant = await db.select().from(quotationVariants)
+          .where(and(
+            eq(quotationVariants.quotationId, Number(validatedData.quotationId)),
+            eq(quotationVariants.isSelected, true)
+          ))
+          .limit(1);
+        if (selectedVariant.length > 0 && !validatedData.selectedVariantId) {
+          (validatedData as any).selectedVariantId = selectedVariant[0].id;
+        }
       }
 
       const project = await storage.createActiveProject(validatedData);

@@ -230,7 +230,10 @@ export const personnel = pgTable("personnel", {
   monthlyFixedSalary: doublePrecision("monthly_fixed_salary"), // For full-time employees
   monthlyHours: doublePrecision("monthly_hours").default(160).notNull(), // Standard monthly hours for full-time employees (160 = 8h/day * 20 working days)
   includeInRealCosts: boolean("include_in_real_costs").notNull().default(true), // Whether to include in real cost calculations
-  
+  billingCurrency: text("billing_currency").notNull().default("ARS"), // 'ARS' | 'USD' | 'mixed'
+  usdBillingFraction: doublePrecision("usd_billing_fraction").default(0), // 0-1, fraction billed in USD (e.g. 0.9 = 90% USD). Only relevant when billingCurrency='mixed'
+  activeUntil: text("active_until"), // YYYY-MM-DD; if set, exclude from new quotations/projects from this date onwards
+
   // ==================== COSTOS HISTÓRICOS 2025 ====================
   // Enero 2025
   jan2025ContractType: text("jan_2025_contract_type"), // 'full-time', 'part-time', 'freelance'
@@ -364,6 +367,9 @@ export const insertPersonnelSchema = createInsertSchema(personnel).pick({
   monthlyFixedSalary: true,
   monthlyHours: true,
   includeInRealCosts: true,
+  billingCurrency: true,
+  usdBillingFraction: true,
+  activeUntil: true,
   // Costos históricos 2025 - Contract Types
   jan2025ContractType: true,
   feb2025ContractType: true,
@@ -857,7 +863,7 @@ export type InsertEstimatedRate = z.infer<typeof insertEstimatedRateSchema>;
 // Proyectos Activos
 export const activeProjects = pgTable("active_projects", {
   id: serial("id").primaryKey(),
-  quotationId: integer("quotation_id").notNull().references(() => quotations.id),
+  quotationId: integer("quotation_id").references(() => quotations.id), // nullable — projects can be created without a quotation
   clientId: integer("client_id").notNull().references(() => clients.id),
   status: text("status").notNull().default("active"), // active, completed, cancelled, on-hold, delivered, invoiced, voided
   startDate: timestamp("start_date").notNull(),

@@ -97,6 +97,9 @@ interface InlineEditPersonnelProps {
     oct2026MonthlySalaryARS?: number;
     nov2026MonthlySalaryARS?: number;
     dec2026MonthlySalaryARS?: number;
+    billingCurrency?: string;
+    usdBillingFraction?: number;
+    activeUntil?: string | null;
   };
   roles: any[];
 }
@@ -177,6 +180,9 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
   const [editedMonthlyFixedSalary, setEditedMonthlyFixedSalary] = useState(getInitialSalary());
   const [editedIncludeInRealCosts, setEditedIncludeInRealCosts] = useState(person.includeInRealCosts ?? true);
   const [editedMonthlyHours, setEditedMonthlyHours] = useState(person.monthlyHours?.toString() || '');
+  const [editedBillingCurrency, setEditedBillingCurrency] = useState(person.billingCurrency || 'ARS');
+  const [editedUsdBillingFraction, setEditedUsdBillingFraction] = useState(person.usdBillingFraction?.toString() || '0');
+  const [editedActiveUntil, setEditedActiveUntil] = useState(person.activeUntil || '');
   const [editingCells, setEditingCells] = useState<Record<string, string>>({});
   const [savingFields, setSavingFields] = useState<Record<string, boolean>>({});
 
@@ -192,7 +198,10 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
     setEditedMonthlyFixedSalary(getInitialSalary());
     setEditedIncludeInRealCosts(person.includeInRealCosts ?? true);
     setEditedMonthlyHours(person.monthlyHours?.toString() || '0');
-  }, [person.id, person.name, person.email, person.roleId, person.hourlyRate, person.contractType, person.monthlyFixedSalary, person.includeInRealCosts, person.monthlyHours]);
+    setEditedBillingCurrency(person.billingCurrency || 'ARS');
+    setEditedUsdBillingFraction(person.usdBillingFraction?.toString() || '0');
+    setEditedActiveUntil(person.activeUntil || '');
+  }, [person.id, person.name, person.email, person.roleId, person.hourlyRate, person.contractType, person.monthlyFixedSalary, person.includeInRealCosts, person.monthlyHours, person.billingCurrency, person.usdBillingFraction, person.activeUntil]);
 
   // Buscamos sueldo / tarifa "vigente" — sólo mes actual hacia atrás.
   // Los meses futuros con valores cargados son proyecciones, no la realidad
@@ -273,15 +282,18 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
   ];
 
   const updatePersonnelMutation = useMutation({
-    mutationFn: async (data: { 
-      name: string; 
-      email: string; 
-      roleId: number; 
+    mutationFn: async (data: {
+      name: string;
+      email: string;
+      roleId: number;
       hourlyRate: number;
       contractType: string;
       monthlyFixedSalary?: number;
       includeInRealCosts: boolean;
       monthlyHours?: number;
+      billingCurrency?: string;
+      usdBillingFraction?: number;
+      activeUntil?: string | null;
     }) => {
       console.log(`🔧 [${person.name}] Sending PATCH request for personnel ${person.id}:`, data);
       console.log(`🔧 [${person.name}] Monthly hours being sent: ${data.monthlyHours} (type: ${typeof data.monthlyHours})`);
@@ -305,6 +317,9 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
       setEditedMonthlyFixedSalary(updatedPerson.monthlyFixedSalary?.toString() || '');
       setEditedIncludeInRealCosts(updatedPerson.includeInRealCosts ?? true);
       setEditedMonthlyHours(updatedPerson.monthlyHours?.toString() || '');
+      setEditedBillingCurrency(updatedPerson.billingCurrency || 'ARS');
+      setEditedUsdBillingFraction(updatedPerson.usdBillingFraction?.toString() || '0');
+      setEditedActiveUntil(updatedPerson.activeUntil || '');
 
       console.log(`🔧 [${person.name}] Local state updated - monthlyHours: ${updatedPerson.monthlyHours}`);
 
@@ -746,6 +761,11 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
       dataToSend.monthlyHours = monthlyHours;
     }
 
+    dataToSend.billingCurrency = editedBillingCurrency;
+    const parsedFraction = parseFloat(editedUsdBillingFraction);
+    dataToSend.usdBillingFraction = !isNaN(parsedFraction) ? parsedFraction : 0;
+    dataToSend.activeUntil = editedActiveUntil.trim() || null;
+
     console.log(`🚀 Sending update request:`, dataToSend);
     updatePersonnelMutation.mutate(dataToSend);
   };
@@ -759,6 +779,9 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
     setEditedMonthlyFixedSalary(getInitialSalary());
     setEditedIncludeInRealCosts(person.includeInRealCosts ?? true);
     setEditedMonthlyHours(person.monthlyHours?.toString() || '0');
+    setEditedBillingCurrency(person.billingCurrency || 'ARS');
+    setEditedUsdBillingFraction(person.usdBillingFraction?.toString() || '0');
+    setEditedActiveUntil(person.activeUntil || '');
     setIsEditing(false);
   };
 
@@ -1008,6 +1031,52 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
             </TooltipProvider>
           </div>
         </td>
+        {/* Moneda de facturación */}
+        <td className="px-6 py-4">
+          <div className="flex flex-col gap-1">
+            <Select
+              value={editedBillingCurrency}
+              onValueChange={setEditedBillingCurrency}
+              disabled={updatePersonnelMutation.isPending}
+            >
+              <SelectTrigger className="h-9 w-28 border-blue-200 focus:border-blue-400 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ARS">Solo ARS</SelectItem>
+                <SelectItem value="USD">Solo USD</SelectItem>
+                <SelectItem value="mixed">Mixto</SelectItem>
+              </SelectContent>
+            </Select>
+            {editedBillingCurrency === 'mixed' && (
+              <div className="flex items-center gap-1">
+                <Input
+                  type="number"
+                  min="0"
+                  max="1"
+                  step="0.01"
+                  value={editedUsdBillingFraction}
+                  onChange={(e) => setEditedUsdBillingFraction(e.target.value)}
+                  className="h-7 w-16 text-xs border-blue-200"
+                  disabled={updatePersonnelMutation.isPending}
+                  placeholder="0.9"
+                />
+                <span className="text-xs text-muted-foreground">USD</span>
+              </div>
+            )}
+          </div>
+        </td>
+        {/* Activo hasta */}
+        <td className="px-6 py-4">
+          <Input
+            type="date"
+            value={editedActiveUntil}
+            onChange={(e) => setEditedActiveUntil(e.target.value)}
+            disabled={updatePersonnelMutation.isPending}
+            className="h-9 w-36 border-blue-200 focus:border-blue-400 text-xs"
+            placeholder="Sin límite"
+          />
+        </td>
         <td className="px-6 py-4">
           <div className="flex items-center gap-2">
             <Button
@@ -1201,6 +1270,22 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
             <X className="h-4 w-4 text-red-600" />
           )}
         </div>
+      </td>
+      {/* Moneda de facturación – display */}
+      <td className="px-6 py-4 text-center text-xs">
+        {person.billingCurrency === 'USD' ? (
+          <span className="font-semibold text-green-700">USD</span>
+        ) : person.billingCurrency === 'mixed' ? (
+          <span className="font-semibold text-blue-700">
+            Mixto {person.usdBillingFraction ? `(${Math.round((person.usdBillingFraction ?? 0) * 100)}% USD)` : ''}
+          </span>
+        ) : (
+          <span className="text-gray-500">ARS</span>
+        )}
+      </td>
+      {/* Activo hasta – display */}
+      <td className="px-6 py-4 text-center text-xs text-muted-foreground">
+        {person.activeUntil ? person.activeUntil : '—'}
       </td>
       <td className="px-6 py-4">
         <div className="flex items-center gap-1">
