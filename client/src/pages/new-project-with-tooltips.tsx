@@ -44,8 +44,8 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 const formSchema = z.object({
-  quotationId: z.number(),
-  clientId: z.number(),
+  quotationId: z.number().optional(),
+  clientId: z.number({ required_error: "El cliente es requerido" }),
   status: z.string().min(1, "El estado es requerido"),
   trackingFrequency: z.string().min(1, "La frecuencia es requerida"),
   startDate: z.date(),
@@ -177,35 +177,7 @@ export default function NewProjectWithTooltips() {
     );
   }
 
-  if (approvedQuotations.length === 0) {
-    return (
-      <div className="container mx-auto py-6">
-        <div className="flex items-center mb-6">
-          <Button variant="ghost" onClick={() => setLocation("/active-projects")}>
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Volver
-          </Button>
-          <h1 className="text-3xl font-bold ml-4">Nuevo Proyecto</h1>
-        </div>
-        <Card className="mx-auto max-w-3xl">
-          <CardHeader className="text-center">
-            <CardTitle>No hay cotizaciones aprobadas</CardTitle>
-          </CardHeader>
-          <CardContent className="text-center">
-            <p className="mb-4">Para crear un proyecto necesitas al menos una cotización aprobada.</p>
-            <div className="flex gap-4 justify-center">
-              <Button variant="outline" onClick={() => setLocation("/active-projects")}>
-                Volver a Proyectos
-              </Button>
-              <Button onClick={() => setLocation("/manage-quotes")}>
-                Gestionar Cotizaciones
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+  // No longer blocking — quotation is optional
 
   return (
     <TooltipProvider>
@@ -236,47 +208,38 @@ export default function NewProjectWithTooltips() {
                   render={({ field }) => (
                     <FormItem>
                       <div className="flex items-center gap-2">
-                        <FormLabel>Cotización Aprobada</FormLabel>
+                        <FormLabel>Cotización Aprobada <span className="text-muted-foreground font-normal">(opcional)</span></FormLabel>
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" />
                           </TooltipTrigger>
                           <TooltipContent>
-                            <p>Selecciona la cotización aprobada que quieres convertir en proyecto activo.</p>
+                            <p>Vincula una cotización aprobada al proyecto. Si el proyecto no viene de una cotización (ej. demo, interno), dejá este campo vacío y seleccioná el cliente directamente.</p>
                           </TooltipContent>
                         </Tooltip>
                       </div>
-                      <Select onValueChange={(value) => {
-                        const quotationId = parseInt(value);
-                        const selectedQuotation = approvedQuotations.find(q => q.id === quotationId);
-                        field.onChange(quotationId);
-                        if (selectedQuotation) {
-                          form.setValue('clientId', selectedQuotation.clientId);
-                        }
-                      }} value={field.value?.toString()}>
+                      <Select
+                        onValueChange={(value) => {
+                          if (value === '__none__') {
+                            field.onChange(undefined);
+                            return;
+                          }
+                          const quotationId = parseInt(value);
+                          const selectedQuotation = approvedQuotations.find((q: any) => q.id === quotationId);
+                          field.onChange(quotationId);
+                          if (selectedQuotation) {
+                            form.setValue('clientId', selectedQuotation.clientId);
+                          }
+                        }}
+                        value={field.value?.toString() ?? '__none__'}
+                      >
                         <FormControl>
                           <SelectTrigger className="h-auto min-h-[40px]">
-                            <SelectValue placeholder="Selecciona una cotización">
-                              {field.value && (() => {
-                                const selected = approvedQuotations.find(q => q.id === field.value);
-                                return selected ? (
-                                  <div className="flex items-center gap-2 py-1">
-                                    <div className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-medium ${selected.clientBgColor} ${selected.clientTextColor}`}>
-                                      {selected.clientInitials}
-                                    </div>
-                                    <div className="flex flex-col items-start">
-                                      <span className="font-medium text-sm">{selected.clientName}</span>
-                                      <span className="text-xs text-muted-foreground">
-                                        {selected.projectName}
-                                      </span>
-                                    </div>
-                                  </div>
-                                ) : null;
-                              })()}
-                            </SelectValue>
+                            <SelectValue placeholder="Sin cotización (proyecto directo)" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
+                          <SelectItem value="__none__">Sin cotización (proyecto directo)</SelectItem>
                           {approvedQuotations.map((q: any) => (
                             <SelectItem key={q.id} value={q.id.toString()}>
                               <div className="flex items-center gap-2 py-1">
@@ -298,6 +261,35 @@ export default function NewProjectWithTooltips() {
                     </FormItem>
                   )}
                 />
+
+                {/* Client selector – shown only when no quotation is selected */}
+                {!form.watch('quotationId') && (
+                  <FormField
+                    control={form.control}
+                    name="clientId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Cliente</FormLabel>
+                        <Select
+                          onValueChange={(v) => field.onChange(parseInt(v))}
+                          value={field.value?.toString()}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Seleccioná un cliente" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {clients.map((c: any) => (
+                              <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Estado */}

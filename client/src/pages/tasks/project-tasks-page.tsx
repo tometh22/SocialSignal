@@ -18,6 +18,7 @@ import {
 import { Loader2, Users, Trash2, Plus, ChevronRight, List, LayoutGrid, Share2, Filter, ArrowUpDown, Layers, MoreHorizontal, Search, X, Check, BarChart2, TrendingUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
+import { usePermissions } from "@/hooks/use-permissions";
 import ProjectTaskList from "@/components/tasks/ProjectTaskList";
 import ProjectOverviewPanel from "@/components/tasks/ProjectOverviewPanel";
 
@@ -53,6 +54,7 @@ interface Props {
 
 export default function ProjectTasksPage({ params }: Props) {
   const projectId = parseInt(params.id);
+  const { isOperations } = usePermissions();
   const [membersOpen, setMembersOpen] = useState(false);
   const [addPersonnelId, setAddPersonnelId] = useState<string>("none");
   const [addRole, setAddRole] = useState("member");
@@ -223,7 +225,7 @@ export default function ProjectTasksPage({ params }: Props) {
                   )}
                 </div>
 
-                {projectId < 1_000_000 && (
+                {isOperations && projectId < 1_000_000 && (
                   <Link href={`/active-projects/${projectId}`}>
                     <Button
                       variant="outline"

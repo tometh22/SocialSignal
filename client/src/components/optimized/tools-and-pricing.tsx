@@ -23,12 +23,15 @@ const ToolsAndPricing: React.FC = () => {
   } = useOptimizedQuote();
 
   const { convertFromUSD, exchangeRate } = useCurrency();
-  const subtotalBeforeTools = baseCost + complexityAdjustment;
-  // Convert tools cost from USD to ARS for display
+  // baseCost and complexityAdjustment are always in ARS
+  const subtotalBeforeToolsARS = baseCost + complexityAdjustment;
   const toolsCostUSD = quotationData.financials.toolsCost || 0;
+  // Convert tools cost from USD to ARS for display/ARS calculations
   const toolsCostARS = exchangeRate ? convertFromUSD(toolsCostUSD, 'ARS') : 0;
-  const subtotalWithTools = subtotalBeforeTools + toolsCostARS;
-  
+  const subtotalWithToolsARS = subtotalBeforeToolsARS + toolsCostARS;
+  // USD equivalent of the full subtotal (used in manual pricing comparisons)
+  const subtotalWithToolsUSD = exchangeRate && exchangeRate > 0 ? subtotalWithToolsARS / exchangeRate : 0;
+
   const isManualMode = quotationData.financials.priceMode === 'manual';
   const effectiveMarginPercentage = quotationData.financials.marginPercentage || 0;
 
@@ -84,7 +87,7 @@ const ToolsAndPricing: React.FC = () => {
               <div className="p-3 bg-white rounded-md border text-sm space-y-1">
                 <div className="flex justify-between">
                   <span>Base + Complejidad:</span>
-                  <span className="font-mono">ARS {subtotalBeforeTools.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
+                  <span className="font-mono">ARS {subtotalBeforeToolsARS.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>+ Herramientas (USD {toolsCostUSD.toFixed(2)}):</span>
@@ -93,7 +96,7 @@ const ToolsAndPricing: React.FC = () => {
                 <Separator className="my-1" />
                 <div className="flex justify-between font-medium">
                   <span>Subtotal:</span>
-                  <span className="font-mono">ARS {subtotalWithTools.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
+                  <span className="font-mono">ARS {subtotalWithToolsARS.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
                 </div>
               </div>
             </div>
@@ -147,12 +150,15 @@ const ToolsAndPricing: React.FC = () => {
                 <Label>Margen Calculado</Label>
                 <div className="p-3 bg-white rounded-md border text-sm space-y-1">
                   <div className="flex justify-between">
-                    <span>Costos base:</span>
-                    <span className="font-mono">${subtotalWithTools.toFixed(2)}</span>
+                    <span>Costos base (USD):</span>
+                    <span className="font-mono">USD {subtotalWithToolsUSD.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>= ARS {subtotalWithToolsARS.toLocaleString('es-AR', { maximumFractionDigits: 0 })} ÷ TC {exchangeRate?.toLocaleString('es-AR')}</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Precio manual:</span>
-                    <span className="font-mono">${(quotationData.financials.manualPrice || 0).toFixed(2)}</span>
+                    <span className="font-mono">USD {(quotationData.financials.manualPrice || 0).toFixed(2)}</span>
                   </div>
                   <Separator className="my-1" />
                   <div className="flex justify-between items-center">
@@ -172,8 +178,8 @@ const ToolsAndPricing: React.FC = () => {
                 <span className="font-medium text-sm">Cálculo Automático</span>
               </div>
               <div className="flex items-center justify-between text-sm">
-                <div className="flex items-center gap-2">
-                  <span>Costos base: ${subtotalWithTools.toFixed(2)}</span>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span>Costos: ARS {subtotalWithToolsARS.toLocaleString('es-AR', { maximumFractionDigits: 0 })}</span>
                   <ArrowRight className="h-3 w-3" />
                   <span>Margen: {effectiveMarginPercentage.toFixed(1)}%</span>
                   <ArrowRight className="h-3 w-3" />

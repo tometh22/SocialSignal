@@ -355,6 +355,7 @@ interface TaskRowProps {
   onToggle: (task: Task) => void;
   onDateSet: (taskId: number, d: Date | undefined) => void;
   onAssignee: (taskId: number, assigneeId: number | null) => void;
+  onRename?: (taskId: number, newTitle: string) => void;
   isSubtask?: boolean;
   clientName?: string | null;
   subtaskMap?: Record<number, Task[]>;
@@ -364,8 +365,10 @@ interface TaskRowProps {
   isDragging?: boolean;
 }
 
-function TaskRow({ task, allPersonnel, onOpen, onToggle, onDateSet, onAssignee, isSubtask = false, clientName, subtaskMap, expandedSubtasks, onToggleSubtasks, dragHandleProps, isDragging }: TaskRowProps) {
+function TaskRow({ task, allPersonnel, onOpen, onToggle, onDateSet, onAssignee, onRename, isSubtask = false, clientName, subtaskMap, expandedSubtasks, onToggleSubtasks, dragHandleProps, isDragging }: TaskRowProps) {
   const [assigneeOpen, setAssigneeOpen] = useState(false);
+  const [renaming, setRenaming] = useState(false);
+  const [renameValue, setRenameValue] = useState("");
   const assignee = allPersonnel.find(p => p.id === task.assigneeId);
   const collaborators = allPersonnel.filter(p => (task.collaboratorIds || []).includes(p.id));
   const overdue = !!isOverdue(task);
@@ -414,9 +417,36 @@ function TaskRow({ task, allPersonnel, onOpen, onToggle, onDateSet, onAssignee, 
         {/* Title */}
         <div className="flex-1 min-w-0 px-2 py-3 flex items-center gap-1.5">
           <div className={cn("w-2 h-2 rounded-full flex-shrink-0", PRIORITY_DOT[task.priority] || "bg-gray-200")} />
-          <span className={cn("text-sm truncate transition-all duration-150", isDone && "line-through text-muted-foreground")}>
-            {task.title}
-          </span>
+          {renaming ? (
+            <Input
+              value={renameValue}
+              onChange={e => setRenameValue(e.target.value)}
+              className="h-6 text-sm border-primary/40 focus-visible:ring-1 px-1 py-0"
+              autoFocus
+              onClick={e => e.stopPropagation()}
+              onKeyDown={e => {
+                e.stopPropagation();
+                if (e.key === "Enter") {
+                  const trimmed = renameValue.trim();
+                  if (trimmed && trimmed !== task.title) onRename?.(task.id, trimmed);
+                  setRenaming(false);
+                }
+                if (e.key === "Escape") setRenaming(false);
+              }}
+              onBlur={() => {
+                const trimmed = renameValue.trim();
+                if (trimmed && trimmed !== task.title) onRename?.(task.id, trimmed);
+                setRenaming(false);
+              }}
+            />
+          ) : (
+            <span
+              className={cn("text-sm truncate transition-all duration-150", isDone && "line-through text-muted-foreground")}
+              onDoubleClick={e => { e.stopPropagation(); setRenameValue(task.title); setRenaming(true); }}
+            >
+              {task.title}
+            </span>
+          )}
           {hasSubtasks && !isSubtask && (
             <button
               onClick={e => { e.stopPropagation(); onToggleSubtasks?.(task.id); }}
@@ -578,6 +608,7 @@ interface SectionBlockProps {
   onToggleTask: (task: Task) => void;
   onDateSet: (taskId: number, d: Date | undefined) => void;
   onAssignee: (taskId: number, assigneeId: number | null) => void;
+  onRename?: (taskId: number, newTitle: string) => void;
   onRefresh: () => void;
   clientName?: string | null;
   autoOpenAdd?: number;
@@ -590,7 +621,7 @@ interface SectionBlockProps {
   taskOrderOverride?: number[];
 }
 
-function SectionBlock({ sectionName, tasks, projectId, allPersonnel, projectMembers = [], onOpenTask, onToggleTask, onDateSet, onAssignee, onRefresh, clientName, autoOpenAdd = 0, forceExpand = false, dragHandleProps, isDragging, sortBy = 'default', allPersonnelForSort = [], isFirst = false, taskOrderOverride }: SectionBlockProps) {
+function SectionBlock({ sectionName, tasks, projectId, allPersonnel, projectMembers = [], onOpenTask, onToggleTask, onDateSet, onAssignee, onRename, onRefresh, clientName, autoOpenAdd = 0, forceExpand = false, dragHandleProps, isDragging, sortBy = 'default', allPersonnelForSort = [], isFirst = false, taskOrderOverride }: SectionBlockProps) {
   const [collapsed, setCollapsed] = useState(false);
   const effectiveCollapsed = forceExpand ? false : collapsed;
   const [showAdd, setShowAdd] = useState(false);
@@ -768,6 +799,7 @@ function SectionBlock({ sectionName, tasks, projectId, allPersonnel, projectMemb
               onToggleTask={onToggleTask}
               onDateSet={onDateSet}
               onAssignee={onAssignee}
+              onRename={onRename}
               clientName={clientName}
               subtaskMap={subtaskMap}
               expandedSubtasks={expandedSubtasks}
@@ -795,6 +827,7 @@ function SectionBlock({ sectionName, tasks, projectId, allPersonnel, projectMemb
                   onToggle={onToggleTask}
                   onDateSet={onDateSet}
                   onAssignee={onAssignee}
+                  onRename={onRename}
                   clientName={clientName}
                   subtaskMap={subtaskMap}
                   expandedSubtasks={expandedSubtasks}
@@ -852,7 +885,7 @@ function SectionBlock({ sectionName, tasks, projectId, allPersonnel, projectMemb
 
 // ─── Sortable wrappers ──────────────────────────────────────────────────────
 
-function SortableTaskRow({ taskId, task, allPersonnel, onOpenTask, onToggleTask, onDateSet, onAssignee, clientName, subtaskMap, expandedSubtasks, onToggleSubtasks }: {
+function SortableTaskRow({ taskId, task, allPersonnel, onOpenTask, onToggleTask, onDateSet, onAssignee, onRename, clientName, subtaskMap, expandedSubtasks, onToggleSubtasks }: {
   taskId: number;
   task: Task;
   allPersonnel: Personnel[];
@@ -860,6 +893,7 @@ function SortableTaskRow({ taskId, task, allPersonnel, onOpenTask, onToggleTask,
   onToggleTask: (task: Task) => void;
   onDateSet: (taskId: number, d: Date | undefined) => void;
   onAssignee: (taskId: number, assigneeId: number | null) => void;
+  onRename?: (taskId: number, newTitle: string) => void;
   clientName?: string | null;
   subtaskMap?: Record<number, Task[]>;
   expandedSubtasks?: Set<number>;
@@ -879,6 +913,7 @@ function SortableTaskRow({ taskId, task, allPersonnel, onOpenTask, onToggleTask,
         onToggle={onToggleTask}
         onDateSet={onDateSet}
         onAssignee={onAssignee}
+        onRename={onRename}
         clientName={clientName}
         subtaskMap={subtaskMap}
         expandedSubtasks={expandedSubtasks}
@@ -895,6 +930,7 @@ function SortableTaskRow({ taskId, task, allPersonnel, onOpenTask, onToggleTask,
           onToggle={onToggleTask}
           onDateSet={onDateSet}
           onAssignee={onAssignee}
+          onRename={onRename}
           isSubtask
         />
       ))}
@@ -1185,6 +1221,10 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
     inlineUpdateMutation.mutate({ taskId, updates: { assigneeId } });
   };
 
+  const handleRenameTask = (taskId: number, newTitle: string) => {
+    inlineUpdateMutation.mutate({ taskId, updates: { title: newTitle } });
+  };
+
   const createSectionTask = useMutation({
     mutationFn: (data: any) => apiRequest("/api/tasks", "POST", data),
     onSuccess: () => { refetch(); invalidateRelated(); setShowAddSection(false); setNewSectionName(""); },
@@ -1432,6 +1472,7 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
                       onToggleTask={(task) => toggleMutation.mutate(task)}
                       onDateSet={handleDateSet}
                       onAssignee={handleAssignee}
+                      onRename={handleRenameTask}
                       onRefresh={refetch}
                       clientName={clientName}
                       autoOpenAdd={idx === 0 ? firstSectionAutoAdd : 0}

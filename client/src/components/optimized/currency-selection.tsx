@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { useOptimizedQuote } from '@/context/optimized-quote-context';
-import { DollarSign, Info, ArrowRight, CheckCircle, Target, Save, Loader2 } from 'lucide-react';
+import { DollarSign, Info, CheckCircle, Target, Loader2, Pencil, Check, X, RotateCcw } from 'lucide-react';
 import { useCurrency } from '@/hooks/use-currency';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
@@ -17,10 +18,51 @@ const CurrencySelection: React.FC = () => {
   const [, setLocation] = useLocation();
   const { user } = useAuth();
   const [isFinalizingDirect, setIsFinalizingDirect] = useState(false);
+  const [isEditingRate, setIsEditingRate] = useState(false);
+  const [manualRateInput, setManualRateInput] = useState("");
+
+  // Effective rate: manual override wins over live market rate
+  const effectiveRate = quotationData.exchangeRateSnapshot && quotationData.exchangeRateSnapshot > 0
+    ? quotationData.exchangeRateSnapshot
+    : exchangeRate;
+  const isRateOverridden = Boolean(
+    quotationData.exchangeRateSnapshot &&
+    Math.abs(quotationData.exchangeRateSnapshot - exchangeRate) > 1
+  );
+
+  const handleStartEditRate = () => {
+    setManualRateInput(effectiveRate.toString());
+    setIsEditingRate(true);
+  };
+
+  const handleConfirmRate = () => {
+    const parsed = parseFloat(manualRateInput);
+    if (!isNaN(parsed) && parsed > 0) {
+      updateQuotationData({ exchangeRateSnapshot: parsed });
+      toast({
+        title: "Tipo de cambio actualizado",
+        description: `TC manual: 1 USD = ${parsed.toLocaleString('es-AR')} ARS`,
+      });
+    }
+    setIsEditingRate(false);
+  };
+
+  const handleCancelEditRate = () => {
+    setIsEditingRate(false);
+    setManualRateInput("");
+  };
+
+  const handleResetRate = () => {
+    updateQuotationData({ exchangeRateSnapshot: exchangeRate });
+    toast({
+      title: "Tipo de cambio restaurado",
+      description: "Usando el tipo de cambio actual del mercado.",
+    });
+  };
 
   const handleCurrencyChange = (currency: 'ARS' | 'USD') => {
-    // Snapshot del tipo de cambio al momento de seleccionar la moneda
-    updateQuotationData({ quotationCurrency: currency, exchangeRateSnapshot: exchangeRate });
+    // Preserve manual override if already set; otherwise snapshot market rate
+    updateQuotationData({ quotationCurrency: currency, exchangeRateSnapshot: effectiveRate });
   };
 
   const handleDirectFinalize = async () => {
@@ -55,11 +97,11 @@ const CurrencySelection: React.FC = () => {
       let finalMarkupAmount = markupAmount;
 
       if (quotationData.quotationCurrency === 'ARS') {
-        // Internal values are in USD, convert to ARS for storage
-        finalTotalAmount = totalAmount * exchangeRate;
-        finalBaseCost = baseCost * exchangeRate;
-        finalComplexityAdjustment = complexityAdjustment * exchangeRate;
-        finalMarkupAmount = markupAmount * exchangeRate;
+        // Internal values are in USD, convert to ARS for storage using effective rate
+        finalTotalAmount = totalAmount * effectiveRate;
+        finalBaseCost = baseCost * effectiveRate;
+        finalComplexityAdjustment = complexityAdjustment * effectiveRate;
+        finalMarkupAmount = markupAmount * effectiveRate;
       }
       // If USD, values are already in USD - no conversion needed
 
@@ -90,8 +132,8 @@ const CurrencySelection: React.FC = () => {
         inflationMethod: quotationData.inflation.inflationMethod,
         manualInflationRate: quotationData.inflation.manualInflationRate,
         quotationCurrency: quotationData.quotationCurrency,
-        exchangeRateAtQuote: exchangeRate,
-        usdExchangeRate: exchangeRate,
+        exchangeRateAtQuote: effectiveRate,
+        usdExchangeRate: effectiveRate,
         createdBy: user?.id ?? 1
       };
 
@@ -126,7 +168,7 @@ const CurrencySelection: React.FC = () => {
   };
 
   const totalInUSD = totalAmount;
-  const totalInARS = totalAmount * exchangeRate;
+  const totalInARS = totalAmount * effectiveRate;
 
   return (
     <div className="space-y-6">
@@ -139,15 +181,72 @@ const CurrencySelection: React.FC = () => {
         </p>
       </div>
 
-      {/* Información del tipo de cambio actual */}
-      <Card className="bg-blue-50 border-blue-200">
-        <CardContent className="pt-4">
-          <div className="flex items-center gap-2 text-blue-800">
-            <Info className="h-4 w-4" />
-            <span className="text-sm font-medium">
-              Tipo de cambio actual: 1 USD = {exchangeRate.toLocaleString('es-AR')} ARS
-            </span>
-          </div>
+      {/* Información del tipo de cambio — editable */}
+      <Card className={`border-2 transition-colors ${isRateOverridden ? 'bg-amber-50 border-amber-300' : 'bg-blue-50 border-blue-200'}`}>
+        <CardContent className="pt-4 pb-4">
+          {isEditingRate ? (
+            <div className="flex items-center gap-2 flex-wrap">
+              <Info className="h-4 w-4 text-blue-800 flex-shrink-0" />
+              <span className="text-sm font-medium text-blue-800">1 USD =</span>
+              <Input
+                type="number"
+                value={manualRateInput}
+                onChange={(e) => setManualRateInput(e.target.value)}
+                className="w-32 h-7 text-sm"
+                min={1}
+                step={1}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleConfirmRate();
+                  if (e.key === 'Escape') handleCancelEditRate();
+                }}
+                autoFocus
+              />
+              <span className="text-sm font-medium text-blue-800">ARS</span>
+              <Button size="sm" variant="ghost" onClick={handleConfirmRate} className="h-7 px-2 text-green-600 hover:text-green-700">
+                <Check className="h-3 w-3" />
+              </Button>
+              <Button size="sm" variant="ghost" onClick={handleCancelEditRate} className="h-7 px-2 text-gray-500">
+                <X className="h-3 w-3" />
+              </Button>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between gap-2">
+              <div className={`flex items-center gap-2 ${isRateOverridden ? 'text-amber-800' : 'text-blue-800'}`}>
+                <Info className="h-4 w-4 flex-shrink-0" />
+                <span className="text-sm font-medium">
+                  Tipo de cambio: 1 USD = {effectiveRate.toLocaleString('es-AR')} ARS
+                </span>
+                {isRateOverridden && (
+                  <Badge variant="outline" className="text-xs border-amber-400 text-amber-700 bg-amber-100">
+                    Manual
+                  </Badge>
+                )}
+              </div>
+              <div className="flex items-center gap-1">
+                {isRateOverridden && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={handleResetRate}
+                    className="h-7 px-2 text-xs text-gray-500 hover:text-gray-700"
+                    title="Restaurar TC del mercado"
+                  >
+                    <RotateCcw className="h-3 w-3 mr-1" />
+                    Restaurar
+                  </Button>
+                )}
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={handleStartEditRate}
+                  className={`h-7 px-2 ${isRateOverridden ? 'text-amber-600 hover:text-amber-700' : 'text-blue-600 hover:text-blue-700'}`}
+                  title="Editar tipo de cambio"
+                >
+                  <Pencil className="h-3 w-3" />
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
