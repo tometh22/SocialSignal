@@ -9,6 +9,7 @@ import {
 } from "date-fns";
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import { TASK_STATUS_CONFIG, TaskStatus } from "@/constants/task-statuses";
 
 interface CalTask {
   id: number;
@@ -26,6 +27,8 @@ interface Props {
 const STATUS_CHIP: Record<string, string> = {
   todo:        "bg-gray-100 text-gray-700 border-gray-200",
   in_progress: "bg-blue-100 text-blue-700 border-blue-200",
+  in_review:   "bg-violet-100 text-violet-700 border-violet-200",
+  blocked:     "bg-orange-100 text-orange-700 border-orange-200",
   done:        "bg-green-100 text-green-700 border-green-200 line-through",
   cancelled:   "bg-red-50 text-red-400 border-red-200 line-through",
 };
@@ -41,12 +44,10 @@ export default function TaskCalendarView({ projectId }: Props) {
     staleTime: 30_000,
   });
 
-  // Only root tasks (no subtasks) with or without a date
   const rootTasks = (data?.tasks || []).filter(t => !t.parentTaskId);
   const tasksWithDate = rootTasks.filter(t => t.dueDate);
   const tasksWithoutDate = rootTasks.filter(t => !t.dueDate && t.status !== "cancelled" && t.status !== "done");
 
-  // Build calendar grid weeks
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(currentMonth);
   const calStart = startOfWeek(monthStart, { weekStartsOn: 1 });
@@ -125,18 +126,24 @@ export default function TaskCalendarView({ projectId }: Props) {
                     {format(d, "d")}
                   </div>
                   <div className="space-y-0.5">
-                    {dayTasks.slice(0, 3).map(t => (
-                      <div
-                        key={t.id}
-                        className={cn(
-                          "text-[9px] px-1 py-0.5 rounded border truncate leading-tight cursor-default",
-                          STATUS_CHIP[t.status] || "bg-gray-100 text-gray-700 border-gray-200"
-                        )}
-                        title={t.title}
-                      >
-                        {t.title}
-                      </div>
-                    ))}
+                    {dayTasks.slice(0, 3).map(t => {
+                      const dot = TASK_STATUS_CONFIG[t.status as TaskStatus]?.dot;
+                      return (
+                        <div
+                          key={t.id}
+                          className={cn(
+                            "text-[9px] px-1 py-0.5 rounded border leading-tight cursor-default flex items-center gap-0.5",
+                            STATUS_CHIP[t.status] || "bg-gray-100 text-gray-700 border-gray-200"
+                          )}
+                          title={t.title}
+                        >
+                          {dot && (
+                            <span className={cn("inline-block w-1.5 h-1.5 rounded-full flex-shrink-0", dot)} />
+                          )}
+                          <span className="truncate">{t.title}</span>
+                        </div>
+                      );
+                    })}
                     {dayTasks.length > 3 && (
                       <div className="text-[9px] text-muted-foreground px-1">
                         +{dayTasks.length - 3} más
@@ -157,15 +164,19 @@ export default function TaskCalendarView({ projectId }: Props) {
             Sin fecha de vencimiento ({tasksWithoutDate.length})
           </p>
           <div className="flex flex-wrap gap-1.5">
-            {tasksWithoutDate.map(t => (
-              <div
-                key={t.id}
-                className="text-[10px] px-2 py-0.5 rounded-full border bg-muted/50 text-muted-foreground truncate max-w-[180px]"
-                title={t.title}
-              >
-                {t.title}
-              </div>
-            ))}
+            {tasksWithoutDate.map(t => {
+              const dot = TASK_STATUS_CONFIG[t.status as TaskStatus]?.dot;
+              return (
+                <div
+                  key={t.id}
+                  className="text-[10px] px-2 py-0.5 rounded-full border bg-muted/50 text-muted-foreground truncate max-w-[180px] flex items-center gap-1"
+                  title={t.title}
+                >
+                  {dot && <span className={cn("inline-block w-1.5 h-1.5 rounded-full flex-shrink-0", dot)} />}
+                  {t.title}
+                </div>
+              );
+            })}
           </div>
         </div>
       )}

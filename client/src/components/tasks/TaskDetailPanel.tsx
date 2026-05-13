@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest, authFetch } from "@/lib/queryClient";
-import { format } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "@/hooks/use-toast";
 import {
@@ -42,6 +42,7 @@ type Task = {
   priority: string;
   parentTaskId?: number | null;
   completedAt?: string | null;
+  updatedAt?: string | null;
   timeEntries?: any[];
   subtasks?: any[];
 };
@@ -50,10 +51,12 @@ type Personnel = { id: number; name: string; email?: string | null };
 type Project = { id: number; name: string; client_name: string };
 
 const STATUS_OPTIONS = [
-  { value: "todo",        label: "Pendiente",  bg: "bg-gray-100 hover:bg-gray-200 text-gray-700",   active: "bg-gray-600 text-white" },
-  { value: "in_progress", label: "En curso",   bg: "bg-blue-50 hover:bg-blue-100 text-blue-700",   active: "bg-blue-600 text-white" },
-  { value: "done",        label: "Completada", bg: "bg-green-50 hover:bg-green-100 text-green-700", active: "bg-green-600 text-white" },
-  { value: "cancelled",   label: "Cancelada",  bg: "bg-red-50 hover:bg-red-100 text-red-700",       active: "bg-red-600 text-white" },
+  { value: "todo",        label: "Pendiente",   bg: "bg-gray-100 hover:bg-gray-200 text-gray-700",       active: "bg-gray-600 text-white" },
+  { value: "in_progress", label: "En curso",    bg: "bg-blue-50 hover:bg-blue-100 text-blue-700",        active: "bg-blue-600 text-white" },
+  { value: "in_review",   label: "En revisión", bg: "bg-violet-50 hover:bg-violet-100 text-violet-700",  active: "bg-violet-600 text-white" },
+  { value: "blocked",     label: "Bloqueado",   bg: "bg-orange-50 hover:bg-orange-100 text-orange-700",  active: "bg-orange-600 text-white" },
+  { value: "done",        label: "Completada",  bg: "bg-green-50 hover:bg-green-100 text-green-700",     active: "bg-green-600 text-white" },
+  { value: "cancelled",   label: "Cancelada",   bg: "bg-red-50 hover:bg-red-100 text-red-700",           active: "bg-red-600 text-white" },
 ];
 
 const PRIORITY_OPTIONS = [
@@ -590,6 +593,11 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
                       </button>
                     ))}
                   </div>
+                  {task.updatedAt && (
+                    <p className="text-[10px] text-muted-foreground mt-1">
+                      Actualizado {formatDistanceToNow(new Date(task.updatedAt), { locale: es, addSuffix: true })}
+                    </p>
+                  )}
                 </div>
 
                 {/* ── Scrollable body ── */}

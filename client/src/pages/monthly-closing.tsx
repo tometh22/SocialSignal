@@ -10,6 +10,8 @@ import { apiRequest } from "@/lib/queryClient";
 import { useCurrency } from "@/hooks/use-currency";
 import { Loader2, Check, Pencil, X, ExternalLink } from "lucide-react";
 import { Link } from "wouter";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
 
 const MONTHS = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
@@ -365,9 +367,16 @@ export default function MonthlyClosing() {
                     </td>
                     <td className="text-center py-2 px-3">
                       {closing ? (
-                        <span className="text-green-600 flex items-center justify-center gap-1">
-                          <Check className="h-4 w-4" /> Cerrado
-                        </span>
+                        <div className="flex flex-col items-center gap-0.5">
+                          <span className="text-green-600 flex items-center gap-1 text-xs font-medium">
+                            <Check className="h-3.5 w-3.5" /> Cerrado
+                          </span>
+                          {closing.closedAt && (
+                            <span className="text-[10px] text-muted-foreground">
+                              {format(new Date(closing.closedAt), "d MMM, HH:mm", { locale: es })}
+                            </span>
+                          )}
+                        </div>
                       ) : (
                         <span className="text-amber-600">Pendiente</span>
                       )}

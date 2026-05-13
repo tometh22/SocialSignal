@@ -223,21 +223,24 @@ function HomeTaskRow({
 }
 
 // ── Tab bar ───────────────────────────────────────────────────────────
+type TabValue = "upcoming" | "in_progress" | "overdue" | "done";
+
 function TabBar({
   active,
   onChange,
   counts,
 }: {
   active: string;
-  onChange: (v: "upcoming" | "overdue" | "done") => void;
-  counts: { upcoming: number; overdue: number; done: number };
+  onChange: (v: TabValue) => void;
+  counts: { upcoming: number; in_progress: number; overdue: number; done: number };
 }) {
   return (
     <div className="flex gap-0 border-b border-border">
       {([
-        ["upcoming", "Próximas"],
-        ["overdue", "Con retraso"],
-        ["done", "Finalizadas"],
+        ["upcoming",    "Próximas"],
+        ["in_progress", "En curso"],
+        ["overdue",     "Con retraso"],
+        ["done",        "Finalizadas"],
       ] as const).map(([val, label]) => (
         <button
           key={val}
@@ -255,7 +258,9 @@ function TabBar({
               "px-1.5 py-0.5 rounded-full text-[10px] font-bold",
               val === "overdue"
                 ? "bg-red-100 text-red-600"
-                : "bg-primary/10 text-primary"
+                : val === "in_progress"
+                  ? "bg-blue-100 text-blue-600"
+                  : "bg-primary/10 text-primary"
             )}>
               {counts[val] > 99 ? "99+" : counts[val]}
             </span>
@@ -270,8 +275,8 @@ function TabBar({
 export default function TasksHomePage() {
   const { user } = useAuth();
   const { isOperations } = usePermissions();
-  const [myTab, setMyTab] = useState<"upcoming" | "overdue" | "done">("upcoming");
-  const [assignedTab, setAssignedTab] = useState<"upcoming" | "overdue" | "done">("upcoming");
+  const [myTab, setMyTab] = useState<TabValue>("upcoming");
+  const [assignedTab, setAssignedTab] = useState<TabValue>("upcoming");
   const [showAllMy, setShowAllMy] = useState(false);
   const [showAllAssigned, setShowAllAssigned] = useState(false);
   const [hidingTaskId, setHidingTaskId] = useState<number | null>(null);
@@ -374,29 +379,33 @@ export default function TasksHomePage() {
   const myPersonnel = personnel.find(p => user?.email && p.email === user.email);
 
   const taskCounts = {
-    upcoming: myTasks.filter(t => t.status !== "done" && !isOverdue(t)).length,
-    overdue: myTasks.filter(t => !!isOverdue(t)).length,
+    upcoming: myTasks.filter(t => t.status !== "done" && t.status !== "cancelled" && t.status !== "in_progress" && t.status !== "in_review" && t.status !== "blocked" && !isOverdue(t)).length,
+    in_progress: myTasks.filter(t => (t.status === "in_progress" || t.status === "in_review" || t.status === "blocked") && t.status !== "done").length,
+    overdue: myTasks.filter(t => !!isOverdue(t) && t.status !== "done").length,
     done: myTasks.filter(t => t.status === "done").length,
   };
 
   const filteredMyTasks = myTasks.filter(t => {
     if (myTab === "done") return t.status === "done";
-    if (myTab === "overdue") return isOverdue(t);
-    return t.status !== "done" && !isOverdue(t);
+    if (myTab === "overdue") return !!isOverdue(t) && t.status !== "done";
+    if (myTab === "in_progress") return (t.status === "in_progress" || t.status === "in_review" || t.status === "blocked") && t.status !== "done";
+    return t.status !== "done" && t.status !== "cancelled" && t.status !== "in_progress" && t.status !== "in_review" && t.status !== "blocked" && !isOverdue(t);
   });
 
   const assignedByMe = allTasks.filter(t =>
     myPersonnel && t.assigneeId && t.assigneeId !== myPersonnel.id
   );
   const assignedCounts = {
-    upcoming: assignedByMe.filter(t => t.status !== "done" && !isOverdue(t)).length,
-    overdue: assignedByMe.filter(t => !!isOverdue(t)).length,
+    upcoming: assignedByMe.filter(t => t.status !== "done" && t.status !== "cancelled" && t.status !== "in_progress" && t.status !== "in_review" && t.status !== "blocked" && !isOverdue(t)).length,
+    in_progress: assignedByMe.filter(t => (t.status === "in_progress" || t.status === "in_review" || t.status === "blocked") && t.status !== "done").length,
+    overdue: assignedByMe.filter(t => !!isOverdue(t) && t.status !== "done").length,
     done: assignedByMe.filter(t => t.status === "done").length,
   };
   const filteredAssigned = assignedByMe.filter(t => {
     if (assignedTab === "done") return t.status === "done";
-    if (assignedTab === "overdue") return isOverdue(t);
-    return t.status !== "done" && !isOverdue(t);
+    if (assignedTab === "overdue") return !!isOverdue(t) && t.status !== "done";
+    if (assignedTab === "in_progress") return (t.status === "in_progress" || t.status === "in_review" || t.status === "blocked") && t.status !== "done";
+    return t.status !== "done" && t.status !== "cancelled" && t.status !== "in_progress" && t.status !== "in_review" && t.status !== "blocked" && !isOverdue(t);
   });
 
   const recentProjects = projects.slice(0, 6);
@@ -523,7 +532,7 @@ export default function TasksHomePage() {
                   <Check className="h-4 w-4 text-muted-foreground/30" />
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  {myTab === "done" ? "Sin tareas completadas" : myTab === "overdue" ? "Sin tareas vencidas" : "No tenés tareas pendientes"}
+                  {myTab === "done" ? "Sin tareas completadas" : myTab === "overdue" ? "Sin tareas vencidas" : myTab === "in_progress" ? "Sin tareas en curso" : "No tenés tareas pendientes"}
                 </p>
               </div>
             ) : (
@@ -637,6 +646,8 @@ export default function TasksHomePage() {
                   ? "Ninguna tarea asignada ha sido completada aún"
                   : assignedTab === "overdue"
                   ? "Ninguna tarea asignada está vencida"
+                  : assignedTab === "in_progress"
+                  ? "Ninguna tarea asignada está en curso"
                   : "No hay tareas pendientes que hayas asignado a otros"}
               </p>
             </div>
