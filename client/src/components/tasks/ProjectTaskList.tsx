@@ -12,7 +12,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuLabel
 } from "@/components/ui/dropdown-menu";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -23,11 +23,14 @@ import {
   MoreHorizontal, Pencil, Trash2, GripVertical, CheckCircle2, ListTodo
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { TaskStatusBadge } from "@/components/ui/status-badge";
+import { TASK_STATUS_CONFIG, BOARD_STATUS_COLUMNS } from "@/constants/task-statuses";
 import TaskDetailPanel from "./TaskDetailPanel";
 import { toast } from "@/hooks/use-toast";
 import {
   DndContext, DragEndEvent, DragOverlay, DragStartEvent, DragOverEvent,
   PointerSensor, useSensor, useSensors, closestCenter, UniqueIdentifier,
+  useDroppable, useDraggable,
 } from "@dnd-kit/core";
 import {
   SortableContext, useSortable, verticalListSortingStrategy, arrayMove,
@@ -356,6 +359,7 @@ interface TaskRowProps {
   onDateSet: (taskId: number, d: Date | undefined) => void;
   onAssignee: (taskId: number, assigneeId: number | null) => void;
   onRename?: (taskId: number, newTitle: string) => void;
+  onStatusChange?: (taskId: number, status: string) => void;
   isSubtask?: boolean;
   clientName?: string | null;
   subtaskMap?: Record<number, Task[]>;
@@ -365,7 +369,7 @@ interface TaskRowProps {
   isDragging?: boolean;
 }
 
-function TaskRow({ task, allPersonnel, onOpen, onToggle, onDateSet, onAssignee, onRename, isSubtask = false, clientName, subtaskMap, expandedSubtasks, onToggleSubtasks, dragHandleProps, isDragging }: TaskRowProps) {
+function TaskRow({ task, allPersonnel, onOpen, onToggle, onDateSet, onAssignee, onRename, onStatusChange, isSubtask = false, clientName, subtaskMap, expandedSubtasks, onToggleSubtasks, dragHandleProps, isDragging }: TaskRowProps) {
   const [assigneeOpen, setAssigneeOpen] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState("");
@@ -417,6 +421,9 @@ function TaskRow({ task, allPersonnel, onOpen, onToggle, onDateSet, onAssignee, 
         {/* Title */}
         <div className="flex-1 min-w-0 px-2 py-3 flex items-center gap-1.5">
           <div className={cn("w-2 h-2 rounded-full flex-shrink-0", PRIORITY_DOT[task.priority] || "bg-gray-200")} />
+          {task.status !== "todo" && task.status !== "done" && task.status !== "cancelled" && (
+            <TaskStatusBadge status={task.status} size="xs" />
+          )}
           {renaming ? (
             <Input
               value={renameValue}
@@ -593,6 +600,38 @@ function TaskRow({ task, allPersonnel, onOpen, onToggle, onDateSet, onAssignee, 
             </span>
           )}
         </div>
+
+        {/* Status quick-change */}
+        {onStatusChange && (
+          <div className="w-8 flex-shrink-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  className="p-1 rounded hover:bg-accent"
+                  onClick={e => e.stopPropagation()}
+                  title="Cambiar estado"
+                >
+                  <MoreHorizontal className="h-3.5 w-3.5 text-muted-foreground" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-44">
+                <DropdownMenuLabel className="text-xs text-muted-foreground py-1">Estado</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {Object.entries(TASK_STATUS_CONFIG)
+                  .filter(([k]) => k !== task.status)
+                  .map(([status, cfg]) => (
+                    <DropdownMenuItem
+                      key={status}
+                      onClick={e => { e.stopPropagation(); onStatusChange(task.id, status); }}
+                    >
+                      <span className={cn("w-2 h-2 rounded-full mr-2 flex-shrink-0", cfg.dot)} />
+                      {cfg.label}
+                    </DropdownMenuItem>
+                  ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        )}
       </div>
     </TooltipProvider>
   );
@@ -609,6 +648,7 @@ interface SectionBlockProps {
   onDateSet: (taskId: number, d: Date | undefined) => void;
   onAssignee: (taskId: number, assigneeId: number | null) => void;
   onRename?: (taskId: number, newTitle: string) => void;
+  onStatusChange?: (taskId: number, status: string) => void;
   onRefresh: () => void;
   clientName?: string | null;
   autoOpenAdd?: number;
@@ -621,7 +661,7 @@ interface SectionBlockProps {
   taskOrderOverride?: number[];
 }
 
-function SectionBlock({ sectionName, tasks, projectId, allPersonnel, projectMembers = [], onOpenTask, onToggleTask, onDateSet, onAssignee, onRename, onRefresh, clientName, autoOpenAdd = 0, forceExpand = false, dragHandleProps, isDragging, sortBy = 'default', allPersonnelForSort = [], isFirst = false, taskOrderOverride }: SectionBlockProps) {
+function SectionBlock({ sectionName, tasks, projectId, allPersonnel, projectMembers = [], onOpenTask, onToggleTask, onDateSet, onAssignee, onRename, onStatusChange, onRefresh, clientName, autoOpenAdd = 0, forceExpand = false, dragHandleProps, isDragging, sortBy = 'default', allPersonnelForSort = [], isFirst = false, taskOrderOverride }: SectionBlockProps) {
   const [collapsed, setCollapsed] = useState(false);
   const effectiveCollapsed = forceExpand ? false : collapsed;
   const [showAdd, setShowAdd] = useState(false);
@@ -800,6 +840,7 @@ function SectionBlock({ sectionName, tasks, projectId, allPersonnel, projectMemb
               onDateSet={onDateSet}
               onAssignee={onAssignee}
               onRename={onRename}
+              onStatusChange={onStatusChange}
               clientName={clientName}
               subtaskMap={subtaskMap}
               expandedSubtasks={expandedSubtasks}
@@ -828,6 +869,7 @@ function SectionBlock({ sectionName, tasks, projectId, allPersonnel, projectMemb
                   onDateSet={onDateSet}
                   onAssignee={onAssignee}
                   onRename={onRename}
+                  onStatusChange={onStatusChange}
                   clientName={clientName}
                   subtaskMap={subtaskMap}
                   expandedSubtasks={expandedSubtasks}
@@ -885,7 +927,7 @@ function SectionBlock({ sectionName, tasks, projectId, allPersonnel, projectMemb
 
 // ─── Sortable wrappers ──────────────────────────────────────────────────────
 
-function SortableTaskRow({ taskId, task, allPersonnel, onOpenTask, onToggleTask, onDateSet, onAssignee, onRename, clientName, subtaskMap, expandedSubtasks, onToggleSubtasks }: {
+function SortableTaskRow({ taskId, task, allPersonnel, onOpenTask, onToggleTask, onDateSet, onAssignee, onRename, onStatusChange, clientName, subtaskMap, expandedSubtasks, onToggleSubtasks }: {
   taskId: number;
   task: Task;
   allPersonnel: Personnel[];
@@ -894,6 +936,7 @@ function SortableTaskRow({ taskId, task, allPersonnel, onOpenTask, onToggleTask,
   onDateSet: (taskId: number, d: Date | undefined) => void;
   onAssignee: (taskId: number, assigneeId: number | null) => void;
   onRename?: (taskId: number, newTitle: string) => void;
+  onStatusChange?: (taskId: number, status: string) => void;
   clientName?: string | null;
   subtaskMap?: Record<number, Task[]>;
   expandedSubtasks?: Set<number>;
@@ -914,6 +957,7 @@ function SortableTaskRow({ taskId, task, allPersonnel, onOpenTask, onToggleTask,
         onDateSet={onDateSet}
         onAssignee={onAssignee}
         onRename={onRename}
+        onStatusChange={onStatusChange}
         clientName={clientName}
         subtaskMap={subtaskMap}
         expandedSubtasks={expandedSubtasks}
@@ -931,6 +975,7 @@ function SortableTaskRow({ taskId, task, allPersonnel, onOpenTask, onToggleTask,
           onDateSet={onDateSet}
           onAssignee={onAssignee}
           onRename={onRename}
+          onStatusChange={onStatusChange}
           isSubtask
         />
       ))}
@@ -958,9 +1003,11 @@ function SortableSectionBlock(props: SectionBlockProps & { sectionName: string; 
 // ─── Board / Kanban view ────────────────────────────────────────────────────
 
 const BOARD_COLUMNS = [
-  { status: "todo",        label: "Por hacer",   dot: "bg-gray-400",  ring: "border-t-gray-300",  empty: "Acá aparecerán las tareas nuevas" },
-  { status: "in_progress", label: "En progreso",  dot: "bg-blue-500",  ring: "border-t-blue-400",  empty: "Mové una tarea aquí para comenzar" },
-  { status: "done",        label: "Completado",   dot: "bg-green-500", ring: "border-t-green-400", empty: "Las tareas finalizadas aparecen aquí" },
+  { status: "todo",        label: "Por hacer",   dot: "bg-gray-400",    ring: "border-t-gray-300",    empty: "Acá aparecerán las tareas nuevas" },
+  { status: "in_progress", label: "En curso",    dot: "bg-blue-500",    ring: "border-t-blue-400",    empty: "Mové una tarea aquí para comenzar" },
+  { status: "in_review",   label: "En revisión", dot: "bg-violet-500",  ring: "border-t-violet-400",  empty: "Tareas esperando aprobación del cliente" },
+  { status: "blocked",     label: "Bloqueado",   dot: "bg-orange-500",  ring: "border-t-orange-400",  empty: "Tareas que necesitan desbloquearse" },
+  { status: "done",        label: "Completado",  dot: "bg-green-500",   ring: "border-t-green-400",   empty: "Las tareas finalizadas aparecen aquí" },
 ];
 
 interface BoardColumnProps {
@@ -975,6 +1022,7 @@ interface BoardColumnProps {
   projectMembers: { personnelId: number; name: string; role: string }[];
   onOpen: (id: number) => void;
   onRefresh: () => void;
+  onStatusChange: (taskId: number, status: string) => void;
 }
 
 const PRIORITY_LEFT_BORDER: Record<string, string> = {
@@ -984,24 +1032,97 @@ const PRIORITY_LEFT_BORDER: Record<string, string> = {
   urgent: "border-l-red-500",
 };
 
-function BoardColumn({ label, dot, ring, empty, status, tasks, allPersonnel, projectId, projectMembers, onOpen, onRefresh }: BoardColumnProps) {
-  const [showAdd, setShowAdd] = useState(false);
-
-  const toggleMutation = useMutation({
-    mutationFn: (task: Task) =>
-      apiRequest(`/api/tasks/${task.id}`, "PUT", {
-        status: task.status === "done" ? "todo" : "done",
-      }),
-    onSuccess: () => {
-      onRefresh();
-      queryClient.invalidateQueries({ queryKey: ["/api/tasks/my-tasks"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/tasks/projects"] });
-    },
+function BoardCard({ task, allPersonnel, onOpen, onStatusChange }: { task: Task; allPersonnel: Personnel[]; onOpen: (id: number) => void; onStatusChange: (taskId: number, status: string) => void }) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: `board-card:${task.id}`,
+    data: { taskId: task.id, fromStatus: task.status },
   });
+  const assignee = allPersonnel.find(p => p.id === task.assigneeId);
+  const overdue = isOverdue(task);
+  const isDone = task.status === "done";
+  const leftBorder = PRIORITY_LEFT_BORDER[task.priority] || "border-l-transparent";
+  return (
+    <div
+      ref={setNodeRef}
+      {...listeners}
+      {...attributes}
+      className={cn(
+        "bg-card rounded-lg border border-border border-l-2 p-2.5 cursor-grab active:cursor-grabbing",
+        "hover:shadow-md hover:border-primary/20 transition-all duration-150",
+        isDone && "opacity-50",
+        isDragging && "opacity-40 ring-2 ring-primary/40 shadow-lg",
+        leftBorder
+      )}
+      onClick={() => !isDragging && onOpen(task.id)}
+    >
+      <div className="flex items-start gap-2 mb-2">
+        <p className={cn("text-sm font-medium leading-snug flex-1 min-w-0", isDone && "line-through text-muted-foreground")}>
+          {task.title}
+        </p>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              className="flex-shrink-0 p-0.5 rounded hover:bg-accent opacity-0 group-hover:opacity-100 transition-opacity"
+              onClick={e => e.stopPropagation()}
+              onPointerDown={e => e.stopPropagation()}
+            >
+              <MoreHorizontal className="h-3.5 w-3.5 text-muted-foreground" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-44">
+            <DropdownMenuLabel className="text-xs text-muted-foreground py-1">Estado</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            {BOARD_COLUMNS.filter(c => c.status !== task.status).map(col => (
+              <DropdownMenuItem key={col.status} onClick={e => { e.stopPropagation(); onStatusChange(task.id, col.status); }}>
+                <span className={cn("w-2 h-2 rounded-full mr-2 flex-shrink-0", col.dot)} />
+                {col.label}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+      <div className="flex items-center justify-between gap-1">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {task.priority && task.priority !== "medium" && (
+            <span className={cn("text-[10px] px-1.5 py-0.5 rounded-full border font-medium", PRIORITY_BADGE[task.priority])}>
+              {PRIORITY_LABELS[task.priority]}
+            </span>
+          )}
+          {task.dueDate && (
+            <span className={cn(
+              "text-[10px] flex items-center gap-0.5",
+              overdue ? "text-red-500 font-semibold" : "text-muted-foreground"
+            )}>
+              <CalendarIcon className="h-2.5 w-2.5" />
+              {format(new Date(task.dueDate), "d MMM", { locale: es })}
+            </span>
+          )}
+        </div>
+        {assignee && (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Avatar className="h-5 w-5 flex-shrink-0 ring-1 ring-border">
+                  <AvatarFallback className={cn("text-[8px] text-white", getAvatarColor(assignee.id))}>
+                    {getInitials(assignee.name)}
+                  </AvatarFallback>
+                </Avatar>
+              </TooltipTrigger>
+              <TooltipContent>{assignee.name}</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function BoardColumn({ label, dot, ring, empty, status, tasks, allPersonnel, projectId, projectMembers, onOpen, onRefresh, onStatusChange }: BoardColumnProps) {
+  const [showAdd, setShowAdd] = useState(false);
+  const { setNodeRef, isOver } = useDroppable({ id: `board-col:${status}` });
 
   return (
-    <div className={cn("flex-1 min-w-0 flex flex-col rounded-xl border-t-2 border border-border bg-muted/5", ring)}>
+    <div className={cn("flex-1 min-w-0 flex flex-col rounded-xl border-t-2 border border-border bg-muted/5 transition-colors", ring, isOver && "bg-primary/5 ring-2 ring-primary/20")}>
       <div className="flex items-center justify-between px-3 py-2.5 border-b border-border/60">
         <div className="flex items-center gap-2">
           <span className={cn("w-2 h-2 rounded-full flex-shrink-0", dot)} />
@@ -1026,7 +1147,7 @@ function BoardColumn({ label, dot, ring, empty, status, tasks, allPersonnel, pro
         </div>
       </div>
 
-      <div className="flex-1 p-2 space-y-2 overflow-y-auto min-h-[200px] max-h-[calc(100vh-280px)]">
+      <div ref={setNodeRef} className="flex-1 p-2 space-y-2 overflow-y-auto min-h-[200px] max-h-[calc(100vh-280px)]">
         {tasks.length === 0 && !showAdd && (
           <div className="flex flex-col items-center justify-center py-8 text-center px-2">
             <span className={cn("w-8 h-8 rounded-full mb-2 flex items-center justify-center opacity-20", dot.replace("bg-", "bg-").concat(" bg-opacity-20"))}>
@@ -1036,68 +1157,11 @@ function BoardColumn({ label, dot, ring, empty, status, tasks, allPersonnel, pro
           </div>
         )}
 
-        {tasks.map(task => {
-          const assignee = allPersonnel.find(p => p.id === task.assigneeId);
-          const overdue = isOverdue(task);
-          const isDone = task.status === "done";
-          const leftBorder = PRIORITY_LEFT_BORDER[task.priority] || "border-l-transparent";
-          return (
-            <div
-              key={task.id}
-              className={cn(
-                "bg-card rounded-lg border border-border border-l-2 p-2.5 cursor-pointer",
-                "hover:shadow-md hover:border-primary/20 hover:-translate-y-px transition-all duration-150",
-                isDone && "opacity-50",
-                leftBorder
-              )}
-              onClick={() => onOpen(task.id)}
-            >
-              <div className="flex items-start gap-2 mb-2">
-                <div className="mt-0.5 flex-shrink-0">
-                  <CircleCheck
-                    checked={isDone}
-                    onClick={e => { e.stopPropagation(); toggleMutation.mutate(task); }}
-                  />
-                </div>
-                <p className={cn("text-sm font-medium leading-snug flex-1 min-w-0", isDone && "line-through text-muted-foreground")}>
-                  {task.title}
-                </p>
-              </div>
-              <div className="flex items-center justify-between gap-1">
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  {task.priority && task.priority !== "medium" && (
-                    <span className={cn("text-[10px] px-1.5 py-0.5 rounded-full border font-medium", PRIORITY_BADGE[task.priority])}>
-                      {PRIORITY_LABELS[task.priority]}
-                    </span>
-                  )}
-                  {task.dueDate && (
-                    <span className={cn(
-                      "text-[10px] flex items-center gap-0.5",
-                      overdue ? "text-red-500 font-semibold" : "text-muted-foreground"
-                    )}>
-                      <CalendarIcon className="h-2.5 w-2.5" />
-                      {format(new Date(task.dueDate), "d MMM", { locale: es })}
-                    </span>
-                  )}
-                </div>
-                {assignee && (
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Avatar className="h-5 w-5 flex-shrink-0 ring-1 ring-border">
-                          <AvatarFallback className={cn("text-[8px] text-white", getAvatarColor(assignee.id))}>
-                            {getInitials(assignee.name)}
-                          </AvatarFallback>
-                        </Avatar>
-                      </TooltipTrigger>
-                      <TooltipContent>{assignee.name}</TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                )}
-              </div>
-            </div>
-          );
-        })}
+        {tasks.map(task => (
+          <div key={task.id} className="group">
+            <BoardCard task={task} allPersonnel={allPersonnel} onOpen={onOpen} onStatusChange={onStatusChange} />
+          </div>
+        ))}
 
         {showAdd ? (
           <div className="bg-card rounded-lg border border-primary/30 p-2">
@@ -1165,6 +1229,7 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
   }, [projectId]);
   const [activeId, setActiveId] = useState<UniqueIdentifier | null>(null);
   const [activeDragData, setActiveDragData] = useState<any>(null);
+  const [boardStatusOverrides, setBoardStatusOverrides] = useState<Record<number, string>>({});
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
@@ -1223,6 +1288,24 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
 
   const handleRenameTask = (taskId: number, newTitle: string) => {
     inlineUpdateMutation.mutate({ taskId, updates: { title: newTitle } });
+  };
+
+  const handleBoardStatusChange = (taskId: number, status: string) => {
+    setBoardStatusOverrides(prev => ({ ...prev, [taskId]: status }));
+    inlineUpdateMutation.mutate(
+      { taskId, updates: { status } },
+      { onError: () => setBoardStatusOverrides(prev => { const n = { ...prev }; delete n[taskId]; return n; }) }
+    );
+  };
+
+  const boardDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over) return;
+    const taskId = active.data.current?.taskId as number;
+    const fromStatus = active.data.current?.fromStatus as string;
+    const toStatus = over.id.toString().replace("board-col:", "");
+    if (!taskId || fromStatus === toStatus) return;
+    handleBoardStatusChange(taskId, toStatus);
   };
 
   const createSectionTask = useMutation({
@@ -1389,30 +1472,39 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
 
       {view === "board" ? (
         // ─── Board view ───────────────────────────────────────────────
-        <div>
-          <div className="flex items-center gap-2 pb-3 mb-1">
-            <span className="text-sm font-medium text-foreground">{totalTasks} tareas</span>
-            <span className="text-xs text-muted-foreground">· {doneTasks} completadas</span>
+        <DndContext sensors={sensors} onDragEnd={boardDragEnd}>
+          <div>
+            <div className="flex items-center gap-2 pb-3 mb-1">
+              <span className="text-sm font-medium text-foreground">{totalTasks} tareas</span>
+              <span className="text-xs text-muted-foreground">· {doneTasks} completadas</span>
+            </div>
+            <div className="flex gap-3 overflow-x-auto pb-2">
+              {BOARD_COLUMNS.map(col => {
+                const colTasks = allTasks
+                  .filter(t => !t.parentTaskId)
+                  .map(t => boardStatusOverrides[t.id] ? { ...t, status: boardStatusOverrides[t.id] } : t)
+                  .filter(t => t.status === col.status);
+                return (
+                  <BoardColumn
+                    key={col.status}
+                    label={col.label}
+                    dot={col.dot}
+                    ring={col.ring}
+                    empty={col.empty}
+                    status={col.status}
+                    tasks={colTasks}
+                    allPersonnel={allPersonnel}
+                    projectId={projectId}
+                    projectMembers={projectMembers}
+                    onOpen={id => handleOpen(id)}
+                    onRefresh={refetch}
+                    onStatusChange={handleBoardStatusChange}
+                  />
+                );
+              })}
+            </div>
           </div>
-          <div className="flex gap-3">
-            {BOARD_COLUMNS.map(col => (
-              <BoardColumn
-                key={col.status}
-                label={col.label}
-                dot={col.dot}
-                ring={col.ring}
-                empty={col.empty}
-                status={col.status}
-                tasks={allTasks.filter(t => t.status === col.status && !t.parentTaskId)}
-                allPersonnel={allPersonnel}
-                projectId={projectId}
-                projectMembers={projectMembers}
-                onOpen={id => handleOpen(id)}
-                onRefresh={refetch}
-              />
-            ))}
-          </div>
-        </div>
+        </DndContext>
       ) : (
         // ─── List view ────────────────────────────────────────────────
         <div>
@@ -1473,6 +1565,7 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
                       onDateSet={handleDateSet}
                       onAssignee={handleAssignee}
                       onRename={handleRenameTask}
+                      onStatusChange={(taskId, status) => inlineUpdateMutation.mutate({ taskId, updates: { status } })}
                       onRefresh={refetch}
                       clientName={clientName}
                       autoOpenAdd={idx === 0 ? firstSectionAutoAdd : 0}

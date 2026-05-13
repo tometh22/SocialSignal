@@ -1,5 +1,6 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
+import { TASK_STATUS_CONFIG, TaskStatus } from "@/constants/task-statuses";
 import { 
   CheckCircle, 
   Clock, 
@@ -109,6 +110,36 @@ export const getStatusBadgeForQuote = (status: string) => {
       return <StatusBadge status={status} variant="neutral" glassEffect />;
   }
 };
+
+// Task-specific status badge using unified TASK_STATUS_CONFIG
+interface TaskStatusBadgeProps {
+  status: string;
+  size?: "sm" | "xs";
+}
+
+export function TaskStatusBadge({ status, size = "sm" }: TaskStatusBadgeProps) {
+  const config = TASK_STATUS_CONFIG[status as TaskStatus];
+  if (!config) return null;
+  if (size === "xs") {
+    return (
+      <span
+        className={cn("inline-block w-2 h-2 rounded-full flex-shrink-0", config.dot)}
+        title={config.label}
+      />
+    );
+  }
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium border",
+        config.color
+      )}
+    >
+      <span className={cn("w-1.5 h-1.5 rounded-full", config.dot)} />
+      {config.label}
+    </span>
+  );
+}
 
 // Helper para mapear estados comunes de proyectos
 export const getStatusBadgeForProject = (status: string) => {

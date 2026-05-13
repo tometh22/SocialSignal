@@ -15,12 +15,21 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
   DropdownMenuLabel
 } from "@/components/ui/dropdown-menu";
-import { Loader2, Users, Trash2, Plus, ChevronRight, List, LayoutGrid, Share2, Filter, ArrowUpDown, Layers, MoreHorizontal, Search, X, Check, BarChart2, TrendingUp } from "lucide-react";
+import { Loader2, Users, Trash2, Plus, ChevronRight, List, LayoutGrid, Share2, Filter, ArrowUpDown, Layers, MoreHorizontal, Search, X, Check, BarChart2, TrendingUp, ChevronDown, CalendarDays } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
 import { usePermissions } from "@/hooks/use-permissions";
 import ProjectTaskList from "@/components/tasks/ProjectTaskList";
+
+const PROJECT_STATUS_CONFIG: Record<string, { label: string; className: string }> = {
+  "active":    { label: "Activo",     className: "text-green-700 border-green-300 bg-green-50 hover:bg-green-100" },
+  "on-hold":   { label: "En pausa",   className: "text-amber-700 border-amber-300 bg-amber-50 hover:bg-amber-100" },
+  "delivered": { label: "Entregado",  className: "text-sky-700 border-sky-300 bg-sky-50 hover:bg-sky-100" },
+  "completed": { label: "Completado", className: "text-slate-700 border-slate-300 bg-slate-50 hover:bg-slate-100" },
+  "cancelled": { label: "Cancelado",  className: "text-red-600 border-red-300 bg-red-50 hover:bg-red-100" },
+};
 import ProjectOverviewPanel from "@/components/tasks/ProjectOverviewPanel";
+import TaskCalendarView from "@/components/tasks/TaskCalendarView";
 
 type ProjectMember = { personnelId: number; name: string; role: string };
 type TaskProject = {
@@ -58,7 +67,7 @@ export default function ProjectTasksPage({ params }: Props) {
   const [membersOpen, setMembersOpen] = useState(false);
   const [addPersonnelId, setAddPersonnelId] = useState<string>("none");
   const [addRole, setAddRole] = useState("member");
-  const [view, setView] = useState<"list" | "board" | "panel">("list");
+  const [view, setView] = useState<"list" | "board" | "panel" | "calendar">("list");
   const [quickAddTrigger, setQuickAddTrigger] = useState(0);
   const [showFilter, setShowFilter] = useState(false);
   const [filterText, setFilterText] = useState("");
@@ -139,6 +148,15 @@ export default function ProjectTasksPage({ params }: Props) {
     addMemberMutation.mutate({ personnelId: parseInt(addPersonnelId), role: addRole });
   };
 
+  const updateProjectStatusMutation = useMutation({
+    mutationFn: (status: string) => apiRequest(`/api/tasks/projects/${projectId}`, "PUT", { status }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks/projects", projectId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks/projects"] });
+      toast({ title: "Estado del proyecto actualizado" });
+    },
+  });
+
   const handleShare = () => {
     navigator.clipboard.writeText(window.location.href);
     toast({ title: "Enlace copiado al portapapeles" });
@@ -194,9 +212,38 @@ export default function ProjectTasksPage({ params }: Props) {
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
                     <h1 className="text-xl font-bold text-foreground truncate">{project.name}</h1>
-                    <Badge variant="outline" className="text-[10px] text-green-700 border-green-300 bg-green-50 flex-shrink-0">
-                      Activo
-                    </Badge>
+                    {(() => {
+                      const cfg = PROJECT_STATUS_CONFIG[project.status] || PROJECT_STATUS_CONFIG["active"];
+                      if (isOperations) {
+                        return (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <button className={cn("inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-medium border flex-shrink-0 transition-colors", cfg.className)}>
+                                {cfg.label}
+                                <ChevronDown className="h-2.5 w-2.5" />
+                              </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="start" className="w-40">
+                              {Object.entries(PROJECT_STATUS_CONFIG).map(([status, c]) => (
+                                <DropdownMenuItem
+                                  key={status}
+                                  onClick={() => updateProjectStatusMutation.mutate(status)}
+                                  className={cn(project.status === status && "font-semibold")}
+                                >
+                                  {project.status === status && <Check className="h-3 w-3 mr-1.5 flex-shrink-0" />}
+                                  {c.label}
+                                </DropdownMenuItem>
+                              ))}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        );
+                      }
+                      return (
+                        <Badge variant="outline" className={cn("text-[10px] flex-shrink-0", cfg.className)}>
+                          {cfg.label}
+                        </Badge>
+                      );
+                    })()}
                   </div>
                   {project.clientName && <p className="text-sm text-muted-foreground">{project.clientName}</p>}
                 </div>
@@ -325,12 +372,24 @@ export default function ProjectTasksPage({ params }: Props) {
                 <BarChart2 className="h-3.5 w-3.5" />
                 Panel
               </button>
+              <button
+                className={cn(
+                  "flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 transition-colors",
+                  view === "calendar"
+                    ? "border-primary text-primary"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
+                )}
+                onClick={() => setView("calendar")}
+              >
+                <CalendarDays className="h-3.5 w-3.5" />
+                Calendario
+              </button>
             </div>
           </div>
         </div>
 
         {/* Toolbar */}
-        {view !== "panel" && (
+        {view !== "panel" && view !== "calendar" && (
         <div className="flex items-center justify-between py-2 border-b border-border gap-2">
           {view === "list" ? (
             <Button
@@ -491,8 +550,13 @@ export default function ProjectTasksPage({ params }: Props) {
           />
         )}
 
+        {/* Calendar view */}
+        {view === "calendar" && (
+          <TaskCalendarView projectId={projectId} />
+        )}
+
         {/* Task list / board */}
-        {view !== "panel" && (
+        {view !== "panel" && view !== "calendar" && (
           <div className="pt-4">
             <ProjectTaskList
               projectId={projectId}

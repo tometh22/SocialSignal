@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
 import { apiRequest, authFetch } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -568,7 +569,22 @@ export default function ManageQuotes() {
     return null;
   };
 
-  const getStatusBadge = (status: string) => {
+  const isQuoteExpired = (quote: { status: string; expiresAt?: string | null }) => {
+    return quote.expiresAt
+      && (quote.status === "pending" || quote.status === "in-negotiation")
+      && new Date(quote.expiresAt) < new Date();
+  };
+
+  const getStatusBadge = (status: string, quote?: { status: string; expiresAt?: string | null }) => {
+    if (quote && isQuoteExpired(quote)) {
+      return (
+        <Badge variant="outline" className="bg-red-50 text-red-600 border-red-200 inline-flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded-md">
+          <AlertOctagon className="h-3.5 w-3.5 flex-shrink-0" />
+          <span>Vencida</span>
+        </Badge>
+      );
+    }
+
     const statusConfig = {
       'approved': {
         variant: 'default' as const,
@@ -606,8 +622,8 @@ export default function ManageQuotes() {
     const Icon = config.icon;
 
     return (
-      <Badge 
-        variant={config.variant} 
+      <Badge
+        variant={config.variant}
         className={`${config.className} inline-flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded-md border whitespace-nowrap`}
       >
         <Icon className="h-3.5 w-3.5 flex-shrink-0" />
@@ -916,8 +932,8 @@ export default function ManageQuotes() {
                       <Card key={quote.id} className="group bg-white border border-gray-200 hover:border-blue-300 hover:shadow-lg transition-all duration-200 overflow-hidden relative">
                         {/* Status badges - NEW LOCATION: Top right corner */}
                         <div className="absolute top-3 right-3 flex flex-col items-end gap-2 z-10">
-                          {getStatusBadge(quote.status)}
-                          {getExpiryBadge(quote)}
+                          {getStatusBadge(quote.status, quote)}
+                          {!isQuoteExpired(quote) && getExpiryBadge(quote)}
                           {(quote as any).leadId && (
                             <Link href={`/crm/${(quote as any).leadId}`}>
                               <Badge
@@ -1227,20 +1243,51 @@ export default function ManageQuotes() {
               )}
             </div>
 
-            <div>
-              <h4 className="text-sm font-semibold text-gray-700 mb-3">Nuevo Estado:</h4>
-              <select 
-                value={newStatus || selectedQuote?.status || ""} 
-                onChange={(e) => setNewStatus(e.target.value)}
-                className="w-full h-12 px-4 rounded-xl border border-gray-200 bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
-              >
-                <option value="draft">Borrador</option>
-                <option value="pending">Pendiente</option>
-                <option value="approved">Aprobada</option>
-                <option value="rejected">Rechazada</option>
-                <option value="in-negotiation">En Negociación</option>
-              </select>
-            </div>
+            {(() => {
+              const VALID_TRANSITIONS: Record<string, Array<{ status: string; label: string; className: string }>> = {
+                "draft":          [{ status: "pending",        label: "Enviar (Pendiente)",    className: "bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100" }],
+                "pending":        [
+                  { status: "approved",       label: "Aprobar",             className: "bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100" },
+                  { status: "in-negotiation", label: "En Negociación",      className: "bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100" },
+                  { status: "rejected",       label: "Rechazar",            className: "bg-red-50 border-red-200 text-red-600 hover:bg-red-100" },
+                ],
+                "in-negotiation": [
+                  { status: "approved",       label: "Aprobar",             className: "bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100" },
+                  { status: "rejected",       label: "Rechazar",            className: "bg-red-50 border-red-200 text-red-600 hover:bg-red-100" },
+                  { status: "pending",        label: "Volver a Pendiente",  className: "bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100" },
+                ],
+                "rejected":       [{ status: "pending",        label: "Reactivar (Pendiente)", className: "bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100" }],
+                "approved":       [],
+              };
+              const currentStatus = selectedQuote?.status || "draft";
+              const transitions = VALID_TRANSITIONS[currentStatus] || Object.keys(VALID_TRANSITIONS)
+                .filter(s => s !== currentStatus)
+                .map(s => ({ status: s, label: s, className: "" }));
+              return (
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-700 mb-3">Cambiar a:</h4>
+                  {transitions.length === 0 ? (
+                    <p className="text-sm text-muted-foreground italic">No hay transiciones disponibles desde este estado.</p>
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      {transitions.map(t => (
+                        <button
+                          key={t.status}
+                          onClick={() => setNewStatus(t.status)}
+                          className={cn(
+                            "px-3 py-2 rounded-xl border text-xs font-medium transition-all",
+                            t.className,
+                            newStatus === t.status && "ring-2 ring-indigo-500 ring-offset-1"
+                          )}
+                        >
+                          {t.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </div>
 
           <DialogFooter className="gap-3">
