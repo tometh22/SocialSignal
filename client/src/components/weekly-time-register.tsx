@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { authFetch } from '@/lib/queryClient';
 import { format, startOfWeek, addDays, parseISO } from 'date-fns';
+import { roundToQuarterHour } from '@shared/utils/num';
 import { es } from 'date-fns/locale';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -380,7 +381,8 @@ export default function WeeklyTimeRegister({ projectId, onSuccess, onCancel }: W
           const baseRate = Number(member.hourlyRate) || 10; // Rate por defecto mínimo
           const customRate = memberData.customRate !== undefined ? Number(memberData.customRate) : null;
           const hourlyRate = customRate !== null && customRate > 0 ? customRate : baseRate;
-          const hours = Number(memberData.hours) || 0;
+          const hours = roundToQuarterHour(Number(memberData.hours) || 0);
+          if (hours <= 0) return null;
           const totalCost = Number((hours * hourlyRate).toFixed(2)); // Redondear a 2 decimales
           
           console.log('💰 Cálculo de costo:', {

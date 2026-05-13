@@ -360,6 +360,7 @@ interface TaskRowProps {
   onAssignee: (taskId: number, assigneeId: number | null) => void;
   onRename?: (taskId: number, newTitle: string) => void;
   onStatusChange?: (taskId: number, status: string) => void;
+  onDuplicate?: (task: Task) => void;
   isSubtask?: boolean;
   clientName?: string | null;
   subtaskMap?: Record<number, Task[]>;
@@ -369,7 +370,7 @@ interface TaskRowProps {
   isDragging?: boolean;
 }
 
-function TaskRow({ task, allPersonnel, onOpen, onToggle, onDateSet, onAssignee, onRename, onStatusChange, isSubtask = false, clientName, subtaskMap, expandedSubtasks, onToggleSubtasks, dragHandleProps, isDragging }: TaskRowProps) {
+function TaskRow({ task, allPersonnel, onOpen, onToggle, onDateSet, onAssignee, onRename, onStatusChange, onDuplicate, isSubtask = false, clientName, subtaskMap, expandedSubtasks, onToggleSubtasks, dragHandleProps, isDragging }: TaskRowProps) {
   const [assigneeOpen, setAssigneeOpen] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState("");
@@ -601,33 +602,48 @@ function TaskRow({ task, allPersonnel, onOpen, onToggle, onDateSet, onAssignee, 
           )}
         </div>
 
-        {/* Status quick-change */}
-        {onStatusChange && (
+        {/* Acciones contextuales */}
+        {(onStatusChange || onDuplicate) && (
           <div className="w-8 flex-shrink-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
-                  className="p-1 rounded hover:bg-accent"
+                  className="p-1 rounded hover:bg-accent transition-colors"
                   onClick={e => e.stopPropagation()}
-                  title="Cambiar estado"
+                  title="Acciones"
                 >
                   <MoreHorizontal className="h-3.5 w-3.5 text-muted-foreground" />
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-44">
-                <DropdownMenuLabel className="text-xs text-muted-foreground py-1">Estado</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                {Object.entries(TASK_STATUS_CONFIG)
-                  .filter(([k]) => k !== task.status)
-                  .map(([status, cfg]) => (
-                    <DropdownMenuItem
-                      key={status}
-                      onClick={e => { e.stopPropagation(); onStatusChange(task.id, status); }}
-                    >
-                      <span className={cn("w-2 h-2 rounded-full mr-2 flex-shrink-0", cfg.dot)} />
-                      {cfg.label}
+              <DropdownMenuContent align="end" className="w-44" onClick={e => e.stopPropagation()}>
+                {onDuplicate && (
+                  <>
+                    <DropdownMenuItem onClick={() => { setRenaming(true); setRenameValue(task.title); }}>
+                      <Pencil className="h-3.5 w-3.5 mr-2" />Renombrar
                     </DropdownMenuItem>
-                  ))}
+                    <DropdownMenuItem onClick={() => onDuplicate(task)}>
+                      <ListTodo className="h-3.5 w-3.5 mr-2" />Duplicar
+                    </DropdownMenuItem>
+                  </>
+                )}
+                {onStatusChange && onDuplicate && <DropdownMenuSeparator />}
+                {onStatusChange && (
+                  <>
+                    <DropdownMenuLabel className="text-xs text-muted-foreground py-1">Estado</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    {Object.entries(TASK_STATUS_CONFIG)
+                      .filter(([k]) => k !== task.status)
+                      .map(([status, cfg]) => (
+                        <DropdownMenuItem
+                          key={status}
+                          onClick={e => { e.stopPropagation(); onStatusChange(task.id, status); }}
+                        >
+                          <span className={cn("w-2 h-2 rounded-full mr-2 flex-shrink-0", cfg.dot)} />
+                          {cfg.label}
+                        </DropdownMenuItem>
+                      ))}
+                  </>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -649,6 +665,8 @@ interface SectionBlockProps {
   onAssignee: (taskId: number, assigneeId: number | null) => void;
   onRename?: (taskId: number, newTitle: string) => void;
   onStatusChange?: (taskId: number, status: string) => void;
+  onDuplicate?: (task: Task) => void;
+  onDuplicateSection?: (sectionName: string) => void;
   onRefresh: () => void;
   clientName?: string | null;
   autoOpenAdd?: number;
@@ -661,7 +679,7 @@ interface SectionBlockProps {
   taskOrderOverride?: number[];
 }
 
-function SectionBlock({ sectionName, tasks, projectId, allPersonnel, projectMembers = [], onOpenTask, onToggleTask, onDateSet, onAssignee, onRename, onStatusChange, onRefresh, clientName, autoOpenAdd = 0, forceExpand = false, dragHandleProps, isDragging, sortBy = 'default', allPersonnelForSort = [], isFirst = false, taskOrderOverride }: SectionBlockProps) {
+function SectionBlock({ sectionName, tasks, projectId, allPersonnel, projectMembers = [], onOpenTask, onToggleTask, onDateSet, onAssignee, onRename, onStatusChange, onDuplicate, onDuplicateSection, onRefresh, clientName, autoOpenAdd = 0, forceExpand = false, dragHandleProps, isDragging, sortBy = 'default', allPersonnelForSort = [], isFirst = false, taskOrderOverride }: SectionBlockProps) {
   const [collapsed, setCollapsed] = useState(false);
   const effectiveCollapsed = forceExpand ? false : collapsed;
   const [showAdd, setShowAdd] = useState(false);
@@ -804,6 +822,12 @@ function SectionBlock({ sectionName, tasks, projectId, allPersonnel, projectMemb
                     <Pencil className="h-3.5 w-3.5 mr-2" />
                     Renombrar sección
                   </DropdownMenuItem>
+                  {onDuplicateSection && (
+                    <DropdownMenuItem onClick={e => { e.stopPropagation(); onDuplicateSection(sectionName); }}>
+                      <ListTodo className="h-3.5 w-3.5 mr-2" />
+                      Duplicar sección
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
                     className="text-red-600 focus:text-red-600"
@@ -841,6 +865,7 @@ function SectionBlock({ sectionName, tasks, projectId, allPersonnel, projectMemb
               onAssignee={onAssignee}
               onRename={onRename}
               onStatusChange={onStatusChange}
+              onDuplicate={onDuplicate}
               clientName={clientName}
               subtaskMap={subtaskMap}
               expandedSubtasks={expandedSubtasks}
@@ -870,6 +895,7 @@ function SectionBlock({ sectionName, tasks, projectId, allPersonnel, projectMemb
                   onAssignee={onAssignee}
                   onRename={onRename}
                   onStatusChange={onStatusChange}
+                  onDuplicate={onDuplicate}
                   clientName={clientName}
                   subtaskMap={subtaskMap}
                   expandedSubtasks={expandedSubtasks}
@@ -927,7 +953,7 @@ function SectionBlock({ sectionName, tasks, projectId, allPersonnel, projectMemb
 
 // ─── Sortable wrappers ──────────────────────────────────────────────────────
 
-function SortableTaskRow({ taskId, task, allPersonnel, onOpenTask, onToggleTask, onDateSet, onAssignee, onRename, onStatusChange, clientName, subtaskMap, expandedSubtasks, onToggleSubtasks }: {
+function SortableTaskRow({ taskId, task, allPersonnel, onOpenTask, onToggleTask, onDateSet, onAssignee, onRename, onStatusChange, onDuplicate, clientName, subtaskMap, expandedSubtasks, onToggleSubtasks }: {
   taskId: number;
   task: Task;
   allPersonnel: Personnel[];
@@ -937,6 +963,7 @@ function SortableTaskRow({ taskId, task, allPersonnel, onOpenTask, onToggleTask,
   onAssignee: (taskId: number, assigneeId: number | null) => void;
   onRename?: (taskId: number, newTitle: string) => void;
   onStatusChange?: (taskId: number, status: string) => void;
+  onDuplicate?: (task: Task) => void;
   clientName?: string | null;
   subtaskMap?: Record<number, Task[]>;
   expandedSubtasks?: Set<number>;
@@ -958,6 +985,7 @@ function SortableTaskRow({ taskId, task, allPersonnel, onOpenTask, onToggleTask,
         onAssignee={onAssignee}
         onRename={onRename}
         onStatusChange={onStatusChange}
+        onDuplicate={onDuplicate}
         clientName={clientName}
         subtaskMap={subtaskMap}
         expandedSubtasks={expandedSubtasks}
@@ -976,6 +1004,7 @@ function SortableTaskRow({ taskId, task, allPersonnel, onOpenTask, onToggleTask,
           onAssignee={onAssignee}
           onRename={onRename}
           onStatusChange={onStatusChange}
+          onDuplicate={onDuplicate}
           isSubtask
         />
       ))}
@@ -1308,6 +1337,79 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
     handleBoardStatusChange(taskId, toStatus);
   };
 
+  const duplicateTaskMutation = useMutation({
+    mutationFn: (data: any) => apiRequest("/api/tasks", "POST", data),
+    onSuccess: () => { refetch(); invalidateRelated(); },
+  });
+
+  const handleDuplicateTask = async (task: Task) => {
+    const allRaw = data?.tasks || [];
+    const newTask = await apiRequest("/api/tasks", "POST", {
+      title: `${task.title} (copia)`,
+      projectId: task.projectId,
+      sectionName: task.sectionName,
+      assigneeId: task.assigneeId,
+      priority: task.priority,
+      status: "todo",
+      estimatedHours: task.estimatedHours,
+      dueDate: task.dueDate,
+      startDate: task.startDate,
+      parentTaskId: task.parentTaskId,
+    });
+    if (!task.parentTaskId) {
+      const subtasks = allRaw.filter((t: Task) => t.parentTaskId === task.id);
+      for (const sub of subtasks) {
+        await apiRequest("/api/tasks", "POST", {
+          title: sub.title,
+          projectId: sub.projectId,
+          sectionName: sub.sectionName,
+          assigneeId: sub.assigneeId,
+          priority: sub.priority,
+          status: "todo",
+          estimatedHours: sub.estimatedHours,
+          parentTaskId: newTask.id,
+        });
+      }
+    }
+    refetch();
+    invalidateRelated();
+    toast({ title: `Tarea duplicada: "${task.title} (copia)"` });
+  };
+
+  const handleDuplicateSection = async (sectionName: string) => {
+    const allRaw = data?.tasks || [];
+    const sectionTasks = allRaw.filter((t: Task) => t.sectionName === sectionName && !t.parentTaskId);
+    for (const task of sectionTasks) {
+      const newTask = await apiRequest("/api/tasks", "POST", {
+        title: task.title,
+        projectId: task.projectId,
+        sectionName: `${sectionName} (copia)`,
+        assigneeId: task.assigneeId,
+        priority: task.priority,
+        status: "todo",
+        estimatedHours: task.estimatedHours,
+        dueDate: task.dueDate,
+        startDate: task.startDate,
+      });
+      const subtasks = allRaw.filter((t: Task) => t.parentTaskId === task.id);
+      for (const sub of subtasks) {
+        await apiRequest("/api/tasks", "POST", {
+          title: sub.title,
+          projectId: sub.projectId,
+          sectionName: `${sectionName} (copia)`,
+          assigneeId: sub.assigneeId,
+          priority: sub.priority,
+          status: "todo",
+          estimatedHours: sub.estimatedHours,
+          parentTaskId: newTask.id,
+        });
+      }
+    }
+    refetch();
+    invalidateRelated();
+    toast({ title: `Sección "${sectionName}" duplicada` });
+  };
+
   const createSectionTask = useMutation({
     mutationFn: (data: any) => apiRequest("/api/tasks", "POST", data),
     onSuccess: () => { refetch(); invalidateRelated(); setShowAddSection(false); setNewSectionName(""); },
@@ -1566,6 +1668,8 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
                       onAssignee={handleAssignee}
                       onRename={handleRenameTask}
                       onStatusChange={(taskId, status) => inlineUpdateMutation.mutate({ taskId, updates: { status } })}
+                      onDuplicate={handleDuplicateTask}
+                      onDuplicateSection={handleDuplicateSection}
                       onRefresh={refetch}
                       clientName={clientName}
                       autoOpenAdd={idx === 0 ? firstSectionAutoAdd : 0}

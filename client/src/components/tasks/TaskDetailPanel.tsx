@@ -108,6 +108,14 @@ function formatHours(hours: number) {
   return `${h}h ${m}min`;
 }
 
+function getMondayOf(d: Date): string {
+  const day = d.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  const monday = new Date(d);
+  monday.setDate(d.getDate() + diff);
+  return monday.toISOString().slice(0, 10);
+}
+
 function CircleCheckSmall({ checked, onClick }: { checked: boolean; onClick: (e: React.MouseEvent) => void }) {
   return (
     <button
@@ -121,6 +129,149 @@ function CircleCheckSmall({ checked, onClick }: { checked: boolean; onClick: (e:
     </button>
   );
 }
+
+// ── CommentsSection with @mention support ────────────────────────────────────
+function CommentsSection({ taskId, allPersonnel }: { taskId: number; allPersonnel: { id: number; name: string }[] }) {
+  const [text, setText] = useState("");
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const { data: comments = [], refetch } = useQuery<any[]>({
+    queryKey: ["/api/tasks", taskId, "comments"],
+    queryFn: () => authFetch(`/api/tasks/${taskId}/comments`).then(r => r.json()),
+    enabled: !!taskId,
+  });
+
+  const addMutation = useMutation({
+    mutationFn: (content: string) => apiRequest(`/api/tasks/${taskId}/comments`, "POST", { content }),
+    onSuccess: () => { refetch(); setText(""); },
+    onError: () => toast({ title: "Error al comentar", variant: "destructive" }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (commentId: number) => apiRequest(`/api/tasks/${taskId}/comments/${commentId}`, "DELETE"),
+    onSuccess: () => refetch(),
+  });
+
+  const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const val = e.target.value;
+    setText(val);
+    const pos = e.target.selectionStart ?? val.length;
+    const before = val.slice(0, pos);
+    const match = before.match(/@([\w\s]*)$/);
+    setMentionQuery(match ? match[1].toLowerCase() : null);
+  };
+
+  const handleInsertMention = (name: string) => {
+    const pos = textareaRef.current?.selectionStart ?? text.length;
+    const before = text.slice(0, pos);
+    const after = text.slice(pos);
+    const newBefore = before.replace(/@([\w\s]*)$/, `@${name} `);
+    setText(newBefore + after);
+    setMentionQuery(null);
+    setTimeout(() => {
+      textareaRef.current?.focus();
+      const newPos = newBefore.length;
+      textareaRef.current?.setSelectionRange(newPos, newPos);
+    }, 0);
+  };
+
+  const filteredPersonnel = mentionQuery !== null
+    ? allPersonnel.filter(p => p.name.toLowerCase().includes(mentionQuery))
+    : [];
+
+  const renderMentions = (content: string): React.ReactNode[] => {
+    const parts = content.split(/(@[\w ]+)/g);
+    return parts.map((part, i) =>
+      /^@[\w ]/.test(part)
+        ? <strong key={i} className="text-primary">{part}</strong>
+        : part
+    );
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && text.trim()) {
+      e.preventDefault();
+      addMutation.mutate(text.trim());
+    }
+    if (e.key === "Escape") setMentionQuery(null);
+  };
+
+  return (
+    <div className="border border-border rounded-xl overflow-hidden">
+      <div className="flex items-center justify-between px-3 py-2 bg-muted/20 border-b border-border">
+        <p className="text-xs font-semibold text-foreground">
+          Comentarios
+          {comments.length > 0 && <span className="ml-1.5 text-muted-foreground font-normal">{comments.length}</span>}
+        </p>
+      </div>
+      <div className="divide-y divide-border">
+        {comments.length === 0 && (
+          <p className="text-xs text-muted-foreground italic px-3 py-2">Sin comentarios aún</p>
+        )}
+        {comments.map((c: any) => (
+          <div key={c.id} className="flex items-start gap-2 px-3 py-2 hover:bg-accent/20 group text-xs">
+            <Avatar className="h-5 w-5 flex-shrink-0 mt-0.5">
+              <AvatarFallback className="text-[8px] bg-primary/20 text-primary">
+                {c.author_name ? c.author_name.charAt(0) : "?"}
+              </AvatarFallback>
+            </Avatar>
+            <div className="flex-1 min-w-0">
+              <p className="font-medium text-foreground text-[11px]">{c.author_name || "Sistema"}</p>
+              <p className="text-muted-foreground mt-0.5 whitespace-pre-wrap">
+                {renderMentions(c.content)}
+              </p>
+            </div>
+            <div className="flex-shrink-0 flex items-center gap-1 opacity-0 group-hover:opacity-100">
+              <span className="text-muted-foreground/50 text-[10px]">
+                {format(new Date(c.created_at), "d/M HH:mm")}
+              </span>
+              <Button variant="ghost" size="sm" className="h-4 w-4 p-0 text-red-500"
+                onClick={() => deleteMutation.mutate(c.id)}>
+                <Trash2 className="h-3 w-3" />
+              </Button>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="px-3 py-2.5 border-t border-border space-y-2 relative">
+        <Textarea
+          ref={textareaRef}
+          value={text}
+          onChange={handleTextChange}
+          onKeyDown={handleKeyDown}
+          placeholder="Agregar comentario... (@ para mencionar, Ctrl+Enter para enviar)"
+          className="min-h-[60px] text-xs resize-none border-dashed"
+          rows={2}
+        />
+        {mentionQuery !== null && filteredPersonnel.length > 0 && (
+          <div className="absolute bottom-[100%] left-3 right-3 bg-card border border-border rounded-lg shadow-lg z-20 max-h-36 overflow-y-auto">
+            {filteredPersonnel.map(p => (
+              <button
+                key={p.id}
+                className="w-full text-left px-3 py-1.5 text-xs hover:bg-accent transition-colors flex items-center gap-2"
+                onMouseDown={e => { e.preventDefault(); handleInsertMention(p.name); }}
+              >
+                <Avatar className="h-4 w-4">
+                  <AvatarFallback className="text-[8px] bg-primary/20 text-primary">{p.name.charAt(0)}</AvatarFallback>
+                </Avatar>
+                {p.name}
+              </button>
+            ))}
+          </div>
+        )}
+        <div className="flex justify-end">
+          <Button size="sm" className="h-6 text-xs px-3" onClick={() => text.trim() && addMutation.mutate(text.trim())}
+            disabled={!text.trim() || addMutation.isPending}>
+            {addMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "Comentar"}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 interface Props {
   taskId: number | null;
@@ -141,6 +292,13 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
   const [logDesc, setLogDesc] = useState("");
   const [showTimeLog, setShowTimeLog] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [subtaskTimePanelId, setSubtaskTimePanelId] = useState<number | null>(null);
+  const [subLogHours, setSubLogHours] = useState("");
+  const [subLogDate, setSubLogDate] = useState(new Date().toISOString().slice(0, 10));
+  const [subLogDesc, setSubLogDesc] = useState("");
+  const [showAddEstimate, setShowAddEstimate] = useState(false);
+  const [newEstWeek, setNewEstWeek] = useState(() => getMondayOf(new Date()));
+  const [newEstHours, setNewEstHours] = useState("");
   const [startDateOpen, setStartDateOpen] = useState(false);
   const [dueDateOpen, setDueDateOpen] = useState(false);
   const descTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -154,6 +312,11 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
       setShowAddSubtask(false);
       setStartDateOpen(false);
       setDueDateOpen(false);
+      setSubtaskTimePanelId(null);
+      setSubLogHours("");
+      setSubLogDesc("");
+      setShowAddEstimate(false);
+      setNewEstHours("");
       // Cancel any pending description save to avoid race condition
       if (descTimerRef.current) clearTimeout(descTimerRef.current);
     }
@@ -179,6 +342,40 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
     queryKey: ["/api/tasks-projects"],
     queryFn: () => authFetch("/api/tasks-projects").then(r => r.json()),
   });
+
+  const { data: weeklyEstimates = [], refetch: refetchEstimates } = useQuery<any[]>({
+    queryKey: ["/api/tasks", taskId, "weekly-estimates"],
+    queryFn: () => authFetch(`/api/tasks/${taskId}/weekly-estimates`).then(r => r.json()),
+    enabled: !!taskId,
+  });
+
+  const addEstimateMutation = useMutation({
+    mutationFn: (data: { weekStart: string; estimatedHours: number }) =>
+      apiRequest(`/api/tasks/${taskId}/weekly-estimates`, "POST", data),
+    onSuccess: () => {
+      refetchEstimates();
+      setShowAddEstimate(false);
+      setNewEstHours("");
+      setNewEstWeek(getMondayOf(new Date()));
+      toast({ title: "Estimación guardada" });
+    },
+    onError: () => toast({ title: "Error al guardar", variant: "destructive" }),
+  });
+
+  const deleteEstimateMutation = useMutation({
+    mutationFn: (weekStart: string) =>
+      apiRequest(`/api/tasks/${taskId}/weekly-estimates/${weekStart}`, "DELETE"),
+    onSuccess: () => refetchEstimates(),
+  });
+
+  const handleSaveEstimate = () => {
+    const hours = parseFloat(newEstHours);
+    if (!newEstHours || isNaN(hours) || hours <= 0) {
+      toast({ variant: "destructive", title: "Error", description: "Ingresá una cantidad de horas válida" });
+      return;
+    }
+    addEstimateMutation.mutate({ weekStart: newEstWeek, estimatedHours: hours });
+  };
 
   const updateMutation = useMutation({
     mutationFn: (updates: Partial<Task>) => {
@@ -236,6 +433,35 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
       toast({ title: "Horas registradas" });
     },
   });
+
+  const logSubtaskTimeMutation = useMutation({
+    mutationFn: ({ subtaskId, data }: { subtaskId: number; data: any }) =>
+      apiRequest(`/api/tasks/${subtaskId}/time`, "POST", data),
+    onSuccess: () => {
+      refetchTask();
+      if (task?.projectId) {
+        queryClient.invalidateQueries({ queryKey: ["/api/tasks/project", task.projectId] });
+      }
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks/hours-summary"] });
+      setSubtaskTimePanelId(null);
+      setSubLogHours(""); setSubLogDesc("");
+      toast({ title: "Horas registradas en subtarea" });
+    },
+  });
+
+  const handleLogSubtaskTime = (subtaskId: number) => {
+    const parsed = parseHoursInput(subLogHours);
+    if (!parsed || parsed <= 0) {
+      toast({ variant: "destructive", title: "Error", description: "Ingresá un valor válido: ej. 1.5, 1h30" });
+      return;
+    }
+    const hours = roundToQuarterHour(parsed);
+    if (hours <= 0) {
+      toast({ variant: "destructive", title: "Mínimo 15 min", description: "El registro mínimo es 0.25h (15 min)." });
+      return;
+    }
+    logSubtaskTimeMutation.mutate({ subtaskId, data: { date: subLogDate, hours, description: subLogDesc } });
+  };
 
   const deleteTimeMutation = useMutation({
     mutationFn: (entryId: number) => apiRequest(`/api/tasks/${taskId}/time/${entryId}`, "DELETE"),
@@ -650,25 +876,70 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
                     </div>
                     <div className="divide-y divide-border">
                       {(task.subtasks || []).map(sub => (
-                        <div key={sub.id} className="flex items-center gap-2.5 px-3 py-2 hover:bg-accent/20 group">
-                          <CircleCheckSmall
-                            checked={sub.status === "done"}
-                            onClick={e => {
-                              e.stopPropagation();
-                              apiRequest(`/api/tasks/${sub.id}`, "PUT", { status: sub.status === "done" ? "todo" : "done" })
-                                .then(() => refetchTask());
-                            }}
-                          />
-                          <span
-                            className={cn(
-                              "text-sm flex-1 cursor-pointer hover:text-primary transition-colors",
-                              sub.status === "done" ? "line-through text-muted-foreground" : ""
-                            )}
-                            onClick={() => onNavigateToTask?.(sub.id)}
-                          >
-                            {sub.title}
-                          </span>
-                          <ChevronRight className="h-3 w-3 text-muted-foreground/40 opacity-0 group-hover:opacity-100 flex-shrink-0" />
+                        <div key={sub.id}>
+                          <div className="flex items-center gap-2.5 px-3 py-2 hover:bg-accent/20 group">
+                            <CircleCheckSmall
+                              checked={sub.status === "done"}
+                              onClick={e => {
+                                e.stopPropagation();
+                                apiRequest(`/api/tasks/${sub.id}`, "PUT", { status: sub.status === "done" ? "todo" : "done" })
+                                  .then(() => refetchTask());
+                              }}
+                            />
+                            <span
+                              className={cn(
+                                "text-sm flex-1 cursor-pointer hover:text-primary transition-colors",
+                                sub.status === "done" ? "line-through text-muted-foreground" : ""
+                              )}
+                              onClick={() => onNavigateToTask?.(sub.id)}
+                            >
+                              {sub.title}
+                            </span>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              title="Registrar horas"
+                              className="h-5 w-5 p-0 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-primary flex-shrink-0"
+                              onClick={e => {
+                                e.stopPropagation();
+                                setSubtaskTimePanelId(subtaskTimePanelId === sub.id ? null : sub.id);
+                                setSubLogHours(""); setSubLogDesc("");
+                                setSubLogDate(new Date().toISOString().slice(0, 10));
+                              }}
+                            >
+                              <Clock className="h-3 w-3" />
+                            </Button>
+                            <ChevronRight className="h-3 w-3 text-muted-foreground/40 opacity-0 group-hover:opacity-100 flex-shrink-0" />
+                          </div>
+                          {subtaskTimePanelId === sub.id && (
+                            <div className="px-3 py-2.5 bg-accent/10 border-t border-border space-y-2">
+                              <p className="text-[10px] text-muted-foreground font-medium">Registrar horas en: <span className="text-foreground">{sub.title}</span></p>
+                              <div className="grid grid-cols-2 gap-2">
+                                <Input
+                                  autoFocus
+                                  value={subLogHours}
+                                  onChange={e => setSubLogHours(e.target.value)}
+                                  onKeyDown={e => { if (e.key === "Enter") handleLogSubtaskTime(sub.id); if (e.key === "Escape") setSubtaskTimePanelId(null); }}
+                                  className="h-7 text-xs"
+                                  placeholder="ej: 1.5 · 1h30"
+                                />
+                                <Input type="date" value={subLogDate} onChange={e => setSubLogDate(e.target.value)} className="h-7 text-xs" />
+                              </div>
+                              <Input
+                                value={subLogDesc}
+                                onChange={e => setSubLogDesc(e.target.value)}
+                                onKeyDown={e => { if (e.key === "Enter") handleLogSubtaskTime(sub.id); }}
+                                className="h-7 text-xs"
+                                placeholder="Descripción (opcional)"
+                              />
+                              <div className="flex gap-2">
+                                <Button size="sm" className="h-6 text-xs bg-green-600 hover:bg-green-700 text-white px-2" onClick={() => handleLogSubtaskTime(sub.id)} disabled={logSubtaskTimeMutation.isPending || !subLogHours.trim()}>
+                                  {logSubtaskTimeMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "Registrar"}
+                                </Button>
+                                <Button size="sm" variant="ghost" className="h-6 text-xs" onClick={() => setSubtaskTimePanelId(null)}>Cancelar</Button>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       ))}
                       {(task.subtasks || []).length === 0 && !showAddSubtask && (
@@ -696,6 +967,78 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
                           <Button size="sm" variant="ghost" className="h-6 text-xs px-1" onClick={() => { setShowAddSubtask(false); setSubtaskTitle(""); }}>✕</Button>
                         </div>
                       )}
+                    </div>
+                  </div>
+
+                  {/* ── Horas estimadas por semana ── */}
+                  <div className="border border-border rounded-xl overflow-hidden">
+                    <div className="flex items-center justify-between px-3 py-2 bg-muted/20 border-b border-border">
+                      <p className="text-xs font-semibold text-foreground">
+                        Horas est. por semana
+                        {weeklyEstimates.length > 0 && (
+                          <span className="ml-1.5 text-muted-foreground font-normal">
+                            {weeklyEstimates.length} {weeklyEstimates.length === 1 ? "semana" : "semanas"}
+                          </span>
+                        )}
+                      </p>
+                      <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => setShowAddEstimate(v => !v)}>
+                        {showAddEstimate ? <X className="h-3 w-3" /> : <><Plus className="h-3 w-3 mr-1" />Agregar</>}
+                      </Button>
+                    </div>
+                    {showAddEstimate && (
+                      <div className="px-3 py-2.5 border-b border-border bg-accent/10 space-y-2">
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <p className="text-[10px] text-muted-foreground mb-1">Semana (lunes)</p>
+                            <Input type="date" value={newEstWeek} onChange={e => setNewEstWeek(e.target.value)} className="h-7 text-xs" />
+                          </div>
+                          <div>
+                            <p className="text-[10px] text-muted-foreground mb-1">Horas</p>
+                            <Input
+                              autoFocus
+                              type="number"
+                              min="0.25"
+                              step="0.25"
+                              value={newEstHours}
+                              onChange={e => setNewEstHours(e.target.value)}
+                              onKeyDown={e => {
+                                if (e.key === "Enter") handleSaveEstimate();
+                                if (e.key === "Escape") { setShowAddEstimate(false); setNewEstHours(""); }
+                              }}
+                              className="h-7 text-xs"
+                              placeholder="ej: 4"
+                            />
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button size="sm" className="h-6 text-xs bg-green-600 hover:bg-green-700 text-white px-2"
+                            onClick={handleSaveEstimate} disabled={addEstimateMutation.isPending || !newEstHours.trim()}>
+                            {addEstimateMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "Guardar"}
+                          </Button>
+                          <Button size="sm" variant="ghost" className="h-6 text-xs" onClick={() => { setShowAddEstimate(false); setNewEstHours(""); }}>Cancelar</Button>
+                        </div>
+                      </div>
+                    )}
+                    <div className="divide-y divide-border">
+                      {weeklyEstimates.length === 0 && !showAddEstimate && (
+                        <p className="text-xs text-muted-foreground italic px-3 py-2">Sin estimaciones semanales</p>
+                      )}
+                      {weeklyEstimates.map((est: any) => (
+                        <div key={est.week_start} className="flex items-center gap-2 px-3 py-2 hover:bg-accent/20 group text-xs">
+                          <CalendarIcon className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                          <span className="text-muted-foreground flex-shrink-0">
+                            Sem. {format(new Date(est.week_start + "T00:00:00"), "d MMM yyyy", { locale: es })}
+                          </span>
+                          <span className="font-semibold text-primary ml-auto">{est.estimated_hours}h</span>
+                          <Button
+                            variant="ghost" size="sm"
+                            className="h-5 w-5 p-0 opacity-0 group-hover:opacity-100 text-red-500 flex-shrink-0"
+                            onClick={() => deleteEstimateMutation.mutate(est.week_start)}
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      ))}
                     </div>
                   </div>
 
@@ -808,6 +1151,9 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
                       ))}
                     </div>
                   </div>
+
+                  {/* ── Comentarios ── */}
+                  <CommentsSection taskId={taskId} allPersonnel={allPersonnel} />
 
                   {/* ── Footer: eliminar tarea ── */}
                   <div className="pt-2 pb-6">

@@ -8,7 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useCurrency } from "@/hooks/use-currency";
-import { Loader2, Check, Pencil, X } from "lucide-react";
+import { Loader2, Check, Pencil, X, ExternalLink } from "lucide-react";
+import { Link } from "wouter";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 
@@ -41,6 +42,14 @@ export default function MonthlyClosing() {
   const { exchangeRate } = useCurrency();
 
   const { data: personnel } = useQuery<any[]>({ queryKey: ["/api/personnel"] });
+  const { data: estimatedRates = [] } = useQuery<any[]>({
+    queryKey: ["/api/estimated-rates", year],
+    queryFn: () =>
+      fetch(`/api/estimated-rates?year=${year}`, {
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+      }).then((r) => r.json()),
+  });
   const { data: closings } = useQuery<any[]>({
     queryKey: ["/api/monthly-closings", year, month + 1],
     queryFn: () =>
@@ -63,6 +72,17 @@ export default function MonthlyClosing() {
 
   const getClosing = (personnelId: number) =>
     closings?.find((c: any) => c.personnelId === personnelId);
+
+  // Returns the best available rate for the selected month: estimated > personnel.hourlyRate
+  const getEffectiveRate = (person: any): { rate: number; isEstimated: boolean } => {
+    const est = estimatedRates.find(
+      (r: any) => r.personnelId === person.id && r.month === month + 1
+    );
+    if (est?.estimatedRateARS && est.estimatedRateARS > 0) {
+      return { rate: Number(est.estimatedRateARS), isEstimated: true };
+    }
+    return { rate: person.hourlyRate || 0, isEstimated: false };
+  };
 
   // Effective base hours for a person: override > default by contract type
   const effectiveBaseHours = (person: any): number => {
@@ -99,7 +119,7 @@ export default function MonthlyClosing() {
 
   const handleClose = (person: any) => {
     const hrs = effectiveBaseHours(person);
-    const rate = person.hourlyRate || 0;
+    const { rate } = getEffectiveRate(person);
     const existing = getClosing(person.id);
     closeMutation.mutate({
       personnelId: person.id,
@@ -119,7 +139,7 @@ export default function MonthlyClosing() {
   // Cost display: returns {arsText, usdText} based on billing modality
   const getCostDisplay = (person: any) => {
     const hrs = effectiveBaseHours(person);
-    const rate = person.hourlyRate || 0; // ARS or USD depending on billingCurrency
+    const { rate } = getEffectiveRate(person); // ARS or USD depending on billingCurrency
     const billing = getBillingCurrency(person);
 
     if (billing === "USD") {
@@ -150,12 +170,14 @@ export default function MonthlyClosing() {
     };
   };
 
-  const getRateDisplay = (person: any): string => {
+  const getRateDisplay = (person: any): { text: string; isEstimated: boolean } => {
     const billing = getBillingCurrency(person);
-    const rate = person.hourlyRate || 0;
-    if (billing === "USD") return `USD ${rate.toLocaleString("en-US")}`;
-    if (billing === "mixed") return `USD ${rate.toLocaleString("en-US")} (mixto)`;
-    return `ARS ${rate.toLocaleString("es-AR")}`;
+    const { rate, isEstimated } = getEffectiveRate(person);
+    let text: string;
+    if (billing === "USD") text = `USD ${rate.toLocaleString("en-US")}`;
+    else if (billing === "mixed") text = `USD ${rate.toLocaleString("en-US")} (mixto)`;
+    else text = `ARS ${rate.toLocaleString("es-AR")}`;
+    return { text, isEstimated };
   };
 
   // Filter personnel
@@ -171,7 +193,10 @@ export default function MonthlyClosing() {
         <div>
           <h1 className="text-2xl font-bold">Cierre Mensual de Horas</h1>
           <p className="text-muted-foreground">
-            Reconciliación: ajustar horas reales a horas contractuales para facturación
+            Reconciliación: ajustar horas reales a horas contractuales para facturación.{" "}
+            <Link href="/estimated-rates" className="inline-flex items-center gap-1 text-primary hover:underline text-sm">
+              Gestionar tarifas proyectadas <ExternalLink className="h-3 w-3" />
+            </Link>
           </p>
         </div>
         <div className="flex gap-2 flex-wrap">
@@ -324,7 +349,16 @@ export default function MonthlyClosing() {
                         </div>
                       )}
                     </td>
-                    <td className="text-center py-2 px-3">{getRateDisplay(p)}</td>
+                    <td className="text-center py-2 px-3">
+                      {(() => {
+                        const { text, isEstimated } = getRateDisplay(p);
+                        return (
+                          <span className={isEstimated ? "text-blue-600" : ""} title={isEstimated ? "Tarifa proyectada del mes" : "Tarifa base de personal"}>
+                            {text}{isEstimated && " *"}
+                          </span>
+                        );
+                      })()}
+                    </td>
                     <td className="text-center py-2 px-3 font-semibold">
                       <div>{cost.primary}</div>
                       {cost.secondary && (
@@ -368,6 +402,13 @@ export default function MonthlyClosing() {
               })}
             </tbody>
           </table>
+          {estimatedRates.some((r: any) => r.month === month + 1) && (
+            <p className="text-xs text-muted-foreground mt-2">
+              * Tarifa proyectada para {MONTHS[month]} {year} (configurada en{" "}
+              <Link href="/estimated-rates" className="text-primary hover:underline">Valor Hora Estimada</Link>
+              ). Los valores sin * usan la tarifa base del personal.
+            </p>
+          )}
         </CardContent>
       </Card>
     </div>

@@ -94,6 +94,8 @@ import {
   insertCrmStageSchema,
   tasks,
   taskTimeEntries,
+  taskComments,
+  taskWeeklyEstimates,
   insertTaskSchema,
   insertTaskTimeEntrySchema,
   projectStatusReviews,
@@ -17717,7 +17719,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const totalResult = await db.execute(sql`SELECT COALESCE(SUM(hours), 0) as total FROM task_time_entries WHERE task_id = ${taskId}`);
       const total = (totalResult.rows[0] as any).total;
       await db.update(tasks).set({ loggedHours: parseFloat(total), updatedAt: new Date() }).where(eq(tasks.id, taskId));
-      
+
+      // If this is a subtask, roll up hours to the parent task too
+      if (task.parentTaskId) {
+        const parentTotal = await db.execute(sql`
+          SELECT COALESCE(SUM(tte.hours), 0) as total
+          FROM task_time_entries tte
+          JOIN tasks t ON t.id = tte.task_id
+          WHERE t.id = ${task.parentTaskId} OR t.parent_task_id = ${task.parentTaskId}
+        `);
+        const parentHours = parseFloat((parentTotal.rows[0] as any).total);
+        await db.update(tasks).set({ loggedHours: parentHours, updatedAt: new Date() }).where(eq(tasks.id, task.parentTaskId));
+      }
+
       res.json(created);
     } catch (error: any) {
       if (error.name === "ZodError") return res.status(400).json({ message: "Datos inválidos", errors: error.errors });
@@ -17729,10 +17743,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/tasks/:taskId/time/:entryId", requireAuth, async (req: Request, res: Response) => {
     try {
       const { taskId, entryId } = req.params;
+      const tid = parseInt(taskId);
+      const [task] = await db.select().from(tasks).where(eq(tasks.id, tid));
       await db.delete(taskTimeEntries).where(eq(taskTimeEntries.id, parseInt(entryId)));
-      const totalResult = await db.execute(sql`SELECT COALESCE(SUM(hours), 0) as total FROM task_time_entries WHERE task_id = ${parseInt(taskId)}`);
+      const totalResult = await db.execute(sql`SELECT COALESCE(SUM(hours), 0) as total FROM task_time_entries WHERE task_id = ${tid}`);
       const total = (totalResult.rows[0] as any).total;
-      await db.update(tasks).set({ loggedHours: parseFloat(total), updatedAt: new Date() }).where(eq(tasks.id, parseInt(taskId)));
+      await db.update(tasks).set({ loggedHours: parseFloat(total), updatedAt: new Date() }).where(eq(tasks.id, tid));
+
+      // Roll up to parent task if this was a subtask
+      if (task?.parentTaskId) {
+        const parentTotal = await db.execute(sql`
+          SELECT COALESCE(SUM(tte.hours), 0) as total
+          FROM task_time_entries tte
+          JOIN tasks t ON t.id = tte.task_id
+          WHERE t.id = ${task.parentTaskId} OR t.parent_task_id = ${task.parentTaskId}
+        `);
+        const parentHours = parseFloat((parentTotal.rows[0] as any).total);
+        await db.update(tasks).set({ loggedHours: parentHours, updatedAt: new Date() }).where(eq(tasks.id, task.parentTaskId));
+      }
+
       res.json({ message: "Entrada eliminada" });
     } catch (error) {
       res.status(500).json({ message: "Error al eliminar entrada" });
@@ -17746,6 +17775,96 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(result);
     } catch (error) {
       res.status(500).json({ message: "Error al obtener personal" });
+    }
+  });
+
+  // GET /api/tasks/:id/comments
+  app.get("/api/tasks/:id/comments", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const taskId = parseInt(req.params.id);
+      const rows = await db.execute(sql`
+        SELECT tc.id, tc.task_id, tc.author_id, tc.content, tc.created_at,
+               u.first_name || ' ' || u.last_name AS author_name
+        FROM task_comments tc
+        LEFT JOIN users u ON u.id = tc.author_id
+        WHERE tc.task_id = ${taskId}
+        ORDER BY tc.created_at ASC
+      `);
+      res.json(rows.rows);
+    } catch (error) {
+      res.status(500).json({ message: "Error al obtener comentarios" });
+    }
+  });
+
+  // POST /api/tasks/:id/comments
+  app.post("/api/tasks/:id/comments", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const taskId = parseInt(req.params.id);
+      const { content } = req.body;
+      if (!content?.trim()) return res.status(400).json({ message: "El contenido es requerido" });
+      const authorId = (req as any).user?.id ?? null;
+      const [comment] = await db.insert(taskComments).values({ taskId, authorId, content: content.trim() }).returning();
+      res.status(201).json(comment);
+    } catch (error) {
+      res.status(500).json({ message: "Error al crear comentario" });
+    }
+  });
+
+  // DELETE /api/tasks/:taskId/comments/:commentId
+  app.delete("/api/tasks/:taskId/comments/:commentId", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const commentId = parseInt(req.params.commentId);
+      await db.delete(taskComments).where(eq(taskComments.id, commentId));
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "Error al eliminar comentario" });
+    }
+  });
+
+  // GET /api/tasks/:id/weekly-estimates
+  app.get("/api/tasks/:id/weekly-estimates", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const taskId = parseInt(req.params.id);
+      const rows = await db.select().from(taskWeeklyEstimates)
+        .where(eq(taskWeeklyEstimates.taskId, taskId))
+        .orderBy(asc(taskWeeklyEstimates.weekStart));
+      res.json(rows);
+    } catch (error) {
+      res.status(500).json({ message: "Error al obtener estimaciones semanales" });
+    }
+  });
+
+  // POST /api/tasks/:id/weekly-estimates — upsert by (task_id, week_start)
+  app.post("/api/tasks/:id/weekly-estimates", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const taskId = parseInt(req.params.id);
+      const { weekStart, estimatedHours } = req.body;
+      if (!weekStart || estimatedHours === undefined) return res.status(400).json({ message: "weekStart y estimatedHours son requeridos" });
+      const createdBy = (req as any).user?.id ?? null;
+      const rows = await db.execute(sql`
+        INSERT INTO task_weekly_estimates (task_id, week_start, estimated_hours, created_by)
+        VALUES (${taskId}, ${weekStart}, ${estimatedHours}, ${createdBy})
+        ON CONFLICT (task_id, week_start)
+        DO UPDATE SET estimated_hours = EXCLUDED.estimated_hours
+        RETURNING *
+      `);
+      res.status(201).json(rows.rows[0]);
+    } catch (error) {
+      res.status(500).json({ message: "Error al guardar estimación semanal" });
+    }
+  });
+
+  // DELETE /api/tasks/:taskId/weekly-estimates/:weekStart
+  app.delete("/api/tasks/:taskId/weekly-estimates/:weekStart", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const taskId = parseInt(req.params.taskId);
+      const weekStart = req.params.weekStart;
+      await db.delete(taskWeeklyEstimates).where(
+        and(eq(taskWeeklyEstimates.taskId, taskId), eq(taskWeeklyEstimates.weekStart, weekStart))
+      );
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "Error al eliminar estimación" });
     }
   });
 

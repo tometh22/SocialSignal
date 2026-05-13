@@ -121,14 +121,13 @@ export default function EstimatedRates() {
       <div className="flex items-start gap-3 rounded-md border border-amber-200 bg-amber-50 p-3">
         <Info className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
         <div className="text-sm text-amber-900">
-          <strong>Esta pantalla es solo proyección.</strong> Los valores hora "reales" que
-          usan las cotizaciones se editan en{" "}
+          <strong>Las tarifas proyectadas acá se usan en el{" "}
+          <Link href="/monthly-closing" className="underline font-medium">Cierre Mensual</Link>
+          </strong>{" "}si existe una tarifa para el mes seleccionado (en lugar de la tarifa base del personal). Los valores hora que usan las cotizaciones se editan en{" "}
           <Link href="/admin" className="underline font-medium">
             Admin → Personal
           </Link>{" "}
-          (grilla de Costos Históricos por mes). Lo que cargues acá no afecta las
-          cotizaciones — sirve para análisis y para usar como base al generar la próxima
-          tabla de Valor Hora Real.
+          (grilla de Costos Históricos por mes).
         </div>
       </div>
 

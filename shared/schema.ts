@@ -1576,6 +1576,30 @@ export const insertTaskTimeEntrySchema = createInsertSchema(taskTimeEntries).omi
 export type TaskTimeEntry = typeof taskTimeEntries.$inferSelect;
 export type InsertTaskTimeEntry = z.infer<typeof insertTaskTimeEntrySchema>;
 
+export const taskWeeklyEstimates = pgTable("task_weekly_estimates", {
+  id: serial("id").primaryKey(),
+  taskId: integer("task_id").notNull().references(() => tasks.id, { onDelete: "cascade" }),
+  weekStart: text("week_start").notNull(), // YYYY-MM-DD (Monday)
+  estimatedHours: doublePrecision("estimated_hours").notNull(),
+  createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertTaskWeeklyEstimateSchema = createInsertSchema(taskWeeklyEstimates).omit({ id: true, createdAt: true });
+export type TaskWeeklyEstimate = typeof taskWeeklyEstimates.$inferSelect;
+
+export const taskComments = pgTable("task_comments", {
+  id: serial("id").primaryKey(),
+  taskId: integer("task_id").notNull().references(() => tasks.id, { onDelete: "cascade" }),
+  authorId: integer("author_id").references(() => users.id, { onDelete: "set null" }),
+  content: text("content").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertTaskCommentSchema = createInsertSchema(taskComments).omit({ id: true, createdAt: true });
+export type TaskComment = typeof taskComments.$inferSelect;
+export type InsertTaskComment = z.infer<typeof insertTaskCommentSchema>;
+
 // Miembros asignados a proyectos dentro del módulo de tareas
 export const taskProjectMembers = pgTable("task_project_members", {
   id: serial("id").primaryKey(),
