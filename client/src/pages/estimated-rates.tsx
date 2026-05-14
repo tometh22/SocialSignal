@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,12 +13,37 @@ const MONTHS = [
   "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"
 ];
 
+const LS_KEY = "estimatedRates:adjustmentPct";
+
+function loadAdjustmentPct(fallback: number): number {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (raw !== null) {
+      const parsed = parseFloat(raw);
+      if (!isNaN(parsed)) return parsed;
+    }
+  } catch {
+    // ignore
+  }
+  return fallback;
+}
+
 export default function EstimatedRates() {
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
-  const [adjustmentPct, setAdjustmentPct] = useState(8.5);
+  const [adjustmentPct, setAdjustmentPct] = useState(() => loadAdjustmentPct(8.5));
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // Controlled cell values: key = `${personnelId}-${month}`
+  const [cellValues, setCellValues] = useState<Record<string, string>>({});
+
+  // Per-cell save status
+  const [cellStatus, setCellStatus] = useState<Record<string, "saving" | "saved" | "error" | null>>({});
+
+  // Auto-generation progress: { personId, count }
+  const [generatingFor, setGeneratingFor] = useState<number | null>(null);
+  const [generateCount, setGenerateCount] = useState(0);
 
   const { data: personnel } = useQuery<any[]>({ queryKey: ["/api/personnel"] });
   const { data: rates } = useQuery<any[]>({
@@ -30,10 +55,48 @@ export default function EstimatedRates() {
       }).then((r) => r.json()),
   });
 
+  // Sync cellValues when rates data changes
+  useEffect(() => {
+    if (!rates) return;
+    setCellValues((prev) => {
+      const next = { ...prev };
+      for (const r of rates) {
+        const k = `${r.personnelId}-${r.month}`;
+        // Only overwrite if user hasn't typed something different
+        if (r.estimatedRateARS != null) {
+          next[k] = r.estimatedRateARS.toString();
+        }
+      }
+      return next;
+    });
+  }, [rates]);
+
+  // Persist adjustmentPct to localStorage on change
+  useEffect(() => {
+    try {
+      localStorage.setItem(LS_KEY, adjustmentPct.toString());
+    } catch {
+      // ignore
+    }
+  }, [adjustmentPct]);
+
   const saveMutation = useMutation({
     mutationFn: (data: any) => apiRequest("/api/estimated-rates", "POST", data),
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["/api/estimated-rates"] });
+      const k = `${variables.personnelId}-${variables.month}`;
+      setCellStatus((prev) => ({ ...prev, [k]: "saved" }));
+      setTimeout(() => {
+        setCellStatus((prev) => ({ ...prev, [k]: null }));
+      }, 1500);
+    },
+    onError: (_err, variables) => {
+      const k = `${variables.personnelId}-${variables.month}`;
+      setCellStatus((prev) => ({ ...prev, [k]: "error" }));
+      setTimeout(() => {
+        setCellStatus((prev) => ({ ...prev, [k]: null }));
+      }, 2000);
+      toast({ title: "Error al guardar tarifa", variant: "destructive" });
     },
   });
 
@@ -41,9 +104,6 @@ export default function EstimatedRates() {
     rates?.find((r: any) => r.personnelId === personnelId && r.month === month);
 
   const getCurrentRate = (person: any): number => {
-    // Get current ARS rate from latest historical or hourlyRate.
-    // Newest → oldest; debe incluir 2026 para que las tarifas recientes
-    // se reflejen acá también.
     const months = [
       'dec2026', 'nov2026', 'oct2026', 'sep2026', 'aug2026', 'jul2026',
       'jun2026', 'may2026', 'apr2026', 'mar2026', 'feb2026', 'jan2026',
@@ -57,11 +117,13 @@ export default function EstimatedRates() {
     return person.hourlyRate || 0;
   };
 
-  const handleGenerateProjection = (person: any) => {
+  const handleGenerateProjection = async (person: any) => {
     const baseRate = getCurrentRate(person);
     if (!baseRate) return;
 
-    // Apply quarterly adjustment: rate increases by adjustmentPct% every 3 months
+    setGeneratingFor(person.id);
+    setGenerateCount(0);
+
     for (let m = 1; m <= 12; m++) {
       const quartersAhead = Math.floor((m - 1) / 3);
       const projected = Math.round(baseRate * Math.pow(1 + adjustmentPct / 100, quartersAhead));
@@ -72,13 +134,25 @@ export default function EstimatedRates() {
         estimatedRateARS: projected,
         adjustmentPct,
       });
+      setGenerateCount(m);
     }
+
     toast({ title: "Proyección generada", description: `${person.name}: ${adjustmentPct}% trimestral` });
+    // Clear generating state after a short delay so user sees 12/12
+    setTimeout(() => {
+      setGeneratingFor(null);
+      setGenerateCount(0);
+    }, 1500);
   };
 
   const handleSaveRate = (personnelId: number, month: number, value: string) => {
     const num = parseFloat(value);
-    if (isNaN(num) || num < 0) return;
+    if (isNaN(num) || num < 0) {
+      toast({ title: "Valor inválido", description: "Ingresá un número positivo.", variant: "destructive" });
+      return;
+    }
+    const k = `${personnelId}-${month}`;
+    setCellStatus((prev) => ({ ...prev, [k]: "saving" }));
     saveMutation.mutate({
       personnelId,
       year,
@@ -112,6 +186,8 @@ export default function EstimatedRates() {
           <Input
             type="number"
             value={year}
+            min={2020}
+            max={2030}
             onChange={(e) => setYear(parseInt(e.target.value) || now.getFullYear())}
             className="w-24"
           />
@@ -153,6 +229,7 @@ export default function EstimatedRates() {
             <tbody>
               {fullTimers.map((p: any) => {
                 const currentRate = getCurrentRate(p);
+                const isGenerating = generatingFor === p.id;
                 return (
                   <tr key={p.id} className="border-b hover:bg-muted/30">
                     <td className="py-1 px-2 font-medium sticky left-0 bg-white text-xs">{p.name}</td>
@@ -161,15 +238,37 @@ export default function EstimatedRates() {
                     </td>
                     {MONTHS.map((_, m) => {
                       const rate = getRate(p.id, m + 1);
+                      const cellKey = `${p.id}-${m + 1}`;
+                      const status = cellStatus[cellKey];
+                      const originalValue = rate?.estimatedRateARS?.toString() || "";
+                      const currentValue = cellValues[cellKey] ?? originalValue;
                       return (
-                        <td key={m} className="text-center py-1 px-1">
-                          <Input
-                            type="number"
-                            className="h-7 w-20 text-xs text-center"
-                            defaultValue={rate?.estimatedRateARS || ""}
-                            placeholder="-"
-                            onBlur={(e) => handleSaveRate(p.id, m + 1, e.target.value)}
-                          />
+                        <td key={m} className="text-center py-1 px-1 relative">
+                          <div className="flex items-center justify-center gap-0.5">
+                            <Input
+                              type="number"
+                              className="h-7 w-20 text-xs text-center"
+                              value={currentValue}
+                              placeholder="-"
+                              onChange={(e) =>
+                                setCellValues((prev) => ({ ...prev, [cellKey]: e.target.value }))
+                              }
+                              onBlur={() => {
+                                if (currentValue !== originalValue && currentValue !== "") {
+                                  handleSaveRate(p.id, m + 1, currentValue);
+                                }
+                              }}
+                            />
+                            {status === "saving" && (
+                              <Loader2 className="h-3 w-3 animate-spin text-muted-foreground flex-shrink-0" />
+                            )}
+                            {status === "saved" && (
+                              <span className="text-green-600 text-xs font-bold flex-shrink-0">✓</span>
+                            )}
+                            {status === "error" && (
+                              <span className="text-red-500 text-xs font-bold flex-shrink-0">✗</span>
+                            )}
+                          </div>
                         </td>
                       );
                     })}
@@ -177,12 +276,18 @@ export default function EstimatedRates() {
                       <Button
                         size="sm"
                         variant="ghost"
-                        className="h-7 w-7 p-0"
+                        className="h-7 w-14 p-0 text-xs"
                         onClick={() => handleGenerateProjection(p)}
-                        disabled={saveMutation.isPending}
+                        disabled={saveMutation.isPending || isGenerating}
                         title={`Generar proyección ${adjustmentPct}% trimestral`}
                       >
-                        {saveMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Wand2 className="h-3 w-3" />}
+                        {isGenerating ? (
+                          <span className="text-xs">{generateCount}/12</span>
+                        ) : saveMutation.isPending ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <Wand2 className="h-3 w-3" />
+                        )}
                       </Button>
                     </td>
                   </tr>
@@ -190,6 +295,9 @@ export default function EstimatedRates() {
               })}
             </tbody>
           </table>
+          <p className="text-xs text-muted-foreground mt-2">
+            * Solo se muestran empleados de tiempo completo. Los freelancers tienen tarifas por cotización.
+          </p>
         </CardContent>
       </Card>
     </div>

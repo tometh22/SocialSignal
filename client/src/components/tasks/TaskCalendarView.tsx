@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { authFetch } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import {
   format, startOfMonth, endOfMonth, startOfWeek, endOfWeek,
@@ -64,10 +65,14 @@ export default function TaskCalendarView({ projectId }: Props) {
     weeks.push(week);
   }
 
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const isTaskOverdue = (t: CalTask, d: Date) =>
+    d < today && t.status !== "done" && t.status !== "cancelled";
+
   const getTasksForDay = (d: Date) =>
     tasksWithDate.filter(t => isSameDay(new Date(t.dueDate!.slice(0, 10) + "T00:00:00"), d));
-
-  const today = new Date();
 
   return (
     <div className="pt-4 pb-8">
@@ -127,13 +132,16 @@ export default function TaskCalendarView({ projectId }: Props) {
                   </div>
                   <div className="space-y-0.5">
                     {dayTasks.slice(0, 3).map(t => {
-                      const dot = TASK_STATUS_CONFIG[t.status as TaskStatus]?.dot;
+                      const overdue = isTaskOverdue(t, d);
+                      const dot = overdue ? undefined : TASK_STATUS_CONFIG[t.status as TaskStatus]?.dot;
                       return (
                         <div
                           key={t.id}
                           className={cn(
                             "text-[9px] px-1 py-0.5 rounded border leading-tight cursor-default flex items-center gap-0.5",
-                            STATUS_CHIP[t.status] || "bg-gray-100 text-gray-700 border-gray-200"
+                            overdue
+                              ? "border-red-400 bg-red-50 text-red-700"
+                              : STATUS_CHIP[t.status] || "bg-gray-100 text-gray-700 border-gray-200"
                           )}
                           title={t.title}
                         >
@@ -145,9 +153,41 @@ export default function TaskCalendarView({ projectId }: Props) {
                       );
                     })}
                     {dayTasks.length > 3 && (
-                      <div className="text-[9px] text-muted-foreground px-1">
-                        +{dayTasks.length - 3} más
-                      </div>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <button className="text-[9px] text-muted-foreground hover:text-foreground px-1 w-full text-left transition-colors">
+                            +{dayTasks.length - 3} más
+                          </button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-52 p-2" align="start">
+                          <p className="text-[10px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-wide">
+                            {format(d, "d 'de' MMMM", { locale: es })}
+                          </p>
+                          <div className="space-y-1">
+                            {dayTasks.map(t => {
+                              const overdue = isTaskOverdue(t, d);
+                              const dot = overdue ? undefined : TASK_STATUS_CONFIG[t.status as TaskStatus]?.dot;
+                              return (
+                                <div
+                                  key={t.id}
+                                  className={cn(
+                                    "text-[10px] px-1.5 py-1 rounded border leading-tight flex items-center gap-1",
+                                    overdue
+                                      ? "border-red-400 bg-red-50 text-red-700"
+                                      : STATUS_CHIP[t.status] || "bg-gray-100 text-gray-700 border-gray-200"
+                                  )}
+                                  title={t.title}
+                                >
+                                  {dot && (
+                                    <span className={cn("inline-block w-1.5 h-1.5 rounded-full flex-shrink-0", dot)} />
+                                  )}
+                                  <span className="truncate">{t.title}</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </PopoverContent>
+                      </Popover>
                     )}
                   </div>
                 </div>

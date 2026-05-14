@@ -5,6 +5,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useCurrency } from "@/hooks/use-currency";
@@ -36,12 +46,16 @@ export default function MonthlyClosing() {
   // editingHours: personnelId currently showing the inline input
   const [editingHours, setEditingHours] = useState<number | null>(null);
   const [editingInput, setEditingInput] = useState<string>("");
+  // Per-row mutation tracking
+  const [closingPersonnelId, setClosingPersonnelId] = useState<number | null>(null);
+  // Re-close confirmation target
+  const [reCloseTarget, setReCloseTarget] = useState<any>(null);
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { exchangeRate } = useCurrency();
 
-  const { data: personnel } = useQuery<any[]>({ queryKey: ["/api/personnel"] });
+  const { data: personnel, isLoading: personnelLoading } = useQuery<any[]>({ queryKey: ["/api/personnel"] });
   const { data: estimatedRates = [] } = useQuery<any[]>({
     queryKey: ["/api/estimated-rates", year],
     queryFn: () =>
@@ -50,7 +64,7 @@ export default function MonthlyClosing() {
         headers: { "Content-Type": "application/json" },
       }).then((r) => r.json()),
   });
-  const { data: closings } = useQuery<any[]>({
+  const { data: closings, isLoading: closingsLoading } = useQuery<any[]>({
     queryKey: ["/api/monthly-closings", year, month + 1],
     queryFn: () =>
       fetch(`/api/monthly-closings?year=${year}&month=${month + 1}`, {
@@ -67,6 +81,9 @@ export default function MonthlyClosing() {
     },
     onError: () => {
       toast({ title: "Error", description: "No se pudo guardar el cierre", variant: "destructive" });
+    },
+    onSettled: () => {
+      setClosingPersonnelId(null);
     },
   });
 
@@ -117,10 +134,11 @@ export default function MonthlyClosing() {
     });
   };
 
-  const handleClose = (person: any) => {
+  const doClose = (person: any) => {
     const hrs = effectiveBaseHours(person);
     const { rate } = getEffectiveRate(person);
     const existing = getClosing(person.id);
+    setClosingPersonnelId(person.id);
     closeMutation.mutate({
       personnelId: person.id,
       year,
@@ -130,6 +148,23 @@ export default function MonthlyClosing() {
       hourlyRate: rate,
       totalCost: hrs * rate,
     });
+  };
+
+  const handleClose = (person: any) => {
+    const closing = getClosing(person.id);
+    if (closing) {
+      // Re-close: ask for confirmation first
+      setReCloseTarget(person);
+    } else {
+      doClose(person);
+    }
+  };
+
+  const handleReCloseConfirm = () => {
+    if (reCloseTarget) {
+      doClose(reCloseTarget);
+    }
+    setReCloseTarget(null);
   };
 
   // Billing currency helpers
@@ -187,8 +222,46 @@ export default function MonthlyClosing() {
     return type === contractFilter;
   });
 
+  // Unsaved changes: any entry in hoursOverrides with a non-empty value
+  const hasUnsavedChanges = Object.keys(hoursOverrides).length > 0;
+
+  // Loading state
+  const isLoading = personnelLoading || closingsLoading;
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 gap-2">
+        <Loader2 className="animate-spin h-8 w-8" />
+        <span className="text-muted-foreground">Cargando...</span>
+      </div>
+    );
+  }
+
   return (
     <div className="p-6 space-y-6">
+      {/* Re-close confirmation dialog */}
+      <AlertDialog open={reCloseTarget !== null} onOpenChange={(open) => { if (!open) setReCloseTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Re-cerrar el mes?</AlertDialogTitle>
+            <AlertDialogDescription>
+              ¿Re-cerrar el mes de <strong>{reCloseTarget?.name}</strong>? Esto sobreescribirá el cierre anterior.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleReCloseConfirm}>Re-cerrar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Unsaved changes banner */}
+      {hasUnsavedChanges && (
+        <div className="rounded-md border border-yellow-400 bg-yellow-50 px-4 py-3 text-sm text-yellow-800">
+          Tenés cambios manuales sin aplicar al cierre. Acordate de usar estos valores al cerrar.
+        </div>
+      )}
+
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h1 className="text-2xl font-bold">Cierre Mensual de Horas</h1>
@@ -222,6 +295,8 @@ export default function MonthlyClosing() {
             value={year}
             onChange={(e) => setYear(parseInt(e.target.value) || now.getFullYear())}
             className="w-24"
+            min={2020}
+            max={2030}
           />
         </div>
       </div>
@@ -236,172 +311,173 @@ export default function MonthlyClosing() {
           </CardTitle>
         </CardHeader>
         <CardContent className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b">
-                <th className="text-left py-2 px-3">Persona</th>
-                <th className="text-center py-2 px-3">Contrato</th>
-                <th className="text-center py-2 px-3">Facturación</th>
-                <th className="text-center py-2 px-3">Hs Base</th>
-                <th className="text-center py-2 px-3">Valor Hora</th>
-                <th className="text-center py-2 px-3">Costo Final</th>
-                <th className="text-center py-2 px-3">Estado</th>
-                <th className="text-center py-2 px-3">Acción</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredPersonnel.length === 0 && (
-                <tr>
-                  <td colSpan={8} className="text-center py-6 text-muted-foreground">
-                    No hay personal para el filtro seleccionado.
-                  </td>
+          {filteredPersonnel.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground">
+              No hay personal para el filtro seleccionado
+            </div>
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b">
+                  <th className="text-left py-2 px-3">Persona</th>
+                  <th className="text-center py-2 px-3">Contrato</th>
+                  <th className="text-center py-2 px-3">Facturación</th>
+                  <th className="text-center py-2 px-3">Hs Base</th>
+                  <th className="text-center py-2 px-3">Valor Hora</th>
+                  <th className="text-center py-2 px-3">Costo Final</th>
+                  <th className="text-center py-2 px-3">Estado</th>
+                  <th className="text-center py-2 px-3">Acción</th>
                 </tr>
-              )}
-              {filteredPersonnel.map((p: any) => {
-                const closing = getClosing(p.id);
-                const baseHrs = effectiveBaseHours(p);
-                const hasOverride = hoursOverrides[p.id] !== undefined && hoursOverrides[p.id] !== "";
-                const cost = getCostDisplay(p);
-                const billing = getBillingCurrency(p);
-                return (
-                  <tr key={p.id} className="border-b hover:bg-muted/30">
-                    <td className="py-2 px-3 font-medium">{p.name}</td>
-                    <td className="text-center py-2 px-3 capitalize">
-                      {p.contractType || "full-time"}
-                    </td>
-                    <td className="text-center py-2 px-3">
-                      <Badge
-                        variant="outline"
-                        className={
-                          billing === "USD"
-                            ? "border-green-400 text-green-700"
-                            : billing === "mixed"
-                            ? "border-amber-400 text-amber-700"
-                            : "border-blue-400 text-blue-700"
-                        }
-                      >
-                        {billing === "mixed" ? "Mixto" : billing}
-                      </Badge>
-                    </td>
-                    <td className="text-center py-2 px-3">
-                      {editingHours === p.id ? (
-                        <div className="flex items-center gap-1 justify-center">
-                          <Input
-                            type="number"
-                            value={editingInput}
-                            onChange={(e) => setEditingInput(e.target.value)}
-                            className="w-20 h-7 text-sm text-center"
-                            min={0}
-                            step={1}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") handleConfirmHours(p.id);
-                              if (e.key === "Escape") handleCancelEditHours();
-                            }}
-                            autoFocus
-                          />
-                          <span className="text-xs text-muted-foreground">h</span>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => handleConfirmHours(p.id)}
-                            className="h-6 w-6 p-0 text-green-600"
-                          >
-                            <Check className="h-3 w-3" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={handleCancelEditHours}
-                            className="h-6 w-6 p-0 text-gray-500"
-                          >
-                            <X className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-1 justify-center group">
-                          <span className={hasOverride ? "font-semibold text-amber-700" : ""}>
-                            {baseHrs}h
-                          </span>
-                          {hasOverride && (
-                            <Badge variant="outline" className="text-xs border-amber-400 text-amber-600 px-1 py-0">
-                              Manual
-                            </Badge>
-                          )}
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => handleStartEditHours(p)}
-                            className="h-5 w-5 p-0 text-muted-foreground opacity-0 group-hover:opacity-100"
-                          >
-                            <Pencil className="h-3 w-3" />
-                          </Button>
-                          {hasOverride && (
+              </thead>
+              <tbody>
+                {filteredPersonnel.map((p: any) => {
+                  const closing = getClosing(p.id);
+                  const baseHrs = effectiveBaseHours(p);
+                  const hasOverride = hoursOverrides[p.id] !== undefined && hoursOverrides[p.id] !== "";
+                  const cost = getCostDisplay(p);
+                  const billing = getBillingCurrency(p);
+                  const isRowPending = closingPersonnelId === p.id && closeMutation.isPending;
+                  return (
+                    <tr key={p.id} className="border-b hover:bg-muted/30">
+                      <td className="py-2 px-3 font-medium">{p.name}</td>
+                      <td className="text-center py-2 px-3 capitalize">
+                        {p.contractType || "full-time"}
+                      </td>
+                      <td className="text-center py-2 px-3">
+                        <Badge
+                          variant="outline"
+                          title={billing === "mixed" ? "Facturación Mixta" : `Facturación en ${billing}`}
+                          className={
+                            billing === "USD"
+                              ? "border-green-400 text-green-700"
+                              : billing === "mixed"
+                              ? "border-amber-400 text-amber-700"
+                              : "border-blue-400 text-blue-700"
+                          }
+                        >
+                          {billing === "mixed" ? "Mixto" : billing}
+                        </Badge>
+                      </td>
+                      <td className="text-center py-2 px-3">
+                        {editingHours === p.id ? (
+                          <div className="flex items-center gap-1 justify-center">
+                            <Input
+                              type="number"
+                              value={editingInput}
+                              onChange={(e) => setEditingInput(e.target.value)}
+                              className="w-20 h-7 text-sm text-center"
+                              min={0}
+                              step={1}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") handleConfirmHours(p.id);
+                                if (e.key === "Escape") handleCancelEditHours();
+                              }}
+                              autoFocus
+                            />
+                            <span className="text-xs text-muted-foreground">h</span>
                             <Button
                               size="sm"
                               variant="ghost"
-                              onClick={() => handleResetHours(p.id)}
-                              className="h-5 w-5 p-0 text-muted-foreground opacity-0 group-hover:opacity-100"
-                              title="Restaurar horas base"
+                              onClick={() => handleConfirmHours(p.id)}
+                              className="h-6 w-6 p-0 text-green-600"
+                            >
+                              <Check className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={handleCancelEditHours}
+                              className="h-6 w-6 p-0 text-gray-500"
                             >
                               <X className="h-3 w-3" />
                             </Button>
-                          )}
-                        </div>
-                      )}
-                    </td>
-                    <td className="text-center py-2 px-3">
-                      {(() => {
-                        const { text, isEstimated } = getRateDisplay(p);
-                        return (
-                          <span className={isEstimated ? "text-blue-600" : ""} title={isEstimated ? "Tarifa proyectada del mes" : "Tarifa base de personal"}>
-                            {text}{isEstimated && " *"}
-                          </span>
-                        );
-                      })()}
-                    </td>
-                    <td className="text-center py-2 px-3 font-semibold">
-                      <div>{cost.primary}</div>
-                      {cost.secondary && (
-                        <div className="text-xs text-muted-foreground font-normal">{cost.secondary}</div>
-                      )}
-                    </td>
-                    <td className="text-center py-2 px-3">
-                      {closing ? (
-                        <div className="flex flex-col items-center gap-0.5">
-                          <span className="text-green-600 flex items-center gap-1 text-xs font-medium">
-                            <Check className="h-3.5 w-3.5" /> Cerrado
-                          </span>
-                          {closing.closedAt && (
-                            <span className="text-[10px] text-muted-foreground">
-                              {format(new Date(closing.closedAt), "d MMM, HH:mm", { locale: es })}
-                            </span>
-                          )}
-                        </div>
-                      ) : (
-                        <span className="text-amber-600">Pendiente</span>
-                      )}
-                    </td>
-                    <td className="text-center py-2 px-3">
-                      <Button
-                        size="sm"
-                        variant={closing ? "outline" : "default"}
-                        onClick={() => handleClose(p)}
-                        disabled={closeMutation.isPending}
-                      >
-                        {closeMutation.isPending ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : closing ? (
-                          "Re-cerrar"
+                          </div>
                         ) : (
-                          "Cerrar"
+                          <div className="flex items-center gap-1 justify-center group">
+                            <span className={hasOverride ? "font-semibold text-amber-700" : ""}>
+                              {baseHrs}h
+                            </span>
+                            {hasOverride && (
+                              <Badge variant="outline" className="text-xs border-amber-400 text-amber-600 px-1 py-0">
+                                Manual
+                              </Badge>
+                            )}
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleStartEditHours(p)}
+                              className="h-5 w-5 p-0 text-muted-foreground opacity-0 group-hover:opacity-100"
+                            >
+                              <Pencil className="h-3 w-3" />
+                            </Button>
+                            {hasOverride && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => handleResetHours(p.id)}
+                                className="h-5 w-5 p-0 text-muted-foreground opacity-0 group-hover:opacity-100"
+                                title="Restaurar horas base"
+                              >
+                                <X className="h-3 w-3" />
+                              </Button>
+                            )}
+                          </div>
                         )}
-                      </Button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                      </td>
+                      <td className="text-center py-2 px-3">
+                        {(() => {
+                          const { text, isEstimated } = getRateDisplay(p);
+                          return (
+                            <span className={isEstimated ? "text-blue-600" : ""} title={isEstimated ? "Tarifa proyectada del mes" : "Tarifa base de personal"}>
+                              {text}{isEstimated && " *"}
+                            </span>
+                          );
+                        })()}
+                      </td>
+                      <td className="text-center py-2 px-3 font-semibold">
+                        <div>{cost.primary}</div>
+                        {cost.secondary && (
+                          <div className="text-xs text-muted-foreground font-normal">{cost.secondary}</div>
+                        )}
+                      </td>
+                      <td className="text-center py-2 px-3">
+                        {closing ? (
+                          <div className="flex flex-col items-center gap-0.5">
+                            <span className="text-green-600 flex items-center gap-1 text-xs font-medium">
+                              <Check className="h-3.5 w-3.5" /> Cerrado
+                            </span>
+                            {closing.closedAt && (
+                              <span className="text-[10px] text-muted-foreground">
+                                {format(new Date(closing.closedAt), "d MMM, HH:mm", { locale: es })}
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-amber-600">Pendiente</span>
+                        )}
+                      </td>
+                      <td className="text-center py-2 px-3">
+                        <Button
+                          size="sm"
+                          variant={closing ? "outline" : "default"}
+                          onClick={() => handleClose(p)}
+                          disabled={isRowPending}
+                        >
+                          {isRowPending ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : closing ? (
+                            "Re-cerrar"
+                          ) : (
+                            "Cerrar"
+                          )}
+                        </Button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
           {estimatedRates.some((r: any) => r.month === month + 1) && (
             <p className="text-xs text-muted-foreground mt-2">
               * Tarifa proyectada para {MONTHS[month]} {year} (configurada en{" "}

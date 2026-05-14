@@ -15,7 +15,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
   DropdownMenuLabel
 } from "@/components/ui/dropdown-menu";
-import { Loader2, Users, Trash2, Plus, ChevronRight, List, LayoutGrid, Share2, Filter, ArrowUpDown, Layers, MoreHorizontal, Search, X, Check, BarChart2, TrendingUp, ChevronDown, CalendarDays } from "lucide-react";
+import { Loader2, Users, Trash2, Plus, ChevronLeft, ChevronRight, List, LayoutGrid, Share2, Filter, ArrowUpDown, Layers, MoreHorizontal, Search, X, Check, BarChart2, TrendingUp, ChevronDown, CalendarDays } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
 import { usePermissions } from "@/hooks/use-permissions";
@@ -67,7 +67,13 @@ export default function ProjectTasksPage({ params }: Props) {
   const [membersOpen, setMembersOpen] = useState(false);
   const [addPersonnelId, setAddPersonnelId] = useState<string>("none");
   const [addRole, setAddRole] = useState("member");
-  const [view, setView] = useState<"list" | "board" | "panel" | "calendar">("list");
+  const [view, setView_] = useState<"list" | "board" | "panel" | "calendar">(
+    () => (localStorage.getItem(`projectView:${projectId}`) as "list" | "board" | "panel" | "calendar") || "list"
+  );
+  const setView = (v: "list" | "board" | "panel" | "calendar") => {
+    setView_(v);
+    localStorage.setItem(`projectView:${projectId}`, v);
+  };
   const [quickAddTrigger, setQuickAddTrigger] = useState(0);
   const [showFilter, setShowFilter] = useState(false);
   const [filterText, setFilterText] = useState("");
@@ -210,6 +216,9 @@ export default function ProjectTasksPage({ params }: Props) {
                   {(project.clientName || project.name || "P").charAt(0).toUpperCase()}
                 </span>
                 <div className="min-w-0">
+                  <Link href="/tasks" className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 mb-0.5">
+                    <ChevronLeft className="h-3 w-3" />Proyectos
+                  </Link>
                   <div className="flex items-center gap-2">
                     <h1 className="text-xl font-bold text-foreground truncate">{project.name}</h1>
                     {(() => {
