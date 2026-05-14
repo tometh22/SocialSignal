@@ -448,12 +448,17 @@ function TaskRow({ task, allPersonnel, onOpen, onToggle, onDateSet, onAssignee, 
               }}
             />
           ) : (
-            <span
-              className={cn("text-sm truncate transition-all duration-150", isDone && "line-through text-muted-foreground")}
-              onDoubleClick={e => { e.stopPropagation(); setRenameValue(task.title); setRenaming(true); }}
-            >
-              {task.title}
-            </span>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span
+                  className={cn("text-sm truncate transition-all duration-150", isDone && "line-through text-muted-foreground")}
+                  onDoubleClick={e => { e.stopPropagation(); setRenameValue(task.title); setRenaming(true); }}
+                >
+                  {task.title}
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="max-w-xs">{task.title}</TooltipContent>
+            </Tooltip>
           )}
           {hasSubtasks && !isSubtask && (
             <button
@@ -1085,7 +1090,7 @@ function BoardCard({ task, allPersonnel, onOpen, onStatusChange }: { task: Task;
       onClick={() => !isDragging && onOpen(task.id)}
     >
       <div className="flex items-start gap-2 mb-2">
-        <p className={cn("text-sm font-medium leading-snug flex-1 min-w-0", isDone && "line-through text-muted-foreground")}>
+        <p className={cn("text-sm font-medium leading-snug flex-1 min-w-0", isDone && "line-through text-muted-foreground")} title={task.title}>
           {task.title}
         </p>
         <DropdownMenu>

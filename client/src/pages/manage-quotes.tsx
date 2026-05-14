@@ -174,7 +174,7 @@ export default function ManageQuotes() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [createProjectDialogOpen, setCreateProjectDialogOpen] = useState(false);
   const [approvedQuote, setApprovedQuote] = useState<Quotation | null>(null);
-  const [newStatus, setNewStatus] = useState("");
+  const [newStatus, setNewStatus] = useState<string | null>(null);
   const [associatedProjects, setAssociatedProjects] = useState<any[]>([]);
   const [checkingProjects, setCheckingProjects] = useState(false);
   const [deletingQuoteId, setDeletingQuoteId] = useState<number | null>(null);
@@ -238,6 +238,8 @@ export default function ManageQuotes() {
         description: `El estado de la cotización "${selectedQuote.projectName}" ha sido actualizado a ${translateStatus(newStatus)}.`,
       });
 
+      setDialogOpen(false);
+
       // Si la cotización fue aprobada, mostrar modal para crear proyecto
       if (newStatus === 'approved') {
         console.log(`[QUOTES] Cotización aprobada, preparando modal de creación de proyecto`);
@@ -268,7 +270,6 @@ export default function ManageQuotes() {
       }
 
       refetch();
-      setDialogOpen(false);
     } catch (error) {
       console.error(`[QUOTES] ❌ Error en actualización de estado:`, {
         quotationId: selectedQuote.id,
@@ -288,7 +289,7 @@ export default function ManageQuotes() {
 
   const openStatusDialog = (quote: Quotation) => {
     setSelectedQuote(quote);
-    setNewStatus(quote.status);
+    setNewStatus(null);
     setTimeout(() => {
       setDialogOpen(true);
     }, 10);
@@ -548,7 +549,7 @@ export default function ManageQuotes() {
   };
 
   const getExpiryBadge = (quote: Quotation) => {
-    if (!quote.expiresAt || quote.status !== 'pending') return null;
+    if (!quote.expiresAt || (quote.status !== 'pending' && quote.status !== 'in-negotiation')) return null;
     const exp = new Date(quote.expiresAt);
     const now = new Date();
     const daysLeft = Math.ceil((exp.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
@@ -1197,21 +1198,36 @@ export default function ManageQuotes() {
                   <div className="mx-auto w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mb-4">
                     <FileText className="h-10 w-10 text-slate-400" />
                   </div>
-                  <h3 className="text-lg font-semibold text-slate-900 mb-2">
-                    {searchTerm || statusFilter !== "all"
-                      ? "No hay cotizaciones que coincidan"
-                      : "No hay cotizaciones disponibles"}
-                  </h3>
-                  <p className="text-slate-600 mb-6">
-                    {searchTerm || statusFilter !== "all"
-                      ? "Prueba ajustando los filtros de búsqueda."
-                      : "Comienza creando tu primera cotización."}
-                  </p>
-                  {!searchTerm && statusFilter === "all" && (
-                    <Button onClick={() => navigate("/optimized-quote")} className="bg-slate-700 hover:bg-slate-800">
-                      <Plus className="mr-2 h-4 w-4" />
-                      Crear Primera Cotización
-                    </Button>
+                  {searchTerm || statusFilter !== "all" ? (
+                    <>
+                      <h3 className="text-lg font-semibold text-slate-900 mb-2">
+                        No se encontraron cotizaciones con los filtros aplicados
+                      </h3>
+                      <p className="text-slate-600 mb-6">
+                        Intenta con otro término de búsqueda o cambia el filtro de estado.
+                      </p>
+                      <Button
+                        variant="outline"
+                        onClick={() => { setSearchTerm(""); setStatusFilter("all"); }}
+                        className="border-slate-300 text-slate-700 hover:bg-slate-50"
+                      >
+                        <X className="mr-2 h-4 w-4" />
+                        Limpiar filtros
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <h3 className="text-lg font-semibold text-slate-900 mb-2">
+                        No hay cotizaciones disponibles
+                      </h3>
+                      <p className="text-slate-600 mb-6">
+                        Comienza creando tu primera cotización.
+                      </p>
+                      <Button onClick={() => navigate("/optimized-quote")} className="bg-slate-700 hover:bg-slate-800">
+                        <Plus className="mr-2 h-4 w-4" />
+                        Crear Primera Cotización
+                      </Button>
+                    </>
                   )}
                 </div>
               )}
@@ -1294,9 +1310,10 @@ export default function ManageQuotes() {
             <Button variant="outline" onClick={() => setDialogOpen(false)} className="rounded-xl">
               Cancelar
             </Button>
-            <Button 
-              className="rounded-xl bg-indigo-600 hover:bg-indigo-700" 
+            <Button
+              className="rounded-xl bg-indigo-600 hover:bg-indigo-700"
               onClick={handleStatusChange}
+              disabled={!newStatus || newStatus === selectedQuote?.status}
             >
               Actualizar Estado
             </Button>
