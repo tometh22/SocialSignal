@@ -159,7 +159,8 @@ export default function ExecutiveDashboardV2() {
             )}
             {viewMode === "year" && (
               <Badge className="text-[10px] bg-indigo-100 text-indigo-700 border border-indigo-200">
-                Acumulado año · Ene → {d.monthLabel}
+                Acumulado año · Ene → {(d as any)._ytdLastMonthLabel ?? d.monthLabel}
+                {(d as any)._ytdMonthCount != null ? ` (${(d as any)._ytdMonthCount} meses cerrados)` : ""}
               </Badge>
             )}
             <span className="text-xs text-muted-foreground">Period key: {d.periodKey}</span>
