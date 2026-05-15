@@ -48,6 +48,7 @@ interface MonthData {
   year: number;
   month: number;
   monthLabel: string;
+  cierre: boolean;
   // P&L
   ventasDelMes: number | null;
   ebitOperativo: number | null;
@@ -127,6 +128,7 @@ function aggregateMonths(
     year,
     month,
     monthLabel,
+    cierre: true,
     ventasDelMes,
     ebitOperativo,
     beneficioNeto,
@@ -174,7 +176,7 @@ export async function fetchResumenEjecutivoDirectly(
   // [15]Beneficio Neto [16]Margen operativo [17]Margen Neto [18]MarkUp
   // [19]Proyección resultado [20]Chasflow [21]CashFlow+60días [22]NOTAS
   const COL = {
-    MES: 0, AÑO: 1,
+    MES: 0, AÑO: 1, CIERRE: 2,
     ACTIVO_LIQUIDO: 3, ACTIVO_MP_CRYPTO: 4, CLIENTES_COBRAR: 5, ACTIVO_TOTAL: 6,
     PASIVO_IMP_USA: 7, PASIVO_FACT_ADEL: 8, PASIVO_PROVEEDORES: 9, PASIVO_TOTAL: 10,
     BALANCE_NETO: 11,
@@ -199,6 +201,9 @@ export async function fetchResumenEjecutivoDirectly(
 
     const periodKey = `${year}-${String(month).padStart(2, '0')}`;
 
+    const cierreRaw = String(row[COL.CIERRE] || '').trim().toLowerCase();
+    const cierre = ['sí', 'si', 'true', 'verdadero', '1', 'yes', 'x', '✓', 'ok', 'cerrado'].includes(cierreRaw);
+
     const ventasDelMes = parseMoney(row[COL.VENTAS]);
     const ebitOperativo = parseMoney(row[COL.EBIT]);
     const sheetMarkup = parseMoney(row[COL.MARKUP]);
@@ -213,6 +218,7 @@ export async function fetchResumenEjecutivoDirectly(
       year,
       month,
       monthLabel: mesLabel,
+      cierre,
       // P&L
       ventasDelMes,
       ebitOperativo,
@@ -242,18 +248,28 @@ export async function fetchResumenEjecutivoDirectly(
   let filtered: MonthData | null = null;
 
   if (filterYear && filterYearTotal) {
-    // Year-to-date: Jan through latest available month of the year
+    // Year-to-date: only months marked as closed (Cierre = true)
     const yearMonths = allData
-      .filter(d => d.year === filterYear)
+      .filter(d => d.year === filterYear && d.cierre)
       .sort((a, b) => a.month - b.month);
-    const lastMonth = yearMonths.length > 0 ? yearMonths[yearMonths.length - 1].month : 12;
+    // Fallback: if no months have cierre flag, use all available months with revenue data
+    const monthsToAggregate = yearMonths.length > 0
+      ? yearMonths
+      : allData.filter(d => d.year === filterYear && d.ventasDelMes != null).sort((a, b) => a.month - b.month);
+    const lastMonth = monthsToAggregate.length > 0 ? monthsToAggregate[monthsToAggregate.length - 1].month : 12;
+    const lastMonthLabel = monthsToAggregate.length > 0 ? monthsToAggregate[monthsToAggregate.length - 1].monthLabel : `Dic ${filterYear}`;
     filtered = aggregateMonths(
-      yearMonths,
+      monthsToAggregate,
       `${filterYear}-YTD`,
       `Año ${filterYear}`,
       filterYear,
       lastMonth
     );
+    // Annotate the period badge label with the actual range
+    if (filtered) {
+      (filtered as any)._ytdLastMonthLabel = lastMonthLabel;
+      (filtered as any)._ytdMonthCount = monthsToAggregate.length;
+    }
   } else if (filterYear && filterQuarter && filterQuarter >= 1 && filterQuarter <= 4) {
     const q0 = (filterQuarter - 1) * 3 + 1;
     const quarterMonths = allData.filter(d => d.year === filterYear && d.month >= q0 && d.month <= q0 + 2);
