@@ -120,8 +120,11 @@ function aggregateMonths(
   const margenOperativo = ventasDelMes ? (ebitOperativo ?? 0) / ventasDelMes * 100 : null;
   const margenNeto = ventasDelMes ? (beneficioNeto ?? 0) / ventasDelMes * 100 : null;
 
-  const markupVals = sorted.map(m => m.markup).filter((v): v is number => v != null);
-  const markup = markupVals.length > 0 ? markupVals.reduce((a, b) => a + b, 0) / markupVals.length : null;
+  // Derive markup from aggregated totals: ventas / (ventas - ebit) = ventas / costos_directos
+  const impliedCosts = ventasDelMes != null && ebitOperativo != null ? ventasDelMes - ebitOperativo : null;
+  const markup = ventasDelMes != null && impliedCosts != null && impliedCosts > 0
+    ? Math.round((ventasDelMes / impliedCosts) * 100) / 100
+    : null;
 
   return {
     periodKey,
@@ -155,7 +158,11 @@ export async function fetchResumenEjecutivoDirectly(
   filterYear?: number,
   filterMonth?: number,
   filterQuarter?: number,
-  filterYearTotal?: boolean
+  filterYearTotal?: boolean,
+  filterStartYear?: number,
+  filterStartMonth?: number,
+  filterEndYear?: number,
+  filterEndMonth?: number,
 ): Promise<{ data: MonthData[]; filtered: MonthData | null; available: string[] }> {
   const sheets = createSheetsClient();
   const response = await sheets.spreadsheets.values.get({
@@ -272,7 +279,10 @@ export async function fetchResumenEjecutivoDirectly(
     }
   } else if (filterYear && filterQuarter && filterQuarter >= 1 && filterQuarter <= 4) {
     const q0 = (filterQuarter - 1) * 3 + 1;
-    const quarterMonths = allData.filter(d => d.year === filterYear && d.month >= q0 && d.month <= q0 + 2);
+    const allQuarterMonths = allData.filter(d => d.year === filterYear && d.month >= q0 && d.month <= q0 + 2);
+    // Only aggregate closed months; fall back to all quarter months if none are marked closed
+    const closedQuarterMonths = allQuarterMonths.filter(d => d.cierre);
+    const quarterMonths = closedQuarterMonths.length > 0 ? closedQuarterMonths : allQuarterMonths;
     filtered = aggregateMonths(
       quarterMonths,
       `${filterYear}-Q${filterQuarter}`,
@@ -280,6 +290,32 @@ export async function fetchResumenEjecutivoDirectly(
       filterYear,
       q0
     );
+    if (filtered) {
+      (filtered as any)._closedMonthCount = quarterMonths.length;
+    }
+  } else if (
+    filterStartYear != null && filterStartMonth != null &&
+    filterEndYear != null && filterEndMonth != null
+  ) {
+    // Custom range: all months between start and end inclusive (regardless of cierre)
+    const startKey = `${filterStartYear}-${String(filterStartMonth).padStart(2, '0')}`;
+    const endKey = `${filterEndYear}-${String(filterEndMonth).padStart(2, '0')}`;
+    const rangeMonths = allData
+      .filter(d => d.periodKey >= startKey && d.periodKey <= endKey)
+      .sort((a, b) => a.periodKey.localeCompare(b.periodKey));
+    const rangeKey = `${startKey}:${endKey}`;
+    filtered = aggregateMonths(
+      rangeMonths,
+      rangeKey,
+      `${startKey} → ${endKey}`,
+      filterEndYear,
+      filterEndMonth
+    );
+    if (filtered) {
+      (filtered as any)._rangeStart = startKey;
+      (filtered as any)._rangeEnd = endKey;
+      (filtered as any)._rangeMonthCount = rangeMonths.length;
+    }
   } else if (filterYear && filterMonth) {
     const key = `${filterYear}-${String(filterMonth).padStart(2, '0')}`;
     filtered = allData.find(d => d.periodKey === key) || null;
