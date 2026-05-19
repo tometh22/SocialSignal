@@ -120,10 +120,17 @@ function aggregateMonths(
   const margenOperativo = ventasDelMes ? (ebitOperativo ?? 0) / ventasDelMes * 100 : null;
   const margenNeto = ventasDelMes ? (beneficioNeto ?? 0) / ventasDelMes * 100 : null;
 
-  // Derive markup from aggregated totals: ventas / (ventas - ebit) = ventas / costos_directos
-  const impliedCosts = ventasDelMes != null && ebitOperativo != null ? ventasDelMes - ebitOperativo : null;
-  const markup = ventasDelMes != null && impliedCosts != null && impliedCosts > 0
-    ? Math.round((ventasDelMes / impliedCosts) * 100) / 100
+  // Markup correcto para períodos multi-mes: media armónica ponderada por ventas.
+  // markup_i = ventas_i / costos_directos_i  →  CD_i = ventas_i / markup_i
+  // Markup total = sum(ventas_i) / sum(CD_i) = sum(ventas_i) / sum(ventas_i / markup_i)
+  const totalDirectCosts = sorted.reduce((acc, m) => {
+    if (m.ventasDelMes != null && m.markup != null && m.markup > 0) {
+      return acc + m.ventasDelMes / m.markup;
+    }
+    return acc;
+  }, 0);
+  const markup = ventasDelMes != null && totalDirectCosts > 0
+    ? Math.round((ventasDelMes / totalDirectCosts) * 100) / 100
     : null;
 
   return {
