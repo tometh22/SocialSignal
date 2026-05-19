@@ -8,7 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, TrendingUp, TrendingDown, DollarSign, BarChart3, Wallet, ArrowDown, ArrowUp, AlertTriangle, Lightbulb, Target, Shield } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { RefreshCw, TrendingUp, TrendingDown, DollarSign, BarChart3, Wallet, ArrowDown, ArrowUp, AlertTriangle, Lightbulb, Target, Shield, Info } from "lucide-react";
 import { ResponsiveContainer, AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RTooltip, Legend, ReferenceLine, ComposedChart, Line } from "recharts";
 
 const MONTHS = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
@@ -196,20 +197,54 @@ export default function ExecutiveDashboardV2() {
           </div>
 
           {/* KPI Cards */}
+          <TooltipProvider delayDuration={200}>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
             {[
-              { label: "EBIT Operativo", value: fmt(d.ebitOperativo), pct: fmtPct(d.margenOperativo), color: kpiColor(d.ebitOperativo, 0), icon: TrendingUp },
-              { label: viewMode === "quarter" ? "Ventas del Trimestre" : viewMode === "year" ? "Ventas del Año" : viewMode === "custom" ? "Ventas del Período" : "Ventas del Mes", value: fmt(d.ventasDelMes), pct: null, color: "text-emerald-700", icon: DollarSign },
-              { label: "Cashflow", value: fmt(d.cashflow), pct: null, color: kpiColor(d.cashflow, 0), icon: d.cashflow && d.cashflow >= 0 ? ArrowUp : ArrowDown },
-              { label: "Margen Neto", value: fmtPct(d.margenNeto), pct: null, color: kpiColor(d.margenNeto, 15), icon: BarChart3 },
-              { label: "Markup", value: d.markup != null ? d.markup.toFixed(2) : "—", pct: null, color: kpiColor(d.markup, 2.5), icon: TrendingUp },
-              { label: "Beneficio Neto", value: fmt(d.beneficioNeto), pct: null, color: kpiColor(d.beneficioNeto, 0), icon: Wallet },
+              {
+                label: "EBIT Operativo",
+                value: fmt(d.ebitOperativo), pct: fmtPct(d.margenOperativo),
+                color: kpiColor(d.ebitOperativo, 0), icon: TrendingUp,
+                tooltip: "Ventas − Costos directos e indirectos. Mide la rentabilidad operativa antes de impuestos. Objetivo: >15% de margen.",
+              },
+              {
+                label: viewMode === "quarter" ? "Ventas del Trimestre" : viewMode === "year" ? "Ventas del Año" : viewMode === "custom" ? "Ventas del Período" : "Ventas del Mes",
+                value: fmt(d.ventasDelMes), pct: null, color: "text-emerald-700", icon: DollarSign,
+                tooltip: "Total facturado sin IVA en el período seleccionado. Fuente: columna 'Ventas del mes' del sheet Resumen Ejecutivo.",
+              },
+              {
+                label: "Cashflow",
+                value: fmt(d.cashflow), pct: null, color: kpiColor(d.cashflow, 0),
+                icon: d.cashflow && d.cashflow >= 0 ? ArrowUp : ArrowDown,
+                tooltip: "Dinero que realmente entró y salió de la cuenta en el período. Puede ser mayor al Beneficio Neto por cobros de facturas anteriores o anticipos de clientes.",
+              },
+              {
+                label: "Margen Neto",
+                value: fmtPct(d.margenNeto), pct: null, color: kpiColor(d.margenNeto, 15), icon: BarChart3,
+                tooltip: "Beneficio Neto / Ventas × 100. Porcentaje de cada dólar de venta que queda como ganancia final después de todos los costos e impuestos.",
+              },
+              {
+                label: "Markup",
+                value: d.markup != null ? d.markup.toFixed(2) : "—", pct: null, color: kpiColor(d.markup, 2.5), icon: TrendingUp,
+                tooltip: "Ventas / Costos Directos del equipo. Indica cuántas veces los ingresos superan el costo directo. Estándar Epical: ≥2.5x. Excelente: ≥3.0x.",
+              },
+              {
+                label: "Beneficio Neto",
+                value: fmt(d.beneficioNeto), pct: null, color: kpiColor(d.beneficioNeto, 0), icon: Wallet,
+                tooltip: "EBIT − Impuestos. Ganancia final del período después de todos los costos e impuestos. Equivale al Margen Neto aplicado sobre las ventas.",
+              },
             ].map((kpi, i) => (
               <Card key={i} className="relative overflow-hidden">
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{kpi.label}</span>
-                    <kpi.icon className="h-4 w-4 text-slate-300" />
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="h-3.5 w-3.5 text-slate-300 hover:text-slate-500 cursor-help flex-shrink-0" />
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" className="max-w-[220px] text-xs leading-snug">
+                        {kpi.tooltip}
+                      </TooltipContent>
+                    </Tooltip>
                   </div>
                   <div className={`text-xl font-bold tabular-nums ${kpi.color}`}>{kpi.value}</div>
                   {kpi.pct && <div className="text-xs text-muted-foreground mt-0.5">{kpi.pct}</div>}
@@ -217,6 +252,7 @@ export default function ExecutiveDashboardV2() {
               </Card>
             ))}
           </div>
+          </TooltipProvider>
 
           {/* P&L + Balance */}
           <div className="grid lg:grid-cols-2 gap-6">
@@ -228,15 +264,26 @@ export default function ExecutiveDashboardV2() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
+                <TooltipProvider delayDuration={200}>
                 {[
-                  { label: viewMode === "quarter" ? "Ventas del trimestre" : viewMode === "year" ? "Ventas del año" : viewMode === "custom" ? "Ventas del período" : "Ventas del mes", value: d.ventasDelMes, bold: false, pct: 100 },
-                  { label: "– Costos (implícito)", value: d.ventasDelMes != null && d.ebitOperativo != null ? -(d.ventasDelMes - d.ebitOperativo) : null, bold: false, pct: d.ventasDelMes ? ((d.ventasDelMes - (d.ebitOperativo || 0)) / d.ventasDelMes * 100) : null, negative: true },
-                  { label: "= EBIT Operativo", value: d.ebitOperativo, bold: true, pct: d.margenOperativo },
-                  { label: "– Impuestos (impl.)", value: d.ebitOperativo != null && d.beneficioNeto != null ? -(d.ebitOperativo - d.beneficioNeto) : null, bold: false, negative: true },
-                  { label: "= Beneficio Neto", value: d.beneficioNeto, bold: true, pct: d.margenNeto },
+                  { label: viewMode === "quarter" ? "Ventas del trimestre" : viewMode === "year" ? "Ventas del año" : viewMode === "custom" ? "Ventas del período" : "Ventas del mes", value: d.ventasDelMes, bold: false, pct: 100, tooltip: "Total facturado sin IVA en el período." },
+                  { label: "– Costos (implícito)", value: d.ventasDelMes != null && d.ebitOperativo != null ? -(d.ventasDelMes - d.ebitOperativo) : null, bold: false, pct: d.ventasDelMes ? ((d.ventasDelMes - (d.ebitOperativo || 0)) / d.ventasDelMes * 100) : null, negative: true, tooltip: "Ventas − EBIT. Incluye costos directos del equipo + costos indirectos de operación." },
+                  { label: "= EBIT Operativo", value: d.ebitOperativo, bold: true, pct: d.margenOperativo, tooltip: "Earnings Before Interest & Taxes. Resultado operativo antes de impuestos." },
+                  { label: "– Impuestos (impl.)", value: d.ebitOperativo != null && d.beneficioNeto != null ? -(d.ebitOperativo - d.beneficioNeto) : null, bold: false, negative: true, tooltip: "EBIT − Beneficio Neto. Provisión impositiva del período (impuestos USA y locales)." },
+                  { label: "= Beneficio Neto", value: d.beneficioNeto, bold: true, pct: d.margenNeto, tooltip: "Ganancia final después de todos los costos e impuestos." },
                 ].map((row, i) => (
                   <div key={i} className={`flex items-center justify-between py-2 px-3 rounded ${row.bold ? "bg-slate-50 border font-semibold" : ""}`}>
-                    <span className={`text-sm ${row.bold ? "" : "text-muted-foreground"}`}>{row.label}</span>
+                    <div className="flex items-center gap-1.5">
+                      <span className={`text-sm ${row.bold ? "" : "text-muted-foreground"}`}>{row.label}</span>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Info className="h-3 w-3 text-slate-300 hover:text-slate-500 cursor-help flex-shrink-0" />
+                        </TooltipTrigger>
+                        <TooltipContent side="right" className="max-w-[200px] text-xs leading-snug">
+                          {row.tooltip}
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
                     <div className="flex items-center gap-3">
                       <span className={`text-sm tabular-nums ${row.negative ? "text-red-500" : kpiColor(row.value, 0)}`}>
                         {row.value != null ? fmt(Math.abs(row.value)) : "—"}
@@ -247,6 +294,7 @@ export default function ExecutiveDashboardV2() {
                     </div>
                   </div>
                 ))}
+                </TooltipProvider>
               </CardContent>
             </Card>
 
@@ -259,21 +307,33 @@ export default function ExecutiveDashboardV2() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2">
+                  <TooltipProvider delayDuration={200}>
                   {[
-                    { label: "Activo Líquido", value: d.activoLiquido },
-                    { label: "Activo M.P. Crypto", value: d.activoMedPlazo },
-                    { label: "Clientes a Cobrar", value: d.clientesACobrar },
-                    { label: "Activo Total", value: d.activoTotal, bold: true },
-                    { label: "Pasivo Total", value: d.pasivoTotal, bold: true, negative: true },
-                    { label: "Patrimonio Neto (Activo − Pasivo)", value: d.balanceNeto, bold: true },
+                    { label: "Activo Líquido", value: d.activoLiquido, tooltip: "Saldo de cuentas bancarias y Transferwise. Dinero disponible inmediatamente." },
+                    { label: "Activo M.P. Crypto", value: d.activoMedPlazo, tooltip: "Saldo en criptomonedas valuado en USD." },
+                    { label: "Clientes a Cobrar", value: d.clientesACobrar, tooltip: "Facturas emitidas no cobradas aún. Incluye facturación del mes + meses anteriores pendientes de cobro." },
+                    { label: "Activo Total", value: d.activoTotal, bold: true, tooltip: "Activo Líquido + Crypto + Clientes a Cobrar." },
+                    { label: "Pasivo Total", value: d.pasivoTotal, bold: true, negative: true, tooltip: "Deudas de la empresa: impuestos USA, proveedores a pagar y facturación adelantada de clientes." },
+                    { label: "Patrimonio Neto (Activo − Pasivo)", value: d.balanceNeto, bold: true, tooltip: "Activo Total − Pasivo Total. El valor neto de la empresa. Incluye utilidades de todos los períodos, no solo el actual." },
                   ].map((row, i) => (
-                    <div key={i} className={`flex justify-between py-1.5 px-3 rounded text-sm ${row.bold ? "bg-slate-50 border font-semibold" : ""}`}>
-                      <span className={row.bold ? "" : "text-muted-foreground"}>{row.label}</span>
+                    <div key={i} className={`flex justify-between items-center py-1.5 px-3 rounded text-sm ${row.bold ? "bg-slate-50 border font-semibold" : ""}`}>
+                      <div className="flex items-center gap-1.5">
+                        <span className={row.bold ? "" : "text-muted-foreground"}>{row.label}</span>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Info className="h-3 w-3 text-slate-300 hover:text-slate-500 cursor-help flex-shrink-0" />
+                          </TooltipTrigger>
+                          <TooltipContent side="right" className="max-w-[210px] text-xs leading-snug">
+                            {row.tooltip}
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
                       <span className={`tabular-nums ${row.negative ? "text-red-500" : kpiColor(row.value, 0)}`}>
                         {fmt(row.value)}
                       </span>
                     </div>
                   ))}
+                  </TooltipProvider>
                 </CardContent>
               </Card>
 
