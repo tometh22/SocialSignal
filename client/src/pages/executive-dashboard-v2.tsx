@@ -265,7 +265,7 @@ export default function ExecutiveDashboardV2() {
                     { label: "Clientes a Cobrar", value: d.clientesACobrar },
                     { label: "Activo Total", value: d.activoTotal, bold: true },
                     { label: "Pasivo Total", value: d.pasivoTotal, bold: true, negative: true },
-                    { label: "Balance Neto", value: d.balanceNeto, bold: true },
+                    { label: "Patrimonio Neto (Activo − Pasivo)", value: d.balanceNeto, bold: true },
                   ].map((row, i) => (
                     <div key={i} className={`flex justify-between py-1.5 px-3 rounded text-sm ${row.bold ? "bg-slate-50 border font-semibold" : ""}`}>
                       <span className={row.bold ? "" : "text-muted-foreground"}>{row.label}</span>
