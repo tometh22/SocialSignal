@@ -5581,15 +5581,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // 📊 DIRECT SHEETS DASHBOARD - reads from Google Sheets in real-time (like Looker Studio)
   app.get("/api/v2/executive/dashboard", requireAuth, async (req, res) => {
     try {
-      const yearParsed = req.query.year ? parseInt(req.query.year as string) : undefined;
-      const monthParsed = req.query.month ? parseInt(req.query.month as string) : undefined;
-      const quarterParsed = req.query.quarter ? parseInt(req.query.quarter as string) : undefined;
-      const year = yearParsed !== undefined && !isNaN(yearParsed) ? yearParsed : undefined;
-      const month = monthParsed !== undefined && !isNaN(monthParsed) ? monthParsed : undefined;
-      const quarter = quarterParsed !== undefined && !isNaN(quarterParsed) ? quarterParsed : undefined;
+      const p = (k: string) => { const v = parseInt(req.query[k] as string); return isNaN(v) ? undefined : v; };
+      const year = p('year');
+      const month = p('month');
+      const quarter = p('quarter');
       const yearTotal = req.query.yearTotal === 'true';
+      const startYear = p('startYear');
+      const startMonth = p('startMonth');
+      const endYear = p('endYear');
+      const endMonth = p('endMonth');
       const { fetchResumenEjecutivoDirectly } = await import('./services/direct-sheets-dashboard');
-      const result = await fetchResumenEjecutivoDirectly(year, month, quarter, yearTotal);
+      const result = await fetchResumenEjecutivoDirectly(year, month, quarter, yearTotal, startYear, startMonth, endYear, endMonth);
       res.json(result);
     } catch (error: any) {
       console.error('❌ Direct sheets dashboard error:', error?.message || error);
