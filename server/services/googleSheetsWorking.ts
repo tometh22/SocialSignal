@@ -2149,6 +2149,12 @@ class GoogleSheetsWorkingService {
       'proyeccion resultado': 'proyeccionResultado',
       'balance 60 días': 'balance60Dias',
       'balance 60 dias': 'balance60Dias',
+      'cashflow+60dias': 'balance60Dias',
+      'cashflow +60 dias': 'balance60Dias',
+      'cash flow+60dias': 'balance60Dias',
+      'cash flow +60 dias': 'balance60Dias',
+      'cashflow+60 dias': 'balance60Dias',
+      'chasflow+60dias': 'balance60Dias',
     };
     
     // Normalize accented characters for comparison
@@ -2176,6 +2182,8 @@ class GoogleSheetsWorkingService {
       { keywords: ['beneficio', 'neto'], field: 'beneficioNeto' },
       { keywords: ['resultado', 'neto'], field: 'beneficioNeto' },
       { keywords: ['utilidad', 'neta'], field: 'beneficioNeto' },
+      { keywords: ['cashflow', '60'], field: 'balance60Dias' },
+      { keywords: ['chasflow', '60'], field: 'balance60Dias' },
       { keywords: ['cashflow'], field: 'cashflowNeto' },
       { keywords: ['chasflow'], field: 'cashflowNeto' },
       { keywords: ['flujo', 'caja'], field: 'cashflowNeto' },
