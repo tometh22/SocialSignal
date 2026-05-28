@@ -48,12 +48,12 @@ function getProjectLabel(project: TaskProject) {
   return null;
 }
 
-function ProgressBar({ done, total }: { done: number; total: number }) {
-  const completedPct = total === 0 ? 0 : Math.round(((total - done) / total) * 100);
+function ProgressBar({ pending, total }: { pending: number; total: number }) {
+  const completedPct = total === 0 ? 0 : Math.round(((total - pending) / total) * 100);
   return (
     <div className="space-y-1">
       <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-        <span>{total - done} completadas</span>
+        <span>{total - pending} completadas</span>
         <span className="font-medium">{completedPct}%</span>
       </div>
       <div className="h-1 rounded-full bg-muted overflow-hidden">
@@ -123,7 +123,7 @@ function ProjectCard({ project, myPersonnelId, onJoin, onLeave, joining, leaving
         </div>
 
         {project.taskCount > 0 && (
-          <ProgressBar done={project.pendingCount} total={project.taskCount} />
+          <ProgressBar pending={project.pendingCount} total={project.taskCount} />
         )}
 
         <div className="flex items-center gap-3 text-[11px] text-muted-foreground">

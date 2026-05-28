@@ -1546,7 +1546,7 @@ export const insertTaskSchema = createInsertSchema(tasks).omit({
   dueDate: z.union([z.date(), z.string().transform((str) => new Date(str))]).optional().nullable(),
   completedAt: z.union([z.date(), z.string().transform((str) => new Date(str))]).optional().nullable(),
   collaboratorIds: z.array(z.number()).optional().default([]),
-  status: z.enum(["todo", "in_progress", "done", "cancelled"]).default("todo"),
+  status: z.enum(["todo", "in_progress", "in_review", "blocked", "done", "cancelled"]).default("todo"),
   priority: z.enum(["low", "medium", "high", "urgent"]).default("medium"),
 });
 

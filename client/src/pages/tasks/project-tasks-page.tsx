@@ -216,7 +216,7 @@ export default function ProjectTasksPage({ params }: Props) {
                   {(project.clientName || project.name || "P").charAt(0).toUpperCase()}
                 </span>
                 <div className="min-w-0">
-                  <Link href="/tasks" className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 mb-0.5">
+                  <Link href="/tasks/projects" className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 mb-0.5">
                     <ChevronLeft className="h-3 w-3" />Proyectos
                   </Link>
                   <div className="flex items-center gap-2">
@@ -281,7 +281,7 @@ export default function ProjectTasksPage({ params }: Props) {
                   )}
                 </div>
 
-                {isOperations && projectId < 1_000_000 && (
+                {isOperations && projectId < 1_000_000 /* active_project */ && (
                   <Link href={`/active-projects/${projectId}`}>
                     <Button
                       variant="outline"

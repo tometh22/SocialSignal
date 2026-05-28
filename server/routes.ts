@@ -17335,6 +17335,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ==================== MÓDULO DE GESTIÓN DE TAREAS ====================
+  const OWN_PROJECT_OFFSET = 1_000_000;
 
   // GET /api/tasks — lista filtrable
   app.get("/api/tasks", requireAuth, async (req: Request, res: Response) => {
@@ -17407,6 +17408,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         JOIN clients c ON c.id = ap.client_id
       `);
       const projectMap = new Map((projectsWithNames.rows as any[]).map(p => [p.id, { name: p.project_name, client: p.client_name }]));
+
+      // Also enrich standalone task projects
+      const ownProjectNames = await db.execute(sql`SELECT id, name FROM task_own_projects`);
+      for (const p of ownProjectNames.rows as any[]) {
+        projectMap.set(p.id + OWN_PROJECT_OFFSET, { name: p.name, client: null });
+      }
       const personnelMap = new Map(allPersonnel.map(p => [p.id, p.name]));
 
       const enriched = result.map(t => ({
@@ -17458,8 +17465,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { projectId, oldName, newName } = req.body;
       if (!projectId || !oldName || !newName) return res.status(400).json({ message: "Faltan datos" });
+      const trimmedNew = newName.trim();
+      if (trimmedNew === oldName) return res.json({ message: "Sin cambios" });
+
+      // Warn if target section already exists (tasks would merge)
+      const [conflict] = await db
+        .select({ id: tasks.id })
+        .from(tasks)
+        .where(and(eq(tasks.projectId, parseInt(projectId)), eq(tasks.sectionName, trimmedNew)))
+        .limit(1);
+      if (conflict) {
+        return res.status(409).json({
+          message: `Ya existe una sección llamada "${trimmedNew}". Renombrá a un nombre distinto para evitar fusionar las tareas.`,
+        });
+      }
+
       await db.update(tasks)
-        .set({ sectionName: newName.trim() })
+        .set({ sectionName: trimmedNew })
         .where(and(eq(tasks.projectId, parseInt(projectId)), eq(tasks.sectionName, oldName)));
       res.json({ message: "Sección renombrada" });
     } catch (error) {
@@ -17697,7 +17719,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/tasks/:id(\\d+)", requireAuth, async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
-      await db.delete(tasks).where(eq(tasks.id, parseInt(id)));
+      const taskId = parseInt(id);
+
+      // Check for parent before deletion (cascade will remove time entries)
+      const [taskToDelete] = await db
+        .select({ parentTaskId: tasks.parentTaskId })
+        .from(tasks)
+        .where(eq(tasks.id, taskId));
+
+      await db.delete(tasks).where(eq(tasks.id, taskId));
+
+      // If it was a subtask, recalculate parent's loggedHours
+      if (taskToDelete?.parentTaskId) {
+        const parentTotal = await db.execute(sql`
+          SELECT COALESCE(SUM(tte.hours), 0) as total
+          FROM task_time_entries tte
+          JOIN tasks t ON t.id = tte.task_id
+          WHERE t.id = ${taskToDelete.parentTaskId} OR t.parent_task_id = ${taskToDelete.parentTaskId}
+        `);
+        const parentHours = parseFloat((parentTotal.rows[0] as any).total);
+        await db.update(tasks)
+          .set({ loggedHours: parentHours, updatedAt: new Date() })
+          .where(eq(tasks.id, taskToDelete.parentTaskId));
+      }
+
       res.json({ message: "Tarea eliminada" });
     } catch (error) {
       res.status(500).json({ message: "Error al eliminar tarea" });
@@ -17922,7 +17967,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           COUNT(DISTINCT t.id) as task_count,
           COUNT(DISTINCT CASE WHEN t.status NOT IN ('done', 'cancelled') THEN t.id END) as pending_count
         FROM task_own_projects top
-        LEFT JOIN tasks t ON t.project_id = (top.id + 1000000)
+        LEFT JOIN tasks t ON t.project_id = (top.id + ${OWN_PROJECT_OFFSET})
         GROUP BY top.id, top.name, top.color_index, top.privacy, top.created_by_personnel_id
         ORDER BY top.created_at DESC
       `);
@@ -17959,13 +18004,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }));
 
       const ownProjects = (ownProjectsResult.rows as any[]).map(p => ({
-        id: p.id + 1000000,
+        id: p.id + OWN_PROJECT_OFFSET,
         name: p.name,
         clientName: "—",
         status: 'active',
         taskCount: parseInt(p.task_count) || 0,
         pendingCount: parseInt(p.pending_count) || 0,
-        members: membersByProject[p.id + 1000000] || [],
+        members: membersByProject[p.id + OWN_PROJECT_OFFSET] || [],
         source: 'own',
         colorIndex: p.color_index,
       }));
@@ -18000,7 +18045,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         RETURNING id
       `);
       const newId = (result.rows[0] as any).id;
-      const offsetId = newId + 1000000;
+      const offsetId = newId + OWN_PROJECT_OFFSET;
 
       // Auto-add creator as owner member
       if (personnelId) {
@@ -18022,12 +18067,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/tasks/projects/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const projectId = parseInt(req.params.id);
-      const isOwnProject = projectId >= 1000000;
+      const isOwnProject = projectId >= OWN_PROJECT_OFFSET;
 
       let projectRow: any;
 
       if (isOwnProject) {
-        const realId = projectId - 1000000;
+        const realId = projectId - OWN_PROJECT_OFFSET;
         const ownResult = await db.execute(sql`
           SELECT id, name, color_index, privacy, created_by_personnel_id
           FROM task_own_projects
@@ -18094,6 +18139,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error en GET /api/tasks/projects/:id:", error);
       res.status(500).json({ message: "Error al obtener proyecto" });
+    }
+  });
+
+  // PUT /api/tasks/projects/:id — actualizar estado del proyecto
+  app.put("/api/tasks/projects/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.id);
+      const { status } = req.body;
+      if (!status) return res.status(400).json({ message: "status requerido" });
+
+      if (projectId < OWN_PROJECT_OFFSET) {
+        await db.execute(sql`UPDATE active_projects SET status = ${status} WHERE id = ${projectId}`);
+      }
+      // Own projects don't have a persistent status field — no-op
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error en PUT /api/tasks/projects/:id:", error);
+      res.status(500).json({ message: "Error al actualizar proyecto" });
     }
   });
 

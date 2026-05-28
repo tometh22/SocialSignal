@@ -25,6 +25,7 @@ type Task = {
   projectName?: string | null;
   clientName?: string | null;
   assigneeId?: number | null;
+  createdBy?: number | null;
 };
 
 type TaskProject = {
@@ -393,6 +394,7 @@ export default function TasksHomePage() {
   });
 
   const assignedByMe = allTasks.filter(t =>
+    user && t.createdBy === user.id &&
     myPersonnel && t.assigneeId && t.assigneeId !== myPersonnel.id
   );
   const assignedCounts = {
