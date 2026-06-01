@@ -166,13 +166,16 @@ export async function getCostsForPeriod(
     console.log(`💱 COSTS SoT: Using FX ${fxRate} for period ${period}`);
     result.projects = applyPeriodReconciler(result.projects, period, fxRate);
     
-    // 6. Recalculate portfolio total after overrides
-    result.portfolioCostUSD = result.projects.reduce(
-      (sum, p) => sum + p.costUSDNormalized, 
-      0
-    );
-    
-    console.log(`✅ COSTS SoT: Returned ${result.projects.length} projects, total ${result.portfolioCostUSD.toFixed(2)} USD`);
+    // 6. Recalculate direct-only totals after reconciler overrides.
+    // El reconciler solo modifica proyectos directos; preservamos el overhead.
+    // Se captura el indirecto ANTES de actualizar directCostsTotalUSD.
+    const originalDirectTotal = result.directCostsTotalUSD;
+    const indirectTotal = result.portfolioCostUSD - originalDirectTotal;
+    const reconciledDirectTotal = result.projects.reduce((sum, p) => sum + p.costUSDNormalized, 0);
+    result.directCostsTotalUSD = reconciledDirectTotal;
+    result.portfolioCostUSD = reconciledDirectTotal + Math.max(0, indirectTotal);
+
+    console.log(`✅ COSTS SoT: Returned ${result.projects.length} projects, directUSD=${result.directCostsTotalUSD.toFixed(2)}, portfolioUSD=${result.portfolioCostUSD.toFixed(2)}`);
     
     return result;
     
@@ -351,17 +354,17 @@ export async function validateCostSystem(period: PeriodKey): Promise<boolean> {
     const portfolioResult = await getPortfolioCosts(period);
     console.log(`✅ Test 2: Portfolio costs - ${portfolioResult.portfolioCostUSD.toFixed(2)} USD`);
     
-    // Test 3: Validate totals match
-    const calculatedTotal = periodResult.projects.reduce((sum, p) => sum + p.costUSDNormalized, 0);
+    // Test 3: Validate that direct costs sum equals directCostsTotalUSD
+    const calculatedDirect = periodResult.projects.reduce((sum, p) => sum + p.costUSDNormalized, 0);
     const tolerance = 0.01;
-    const totalsMatch = Math.abs(calculatedTotal - portfolioResult.portfolioCostUSD) < tolerance;
-    
+    const totalsMatch = Math.abs(calculatedDirect - periodResult.directCostsTotalUSD) < tolerance;
+
     if (!totalsMatch) {
-      console.error(`❌ Test 3: Totals mismatch - Period: ${calculatedTotal}, Portfolio: ${portfolioResult.portfolioCostUSD}`);
+      console.error(`❌ Test 3: Direct costs mismatch - projects.sum: ${calculatedDirect}, directCostsTotalUSD: ${periodResult.directCostsTotalUSD}`);
       return false;
     }
-    
-    console.log(`✅ Test 3: Totals match within tolerance`);
+
+    console.log(`✅ Test 3: Direct costs match. Portfolio (with overhead): ${periodResult.portfolioCostUSD.toFixed(2)} USD`);
     
     console.log(`🎉 COSTS VALIDATION: All tests passed for ${period}`);
     return true;

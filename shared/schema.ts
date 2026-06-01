@@ -2552,7 +2552,10 @@ export const projectMetricsSchema = z.object({
   revenueUSDNormalized: z.number(),                    // Amount normalized to USD for ALL calculations
   revenueDisplay: moneyDisplaySchema.optional(),       // Structured display: {amount, currency}
   costUSDNormalized: z.number().optional(),            // Amount normalized to USD for calculations
-  costDisplay: moneyDisplaySchema.optional()           // Structured display: {amount, currency}
+  costDisplay: moneyDisplaySchema.optional(),          // Structured display: {amount, currency}
+
+  // 🕐 VALOR HORA REAL: ARS promedio ponderado del período (costARS / asanaHours)
+  avgHourlyRateARS: z.number().nullable().optional()
 });
 
 export type ProjectMetrics = z.infer<typeof projectMetricsSchema>;
@@ -3037,7 +3040,10 @@ export const factLaborMonth = pgTable("fact_labor_month", {
   projectKey: varchar("project_key", { length: 255 }),
   personKey: varchar("person_key", { length: 255 }),
   
-  // 3 tipos de horas
+  // 3 tipos de horas — uso canónico:
+  //   targetHours  → planificadas en cotización (eficiencia: asana / target)
+  //   asanaHours   → reales registradas en Asana (campo oficial de "horas trabajadas")
+  //   billingHours → facturables al cliente (puede diferir de Asana)
   targetHours: numeric("target_hours", { precision: 10, scale: 2 }).default('0'),
   asanaHours: numeric("asana_hours", { precision: 10, scale: 2 }).default('0'),
   billingHours: numeric("billing_hours", { precision: 10, scale: 2 }).default('0'),
@@ -3053,6 +3059,8 @@ export const factLaborMonth = pgTable("fact_labor_month", {
   
   // Flags y metadata
   flags: jsonb("flags").default([]),
+  // true cuando personId es NULL y no se pudo resolver la persona desde el Excel
+  unresolvedPerson: boolean("unresolved_person").notNull().default(false),
   sourceRowId: text("source_row_id"),
   loadedAt: timestamp("loaded_at").notNull().defaultNow(),
 }, (table) => ({

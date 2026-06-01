@@ -30,7 +30,7 @@ import { convertToUsd, extractPeriod } from "../utils/fx";
 import { monthKeyFromSpanish } from "../services/dates";
 import type { IStorage } from "../storage";
 import { db } from "../db";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import { CoverageCalculator } from "./coverage";
 import { aggregateIncome, type DualNormalizedIncome } from "../services/sales";
 import { aggregateFinancialProjects } from "./financial-aggregator";
@@ -82,6 +82,14 @@ interface CostRecord {
   costUSDNormalized?: number;
 }
 
+// Horas y valor hora del período, agregadas desde fact_labor_month por proyecto
+interface LaborHoursData {
+  asanaHours: number;          // Horas reales Asana (campo canónico "horas trabajadas")
+  targetHours: number;         // Horas planificadas en cotización
+  billingHours: number;        // Horas facturables
+  avgHourlyRateARS: number | null; // Valor hora promedio ponderado (costARS / asanaHours)
+}
+
 interface ProjectData {
   projectId: number;
   clientId: number;
@@ -121,10 +129,15 @@ export class ActiveProjectsAggregator {
     const allProjects = await this.storage.getActiveProjects();
     console.log(`📊 Base projects retrieved: ${allProjects.length}`);
 
-    // 3. Get unified data from Excel MAESTRO sources
-    const salesData = await this.getSalesInPeriod(period);
-    const costsData = await this.getCostsInPeriod(period);
-    console.log(`📊 Data retrieved: ${salesData.length} sales records, ${costsData.length} cost records`);
+    const monthKey = period.start.substring(0, 7); // "2025-08-01" → "2025-08"
+
+    // 3. Obtener datos en paralelo: ventas, costos y horas reales de fact_labor_month
+    const [salesData, costsData, laborHoursMap] = await Promise.all([
+      this.getSalesInPeriod(period),
+      this.getCostsInPeriod(period),
+      this.fetchLaborHoursByProject(monthKey),
+    ]);
+    console.log(`📊 Data retrieved: ${salesData.length} sales, ${costsData.length} costs, ${laborHoursMap.size} labor projects`);
 
     // 3b. 🎯 ONE-SHOT SPECIAL LOGIC: Add one-shot projects with lifetime revenue even if not in current period
     console.log(`🎯 ONE-SHOT TRIGGER: About to call addOneShotProjectsLifetime for period ${period.start}`);
@@ -136,7 +149,7 @@ export class ActiveProjectsAggregator {
     console.log(`📊 Projects merged: ${projectsData.length} with data, ${orphanRows} orphan rows (debug only)`);
 
     // 5. Calculate metrics for each project - exact formulas
-    const projectItems = await this.calculateProjectMetrics(projectsData, period);
+    const projectItems = await this.calculateProjectMetrics(projectsData, period, laborHoursMap);
     console.log(`📊 Metrics calculated for ${projectItems.length} projects`);
 
     // 6. Filter by activity if requested
@@ -675,9 +688,49 @@ export class ActiveProjectsAggregator {
   }
 
   /**
+   * Consulta fact_labor_month para obtener horas y valor hora real por proyecto en el período.
+   * Retorna un Map keyed por projectId con asanaHours, targetHours, billingHours y avgHourlyRateARS.
+   */
+  private async fetchLaborHoursByProject(monthKey: string): Promise<Map<number, LaborHoursData>> {
+    const map = new Map<number, LaborHoursData>();
+    try {
+      const rows = await db
+        .select({
+          projectId: factLaborMonth.projectId,
+          asanaHours:   sql<string>`SUM(COALESCE(${factLaborMonth.asanaHours}::numeric, 0))`,
+          targetHours:  sql<string>`SUM(COALESCE(${factLaborMonth.targetHours}::numeric, 0))`,
+          billingHours: sql<string>`SUM(COALESCE(${factLaborMonth.billingHours}::numeric, 0))`,
+          totalCostARS: sql<string>`SUM(COALESCE(${factLaborMonth.costARS}::numeric, 0))`,
+        })
+        .from(factLaborMonth)
+        .where(eq(factLaborMonth.periodKey, monthKey))
+        .groupBy(factLaborMonth.projectId);
+
+      for (const row of rows) {
+        const asana = parseFloat(row.asanaHours) || 0;
+        const costARS = parseFloat(row.totalCostARS) || 0;
+        map.set(row.projectId, {
+          asanaHours:   asana,
+          targetHours:  parseFloat(row.targetHours) || 0,
+          billingHours: parseFloat(row.billingHours) || 0,
+          avgHourlyRateARS: asana > 0 ? costARS / asana : null,
+        });
+      }
+      console.log(`⏱️ LABOR HOURS: Cargados ${map.size} proyectos con horas reales para ${monthKey}`);
+    } catch (error) {
+      console.error(`❌ LABOR HOURS: Error fetching labor hours for ${monthKey}:`, error);
+    }
+    return map;
+  }
+
+  /**
    * Calculate metrics for each project using exact formulas from blueprint
    */
-  private async calculateProjectMetrics(projectsData: ProjectData[], period: ResolvedPeriod): Promise<ActiveProjectItem[]> {
+  private async calculateProjectMetrics(
+    projectsData: ProjectData[],
+    period: ResolvedPeriod,
+    laborHoursMap: Map<number, LaborHoursData>
+  ): Promise<ActiveProjectItem[]> {
     const projectItems: ActiveProjectItem[] = [];
     
     console.log(`🚀 CALCULATE METRICS: Starting with ${projectsData.length} projects`);
@@ -689,8 +742,11 @@ export class ActiveProjectsAggregator {
       const revenueUSD = revenueUSDNormalized; // Backward compatibility
       const costUSDNormalized = projectData.costs.reduce((sum, cost) => sum + (cost.costUSDNormalized || cost.costUSD), 0);
       const costUSD = costUSDNormalized; // Backward compatibility
-      const workedHours = projectData.costs.reduce((sum, cost) => sum + cost.hoursReal, 0);
-      const targetHours = projectData.costs.reduce((sum, cost) => sum + cost.hoursTarget, 0);
+
+      // Horas desde fact_labor_month (asanaHours = horas reales canónicas)
+      const laborData = laborHoursMap.get(projectData.projectId);
+      const workedHours = laborData?.asanaHours ?? 0;
+      const targetHours = laborData?.targetHours ?? 0;
 
       // Calculate derived metrics - USING USD NORMALIZED (PLAN QUIRÚRGICO)
       const profitUSD = (revenueUSDNormalized ?? 0) - (costUSD ?? 0);
@@ -710,10 +766,11 @@ export class ActiveProjectsAggregator {
       }
 
       // Calculate flags - USING USD NORMALIZED
+      // hasHours usa workedHours de fact_labor_month (asanaHours reales), no de financial_sot
       const flags: ProjectFlags = {
         hasSales: (revenueUSDNormalized ?? 0) > 0,
         hasCosts: (costUSD ?? 0) > 0,
-        hasHours: (workedHours ?? 0) > 0
+        hasHours: workedHours > 0
       };
 
       // 🚀 EXTRACT DUAL CURRENCY FIELDS from sales
@@ -766,6 +823,8 @@ export class ActiveProjectsAggregator {
         workedHours,
         targetHours,
         efficiencyFrac,
+        // Valor hora real ARS del período (ponderado por costARS / asanaHours)
+        avgHourlyRateARS: laborData?.avgHourlyRateARS ?? null,
         // 🚀 STRUCTURED DISPLAY following user suggestions
         revenueDisplay: displayCurrency ? { amount: revenueDisplay, currency: displayCurrency } : undefined,
         costDisplay: costDisplayCurrency ? { amount: costDisplayAmount, currency: costDisplayCurrency } : undefined
