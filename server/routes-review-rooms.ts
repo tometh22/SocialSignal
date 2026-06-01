@@ -386,82 +386,128 @@ export function createReviewRoomsRouter(requireAuth: RequireAuth): Router {
       const roomId = req.roomMember!.roomId;
       const userId = req.user!.id;
       const includeHidden = req.query.includeHidden === 'true';
+      const whereConditions = and(
+        eq(projectStatusReviews.roomId, roomId),
+        ...(includeHidden ? [] : [sql`(${projectStatusReviews.hiddenFromWeekly} IS NOT TRUE)`]),
+      );
 
-      const rows = await db
-        .select({
-          projectId: activeProjects.id,
-          status: activeProjects.status,
-          quotationId: activeProjects.quotationId,
-          clientId: activeProjects.clientId,
-          clientName: clients.name,
-          quotationName: quotations.projectName,
-          trackingFrequency: activeProjects.trackingFrequency,
-          startDate: activeProjects.startDate,
-          expectedEndDate: activeProjects.expectedEndDate,
-          reviewId: projectStatusReviews.id,
-          healthStatus: projectStatusReviews.healthStatus,
-          marginStatus: projectStatusReviews.marginStatus,
-          teamStrain: projectStatusReviews.teamStrain,
-          mainRisk: projectStatusReviews.mainRisk,
-          currentAction: projectStatusReviews.currentAction,
-          nextMilestone: projectStatusReviews.nextMilestone,
-          nextMilestoneDate: projectStatusReviews.nextMilestoneDate,
-          deadline: projectStatusReviews.deadline,
-          ownerId: projectStatusReviews.ownerId,
-          decisionNeeded: projectStatusReviews.decisionNeeded,
-          hiddenFromWeekly: projectStatusReviews.hiddenFromWeekly,
-          reviewUpdatedAt: projectStatusReviews.updatedAt,
-          reviewUpdatedBy: projectStatusReviews.updatedBy,
-          noteCount: sql<number>`COALESCE((SELECT COUNT(*)::int FROM ${projectReviewNotes} WHERE ${projectReviewNotes.projectId} = ${activeProjects.id} AND ${projectReviewNotes.roomId} = ${roomId}), 0)`,
-          unreadCount: sql<number>`COALESCE((
-            SELECT COUNT(*)::int FROM ${projectReviewNotes}
-            WHERE ${projectReviewNotes.projectId} = ${activeProjects.id}
-              AND ${projectReviewNotes.roomId} = ${roomId}
-              AND ${projectReviewNotes.authorId} IS DISTINCT FROM ${userId}
-              AND ${projectReviewNotes.createdAt} > COALESCE(
-                (SELECT last_seen_at FROM ${reviewItemReadState}
-                 WHERE user_id = ${userId} AND target_kind = 'project' AND target_id = ${activeProjects.id}),
-                'epoch'::timestamp
-              )
-          ), 0)`,
-          lastNoteContent: sql<string | null>`(
-            SELECT content FROM ${projectReviewNotes}
-            WHERE ${projectReviewNotes.projectId} = ${activeProjects.id}
-              AND ${projectReviewNotes.roomId} = ${roomId}
-            ORDER BY created_at DESC LIMIT 1
-          )`,
-          lastNoteAt: sql<string | null>`(
-            SELECT created_at FROM ${projectReviewNotes}
-            WHERE ${projectReviewNotes.projectId} = ${activeProjects.id}
-              AND ${projectReviewNotes.roomId} = ${roomId}
-            ORDER BY created_at DESC LIMIT 1
-          )`,
-          lastNoteAuthorId: sql<number | null>`(
-            SELECT author_id FROM ${projectReviewNotes}
-            WHERE ${projectReviewNotes.projectId} = ${activeProjects.id}
-              AND ${projectReviewNotes.roomId} = ${roomId}
-            ORDER BY created_at DESC LIMIT 1
-          )`,
-          lastNoteAuthorName: sql<string | null>`(
-            SELECT ${users.firstName} || ' ' || ${users.lastName}
-            FROM ${projectReviewNotes}
-            LEFT JOIN ${users} ON ${users.id} = ${projectReviewNotes.authorId}
-            WHERE ${projectReviewNotes.projectId} = ${activeProjects.id}
-              AND ${projectReviewNotes.roomId} = ${roomId}
-            ORDER BY ${projectReviewNotes.createdAt} DESC LIMIT 1
-          )`,
-          ownerName: sql<string | null>`(SELECT ${users.firstName} || ' ' || ${users.lastName} FROM ${users} WHERE ${users.id} = ${projectStatusReviews.ownerId})`,
-          reviewUpdatedByName: sql<string | null>`(SELECT ${users.firstName} || ' ' || ${users.lastName} FROM ${users} WHERE ${users.id} = ${projectStatusReviews.updatedBy})`,
-        })
-        .from(projectStatusReviews)
-        .innerJoin(activeProjects, eq(activeProjects.id, projectStatusReviews.projectId))
-        .leftJoin(clients, eq(clients.id, activeProjects.clientId))
-        .leftJoin(quotations, eq(quotations.id, activeProjects.quotationId))
-        .where(and(
-          eq(projectStatusReviews.roomId, roomId),
-          ...(includeHidden ? [] : [sql`(${projectStatusReviews.hiddenFromWeekly} IS NOT TRUE)`]),
-        ))
-        .orderBy(asc(clients.name));
+      let rows: any[];
+      try {
+        rows = await db
+          .select({
+            projectId: activeProjects.id,
+            status: activeProjects.status,
+            quotationId: activeProjects.quotationId,
+            clientId: activeProjects.clientId,
+            clientName: clients.name,
+            quotationName: quotations.projectName,
+            trackingFrequency: activeProjects.trackingFrequency,
+            startDate: activeProjects.startDate,
+            expectedEndDate: activeProjects.expectedEndDate,
+            reviewId: projectStatusReviews.id,
+            healthStatus: projectStatusReviews.healthStatus,
+            marginStatus: projectStatusReviews.marginStatus,
+            teamStrain: projectStatusReviews.teamStrain,
+            mainRisk: projectStatusReviews.mainRisk,
+            currentAction: projectStatusReviews.currentAction,
+            nextMilestone: projectStatusReviews.nextMilestone,
+            nextMilestoneDate: projectStatusReviews.nextMilestoneDate,
+            deadline: projectStatusReviews.deadline,
+            ownerId: projectStatusReviews.ownerId,
+            decisionNeeded: projectStatusReviews.decisionNeeded,
+            hiddenFromWeekly: projectStatusReviews.hiddenFromWeekly,
+            reviewUpdatedAt: projectStatusReviews.updatedAt,
+            reviewUpdatedBy: projectStatusReviews.updatedBy,
+            noteCount: sql<number>`COALESCE((SELECT COUNT(*)::int FROM ${projectReviewNotes} WHERE ${projectReviewNotes.projectId} = ${activeProjects.id} AND ${projectReviewNotes.roomId} = ${roomId}), 0)`,
+            unreadCount: sql<number>`COALESCE((
+              SELECT COUNT(*)::int FROM ${projectReviewNotes}
+              WHERE ${projectReviewNotes.projectId} = ${activeProjects.id}
+                AND ${projectReviewNotes.roomId} = ${roomId}
+                AND ${projectReviewNotes.authorId} IS DISTINCT FROM ${userId}
+                AND ${projectReviewNotes.createdAt} > COALESCE(
+                  (SELECT last_seen_at FROM ${reviewItemReadState}
+                   WHERE user_id = ${userId} AND target_kind = 'project' AND target_id = ${activeProjects.id}),
+                  'epoch'::timestamp
+                )
+            ), 0)`,
+            lastNoteContent: sql<string | null>`(
+              SELECT content FROM ${projectReviewNotes}
+              WHERE ${projectReviewNotes.projectId} = ${activeProjects.id}
+                AND ${projectReviewNotes.roomId} = ${roomId}
+              ORDER BY created_at DESC LIMIT 1
+            )`,
+            lastNoteAt: sql<string | null>`(
+              SELECT created_at FROM ${projectReviewNotes}
+              WHERE ${projectReviewNotes.projectId} = ${activeProjects.id}
+                AND ${projectReviewNotes.roomId} = ${roomId}
+              ORDER BY created_at DESC LIMIT 1
+            )`,
+            lastNoteAuthorId: sql<number | null>`(
+              SELECT author_id FROM ${projectReviewNotes}
+              WHERE ${projectReviewNotes.projectId} = ${activeProjects.id}
+                AND ${projectReviewNotes.roomId} = ${roomId}
+              ORDER BY created_at DESC LIMIT 1
+            )`,
+            lastNoteAuthorName: sql<string | null>`(
+              SELECT ${users.firstName} || ' ' || ${users.lastName}
+              FROM ${projectReviewNotes}
+              LEFT JOIN ${users} ON ${users.id} = ${projectReviewNotes.authorId}
+              WHERE ${projectReviewNotes.projectId} = ${activeProjects.id}
+                AND ${projectReviewNotes.roomId} = ${roomId}
+              ORDER BY ${projectReviewNotes.createdAt} DESC LIMIT 1
+            )`,
+            ownerName: sql<string | null>`(SELECT ${users.firstName} || ' ' || ${users.lastName} FROM ${users} WHERE ${users.id} = ${projectStatusReviews.ownerId})`,
+            reviewUpdatedByName: sql<string | null>`(SELECT ${users.firstName} || ' ' || ${users.lastName} FROM ${users} WHERE ${users.id} = ${projectStatusReviews.updatedBy})`,
+          })
+          .from(projectStatusReviews)
+          .innerJoin(activeProjects, eq(activeProjects.id, projectStatusReviews.projectId))
+          .leftJoin(clients, eq(clients.id, activeProjects.clientId))
+          .leftJoin(quotations, eq(quotations.id, activeProjects.quotationId))
+          .where(whereConditions)
+          .orderBy(asc(clients.name));
+      } catch (queryErr) {
+        console.error('GET /items enhanced query failed, falling back:', queryErr);
+        rows = await db
+          .select({
+            projectId: activeProjects.id,
+            status: activeProjects.status,
+            quotationId: activeProjects.quotationId,
+            clientId: activeProjects.clientId,
+            clientName: clients.name,
+            quotationName: quotations.projectName,
+            trackingFrequency: activeProjects.trackingFrequency,
+            startDate: activeProjects.startDate,
+            expectedEndDate: activeProjects.expectedEndDate,
+            reviewId: projectStatusReviews.id,
+            healthStatus: projectStatusReviews.healthStatus,
+            marginStatus: projectStatusReviews.marginStatus,
+            teamStrain: projectStatusReviews.teamStrain,
+            mainRisk: projectStatusReviews.mainRisk,
+            currentAction: projectStatusReviews.currentAction,
+            nextMilestone: projectStatusReviews.nextMilestone,
+            nextMilestoneDate: projectStatusReviews.nextMilestoneDate,
+            deadline: projectStatusReviews.deadline,
+            ownerId: projectStatusReviews.ownerId,
+            decisionNeeded: projectStatusReviews.decisionNeeded,
+            hiddenFromWeekly: projectStatusReviews.hiddenFromWeekly,
+            reviewUpdatedAt: projectStatusReviews.updatedAt,
+            reviewUpdatedBy: projectStatusReviews.updatedBy,
+            noteCount: sql<number>`COALESCE((SELECT COUNT(*)::int FROM ${projectReviewNotes} WHERE ${projectReviewNotes.projectId} = ${activeProjects.id} AND ${projectReviewNotes.roomId} = ${roomId}), 0)`,
+            unreadCount: sql<number>`0`,
+            lastNoteContent: sql<string | null>`null`,
+            lastNoteAt: sql<string | null>`null`,
+            lastNoteAuthorId: sql<number | null>`null`,
+            lastNoteAuthorName: sql<string | null>`null`,
+            ownerName: sql<string | null>`(SELECT ${users.firstName} || ' ' || ${users.lastName} FROM ${users} WHERE ${users.id} = ${projectStatusReviews.ownerId})`,
+            reviewUpdatedByName: sql<string | null>`(SELECT ${users.firstName} || ' ' || ${users.lastName} FROM ${users} WHERE ${users.id} = ${projectStatusReviews.updatedBy})`,
+          })
+          .from(projectStatusReviews)
+          .innerJoin(activeProjects, eq(activeProjects.id, projectStatusReviews.projectId))
+          .leftJoin(clients, eq(clients.id, activeProjects.clientId))
+          .leftJoin(quotations, eq(quotations.id, activeProjects.quotationId))
+          .where(whereConditions)
+          .orderBy(asc(clients.name));
+      }
 
       res.setHeader('Cache-Control', 'no-store');
       res.json(rows);
@@ -638,68 +684,102 @@ export function createReviewRoomsRouter(requireAuth: RequireAuth): Router {
       const roomId = req.roomMember!.roomId;
       const userId = req.user!.id;
       const includeHidden = req.query.includeHidden === 'true';
-      const items = await db.select({
-        id: weeklyStatusItems.id,
-        title: weeklyStatusItems.title,
-        subtitle: weeklyStatusItems.subtitle,
-        healthStatus: weeklyStatusItems.healthStatus,
-        marginStatus: weeklyStatusItems.marginStatus,
-        teamStrain: weeklyStatusItems.teamStrain,
-        mainRisk: weeklyStatusItems.mainRisk,
-        currentAction: weeklyStatusItems.currentAction,
-        nextMilestone: weeklyStatusItems.nextMilestone,
-        deadline: weeklyStatusItems.deadline,
-        ownerId: weeklyStatusItems.ownerId,
-        ownerName: sql<string | null>`(SELECT ${users.firstName} || ' ' || ${users.lastName} FROM ${users} WHERE ${users.id} = ${weeklyStatusItems.ownerId})`,
-        decisionNeeded: weeklyStatusItems.decisionNeeded,
-        hiddenFromWeekly: weeklyStatusItems.hiddenFromWeekly,
-        updatedAt: weeklyStatusItems.updatedAt,
-        updatedBy: weeklyStatusItems.updatedBy,
-        updatedByName: sql<string | null>`(SELECT ${users.firstName} || ' ' || ${users.lastName} FROM ${users} WHERE ${users.id} = ${weeklyStatusItems.updatedBy})`,
-        noteCount: sql<number>`COALESCE((SELECT COUNT(*)::int FROM ${projectReviewNotes} WHERE ${projectReviewNotes.weeklyStatusItemId} = ${weeklyStatusItems.id} AND ${projectReviewNotes.roomId} = ${roomId}), 0)`,
-        unreadCount: sql<number>`COALESCE((
-          SELECT COUNT(*)::int FROM ${projectReviewNotes}
-          WHERE ${projectReviewNotes.weeklyStatusItemId} = ${weeklyStatusItems.id}
-            AND ${projectReviewNotes.roomId} = ${roomId}
-            AND ${projectReviewNotes.authorId} IS DISTINCT FROM ${userId}
-            AND ${projectReviewNotes.createdAt} > COALESCE(
-              (SELECT last_seen_at FROM ${reviewItemReadState}
-               WHERE user_id = ${userId} AND target_kind = 'custom' AND target_id = ${weeklyStatusItems.id}),
-              'epoch'::timestamp
-            )
-        ), 0)`,
-        lastNoteContent: sql<string | null>`(
-          SELECT content FROM ${projectReviewNotes}
-          WHERE ${projectReviewNotes.weeklyStatusItemId} = ${weeklyStatusItems.id}
-            AND ${projectReviewNotes.roomId} = ${roomId}
-          ORDER BY created_at DESC LIMIT 1
-        )`,
-        lastNoteAt: sql<string | null>`(
-          SELECT created_at FROM ${projectReviewNotes}
-          WHERE ${projectReviewNotes.weeklyStatusItemId} = ${weeklyStatusItems.id}
-            AND ${projectReviewNotes.roomId} = ${roomId}
-          ORDER BY created_at DESC LIMIT 1
-        )`,
-        lastNoteAuthorId: sql<number | null>`(
-          SELECT author_id FROM ${projectReviewNotes}
-          WHERE ${projectReviewNotes.weeklyStatusItemId} = ${weeklyStatusItems.id}
-            AND ${projectReviewNotes.roomId} = ${roomId}
-          ORDER BY created_at DESC LIMIT 1
-        )`,
-        lastNoteAuthorName: sql<string | null>`(
-          SELECT ${users.firstName} || ' ' || ${users.lastName}
-          FROM ${projectReviewNotes}
-          LEFT JOIN ${users} ON ${users.id} = ${projectReviewNotes.authorId}
-          WHERE ${projectReviewNotes.weeklyStatusItemId} = ${weeklyStatusItems.id}
-            AND ${projectReviewNotes.roomId} = ${roomId}
-          ORDER BY ${projectReviewNotes.createdAt} DESC LIMIT 1
-        )`,
-      }).from(weeklyStatusItems)
-        .where(and(
-          eq(weeklyStatusItems.roomId, roomId),
-          ...(includeHidden ? [] : [sql`(${weeklyStatusItems.hiddenFromWeekly} IS NOT TRUE)`]),
-        ))
-        .orderBy(desc(weeklyStatusItems.createdAt));
+      const whereConditions = and(
+        eq(weeklyStatusItems.roomId, roomId),
+        ...(includeHidden ? [] : [sql`(${weeklyStatusItems.hiddenFromWeekly} IS NOT TRUE)`]),
+      );
+
+      let items: any[];
+      try {
+        items = await db.select({
+          id: weeklyStatusItems.id,
+          title: weeklyStatusItems.title,
+          subtitle: weeklyStatusItems.subtitle,
+          healthStatus: weeklyStatusItems.healthStatus,
+          marginStatus: weeklyStatusItems.marginStatus,
+          teamStrain: weeklyStatusItems.teamStrain,
+          mainRisk: weeklyStatusItems.mainRisk,
+          currentAction: weeklyStatusItems.currentAction,
+          nextMilestone: weeklyStatusItems.nextMilestone,
+          deadline: weeklyStatusItems.deadline,
+          ownerId: weeklyStatusItems.ownerId,
+          ownerName: sql<string | null>`(SELECT ${users.firstName} || ' ' || ${users.lastName} FROM ${users} WHERE ${users.id} = ${weeklyStatusItems.ownerId})`,
+          decisionNeeded: weeklyStatusItems.decisionNeeded,
+          hiddenFromWeekly: weeklyStatusItems.hiddenFromWeekly,
+          updatedAt: weeklyStatusItems.updatedAt,
+          updatedBy: weeklyStatusItems.updatedBy,
+          updatedByName: sql<string | null>`(SELECT ${users.firstName} || ' ' || ${users.lastName} FROM ${users} WHERE ${users.id} = ${weeklyStatusItems.updatedBy})`,
+          noteCount: sql<number>`COALESCE((SELECT COUNT(*)::int FROM ${projectReviewNotes} WHERE ${projectReviewNotes.weeklyStatusItemId} = ${weeklyStatusItems.id} AND ${projectReviewNotes.roomId} = ${roomId}), 0)`,
+          unreadCount: sql<number>`COALESCE((
+            SELECT COUNT(*)::int FROM ${projectReviewNotes}
+            WHERE ${projectReviewNotes.weeklyStatusItemId} = ${weeklyStatusItems.id}
+              AND ${projectReviewNotes.roomId} = ${roomId}
+              AND ${projectReviewNotes.authorId} IS DISTINCT FROM ${userId}
+              AND ${projectReviewNotes.createdAt} > COALESCE(
+                (SELECT last_seen_at FROM ${reviewItemReadState}
+                 WHERE user_id = ${userId} AND target_kind = 'custom' AND target_id = ${weeklyStatusItems.id}),
+                'epoch'::timestamp
+              )
+          ), 0)`,
+          lastNoteContent: sql<string | null>`(
+            SELECT content FROM ${projectReviewNotes}
+            WHERE ${projectReviewNotes.weeklyStatusItemId} = ${weeklyStatusItems.id}
+              AND ${projectReviewNotes.roomId} = ${roomId}
+            ORDER BY created_at DESC LIMIT 1
+          )`,
+          lastNoteAt: sql<string | null>`(
+            SELECT created_at FROM ${projectReviewNotes}
+            WHERE ${projectReviewNotes.weeklyStatusItemId} = ${weeklyStatusItems.id}
+              AND ${projectReviewNotes.roomId} = ${roomId}
+            ORDER BY created_at DESC LIMIT 1
+          )`,
+          lastNoteAuthorId: sql<number | null>`(
+            SELECT author_id FROM ${projectReviewNotes}
+            WHERE ${projectReviewNotes.weeklyStatusItemId} = ${weeklyStatusItems.id}
+              AND ${projectReviewNotes.roomId} = ${roomId}
+            ORDER BY created_at DESC LIMIT 1
+          )`,
+          lastNoteAuthorName: sql<string | null>`(
+            SELECT ${users.firstName} || ' ' || ${users.lastName}
+            FROM ${projectReviewNotes}
+            LEFT JOIN ${users} ON ${users.id} = ${projectReviewNotes.authorId}
+            WHERE ${projectReviewNotes.weeklyStatusItemId} = ${weeklyStatusItems.id}
+              AND ${projectReviewNotes.roomId} = ${roomId}
+            ORDER BY ${projectReviewNotes.createdAt} DESC LIMIT 1
+          )`,
+        }).from(weeklyStatusItems)
+          .where(whereConditions)
+          .orderBy(desc(weeklyStatusItems.createdAt));
+      } catch (queryErr) {
+        console.error('GET /items/custom enhanced query failed, falling back:', queryErr);
+        items = await db.select({
+          id: weeklyStatusItems.id,
+          title: weeklyStatusItems.title,
+          subtitle: weeklyStatusItems.subtitle,
+          healthStatus: weeklyStatusItems.healthStatus,
+          marginStatus: weeklyStatusItems.marginStatus,
+          teamStrain: weeklyStatusItems.teamStrain,
+          mainRisk: weeklyStatusItems.mainRisk,
+          currentAction: weeklyStatusItems.currentAction,
+          nextMilestone: weeklyStatusItems.nextMilestone,
+          deadline: weeklyStatusItems.deadline,
+          ownerId: weeklyStatusItems.ownerId,
+          ownerName: sql<string | null>`(SELECT ${users.firstName} || ' ' || ${users.lastName} FROM ${users} WHERE ${users.id} = ${weeklyStatusItems.ownerId})`,
+          decisionNeeded: weeklyStatusItems.decisionNeeded,
+          hiddenFromWeekly: weeklyStatusItems.hiddenFromWeekly,
+          updatedAt: weeklyStatusItems.updatedAt,
+          updatedBy: weeklyStatusItems.updatedBy,
+          updatedByName: sql<string | null>`(SELECT ${users.firstName} || ' ' || ${users.lastName} FROM ${users} WHERE ${users.id} = ${weeklyStatusItems.updatedBy})`,
+          noteCount: sql<number>`COALESCE((SELECT COUNT(*)::int FROM ${projectReviewNotes} WHERE ${projectReviewNotes.weeklyStatusItemId} = ${weeklyStatusItems.id} AND ${projectReviewNotes.roomId} = ${roomId}), 0)`,
+          unreadCount: sql<number>`0`,
+          lastNoteContent: sql<string | null>`null`,
+          lastNoteAt: sql<string | null>`null`,
+          lastNoteAuthorId: sql<number | null>`null`,
+          lastNoteAuthorName: sql<string | null>`null`,
+        }).from(weeklyStatusItems)
+          .where(whereConditions)
+          .orderBy(desc(weeklyStatusItems.createdAt));
+      }
 
       res.setHeader('Cache-Control', 'no-store');
       res.json(items);
