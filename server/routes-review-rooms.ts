@@ -384,6 +384,7 @@ export function createReviewRoomsRouter(requireAuth: RequireAuth): Router {
   router.get('/:roomId/items', requireAuth, requireRoomMember(), async (req: Request, res: Response) => {
     try {
       const roomId = req.roomMember!.roomId;
+      const userId = req.user!.id;
       const includeHidden = req.query.includeHidden === 'true';
 
       const rows = await db
@@ -412,6 +413,43 @@ export function createReviewRoomsRouter(requireAuth: RequireAuth): Router {
           reviewUpdatedAt: projectStatusReviews.updatedAt,
           reviewUpdatedBy: projectStatusReviews.updatedBy,
           noteCount: sql<number>`COALESCE((SELECT COUNT(*)::int FROM ${projectReviewNotes} WHERE ${projectReviewNotes.projectId} = ${activeProjects.id} AND ${projectReviewNotes.roomId} = ${roomId}), 0)`,
+          unreadCount: sql<number>`COALESCE((
+            SELECT COUNT(*)::int FROM ${projectReviewNotes}
+            WHERE ${projectReviewNotes.projectId} = ${activeProjects.id}
+              AND ${projectReviewNotes.roomId} = ${roomId}
+              AND ${projectReviewNotes.authorId} IS DISTINCT FROM ${userId}
+              AND ${projectReviewNotes.createdAt} > COALESCE(
+                (SELECT last_seen_at FROM ${reviewItemReadState}
+                 WHERE user_id = ${userId} AND target_kind = 'project' AND target_id = ${activeProjects.id}),
+                'epoch'::timestamp
+              )
+          ), 0)`,
+          lastNoteContent: sql<string | null>`(
+            SELECT content FROM ${projectReviewNotes}
+            WHERE ${projectReviewNotes.projectId} = ${activeProjects.id}
+              AND ${projectReviewNotes.roomId} = ${roomId}
+            ORDER BY created_at DESC LIMIT 1
+          )`,
+          lastNoteAt: sql<string | null>`(
+            SELECT created_at FROM ${projectReviewNotes}
+            WHERE ${projectReviewNotes.projectId} = ${activeProjects.id}
+              AND ${projectReviewNotes.roomId} = ${roomId}
+            ORDER BY created_at DESC LIMIT 1
+          )`,
+          lastNoteAuthorId: sql<number | null>`(
+            SELECT author_id FROM ${projectReviewNotes}
+            WHERE ${projectReviewNotes.projectId} = ${activeProjects.id}
+              AND ${projectReviewNotes.roomId} = ${roomId}
+            ORDER BY created_at DESC LIMIT 1
+          )`,
+          lastNoteAuthorName: sql<string | null>`(
+            SELECT u.first_name || ' ' || u.last_name
+            FROM ${projectReviewNotes} pn
+            LEFT JOIN users u ON u.id = pn.author_id
+            WHERE pn.project_id = ${activeProjects.id}
+              AND pn.room_id = ${roomId}
+            ORDER BY pn.created_at DESC LIMIT 1
+          )`,
           ownerName: sql<string | null>`(SELECT ${users.firstName} || ' ' || ${users.lastName} FROM ${users} WHERE ${users.id} = ${projectStatusReviews.ownerId})`,
           reviewUpdatedByName: sql<string | null>`(SELECT ${users.firstName} || ' ' || ${users.lastName} FROM ${users} WHERE ${users.id} = ${projectStatusReviews.updatedBy})`,
         })
@@ -598,6 +636,7 @@ export function createReviewRoomsRouter(requireAuth: RequireAuth): Router {
   router.get('/:roomId/items/custom', requireAuth, requireRoomMember(), async (req: Request, res: Response) => {
     try {
       const roomId = req.roomMember!.roomId;
+      const userId = req.user!.id;
       const includeHidden = req.query.includeHidden === 'true';
       const items = await db.select({
         id: weeklyStatusItems.id,
@@ -617,7 +656,44 @@ export function createReviewRoomsRouter(requireAuth: RequireAuth): Router {
         updatedAt: weeklyStatusItems.updatedAt,
         updatedBy: weeklyStatusItems.updatedBy,
         updatedByName: sql<string | null>`(SELECT ${users.firstName} || ' ' || ${users.lastName} FROM ${users} WHERE ${users.id} = ${weeklyStatusItems.updatedBy})`,
-        noteCount: sql<number>`COALESCE((SELECT COUNT(*)::int FROM ${projectReviewNotes} WHERE ${projectReviewNotes.weeklyStatusItemId} = ${weeklyStatusItems.id}), 0)`,
+        noteCount: sql<number>`COALESCE((SELECT COUNT(*)::int FROM ${projectReviewNotes} WHERE ${projectReviewNotes.weeklyStatusItemId} = ${weeklyStatusItems.id} AND ${projectReviewNotes.roomId} = ${roomId}), 0)`,
+        unreadCount: sql<number>`COALESCE((
+          SELECT COUNT(*)::int FROM ${projectReviewNotes}
+          WHERE ${projectReviewNotes.weeklyStatusItemId} = ${weeklyStatusItems.id}
+            AND ${projectReviewNotes.roomId} = ${roomId}
+            AND ${projectReviewNotes.authorId} IS DISTINCT FROM ${userId}
+            AND ${projectReviewNotes.createdAt} > COALESCE(
+              (SELECT last_seen_at FROM ${reviewItemReadState}
+               WHERE user_id = ${userId} AND target_kind = 'custom' AND target_id = ${weeklyStatusItems.id}),
+              'epoch'::timestamp
+            )
+        ), 0)`,
+        lastNoteContent: sql<string | null>`(
+          SELECT content FROM ${projectReviewNotes}
+          WHERE ${projectReviewNotes.weeklyStatusItemId} = ${weeklyStatusItems.id}
+            AND ${projectReviewNotes.roomId} = ${roomId}
+          ORDER BY created_at DESC LIMIT 1
+        )`,
+        lastNoteAt: sql<string | null>`(
+          SELECT created_at FROM ${projectReviewNotes}
+          WHERE ${projectReviewNotes.weeklyStatusItemId} = ${weeklyStatusItems.id}
+            AND ${projectReviewNotes.roomId} = ${roomId}
+          ORDER BY created_at DESC LIMIT 1
+        )`,
+        lastNoteAuthorId: sql<number | null>`(
+          SELECT author_id FROM ${projectReviewNotes}
+          WHERE ${projectReviewNotes.weeklyStatusItemId} = ${weeklyStatusItems.id}
+            AND ${projectReviewNotes.roomId} = ${roomId}
+          ORDER BY created_at DESC LIMIT 1
+        )`,
+        lastNoteAuthorName: sql<string | null>`(
+          SELECT u.first_name || ' ' || u.last_name
+          FROM ${projectReviewNotes} pn
+          LEFT JOIN users u ON u.id = pn.author_id
+          WHERE pn.weekly_status_item_id = ${weeklyStatusItems.id}
+            AND pn.room_id = ${roomId}
+          ORDER BY pn.created_at DESC LIMIT 1
+        )`,
       }).from(weeklyStatusItems)
         .where(and(
           eq(weeklyStatusItems.roomId, roomId),
@@ -1021,8 +1097,8 @@ export function createReviewRoomsRouter(requireAuth: RequireAuth): Router {
 
   async function nextProposalVersion(target: ProposalTarget): Promise<number> {
     const where = target.projectId != null
-      ? and(eq(statusItemProposals.projectId, target.projectId))
-      : and(eq(statusItemProposals.weeklyStatusItemId, target.itemId!));
+      ? and(eq(statusItemProposals.roomId, target.roomId), eq(statusItemProposals.projectId, target.projectId))
+      : and(eq(statusItemProposals.roomId, target.roomId), eq(statusItemProposals.weeklyStatusItemId, target.itemId!));
     const [row] = await db.select({ max: sql<number | null>`MAX(${statusItemProposals.version})` })
       .from(statusItemProposals).where(where);
     return (row?.max ?? 0) + 1;
