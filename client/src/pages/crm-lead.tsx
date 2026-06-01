@@ -19,18 +19,44 @@ import {
   Clock, ChevronDown, ChevronUp, AlertCircle, Briefcase, Paperclip, Download, X
 } from "lucide-react";
 
-type Stage = 'new' | 'contacted' | 'qualified' | 'proposal' | 'negotiation' | 'won' | 'lost';
+type Stage = string;
 type ActivityType = 'note' | 'call' | 'email' | 'meeting' | 'proposal' | 'followup';
 
-const STAGES: { key: Stage; label: string; color: string; bg: string; border: string }[] = [
-  { key: 'new',         label: 'Nuevo',        color: 'text-slate-700',   bg: 'bg-slate-100',   border: 'border-slate-300' },
-  { key: 'contacted',   label: 'Contactado',   color: 'text-blue-700',    bg: 'bg-blue-100',    border: 'border-blue-300' },
-  { key: 'qualified',   label: 'Calificado',   color: 'text-indigo-700',  bg: 'bg-indigo-100',  border: 'border-indigo-300' },
-  { key: 'proposal',    label: 'Propuesta',    color: 'text-amber-700',   bg: 'bg-amber-100',   border: 'border-amber-300' },
-  { key: 'negotiation', label: 'Negociación',  color: 'text-orange-700',  bg: 'bg-orange-100',  border: 'border-orange-300' },
-  { key: 'won',         label: 'Ganado',       color: 'text-green-700',   bg: 'bg-green-100',   border: 'border-green-300' },
-  { key: 'lost',        label: 'Perdido',      color: 'text-red-700',     bg: 'bg-red-100',     border: 'border-red-300' },
+interface CrmStage {
+  id: number;
+  key: string;
+  label: string;
+  color: string;
+  position: number;
+  isActive: boolean;
+  followUpDays?: number | null;
+}
+
+const FALLBACK_STAGES: CrmStage[] = [
+  { id: 0, key: 'new',         label: 'Nuevo',       color: 'slate',  position: 0, isActive: true },
+  { id: 1, key: 'contacted',   label: 'Contactado',  color: 'blue',   position: 1, isActive: true },
+  { id: 2, key: 'qualified',   label: 'Calificado',  color: 'indigo', position: 2, isActive: true },
+  { id: 3, key: 'proposal',    label: 'Propuesta',   color: 'amber',  position: 3, isActive: true },
+  { id: 4, key: 'negotiation', label: 'Negociación', color: 'orange', position: 4, isActive: true },
+  { id: 5, key: 'won',         label: 'Ganado',      color: 'green',  position: 5, isActive: true },
+  { id: 6, key: 'lost',        label: 'Perdido',     color: 'red',    position: 6, isActive: true },
 ];
+
+const STAGE_COLOR_MAP: Record<string, { color: string; bg: string; border: string }> = {
+  slate:  { color: 'text-slate-700',   bg: 'bg-slate-100',   border: 'border-slate-300' },
+  blue:   { color: 'text-blue-700',    bg: 'bg-blue-100',    border: 'border-blue-300' },
+  indigo: { color: 'text-indigo-700',  bg: 'bg-indigo-100',  border: 'border-indigo-300' },
+  violet: { color: 'text-violet-700',  bg: 'bg-violet-100',  border: 'border-violet-300' },
+  purple: { color: 'text-purple-700',  bg: 'bg-purple-100',  border: 'border-purple-300' },
+  pink:   { color: 'text-pink-700',    bg: 'bg-pink-100',    border: 'border-pink-300' },
+  red:    { color: 'text-red-700',     bg: 'bg-red-100',     border: 'border-red-300' },
+  orange: { color: 'text-orange-700',  bg: 'bg-orange-100',  border: 'border-orange-300' },
+  amber:  { color: 'text-amber-700',   bg: 'bg-amber-100',   border: 'border-amber-300' },
+  yellow: { color: 'text-yellow-700',  bg: 'bg-yellow-100',  border: 'border-yellow-300' },
+  green:  { color: 'text-green-700',   bg: 'bg-green-100',   border: 'border-green-300' },
+  teal:   { color: 'text-teal-700',    bg: 'bg-teal-100',    border: 'border-teal-300' },
+  cyan:   { color: 'text-cyan-700',    bg: 'bg-cyan-100',    border: 'border-cyan-300' },
+};
 
 const ACTIVITY_ICONS: Record<ActivityType, { icon: any; color: string; bg: string; label: string }> = {
   note:     { icon: MessageSquare, color: 'text-slate-600', bg: 'bg-slate-100',  label: 'Nota' },
@@ -41,7 +67,14 @@ const ACTIVITY_ICONS: Record<ActivityType, { icon: any; color: string; bg: strin
   followup: { icon: Bell,          color: 'text-orange-600',bg: 'bg-orange-100', label: 'Follow-up' },
 };
 
-function stageMeta(stage: Stage) { return STAGES.find(s => s.key === stage) || STAGES[0]; }
+function stageMeta(stage: Stage, stages: CrmStage[]) {
+  const found = stages.find(s => s.key === stage);
+  if (found) {
+    const colorEntry = STAGE_COLOR_MAP[found.color] ?? STAGE_COLOR_MAP['slate'];
+    return { key: found.key, label: found.label, ...colorEntry };
+  }
+  return { key: stage, label: stage, ...STAGE_COLOR_MAP['slate'] };
+}
 function fmtUsd(val: number | null | undefined) {
   if (!val) return '—';
   return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(val);
@@ -102,6 +135,11 @@ export default function CRMLeadPage({ params }: { params: { id: string } }) {
   const [editingNotes, setEditingNotes] = useState(false);
   const [tempNotes, setTempNotes] = useState('');
 
+  const [emailOpen, setEmailOpen] = useState(false);
+  const [emailTo, setEmailTo] = useState('');
+  const [emailSubject, setEmailSubject] = useState('');
+  const [emailBody, setEmailBody] = useState('');
+
   const { data: lead, isLoading, refetch } = useQuery<Lead>({
     queryKey: ['/api/crm/leads', leadId],
     queryFn: async () => {
@@ -113,6 +151,13 @@ export default function CRMLeadPage({ params }: { params: { id: string } }) {
   const { data: clients = [] } = useQuery<{ id: number; name: string }[]>({
     queryKey: ['/api/clients'],
   });
+
+  const { data: fetchedStages = [] } = useQuery<CrmStage[]>({
+    queryKey: ['/api/crm/stages'],
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
+  });
+  const stages = fetchedStages.length > 0 ? fetchedStages : FALLBACK_STAGES;
 
   const invalidate = () => {
     refetch();
@@ -191,6 +236,18 @@ export default function CRMLeadPage({ params }: { params: { id: string } }) {
     onSuccess: () => invalidate(),
   });
 
+  const sendEmail = useMutation({
+    mutationFn: (data: { to: string; subject: string; body: string }) =>
+      apiRequest(`/api/crm/leads/${leadId}/send-email`, 'POST', data),
+    onSuccess: () => {
+      invalidate();
+      setEmailOpen(false);
+      setEmailSubject('');
+      setEmailBody('');
+      toast({ title: 'Email enviado correctamente' });
+    },
+    onError: () => toast({ title: 'Error al enviar el email', variant: 'destructive' }),
+  });
 
   const handleStageChange = (stage: string) => {
     updateLead.mutate({ stage });
@@ -210,7 +267,7 @@ export default function CRMLeadPage({ params }: { params: { id: string } }) {
   if (isLoading) return <div className="text-center py-16 text-slate-400">Cargando lead...</div>;
   if (!lead) return <div className="text-center py-16 text-slate-400">Lead no encontrado</div>;
 
-  const meta = stageMeta(lead.stage);
+  const meta = stageMeta(lead.stage, stages);
   const daysSinceUpdate = daysSince(lead.updatedAt);
   const pendingReminders = lead.reminders.filter(r => !r.completed);
   const completedReminders = lead.reminders.filter(r => r.completed);
@@ -254,7 +311,7 @@ export default function CRMLeadPage({ params }: { params: { id: string } }) {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {STAGES.map(s => (
+                    {stages.map(s => (
                       <SelectItem key={s.key} value={s.key}>{s.label}</SelectItem>
                     ))}
                   </SelectContent>
@@ -736,6 +793,40 @@ export default function CRMLeadPage({ params }: { params: { id: string } }) {
         </div>
       </div>
 
+
+      {/* Email Compose Modal */}
+      <Dialog open={emailOpen} onOpenChange={(open) => { if (!open) { setEmailOpen(false); setEmailSubject(''); setEmailBody(''); } }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Mail className="w-4 h-4 text-indigo-600" /> Enviar Email
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 pt-2">
+            <div>
+              <Label className="text-xs">Para</Label>
+              <Input value={emailTo} onChange={e => setEmailTo(e.target.value)} placeholder="destinatario@empresa.com" type="email" />
+            </div>
+            <div>
+              <Label className="text-xs">Asunto</Label>
+              <Input value={emailSubject} onChange={e => setEmailSubject(e.target.value)} placeholder="Asunto del email" />
+            </div>
+            <div>
+              <Label className="text-xs">Mensaje</Label>
+              <Textarea value={emailBody} onChange={e => setEmailBody(e.target.value)} rows={5} placeholder="Escribí tu mensaje aquí..." />
+            </div>
+            <div className="flex justify-end gap-2 pt-1">
+              <Button variant="outline" size="sm" onClick={() => { setEmailOpen(false); setEmailSubject(''); setEmailBody(''); }}>Cancelar</Button>
+              <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white gap-1.5"
+                onClick={() => sendEmail.mutate({ to: emailTo, subject: emailSubject, body: emailBody })}
+                disabled={!emailTo || !emailSubject || !emailBody || sendEmail.isPending}>
+                <Mail className="w-3.5 h-3.5" />
+                {sendEmail.isPending ? 'Enviando...' : 'Enviar'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Activity Detail Modal */}
       {selectedActivity && (() => {
