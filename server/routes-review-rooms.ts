@@ -443,12 +443,12 @@ export function createReviewRoomsRouter(requireAuth: RequireAuth): Router {
             ORDER BY created_at DESC LIMIT 1
           )`,
           lastNoteAuthorName: sql<string | null>`(
-            SELECT u.first_name || ' ' || u.last_name
-            FROM ${projectReviewNotes} pn
-            LEFT JOIN users u ON u.id = pn.author_id
-            WHERE pn.project_id = ${activeProjects.id}
-              AND pn.room_id = ${roomId}
-            ORDER BY pn.created_at DESC LIMIT 1
+            SELECT ${users.firstName} || ' ' || ${users.lastName}
+            FROM ${projectReviewNotes}
+            LEFT JOIN ${users} ON ${users.id} = ${projectReviewNotes.authorId}
+            WHERE ${projectReviewNotes.projectId} = ${activeProjects.id}
+              AND ${projectReviewNotes.roomId} = ${roomId}
+            ORDER BY ${projectReviewNotes.createdAt} DESC LIMIT 1
           )`,
           ownerName: sql<string | null>`(SELECT ${users.firstName} || ' ' || ${users.lastName} FROM ${users} WHERE ${users.id} = ${projectStatusReviews.ownerId})`,
           reviewUpdatedByName: sql<string | null>`(SELECT ${users.firstName} || ' ' || ${users.lastName} FROM ${users} WHERE ${users.id} = ${projectStatusReviews.updatedBy})`,
@@ -687,12 +687,12 @@ export function createReviewRoomsRouter(requireAuth: RequireAuth): Router {
           ORDER BY created_at DESC LIMIT 1
         )`,
         lastNoteAuthorName: sql<string | null>`(
-          SELECT u.first_name || ' ' || u.last_name
-          FROM ${projectReviewNotes} pn
-          LEFT JOIN users u ON u.id = pn.author_id
-          WHERE pn.weekly_status_item_id = ${weeklyStatusItems.id}
-            AND pn.room_id = ${roomId}
-          ORDER BY pn.created_at DESC LIMIT 1
+          SELECT ${users.firstName} || ' ' || ${users.lastName}
+          FROM ${projectReviewNotes}
+          LEFT JOIN ${users} ON ${users.id} = ${projectReviewNotes.authorId}
+          WHERE ${projectReviewNotes.weeklyStatusItemId} = ${weeklyStatusItems.id}
+            AND ${projectReviewNotes.roomId} = ${roomId}
+          ORDER BY ${projectReviewNotes.createdAt} DESC LIMIT 1
         )`,
       }).from(weeklyStatusItems)
         .where(and(
