@@ -17278,6 +17278,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/crm/leads/:id/send-email", requireAuth, async (req: Request, res: Response) => {
     try {
       const leadId = parseInt(req.params.id);
+      if (isNaN(leadId)) return res.status(400).json({ error: 'ID de lead inválido' });
+
+      const [existingLead] = await db.select({ id: crmLeads.id }).from(crmLeads).where(eq(crmLeads.id, leadId));
+      if (!existingLead) return res.status(404).json({ error: 'Lead no encontrado' });
+
       const { to, subject, body, contactId } = req.body;
       const userId = (req.session as any)?.userId;
 
