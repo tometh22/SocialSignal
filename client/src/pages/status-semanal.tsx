@@ -2307,6 +2307,7 @@ export default function StatusSemanalPage() {
   const { user } = useAuth();
   const currentUserId = (user as any)?.id ?? null;
   const roomCtx = useMaybeReviewRoom();
+  const currentWeekLabel = useMemo(() => weekLabel(), []);
   const [membersDialogOpen, setMembersDialogOpen] = useState(false);
   const [addProjectDialogOpen, setAddProjectDialogOpen] = useState(false);
   const [notesOpen, setNotesOpen] = useState<{ type: 'project' | 'custom'; id: number } | null>(null);
@@ -2645,15 +2646,17 @@ export default function StatusSemanalPage() {
     return { alertItems, decisionItems, normalItems, alertKeys, decisionKeys, flatNavItems };
   }, [visible]);
 
+  const normalItemKeysSig = normalItems.map(i => i.key).join(',');
   // Sync normalOrder when normalItems changes (keep existing order, add new items at end)
   useEffect(() => {
-    const currentKeys = normalItems.map(i => i.key);
+    const currentKeys = normalItemKeysSig ? normalItemKeysSig.split(',') : [];
     setNormalOrder(prev => {
       const existing = prev.filter(k => currentKeys.includes(k));
       const added = currentKeys.filter(k => !prev.includes(k));
       return [...existing, ...added];
     });
-  }, [normalItems.map(i => i.key).join(',')]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [normalItemKeysSig]);
 
   // Keyboard navigation effect (depends on flatNavItems, so inside render)
   useEffect(() => {
@@ -2761,7 +2764,7 @@ export default function StatusSemanalPage() {
                         privacy={roomCtx.room?.privacy || 'members'}
                         myRole={roomCtx.myRole}
                       />
-                      <p className="text-[9px] text-indigo-200 font-medium">{weekLabel()}</p>
+                      <p className="text-[9px] text-indigo-200 font-medium">{currentWeekLabel}</p>
                     </div>
                   </>
                 ) : (
@@ -2771,7 +2774,7 @@ export default function StatusSemanalPage() {
                     </div>
                     <div>
                       <h1 className="text-base font-bold leading-tight text-white tracking-tight">Status</h1>
-                      <p className="text-[9px] text-indigo-200 font-medium">{weekLabel()}</p>
+                      <p className="text-[9px] text-indigo-200 font-medium">{currentWeekLabel}</p>
                     </div>
                   </>
                 )}
@@ -3409,7 +3412,7 @@ export default function StatusSemanalPage() {
             <div className="px-6 py-4 space-y-4 print:px-0">
               <div className="text-center mb-4">
                 <h3 className="text-xl font-bold text-slate-800">Review Semanal</h3>
-                <p className="text-sm text-slate-500">{weekLabel()}</p>
+                <p className="text-sm text-slate-500">{currentWeekLabel}</p>
               </div>
               {alertItems.length > 0 && (
                 <div>

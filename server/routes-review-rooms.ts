@@ -1445,7 +1445,10 @@ export function createReviewRoomsRouter(requireAuth: RequireAuth): Router {
         .innerJoin(activeProjects, eq(activeProjects.id, projectStatusReviews.projectId))
         .leftJoin(clients, eq(clients.id, activeProjects.clientId))
         .leftJoin(quotations, eq(quotations.id, activeProjects.quotationId))
-        .where(eq(projectStatusReviews.roomId, roomId));
+        .where(and(
+          eq(projectStatusReviews.roomId, roomId),
+          sql`(${projectStatusReviews.hiddenFromWeekly} IS NOT TRUE)`,
+        ));
 
       const ownerIds = [...new Set(rows.map(r => r.ownerId).filter(Boolean))] as number[];
       const owners = ownerIds.length > 0
