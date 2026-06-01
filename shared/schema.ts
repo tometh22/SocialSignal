@@ -811,6 +811,26 @@ export const insertHolidaySchema = createInsertSchema(holidays).omit({
 export type Holiday = typeof holidays.$inferSelect;
 export type InsertHoliday = z.infer<typeof insertHolidaySchema>;
 
+// ==================== AUSENCIAS DE PERSONAL ====================
+export const personnelAbsences = pgTable("personnel_absences", {
+  id: serial("id").primaryKey(),
+  personnelId: integer("personnel_id").notNull().references(() => personnel.id, { onDelete: 'cascade' }),
+  startDate: text("start_date").notNull(), // YYYY-MM-DD
+  endDate: text("end_date").notNull(),     // YYYY-MM-DD
+  type: text("type").notNull().default('vacation'), // 'vacation' | 'sick' | 'other'
+  notes: text("notes"),
+  createdBy: integer("created_by").references(() => users.id, { onDelete: 'set null' }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertPersonnelAbsenceSchema = createInsertSchema(personnelAbsences).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type PersonnelAbsence = typeof personnelAbsences.$inferSelect;
+export type InsertPersonnelAbsence = z.infer<typeof insertPersonnelAbsenceSchema>;
+
 // ==================== CIERRE MENSUAL ====================
 export const monthlyClosings = pgTable("monthly_closings", {
   id: serial("id").primaryKey(),

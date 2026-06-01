@@ -204,7 +204,17 @@ export default function CapacityDashboard() {
                     const hasOverride = getOverride(p.personnelId) !== null;
                     return (
                       <tr key={p.personnelId} className="border-b hover:bg-muted/30 group">
-                        <td className="py-2 px-3 font-medium">{p.name}</td>
+                        <td className="py-2 px-3 font-medium">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            {p.name}
+                            {p.isAbsent && (
+                              <span className="text-[10px] bg-amber-100 text-amber-700 rounded px-1.5 py-0.5">En ausencia</span>
+                            )}
+                            {!p.isAbsent && p.absenceHours > 0 && (
+                              <span className="text-[10px] text-amber-600">({p.absenceHours.toFixed(0)}h ausencia)</span>
+                            )}
+                          </div>
+                        </td>
                         <td className="text-center py-2 px-3">
                           {isOperations && editingCapacityId === p.personnelId ? (
                             <div className="flex items-center justify-center gap-1">

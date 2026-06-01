@@ -110,6 +110,8 @@ import {
   insertMonthlyClosingSchema,
   estimatedRates,
   insertEstimatedRateSchema,
+  personnelAbsences,
+  insertPersonnelAbsenceSchema,
   quotationTeamMembers,
   quotationTemplates,
   sheetPersonnelAliases,
@@ -5496,6 +5498,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
             eq(quotationVariants.quotationId, quotationId)
           ))
           .returning();
+
+        // Sync quotation.totalAmount to the selected variant's totalAmount
+        if (variant?.totalAmount != null) {
+          await tx.update(quotations)
+            .set({ totalAmount: String(variant.totalAmount) })
+            .where(eq(quotations.id, quotationId));
+        }
+
         return variant;
       });
 
@@ -19442,6 +19452,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== PERSONNEL ABSENCES ====================
+  app.get("/api/personnel-absences", requireAuth, async (req, res) => {
+    try {
+      const { personnelId } = req.query;
+      let result;
+      if (personnelId) {
+        result = await db.select().from(personnelAbsences)
+          .where(eq(personnelAbsences.personnelId, parseInt(personnelId as string)))
+          .orderBy(personnelAbsences.startDate);
+      } else {
+        result = await db.select().from(personnelAbsences).orderBy(personnelAbsences.startDate);
+      }
+      res.json(result);
+    } catch (error) { res.status(500).json({ message: "Error fetching personnel absences" }); }
+  });
+
+  app.post("/api/personnel-absences", requireAuth, async (req, res) => {
+    try {
+      const data = insertPersonnelAbsenceSchema.parse({ ...req.body, createdBy: req.user?.id });
+      const [absence] = await db.insert(personnelAbsences).values(data).returning();
+      res.status(201).json(absence);
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: "Datos inválidos", errors: error.errors });
+      res.status(500).json({ message: "Error creating absence" });
+    }
+  });
+
+  app.delete("/api/personnel-absences/:id", requireAuth, async (req, res) => {
+    try {
+      await db.delete(personnelAbsences).where(eq(personnelAbsences.id, parseInt(req.params.id)));
+      res.json({ success: true });
+    } catch (error) { res.status(500).json({ message: "Error deleting absence" }); }
+  });
+
   // ==================== CAPACITY DASHBOARD ====================
   app.get("/api/capacity/weekly", requireAuth, async (req, res) => {
     try {
@@ -19468,9 +19512,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
           sql`${timeEntries.date} <= ${weekEndDate.toISOString()}`
         ));
 
+      // Get absences that overlap this week
+      const weekStartStr = weekStartDate.toISOString().split('T')[0];
+      const weekEndStr = weekEndDate.toISOString().split('T')[0];
+      const absencesList = await db.select().from(personnelAbsences)
+        .where(and(
+          sql`${personnelAbsences.startDate} <= ${weekEndStr}`,
+          sql`${personnelAbsences.endDate} >= ${weekStartStr}`
+        ));
+
       const capacityData = allPersonnel.map(person => {
         const dailyHours = (person.monthlyHours || 160) / 20; // monthly hours / 20 working days
-        const maxCapacity = dailyHours * workingDays;
+        const maxCapacityBase = dailyHours * workingDays;
+
+        // Count working days this person is absent this week
+        const personAbsences = absencesList.filter(a => a.personnelId === person.id);
+        let absenceDays = 0;
+        for (const absence of personAbsences) {
+          const absStart = new Date(Math.max(new Date(absence.startDate).getTime(), weekStartDate.getTime()));
+          const absEnd = new Date(Math.min(new Date(absence.endDate).getTime(), weekEndDate.getTime()));
+          for (const d = new Date(absStart); d <= absEnd; d.setDate(d.getDate() + 1)) {
+            const dow = d.getDay();
+            if (dow !== 0 && dow !== 6) absenceDays++;
+          }
+        }
+        const absenceHours = absenceDays * dailyHours;
+        const maxCapacity = Math.max(0, maxCapacityBase - absenceHours);
+
         const personEntries = entries.filter(e => e.personnelId === person.id);
         const actualHours = personEntries.reduce((sum, e) => sum + (e.hours || 0), 0);
         const idleHours = Math.max(0, maxCapacity - actualHours);
@@ -19484,6 +19552,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           idleHours: Math.round(idleHours * 100) / 100,
           utilizationPct: maxCapacity > 0 ? Math.round((actualHours / maxCapacity) * 100) : 0,
           isOverloaded: actualHours > maxCapacity,
+          absenceHours: Math.round(absenceHours * 100) / 100,
+          isAbsent: absenceHours >= maxCapacityBase && maxCapacityBase > 0,
         };
       });
 

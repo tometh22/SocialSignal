@@ -170,7 +170,8 @@ export default function EstimatedRates() {
         <div>
           <h1 className="text-2xl font-bold">Valor Hora Estimada</h1>
           <p className="text-muted-foreground">
-            Proyección de valor hora con ajuste trimestral, solo para análisis interno
+            Proyección de valor hora con ajuste trimestral, solo para análisis interno.{" "}
+            <Link to="/admin" className="text-blue-600 underline text-sm">Ver configuración base (costos reales) →</Link>
           </p>
         </div>
         <div className="flex gap-2 items-center">

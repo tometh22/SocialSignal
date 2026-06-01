@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Link } from "wouter";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -146,7 +147,8 @@ export function PersonnelHistoricalCostsManager({ onClose }: PersonnelHistorical
           <div>
             <CardTitle className="text-xl font-bold">Costos Históricos de Personal</CardTitle>
             <p className="text-sm text-muted-foreground mt-1">
-              Gestiona los costos históricos por hora para cálculos de rentabilidad temporal
+              Costos históricos reales ·{" "}
+              <Link to="/operations/estimated-rates" className="text-blue-600 underline">Ver tarifas estimadas →</Link>
             </p>
           </div>
         </div>

@@ -41,6 +41,7 @@ import {
   Calendar,
   Receipt,
   MessageSquare,
+  UserX,
 } from "lucide-react";
 
 const PROJECT_ICON_COLORS = [
@@ -229,6 +230,7 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
         { href: "/operations/monthly-closing", title: "Cierre Mensual", icon: CalendarCheck, description: "Cierre de horas del mes", permission: 'operations' as AppSection },
         { href: "/operations/estimated-rates", title: "Valor Hora Estimada", icon: TrendingUp, description: "Proyección de tarifas (no afecta cotizaciones)", permission: 'operations' as AppSection },
         { href: "/operations/holidays", title: "Feriados", icon: Calendar, description: "Gestión de feriados", permission: 'operations' as AppSection },
+        { href: "/operations/absences", title: "Ausencias", icon: UserX, description: "Vacaciones y licencias del equipo", permission: 'operations' as AppSection },
       ]
     },
     {

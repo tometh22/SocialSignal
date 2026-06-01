@@ -232,11 +232,13 @@ export default function FinancialReviewFinal() {
 
   // Create USD equivalents for calculations that need them
   const { convertToUSD, exchangeRate } = useCurrency();
-  const subtotalWithPlatformUSD = convertToUSD(subtotalWithPlatformARS, 'ARS');
-  const subtotalWithMarginUSD = convertToUSD(subtotalWithMarginARS, 'ARS');
-  const finalTotalUSD = convertToUSD(finalTotalARS, 'ARS');
-  const inflationAdjustmentUSD = convertToUSD(inflationAdjustmentARS, 'ARS');
-  const toolsCostUSD = convertToUSD(toolsCostARS, 'ARS');
+  // Guard against missing/zero exchange rate to prevent NaN/Infinity in manual mode
+  const safeRate = typeof exchangeRate === 'number' && exchangeRate > 0 ? exchangeRate : 1;
+  const subtotalWithPlatformUSD = safeRate > 1 ? convertToUSD(subtotalWithPlatformARS, 'ARS') : 0;
+  const subtotalWithMarginUSD = safeRate > 1 ? convertToUSD(subtotalWithMarginARS, 'ARS') : 0;
+  const finalTotalUSD = safeRate > 1 ? convertToUSD(finalTotalARS, 'ARS') : 0;
+  const inflationAdjustmentUSD = safeRate > 1 ? convertToUSD(inflationAdjustmentARS, 'ARS') : 0;
+  const toolsCostUSD = safeRate > 1 ? convertToUSD(toolsCostARS, 'ARS') : 0;
   
   // All values are already in ARS - no conversion needed for display
   const teamBaseCostDisplay = teamBaseCostARS;
@@ -951,23 +953,23 @@ export default function FinancialReviewFinal() {
                           <div className="bg-gray-50 rounded-lg p-2 text-center">
                             <p className="text-xs text-gray-600">Costo Base</p>
                             <p className="font-mono text-sm font-semibold text-gray-900">
-                              ${((subtotalWithPlatformUSD + toolsCostUSD) * exchangeRate).toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                              ${safeRate > 1 ? ((subtotalWithPlatformUSD + toolsCostUSD) * safeRate).toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) : '—'}
                             </p>
                           </div>
                           <div className="bg-blue-50 rounded-lg p-2 text-center">
                             <p className="text-xs text-blue-600">Markup</p>
                             <p className="font-mono text-sm font-semibold text-blue-900">
-                              {quotationData.financials.manualPrice 
-                                ? `${(((quotationData.financials.manualPrice / exchangeRate - toolsCostUSD) / (1 - (discountPercentage / 100))) / subtotalWithPlatformUSD).toFixed(2)}x`
-                                : '0.00x'}
+                              {quotationData.financials.manualPrice && subtotalWithPlatformUSD > 0 && safeRate > 1
+                                ? `${(((quotationData.financials.manualPrice / safeRate - toolsCostUSD) / (1 - (discountPercentage / 100))) / subtotalWithPlatformUSD).toFixed(2)}x`
+                                : '—'}
                             </p>
                           </div>
                           <div className="bg-green-50 rounded-lg p-2 text-center">
                             <p className="text-xs text-green-600">Ganancia</p>
                             <p className="font-mono text-sm font-semibold text-green-900">
-                              ${quotationData.financials.manualPrice 
-                                ? Math.max(0, quotationData.financials.manualPrice - ((subtotalWithPlatformUSD + toolsCostUSD) * exchangeRate)).toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
-                                : '0'}
+                              {quotationData.financials.manualPrice && safeRate > 1
+                                ? `$${Math.max(0, quotationData.financials.manualPrice - ((subtotalWithPlatformUSD + toolsCostUSD) * safeRate)).toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+                                : '—'}
                             </p>
                           </div>
                         </div>
@@ -1271,8 +1273,8 @@ export default function FinancialReviewFinal() {
                     <div className="flex flex-col gap-0.5">
                       <span className="text-sm text-green-800">Margen de Ganancia</span>
                       <span className="text-xs text-green-600">
-                        Markup {quotationData.financials.priceMode === 'manual' && quotationData.financials.manualPrice 
-                          ? `${((subtotalWithMarginUSD / subtotalWithPlatformUSD) || 1).toFixed(2)}x calc.`
+                        Markup {quotationData.financials.priceMode === 'manual' && quotationData.financials.manualPrice
+                          ? (subtotalWithPlatformUSD > 0 ? `${(subtotalWithMarginUSD / subtotalWithPlatformUSD).toFixed(2)}x calc.` : '—')
                           : `${markupMultiplier}x`}
                       </span>
                     </div>
