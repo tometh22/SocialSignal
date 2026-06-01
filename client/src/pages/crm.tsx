@@ -52,6 +52,7 @@ interface CrmStage {
   color: string;
   position: number;
   isActive: boolean;
+  followUpDays?: number | null;
 }
 
 const COLOR_MAP: Record<string, { color: string; bg: string; border: string; dropActive: string; hex: string }> = {

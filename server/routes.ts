@@ -16990,12 +16990,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/crm/leads/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const id = parseInt(req.params.id);
-      const updates: any = { ...req.body, updatedAt: new Date() };
-      
+      if (isNaN(id)) return res.status(400).json({ error: 'Invalid lead ID' });
+
+      // Allowlist of patchable fields — prevents mass-assignment of id, createdBy, etc.
+      const ALLOWED = ['companyName', 'stage', 'source', 'estimatedValueUsd', 'notes', 'clientId', 'assignedTo', 'lostReason'] as const;
+      const updates: Record<string, any> = { updatedAt: new Date() };
+      for (const field of ALLOWED) {
+        if (req.body[field] !== undefined) updates[field] = req.body[field];
+      }
+
       // Auto-set dates when stage changes
-      if (req.body.stage === 'won' && !updates.wonAt) updates.wonAt = new Date();
-      if (req.body.stage === 'lost' && !updates.lostAt) updates.lostAt = new Date();
-      
+      if (req.body.stage === 'won') updates.wonAt = new Date();
+      if (req.body.stage === 'lost') updates.lostAt = new Date();
+
       const [lead] = await db.update(crmLeads).set(updates).where(eq(crmLeads.id, id)).returning();
       if (!lead) return res.status(404).json({ error: 'Lead not found' });
       res.json(lead);
@@ -17008,7 +17015,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/crm/leads/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const id = parseInt(req.params.id);
-      await db.delete(crmLeads).where(eq(crmLeads.id, id));
+      if (isNaN(id)) return res.status(400).json({ error: 'Invalid lead ID' });
+      const [deleted] = await db.delete(crmLeads).where(eq(crmLeads.id, id)).returning();
+      if (!deleted) return res.status(404).json({ error: 'Lead not found' });
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
@@ -17064,7 +17073,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // DELETE /api/crm/contacts/:id
   app.delete("/api/crm/contacts/:id", requireAuth, async (req: Request, res: Response) => {
     try {
-      await db.delete(crmContacts).where(eq(crmContacts.id, parseInt(req.params.id)));
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ error: 'Invalid contact ID' });
+      const [deleted] = await db.delete(crmContacts).where(eq(crmContacts.id, id)).returning();
+      if (!deleted) return res.status(404).json({ error: 'Contact not found' });
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
@@ -17104,7 +17116,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // DELETE /api/crm/activities/:id
   app.delete("/api/crm/activities/:id", requireAuth, async (req: Request, res: Response) => {
     try {
-      await db.delete(crmActivities).where(eq(crmActivities.id, parseInt(req.params.id)));
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ error: 'Invalid activity ID' });
+      await db.delete(crmActivities).where(eq(crmActivities.id, id));
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
@@ -17232,10 +17246,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // PATCH /api/crm/reminders/:id — marcar completo u otros cambios
   app.patch("/api/crm/reminders/:id", requireAuth, async (req: Request, res: Response) => {
     try {
-      const updates: any = { ...req.body };
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ error: 'Invalid reminder ID' });
+      const updates: any = {};
+      if (req.body.completed !== undefined) updates.completed = req.body.completed;
       if (req.body.completed === true) updates.completedAt = new Date();
+      if (req.body.description !== undefined) updates.description = req.body.description;
+      if (req.body.dueDate !== undefined) updates.dueDate = new Date(req.body.dueDate);
       const [reminder] = await db.update(crmReminders).set(updates)
-        .where(eq(crmReminders.id, parseInt(req.params.id))).returning();
+        .where(eq(crmReminders.id, id)).returning();
+      if (!reminder) return res.status(404).json({ error: 'Reminder not found' });
       res.json(reminder);
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
@@ -17245,7 +17265,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // DELETE /api/crm/reminders/:id
   app.delete("/api/crm/reminders/:id", requireAuth, async (req: Request, res: Response) => {
     try {
-      await db.delete(crmReminders).where(eq(crmReminders.id, parseInt(req.params.id)));
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ error: 'Invalid reminder ID' });
+      await db.delete(crmReminders).where(eq(crmReminders.id, id));
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
@@ -17256,6 +17278,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/crm/leads/:id/send-email", requireAuth, async (req: Request, res: Response) => {
     try {
       const leadId = parseInt(req.params.id);
+      if (isNaN(leadId)) return res.status(400).json({ error: 'ID de lead inválido' });
+
+      const [existingLead] = await db.select({ id: crmLeads.id }).from(crmLeads).where(eq(crmLeads.id, leadId));
+      if (!existingLead) return res.status(404).json({ error: 'Lead no encontrado' });
+
       const { to, subject, body, contactId } = req.body;
       const userId = (req.session as any)?.userId;
 

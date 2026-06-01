@@ -246,7 +246,7 @@ export function normalizeIncomeRow(row: any): DualNormalizedIncome | null {
     console.log(`🔧 DB FIELDS: Monto_USD=${dbRow.Monto_USD}, Monto_ARS=${dbRow.Monto_ARS}, amountLocal=${dbRow.amountLocal}, currency=${dbRow.currency}, amountUsd=${dbRow.amountUsd}`);
     
     const hasUsd = isFiniteNumber(dbRow.Monto_USD) || isFiniteNumber(dbRow.amountUsd);
-    const hasArs = isFiniteNumber(dbRow.Monto_ARS) || isFiniteNumber(dbRow.amountLocal && dbRow.currency === 'ARS');
+    const hasArs = isFiniteNumber(dbRow.Monto_ARS) || (isFiniteNumber(dbRow.amountLocal) && dbRow.currency === 'ARS');
     
     console.log(`🔧 DETECTION: hasUsd=${hasUsd}, hasArs=${hasArs}`);
     
