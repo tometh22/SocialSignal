@@ -63,6 +63,7 @@ type StatusRow = {
   reviewUpdatedBy: number | null;
   reviewUpdatedByName: string | null;
   noteCount: number;
+  unreadCount: number;
   lastNoteContent: string | null;
   lastNoteAt: string | null;
   lastNoteAuthorId: number | null;
@@ -88,6 +89,7 @@ type CustomItem = {
   updatedBy: number | null;
   updatedByName: string | null;
   noteCount?: number;
+  unreadCount?: number;
   lastNoteContent?: string | null;
   lastNoteAt?: string | null;
   lastNoteAuthorId?: number | null;
@@ -194,6 +196,7 @@ function weekLabel() {
 
 function relTime(s: string) {
   const diff = Math.floor((Date.now() - new Date(s).getTime()) / 1000);
+  if (diff < 0) return 'ahora';
   if (diff < 60) return 'ahora';
   if (diff < 3600) return `hace ${Math.floor(diff / 60)}m`;
   if (diff < 86400) return `hace ${Math.floor(diff / 3600)}h`;
@@ -221,15 +224,6 @@ function fullDateTime(s: string) {
 function initials(name: string | null) {
   if (!name) return '?';
   return name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
-}
-
-function isThisWeek(dateStr: string | null): boolean {
-  if (!dateStr) return false;
-  const d = new Date(dateStr);
-  const now = new Date();
-  const mon = new Date(now); mon.setDate(now.getDate() - ((now.getDay() + 6) % 7));
-  mon.setHours(0, 0, 0, 0);
-  return d >= mon;
 }
 
 function isStale(dateStr: string | null): boolean {
@@ -2381,15 +2375,17 @@ export default function StatusSemanalPage() {
     return () => window.removeEventListener('keydown', handler);
   }, [notesOpen, confirmDelete, kbFocusKey, showExport]);
 
+  const aiCooldownRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (aiCooldownRef.current) clearTimeout(aiCooldownRef.current); }, []);
+
   const aiMutation = useMutation({
     mutationFn: () => mutationFetch('/api/status-semanal/ai-summary', 'POST'),
     onSuccess: (data: AISummary) => {
       setAiSummary(data);
       try { localStorage.setItem('status-semanal-ai-summary', JSON.stringify(data)); } catch {}
       toast({ title: 'Resumen generado', description: `Score del portafolio: ${data.weeklyScore}/100` });
-      // Cooldown 30s to prevent excessive API calls
       setAiCooldown(true);
-      setTimeout(() => setAiCooldown(false), 30000);
+      aiCooldownRef.current = setTimeout(() => setAiCooldown(false), 30000);
     },
     onError: (err: Error) => {
       toast({ title: 'Error al generar resumen IA', description: err.message, variant: 'destructive' });
@@ -2569,7 +2565,7 @@ export default function StatusSemanalPage() {
     decisionNeeded: r.decisionNeeded,
     hiddenFromWeekly: r.hiddenFromWeekly,
     noteCount: r.noteCount,
-    unreadCount: (r as any).unreadCount ?? 0,
+    unreadCount: r.unreadCount ?? 0,
     isOverdue: isOverdue(r.deadline),
     updatedAt: r.reviewUpdatedAt,
     updatedById: r.reviewUpdatedBy,
@@ -2598,7 +2594,7 @@ export default function StatusSemanalPage() {
     decisionNeeded: c.decisionNeeded,
     hiddenFromWeekly: c.hiddenFromWeekly,
     noteCount: c.noteCount ?? 0,
-    unreadCount: (c as any).unreadCount ?? 0,
+    unreadCount: c.unreadCount ?? 0,
     isOverdue: isOverdue(c.deadline),
     updatedAt: c.updatedAt,
     updatedById: c.updatedBy,
@@ -3364,12 +3360,11 @@ export default function StatusSemanalPage() {
             defaultValue=""
             onChange={e => {
               const ownerId = e.target.value ? parseInt(e.target.value) : null;
-              const ownerName = ownerId ? appUsers.find(u => u.id === ownerId)?.name ?? null : null;
               selectedKeys.forEach(key => {
                 const item = visible.find(i => i.key === key);
                 if (!item) return;
                 const h = getItemHandlers(item);
-                h.onUpdate({ ownerId, ownerName });
+                h.onUpdate({ ownerId });
               });
               e.target.value = '';
             }}>
