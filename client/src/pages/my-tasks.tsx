@@ -30,7 +30,7 @@ type Task = {
   priority: string;
 };
 
-type Project = { id: number; name: string; client_name: string };
+type Project = { id: number; name: string; clientName: string | null; source?: string };
 
 const PRIORITY_COLORS: Record<string, string> = {
   low: "text-gray-400",
@@ -111,8 +111,8 @@ export default function MyTasksPage() {
   });
 
   const { data: allProjects = [] } = useQuery<Project[]>({
-    queryKey: ["/api/tasks-projects"],
-    queryFn: () => authFetch("/api/tasks-projects").then(r => r.json()),
+    queryKey: ["/api/tasks/projects"],
+    queryFn: () => authFetch("/api/tasks/projects").then(r => r.json()),
   });
 
   const toggleMutation = useMutation({
@@ -137,7 +137,7 @@ export default function MyTasksPage() {
   const tasksByProject: Record<string, Task[]> = {};
   for (const task of activeTasks) {
     const proj = allProjects.find(p => p.id === task.projectId);
-    const key = proj ? `${proj.client_name} · ${proj.name}` : "Sin proyecto";
+    const key = proj ? `${proj.clientName} · ${proj.name}` : "Sin proyecto";
     if (!tasksByProject[key]) tasksByProject[key] = [];
     tasksByProject[key].push(task);
   }
@@ -280,12 +280,12 @@ export default function MyTasksPage() {
                                     )}>
                                       {task.title}
                                     </p>
-                                    {proj && <p className="text-[10px] opacity-70 truncate">{proj.client_name}</p>}
+                                    {proj && <p className="text-[10px] opacity-70 truncate">{proj.clientName}</p>}
                                   </div>
                                 </TooltipTrigger>
                                 <TooltipContent side="top" className="max-w-[200px]">
                                   <p className="font-medium">{task.title}</p>
-                                  {proj && <p className="text-xs opacity-80">{proj.client_name} · {proj.name}</p>}
+                                  {proj && <p className="text-xs opacity-80">{proj.clientName} · {proj.name}</p>}
                                   {task.dueDate && <p className="text-xs opacity-70">Vence: {format(parseISO(task.dueDate), "dd/MM/yyyy")}</p>}
                                 </TooltipContent>
                               </Tooltip>
@@ -314,7 +314,7 @@ export default function MyTasksPage() {
                                         onClick={() => { setSelectedTaskId(task.id); setOverflowDay(null); }}
                                       >
                                         <p className={cn("font-medium truncate", style.text)}>{task.title}</p>
-                                        {proj && <p className="text-[10px] opacity-70">{proj.client_name}</p>}
+                                        {proj && <p className="text-[10px] opacity-70">{proj.clientName}</p>}
                                       </div>
                                     );
                                   })}
@@ -394,7 +394,7 @@ export default function MyTasksPage() {
                                   </span>
                                 </div>
                                 <span className="text-xs text-muted-foreground truncate" onClick={() => setSelectedTaskId(task.id)}>
-                                  {proj?.client_name || "—"}
+                                  {proj?.clientName || "—"}
                                 </span>
                                 <span
                                   className={cn("text-xs text-center", task.dueDate && new Date(task.dueDate) < new Date() && task.status !== "done" ? "text-red-500 font-medium" : "text-muted-foreground")}
@@ -441,16 +441,16 @@ export default function MyTasksPage() {
                   <SelectContent>
                     <SelectItem value="none">Sin proyecto</SelectItem>
                     {allProjects.map(p => (
-                      <SelectItem key={p.id} value={p.id.toString()}>{p.client_name} · {p.name}</SelectItem>
+                      <SelectItem key={p.id} value={p.id.toString()}>{p.clientName} · {p.name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
                 {newTaskProjectId !== "none" && (() => {
                   const proj = allProjects.find(p => p.id === parseInt(newTaskProjectId));
-                  return proj?.client_name ? (
+                  return proj?.clientName ? (
                     <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                       <span>Cliente:</span>
-                      <Badge variant="outline" className="text-xs px-1.5 py-0 font-normal">{proj.client_name}</Badge>
+                      <Badge variant="outline" className="text-xs px-1.5 py-0 font-normal">{proj.clientName}</Badge>
                     </div>
                   ) : null;
                 })()}

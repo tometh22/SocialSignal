@@ -711,6 +711,11 @@ function SectionBlock({ sectionName, tasks, projectId, allPersonnel, projectMemb
   const renameMutation = useMutation({
     mutationFn: (newName: string) => apiRequest("/api/tasks/section/rename", "PUT", { projectId, oldName: sectionName, newName }),
     onSuccess: () => { onRefresh(); setRenamingSection(false); toast({ title: "Sección renombrada" }); },
+    onError: (err: any) => {
+      setRenamingSection(false);
+      setNewSectionName(sectionName);
+      toast({ title: "No se pudo renombrar", description: err?.message || "Nombre en conflicto", variant: "destructive" });
+    },
   });
 
   const deleteMutation = useMutation({
