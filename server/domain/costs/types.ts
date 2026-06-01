@@ -54,8 +54,12 @@ export type ProjectCost = {
 
 export type CostsResult = {
   period: PeriodKey;
+  // Solo costos directos (indirectos excluidos de proyectos individuales)
   projects: ProjectCost[];
-  portfolioCostUSD: number; // suma de costUSDNormalized
+  // Total directo + indirecto (para display de portfolio)
+  portfolioCostUSD: number;
+  // Solo costos directos (para validación: debe ser igual a Σ projects.costUSDNormalized)
+  directCostsTotalUSD: number;
 };
 
 // ==================== RAW DATA TYPES ====================

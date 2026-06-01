@@ -413,7 +413,8 @@ export async function processCostsForPeriod(
     return {
       period,
       projects: [],
-      portfolioCostUSD: 0
+      portfolioCostUSD: 0,
+      directCostsTotalUSD: 0
     };
   }
   
@@ -429,32 +430,42 @@ export async function processCostsForPeriod(
   // 4. For now, return only direct costs (exclude indirect from project list)
   const finalProjects = directCosts;
   
-  console.log(`✅ COST PROCESSING: Completed for ${period} - ${finalProjects.length} projects, ${portfolioTotal.toFixed(2)} USD total`);
-  
+  const directCostsTotalUSD = directCosts.reduce((sum, c) => sum + c.costUSDNormalized, 0);
+
+  console.log(`✅ COST PROCESSING: Completed for ${period} - ${finalProjects.length} direct projects, directUSD=${directCostsTotalUSD.toFixed(2)}, portfolioUSD=${portfolioTotal.toFixed(2)}`);
+
   return {
     period,
     projects: finalProjects,
-    portfolioCostUSD: portfolioTotal
+    portfolioCostUSD: portfolioTotal,
+    directCostsTotalUSD
   };
 }
 
 // ==================== DEBUGGING & VALIDATION ====================
 
 export function validateCostResult(result: CostsResult): boolean {
-  const calculatedTotal = result.projects.reduce((sum, p) => sum + p.costUSDNormalized, 0);
+  // result.projects contiene SOLO costos directos.
+  // portfolioCostUSD puede incluir indirectos (strategy: 'portfolio-only').
+  // La validación correcta es: Σ projects == directCostsTotalUSD.
+  const calculatedDirectTotal = result.projects.reduce((sum, p) => sum + p.costUSDNormalized, 0);
   const tolerance = 0.01;
-  
-  const isValid = Math.abs(calculatedTotal - result.portfolioCostUSD) < tolerance;
-  
+
+  const isValid = Math.abs(calculatedDirectTotal - result.directCostsTotalUSD) < tolerance;
+
   if (!isValid) {
     console.error(`❌ COST VALIDATION FAILED:`, {
-      declared: result.portfolioCostUSD,
-      calculated: calculatedTotal,
-      difference: Math.abs(calculatedTotal - result.portfolioCostUSD)
+      declaredDirect: result.directCostsTotalUSD,
+      calculatedDirect: calculatedDirectTotal,
+      difference: Math.abs(calculatedDirectTotal - result.directCostsTotalUSD),
+      portfolioTotal: result.portfolioCostUSD
     });
   } else {
-    console.log(`✅ COST VALIDATION: Portfolio total matches project sum (${result.portfolioCostUSD.toFixed(2)} USD)`);
+    console.log(
+      `✅ COST VALIDATION: Direct costs match (${result.directCostsTotalUSD.toFixed(2)} USD). ` +
+      `Portfolio with overhead: ${result.portfolioCostUSD.toFixed(2)} USD`
+    );
   }
-  
+
   return isValid;
 }
