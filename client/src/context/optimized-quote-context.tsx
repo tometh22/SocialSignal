@@ -123,6 +123,8 @@ interface OptimizedQuoteContextType {
   getPersonnelRate: (personnelId: number, targetCurrency?: string, targetMonth?: string | null) => number;
   // Mes histórico a considerar para tarifas al agregar personal a la cotización.
   updateSalaryMonth: (salaryMonth: string | null) => void;
+  // Retorna el mes que efectivamente se está usando en modo automático.
+  getResolvedSalaryMonth: () => string | null;
 
   // Deliverables
   updateDeliverables: (deliverables: any[]) => void;
@@ -289,6 +291,26 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
     staleTime: 0, // Force fresh data after fixes
   });
 
+  // Fetch estimated rates only when rate projection mode requires them
+  const needsEstimatedRates = ['projected', 'annual_avg'].includes(
+    quotationData.inflation.rateProjectionMode ?? 'current'
+  );
+  const currentYear = new Date().getFullYear();
+  const { data: estimatedRatesData = [] } = useQuery<any[]>({
+    queryKey: ["/api/estimated-rates", currentYear],
+    enabled: needsEstimatedRates,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Personnel filtered to exclude inactive (activeUntil passed)
+  const filteredPersonnel = useMemo(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    return personnel.filter((p: any) => {
+      const until = p.activeUntil;
+      return !until || until >= today;
+    });
+  }, [personnel]);
+
   // All historical months, newest → oldest. Used for explicit month lookups (when a
   // specific month is selected — including future projections).
   const HISTORICAL_MONTHS_DESC = [
@@ -325,6 +347,31 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
       return 50;
     }
 
+    const rateMode = quotationData.inflation.rateProjectionMode ?? 'current';
+
+    // Projected mode: use estimated rate for the project start month
+    if (rateMode === 'projected' && estimatedRatesData.length > 0) {
+      const startDate = quotationData.inflation.projectStartDate
+        ? new Date(quotationData.inflation.projectStartDate)
+        : new Date();
+      const rate = estimatedRatesData.find((r: any) =>
+        r.personnelId === personnelId &&
+        r.year === startDate.getFullYear() &&
+        r.month === startDate.getMonth() + 1
+      );
+      if (rate?.estimatedRateARS > 0) return rate.estimatedRateARS;
+    }
+
+    // Annual average mode: average of all estimated rates for the year
+    if (rateMode === 'annual_avg' && estimatedRatesData.length > 0) {
+      const personRates = estimatedRatesData.filter((r: any) =>
+        r.personnelId === personnelId && r.year === currentYear && r.estimatedRateARS > 0
+      );
+      if (personRates.length > 0) {
+        return personRates.reduce((s: number, r: any) => s + r.estimatedRateARS, 0) / personRates.length;
+      }
+    }
+
     const month = targetMonth ?? quotationData.salaryMonth;
 
     // 1) Si la cotización fija un mes específico, intentar ese mes primero.
@@ -349,7 +396,18 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
     if (person.hourlyRateARS && person.hourlyRateARS > 0) return person.hourlyRateARS;
 
     return 5000;
-  }, [personnel, quotationData.quotationCurrency, quotationData.salaryMonth]);
+  }, [personnel, quotationData.quotationCurrency, quotationData.salaryMonth,
+      quotationData.inflation.rateProjectionMode, quotationData.inflation.projectStartDate,
+      estimatedRatesData, currentYear]);
+
+  // Returns the month key actually being used in auto-mode (null if no data found)
+  const getResolvedSalaryMonth = useCallback((): string | null => {
+    if (quotationData.salaryMonth) return quotationData.salaryMonth;
+    for (const m of CURRENT_OR_PAST_MONTHS_DESC) {
+      if (personnel.some((p: any) => (p as any)[`${m}HourlyRateARS`] > 0)) return m;
+    }
+    return null;
+  }, [personnel, quotationData.salaryMonth]);
 
   // Force recalculation function with debouncing
   const forceRecalculate = useCallback(() => {
@@ -1369,7 +1427,7 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
     totalAmount,
     complexityFactors,
     availableRoles: roles,
-    availablePersonnel: personnel,
+    availablePersonnel: filteredPersonnel,
     recommendedRoleIds,
     currentStep,
     nextStep,
@@ -1414,6 +1472,7 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
     updateQuotationData,
     // Currency conversion helper
     getPersonnelRate,
+    getResolvedSalaryMonth,
     updateSalaryMonth,
     // Templates
     saveAsTemplate,

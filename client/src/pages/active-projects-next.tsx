@@ -58,6 +58,7 @@ export type ProjectItem = {
   isFinished?: boolean;
   supportsRollup?: boolean;
   allowFinish?: boolean;
+  projectCategory?: 'billable' | 'internal';
 };
 
 export const LIFECYCLE_LABELS: Record<LifecycleStatus, string> = {
@@ -365,6 +366,8 @@ function Controls({
   setActiveOnly,
   statusFilter,
   setStatusFilter,
+  categoryFilter,
+  setCategoryFilter,
 }: {
   period: string;
   setPeriod: (p: string) => void;
@@ -376,6 +379,8 @@ function Controls({
   setActiveOnly: (v: boolean) => void;
   statusFilter: LifecycleStatus | "all";
   setStatusFilter: (s: LifecycleStatus | "all") => void;
+  categoryFilter: 'all' | 'billable' | 'internal';
+  setCategoryFilter: (c: 'all' | 'billable' | 'internal') => void;
 }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -448,6 +453,17 @@ function Controls({
         <option value="completed">Finalizados</option>
         <option value="cancelled">Cancelados</option>
         <option value="voided">Anulados</option>
+      </select>
+
+      {/* Category filter */}
+      <select
+        value={categoryFilter}
+        onChange={e => setCategoryFilter(e.target.value as 'all' | 'billable' | 'internal')}
+        className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+      >
+        <option value="all">Todos los tipos</option>
+        <option value="billable">Facturables</option>
+        <option value="internal">Internos</option>
       </select>
 
       {/* Active filter */}
@@ -606,6 +622,11 @@ function ProjectRow({
             {p.isOneShot && (
               <span className="text-[10px] bg-indigo-50 text-indigo-600 rounded px-1.5 py-0.5 flex-shrink-0">
                 PUNTUAL
+              </span>
+            )}
+            {p.projectCategory === 'internal' && (
+              <span className="text-[10px] bg-slate-100 text-slate-600 rounded px-1.5 py-0.5 flex-shrink-0">
+                INTERNO
               </span>
             )}
             {(p.anomaly?.length ?? 0) > 0 && (
@@ -800,6 +821,7 @@ export default function ActiveProjectsNext() {
   const [search, setSearch] = useState("");
   const [activeOnly, setActiveOnly] = useState(true);
   const [statusFilter, setStatusFilter] = useState<LifecycleStatus | "all">("all");
+  const [categoryFilter, setCategoryFilter] = useState<'all' | 'billable' | 'internal'>('all');
 
   useEffect(() => {
     if (typeof window !== "undefined") window.localStorage.setItem("ap.period", period);
@@ -827,6 +849,7 @@ export default function ActiveProjectsNext() {
       .filter(p => {
         if (activeOnly && !isRecentlyActive(p, period)) return false;
         if (statusFilter !== "all" && (p.lifecycleStatus ?? "active") !== statusFilter) return false;
+        if (categoryFilter !== "all" && (p.projectCategory ?? 'billable') !== categoryFilter) return false;
         if (q && !`${p.clientName} ${p.projectName}`.toLowerCase().includes(q)) return false;
         return true;
       })
@@ -921,6 +944,8 @@ export default function ActiveProjectsNext() {
           setActiveOnly={setActiveOnly}
           statusFilter={statusFilter}
           setStatusFilter={setStatusFilter}
+          categoryFilter={categoryFilter}
+          setCategoryFilter={setCategoryFilter}
         />
 
         {/* KPI Bar */}

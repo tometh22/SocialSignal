@@ -318,14 +318,20 @@ export default function ProjectDetail() {
     pid, "current_month", periodFromUrl, "operativa"
   );
 
+  // Tabs visible depending on role: operations sees all; team members skip Finanzas
+  const visibleTabs = isOperations ? TABS : TABS.filter(t => t.value !== 'finanzas');
+
   // ── Active tab — persists in URL via ?tab=<value> so it's shareable ──
   const tabFromUrl = urlParams.get("tab");
-  const [activeTab, setActiveTabState] = useState<TabValue>(
-    isTabValue(tabFromUrl) ? tabFromUrl : "resumen"
-  );
+  const [activeTab, setActiveTabState] = useState<TabValue>(() => {
+    const requested = isTabValue(tabFromUrl) ? tabFromUrl : "resumen";
+    if (requested === 'finanzas' && !isOperations) return 'resumen';
+    return requested;
+  });
 
   const setActiveTab = (next: string) => {
     if (!isTabValue(next)) return;
+    if (next === 'finanzas' && !isOperations) return;
     setActiveTabState(next);
     const params = new URLSearchParams(window.location.search);
     params.set("tab", next);
@@ -437,7 +443,7 @@ export default function ProjectDetail() {
             "inline-flex flex-wrap items-center justify-start gap-0.5"
           )}
         >
-          {TABS.map(t => (
+          {visibleTabs.map(t => (
             <TabsTrigger
               key={t.value}
               value={t.value}

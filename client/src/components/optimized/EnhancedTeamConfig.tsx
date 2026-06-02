@@ -9,20 +9,21 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator';
 import { Personnel, Role } from '@shared/schema';
 import { parseDecimalInput } from '@/lib/number-utils';
-import { 
-  Clock, 
-  UserPlus, 
-  Users, 
-  Edit, 
-  Check, 
-  X, 
-  Trash2, 
+import {
+  Clock,
+  UserPlus,
+  Users,
+  Edit,
+  Check,
+  X,
+  Trash2,
   GripVertical,
   Plus,
   Calculator,
   Star,
   User,
-  DollarSign
+  DollarSign,
+  Info
 } from 'lucide-react';
 import { motion, AnimatePresence, Reorder } from 'framer-motion';
 
@@ -66,7 +67,9 @@ const EnhancedTeamConfig: React.FC = () => {
     availablePersonnel,
     recommendedRoleIds,
     getPersonnelRate,
-    updateSalaryMonth
+    getResolvedSalaryMonth,
+    updateSalaryMonth,
+    updateInflation
   } = useOptimizedQuote();
 
   // Estados para la nueva UI
@@ -332,18 +335,56 @@ const EnhancedTeamConfig: React.FC = () => {
               Se usará como tarifa por defecto al agregar personas. Podés ajustar manualmente cada fila después.
             </p>
           </div>
+          <div className="flex flex-col gap-1">
+            <Select
+              value={quotationData.salaryMonth ?? SALARY_MONTH_AUTO}
+              onValueChange={(value) => updateSalaryMonth(value === SALARY_MONTH_AUTO ? null : value)}
+            >
+              <SelectTrigger className="w-full md:w-56 bg-white">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={SALARY_MONTH_AUTO}>Más reciente disponible</SelectItem>
+                {SALARY_MONTH_OPTIONS.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {!quotationData.salaryMonth && (
+              <span className="text-xs text-amber-700 flex items-center gap-1">
+                <Info className="h-3 w-3" />
+                Usando:&nbsp;
+                <span className="font-medium">{
+                  SALARY_MONTH_OPTIONS.find(o => o.value === getResolvedSalaryMonth())?.label
+                  ?? getResolvedSalaryMonth()
+                  ?? '—'
+                }</span>
+              </span>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Proyección de tarifas */}
+      <Card className="border-blue-200 bg-blue-50/40">
+        <CardContent className="py-3 px-4 flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+          <div>
+            <Label className="text-sm font-medium text-blue-900">Proyección de tarifas</Label>
+            <p className="text-xs text-blue-700">
+              Cómo se calculan las tarifas del equipo para esta cotización.
+            </p>
+          </div>
           <Select
-            value={quotationData.salaryMonth ?? SALARY_MONTH_AUTO}
-            onValueChange={(value) => updateSalaryMonth(value === SALARY_MONTH_AUTO ? null : value)}
+            value={quotationData.inflation.rateProjectionMode ?? 'current'}
+            onValueChange={(v) => updateInflation({ rateProjectionMode: v as any })}
           >
-            <SelectTrigger className="w-full md:w-56 bg-white">
+            <SelectTrigger className="w-full md:w-64 bg-white">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={SALARY_MONTH_AUTO}>Más reciente disponible</SelectItem>
-              {SALARY_MONTH_OPTIONS.map((opt) => (
-                <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-              ))}
+              <SelectItem value="current">Foto del mes seleccionado</SelectItem>
+              <SelectItem value="projected">Tarifa estimada proyectada</SelectItem>
+              <SelectItem value="annual_avg">Promedio anual estimado</SelectItem>
             </SelectContent>
           </Select>
         </CardContent>

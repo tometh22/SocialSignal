@@ -176,6 +176,23 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
     };
   }, [user, lastActivity, setLocation, toast]);
 
+  const variantsStep = quotationData.project?.type === 'always-on' ? 8 : 7;
+
+  const handleNextStep = async () => {
+    // Auto-save before entering the variants step if quote not yet saved
+    if (currentStep === variantsStep - 1 && !quotationData.id) {
+      try {
+        setIsSaving(true);
+        await saveQuotation('draft');
+      } catch {
+        // Non-fatal: proceed even if save fails
+      } finally {
+        setIsSaving(false);
+      }
+    }
+    nextStep();
+  };
+
   const handleSave = async () => {
     try {
       setIsSaving(true);
@@ -494,9 +511,11 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
 
             <div className="flex gap-3">
               <Button
-                onClick={nextStep}
+                onClick={handleNextStep}
+                disabled={isSaving}
                 className="bg-primary hover:bg-primary/90 text-white flex items-center px-6"
               >
+                {isSaving ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
                 Siguiente
                 <ChevronRight className="h-4 w-4 ml-1" />
               </Button>

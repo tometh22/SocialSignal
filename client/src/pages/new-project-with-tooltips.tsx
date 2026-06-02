@@ -47,6 +47,7 @@ const formSchema = z.object({
   quotationId: z.number().optional(),
   clientId: z.number({ required_error: "El cliente es requerido" }),
   status: z.string().min(1, "El estado es requerido"),
+  projectCategory: z.enum(["billable", "internal"]).default("billable"),
   trackingFrequency: z.string().min(1, "La frecuencia es requerida"),
   startDate: z.date(),
   expectedEndDate: z.date().optional(),
@@ -66,6 +67,7 @@ export default function NewProjectWithTooltips() {
     resolver: zodResolver(formSchema),
     defaultValues: {
       status: "active",
+      projectCategory: "billable",
       trackingFrequency: "weekly",
       startDate: new Date(),
       notes: "",
@@ -321,6 +323,29 @@ export default function NewProjectWithTooltips() {
                                 {option.label}
                               </SelectItem>
                             ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {/* Tipo de proyecto */}
+                  <FormField
+                    control={form.control}
+                    name="projectCategory"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Tipo de proyecto</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="billable">Facturable</SelectItem>
+                            <SelectItem value="internal">Interno (no facturable)</SelectItem>
                           </SelectContent>
                         </Select>
                         <FormMessage />
