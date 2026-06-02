@@ -90,6 +90,10 @@ export default function FinancialReviewFinal() {
     }
   }, [quotationData.financials?.marginFactor, quotationData.financials?.discountPercentage]);
 
+  // Declare currency hook early so safeRate is available for toolsCostARS conversion below
+  const { convertToUSD, exchangeRate } = useCurrency();
+  const safeRate = typeof exchangeRate === 'number' && exchangeRate > 0 ? exchangeRate : 1;
+
   const currencyLabel = quotationData.quotationCurrency || 'ARS';
   const formatFinalCurrency = (amount: number) => 
     `${currencyLabel} ${amount.toLocaleString('es-AR', { 
@@ -201,7 +205,9 @@ export default function FinancialReviewFinal() {
   }
 
   const platformCostARS = quotationData.financials.platformCost || 0;
-  const toolsCostARS = quotationData.financials.toolsCost || 0;
+  // toolsCost is stored in USD — multiply by safeRate to get the ARS equivalent
+  const toolsCostUSD_stored = quotationData.financials.toolsCost || 0;
+  const toolsCostARS = toolsCostUSD_stored * safeRate;
   const subtotalWithPlatformARS = finalBaseAfterInflationARS + platformCostARS;
 
   // Check if we're in manual pricing mode
@@ -231,14 +237,12 @@ export default function FinancialReviewFinal() {
   }
 
   // Create USD equivalents for calculations that need them
-  const { convertToUSD, exchangeRate } = useCurrency();
-  // Guard against missing/zero exchange rate to prevent NaN/Infinity in manual mode
-  const safeRate = typeof exchangeRate === 'number' && exchangeRate > 0 ? exchangeRate : 1;
+  // useCurrency() and safeRate are declared near the top of this component
   const subtotalWithPlatformUSD = safeRate > 1 ? convertToUSD(subtotalWithPlatformARS, 'ARS') : 0;
   const subtotalWithMarginUSD = safeRate > 1 ? convertToUSD(subtotalWithMarginARS, 'ARS') : 0;
   const finalTotalUSD = safeRate > 1 ? convertToUSD(finalTotalARS, 'ARS') : 0;
   const inflationAdjustmentUSD = safeRate > 1 ? convertToUSD(inflationAdjustmentARS, 'ARS') : 0;
-  const toolsCostUSD = safeRate > 1 ? convertToUSD(toolsCostARS, 'ARS') : 0;
+  const toolsCostUSD = toolsCostUSD_stored; // already in USD — no second conversion needed
   
   // All values are already in ARS - no conversion needed for display
   const teamBaseCostDisplay = teamBaseCostARS;
