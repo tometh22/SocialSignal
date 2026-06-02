@@ -598,9 +598,9 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
 
       // Keep manual price in ARS (no conversion needed)
       const manualPriceARS = quotationData.financials.manualPrice;
-      const toolsCost = quotationData.financials.toolsCost || 0;
-      // Manual price includes tools, so we need to subtract tools to get the base for markup calculation
-      const priceBeforeTools = manualPriceARS - toolsCost;
+      // toolsCost is stored in USD — convert to ARS before subtracting from an ARS price
+      const toolsCostARS_manual = (quotationData.financials.toolsCost || 0) * (exchangeRate || 1);
+      const priceBeforeTools = manualPriceARS - toolsCostARS_manual;
       calculatedMarkup = priceBeforeTools - subtotalWithComplexity;
       const marginFactor = subtotalWithComplexity > 0 ? (priceBeforeTools / subtotalWithComplexity) : 1;
 
@@ -632,10 +632,10 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
       console.log(`📈 Auto subtotal with markup: $${subtotalWithMarkup} ARS`);
     }
 
-    // Add tools cost AFTER markup
-    const toolsCost = quotationData.financials.toolsCost || 0;
-    const subtotalWithTools = subtotalWithMarkup + toolsCost;
-    console.log(`🔧 Tools cost (added after markup): ${toolsCost} ARS, Subtotal with tools: ${subtotalWithTools} ARS`);
+    // Add tools cost AFTER markup — convert from USD to ARS first
+    const toolsCostARS_auto = (quotationData.financials.toolsCost || 0) * (exchangeRate || 1);
+    const subtotalWithTools = subtotalWithMarkup + toolsCostARS_auto;
+    console.log(`🔧 Tools cost (added after markup): ${toolsCostARS_auto} ARS (${quotationData.financials.toolsCost || 0} USD × TC), Subtotal with tools: ${subtotalWithTools} ARS`);
 
     // Update the variable name for consistency
     subtotalWithMarkup = subtotalWithTools;
@@ -712,7 +712,7 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
     console.log(`💰 FINAL VALUES: Base: $${finalBaseCost}, Complexity: $${finalComplexityAdjustment}, Markup: $${finalMarkupAmount}, Total: $${finalTotalAmount}`);
     console.log('💰 === COST CALCULATION END ===');
 
-  }, [quotationData.teamMembers, quotationData.template, quotationData.financials, complexityFactors, roles, recalculationTrigger]);
+  }, [quotationData.teamMembers, quotationData.template, quotationData.financials, complexityFactors, roles, recalculationTrigger, exchangeRate]);
 
   // Navigation functions
   const nextStep = useCallback(() => {

@@ -424,8 +424,8 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
     mutationFn: (data: any) => apiRequest(`/api/tasks/${taskId}/time`, "POST", data),
     onSuccess: () => {
       refetchTask();
+      onUpdate?.();
       queryClient.invalidateQueries({ queryKey: ["/api/tasks/hours-summary"] });
-      // Also refresh the project task list so the logged hours appear in the row summary
       if (task?.projectId) {
         queryClient.invalidateQueries({ queryKey: ["/api/tasks/project", task.projectId] });
       }
@@ -439,6 +439,7 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
       apiRequest(`/api/tasks/${subtaskId}/time`, "POST", data),
     onSuccess: () => {
       refetchTask();
+      onUpdate?.();
       if (task?.projectId) {
         queryClient.invalidateQueries({ queryKey: ["/api/tasks/project", task.projectId] });
       }
