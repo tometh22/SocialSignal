@@ -85,6 +85,7 @@ export default function CapacityDashboard() {
   const totals = personnel.length > 0 ? {
     totalMaxCapacity: personnel.reduce((s: number, p: any) => s + p.maxCapacity, 0),
     totalActualHours: personnel.reduce((s: number, p: any) => s + p.actualHours, 0),
+    totalEstimatedHours: personnel.reduce((s: number, p: any) => s + (p.estimatedHours || 0), 0),
     totalIdleHours: personnel.reduce((s: number, p: any) => s + p.idleHours, 0),
     avgUtilization: Math.round(personnel.reduce((s: number, p: any) => s + p.utilizationPct, 0) / personnel.length),
   } : data?.totals;
@@ -148,7 +149,7 @@ export default function CapacityDashboard() {
       )}
 
       {isOperations && totals && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
           <Card>
             <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Capacidad Total</CardTitle></CardHeader>
             <CardContent><span className="text-2xl font-bold">{totals.totalMaxCapacity.toFixed(0)}h</span></CardContent>
@@ -156,6 +157,10 @@ export default function CapacityDashboard() {
           <Card>
             <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Horas Trabajadas</CardTitle></CardHeader>
             <CardContent><span className="text-2xl font-bold">{totals.totalActualHours.toFixed(0)}h</span></CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Horas Estimadas</CardTitle></CardHeader>
+            <CardContent><span className="text-2xl font-bold text-blue-600">{(totals.totalEstimatedHours || 0).toFixed(0)}h</span></CardContent>
           </Card>
           <Card>
             <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Horas Ociosas</CardTitle></CardHeader>
@@ -195,6 +200,7 @@ export default function CapacityDashboard() {
                     <th className="text-left py-2 px-3">Persona</th>
                     <th className="text-center py-2 px-3">Cap. Máxima</th>
                     <th className="text-center py-2 px-3">Horas Reales</th>
+                    <th className="text-center py-2 px-3">Horas Est.</th>
                     {isOperations && <th className="text-center py-2 px-3">Horas Ociosas</th>}
                     <th className="text-center py-2 px-3">Utilización</th>
                   </tr>
@@ -279,6 +285,17 @@ export default function CapacityDashboard() {
                           )}
                         </td>
                         <td className="text-center py-2 px-3">{p.actualHours.toFixed(1)}h</td>
+                        <td className="text-center py-2 px-3">
+                          <span className={
+                            p.estimatedHours > p.maxCapacity
+                              ? "text-red-600 font-medium"
+                              : p.estimatedHours > 0
+                              ? "text-blue-600"
+                              : "text-muted-foreground"
+                          }>
+                            {(p.estimatedHours || 0).toFixed(1)}h
+                          </span>
+                        </td>
                         {isOperations && (
                           <td className="text-center py-2 px-3">
                             <span className={p.idleHours > 0 ? "text-amber-600" : "text-green-600"}>

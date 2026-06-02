@@ -17401,7 +17401,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const personnelRecord = user?.email
         ? await db.select().from(personnel).where(eq(personnel.email, user.email)).limit(1)
         : [];
-      
+
       let myTasks: any[] = [];
       if (personnelRecord.length > 0) {
         const pid = personnelRecord[0].id;
@@ -17412,8 +17412,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (dateTo) conditions.push(lte(tasks.dueDate, new Date(dateTo as string)));
         myTasks = await db.select().from(tasks).where(and(...conditions)).orderBy(asc(tasks.dueDate), asc(tasks.position));
       }
-      
-      res.json({ tasks: myTasks, personnelId: personnelRecord[0]?.id || null });
+
+      // Enrich with project and client names
+      const projectsWithNames = await db.execute(sql`
+        SELECT ap.id, q.project_name, c.name as client_name
+        FROM active_projects ap
+        JOIN quotations q ON q.id = ap.quotation_id
+        JOIN clients c ON c.id = ap.client_id
+      `);
+      const projectMap = new Map((projectsWithNames.rows as any[]).map(p => [p.id, { name: p.project_name, client: p.client_name }]));
+      const ownProjectNames = await db.execute(sql`SELECT id, name FROM task_own_projects`);
+      for (const p of ownProjectNames.rows as any[]) {
+        projectMap.set(p.id + OWN_PROJECT_OFFSET, { name: p.name, client: null });
+      }
+
+      const enriched = myTasks.map(t => ({
+        ...t,
+        projectName: t.projectId ? projectMap.get(t.projectId)?.name ?? null : null,
+        clientName: t.projectId ? projectMap.get(t.projectId)?.client ?? null : null,
+      }));
+
+      res.json({ tasks: enriched, personnelId: personnelRecord[0]?.id || null });
     } catch (error) {
       res.status(500).json({ message: "Error al obtener mis tareas" });
     }
@@ -19521,6 +19540,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
           sql`${personnelAbsences.endDate} >= ${weekStartStr}`
         ));
 
+      // Get estimated hours per person from task_weekly_estimates for this week
+      const weekStartStr2 = weekStartDate.toISOString().split('T')[0];
+      const estimatedHoursRows = await db.execute(sql`
+        SELECT t.assignee_id as personnel_id, COALESCE(SUM(twe.estimated_hours), 0) as estimated_hours
+        FROM task_weekly_estimates twe
+        JOIN tasks t ON t.id = twe.task_id
+        WHERE twe.week_start = ${weekStartStr2}
+          AND t.status NOT IN ('done', 'cancelled')
+          AND t.assignee_id IS NOT NULL
+        GROUP BY t.assignee_id
+      `);
+      const estimatedMap = new Map(
+        (estimatedHoursRows.rows as any[]).map(r => [r.personnel_id, parseFloat(r.estimated_hours) || 0])
+      );
+
       const capacityData = allPersonnel.map(person => {
         const dailyHours = (person.monthlyHours || 160) / 20; // monthly hours / 20 working days
         const maxCapacityBase = dailyHours * workingDays;
@@ -19542,6 +19576,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const personEntries = entries.filter(e => e.personnelId === person.id);
         const actualHours = personEntries.reduce((sum, e) => sum + (e.hours || 0), 0);
         const idleHours = Math.max(0, maxCapacity - actualHours);
+        const estimatedHours = Math.round((estimatedMap.get(person.id) || 0) * 100) / 100;
+        const estimatedIdleHours = Math.max(0, maxCapacity - estimatedHours);
 
         return {
           personnelId: person.id,
@@ -19549,9 +19585,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           roleId: person.roleId,
           maxCapacity: Math.round(maxCapacity * 100) / 100,
           actualHours: Math.round(actualHours * 100) / 100,
+          estimatedHours,
           idleHours: Math.round(idleHours * 100) / 100,
+          estimatedIdleHours: Math.round(estimatedIdleHours * 100) / 100,
           utilizationPct: maxCapacity > 0 ? Math.round((actualHours / maxCapacity) * 100) : 0,
+          estimatedUtilizationPct: maxCapacity > 0 ? Math.round((estimatedHours / maxCapacity) * 100) : 0,
           isOverloaded: actualHours > maxCapacity,
+          isEstimatedOverloaded: estimatedHours > maxCapacity,
           absenceHours: Math.round(absenceHours * 100) / 100,
           isAbsent: absenceHours >= maxCapacityBase && maxCapacityBase > 0,
         };
@@ -19565,9 +19605,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totals: {
           totalMaxCapacity: capacityData.reduce((s, p) => s + p.maxCapacity, 0),
           totalActualHours: capacityData.reduce((s, p) => s + p.actualHours, 0),
+          totalEstimatedHours: capacityData.reduce((s, p) => s + p.estimatedHours, 0),
           totalIdleHours: capacityData.reduce((s, p) => s + p.idleHours, 0),
           avgUtilization: capacityData.length > 0
             ? Math.round(capacityData.reduce((s, p) => s + p.utilizationPct, 0) / capacityData.length)
+            : 0,
+          avgEstimatedUtilization: capacityData.length > 0
+            ? Math.round(capacityData.reduce((s, p) => s + p.estimatedUtilizationPct, 0) / capacityData.length)
             : 0,
         }
       });
