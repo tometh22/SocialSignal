@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, doublePrecision, json, numeric, varchar, unique, pgEnum, jsonb, index, primaryKey } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, doublePrecision, json, numeric, varchar, unique, pgEnum, jsonb, index, primaryKey, date } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations } from "drizzle-orm";
@@ -1599,7 +1599,7 @@ export type InsertTaskTimeEntry = z.infer<typeof insertTaskTimeEntrySchema>;
 export const taskWeeklyEstimates = pgTable("task_weekly_estimates", {
   id: serial("id").primaryKey(),
   taskId: integer("task_id").notNull().references(() => tasks.id, { onDelete: "cascade" }),
-  weekStart: text("week_start").notNull(), // YYYY-MM-DD (Monday)
+  weekStart: date("week_start").notNull(), // YYYY-MM-DD (Monday)
   estimatedHours: doublePrecision("estimated_hours").notNull(),
   createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at").notNull().defaultNow(),

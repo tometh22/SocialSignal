@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { queryClient, apiRequest, authFetch } from "@/lib/queryClient";
@@ -77,6 +78,7 @@ export default function ProjectTasksPage({ params }: Props) {
   const [quickAddTrigger, setQuickAddTrigger] = useState(0);
   const [showFilter, setShowFilter] = useState(false);
   const [filterText, setFilterText] = useState("");
+  const debouncedFilterText = useDebouncedValue(filterText, 250);
   const [localMembers, setLocalMembers] = useState<ProjectMember[] | null>(null);
   const [sortBy, setSortBy] = useState("default");
   const [groupBy, setGroupBy] = useState("section");
@@ -573,7 +575,7 @@ export default function ProjectTasksPage({ params }: Props) {
               view={view as "list" | "board"}
               clientName={project.clientName}
               onQuickAddTrigger={quickAddTrigger}
-              filterText={filterText}
+              filterText={debouncedFilterText}
               sortBy={sortBy}
               groupBy={groupBy}
             />

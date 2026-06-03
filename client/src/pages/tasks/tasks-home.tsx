@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useInfiniteQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { queryClient, apiRequest, authFetch } from "@/lib/queryClient";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -287,9 +287,19 @@ export default function TasksHomePage() {
   const [quickDateOpen, setQuickDateOpen] = useState(false);
   const quickInputRef = useRef<HTMLInputElement>(null);
 
-  const { data: myTasksResponse, refetch: refetchMyTasks } = useQuery({
+  const {
+    data: myTasksPages,
+    refetch: refetchMyTasks,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
     queryKey: ["/api/tasks/my-tasks"],
-    queryFn: () => authFetch("/api/tasks/my-tasks").then(r => r.json()),
+    queryFn: ({ pageParam = 0 }) =>
+      authFetch(`/api/tasks/my-tasks?offset=${pageParam}&limit=50`).then(r => r.json()),
+    getNextPageParam: (lastPage: any) =>
+      lastPage.hasMore ? (lastPage.tasks?.length ?? 0) + (lastPage.offset ?? 0) : undefined,
+    initialPageParam: 0,
   });
 
   const { data: allTasksData } = useQuery<Task[]>({
@@ -372,8 +382,9 @@ export default function TasksHomePage() {
     dateMutation.mutate({ taskId, date });
   }, [dateMutation]);
 
-  const raw = myTasksResponse as any;
-  const myTasks: Task[] = Array.isArray(raw) ? raw : Array.isArray(raw?.tasks) ? raw.tasks : [];
+  const myTasks: Task[] = myTasksPages?.pages.flatMap((p: any) =>
+    Array.isArray(p) ? p : Array.isArray(p?.tasks) ? p.tasks : []
+  ) ?? [];
   const allTasks: Task[] = Array.isArray(allTasksData) ? allTasksData : [];
   const projects: TaskProject[] = Array.isArray(rawProjects) ? rawProjects : [];
 
@@ -529,13 +540,18 @@ export default function TasksHomePage() {
 
           <div className="flex-1 divide-y divide-border/60 min-h-[160px]">
             {filteredMyTasks.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-10 text-center px-4">
-                <div className="w-8 h-8 rounded-full border-2 border-muted-foreground/20 flex items-center justify-center mb-2">
-                  <Check className="h-4 w-4 text-muted-foreground/30" />
+              <div className="flex flex-col items-center justify-center py-10 text-center px-4 gap-2">
+                <div className="w-10 h-10 rounded-full border-2 border-muted-foreground/20 flex items-center justify-center">
+                  <Check className="h-5 w-5 text-muted-foreground/30" />
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  {myTab === "done" ? "Sin tareas completadas" : myTab === "overdue" ? "Sin tareas vencidas" : myTab === "in_progress" ? "Sin tareas en curso" : "No tenés tareas pendientes"}
-                </p>
+                <div>
+                  <p className="text-xs font-medium text-foreground/70">
+                    {myTab === "done" ? "Sin tareas completadas" : myTab === "overdue" ? "¡Sin tareas vencidas!" : myTab === "in_progress" ? "Sin tareas en curso" : "No tenés tareas pendientes"}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                    {myTab === "upcoming" ? "Usá el campo de arriba para crear una rápido" : myTab === "overdue" ? "Todo al día" : ""}
+                  </p>
+                </div>
               </div>
             ) : (
               <>
@@ -557,6 +573,17 @@ export default function TasksHomePage() {
                     {showAllMy
                       ? "Mostrar menos"
                       : `Mostrar ${filteredMyTasks.length - MY_LIMIT} más`}
+                  </button>
+                )}
+                {hasNextPage && (
+                  <button
+                    className="w-full px-4 py-2.5 text-xs text-muted-foreground hover:text-primary transition-colors text-left flex items-center gap-1.5"
+                    onClick={() => fetchNextPage()}
+                    disabled={isFetchingNextPage}
+                  >
+                    {isFetchingNextPage
+                      ? <><Loader2 className="h-3 w-3 animate-spin" /> Cargando...</>
+                      : "Cargar más tareas del servidor"}
                   </button>
                 )}
               </>
@@ -641,17 +668,26 @@ export default function TasksHomePage() {
 
         <div className="divide-y divide-border/60 min-h-[80px]">
           {filteredAssigned.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-8 text-center px-4">
-              <Clock className="h-6 w-6 text-muted-foreground/30 mb-1.5" />
-              <p className="text-xs text-muted-foreground">
-                {assignedTab === "done"
-                  ? "Ninguna tarea asignada ha sido completada aún"
-                  : assignedTab === "overdue"
-                  ? "Ninguna tarea asignada está vencida"
-                  : assignedTab === "in_progress"
-                  ? "Ninguna tarea asignada está en curso"
-                  : "No hay tareas pendientes que hayas asignado a otros"}
-              </p>
+            <div className="flex flex-col items-center justify-center py-10 text-center px-4 gap-2">
+              <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
+                <Clock className="h-5 w-5 text-muted-foreground/40" />
+              </div>
+              <div>
+                <p className="text-xs font-medium text-foreground/70">
+                  {assignedTab === "done"
+                    ? "Ninguna tarea asignada completada aún"
+                    : assignedTab === "overdue"
+                    ? "Ninguna tarea asignada está vencida"
+                    : assignedTab === "in_progress"
+                    ? "Ninguna tarea asignada en curso"
+                    : "Sin tareas asignadas pendientes"}
+                </p>
+                {assignedTab === "upcoming" && (
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                    Abrí un proyecto para asignar tareas al equipo
+                  </p>
+                )}
+              </div>
             </div>
           ) : (
             <>

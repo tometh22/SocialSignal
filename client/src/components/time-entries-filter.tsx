@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -30,6 +31,7 @@ export function TimeEntriesFilter({
   onFilteredEntriesChange
 }: TimeEntriesFilterProps) {
   const [searchText, setSearchText] = useState("");
+  const debouncedSearchText = useDebouncedValue(searchText, 300);
   const [selectedPerson, setSelectedPerson] = useState<string>("all");
   const [dateFilter, setDateFilter] = useState<string>("all");
   const [hoursFilter, setHoursFilter] = useState<string>("all");
@@ -40,8 +42,8 @@ export function TimeEntriesFilter({
     let filtered = [...timeEntries];
 
     // Filtro de búsqueda de texto
-    if (searchText.trim()) {
-      const searchLower = searchText.toLowerCase();
+    if (debouncedSearchText.trim()) {
+      const searchLower = debouncedSearchText.toLowerCase();
       filtered = filtered.filter(entry =>
         entry.personnelName?.toLowerCase().includes(searchLower) ||
         entry.description?.toLowerCase().includes(searchLower) ||
@@ -101,7 +103,7 @@ export function TimeEntriesFilter({
   // Aplicar filtros cada vez que cambien los valores
   useEffect(() => {
     applyFilters();
-  }, [searchText, selectedPerson, dateFilter, hoursFilter, timeEntries]);
+  }, [debouncedSearchText, selectedPerson, dateFilter, hoursFilter, timeEntries]);
 
   // Limpiar todos los filtros
   const clearAllFilters = () => {

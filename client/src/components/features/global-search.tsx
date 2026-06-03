@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { useQuery } from '@tanstack/react-query';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -50,6 +51,7 @@ interface GlobalSearchProps {
 
 export function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
   const [searchTerm, setSearchTerm] = useState('');
+  const debouncedSearchTerm = useDebouncedValue(searchTerm, 300);
   const [selectedFilters, setSelectedFilters] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState('all');
   const inputRef = useRef<HTMLInputElement>(null);
@@ -68,10 +70,10 @@ export function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
 
   // Generar resultados de búsqueda inteligente
   const searchResults = useMemo(() => {
-    if (!searchTerm.trim()) return [];
+    if (!debouncedSearchTerm.trim()) return [];
 
     const results: SearchResult[] = [];
-    const term = searchTerm.toLowerCase();
+    const term = debouncedSearchTerm.toLowerCase();
 
     // Buscar en clientes
     (clients as any[]).forEach(client => {
@@ -201,7 +203,7 @@ export function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
 
       return 0;
     });
-  }, [searchTerm, clients, activeProjects, quotations, deliverables, selectedFilters]);
+  }, [debouncedSearchTerm, clients, activeProjects, quotations, deliverables, selectedFilters]);
 
   // Agrupar resultados por tipo
   const groupedResults = useMemo(() => {
@@ -331,7 +333,7 @@ export function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
         </CardHeader>
 
         <CardContent className="pt-0">
-          {searchTerm.trim() === '' ? (
+          {debouncedSearchTerm.trim() === '' ? (
             <div className="text-center py-12 text-gray-500">
               <Search className="h-12 w-12 mx-auto mb-3 text-gray-300" />
               <h3 className="font-medium text-gray-600">Comienza a escribir para buscar</h3>

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { queryClient, apiRequest, authFetch } from "@/lib/queryClient";
@@ -315,7 +316,13 @@ function GeneralPanel({ projects }: { projects: TaskProject[] }) {
               );
             })}
             {byCompletion.length === 0 && emptyProjects.length === 0 && (
-              <p className="text-sm text-muted-foreground text-center py-6">Sin proyectos con tareas</p>
+              <div className="flex flex-col items-center justify-center py-8 text-center px-4 gap-1.5">
+                <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center">
+                  <ListTodo className="h-4 w-4 text-muted-foreground/40" />
+                </div>
+                <p className="text-sm font-medium text-foreground/60">Sin proyectos con tareas</p>
+                <p className="text-xs text-muted-foreground">Abrí un proyecto y cargá la primera tarea</p>
+              </div>
             )}
           </div>
         </div>
@@ -491,6 +498,7 @@ async function fetchProjects(): Promise<TaskProject[]> {
 
 export default function ProjectsHubPage() {
   const [search, setSearch] = useState("");
+  const debouncedSearch = useDebouncedValue(search, 250);
   const [gridMode, setGridMode] = useState<"grid" | "list">("grid");
   const [view, setView] = useState<"projects" | "panel">("projects");
   const [newProjectOpen, setNewProjectOpen] = useState(false);
@@ -534,9 +542,9 @@ export default function ProjectsHubPage() {
   const myPersonnelId = myPersonnel?.id;
 
   const filtered = projects.filter(p =>
-    !search ||
-    (p.name || "").toLowerCase().includes(search.toLowerCase()) ||
-    (p.clientName || "").toLowerCase().includes(search.toLowerCase())
+    !debouncedSearch ||
+    (p.name || "").toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+    (p.clientName || "").toLowerCase().includes(debouncedSearch.toLowerCase())
   );
 
   const myProjects = filtered.filter(p => myPersonnelId && p.members.some(m => m.personnelId === myPersonnelId));
@@ -698,12 +706,12 @@ export default function ProjectsHubPage() {
                 <Plus className="h-8 w-8 text-muted-foreground/40" />
               </div>
               <p className="font-medium text-foreground mb-1">
-                {search ? "No se encontraron proyectos" : "Todavía no hay proyectos"}
+                {debouncedSearch ? "No se encontraron proyectos" : "Todavía no hay proyectos"}
               </p>
               <p className="text-sm text-muted-foreground mb-4">
-                {search ? "Probá con otro término de búsqueda" : "Creá tu primer proyecto para empezar a organizar tareas"}
+                {debouncedSearch ? "Probá con otro término de búsqueda" : "Creá tu primer proyecto para empezar a organizar tareas"}
               </p>
-              {!search && (
+              {!debouncedSearch && (
                 <Button size="sm" onClick={() => setNewProjectOpen(true)}>
                   <Plus className="h-4 w-4 mr-1.5" />Nuevo proyecto
                 </Button>

@@ -362,6 +362,7 @@ interface TaskRowProps {
   onStatusChange?: (taskId: number, status: string) => void;
   onDuplicate?: (task: Task) => void;
   isSubtask?: boolean;
+  isLoading?: boolean;
   clientName?: string | null;
   subtaskMap?: Record<number, Task[]>;
   expandedSubtasks?: Set<number>;
@@ -370,7 +371,7 @@ interface TaskRowProps {
   isDragging?: boolean;
 }
 
-function TaskRow({ task, allPersonnel, onOpen, onToggle, onDateSet, onAssignee, onRename, onStatusChange, onDuplicate, isSubtask = false, clientName, subtaskMap, expandedSubtasks, onToggleSubtasks, dragHandleProps, isDragging }: TaskRowProps) {
+function TaskRow({ task, allPersonnel, onOpen, onToggle, onDateSet, onAssignee, onRename, onStatusChange, onDuplicate, isSubtask = false, isLoading = false, clientName, subtaskMap, expandedSubtasks, onToggleSubtasks, dragHandleProps, isDragging }: TaskRowProps) {
   const [assigneeOpen, setAssigneeOpen] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState("");
@@ -413,10 +414,14 @@ function TaskRow({ task, allPersonnel, onOpen, onToggle, onDateSet, onAssignee, 
 
         {/* Circle Checkbox */}
         <div className="w-5 flex-shrink-0 flex items-center justify-center py-3">
-          <CircleCheck
-            checked={isDone}
-            onClick={e => { e.stopPropagation(); onToggle(task); }}
-          />
+          {isLoading ? (
+            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground/50" />
+          ) : (
+            <CircleCheck
+              checked={isDone}
+              onClick={e => { e.stopPropagation(); onToggle(task); }}
+            />
+          )}
         </div>
 
         {/* Title */}
@@ -682,9 +687,10 @@ interface SectionBlockProps {
   allPersonnelForSort?: Personnel[];
   isFirst?: boolean;
   taskOrderOverride?: number[];
+  loadingTaskIds?: Set<number>;
 }
 
-function SectionBlock({ sectionName, tasks, projectId, allPersonnel, projectMembers = [], onOpenTask, onToggleTask, onDateSet, onAssignee, onRename, onStatusChange, onDuplicate, onDuplicateSection, onRefresh, clientName, autoOpenAdd = 0, forceExpand = false, dragHandleProps, isDragging, sortBy = 'default', allPersonnelForSort = [], isFirst = false, taskOrderOverride }: SectionBlockProps) {
+function SectionBlock({ sectionName, tasks, projectId, allPersonnel, projectMembers = [], onOpenTask, onToggleTask, onDateSet, onAssignee, onRename, onStatusChange, onDuplicate, onDuplicateSection, onRefresh, clientName, autoOpenAdd = 0, forceExpand = false, dragHandleProps, isDragging, sortBy = 'default', allPersonnelForSort = [], isFirst = false, taskOrderOverride, loadingTaskIds }: SectionBlockProps) {
   const [collapsed, setCollapsed] = useState(false);
   const effectiveCollapsed = forceExpand ? false : collapsed;
   const [showAdd, setShowAdd] = useState(false);
@@ -880,6 +886,7 @@ function SectionBlock({ sectionName, tasks, projectId, allPersonnel, projectMemb
               subtaskMap={subtaskMap}
               expandedSubtasks={expandedSubtasks}
               onToggleSubtasks={toggleSubtasks}
+              isLoading={loadingTaskIds?.has(task.id)}
             />
           ))}
           </SortableContext>
@@ -910,6 +917,7 @@ function SectionBlock({ sectionName, tasks, projectId, allPersonnel, projectMemb
                   subtaskMap={subtaskMap}
                   expandedSubtasks={expandedSubtasks}
                   onToggleSubtasks={toggleSubtasks}
+                  isLoading={loadingTaskIds?.has(task.id)}
                 />
               ))}
             </>
@@ -963,7 +971,7 @@ function SectionBlock({ sectionName, tasks, projectId, allPersonnel, projectMemb
 
 // ─── Sortable wrappers ──────────────────────────────────────────────────────
 
-function SortableTaskRow({ taskId, task, allPersonnel, onOpenTask, onToggleTask, onDateSet, onAssignee, onRename, onStatusChange, onDuplicate, clientName, subtaskMap, expandedSubtasks, onToggleSubtasks }: {
+function SortableTaskRow({ taskId, task, allPersonnel, onOpenTask, onToggleTask, onDateSet, onAssignee, onRename, onStatusChange, onDuplicate, clientName, subtaskMap, expandedSubtasks, onToggleSubtasks, isLoading }: {
   taskId: number;
   task: Task;
   allPersonnel: Personnel[];
@@ -978,6 +986,7 @@ function SortableTaskRow({ taskId, task, allPersonnel, onOpenTask, onToggleTask,
   subtaskMap?: Record<number, Task[]>;
   expandedSubtasks?: Set<number>;
   onToggleSubtasks?: (taskId: number) => void;
+  isLoading?: boolean;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: `task:${taskId}`,
@@ -1002,6 +1011,7 @@ function SortableTaskRow({ taskId, task, allPersonnel, onOpenTask, onToggleTask,
         onToggleSubtasks={onToggleSubtasks}
         dragHandleProps={{ ...attributes, ...listeners }}
         isDragging={isDragging}
+        isLoading={isLoading}
       />
       {expandedSubtasks?.has(taskId) && (subtaskMap?.[taskId] || []).map(sub => (
         <TaskRow
@@ -1269,6 +1279,7 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
   const [activeId, setActiveId] = useState<UniqueIdentifier | null>(null);
   const [activeDragData, setActiveDragData] = useState<any>(null);
   const [boardStatusOverrides, setBoardStatusOverrides] = useState<Record<number, string>>({});
+  const [pendingTaskIds, setPendingTaskIds] = useState<Set<number>>(new Set());
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
@@ -1298,17 +1309,52 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
     queryClient.invalidateQueries({ queryKey: ["/api/tasks/projects"] });
   };
 
+  const applyOptimisticTask = (taskId: number, updates: Partial<Task>) => {
+    const patchTask = (t: Task) => t.id === taskId ? { ...t, ...updates } : t;
+    queryClient.setQueryData(["/api/tasks/project", projectId], (old: any) => {
+      if (!old) return old;
+      const newSections: Record<string, Task[]> = {};
+      for (const [k, v] of Object.entries(old.sections || {})) {
+        newSections[k] = (v as Task[]).map(patchTask);
+      }
+      return { tasks: old.tasks.map(patchTask), sections: newSections };
+    });
+  };
+
   const toggleMutation = useMutation({
     mutationFn: (task: Task) => apiRequest(`/api/tasks/${task.id}`, "PUT", {
       status: task.status === "done" ? "todo" : "done",
     }),
-    onSuccess: () => { refetch(); invalidateRelated(); },
+    onMutate: async (task: Task) => {
+      await queryClient.cancelQueries({ queryKey: ["/api/tasks/project", projectId] });
+      const previous = queryClient.getQueryData(["/api/tasks/project", projectId]);
+      applyOptimisticTask(task.id, { status: task.status === "done" ? "todo" : "done" });
+      setPendingTaskIds(prev => new Set([...prev, task.id]));
+      return { previous };
+    },
+    onError: (_err, _task, context: any) => {
+      queryClient.setQueryData(["/api/tasks/project", projectId], context?.previous);
+    },
+    onSettled: (_data, _err, task) => {
+      setPendingTaskIds(prev => { const next = new Set(prev); next.delete(task.id); return next; });
+      refetch();
+      invalidateRelated();
+    },
   });
 
   const dateMutation = useMutation({
     mutationFn: ({ taskId, date }: { taskId: number; date: Date | undefined }) =>
       apiRequest(`/api/tasks/${taskId}`, "PUT", { dueDate: date ? date.toISOString() : null }),
-    onSuccess: () => { refetch(); invalidateRelated(); },
+    onMutate: async ({ taskId, date }: { taskId: number; date: Date | undefined }) => {
+      await queryClient.cancelQueries({ queryKey: ["/api/tasks/project", projectId] });
+      const previous = queryClient.getQueryData(["/api/tasks/project", projectId]);
+      applyOptimisticTask(taskId, { dueDate: date ? date.toISOString() as any : null });
+      return { previous };
+    },
+    onError: (_err, _vars, context: any) => {
+      queryClient.setQueryData(["/api/tasks/project", projectId], context?.previous);
+    },
+    onSettled: () => { refetch(); invalidateRelated(); },
   });
 
   const handleDateSet = (taskId: number, d: Date | undefined) => {
@@ -1318,7 +1364,21 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
   const inlineUpdateMutation = useMutation({
     mutationFn: ({ taskId, updates }: { taskId: number; updates: any }) =>
       apiRequest(`/api/tasks/${taskId}`, "PUT", updates),
-    onSuccess: () => { refetch(); invalidateRelated(); },
+    onMutate: async ({ taskId, updates }: { taskId: number; updates: any }) => {
+      await queryClient.cancelQueries({ queryKey: ["/api/tasks/project", projectId] });
+      const previous = queryClient.getQueryData(["/api/tasks/project", projectId]);
+      applyOptimisticTask(taskId, updates);
+      setPendingTaskIds(prev => new Set([...prev, taskId]));
+      return { previous };
+    },
+    onError: (_err, _vars, context: any) => {
+      queryClient.setQueryData(["/api/tasks/project", projectId], context?.previous);
+    },
+    onSettled: (_data, _err, vars) => {
+      setPendingTaskIds(prev => { const next = new Set(prev); next.delete(vars.taskId); return next; });
+      refetch();
+      invalidateRelated();
+    },
   });
 
   const handleAssignee = (taskId: number, assigneeId: number | null) => {
@@ -1688,6 +1748,7 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
                       allPersonnelForSort={allPersonnel}
                       isFirst={idx === 0}
                       taskOrderOverride={taskOrderMap[section]}
+                      loadingTaskIds={pendingTaskIds}
                     />
                   ))}
                 </SortableContext>

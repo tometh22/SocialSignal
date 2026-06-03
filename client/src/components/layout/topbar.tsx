@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
+import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -54,6 +55,13 @@ export default function Topbar({ onMenuClick }: TopbarProps = {}) {
   const [location, navigate] = useLocation();
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const { user, logoutMutation, isLoading } = useAuth();
+
+  const shortcuts = useMemo(() => ({
+    "ctrl+k": (e: KeyboardEvent) => { e.preventDefault(); setIsSearchOpen(true); },
+    "meta+k": (e: KeyboardEvent) => { e.preventDefault(); setIsSearchOpen(true); },
+    "escape": () => setIsSearchOpen(false),
+  }), []);
+  useKeyboardShortcuts(shortcuts);
   
   // Obtener iniciales del nombre de usuario
   const getUserInitials = () => {
@@ -254,10 +262,21 @@ export default function Topbar({ onMenuClick }: TopbarProps = {}) {
         {/* Acciones compactas */}
         <div className="flex items-center space-x-1 flex-shrink-0">
           {/* Búsqueda global */}
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-accent"
+          <Button
+            variant="ghost"
+            size="sm"
+            className="hidden sm:flex items-center gap-1.5 h-8 px-2.5 text-muted-foreground hover:text-foreground hover:bg-accent text-xs"
+            onClick={() => setIsSearchOpen(true)}
+            title="Buscar (Ctrl+K)"
+          >
+            <Search className="h-3.5 w-3.5" />
+            <span className="hidden md:inline text-[11px]">Buscar</span>
+            <kbd className="hidden md:inline ml-1 px-1 py-0.5 text-[10px] border rounded bg-muted text-muted-foreground font-sans leading-none">⌘K</kbd>
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="flex sm:hidden h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-accent"
             onClick={() => setIsSearchOpen(true)}
           >
             <Search className="h-4 w-4" />

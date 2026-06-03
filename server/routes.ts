@@ -17402,7 +17402,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ? await db.select().from(personnel).where(eq(personnel.email, user.email)).limit(1)
         : [];
 
-      let myTasks: any[] = [];
+      const pageLimit = Math.min(parseInt(req.query.limit as string) || 50, 200);
+      const pageOffset = parseInt(req.query.offset as string) || 0;
+
+      let enriched: any[] = [];
+      let totalCount = 0;
+
       if (personnelRecord.length > 0) {
         const pid = personnelRecord[0].id;
         const { status, dateFrom, dateTo } = req.query;
@@ -17410,29 +17415,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (status && status !== 'all') conditions.push(eq(tasks.status, status as string));
         if (dateFrom) conditions.push(gte(tasks.dueDate, new Date(dateFrom as string)));
         if (dateTo) conditions.push(lte(tasks.dueDate, new Date(dateTo as string)));
-        myTasks = await db.select().from(tasks).where(and(...conditions)).orderBy(asc(tasks.dueDate), asc(tasks.position));
+
+        const [countResult] = await db.select({ count: sql<number>`count(*)::int` }).from(tasks).where(and(...conditions));
+        totalCount = countResult.count || 0;
+
+        const myTasksPage = await db.select().from(tasks)
+          .where(and(...conditions))
+          .orderBy(asc(tasks.dueDate), asc(tasks.position))
+          .limit(pageLimit)
+          .offset(pageOffset);
+
+        // Enrich with project and client names
+        const projectsWithNames = await db.execute(sql`
+          SELECT ap.id, q.project_name, c.name as client_name
+          FROM active_projects ap
+          JOIN quotations q ON q.id = ap.quotation_id
+          JOIN clients c ON c.id = ap.client_id
+        `);
+        const projectMap = new Map((projectsWithNames.rows as any[]).map(p => [p.id, { name: p.project_name, client: p.client_name }]));
+        const ownProjectNames = await db.execute(sql`SELECT id, name FROM task_own_projects`);
+        for (const p of ownProjectNames.rows as any[]) {
+          projectMap.set(p.id + OWN_PROJECT_OFFSET, { name: p.name, client: null });
+        }
+
+        enriched = myTasksPage.map(t => ({
+          ...t,
+          projectName: t.projectId ? projectMap.get(t.projectId)?.name ?? null : null,
+          clientName: t.projectId ? projectMap.get(t.projectId)?.client ?? null : null,
+        }));
       }
 
-      // Enrich with project and client names
-      const projectsWithNames = await db.execute(sql`
-        SELECT ap.id, q.project_name, c.name as client_name
-        FROM active_projects ap
-        JOIN quotations q ON q.id = ap.quotation_id
-        JOIN clients c ON c.id = ap.client_id
-      `);
-      const projectMap = new Map((projectsWithNames.rows as any[]).map(p => [p.id, { name: p.project_name, client: p.client_name }]));
-      const ownProjectNames = await db.execute(sql`SELECT id, name FROM task_own_projects`);
-      for (const p of ownProjectNames.rows as any[]) {
-        projectMap.set(p.id + OWN_PROJECT_OFFSET, { name: p.name, client: null });
-      }
-
-      const enriched = myTasks.map(t => ({
-        ...t,
-        projectName: t.projectId ? projectMap.get(t.projectId)?.name ?? null : null,
-        clientName: t.projectId ? projectMap.get(t.projectId)?.client ?? null : null,
-      }));
-
-      res.json({ tasks: enriched, personnelId: personnelRecord[0]?.id || null });
+      res.json({
+        tasks: enriched,
+        totalCount,
+        hasMore: pageOffset + pageLimit < totalCount,
+        personnelId: personnelRecord[0]?.id || null,
+      });
     } catch (error) {
       res.status(500).json({ message: "Error al obtener mis tareas" });
     }
