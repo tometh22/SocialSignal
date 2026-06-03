@@ -475,8 +475,8 @@ const CompactTimeForm: React.FC<{
                     <FormControl>
                       <Input
                         type="number"
-                        step="0.1"
-                        min="0.1"
+                        step="0.25"
+                        min="0.25"
                         max="500"
                         className="h-9 pl-8 text-sm"
                         {...field}
@@ -824,7 +824,7 @@ const TimeEntries: React.FC = () => {
       case "february":
         return {
           start: new Date(year, 1, 1),
-          end: new Date(year, 1, 28 + (year % 4 === 0 ? 1 : 0))
+          end: new Date(year, 2, 0) // day 0 of March = last day of February, handles leap years correctly
         };
       case "march":
         return {

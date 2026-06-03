@@ -416,6 +416,23 @@ async function applyPendingMigrations() {
       ON CONFLICT (user_id, target_kind, target_id) DO NOTHING;
     `);
 
+    // 0021: personnel_absences — absence tracking to discount capacity from weekly dashboard
+    await run('0021 personnel_absences table', `
+      CREATE TABLE IF NOT EXISTS personnel_absences (
+        id           SERIAL PRIMARY KEY,
+        personnel_id INTEGER NOT NULL REFERENCES personnel(id) ON DELETE CASCADE,
+        start_date   TEXT NOT NULL,
+        end_date     TEXT NOT NULL,
+        reason       TEXT,
+        notes        TEXT,
+        created_by   INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        created_at   TIMESTAMP NOT NULL DEFAULT NOW(),
+        updated_at   TIMESTAMP NOT NULL DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_pa_personnel ON personnel_absences(personnel_id);
+      CREATE INDEX IF NOT EXISTS idx_pa_dates     ON personnel_absences(start_date, end_date);
+    `);
+
   } finally {
     client.release();
   }

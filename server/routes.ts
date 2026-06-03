@@ -17015,15 +17015,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (key in req.body) updates[key] = req.body[key];
       }
 
-      // Auto-set dates when stage changes
-      if (req.body.stage === 'won' && !updates.wonAt) updates.wonAt = new Date();
-      if (req.body.stage === 'lost' && !updates.lostAt) updates.lostAt = new Date();
-      // Clear terminal dates if stage is moved back to an active stage
-      if (req.body.stage && req.body.stage !== 'won') updates.wonAt = null;
-      if (req.body.stage && req.body.stage !== 'lost') updates.lostAt = null;
-      // Re-apply if stage IS won or lost (overrides the null above)
-      if (req.body.stage === 'won') updates.wonAt = updates.wonAt ?? new Date();
-      if (req.body.stage === 'lost') updates.lostAt = updates.lostAt ?? new Date();
+      // Auto-set/clear terminal dates when stage changes
+      if ('stage' in req.body) {
+        if (req.body.stage === 'won') {
+          updates.wonAt = updates.wonAt ?? new Date();
+          updates.lostAt = null;
+        } else if (req.body.stage === 'lost') {
+          updates.lostAt = updates.lostAt ?? new Date();
+          updates.wonAt = null;
+        } else {
+          // Moved back to an active stage — clear both terminal dates
+          updates.wonAt = null;
+          updates.lostAt = null;
+        }
+      }
 
       const [lead] = await db.update(crmLeads).set(updates).where(eq(crmLeads.id, id)).returning();
       if (!lead) return res.status(404).json({ error: 'Lead not found' });
@@ -17093,7 +17098,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // DELETE /api/crm/contacts/:id
   app.delete("/api/crm/contacts/:id", requireAuth, async (req: Request, res: Response) => {
     try {
-      await db.delete(crmContacts).where(eq(crmContacts.id, parseInt(req.params.id)));
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ error: 'Invalid contact ID' });
+      await db.delete(crmContacts).where(eq(crmContacts.id, id));
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
@@ -17133,7 +17140,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // DELETE /api/crm/activities/:id
   app.delete("/api/crm/activities/:id", requireAuth, async (req: Request, res: Response) => {
     try {
-      await db.delete(crmActivities).where(eq(crmActivities.id, parseInt(req.params.id)));
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ error: 'Invalid activity ID' });
+      await db.delete(crmActivities).where(eq(crmActivities.id, id));
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
@@ -17261,10 +17270,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // PATCH /api/crm/reminders/:id — marcar completo u otros cambios
   app.patch("/api/crm/reminders/:id", requireAuth, async (req: Request, res: Response) => {
     try {
-      const updates: any = { ...req.body };
-      if (req.body.completed === true) updates.completedAt = new Date();
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ error: 'Invalid reminder ID' });
+
+      // Allowlist: only permit known updatable fields
+      const updates: Record<string, any> = {};
+      if ('completed' in req.body) {
+        updates.completed = req.body.completed;
+        // Sync completedAt: set when completing, clear when uncompleting
+        updates.completedAt = req.body.completed === true ? new Date() : null;
+      }
+      if ('description' in req.body) updates.description = req.body.description;
+      if ('dueDate' in req.body) updates.dueDate = new Date(req.body.dueDate);
+
       const [reminder] = await db.update(crmReminders).set(updates)
-        .where(eq(crmReminders.id, parseInt(req.params.id))).returning();
+        .where(eq(crmReminders.id, id)).returning();
+      if (!reminder) return res.status(404).json({ error: 'Reminder not found' });
       res.json(reminder);
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
@@ -17274,7 +17295,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // DELETE /api/crm/reminders/:id
   app.delete("/api/crm/reminders/:id", requireAuth, async (req: Request, res: Response) => {
     try {
-      await db.delete(crmReminders).where(eq(crmReminders.id, parseInt(req.params.id)));
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ error: 'Invalid reminder ID' });
+      await db.delete(crmReminders).where(eq(crmReminders.id, id));
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
@@ -17327,11 +17350,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const [activity] = await db.insert(crmActivities).values({
         leadId,
         type: 'email',
-        title: `Email: ${subject}`,
+        title: `Email: ${sanitizedSubject}`,
         content: body,
         activityDate: new Date(),
         createdBy: userId,
-        emailMetadata: { subject, to, body, sentAt: new Date().toISOString() },
+        emailMetadata: { subject: sanitizedSubject, to: String(to).trim(), body, sentAt: new Date().toISOString() },
       }).returning();
 
       // Actualizar updatedAt del lead
@@ -17616,7 +17639,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       for (const e of enriched) {
         const d = new Date(e.date);
         const weekStart = new Date(d);
-        weekStart.setDate(d.getDate() - d.getDay() + 1);
+        // getDay() returns 0 for Sunday; offset must wrap Sunday back 6 days to the previous Monday
+        const dayOfWeek = d.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
+        const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+        weekStart.setDate(d.getDate() - daysFromMonday);
         const key = weekStart.toISOString().slice(0, 10);
         byWeekMap[key] = (byWeekMap[key] || 0) + e.hours;
       }

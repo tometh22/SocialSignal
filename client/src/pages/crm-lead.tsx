@@ -19,18 +19,29 @@ import {
   Clock, ChevronDown, ChevronUp, AlertCircle, Briefcase, Paperclip, Download, X
 } from "lucide-react";
 
-type Stage = 'new' | 'contacted' | 'qualified' | 'proposal' | 'negotiation' | 'won' | 'lost';
+type Stage = string;
 type ActivityType = 'note' | 'call' | 'email' | 'meeting' | 'proposal' | 'followup';
 
-const STAGES: { key: Stage; label: string; color: string; bg: string; border: string }[] = [
-  { key: 'new',         label: 'Nuevo',        color: 'text-slate-700',   bg: 'bg-slate-100',   border: 'border-slate-300' },
-  { key: 'contacted',   label: 'Contactado',   color: 'text-blue-700',    bg: 'bg-blue-100',    border: 'border-blue-300' },
-  { key: 'qualified',   label: 'Calificado',   color: 'text-indigo-700',  bg: 'bg-indigo-100',  border: 'border-indigo-300' },
-  { key: 'proposal',    label: 'Propuesta',    color: 'text-amber-700',   bg: 'bg-amber-100',   border: 'border-amber-300' },
-  { key: 'negotiation', label: 'Negociación',  color: 'text-orange-700',  bg: 'bg-orange-100',  border: 'border-orange-300' },
-  { key: 'won',         label: 'Ganado',       color: 'text-green-700',   bg: 'bg-green-100',   border: 'border-green-300' },
-  { key: 'lost',        label: 'Perdido',      color: 'text-red-700',     bg: 'bg-red-100',     border: 'border-red-300' },
-];
+// Color mapping for dynamic stages (matches crm.tsx COLOR_MAP)
+const COLOR_CLASS_MAP: Record<string, { color: string; bg: string; border: string }> = {
+  slate:  { color: 'text-slate-700',   bg: 'bg-slate-100',   border: 'border-slate-300' },
+  blue:   { color: 'text-blue-700',    bg: 'bg-blue-100',    border: 'border-blue-300' },
+  indigo: { color: 'text-indigo-700',  bg: 'bg-indigo-100',  border: 'border-indigo-300' },
+  violet: { color: 'text-violet-700',  bg: 'bg-violet-100',  border: 'border-violet-300' },
+  purple: { color: 'text-purple-700',  bg: 'bg-purple-100',  border: 'border-purple-300' },
+  pink:   { color: 'text-pink-700',    bg: 'bg-pink-100',    border: 'border-pink-300' },
+  red:    { color: 'text-red-700',     bg: 'bg-red-100',     border: 'border-red-300' },
+  orange: { color: 'text-orange-700',  bg: 'bg-orange-100',  border: 'border-orange-300' },
+  amber:  { color: 'text-amber-700',   bg: 'bg-amber-100',   border: 'border-amber-300' },
+  yellow: { color: 'text-yellow-700',  bg: 'bg-yellow-100',  border: 'border-yellow-300' },
+  green:  { color: 'text-green-700',   bg: 'bg-green-100',   border: 'border-green-300' },
+  teal:   { color: 'text-teal-700',    bg: 'bg-teal-100',    border: 'border-teal-300' },
+  cyan:   { color: 'text-cyan-700',    bg: 'bg-cyan-100',    border: 'border-cyan-300' },
+};
+
+interface CrmStageApi {
+  id: number; key: string; label: string; color: string; position: number; isActive: boolean;
+}
 
 const ACTIVITY_ICONS: Record<ActivityType, { icon: any; color: string; bg: string; label: string }> = {
   note:     { icon: MessageSquare, color: 'text-slate-600', bg: 'bg-slate-100',  label: 'Nota' },
@@ -40,8 +51,6 @@ const ACTIVITY_ICONS: Record<ActivityType, { icon: any; color: string; bg: strin
   proposal: { icon: FileText,      color: 'text-amber-600', bg: 'bg-amber-100',  label: 'Propuesta' },
   followup: { icon: Bell,          color: 'text-orange-600',bg: 'bg-orange-100', label: 'Follow-up' },
 };
-
-function stageMeta(stage: Stage) { return STAGES.find(s => s.key === stage) || STAGES[0]; }
 function fmtUsd(val: number | null | undefined) {
   if (!val) return '—';
   return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(val);
@@ -68,7 +77,7 @@ interface LinkedQuotation {
   quotationCurrency: string; status: string; createdAt: string;
 }
 interface Lead {
-  id: number; companyName: string; stage: Stage; source: string | null;
+  id: number; companyName: string; stage: string; source: string | null;
   estimatedValueUsd: number | null; notes: string | null; clientId: number | null;
   createdAt: string; updatedAt: string; lostReason: string | null;
   contacts: Contact[]; activities: Activity[]; reminders: Reminder[];
@@ -80,7 +89,11 @@ export default function CRMLeadPage({ params }: { params: { id: string } }) {
   const [, navigate] = useLocation();
   const { toast } = useToast();
 
-
+  const [emailOpen, setEmailOpen] = useState(false);
+  const [emailTo, setEmailTo] = useState('');
+  const [emailSubject, setEmailSubject] = useState('');
+  const [emailBody, setEmailBody] = useState('');
+  const [sendingEmail, setSendingEmail] = useState(false);
 
   const [newActivity, setNewActivity] = useState({ type: 'note' as ActivityType, title: '', content: '' });
   const [activityOpen, setActivityOpen] = useState(false);
@@ -109,6 +122,18 @@ export default function CRMLeadPage({ params }: { params: { id: string } }) {
       return res.json();
     },
   });
+
+  const { data: apiStages = [] } = useQuery<CrmStageApi[]>({
+    queryKey: ['/api/crm/stages'],
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
+  });
+
+  const stageMeta = (stageKey: string) => {
+    const s = apiStages.find(s => s.key === stageKey);
+    const classes = COLOR_CLASS_MAP[s?.color ?? 'slate'] ?? COLOR_CLASS_MAP['slate'];
+    return { key: stageKey, label: s?.label ?? stageKey, ...classes };
+  };
 
   const { data: clients = [] } = useQuery<{ id: number; name: string }[]>({
     queryKey: ['/api/clients'],
@@ -202,8 +227,31 @@ export default function CRMLeadPage({ params }: { params: { id: string } }) {
     setEditingValue(false);
   };
 
+  const handleSendEmail = async () => {
+    if (!emailTo || !emailSubject || !emailBody) return;
+    setSendingEmail(true);
+    try {
+      await apiRequest(`/api/crm/leads/${leadId}/send-email`, 'POST', {
+        to: emailTo,
+        subject: emailSubject,
+        body: emailBody,
+      });
+      toast({ title: 'Email enviado correctamente' });
+      setEmailOpen(false);
+      setEmailSubject('');
+      setEmailBody('');
+      invalidate();
+    } catch {
+      toast({ title: 'Error al enviar el email', variant: 'destructive' });
+    } finally {
+      setSendingEmail(false);
+    }
+  };
+
   const openEmailWith = (contact: Contact) => {
     setEmailTo(contact.email || '');
+    setEmailSubject('');
+    setEmailBody('');
     setEmailOpen(true);
   };
 
@@ -254,7 +302,7 @@ export default function CRMLeadPage({ params }: { params: { id: string } }) {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {STAGES.map(s => (
+                    {apiStages.map(s => (
                       <SelectItem key={s.key} value={s.key}>{s.label}</SelectItem>
                     ))}
                   </SelectContent>
@@ -808,6 +856,45 @@ export default function CRMLeadPage({ params }: { params: { id: string } }) {
           </Dialog>
         );
       })()}
+
+      {/* Send Email Modal */}
+      <Dialog open={emailOpen} onOpenChange={setEmailOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Mail className="w-4 h-4 text-indigo-500" /> Enviar Email
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 pt-2">
+            <div>
+              <Label className="text-xs text-slate-600">Para</Label>
+              <Input type="email" value={emailTo} onChange={e => setEmailTo(e.target.value)}
+                placeholder="destinatario@empresa.com" />
+            </div>
+            <div>
+              <Label className="text-xs text-slate-600">Asunto</Label>
+              <Input value={emailSubject} onChange={e => setEmailSubject(e.target.value)}
+                placeholder="Asunto del email" />
+            </div>
+            <div>
+              <Label className="text-xs text-slate-600">Mensaje</Label>
+              <Textarea value={emailBody} onChange={e => setEmailBody(e.target.value)}
+                placeholder="Cuerpo del email..." rows={5} />
+            </div>
+            <div className="flex justify-end gap-2 pt-1">
+              <Button variant="outline" onClick={() => setEmailOpen(false)}>Cancelar</Button>
+              <Button
+                className="bg-indigo-600 hover:bg-indigo-700 text-white gap-1.5"
+                onClick={handleSendEmail}
+                disabled={sendingEmail || !emailTo || !emailSubject || !emailBody}
+              >
+                <Mail className="w-3.5 h-3.5" />
+                {sendingEmail ? 'Enviando...' : 'Enviar'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

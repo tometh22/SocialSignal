@@ -3786,3 +3786,31 @@ export const insertProviderProjectAccessSchema = createInsertSchema(providerProj
 
 export type ProviderProjectAccess = typeof providerProjectAccess.$inferSelect;
 export type InsertProviderProjectAccess = z.infer<typeof insertProviderProjectAccessSchema>;
+
+// ==================== AUSENCIAS DE PERSONAL ====================
+// Registra ausencias (vacaciones, licencias, enfermedad, etc.) para descontar de la capacidad semanal.
+export const personnelAbsences = pgTable("personnel_absences", {
+  id: serial("id").primaryKey(),
+  personnelId: integer("personnel_id").notNull().references(() => personnel.id, { onDelete: "cascade" }),
+  startDate: text("start_date").notNull(), // YYYY-MM-DD
+  endDate: text("end_date").notNull(),     // YYYY-MM-DD (inclusive)
+  reason: text("reason"),                  // 'vacation', 'sick', 'personal', 'other'
+  notes: text("notes"),
+  createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertPersonnelAbsenceSchema = createInsertSchema(personnelAbsences).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Formato YYYY-MM-DD requerido"),
+  endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Formato YYYY-MM-DD requerido"),
+  reason: z.string().nullable().optional(),
+  notes: z.string().nullable().optional(),
+});
+
+export type PersonnelAbsence = typeof personnelAbsences.$inferSelect;
+export type InsertPersonnelAbsence = z.infer<typeof insertPersonnelAbsenceSchema>;
