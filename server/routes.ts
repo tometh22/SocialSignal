@@ -113,6 +113,8 @@ import {
   quotationTeamMembers,
   quotationTemplates,
   sheetPersonnelAliases,
+  personnelAbsences,
+  insertPersonnelAbsenceSchema,
 } from "@shared/schema";
 import { fetchValorHora2026, HISTORICAL_RATE_FIELDS_2026 } from "./services/personnelSheetsSync";
 import { ActiveProjectsAggregator } from "./domain/projectsActive";import { resolveTimeFilter } from "./services/time";
@@ -1782,11 +1784,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         periodKeys.push(periodKey);
       }
 
+      // Guard: si no hay períodos resueltos, retornar vacío en vez de crashear con inArray([])
+      if (periodKeys.length === 0) {
+        return res.json({
+          projectId,
+          timeFilter,
+          kpis: { wipTotal: 0, leadTime: 0, throughput: 0, operationalRisk: 0 },
+          workload: [],
+          bottlenecks: [],
+          riskBreakdown: { wipScore: 0, overloadScore: 0, dependencyScore: 0, total: 0 },
+          recommendations: [{ icon: '✅', priority: 'low', title: 'Sin datos', description: 'No hay datos de carga laboral para este período.' }],
+          metadata: { totalEntries: 0, totalPeople: 0, weeksInPeriod: 0, periodsCount: 0, periodKeys: [], dateRange: null }
+        });
+      }
+
       // 3. Consultar fact_labor_month con LEFT JOIN a personnel y roles para obtener rol actualizado
       const periodCondition = periodKeys.length === 1
         ? eq(factLaborMonth.periodKey, periodKeys[0])
         : inArray(factLaborMonth.periodKey, periodKeys);
-      
+
       const laborRows = await db
         .select({
           person_id: factLaborMonth.personId,
@@ -16990,12 +17006,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/crm/leads/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const id = parseInt(req.params.id);
-      const updates: any = { ...req.body, updatedAt: new Date() };
-      
+      if (isNaN(id)) return res.status(400).json({ error: 'Invalid lead ID' });
+
+      // Allowlist: only permit known updatable fields to prevent mass-assignment
+      const ALLOWED = ['companyName', 'stage', 'source', 'estimatedValueUsd', 'notes', 'clientId', 'assignedTo', 'lostReason', 'wonAt', 'lostAt'] as const;
+      const updates: Record<string, any> = { updatedAt: new Date() };
+      for (const key of ALLOWED) {
+        if (key in req.body) updates[key] = req.body[key];
+      }
+
       // Auto-set dates when stage changes
       if (req.body.stage === 'won' && !updates.wonAt) updates.wonAt = new Date();
       if (req.body.stage === 'lost' && !updates.lostAt) updates.lostAt = new Date();
-      
+      // Clear terminal dates if stage is moved back to an active stage
+      if (req.body.stage && req.body.stage !== 'won') updates.wonAt = null;
+      if (req.body.stage && req.body.stage !== 'lost') updates.lostAt = null;
+      // Re-apply if stage IS won or lost (overrides the null above)
+      if (req.body.stage === 'won') updates.wonAt = updates.wonAt ?? new Date();
+      if (req.body.stage === 'lost') updates.lostAt = updates.lostAt ?? new Date();
+
       const [lead] = await db.update(crmLeads).set(updates).where(eq(crmLeads.id, id)).returning();
       if (!lead) return res.status(404).json({ error: 'Lead not found' });
       res.json(lead);
@@ -17791,8 +17820,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { taskId, entryId } = req.params;
       const tid = parseInt(taskId);
+      const eid = parseInt(entryId);
       const [task] = await db.select().from(tasks).where(eq(tasks.id, tid));
-      await db.delete(taskTimeEntries).where(eq(taskTimeEntries.id, parseInt(entryId)));
+      // Verify the entry belongs to this task before deleting to prevent cross-task data corruption
+      await db.delete(taskTimeEntries).where(and(eq(taskTimeEntries.id, eid), eq(taskTimeEntries.taskId, tid)));
       const totalResult = await db.execute(sql`SELECT COALESCE(SUM(hours), 0) as total FROM task_time_entries WHERE task_id = ${tid}`);
       const total = (totalResult.rows[0] as any).total;
       await db.update(tasks).set({ loggedHours: parseFloat(total), updatedAt: new Date() }).where(eq(tasks.id, tid));

@@ -432,6 +432,9 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
       setLogHours(""); setLogDesc(""); setShowTimeLog(false);
       toast({ title: "Horas registradas" });
     },
+    onError: (err: any) => {
+      toast({ variant: "destructive", title: "Error al registrar horas", description: err?.message || "No se pudieron guardar las horas." });
+    },
   });
 
   const logSubtaskTimeMutation = useMutation({
@@ -500,7 +503,11 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
       toast({ variant: "destructive", title: "Mínimo 15 min", description: "El registro mínimo es 0.25h (15 min)." });
       return;
     }
-    logTimeMutation.mutate({ personnelId: task?.assigneeId, date: logDate, hours, description: logDesc });
+    if (!task?.assigneeId) {
+      toast({ variant: "destructive", title: "Sin responsable", description: "Asigná un responsable a la tarea antes de registrar horas." });
+      return;
+    }
+    logTimeMutation.mutate({ personnelId: task.assigneeId, date: logDate, hours, description: logDesc });
   };
 
   const handleDescBlur = (value: string) => {
