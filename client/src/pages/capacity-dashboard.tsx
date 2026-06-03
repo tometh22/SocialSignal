@@ -43,7 +43,10 @@ export default function CapacityDashboard() {
   const [resetTarget, setResetTarget] = useState<{ personnelId: number; name: string } | null>(null);
   const [weekStart, setWeekStart] = useState(() => {
     const d = new Date();
-    d.setDate(d.getDate() - d.getDay() + 1); // Monday
+    // Bug fix: d.getDay() === 0 means Sunday. The formula `- 0 + 1` would jump
+    // to NEXT Monday instead of the current week's Monday. Use || 7 to treat
+    // Sunday (0) as day 7 so the subtraction always lands on the correct Monday.
+    d.setDate(d.getDate() - (d.getDay() || 7) + 1);
     return d.toISOString().split("T")[0];
   });
 
@@ -204,7 +207,21 @@ export default function CapacityDashboard() {
                     const hasOverride = getOverride(p.personnelId) !== null;
                     return (
                       <tr key={p.personnelId} className="border-b hover:bg-muted/30 group">
-                        <td className="py-2 px-3 font-medium">{p.name}</td>
+                        <td className="py-2 px-3 font-medium">
+                          <div className="flex items-center gap-2">
+                            <span>{p.name}</span>
+                            {p.isAbsent && (
+                              <Badge className="text-[10px] bg-blue-100 text-blue-700 border-blue-300 px-1 py-0">
+                                En ausencia
+                              </Badge>
+                            )}
+                            {!p.isAbsent && p.absentDays > 0 && (
+                              <Badge className="text-[10px] bg-blue-50 text-blue-600 border-blue-200 px-1 py-0">
+                                {p.absentDays}d ausente
+                              </Badge>
+                            )}
+                          </div>
+                        </td>
                         <td className="text-center py-2 px-3">
                           {isOperations && editingCapacityId === p.personnelId ? (
                             <div className="flex items-center justify-center gap-1">

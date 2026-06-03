@@ -19472,38 +19472,167 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== AUSENCIAS DE PERSONAL ====================
+
+  // GET /api/personnel-absences?personnelId=X&from=YYYY-MM-DD&to=YYYY-MM-DD
+  app.get("/api/personnel-absences", requireAuth, async (req, res) => {
+    try {
+      const conditions: any[] = [];
+      if (req.query.personnelId) {
+        conditions.push(eq(personnelAbsences.personnelId, parseInt(req.query.personnelId as string)));
+      }
+      // Filter absences overlapping the requested date range
+      if (req.query.from) {
+        conditions.push(sql`${personnelAbsences.endDate} >= ${req.query.from as string}`);
+      }
+      if (req.query.to) {
+        conditions.push(sql`${personnelAbsences.startDate} <= ${req.query.to as string}`);
+      }
+      const result = conditions.length > 0
+        ? await db.select().from(personnelAbsences).where(and(...conditions)).orderBy(personnelAbsences.startDate)
+        : await db.select().from(personnelAbsences).orderBy(personnelAbsences.startDate);
+      res.json(result);
+    } catch (error) {
+      console.error("Error fetching personnel absences:", error);
+      res.status(500).json({ message: "Error fetching absences" });
+    }
+  });
+
+  // POST /api/personnel-absences
+  app.post("/api/personnel-absences", requireAuth, async (req, res) => {
+    try {
+      const data = insertPersonnelAbsenceSchema.parse({ ...req.body, createdBy: req.user?.id });
+      if (data.startDate > data.endDate) {
+        return res.status(400).json({ message: "startDate no puede ser posterior a endDate" });
+      }
+      const [absence] = await db.insert(personnelAbsences).values(data).returning();
+      res.status(201).json(absence);
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: "Datos invalidos", errors: error.errors });
+      console.error("Error creating absence:", error);
+      res.status(500).json({ message: "Error creating absence" });
+    }
+  });
+
+  // PUT /api/personnel-absences/:id
+  app.put("/api/personnel-absences/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const data = insertPersonnelAbsenceSchema.partial().parse(req.body);
+      if (data.startDate && data.endDate && data.startDate > data.endDate) {
+        return res.status(400).json({ message: "startDate no puede ser posterior a endDate" });
+      }
+      const [updated] = await db.update(personnelAbsences)
+        .set({ ...data, updatedAt: new Date() })
+        .where(eq(personnelAbsences.id, id))
+        .returning();
+      if (!updated) return res.status(404).json({ message: "Ausencia no encontrada" });
+      res.json(updated);
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: "Datos invalidos", errors: error.errors });
+      console.error("Error updating absence:", error);
+      res.status(500).json({ message: "Error updating absence" });
+    }
+  });
+
+  // DELETE /api/personnel-absences/:id
+  app.delete("/api/personnel-absences/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      await db.delete(personnelAbsences).where(eq(personnelAbsences.id, id));
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting absence:", error);
+      res.status(500).json({ message: "Error deleting absence" });
+    }
+  });
+
   // ==================== CAPACITY DASHBOARD ====================
   app.get("/api/capacity/weekly", requireAuth, async (req, res) => {
     try {
-      const weekStart = req.query.weekStart as string; // YYYY-MM-DD
-      const allPersonnel = await db.select().from(personnel);
-      const year = weekStart ? new Date(weekStart).getFullYear() : new Date().getFullYear();
+      const weekStartParam = req.query.weekStart as string | undefined;
+
+      // Determine the Monday of the requested week. All logic in UTC to avoid
+      // timezone drift when the server TZ differs from the client.
+      const weekStartDate = (() => {
+        if (weekStartParam && /^\d{4}-\d{2}-\d{2}$/.test(weekStartParam)) {
+          return new Date(weekStartParam + "T00:00:00.000Z");
+        }
+        const now = new Date();
+        const dayOfWeek = now.getUTCDay(); // 0=Sunday, 1=Monday, ...
+        // Go back to Monday; Sunday (0) wraps back by 6 days
+        const offset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+        const monday = new Date(now);
+        monday.setUTCDate(now.getUTCDate() + offset);
+        monday.setUTCHours(0, 0, 0, 0);
+        return monday;
+      })();
+
+      // weekEndDate = start of next Monday (exclusive upper bound).
+      // Strict < means a time entry at exactly next-Monday 00:00:00Z is NOT
+      // counted in the previous week, fixing the double-counting boundary bug.
+      const weekEndDate = new Date(weekStartDate);
+      weekEndDate.setUTCDate(weekEndDate.getUTCDate() + 7);
+
+      const weekStartStr = weekStartDate.toISOString().split("T")[0]; // YYYY-MM-DD
+      const weekEndStr = weekEndDate.toISOString().split("T")[0];     // YYYY-MM-DD (exclusive)
+
+      const year = weekStartDate.getUTCFullYear();
       const holidaysList = await db.select().from(holidays).where(eq(holidays.year, year));
 
-      // Calculate working days in the week (5 - holidays in that week)
-      const weekStartDate = weekStart ? new Date(weekStart) : new Date();
-      const weekEndDate = new Date(weekStartDate);
-      weekEndDate.setDate(weekEndDate.getDate() + 6);
-
+      // Count holidays Mon-Sun by comparing date portions in UTC
       const holidaysInWeek = holidaysList.filter(h => {
-        const hDate = new Date(h.date);
-        return hDate >= weekStartDate && hDate <= weekEndDate;
+        const hStr = new Date(h.date).toISOString().split("T")[0];
+        return hStr >= weekStartStr && hStr < weekEndStr;
       });
-      const workingDays = 5 - holidaysInWeek.length;
+      // Guard: workingDays never negative (handles erroneous holiday data)
+      const workingDays = Math.max(0, 5 - holidaysInWeek.length);
 
-      // Get time entries for this week
-      const entries = await db.select().from(timeEntries)
-        .where(and(
+      // Fetch all data in parallel -- eliminates N+1 queries
+      const [allPersonnel, entries, absences] = await Promise.all([
+        db.select().from(personnel),
+        // Strict bounds: start_of_week <= date < start_of_next_week
+        db.select().from(timeEntries).where(and(
           sql`${timeEntries.date} >= ${weekStartDate.toISOString()}`,
-          sql`${timeEntries.date} <= ${weekEndDate.toISOString()}`
-        ));
+          sql`${timeEntries.date} < ${weekEndDate.toISOString()}`
+        )),
+        // Absences overlapping this week: ends on/after weekStart AND starts before weekEnd
+        db.select().from(personnelAbsences).where(and(
+          sql`${personnelAbsences.endDate} >= ${weekStartStr}`,
+          sql`${personnelAbsences.startDate} < ${weekEndStr}`
+        )),
+      ]);
 
-      const capacityData = allPersonnel.map(person => {
-        const dailyHours = (person.monthlyHours || 160) / 20; // monthly hours / 20 working days
-        const maxCapacity = dailyHours * workingDays;
+      // Exclude personnel who became inactive before this week
+      const activePersonnel = allPersonnel.filter(p => {
+        if (!p.activeUntil) return true;
+        return p.activeUntil >= weekStartStr;
+      });
+
+      const capacityData = activePersonnel.map(person => {
+        const dailyHours = (person.monthlyHours || 160) / 20;
+
+        // Count working days (Mon-Fri) that are covered by any absence for this person
+        const personAbsences = absences.filter(a => a.personnelId === person.id);
+        let absentWorkingDays = 0;
+        if (personAbsences.length > 0) {
+          for (let i = 0; i < 5; i++) {
+            const dayDate = new Date(weekStartDate);
+            dayDate.setUTCDate(weekStartDate.getUTCDate() + i);
+            const dayStr = dayDate.toISOString().split("T")[0];
+            if (personAbsences.some(a => a.startDate <= dayStr && a.endDate >= dayStr)) {
+              absentWorkingDays++;
+            }
+          }
+        }
+
+        const availableWorkingDays = Math.max(0, workingDays - absentWorkingDays);
+        const maxCapacity = dailyHours * availableWorkingDays;
         const personEntries = entries.filter(e => e.personnelId === person.id);
         const actualHours = personEntries.reduce((sum, e) => sum + (e.hours || 0), 0);
         const idleHours = Math.max(0, maxCapacity - actualHours);
+        // isAbsent = person is absent for the entire work week
+        const isAbsent = workingDays > 0 && absentWorkingDays >= workingDays;
 
         return {
           personnelId: person.id,
@@ -19514,11 +19643,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           idleHours: Math.round(idleHours * 100) / 100,
           utilizationPct: maxCapacity > 0 ? Math.round((actualHours / maxCapacity) * 100) : 0,
           isOverloaded: actualHours > maxCapacity,
+          absentDays: absentWorkingDays,
+          isAbsent,
         };
       });
 
       res.json({
-        weekStart: weekStartDate.toISOString().split('T')[0],
+        weekStart: weekStartStr,
         workingDays,
         holidaysInWeek: holidaysInWeek.map(h => ({ date: h.date, name: h.name })),
         personnel: capacityData,
