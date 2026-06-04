@@ -267,7 +267,7 @@ export default function MonthlyClosing() {
           <h1 className="text-2xl font-bold">Cierre Mensual de Horas</h1>
           <p className="text-muted-foreground">
             Reconciliación: ajustar horas reales a horas contractuales para facturación.{" "}
-            <Link href="/estimated-rates" className="inline-flex items-center gap-1 text-primary hover:underline text-sm">
+            <Link href="/operations/estimated-rates" className="inline-flex items-center gap-1 text-primary hover:underline text-sm">
               Gestionar tarifas proyectadas <ExternalLink className="h-3 w-3" />
             </Link>
           </p>

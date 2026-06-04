@@ -170,8 +170,8 @@ export default function EstimatedRates() {
         <div>
           <h1 className="text-2xl font-bold">Valor Hora Estimada</h1>
           <p className="text-muted-foreground">
-            Proyección de valor hora con ajuste trimestral, solo para análisis interno.{" "}
-            <Link to="/admin" className="text-blue-600 underline text-sm">Ver configuración base (costos reales) →</Link>
+            Proyección del costo hora por persona con ajuste trimestral, para análisis interno.{" "}
+            <Link to="/admin" className="text-blue-600 underline text-sm">Editar tarifa base en Admin → Personal →</Link>
           </p>
         </div>
         <div className="flex gap-2 items-center">
@@ -199,7 +199,7 @@ export default function EstimatedRates() {
         <Info className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
         <div className="text-sm text-amber-900">
           <strong>Las tarifas proyectadas acá se usan en el{" "}
-          <Link href="/monthly-closing" className="underline font-medium">Cierre Mensual</Link>
+          <Link href="/operations/monthly-closing" className="underline font-medium">Cierre Mensual</Link>
           </strong>{" "}si existe una tarifa para el mes seleccionado (en lugar de la tarifa base del personal). Los valores hora que usan las cotizaciones se editan en{" "}
           <Link href="/admin" className="underline font-medium">
             Admin → Personal
