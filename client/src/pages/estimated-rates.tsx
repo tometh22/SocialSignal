@@ -104,17 +104,15 @@ export default function EstimatedRates() {
     rates?.find((r: any) => r.personnelId === personnelId && r.month === month);
 
   const getCurrentRate = (person: any): number => {
-    const months = [
-      'dec2026', 'nov2026', 'oct2026', 'sep2026', 'aug2026', 'jul2026',
-      'jun2026', 'may2026', 'apr2026', 'mar2026', 'feb2026', 'jan2026',
-      'dec2025', 'nov2025', 'oct2025', 'sep2025', 'aug2025', 'jul2025',
-      'jun2025', 'may2025', 'apr2025', 'mar2025', 'feb2025', 'jan2025'
-    ];
-    for (const m of months) {
-      const value = (person as any)[`${m}HourlyRateARS`];
-      if (value && value > 0) return value;
+    const ABBRS = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
+    // Search backwards from selected year so the view stays consistent
+    for (let y = year; y >= year - 2; y--) {
+      for (let m = 11; m >= 0; m--) {
+        const value = (person as any)[`${ABBRS[m]}${y}HourlyRateARS`];
+        if (value && value > 0) return value;
+      }
     }
-    return person.hourlyRate || 0;
+    return person.hourlyRateARS || person.hourlyRate || 0;
   };
 
   const handleGenerateProjection = async (person: any) => {

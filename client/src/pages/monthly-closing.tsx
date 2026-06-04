@@ -31,9 +31,10 @@ const MONTHS = [
 // Default contractual base hours by contract type
 function defaultBaseHours(person: any): number {
   const type = (person.contractType || "full-time").toLowerCase();
-  if (type === "part-time") return 120;
   if (type === "freelance") return person.monthlyHours || 0;
-  return 160; // full-time
+  // Use configured monthlyHours when available; fall back to contract-type defaults
+  if (person.monthlyHours) return person.monthlyHours;
+  return type === "part-time" ? 120 : 160;
 }
 
 export default function MonthlyClosing() {
@@ -90,7 +91,7 @@ export default function MonthlyClosing() {
   const getClosing = (personnelId: number) =>
     closings?.find((c: any) => c.personnelId === personnelId);
 
-  // Returns the best available rate for the selected month: estimated > personnel.hourlyRate
+  // Returns the best available rate for the selected month: estimated > base by billing currency
   const getEffectiveRate = (person: any): { rate: number; isEstimated: boolean } => {
     const est = estimatedRates.find(
       (r: any) => r.personnelId === person.id && r.month === month + 1
@@ -98,7 +99,12 @@ export default function MonthlyClosing() {
     if (est?.estimatedRateARS && est.estimatedRateARS > 0) {
       return { rate: Number(est.estimatedRateARS), isEstimated: true };
     }
-    return { rate: person.hourlyRate || 0, isEstimated: false };
+    const billing = person.billingCurrency ?? "ARS";
+    if (billing === "USD" || billing === "mixed") {
+      return { rate: person.hourlyRate || 0, isEstimated: false };
+    }
+    // ARS: prefer the ARS-specific rate, fall back to hourlyRate only as last resort
+    return { rate: person.hourlyRateARS || person.hourlyRate || 0, isEstimated: false };
   };
 
   // Effective base hours for a person: override > default by contract type
@@ -137,6 +143,14 @@ export default function MonthlyClosing() {
   const doClose = (person: any) => {
     const hrs = effectiveBaseHours(person);
     const { rate } = getEffectiveRate(person);
+    if (rate <= 0) {
+      toast({
+        title: "Sin tarifa configurada",
+        description: `${person.name} no tiene tarifa para ${MONTHS[month]} ${year}. Configurala en Valor Hora Estimada o en Admin → Personal.`,
+        variant: "destructive",
+      });
+      return;
+    }
     const existing = getClosing(person.id);
     setClosingPersonnelId(person.id);
     closeMutation.mutate({
@@ -277,8 +291,8 @@ export default function MonthlyClosing() {
             <SelectTrigger className="w-44"><SelectValue placeholder="Tipo de contrato" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos los contratos</SelectItem>
-              <SelectItem value="full-time">Full-time (160h)</SelectItem>
-              <SelectItem value="part-time">Part-time (120h)</SelectItem>
+              <SelectItem value="full-time">Full-time</SelectItem>
+              <SelectItem value="part-time">Part-time</SelectItem>
               <SelectItem value="freelance">Freelance (por hora)</SelectItem>
             </SelectContent>
           </Select>
@@ -481,7 +495,7 @@ export default function MonthlyClosing() {
           {estimatedRates.some((r: any) => r.month === month + 1) && (
             <p className="text-xs text-muted-foreground mt-2">
               * Tarifa proyectada para {MONTHS[month]} {year} (configurada en{" "}
-              <Link href="/estimated-rates" className="text-primary hover:underline">Valor Hora Estimada</Link>
+              <Link href="/operations/estimated-rates" className="text-primary hover:underline">Valor Hora Estimada</Link>
               ). Los valores sin * usan la tarifa base del personal.
             </p>
           )}
