@@ -19411,6 +19411,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             adjustedHours: data.adjustedHours,
             hourlyRate: data.hourlyRate,
             totalCost: data.totalCost,
+            exchangeRateAtClose: data.exchangeRateAtClose,
             notes: data.notes,
             closedBy: data.closedBy,
           }

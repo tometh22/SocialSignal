@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -32,6 +32,7 @@ export default function EstimatedRates() {
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [adjustmentPct, setAdjustmentPct] = useState(() => loadAdjustmentPct(8.5));
+  const lastSyncedYear = useRef<number | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -55,21 +56,28 @@ export default function EstimatedRates() {
       }).then((r) => r.json()),
   });
 
-  // Sync cellValues when rates data changes
+  // Sync cellValues and adjustmentPct when rates data changes
   useEffect(() => {
     if (!rates) return;
     setCellValues((prev) => {
       const next = { ...prev };
       for (const r of rates) {
         const k = `${r.personnelId}-${r.month}`;
-        // Only overwrite if user hasn't typed something different
         if (r.estimatedRateARS != null) {
           next[k] = r.estimatedRateARS.toString();
         }
       }
       return next;
     });
-  }, [rates]);
+    // Sync adjustmentPct from DB once per year — DB is source of truth over localStorage
+    if (lastSyncedYear.current !== year) {
+      const rowWithPct = rates.find((r: any) => r.adjustmentPct != null);
+      if (rowWithPct?.adjustmentPct != null) {
+        setAdjustmentPct(rowWithPct.adjustmentPct);
+      }
+      lastSyncedYear.current = year;
+    }
+  }, [rates, year]);
 
   // Persist adjustmentPct to localStorage on change
   useEffect(() => {

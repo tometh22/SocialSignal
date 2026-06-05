@@ -161,6 +161,7 @@ export default function MonthlyClosing() {
       adjustedHours: hrs,
       hourlyRate: rate,
       totalCost: hrs * rate,
+      exchangeRateAtClose: exchangeRate || null,
     });
   };
 

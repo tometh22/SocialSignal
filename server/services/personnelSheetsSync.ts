@@ -189,3 +189,10 @@ export const HISTORICAL_RATE_FIELDS_2026 = [
   "jul2026HourlyRateARS", "aug2026HourlyRateARS", "sep2026HourlyRateARS",
   "oct2026HourlyRateARS", "nov2026HourlyRateARS", "dec2026HourlyRateARS",
 ] as const;
+
+export const HISTORICAL_RATE_FIELDS_2027 = [
+  "jan2027HourlyRateARS", "feb2027HourlyRateARS", "mar2027HourlyRateARS",
+  "apr2027HourlyRateARS", "may2027HourlyRateARS", "jun2027HourlyRateARS",
+  "jul2027HourlyRateARS", "aug2027HourlyRateARS", "sep2027HourlyRateARS",
+  "oct2027HourlyRateARS", "nov2027HourlyRateARS", "dec2027HourlyRateARS",
+] as const;

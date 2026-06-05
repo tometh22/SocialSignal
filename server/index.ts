@@ -416,6 +416,47 @@ async function applyPendingMigrations() {
       ON CONFLICT (user_id, target_kind, target_id) DO NOTHING;
     `);
 
+    // 0022: columnas históricas 2027 + tipo de cambio en cierre mensual
+    await run('0022 2027_costs_and_exchange_rate', `
+      ALTER TABLE "personnel" ADD COLUMN IF NOT EXISTS "jan_2027_contract_type" text;
+      ALTER TABLE "personnel" ADD COLUMN IF NOT EXISTS "jan_2027_hourly_rate_ars" double precision;
+      ALTER TABLE "personnel" ADD COLUMN IF NOT EXISTS "jan_2027_monthly_salary_ars" double precision;
+      ALTER TABLE "personnel" ADD COLUMN IF NOT EXISTS "feb_2027_contract_type" text;
+      ALTER TABLE "personnel" ADD COLUMN IF NOT EXISTS "feb_2027_hourly_rate_ars" double precision;
+      ALTER TABLE "personnel" ADD COLUMN IF NOT EXISTS "feb_2027_monthly_salary_ars" double precision;
+      ALTER TABLE "personnel" ADD COLUMN IF NOT EXISTS "mar_2027_contract_type" text;
+      ALTER TABLE "personnel" ADD COLUMN IF NOT EXISTS "mar_2027_hourly_rate_ars" double precision;
+      ALTER TABLE "personnel" ADD COLUMN IF NOT EXISTS "mar_2027_monthly_salary_ars" double precision;
+      ALTER TABLE "personnel" ADD COLUMN IF NOT EXISTS "apr_2027_contract_type" text;
+      ALTER TABLE "personnel" ADD COLUMN IF NOT EXISTS "apr_2027_hourly_rate_ars" double precision;
+      ALTER TABLE "personnel" ADD COLUMN IF NOT EXISTS "apr_2027_monthly_salary_ars" double precision;
+      ALTER TABLE "personnel" ADD COLUMN IF NOT EXISTS "may_2027_contract_type" text;
+      ALTER TABLE "personnel" ADD COLUMN IF NOT EXISTS "may_2027_hourly_rate_ars" double precision;
+      ALTER TABLE "personnel" ADD COLUMN IF NOT EXISTS "may_2027_monthly_salary_ars" double precision;
+      ALTER TABLE "personnel" ADD COLUMN IF NOT EXISTS "jun_2027_contract_type" text;
+      ALTER TABLE "personnel" ADD COLUMN IF NOT EXISTS "jun_2027_hourly_rate_ars" double precision;
+      ALTER TABLE "personnel" ADD COLUMN IF NOT EXISTS "jun_2027_monthly_salary_ars" double precision;
+      ALTER TABLE "personnel" ADD COLUMN IF NOT EXISTS "jul_2027_contract_type" text;
+      ALTER TABLE "personnel" ADD COLUMN IF NOT EXISTS "jul_2027_hourly_rate_ars" double precision;
+      ALTER TABLE "personnel" ADD COLUMN IF NOT EXISTS "jul_2027_monthly_salary_ars" double precision;
+      ALTER TABLE "personnel" ADD COLUMN IF NOT EXISTS "aug_2027_contract_type" text;
+      ALTER TABLE "personnel" ADD COLUMN IF NOT EXISTS "aug_2027_hourly_rate_ars" double precision;
+      ALTER TABLE "personnel" ADD COLUMN IF NOT EXISTS "aug_2027_monthly_salary_ars" double precision;
+      ALTER TABLE "personnel" ADD COLUMN IF NOT EXISTS "sep_2027_contract_type" text;
+      ALTER TABLE "personnel" ADD COLUMN IF NOT EXISTS "sep_2027_hourly_rate_ars" double precision;
+      ALTER TABLE "personnel" ADD COLUMN IF NOT EXISTS "sep_2027_monthly_salary_ars" double precision;
+      ALTER TABLE "personnel" ADD COLUMN IF NOT EXISTS "oct_2027_contract_type" text;
+      ALTER TABLE "personnel" ADD COLUMN IF NOT EXISTS "oct_2027_hourly_rate_ars" double precision;
+      ALTER TABLE "personnel" ADD COLUMN IF NOT EXISTS "oct_2027_monthly_salary_ars" double precision;
+      ALTER TABLE "personnel" ADD COLUMN IF NOT EXISTS "nov_2027_contract_type" text;
+      ALTER TABLE "personnel" ADD COLUMN IF NOT EXISTS "nov_2027_hourly_rate_ars" double precision;
+      ALTER TABLE "personnel" ADD COLUMN IF NOT EXISTS "nov_2027_monthly_salary_ars" double precision;
+      ALTER TABLE "personnel" ADD COLUMN IF NOT EXISTS "dec_2027_contract_type" text;
+      ALTER TABLE "personnel" ADD COLUMN IF NOT EXISTS "dec_2027_hourly_rate_ars" double precision;
+      ALTER TABLE "personnel" ADD COLUMN IF NOT EXISTS "dec_2027_monthly_salary_ars" double precision;
+      ALTER TABLE "monthly_closings" ADD COLUMN IF NOT EXISTS "exchange_rate_at_close" double precision;
+    `);
+
     // 0021: personnel_absences table
     await run('0021 personnel_absences', `
       CREATE TABLE IF NOT EXISTS "personnel_absences" (
