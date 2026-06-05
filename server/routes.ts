@@ -3905,9 +3905,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       res.json(activePersonnel);
-    } catch (error) {
-      console.error("Error fetching personnel:", error);
-      res.status(500).json({ error: "Error fetching personnel" });
+    } catch (error: any) {
+      console.error("Error fetching personnel:", error?.message || error);
+      res.status(500).json({ message: error?.message || "Error fetching personnel" });
     }
   });
 

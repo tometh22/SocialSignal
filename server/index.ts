@@ -25,6 +25,52 @@ async function applyPendingMigrations() {
   };
 
   try {
+    // 0002_new_terrax: personnel extra columns (idempotent guard for Railway DB)
+    // These were added via drizzle-kit migration in the repo but may not have been
+    // applied if drizzle-kit push/migrate was never run on the production DB.
+    await run('0002 personnel_hourly_rate_ars', `
+      ALTER TABLE "personnel" ADD COLUMN IF NOT EXISTS "hourly_rate_ars" double precision;
+    `);
+    await run('0002 personnel_contract_type', `
+      ALTER TABLE "personnel" ADD COLUMN IF NOT EXISTS "contract_type" text NOT NULL DEFAULT 'full-time';
+    `);
+    await run('0002 personnel_monthly_fixed_salary', `
+      ALTER TABLE "personnel" ADD COLUMN IF NOT EXISTS "monthly_fixed_salary" double precision;
+    `);
+    await run('0002 personnel_monthly_hours', `
+      ALTER TABLE "personnel" ADD COLUMN IF NOT EXISTS "monthly_hours" double precision NOT NULL DEFAULT 160;
+    `);
+    await run('0002 personnel_include_in_real_costs', `
+      ALTER TABLE "personnel" ADD COLUMN IF NOT EXISTS "include_in_real_costs" boolean NOT NULL DEFAULT true;
+    `);
+    for (const month of ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec']) {
+      await run(`0002 personnel_2025_${month}`, `
+        ALTER TABLE "personnel" ADD COLUMN IF NOT EXISTS "${month}_2025_contract_type" text;
+        ALTER TABLE "personnel" ADD COLUMN IF NOT EXISTS "${month}_2025_hourly_rate_ars" double precision;
+        ALTER TABLE "personnel" ADD COLUMN IF NOT EXISTS "${month}_2025_monthly_salary_ars" double precision;
+      `);
+    }
+
+    // 0014_personnel_2026_costs: guard for Railway DB
+    for (const month of ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec']) {
+      await run(`0014 personnel_2026_${month}`, `
+        ALTER TABLE "personnel" ADD COLUMN IF NOT EXISTS "${month}_2026_contract_type" text;
+        ALTER TABLE "personnel" ADD COLUMN IF NOT EXISTS "${month}_2026_hourly_rate_ars" double precision;
+        ALTER TABLE "personnel" ADD COLUMN IF NOT EXISTS "${month}_2026_monthly_salary_ars" double precision;
+      `);
+    }
+
+    // 0016_personnel_billing_and_active_until: guard for Railway DB
+    await run('0016 personnel_billing_currency', `
+      ALTER TABLE "personnel" ADD COLUMN IF NOT EXISTS "billing_currency" text NOT NULL DEFAULT 'ARS';
+    `);
+    await run('0016 personnel_usd_billing_fraction', `
+      ALTER TABLE "personnel" ADD COLUMN IF NOT EXISTS "usd_billing_fraction" double precision DEFAULT 0;
+    `);
+    await run('0016 personnel_active_until', `
+      ALTER TABLE "personnel" ADD COLUMN IF NOT EXISTS "active_until" text;
+    `);
+
     // 0003: deadline columns on status tables
     await run('0003 deadline columns', `
       ALTER TABLE "project_status_reviews" ADD COLUMN IF NOT EXISTS "deadline" timestamp;

@@ -204,7 +204,7 @@ export default function Admin() {
     queryKey: ["/api/roles"],
   });
 
-  const { data: personnel, isLoading: personnelLoading, refetch: refetchPersonnel } = useQuery<Personnel[]>({
+  const { data: personnel, isLoading: personnelLoading, isError: personnelError, error: personnelFetchError, refetch: refetchPersonnel } = useQuery<Personnel[]>({
     queryKey: ["/api/personnel"],
     staleTime: 0, // Forzar que siempre vaya al servidor
     gcTime: 0,    // No guardar en cache
@@ -1294,6 +1294,12 @@ export default function Admin() {
                       ))}
                     </TableBody>
                   </Table>
+                </div>
+              ) : personnelError ? (
+                <div className="text-center py-8 text-destructive">
+                  <p className="font-semibold">Error al cargar el personal</p>
+                  <p className="text-sm mt-1 text-muted-foreground">{String((personnelFetchError as any)?.message || "Error desconocido")}</p>
+                  <button className="mt-3 underline text-sm" onClick={() => refetchPersonnel()}>Reintentar</button>
                 </div>
               ) : (
                 <div className="text-center py-8 text-muted-foreground">
