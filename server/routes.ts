@@ -3803,6 +3803,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         email: personnel.email,
         roleId: personnel.roleId,
         hourlyRate: personnel.hourlyRate,
+        hourlyRateARS: personnel.hourlyRateARS,
         roleName: roles.name,
         contractType: personnel.contractType,
         monthlyFixedSalary: personnel.monthlyFixedSalary,
