@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -32,6 +32,7 @@ export default function EstimatedRates() {
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [adjustmentPct, setAdjustmentPct] = useState(() => loadAdjustmentPct(8.5));
+  const lastSyncedYear = useRef<number | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -55,21 +56,28 @@ export default function EstimatedRates() {
       }).then((r) => r.json()),
   });
 
-  // Sync cellValues when rates data changes
+  // Sync cellValues and adjustmentPct when rates data changes
   useEffect(() => {
     if (!rates) return;
     setCellValues((prev) => {
       const next = { ...prev };
       for (const r of rates) {
         const k = `${r.personnelId}-${r.month}`;
-        // Only overwrite if user hasn't typed something different
         if (r.estimatedRateARS != null) {
           next[k] = r.estimatedRateARS.toString();
         }
       }
       return next;
     });
-  }, [rates]);
+    // Sync adjustmentPct from DB once per year — DB is source of truth over localStorage
+    if (lastSyncedYear.current !== year) {
+      const rowWithPct = rates.find((r: any) => r.adjustmentPct != null);
+      if (rowWithPct?.adjustmentPct != null) {
+        setAdjustmentPct(rowWithPct.adjustmentPct);
+      }
+      lastSyncedYear.current = year;
+    }
+  }, [rates, year]);
 
   // Persist adjustmentPct to localStorage on change
   useEffect(() => {
@@ -104,17 +112,15 @@ export default function EstimatedRates() {
     rates?.find((r: any) => r.personnelId === personnelId && r.month === month);
 
   const getCurrentRate = (person: any): number => {
-    const months = [
-      'dec2026', 'nov2026', 'oct2026', 'sep2026', 'aug2026', 'jul2026',
-      'jun2026', 'may2026', 'apr2026', 'mar2026', 'feb2026', 'jan2026',
-      'dec2025', 'nov2025', 'oct2025', 'sep2025', 'aug2025', 'jul2025',
-      'jun2025', 'may2025', 'apr2025', 'mar2025', 'feb2025', 'jan2025'
-    ];
-    for (const m of months) {
-      const value = (person as any)[`${m}HourlyRateARS`];
-      if (value && value > 0) return value;
+    const ABBRS = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
+    // Search backwards from selected year so the view stays consistent
+    for (let y = year; y >= year - 2; y--) {
+      for (let m = 11; m >= 0; m--) {
+        const value = (person as any)[`${ABBRS[m]}${y}HourlyRateARS`];
+        if (value && value > 0) return value;
+      }
     }
-    return person.hourlyRate || 0;
+    return person.hourlyRateARS || person.hourlyRate || 0;
   };
 
   const handleGenerateProjection = async (person: any) => {
@@ -170,8 +176,8 @@ export default function EstimatedRates() {
         <div>
           <h1 className="text-2xl font-bold">Valor Hora Estimada</h1>
           <p className="text-muted-foreground">
-            Proyección de valor hora con ajuste trimestral, solo para análisis interno.{" "}
-            <Link to="/admin" className="text-blue-600 underline text-sm">Ver configuración base (costos reales) →</Link>
+            Proyección del costo hora por persona con ajuste trimestral, para análisis interno.{" "}
+            <Link to="/admin" className="text-blue-600 underline text-sm">Editar tarifa base en Admin → Personal →</Link>
           </p>
         </div>
         <div className="flex gap-2 items-center">
@@ -199,7 +205,7 @@ export default function EstimatedRates() {
         <Info className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
         <div className="text-sm text-amber-900">
           <strong>Las tarifas proyectadas acá se usan en el{" "}
-          <Link href="/monthly-closing" className="underline font-medium">Cierre Mensual</Link>
+          <Link href="/operations/monthly-closing" className="underline font-medium">Cierre Mensual</Link>
           </strong>{" "}si existe una tarifa para el mes seleccionado (en lugar de la tarifa base del personal). Los valores hora que usan las cotizaciones se editan en{" "}
           <Link href="/admin" className="underline font-medium">
             Admin → Personal

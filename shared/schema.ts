@@ -355,6 +355,67 @@ export const personnel = pgTable("personnel", {
   dec2026ContractType: text("dec_2026_contract_type"),
   dec2026HourlyRateARS: doublePrecision("dec_2026_hourly_rate_ars"),
   dec2026MonthlySalaryARS: doublePrecision("dec_2026_monthly_salary_ars"),
+
+  // ==================== COSTOS HISTÓRICOS 2027 ====================
+  // Enero 2027
+  jan2027ContractType: text("jan_2027_contract_type"),
+  jan2027HourlyRateARS: doublePrecision("jan_2027_hourly_rate_ars"),
+  jan2027MonthlySalaryARS: doublePrecision("jan_2027_monthly_salary_ars"),
+
+  // Febrero 2027
+  feb2027ContractType: text("feb_2027_contract_type"),
+  feb2027HourlyRateARS: doublePrecision("feb_2027_hourly_rate_ars"),
+  feb2027MonthlySalaryARS: doublePrecision("feb_2027_monthly_salary_ars"),
+
+  // Marzo 2027
+  mar2027ContractType: text("mar_2027_contract_type"),
+  mar2027HourlyRateARS: doublePrecision("mar_2027_hourly_rate_ars"),
+  mar2027MonthlySalaryARS: doublePrecision("mar_2027_monthly_salary_ars"),
+
+  // Abril 2027
+  apr2027ContractType: text("apr_2027_contract_type"),
+  apr2027HourlyRateARS: doublePrecision("apr_2027_hourly_rate_ars"),
+  apr2027MonthlySalaryARS: doublePrecision("apr_2027_monthly_salary_ars"),
+
+  // Mayo 2027
+  may2027ContractType: text("may_2027_contract_type"),
+  may2027HourlyRateARS: doublePrecision("may_2027_hourly_rate_ars"),
+  may2027MonthlySalaryARS: doublePrecision("may_2027_monthly_salary_ars"),
+
+  // Junio 2027
+  jun2027ContractType: text("jun_2027_contract_type"),
+  jun2027HourlyRateARS: doublePrecision("jun_2027_hourly_rate_ars"),
+  jun2027MonthlySalaryARS: doublePrecision("jun_2027_monthly_salary_ars"),
+
+  // Julio 2027
+  jul2027ContractType: text("jul_2027_contract_type"),
+  jul2027HourlyRateARS: doublePrecision("jul_2027_hourly_rate_ars"),
+  jul2027MonthlySalaryARS: doublePrecision("jul_2027_monthly_salary_ars"),
+
+  // Agosto 2027
+  aug2027ContractType: text("aug_2027_contract_type"),
+  aug2027HourlyRateARS: doublePrecision("aug_2027_hourly_rate_ars"),
+  aug2027MonthlySalaryARS: doublePrecision("aug_2027_monthly_salary_ars"),
+
+  // Septiembre 2027
+  sep2027ContractType: text("sep_2027_contract_type"),
+  sep2027HourlyRateARS: doublePrecision("sep_2027_hourly_rate_ars"),
+  sep2027MonthlySalaryARS: doublePrecision("sep_2027_monthly_salary_ars"),
+
+  // Octubre 2027
+  oct2027ContractType: text("oct_2027_contract_type"),
+  oct2027HourlyRateARS: doublePrecision("oct_2027_hourly_rate_ars"),
+  oct2027MonthlySalaryARS: doublePrecision("oct_2027_monthly_salary_ars"),
+
+  // Noviembre 2027
+  nov2027ContractType: text("nov_2027_contract_type"),
+  nov2027HourlyRateARS: doublePrecision("nov_2027_hourly_rate_ars"),
+  nov2027MonthlySalaryARS: doublePrecision("nov_2027_monthly_salary_ars"),
+
+  // Diciembre 2027
+  dec2027ContractType: text("dec_2027_contract_type"),
+  dec2027HourlyRateARS: doublePrecision("dec_2027_hourly_rate_ars"),
+  dec2027MonthlySalaryARS: doublePrecision("dec_2027_monthly_salary_ars"),
 });
 
 export const insertPersonnelSchema = createInsertSchema(personnel).pick({
@@ -446,6 +507,44 @@ export const insertPersonnelSchema = createInsertSchema(personnel).pick({
   nov2026MonthlySalaryARS: true,
   dec2026HourlyRateARS: true,
   dec2026MonthlySalaryARS: true,
+  // Costos históricos 2027 - Contract Types
+  jan2027ContractType: true,
+  feb2027ContractType: true,
+  mar2027ContractType: true,
+  apr2027ContractType: true,
+  may2027ContractType: true,
+  jun2027ContractType: true,
+  jul2027ContractType: true,
+  aug2027ContractType: true,
+  sep2027ContractType: true,
+  oct2027ContractType: true,
+  nov2027ContractType: true,
+  dec2027ContractType: true,
+  // Costos históricos 2027 - Rates and Salaries
+  jan2027HourlyRateARS: true,
+  jan2027MonthlySalaryARS: true,
+  feb2027HourlyRateARS: true,
+  feb2027MonthlySalaryARS: true,
+  mar2027HourlyRateARS: true,
+  mar2027MonthlySalaryARS: true,
+  apr2027HourlyRateARS: true,
+  apr2027MonthlySalaryARS: true,
+  may2027HourlyRateARS: true,
+  may2027MonthlySalaryARS: true,
+  jun2027HourlyRateARS: true,
+  jun2027MonthlySalaryARS: true,
+  jul2027HourlyRateARS: true,
+  jul2027MonthlySalaryARS: true,
+  aug2027HourlyRateARS: true,
+  aug2027MonthlySalaryARS: true,
+  sep2027HourlyRateARS: true,
+  sep2027MonthlySalaryARS: true,
+  oct2027HourlyRateARS: true,
+  oct2027MonthlySalaryARS: true,
+  nov2027HourlyRateARS: true,
+  nov2027MonthlySalaryARS: true,
+  dec2027HourlyRateARS: true,
+  dec2027MonthlySalaryARS: true,
 }).extend({
   name: z.string().min(2, "El nombre debe tener al menos 2 caracteres").max(100, "El nombre no puede exceder 100 caracteres"),
   email: z.string().email("Email inválido").optional().or(z.literal("")),
@@ -841,6 +940,7 @@ export const monthlyClosings = pgTable("monthly_closings", {
   adjustedHours: doublePrecision("adjusted_hours").notNull(), // horas ajustadas para facturación (ej: 160)
   hourlyRate: doublePrecision("hourly_rate").notNull(), // valor hora al cierre
   totalCost: doublePrecision("total_cost").notNull(), // adjustedHours * hourlyRate
+  exchangeRateAtClose: doublePrecision("exchange_rate_at_close"), // ARS/USD al momento del cierre
   notes: text("notes"),
   closedBy: integer("closed_by").references(() => users.id, { onDelete: 'set null' }),
   closedAt: timestamp("closed_at").notNull().defaultNow(),

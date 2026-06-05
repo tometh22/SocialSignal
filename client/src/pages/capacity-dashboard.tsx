@@ -123,10 +123,10 @@ export default function CapacityDashboard() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Capacidad Operativa Semanal</h1>
-          <p className="text-muted-foreground">
+          <p className="text-muted-foreground text-sm">
             {isOperations
-              ? "Vista de operaciones: capacidad, horas ociosas y utilización"
-              : "Tu carga de horas semanal"}
+              ? "Capacidad máxima según contrato vs. horas registradas en el Panel de Horas. Doble clic en Cap. Máx para ajustar puntualmente."
+              : "Tus horas registradas vs. tu capacidad semanal contratada."}
           </p>
         </div>
         <Input

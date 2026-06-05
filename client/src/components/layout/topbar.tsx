@@ -158,6 +158,13 @@ export default function Topbar({ onMenuClick }: TopbarProps = {}) {
       'history': 'Historial',
       'status-semanal': 'Status',
       'review': 'Status',
+      'operations': 'Operaciones',
+      'capacity': 'Capacidad Semanal',
+      'monthly-closing': 'Cierre Mensual',
+      'estimated-rates': 'Valor Hora Estimada',
+      'holidays': 'Feriados',
+      'absences': 'Ausencias',
+      'my-invoices': 'Mis facturas',
     };
 
     // Casos especiales para páginas principales que no necesitan "Dashboard" como padre

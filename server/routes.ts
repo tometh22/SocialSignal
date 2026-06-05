@@ -3803,6 +3803,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         email: personnel.email,
         roleId: personnel.roleId,
         hourlyRate: personnel.hourlyRate,
+        hourlyRateARS: personnel.hourlyRateARS,
         roleName: roles.name,
         contractType: personnel.contractType,
         monthlyFixedSalary: personnel.monthlyFixedSalary,
@@ -19411,6 +19412,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             adjustedHours: data.adjustedHours,
             hourlyRate: data.hourlyRate,
             totalCost: data.totalCost,
+            exchangeRateAtClose: data.exchangeRateAtClose,
             notes: data.notes,
             closedBy: data.closedBy,
           }
