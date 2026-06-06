@@ -3795,8 +3795,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Personnel routes
-  app.get("/api/personnel", requireAuth, async (_, res) => {
+  app.get("/api/personnel", requireAuth, async (req, res) => {
     try {
+      const includeInactive = req.query.includeInactive === "true";
       const personnelData = await db.select({
         id: personnel.id,
         name: personnel.name,
@@ -3895,6 +3896,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       .leftJoin(roles, eq(personnel.roleId, roles.id))
       .orderBy(personnel.name);
 
+      if (includeInactive) {
+        res.json(personnelData);
+        return;
+      }
+
       // Filter out inactive personnel and those whose active period has ended.
       // We filter in JS (not SQL WHERE) so existing quotations that reference them still load;
       // only new selector lists exclude them.
@@ -3904,6 +3910,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return p.activeUntil >= today;
       });
 
+      console.log(`GET /api/personnel: total=${personnelData.length} active=${activePersonnel.length} today=${today}`);
       res.json(activePersonnel);
     } catch (error: any) {
       console.error("Error fetching personnel:", error?.message || error);

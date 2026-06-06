@@ -205,9 +205,9 @@ export default function Admin() {
   });
 
   const { data: personnel, isLoading: personnelLoading, isError: personnelError, error: personnelFetchError, refetch: refetchPersonnel } = useQuery<Personnel[]>({
-    queryKey: ["/api/personnel"],
-    staleTime: 0, // Forzar que siempre vaya al servidor
-    gcTime: 0,    // No guardar en cache
+    queryKey: ["/api/personnel?includeInactive=true"],
+    staleTime: 0,
+    gcTime: 0,
     refetchOnMount: true,
     refetchOnWindowFocus: true,
   });
