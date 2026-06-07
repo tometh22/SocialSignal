@@ -947,7 +947,8 @@ export default function Admin() {
       const value = person[`${month}HourlyRateARS`];
       if (value && value > 0) return value;
     }
-    return person.hourlyRate || 0;
+    const billing = (person.billingCurrency ?? 'ARS');
+    return billing === 'ARS' ? (person.hourlyRateARS || 0) : (person.hourlyRate || 0);
   };
 
   // Sueldo vigente: si la tarifa más reciente es de un mes posterior al

@@ -91,20 +91,27 @@ export default function MonthlyClosing() {
   const getClosing = (personnelId: number) =>
     closings?.find((c: any) => c.personnelId === personnelId);
 
-  // Returns the best available rate for the selected month: estimated > base by billing currency
-  const getEffectiveRate = (person: any): { rate: number; isEstimated: boolean } => {
+  // Returns the best available rate for the selected month: estimated > base by billing currency.
+  // rate    = ARS rate (or USD rate for "USD" billing)
+  // rateUSD = USD component (only meaningful for "USD" and "mixed" billing)
+  const getEffectiveRate = (person: any): { rate: number; rateUSD: number; isEstimated: boolean } => {
     const est = estimatedRates.find(
       (r: any) => r.personnelId === person.id && r.month === month + 1
     );
-    if (est?.estimatedRateARS && est.estimatedRateARS > 0) {
-      return { rate: Number(est.estimatedRateARS), isEstimated: true };
-    }
     const billing = person.billingCurrency ?? "ARS";
-    if (billing === "USD" || billing === "mixed") {
-      return { rate: person.hourlyRate || 0, isEstimated: false };
+    const usdRate = person.hourlyRate || 0;
+    if (est?.estimatedRateARS && est.estimatedRateARS > 0) {
+      return { rate: Number(est.estimatedRateARS), rateUSD: usdRate, isEstimated: true };
     }
-    // ARS: prefer the ARS-specific rate, fall back to hourlyRate only as last resort
-    return { rate: person.hourlyRateARS || person.hourlyRate || 0, isEstimated: false };
+    if (billing === "USD") {
+      return { rate: usdRate, rateUSD: usdRate, isEstimated: false };
+    }
+    if (billing === "mixed") {
+      // rate = ARS component, rateUSD = USD component
+      return { rate: person.hourlyRateARS || 0, rateUSD: usdRate, isEstimated: false };
+    }
+    // ARS: prefer the ARS-specific rate, fall back to direct ARS field
+    return { rate: person.hourlyRateARS || 0, rateUSD: 0, isEstimated: false };
   };
 
   // Effective base hours for a person: override > default by contract type
@@ -142,8 +149,10 @@ export default function MonthlyClosing() {
 
   const doClose = (person: any) => {
     const hrs = effectiveBaseHours(person);
-    const { rate } = getEffectiveRate(person);
-    if (rate <= 0) {
+    const { rate, rateUSD } = getEffectiveRate(person);
+    const billing = getBillingCurrency(person);
+    const hasRate = billing === "mixed" ? (rate > 0 || rateUSD > 0) : rate > 0;
+    if (!hasRate) {
       toast({
         title: "Sin tarifa configurada",
         description: `${person.name} no tiene tarifa para ${MONTHS[month]} ${year}. Configurala en Valor Hora Estimada o en Admin → Personal.`,
@@ -153,14 +162,38 @@ export default function MonthlyClosing() {
     }
     const existing = getClosing(person.id);
     setClosingPersonnelId(person.id);
+
+    let hourlyRate: number;
+    let totalCost: number;
+    let hourlyRateCurrency: string;
+
+    if (billing === "USD") {
+      // Store USD rate; totalCost = ARS equivalent
+      hourlyRate = rateUSD;
+      totalCost = hrs * rateUSD * (exchangeRate || 1);
+      hourlyRateCurrency = "USD";
+    } else if (billing === "mixed") {
+      const usdFraction = getUsdFraction(person);
+      const costARS = hrs * rate * (1 - usdFraction);
+      const costUSD = hrs * rateUSD * usdFraction;
+      totalCost = costARS + costUSD * (exchangeRate || 1);
+      hourlyRate = hrs > 0 ? totalCost / hrs : 0;
+      hourlyRateCurrency = "mixed";
+    } else {
+      hourlyRate = rate;
+      totalCost = hrs * rate;
+      hourlyRateCurrency = "ARS";
+    }
+
     closeMutation.mutate({
       personnelId: person.id,
       year,
       month: month + 1,
       actualHours: existing?.actualHours || hrs,
       adjustedHours: hrs,
-      hourlyRate: rate,
-      totalCost: hrs * rate,
+      hourlyRate,
+      hourlyRateCurrency,
+      totalCost,
       exchangeRateAtClose: exchangeRate || null,
     });
   };
@@ -186,14 +219,14 @@ export default function MonthlyClosing() {
   const getBillingCurrency = (person: any): string => person.billingCurrency ?? "ARS";
   const getUsdFraction = (person: any): number => person.usdBillingFraction ?? 0;
 
-  // Cost display: returns {arsText, usdText} based on billing modality
+  // Cost display: returns {primary, secondary} based on billing modality
   const getCostDisplay = (person: any) => {
     const hrs = effectiveBaseHours(person);
-    const { rate } = getEffectiveRate(person); // ARS or USD depending on billingCurrency
+    const { rate, rateUSD } = getEffectiveRate(person);
     const billing = getBillingCurrency(person);
 
     if (billing === "USD") {
-      const costUSD = hrs * rate;
+      const costUSD = hrs * rateUSD;
       const costARS = costUSD * exchangeRate;
       return {
         primary: `USD ${costUSD.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`,
@@ -203,9 +236,9 @@ export default function MonthlyClosing() {
 
     if (billing === "mixed") {
       const usdFraction = getUsdFraction(person);
-      const costTotal = hrs * rate;
-      const costUSD = costTotal * usdFraction;
-      const costARS = costTotal * (1 - usdFraction);
+      // rate = ARS component rate, rateUSD = USD component rate
+      const costUSD = hrs * rateUSD * usdFraction;
+      const costARS = hrs * rate * (1 - usdFraction);
       return {
         primary: `USD ${costUSD.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`,
         secondary: `+ ARS ${costARS.toLocaleString("es-AR", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`,
@@ -222,11 +255,14 @@ export default function MonthlyClosing() {
 
   const getRateDisplay = (person: any): { text: string; isEstimated: boolean } => {
     const billing = getBillingCurrency(person);
-    const { rate, isEstimated } = getEffectiveRate(person);
+    const { rate, rateUSD, isEstimated } = getEffectiveRate(person);
     let text: string;
-    if (billing === "USD") text = `USD ${rate.toLocaleString("en-US")}`;
-    else if (billing === "mixed") text = `USD ${rate.toLocaleString("en-US")} (mixto)`;
-    else text = `ARS ${rate.toLocaleString("es-AR")}`;
+    if (billing === "USD") text = `USD ${rateUSD.toLocaleString("en-US")}/hr`;
+    else if (billing === "mixed") {
+      const usdFraction = getUsdFraction(person);
+      text = `USD ${rateUSD.toLocaleString("en-US")} (${Math.round(usdFraction * 100)}%) + ARS ${rate.toLocaleString("es-AR")} (${Math.round((1 - usdFraction) * 100)}%)`;
+    }
+    else text = `ARS ${rate.toLocaleString("es-AR")}/hr`;
     return { text, isEstimated };
   };
 

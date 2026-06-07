@@ -939,7 +939,8 @@ export const monthlyClosings = pgTable("monthly_closings", {
   actualHours: doublePrecision("actual_hours").notNull(), // horas reales trabajadas
   adjustedHours: doublePrecision("adjusted_hours").notNull(), // horas ajustadas para facturación (ej: 160)
   hourlyRate: doublePrecision("hourly_rate").notNull(), // valor hora al cierre
-  totalCost: doublePrecision("total_cost").notNull(), // adjustedHours * hourlyRate
+  hourlyRateCurrency: text("hourly_rate_currency").default("ARS"), // ARS | USD | mixed
+  totalCost: doublePrecision("total_cost").notNull(), // adjustedHours * hourlyRate, always in ARS
   exchangeRateAtClose: doublePrecision("exchange_rate_at_close"), // ARS/USD al momento del cierre
   notes: text("notes"),
   closedBy: integer("closed_by").references(() => users.id, { onDelete: 'set null' }),

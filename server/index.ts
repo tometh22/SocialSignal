@@ -473,6 +473,9 @@ async function applyPendingMigrations() {
     await run('0022 monthly_closings_exchange_rate', `
       ALTER TABLE "monthly_closings" ADD COLUMN IF NOT EXISTS "exchange_rate_at_close" double precision;
     `);
+    await run('0022 monthly_closings_hourly_rate_currency', `
+      ALTER TABLE "monthly_closings" ADD COLUMN IF NOT EXISTS "hourly_rate_currency" text DEFAULT 'ARS';
+    `);
 
     // 0021: personnel_absences table
     await run('0021 personnel_absences', `

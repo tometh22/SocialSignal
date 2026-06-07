@@ -340,8 +340,9 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
 
     // Personnel who bill in USD always return their USD rate regardless of quotation currency,
     // so their cost is always denominated in USD and converted to ARS by the caller.
+    // "mixed" billing falls through to the ARS lookup when the quotation is in ARS.
     const personBillingCurrency = (person as any).billingCurrency ?? 'ARS';
-    if (currency === 'USD' || personBillingCurrency === 'USD' || personBillingCurrency === 'mixed') {
+    if (currency === 'USD' || personBillingCurrency === 'USD') {
       const usdRate = person.hourlyRate;
       if (usdRate && usdRate > 0) return usdRate;
       return 50;

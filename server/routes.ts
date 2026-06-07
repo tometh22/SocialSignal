@@ -19418,6 +19418,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             actualHours: data.actualHours,
             adjustedHours: data.adjustedHours,
             hourlyRate: data.hourlyRate,
+            hourlyRateCurrency: data.hourlyRateCurrency,
             totalCost: data.totalCost,
             exchangeRateAtClose: data.exchangeRateAtClose,
             notes: data.notes,
