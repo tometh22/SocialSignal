@@ -111,7 +111,10 @@ const personnelSchema = z.object({
   email: z.string().email().optional().or(z.literal("")),
   contractType: z.enum(["full-time", "part-time", "freelance"]).default("full-time"),
   monthlyFixedSalary: z.coerce.number().min(0).optional(),
-  includeInRealCosts: z.boolean().default(true)
+  includeInRealCosts: z.boolean().default(true),
+  billingCurrency: z.enum(["ARS", "USD", "mixed"]).default("ARS"),
+  usdBillingFraction: z.coerce.number().min(0).max(1).optional(),
+  activeUntil: z.string().optional().nullable(),
 });
 
 // Schema para el formulario de plantillas
@@ -1288,7 +1291,11 @@ export default function Admin() {
                             sep2026MonthlySalaryARS: person.sep2026MonthlySalaryARS,
                             oct2026MonthlySalaryARS: person.oct2026MonthlySalaryARS,
                             nov2026MonthlySalaryARS: person.nov2026MonthlySalaryARS,
-                            dec2026MonthlySalaryARS: person.dec2026MonthlySalaryARS
+                            dec2026MonthlySalaryARS: person.dec2026MonthlySalaryARS,
+                            // Billing & activity
+                            billingCurrency: person.billingCurrency,
+                            usdBillingFraction: person.usdBillingFraction,
+                            activeUntil: person.activeUntil,
                           }}
                           roles={roles || []} 
                         />
