@@ -42,6 +42,11 @@ import CRMLeadPage from "@/pages/crm-lead";
 import StatusSemanalPage from "@/pages/status-semanal";
 import ReviewHubPage from "@/pages/review/hub";
 import ReviewRoomPage from "@/pages/review/room";
+import ActivoPage from "@/pages/activo";
+import PasivoPage from "@/pages/pasivo";
+import ProvisionsPage from "@/pages/provisions";
+import CashflowPage from "@/pages/cashflow";
+import ClientPnlPage from "@/pages/client-pnl";
 
 // Task Management Module
 import MyTasksPage from "@/pages/my-tasks";
@@ -236,6 +241,13 @@ function AppRoutes() {
                   <ProtectedRoute path="/admin/users" component={AdminUsersPage} requiredPermission="admin" />
                   <ProtectedRoute path="/admin/inflation" component={AdminInflation} requiredPermission="admin" />
                   <ProtectedRoute path="/admin" component={Admin} requiredPermission="admin" />
+
+                  {/* Finance Ledger */}
+                  <ProtectedRoute path="/finance/activo" component={ActivoPage} requiredPermission="finance" />
+                  <ProtectedRoute path="/finance/pasivo" component={PasivoPage} requiredPermission="finance" />
+                  <ProtectedRoute path="/finance/provisions" component={ProvisionsPage} requiredPermission="finance" />
+                  <ProtectedRoute path="/finance/cashflow" component={CashflowPage} requiredPermission="finance" />
+                  <ProtectedRoute path="/clients/:id/pnl" component={ClientPnlPage} requiredPermission="finance" />
 
                   {/* Operations Management */}
                   <ProtectedRoute path="/operations/capacity" component={CapacityDashboard} requiredPermission="operations" />

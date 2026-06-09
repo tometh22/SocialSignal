@@ -128,13 +128,12 @@ import { setupAuth, hashPassword } from "./auth";
 import { requireProjectUnlocked, projectIdFromTimeEntry } from "./middleware/projectLocked";
 import { requireRole, requireProvider, requireProviderCanAccessProject } from "./middleware/requireRole";
 import { createReviewRoomsRouter } from "./routes-review-rooms";
+import { createLedgerRouter } from "./routes-ledger";
 import { reviewRooms, reviewRoomMembers } from "@shared/schema";
 import path from 'path';
 import { setupChat } from "./chat";
 // import { googleSheetsService } from "./services/googleSheetsService"; // Temporalmente deshabilitado
 import { googleSheetsServiceAlternative } from "./services/googleSheetsServiceAlternative";
-import { googleSheetsSimpleService } from "./services/googleSheetsSimple";
-import { googleSheetsFixedService } from "./services/googleSheetsFixed";
 import { googleSheetsWorkingService } from "./services/googleSheetsWorking";
 import { autoSyncService } from "./services/autoSyncService";
 import { 
@@ -644,6 +643,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ═══ Review Rooms (multi-sala) ═══════════════════════════════════════════
   app.use('/api/reviews', createReviewRoomsRouter(requireAuth));
+  app.use('/api', createLedgerRouter(requireAuth));
 
   // Legacy aliases: resuelven /api/status-semanal/* → /api/reviews/:miReviewId/*
   // para no romper bookmarks/clientes stale mientras migran. Borrar en v1.1.

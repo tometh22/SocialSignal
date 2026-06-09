@@ -200,6 +200,8 @@ export interface CostoDirectoRow {
   'Tipo de cambio'?: any;
   'Monto Total USD'?: any;
   Rol?: string;
+  'Subtipo de costo'?: string;
+  Subtipo?: string;
   __rowId?: string;
 }
 
@@ -515,8 +517,28 @@ const PROVISION_PATTERNS_CDI = [
   'ajuste contable', 'ajuste provision'
 ];
 
+// Subtipos de costo que se enrutan al bucket fiscal/provisión (no al EBIT operativo base)
+// Sin acentos — el input se normaliza con NFD antes de comparar
+const FISCAL_SUBTIPOS = new Set([
+  'impuestos arg',
+  'impuestos usa',
+  'intereses oxean',
+  'provision pasivo',
+  'equipo - bono',
+  'board - bono',
+  'administracion finanzas - bono',
+  'bonos total',
+]);
+
 function isProvisionConceptCDI(row: CostoDirectoRow): boolean {
-  // Revisar múltiples campos para detectar conceptos de provisión
+  // 1. Chequear subtipoCosto primero (campo explícito más confiable)
+  const subtipo = (row['Subtipo de costo'] || row['Subtipo'] || '')
+    .toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .trim();
+  if (subtipo && FISCAL_SUBTIPOS.has(subtipo)) return true;
+
+  // 2. Fallback: revisar múltiples campos por patrones de texto libre
   const fieldsToCheck = [
     row['Detalle'],
     row['Subtipo'],
@@ -525,10 +547,10 @@ function isProvisionConceptCDI(row: CostoDirectoRow): boolean {
     row['Proyecto'],
     row['Cliente']
   ].filter(Boolean);
-  
+
   const combined = fieldsToCheck.join(' ').toLowerCase()
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-  
+
   return PROVISION_PATTERNS_CDI.some(pattern => combined.includes(pattern));
 }
 

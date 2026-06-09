@@ -7,118 +7,16 @@
  * - GET /api/portfolio/costs?period=YYYY-MM
  */
 
-import type { 
-  CostsResult, 
-  ProjectCost, 
-  PortfolioCostSummary, 
-  PeriodKey 
+import type {
+  CostsResult,
+  ProjectCost,
+  PortfolioCostSummary,
+  PeriodKey
 } from './types';
 
 import { getCostData, getCostDataForProject } from './data-access';
 import { processCostsForPeriod } from './business-rules';
 import * as income from '../income';
-import { getFx } from '../income/fx';
-
-// ==================== PERIOD RECONCILER (TEMPORAL) ====================
-// 🎯 Overrides temporales para agosto 2025 mientras se completa la DB
-// TODO: Remove period overrides once direct_costs is complete for 2025-08
-// Este reconciler NO toca la DB y es completamente reversible
-
-interface CostOverride {
-  clientKey: string;  // slugify(lower(trim(cliente)))
-  projectKey: string; // slugify(lower(trim(proyecto)))
-  period: PeriodKey;
-  nativeAmount: number;
-  nativeCurrency: 'USD' | 'ARS';
-}
-
-const COST_OVERRIDES_2025_08: CostOverride[] = [
-  {
-    clientKey: 'warner',
-    projectKey: 'fee-marketing',
-    period: '2025-08',
-    nativeAmount: 7005.20,
-    nativeCurrency: 'USD'
-  },
-  {
-    clientKey: 'kimberly-clark',
-    projectKey: 'fee-huggies',
-    period: '2025-08',
-    nativeAmount: 2436.09,
-    nativeCurrency: 'USD'
-  },
-  {
-    clientKey: 'play-digital-sa-modo',
-    projectKey: 'fee-mensual',
-    period: '2025-08',
-    nativeAmount: 497550,
-    nativeCurrency: 'ARS'
-  },
-  {
-    clientKey: 'coelsa',
-    projectKey: 'fee-mensual',
-    period: '2025-08',
-    nativeAmount: 553002,
-    nativeCurrency: 'ARS'
-  }
-];
-
-function slugify(text: string): string {
-  return text
-    .toLowerCase()
-    .trim()
-    .replace(/\s+/g, '-')
-    .replace(/[^a-z0-9-]/g, '')
-    .replace(/-+/g, '-');
-}
-
-function applyPeriodReconciler(
-  projects: ProjectCost[], 
-  period: PeriodKey,
-  fxRate: number
-): ProjectCost[] {
-  
-  // Solo aplicar overrides para agosto 2025
-  if (period !== '2025-08') {
-    return projects;
-  }
-  
-  console.log(`🔧 RECONCILER: Applying period overrides for ${period}`);
-  
-  const overridesMap = new Map<string, CostOverride>();
-  for (const override of COST_OVERRIDES_2025_08) {
-    const key = `${override.clientKey}|${override.projectKey}`;
-    overridesMap.set(key, override);
-  }
-  
-  return projects.map(project => {
-    const clientKey = slugify(project.clientName);
-    const projectKey = slugify(project.projectName);
-    const key = `${clientKey}|${projectKey}`;
-    
-    const override = overridesMap.get(key);
-    
-    if (override) {
-      const costUSDNormalized = override.nativeCurrency === 'USD' 
-        ? override.nativeAmount
-        : override.nativeAmount / fxRate;
-      
-      console.log(`✅ RECONCILER OVERRIDE: ${project.clientName} | ${project.projectName} → ${override.nativeCurrency} ${override.nativeAmount} (was ${project.costDisplay.currency} ${project.costDisplay.amount})`);
-      
-      return {
-        ...project,
-        costDisplay: {
-          amount: override.nativeAmount,
-          currency: override.nativeCurrency
-        },
-        costUSDNormalized,
-        overridden: true  // 🎯 Marca que este valor fue reconciliado
-      };
-    }
-    
-    return project;
-  });
-}
 
 // ==================== PUBLIC API ====================
 
@@ -159,24 +57,9 @@ export async function getCostsForPeriod(
     
     // 4. Process for the specific period (with currency info)
     const result = await processCostsForPeriod(allCostRecords, period, {}, projectCurrencyMap);
-    
-    // 5. 🎯 Apply period reconciler (temporal overrides for 2025-08)
-    // 🚀 FIXED: Use dynamic FX based on period instead of hardcoded 1345
-    const fxRate = await getFx(period);
-    console.log(`💱 COSTS SoT: Using FX ${fxRate} for period ${period}`);
-    result.projects = applyPeriodReconciler(result.projects, period, fxRate);
-    
-    // 6. Recalculate direct-only totals after reconciler overrides.
-    // El reconciler solo modifica proyectos directos; preservamos el overhead.
-    // Se captura el indirecto ANTES de actualizar directCostsTotalUSD.
-    const originalDirectTotal = result.directCostsTotalUSD;
-    const indirectTotal = result.portfolioCostUSD - originalDirectTotal;
-    const reconciledDirectTotal = result.projects.reduce((sum, p) => sum + p.costUSDNormalized, 0);
-    result.directCostsTotalUSD = reconciledDirectTotal;
-    result.portfolioCostUSD = reconciledDirectTotal + Math.max(0, indirectTotal);
 
     console.log(`✅ COSTS SoT: Returned ${result.projects.length} projects, directUSD=${result.directCostsTotalUSD.toFixed(2)}, portfolioUSD=${result.portfolioCostUSD.toFixed(2)}`);
-    
+
     return result;
     
   } catch (error) {

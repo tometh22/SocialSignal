@@ -72,6 +72,7 @@ export const indirectCostCategories = pgTable("indirect_cost_categories", {
   description: text("description"),
   type: varchar("type", { length: 50 }).notNull(), // 'fixed', 'variable', 'executive', 'tax', 'subscription'
   isActive: boolean("is_active").notNull().default(true),
+  removeIVA: boolean("remove_iva").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
@@ -2380,6 +2381,7 @@ export const directCosts = pgTable("direct_costs", {
   mes: text("mes").notNull(),
   año: integer("año").notNull(),
   tipoGasto: text("tipo_gasto"), // "Directo", "Indirecto"
+  subtipoCosto: varchar("subtipo_costo", { length: 60 }), // Equipo|Board|Equipo - Bono|Board - Bono|Suscripciones/Herramientas|Impuestos ARG|Impuestos USA|Estudio Contable|Otros Proveedores|Otros Gastos|Tarjeta|People|Comisiones Bancarias|Monotributo|Provisión Pasivo|Intereses Oxean|Comisiones equipo|Bonos Total|Gastos Varios|Administración Finanzas|Administración Finanzas - Bono
   especificacion: text("especificacion"), // PRO00003734, etc.
   proyecto: text("proyecto"), // Fee mensual, Especial, General
   tipoProyecto: text("tipo_proyecto"), // Fee mensual, Especial
@@ -3911,6 +3913,128 @@ export const insertProviderProjectAccessSchema = createInsertSchema(providerProj
   id: true,
   grantedAt: true,
 });
+
+// ==================== LEDGER TABLES ====================
+
+// Cuentas a cobrar — refleja la solapa "Activo" del Excel MAESTRO
+export const activoEntries = pgTable("activo_entries", {
+  id: serial("id").primaryKey(),
+  periodKey: varchar("period_key", { length: 7 }).notNull(),
+  tipoActivo: varchar("tipo_activo", { length: 50 }),
+  concepto: text("concepto"),
+  clienteId: integer("cliente_id").references(() => clients.id, { onDelete: "set null" }),
+  clienteNombre: text("cliente_nombre"),
+  montoARS: numeric("monto_ars", { precision: 14, scale: 2 }),
+  montoUSD: numeric("monto_usd", { precision: 12, scale: 2 }),
+  cotizacion: numeric("cotizacion", { precision: 10, scale: 4 }),
+  montoTotalUSD: numeric("monto_total_usd", { precision: 12, scale: 2 }),
+  fechaFacturacion: timestamp("fecha_facturacion"),
+  fechaPago: timestamp("fecha_pago"),
+  fechaVencimiento: timestamp("fecha_vencimiento"),
+  vencido: boolean("vencido").default(false),
+  cobradoAlCierre: boolean("cobrado_al_cierre").default(false),
+  nroFactura: varchar("nro_factura", { length: 100 }),
+  razonSocial: text("razon_social"),
+  overrideManual: boolean("override_manual").default(false),
+  importedAt: timestamp("imported_at").defaultNow(),
+  importBatch: varchar("import_batch", { length: 100 }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (t) => ({
+  idxPeriod: index("idx_activo_period").on(t.periodKey),
+  idxCliente: index("idx_activo_cliente").on(t.clienteNombre),
+}));
+
+export const insertActivoEntrySchema = createInsertSchema(activoEntries).omit({ id: true, createdAt: true, updatedAt: true, importedAt: true });
+export type ActivoEntry = typeof activoEntries.$inferSelect;
+export type InsertActivoEntry = z.infer<typeof insertActivoEntrySchema>;
+
+// Cuentas a pagar — refleja la solapa "Pasivo" del Excel MAESTRO
+export const pasivoEntries = pgTable("pasivo_entries", {
+  id: serial("id").primaryKey(),
+  periodKey: varchar("period_key", { length: 7 }).notNull(),
+  detalle: text("detalle").notNull(),
+  subtipoCosto: varchar("subtipo_costo", { length: 60 }),
+  concepto: text("concepto"),
+  descripcion: text("descripcion"),
+  montoARS: numeric("monto_ars", { precision: 14, scale: 2 }),
+  montoUSD: numeric("monto_usd", { precision: 12, scale: 2 }),
+  cotizacion: numeric("cotizacion", { precision: 10, scale: 4 }),
+  montoTotalUSD: numeric("monto_total_usd", { precision: 12, scale: 2 }),
+  fechaEmision: timestamp("fecha_emision"),
+  fechaPago: timestamp("fecha_pago"),
+  fechaVencimiento: timestamp("fecha_vencimiento"),
+  vencido: boolean("vencido").default(false),
+  pagadoAlCierre: boolean("pagado_al_cierre").default(false),
+  overrideManual: boolean("override_manual").default(false),
+  importedAt: timestamp("imported_at").defaultNow(),
+  importBatch: varchar("import_batch", { length: 100 }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (t) => ({
+  idxPeriod: index("idx_pasivo_period").on(t.periodKey),
+  idxSubtipo: index("idx_pasivo_subtipo").on(t.subtipoCosto),
+}));
+
+export const insertPasivoEntrySchema = createInsertSchema(pasivoEntries).omit({ id: true, createdAt: true, updatedAt: true, importedAt: true });
+export type PasivoEntry = typeof pasivoEntries.$inferSelect;
+export type InsertPasivoEntry = z.infer<typeof insertPasivoEntrySchema>;
+
+// Provisiones de facturación — refleja la solapa "Provisión Pasivo" del Excel MAESTRO
+export const provisionEntries = pgTable("provision_entries", {
+  id: serial("id").primaryKey(),
+  periodKey: varchar("period_key", { length: 7 }).notNull(),
+  projectId: integer("project_id").references(() => activeProjects.id, { onDelete: "set null" }),
+  clienteNombre: text("cliente_nombre"),
+  tipo: varchar("tipo", { length: 20 }).notNull(),
+  montoCosto: numeric("monto_costo", { precision: 12, scale: 2 }),
+  montoProvision: numeric("monto_provision", { precision: 12, scale: 2 }),
+  criterio: text("criterio"),
+  mesAplicacion: varchar("mes_aplicacion", { length: 7 }),
+  unwoundAmount: numeric("unwound_amount", { precision: 12, scale: 2 }),
+  importedAt: timestamp("imported_at").defaultNow(),
+  importBatch: varchar("import_batch", { length: 100 }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
+}, (t) => ({
+  idxPeriod: index("idx_provision_period").on(t.periodKey),
+  idxProject: index("idx_provision_project").on(t.projectId),
+}));
+
+export const insertProvisionEntrySchema = createInsertSchema(provisionEntries).omit({ id: true, createdAt: true, importedAt: true });
+export type ProvisionEntry = typeof provisionEntries.$inferSelect;
+export type InsertProvisionEntry = z.infer<typeof insertProvisionEntrySchema>;
+
+// Movimientos de cashflow — refleja la solapa "Cashflow" del Excel MAESTRO
+export const cashflowTransactions = pgTable("cashflow_transactions", {
+  id: serial("id").primaryKey(),
+  fecha: timestamp("fecha").notNull(),
+  periodKey: varchar("period_key", { length: 7 }).notNull(),
+  tipoMovimiento: varchar("tipo_movimiento", { length: 10 }).notNull(),
+  banco: varchar("banco", { length: 30 }),
+  moneda: varchar("moneda", { length: 3 }),
+  clienteNombre: text("cliente_nombre"),
+  detalleOperacion: text("detalle_operacion"),
+  concepto: text("concepto"),
+  montoARS: numeric("monto_ars", { precision: 14, scale: 2 }),
+  cotizacion: numeric("cotizacion", { precision: 10, scale: 4 }),
+  montoUSD: numeric("monto_usd", { precision: 12, scale: 2 }),
+  saldoSantander: numeric("saldo_santander", { precision: 14, scale: 2 }),
+  saldoBOA: numeric("saldo_boa", { precision: 14, scale: 2 }),
+  saldoCaja: numeric("saldo_caja", { precision: 14, scale: 2 }),
+  saldoTotalUSD: numeric("saldo_total_usd", { precision: 14, scale: 2 }),
+  importedAt: timestamp("imported_at").defaultNow(),
+  importBatch: varchar("import_batch", { length: 100 }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => ({
+  idxPeriod: index("idx_cashflow_period").on(t.periodKey),
+  idxFecha: index("idx_cashflow_fecha").on(t.fecha),
+  idxBanco: index("idx_cashflow_banco").on(t.banco),
+}));
+
+export const insertCashflowTransactionSchema = createInsertSchema(cashflowTransactions).omit({ id: true, createdAt: true, importedAt: true });
+export type CashflowTransaction = typeof cashflowTransactions.$inferSelect;
+export type InsertCashflowTransaction = z.infer<typeof insertCashflowTransactionSchema>;
 
 export type ProviderProjectAccess = typeof providerProjectAccess.$inferSelect;
 export type InsertProviderProjectAccess = z.infer<typeof insertProviderProjectAccessSchema>;
