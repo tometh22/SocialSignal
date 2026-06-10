@@ -358,6 +358,34 @@ export default function ExecutiveDashboardV2() {
                       <Badge className="bg-red-100 text-red-800">{runwayMonths.toFixed(1)} meses</Badge>
                     </div>
                   )}
+                  {d.proyeccionResultado != null && (
+                    <TooltipProvider delayDuration={200}>
+                      <div className="border-t pt-2 mt-2 space-y-1.5">
+                        <div className="flex justify-between py-1 px-3 text-sm">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-muted-foreground">Proyección resultado</span>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Info className="h-3 w-3 text-slate-300 hover:text-slate-500 cursor-help flex-shrink-0" />
+                              </TooltipTrigger>
+                              <TooltipContent side="right" className="max-w-[210px] text-xs leading-snug">
+                                Resultado proyectado del período según el Excel Maestro (Resumen Ejecutivo).
+                              </TooltipContent>
+                            </Tooltip>
+                          </div>
+                          <span className={`tabular-nums font-medium ${kpiColor(d.proyeccionResultado, 0)}`}>{fmt(d.proyeccionResultado)}</span>
+                        </div>
+                        {d.beneficioNeto != null && (
+                          <div className="flex justify-between py-1.5 px-3 rounded bg-slate-50 border text-sm font-semibold">
+                            <span>Real vs Proyección</span>
+                            <span className={`tabular-nums ${kpiColor(d.beneficioNeto - d.proyeccionResultado, 0)}`}>
+                              {d.beneficioNeto - d.proyeccionResultado >= 0 ? "+" : ""}{fmt(d.beneficioNeto - d.proyeccionResultado)}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </TooltipProvider>
+                  )}
                 </CardContent>
               </Card>
             </div>

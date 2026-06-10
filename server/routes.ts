@@ -4191,6 +4191,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (Object.keys(updates).length === 0) continue;
 
         await db.update(personnel).set(updates as any).where(eq(personnel.id, pid));
+
+        // Dual-write: mantener personnel_historical_costs como fuente normalizada
+        // (las columnas mensuales de personnel quedan como legacy hasta el drop)
+        const MONTH_NUM: Record<string, number> = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12 };
+        for (const [field, rate] of Object.entries(updates)) {
+          const m = field.match(/^([a-z]{3})(\d{4})HourlyRateARS$/);
+          if (!m) continue;
+          const month = MONTH_NUM[m[1]];
+          const year = parseInt(m[2]);
+          if (!month || !year) continue;
+
+          const existing = await db.select({ id: personnelHistoricalCosts.id })
+            .from(personnelHistoricalCosts)
+            .where(and(
+              eq(personnelHistoricalCosts.personnelId, pid),
+              eq(personnelHistoricalCosts.year, year),
+              eq(personnelHistoricalCosts.month, month),
+              eq(personnelHistoricalCosts.isActive, true),
+            ))
+            .limit(1);
+
+          if (existing.length > 0) {
+            await db.update(personnelHistoricalCosts)
+              .set({ hourlyRateARS: String(rate), updatedAt: new Date() })
+              .where(eq(personnelHistoricalCosts.id, existing[0].id));
+          } else {
+            await db.insert(personnelHistoricalCosts).values({
+              personnelId: pid,
+              year,
+              month,
+              hourlyRateARS: String(rate),
+              adjustmentReason: 'Sync desde Valor Hora Real y Estimada',
+            });
+          }
+        }
+
         updatedPersonnel += 1;
         cellsUpdated += Object.keys(updates).length;
       }
