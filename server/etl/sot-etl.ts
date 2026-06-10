@@ -554,6 +554,24 @@ function isProvisionConceptCDI(row: CostoDirectoRow): boolean {
   return PROVISION_PATTERNS_CDI.some(pattern => combined.includes(pattern));
 }
 
+// Proveedores cuyos montos vienen CON IVA en el Excel y deben netearse (/1.21)
+// Réplica de la regla del Excel: Itecsa y Estudio Contable
+const REMOVE_IVA_PATTERNS = ['itecsa', 'estudio contable'];
+const IVA_FACTOR = 1.21;
+
+function shouldRemoveIVA(row: CostoDirectoRow): boolean {
+  const subtipo = (row['Subtipo de costo'] || row['Subtipo'] || '')
+    .toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .trim();
+  if (subtipo === 'estudio contable') return true;
+
+  const detalle = (row['Detalle'] || '')
+    .toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  return REMOVE_IVA_PATTERNS.some(p => detalle.includes(p));
+}
+
 export async function processCostsByPeriod(rows: CostoDirectoRow[]): Promise<void> {
   console.log(`💰 [SoT ETL] Procesando costos agregados por período desde ${rows.length} filas...`);
   console.log(`   ℹ️ NUEVA LÓGICA: Separando indirectos operativos de provisiones para evitar doble conteo`);
@@ -592,14 +610,21 @@ export async function processCostsByPeriod(rows: CostoDirectoRow[]): Promise<voi
       const isDirect = tipoCostoNorm === 'directo' || tipoCostoNorm === 'costos directos e indirectos';
       const isIndirect = tipoCostoNorm === 'indirecto';
       
-      const montoUSD = parseNum(row['Monto Total USD']);
-      const montoARS = parseNum(row['Monto Total ARS'] || row['Monto Original ARS'] || row['Total ARS']);
-      
+      let montoUSD = parseNum(row['Monto Total USD']);
+      let montoARS = parseNum(row['Monto Total ARS'] || row['Monto Original ARS'] || row['Total ARS']);
+
       if (montoUSD === 0 && montoARS === 0) {
         skipped++;
         continue;
       }
-      
+
+      // Regla del Excel: Itecsa y Estudio Contable se importan con IVA incluido → netear /1.21
+      if (shouldRemoveIVA(row)) {
+        montoUSD = montoUSD / IVA_FACTOR;
+        montoARS = montoARS / IVA_FACTOR;
+        console.log(`   🧾 [CDI] IVA removido (${row['Detalle']}): USD ${montoUSD.toFixed(2)} neto`);
+      }
+
       if (!periodCosts.has(periodKey)) {
         periodCosts.set(periodKey, {
           directUSD: 0, directARS: 0,
