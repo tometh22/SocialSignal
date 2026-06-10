@@ -61,7 +61,8 @@ interface VentaTomi {
 
 interface CostoDirectoExcel {
   persona: string;
-  rol?: string; // 🆕 Rol de la persona
+  rol?: string;
+  subtipoCosto?: string; // Columna B: Subtipo de costo (Equipo, Board, etc.)
   mes: string;
   año: number;
   tipoGasto: string;
@@ -71,7 +72,7 @@ interface CostoDirectoExcel {
   cliente: string;
   horasObjetivo?: number; // Columna K: Cantidad de horas objetivo
   horasRealesAsana: number; // Columna L: Cantidad de horas reales Asana
-  horasParaFacturacion?: number; // Columna M: Cantidad de horas para facturación - NUEVO
+  horasParaFacturacion?: number; // Columna M: Cantidad de horas para facturación
   valorHoraPersona?: number;
   costoTotal?: number;
   tipoCambio?: number; // Columna P del Excel
@@ -1033,7 +1034,8 @@ class GoogleSheetsWorkingService {
 
     // Buscar pestañas que podrían contener tipos de cambio
     const possibleSheetNames = [
-      ...sheetNames.filter(name => 
+      'Info Tipo de Cambio y REM', // Fuente primaria: dólar Blue + proyecciones REM
+      ...sheetNames.filter(name =>
         name.toLowerCase().includes('tipo') ||
         name.toLowerCase().includes('cambio') ||
         name.toLowerCase().includes('exchange') ||
@@ -1042,7 +1044,7 @@ class GoogleSheetsWorkingService {
         name.toLowerCase().includes('dollar')
       ),
       'Tipos de cambio',
-      'tipos de cambio', 
+      'tipos de cambio',
       'TiposDeCambio',
       'Exchange Rates',
       'BCRA',
@@ -1580,9 +1582,10 @@ class GoogleSheetsWorkingService {
           }
           
           const directCostData = {
-            monthKey: monthKey, // NUEVO: Clave temporal única
+            monthKey: monthKey,
             persona: costo.persona,
-            rol: costo.rol || null, // 🆕 Rol de la persona
+            rol: costo.rol || null,
+            subtipoCosto: costo.subtipoCosto || null,
             mes: costo.mes,
             año: costo.año,
             tipoGasto: costo.tipoGasto,
@@ -1664,20 +1667,21 @@ class GoogleSheetsWorkingService {
 
     // CORRECCIÓN COMPLETA: Mapeo según la estructura real del Excel
     const columnMap = {
-      persona: 0, // Columna A - Detalle (nombre persona)
-      rol: 1, // Columna B - Rol 🆕
-      mes: 2, // Columna C - Mes  
-      año: 3, // Columna D - Año
-      tipoGasto: 4, // Columna E - Tipo de Costo (DIRECTO/INDIRECTO)
-      especificacion: 5, // Columna F - Especificación
-      proyecto: 8, // Columna I - Nombre del proyecto
-      cliente: 9, // Columna J - Cliente
-      horasObjetivo: 10, // Columna K - Cantidad de horas objetivo
+      persona: 0,           // Columna A - Detalle (nombre persona)
+      subtipoCosto: 1,      // Columna B - Subtipo de costo (Equipo, Board, etc.)
+      mes: 2,               // Columna C - Mes
+      año: 3,               // Columna D - Año
+      tipoGasto: 4,         // Columna E - Tipo de Costo (DIRECTO/INDIRECTO)
+      especificacion: 5,    // Columna F - Especificación
+      rol: 1,               // Columna B - también usada como Rol (mismo campo)
+      proyecto: 8,          // Columna I - Nombre del proyecto
+      cliente: 9,           // Columna J - Cliente
+      horasObjetivo: 10,    // Columna K - Cantidad de horas objetivo
       horasRealesAsana: 11, // Columna L - Cantidad de horas reales Asana
-      horasParaFacturacion: 12, // Columna M - Cantidad de horas para facturación - NUEVO
+      horasParaFacturacion: 12, // Columna M - Cantidad de horas para facturación
       montoOriginalARS: 14, // Columna O - Moneda Original ARS
-      montoTotalUSD: 17, // Columna R - Monto Total USD (ya convertido)
-      tipoCambio: 16 // Columna Q - Tipo Cambio (para referencia)
+      montoTotalUSD: 17,    // Columna R - Monto Total USD (ya convertido)
+      tipoCambio: 16        // Columna Q - Tipo Cambio (para referencia)
     };
 
     console.log('🗺️ Mapeo de columnas costos directos:', columnMap);
@@ -1778,7 +1782,8 @@ class GoogleSheetsWorkingService {
 
         const costoData: CostoDirectoExcel = {
           persona: persona,
-          rol: this.getCellValue(row, columnMap.rol) || undefined, // 🆕 Rol de la persona
+          rol: this.getCellValue(row, columnMap.rol) || undefined,
+          subtipoCosto: this.getCellValue(row, columnMap.subtipoCosto) || undefined,
           mes: this.getCellValue(row, columnMap.mes) || '',
           año: parseDec(this.getCellValue(row, columnMap.año)) || new Date().getFullYear(),
           tipoGasto: tipoGasto,
@@ -4249,6 +4254,314 @@ class GoogleSheetsWorkingService {
     }
     
     return null;
+  }
+
+  async importActivoEntries(storage: any, periodKey: string): Promise<{ inserted: number; updated: number; errors: string[] }> {
+    const errors: string[] = [];
+    let inserted = 0;
+    let updated = 0;
+    try {
+      const { db } = await import('../db');
+      const { activoEntries } = await import('@shared/schema');
+      const { eq, and } = await import('drizzle-orm');
+
+      const sheets = this.createSheetsClientFromJSON();
+      if (!sheets) return { inserted, updated, errors: ['Google Sheets client not available'] };
+
+      const response = await sheets.spreadsheets.values.get({
+        spreadsheetId: this.spreadsheetId,
+        range: 'Activo!A:Z',
+      }).catch(() => null);
+
+      if (!response?.data.values || response.data.values.length < 2) {
+        return { inserted, updated, errors: [`No data found in Activo sheet for ${periodKey}`] };
+      }
+
+      const headers: string[] = response.data.values[0].map((h: any) => String(h || '').trim());
+      const importBatch = `activo_${periodKey}_${Date.now()}`;
+
+      for (let i = 1; i < response.data.values.length; i++) {
+        const row = response.data.values[i];
+        if (!row || row.length === 0) continue;
+
+        const get = (name: string) => {
+          const idx = headers.findIndex(h => h.toLowerCase().includes(name.toLowerCase()));
+          return idx >= 0 ? String(row[idx] || '').trim() : '';
+        };
+
+        const rowPeriod = (() => {
+          const mesRaw = get('mes') || get('period') || get('fecha');
+          if (!mesRaw) return null;
+          const d = new Date(mesRaw);
+          if (!isNaN(d.getTime())) return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+          return null;
+        })();
+
+        if (rowPeriod && rowPeriod !== periodKey) continue;
+
+        const concepto = get('concepto') || get('detalle') || get('descripcion');
+        const clienteNombre = get('cliente') || get('razon social') || get('razon');
+        const montoARSRaw = parseFloat((get('monto ars') || get('ars') || '0').replace(/[^0-9.-]/g, '')) || null;
+        const montoUSDRaw = parseFloat((get('monto usd') || get('usd') || '0').replace(/[^0-9.-]/g, '')) || null;
+        const nroFactura = get('factura') || get('nro') || get('numero') || null;
+
+        if (!concepto && !clienteNombre) continue;
+
+        try {
+          const existing = nroFactura
+            ? await db.select({ id: activoEntries.id })
+                .from(activoEntries)
+                .where(and(eq(activoEntries.periodKey, periodKey), eq(activoEntries.nroFactura, nroFactura)))
+                .limit(1)
+            : [];
+
+          const entry: any = {
+            periodKey,
+            concepto: concepto || null,
+            clienteNombre: clienteNombre || null,
+            montoARS: montoARSRaw ? String(montoARSRaw) : null,
+            montoUSD: montoUSDRaw ? String(montoUSDRaw) : null,
+            nroFactura,
+            importBatch,
+          };
+
+          if (existing.length > 0) {
+            await db.update(activoEntries).set(entry).where(eq(activoEntries.id, existing[0].id));
+            updated++;
+          } else {
+            await db.insert(activoEntries).values(entry);
+            inserted++;
+          }
+        } catch (rowErr: any) {
+          errors.push(`Row ${i}: ${rowErr.message}`);
+        }
+      }
+    } catch (err: any) {
+      errors.push(err.message);
+    }
+    console.log(`✅ Activo ${periodKey}: ${inserted} inserted, ${updated} updated`);
+    return { inserted, updated, errors };
+  }
+
+  async importPasivoEntries(storage: any, periodKey: string): Promise<{ inserted: number; updated: number; errors: string[] }> {
+    const errors: string[] = [];
+    let inserted = 0;
+    let updated = 0;
+    try {
+      const { db } = await import('../db');
+      const { pasivoEntries } = await import('@shared/schema');
+      const { eq, and } = await import('drizzle-orm');
+
+      const sheets = this.createSheetsClientFromJSON();
+      if (!sheets) return { inserted, updated, errors: ['Google Sheets client not available'] };
+
+      const response = await sheets.spreadsheets.values.get({
+        spreadsheetId: this.spreadsheetId,
+        range: 'Pasivo!A:Z',
+      }).catch(() => null);
+
+      if (!response?.data.values || response.data.values.length < 2) {
+        return { inserted, updated, errors: [`No data found in Pasivo sheet for ${periodKey}`] };
+      }
+
+      const headers: string[] = response.data.values[0].map((h: any) => String(h || '').trim());
+      const importBatch = `pasivo_${periodKey}_${Date.now()}`;
+
+      for (let i = 1; i < response.data.values.length; i++) {
+        const row = response.data.values[i];
+        if (!row || row.length === 0) continue;
+
+        const get = (name: string) => {
+          const idx = headers.findIndex(h => h.toLowerCase().includes(name.toLowerCase()));
+          return idx >= 0 ? String(row[idx] || '').trim() : '';
+        };
+
+        const rowPeriod = (() => {
+          const mesRaw = get('mes') || get('period') || get('fecha emision');
+          if (!mesRaw) return null;
+          const d = new Date(mesRaw);
+          if (!isNaN(d.getTime())) return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+          return null;
+        })();
+
+        if (rowPeriod && rowPeriod !== periodKey) continue;
+
+        const detalle = get('detalle') || get('persona') || get('proveedor') || get('nombre');
+        if (!detalle) continue;
+
+        const subtipoCosto = get('subtipo') || get('tipo costo') || null;
+        const montoARSRaw = parseFloat((get('monto ars') || get('ars') || '0').replace(/[^0-9.-]/g, '')) || null;
+        const montoUSDRaw = parseFloat((get('monto usd') || get('usd') || '0').replace(/[^0-9.-]/g, '')) || null;
+        const fechaEmisionRaw = get('emision') || get('fecha emision') || null;
+        const fechaEmision = fechaEmisionRaw ? (() => { const d = new Date(fechaEmisionRaw); return isNaN(d.getTime()) ? null : d; })() : null;
+
+        try {
+          const existing = fechaEmision
+            ? await db.select({ id: pasivoEntries.id })
+                .from(pasivoEntries)
+                .where(and(
+                  eq(pasivoEntries.periodKey, periodKey),
+                  eq(pasivoEntries.detalle, detalle),
+                ))
+                .limit(1)
+            : [];
+
+          const entry: any = {
+            periodKey,
+            detalle,
+            subtipoCosto: subtipoCosto || null,
+            montoARS: montoARSRaw ? String(montoARSRaw) : null,
+            montoUSD: montoUSDRaw ? String(montoUSDRaw) : null,
+            fechaEmision,
+            importBatch,
+          };
+
+          if (existing.length > 0) {
+            await db.update(pasivoEntries).set(entry).where(eq(pasivoEntries.id, existing[0].id));
+            updated++;
+          } else {
+            await db.insert(pasivoEntries).values(entry);
+            inserted++;
+          }
+        } catch (rowErr: any) {
+          errors.push(`Row ${i}: ${rowErr.message}`);
+        }
+      }
+    } catch (err: any) {
+      errors.push(err.message);
+    }
+    console.log(`✅ Pasivo ${periodKey}: ${inserted} inserted, ${updated} updated`);
+    return { inserted, updated, errors };
+  }
+
+  async importProvisionEntries(storage: any, periodKey: string): Promise<{ inserted: number; errors: string[] }> {
+    const errors: string[] = [];
+    let inserted = 0;
+    try {
+      const { db } = await import('../db');
+      const { provisionEntries } = await import('@shared/schema');
+
+      const sheets = this.createSheetsClientFromJSON();
+      if (!sheets) return { inserted, errors: ['Google Sheets client not available'] };
+
+      const response = await sheets.spreadsheets.values.get({
+        spreadsheetId: this.spreadsheetId,
+        range: 'Provisión Pasivo!A:Z',
+      }).catch(() => null);
+
+      if (!response?.data.values || response.data.values.length < 2) {
+        return { inserted, errors: [`No data found in Provisión Pasivo sheet`] };
+      }
+
+      const headers: string[] = response.data.values[0].map((h: any) => String(h || '').trim());
+      const importBatch = `provision_${periodKey}_${Date.now()}`;
+
+      for (let i = 1; i < response.data.values.length; i++) {
+        const row = response.data.values[i];
+        if (!row || row.length === 0) continue;
+
+        const get = (name: string) => {
+          const idx = headers.findIndex(h => h.toLowerCase().includes(name.toLowerCase()));
+          return idx >= 0 ? String(row[idx] || '').trim() : '';
+        };
+
+        const clienteNombre = get('cliente') || get('nombre');
+        const tipo = get('tipo') || 'NUEVA_PROVISION';
+        const montoProvision = parseFloat((get('provision') || get('monto') || '0').replace(/[^0-9.-]/g, '')) || null;
+
+        if (!clienteNombre || !montoProvision) continue;
+
+        try {
+          await db.insert(provisionEntries).values({
+            periodKey,
+            clienteNombre,
+            tipo: tipo.toUpperCase().includes('RECUP') ? 'RECUPERO' : 'NUEVA_PROVISION',
+            montoProvision: montoProvision ? String(montoProvision) : null,
+            mesAplicacion: periodKey,
+            importBatch,
+          });
+          inserted++;
+        } catch (rowErr: any) {
+          errors.push(`Row ${i}: ${rowErr.message}`);
+        }
+      }
+    } catch (err: any) {
+      errors.push(err.message);
+    }
+    console.log(`✅ Provisiones ${periodKey}: ${inserted} inserted`);
+    return { inserted, errors };
+  }
+
+  async importCashflowTransactions(storage: any, periodKey: string): Promise<{ inserted: number; errors: string[] }> {
+    const errors: string[] = [];
+    let inserted = 0;
+    try {
+      const { db } = await import('../db');
+      const { cashflowTransactions } = await import('@shared/schema');
+
+      const sheets = this.createSheetsClientFromJSON();
+      if (!sheets) return { inserted, errors: ['Google Sheets client not available'] };
+
+      const response = await sheets.spreadsheets.values.get({
+        spreadsheetId: this.spreadsheetId,
+        range: 'Cashflow!A:Z',
+      }).catch(() => null);
+
+      if (!response?.data.values || response.data.values.length < 2) {
+        return { inserted, errors: [`No data found in Cashflow sheet for ${periodKey}`] };
+      }
+
+      const headers: string[] = response.data.values[0].map((h: any) => String(h || '').trim());
+      const importBatch = `cashflow_${periodKey}_${Date.now()}`;
+
+      for (let i = 1; i < response.data.values.length; i++) {
+        const row = response.data.values[i];
+        if (!row || row.length === 0) continue;
+
+        const get = (name: string) => {
+          const idx = headers.findIndex(h => h.toLowerCase().includes(name.toLowerCase()));
+          return idx >= 0 ? String(row[idx] || '').trim() : '';
+        };
+
+        const fechaRaw = get('fecha');
+        if (!fechaRaw) continue;
+        const fecha = this.parseDateValue(fechaRaw);
+        if (!fecha) continue;
+
+        const rowYear = fecha.getFullYear();
+        const rowMonth = fecha.getMonth() + 1;
+        const rowPeriod = `${rowYear}-${String(rowMonth).padStart(2, '0')}`;
+        if (rowPeriod !== periodKey) continue;
+
+        const tipoMovimiento = (get('tipo') || get('ingreso') || 'Ingreso').toLowerCase().includes('egreso') ? 'Egreso' : 'Ingreso';
+        const banco = get('banco') || get('cuenta') || null;
+        const detalleOperacion = get('detalle') || get('operacion') || get('concepto');
+        const montoARSRaw = parseFloat((get('monto ars') || get('ars') || get('monto') || '0').replace(/[^0-9.-]/g, '')) || null;
+        const montoUSDRaw = parseFloat((get('monto usd') || get('usd') || '0').replace(/[^0-9.-]/g, '')) || null;
+
+        if (!detalleOperacion && !montoARSRaw && !montoUSDRaw) continue;
+
+        try {
+          await db.insert(cashflowTransactions).values({
+            fecha,
+            periodKey,
+            tipoMovimiento,
+            banco,
+            detalleOperacion: detalleOperacion || null,
+            montoARS: montoARSRaw ? String(montoARSRaw) : null,
+            montoUSD: montoUSDRaw ? String(montoUSDRaw) : null,
+            importBatch,
+          });
+          inserted++;
+        } catch (rowErr: any) {
+          errors.push(`Row ${i}: ${rowErr.message}`);
+        }
+      }
+    } catch (err: any) {
+      errors.push(err.message);
+    }
+    console.log(`✅ Cashflow ${periodKey}: ${inserted} inserted`);
+    return { inserted, errors };
   }
 }
 

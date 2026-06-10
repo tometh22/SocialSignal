@@ -42,6 +42,10 @@ import {
   Receipt,
   MessageSquare,
   UserX,
+  CircleArrowDown,
+  CircleArrowUp,
+  Wallet,
+  ShieldAlert,
 } from "lucide-react";
 
 const PROJECT_ICON_COLORS = [
@@ -231,6 +235,15 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
         { href: "/operations/estimated-rates", title: "Valor Hora Estimada", icon: TrendingUp, description: "Proyección de tarifas (no afecta cotizaciones)", permission: 'operations' as AppSection },
         { href: "/operations/holidays", title: "Feriados", icon: Calendar, description: "Gestión de feriados", permission: 'operations' as AppSection },
         { href: "/operations/absences", title: "Ausencias", icon: UserX, description: "Vacaciones y licencias del equipo", permission: 'operations' as AppSection },
+      ]
+    },
+    {
+      title: "Finanzas",
+      items: [
+        { href: "/finance/activo", title: "Activo", icon: CircleArrowUp, description: "Cuentas a cobrar y activos líquidos", permission: 'finance' as AppSection },
+        { href: "/finance/pasivo", title: "Pasivo", icon: CircleArrowDown, description: "Cuentas a pagar y deudas", permission: 'finance' as AppSection },
+        { href: "/finance/provisions", title: "Provisiones", icon: ShieldAlert, description: "Provisiones y contingencias", permission: 'finance' as AppSection },
+        { href: "/finance/cashflow", title: "Cashflow", icon: Wallet, description: "Movimientos y saldos bancarios", permission: 'finance' as AppSection },
       ]
     },
     {

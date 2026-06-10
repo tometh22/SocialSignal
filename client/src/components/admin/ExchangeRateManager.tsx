@@ -21,6 +21,7 @@ const exchangeRateSchema = z.object({
   month: z.number().min(1).max(12),
   rate: z.number().min(0.01, "La tasa debe ser mayor a 0"),
   rateType: z.enum(["end_of_month", "daily", "average"]),
+  source: z.enum(["Blue", "REM", "MEP", "CCL", "BCRA", "Manual"]).default("Blue"),
   specificDate: z.string().optional(),
   isActive: z.boolean().default(true),
   notes: z.string().optional(),
@@ -34,6 +35,7 @@ interface ExchangeRate {
   month: number;
   rate: number;
   rateType: "end_of_month" | "daily" | "average";
+  source?: string;
   specificDate?: string;
   isActive: boolean;
   notes?: string;
@@ -42,6 +44,17 @@ interface ExchangeRate {
   createdBy?: number;
   updatedBy?: number;
 }
+
+const RATE_SOURCES = ["Blue", "REM", "MEP", "CCL", "BCRA", "Manual"] as const;
+
+const SOURCE_BADGE: Record<string, { label: string; className: string }> = {
+  Blue: { label: "Blue", className: "bg-blue-100 text-blue-800 border-blue-200" },
+  REM: { label: "REM", className: "bg-purple-100 text-purple-800 border-purple-200" },
+  MEP: { label: "MEP", className: "bg-yellow-100 text-yellow-800 border-yellow-200" },
+  CCL: { label: "CCL", className: "bg-orange-100 text-orange-800 border-orange-200" },
+  BCRA: { label: "BCRA", className: "bg-green-100 text-green-800 border-green-200" },
+  Manual: { label: "Manual", className: "bg-gray-100 text-gray-800 border-gray-200" },
+};
 
 const MONTHS = [
   { value: 1, label: "Enero" },
@@ -84,6 +97,7 @@ export function ExchangeRateManager() {
       month: new Date().getMonth() + 1,
       rate: 0,
       rateType: "end_of_month",
+      source: "Blue",
       isActive: true,
     },
   });
@@ -163,6 +177,7 @@ export function ExchangeRateManager() {
       month: rate.month,
       rate: rate.rate,
       rateType: rate.rateType,
+      source: (rate.source as any) || "Blue",
       specificDate: rate.specificDate || "",
       isActive: rate.isActive,
       notes: rate.notes || "",
@@ -178,6 +193,7 @@ export function ExchangeRateManager() {
       month: new Date().getMonth() + 1,
       rate: 0,
       rateType: "end_of_month",
+      source: "Blue",
       isActive: true,
     });
   };
@@ -358,13 +374,38 @@ export function ExchangeRateManager() {
 
                   <FormField
                     control={form.control}
+                    name="source"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Fuente</FormLabel>
+                        <Select value={field.value} onValueChange={field.onChange}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {RATE_SOURCES.map((src) => (
+                              <SelectItem key={src} value={src}>
+                                {src}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
                     name="notes"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Notas (opcional)</FormLabel>
                         <FormControl>
                           <Input
-                            placeholder="Fuente: BCRA, observaciones especiales..."
+                            placeholder="Observaciones especiales..."
                             {...field}
                           />
                         </FormControl>
@@ -487,6 +528,7 @@ export function ExchangeRateManager() {
                   <TableHead>Período</TableHead>
                   <TableHead>Tasa (ARS/USD)</TableHead>
                   <TableHead>Tipo</TableHead>
+                  <TableHead>Fuente</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead>Fecha específica</TableHead>
                   <TableHead>Notas</TableHead>
@@ -508,6 +550,17 @@ export function ExchangeRateManager() {
                         <Badge variant="outline">
                           {getRateTypeLabel(rate.rateType)}
                         </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {(() => {
+                          const src = rate.source || "Blue";
+                          const badge = SOURCE_BADGE[src] || SOURCE_BADGE.Manual;
+                          return (
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${badge.className}`}>
+                              {badge.label}
+                            </span>
+                          );
+                        })()}
                       </TableCell>
                       <TableCell>
                         <Badge variant={rate.isActive ? "default" : "secondary"}>

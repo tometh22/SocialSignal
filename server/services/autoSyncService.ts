@@ -202,6 +202,9 @@ export class AutoSyncService {
         console.error(`❌ [${syncId}] Error ejecutando AUTO-ETL:`, etlError);
       }
 
+      // 3b. Sincronizar tablas ledger detalladas (activo, pasivo, provisiones, cashflow)
+      await this.syncLedger();
+
       // 4b. Sincronizar CashFlow, Resumen Ejecutivo y Activo hacia monthly_financial_summary
       // Use allSettled so one failure doesn't block others
       try {
@@ -463,6 +466,33 @@ export class AutoSyncService {
   }
 
   // FUNCIÓN ELIMINADA: syncDirectCosts - Ahora se maneja en syncUnifiedExcelData
+
+  private async syncLedger(): Promise<void> {
+    try {
+      const now = new Date();
+      const currMonth = now.getMonth() + 1;
+      const currYear = now.getFullYear();
+      const prevMonth = now.getMonth() === 0 ? 12 : now.getMonth();
+      const prevYear = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
+      const periods = [
+        `${currYear}-${String(currMonth).padStart(2, '0')}`,
+        `${prevYear}-${String(prevMonth).padStart(2, '0')}`,
+      ];
+
+      console.log(`📒 Syncing ledger tables for periods: ${periods.join(', ')}`);
+
+      for (const period of periods) {
+        await Promise.allSettled([
+          googleSheetsWorkingService.importActivoEntries(storage, period),
+          googleSheetsWorkingService.importPasivoEntries(storage, period),
+          googleSheetsWorkingService.importCashflowTransactions(storage, period),
+          googleSheetsWorkingService.importProvisionEntries(storage, period),
+        ]);
+      }
+    } catch (err: any) {
+      console.error('⚠️ syncLedger error (non-critical):', err?.message);
+    }
+  }
 
   /**
    * Obtener estado de la sincronización
