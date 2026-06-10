@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -52,6 +52,10 @@ export default function ProvisionsPage() {
     resolver: zodResolver(provisionSchema),
     defaultValues: { periodKey: period, tipo: "NUEVA_PROVISION", montoProvision: "" },
   });
+
+  useEffect(() => {
+    form.setValue("periodKey", period);
+  }, [period, form]);
 
   const createMutation = useMutation({
     mutationFn: (data: z.infer<typeof provisionSchema>) => apiRequest("/api/provisions", "POST", data),

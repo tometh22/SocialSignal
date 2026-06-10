@@ -4,6 +4,7 @@
  */
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -309,16 +310,22 @@ export default function ExecutiveDashboardV2() {
                 <CardContent className="space-y-2">
                   <TooltipProvider delayDuration={200}>
                   {[
-                    { label: "Activo Líquido", value: d.activoLiquido, tooltip: "Saldo de cuentas bancarias y Transferwise. Dinero disponible inmediatamente." },
+                    { label: "Activo Líquido", value: d.activoLiquido, tooltip: "Saldo de cuentas bancarias y Transferwise. Dinero disponible inmediatamente.", href: `/finance/cashflow?period=${d.periodKey}` },
                     { label: "Activo M.P. Crypto", value: d.activoMedPlazo, tooltip: "Saldo en criptomonedas valuado en USD." },
-                    { label: "Clientes a Cobrar", value: d.clientesACobrar, tooltip: "Facturas emitidas no cobradas aún. Incluye facturación del mes + meses anteriores pendientes de cobro." },
-                    { label: "Activo Total", value: d.activoTotal, bold: true, tooltip: "Activo Líquido + Crypto + Clientes a Cobrar." },
-                    { label: "Pasivo Total", value: d.pasivoTotal, bold: true, negative: true, tooltip: "Deudas de la empresa: impuestos USA, proveedores a pagar y facturación adelantada de clientes." },
+                    { label: "Clientes a Cobrar", value: d.clientesACobrar, tooltip: "Facturas emitidas no cobradas aún. Incluye facturación del mes + meses anteriores pendientes de cobro.", href: `/finance/activo?period=${d.periodKey}` },
+                    { label: "Activo Total", value: d.activoTotal, bold: true, tooltip: "Activo Líquido + Crypto + Clientes a Cobrar.", href: `/finance/activo?period=${d.periodKey}` },
+                    { label: "Pasivo Total", value: d.pasivoTotal, bold: true, negative: true, tooltip: "Deudas de la empresa: impuestos USA, proveedores a pagar y facturación adelantada de clientes.", href: `/finance/pasivo?period=${d.periodKey}` },
                     { label: "Patrimonio Neto (Activo − Pasivo)", value: d.balanceNeto, bold: true, tooltip: "Activo Total − Pasivo Total. El valor neto de la empresa. Incluye utilidades de todos los períodos, no solo el actual." },
-                  ].map((row, i) => (
-                    <div key={i} className={`flex justify-between items-center py-1.5 px-3 rounded text-sm ${row.bold ? "bg-slate-50 border font-semibold" : ""}`}>
+                  ].map((row: any, i) => (
+                    <div key={i} className={`flex justify-between items-center py-1.5 px-3 rounded text-sm ${row.bold ? "bg-slate-50 border font-semibold" : ""} ${row.href ? "group" : ""}`}>
                       <div className="flex items-center gap-1.5">
-                        <span className={row.bold ? "" : "text-muted-foreground"}>{row.label}</span>
+                        {row.href ? (
+                          <Link href={row.href} className={`${row.bold ? "" : "text-muted-foreground"} hover:text-indigo-600 hover:underline transition-colors`}>
+                            {row.label}
+                          </Link>
+                        ) : (
+                          <span className={row.bold ? "" : "text-muted-foreground"}>{row.label}</span>
+                        )}
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <Info className="h-3 w-3 text-slate-300 hover:text-slate-500 cursor-help flex-shrink-0" />
@@ -345,11 +352,15 @@ export default function ExecutiveDashboardV2() {
                 </CardHeader>
                 <CardContent className="space-y-2">
                   <div className="flex justify-between py-1.5 px-3 text-sm">
-                    <span className="text-muted-foreground">Cashflow Neto</span>
+                    <Link href={`/finance/cashflow?period=${d.periodKey}`} className="text-muted-foreground hover:text-indigo-600 hover:underline transition-colors">
+                      Cashflow Neto
+                    </Link>
                     <span className={`tabular-nums font-medium ${kpiColor(d.cashflow, 0)}`}>{fmt(d.cashflow)}</span>
                   </div>
                   <div className="flex justify-between py-1.5 px-3 text-sm">
-                    <span className="text-muted-foreground">Caja Total</span>
+                    <Link href={`/finance/cashflow?period=${d.periodKey}`} className="text-muted-foreground hover:text-indigo-600 hover:underline transition-colors">
+                      Caja Total
+                    </Link>
                     <span className={`tabular-nums font-medium ${kpiColor(d.activoLiquido, 0)}`}>{fmt(d.activoLiquido)}</span>
                   </div>
                   {runwayMonths != null && (

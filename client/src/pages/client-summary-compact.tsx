@@ -194,6 +194,12 @@ export default function ClientSummaryCompact() {
                 <Star className="h-3 w-3 mr-1" />
                 Calidad
               </Button>
+              <Button variant="outline" size="sm" className="text-xs h-7 px-2" asChild>
+                <Link href={`/clients/${clientId}/pnl`}>
+                  <DollarSign className="h-3 w-3 mr-1" />
+                  P&L
+                </Link>
+              </Button>
               <Button size="sm" className="text-xs h-7 px-2">
                 <FileText className="h-3 w-3 mr-1" />
                 Reportes

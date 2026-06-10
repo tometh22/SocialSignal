@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useSearch } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,8 +20,10 @@ function fmtUSD(n: number) {
 }
 
 export default function CashflowPage() {
-  const [year, setYear] = useState(String(new Date().getFullYear()));
-  const [month, setMonth] = useState(String(new Date().getMonth() + 1).padStart(2, "0"));
+  const search = useSearch();
+  const urlPeriod = new URLSearchParams(search).get("period");
+  const [year, setYear] = useState(urlPeriod ? urlPeriod.split("-")[0] : String(new Date().getFullYear()));
+  const [month, setMonth] = useState(urlPeriod ? urlPeriod.split("-")[1] : String(new Date().getMonth() + 1).padStart(2, "0"));
   const [banco, setBanco] = useState("todos");
   const [tipo, setTipo] = useState("todos");
 

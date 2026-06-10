@@ -1,12 +1,13 @@
 import { useState } from "react";
-import { useParams, Redirect } from "wouter";
+import { useParams, Redirect, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { DollarSign, TrendingUp, TrendingDown, Percent } from "lucide-react";
+import { DollarSign, TrendingUp, TrendingDown, Percent, ArrowLeft } from "lucide-react";
 
 const MONTHS = Array.from({ length: 12 }, (_, i) => ({
   value: String(i + 1).padStart(2, "0"),
@@ -21,6 +22,10 @@ function fmtUSD(n: number) {
 
 function fmtPct(n: number) {
   return `${n > 0 ? "+" : ""}${n.toFixed(1)}%`;
+}
+
+function fmtMultiplier(n: number) {
+  return `${n.toFixed(2)}x`;
 }
 
 export default function ClientPnlPage() {
@@ -51,6 +56,12 @@ export default function ClientPnlPage() {
   return (
     <div className="space-y-6">
       <div>
+        <Button variant="ghost" size="sm" asChild className="-ml-2 mb-1 text-muted-foreground">
+          <Link href={`/client-summary/${clientId}`}>
+            <ArrowLeft className="h-3.5 w-3.5 mr-1" />
+            Volver al cliente
+          </Link>
+        </Button>
         <h1 className="text-2xl font-bold">P&L por Cliente</h1>
         <p className="text-muted-foreground text-sm">
           {pnl?.client?.name ?? `Cliente #${clientId}`} — Rentabilidad y desglose de costos
@@ -103,7 +114,10 @@ export default function ClientPnlPage() {
                 <TrendingUp className="h-4 w-4 text-green-500" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-green-600">{fmtPct(pnl?.markup ?? 0)}</div>
+                <div className={`text-2xl font-bold ${(pnl?.markup ?? 0) >= 2.5 ? "text-green-600" : "text-amber-600"}`}>
+                  {fmtMultiplier(pnl?.markup ?? 0)}
+                </div>
+                <p className="text-xs text-muted-foreground mt-0.5">mínimo 2.5x</p>
               </CardContent>
             </Card>
             <Card>
