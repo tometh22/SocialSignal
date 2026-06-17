@@ -71,20 +71,27 @@ export async function lifetimeMetricsHandler(req: Request, res: Response) {
       .orderBy(factLaborMonth.periodKey);
 
     // Calculate lifetime totals
-    const totalRevenueUSD = rcData.reduce((sum, row) => sum + (parseFloat(row.revenueUsd as string) || 0), 0);
-    const totalRevenueARS = rcData.reduce((sum, row) => sum + (parseFloat(row.revenueArs as string) || 0), 0);
-    const totalCostUSD = rcData.reduce((sum, row) => sum + (parseFloat(row.costUsd as string) || 0), 0);
-    const totalCostARS = rcData.reduce((sum, row) => sum + (parseFloat(row.costArs as string) || 0), 0);
+    const totalRevenueUSD = rcData.reduce((sum, row) => sum + (parseFloat(row.revenueUSD as string) || 0), 0);
+    const totalRevenueARS = rcData.reduce((sum, row) => sum + (parseFloat(row.revenueARS as string) || 0), 0);
+    const totalCostUSD = rcData.reduce((sum, row) => sum + (parseFloat(row.costUSD as string) || 0), 0);
+    const totalCostARS = rcData.reduce((sum, row) => sum + (parseFloat(row.costARS as string) || 0), 0);
     
     const totalAsanaHours = laborData.reduce((sum, row) => sum + (parseFloat(row.asanaHours as string) || 0), 0);
     const totalBillingHours = laborData.reduce((sum, row) => sum + (parseFloat(row.billingHours as string) || 0), 0);
     const totalTargetHours = laborData.reduce((sum, row) => sum + (parseFloat(row.targetHours as string) || 0), 0);
 
     // Determine native currency (use first RC row with revenue)
-    const firstRCWithRevenue = rcData.find(row => 
-      (parseFloat(row.revenueUsd as string) || 0) > 0 || (parseFloat(row.revenueArs as string) || 0) > 0
+    const firstRCWithRevenue = rcData.find(row =>
+      (parseFloat(row.revenueUSD as string) || 0) > 0 || (parseFloat(row.revenueARS as string) || 0) > 0
     );
-    const currencyNative = firstRCWithRevenue?.currency as string || 'USD';
+    // factRCMonth no tiene columna `currency`: la moneda nativa se infiere de los montos
+    // (ARS cuando hay ingreso en ARS y no en USD).
+    const currencyNative =
+      firstRCWithRevenue &&
+      (parseFloat(firstRCWithRevenue.revenueARS as string) || 0) > 0 &&
+      (parseFloat(firstRCWithRevenue.revenueUSD as string) || 0) === 0
+        ? 'ARS'
+        : 'USD';
     const quoteNative = parseFloat(firstRCWithRevenue?.quoteNative as string || '0');
     
     // Calculate display values
@@ -98,8 +105,8 @@ export async function lifetimeMetricsHandler(req: Request, res: Response) {
     const budgetUtilization = quoteNative > 0 ? costDisplay / quoteNative : 0;
 
     // Find period with revenue (for one-shot projects)
-    const periodWithRevenue = rcData.find(row => 
-      (parseFloat(row.revenueUsd as string) || 0) > 0 || (parseFloat(row.revenueArs as string) || 0) > 0
+    const periodWithRevenue = rcData.find(row =>
+      (parseFloat(row.revenueUSD as string) || 0) > 0 || (parseFloat(row.revenueARS as string) || 0) > 0
     )?.periodKey || null;
 
     // Monthly breakdown
@@ -107,10 +114,10 @@ export async function lifetimeMetricsHandler(req: Request, res: Response) {
       const rcRow = rcData.find(r => r.periodKey === periodKey);
       const laborRows = laborData.filter(l => l.periodKey === periodKey);
       
-      const revenueUSD = parseFloat(rcRow?.revenueUsd as string || '0');
-      const revenueARS = parseFloat(rcRow?.revenueArs as string || '0');
-      const costUSD = parseFloat(rcRow?.costUsd as string || '0');
-      const costARS = parseFloat(rcRow?.costArs as string || '0');
+      const revenueUSD = parseFloat(rcRow?.revenueUSD as string || '0');
+      const revenueARS = parseFloat(rcRow?.revenueARS as string || '0');
+      const costUSD = parseFloat(rcRow?.costUSD as string || '0');
+      const costARS = parseFloat(rcRow?.costARS as string || '0');
       
       const asanaHours = laborRows.reduce((sum, l) => sum + (parseFloat(l.asanaHours as string) || 0), 0);
       const billingHours = laborRows.reduce((sum, l) => sum + (parseFloat(l.billingHours as string) || 0), 0);

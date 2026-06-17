@@ -40,7 +40,7 @@ export function ExecutiveSummary() {
   const projectTypeLabel = PROJECT_TYPE_LABELS[project?.type] || project?.type || '';
   const analysisLabel = ANALYSIS_LABELS[quotationData.analysisType] || quotationData.analysisType || '';
 
-  const fmt = (n: number) => formatCurrency(n);
+  const fmt = (n: number) => formatCurrency(n, currency);
 
   // Email template
   const emailTemplate = `Estimado/a ${client?.contactName || 'cliente'},

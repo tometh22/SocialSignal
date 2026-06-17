@@ -119,7 +119,7 @@ import {
 import { fetchValorHora2026, HISTORICAL_RATE_FIELDS_2026 } from "./services/personnelSheetsSync";
 import { ActiveProjectsAggregator } from "./domain/projectsActive";import { resolveTimeFilter } from "./services/time";
 import { CoverageCalculator } from "./domain/coverage";
-import { eq, and, isNull, isNotNull, desc, sql, asc, gte, lte, inArray } from "drizzle-orm";
+import { eq, and, or, isNull, isNotNull, desc, sql, asc, gte, lte, inArray } from "drizzle-orm";
 import { reinitializeDatabase } from "./reinit-data";
 import { upload, uploadDocument, uploadInvoice, deleteOldFile } from "./upload";
 import { personalMonthlyInvoices, externalProviders as externalProvidersTable, providerProjectAccess as providerProjectAccessTable } from "@shared/schema";
@@ -1843,7 +1843,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // 5. Obtener información de personnel para capacidades
       const uniquePersonIds = Array.from(hoursByPersonId.keys()).filter(id => id !== null) as number[];
       const personnelData = await Promise.all(
-        uniquePersonIds.map(id => storage.getPersonnel(id))
+        uniquePersonIds.map(id => storage.getPersonnelById(id))
       );
       
       const capacityMap = new Map<number, number>();
@@ -3427,7 +3427,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           filteredSales = allSales.filter((sale: any) => {
             const monthNum = getMonthNumber(sale.month);
             const saleDate = new Date(sale.year, monthNum - 1, 1);
-            return saleDate >= dateRange.start && saleDate <= dateRange.end;
+            return saleDate >= dateRange.startDate && saleDate <= dateRange.endDate;
           });
         }
       }
@@ -14514,7 +14514,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const etlService = new ETLService(db);
       
       // Run full ETL pipeline
-      const result = await etlService.runFullETL(googleSheetsServiceWorking.default);
+      const result = await etlService.runFullETL(googleSheetsServiceWorking.googleSheetsWorkingService);
       
       res.json({
         success: result.success,
@@ -15189,7 +15189,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const { factRCMonth, rcUnmatchedStaging } = await import('../shared/schema');
       const { processRendimientoClienteToFactRC, computeAggProjectMonth } = await import('./etl/sot-etl');
-      const { fetchGoogleSheetData } = await import('./etl/google-sheets-etl');
+      const { googleSheetsWorkingService } = await import('./services/googleSheetsWorking');
       
       // 1. Limpiar datos existentes de esos períodos
       for (const period of periods) {
@@ -15198,8 +15198,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`🗑️ Limpiados datos de período ${period}`);
       }
       
-      // 2. Fetch fresh data desde Google Sheets
-      const sheetData = await fetchGoogleSheetData('Rendimiento Cliente');
+      // 2. Fetch fresh data desde Google Sheets ("Rendimiento Cliente", header-keyed)
+      const rcRaw = await googleSheetsWorkingService.getSheetValues(
+        '1FZLFmTQQOSYQns2cOYlM86UGEH7EHZsJOFegyDR7quc',
+        'Rendimiento Cliente',
+        { valueRenderOption: 'UNFORMATTED_VALUE', dateTimeRenderOption: 'SERIAL_NUMBER' }
+      );
+      const rcHeaders = (rcRaw[0] || []) as string[];
+      const sheetData = rcRaw.slice(1).map((row: any[]) => {
+        const obj: any = {};
+        rcHeaders.forEach((header: string, i: number) => { obj[header] = row[i]; });
+        return obj;
+      });
       
       // 3. Filtrar solo filas de los períodos solicitados
       const filteredRows = sheetData.filter((row: any) => {
@@ -15371,10 +15381,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Build filters for aggregator
       const filters: any = {};
-      if (dateRange && dateRange.start && dateRange.end) {
+      if (dateRange && dateRange.startDate && dateRange.endDate) {
         filters.dateRange = {
-          start: dateRange.start.toISOString().substring(0, 7), // YYYY-MM
-          end: dateRange.end.toISOString().substring(0, 7)
+          start: dateRange.startDate.toISOString().substring(0, 7), // YYYY-MM
+          end: dateRange.endDate.toISOString().substring(0, 7)
         };
       }
       
@@ -15480,7 +15490,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let monthKey = 'all-time';
       
       if (dateRange) {
-        monthKey = dateRange.start.toISOString().substring(0, 7); // Use start month as representative
+        monthKey = dateRange.startDate.toISOString().substring(0, 7); // Use start month as representative
       }
       
       // Get detailed data for the project
@@ -15521,8 +15531,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Filter by date range if specified
       const filterByDateRange = (data: any[]) => {
         if (!dateRange) return data;
-        const startMonth = dateRange.start.toISOString().substring(0, 7);
-        const endMonth = dateRange.end.toISOString().substring(0, 7);
+        const startMonth = dateRange.startDate.toISOString().substring(0, 7);
+        const endMonth = dateRange.endDate.toISOString().substring(0, 7);
         return data.filter(d => d.monthKey >= startMonth && d.monthKey <= endMonth);
       };
       
@@ -15558,7 +15568,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({
         success: true,
         projectKey,
-        period: dateRange ? `${dateRange.start.toISOString().substring(0, 7)} to ${dateRange.end.toISOString().substring(0, 7)}` : 'all-time',
+        period: dateRange ? `${dateRange.startDate.toISOString().substring(0, 7)} to ${dateRange.endDate.toISOString().substring(0, 7)}` : 'all-time',
         metrics,
         details: {
           sales: filteredSales.map(s => ({
@@ -15610,8 +15620,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const filters: any = {};
       if (dateRange) {
         filters.dateRange = {
-          start: dateRange.start.toISOString().substring(0, 7),
-          end: dateRange.end.toISOString().substring(0, 7)
+          start: dateRange.startDate.toISOString().substring(0, 7),
+          end: dateRange.endDate.toISOString().substring(0, 7)
         };
       }
       
@@ -15703,8 +15713,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const filters: any = {};
       if (dateRange) {
         filters.dateRange = {
-          start: dateRange.start.toISOString().substring(0, 7),
-          end: dateRange.end.toISOString().substring(0, 7)
+          start: dateRange.startDate.toISOString().substring(0, 7),
+          end: dateRange.endDate.toISOString().substring(0, 7)
         };
       }
       
@@ -15760,8 +15770,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let rawCounts = { sales: 0, costs: 0, targets: 0 };
       try {
         const googleSheetsServiceWorking = await import('./services/googleSheetsWorking');
-        const rawSales = await googleSheetsServiceWorking.default.getVentasTomi();
-        const rawCosts = await googleSheetsServiceWorking.default.getCostosDirectosIndirectos();
+        const rawSales = await googleSheetsServiceWorking.googleSheetsWorkingService.getVentasTomi();
+        const rawCosts = await googleSheetsServiceWorking.googleSheetsWorkingService.getCostosDirectosIndirectos();
         
         rawCounts.sales = rawSales.length;
         rawCounts.costs = rawCosts.length;
@@ -16046,43 +16056,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`🗑️ REBUILD SOT: Cleared existing data for ${period}`);
       
       // Insert new data for each project
+      const { generateCanonicalFields } = await import('./utils/normalize');
+      const periodYear = parseInt(period.slice(0, 4), 10);
       let insertedCount = 0;
       for (const project of response.projects) {
-        if (!project.projectKey) continue;
-        
-        const projectKey = project.projectKey;
-        const currencyNative = project.metrics?.displayCurrency || 'USD';
-        const revenueUSD = project.metrics?.revenueUSD || 0;
-        const costUSD = project.metrics?.costUSD || 0;
-        const revenueDisplay = project.metrics?.revenueDisplay || revenueUSD;
-        const costDisplay = project.metrics?.costDisplay || costUSD;
-        
-        // Insert income
+        const clientName = project.client?.name || '';
+        const projectName = project.name;
+        if (!clientName || !projectName) continue;
+
+        // El item del aggregator no trae projectKey: lo derivamos canónicamente
+        const { projectKey } = generateCanonicalFields(clientName, projectName);
+
+        // revenueDisplay/costDisplay son objetos {amount, currency}; revenueUSD/costUSD son números USD
+        const revenueUSD = project.metrics?.revenueUSDNormalized ?? project.metrics?.revenueUSD ?? 0;
+        const costUSD = project.metrics?.costUSDNormalized ?? project.metrics?.costUSD ?? 0;
+        const currencyNative =
+          project.metrics?.costDisplay?.currency || project.metrics?.revenueDisplay?.currency || 'USD';
+        const costDisplay = project.metrics?.costDisplay?.amount ?? costUSD;
+
+        // Insert income (income_sot: monthKey, year, clientName, projectName, revenueUsd)
         await db.insert(incomeSot).values({
-          projectKey,
           monthKey: period,
-          currencyNative,
-          revenueDisplay: String(revenueDisplay),
-          revenueUsd: String(revenueUSD),
-          flags: JSON.stringify([])
+          year: periodYear,
+          clientName,
+          projectName,
+          revenueUsd: String(revenueUSD)
         }).onConflictDoUpdate({
-          target: [incomeSot.projectKey, incomeSot.monthKey],
+          target: [incomeSot.clientName, incomeSot.projectName, incomeSot.monthKey],
           set: {
-            currencyNative,
-            revenueDisplay: String(revenueDisplay),
             revenueUsd: String(revenueUSD),
             updatedAt: new Date()
           }
         });
-        
-        // Insert cost
+
+        // Insert cost (costs_sot: projectKey, monthKey, currencyNative, costDisplay, costUsd)
         await db.insert(costsSot).values({
           projectKey,
           monthKey: period,
           currencyNative,
           costDisplay: String(costDisplay),
           costUsd: String(costUSD),
-          flags: JSON.stringify([])
+          flags: []
         }).onConflictDoUpdate({
           target: [costsSot.projectKey, costsSot.monthKey],
           set: {
@@ -16092,7 +16106,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             updatedAt: new Date()
           }
         });
-        
+
         insertedCount++;
       }
       
@@ -16777,11 +16791,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // DEBUG: Ver datos raw de Google Sheets para Warner
   app.get("/api/debug/sheets-warner", requireAuth, async (req, res) => {
     try {
-      const { googleSheetsWorking } = await import('./services/googleSheetsWorking');
-      const rcData = await googleSheetsWorking.getRendimientoCliente();
-      
-      const warnerRows = rcData.filter(row => 
-        row.Cliente && row.Cliente.toLowerCase().includes('warner')
+      const { googleSheetsWorkingService } = await import('./services/googleSheetsWorking');
+      // "Rendimiento Cliente" se lee como valores crudos y se mapea con la fila de headers
+      const rcRaw = await googleSheetsWorkingService.getSheetValues(
+        '1FZLFmTQQOSYQns2cOYlM86UGEH7EHZsJOFegyDR7quc',
+        'Rendimiento Cliente',
+        { valueRenderOption: 'UNFORMATTED_VALUE', dateTimeRenderOption: 'SERIAL_NUMBER' }
+      );
+      const rcHeaders = rcRaw[0] || [];
+      const rcData = rcRaw.slice(1).map((row: any[]) => {
+        const obj: any = {};
+        rcHeaders.forEach((header: string, i: number) => { obj[header] = row[i]; });
+        return obj;
+      });
+
+      const warnerRows = rcData.filter((row: any) =>
+        row.Cliente && String(row.Cliente).toLowerCase().includes('warner')
       );
       
       res.json({
@@ -18463,6 +18488,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         deadline: projectStatusReviews.deadline,
         ownerId: projectStatusReviews.ownerId,
         decisionNeeded: projectStatusReviews.decisionNeeded,
+        roomId: projectStatusReviews.roomId,
       }).from(projectStatusReviews)
         .where(eq(projectStatusReviews.projectId, projectId));
 
@@ -18522,10 +18548,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Insert change log entries (fire-and-forget, silently fails if table doesn't exist)
+      // statusChangeLog.roomId es NOT NULL: solo registramos cuando conocemos el room de la fila.
       if (changeLogs.length > 0) {
-        db.insert(statusChangeLog)
-          .values(changeLogs.map(cl => ({ projectId, userId, ...cl })))
-          .catch((err: any) => console.error('statusChangeLog insert error (project):', err));
+        const roomId = (result as any)?.roomId ?? (existing as any)?.roomId;
+        if (roomId != null) {
+          db.insert(statusChangeLog)
+            .values(changeLogs.map(cl => ({ roomId, projectId, userId, ...cl })))
+            .catch((err: any) => console.error('statusChangeLog insert error (project):', err));
+        }
       }
 
       console.log(`PATCH /api/status-semanal/${projectId} OK`, result?.id);
@@ -19280,10 +19310,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Insert change log entries (fire-and-forget, silently fails if table doesn't exist)
+      // statusChangeLog.roomId es NOT NULL: lo tomamos de la fila del ítem.
       if (changeLogs.length > 0) {
-        db.insert(statusChangeLog)
-          .values(changeLogs.map(cl => ({ weeklyStatusItemId: id, userId, ...cl })))
-          .catch((err: any) => console.error('statusChangeLog insert error (custom):', err));
+        const roomId = (item as any)?.roomId;
+        if (roomId != null) {
+          db.insert(statusChangeLog)
+            .values(changeLogs.map(cl => ({ roomId, weeklyStatusItemId: id, userId, ...cl })))
+            .catch((err: any) => console.error('statusChangeLog insert error (custom):', err));
+        }
       }
       console.log(`PATCH /api/status-semanal/custom/${id} OK`);
       res.json(item);

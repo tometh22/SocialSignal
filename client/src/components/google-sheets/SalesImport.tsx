@@ -53,7 +53,7 @@ export default function SalesImport() {
 
   // Probar lectura de datos
   const testSalesMutation = useMutation({
-    mutationFn: () => apiRequest('/api/google-sheets/test-sales'),
+    mutationFn: () => apiRequest('/api/google-sheets/test-sales', 'GET'),
     onSuccess: (data) => {
       console.log('Test sales data:', data);
       toast({

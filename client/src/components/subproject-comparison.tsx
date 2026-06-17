@@ -73,12 +73,15 @@ export function SubprojectComparison({
   const comparisonStatus = getComparisonStatus();
   
   const statusConfig = {
-    excellent: { 
-      label: "Excelente", 
-      color: "green", 
-      bgColor: "bg-green-50", 
+    excellent: {
+      label: "Excelente",
+      color: "green",
+      bgColor: "bg-green-50",
       textColor: "text-green-700",
-      icon: Award 
+      borderColor: "border-green-200",
+      iconColor: "text-green-600",
+      textSmColor: "text-green-600",
+      icon: Award
     },
     good: {
       label: "Bueno",

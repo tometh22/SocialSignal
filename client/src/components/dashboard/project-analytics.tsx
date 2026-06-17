@@ -898,7 +898,7 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
 
                       return (
                         <div key={member.personnelId} className="flex justify-between items-center">
-                          <span className="text-sm text-slate-700">{member.personnelName}</span>
+                          <span className="text-sm text-slate-700">{member.name}</span>
                           <div className="flex items-center gap-2">
                             <span className="text-sm font-medium text-slate-800">{formatNumber(memberHours, 1)}h</span>
                             <span className="text-xs text-slate-600">({percentage.toFixed(1)}%)</span>
@@ -943,9 +943,9 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
                               bgIntensity <= 6 ? 'bg-orange-300 text-orange-900' :
                               'bg-emerald-400 text-emerald-900'}
                           `}
-                          title={`${member.personnelName}: ${memberHours.toFixed(1)}h`}
+                          title={`${member.name || 'NN'}: ${memberHours.toFixed(1)}h`}
                         >
-                          {member.personnelName.substring(0, 2).toUpperCase()}
+                          {(member.name || 'NN').substring(0, 2).toUpperCase()}
                         </div>
                       );
                     })}

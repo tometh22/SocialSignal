@@ -193,7 +193,7 @@ export const QuoteProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         try {
           // Cargar las asignaciones de roles para esta plantilla desde la API
           // Esta llamada obtiene qué roles están asignados a la plantilla seleccionada
-          apiRequest(`/api/template-roles/${templateId}`)
+          apiRequest(`/api/template-roles/${templateId}`, "GET")
             .then(response => {
               
               if (response && Array.isArray(response)) {
@@ -385,7 +385,7 @@ export const QuoteProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
       
       // Primero cargaremos las asignaciones de roles para obtener las horas asociadas
-      apiRequest(`/api/template-roles/${selectedTemplateId}`)
+      apiRequest(`/api/template-roles/${selectedTemplateId}`, "GET")
         .then(assignments => {
           if (selectedTemplateId === 17) {
           }
