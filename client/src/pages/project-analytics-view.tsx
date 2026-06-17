@@ -439,10 +439,10 @@ const ProjectAnalyticsView: React.FC = () => {
     });
 
     // Para proyectos Always-On, ajustar el costo planificado según el período
-    let plannedCost = quotationData.finalPrice || 0;
+    let plannedCost = quotationData.totalAmount || 0;
     if (quotationData.projectType === 'always-on' && timeFilter !== "all") {
-      const quotationMultiplier = getQuotationMultiplier(timeFilter);
-      plannedCost = (quotationData.finalPrice || 0) * quotationMultiplier;
+      const quotationMultiplier = getQuotationMultiplier();
+      plannedCost = (quotationData.totalAmount || 0) * quotationMultiplier;
     }
 
     const percentageUsed = plannedCost > 0 ? (actualCost / plannedCost) * 100 : 0;
@@ -475,11 +475,11 @@ const ProjectAnalyticsView: React.FC = () => {
     const actualHours = dataToUse.reduce((sum, entry) => sum + (entry.hours || 0), 0);
 
     // Para proyectos Always-On, ajustar las horas planificadas según el período
-    let plannedHours = project.quotation?.totalHours || 0;
+    let plannedHours = project.quotation?.estimatedHours || 0;
 
     if (quotationData?.projectType === 'always-on' && timeFilter !== "all") {
       const quotationMultiplier = getQuotationMultiplier();
-      plannedHours = (project.quotation?.totalHours || 0) * quotationMultiplier;
+      plannedHours = (project.quotation?.estimatedHours || 0) * quotationMultiplier;
     }
 
     const startDate = project.startDate ? new Date(project.startDate) : new Date();
@@ -900,9 +900,9 @@ const ProjectAnalyticsView: React.FC = () => {
             {timeFilter !== "all" && (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <span>Período: {getFilterDisplayName(timeFilter)}</span>
-                {quotationMultiplier > 1 && (
+                {getQuotationMultiplier() > 1 && (
                   <span className="text-blue-600">
-                    (Objetivo × {quotationMultiplier})
+                    (Objetivo × {getQuotationMultiplier()})
                   </span>
                 )}
               </div>

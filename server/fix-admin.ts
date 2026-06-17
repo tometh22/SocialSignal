@@ -35,14 +35,14 @@ async function createNewAdminUser() {
       createdAt: new Date(),
       updatedAt: new Date()
     }).returning();
-    
+
+    console.log("Usuario administrador creado exitosamente:", {
       id: newUser.id,
       email: newUser.email,
       firstName: newUser.firstName,
       lastName: newUser.lastName
     });
-    
-    
+
   } catch (error) {
     console.error("Error al crear usuario administrador:", error);
   }

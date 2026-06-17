@@ -51,7 +51,8 @@ import {
   projectBaseTeam, quickTimeEntries, quickTimeEntryDetails, passwordResetTokens, unquotedPersonnel, monthlyHourAdjustments,
   projectPriceAdjustments, negotiationHistory, exchangeRates, indirectCostCategories, indirectCosts, nonBillableHours,
   googleSheetsProjects, googleSheetsProjectBilling, projectMonthlyRevenue, projectPricingChanges, projectFinancialSummary,
-  projectMonthlySales, projectFinancialTransactions, googleSheetsSales, directCosts
+  projectMonthlySales, projectFinancialTransactions, googleSheetsSales, directCosts,
+  crmLeads
 } from "@shared/schema";
 import { db, pool } from "./db";
 import { eq, ne, and, sql, inArray, desc, asc } from "drizzle-orm";

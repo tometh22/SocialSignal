@@ -116,8 +116,8 @@ export function PersonnelHistoricalCostsManager({ onClose }: PersonnelHistorical
     form.setValue("personnelId", cost.personnelId);
     form.setValue("year", cost.year);
     form.setValue("month", cost.month);
-    form.setValue("hourlyRateARS", cost.hourlyRateARS || undefined);
-    form.setValue("hourlyRateUSD", cost.hourlyRateUSD || 0);
+    form.setValue("hourlyRateARS", cost.hourlyRateARS != null ? Number(cost.hourlyRateARS) : undefined);
+    form.setValue("hourlyRateUSD", cost.hourlyRateUSD != null ? Number(cost.hourlyRateUSD) : 0);
     form.setValue("adjustmentReason", cost.adjustmentReason || "");
     form.setValue("notes", cost.notes || "");
     setShowForm(true);

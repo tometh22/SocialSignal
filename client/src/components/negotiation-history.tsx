@@ -7,7 +7,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, History, TrendingUp, TrendingDown, FileText, MessageSquare, AlertCircle, Users, Handshake, UserPlus, UserMinus, UserCheck } from 'lucide-react';
+import { Plus, History, TrendingUp, TrendingDown, FileText, MessageSquare, AlertCircle, Users, Handshake, UserPlus, UserMinus, UserCheck, ExternalLink } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { NegotiationFormModern } from './negotiation-form-modern';
