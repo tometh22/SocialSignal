@@ -13,6 +13,7 @@ import QuoteRedirect from "@/pages/quote-redirect";
 import Clients from "@/pages/clients";
 import Admin from "@/pages/admin-fixed";
 import AdminInflation from "@/pages/admin-inflation";
+import AdminDataSources from "@/pages/admin-data-sources";
 
 // Project Management Pages
 import ActiveProjectsNext from "@/pages/active-projects-next";
@@ -238,6 +239,7 @@ function AppRoutes() {
                   <ProtectedRoute path="/clients" component={Clients} requiredPermission="crm" />
                   <ProtectedRoute path="/admin/users" component={AdminUsersPage} requiredPermission="admin" />
                   <ProtectedRoute path="/admin/inflation" component={AdminInflation} requiredPermission="admin" />
+                  <ProtectedRoute path="/admin/data-sources" component={AdminDataSources} requiredPermission="admin" />
                   <ProtectedRoute path="/admin" component={Admin} requiredPermission="admin" />
 
                   {/* Finance Ledger */}

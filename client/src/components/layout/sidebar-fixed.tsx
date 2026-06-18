@@ -46,6 +46,7 @@ import {
   CircleArrowUp,
   Wallet,
   ShieldAlert,
+  Database,
 } from "lucide-react";
 
 const PROJECT_ICON_COLORS = [
@@ -257,6 +258,7 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
       items: [
         { href: "/admin/users", title: "Usuarios", icon: Users, description: "Usuarios y permisos", permission: 'admin' as AppSection },
         { href: "/admin/providers", title: "Proveedores", icon: Building2, description: "Proveedores externos y su acceso a proyectos", permission: 'admin' as AppSection },
+        { href: "/admin/data-sources", title: "Fuente de datos", icon: Database, description: "Toggle Excel / Registros de la app", permission: 'admin' as AppSection },
         { href: "/admin", title: "Configuración", icon: Settings, description: "Administración", permission: 'admin' as AppSection }
       ]
     }

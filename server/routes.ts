@@ -1746,6 +1746,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const { lifetimeMetricsHandler } = await import('./routes/lifetime-metrics');
   app.get('/api/projects/:id/lifetime-metrics', requireAuth, lifetimeMetricsHandler);
 
+  // 📊 ENDPOINT: Hours Summary from fact_labor_month (works in both Excel and App mode)
+  app.get('/api/projects/:id/hours-summary', requireAuth, async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.id);
+      const period = req.query.period as string | undefined;
+
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: 'Invalid project ID' });
+      }
+      if (period && !/^\d{4}-\d{2}$/.test(period)) {
+        return res.status(400).json({ message: 'Invalid period format. Use YYYY-MM' });
+      }
+
+      const whereClause = period
+        ? and(eq(factLaborMonth.projectId, projectId), eq(factLaborMonth.periodKey, period))
+        : eq(factLaborMonth.projectId, projectId);
+
+      const rows = await db
+        .select({
+          personId:      factLaborMonth.personId,
+          personKey:     factLaborMonth.personKey,
+          periodKey:     factLaborMonth.periodKey,
+          roleName:      factLaborMonth.roleName,
+          asanaHours:    factLaborMonth.asanaHours,
+          billingHours:  factLaborMonth.billingHours,
+          targetHours:   factLaborMonth.targetHours,
+          costARS:       factLaborMonth.costARS,
+          costUSD:       factLaborMonth.costUSD,
+          hourlyRateARS: factLaborMonth.hourlyRateARS,
+          fx:            factLaborMonth.fx,
+          flags:         factLaborMonth.flags,
+        })
+        .from(factLaborMonth)
+        .where(whereClause)
+        .orderBy(asc(factLaborMonth.personKey), asc(factLaborMonth.periodKey));
+
+      const teamBreakdown = rows.map((row) => ({
+        personnelId:   row.personId,
+        personKey:     row.personKey,
+        periodKey:     row.periodKey,
+        roleName:      row.roleName,
+        asanaHours:    parseFloat(row.asanaHours?.toString() ?? '0'),
+        billingHours:  parseFloat(row.billingHours?.toString() ?? '0'),
+        targetHours:   parseFloat(row.targetHours?.toString() ?? '0'),
+        costARS:       parseFloat(row.costARS?.toString() ?? '0'),
+        costUSD:       parseFloat(row.costUSD?.toString() ?? '0'),
+        hourlyRateARS: parseFloat(row.hourlyRateARS?.toString() ?? '0'),
+        fx:            row.fx ? parseFloat(row.fx.toString()) : null,
+        flags:         row.flags ?? [],
+      }));
+
+      const totals = {
+        totalAsanaHours:   teamBreakdown.reduce((s, r) => s + r.asanaHours, 0),
+        totalBillingHours: teamBreakdown.reduce((s, r) => s + r.billingHours, 0),
+        totalTargetHours:  teamBreakdown.reduce((s, r) => s + r.targetHours, 0),
+        totalCostARS:      teamBreakdown.reduce((s, r) => s + r.costARS, 0),
+        totalCostUSD:      teamBreakdown.reduce((s, r) => s + r.costUSD, 0),
+      };
+
+      res.json({ teamBreakdown, totals });
+    } catch (error) {
+      console.error('[hours-summary] Error:', error);
+      res.status(500).json({ message: 'Error fetching hours summary', error: String(error) });
+    }
+  });
+
   // 🔧 ENDPOINT: Operational Metrics (WIP, Lead Time, Throughput, Workload, Risk)
   // MIGRATED TO STAR SCHEMA SoT: Uses fact_labor_month instead of time_entries
   app.get('/api/projects/:id/operational-metrics', requireAuth, async (req, res) => {
@@ -16140,6 +16206,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return _res.status(500).json({ 
         error: error instanceof Error ? error.message : String(error) 
       });
+    }
+  });
+
+  // ==================== APP-MODE REBUILD ENDPOINT ====================
+  // Rebuilds fact_labor_month for a period from time_entries (app mode ETL)
+  app.post('/internal/rebuild-labor-from-app', requireAuth, requireAdminMiddleware, async (req: Request, res: Response) => {
+    try {
+      const { period, force } = req.body as { period: string; force?: boolean };
+
+      if (!period || !/^\d{4}-\d{2}$/.test(period)) {
+        return res.status(400).json({ message: 'period requerido en formato YYYY-MM' });
+      }
+
+      const { buildFactLaborFromTimeEntries } = await import('./etl/time-entries-to-fact-labor');
+      const result = await buildFactLaborFromTimeEntries(period, force);
+      console.log(`[rebuild-labor-from-app] period=${period} inserted=${result.inserted} updated=${result.updated} errors=${result.errors.length} ms=${result.executionTimeMs}`);
+      res.json(result);
+    } catch (error) {
+      console.error('[rebuild-labor-from-app] Error:', error);
+      res.status(500).json({ message: 'Error ejecutando rebuild', error: String(error) });
     }
   });
 
