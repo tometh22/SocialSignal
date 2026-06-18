@@ -46,13 +46,13 @@ export default function AdminDataSources() {
     mutationFn: (newValue: 0 | 1) =>
       apiRequest('/api/admin/system-config', {
         method: 'POST',
-        body: JSON.stringify({
+        body: {
           configKey: 'hours_data_source',
           configValue: newValue,
           description: newValue === 1
             ? 'Fuente de horas: App (time_entries → fact_labor_month)'
             : 'Fuente de horas: Excel Maestro (Google Sheets → fact_labor_month)',
-        }),
+        },
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/system-config'] });
@@ -67,8 +67,8 @@ export default function AdminDataSources() {
     mutationFn: (period: string) =>
       apiRequest('/internal/rebuild-labor-from-app', {
         method: 'POST',
-        body: JSON.stringify({ period }),
-      }).then((r: any) => r as RebuildResult),
+        body: { period },
+      }) as Promise<RebuildResult>,
     onSuccess: (data: RebuildResult) => {
       setRebuildResult(data);
       toast({

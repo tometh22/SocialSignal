@@ -145,7 +145,7 @@ export async function buildFactLaborFromTimeEntries(
     const rate = row.hourlyRateAtTime ?? 0;
 
     agg.totalHours += hours;
-    if (row.billable !== false) agg.billableHours += hours;
+    if (row.billable === true) agg.billableHours += hours;
     agg.totalCostARS += cost;
     if (rate > 0) {
       agg.rateSum += rate;
