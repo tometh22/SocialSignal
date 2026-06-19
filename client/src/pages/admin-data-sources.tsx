@@ -19,20 +19,28 @@ interface SystemConfig {
 }
 
 interface RebuildResult {
-  periodKey: string;
-  inserted: number;
-  updated: number;
+  periodKey?: string;
+  inserted?: number;
+  updated?: number;
   errors: string[];
-  executionTimeMs: number;
+  executionTimeMs?: number;
+  // range mode
+  periods?: string[];
+  totalInserted?: number;
+  totalUpdated?: number;
+  results?: Array<{ periodKey: string; inserted: number; updated: number; errors: string[]; executionTimeMs: number }>;
 }
 
 export default function AdminDataSources() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [rebuildMode, setRebuildMode] = useState<'single' | 'range'>('single');
   const [rebuildPeriod, setRebuildPeriod] = useState(() => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   });
+  const [rebuildFrom, setRebuildFrom] = useState('');
+  const [rebuildTo, setRebuildTo] = useState('');
   const [rebuildResult, setRebuildResult] = useState<RebuildResult | null>(null);
 
   const { data: configList = [], isLoading } = useQuery<SystemConfig[]>({
@@ -64,16 +72,16 @@ export default function AdminDataSources() {
   });
 
   const rebuildMutation = useMutation({
-    mutationFn: (period: string) =>
-      apiRequest('/internal/rebuild-labor-from-app', {
-        method: 'POST',
-        body: { period },
-      }) as Promise<RebuildResult>,
+    mutationFn: (body: object) =>
+      apiRequest('/internal/rebuild-labor-from-app', { method: 'POST', body }) as Promise<RebuildResult>,
     onSuccess: (data: RebuildResult) => {
       setRebuildResult(data);
+      const inserted = data.totalInserted ?? data.inserted ?? 0;
+      const updated = data.totalUpdated ?? data.updated ?? 0;
+      const periods = data.periods?.length ?? 1;
       toast({
         title: `Rebuild completado`,
-        description: `${data.inserted} insertados, ${data.updated} actualizados en ${data.executionTimeMs}ms`,
+        description: `${periods > 1 ? `${periods} períodos — ` : ''}${inserted} insertados, ${updated} actualizados`,
       });
     },
     onError: () => {
@@ -86,12 +94,24 @@ export default function AdminDataSources() {
   };
 
   const handleRebuild = () => {
-    if (!/^\d{4}-\d{2}$/.test(rebuildPeriod)) {
-      toast({ title: 'Período inválido. Usá formato YYYY-MM', variant: 'destructive' });
-      return;
-    }
     setRebuildResult(null);
-    rebuildMutation.mutate(rebuildPeriod);
+    if (rebuildMode === 'range') {
+      if (!/^\d{4}-\d{2}$/.test(rebuildFrom) || !/^\d{4}-\d{2}$/.test(rebuildTo)) {
+        toast({ title: 'Rango inválido. Usá formato YYYY-MM en ambos campos', variant: 'destructive' });
+        return;
+      }
+      if (rebuildFrom > rebuildTo) {
+        toast({ title: '"Desde" debe ser anterior o igual a "Hasta"', variant: 'destructive' });
+        return;
+      }
+      rebuildMutation.mutate({ periodFrom: rebuildFrom, periodTo: rebuildTo });
+    } else {
+      if (!/^\d{4}-\d{2}$/.test(rebuildPeriod)) {
+        toast({ title: 'Período inválido. Usá formato YYYY-MM', variant: 'destructive' });
+        return;
+      }
+      rebuildMutation.mutate({ period: rebuildPeriod });
+    }
   };
 
   return (
@@ -175,22 +195,54 @@ export default function AdminDataSources() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-end gap-3">
-            <div className="space-y-1">
-              <Label htmlFor="rebuild-period">Período (YYYY-MM)</Label>
-              <Input
-                id="rebuild-period"
-                value={rebuildPeriod}
-                onChange={(e) => setRebuildPeriod(e.target.value)}
-                placeholder="2025-06"
-                className="w-36 font-mono"
-              />
-            </div>
+          <div className="flex gap-2">
             <Button
-              onClick={handleRebuild}
-              disabled={rebuildMutation.isPending}
-              className="gap-2"
-            >
+              size="sm" variant={rebuildMode === 'single' ? 'default' : 'outline'}
+              onClick={() => setRebuildMode('single')}
+            >Período único</Button>
+            <Button
+              size="sm" variant={rebuildMode === 'range' ? 'default' : 'outline'}
+              onClick={() => setRebuildMode('range')}
+            >Rango de períodos</Button>
+          </div>
+
+          <div className="flex items-end gap-3 flex-wrap">
+            {rebuildMode === 'single' ? (
+              <div className="space-y-1">
+                <Label htmlFor="rebuild-period">Período (YYYY-MM)</Label>
+                <Input
+                  id="rebuild-period"
+                  value={rebuildPeriod}
+                  onChange={(e) => setRebuildPeriod(e.target.value)}
+                  placeholder="2026-06"
+                  className="w-36 font-mono"
+                />
+              </div>
+            ) : (
+              <>
+                <div className="space-y-1">
+                  <Label htmlFor="rebuild-from">Desde</Label>
+                  <Input
+                    id="rebuild-from"
+                    value={rebuildFrom}
+                    onChange={(e) => setRebuildFrom(e.target.value)}
+                    placeholder="2026-01"
+                    className="w-32 font-mono"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="rebuild-to">Hasta</Label>
+                  <Input
+                    id="rebuild-to"
+                    value={rebuildTo}
+                    onChange={(e) => setRebuildTo(e.target.value)}
+                    placeholder="2026-06"
+                    className="w-32 font-mono"
+                  />
+                </div>
+              </>
+            )}
+            <Button onClick={handleRebuild} disabled={rebuildMutation.isPending} className="gap-2">
               <RefreshCw className={`h-4 w-4 ${rebuildMutation.isPending ? 'animate-spin' : ''}`} />
               {rebuildMutation.isPending ? 'Reconstruyendo...' : 'Reconstruir'}
             </Button>
@@ -204,15 +256,20 @@ export default function AdminDataSources() {
                   : <CheckCircle2 className="h-4 w-4 text-emerald-600" />
                 }
                 <span className="font-medium text-sm">
-                  Período {rebuildResult.periodKey} — {rebuildResult.inserted} insertados, {rebuildResult.updated} actualizados
+                  {rebuildResult.periods
+                    ? `${rebuildResult.periods.length} períodos (${rebuildResult.periods[0]}→${rebuildResult.periods[rebuildResult.periods.length - 1]}) — ${rebuildResult.totalInserted} insertados, ${rebuildResult.totalUpdated} actualizados`
+                    : `Período ${rebuildResult.periodKey} — ${rebuildResult.inserted} insertados, ${rebuildResult.updated} actualizados`}
                 </span>
-                <span className="ml-auto flex items-center gap-1 text-xs text-slate-500">
-                  <Clock className="h-3 w-3" /> {rebuildResult.executionTimeMs}ms
-                </span>
+                {rebuildResult.executionTimeMs && (
+                  <span className="ml-auto flex items-center gap-1 text-xs text-slate-500">
+                    <Clock className="h-3 w-3" /> {rebuildResult.executionTimeMs}ms
+                  </span>
+                )}
               </div>
               {rebuildResult.errors.length > 0 && (
                 <ul className="text-xs text-amber-700 space-y-0.5 pl-6 list-disc">
-                  {rebuildResult.errors.map((e, i) => <li key={i}>{e}</li>)}
+                  {rebuildResult.errors.slice(0, 10).map((e, i) => <li key={i}>{e}</li>)}
+                  {rebuildResult.errors.length > 10 && <li>...y {rebuildResult.errors.length - 10} errores más</li>}
                 </ul>
               )}
             </div>

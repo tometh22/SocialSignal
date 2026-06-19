@@ -15973,16 +15973,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ==================== APP-MODE REBUILD ENDPOINT ====================
-  // Rebuilds fact_labor_month for a period from time_entries (app mode ETL)
+  // Rebuilds fact_labor_month for a period (or range) from time_entries (app mode ETL)
   app.post('/internal/rebuild-labor-from-app', requireAuth, requireAdminMiddleware, async (req: Request, res: Response) => {
     try {
-      const { period, force } = req.body as { period: string; force?: boolean };
+      const { period, periodFrom, periodTo, force } = req.body as {
+        period?: string; periodFrom?: string; periodTo?: string; force?: boolean;
+      };
 
+      const { buildFactLaborFromTimeEntries } = await import('./etl/time-entries-to-fact-labor');
+
+      // Range mode: periodFrom + periodTo
+      if (periodFrom || periodTo) {
+        if (!periodFrom || !periodTo || !/^\d{4}-\d{2}$/.test(periodFrom) || !/^\d{4}-\d{2}$/.test(periodTo)) {
+          return res.status(400).json({ message: 'periodFrom y periodTo requeridos en formato YYYY-MM' });
+        }
+        if (periodFrom > periodTo) {
+          return res.status(400).json({ message: 'periodFrom debe ser <= periodTo' });
+        }
+
+        // Generate all YYYY-MM in the range
+        const periods: string[] = [];
+        let [y, m] = periodFrom.split('-').map(Number);
+        const [ey, em] = periodTo.split('-').map(Number);
+        while (y < ey || (y === ey && m <= em)) {
+          periods.push(`${y}-${String(m).padStart(2, '0')}`);
+          m++;
+          if (m > 12) { m = 1; y++; }
+        }
+
+        const results = [];
+        let totalInserted = 0, totalUpdated = 0;
+        const allErrors: string[] = [];
+        for (const p of periods) {
+          const r = await buildFactLaborFromTimeEntries(p, force);
+          results.push(r);
+          totalInserted += r.inserted;
+          totalUpdated += r.updated;
+          allErrors.push(...r.errors);
+        }
+        return res.json({ periods, totalInserted, totalUpdated, errors: allErrors, results });
+      }
+
+      // Single period mode
       if (!period || !/^\d{4}-\d{2}$/.test(period)) {
         return res.status(400).json({ message: 'period requerido en formato YYYY-MM' });
       }
-
-      const { buildFactLaborFromTimeEntries } = await import('./etl/time-entries-to-fact-labor');
       const result = await buildFactLaborFromTimeEntries(period, force);
       console.log(`[rebuild-labor-from-app] period=${period} inserted=${result.inserted} updated=${result.updated} errors=${result.errors.length} ms=${result.executionTimeMs}`);
       res.json(result);
