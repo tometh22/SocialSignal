@@ -173,26 +173,25 @@ export function parseValorHoraSection(rows: string[][], year: number): ParsedShe
   return result;
 }
 
-export async function fetchValorHora2026(): Promise<ParsedSheetRow[]> {
+export async function fetchValorHoraForYear(year: number): Promise<ParsedSheetRow[]> {
   const sheets = buildSheetsClient();
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId: SPREADSHEET_ID,
     range: READ_RANGE,
   });
   const rows = (response.data.values || []) as string[][];
-  return parseValorHoraSection(rows, 2026);
+  return parseValorHoraSection(rows, year);
 }
 
-export const HISTORICAL_RATE_FIELDS_2026 = [
-  "jan2026HourlyRateARS", "feb2026HourlyRateARS", "mar2026HourlyRateARS",
-  "apr2026HourlyRateARS", "may2026HourlyRateARS", "jun2026HourlyRateARS",
-  "jul2026HourlyRateARS", "aug2026HourlyRateARS", "sep2026HourlyRateARS",
-  "oct2026HourlyRateARS", "nov2026HourlyRateARS", "dec2026HourlyRateARS",
-] as const;
+/** @deprecated Use fetchValorHoraForYear(2026) */
+export const fetchValorHora2026 = () => fetchValorHoraForYear(2026);
 
-export const HISTORICAL_RATE_FIELDS_2027 = [
-  "jan2027HourlyRateARS", "feb2027HourlyRateARS", "mar2027HourlyRateARS",
-  "apr2027HourlyRateARS", "may2027HourlyRateARS", "jun2027HourlyRateARS",
-  "jul2027HourlyRateARS", "aug2027HourlyRateARS", "sep2027HourlyRateARS",
-  "oct2027HourlyRateARS", "nov2027HourlyRateARS", "dec2027HourlyRateARS",
-] as const;
+const MONTHS_EN = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"] as const;
+
+export function getHistoricalRateFields(year: number): string[] {
+  return MONTHS_EN.map((m) => `${m}${year}HourlyRateARS`);
+}
+
+export const HISTORICAL_RATE_FIELDS_2025 = getHistoricalRateFields(2025);
+export const HISTORICAL_RATE_FIELDS_2026 = getHistoricalRateFields(2026);
+export const HISTORICAL_RATE_FIELDS_2027 = getHistoricalRateFields(2027);

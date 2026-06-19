@@ -1,33 +1,34 @@
 /**
  * Parser para Excel MAESTRO "Costos directos e indirectos"
- * 
- * IMPORTANTE: El Excel NO tiene fila de headers.
- * Todas las filas (incluyendo fila 0) son datos.
- * 
- * Estructura de columnas por índice:
+ *
+ * Soporta dos layouts detectados automáticamente:
+ *
+ * OLD (pre-"Año Facturación"):
+ *   col 3 = año, col 4 = tipoGasto, col 5 = especificacion, col 6 = clienteId
+ *
+ * NEW (con columna extra "Año Facturación" en col 3):
+ *   col 3 = añoFacturacion (ignorar), col 4 = año, col 5 = tipoGasto, col 6 = especificacion
+ *   cols 7-17 idénticos en ambos layouts
  */
 
 import type { CostoDirectoRow } from './sot-etl.js';
 
 export const COSTO_COLUMN_LAYOUT = {
-  persona: 0,           // "Lola Camara"
-  rol: 1,               // "Equipo", "Coordinación", etc.
-  mes: 2,               // "09 sep"
-  año: 3,               // 2025
-  tipoGasto: 4,         // "Directo", "Indirecto", "Costos directos e indirectos"
-  especificacion: 5,    // Detalles adicionales (a menudo vacío)
-  clienteId: 6,         // "PRO-00003250" (ID interno)
-  tipoProyecto: 7,      // "Fee", "Proyecto", etc.
-  proyecto: 8,          // "Fee Marketing"
-  cliente: 9,           // "Warner"
-  horasObjetivo: 10,    // Horas target del mes
-  horasAsana: 11,       // Horas reales trabajadas
-  horasFact: 12,        // Horas billables
-  valorHora: 13,        // Valor/hora en moneda local
-  costoTotal: 14,       // Costo total en ARS
-  _reserved: 15,        // Columna vacía (ignorar)
-  tipoCambio: 16,       // FX rate USD/ARS
-  montoTotalUSD: 17     // Monto total en USD (columna R)
+  persona: 0,
+  rol: 1,
+  mes: 2,
+  // cols 3-6 varían por layout — ver detectColumnOffset()
+  tipoProyecto: 7,
+  proyecto: 8,
+  cliente: 9,
+  horasObjetivo: 10,
+  horasAsana: 11,
+  horasFact: 12,
+  valorHora: 13,
+  costoTotal: 14,
+  _reserved: 15,
+  tipoCambio: 16,
+  montoTotalUSD: 17,
 } as const;
 
 export interface CostoDirectoRowParsed {
@@ -51,82 +52,98 @@ export interface CostoDirectoRowParsed {
 }
 
 /**
- * Parser que mapea una fila del Excel (array de valores) a un objeto tipado
- * 
- * @param row Array de valores de la fila
- * @param rowIndex Índice de la fila (para logging)
- * @returns Objeto CostoDirectoRowParsed o null si la fila es inválida
+ * Detects whether the sheet has the extra "Año Facturación" column inserted at col 3.
+ *
+ * OLD layout: col 3 = year number, col 4 = tipo string  → offset 0
+ * NEW layout: col 4 = year number, col 5 = tipo string  → offset 1
  */
-export function parseCostoRow(row: any[], rowIndex: number): CostoDirectoRowParsed | null {
+function detectColumnOffset(rawRows: any[][]): number {
+  const TIPO_KEYWORDS = ['directo', 'indirecto', 'costo'];
+  const isYear = (v: any) => typeof v === 'number' && v >= 2020 && v <= 2035;
+  const isTipo = (v: any) => {
+    const s = String(v ?? '').toLowerCase().trim();
+    return TIPO_KEYWORDS.some((k) => s.includes(k));
+  };
+
+  for (const row of rawRows.slice(0, 20)) {
+    if (!row || row.length < 6) continue;
+    // NEW: col4 = year AND col5 = tipo
+    if (isYear(row[4]) && isTipo(row[5])) return 1;
+    // OLD: col3 = year AND col4 = tipo
+    if (isYear(row[3]) && isTipo(row[4])) return 0;
+  }
+  return 0;
+}
+
+/**
+ * Parses a single Excel row into a typed object.
+ * @param offset 0 for old layout, 1 for new layout (extra "Año Facturación" col)
+ */
+export function parseCostoRow(
+  row: any[],
+  rowIndex: number,
+  offset = 0,
+): CostoDirectoRowParsed | null {
   try {
-    // Validar longitud mínima (14 columnas para campos esenciales)
-    // Columnas 14-17 son opcionales (costoTotal, _reserved, tipoCambio, montoTotalUSD)
-    const minLength = 14; // Necesitamos al menos hasta valorHora (índice 13)
+    const minLength = 14 + offset;
     if (row.length < minLength) {
       console.warn(`⚠️ Fila ${rowIndex}: Longitud insuficiente (${row.length} < ${minLength}). Saltando.`);
       return null;
     }
-    
-    // Extender fila con valores por defecto si es más corta que 18
+
     const extendedRow = [...row];
-    while (extendedRow.length < 18) {
-      extendedRow.push(''); // Agregar valores vacíos para columnas faltantes
-    }
-    
-    // Extraer valores usando el layout (usar extendedRow que siempre tiene 18 columnas)
-    const persona = String(extendedRow[COSTO_COLUMN_LAYOUT.persona] || '').trim();
-    const tipoGasto = String(extendedRow[COSTO_COLUMN_LAYOUT.tipoGasto] || '').trim();
-    const año = parseInt(String(extendedRow[COSTO_COLUMN_LAYOUT.año] || 0));
-    
-    // Validar campos obligatorios
+    while (extendedRow.length < 18 + offset) extendedRow.push('');
+
+    const persona = String(extendedRow[0] || '').trim();
+    const año = parseInt(String(extendedRow[3 + offset] || 0));
+    const tipoGasto = String(extendedRow[4 + offset] || '').trim();
+
     if (!persona || !tipoGasto || !año) {
-      console.warn(`⚠️ Fila ${rowIndex}: Campos obligatorios vacíos (persona="${persona}", tipoGasto="${tipoGasto}", año=${año}). Saltando.`);
+      console.warn(
+        `⚠️ Fila ${rowIndex}: Campos obligatorios vacíos (persona="${persona}", tipoGasto="${tipoGasto}", año=${año}). Saltando.`,
+      );
       return null;
     }
-    
-    // Parse valores numéricos con fallback a 0
+
     const parseNumber = (val: any): number => {
       const num = parseFloat(String(val || 0));
       return isNaN(num) ? 0 : num;
     };
-    
-    // Parsear valores monetarios y horas
+
     const costoTotal = parseNumber(extendedRow[COSTO_COLUMN_LAYOUT.costoTotal]);
     const montoTotalUSD = parseNumber(extendedRow[COSTO_COLUMN_LAYOUT.montoTotalUSD]);
     const horasObjetivo = parseNumber(extendedRow[COSTO_COLUMN_LAYOUT.horasObjetivo]);
     const valorHora = parseNumber(extendedRow[COSTO_COLUMN_LAYOUT.valorHora]);
     const tipoCambio = parseNumber(extendedRow[COSTO_COLUMN_LAYOUT.tipoCambio]);
-    
-    // Validar que haya datos válidos para computar costos:
-    // Aceptar si: (a) USD>0, (b) ARS>0, o (c) horas>0 con rate/FX válidos
+
     const hasValidMonetary = costoTotal > 0 || montoTotalUSD > 0;
     const hasValidHourly = horasObjetivo > 0 && (valorHora > 0 || tipoCambio > 0);
-    
+
     if (!hasValidMonetary && !hasValidHourly) {
       console.warn(`⚠️ Fila ${rowIndex}: Sin datos válidos para computar costos. Saltando.`);
       return null;
     }
-    
+
     return {
       persona,
       rol: String(extendedRow[COSTO_COLUMN_LAYOUT.rol] || '').trim(),
       mes: String(extendedRow[COSTO_COLUMN_LAYOUT.mes] || '').trim(),
       año,
       tipoGasto,
-      especificacion: String(extendedRow[COSTO_COLUMN_LAYOUT.especificacion] || '').trim(),
-      clienteId: String(extendedRow[COSTO_COLUMN_LAYOUT.clienteId] || '').trim(),
+      especificacion: String(extendedRow[5 + offset] || '').trim(),
+      // clienteId existed in old layout at col 6; in new layout col 6 = especificacion
+      clienteId: offset === 0 ? String(extendedRow[6] || '').trim() : '',
       tipoProyecto: String(extendedRow[COSTO_COLUMN_LAYOUT.tipoProyecto] || '').trim(),
       proyecto: String(extendedRow[COSTO_COLUMN_LAYOUT.proyecto] || '').trim(),
       cliente: String(extendedRow[COSTO_COLUMN_LAYOUT.cliente] || '').trim(),
-      horasObjetivo,  // Ya parseado arriba con validación
+      horasObjetivo,
       horasAsana: parseNumber(extendedRow[COSTO_COLUMN_LAYOUT.horasAsana]),
       horasFact: parseNumber(extendedRow[COSTO_COLUMN_LAYOUT.horasFact]),
-      valorHora,  // Ya parseado arriba con validación
-      costoTotal,  // Ya parseado arriba con validación
-      tipoCambio,  // Ya parseado arriba con validación
-      montoTotalUSD  // Ya parseado arriba con validación
+      valorHora,
+      costoTotal,
+      tipoCambio,
+      montoTotalUSD,
     };
-    
   } catch (error) {
     console.error(`❌ Error parseando fila ${rowIndex}:`, error);
     return null;
@@ -134,67 +151,58 @@ export function parseCostoRow(row: any[], rowIndex: number): CostoDirectoRowPars
 }
 
 /**
- * Convierte un array de filas del Excel a objetos parseados con nombres estándar
- * Compatible con la interfaz existente `CostoDirectoRow` de sot-etl.ts
+ * Converts a 2D array of raw Google Sheets rows into typed CostoDirectoRow objects.
+ * Auto-detects OLD vs NEW column layout.
  */
 export function parseCostosDirectos(rawRows: any[][]): CostoDirectoRow[] {
-  console.log(`📊 [Excel Parser] Parseando ${rawRows.length} filas de costos directos...`);
-  
+  const offset = detectColumnOffset(rawRows);
+  console.log(
+    `📊 [Excel Parser] Parseando ${rawRows.length} filas — layout ${offset === 1 ? 'NEW (+1 offset, col "Año Facturación" detectada)' : 'OLD (sin offset)'}`,
+  );
+
   const parsed: CostoDirectoRow[] = [];
   let skipped = 0;
-  
+
   for (let i = 0; i < rawRows.length; i++) {
     const row = rawRows[i];
-    const parsedRow = parseCostoRow(row, i);
-    
+    const parsedRow = parseCostoRow(row, i, offset);
+
     if (!parsedRow) {
       skipped++;
       continue;
     }
-    
-    // Mapear a interfaz compatible con CostoDirectoRow existente
-    // Usar nombres exactos que espera el ETL (ver server/etl/sot-etl.ts:181-203)
+
     parsed.push({
-      // Campos básicos de identificación
-      'Detalle': parsedRow.persona,  // ETL espera "Detalle", no "Persona"
+      'Detalle': parsedRow.persona,
       'Rol': parsedRow.rol,
       'Mes': parsedRow.mes,
       'Año': parsedRow.año,
       'Tipo de Costo': parsedRow.tipoGasto,
-      'Tipo de Coste': parsedRow.tipoGasto,  // Variante header
-      'Tipo Costo': parsedRow.tipoGasto,  // Variante header
+      'Tipo de Coste': parsedRow.tipoGasto,
+      'Tipo Costo': parsedRow.tipoGasto,
       'Especificación': parsedRow.especificacion,
-      'Especificacion': parsedRow.especificacion,  // Variante sin tilde
-      
-      // Identificadores de cliente y proyecto - INCLUIR TODAS LAS VARIANTES
+      'Especificacion': parsedRow.especificacion,
       'Cliente ID': parsedRow.clienteId,
-      'ID Cliente': parsedRow.clienteId,  // Variante invertida
+      'ID Cliente': parsedRow.clienteId,
       'Cliente': parsedRow.cliente,
       'Tipo de Proyecto': parsedRow.tipoProyecto,
-      'Tipo Proyecto': parsedRow.tipoProyecto,  // Variante sin "de"
-      'TipoProyecto': parsedRow.tipoProyecto,  // Variante sin espacios
+      'Tipo Proyecto': parsedRow.tipoProyecto,
+      'TipoProyecto': parsedRow.tipoProyecto,
       'Proyecto': parsedRow.proyecto,
-      
-      // Horas - usar nombres exactos del ETL
       'Cantidad de horas objetivo': parsedRow.horasObjetivo,
       'Cantidad de horas reales Asana': parsedRow.horasAsana,
       'Cantidad de horas para facturación': parsedRow.horasFact,
-      
-      // Valores monetarios - incluir TODAS las variantes que el ETL busca
       'Valor hora ARS': parsedRow.valorHora,
-      'Valor Hora': parsedRow.valorHora,  // Variante alternativa
-      'Total ARS': parsedRow.costoTotal,  // Variante antigua
-      'Monto Total ARS': parsedRow.costoTotal,  // Nombre real del Excel
-      'Monto Original ARS': parsedRow.costoTotal,  // Columna adicional
-      
-      // FX y USD - incluir TODAS las variantes
+      'Valor Hora': parsedRow.valorHora,
+      'Total ARS': parsedRow.costoTotal,
+      'Monto Total ARS': parsedRow.costoTotal,
+      'Monto Original ARS': parsedRow.costoTotal,
       'Cotización': parsedRow.tipoCambio,
-      'Tipo de cambio': parsedRow.tipoCambio,  // Variante alternativa
-      'Monto Total USD': parsedRow.montoTotalUSD
+      'Tipo de cambio': parsedRow.tipoCambio,
+      'Monto Total USD': parsedRow.montoTotalUSD,
     } as CostoDirectoRow);
   }
-  
+
   console.log(`✅ [Excel Parser] ${parsed.length} filas parseadas exitosamente, ${skipped} saltadas`);
-  
   return parsed;
 }

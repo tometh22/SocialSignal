@@ -116,7 +116,7 @@ import {
   quotationTemplates,
   sheetPersonnelAliases,
 } from "@shared/schema";
-import { fetchValorHora2026, HISTORICAL_RATE_FIELDS_2026 } from "./services/personnelSheetsSync";
+import { fetchValorHora2026, fetchValorHoraForYear, getHistoricalRateFields, HISTORICAL_RATE_FIELDS_2026 } from "./services/personnelSheetsSync";
 import { ActiveProjectsAggregator } from "./domain/projectsActive";import { resolveTimeFilter } from "./services/time";
 import { CoverageCalculator } from "./domain/coverage";
 import { eq, and, or, isNull, isNotNull, desc, sql, asc, gte, lte, inArray } from "drizzle-orm";
@@ -4126,14 +4126,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ==================== SYNC TARIFAS DESDE GOOGLE SHEETS ====================
-  // Lee la pestaña "Valor Hora Real y Estimada" del master, sección 2026, y
-  // devuelve un preview con las filas que matchean (por nombre exacto o por
-  // alias persistido), las que no matchean (para que el usuario las mapee), y
-  // los valores que se aplicarían a cada {mmm}2026HourlyRateARS.
-  app.get("/api/personnel/sheets-sync/preview", requireAuth, async (_req, res) => {
+  // Lee la pestaña "Valor Hora Real y Estimada" del master para el año indicado (default 2026),
+  // devuelve un preview con las filas que matchean (por nombre exacto o alias) y las que no.
+  app.get("/api/personnel/sheets-sync/preview", requireAuth, async (req, res) => {
     try {
+      const year = parseInt(String(req.query.year || 2026));
+      if (isNaN(year) || year < 2024 || year > 2030) {
+        return res.status(400).json({ message: "year inválido (2024-2030)" });
+      }
+      const rateFields = getHistoricalRateFields(year);
+
       const [sheetRows, allPersonnel, aliasRows] = await Promise.all([
-        fetchValorHora2026(),
+        fetchValorHoraForYear(year),
         db.select().from(personnel).orderBy(personnel.name),
         db.select().from(sheetPersonnelAliases),
       ]);
@@ -4171,9 +4175,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         const proposedChanges: PreviewRow["proposedChanges"] = [];
         if (match && "personnelId" in match) {
-          const person = allPersonnel.find((p) => p.id === match.personnelId);
+          const person = allPersonnel.find((p) => p.id === (match as any).personnelId);
           if (person) {
-            for (const field of HISTORICAL_RATE_FIELDS_2026) {
+            for (const field of rateFields) {
               const next = row.monthlyRates[field.replace("HourlyRateARS", "")];
               if (next === undefined) continue;
               const current = (person as any)[field] as number | null;
@@ -4193,6 +4197,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       res.json({
+        year,
         matched,
         unmatched,
         availablePersonnel: allPersonnel.map((p) => ({ id: p.id, name: p.name })),
@@ -4203,15 +4208,95 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Aplica el sync. Body: { aliases?: { [sheetName]: number | null }, applyTo: string[] }
+  // Helper: apply rate rows to personnelHistoricalCosts (and legacy personnel columns) for a given year.
+  async function applyRateRows(
+    sheetRows: { sheetName: string; monthlyRates: Record<string, number> }[],
+    applyToSet: Set<string> | null, // null = apply all matched
+    year: number,
+    aliasBySheetName: Map<string, number | null>,
+    personnelByName: Map<string, number>,
+  ): Promise<{ updatedPersonnel: number; cellsUpdated: number; skipped: string[] }> {
+    const rateFields = getHistoricalRateFields(year);
+    const MONTH_NUM: Record<string, number> = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12 };
+    let updatedPersonnel = 0;
+    let cellsUpdated = 0;
+    const skipped: string[] = [];
+
+    for (const row of sheetRows) {
+      if (applyToSet !== null && !applyToSet.has(row.sheetName)) continue;
+
+      let pid: number | null = null;
+      if (aliasBySheetName.has(row.sheetName)) {
+        pid = aliasBySheetName.get(row.sheetName) ?? null;
+      } else {
+        pid = personnelByName.get(row.sheetName.trim().toLowerCase()) ?? null;
+      }
+      if (pid === null) {
+        skipped.push(row.sheetName);
+        continue;
+      }
+
+      const updates: Record<string, number> = {};
+      for (const field of rateFields) {
+        const next = row.monthlyRates[field.replace("HourlyRateARS", "")];
+        if (next === undefined) continue;
+        updates[field] = next;
+      }
+      if (Object.keys(updates).length === 0) continue;
+
+      await db.update(personnel).set(updates as any).where(eq(personnel.id, pid));
+
+      for (const [field, rate] of Object.entries(updates)) {
+        const m = field.match(/^([a-z]{3})(\d{4})HourlyRateARS$/);
+        if (!m) continue;
+        const month = MONTH_NUM[m[1]];
+        const yr = parseInt(m[2]);
+        if (!month || !yr) continue;
+
+        const existing = await db.select({ id: personnelHistoricalCosts.id })
+          .from(personnelHistoricalCosts)
+          .where(and(
+            eq(personnelHistoricalCosts.personnelId, pid),
+            eq(personnelHistoricalCosts.year, yr),
+            eq(personnelHistoricalCosts.month, month),
+            eq(personnelHistoricalCosts.isActive, true),
+          ))
+          .limit(1);
+
+        if (existing.length > 0) {
+          await db.update(personnelHistoricalCosts)
+            .set({ hourlyRateARS: String(rate), updatedAt: new Date() })
+            .where(eq(personnelHistoricalCosts.id, existing[0].id));
+        } else {
+          await db.insert(personnelHistoricalCosts).values({
+            personnelId: pid,
+            year: yr,
+            month,
+            hourlyRateARS: String(rate),
+            adjustmentReason: 'Sync desde Valor Hora Real y Estimada',
+          });
+        }
+      }
+
+      updatedPersonnel++;
+      cellsUpdated += Object.keys(updates).length;
+    }
+    return { updatedPersonnel, cellsUpdated, skipped };
+  }
+
+  // Aplica el sync. Body: { aliases?: { [sheetName]: number | null }, applyTo: string[], year?: number }
   // - aliases: nuevos mapeos a persistir (number = personnel id; null = ignorar para siempre).
   // - applyTo: lista de sheetNames cuyas tarifas se van a escribir en personnel.
+  // - year: año a sincronizar (default 2026).
   app.post("/api/personnel/sheets-sync/apply", requireAuth, async (req, res) => {
     try {
+      const year = parseInt(String(req.body?.year || 2026));
+      if (isNaN(year) || year < 2024 || year > 2030) {
+        return res.status(400).json({ message: "year inválido (2024-2030)" });
+      }
       const aliases = (req.body?.aliases ?? {}) as Record<string, number | null>;
       const applyTo = new Set<string>(Array.isArray(req.body?.applyTo) ? req.body.applyTo : []);
 
-      // Persistir aliases nuevos / actualizados.
       for (const [sheetName, personnelId] of Object.entries(aliases)) {
         await db
           .insert(sheetPersonnelAliases)
@@ -4222,85 +4307,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
       }
 
-      const sheetRows = await fetchValorHora2026();
-      const aliasRows = await db.select().from(sheetPersonnelAliases);
+      const [sheetRows, aliasRows, allPersonnel] = await Promise.all([
+        fetchValorHoraForYear(year),
+        db.select().from(sheetPersonnelAliases),
+        db.select().from(personnel),
+      ]);
       const aliasBySheetName = new Map<string, number | null>();
       for (const a of aliasRows) aliasBySheetName.set(a.sheetName, a.personnelId);
-      const allPersonnel = await db.select().from(personnel);
       const personnelByName = new Map<string, number>();
       for (const p of allPersonnel) personnelByName.set(p.name.trim().toLowerCase(), p.id);
 
-      let updatedPersonnel = 0;
-      let cellsUpdated = 0;
-      const skipped: string[] = [];
-
-      for (const row of sheetRows) {
-        if (!applyTo.has(row.sheetName)) continue;
-
-        let pid: number | null = null;
-        if (aliasBySheetName.has(row.sheetName)) {
-          pid = aliasBySheetName.get(row.sheetName) ?? null;
-        } else {
-          pid = personnelByName.get(row.sheetName.trim().toLowerCase()) ?? null;
-        }
-        if (pid === null) {
-          skipped.push(row.sheetName);
-          continue;
-        }
-
-        const updates: Record<string, number> = {};
-        for (const field of HISTORICAL_RATE_FIELDS_2026) {
-          const next = row.monthlyRates[field.replace("HourlyRateARS", "")];
-          if (next === undefined) continue;
-          updates[field] = next;
-        }
-        if (Object.keys(updates).length === 0) continue;
-
-        await db.update(personnel).set(updates as any).where(eq(personnel.id, pid));
-
-        // Dual-write: mantener personnel_historical_costs como fuente normalizada
-        // (las columnas mensuales de personnel quedan como legacy hasta el drop)
-        const MONTH_NUM: Record<string, number> = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12 };
-        for (const [field, rate] of Object.entries(updates)) {
-          const m = field.match(/^([a-z]{3})(\d{4})HourlyRateARS$/);
-          if (!m) continue;
-          const month = MONTH_NUM[m[1]];
-          const year = parseInt(m[2]);
-          if (!month || !year) continue;
-
-          const existing = await db.select({ id: personnelHistoricalCosts.id })
-            .from(personnelHistoricalCosts)
-            .where(and(
-              eq(personnelHistoricalCosts.personnelId, pid),
-              eq(personnelHistoricalCosts.year, year),
-              eq(personnelHistoricalCosts.month, month),
-              eq(personnelHistoricalCosts.isActive, true),
-            ))
-            .limit(1);
-
-          if (existing.length > 0) {
-            await db.update(personnelHistoricalCosts)
-              .set({ hourlyRateARS: String(rate), updatedAt: new Date() })
-              .where(eq(personnelHistoricalCosts.id, existing[0].id));
-          } else {
-            await db.insert(personnelHistoricalCosts).values({
-              personnelId: pid,
-              year,
-              month,
-              hourlyRateARS: String(rate),
-              adjustmentReason: 'Sync desde Valor Hora Real y Estimada',
-            });
-          }
-        }
-
-        updatedPersonnel += 1;
-        cellsUpdated += Object.keys(updates).length;
-      }
-
-      res.json({ updatedPersonnel, cellsUpdated, skipped });
+      const result = await applyRateRows(sheetRows, applyTo, year, aliasBySheetName, personnelByName);
+      res.json({ year, ...result });
     } catch (error) {
       console.error("Error en sheets-sync apply:", error);
       res.status(500).json({ message: (error as Error).message || "Error aplicando sync" });
+    }
+  });
+
+  // Auto-apply: sync all matched personnel rates for one or more years without requiring user confirmation.
+  // Body: { years?: number[] }  — default [currentYear - 1, currentYear, currentYear + 1]
+  app.post("/api/personnel/sheets-sync/auto-apply", requireAuth, async (req, res) => {
+    try {
+      const now = new Date();
+      const currentYear = now.getFullYear();
+      const rawYears: number[] = Array.isArray(req.body?.years)
+        ? req.body.years.map(Number).filter((y: number) => y >= 2024 && y <= 2030)
+        : [currentYear - 1, currentYear, currentYear + 1];
+
+      const [aliasRows, allPersonnel] = await Promise.all([
+        db.select().from(sheetPersonnelAliases),
+        db.select().from(personnel),
+      ]);
+      const aliasBySheetName = new Map<string, number | null>();
+      for (const a of aliasRows) aliasBySheetName.set(a.sheetName, a.personnelId);
+      const personnelByName = new Map<string, number>();
+      for (const p of allPersonnel) personnelByName.set(p.name.trim().toLowerCase(), p.id);
+
+      const summary: Record<number, { updatedPersonnel: number; cellsUpdated: number; skipped: string[]; error?: string }> = {};
+      for (const year of rawYears) {
+        try {
+          const sheetRows = await fetchValorHoraForYear(year);
+          const r = await applyRateRows(sheetRows, null, year, aliasBySheetName, personnelByName);
+          summary[year] = r;
+        } catch (err) {
+          summary[year] = { updatedPersonnel: 0, cellsUpdated: 0, skipped: [], error: String(err) };
+        }
+      }
+
+      const totalUpdated = Object.values(summary).reduce((s, r) => s + r.updatedPersonnel, 0);
+      const totalCells = Object.values(summary).reduce((s, r) => s + r.cellsUpdated, 0);
+      console.log(`[sheets-sync/auto-apply] years=${rawYears.join(',')} → ${totalUpdated} personnel, ${totalCells} cells`);
+      res.json({ years: rawYears, summary, totalUpdated, totalCells });
+    } catch (error) {
+      console.error("Error en sheets-sync auto-apply:", error);
+      res.status(500).json({ message: (error as Error).message || "Error en auto-apply" });
     }
   });
 
@@ -14607,7 +14668,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // 3. Execute SoT ETL with options
       const result = await executeSoTETL(costosRows, rcRows, options);
-      
+
+      // 4. Auto-sync personnel rates from "Valor Hora Real y Estimada" (fire-and-forget)
+      if (!options.dryRun) {
+        const now2 = new Date();
+        const cy = now2.getFullYear();
+        Promise.all([
+          db.select().from(sheetPersonnelAliases),
+          db.select().from(personnel),
+        ]).then(([aliasRows2, allPersonnel2]) => {
+          const aliasBySheetName2 = new Map<string, number | null>();
+          for (const a of aliasRows2) aliasBySheetName2.set(a.sheetName, a.personnelId);
+          const personnelByName2 = new Map<string, number>();
+          for (const p of allPersonnel2) personnelByName2.set(p.name.trim().toLowerCase(), p.id);
+
+          const years = [cy - 1, cy];
+          return Promise.all(years.map(async (yr) => {
+            try {
+              const rows2 = await fetchValorHoraForYear(yr);
+              const r = await applyRateRows(rows2, null, yr, aliasBySheetName2, personnelByName2);
+              console.log(`[sot-etl] rates sync ${yr}: ${r.updatedPersonnel} personnel, ${r.cellsUpdated} cells`);
+            } catch (e) {
+              console.warn(`[sot-etl] rates sync ${yr} failed:`, e);
+            }
+          }));
+        }).catch((e) => console.warn('[sot-etl] rates pre-fetch failed:', e));
+      }
+
       res.json({
         success: result.success,
         summary: {
