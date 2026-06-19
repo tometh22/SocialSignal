@@ -2272,7 +2272,6 @@ export class DatabaseStorage implements IStorage {
 
   async getProjectCostSummary(projectId: number, dateRangeOrFilter?: { startDate: Date; endDate: Date } | string): Promise<any> {
     try {
-      console.log(`🔍 getProjectCostSummary called with projectId: ${projectId}, filter:`, dateRangeOrFilter);
       const project = await this.getActiveProject(projectId);
       if (!project) return null;
 
@@ -2294,10 +2293,6 @@ export class DatabaseStorage implements IStorage {
           const entryDate = new Date(entry.date);
           return entryDate >= dateRange.startDate && entryDate <= dateRange.endDate;
         });
-        // DEFENSIVE LOGGING: Guard para evitar errores
-        const startIso = dateRange.startDate?.toISOString?.() ?? 'unknown';
-        const endIso = dateRange.endDate?.toISOString?.() ?? 'unknown';
-        console.log(`📊 Filtered time entries for cost summary: ${entries.length} entries in range ${startIso} to ${endIso}`);
       }
       
       // NUEVA INTEGRACIÓN: Obtener costos directos del Excel MAESTRO con filtros temporales
@@ -2317,15 +2312,9 @@ export class DatabaseStorage implements IStorage {
           }
           const costDate = new Date(`${cost.año}-${monthNumber}-15`); // Día 15 del mes
           const isInRange = costDate >= dateRange.startDate && costDate <= dateRange.endDate;
-          if (projectId === 39) {
-            console.log(`🔍 Excel cost filter: ${cost.persona} ${cost.mes} ${cost.año} -> Month ${monthNumber} -> ${costDate.toISOString()} -> In range: ${isInRange}`);
-          }
           return isInRange;
         });
-        console.log(`📊 Filtered Excel direct costs for cost summary: ${excelDirectCosts.length} costs in range`);
       }
-      
-      console.log(`💰 Direct costs from Excel MAESTRO for project ${projectId}: ${excelDirectCosts.length} records (filtered: ${dateRange ? 'YES' : 'NO'})`);
       
       // Obtener personal involucrado en el proyecto (timeEntries + directCosts)
       const timeEntryPersonnelIds = Array.from(new Set(entries.map(e => e.personnelId)));
@@ -2352,7 +2341,6 @@ export class DatabaseStorage implements IStorage {
         if (montoUSD > 0) {
           directCostsFromExcel += montoUSD;
           
-          console.log(`💰 Excel MAESTRO cost: ${directCost.persona} - ${directCost.mes} ${directCost.año} = $${montoUSD} USD`);
           
           // Crear time entry sintético para integrar con el sistema existente
           let monthNumber;
@@ -2393,11 +2381,6 @@ export class DatabaseStorage implements IStorage {
         }
       }
 
-      console.log(`💰 Direct costs calculation for project ${projectId}: { 
-        directCostsFromExcel: ${directCostsFromExcel}, 
-        directCostsCount: ${excelDirectCosts.length},
-        syntheticTimeEntries: ${syntheticTimeEntries.length}
-      }`);
 
       // PASO 2: Combinar time entries reales con los sintéticos del Excel MAESTRO
       const allEntries = [...entries, ...syntheticTimeEntries];
@@ -2462,13 +2445,6 @@ export class DatabaseStorage implements IStorage {
       totalRealCost = Array.from(costByPersonMonth.values()).reduce((sum, cost) => sum + cost, 0);
       operationalCost = Array.from(operationalByPersonMonth.values()).reduce((sum, cost) => sum + cost, 0);
       
-      console.log(`💰 Direct costs calculation for project ${projectId}: {
-        timeEntriesCost: ${totalRealCost - directCostsFromExcel},
-        directCostsFromExcel: ${directCostsFromExcel},
-        totalCombinedCost: ${totalRealCost},
-        directCostsCount: ${excelDirectCosts.length},
-        usingUSDConversion: true
-      }`);
 
       const budget = parseFloat(String(project.deliverableBudget || 0));
 
@@ -2514,9 +2490,6 @@ export class DatabaseStorage implements IStorage {
         })
         .filter(person => person.realCost > 0 || person.operationalCost > 0 || person.hours > 0);
 
-      if (projectId === 39) {
-        console.log(`🔍 DEBUG costByPerson for project 39 (traditional personnel):`, costByPerson.map(p => ({ name: p.name, hours: p.hours, realCost: p.realCost })));
-      }
 
       // CORRECCIÓN CRÍTICA: Forzar inclusión de datos del Excel MAESTRO para proyectos filtrados
       const excelOnlyPersonnel = excelDirectCosts
@@ -2543,16 +2516,12 @@ export class DatabaseStorage implements IStorage {
           return acc;
         }, [] as any[]);
       
-      if (projectId === 39 && dateRange) {
-        console.log(`🔍 FORCED DEBUG - Excel personnel for project 39:`, excelOnlyPersonnel.map(p => ({ name: p.name, hours: p.hours, realCost: p.realCost })));
-      }
 
       // CORRECCIÓN CRÍTICA: Combinar costByPerson con excelOnlyPersonnel SIN DUPLICADOS
       for (const excelPerson of excelOnlyPersonnel) {
         const existingTraditional = costByPerson.find(p => p.name === excelPerson.name);
         if (existingTraditional) {
           // CORRECCIÓN CRÍTICA: Para rankings, usar SOLO datos del Excel MAESTRO (más exactos)
-          console.log(`🔗 Reemplazando datos tradicionales con Excel MAESTRO: ${excelPerson.name}`);
           existingTraditional.realCost = excelPerson.realCost; // USAR SOLO Excel MAESTRO
           existingTraditional.operationalCost = excelPerson.operationalCost; // USAR SOLO Excel MAESTRO
           existingTraditional.hours = excelPerson.hours; // USAR SOLO Excel MAESTRO
@@ -2567,20 +2536,11 @@ export class DatabaseStorage implements IStorage {
         }
       }
       
-      console.log(`🔍 DEBUG costByPerson for project ${projectId}:`, {
-        traditionalPersonnel: costByPerson.length - excelOnlyPersonnel.length,
-        excelOnlyPersonnel: excelOnlyPersonnel.length,
-        totalCostByPerson: costByPerson.length,
-        excelDirectCostsCount: excelDirectCosts.length,
-        allPersonnelCount: allPersonnel.length,
-        dateRangeApplied: !!dateRange
-      });
 
       // Calcular horas totales (time entries + Excel MAESTRO)
       const totalWorkedHours = entries.reduce((sum, entry) => sum + entry.hours, 0) + 
                               excelDirectCosts.reduce((sum, dc) => sum + dc.horasRealesAsana, 0);
 
-      console.log(`💰 Proyecto ${projectId} - Real: $${totalRealCost.toFixed(2)} | Operacional: $${operationalCost.toFixed(2)} | Presupuesto: $${budget.toFixed(2)} | Horas: ${totalWorkedHours.toFixed(1)}`);
 
       return {
         projectId,

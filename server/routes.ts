@@ -10984,7 +10984,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Aprobar registro rápido
+  // Aprobar registro rápido — aprueba y materializa en time_entries
   app.post("/api/quick-time-entries/:id/approve", requireAuth, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
@@ -10992,8 +10992,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid entry ID" });
       }
 
+      const [qte] = await db.select().from(quickTimeEntries).where(eq(quickTimeEntries.id, id)).limit(1);
+      if (!qte) return res.status(404).json({ message: "Quick time entry not found" });
+
       const entry = await storage.approveQuickTimeEntry(id, req.user?.id || 1);
+
+      // Materialize into time_entries so analytics pick it up
+      const details = await storage.getQuickTimeEntryDetails(id);
+      const entryDate = qte.startDate;
+      for (const detail of details) {
+        const person = await storage.getPersonnelById(detail.personnelId);
+        if (!person) continue;
+        await storage.createTimeEntry({
+          projectId: qte.projectId,
+          personnelId: detail.personnelId,
+          date: entryDate,
+          hours: detail.hours,
+          hourlyRateAtTime: detail.hourlyRate,
+          totalCost: detail.totalCost,
+          description: detail.description || qte.periodName,
+          entryType: 'hours',
+          billable: true,
+          approved: true,
+          approvedBy: req.user?.id || null,
+          approvedDate: new Date(),
+        } as any);
+      }
+
       res.json(entry);
+      triggerLaborRebuild(entryDate);
     } catch (error) {
       console.error("Error approving quick time entry:", error);
       res.status(500).json({ message: "Failed to approve quick time entry" });
