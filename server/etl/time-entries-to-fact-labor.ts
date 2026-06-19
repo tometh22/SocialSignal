@@ -11,7 +11,7 @@ import {
 } from '@shared/schema';
 import { eq, and, gte, lte, or, isNull } from 'drizzle-orm';
 import { canon, generateProjectKey } from '../utils/normalize';
-import { ensurePeriod, computeAggProjectMonth } from './sot-etl';
+import { ensurePeriod } from './sot-etl';
 
 export interface BuildFactLaborResult {
   periodKey: string;
@@ -35,6 +35,21 @@ interface Aggregate {
   rateCount: number;
 }
 
+/**
+ * Reads the app-mode cutover date from systemConfig.
+ * Returns the YYYY-MM string stored in the 'description' field of the
+ * 'app_mode_cutover_date' row, or null if not set.
+ */
+export async function getCutoverDate(): Promise<string | null> {
+  const row = await db
+    .select({ description: systemConfig.description })
+    .from(systemConfig)
+    .where(eq(systemConfig.configKey, 'app_mode_cutover_date'))
+    .limit(1)
+    .then((r) => r[0]);
+  return row?.description ?? null;
+}
+
 export async function buildFactLaborFromTimeEntries(
   periodKey: string,
   force?: boolean,
@@ -44,6 +59,14 @@ export async function buildFactLaborFromTimeEntries(
 
   if (!/^\d{4}-\d{2}$/.test(periodKey)) {
     throw new Error(`Invalid periodKey: ${periodKey}. Expected YYYY-MM.`);
+  }
+
+  // Cutover date guard: refuse to overwrite periods before the cutover date
+  const cutoverDate = await getCutoverDate();
+  if (cutoverDate && periodKey < cutoverDate) {
+    throw new Error(
+      `Period ${periodKey} is before cutover date ${cutoverDate}. Set cutover date earlier or use Excel mode for historical periods.`,
+    );
   }
 
   const [yearStr, monthStr] = periodKey.split('-');
@@ -231,17 +254,6 @@ export async function buildFactLaborFromTimeEntries(
       const msg = `Error upserting project=${agg.projectId} person=${agg.personnelId}: ${String(err)}`;
       errors.push(msg);
       console.error('[time-entries-to-fact-labor]', msg);
-    }
-  }
-
-  // Update agg_project_month for every affected project
-  const affectedProjects = new Set<number>();
-  for (const agg of aggregates.values()) affectedProjects.add(agg.projectId);
-  for (const projectId of affectedProjects) {
-    try {
-      await computeAggProjectMonth(projectId, periodKey);
-    } catch (err) {
-      errors.push(`agg_project_month update failed for project=${projectId}: ${String(err)}`);
     }
   }
 
