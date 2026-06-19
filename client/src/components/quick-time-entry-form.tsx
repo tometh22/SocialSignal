@@ -109,21 +109,9 @@ export default function QuickTimeEntryForm({ projectId, onSuccess, onCancel }: Q
   }, [watchedStartDate, watchedEndDate, form]);
 
   // Obtener equipo base del proyecto
-  const { data: baseTeam = [], isLoading: loadingTeam } = useQuery({
+  const { data: baseTeam = [], isLoading: loadingTeam } = useQuery<{ personnelId?: number; roleId?: number | null; hourlyRate?: number; personnel?: { name?: string }; role?: { name?: string } }[]>({
     queryKey: [`/api/projects/${projectId}/base-team`],
     enabled: !!projectId,
-    onSuccess: (data) => {
-      console.log('🔍 Base team loaded:', data);
-      console.log('🔍 Team members count:', data?.length || 0);
-      if (Array.isArray(data)) {
-        data.forEach((member, index) => {
-          console.log(`  ${index + 1}. ${member.personnel?.name} - ${member.role?.name} - $${member.hourlyRate}`);
-        });
-      }
-    },
-    onError: (error) => {
-      console.error('❌ Error loading base team:', error);
-    }
   });
 
   // Crear entrada rápida de tiempo
@@ -203,7 +191,7 @@ export default function QuickTimeEntryForm({ projectId, onSuccess, onCancel }: Q
     const promises = validEntries.map(([personnelId, data]) => {
       const teamMember = Array.isArray(baseTeam) ? baseTeam.find((member: any) => member.personnelId === parseInt(personnelId)) : null;
       if (teamMember) {
-        const effectiveRate = data.customRate !== undefined ? data.customRate : teamMember.hourlyRate;
+        const effectiveRate = data.customRate !== undefined ? data.customRate : (teamMember.hourlyRate ?? 0);
         return addTimeDetail.mutateAsync({
           quickTimeEntryId: currentQuickEntryId,
           data: {
@@ -250,7 +238,7 @@ export default function QuickTimeEntryForm({ projectId, onSuccess, onCancel }: Q
     return Object.entries(teamHours).reduce((sum, [personnelId, data]) => {
       const teamMember = baseTeam.find((member: any) => member.personnelId === parseInt(personnelId));
       if (teamMember && data.hours > 0) {
-        const effectiveRate = data.customRate || teamMember.hourlyRate;
+        const effectiveRate = data.customRate || teamMember.hourlyRate || 0;
         return sum + (data.hours * effectiveRate);
       }
       return sum;

@@ -162,7 +162,7 @@ const CompactTimeForm: React.FC<{
   });
 
   // Query para obtener datos completos del proyecto (equipo cotizado)
-  const { data: projectData } = useQuery({
+  const { data: projectData } = useQuery<{ quotation?: { team?: { personnelId: number; personnelName: string }[] } }>({
     queryKey: [`/api/projects/${projectId}/complete-data`],
     enabled: projectId > 0,
   });
@@ -639,13 +639,20 @@ const TimeEntries: React.FC = () => {
     setEditDialogOpen(true);
   };
 
+  interface ActiveProject {
+    id: number;
+    quotationId?: number | null;
+    quotation?: { projectName?: string; clientName?: string };
+  }
+  interface QuotationTeamMember { personnelId: number; personnelName?: string }
+
   // Queries
-  const { data: project, isLoading: projectLoading } = useQuery({
+  const { data: project, isLoading: projectLoading } = useQuery<ActiveProject>({
     queryKey: [`/api/active-projects/${projectId}`],
     enabled: projectId > 0
   });
 
-  const { data: timeEntries, isLoading } = useQuery({
+  const { data: timeEntries, isLoading } = useQuery<TimeEntry[]>({
     queryKey: [`/api/time-entries/project/${projectId}`],
     enabled: projectId > 0
   });
@@ -656,12 +663,12 @@ const TimeEntries: React.FC = () => {
     }
   }, [timeEntries]);
 
-  const { data: personnel } = useQuery({
+  const { data: personnel } = useQuery<Personnel[]>({
     queryKey: ['/api/personnel'],
   });
 
   // Query para obtener el equipo original de la cotización
-  const { data: quotationTeam } = useQuery({
+  const { data: quotationTeam } = useQuery<QuotationTeamMember[]>({
     queryKey: [`/api/quotations/${project?.quotationId}/team`],
     enabled: !!project?.quotationId,
   });
@@ -669,8 +676,8 @@ const TimeEntries: React.FC = () => {
   // Función para detectar personal no cotizado
   const detectUncotizedPersonnel = () => {
     if (!timeEntries || !quotationTeam || !personnel) return [];
-    
-    const uncotizedPersonnel = [];
+
+    const uncotizedPersonnel: Personnel[] = [];
     
     // Obtener IDs de personal original de la cotización
     const originalPersonnelIds = quotationTeam.map(member => member.personnelId);

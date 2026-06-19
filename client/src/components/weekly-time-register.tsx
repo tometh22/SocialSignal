@@ -432,7 +432,7 @@ export default function WeeklyTimeRegister({ projectId, onSuccess, onCancel }: W
           
           return entryData;
         })
-        .filter(Boolean);
+        .filter((e): e is NonNullable<typeof e> => e !== null);
 
       if (entries.length === 0) {
         toast({
@@ -803,7 +803,7 @@ export default function WeeklyTimeRegister({ projectId, onSuccess, onCancel }: W
                           <div className="flex items-center gap-3">
                             <Avatar className="w-8 h-8">
                               <AvatarFallback className="bg-blue-600 text-white text-xs font-semibold">
-                                {member.name ? member.name.split(' ').map(n => n[0]).join('').toUpperCase() : '?'}
+                                {member.name ? member.name.split(' ').map((n: string) => n[0]).join('').toUpperCase() : '?'}
                               </AvatarFallback>
                             </Avatar>
                             <div>
