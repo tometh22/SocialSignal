@@ -585,6 +585,7 @@ const ProjectAnalyticsView: React.FC = () => {
       return {
         budgetRisk: 0,
         scheduleRisk: 0,
+        activeAlerts: 0,
       };
     }
 
@@ -600,9 +601,12 @@ const ProjectAnalyticsView: React.FC = () => {
       ? Math.max(0, Math.min(100, (1 - (progressPercentage / expectedProgress)) * 100))
       : 0;
 
+    const activeAlerts = [budgetRisk, scheduleRisk].filter(r => r > 80).length;
+
     return {
       budgetRisk,
       scheduleRisk,
+      activeAlerts,
     };
   }, [costSummary, projectMetrics]);
 

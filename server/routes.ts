@@ -1548,7 +1548,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const dateRange = parseTimeFilter(timeFilter);
       const filteredCosts = allCosts?.filter(cost => {
         const costDate = new Date(cost.año, getMonthNumber(cost.mes) - 1, 1);
-        const inRange = costDate >= dateRange.startDate && costDate <= dateRange.endDate;
+        const inRange = costDate >= new Date(dateRange.start) && costDate <= new Date(dateRange.end);
         
         console.log(`💰 Costo: ${cost.cliente || 'Unknown'} - ${cost.mes} ${cost.año} = $${cost.montoTotalUSD} USD, En rango: ${inRange}`);
         return inRange;
@@ -1564,8 +1564,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         projectId,
         timeFilter,
         dateRange: {
-          start: dateRange?.startDate?.toISOString() || 'N/A',
-          end: dateRange?.endDate?.toISOString() || 'N/A'
+          start: new Date(dateRange.start).toISOString() || 'N/A',
+          end: new Date(dateRange.end).toISOString() || 'N/A'
         },
         allCosts: allCosts?.length || 0,
         filteredCosts: filteredCosts.length,
@@ -4876,7 +4876,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json({
         quotation: { totalAmount: quotation.totalAmount, baseCost: quotedCost, quotedHours },
-        project: { id: project.id, name: project.projectName || project.id },
+        project: { id: project.id, name: project.subprojectName || project.id },
         profitability: { realHours, realCost, quotedHours, quotedCost, marginDelta: parseFloat(margin.toFixed(1)) },
       });
     } catch (e) {
@@ -10704,7 +10704,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             name: personnelData?.name || 'Sin nombre',
             hours: workedHours, // Real worked hours from time entries
             estimatedHours: member.hours || member.estimatedHours, // Original estimated hours
-            hourlyRate: member.rate || member.hourlyRate // Hourly rate
+            hourlyRate: member.rate || member.hourlyRate, // Hourly rate
+            cost: (member as any).cost ?? (member.estimatedHours * member.hourlyRate)
           };
           
           console.log(`🚀 ENVIANDO AL FRONTEND - ${personnelData?.name}:`, {
@@ -12143,279 +12144,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to generate deviation analysis" });
     }
   });*/
-
-  // DUPLICATE: recommendations endpoint (dead code — first definition at ~10393 is the active one)
-  app.get('/api/projects/:id/recommendations-dup1', requireAuth, async (req, res) => {
-    try {
-      const projectId = parseInt(req.params.id);
-      const { startDate, endDate, timeFilter } = req.query;
-
-      console.log(`🔍🔍🔍 RECOMMENDATIONS CALLED - ProjectId: ${projectId}, TimeFilter: ${timeFilter}, StartDate: ${startDate}, EndDate: ${endDate}`);
-      
-      const project = await storage.getActiveProject(projectId);
-      if (!project) {
-        return res.status(404).json({ message: "Project not found" });
-      }
-
-      const quotation = await storage.getQuotation(project.quotationId);
-      const teamMembers = await storage.getQuotationTeamMembers(project.quotationId);
-      
-      // Construir condiciones de filtro
-      const whereConditions = [eq(timeEntries.projectId, projectId)];
-      
-      // Procesar timeFilter o usar startDate/endDate
-      let filterStartDate: string | undefined;
-      let filterEndDate: string | undefined;
-      
-      if (timeFilter) {
-        const filterDates = getDateRangeForFilter(timeFilter);
-        if (filterDates) {
-          filterStartDate = filterDates.startDate;
-          filterEndDate = filterDates.endDate;
-          periodKey = `${filterStartDate.getFullYear()}-${String(filterStartDate.getMonth() + 1).padStart(2, '0')}`;
-        }
-        console.log(`📅 TimeFilter resolved: ${timeFilter} → ${filterStartDate} to ${filterEndDate}`);
-      } else if (startDate && endDate) {
-        filterStartDate = new Date(startDate as string);
-        filterEndDate = new Date(endDate as string);
-        periodKey = `${filterStartDate.getFullYear()}-${String(filterStartDate.getMonth() + 1).padStart(2, '0')}`;
-        console.log(`📅 StartDate/EndDate resolved: ${filterStartDate} to ${filterEndDate}`);
-      }
-
-      // 🎯 PASO 2: Obtener datos del Excel MAESTRO (fuente única)
-      let excelCosts = await storage.getDirectCostsByProject(projectId);
-      console.log(`💰 Retrieved ${excelCosts.length} Excel MAESTRO records`);
-
-      // Filtrar por período si especificado
-      if (filterStartDate && filterEndDate) {
-        excelCosts = excelCosts.filter(cost => {
-          let monthNumber;
-          if (cost.mes.includes(' ')) {
-            monthNumber = parseInt(cost.mes.substring(0, 2));
-          } else {
-            // Simple month mapping for cost.mes
-            const monthMap: { [key: string]: number } = {
-              'ene': 1, 'feb': 2, 'mar': 3, 'abr': 4, 'may': 5, 'jun': 6,
-              'jul': 7, 'ago': 8, 'sep': 9, 'oct': 10, 'nov': 11, 'dic': 12
-            };
-            monthNumber = monthMap[cost.mes.toLowerCase()] || 1;
-          }
-          const costDate = new Date(cost.año, monthNumber - 1, 15);
-          return costDate >= filterStartDate && costDate <= filterEndDate;
-        });
-        console.log(`💰 Filtered to ${excelCosts.length} records for period ${periodKey}`);
-      }
-
-      if (excelCosts.length === 0) {
-        console.log(`⚠️ No Excel MAESTRO data found for period, returning empty`);
-        return res.json({
-          summary: {
-            activeMembers: 0,
-            totalHours: 0,
-            efficiencyPct: 0,
-            teamCost: 0,
-            basis: basis as string,
-            period: periodKey
-          },
-          deviations: []
-        });
-      }
-
-      // 🎯 PASO 3: Agregar por persona usando lógica K, L, M
-      const personMap = new Map();
-      const defaultFxRate = 1350; // Fallback FX rate
-
-      for (const cost of excelCosts) {
-        const personKey = cost.persona;
-        if (!personMap.has(personKey)) {
-          personMap.set(personKey, {
-            personnelName: personKey,
-            K: 0,    // Horas objetivo
-            L: 0,    // Horas reales
-            M: 0,    // Horas facturables
-            valorHoraARS: 0,
-            fxRate: 0,
-            records: []
-          });
-        }
-
-        const person = personMap.get(personKey);
-        person.K += cost.horasObjetivo || 0;
-        person.L += cost.horasRealesAsana || 0;
-        person.M += cost.horasParaFacturacion || 0;
-        person.valorHoraARS += (cost.valorHoraPersona || 0);
-        person.fxRate = cost.tipoCambio || defaultFxRate;
-        person.records.push(cost);
-      }
-
-      // 🎯 PASO 4: Calcular desviaciones con rateUSD
-      const deviations = [];
-      let totalActiveMembers = 0;
-      let totalHours = 0;
-      let totalTeamCost = 0;
-      let totalEfficiencyNum = 0;
-      let totalEfficiencyDen = 0;
-
-      for (const [personKey, person] of personMap.entries()) {
-        // Solo procesar miembros con actividad real
-        if (person.L === 0 && person.M === 0) continue;
-
-        totalActiveMembers++;
-
-        // Calcular rateUSD usando Excel MAESTRO o tarifas históricas como fallback
-        let rateUSD = 0;
-        if (person.records.length > 0) {
-          let totalWeightedRate = 0;
-          let totalWeight = 0;
-          
-          for (const record of person.records) {
-            const weight = record.horasRealesAsana || 1;
-            const recordRateARS = record.valorHoraPersona || 0;
-            const fxRate = record.tipoCambio || defaultFxRate;
-            
-            if (recordRateARS > 0) {
-              const recordRateUSD = recordRateARS / fxRate;
-              totalWeightedRate += recordRateUSD * weight;
-              totalWeight += weight;
-              console.log(`💰 Rate from Excel for ${personKey}: ${recordRateARS} ARS / ${fxRate} FX = ${recordRateUSD} USD`);
-            }
-          }
-          
-          if (totalWeight > 0) {
-            rateUSD = totalWeightedRate / totalWeight;
-            console.log(`💰 Final rateUSD from Excel for ${personKey}: ${rateUSD} USD/hour`);
-          } else {
-            // Fallback: usar costo real dividido por horas para calcular tarifa
-            const totalCostUSD = person.records.reduce((sum, record) => {
-              const montoTotalUSD = record.montoTotalUSD || 0;
-              const costoTotal = record.costoTotal || 0;
-              const fxRate = record.tipoCambio || defaultFxRate;
-              
-              if (montoTotalUSD > 0) {
-                return sum + montoTotalUSD;
-              } else {
-                return sum + (costoTotal / fxRate);
-              }
-            }, 0);
-            
-            const totalHours = person.L > 0 ? person.L : person.M;
-            rateUSD = totalHours > 0 ? totalCostUSD / totalHours : 0;
-            console.log(`💰 Calculated rateUSD for ${personKey}: $${totalCostUSD} / ${totalHours}h = ${rateUSD} USD/hour`);
-          }
-        }
-
-        // Calcular costos según basis ECON: usar costos directos del Excel MAESTRO
-        let actualCost = 0;
-        if (person.records.length > 0) {
-          actualCost = person.records.reduce((sum, record) => {
-            const montoTotalUSD = record.montoTotalUSD || 0;
-            const costoTotal = record.costoTotal || 0;
-            
-            // Usar montoTotalUSD si está disponible, sino convertir costoTotal
-            if (montoTotalUSD > 0) {
-              console.log(`💰 ECON using montoTotalUSD for ${personKey}: ${montoTotalUSD} USD`);
-              return sum + montoTotalUSD;
-            } else {
-              const fxRate = record.tipoCambio || defaultFxRate;
-              const costUSD = costoTotal / fxRate;
-              console.log(`💰 ECON converting for ${personKey}: ${costoTotal} ARS / ${fxRate} FX = ${costUSD} USD`);
-              return sum + costUSD;
-            }
-          }, 0);
-          console.log(`💰 ECON total cost for ${personKey}: $${actualCost.toFixed(2)} USD from ${person.records.length} records`);
-        }
-        
-        // Calcular presupuesto usando tarifa estable USD por persona
-        const budgetedCost = person.K * rateUSD;
-        console.log(`💰 Budget for ${personKey}: ${person.K} hours × $${rateUSD.toFixed(2)}/hr = $${budgetedCost.toFixed(2)}`);
-
-        // Calcular desviaciones
-        const hourDeviation = person.L - person.K;
-        const costDeviation = actualCost - budgetedCost;
-        const deviationPercentage = person.K > 0 ? ((person.L / person.K) - 1) * 100 : 0;
-
-        // Determinar severidad según criterios corporativos
-        let severity: 'critical' | 'high' | 'medium' | 'low';
-        let alertType: 'overrun' | 'underrun' | 'ok';
-
-        const ratio = person.K > 0 ? person.L / person.K : 0;
-        if (ratio >= 1.30 || ratio <= 0.70) {
-          severity = 'critical';
-        } else if ((ratio >= 1.15 && ratio < 1.30) || (ratio > 0.70 && ratio <= 0.85)) {
-          severity = 'high';
-        } else if ((ratio >= 1.05 && ratio < 1.15) || (ratio > 0.85 && ratio <= 0.95)) {
-          severity = 'medium';
-        } else {
-          severity = 'low';
-        }
-
-        if (person.L > person.K) {
-          alertType = 'overrun';
-        } else if (person.L < person.K) {
-          alertType = 'underrun';
-        } else {
-          alertType = 'ok';
-        }
-
-        const deviation = {
-          personnelId: personKey,
-          personnelName: personKey,
-          budgetedHours: person.K,
-          actualHours: person.L,
-          budgetedCost: Number(budgetedCost.toFixed(2)),
-          actualCost: Number(actualCost.toFixed(2)),
-          hourDeviation: Number(hourDeviation.toFixed(1)),
-          costDeviation: Number(costDeviation.toFixed(2)),
-          deviationPercentage: Number(deviationPercentage.toFixed(1)),
-          severity,
-          alertType,
-          deviationType: 'hours'
-        };
-
-        deviations.push(deviation);
-
-        // Acumular totales
-        totalHours += person.L;
-        totalTeamCost += actualCost;
-        // Acumular SOLO miembros con presupuesto (K>0) para eficiencia ΣL/ΣK
-        if (person.K > 0) {
-          totalEfficiencyNum += person.L;
-          totalEfficiencyDen += person.K;
-        }
-      }
-
-      // 🎯 PASO 5: Calcular métricas resumen
-      const efficiencyPct = totalEfficiencyDen > 0 ? 
-        Math.min(100, (totalEfficiencyNum / totalEfficiencyDen) * 100) : 70;
-
-      // Ordenar por criticidad (critical → high → medium → low)
-      const severityOrder = { 'critical': 4, 'high': 3, 'medium': 2, 'low': 1 };
-      deviations.sort((a, b) => {
-        const severityDiff = severityOrder[b.severity] - severityOrder[a.severity];
-        if (severityDiff !== 0) return severityDiff;
-        return Math.abs(b.deviationPercentage) - Math.abs(a.deviationPercentage);
-      });
-
-      console.log(`📊 UNIVERSAL DEVIATION ANALYSIS RESULT: ${totalActiveMembers} members, ${totalHours}h, ${efficiencyPct.toFixed(1)}% efficiency, $${totalTeamCost.toFixed(2)} cost`);
-
-      // 🎯 PASO 6: Devolver estructura universal
-      res.json({
-        summary: {
-          activeMembers: totalActiveMembers,
-          totalHours: Number(totalHours.toFixed(2)),
-          efficiencyPct: Number(efficiencyPct.toFixed(1)),
-          teamCost: Number(totalTeamCost.toFixed(2)),
-          basis: "ECON",
-          period: periodKey
-        },
-        deviations
-      });
-
-    } catch (error) {
-      console.error("❌ Universal deviation analysis error:", error);
-      res.status(500).json({ message: "Failed to generate deviation analysis" });
-    }
-  });
+  // DUPLICATE: recommendations-dup1 deleted (periodKey/basis ReferenceError — dead code)
 
   // DUPLICATE: recommendations endpoint (dead code — first definition at ~10393 is the active one)
   app.get('/api/projects/:id/recommendations-dup2', requireAuth, async (req, res) => {
@@ -12671,11 +12400,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // INTELIGENCIA DE NEGOCIO: Recomendación basada en patrones de equipo
+      const personnelRows = await db.select({ id: personnel.id, name: personnel.name }).from(personnel);
+      const nameMap = new Map(personnelRows.map(p => [p.id, p.name]));
       const teamPerformance = teamMembers.map(member => {
         const memberEntries = projectEntries.filter(e => e.personnelId === member.personnelId);
         const actualHours = memberEntries.reduce((sum, e) => sum + e.hours, 0);
         const efficiency = member.hours > 0 ? actualHours / member.hours : 0;
-        return { ...member, actualHours, efficiency };
+        return { ...member, personnelName: nameMap.get(member.personnelId) ?? String(member.personnelId), actualHours, efficiency };
       }).filter(m => m.actualHours > 0);
       
       const overperformers = teamPerformance.filter(m => m.efficiency > 1.5);
@@ -12713,8 +12444,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Predicciones mejoradas con inteligencia de negocio
-      const isPastPeriod = req.query.timeFilter && 
-        (req.query.timeFilter.includes('last') || req.query.timeFilter.includes('pasado'));
+      const tf = typeof req.query.timeFilter === 'string' ? req.query.timeFilter : undefined;
+      const isPastPeriod = tf && (tf.includes('last') || tf.includes('pasado'));
       
       let predictions;
       if (isPastPeriod) {
@@ -14503,8 +14234,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`   año: ${cost.año}`);
         console.log(`   cliente: "${cost.cliente}"`);
         console.log(`   proyecto: "${cost.proyecto}"`);
-        console.log(`   montoUSD: ${cost.montoUSD}`);
-        console.log(`   montoARS: ${cost.montoARS}`);
+        console.log(`   montoUSD: ${cost.montoTotalUSD}`);
+        console.log(`   montoARS: ${cost.costoTotal}`);
         console.log(`   ---`);
       });
       
@@ -18528,7 +18259,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Body vacío o inválido" });
       }
       console.log(`PATCH /api/status-semanal/${projectId}`, JSON.stringify(req.body));
-      const { healthStatus, marginStatus, teamStrain, mainRisk, currentAction, nextMilestone, nextMilestoneDate, deadline, ownerId, decisionNeeded, hiddenFromWeekly } = req.body;
+      const { healthStatus, marginStatus, teamStrain, mainRisk, currentAction, nextMilestone, nextMilestoneDate, deadline, ownerId, decisionNeeded, hiddenFromWeekly, roomId } = req.body;
 
       // Validate enum fields
       const validHealth = ['verde', 'amarillo', 'rojo'];
@@ -18576,7 +18307,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         decisionNeeded: projectStatusReviews.decisionNeeded,
         roomId: projectStatusReviews.roomId,
       }).from(projectStatusReviews)
-        .where(eq(projectStatusReviews.projectId, projectId));
+        .where(roomId != null
+          ? and(eq(projectStatusReviews.projectId, projectId), eq(projectStatusReviews.roomId, roomId))
+          : eq(projectStatusReviews.projectId, projectId));
 
       // Track changed fields for the activity log
       const trackFields = ['healthStatus', 'marginStatus', 'teamStrain', 'mainRisk', 'currentAction', 'nextMilestone', 'deadline', 'ownerId', 'decisionNeeded'] as const;
@@ -18608,7 +18341,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             .returning();
         } else {
           [result] = await db.insert(projectStatusReviews)
-            .values({ projectId, ...updateWithUser })
+            .values({ projectId, roomId, ...updateWithUser })
             .returning();
         }
       } catch (e: any) {
@@ -18622,7 +18355,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 .where(eq(projectStatusReviews.projectId, projectId));
             } else {
               await db.insert(projectStatusReviews)
-                .values({ projectId, ...update });
+                .values({ projectId, roomId, ...update });
             }
             result = { projectId, ...update };
           } catch (e2: any) {
@@ -18701,8 +18434,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const itemId = parseInt(req.params.itemId);
       const { content } = req.body;
       if (!content?.trim()) return res.status(400).json({ message: "El contenido es requerido" });
+      const [statusItem] = await db.select({ roomId: weeklyStatusItems.roomId }).from(weeklyStatusItems).where(eq(weeklyStatusItems.id, itemId)).limit(1);
+      if (!statusItem) return res.status(400).json({ message: "Ítem no encontrado" });
       const [note] = await db.insert(projectReviewNotes)
-        .values({ weeklyStatusItemId: itemId, content: content.trim(), authorId, noteDate: new Date() })
+        .values({ weeklyStatusItemId: itemId, content: content.trim(), authorId, noteDate: new Date(), roomId: statusItem.roomId })
         .returning();
       res.status(201).json(note);
     } catch (error) {
@@ -18757,8 +18492,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`POST /api/status-semanal/${projectId}/notes`, JSON.stringify(req.body));
       const { content } = req.body;
       if (!content?.trim()) return res.status(400).json({ message: "El contenido es requerido" });
+      const [reviewRow] = await db.select({ roomId: projectStatusReviews.roomId }).from(projectStatusReviews).where(eq(projectStatusReviews.projectId, Number(projectId))).limit(1);
+      if (!reviewRow) return res.status(400).json({ message: "No existe revisión para este proyecto" });
       const [note] = await db.insert(projectReviewNotes)
-        .values({ projectId, content: content.trim(), authorId, noteDate: new Date() })
+        .values({ projectId, content: content.trim(), authorId, noteDate: new Date(), roomId: reviewRow.roomId })
         .returning();
       res.status(201).json(note);
     } catch (error) {
@@ -18953,9 +18690,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { content } = req.body;
       if (!content?.trim()) return res.status(400).json({ message: "Contenido vacío" });
       const userId = req.user?.id ?? null;
+      const [itemForRoom] = await db.select({ roomId: weeklyStatusItems.roomId }).from(weeklyStatusItems).where(eq(weeklyStatusItems.id, itemId)).limit(1);
       try {
         const [entry] = await db.insert(statusUpdateEntries)
-          .values({ weeklyStatusItemId: itemId, content: content.trim(), authorId: userId })
+          .values({ weeklyStatusItemId: itemId, content: content.trim(), authorId: userId, roomId: itemForRoom?.roomId })
           .returning();
         // Also update the currentAction field so collapsed row shows latest
         try {
@@ -19013,9 +18751,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { content } = req.body;
       if (!content?.trim()) return res.status(400).json({ message: "Contenido vacío" });
       const userId = req.user?.id ?? null;
+      const [proj] = await db.select({ roomId: projectStatusReviews.roomId }).from(projectStatusReviews).where(eq(projectStatusReviews.projectId, Number(projectId))).limit(1);
       try {
         const [entry] = await db.insert(statusUpdateEntries)
-          .values({ projectId, content: content.trim(), authorId: userId })
+          .values({ projectId, content: content.trim(), authorId: userId, roomId: proj?.roomId })
           .returning();
         // Also update the currentAction field on the review so collapsed row shows latest
         try {
@@ -19027,7 +18766,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               .where(eq(projectStatusReviews.projectId, projectId));
           } else {
             await db.insert(projectStatusReviews)
-              .values({ projectId, currentAction: content.trim(), updatedAt: new Date() });
+              .values({ projectId, roomId: proj?.roomId, currentAction: content.trim(), updatedAt: new Date() });
           }
         } catch {}
         res.status(201).json(entry);
@@ -19428,6 +19167,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/status-semanal/:projectId", requireAuth, async (req: Request, res: Response) => {
     try {
       const projectId = parseInt(req.params.projectId);
+      const { roomId } = req.body ?? {};
       console.log(`DELETE /api/status-semanal/${projectId} - quitar proyecto del status`);
 
       const [existing] = await db.select({ id: projectStatusReviews.id })
@@ -19440,7 +19180,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .where(eq(projectStatusReviews.projectId, projectId));
       } else {
         await db.insert(projectStatusReviews)
-          .values({ projectId, hiddenFromWeekly: true, updatedAt: new Date() });
+          .values({ projectId, roomId, hiddenFromWeekly: true, updatedAt: new Date() });
       }
 
       res.json({ ok: true });

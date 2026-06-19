@@ -202,6 +202,8 @@ export interface CostoDirectoRow {
   Rol?: string;
   'Subtipo de costo'?: string;
   Subtipo?: string;
+  Concepto?: string;
+  Cuenta?: string;
   __rowId?: string;
 }
 

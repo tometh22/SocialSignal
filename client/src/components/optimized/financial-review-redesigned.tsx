@@ -204,7 +204,6 @@ const OptimizedFinancialReview: React.FC = () => {
     addTeamMember,
     removeTeamMember,
     updateTeamMember,
-    applyRecommendedTeam,
     availableRoles,
     availablePersonnel
   } = useOptimizedQuote();
@@ -518,7 +517,6 @@ const OptimizedFinancialReview: React.FC = () => {
               variant="ghost" 
               size="sm" 
               className="h-6 px-2 text-xs text-blue-600 hover:bg-blue-50"
-              onClick={applyRecommendedTeam}
             >
               <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />

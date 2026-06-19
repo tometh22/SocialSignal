@@ -79,11 +79,11 @@ const ReviewCleanDesign: React.FC = () => {
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-600">FTE</span>
-                        <span className="font-medium">{((member.fte || 0) * 100).toFixed(0)}%</span>
+                        <span className="font-medium">{((member.hours / 160) * 100).toFixed(0)}%</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-600">Dedicación</span>
-                        <span className="font-medium">{member.dedication || 0}%</span>
+                        <span className="font-medium">{((member.hours / 160) * 100).toFixed(0)}%</span>
                       </div>
                     </div>
                   </div>

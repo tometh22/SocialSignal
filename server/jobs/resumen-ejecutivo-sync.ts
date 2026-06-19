@@ -59,13 +59,13 @@ async function runSync() {
     }
 
     if (cashflow.status === 'fulfilled') {
-      console.log(`  ✅ CashFlow: ${cashflow.value.recordsInserted} insertados, ${cashflow.value.recordsUpdated} actualizados`);
+      console.log(`  ✅ CashFlow: ${cashflow.value.recordsInserted} insertados, ${cashflow.value.periodsProcessed} períodos procesados`);
     } else {
       console.error(`  ❌ CashFlow FAILED:`, cashflow.reason?.message || cashflow.reason);
     }
 
     if (activo.status === 'fulfilled') {
-      console.log(`  ✅ Activo: ${activo.value.recordsInserted} insertados, ${activo.value.recordsUpdated} actualizados`);
+      console.log(`  ✅ Activo: ${activo.value.periodsUpdated} períodos actualizados`);
     } else {
       console.error(`  ❌ Activo FAILED:`, activo.reason?.message || activo.reason);
     }

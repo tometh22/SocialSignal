@@ -67,11 +67,11 @@ export const OptimizedTemplateSelection = () => {
         className={`cursor-pointer transition-all ${isSelected ? 'border-primary ring-2 ring-primary/20 bg-blue-50/30' : 'hover:border-gray-300'}`}
         onClick={() => {
           // Configurar valores predeterminados basados en la plantilla
-          updateAnalysisType(template.defaultAnalysisType || 'standard');
-          updateMentionsVolume(template.defaultMentionsVolume || 'medium');
-          updateCountriesCovered(template.defaultCountriesCovered || '1');
-          updateClientEngagement(template.defaultClientEngagement || 'medium');
-          updateComplexity(template.defaultComplexity || 'medium');
+          updateAnalysisType('standard');
+          updateMentionsVolume('medium');
+          updateCountriesCovered('1');
+          updateClientEngagement('medium');
+          updateComplexity('medium');
           
           // Actualizar la plantilla seleccionada
           updateTemplate(template);
