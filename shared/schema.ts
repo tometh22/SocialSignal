@@ -4038,3 +4038,17 @@ export type InsertCashflowTransaction = z.infer<typeof insertCashflowTransaction
 
 export type ProviderProjectAccess = typeof providerProjectAccess.$inferSelect;
 export type InsertProviderProjectAccess = z.infer<typeof insertProviderProjectAccessSchema>;
+
+// ==================== CAPACITY OVERRIDES ====================
+export const capacityOverrides = pgTable("capacity_overrides", {
+  id: serial("id").primaryKey(),
+  personnelId: integer("personnel_id").notNull().references(() => personnel.id, { onDelete: 'cascade' }),
+  weekStart: varchar("week_start", { length: 10 }).notNull(), // YYYY-MM-DD
+  maxHours: doublePrecision("max_hours").notNull(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  updatedBy: integer("updated_by").references(() => users.id, { onDelete: 'set null' }),
+}, (t) => ({
+  uniq: unique("uq_cap_override_person_week").on(t.personnelId, t.weekStart),
+  idxWeek: index("idx_cap_override_week").on(t.weekStart),
+}));
+export type CapacityOverride = typeof capacityOverrides.$inferSelect;

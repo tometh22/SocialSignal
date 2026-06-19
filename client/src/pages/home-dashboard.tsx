@@ -32,7 +32,7 @@ export default function HomeDashboard() {
       .then(r => r.json()).then(d => d.count || 0).catch(() => 0),
   });
 
-  const { data: quotationStats } = useQuery<any>({
+  const { data: quotationStats } = useQuery<{ total: number; pending: number; draft: number }>({
     queryKey: ["/api/quotations/stats"],
     queryFn: () => authFetch("/api/quotations")
       .then(r => r.json()).then((qs: any[]) => ({

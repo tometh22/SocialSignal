@@ -284,7 +284,6 @@ export default function BulkTimeForm({
                   <tr key={person.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3">
                       <div className="font-medium text-gray-900">{person.name}</div>
-                      <div className="text-sm text-gray-500">ID: {person.id}</div>
                     </td>
                     <td className="px-4 py-3">
                       <Badge variant="secondary">${person.hourlyRate.toFixed(2)}</Badge>
