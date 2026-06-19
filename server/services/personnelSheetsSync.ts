@@ -195,3 +195,49 @@ export function getHistoricalRateFields(year: number): string[] {
 export const HISTORICAL_RATE_FIELDS_2025 = getHistoricalRateFields(2025);
 export const HISTORICAL_RATE_FIELDS_2026 = getHistoricalRateFields(2026);
 export const HISTORICAL_RATE_FIELDS_2027 = getHistoricalRateFields(2027);
+
+/**
+ * Normalize a person name for fuzzy matching:
+ * lowercase, remove accents, collapse spaces, remove non-alphanumeric.
+ */
+export function normalizeName(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9 ]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * Find the best matching personnel ID for a sheet name using fuzzy logic:
+ * 1. Exact normalized match
+ * 2. One name is a substring of the other
+ * 3. All words of the shorter name appear in the longer name (min 2 words)
+ */
+export function findPersonnelIdFuzzy(
+  sheetName: string,
+  personnelByName: Map<string, number>,
+): number | null {
+  const normalized = normalizeName(sheetName);
+
+  for (const [key, id] of personnelByName.entries()) {
+    if (normalizeName(key) === normalized) return id;
+  }
+
+  for (const [key, id] of personnelByName.entries()) {
+    const normKey = normalizeName(key);
+    if (normalized.includes(normKey) || normKey.includes(normalized)) return id;
+  }
+
+  const words = normalized.split(" ").filter(Boolean);
+  for (const [key, id] of personnelByName.entries()) {
+    const keyWords = normalizeName(key).split(" ").filter(Boolean);
+    const shorter = words.length <= keyWords.length ? words : keyWords;
+    const longer  = words.length <= keyWords.length ? keyWords : words;
+    if (shorter.length >= 2 && shorter.every(w => longer.includes(w))) return id;
+  }
+
+  return null;
+}

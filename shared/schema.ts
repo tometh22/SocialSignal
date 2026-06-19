@@ -4052,3 +4052,26 @@ export const capacityOverrides = pgTable("capacity_overrides", {
   idxWeek: index("idx_cap_override_week").on(t.weekStart),
 }));
 export type CapacityOverride = typeof capacityOverrides.$inferSelect;
+
+// ==================== COSTOS ESTIMADOS ====================
+export const factEstimatedCostMonth = pgTable("fact_estimated_cost_month", {
+  id: serial("id").primaryKey(),
+  monthKey: varchar("month_key", { length: 7 }).notNull(),
+  year: integer("year").notNull(),
+  billingYear: integer("billing_year"),
+  detalle: varchar("detalle", { length: 255 }),
+  subtipoCosto: varchar("subtipo_costo", { length: 255 }),
+  puesto: varchar("puesto", { length: 255 }),
+  horasUnidades: numeric("horas_unidades", { precision: 10, scale: 2 }),
+  valorHora: numeric("valor_hora", { precision: 12, scale: 4 }),
+  monedaOriginalArs: numeric("moneda_original_ars", { precision: 14, scale: 2 }),
+  monedaOriginalUsd: numeric("moneda_original_usd", { precision: 14, scale: 4 }),
+  cotizacion: numeric("cotizacion", { precision: 10, scale: 4 }),
+  montoTotalUsd: numeric("monto_total_usd", { precision: 14, scale: 4 }),
+  pasadoFuturo: varchar("pasado_futuro", { length: 50 }),
+  loadedAt: timestamp("loaded_at").notNull().defaultNow(),
+  sourceRunId: varchar("source_run_id", { length: 100 }),
+}, (t) => ({
+  monthKeyIdx: index("fact_estimated_cost_month_month_key_idx").on(t.monthKey),
+}));
+export type FactEstimatedCostMonth = typeof factEstimatedCostMonth.$inferSelect;

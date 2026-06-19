@@ -116,7 +116,7 @@ import {
   quotationTemplates,
   sheetPersonnelAliases,
 } from "@shared/schema";
-import { fetchValorHora2026, fetchValorHoraForYear, getHistoricalRateFields, HISTORICAL_RATE_FIELDS_2026 } from "./services/personnelSheetsSync";
+import { fetchValorHora2026, fetchValorHoraForYear, getHistoricalRateFields, HISTORICAL_RATE_FIELDS_2026, findPersonnelIdFuzzy } from "./services/personnelSheetsSync";
 import { ActiveProjectsAggregator } from "./domain/projectsActive";import { resolveTimeFilter } from "./services/time";
 import { CoverageCalculator } from "./domain/coverage";
 import { eq, and, or, isNull, isNotNull, desc, sql, asc, gte, lte, inArray } from "drizzle-orm";
@@ -4230,6 +4230,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         pid = aliasBySheetName.get(row.sheetName) ?? null;
       } else {
         pid = personnelByName.get(row.sheetName.trim().toLowerCase()) ?? null;
+        if (pid === null) {
+          pid = findPersonnelIdFuzzy(row.sheetName, personnelByName);
+          if (pid !== null) {
+            console.log(`[applyRateRows] Fuzzy matched "${row.sheetName}" → personnel ID ${pid}`);
+          }
+        }
       }
       if (pid === null) {
         skipped.push(row.sheetName);
@@ -14705,6 +14711,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const SPANISH_MONTH_NUM: Record<string, number> = {
         ene:1,feb:2,mar:3,abr:4,may:5,jun:6,jul:7,ago:8,sep:9,oct:10,nov:11,dic:12
       };
+      const _fxSyncUserId = (req as any).user?.id ?? null;
       if (!options.dryRun) {
         googleSheetsWorkingService.getTiposCambio().then(async (rates) => {
           const { exchangeRates } = await import('../shared/schema');
@@ -14713,17 +14720,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const month = SPANISH_MONTH_NUM[r.mes?.toLowerCase()?.substring(0,3) ?? ''];
             if (!month || !r.año || !r.tipoCambio) continue;
             try {
-              await db.update(exchangeRates)
-                .set({ rate: r.tipoCambio.toString(), source: 'auto_sync_maestro', updatedAt: new Date() })
+              const existing = await db.select({ id: exchangeRates.id })
+                .from(exchangeRates)
                 .where(and(
                   eq(exchangeRates.year, r.año),
                   eq(exchangeRates.month, month),
                   eq(exchangeRates.isActive, true),
-                ));
+                ))
+                .limit(1);
+              if (existing.length > 0) {
+                await db.update(exchangeRates)
+                  .set({ rate: r.tipoCambio.toString(), source: 'auto_sync_maestro', updatedAt: new Date() })
+                  .where(eq(exchangeRates.id, existing[0].id));
+              } else if (_fxSyncUserId) {
+                await db.insert(exchangeRates).values({
+                  year: r.año, month, rate: r.tipoCambio.toString(),
+                  source: 'auto_sync_maestro', isActive: true, createdBy: _fxSyncUserId,
+                });
+              }
               synced++;
             } catch (_) {}
           }
-          console.log(`[fx-sync] Updated ${synced} exchange rates from Info Tipo de Cambio y REM`);
+          console.log(`[fx-sync] Synced ${synced} exchange rates from Info Tipo de Cambio y REM`);
         }).catch((e) => console.warn('[fx-sync] FX sync failed:', e));
       }
 
@@ -14753,6 +14771,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }).catch((e) => console.warn('[sot-etl] rates pre-fetch failed:', e));
       }
 
+      // Fire-and-forget: sync incomes from "Proyectos confirmados y estimados"
+      if (!options.dryRun) {
+        googleSheetsWorkingService.getProyectosConfirmados().then(async (proyectos: any[]) => {
+          const { importIncomesFromConfirmed } = await import('./etl/import-incomes-confirmed');
+          const incomeRows = proyectos.map((p: any) => ({
+            "Mes Facturación": p.mesFacturacion,
+            "Año Facturación": p.añoFacturacion,
+            "Cliente": p.cliente,
+            "Detalle": p.detalle || p.proyecto,
+            "Tipo de proyecto": (p.proyecto || '').toLowerCase().includes('fee') ? 'Fee' : 'Puntual',
+            "Confirmado": p.confirmado ? "Sí" : "No",
+            "Pasado/Futuro": p.pasadoFuturo || "",
+            "Cotización": "",
+            "Moneda Original ARS": p.monedaARS ? String(p.monedaARS) : "",
+            "Moneda Original USD": p.monedaUSD ? String(p.monedaUSD) : "",
+            "Monto Total USD": String(p.monedaUSD || ""),
+          }));
+          const ir = await importIncomesFromConfirmed(incomeRows);
+          console.log(`[income-sync] Auto-synced: ${ir.inserted} inserted, ${ir.updated} updated`);
+        }).catch((e: any) => console.warn('[income-sync] Auto-sync failed:', e));
+      }
+
+      // Fire-and-forget: run Costos estimados ETL
+      if (!options.dryRun) {
+        googleSheetsWorkingService.getSheetValues(
+          '1FZLFmTQQOSYQns2cOYlM86UGEH7EHZsJOFegyDR7quc',
+          'Costos estimados',
+          { valueRenderOption: 'UNFORMATTED_VALUE' }
+        ).then(async (rawRows: any[][]) => {
+          const { parseEstimatedCosts, runEstimatedCostsETL } = await import('./etl/costos-estimados-etl.js');
+          const parsed = parseEstimatedCosts(rawRows);
+          const ce = await runEstimatedCostsETL(parsed);
+          console.log(`[costos-estimados] Auto-ETL: ${ce.inserted}/${ce.parsed} rows inserted`);
+        }).catch((e: any) => console.warn('[costos-estimados] Auto-ETL failed:', e));
+      }
+
       res.json({
         success: result.success,
         summary: {
@@ -14763,6 +14817,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           executionTimeMs: result.executionTimeMs
         },
         errors: result.errors,
+        headerWarnings: (result as any).warnings?.filter((w: string) => w.toLowerCase().includes('header') || w.toLowerCase().includes('columna')) ?? [],
         timestamp: new Date().toISOString()
       });
       
@@ -19759,6 +19814,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting capacity override:", error);
       res.status(500).json({ message: "Error al eliminar el override" });
+    }
+  });
+
+  // ── Proyecto ID=50 audit ──────────────────────────────────────────────────
+  // GET /api/admin/project-50-audit?from=YYYY-MM&to=YYYY-MM
+  app.get('/api/admin/project-50-audit', requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { from, to } = req.query as { from?: string; to?: string };
+      const conditions = [eq(factLaborMonth.projectId, 50)];
+      if (from) conditions.push(gte(factLaborMonth.periodKey, from));
+      if (to)   conditions.push(lte(factLaborMonth.periodKey, to));
+
+      const rows = await db
+        .select({
+          periodKey: factLaborMonth.periodKey,
+          rowCount: sql<number>`COUNT(*)`.mapWith(Number),
+          totalHours: sql<number>`COALESCE(SUM(${factLaborMonth.billingHours}::numeric), 0)`.mapWith(Number),
+          totalCostUSD: sql<number>`COALESCE(SUM(${factLaborMonth.costUSD}::numeric), 0)`.mapWith(Number),
+          people: sql<string[]>`array_agg(DISTINCT ${factLaborMonth.personKey})`,
+        })
+        .from(factLaborMonth)
+        .where(and(...conditions))
+        .groupBy(factLaborMonth.periodKey)
+        .orderBy(factLaborMonth.periodKey);
+
+      const totalCostUSD = rows.reduce((s, r) => s + r.totalCostUSD, 0);
+      const totalHours   = rows.reduce((s, r) => s + r.totalHours, 0);
+      const totalRows    = rows.reduce((s, r) => s + r.rowCount, 0);
+      res.json({ totalRows, totalHours, totalCostUSD, byPeriod: rows });
+    } catch (error) {
+      res.status(500).json({ message: String(error) });
     }
   });
 
