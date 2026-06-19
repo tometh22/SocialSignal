@@ -129,7 +129,7 @@ import { requireProjectUnlocked, projectIdFromTimeEntry } from "./middleware/pro
 import { requireRole, requireProvider, requireProviderCanAccessProject } from "./middleware/requireRole";
 import { createReviewRoomsRouter } from "./routes-review-rooms";
 import { createLedgerRouter } from "./routes-ledger";
-import { reviewRooms, reviewRoomMembers } from "@shared/schema";
+import { reviewRooms, reviewRoomMembers, capacityOverrides } from "@shared/schema";
 import path from 'path';
 import { setupChat } from "./chat";
 // import { googleSheetsService } from "./services/googleSheetsService"; // Temporalmente deshabilitado
@@ -19376,6 +19376,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const year = weekStart ? new Date(weekStart).getFullYear() : new Date().getFullYear();
       const holidaysList = await db.select().from(holidays).where(eq(holidays.year, year));
 
+      // Load capacity overrides for this week
+      const weekKey = weekStart || new Date().toISOString().split('T')[0];
+      const overrideRows = await db.select().from(capacityOverrides)
+        .where(eq(capacityOverrides.weekStart, weekKey));
+      const overrideMap: Record<number, number> = {};
+      for (const row of overrideRows) overrideMap[row.personnelId] = row.maxHours;
+
       // Calculate working days in the week (5 - holidays in that week)
       const weekStartDate = weekStart ? new Date(weekStart) : new Date();
       const weekEndDate = new Date(weekStartDate);
@@ -19419,7 +19426,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
         const absenceHours = absenceDays * dailyHours;
-        const maxCapacity = Math.max(0, maxCapacityBase - absenceHours);
+        const maxCapacityCalc = Math.max(0, maxCapacityBase - absenceHours);
+        // Apply manual override if set, otherwise use calculated value
+        const maxCapacity = overrideMap[person.id] !== undefined ? overrideMap[person.id] : maxCapacityCalc;
 
         const personEntries = entries.filter(e => e.personnelId === person.id);
         const actualHours = personEntries.reduce((sum, e) => sum + (e.hours || 0), 0);
@@ -19430,6 +19439,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           name: person.name,
           roleId: person.roleId,
           maxCapacity: Math.round(maxCapacity * 100) / 100,
+          hasOverride: overrideMap[person.id] !== undefined,
           actualHours: Math.round(actualHours * 100) / 100,
           idleHours: Math.round(idleHours * 100) / 100,
           utilizationPct: maxCapacity > 0 ? Math.round((actualHours / maxCapacity) * 100) : 0,
@@ -19456,6 +19466,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error in capacity dashboard:", error);
       res.status(500).json({ message: "Error fetching capacity data" });
+    }
+  });
+
+  // Upsert a capacity override for a person+week
+  app.put("/api/capacity/overrides", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { personnelId, weekStart, maxHours } = req.body;
+      if (!personnelId || !weekStart || maxHours === undefined || maxHours < 0) {
+        return res.status(400).json({ message: "personnelId, weekStart y maxHours (>=0) son requeridos" });
+      }
+      const userId = (req as any).user?.id ?? null;
+      await db.insert(capacityOverrides)
+        .values({ personnelId, weekStart, maxHours, updatedBy: userId })
+        .onConflictDoUpdate({
+          target: [capacityOverrides.personnelId, capacityOverrides.weekStart],
+          set: { maxHours, updatedAt: sql`now()`, updatedBy: userId },
+        });
+      res.json({ ok: true });
+    } catch (error) {
+      console.error("Error saving capacity override:", error);
+      res.status(500).json({ message: "Error al guardar el override de capacidad" });
+    }
+  });
+
+  // Delete (reset) a capacity override
+  app.delete("/api/capacity/overrides/:personnelId", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const personnelId = parseInt(req.params.personnelId);
+      const weekStart = req.query.weekStart as string;
+      if (isNaN(personnelId) || !weekStart) {
+        return res.status(400).json({ message: "personnelId y weekStart son requeridos" });
+      }
+      await db.delete(capacityOverrides)
+        .where(and(
+          eq(capacityOverrides.personnelId, personnelId),
+          eq(capacityOverrides.weekStart, weekStart)
+        ));
+      res.json({ ok: true });
+    } catch (error) {
+      console.error("Error deleting capacity override:", error);
+      res.status(500).json({ message: "Error al eliminar el override" });
     }
   });
 
