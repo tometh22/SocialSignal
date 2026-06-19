@@ -8261,6 +8261,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Fire-and-forget: rebuild fact_labor_month for the given entry date if app mode is active
+  function triggerLaborRebuild(date: Date | string | null | undefined): void {
+    if (!date) return;
+    const d = new Date(date as string);
+    if (isNaN(d.getTime())) return;
+    const periodKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    Promise.all([
+      import('./etl/time-entries-to-fact-labor'),
+      import('./utils/dataSourceMode'),
+    ]).then(([{ buildFactLaborFromTimeEntries }, { getHoursDataSource }]) =>
+      getHoursDataSource().then(mode => {
+        if (mode !== 'app') return;
+        buildFactLaborFromTimeEntries(periodKey)
+          .then(r => console.log(`[fact-labor-auto] ${periodKey} inserted=${r.inserted} updated=${r.updated} errors=${r.errors.length} ms=${r.executionTimeMs}`))
+          .catch(err => console.error('[fact-labor-auto] rebuild error:', err));
+      })
+    ).catch(() => {});
+  }
+
   // Crear un nuevo registro de horas
   app.post("/api/time-entries", requireAuth, requireProjectUnlocked(), async (req, res) => {
     try {
@@ -8362,6 +8381,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       res.status(201).json(entryWithMetadata);
+      triggerLaborRebuild(entry.date);
     } catch (error) {
       if (error instanceof z.ZodError) {
         console.error("Error de validación:", error.errors);
@@ -8407,6 +8427,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       res.json(updatedEntry);
+      triggerLaborRebuild(updatedEntry.date);
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Invalid time entry data", errors: error.errors });
@@ -8422,6 +8443,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (isNaN(id)) return res.status(400).json({ message: "Invalid time entry ID" });
 
     try {
+      const [entryBeforeDelete] = await db.select({ date: timeEntries.date }).from(timeEntries).where(eq(timeEntries.id, id)).limit(1);
       const deleted = await storage.deleteTimeEntry(id);
 
       if (!deleted) {
@@ -8429,6 +8451,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       res.json({ success: true, message: "Time entry deleted successfully" });
+      if (entryBeforeDelete?.date) triggerLaborRebuild(entryBeforeDelete.date);
     } catch (error) {
       console.error("Error deleting time entry:", error);
       res.status(500).json({ message: "Failed to delete time entry" });
