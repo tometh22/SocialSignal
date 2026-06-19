@@ -139,7 +139,11 @@ export function parseEstimatedCosts(rawRows: any[][]): EstimatedCostRow[] {
   return results;
 }
 
-// ─── dry-run / future ETL hook ───────────────────────────────────────────────
+// ─── ETL write ───────────────────────────────────────────────────────────────
+
+import { db } from '../db.js';
+import { factEstimatedCostMonth } from '../../shared/schema.js';
+import { inArray } from 'drizzle-orm';
 
 export interface EstimatedCostsETLResult {
   parsed: number;
@@ -148,37 +152,43 @@ export interface EstimatedCostsETLResult {
 }
 
 /**
- * Placeholder for the write-to-DB step.
- *
- * There is currently no target table for estimated costs (fact_estimated_cost_month
- * does not exist in the schema and creating migrations is out of scope for this PR).
- *
- * This function performs a dry-run: it validates the rows and returns statistics
- * without writing to the database. When a target table is added, replace the body
- * with real INSERT logic.
+ * Writes parsed EstimatedCostRow[] to fact_estimated_cost_month.
+ * Delete-then-insert per distinct monthKey for idempotency.
  */
 export async function runEstimatedCostsETL(
   rows: EstimatedCostRow[]
 ): Promise<EstimatedCostsETLResult> {
   const errors: string[] = [];
 
-  for (let i = 0; i < rows.length; i++) {
-    const r = rows[i];
-    if (!r.monthKey.match(/^\d{4}-\d{2}$/)) {
-      errors.push(`Row ${i}: invalid monthKey "${r.monthKey}"`);
-    }
-    if (!r.detalle) {
-      errors.push(`Row ${i}: missing detalle`);
-    }
-    if (r.montoTotalUsd === null && r.monedaOriginalArs === null && r.monedaOriginalUsd === null) {
-      errors.push(`Row ${i} (${r.detalle} ${r.monthKey}): no monetary value present`);
-    }
+  if (rows.length === 0) return { parsed: 0, inserted: 0, errors };
+
+  const monthKeys = [...new Set(rows.map(r => r.monthKey))];
+
+  try {
+    await db.delete(factEstimatedCostMonth)
+      .where(inArray(factEstimatedCostMonth.monthKey, monthKeys));
+
+    await db.insert(factEstimatedCostMonth).values(
+      rows.map(r => ({
+        monthKey: r.monthKey,
+        year: r.year,
+        billingYear: r.billingYear ?? r.year,
+        detalle: r.detalle,
+        subtipoCosto: r.subtipoCosto,
+        puesto: r.puesto,
+        horasUnidades: r.horasUnidades?.toString() ?? null,
+        valorHora: r.valorHora?.toString() ?? null,
+        monedaOriginalArs: r.monedaOriginalArs?.toString() ?? null,
+        monedaOriginalUsd: r.monedaOriginalUsd?.toString() ?? null,
+        cotizacion: r.cotizacion?.toString() ?? null,
+        montoTotalUsd: r.montoTotalUsd?.toString() ?? null,
+        pasadoFuturo: r.pasadoFuturo,
+      }))
+    );
+  } catch (err) {
+    errors.push(String(err));
+    return { parsed: rows.length, inserted: 0, errors };
   }
 
-  // No DB insert — table does not exist yet.
-  return {
-    parsed: rows.length,
-    inserted: 0,
-    errors,
-  };
+  return { parsed: rows.length, inserted: rows.length, errors };
 }
