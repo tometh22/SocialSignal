@@ -5,7 +5,7 @@ import { ChevronRight, Home } from "lucide-react";
 import { useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 
-interface BreadcrumbItem {
+export interface BreadcrumbItem {
   label: string;
   href?: string;
   current?: boolean;

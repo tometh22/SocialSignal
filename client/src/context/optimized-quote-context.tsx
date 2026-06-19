@@ -61,6 +61,7 @@ export interface QuotationData {
     projectStartDate: string;
     rateProjectionMode?: "current" | "projected" | "annual_avg";
   };
+  customization?: string;
   proposalLink?: string; // Link a la propuesta original
   leadId?: number; // Lead CRM de origen (para integración CRM-Cotizaciones)
   exchangeRateSnapshot?: number; // Tipo de cambio al momento de cotizar (snapshot)

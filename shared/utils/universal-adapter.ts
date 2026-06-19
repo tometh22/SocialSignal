@@ -76,7 +76,7 @@ export function adaptExcelToUniversal(
       person: personStr,
       projectId,
       year: yearRaw ? parseInt(String(yearRaw)) || new Date().getFullYear() : new Date().getFullYear(),
-      month: monthRaw ? normMonth(monthRaw) : new Date().getMonth() + 1,
+      month: monthRaw ? normMonth(monthRaw as string | number) : new Date().getMonth() + 1,
       horasReal: getCell(row, columnMap.horasReal),
       horasObjetivo: getCell(row, columnMap.horasObjetivo), 
       horasFacturacion: getCell(row, columnMap.horasFacturacion),

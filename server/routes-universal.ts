@@ -63,7 +63,7 @@ export function addUniversalRankingsEndpoint(app: Express, storage: any, require
       }
 
       // 4. Convertir datos al formato universal
-      const universalRows = adaptExcelToUniversal(rawData, projectKey, id.toString());
+      const universalRows = adaptExcelToUniversal(rawData as any, projectKey, id.toString());
       console.log(`🔄 Converted ${rawData.length} Excel rows to ${universalRows.length} universal rows`);
 
       // 5. Filtrar por período temporal

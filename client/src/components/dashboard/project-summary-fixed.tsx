@@ -46,10 +46,31 @@ import { formatCurrency } from "@/lib/formatters";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 
-/**
- * Componente principal de resumen de proyecto, versión final optimizada
- * Soluciona todos los problemas de espaciado y superposición
- */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyRecord = any;
+
+interface ProjectSummaryFixedProps {
+  project?: AnyRecord;
+  costSummary?: AnyRecord;
+  timeEntries?: AnyRecord[];
+  personnel?: AnyRecord[];
+  roles?: AnyRecord[];
+  deliverableData?: AnyRecord;
+  dashboardState?: AnyRecord;
+  setDashboardState?: (state: AnyRecord) => void;
+  timeByPersonnelData?: AnyRecord[];
+  billableDistributionData?: AnyRecord[];
+  projectMetrics?: AnyRecord;
+  riskIndicators?: AnyRecord;
+  handleTimeFilterChange?: (filter: string) => void;
+  handleViewModeChange?: (mode: string) => void;
+  handleSectionToggle?: (section: string) => void;
+  handleExpandChart?: (chart: string) => void;
+  handleHelpDialog?: (section?: string) => void;
+  handleGoBack?: () => void;
+  isLoading?: boolean;
+}
+
 const ProjectSummaryFixed = ({
   project,
   costSummary,
@@ -70,22 +91,22 @@ const ProjectSummaryFixed = ({
   handleHelpDialog,
   handleGoBack,
   isLoading,
-}) => {
-  
+}: ProjectSummaryFixedProps) => {
+
   // Cálculos de estadísticas clave
-  const totalHours = timeEntries?.reduce((sum, entry) => sum + entry.hours, 0) || 0;
-  const billableHours = timeEntries?.filter(entry => entry.billable).reduce((sum, entry) => sum + entry.hours, 0) || 0;
+  const totalHours = timeEntries?.reduce((sum: number, entry) => sum + entry.hours, 0) || 0;
+  const billableHours = timeEntries?.filter(entry => entry.billable).reduce((sum: number, entry) => sum + entry.hours, 0) || 0;
   const nonBillableHours = totalHours - billableHours;
   const billablePercentage = totalHours > 0 ? (billableHours / totalHours) * 100 : 0;
 
   // Formatear fechas
-  const formatDate = (dateString) => {
+  const formatDate = (dateString: string | null | undefined): string => {
     if (!dateString) return "No definida";
     return format(new Date(dateString), "dd MMM yyyy", { locale: es });
   };
 
   // Formatear números con separador de miles
-  const formatNumber = (num) => {
+  const formatNumber = (num: number): string => {
     return new Intl.NumberFormat('es-AR', { 
       maximumFractionDigits: 1 
     }).format(num);
@@ -152,13 +173,13 @@ const ProjectSummaryFixed = ({
                   <DropdownMenuContent align="end" className="w-48">
                     <DropdownMenuLabel>Periodo de tiempo</DropdownMenuLabel>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={() => handleTimeFilterChange("all")} className={dashboardState.timeFilter === "all" ? "bg-primary/10" : ""}>
+                    <DropdownMenuItem onClick={() => handleTimeFilterChange?.("all")} className={dashboardState.timeFilter === "all" ? "bg-primary/10" : ""}>
                       Todo el proyecto
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleTimeFilterChange("month")} className={dashboardState.timeFilter === "month" ? "bg-primary/10" : ""}>
+                    <DropdownMenuItem onClick={() => handleTimeFilterChange?.("month")} className={dashboardState.timeFilter === "month" ? "bg-primary/10" : ""}>
                       Último mes
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleTimeFilterChange("week")} className={dashboardState.timeFilter === "week" ? "bg-primary/10" : ""}>
+                    <DropdownMenuItem onClick={() => handleTimeFilterChange?.("week")} className={dashboardState.timeFilter === "week" ? "bg-primary/10" : ""}>
                       Última semana
                     </DropdownMenuItem>
                   </DropdownMenuContent>
@@ -174,10 +195,10 @@ const ProjectSummaryFixed = ({
                   <DropdownMenuContent align="end" className="w-56">
                     <DropdownMenuLabel>Modo de visualización</DropdownMenuLabel>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={() => handleViewModeChange("detailed")} className={dashboardState.viewMode === "detailed" ? "bg-primary/10" : ""}>
+                    <DropdownMenuItem onClick={() => handleViewModeChange?.("detailed")} className={dashboardState.viewMode === "detailed" ? "bg-primary/10" : ""}>
                       Detallado
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleViewModeChange("compact")} className={dashboardState.viewMode === "compact" ? "bg-primary/10" : ""}>
+                    <DropdownMenuItem onClick={() => handleViewModeChange?.("compact")} className={dashboardState.viewMode === "compact" ? "bg-primary/10" : ""}>
                       Compacto
                     </DropdownMenuItem>
                   </DropdownMenuContent>
@@ -207,7 +228,7 @@ const ProjectSummaryFixed = ({
                             variant="ghost"
                             size="icon"
                             className="h-6 w-6 text-blue-600 hover:text-blue-800 hover:bg-blue-50"
-                            onClick={() => handleHelpDialog('hoursHelp')}
+                            onClick={() => handleHelpDialog?.('hoursHelp')}
                           >
                             <Info className="h-3.5 w-3.5" />
                           </Button>
@@ -264,7 +285,7 @@ const ProjectSummaryFixed = ({
                             variant="ghost"
                             size="icon"
                             className="h-6 w-6 text-green-600 hover:text-green-800 hover:bg-green-50"
-                            onClick={() => handleHelpDialog('costHelp')}
+                            onClick={() => handleHelpDialog?.('costHelp')}
                           >
                             <Info className="h-3.5 w-3.5" />
                           </Button>
@@ -335,7 +356,7 @@ const ProjectSummaryFixed = ({
                             variant="ghost"
                             size="icon"
                             className="h-6 w-6 text-amber-600 hover:text-amber-800 hover:bg-amber-50"
-                            onClick={() => handleHelpDialog('timeHelp')}
+                            onClick={() => handleHelpDialog?.('timeHelp')}
                           >
                             <Info className="h-3.5 w-3.5" />
                           </Button>

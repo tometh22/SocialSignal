@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { apiRequest, authFetch } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
@@ -50,12 +50,10 @@ export default function ManageQuotes() {
   const [, navigate] = useLocation();
   const { formatCurrency: formatCurrencyWithConversion, convertFromUSD, exchangeRate } = useCurrency();
 
-  console.log('[QUOTES] 🚀 Inicializando página de gestión de cotizaciones');
-
   const { data: quotations, isLoading, refetch, error: quotationsError } = useQuery<Quotation[]>({
     queryKey: ["/api/quotations"],
-    staleTime: 0, // Always refetch to avoid cache issues
-    cacheTime: 0,  // Don't cache to ensure fresh data
+    staleTime: 0,
+    gcTime: 0,
     refetchOnWindowFocus: true
   });
 
@@ -131,41 +129,6 @@ export default function ManageQuotes() {
     }
   });
 
-  // Log success/error after data is loaded
-  useEffect(() => {
-    if (quotations) {
-      console.log(`[QUOTES] ✅ Cotizaciones cargadas exitosamente: ${quotations.length} elementos`);
-      console.log('[QUOTES] 📊 Datos detallados de cotizaciones:', quotations);
-      quotations.forEach(quote => {
-        console.log(`[QUOTES] Cotización ${quote.id}:`, {
-          id: quote.id,
-          projectName: quote.projectName,
-          baseCost: quote.baseCost,
-          complexityAdjustment: quote.complexityAdjustment,
-          totalAmount: quote.totalAmount,
-          quotationCurrency: quote.quotationCurrency
-        });
-      });
-    }
-  }, [quotations]);
-
-  useEffect(() => {
-    if (quotationsError) {
-      console.error(`[QUOTES] ❌ Error al cargar cotizaciones:`, quotationsError);
-    }
-  }, [quotationsError]);
-
-  useEffect(() => {
-    if (clients.length > 0) {
-      console.log(`[QUOTES] ✅ Clientes cargados exitosamente: ${clients.length} elementos`);
-    }
-  }, [clients]);
-
-  useEffect(() => {
-    if (clientsError) {
-      console.error(`[QUOTES] ❌ Error al cargar clientes:`, clientsError);
-    }
-  }, [clientsError]);
 
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -213,25 +176,14 @@ export default function ManageQuotes() {
     : [];
 
   const handleStatusChange = async () => {
-    if (!selectedQuote || !newStatus) {
-      console.warn('[QUOTES] Intento de cambio de estado sin cotización o estado seleccionado');
-      return;
-    }
-
-    console.log(`[QUOTES] Iniciando cambio de estado para cotización ID: ${selectedQuote.id}`);
-    console.log(`[QUOTES] Estado anterior: ${selectedQuote.status} → Nuevo estado: ${newStatus}`);
+    if (!selectedQuote || !newStatus) return;
 
     try {
-      const startTime = performance.now();
-
       await apiRequest(
         `/api/quotations/${selectedQuote.id}/status`,
         "PATCH",
         { status: newStatus }
       );
-
-      const endTime = performance.now();
-      console.log(`[QUOTES] ✅ Estado actualizado exitosamente en ${(endTime - startTime).toFixed(2)}ms`);
 
       toast({
         title: "Estado actualizado",
@@ -240,29 +192,13 @@ export default function ManageQuotes() {
 
       setDialogOpen(false);
 
-      // Si la cotización fue aprobada, mostrar modal para crear proyecto
       if (newStatus === 'approved') {
-        console.log(`[QUOTES] Cotización aprobada, preparando modal de creación de proyecto`);
-        
-        // Obtener la cotización actualizada con el precio negociado
         try {
           const response = await authFetch(`/api/quotations/${selectedQuote.id}`, {
             credentials: 'include'
           });
-          
-          if (response.ok) {
-            const updatedQuote = await response.json();
-            console.log(`[QUOTES] Cotización actualizada obtenida:`, {
-              originalPrice: selectedQuote.totalAmount,
-              updatedPrice: updatedQuote.totalAmount
-            });
-            setApprovedQuote(updatedQuote);
-          } else {
-            // Si falla, usar la cotización original
-            setApprovedQuote(selectedQuote);
-          }
-        } catch (error) {
-          console.error(`[QUOTES] Error obteniendo cotización actualizada:`, error);
+          setApprovedQuote(response.ok ? await response.json() : selectedQuote);
+        } catch {
           setApprovedQuote(selectedQuote);
         }
         
@@ -362,9 +298,8 @@ export default function ManageQuotes() {
       // Copiar automáticamente el equipo de la cotización al proyecto
       try {
         await apiRequest(`/api/projects/${createdProject.id}/copy-quotation-team`, 'POST');
-        console.log('✅ Equipo copiado automáticamente al proyecto desde la cotización');
       } catch (teamError) {
-        console.warn('⚠️ Error al copiar equipo de la cotización:', teamError);
+        console.error('Error copying quotation team to project:', teamError);
         // No fallar la creación del proyecto si falla la copia del equipo
       }
 
@@ -451,22 +386,10 @@ export default function ManageQuotes() {
   };
 
   const handleDeleteQuotation = async () => {
-    if (!selectedQuote) {
-      console.warn('[QUOTES] Intento de eliminación sin cotización seleccionada');
-      return;
-    }
-
-    console.log(`[QUOTES] 🗑️ Iniciando eliminación de cotización:`, {
-      id: selectedQuote.id,
-      projectName: selectedQuote.projectName,
-      status: selectedQuote.status,
-      clientId: selectedQuote.clientId,
-      timestamp: new Date().toISOString()
-    });
+    if (!selectedQuote) return;
 
     try {
       setDeletingQuoteId(selectedQuote.id);
-      const startTime = performance.now();
 
       const response = await authFetch(`/api/quotations/${selectedQuote.id}`, {
         method: 'DELETE',
@@ -476,20 +399,14 @@ export default function ManageQuotes() {
         }
       });
 
-      const endTime = performance.now();
-      console.log(`[QUOTES] Respuesta del servidor recibida en ${(endTime - startTime).toFixed(2)}ms`);
-
       let data;
       try {
         data = await response.json();
-        console.log(`[QUOTES] Datos de respuesta parseados:`, data);
-      } catch (e) {
-        console.error('[QUOTES] ❌ Error al parsear respuesta JSON:', e);
+      } catch {
         data = { success: response.ok, message: response.statusText };
       }
 
       if (response.status === 409) {
-        console.warn(`[QUOTES] ⚠️ Conflicto al eliminar cotización - Proyectos asociados detectados`);
         setDeletingQuoteId(null);
         toast({
           title: "No se puede eliminar",
@@ -500,7 +417,6 @@ export default function ManageQuotes() {
       }
 
       if (response.ok && data.success) {
-        console.log(`[QUOTES] ✅ Cotización eliminada exitosamente: ${selectedQuote.projectName}`);
 
         setTimeout(() => {
           toast({
@@ -570,13 +486,13 @@ export default function ManageQuotes() {
     return null;
   };
 
-  const isQuoteExpired = (quote: { status: string; expiresAt?: string | null }) => {
+  const isQuoteExpired = (quote: { status: string; expiresAt?: string | Date | null }) => {
     return quote.expiresAt
       && (quote.status === "pending" || quote.status === "in-negotiation")
       && new Date(quote.expiresAt) < new Date();
   };
 
-  const getStatusBadge = (status: string, quote?: { status: string; expiresAt?: string | null }) => {
+  const getStatusBadge = (status: string, quote?: { status: string; expiresAt?: string | Date | null }) => {
     if (quote && isQuoteExpired(quote)) {
       return (
         <Badge variant="outline" className="bg-red-50 text-red-600 border-red-200 inline-flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded-md">
@@ -645,7 +561,6 @@ export default function ManageQuotes() {
   };
 
   const handleEditQuotation = (quotation: Quotation) => {
-    console.log('🔧 Editando cotización:', quotation.id, quotation.projectName);
     navigate(`/optimized-quote/${quotation.id}`);
   };
 

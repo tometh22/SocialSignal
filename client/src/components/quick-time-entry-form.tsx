@@ -109,21 +109,9 @@ export default function QuickTimeEntryForm({ projectId, onSuccess, onCancel }: Q
   }, [watchedStartDate, watchedEndDate, form]);
 
   // Obtener equipo base del proyecto
-  const { data: baseTeam = [], isLoading: loadingTeam } = useQuery({
+  const { data: baseTeam = [], isLoading: loadingTeam } = useQuery<{ personnelId?: number; roleId?: number | null; hourlyRate?: number; personnel?: { name?: string }; role?: { name?: string } }[]>({
     queryKey: [`/api/projects/${projectId}/base-team`],
     enabled: !!projectId,
-    onSuccess: (data) => {
-      console.log('🔍 Base team loaded:', data);
-      console.log('🔍 Team members count:', data?.length || 0);
-      if (Array.isArray(data)) {
-        data.forEach((member, index) => {
-          console.log(`  ${index + 1}. ${member.personnel?.name} - ${member.role?.name} - $${member.hourlyRate}`);
-        });
-      }
-    },
-    onError: (error) => {
-      console.error('❌ Error loading base team:', error);
-    }
   });
 
   // Crear entrada rápida de tiempo
@@ -203,7 +191,7 @@ export default function QuickTimeEntryForm({ projectId, onSuccess, onCancel }: Q
     const promises = validEntries.map(([personnelId, data]) => {
       const teamMember = Array.isArray(baseTeam) ? baseTeam.find((member: any) => member.personnelId === parseInt(personnelId)) : null;
       if (teamMember) {
-        const effectiveRate = data.customRate !== undefined ? data.customRate : teamMember.hourlyRate;
+        const effectiveRate = data.customRate !== undefined ? data.customRate : (teamMember.hourlyRate ?? 0);
         return addTimeDetail.mutateAsync({
           quickTimeEntryId: currentQuickEntryId,
           data: {
@@ -250,7 +238,7 @@ export default function QuickTimeEntryForm({ projectId, onSuccess, onCancel }: Q
     return Object.entries(teamHours).reduce((sum, [personnelId, data]) => {
       const teamMember = baseTeam.find((member: any) => member.personnelId === parseInt(personnelId));
       if (teamMember && data.hours > 0) {
-        const effectiveRate = data.customRate || teamMember.hourlyRate;
+        const effectiveRate = data.customRate || teamMember.hourlyRate || 0;
         return sum + (data.hours * effectiveRate);
       }
       return sum;
@@ -269,16 +257,8 @@ export default function QuickTimeEntryForm({ projectId, onSuccess, onCancel }: Q
     const matchesFilter = personnelName.toLowerCase().includes(filterTeam.toLowerCase()) ||
                          roleName.toLowerCase().includes(filterTeam.toLowerCase());
 
-    if (!matchesFilter && filterTeam) {
-      console.log(`🔍 Filtered out: ${personnelName} - ${roleName}`);
-    }
-
     return matchesFilter;
   }) : [];
-
-  // Log del equipo filtrado
-  console.log('🔍 Filtered team:', filteredTeam.length, 'members');
-  console.log('🔍 Filter text:', filterTeam);
 
   if (loadingTeam) {
     return (
@@ -301,8 +281,6 @@ export default function QuickTimeEntryForm({ projectId, onSuccess, onCancel }: Q
   }
 
   if (!Array.isArray(baseTeam) || baseTeam.length === 0) {
-    console.log('⚠️ No base team found or invalid data:', { baseTeam, isArray: Array.isArray(baseTeam), length: baseTeam?.length });
-
     return (
       <motion.div
         initial={{ opacity: 0, y: 20 }}
@@ -315,31 +293,20 @@ export default function QuickTimeEntryForm({ projectId, onSuccess, onCancel }: Q
         <div>
           <h3 className="text-xl font-bold text-gray-900 mb-2">Sin Equipo Base Configurado</h3>
           <p className="text-gray-600 mb-6">Este proyecto necesita un equipo base para registrar horas</p>
-          <div className="bg-gray-100 p-4 rounded-lg mb-4 text-left">
-            <p className="text-sm text-gray-600">
-              <strong>Debug info:</strong><br/>
-              ProjectId: {projectId}<br/>
-              BaseTeam type: {typeof baseTeam}<br/>
-              BaseTeam length: {baseTeam?.length || 'N/A'}<br/>
-              Loading: {loadingTeam ? 'Yes' : 'No'}
-            </p>
-          </div>
           <Button
             onClick={() => {
-              console.log('🔄 Attempting to copy quotation team...');
               apiRequest(`/api/projects/${projectId}/copy-quotation-team`, "POST")
-                .then((result) => {
-                  console.log('✅ Copy quotation team success:', result);
+                .then(() => {
                   queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/base-team`] });
                   toast({
-                    title: "🎉 Equipo configurado",
+                    title: "Equipo configurado",
                     description: "El equipo de la cotización ha sido copiado al proyecto"
                   });
                 })
                 .catch((error) => {
-                  console.error('❌ Copy quotation team error:', error);
+                  console.error('Error copying quotation team:', error);
                   toast({
-                    title: "❌ Error",
+                    title: "Error",
                     description: "Error al configurar el equipo",
                     variant: "destructive"
                   });

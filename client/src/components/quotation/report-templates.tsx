@@ -74,7 +74,7 @@ export default function ReportTemplates({ onPrevious, onNext }: { onPrevious: ()
       // Cargar automáticamente los roles recomendados al seleccionar una plantilla
       try {
         // Primero cargaremos las asignaciones de roles para obtener las horas asociadas
-        apiRequest(`/api/template-roles/${selectedTemplateId}`)
+        apiRequest(`/api/template-roles/${selectedTemplateId}`, "GET")
           .then((assignments: any) => {
             
             if (!Array.isArray(assignments) || assignments.length === 0) {

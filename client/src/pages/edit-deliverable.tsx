@@ -94,19 +94,19 @@ export default function EditDeliverable() {
   });
 
   // Consulta para obtener el personal (analistas y PMs)
-  const { data: personnel, isLoading: isLoadingPersonnel } = useQuery({
+  const { data: personnel, isLoading: isLoadingPersonnel } = useQuery<{ id: number; name: string; roleId: number }[]>({
     queryKey: ["/api/personnel"],
     queryFn: () => apiRequest("/api/personnel", "GET"),
   });
 
   // Consulta para obtener los roles para identificar analistas y PMs
-  const { data: roles, isLoading: isLoadingRoles } = useQuery({
+  const { data: roles, isLoading: isLoadingRoles } = useQuery<{ id: number; name: string }[]>({
     queryKey: ["/api/roles"],
     queryFn: () => apiRequest("/api/roles", "GET"),
   });
 
   // Consulta para obtener los registros de tiempo del proyecto
-  const { data: timeEntries, isLoading: isLoadingTimeEntries } = useQuery({
+  const { data: timeEntries, isLoading: isLoadingTimeEntries } = useQuery<{ id: number; personnelId: number; hours: number; date: string }[]>({
     queryKey: ["/api/time-entries/project", deliverable?.project_id],
     queryFn: () => apiRequest(`/api/time-entries/project/${deliverable?.project_id}`, "GET"),
     enabled: !!deliverable?.project_id,

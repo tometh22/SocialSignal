@@ -273,7 +273,7 @@ async function fetchProjects(period: string, fresh: boolean): Promise<ProjectsAp
 }
 
 function useActiveProjects(period: string, fresh: boolean) {
-  return useQuery({
+  return useQuery<ProjectsApi>({
     queryKey: ["projects", period, fresh ? "fresh" : "cached"],
     queryFn: () => fetchProjects(period, fresh),
     staleTime: 30_000,

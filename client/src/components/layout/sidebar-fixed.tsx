@@ -266,7 +266,7 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
 
   const filteredNavSections = navSections.map(section => ({
     ...section,
-    items: section.items.filter(item =>
+    items: section.items.filter((item: NavItem) =>
       !item.permission || hasPermission(item.permission)
     )
   })).filter(section => section.items.length > 0);

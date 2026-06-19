@@ -47,6 +47,8 @@ interface Quotation {
   additionalNotes: string;
   quotationCurrency?: string;
   createdAt: string;
+  expiresAt?: string | null;
+  lossReason?: string | null;
 }
 
 interface ClientInfo {

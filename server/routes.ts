@@ -317,7 +317,7 @@ function setupIncomeSOTEndpoints(app: Express, requireAuth: any) {
     } catch (error) {
       console.error('❌ Income SoT Error:', error);
       res.status(500).json({ 
-        error: error instanceof Error ? error.message : String(error) 
+        error: error instanceof Error ? (error as Error).message : String(error) 
       });
     }
   });
@@ -344,7 +344,7 @@ function setupIncomeSOTEndpoints(app: Express, requireAuth: any) {
     } catch (error) {
       console.error('❌ Portfolio Income SoT Error:', error);
       res.status(500).json({ 
-        error: error instanceof Error ? error.message : String(error) 
+        error: error instanceof Error ? (error as Error).message : String(error) 
       });
     }
   });
@@ -378,7 +378,7 @@ function setupIncomeSOTEndpoints(app: Express, requireAuth: any) {
     } catch (error) {
       console.error('❌ Project Income SoT Error:', error);
       res.status(500).json({ 
-        error: error instanceof Error ? error.message : String(error) 
+        error: error instanceof Error ? (error as Error).message : String(error) 
       });
     }
   });
@@ -412,7 +412,7 @@ function setupCostsSOTEndpoints(app: Express, requireAuth: any) {
     } catch (error) {
       console.error('❌ Costs SoT Error:', error);
       res.status(500).json({ 
-        error: error instanceof Error ? error.message : String(error) 
+        error: error instanceof Error ? (error as Error).message : String(error) 
       });
     }
   });
@@ -439,7 +439,7 @@ function setupCostsSOTEndpoints(app: Express, requireAuth: any) {
     } catch (error) {
       console.error('❌ Portfolio Costs SoT Error:', error);
       res.status(500).json({ 
-        error: error instanceof Error ? error.message : String(error) 
+        error: error instanceof Error ? (error as Error).message : String(error) 
       });
     }
   });
@@ -478,7 +478,7 @@ function setupCostsSOTEndpoints(app: Express, requireAuth: any) {
     } catch (error) {
       console.error('❌ Project Costs SoT Error:', error);
       res.status(500).json({ 
-        error: error instanceof Error ? error.message : String(error) 
+        error: error instanceof Error ? (error as Error).message : String(error) 
       });
     }
   });
@@ -551,7 +551,7 @@ function setupCostsSOTEndpoints(app: Express, requireAuth: any) {
     } catch (error) {
       console.error('❌ Costs Debug Error:', error);
       res.status(500).json({ 
-        error: error instanceof Error ? error.message : String(error) 
+        error: error instanceof Error ? (error as Error).message : String(error) 
       });
     }
   });
@@ -744,7 +744,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       return res.status(500).json({
         error: 'Failed to get active projects data',
-        message: error instanceof Error ? error.message : String(error),
+        message: error instanceof Error ? (error as Error).message : String(error),
         engine: 'unified_aggregator'
       });
     }
@@ -931,7 +931,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       return res.status(500).json({
         error: 'Failed to get projects data',
-        message: error instanceof Error ? error.message : String(error),
+        message: error instanceof Error ? (error as Error).message : String(error),
         engine: 'consolidated_aggregator'
       });
     }
@@ -1040,7 +1040,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error('❌ Error in rollup endpoint:', error);
       return res.status(500).json({
         error: 'Failed to get rollup data',
-        message: error instanceof Error ? error.message : String(error)
+        message: error instanceof Error ? (error as Error).message : String(error)
       });
     }
   });
@@ -1136,7 +1136,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error('❌ Error in consistency check:', error);
       return res.status(500).json({
         error: 'Failed to check consistency',
-        message: error instanceof Error ? error.message : String(error)
+        message: error instanceof Error ? (error as Error).message : String(error)
       });
     }
   });
@@ -1178,7 +1178,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .innerJoin(clients, eq(clients.id, activeProjects.clientId))
         .where(and(
           sql`LOWER(${clients.name}) = LOWER(${clientName})`,
-          sql`LOWER(${quotations.name}) = LOWER(${projectName})`
+          sql`LOWER(${quotations.projectName}) = LOWER(${projectName})`
         ));
       if (!project) {
         return res.status(404).json({ error: 'Project not found' });
@@ -1199,7 +1199,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error('❌ Error in status update endpoint:', error);
       return res.status(500).json({
         error: 'Failed to update project status',
-        message: error instanceof Error ? error.message : String(error)
+        message: error instanceof Error ? (error as Error).message : String(error)
       });
     }
   });
@@ -1221,7 +1221,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Get Excel MAESTRO data (using existing logic)
-      let projectDirectCosts = [];
+      let projectDirectCosts: any[] = [];
       try {
         projectDirectCosts = await storage.getDirectCostsByProject(projectId);
         console.log(`📊 Retrieved ${projectDirectCosts.length} direct costs for project ${projectId}`);
@@ -1250,7 +1250,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               return false;
             }
             
-            const costDate = new Date(año, monthMap[mesStr], 1);
+            const costDate = new Date(año, (monthMap as Record<string, number>)[mesStr], 1);
             return costDate >= dateRange.startDate && costDate <= dateRange.endDate;
           });
         }
@@ -1274,7 +1274,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const isBasisEXEC = (basis || 'EXEC') === 'EXEC';
       
       // Aggregate data by team member
-      const memberData = {};
+      const memberData: Record<string, any> = {};
       filteredCosts.forEach(cost => {
         const memberName = cost.persona || 'Unknown';
         if (!memberData[memberName]) {
@@ -1347,7 +1347,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       console.error("❌ Error in test deviation analysis:", error);
-      res.status(500).json({ message: "Failed to analyze project deviations", error: error.message });
+      res.status(500).json({ message: "Failed to analyze project deviations", error: (error as Error).message });
     }
   });
 
@@ -1383,7 +1383,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error('❌ Force sync failed:', error);
       res.status(500).json({ 
         success: false, 
-        error: error.message 
+        error: (error as Error).message 
       });
     }
   });
@@ -1409,7 +1409,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error('❌ Provision sync error:', error);
       res.status(500).json({ 
         success: false, 
-        error: error.message,
+        error: (error as Error).message,
         stack: error.stack
       });
     }
@@ -1493,7 +1493,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error('❌ Provision debug error:', error);
       res.status(500).json({ 
         success: false, 
-        error: error.message,
+        error: (error as Error).message,
         stack: error.stack
       });
     }
@@ -1527,7 +1527,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       console.error('❌ Error en debug de costos:', error);
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      res.status(500).json({ error: error instanceof Error ? (error as Error).message : 'Unknown error' });
     }
   });
 
@@ -1584,7 +1584,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       console.error('❌ Error en debug de costos filtrados:', error);
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      res.status(500).json({ error: error instanceof Error ? (error as Error).message : 'Unknown error' });
     }
   });
 
@@ -2094,7 +2094,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("❌ Error calculating operational metrics:", error);
       res.status(500).json({ 
         message: "Failed to calculate operational metrics",
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? (error as Error).message : String(error)
       });
     }
   });
@@ -2158,7 +2158,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("❌ Error fetching monthly trends:", error);
       res.status(500).json({ 
         message: "Failed to fetch monthly trends",
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? (error as Error).message : String(error)
       });
     }
   });
@@ -3569,7 +3569,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     } catch (error) {
       console.error("❌ Error getting performance rankings for project", id, "with filter", timeFilter, ":", error);
-      console.error("❌ Error stack:", error.stack);
+      console.error("❌ Error stack:", (error as Error).stack);
       res.status(500).json({ message: "Failed to get performance rankings" });
     }
   });
@@ -4842,7 +4842,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(updatedQuotation);
     } catch (error) {
       console.error(`[API] Error actualizando estado de cotización ID ${id}:`, error);
-      res.status(500).json({ message: "Failed to update quotation status", error: error instanceof Error ? error.message : 'Unknown error' });
+      res.status(500).json({ message: "Failed to update quotation status", error: error instanceof Error ? (error as Error).message : 'Unknown error' });
     }
   });
 
@@ -5118,6 +5118,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const project = await storage.getActiveProject(projectId);
       if (!project) {
         return res.status(404).json({ message: "Project not found" });
+      }
+
+      if (!project.quotationId) {
+        return res.status(400).json({ message: "Project has no quotation" });
       }
 
       // Obtener la cotización actual
@@ -5605,7 +5609,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Sync quotation.totalAmount to the selected variant's totalAmount
         if (variant?.totalAmount != null) {
           await tx.update(quotations)
-            .set({ totalAmount: String(variant.totalAmount) })
+            .set({ totalAmount: Number(variant.totalAmount) })
             .where(eq(quotations.id, quotationId));
         }
 
@@ -5687,7 +5691,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ success: true, result });
     } catch (error: any) {
       console.error('❌ [API] ETL sync failed:', error);
-      res.status(500).json({ success: false, error: error.message });
+      res.status(500).json({ success: false, error: (error as Error).message });
     }
   });
 
@@ -5726,7 +5730,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ success: true, result });
     } catch (error: any) {
       console.error('❌ [API] Resumen Ejecutivo ETL sync failed:', error);
-      res.status(500).json({ success: false, error: error.message });
+      res.status(500).json({ success: false, error: (error as Error).message });
     } finally {
       resumenSyncInProgress = false;
     }
@@ -5768,7 +5772,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         periods: summary.sort((a, b) => b.periodKey.localeCompare(a.periodKey))
       });
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: (error as Error).message });
     }
   });
 
@@ -5880,7 +5884,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json(diagnosis);
     } catch (error: any) {
-      diagnosis.error = error.message;
+      diagnosis.error = (error as Error).message;
       diagnosis.stack = error.stack;
       res.status(500).json(diagnosis);
     }
@@ -5894,7 +5898,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ success: true, result });
     } catch (error: any) {
       console.error('❌ [API] Activo ETL sync failed:', error);
-      res.status(500).json({ success: false, error: error.message });
+      res.status(500).json({ success: false, error: (error as Error).message });
     }
   });
 
@@ -5939,7 +5943,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error: any) {
       console.error('❌ [DEBUG] Resumen Ejecutivo parse error:', error);
-      res.status(500).json({ success: false, error: error.message });
+      res.status(500).json({ success: false, error: (error as Error).message });
     }
   });
 
@@ -6027,7 +6031,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ success: errors.length === 0, inserted, updated, errors });
     } catch (error: any) {
       console.error('❌ [Manual Import] Error:', error);
-      res.status(500).json({ success: false, error: error.message });
+      res.status(500).json({ success: false, error: (error as Error).message });
     }
   });
 
@@ -6054,7 +6058,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         allRows: rows,
       });
     } catch (error: any) {
-      res.status(500).json({ success: false, error: error.message });
+      res.status(500).json({ success: false, error: (error as Error).message });
     }
   });
 
@@ -6093,7 +6097,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json({ totalRows: rows.length, data: summary });
     } catch (error: any) {
-      res.status(500).json({ success: false, error: error.message });
+      res.status(500).json({ success: false, error: (error as Error).message });
     }
   });
 
@@ -6141,7 +6145,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         directCosts: directCostRows,
       });
     } catch (error: any) {
-      res.status(500).json({ success: false, error: error.message });
+      res.status(500).json({ success: false, error: (error as Error).message });
     }
   });
 
@@ -7272,7 +7276,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
           
           // Obtener costos desde el sistema SoT corregido
-          const periodKey = timeFilter?.monthKeys ? timeFilter.monthKeys[0] : '2025-08'; // Default para agosto
+          const _dr = timeFilter && timeFilter !== 'all' ? getDateRangeForFilter(timeFilter) : null;
+          const periodKey = _dr?.startDate
+            ? `${_dr.startDate.getFullYear()}-${String(_dr.startDate.getMonth() + 1).padStart(2, '0')}`
+            : '2025-08';
           const projectCostResult = await costs.getCostsForProject(project.clientName, project.name, periodKey as any);
           
           if (projectCostResult) {
@@ -7546,7 +7553,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Error deleting active project:", error);
       res.status(500).json({ 
         message: "Failed to delete project",
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: error instanceof Error ? (error as Error).message : 'Unknown error'
       });
     }
   });
@@ -7712,7 +7719,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Error al guardar asignaciones de presupuesto:", error);
       res.status(500).json({ 
         message: "Error al procesar la asignación de presupuesto",
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: error instanceof Error ? (error as Error).message : 'Unknown error'
       });
     }
   });
@@ -8144,7 +8151,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         timeFilter 
       });
 
-      let query = db.select({
+      let query: any = db.select({
         projectId: sql`time_entries.project_id`,
         hours: sql`time_entries.hours`,
         date: sql`time_entries.date`
@@ -8171,7 +8178,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Agrupar por proyecto
       const groupedByProject: Record<number, any[]> = {};
-      entries.forEach(entry => {
+      entries.forEach((entry: any) => {
         const projectId = entry.projectId as number;
         if (!groupedByProject[projectId]) {
           groupedByProject[projectId] = [];
@@ -8279,47 +8286,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Solo calcular si faltan datos completamente
       if (processedData.entryType === "hours" && (processedData.totalCost === undefined || processedData.totalCost === null)) {
-        // Si se registró por horas y no hay costo definido, calcularlo
         processedData.totalCost = (processedData.hours || 0) * (processedData.hourlyRateAtTime || 0);
-        console.log('🔧 Calculando totalCost en backend:', {
-          hours: processedData.hours,
-          hourlyRateAtTime: processedData.hourlyRateAtTime,
-          totalCost: processedData.totalCost
-        });
       } else if (processedData.entryType === "cost" && (processedData.hours === undefined || processedData.hours === null)) {
-        // Si se registró por costo y no hay horas definidas, calcularlas
         processedData.hours = (processedData.totalCost || 0) / (processedData.hourlyRateAtTime || 1);
-        console.log('🔧 Calculando hours en backend:', {
-          totalCost: processedData.totalCost,
-          hourlyRateAtTime: processedData.hourlyRateAtTime,
-          hours: processedData.hours
-        });
       }
-      
-      console.log('📋 Backend recibe:', { 
-        entryType: processedData.entryType, 
-        totalCost: processedData.totalCost, 
-        originalKeys: Object.keys(req.body || {}) 
-      });
 
-      // Validar que tenemos valores válidos y positivos
-      if (typeof processedData.totalCost !== 'number' || isNaN(processedData.totalCost) || processedData.totalCost <= 0) {
-        console.error('❌ Validación totalCost fallida:', {
-          totalCost: processedData.totalCost,
-          type: typeof processedData.totalCost,
-          isNaN: isNaN(processedData.totalCost),
-          hours: processedData.hours,
-          hourlyRateAtTime: processedData.hourlyRateAtTime
-        });
-        return res.status(400).json({ 
-          message: "El costo total debe ser un número positivo",
-          debug: {
-            totalCost: processedData.totalCost,
-            type: typeof processedData.totalCost,
-            hours: processedData.hours,
-            hourlyRateAtTime: processedData.hourlyRateAtTime
-          }
-        });
+      // Allow totalCost = 0 for personnel with hourlyRate = 0 (internal/non-billed)
+      if (typeof processedData.totalCost !== 'number' || isNaN(processedData.totalCost) || processedData.totalCost < 0) {
+        return res.status(400).json({ message: "El costo total debe ser un número no negativo" });
       }
 
       if (typeof processedData.hours !== 'number' || isNaN(processedData.hours) || processedData.hours < 0.25) {
@@ -8653,7 +8627,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const subprojectCosts = await Promise.all(
           filteredSubprojects.map(async (subproject) => {
             // Obtener cotización para el subproyecto
-            const [quotation] = await db.select().from(quotations).where(eq(quotations.id, subproject.quotationId));
+            const [quotation] = subproject.quotationId
+              ? await db.select().from(quotations).where(eq(quotations.id, subproject.quotationId))
+              : [];
 
             // Obtener entradas de tiempo para el subproyecto
             const timeEntryData = await db.select({
@@ -8746,12 +8722,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Project not found" });
       }
 
+      if (!project.quotationId) {
+        return res.status(400).json({ message: "Project has no quotation" });
+      }
 
       const quotation = await storage.getQuotation(project.quotationId);
       if (!quotation) {
         return res.status(404).json({ message: "Quotation not found" });
       }
-
 
       // Verificar si hay otros proyectos que usan la misma cotización
       const projectsWithSameQuotation = await storage.getActiveProjectsByQuotationId(project.quotationId);
@@ -10664,7 +10642,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Convertir formato de cotización a formato de equipo base
           baseTeam = quotationTeam.map(member => {
             console.log(`🔄 MAPEANDO MIEMBRO:`, { id: member.id, hours: member.hours, rate: member.rate });
-            
+
             return {
               id: member.id,
               projectId: projectId,
@@ -10676,7 +10654,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               estimatedHours: member.hours,
               hourlyRate: member.rate
             };
-          });
+          }) as any[];
           
           console.log(`🔍 DESPUÉS DEL MAPEO - Equipo base:`, baseTeam.slice(0, 2));
         }
@@ -10697,23 +10675,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           const workedHours = parseFloat(timeEntryRows[0]?.total_hours || '0');
           
+          const m = member as any;
           const enrichedMember = {
             ...member,
             personnel: personnelData,
             role: roleData,
             name: personnelData?.name || 'Sin nombre',
             hours: workedHours, // Real worked hours from time entries
-            estimatedHours: member.hours || member.estimatedHours, // Original estimated hours
-            hourlyRate: member.rate || member.hourlyRate, // Hourly rate
-            cost: (member as any).cost ?? (member.estimatedHours * member.hourlyRate)
+            estimatedHours: m.hours || member.estimatedHours, // Original estimated hours
+            hourlyRate: m.rate || member.hourlyRate, // Hourly rate
+            cost: m.cost ?? (member.estimatedHours * member.hourlyRate)
           };
-          
+
           console.log(`🚀 ENVIANDO AL FRONTEND - ${personnelData?.name}:`, {
             hours: workedHours,
-            rate: member.rate,
-            cost: member.cost,
-            estimatedHours: member.hours || member.estimatedHours,
-            hourlyRate: member.rate || member.hourlyRate,
+            rate: m.rate,
+            cost: m.cost,
+            estimatedHours: m.hours || member.estimatedHours,
+            hourlyRate: m.rate || member.hourlyRate,
             personnelId: member.personnelId
           });
           
@@ -10724,7 +10703,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`📤 RESPUESTA COMPLETA AL FRONTEND:`, enrichedTeam.map(m => ({
         name: m.personnel?.name,
         hours: m.hours,
-        rate: m.rate,
+        rate: (m as any).rate,
         estimatedHours: m.estimatedHours,
         hourlyRate: m.hourlyRate,
         personnelId: m.personnelId
@@ -10749,6 +10728,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const [project] = await db.select().from(activeProjects).where(eq(activeProjects.id, projectId));
       if (!project) {
         return res.status(404).json({ message: "Project not found" });
+      }
+
+      if (!project.quotationId) {
+        return res.status(400).json({ message: "Project has no quotation" });
       }
 
       // Verificar si ya existe equipo base
@@ -11757,7 +11740,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           person.costARS += safeNum(row.costARS);
           person.costUSD += safeNum(row.costUSD);
           // Merge flags
-          if (row.flags) {
+          if (Array.isArray(row.flags)) {
             person.flags = [...new Set([...person.flags, ...row.flags])];
           }
         }
@@ -11896,7 +11879,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const revenueMap = new Map(revenueByPeriod.map(r => [r.periodKey, r.revenue]));
 
       // Obtener quotation para targets
-      const quotation = await storage.getQuotation(project.quotationId);
+      const quotation = project.quotationId ? await storage.getQuotation(project.quotationId) : null;
       const targetHours = quotation ? await calculateEstimatedHours(quotation.id) : 0;
       const targetCost = quotation?.baseCost || 0;
 
@@ -11991,11 +11974,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const last = new Date(projectEntries[projectEntries.length - 1].date);
     const weeksDiff = Math.max(1, (last.getTime() - first.getTime()) / (1000 * 60 * 60 * 24 * 7));
     const totalHours = projectEntries.reduce((sum, entry) => sum + entry.hours, 0);
-    const totalCost = projectEntries.reduce((sum, entry) => sum + entry.totalCost, 0);
+    const totalCost = projectEntries.reduce((sum, entry) => sum + (entry.totalCost ?? 0), 0);
     const velocityPerWeek = totalHours / weeksDiff;
 
     const project = await storage.getActiveProject(projectId);
-    const quotation = project ? await storage.getQuotation(project.quotationId) : null;
+    const quotation = project?.quotationId ? await storage.getQuotation(project.quotationId) : null;
     let targetHours = quotation ? await calculateEstimatedHours(quotation.id) : 0;
     let targetCost = quotation?.baseCost || 0;
     
@@ -12159,8 +12142,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Project not found" });
       }
 
-      const quotation = await storage.getQuotation(project.quotationId);
-      const teamMembers = await storage.getQuotationTeamMembers(project.quotationId);
+      const quotation = project.quotationId ? await storage.getQuotation(project.quotationId) : null;
+      const teamMembers = project.quotationId ? await storage.getQuotationTeamMembers(project.quotationId) : [];
       
       // Construir condiciones de filtro
       const whereConditions = [eq(timeEntries.projectId, projectId)];
@@ -12302,12 +12285,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // INTELIGENCIA DE NEGOCIO: Análisis de eficiencia operativa
       if (hourDeviation > 0) {
         // Identificar personas con mayor desviación
-        const teamAnalysis = projectEntries.reduce((acc, entry) => {
+        const teamAnalysis = projectEntries.reduce((acc: Record<number, any>, entry) => {
           const person = teamMembers.find(m => m.personnelId === entry.personnelId);
           if (!acc[entry.personnelId]) {
-            acc[entry.personnelId] = { 
+            acc[entry.personnelId] = {
               name: 'N/A',
-              actual: 0, 
+              actual: 0,
               estimated: person?.hours || 0,
               cost: 0
             };
@@ -12362,7 +12345,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // INTELIGENCIA DE NEGOCIO: Análisis predictivo basado en tendencias
       if (projectEntries.length >= 3) {
         // Análisis de tendencia mensual
-        const monthlyData = projectEntries.reduce((acc, entry) => {
+        const monthlyData = projectEntries.reduce((acc: Record<string, { hours: number; cost: number }>, entry) => {
           const month = new Date(entry.date).toISOString().slice(0, 7);
           if (!acc[month]) acc[month] = { hours: 0, cost: 0 };
           acc[month].hours += entry.hours;
@@ -12406,7 +12389,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const memberEntries = projectEntries.filter(e => e.personnelId === member.personnelId);
         const actualHours = memberEntries.reduce((sum, e) => sum + e.hours, 0);
         const efficiency = member.hours > 0 ? actualHours / member.hours : 0;
-        return { ...member, personnelName: nameMap.get(member.personnelId) ?? String(member.personnelId), actualHours, efficiency };
+        return { ...member, personnelName: nameMap.get(member.personnelId ?? 0) ?? String(member.personnelId), actualHours, efficiency };
       }).filter(m => m.actualHours > 0);
       
       const overperformers = teamPerformance.filter(m => m.efficiency > 1.5);
@@ -12466,7 +12449,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const currentQuarter = Math.floor(now.getMonth() / 3) + 1;
         const currentYear = now.getFullYear();
         
-        const analyzedDate = new Date(filterEndDate);
+        const analyzedDate = new Date(filterEndDate as string);
         const analyzedQuarter = Math.floor(analyzedDate.getMonth() / 3) + 1;
         const analyzedYear = analyzedDate.getFullYear();
         
@@ -12549,7 +12532,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               Math.max(1, Math.round((new Date(filterEndDate).getTime() - new Date(filterStartDate).getTime()) / (1000 * 60 * 60 * 24 * 30))) : 1),
             projectedAnnualRevenue: quotation && quotation.projectType === 'fee-mensual' ? 
               (quotation.totalAmount * 8) : // Mayo a Diciembre = 8 meses
-              (totalActualCost * currentMarkup * 12 / Math.max(1, Math.round((new Date(filterEndDate).getTime() - new Date(filterStartDate).getTime()) / (1000 * 60 * 60 * 24 * 30)))),
+              (totalActualCost * currentMarkup * 12 / Math.max(1, Math.round((new Date(filterEndDate as string).getTime() - new Date(filterStartDate as string).getTime()) / (1000 * 60 * 60 * 24 * 30)))),
             breakEvenPoint: currentMarkup >= 1.2 ? 'achieved' : `${((1.2 - currentMarkup) * 100).toFixed(0)}% para alcanzar`,
             clientSatisfactionRisk: hourDeviation > 20 ? 'high' : hourDeviation > 10 ? 'medium' : 'low'
           }
@@ -12558,7 +12541,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json({
         projectId,
-        projectName: project.name,
+        projectName: quotation?.projectName || `Proyecto ${projectId}`,
         recommendations,
         predictions,
         generatedAt: new Date().toISOString()
@@ -12851,8 +12834,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // =========== RUTAS PARA GOOGLE SHEETS INTEGRATION ===========
   
-  // Importar el servicio después de todas las rutas
-  const { googleSheetsService } = await import('./services/googleSheetsService');
+  // Note: using googleSheetsServiceAlternative for sync (googleSheetsService not needed here)
 
   // Sincronizar datos desde Google Sheets
   app.post("/api/google-sheets/sync", requireAuth, async (req, res) => {
@@ -12877,7 +12859,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ 
         success: false,
         message: "Error al sincronizar con Google Sheets",
-        error: error.message 
+        error: (error as Error).message 
       });
     }
   });
@@ -12914,7 +12896,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({
         success: false,
         message: 'Error al ejecutar sincronización manual con Excel MAESTRO',
-        error: error instanceof Error ? error.message : 'Error desconocido',
+        error: error instanceof Error ? (error as Error).message : 'Error desconocido',
         timestamp: new Date().toISOString()
       });
     }
@@ -12939,7 +12921,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({
         success: false,
         message: 'Error al obtener costos directos',
-        error: error instanceof Error ? error.message : 'Error desconocido'
+        error: error instanceof Error ? (error as Error).message : 'Error desconocido'
       });
     }
   });
@@ -12960,8 +12942,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         if (period) {
           // Get data from new SoT system
-          const incomeData = await income.getIncomeByPeriod(period);
-          
+          const incomeData = await income.getIncomeByPeriod(period as income.PeriodKey);
+
           // Transform to legacy format
           const legacyRecords = incomeData.projects
             .filter(project => {
@@ -13055,7 +13037,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error('❌ Error in income-dashboard-rows:', error);
       res.status(500).json({ 
         error: 'Error fetching income data',
-        message: error.message 
+        message: (error as Error).message 
       });
     }
   });
@@ -13083,7 +13065,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         if (period) {
           // Get data from new SoT system for specific project
-          const projectIncomeData = await income.getIncomeByProject(projectId, period);
+          const projectIncomeData = await income.getIncomeByProject(projectId, period as income.PeriodKey);
           
           if (projectIncomeData) {
             // Transform to legacy format
@@ -13120,8 +13102,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // 2. Aplicar filtro temporal usando la misma lógica que complete-data
       let filteredSales = allSales;
-      let periodInfo = { applied: false, range: null };
-      
+      let periodInfo: { applied: boolean; range: { startDate: Date; endDate: Date } | null } = { applied: false, range: null };
+
       if (timeFilter && timeFilter !== 'all') {
         const dateRange = getDateRangeForFilter(timeFilter);
         if (dateRange) {
@@ -13258,7 +13240,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("❌ Error getting project incomes:", error);
       res.status(500).json({ 
         message: "Failed to get project incomes",
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? (error as Error).message : String(error)
       });
     }
   });
@@ -13280,7 +13262,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // 2. Aplicar filtro temporal usando la misma lógica que complete-data
       let filteredCosts = allCosts;
-      let periodInfo = { applied: false, range: null };
+      let periodInfo: { applied: boolean; range: { startDate: Date; endDate: Date } | null } = { applied: false, range: null };
       
       // Helper para obtener número de mes (función unificada para costs)
       const getMonthNumberCosts = (monthName: string): number => {
@@ -13426,7 +13408,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("❌ Error getting project costs:", error);
       res.status(500).json({ 
         message: "Failed to get project costs",
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? (error as Error).message : String(error)
       });
     }
   });
@@ -13785,7 +13767,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("❌ Error in universal projects listing:", error);
       res.status(500).json({ 
         message: "Failed to get universal projects listing",
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? (error as Error).message : String(error)
       });
     }
   }); 
@@ -13948,7 +13930,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("❌ Error in universal complete data:", error);
       res.status(500).json({ 
         message: "Failed to get universal complete data",
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? (error as Error).message : String(error)
       });
     }
   });
@@ -13962,8 +13944,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Buscar sales de agosto 2025 en múltiples formatos
       const augustSales = allSales.filter(sale => {
-        const month = sale.month || sale.mes || '';
-        const year = sale.year || sale.año || 0;
+        const month = sale.month || '';
+        const year = sale.year || 0;
         const monthKey = sale.monthKey || '';
         
         return (
@@ -13981,7 +13963,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         warnerAugustSales: warnerAugustSales
       });
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: (error as Error).message });
     }
   });
 
@@ -14044,7 +14026,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
     } catch (error) {
       console.error('❌ Cost backfill error:', error);
-      res.status(500).json({ error: 'Failed to perform cost backfill', details: error.message });
+      res.status(500).json({ error: 'Failed to perform cost backfill', details: (error as Error).message });
     }
   });
 
@@ -14056,8 +14038,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get August sales data (verified working)
       const allSales = await storage.getGoogleSheetsSales();
       const augustSales = allSales.filter(sale => {
-        const month = sale.month || sale.mes || '';
-        const year = sale.year || sale.año || 0;
+        const month = sale.month || '';
+        const year = sale.year || 0;
         const monthKey = sale.monthKey || '';
         return (
           (month.toLowerCase().includes('agosto') || month.toLowerCase().includes('august')) && 
@@ -14086,16 +14068,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       `);
       
       // Calculate with anti×100 detection (using the same logic as the working system)
-      const applyAnti100 = (revenue) => {
+      const applyAnti100 = (revenue: number) => {
         const goldenRevenues = [29230, 8450];
-        const isLikelyMultipliedBy100 = goldenRevenues.some(golden => 
+        const isLikelyMultipliedBy100 = goldenRevenues.some(golden =>
           Math.abs(revenue - golden * 100) < Math.abs(revenue - golden)
         );
         return isLikelyMultipliedBy100 ? revenue / 100 : revenue;
       };
-      
-      const warnerRevenue = warnerSales ? applyAnti100(parseFloat(warnerSales.amountUsd)) : 0;
-      const kimberlyRevenue = kimberlySales ? parseFloat(kimberlySales.amountUsd) : 0;
+
+      const warnerRevenue = warnerSales ? applyAnti100(parseFloat(warnerSales.amountUsd ?? '0')) : 0;
+      const kimberlyRevenue = kimberlySales ? parseFloat(kimberlySales.amountUsd ?? '0') : 0;
       const warnerCost = parseFloat(warnerCosts.rows[0]?.total_cost || 0);
       const kimberlyCost = parseFloat(kimberlyCosts.rows[0]?.total_cost || 0);
       
@@ -14141,7 +14123,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
     } catch (error) {
       console.error('❌ Golden status check error:', error);
-      res.status(500).json({ error: 'Failed to check golden status', details: error.message });
+      res.status(500).json({ error: 'Failed to check golden status', details: (error as Error).message });
     }
   });
 
@@ -14211,7 +14193,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
     } catch (error) {
       console.error('❌ Excel headers inspection error:', error);
-      res.status(500).json({ error: 'Failed to fetch Excel headers', details: error.message });
+      res.status(500).json({ error: 'Failed to fetch Excel headers', details: (error as Error).message });
     }
   });
 
@@ -14328,7 +14310,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error('❌ ETL API Error:', error);
       res.status(500).json({ 
         success: false, 
-        error: error instanceof Error ? error.message : String(error) 
+        error: error instanceof Error ? (error as Error).message : String(error) 
       });
     }
   });
@@ -14339,9 +14321,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { salesNorm, costsNorm, targetsNorm } = await import('../shared/schema');
       const { sql } = await import('drizzle-orm');
       
-      const salesCount = await db.select({ count: sql`count(*)` }).from(salesNorm);
-      const costsCount = await db.select({ count: sql`count(*)` }).from(costsNorm);
-      const targetsCount = await db.select({ count: sql`count(*)` }).from(targetsNorm);
+      const salesCount = await db.select({ count: sql<number>`count(*)` }).from(salesNorm);
+      const costsCount = await db.select({ count: sql<number>`count(*)` }).from(costsNorm);
+      const targetsCount = await db.select({ count: sql<number>`count(*)` }).from(targetsNorm);
       
       res.json({
         normalized_data: {
@@ -14355,7 +14337,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('❌ ETL Status Error:', error);
       res.status(500).json({ 
-        error: error instanceof Error ? error.message : String(error) 
+        error: error instanceof Error ? (error as Error).message : String(error) 
       });
     }
   });
@@ -14377,7 +14359,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('❌ Golden Values Test Error:', error);
       res.status(500).json({ 
-        error: error instanceof Error ? error.message : String(error) 
+        error: error instanceof Error ? (error as Error).message : String(error) 
       });
     }
   });
@@ -14403,7 +14385,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('❌ Universal Aggregator Error:', error);
       res.status(500).json({ 
-        error: error instanceof Error ? error.message : String(error) 
+        error: error instanceof Error ? (error as Error).message : String(error) 
       });
     }
   });
@@ -14414,7 +14396,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { UniversalAggregator } = await import('./services/universal-aggregator');
       
       const filters = req.body.filters || {};
-      const projectTypeMap = req.body.projectTypeMap ? new Map(req.body.projectTypeMap) : undefined;
+      const projectTypeMap = req.body.projectTypeMap ? new Map<string, any>(req.body.projectTypeMap) : undefined;
       
       const aggregator = new UniversalAggregator(db);
       const metricsArray = await aggregator.aggregateMultipleProjects(filters, projectTypeMap);
@@ -14429,7 +14411,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('❌ Bulk Aggregator Error:', error);
       res.status(500).json({ 
-        error: error instanceof Error ? error.message : String(error) 
+        error: error instanceof Error ? (error as Error).message : String(error) 
       });
     }
   });
@@ -14479,7 +14461,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('❌ Debug RAW Error:', error);
       res.status(500).json({ 
-        error: error instanceof Error ? error.message : String(error) 
+        error: error instanceof Error ? (error as Error).message : String(error) 
       });
     }
   });
@@ -14507,7 +14489,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }))
       });
     } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+      res.status(500).json({ error: error instanceof Error ? (error as Error).message : String(error) });
     }
   });
 
@@ -14593,7 +14575,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error('❌ SoT ETL API Error:', error);
       res.status(500).json({ 
         success: false, 
-        error: error instanceof Error ? error.message : String(error) 
+        error: error instanceof Error ? (error as Error).message : String(error) 
       });
     }
   });
@@ -14633,7 +14615,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('❌ Diagnostics Error:', error);
       res.status(500).json({ 
-        error: error instanceof Error ? error.message : String(error) 
+        error: error instanceof Error ? (error as Error).message : String(error) 
       });
     }
   });
@@ -14673,7 +14655,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error('❌ Recompute Error:', error);
       res.status(500).json({ 
         success: false,
-        error: error instanceof Error ? error.message : String(error) 
+        error: error instanceof Error ? (error as Error).message : String(error) 
       });
     }
   });
@@ -14832,7 +14814,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('❌ Validation Error:', error);
       res.status(500).json({ 
-        error: error instanceof Error ? error.message : String(error) 
+        error: error instanceof Error ? (error as Error).message : String(error) 
       });
     }
   });
@@ -14843,8 +14825,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const periodKey = req.query.period as string;
       const { rcUnmatchedStaging } = await import('../shared/schema');
       
-      let query = db.select().from(rcUnmatchedStaging);
-      
+      let query: any = db.select().from(rcUnmatchedStaging);
+
       if (periodKey) {
         query = query.where(eq(rcUnmatchedStaging.periodKey, periodKey));
       }
@@ -14852,7 +14834,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const unmatchedRows = await query.orderBy(rcUnmatchedStaging.createdAt);
       
       // Agrupar por motivo para resumen
-      const summary = unmatchedRows.reduce((acc, row) => {
+      const summary = unmatchedRows.reduce((acc: Record<string, number>, row: any) => {
         acc[row.motivo] = (acc[row.motivo] || 0) + 1;
         return acc;
       }, {} as Record<string, number>);
@@ -14868,7 +14850,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('❌ RC Unmatched Diagnostics Error:', error);
       res.status(500).json({ 
-        error: error instanceof Error ? error.message : String(error) 
+        error: error instanceof Error ? (error as Error).message : String(error) 
       });
     }
   });
@@ -14963,7 +14945,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error('❌ Migration Error:', error);
       res.status(500).json({ 
         success: false,
-        error: error instanceof Error ? error.message : String(error) 
+        error: error instanceof Error ? (error as Error).message : String(error) 
       });
     }
   });
@@ -15055,7 +15037,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error('❌ Reprocess RC Error:', error);
       res.status(500).json({ 
         success: false,
-        error: error instanceof Error ? error.message : String(error) 
+        error: error instanceof Error ? (error as Error).message : String(error) 
       });
     }
   });
@@ -15082,7 +15064,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error('❌ CashFlow Sync Error:', error);
       res.status(500).json({ 
         success: false,
-        error: error instanceof Error ? error.message : String(error) 
+        error: error instanceof Error ? (error as Error).message : String(error) 
       });
     }
   });
@@ -15150,7 +15132,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error('❌ CashFlow Debug Error:', error);
       res.status(500).json({ 
         success: false,
-        error: error instanceof Error ? error.message : String(error) 
+        error: error instanceof Error ? (error as Error).message : String(error) 
       });
     }
   });
@@ -15261,7 +15243,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('❌ Stable Projects Endpoint Error:', error);
       res.status(500).json({ 
-        error: error instanceof Error ? error.message : String(error) 
+        error: error instanceof Error ? (error as Error).message : String(error) 
       });
     }
   });
@@ -15394,7 +15376,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('❌ Project Detail Endpoint Error:', error);
       res.status(500).json({ 
-        error: error instanceof Error ? error.message : String(error) 
+        error: error instanceof Error ? (error as Error).message : String(error) 
       });
     }
   });
@@ -15484,7 +15466,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('❌ Performance Rankings Endpoint Error:', error);
       res.status(500).json({ 
-        error: error instanceof Error ? error.message : String(error) 
+        error: error instanceof Error ? (error as Error).message : String(error) 
       });
     }
   });
@@ -15537,7 +15519,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('❌ Business Invariants Validation Error:', error);
       res.status(500).json({ 
-        error: error instanceof Error ? error.message : String(error) 
+        error: error instanceof Error ? (error as Error).message : String(error) 
       });
     }
   });
@@ -15559,9 +15541,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         whereClause = ` WHERE month_key = '${period}'`;
       }
       
-      const salesCount = await db.select({ count: sql`count(*)` }).from(salesNorm);
-      const costsCount = await db.select({ count: sql`count(*)` }).from(costsNorm);
-      const targetsCount = await db.select({ count: sql`count(*)` }).from(targetsNorm);
+      const salesCount = await db.select({ count: sql<number>`count(*)` }).from(salesNorm);
+      const costsCount = await db.select({ count: sql<number>`count(*)` }).from(costsNorm);
+      const targetsCount = await db.select({ count: sql<number>`count(*)` }).from(targetsNorm);
       
       // Get raw data counts from Google Sheets service
       let rawCounts = { sales: 0, costs: 0, targets: 0 };
@@ -15609,7 +15591,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('❌ Debug Completeness Error:', error);
       res.status(500).json({ 
-        error: error instanceof Error ? error.message : String(error) 
+        error: error instanceof Error ? (error as Error).message : String(error) 
       });
     }
   });
@@ -15707,7 +15689,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('❌ Debug Aggregates Error:', error);
       res.status(500).json({ 
-        error: error instanceof Error ? error.message : String(error) 
+        error: error instanceof Error ? (error as Error).message : String(error) 
       });
     }
   });
@@ -15722,7 +15704,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`🐛 DEBUG ANOMALIES: period=${period}`);
       
       // Query for records with anomalies
-      let salesQuery = db.select({
+      let salesQuery: any = db.select({
         projectKey: salesNorm.projectKey,
         monthKey: salesNorm.monthKey,
         usd: salesNorm.usd,
@@ -15731,8 +15713,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       })
       .from(salesNorm)
       .where(isNotNull(salesNorm.anomaly));
-      
-      let costsQuery = db.select({
+
+      let costsQuery: any = db.select({
         projectKey: costsNorm.projectKey,
         monthKey: costsNorm.monthKey,
         usd: costsNorm.usd,
@@ -15812,7 +15794,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('❌ Debug Anomalies Error:', error);
       res.status(500).json({ 
-        error: error instanceof Error ? error.message : String(error) 
+        error: error instanceof Error ? (error as Error).message : String(error) 
       });
     }
   });
@@ -15935,7 +15917,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('❌ REBUILD SOT Error:', error);
       return _res.status(500).json({ 
-        error: error instanceof Error ? error.message : String(error) 
+        error: error instanceof Error ? (error as Error).message : String(error) 
       });
     }
   });
@@ -16002,7 +15984,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('❌ IMPORT INCOMES Error:', error);
       return res.status(500).json({
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? (error as Error).message : String(error)
       });
     }
   });
@@ -16050,7 +16032,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('❌ SYNC INCOME Error:', error);
       return res.status(500).json({
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? (error as Error).message : String(error)
       });
     }
   });
@@ -16077,7 +16059,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('❌ SYNC FINANCIAL Error:', error);
       return res.status(500).json({
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? (error as Error).message : String(error)
       });
     }
   });
@@ -16110,7 +16092,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('❌ SYNC MONTHLY AGGREGATES Error:', error);
       return res.status(500).json({
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? (error as Error).message : String(error)
       });
     }
   });
@@ -16172,7 +16154,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error creating exchange rate:", error);
       return res.status(500).json({ 
-        message: error instanceof Error ? error.message : "Failed to create exchange rate" 
+        message: error instanceof Error ? (error as Error).message : "Failed to create exchange rate" 
       });
     }
   });
@@ -16206,7 +16188,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error updating exchange rate:", error);
       return res.status(500).json({ 
-        message: error instanceof Error ? error.message : "Failed to update exchange rate" 
+        message: error instanceof Error ? (error as Error).message : "Failed to update exchange rate" 
       });
     }
   });
@@ -16231,7 +16213,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error previewing Asana hours:", error);
       return res.status(502).json({
-        message: error instanceof Error ? error.message : "Failed to preview Asana hours",
+        message: error instanceof Error ? (error as Error).message : "Failed to preview Asana hours",
       });
     }
   });
@@ -16254,7 +16236,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error importing Asana hours:", error);
       return res.status(502).json({
-        message: error instanceof Error ? error.message : "Failed to import Asana hours",
+        message: error instanceof Error ? (error as Error).message : "Failed to import Asana hours",
       });
     }
   });
@@ -16276,7 +16258,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error syncing blue rate:", error);
       return res.status(502).json({
-        message: error instanceof Error ? error.message : "Failed to sync blue rate",
+        message: error instanceof Error ? (error as Error).message : "Failed to sync blue rate",
       });
     }
   });
@@ -16299,7 +16281,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error importing REM estimates:", error);
       return res.status(500).json({
-        message: error instanceof Error ? error.message : "Failed to import REM",
+        message: error instanceof Error ? (error as Error).message : "Failed to import REM",
       });
     }
   });
@@ -16342,7 +16324,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .reduce((sum, p) => sum + p.amountUsd, 0)
       });
     } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+      res.status(500).json({ error: error instanceof Error ? (error as Error).message : String(error) });
     }
   });
 
@@ -16408,7 +16390,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json({ diagnostics, authResult });
     } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+      res.status(500).json({ error: error instanceof Error ? (error as Error).message : String(error) });
     }
   });
 
@@ -16416,11 +16398,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/debug/sheets-activo", requireAuth, async (req, res) => {
     try {
       const { googleSheetsWorkingService } = await import('./services/googleSheetsWorking');
-      const sheets = googleSheetsWorkingService.createSheetsClientFromJSON();
-      
+      const svc = googleSheetsWorkingService as any;
+      const sheets = svc.createSheetsClientFromJSON();
+      if (!sheets) return res.status(500).json({ error: 'Failed to create sheets client' });
+
       // Get raw data from "Activo" sheet
       const response = await sheets.spreadsheets.values.get({
-        spreadsheetId: googleSheetsWorkingService.spreadsheetId,
+        spreadsheetId: svc.spreadsheetId,
         range: "'Activo'!A:U",
         valueRenderOption: 'FORMATTED_VALUE',
       });
@@ -16437,7 +16421,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }));
       return res.json({ success: true, tiposUnicos, recentRows, headers: rawHeaders, totalRows: rawRows.length });
     } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+      res.status(500).json({ error: error instanceof Error ? (error as Error).message : String(error) });
     }
   });
 
@@ -16638,7 +16622,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }))
       });
     } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+      res.status(500).json({ error: error instanceof Error ? (error as Error).message : String(error) });
     }
   });
 
@@ -16773,7 +16757,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         byStage,
       });
     } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+      res.status(500).json({ error: error instanceof Error ? (error as Error).message : String(error) });
     }
   });
 
@@ -16813,7 +16797,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json(enriched);
     } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+      res.status(500).json({ error: error instanceof Error ? (error as Error).message : String(error) });
     }
   });
 
@@ -16839,7 +16823,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(lead);
     } catch (error) {
       if (error instanceof z.ZodError) return res.status(400).json({ error: error.errors });
-      res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+      res.status(500).json({ error: error instanceof Error ? (error as Error).message : String(error) });
     }
   });
 
@@ -16871,7 +16855,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json({ ...lead, contacts, activities, reminders, quotations: linkedQuotations });
     } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+      res.status(500).json({ error: error instanceof Error ? (error as Error).message : String(error) });
     }
   });
 
@@ -16896,7 +16880,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!lead) return res.status(404).json({ error: 'Lead not found' });
       res.json(lead);
     } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+      res.status(500).json({ error: error instanceof Error ? (error as Error).message : String(error) });
     }
   });
 
@@ -16909,7 +16893,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!deleted) return res.status(404).json({ error: 'Lead not found' });
       res.json({ success: true });
     } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+      res.status(500).json({ error: error instanceof Error ? (error as Error).message : String(error) });
     }
   });
 
@@ -16921,7 +16905,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .orderBy(desc(crmContacts.isPrimary));
       res.json(contacts);
     } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+      res.status(500).json({ error: error instanceof Error ? (error as Error).message : String(error) });
     }
   });
 
@@ -16934,7 +16918,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(contact);
     } catch (error) {
       if (error instanceof z.ZodError) return res.status(400).json({ error: error.errors });
-      res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+      res.status(500).json({ error: error instanceof Error ? (error as Error).message : String(error) });
     }
   });
 
@@ -16955,7 +16939,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(contact);
     } catch (error) {
       if (error instanceof z.ZodError) return res.status(400).json({ error: error.errors });
-      res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+      res.status(500).json({ error: error instanceof Error ? (error as Error).message : String(error) });
     }
   });
 
@@ -16968,7 +16952,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!deleted) return res.status(404).json({ error: 'Contact not found' });
       res.json({ success: true });
     } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+      res.status(500).json({ error: error instanceof Error ? (error as Error).message : String(error) });
     }
   });
 
@@ -16980,7 +16964,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .orderBy(desc(crmActivities.activityDate));
       res.json(activities);
     } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+      res.status(500).json({ error: error instanceof Error ? (error as Error).message : String(error) });
     }
   });
 
@@ -16998,7 +16982,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(activity);
     } catch (error) {
       if (error instanceof z.ZodError) return res.status(400).json({ error: error.errors });
-      res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+      res.status(500).json({ error: error instanceof Error ? (error as Error).message : String(error) });
     }
   });
 
@@ -17010,7 +16994,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await db.delete(crmActivities).where(eq(crmActivities.id, id));
       res.json({ success: true });
     } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+      res.status(500).json({ error: error instanceof Error ? (error as Error).message : String(error) });
     }
   });
 
@@ -17099,7 +17083,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json([...manualAlerts, ...inactivityAlerts]);
     } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+      res.status(500).json({ error: error instanceof Error ? (error as Error).message : String(error) });
     }
   });
 
@@ -17111,7 +17095,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .orderBy(asc(crmReminders.dueDate));
       res.json(reminders);
     } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+      res.status(500).json({ error: error instanceof Error ? (error as Error).message : String(error) });
     }
   });
 
@@ -17128,7 +17112,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(reminder);
     } catch (error) {
       if (error instanceof z.ZodError) return res.status(400).json({ error: error.errors });
-      res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+      res.status(500).json({ error: error instanceof Error ? (error as Error).message : String(error) });
     }
   });
 
@@ -17147,7 +17131,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!reminder) return res.status(404).json({ error: 'Reminder not found' });
       res.json(reminder);
     } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+      res.status(500).json({ error: error instanceof Error ? (error as Error).message : String(error) });
     }
   });
 
@@ -17159,7 +17143,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await db.delete(crmReminders).where(eq(crmReminders.id, id));
       res.json({ success: true });
     } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+      res.status(500).json({ error: error instanceof Error ? (error as Error).message : String(error) });
     }
   });
 
@@ -17226,8 +17210,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json({ success: true, activity });
     } catch (error: any) {
-      console.error('SendGrid error:', error?.response?.body || error.message);
-      res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+      console.error('SendGrid error:', error?.response?.body || (error as Error).message);
+      res.status(500).json({ error: error instanceof Error ? (error as Error).message : String(error) });
     }
   });
 
@@ -18907,7 +18891,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(summary);
     } catch (error: any) {
       console.error('POST /api/status-semanal/ai-summary error:', error);
-      res.status(500).json({ message: error.message || "Error al generar resumen IA" });
+      res.status(500).json({ message: (error as Error).message || "Error al generar resumen IA" });
     }
   });
 
@@ -19021,7 +19005,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { title, subtitle } = req.body;
       if (!title?.trim()) return res.status(400).json({ message: "El título es requerido" });
       const [item] = await db.insert(weeklyStatusItems)
-        .values({ title: title.trim(), subtitle: subtitle?.trim() || null })
+        .values({ title: title.trim(), subtitle: subtitle?.trim() || null } as any)
         .returning();
       res.status(201).json(item);
     } catch (error) {
@@ -19200,7 +19184,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(result.rows);
     } catch (error: any) {
       console.error("BI pnl-mensual error:", error);
-      res.status(500).json({ message: "Error fetching P&L data", error: error.message });
+      res.status(500).json({ message: "Error fetching P&L data", error: (error as Error).message });
     }
   });
 
@@ -19210,7 +19194,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(result.rows);
     } catch (error: any) {
       console.error("BI proyectos-mensual error:", error);
-      res.status(500).json({ message: "Error fetching project data", error: error.message });
+      res.status(500).json({ message: "Error fetching project data", error: (error as Error).message });
     }
   });
 
@@ -19220,7 +19204,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(result.rows);
     } catch (error: any) {
       console.error("BI costos-mensual error:", error);
-      res.status(500).json({ message: "Error fetching cost data", error: error.message });
+      res.status(500).json({ message: "Error fetching cost data", error: (error as Error).message });
     }
   });
 
@@ -19230,7 +19214,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(result.rows);
     } catch (error: any) {
       console.error("BI equipo-mensual error:", error);
-      res.status(500).json({ message: "Error fetching team data", error: error.message });
+      res.status(500).json({ message: "Error fetching team data", error: (error as Error).message });
     }
   });
 
@@ -19240,7 +19224,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(result.rows);
     } catch (error: any) {
       console.error("BI cashflow error:", error);
-      res.status(500).json({ message: "Error fetching cashflow data", error: error.message });
+      res.status(500).json({ message: "Error fetching cashflow data", error: (error as Error).message });
     }
   });
 
@@ -19250,7 +19234,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(result.rows);
     } catch (error: any) {
       console.error("BI revenue-por-cliente error:", error);
-      res.status(500).json({ message: "Error fetching client revenue data", error: error.message });
+      res.status(500).json({ message: "Error fetching client revenue data", error: (error as Error).message });
     }
   });
 

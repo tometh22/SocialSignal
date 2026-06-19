@@ -465,7 +465,7 @@ export async function getUnifiedDashboard(periodKey: string): Promise<UnifiedDas
     beneficioNeto,
     margenNetoPct: sheetMargenNeto !== 0 ? sheetMargenNeto : pct(beneficioNeto, ventasMes),
     markup: Math.round(markup * 100) / 100, // ratio: revenue/cost (e.g. 2.5 = 250%)
-    markupRatio: Math.round(markup * 100) / 100, // alias for clarity (same value as markup)
+    // markupRatio is an alias for markup (same value)
 
     // Balance
     totalActivo,

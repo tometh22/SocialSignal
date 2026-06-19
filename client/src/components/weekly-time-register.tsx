@@ -93,7 +93,6 @@ export default function WeeklyTimeRegister({ projectId, onSuccess, onCancel }: W
       timestamp: Date.now()
     };
     localStorage.setItem(storageKey, JSON.stringify(data));
-    console.log('📁 Datos guardados automáticamente');
   };
 
   // Función para cargar desde localStorage
@@ -377,40 +376,18 @@ export default function WeeklyTimeRegister({ projectId, onSuccess, onCancel }: W
           const memberData = teamHours[member.personnelId];
           if (!memberData || !memberData.hours || memberData.hours <= 0) return null;
           
-          // Asegurar que hourlyRate sea un número válido
-          const baseRate = Number(member.hourlyRate) || 10; // Rate por defecto mínimo
+          const baseRate = Number(member.hourlyRate) || 0;
           const customRate = memberData.customRate !== undefined ? Number(memberData.customRate) : null;
-          const hourlyRate = customRate !== null && customRate > 0 ? customRate : baseRate;
+          const hourlyRate = customRate !== null && customRate >= 0 ? customRate : baseRate;
           const hours = roundToQuarterHour(Number(memberData.hours) || 0);
           if (hours <= 0) return null;
-          const totalCost = Number((hours * hourlyRate).toFixed(2)); // Redondear a 2 decimales
-          
-          console.log('💰 Cálculo de costo:', {
-            personnelId: member.personnelId,
-            memberName: member.name,
-            hours: hours,
-            baseRate: baseRate,
-            customRate: customRate,
-            hourlyRate: hourlyRate,
-            totalCost: totalCost,
-            calculation: `${hours} * ${hourlyRate} = ${totalCost}`
-          });
-          
-          // Validar que los valores sean válidos
-          if (typeof totalCost !== 'number' || isNaN(totalCost) || totalCost <= 0 || 
-              typeof hourlyRate !== 'number' || isNaN(hourlyRate) || hourlyRate <= 0 ||
-              typeof hours !== 'number' || isNaN(hours) || hours <= 0) {
-            console.error('❌ Validación fallida:', { 
-              personnelId: member.personnelId,
-              hours: { value: hours, type: typeof hours, isNaN: isNaN(hours) }, 
-              hourlyRate: { value: hourlyRate, type: typeof hourlyRate, isNaN: isNaN(hourlyRate) }, 
-              totalCost: { value: totalCost, type: typeof totalCost, isNaN: isNaN(totalCost) },
-              baseRate: member.hourlyRate,
-              customRate: memberData.customRate
-            });
+          const totalCost = Number((hours * hourlyRate).toFixed(2));
+
+          // Allow 0-cost entries for personnel with 0 hourly rate
+          if (typeof hours !== 'number' || isNaN(hours) || typeof totalCost !== 'number' || isNaN(totalCost) || totalCost < 0) {
             return null;
           }
-          
+
           const entryData = {
             projectId,
             personnelId: member.personnelId,
@@ -428,11 +405,9 @@ export default function WeeklyTimeRegister({ projectId, onSuccess, onCancel }: W
             billable: true
           };
           
-          console.log('Creating entry:', entryData);
-          
           return entryData;
         })
-        .filter(Boolean);
+        .filter((e): e is NonNullable<typeof e> => e !== null);
 
       if (entries.length === 0) {
         toast({
@@ -443,29 +418,11 @@ export default function WeeklyTimeRegister({ projectId, onSuccess, onCancel }: W
         return;
       }
 
-      // Crear todas las entradas
-      console.log('📤 Enviando entradas:', entries);
-      
-      // Log específico para debug
-      entries.forEach((entry, index) => {
-        console.log(`Entry ${index}:`, {
-          entryType: entry.entryType,
-          totalCost: entry.totalCost,
-          hourlyRateAtTime: entry.hourlyRateAtTime,
-          typeof_entryType: typeof entry.entryType,
-          typeof_totalCost: typeof entry.totalCost,
-          typeof_hourlyRateAtTime: typeof entry.hourlyRateAtTime
-        });
-      });
-      
       for (const entry of entries) {
         try {
-          console.log('🔄 Procesando entrada individual:', entry);
           await createTimeEntry.mutateAsync(entry);
-          console.log('✅ Entrada procesada correctamente');
         } catch (error) {
-          console.error('❌ Error en entrada específica:', error);
-          console.error('📄 Datos de la entrada fallida:', entry);
+          console.error('Error creating time entry:', error);
           throw error;
         }
       }
@@ -803,7 +760,7 @@ export default function WeeklyTimeRegister({ projectId, onSuccess, onCancel }: W
                           <div className="flex items-center gap-3">
                             <Avatar className="w-8 h-8">
                               <AvatarFallback className="bg-blue-600 text-white text-xs font-semibold">
-                                {member.name ? member.name.split(' ').map(n => n[0]).join('').toUpperCase() : '?'}
+                                {member.name ? member.name.split(' ').map((n: string) => n[0]).join('').toUpperCase() : '?'}
                               </AvatarFallback>
                             </Avatar>
                             <div>

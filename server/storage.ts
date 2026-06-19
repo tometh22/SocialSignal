@@ -2560,7 +2560,7 @@ export class DatabaseStorage implements IStorage {
             existingTraditional.targetHours = excelPerson.targetHours; // USAR SOLO Excel MAESTRO
           }
           // Marcar que tiene datos de Excel
-          existingTraditional.hasExcelData = true;
+          (existingTraditional as any).hasExcelData = true;
         } else {
           // Solo agregar si NO existe en el array tradicional
           costByPerson.push(excelPerson);
@@ -2929,6 +2929,7 @@ export class DatabaseStorage implements IStorage {
           quotationId: parentProject.quotationId,
           clientId: parentProject.clientId,
           parentProjectId,
+          projectCategory: 'billable',
           startDate: new Date(currentDate),
           expectedEndDate: cycleEnd,
           status: 'active',
@@ -4037,7 +4038,7 @@ export class DatabaseStorage implements IStorage {
   // ==================== GOOGLE SHEETS IMPORT OPERATIONS ====================
   
   async importGoogleSheetsProjects(projectsData: any[]): Promise<{ imported: number; updated: number; errors: string[] }> {
-    const results = { imported: 0, updated: 0, errors: [] };
+    const results: { imported: number; updated: number; errors: string[] } = { imported: 0, updated: 0, errors: [] };
     
     try {
       // Utility function to parse amounts
@@ -4873,7 +4874,7 @@ export class DatabaseStorage implements IStorage {
       // Usar la función auxiliar importada para obtener rango de fechas del filtro temporal
 
       // Construir query base
-      let query = db.select().from(googleSheetsSales);
+      let query: any = db.select().from(googleSheetsSales);
       const conditions = [];
 
       // Filtro por proyecto específico - CORRECTED: usar quotation_id -> client mapping

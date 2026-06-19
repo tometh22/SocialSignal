@@ -381,7 +381,7 @@ export default function TasksHomePage() {
 
   const taskCounts = {
     upcoming: myTasks.filter(t => t.status !== "done" && t.status !== "cancelled" && t.status !== "in_progress" && t.status !== "in_review" && t.status !== "blocked" && !isOverdue(t)).length,
-    in_progress: myTasks.filter(t => (t.status === "in_progress" || t.status === "in_review" || t.status === "blocked") && t.status !== "done").length,
+    in_progress: myTasks.filter(t => t.status === "in_progress" || t.status === "in_review" || t.status === "blocked").length,
     overdue: myTasks.filter(t => !!isOverdue(t) && t.status !== "done").length,
     done: myTasks.filter(t => t.status === "done").length,
   };
@@ -389,7 +389,7 @@ export default function TasksHomePage() {
   const filteredMyTasks = myTasks.filter(t => {
     if (myTab === "done") return t.status === "done";
     if (myTab === "overdue") return !!isOverdue(t) && t.status !== "done";
-    if (myTab === "in_progress") return (t.status === "in_progress" || t.status === "in_review" || t.status === "blocked") && t.status !== "done";
+    if (myTab === "in_progress") return t.status === "in_progress" || t.status === "in_review" || t.status === "blocked";
     return t.status !== "done" && t.status !== "cancelled" && t.status !== "in_progress" && t.status !== "in_review" && t.status !== "blocked" && !isOverdue(t);
   });
 
@@ -399,14 +399,14 @@ export default function TasksHomePage() {
   );
   const assignedCounts = {
     upcoming: assignedByMe.filter(t => t.status !== "done" && t.status !== "cancelled" && t.status !== "in_progress" && t.status !== "in_review" && t.status !== "blocked" && !isOverdue(t)).length,
-    in_progress: assignedByMe.filter(t => (t.status === "in_progress" || t.status === "in_review" || t.status === "blocked") && t.status !== "done").length,
+    in_progress: assignedByMe.filter(t => t.status === "in_progress" || t.status === "in_review" || t.status === "blocked").length,
     overdue: assignedByMe.filter(t => !!isOverdue(t) && t.status !== "done").length,
     done: assignedByMe.filter(t => t.status === "done").length,
   };
   const filteredAssigned = assignedByMe.filter(t => {
     if (assignedTab === "done") return t.status === "done";
     if (assignedTab === "overdue") return !!isOverdue(t) && t.status !== "done";
-    if (assignedTab === "in_progress") return (t.status === "in_progress" || t.status === "in_review" || t.status === "blocked") && t.status !== "done";
+    if (assignedTab === "in_progress") return t.status === "in_progress" || t.status === "in_review" || t.status === "blocked";
     return t.status !== "done" && t.status !== "cancelled" && t.status !== "in_progress" && t.status !== "in_review" && t.status !== "blocked" && !isOverdue(t);
   });
 

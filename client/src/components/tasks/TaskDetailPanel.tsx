@@ -1154,7 +1154,7 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
                   </div>
 
                   {/* ── Comentarios ── */}
-                  <CommentsSection taskId={taskId} allPersonnel={allPersonnel} />
+                  <CommentsSection taskId={taskId!} allPersonnel={allPersonnel} />
 
                   {/* ── Footer: eliminar tarea ── */}
                   <div className="pt-2 pb-6">

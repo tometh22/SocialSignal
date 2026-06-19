@@ -17,6 +17,7 @@ interface DeviationAnalysisProps {
 
 interface Deviation {
   personnelId: number;
+  personnelName?: string;
   budgetedHours: number;
   actualHours: number;
   budgetedCost: number;

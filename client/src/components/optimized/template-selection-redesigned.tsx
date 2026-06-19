@@ -67,8 +67,8 @@ const TemplateSelectionRedesigned: React.FC = () => {
     // Ahora actualizar la plantilla para que se considere el costo base
     updateTemplate(template);
     
-    // Luego establecer la complejidad y otros valores
-    updateComplexity(templateComplexity);
+    // Luego establecer la complejidad y otros valores (map 'low' → 'basic' for QuotationData)
+    updateComplexity(templateComplexity === 'low' ? 'basic' : templateComplexity as 'basic' | 'medium' | 'high');
     
     // Si no se han establecido los factores de complejidad, poner valores por defecto
     if (!quotationData.analysisType) {

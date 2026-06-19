@@ -246,7 +246,11 @@ export default function CRMLeadPage({ params }: { params: { id: string } }) {
       setEmailBody('');
       toast({ title: 'Email enviado correctamente' });
     },
-    onError: () => toast({ title: 'Error al enviar el email', variant: 'destructive' }),
+    onError: (err: any) => toast({
+      title: 'Error al enviar el email',
+      description: err?.message || 'Verifica que el servicio de email esté configurado.',
+      variant: 'destructive',
+    }),
   });
 
   const handleStageChange = (stage: string) => {

@@ -293,7 +293,7 @@ export const ChartsSection = ({
                           strokeWidth: 1,
                           length: 15,
                           length2: 10
-                        }}
+                        } as any}
                         outerRadius={90}
                         innerRadius={45}
                         fill="#8884d8"
