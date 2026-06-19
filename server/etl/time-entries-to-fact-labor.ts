@@ -11,7 +11,7 @@ import {
 } from '@shared/schema';
 import { eq, and, gte, lte, or, isNull } from 'drizzle-orm';
 import { canon, generateProjectKey } from '../utils/normalize';
-import { ensurePeriod } from './sot-etl';
+import { ensurePeriod, computeAggProjectMonth } from './sot-etl';
 
 export interface BuildFactLaborResult {
   periodKey: string;
@@ -231,6 +231,17 @@ export async function buildFactLaborFromTimeEntries(
       const msg = `Error upserting project=${agg.projectId} person=${agg.personnelId}: ${String(err)}`;
       errors.push(msg);
       console.error('[time-entries-to-fact-labor]', msg);
+    }
+  }
+
+  // Update agg_project_month for every affected project
+  const affectedProjects = new Set<number>();
+  for (const agg of aggregates.values()) affectedProjects.add(agg.projectId);
+  for (const projectId of affectedProjects) {
+    try {
+      await computeAggProjectMonth(projectId, periodKey);
+    } catch (err) {
+      errors.push(`agg_project_month update failed for project=${projectId}: ${String(err)}`);
     }
   }
 
