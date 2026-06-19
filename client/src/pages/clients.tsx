@@ -23,7 +23,6 @@ const ClientLogo = ({ client }: { client: Client }) => {
 
   // Reset error and loading state when client changes or global refresh occurs
   React.useEffect(() => {
-    console.log(`🖼️ ClientLogo ${client.name} - refreshTimestamp changed:`, refreshTimestamp);
     setHasError(false);
     setIsLoading(true);
   }, [client.logoUrl, client.id, refreshTimestamp]);
@@ -84,7 +83,7 @@ export default function Clients() {
   const { forceRefresh } = useImageRefresh();
 
   // Query para obtener clientes
-  const { data: clients = [], isLoading, error } = useQuery({
+  const { data: clients = [], isLoading, error } = useQuery<Client[]>({
     queryKey: ['/api/clients'],
   });
 
@@ -246,7 +245,6 @@ export default function Clients() {
       queryClient.invalidateQueries({ queryKey: ['/api/active-projects'] });
       queryClient.invalidateQueries({ queryKey: ['/api/quotations'] });
       // Forzar refresh de todas las imágenes
-      console.log('📸 Logo uploaded, forcing refresh...');
       forceRefresh();
       toast({
         title: "Logo subido",
