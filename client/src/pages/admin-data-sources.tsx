@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { Database, FileSpreadsheet, RefreshCw, CheckCircle2, AlertTriangle, Clock } from "lucide-react";
+import { Database, FileSpreadsheet, RefreshCw, CheckCircle2, AlertTriangle, Clock, CalendarClock, GitCompare } from "lucide-react";
 
 interface SystemConfig {
   id: number;
@@ -19,29 +19,24 @@ interface SystemConfig {
 }
 
 interface RebuildResult {
-  periodKey?: string;
-  inserted?: number;
-  updated?: number;
+  periodKey: string;
+  inserted: number;
+  updated: number;
   errors: string[];
-  executionTimeMs?: number;
-  // range mode
-  periods?: string[];
-  totalInserted?: number;
-  totalUpdated?: number;
-  results?: Array<{ periodKey: string; inserted: number; updated: number; errors: string[]; executionTimeMs: number }>;
+  executionTimeMs: number;
 }
 
 export default function AdminDataSources() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [rebuildMode, setRebuildMode] = useState<'single' | 'range'>('single');
   const [rebuildPeriod, setRebuildPeriod] = useState(() => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   });
-  const [rebuildFrom, setRebuildFrom] = useState('');
-  const [rebuildTo, setRebuildTo] = useState('');
   const [rebuildResult, setRebuildResult] = useState<RebuildResult | null>(null);
+  const [cutoverDate, setCutoverDate] = useState('');
+  const [recoFrom, setRecoFrom] = useState('');
+  const [recoTo, setRecoTo] = useState('');
 
   const { data: configList = [], isLoading } = useQuery<SystemConfig[]>({
     queryKey: ['/api/admin/system-config'],
@@ -72,16 +67,16 @@ export default function AdminDataSources() {
   });
 
   const rebuildMutation = useMutation({
-    mutationFn: (body: object) =>
-      apiRequest('/internal/rebuild-labor-from-app', { method: 'POST', body }) as Promise<RebuildResult>,
+    mutationFn: (period: string) =>
+      apiRequest('/internal/rebuild-labor-from-app', {
+        method: 'POST',
+        body: { period },
+      }) as Promise<RebuildResult>,
     onSuccess: (data: RebuildResult) => {
       setRebuildResult(data);
-      const inserted = data.totalInserted ?? data.inserted ?? 0;
-      const updated = data.totalUpdated ?? data.updated ?? 0;
-      const periods = data.periods?.length ?? 1;
       toast({
         title: `Rebuild completado`,
-        description: `${periods > 1 ? `${periods} períodos — ` : ''}${inserted} insertados, ${updated} actualizados`,
+        description: `${data.inserted} insertados, ${data.updated} actualizados en ${data.executionTimeMs}ms`,
       });
     },
     onError: () => {
@@ -89,29 +84,39 @@ export default function AdminDataSources() {
     },
   });
 
+  const { data: cutoverConfig } = useQuery<{ configValue: number; description?: string }>({
+    queryKey: ['/api/admin/system-config/cutover-date'],
+    queryFn: () => apiRequest('/api/admin/system-config/cutover-date', 'GET'),
+  });
+  const currentCutover = cutoverConfig?.description || null;
+
+  const cutoverMutation = useMutation({
+    mutationFn: (date: string) =>
+      apiRequest('/api/admin/system-config/cutover-date', { method: 'POST', body: { cutoverDate: date } }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/system-config/cutover-date'] });
+      toast({ title: 'Fecha de corte guardada' });
+    },
+    onError: () => toast({ title: 'Error guardando fecha de corte', variant: 'destructive' }),
+  });
+
+  const { data: recoData, isLoading: recoLoading, refetch: recoRefetch } = useQuery({
+    queryKey: ['/internal/reconciliation', recoFrom, recoTo],
+    queryFn: () => apiRequest(`/internal/reconciliation?periodFrom=${recoFrom}&periodTo=${recoTo}`, 'GET'),
+    enabled: false,
+  });
+
   const handleToggle = (checked: boolean) => {
     toggleMutation.mutate(checked ? 1 : 0);
   };
 
   const handleRebuild = () => {
-    setRebuildResult(null);
-    if (rebuildMode === 'range') {
-      if (!/^\d{4}-\d{2}$/.test(rebuildFrom) || !/^\d{4}-\d{2}$/.test(rebuildTo)) {
-        toast({ title: 'Rango inválido. Usá formato YYYY-MM en ambos campos', variant: 'destructive' });
-        return;
-      }
-      if (rebuildFrom > rebuildTo) {
-        toast({ title: '"Desde" debe ser anterior o igual a "Hasta"', variant: 'destructive' });
-        return;
-      }
-      rebuildMutation.mutate({ periodFrom: rebuildFrom, periodTo: rebuildTo });
-    } else {
-      if (!/^\d{4}-\d{2}$/.test(rebuildPeriod)) {
-        toast({ title: 'Período inválido. Usá formato YYYY-MM', variant: 'destructive' });
-        return;
-      }
-      rebuildMutation.mutate({ period: rebuildPeriod });
+    if (!/^\d{4}-\d{2}$/.test(rebuildPeriod)) {
+      toast({ title: 'Período inválido. Usá formato YYYY-MM', variant: 'destructive' });
+      return;
     }
+    setRebuildResult(null);
+    rebuildMutation.mutate(rebuildPeriod);
   };
 
   return (
@@ -195,54 +200,22 @@ export default function AdminDataSources() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex gap-2">
+          <div className="flex items-end gap-3">
+            <div className="space-y-1">
+              <Label htmlFor="rebuild-period">Período (YYYY-MM)</Label>
+              <Input
+                id="rebuild-period"
+                value={rebuildPeriod}
+                onChange={(e) => setRebuildPeriod(e.target.value)}
+                placeholder="2025-06"
+                className="w-36 font-mono"
+              />
+            </div>
             <Button
-              size="sm" variant={rebuildMode === 'single' ? 'default' : 'outline'}
-              onClick={() => setRebuildMode('single')}
-            >Período único</Button>
-            <Button
-              size="sm" variant={rebuildMode === 'range' ? 'default' : 'outline'}
-              onClick={() => setRebuildMode('range')}
-            >Rango de períodos</Button>
-          </div>
-
-          <div className="flex items-end gap-3 flex-wrap">
-            {rebuildMode === 'single' ? (
-              <div className="space-y-1">
-                <Label htmlFor="rebuild-period">Período (YYYY-MM)</Label>
-                <Input
-                  id="rebuild-period"
-                  value={rebuildPeriod}
-                  onChange={(e) => setRebuildPeriod(e.target.value)}
-                  placeholder="2026-06"
-                  className="w-36 font-mono"
-                />
-              </div>
-            ) : (
-              <>
-                <div className="space-y-1">
-                  <Label htmlFor="rebuild-from">Desde</Label>
-                  <Input
-                    id="rebuild-from"
-                    value={rebuildFrom}
-                    onChange={(e) => setRebuildFrom(e.target.value)}
-                    placeholder="2026-01"
-                    className="w-32 font-mono"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="rebuild-to">Hasta</Label>
-                  <Input
-                    id="rebuild-to"
-                    value={rebuildTo}
-                    onChange={(e) => setRebuildTo(e.target.value)}
-                    placeholder="2026-06"
-                    className="w-32 font-mono"
-                  />
-                </div>
-              </>
-            )}
-            <Button onClick={handleRebuild} disabled={rebuildMutation.isPending} className="gap-2">
+              onClick={handleRebuild}
+              disabled={rebuildMutation.isPending}
+              className="gap-2"
+            >
               <RefreshCw className={`h-4 w-4 ${rebuildMutation.isPending ? 'animate-spin' : ''}`} />
               {rebuildMutation.isPending ? 'Reconstruyendo...' : 'Reconstruir'}
             </Button>
@@ -256,20 +229,15 @@ export default function AdminDataSources() {
                   : <CheckCircle2 className="h-4 w-4 text-emerald-600" />
                 }
                 <span className="font-medium text-sm">
-                  {rebuildResult.periods
-                    ? `${rebuildResult.periods.length} períodos (${rebuildResult.periods[0]}→${rebuildResult.periods[rebuildResult.periods.length - 1]}) — ${rebuildResult.totalInserted} insertados, ${rebuildResult.totalUpdated} actualizados`
-                    : `Período ${rebuildResult.periodKey} — ${rebuildResult.inserted} insertados, ${rebuildResult.updated} actualizados`}
+                  Período {rebuildResult.periodKey} — {rebuildResult.inserted} insertados, {rebuildResult.updated} actualizados
                 </span>
-                {rebuildResult.executionTimeMs && (
-                  <span className="ml-auto flex items-center gap-1 text-xs text-slate-500">
-                    <Clock className="h-3 w-3" /> {rebuildResult.executionTimeMs}ms
-                  </span>
-                )}
+                <span className="ml-auto flex items-center gap-1 text-xs text-slate-500">
+                  <Clock className="h-3 w-3" /> {rebuildResult.executionTimeMs}ms
+                </span>
               </div>
               {rebuildResult.errors.length > 0 && (
                 <ul className="text-xs text-amber-700 space-y-0.5 pl-6 list-disc">
-                  {rebuildResult.errors.slice(0, 10).map((e, i) => <li key={i}>{e}</li>)}
-                  {rebuildResult.errors.length > 10 && <li>...y {rebuildResult.errors.length - 10} errores más</li>}
+                  {rebuildResult.errors.map((e, i) => <li key={i}>{e}</li>)}
                 </ul>
               )}
             </div>
@@ -277,7 +245,145 @@ export default function AdminDataSources() {
         </CardContent>
       </Card>
 
-      {/* Card 3: Behavior table */}
+      {/* Card 3: Cutover date */}
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center gap-2">
+            <CalendarClock className="h-5 w-5 text-slate-600" />
+            <CardTitle className="text-base">Fecha de corte del modo App</CardTitle>
+          </div>
+          <CardDescription>
+            Protege los datos históricos del Excel. El rebuild en modo App no puede sobrescribir períodos anteriores a esta fecha.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            {currentCutover ? (
+              <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 text-xs">
+                Corte activo: {currentCutover}
+              </Badge>
+            ) : (
+              <Badge className="bg-amber-100 text-amber-700 border-amber-200 text-xs">
+                Sin fecha de corte — historial vulnerable
+              </Badge>
+            )}
+          </div>
+          <div className="flex items-end gap-3">
+            <div className="space-y-1">
+              <Label htmlFor="cutover-date">Fecha de corte (YYYY-MM)</Label>
+              <Input
+                id="cutover-date"
+                value={cutoverDate}
+                onChange={(e) => setCutoverDate(e.target.value)}
+                placeholder="2026-01"
+                className="w-36 font-mono"
+              />
+            </div>
+            <Button
+              onClick={() => cutoverMutation.mutate(cutoverDate)}
+              disabled={cutoverMutation.isPending || !cutoverDate}
+              className="gap-2"
+            >
+              <CalendarClock className="h-4 w-4" />
+              {cutoverMutation.isPending ? 'Guardando...' : 'Guardar fecha de corte'}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Card 4: Reconciliation */}
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center gap-2">
+            <GitCompare className="h-5 w-5 text-slate-600" />
+            <CardTitle className="text-base">Reconciliación de datos</CardTitle>
+          </div>
+          <CardDescription>
+            Compara los datos del Excel con los registros de la app para detectar discrepancias antes de migrar.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-end gap-3 flex-wrap">
+            <div className="space-y-1">
+              <Label htmlFor="reco-from">Desde</Label>
+              <Input
+                id="reco-from"
+                value={recoFrom}
+                onChange={(e) => setRecoFrom(e.target.value)}
+                placeholder="2026-01"
+                className="w-32 font-mono"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="reco-to">Hasta</Label>
+              <Input
+                id="reco-to"
+                value={recoTo}
+                onChange={(e) => setRecoTo(e.target.value)}
+                placeholder="2026-06"
+                className="w-32 font-mono"
+              />
+            </div>
+            <Button
+              onClick={() => recoRefetch()}
+              disabled={recoLoading || !recoFrom || !recoTo}
+              className="gap-2"
+            >
+              <GitCompare className={`h-4 w-4 ${recoLoading ? 'animate-spin' : ''}`} />
+              {recoLoading ? 'Comparando...' : 'Comparar'}
+            </Button>
+          </div>
+
+          {recoData && Array.isArray(recoData) && recoData.length > 0 && (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Período</TableHead>
+                  <TableHead className="text-right">Filas Excel</TableHead>
+                  <TableHead className="text-right">Horas Excel</TableHead>
+                  <TableHead className="text-right">Filas App</TableHead>
+                  <TableHead className="text-right">Horas App</TableHead>
+                  <TableHead className="text-right">Δ Horas %</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {(recoData as Array<{
+                  period: string;
+                  excelRows: number;
+                  excelHours: number;
+                  appRows: number;
+                  appHours: number;
+                  deltaPct: number;
+                }>).map((row) => {
+                  const absDelta = Math.abs(row.deltaPct);
+                  const deltaClass =
+                    row.excelRows === 0
+                      ? 'text-slate-400'
+                      : absDelta < 5
+                      ? 'text-emerald-700'
+                      : absDelta < 15
+                      ? 'text-amber-700'
+                      : 'text-red-700';
+                  return (
+                    <TableRow key={row.period}>
+                      <TableCell className="font-mono text-sm">{row.period}</TableCell>
+                      <TableCell className="text-right text-sm">{row.excelRows ?? '—'}</TableCell>
+                      <TableCell className="text-right text-sm">{row.excelHours?.toFixed(1) ?? '—'}</TableCell>
+                      <TableCell className="text-right text-sm">{row.appRows ?? '—'}</TableCell>
+                      <TableCell className="text-right text-sm">{row.appHours?.toFixed(1) ?? '—'}</TableCell>
+                      <TableCell className={`text-right text-sm font-medium ${deltaClass}`}>
+                        {row.excelRows === 0 ? '—' : `${row.deltaPct >= 0 ? '+' : ''}${row.deltaPct.toFixed(1)}%`}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Card 5: Behavior table */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base">Comportamiento por modo</CardTitle>

@@ -4244,8 +4244,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       if (Object.keys(updates).length === 0) continue;
 
-      await db.update(personnel).set(updates as any).where(eq(personnel.id, pid));
-
+      // Rate source of truth: personnelHistoricalCosts (legacy personnel monthly columns no longer written)
       for (const [field, rate] of Object.entries(updates)) {
         const m = field.match(/^([a-z]{3})(\d{4})HourlyRateARS$/);
         if (!m) continue;
@@ -9728,6 +9727,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Leer fecha de corte del modo app
+  app.get("/api/admin/system-config/cutover-date", requireAuth, async (req, res) => {
+    try {
+      const row = await db.select()
+        .from(systemConfig)
+        .where(eq(systemConfig.configKey, 'app_mode_cutover_date'))
+        .limit(1)
+        .then(r => r[0]);
+      res.json({ configValue: row?.configValue ?? null, description: row?.description ?? null });
+    } catch (error) {
+      res.status(500).json({ message: (error as Error).message });
+    }
+  });
+
+  // Establecer fecha de corte del modo app
+  app.post("/api/admin/system-config/cutover-date", requireAuth, async (req, res) => {
+    try {
+      const cutoverDate = String(req.body?.cutoverDate || '').trim();
+      if (!/^\d{4}-\d{2}$/.test(cutoverDate)) {
+        return res.status(400).json({ message: 'cutoverDate debe tener formato YYYY-MM' });
+      }
+      await db.insert(systemConfig)
+        .values({ configKey: 'app_mode_cutover_date', configValue: 1, description: cutoverDate })
+        .onConflictDoUpdate({
+          target: systemConfig.configKey,
+          set: { configValue: 1, description: cutoverDate, updatedAt: new Date() },
+        });
+      res.json({ cutoverDate });
+    } catch (error) {
+      res.status(500).json({ message: (error as Error).message });
+    }
+  });
+
   // =========== RUTAS PARA ENCUESTAS NPS ===========
 
   // Obtener todas las encuestas NPS
@@ -14669,6 +14701,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // 3. Execute SoT ETL with options
       const result = await executeSoTETL(costosRows, rcRows, options);
 
+      // Fire-and-forget: persist FX rates from Info Tipo de Cambio y REM → exchange_rates
+      const SPANISH_MONTH_NUM: Record<string, number> = {
+        ene:1,feb:2,mar:3,abr:4,may:5,jun:6,jul:7,ago:8,sep:9,oct:10,nov:11,dic:12
+      };
+      if (!options.dryRun) {
+        googleSheetsWorkingService.getTiposCambio().then(async (rates) => {
+          const { exchangeRates } = await import('../shared/schema');
+          let synced = 0;
+          for (const r of rates) {
+            const month = SPANISH_MONTH_NUM[r.mes?.toLowerCase()?.substring(0,3) ?? ''];
+            if (!month || !r.año || !r.tipoCambio) continue;
+            try {
+              await db.update(exchangeRates)
+                .set({ rate: r.tipoCambio.toString(), source: 'auto_sync_maestro', updatedAt: new Date() })
+                .where(and(
+                  eq(exchangeRates.year, r.año),
+                  eq(exchangeRates.month, month),
+                  eq(exchangeRates.isActive, true),
+                ));
+              synced++;
+            } catch (_) {}
+          }
+          console.log(`[fx-sync] Updated ${synced} exchange rates from Info Tipo de Cambio y REM`);
+        }).catch((e) => console.warn('[fx-sync] FX sync failed:', e));
+      }
+
       // 4. Auto-sync personnel rates from "Valor Hora Real y Estimada" (fire-and-forget)
       if (!options.dryRun) {
         const now2 = new Date();
@@ -16067,7 +16125,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         period?: string; periodFrom?: string; periodTo?: string; force?: boolean;
       };
 
-      const { buildFactLaborFromTimeEntries } = await import('./etl/time-entries-to-fact-labor');
+      const { buildFactLaborFromTimeEntries, getCutoverDate } = await import('./etl/time-entries-to-fact-labor');
 
       // Range mode: periodFrom + periodTo
       if (periodFrom || periodTo) {
@@ -16077,6 +16135,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (periodFrom > periodTo) {
           return res.status(400).json({ message: 'periodFrom debe ser <= periodTo' });
         }
+
+        const cutoverDate = await getCutoverDate();
 
         // Generate all YYYY-MM in the range
         const periods: string[] = [];
@@ -16088,23 +16148,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (m > 12) { m = 1; y++; }
         }
 
+        // Filter out periods before cutoverDate (skip silently)
+        const skipped: string[] = [];
+        const toProcess: string[] = [];
+        for (const p of periods) {
+          if (cutoverDate && p < cutoverDate) {
+            skipped.push(p);
+          } else {
+            toProcess.push(p);
+          }
+        }
+
         const results = [];
         let totalInserted = 0, totalUpdated = 0;
         const allErrors: string[] = [];
-        for (const p of periods) {
+        for (const p of toProcess) {
           const r = await buildFactLaborFromTimeEntries(p, force);
           results.push(r);
           totalInserted += r.inserted;
           totalUpdated += r.updated;
           allErrors.push(...r.errors);
         }
-        return res.json({ periods, totalInserted, totalUpdated, errors: allErrors, results });
+        return res.json({ periods, skipped, totalInserted, totalUpdated, errors: allErrors, results });
       }
 
       // Single period mode
       if (!period || !/^\d{4}-\d{2}$/.test(period)) {
         return res.status(400).json({ message: 'period requerido en formato YYYY-MM' });
       }
+
+      // Cutover date check for single mode
+      const cutoverDate = await getCutoverDate();
+      if (cutoverDate && period < cutoverDate) {
+        return res.status(400).json({
+          message: `Period ${period} is before cutover date ${cutoverDate}. Set cutover date earlier or use Excel mode for historical periods.`,
+        });
+      }
+
       const result = await buildFactLaborFromTimeEntries(period, force);
       console.log(`[rebuild-labor-from-app] period=${period} inserted=${result.inserted} updated=${result.updated} errors=${result.errors.length} ms=${result.executionTimeMs}`);
       res.json(result);
@@ -19679,6 +19759,100 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting capacity override:", error);
       res.status(500).json({ message: "Error al eliminar el override" });
+    }
+  });
+
+  // ==================== RECONCILIATION ENDPOINT ====================
+  // Compares Excel vs App data for a given period range
+  app.get('/internal/reconciliation', requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { periodFrom, periodTo } = req.query as { periodFrom?: string; periodTo?: string };
+
+      if (!periodFrom || !periodTo || !/^\d{4}-\d{2}$/.test(periodFrom) || !/^\d{4}-\d{2}$/.test(periodTo)) {
+        return res.status(400).json({ message: 'periodFrom y periodTo requeridos en formato YYYY-MM' });
+      }
+      if (periodFrom > periodTo) {
+        return res.status(400).json({ message: 'periodFrom debe ser <= periodTo' });
+      }
+
+      const rows = await db
+        .select({
+          periodKey: factLaborMonth.periodKey,
+          flags: factLaborMonth.flags,
+          billingHours: factLaborMonth.billingHours,
+          costUSD: factLaborMonth.costUSD,
+        })
+        .from(factLaborMonth)
+        .where(and(gte(factLaborMonth.periodKey, periodFrom), lte(factLaborMonth.periodKey, periodTo)));
+
+      type PeriodAgg = { rows: number; totalHours: number; totalCostUSD: number };
+      const byPeriod: Record<string, { excel: PeriodAgg; app: PeriodAgg }> = {};
+
+      for (const row of rows) {
+        const pk = row.periodKey;
+        if (!byPeriod[pk]) {
+          byPeriod[pk] = {
+            excel: { rows: 0, totalHours: 0, totalCostUSD: 0 },
+            app: { rows: 0, totalHours: 0, totalCostUSD: 0 },
+          };
+        }
+        const flags = Array.isArray(row.flags) ? row.flags as string[] : [];
+        const isApp = flags.includes('source_app');
+        const bucket = isApp ? byPeriod[pk].app : byPeriod[pk].excel;
+        bucket.rows += 1;
+        bucket.totalHours += parseFloat(row.billingHours?.toString() ?? '0');
+        bucket.totalCostUSD += parseFloat(row.costUSD?.toString() ?? '0');
+      }
+
+      const result = Object.entries(byPeriod)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([periodKey, { excel, app }]) => {
+          const hoursPct = excel.totalHours !== 0
+            ? ((app.totalHours - excel.totalHours) / excel.totalHours) * 100
+            : null;
+          const costPct = excel.totalCostUSD !== 0
+            ? ((app.totalCostUSD - excel.totalCostUSD) / excel.totalCostUSD) * 100
+            : null;
+          return { periodKey, excel, app, diff: { hoursPct, costPct } };
+        });
+
+      res.json(result);
+    } catch (error) {
+      console.error('[reconciliation] Error:', error);
+      res.status(500).json({ message: 'Error ejecutando reconciliación', error: String(error) });
+    }
+  });
+
+  // ── Costos estimados preview ────────────────────────────────────────────
+  // GET /api/etl/costos-estimados/preview
+  app.get("/api/etl/costos-estimados/preview", requireAuth, async (_req, res) => {
+    try {
+      const { parseEstimatedCosts, runEstimatedCostsETL } = await import('./etl/costos-estimados-etl.js');
+
+      const SPREADSHEET_ID = '1FZLFmTQQOSYQns2cOYlM86UGEH7EHZsJOFegyDR7quc';
+      const SHEET_NAME = 'Costos estimados';
+
+      const rawRows = await googleSheetsWorkingService.getSheetValues(
+        SPREADSHEET_ID,
+        SHEET_NAME,
+        { valueRenderOption: 'UNFORMATTED_VALUE' }
+      );
+
+      const parsed = parseEstimatedCosts(rawRows);
+      const dryRun = await runEstimatedCostsETL(parsed);
+
+      res.json({
+        success: true,
+        totalParsed: parsed.length,
+        dryRun,
+        preview: parsed.slice(0, 20),
+      });
+    } catch (error) {
+      console.error('Error in costos-estimados preview:', error);
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
   });
 
