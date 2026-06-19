@@ -18,6 +18,21 @@ function fmtUSD(n: number) {
   return new Intl.NumberFormat("es-AR", { style: "currency", currency: "USD", minimumFractionDigits: 0 }).format(n);
 }
 
+interface CashflowRow {
+  id: number;
+  fecha?: string;
+  tipoMovimiento: string;
+  banco?: string;
+  detalleOperacion?: string;
+  concepto?: string;
+  montoUSD?: string;
+}
+
+interface CashflowBalance {
+  balances: Record<string, number>;
+  totalUSD?: number;
+}
+
 export default function CashflowPage() {
   const [year, setYear] = useState(String(new Date().getFullYear()));
   const [month, setMonth] = useState(String(new Date().getMonth() + 1).padStart(2, "0"));
@@ -30,7 +45,7 @@ export default function CashflowPage() {
   const lastDay = new Date(parseInt(year), parseInt(month), 0);
   const dateStr = `${lastDay.getFullYear()}-${String(lastDay.getMonth() + 1).padStart(2, "0")}-${String(lastDay.getDate()).padStart(2, "0")}`;
 
-  const { data: rows = [], isLoading } = useQuery<any[]>({
+  const { data: rows = [], isLoading } = useQuery<CashflowRow[]>({
     queryKey: ["/api/cashflow", period, banco, tipo],
     queryFn: () => {
       const params = new URLSearchParams({ period });
@@ -40,7 +55,7 @@ export default function CashflowPage() {
     },
   });
 
-  const { data: balance } = useQuery<any>({
+  const { data: balance } = useQuery<CashflowBalance>({
     queryKey: ["/api/cashflow/balance", dateStr],
     queryFn: () => apiRequest(`/api/cashflow/balance?date=${dateStr}`, "GET"),
     enabled: !!dateStr,
@@ -158,7 +173,7 @@ export default function CashflowPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {rows.map((row: any) => (
+                {rows.map((row) => (
                   <TableRow key={row.id}>
                     <TableCell className="text-sm">
                       {row.fecha ? new Date(row.fecha).toLocaleDateString("es-AR") : "-"}
