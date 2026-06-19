@@ -44,7 +44,7 @@ export default function HomeDashboard() {
   });
 
   // Fetch projects for smart alerts
-  const { data: projectsRaw } = useQuery<any>({
+  const { data: projectsRaw } = useQuery<any[] | { projects: any[] }>({
     queryKey: ["/api/projects/alerts-data"],
     queryFn: () => authFetch("/api/active-projects")
       .then(r => r.ok ? r.json() : []).catch(() => []),

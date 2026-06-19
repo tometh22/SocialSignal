@@ -577,16 +577,9 @@ const TimeEntries: React.FC = () => {
   const [, setLocation] = useLocation();
   const params = useParams();
 
-  let projectId: number = 0;
-
-  if (params.projectId) {
-    projectId = parseInt(params.projectId);
-  } else if (window.location.pathname.includes('/active-projects/')) {
-    const match = window.location.pathname.match(/\/active-projects\/(\d+)\/time-entries/);
-    if (match && match[1]) {
-      projectId = parseInt(match[1]);
-    }
-  }
+  // Route /active-projects/:id/time-entries uses param "id"
+  // Route /time-entries/project/:projectId uses param "projectId"
+  const projectId = parseInt((params as any).id || (params as any).projectId || '0') || 0;
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
