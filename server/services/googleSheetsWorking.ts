@@ -43,6 +43,7 @@ interface TipoCambio {
   año?: number;
   tipoCambio: number;
   fuente: string;
+  periodKey?: string;
 }
 
 interface VentaTomi {
@@ -1175,11 +1176,23 @@ class GoogleSheetsWorkingService {
       
       if (isNaN(tipoCambio)) continue;
       
+      const monthMapTc: Record<string, number> = {
+        enero: 1, febrero: 2, marzo: 3, abril: 4, mayo: 5, junio: 6,
+        julio: 7, agosto: 8, septiembre: 9, octubre: 10, noviembre: 11, diciembre: 12,
+        jan: 1, feb: 2, mar: 3, apr: 4, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12
+      };
+      const mesLower = mes.toLowerCase().replace(/[^a-záéíóú]/g, '').substring(0, 10);
+      const mesNum = Object.entries(monthMapTc).find(([k]) => mesLower.startsWith(k))?.[1];
+      const periodKey = mesNum && currentYear
+        ? `${currentYear}-${String(mesNum).padStart(2, '0')}`
+        : undefined;
+
       tiposCambio.push({
         mes: mes,
         año: currentYear, // Usar año detectado dinámicamente
         tipoCambio: tipoCambio,
-        fuente: 'BCRA'
+        fuente: 'BCRA',
+        periodKey,
       });
       
       if (tiposCambio.length <= 5) {
@@ -3873,7 +3886,7 @@ class GoogleSheetsWorkingService {
 
   /**
    * Get cash end-of-month balances by period from Resumen Ejecutivo
-   * Uses the cajaTotalUsd field which represents "Caja fin de mes"
+   * Uses the cajaTotal field which represents "Caja fin de mes"
    * 
    * NOTE: CashFlow sheet only has 3 global SALDO rows (not per-month),
    * so we source end-of-month balances from Resumen Ejecutivo instead.
@@ -3884,12 +3897,12 @@ class GoogleSheetsWorkingService {
     const result = new Map<string, number>();
     
     try {
-      // Get Resumen Ejecutivo data which has cajaTotalUsd per period
+      // Get Resumen Ejecutivo data which has cajaTotal per period
       const resumenData = await this.getResumenEjecutivo();
       
       for (const row of resumenData) {
-        if (row.periodKey && typeof row.cajaTotalUsd === 'number' && row.cajaTotalUsd !== 0) {
-          result.set(row.periodKey, Math.round(row.cajaTotalUsd * 100) / 100);
+        if (row.periodKey && typeof row.cajaTotal === 'number' && row.cajaTotal !== 0) {
+          result.set(row.periodKey, Math.round(row.cajaTotal * 100) / 100);
         }
       }
       

@@ -31,6 +31,7 @@ interface DeviationAnalysisData {
   deviationByRole: Deviation[];
   totalVariance: {
     variance: number;
+    adjustedBudget?: number;
   };
   summary: {
     membersOverBudget: number;
@@ -235,8 +236,9 @@ export function DeviationAnalysis({ projectId, dateFilter, timeFilter, onNavigat
           {/* Sobrecosto Total */}
           {(() => {
             // Calcular el porcentaje de desviación para determinar severidad
-            const variancePercentage = deviationData.totalVariance.adjustedBudget > 0 
-              ? (deviationData.totalVariance.variance / deviationData.totalVariance.adjustedBudget) * 100
+            const adjustedBudget = deviationData.totalVariance.adjustedBudget ?? deviationData.deviationByRole?.reduce((sum, r) => sum + (r.budgetedCost ?? 0), 0) ?? 0;
+            const variancePercentage = adjustedBudget > 0
+              ? (deviationData.totalVariance.variance / adjustedBudget) * 100
               : 0;
             
             // Usar los mismos umbrales que el dashboard principal

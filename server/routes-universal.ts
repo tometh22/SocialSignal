@@ -50,7 +50,7 @@ export function addUniversalRankingsEndpoint(app: Express, storage: any, require
       const sheetsService = googleSheetsWorkingService;
       
       // Usar configuración dinámica del proyecto
-      const rawData = await sheetsService.getAllData(config.spreadsheetId, config.sheetName);
+      const rawData = await sheetsService.getSheetValues(config.spreadsheetId, config.sheetName);
       
       if (!rawData || rawData.length === 0) {
         console.log('⚠️ No data found in Excel MAESTRO');

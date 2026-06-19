@@ -158,7 +158,7 @@ const OptimizedFinancialReview: React.FC = () => {
             <div className="space-y-2">
               <p className="text-sm font-medium text-neutral-700">Complejidad:</p>
               <p className="text-sm text-neutral-600">
-                {quotationData.complexity === 'low' ? 'Baja' :
+                {quotationData.complexity === 'basic' ? 'Básica' :
                  quotationData.complexity === 'medium' ? 'Media' :
                  quotationData.complexity === 'high' ? 'Alta' : 'No definida'}
               </p>
@@ -496,16 +496,6 @@ const OptimizedFinancialReview: React.FC = () => {
       </div>
 
       {/* Notas adicionales */}
-      {quotationData.template && !quotationData.customization && (
-        <Alert className="bg-amber-50 text-amber-800 border-amber-200">
-          <AlertCircle className="h-4 w-4 mr-2" />
-          <AlertTitle>Personalización no especificada</AlertTitle>
-          <AlertDescription>
-            No has agregado notas de personalización para este proyecto. 
-            Considera regresar al Paso 2 para agregar detalles específicos.
-          </AlertDescription>
-        </Alert>
-      )}
 
       {/* Información de contacto */}
       {quotationData.client && (

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useOptimizedQuote } from '@/context/optimized-quote-context';
+import { useOptimizedQuote, OptimizedTeamMember } from '@/context/optimized-quote-context';
 import { Button } from '@/components/ui/button';
 import { 
   Card, 
@@ -9,7 +9,6 @@ import {
   CardTitle 
 } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { TeamMember } from '@/models/quote';
 import { Users, AlertCircle, CheckCircle } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -127,7 +126,7 @@ export const ApplyTeamFromWarnerTemplate: React.FC = () => {
           const matchingPersonnel = availablePersonnel.filter(p => p.roleId === roleId);
           
           // Crear nuevo miembro del equipo
-          const member: TeamMember = {
+          const member: OptimizedTeamMember = {
             id: uuidv4(),
             roleId: roleId,
             personnelId: null, // Asignación por rol, no por persona específica

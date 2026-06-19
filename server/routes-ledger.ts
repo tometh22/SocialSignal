@@ -276,7 +276,7 @@ export function createLedgerRouter(requireAuth: any) {
         ? await db.select().from(googleSheetsSales).where(
             and(
               sql`lower(${googleSheetsSales.clientName}) = lower(${client.name})`,
-              sql`${googleSheetsSales.periodKey} = ${period}`
+              sql`${googleSheetsSales.monthKey} = ${period}`
             )
           )
         : await db.select().from(googleSheetsSales).where(

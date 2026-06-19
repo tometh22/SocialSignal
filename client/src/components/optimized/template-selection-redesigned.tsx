@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Check, Search, FileText, BarChart, Info, AlertTriangle } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { ComplexityFactorsCard } from './complexity-factors-card';
+import ComplexityFactorsCard from './complexity-factors-card';
 import { FinancialSummary } from './financial-summary';
 
 const TemplateSelectionRedesigned: React.FC = () => {
@@ -21,7 +21,6 @@ const TemplateSelectionRedesigned: React.FC = () => {
     quotationData,
     updateTemplate,
     updateComplexity,
-    updateCustomization,
     updateAnalysisType,
     updateMentionsVolume,
     updateCountriesCovered,
@@ -215,9 +214,8 @@ const TemplateSelectionRedesigned: React.FC = () => {
           placeholder="Agrega detalles específicos, requerimientos particulares o cualquier información adicional para este proyecto..."
           className="min-h-[120px]"
           value={quotationData.customization || ''}
-          onChange={(e) => updateCustomization(e.target.value)}
         />
-        
+
         {!quotationData.customization && (
           <Alert className="bg-amber-50 text-amber-800 border-amber-200">
             <AlertTriangle className="h-4 w-4" />
@@ -647,7 +645,6 @@ const TemplateSelectionRedesigned: React.FC = () => {
                 placeholder="Agrega detalles específicos, requerimientos particulares o cualquier información adicional para este proyecto..."
                 className="min-h-[100px] text-sm"
                 value={quotationData.customization || ''}
-                onChange={(e) => updateCustomization(e.target.value)}
               />
               
               {!quotationData.customization && (

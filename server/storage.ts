@@ -544,7 +544,7 @@ export class DatabaseStorage implements IStorage {
   // **VALIDACIÓN CRÍTICA 2: PREVENIR RELACIONES CIRCULARES EN PROYECTOS**
   async createActiveProject(project: InsertActiveProject): Promise<ActiveProject> {
     // Validar relaciones parent-child para evitar ciclos
-    if (project.parentProjectId) {
+    if (project.parentProjectId && project.quotationId != null) {
       const isValidParent = await this.validateProjectHierarchy(project.parentProjectId, project.quotationId);
       if (!isValidParent) {
         throw new Error("La relación padre-hijo crearía un ciclo en la jerarquía de proyectos");
@@ -4707,9 +4707,8 @@ export class DatabaseStorage implements IStorage {
         // Buscar cliente y proyecto en el sistema
         const client = await this.getClientByName(normalized.client);
         const projects = await this.getActiveProjects();
-        const project = projects.find(p => 
-          p.quotation?.projectName?.toLowerCase().includes(normalized.project.toLowerCase()) ||
-          p.quotation?.clientProjectName?.toLowerCase().includes(normalized.project.toLowerCase())
+        const project = projects.find(p =>
+          p.quotation?.projectName?.toLowerCase().includes(normalized.project.toLowerCase())
         );
 
         // Crear clave única para evitar duplicados
