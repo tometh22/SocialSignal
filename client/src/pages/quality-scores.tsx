@@ -86,9 +86,9 @@ const QualityScoresPage = () => {
 
 
   // Obtener entregables del proyecto seleccionado o de todos los subproyectos si es el padre
-  const { data: deliverables } = useQuery({
-    queryKey: selectedProject === "16" 
-      ? [`/api/projects/always-on/deliverables`] 
+  const { data: deliverables } = useQuery<{ id: number; displayTitle?: string; title?: string; name?: string }[]>({
+    queryKey: selectedProject === "16"
+      ? [`/api/projects/always-on/deliverables`]
       : [`/api/projects/${selectedProject}/deliverables`],
     enabled: !!selectedProject,
   });

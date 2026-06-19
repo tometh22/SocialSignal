@@ -218,7 +218,7 @@ export default function AICopilot(props: AICopilotProps) {
     critical: { label: "Proyecto en Riesgo", dot: "bg-red-500", text: "text-red-700", bg: "bg-red-50 border-red-100" },
     warning:  { label: "Requiere Atención",  dot: "bg-amber-400", text: "text-amber-700", bg: "bg-amber-50 border-amber-100" },
     healthy:  { label: "Proyecto Saludable", dot: "bg-emerald-500", text: "text-emerald-700", bg: "bg-emerald-50 border-emerald-100" },
-  }[diagnosis];
+  }[diagnosis]!;
 
   const criticalCount = signals.filter(s => s.level === "critical").length;
   const warningCount  = signals.filter(s => s.level === "warning").length;

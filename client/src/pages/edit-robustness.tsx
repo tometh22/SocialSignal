@@ -44,19 +44,19 @@ const EditRobustnessPage = () => {
   });
   
   // Consultar personal disponible
-  const { data: personnel } = useQuery({
+  const { data: personnel } = useQuery<{ id: number; name: string; roleId?: number }[]>({
     queryKey: ['/api/personnel'],
     enabled: !!id
   });
-  
+
   // Consultar roles
-  const { data: roles } = useQuery({
+  const { data: roles } = useQuery<{ id: number; name: string }[]>({
     queryKey: ['/api/roles'],
     enabled: !!id
   });
-  
+
   // Consultar entradas de tiempo
-  const { data: timeEntries } = useQuery({
+  const { data: timeEntries } = useQuery<{ id: number; personnelId: number; hours: number; date: string }[]>({
     queryKey: [`/api/time-entries/project/${deliverable?.project_id}`],
     enabled: !!deliverable?.project_id
   });

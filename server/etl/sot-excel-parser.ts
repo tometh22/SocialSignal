@@ -191,7 +191,7 @@ export function parseCostosDirectos(rawRows: any[][]): CostoDirectoRow[] {
       'Cotización': parsedRow.tipoCambio,
       'Tipo de cambio': parsedRow.tipoCambio,  // Variante alternativa
       'Monto Total USD': parsedRow.montoTotalUSD
-    });
+    } as CostoDirectoRow);
   }
   
   console.log(`✅ [Excel Parser] ${parsed.length} filas parseadas exitosamente, ${skipped} saltadas`);

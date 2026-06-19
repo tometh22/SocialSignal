@@ -58,7 +58,7 @@ export const OptimizedTemplateSelection = () => {
   /**
    * Renderizar tarjeta de plantilla individual
    */
-  const renderTemplateCard = (template: ReportTemplate) => {
+  const renderTemplateCard = (template: ReportTemplate & { badge?: string; type?: string; duration?: string }) => {
     const isSelected = quotationData.template?.id === template.id;
     
     return (
@@ -228,7 +228,7 @@ export const OptimizedTemplateSelection = () => {
         </p>
       </div>
 
-      <Tabs value={selectedTab} onValueChange={setSelectedTab} className="space-y-4">
+      <Tabs value={selectedTab} onValueChange={(v) => setSelectedTab(v as DetailsTab)} className="space-y-4">
         <TabsList className="grid grid-cols-2">
           <TabsTrigger value="list" className="flex items-center">
             <FileText className="h-4 w-4 mr-2" />
@@ -378,7 +378,7 @@ export const OptimizedTemplateSelection = () => {
           {/* Nivel de Complejidad del Proyecto - Componente separado */}
           <ComplexityLevel 
             value={quotationData.complexity || 'medium'} 
-            onChange={updateComplexity}
+            onChange={(v) => updateComplexity(v as 'high' | 'medium' | 'basic')}
           />
         </TabsContent>
       </Tabs>

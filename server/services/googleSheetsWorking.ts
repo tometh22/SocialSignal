@@ -982,7 +982,7 @@ class GoogleSheetsWorkingService {
    */
   async getSheetNames(): Promise<string[]> {
     console.log('🔄 Obteniendo nombres de pestañas del Excel MAESTRO...');
-    console.log(`🔑 Using credentials file: ${this.credentialsPath}`);
+    console.log(`🔑 Using spreadsheet: ${this.spreadsheetId}`);
     
     const sheets = this.createSheetsClientFromJSON();
     if (!sheets) {
@@ -1101,7 +1101,7 @@ class GoogleSheetsWorkingService {
         
       } catch (error) {
         // Continuar con el siguiente nombre
-        console.log(`⚠️ Pestaña "${sheetName}" no encontrada o error:`, error.message);
+        console.log(`⚠️ Pestaña "${sheetName}" no encontrada o error:`, error instanceof Error ? error.message : String(error));
         continue;
       }
     }
@@ -1166,7 +1166,7 @@ class GoogleSheetsWorkingService {
       }
       
       // Convertir el tipo de cambio a número
-      const tipoCambio = parseDec(tipoCambioStr.replace(/[.,]/g, (match, offset, string) => {
+      const tipoCambio = parseDec(tipoCambioStr.replace(/[.,]/g, (match: string, offset: number, string: string) => {
         // Reemplazar la última coma/punto por punto decimal
         const lastDotIndex = string.lastIndexOf('.');
         const lastCommaIndex = string.lastIndexOf(',');
@@ -1430,73 +1430,6 @@ class GoogleSheetsWorkingService {
     return result;
   }
 
-  /**
-   * Procesar los datos de ventas de la pestaña "Ventas Tomi" (método legacy)
-   */
-  private processVentasData(rows: any[][]): VentaTomi[] {
-    const result: VentaTomi[] = [];
-    
-    if (rows.length === 0) return result;
-
-    // La primera fila contiene los headers
-    const headers = rows[0];
-    console.log('📋 Headers de ventas encontrados:', headers);
-
-    // Mapear las columnas según los headers EXACTOS del Excel MAESTRO
-    const columnMap = {
-      cliente: headers.findIndex(h => h === 'Cliente'),
-      proyecto: headers.findIndex(h => h === 'Proyecto'),
-      mes: headers.findIndex(h => h === 'Mes'),
-      año: headers.findIndex(h => h === 'Año ' || h === 'Año'), // Incluir versión con espacio
-      monto_usd: headers.findIndex(h => h === 'Monto_USD'),
-      monto_ars: headers.findIndex(h => h === 'Monto_ARS'),
-      tipo_venta: headers.findIndex(h => h === 'Tipo_Venta'),
-      confirmado: headers.findIndex(h => h === 'Confirmado')
-    };
-
-    console.log('🗺️ Mapeo de columnas ventas:', columnMap);
-
-    // Procesar cada fila de datos (omitir headers)
-    for (let i = 1; i < rows.length; i++) {
-      const row = rows[i];
-      
-      if (!row || row.length === 0) continue;
-
-      try {
-        const cliente = this.getCellValue(row, columnMap.cliente);
-        const proyecto = this.getCellValue(row, columnMap.proyecto);
-        const mes = this.getCellValue(row, columnMap.mes);
-        const año = this.getCellValue(row, columnMap.año);
-        
-        // Solo procesar filas con datos mínimos requeridos
-        if (!cliente || !proyecto || !mes || !año) continue;
-        
-        const ventaData: VentaTomi = {
-          cliente: cliente,
-          proyecto: proyecto,
-          mes: mes,
-          año: parseDec(año) || new Date().getFullYear(),
-          monto_usd: this.parseMoneyValue(this.getCellValue(row, columnMap.monto_usd)),
-          monto_ars: this.parseMoneyValue(this.getCellValue(row, columnMap.monto_ars)),
-          tipo_venta: this.getCellValue(row, columnMap.tipo_venta) || 'fee',
-          confirmado: this.getCellValue(row, columnMap.confirmado) || 'SI'
-        };
-
-        result.push(ventaData);
-        
-        // Debug primeras 5 filas
-        if (i <= 5) {
-          console.log(`🔍 Venta ${i} debug:`, ventaData);
-        }
-        
-      } catch (error) {
-        console.warn(`⚠️ Error procesando fila de venta ${i}:`, error);
-      }
-    }
-
-    console.log(`✅ Procesadas ${result.length} ventas válidas de ${rows.length - 1} filas`);
-    return result;
-  }
 
   /**
    * Importar costos directos desde "Costos directos e indirectos"
@@ -1923,9 +1856,9 @@ class GoogleSheetsWorkingService {
       // Fallback: buscar usando getActiveProjects
       const projects = await storage.getActiveProjects();
       console.log(`🔍 Total proyectos disponibles: ${projects.length}`);
-      console.log(`🔍 Primeros 3 proyectos:`, projects.slice(0, 3).map(p => ({ id: p.id, clientName: p.clientName })));
-      
-      const project = projects.find(p => {
+      console.log(`🔍 Primeros 3 proyectos:`, projects.slice(0, 3).map((p: any) => ({ id: p.id, clientName: p.clientName })));
+
+      const project = projects.find((p: any) => {
         if (!p.clientName) return false;
         
         // Normalizar nombres para comparación
@@ -2019,7 +1952,7 @@ class GoogleSheetsWorkingService {
       'diciembre': 'dec'
     };
 
-    const monthKey = monthMap[month.toLowerCase()];
+    const monthKey = (monthMap as Record<string, string>)[month.toLowerCase()];
     if (!monthKey) return null;
 
     return `${monthKey}${year}HourlyRateARS`;
@@ -4151,8 +4084,8 @@ class GoogleSheetsWorkingService {
       }
       
       // CLASIFICAR: monto > 0 → inflow, monto < 0 → outflow
-      const type: 'ingreso' | 'egreso' = amountRawNum >= 0 ? 'ingreso' : 'egreso';
-      
+      const type: 'IN' | 'OUT' = amountRawNum >= 0 ? 'IN' : 'OUT';
+
       result.push({
         date,
         periodKey,
@@ -4163,12 +4096,12 @@ class GoogleSheetsWorkingService {
         reference: referenceRaw || undefined,
       });
     }
-    
+
     console.log(`✅ [CashFlow] Parseados ${result.length} movimientos`);
     console.log(`   📊 Convertidos ARS→USD: ${convertedToUsd}`);
     console.log(`   🔄 Transferencias internas excluidas: ${skippedInternal}`);
-    console.log(`   💰 Ingresos: ${result.filter(r => r.type === 'ingreso').length}`);
-    console.log(`   💸 Egresos: ${result.filter(r => r.type === 'egreso').length}`);
+    console.log(`   💰 Ingresos: ${result.filter(r => r.type === 'IN').length}`);
+    console.log(`   💸 Egresos: ${result.filter(r => r.type === 'OUT').length}`);
     
     return result;
   }
@@ -4231,7 +4164,7 @@ class GoogleSheetsWorkingService {
         periodKey,
         concept: conceptRaw || `Movimiento ${i}`,
         amountUsd: Math.abs(amount),
-        type: amount >= 0 ? 'ingreso' : 'egreso',
+        type: (amount >= 0 ? 'IN' : 'OUT') as 'IN' | 'OUT',
         category: categoryRaw || undefined,
         reference: referenceRaw || undefined,
       });

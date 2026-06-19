@@ -40,14 +40,14 @@ interface ProjectAnalyticsProps {
   personnel: any[];
   roles: any[];
   deliverableData: any;
-  projectMetrics: {
+  projectMetrics?: {
     hoursPerDay: number;
     progressPercentage: number;
     plannedHours: number;
     actualHours: number;
     daysElapsed: number;
     daysTotal: number;
-  };
+  } | null;
   riskIndicators: {
     budgetRisk: number;
     scheduleRisk: number;
@@ -257,13 +257,13 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
                 </CardDescription>
               </CardHeader>
               <CardContent className="p-4 pt-2">
-                {completeData?.quotation?.team?.length > 0 ? (
+                {(completeData?.quotation?.team?.length ?? 0) > 0 ? (
                   <div className="space-y-3 mt-2">
-                    {completeData.quotation.team.map(member => {
+                    {completeData!.quotation.team.map(member => {
                       const estimatedHours = member.hours || 0;
                       const memberCost = member.cost || 0;
-                      const percentOfTeam = completeData.quotation?.estimatedHours > 0 
-                        ? ((estimatedHours / completeData.quotation.estimatedHours) * 100).toFixed(1)
+                      const percentOfTeam = (completeData?.quotation?.estimatedHours ?? 0) > 0 
+                        ? ((estimatedHours / completeData!.quotation.estimatedHours) * 100).toFixed(1)
                         : '0';
 
                       return (
@@ -282,7 +282,7 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
                           </div>
                           <Progress 
                             value={estimatedHours} 
-                            max={Math.max(...completeData.quotation.team.map(m => m.hours || 0))} 
+                            max={Math.max(...completeData!.quotation.team.map(m => m.hours || 0))} 
                             className="h-1.5" 
                           />
                         </div>
@@ -314,7 +314,7 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
               </CardDescription>
             </CardHeader>
             <CardContent className="p-4 pt-2">
-              {completeData?.quotation?.team?.length > 0 ? (
+              {(completeData?.quotation?.team?.length ?? 0) > 0 ? (
                 <div className="border rounded-lg overflow-hidden">
                   <div className="grid grid-cols-12 gap-2 p-3 bg-muted/20 text-xs font-medium">
                     <div className="col-span-4">Nombre</div>
@@ -325,12 +325,12 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
                   </div>
 
                   <div className="divide-y">
-                    {completeData.quotation.team.map((member, index) => {
+                    {completeData!.quotation.team.map((member, index) => {
                       const estimatedHours = member.hours || 0;
                       const hourlyRate = member.rate || 0;
                       const memberCost = member.cost || 0;
-                      const percentOfTeam = completeData.quotation?.estimatedHours > 0 
-                        ? ((estimatedHours / completeData.quotation.estimatedHours) * 100).toFixed(1)
+                      const percentOfTeam = (completeData?.quotation?.estimatedHours ?? 0) > 0 
+                        ? ((estimatedHours / completeData!.quotation.estimatedHours) * 100).toFixed(1)
                         : '0';
 
                       return (
@@ -724,8 +724,8 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
             </CardHeader>
             <CardContent className="pt-0">
               <div className="space-y-4">
-                {completeData?.quotation?.team?.length > 0 ? (
-                  completeData.quotation.team.map((member) => {
+                {(completeData?.quotation?.team?.length ?? 0) > 0 ? (
+                  completeData!.quotation.team.map((member) => {
                     // Usar datos únicamente de la fuente consolidada
                     const estimatedHours = member.hours || 0;
                     const memberHourlyRate = member.rate || 0;

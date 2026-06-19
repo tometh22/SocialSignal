@@ -82,9 +82,8 @@ export function startDailySoTSync() {
       console.error('❌ [Daily SoT Sync] Error:', error);
     }
   }, {
-    scheduled: true,
     timezone: "America/Argentina/Buenos_Aires"
-  });
+  } as any);
   
   job.start();
   console.log(`✅ Job diario SoT programado: ${schedule} (02:00 AR)`);

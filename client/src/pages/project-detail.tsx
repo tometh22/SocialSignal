@@ -371,7 +371,7 @@ export default function ProjectDetail() {
   const margin           = vm.margin ?? 0;
   const totalHours       = vm.totalHours ?? 0;
   const estimatedHours   = vm.estimatedHours ?? q?.estimatedHours ?? 0;
-  const budget           = q?.totalAmount ?? unifiedData.project?.budget ?? 0;
+  const budget           = q?.totalAmount ?? (unifiedData.project as any)?.budget ?? 0;
   const budgetUtil       = m?.budgetUtilization ?? (budget > 0 ? (cost / budget) * 100 : 0);
   const hoursDeviation   = m?.hoursDeviation ?? (estimatedHours > 0 ? ((totalHours - estimatedHours) / estimatedHours) * 100 : 0);
   const costDeviation    = m?.costDeviation ?? 0;
@@ -543,7 +543,7 @@ export default function ProjectDetail() {
                       { label: "Precio cotizado", value: fmt(q.totalAmount) },
                       { label: "Costo base",      value: fmt(q.baseCost) },
                       { label: "Horas estimadas", value: fmtHours(q.estimatedHours) },
-                      { label: "Tipo",            value: q.quotationType || "—" },
+                      { label: "Tipo",            value: (q as any).quotationType || "—" },
                     ].map((f, i) => (
                       <div key={i}>
                         <p className="text-[11px] text-slate-400 uppercase tracking-wide">{f.label}</p>

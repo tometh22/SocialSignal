@@ -110,7 +110,7 @@ export default function RecurringTemplatesPage() {
   });
 
   // Query for all projects when no specific project is selected
-  const { data: projects = [] } = useQuery({
+  const { data: projects = [] } = useQuery<{ id: number; [key: string]: unknown }[]>({
     queryKey: ['/api/active-projects'],
     enabled: !projectId,
     staleTime: 5 * 60 * 1000,
@@ -118,21 +118,21 @@ export default function RecurringTemplatesPage() {
   });
 
   // Queries with proper error handling and faster loading
-  const { data: templates = [], isLoading: templatesLoading } = useQuery({
+  const { data: templates = [], isLoading: templatesLoading } = useQuery<RecurringTemplate[]>({
     queryKey: ['/api/projects', selectedProject || projectId, 'recurring-templates'],
     enabled: !!(selectedProject || projectId),
     staleTime: 5 * 60 * 1000, // 5 minutes
     retry: 1
   });
 
-  const { data: cycles = [], isLoading: cyclesLoading } = useQuery({
+  const { data: cycles = [], isLoading: cyclesLoading } = useQuery<ProjectCycle[]>({
     queryKey: ['/api/projects', selectedProject || projectId, 'project-cycles'],
     enabled: !!(selectedProject || projectId),
     staleTime: 5 * 60 * 1000,
     retry: 1
   });
 
-  const { data: personnel = [] } = useQuery({
+  const { data: personnel = [] } = useQuery<{ id: number; name?: string; [key: string]: unknown }[]>({
     queryKey: ['/api/personnel'],
     staleTime: 10 * 60 * 1000, // 10 minutes
     retry: 1
@@ -178,7 +178,7 @@ export default function RecurringTemplatesPage() {
     return Object.entries(selectedTeamMembers).reduce((total, [personnelId, assignment]) => {
       const person = personnel.find((p: any) => p.id === parseInt(personnelId));
       if (!person) return total;
-      return total + (assignment.hours * (person.hourlyRate || 50));
+      return total + (assignment.hours * ((person.hourlyRate as number) || 50));
     }, 0);
   };
 

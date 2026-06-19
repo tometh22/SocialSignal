@@ -1391,7 +1391,7 @@ export async function executeSoTETL(
       const firstRowKeys = Object.keys(filteredCostos[0]);
       const tipoKeys = firstRowKeys.filter(k => k.toLowerCase().includes('tipo'));
       console.log(`🔍 [SoT ETL DEBUG] Columnas con 'tipo' en primera fila:`, tipoKeys);
-      console.log(`🔍 [SoT ETL DEBUG] Valor de primera columna tipo:`, filteredCostos[0][tipoKeys[0]]);
+      console.log(`🔍 [SoT ETL DEBUG] Valor de primera columna tipo:`, (filteredCostos[0] as Record<string, unknown>)[tipoKeys[0]]);
     }
     
     const filteredCostosDirectos = filteredCostos.filter(row => {
@@ -1538,7 +1538,7 @@ export async function syncResumenEjecutivoToMonthlyFinancialSummary(): Promise<{
   console.log('📊 [Resumen Ejecutivo ETL] Iniciando sincronización...');
   
   try {
-    const { googleSheetsWorkingService, ResumenEjecutivoRow } = await import('../services/googleSheetsWorking');
+    const { googleSheetsWorkingService } = await import('../services/googleSheetsWorking');
     const { monthlyFinancialSummary } = await import('@shared/schema');
     const { sql } = await import('drizzle-orm');
     
@@ -1620,7 +1620,7 @@ export async function syncResumenEjecutivoToMonthlyFinancialSummary(): Promise<{
           recordsUpdated++;
         } else {
           // INSERT: use all values (null fields are fine for new rows)
-          await db.insert(monthlyFinancialSummary).values(allValues);
+          await db.insert(monthlyFinancialSummary).values(allValues as any);
           recordsInserted++;
         }
         

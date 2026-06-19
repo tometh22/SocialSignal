@@ -54,8 +54,8 @@ export default function ManageQuotes() {
 
   const { data: quotations, isLoading, refetch, error: quotationsError } = useQuery<Quotation[]>({
     queryKey: ["/api/quotations"],
-    staleTime: 0, // Always refetch to avoid cache issues
-    cacheTime: 0,  // Don't cache to ensure fresh data
+    staleTime: 0,
+    gcTime: 0,
     refetchOnWindowFocus: true
   });
 
@@ -570,13 +570,13 @@ export default function ManageQuotes() {
     return null;
   };
 
-  const isQuoteExpired = (quote: { status: string; expiresAt?: string | null }) => {
+  const isQuoteExpired = (quote: { status: string; expiresAt?: string | Date | null }) => {
     return quote.expiresAt
       && (quote.status === "pending" || quote.status === "in-negotiation")
       && new Date(quote.expiresAt) < new Date();
   };
 
-  const getStatusBadge = (status: string, quote?: { status: string; expiresAt?: string | null }) => {
+  const getStatusBadge = (status: string, quote?: { status: string; expiresAt?: string | Date | null }) => {
     if (quote && isQuoteExpired(quote)) {
       return (
         <Badge variant="outline" className="bg-red-50 text-red-600 border-red-200 inline-flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded-md">

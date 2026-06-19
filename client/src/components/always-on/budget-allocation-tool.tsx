@@ -107,7 +107,7 @@ export function BudgetAllocationTool({ project, subprojects = [] }: BudgetAlloca
       toast({
         title: 'Presupuesto asignado',
         description: 'La distribución del presupuesto ha sido guardada exitosamente.',
-        variant: 'success',
+        variant: 'default',
       });
       
       // Ocultar mensaje de confirmación después de 3 segundos
@@ -143,7 +143,7 @@ export function BudgetAllocationTool({ project, subprojects = [] }: BudgetAlloca
       setAllocations(currentAllocations);
       
       // Calcular monto sin asignar
-      const totalAllocated = currentAllocations.reduce((sum, item) => sum + item.newBudget, 0);
+      const totalAllocated = currentAllocations.reduce((sum: number, item: any) => sum + item.newBudget, 0);
       setUnallocatedAmount(Math.max(0, monthlyBudget - totalAllocated));
     }
   }, [effectiveSubprojects, costSummaries, isLoadingCosts, monthlyBudget]);

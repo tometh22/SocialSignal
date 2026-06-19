@@ -29,7 +29,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import EditMacroProjectButton from "@/components/always-on/edit-macro-project-button";
 import { format, subDays } from 'date-fns';
-import { DateRangePicker } from "@/components/ui/date-range-picker";
 // Interfaces para el tipado
 interface CostSummary {
   estimatedCost: number;
@@ -89,6 +88,7 @@ interface TimeEntry {
   billable: boolean;
   hourlyRate?: number;
   hourlyRateAtTime?: number;
+  createdAt?: string;
 }
 
 interface Personnel {
@@ -254,7 +254,7 @@ const ProjectAnalyticsView: React.FC = () => {
     switch (filter) {
       case "current_month":
         const currentMonthFiltered = entries.filter(entry => {
-          const entryDate = new Date(entry.date || entry.createdAt);
+          const entryDate = new Date(entry.date || entry.createdAt || '');
           const matches = entryDate.getFullYear() === currentYear && entryDate.getMonth() === currentMonth;
           return matches;
         });
@@ -265,7 +265,7 @@ const ProjectAnalyticsView: React.FC = () => {
         const lastMonth = currentMonth === 0 ? 11 : currentMonth - 1;
         const lastMonthYear = currentMonth === 0 ? currentYear - 1 : currentYear;
         const lastMonthFiltered = entries.filter(entry => {
-          const entryDate = new Date(entry.date || entry.createdAt);
+          const entryDate = new Date(entry.date || entry.createdAt || '');
           const entryYear = entryDate.getFullYear();
           const entryMonth = entryDate.getMonth();
           const matches = entryYear === lastMonthYear && entryMonth === lastMonth;
@@ -300,7 +300,7 @@ const ProjectAnalyticsView: React.FC = () => {
         const quarterStartMonth = currentQuarter * 3;
         const quarterEndMonth = quarterStartMonth + 2;
         const currentQuarterFiltered = entries.filter(entry => {
-          const entryDate = new Date(entry.date || entry.createdAt);
+          const entryDate = new Date(entry.date || entry.createdAt || '');
           const entryMonth = entryDate.getMonth();
           const matches = entryDate.getFullYear() === currentYear && 
                  entryMonth >= quarterStartMonth && 
@@ -316,7 +316,7 @@ const ProjectAnalyticsView: React.FC = () => {
         const lastQuarterStartMonth = lastQuarter * 3;
         const lastQuarterEndMonth = lastQuarterStartMonth + 2;
         const lastQuarterFiltered = entries.filter(entry => {
-          const entryDate = new Date(entry.date || entry.createdAt);
+          const entryDate = new Date(entry.date || entry.createdAt || '');
           const entryMonth = entryDate.getMonth();
           const matches = entryDate.getFullYear() === lastQuarterYear && 
                  entryMonth >= lastQuarterStartMonth && 
@@ -331,7 +331,7 @@ const ProjectAnalyticsView: React.FC = () => {
         const semesterStartMonth = currentSemester * 6;
         const semesterEndMonth = semesterStartMonth + 5;
         const currentSemesterFiltered = entries.filter(entry => {
-          const entryDate = new Date(entry.date || entry.createdAt);
+          const entryDate = new Date(entry.date || entry.createdAt || '');
           const entryMonth = entryDate.getMonth();
           const matches = entryDate.getFullYear() === currentYear && 
                  entryMonth >= semesterStartMonth && 
@@ -347,7 +347,7 @@ const ProjectAnalyticsView: React.FC = () => {
         const lastSemesterStartMonth = lastSemester * 6;
         const lastSemesterEndMonth = lastSemesterStartMonth + 5;
         const lastSemesterFiltered = entries.filter(entry => {
-          const entryDate = new Date(entry.date || entry.createdAt);
+          const entryDate = new Date(entry.date || entry.createdAt || '');
           const entryMonth = entryDate.getMonth();
           const matches = entryDate.getFullYear() === lastSemesterYear && 
                  entryMonth >= lastSemesterStartMonth && 
@@ -359,7 +359,7 @@ const ProjectAnalyticsView: React.FC = () => {
 
       case "current_year":
         const currentYearFiltered = entries.filter(entry => {
-          const entryDate = new Date(entry.date || entry.createdAt);
+          const entryDate = new Date(entry.date || entry.createdAt || '');
           const matches = entryDate.getFullYear() === currentYear;
           return matches;
         });
@@ -408,7 +408,7 @@ const ProjectAnalyticsView: React.FC = () => {
       const person = personnel.find(p => p.id === entry.personnelId);
       if (!person || !entry.hours) return;
       
-      const entryDate = new Date(entry.date || entry.createdAt);
+      const entryDate = new Date(entry.date || entry.createdAt || '');
       const monthYear = `${entryDate.getFullYear()}-${entryDate.getMonth()}`;
       const key = `${person.id}-${monthYear}`;
       

@@ -50,7 +50,7 @@ export default function QuarterlyNpsSurvey() {
   });
 
   // Obtener datos del cliente
-  const { data: client } = useQuery({
+  const { data: client } = useQuery<{ id: number; name: string }>({
     queryKey: [`/api/clients/${clientId}`],
     enabled: !!clientId,
   });
@@ -92,7 +92,7 @@ export default function QuarterlyNpsSurvey() {
     e.preventDefault();
     
     // Calcular categoría NPS automáticamente
-    if (formData.npsScore !== undefined) {
+    if (formData.npsScore != null) {
       let category = "";
       if (formData.npsScore >= 9) category = "Promotor";
       else if (formData.npsScore >= 7) category = "Pasivo";
@@ -163,7 +163,7 @@ export default function QuarterlyNpsSurvey() {
           <span>0: Muy improbable</span>
           <span>10: Extremadamente probable</span>
         </div>
-        {formData.npsScore !== undefined && (
+        {formData.npsScore != null && (
           <div className="text-sm">
             <span className="font-medium">Categoría: </span>
             <span className={
@@ -255,7 +255,7 @@ export default function QuarterlyNpsSurvey() {
                 </Label>
                 <Textarea
                   id="improvementSuggestions"
-                  value={formData.improvementSuggestions}
+                  value={formData.improvementSuggestions ?? ''}
                   onChange={(e) => handleInputChange("improvementSuggestions", e.target.value)}
                   placeholder="Describa las áreas donde podríamos mejorar..."
                   className="h-24"
@@ -268,7 +268,7 @@ export default function QuarterlyNpsSurvey() {
                 </Label>
                 <Textarea
                   id="strengthsFeedback"
-                  value={formData.strengthsFeedback}
+                  value={formData.strengthsFeedback ?? ''}
                   onChange={(e) => handleInputChange("strengthsFeedback", e.target.value)}
                   placeholder="Mencione los aspectos más valorados del servicio..."
                   className="h-24"

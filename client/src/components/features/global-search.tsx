@@ -54,10 +54,10 @@ export function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
   const [activeTab, setActiveTab] = useState('all');
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const { data: clients = [] } = useQuery({ queryKey: ['/api/clients'] });
-  const { data: activeProjects = [] } = useQuery({ queryKey: ['/api/active-projects'] });
-  const { data: quotations = [] } = useQuery({ queryKey: ['/api/quotations'] });
-  const { data: deliverables = [] } = useQuery({ queryKey: ['/api/deliverables'] });
+  const { data: clients = [] } = useQuery<{ id: number; name: string; [key: string]: unknown }[]>({ queryKey: ['/api/clients'] });
+  const { data: activeProjects = [] } = useQuery<{ id: number; quotationId?: number | null; [key: string]: unknown }[]>({ queryKey: ['/api/active-projects'] });
+  const { data: quotations = [] } = useQuery<{ id: number; projectName?: string; clientId?: number; [key: string]: unknown }[]>({ queryKey: ['/api/quotations'] });
+  const { data: deliverables = [] } = useQuery<{ id: number; [key: string]: unknown }[]>({ queryKey: ['/api/deliverables'] });
 
   // Focus en el input cuando se abre
   useEffect(() => {

@@ -206,7 +206,7 @@ export function BudgetSummaryPanel({ project }: BudgetSummaryPanelProps) {
       const projectIds = subprojects.map((p: any) => p.id);
       const summaries: Record<number, any> = {};
       
-      await Promise.all(projectIds.map(async (id) => {
+      await Promise.all(projectIds.map(async (id: number) => {
         try {
           const url = getCostSummaryUrl(id);
           const response = await fetch(url);

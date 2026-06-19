@@ -11,6 +11,8 @@ type Summary = {
   costDisplay?: number;
   currencyNative?: "ARS" | "USD";
   flags?: string[];
+  teamCostUSD?: number;
+  markupUSD?: number;
 };
 
 type ProjectSummaryResponse = {
@@ -62,8 +64,8 @@ export function useProjectSummary(
               revenueUSD: data.summary.revenueUSD ?? 0,
               costUSD: data.summary.teamCostUSD ?? 0,
               profitUSD: data.summary.markupUSD ?? 0,
-              markup: data.summary.markup ?? (data.summary.teamCostUSD > 0 ? data.summary.revenueUSD / data.summary.teamCostUSD : 0),
-              margin: data.summary.margin ?? (data.summary.revenueUSD > 0 ? (data.summary.revenueUSD - data.summary.teamCostUSD) / data.summary.revenueUSD : 0),
+              markup: data.summary.markup ?? ((data.summary.teamCostUSD ?? 0) > 0 ? data.summary.revenueUSD / (data.summary.teamCostUSD ?? 1) : 0),
+              margin: data.summary.margin ?? (data.summary.revenueUSD > 0 ? (data.summary.revenueUSD - (data.summary.teamCostUSD ?? 0)) / data.summary.revenueUSD : 0),
               revenueDisplay: data.summary.revenueDisplay,
               costDisplay: data.summary.costDisplay,
               currencyNative: data.summary.currencyNative,

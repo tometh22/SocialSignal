@@ -121,7 +121,7 @@ class GoogleSheetsServiceAlternative {
       
     } catch (error) {
       console.error('Error fetching data from Google Sheets:', error);
-      throw new Error(`Failed to fetch costs data: ${error.message}`);
+      throw new Error(`Failed to fetch costs data: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
