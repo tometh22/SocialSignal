@@ -619,10 +619,10 @@ const port = Number(process.env.PORT || 5000);
     startResumenEjecutivoSync();
     console.log("📊 Resumen Ejecutivo auto-sync iniciado (cada 2 horas)");
 
-    // Start daily SoT ETL synchronization job
-    // const { startDailySoTSync } = await import("./jobs/daily-sot-sync");
-    // startDailySoTSync();
-    // console.log("📅 Job diario SoT ETL programado (02:00 AR)");
+    // Full SoT pipeline sync — every 6 hours, also runs 60s after startup
+    const { startDailySoTSync } = await import("./jobs/daily-sot-sync");
+    startDailySoTSync();
+    console.log("📅 [SoT Sync] Pipeline completo programado cada 6 horas");
 
     // Start CRM reminder notifications job
     const { startReminderNotifications } = await import("./jobs/reminder-notifications");
