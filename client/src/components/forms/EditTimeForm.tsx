@@ -87,6 +87,7 @@ export default function EditTimeForm({
 
   const updateTimeEntryMutation = useMutation({
     mutationFn: async (data: EditTimeFormData) => {
+      const person = personnel.find(p => p.id === data.personnelId);
       return apiRequest(`/api/time-entries/${entry.id}`, {
         method: "PATCH",
         body: {
@@ -96,6 +97,8 @@ export default function EditTimeForm({
           description: data.description,
           billable: data.billable,
           componentId: data.componentId,
+          totalCost: person ? data.hours * person.hourlyRate : undefined,
+          hourlyRateAtTime: person?.hourlyRate,
         }
       });
     },
@@ -211,7 +214,7 @@ export default function EditTimeForm({
                 type="number"
                 step="0.1"
                 min="0.1"
-                max="24"
+                max="500"
                 className="pl-8"
                 {...form.register('hours', { valueAsNumber: true })}
               />

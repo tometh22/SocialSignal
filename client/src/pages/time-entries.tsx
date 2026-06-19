@@ -85,6 +85,7 @@ interface Personnel {
   id: number;
   name: string;
   roleId: number;
+  roleName?: string;
   hourlyRate: number;
 }
 
@@ -262,30 +263,8 @@ const CompactTimeForm: React.FC<{
 
   // Función para verificar si una persona está cotizada
   const isPersonnelQuoted = (personnelId: number) => {
-    console.log('🔍 Verificando personal cotizado:', {
-      personnelId,
-      projectId,
-      hasProjectData: !!projectData,
-      hasQuotation: !!projectData?.quotation,
-      hasTeam: !!projectData?.quotation?.team,
-      teamSize: projectData?.quotation?.team?.length || 0,
-      team: projectData?.quotation?.team,
-      fullProjectData: projectData
-    });
-    
-    if (!projectData?.quotation?.team) {
-      console.log('❌ No hay datos de equipo cotizado disponibles');
-      return false;
-    }
-    
-    const isQuoted = projectData.quotation.team.some((member: any) => member.personnelId === personnelId);
-    console.log('🔍 Resultado de verificación:', { 
-      personnelId, 
-      isQuoted,
-      teamMembers: projectData.quotation.team.map((m: any) => ({ id: m.personnelId, name: m.personnelName }))
-    });
-    
-    return isQuoted;
+    if (!projectData?.quotation?.team) return false;
+    return projectData.quotation.team.some((member: any) => member.personnelId === personnelId);
   };
 
   const onSubmit = async (data: z.infer<typeof formSchema>) => {
@@ -629,7 +608,6 @@ const TimeEntries: React.FC = () => {
       const filtered = prev.filter(e => e.id !== entry.id);
       // Agregar al principio y mantener orden por fecha de creación (más reciente primero)
       const updated = [entry, ...filtered].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-      console.log('📝 Estado local actualizado:', updated.length, 'registros');
       return updated;
     });
   };
@@ -1232,7 +1210,7 @@ const TimeEntries: React.FC = () => {
                                       )}
                                     </div>
                                     <div className="text-xs text-gray-500">
-                                      {person?.roleId ? `Rol ID: ${person.roleId}` : 'Personal'}
+                                      {person?.roleName || 'Personal'}
                                     </div>
                                   </div>
                                 </div>

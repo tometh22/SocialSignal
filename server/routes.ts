@@ -8286,47 +8286,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Solo calcular si faltan datos completamente
       if (processedData.entryType === "hours" && (processedData.totalCost === undefined || processedData.totalCost === null)) {
-        // Si se registró por horas y no hay costo definido, calcularlo
         processedData.totalCost = (processedData.hours || 0) * (processedData.hourlyRateAtTime || 0);
-        console.log('🔧 Calculando totalCost en backend:', {
-          hours: processedData.hours,
-          hourlyRateAtTime: processedData.hourlyRateAtTime,
-          totalCost: processedData.totalCost
-        });
       } else if (processedData.entryType === "cost" && (processedData.hours === undefined || processedData.hours === null)) {
-        // Si se registró por costo y no hay horas definidas, calcularlas
         processedData.hours = (processedData.totalCost || 0) / (processedData.hourlyRateAtTime || 1);
-        console.log('🔧 Calculando hours en backend:', {
-          totalCost: processedData.totalCost,
-          hourlyRateAtTime: processedData.hourlyRateAtTime,
-          hours: processedData.hours
-        });
       }
-      
-      console.log('📋 Backend recibe:', { 
-        entryType: processedData.entryType, 
-        totalCost: processedData.totalCost, 
-        originalKeys: Object.keys(req.body || {}) 
-      });
 
-      // Validar que tenemos valores válidos y positivos
-      if (typeof processedData.totalCost !== 'number' || isNaN(processedData.totalCost) || processedData.totalCost <= 0) {
-        console.error('❌ Validación totalCost fallida:', {
-          totalCost: processedData.totalCost,
-          type: typeof processedData.totalCost,
-          isNaN: isNaN(processedData.totalCost),
-          hours: processedData.hours,
-          hourlyRateAtTime: processedData.hourlyRateAtTime
-        });
-        return res.status(400).json({ 
-          message: "El costo total debe ser un número positivo",
-          debug: {
-            totalCost: processedData.totalCost,
-            type: typeof processedData.totalCost,
-            hours: processedData.hours,
-            hourlyRateAtTime: processedData.hourlyRateAtTime
-          }
-        });
+      // Allow totalCost = 0 for personnel with hourlyRate = 0 (internal/non-billed)
+      if (typeof processedData.totalCost !== 'number' || isNaN(processedData.totalCost) || processedData.totalCost < 0) {
+        return res.status(400).json({ message: "El costo total debe ser un número no negativo" });
       }
 
       if (typeof processedData.hours !== 'number' || isNaN(processedData.hours) || processedData.hours < 0.25) {

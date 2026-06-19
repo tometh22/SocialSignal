@@ -108,7 +108,7 @@ export default function BulkTimeForm({
       return Promise.all(requests);
     },
     onSuccess: (results) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/time-entries"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/time-entries/project/${projectId}`] });
       updateLocalEntries(results);
       toast({
         title: "Éxito",
