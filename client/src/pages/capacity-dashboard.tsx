@@ -158,6 +158,7 @@ export default function CapacityDashboard() {
                   <tr className="border-b">
                     <th className="text-left py-2 px-3">Persona</th>
                     <th className="text-center py-2 px-3">Cap. Máxima</th>
+                    <th className="text-center py-2 px-3">Hs Tareas</th>
                     <th className="text-center py-2 px-3">Horas Reales</th>
                     {isOperations && <th className="text-center py-2 px-3">Horas Ociosas</th>}
                     <th className="text-center py-2 px-3">Utilización</th>
@@ -239,6 +240,13 @@ export default function CapacityDashboard() {
                             )}
                           </div>
                         )}
+                      </td>
+                      <td className="text-center py-2 px-3">
+                        {p.estimatedTaskHours > 0 ? (
+                          <span className={p.estimatedTaskHours > p.maxCapacity ? "text-orange-600 font-medium" : "text-foreground"}>
+                            {p.estimatedTaskHours.toFixed(1)}h
+                          </span>
+                        ) : <span className="text-muted-foreground/40">—</span>}
                       </td>
                       <td className="text-center py-2 px-3">{p.actualHours.toFixed(1)}h</td>
                       {isOperations && (

@@ -26,6 +26,7 @@ type MonthSummary = {
   hours: number;
   totalCostARS: number;
   totalCostUSD: number;
+  billingCurrency?: string;
   entryCount: number;
 };
 
@@ -37,6 +38,11 @@ function currentPeriod(): string {
 function formatARS(n: number | null | undefined): string {
   if (n == null || !isFinite(n)) return "—";
   return new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 0 }).format(n);
+}
+
+function formatUSD(n: number | null | undefined): string {
+  if (n == null || !isFinite(n) || n === 0) return "—";
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 }).format(n);
 }
 
 function formatDate(iso: string): string {
@@ -127,7 +133,7 @@ export default function MyInvoices() {
       </p>
 
       {/* Hero: resumen del mes */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-6">
         <div className="rounded-xl border border-slate-200 bg-white p-4">
           <div className="flex items-center gap-2 text-xs text-slate-500 mb-1">
             <Clock className="h-3.5 w-3.5" /> Horas del mes
@@ -135,17 +141,31 @@ export default function MyInvoices() {
           <div className="text-2xl font-semibold text-slate-800 tabular-nums">
             {summaryQuery.data ? summaryQuery.data.hours.toFixed(2) : "—"}
           </div>
+          <div className="text-[11px] text-slate-400 mt-1">
+            {summaryQuery.data?.entryCount ?? 0} registros
+          </div>
         </div>
         <div className="rounded-xl border border-slate-200 bg-white p-4">
           <div className="flex items-center gap-2 text-xs text-slate-500 mb-1">
-            <DollarSign className="h-3.5 w-3.5" /> Total calculado (ARS)
+            <DollarSign className="h-3.5 w-3.5" /> Total (ARS)
           </div>
           <div className="text-2xl font-semibold text-emerald-700 tabular-nums">
             {summaryQuery.data ? formatARS(summaryQuery.data.totalCostARS) : "—"}
           </div>
-          <div className="text-[11px] text-slate-400 mt-1">
-            {summaryQuery.data?.entryCount ?? 0} registros cargados
+        </div>
+        <div className="rounded-xl border border-slate-200 bg-white p-4">
+          <div className="flex items-center gap-2 text-xs text-slate-500 mb-1">
+            <DollarSign className="h-3.5 w-3.5" /> Total (USD)
           </div>
+          <div className="text-2xl font-semibold text-blue-700 tabular-nums">
+            {summaryQuery.data ? formatUSD(summaryQuery.data.totalCostUSD) : "—"}
+          </div>
+          {summaryQuery.data?.billingCurrency === 'USD' && (
+            <div className="text-[11px] text-blue-400 mt-1">Tarifa USD directa</div>
+          )}
+          {summaryQuery.data?.billingCurrency !== 'USD' && summaryQuery.data?.totalCostUSD === 0 && (
+            <div className="text-[11px] text-slate-400 mt-1">Sin TC del mes</div>
+          )}
         </div>
         <div className="rounded-xl border border-slate-200 bg-white p-4">
           <div className="flex items-center gap-2 text-xs text-slate-500 mb-1">Período</div>
@@ -203,7 +223,8 @@ export default function MyInvoices() {
             <tr className="text-[11px] uppercase tracking-wide text-slate-500">
               <th className="px-4 py-2.5">Mes</th>
               <th className="px-4 py-2.5 text-right">Horas</th>
-              <th className="px-4 py-2.5 text-right">Total calculado</th>
+              <th className="px-4 py-2.5 text-right">ARS</th>
+              <th className="px-4 py-2.5 text-right">USD</th>
               <th className="px-4 py-2.5">Archivo</th>
               <th className="px-4 py-2.5">Subida</th>
               <th className="px-4 py-2.5"></th>
@@ -211,16 +232,17 @@ export default function MyInvoices() {
           </thead>
           <tbody>
             {invoicesQuery.isLoading && (
-              <tr><td colSpan={6} className="px-4 py-6 text-center text-sm text-slate-400">Cargando…</td></tr>
+              <tr><td colSpan={7} className="px-4 py-6 text-center text-sm text-slate-400">Cargando…</td></tr>
             )}
             {invoicesQuery.data && invoicesQuery.data.length === 0 && (
-              <tr><td colSpan={6} className="px-4 py-6 text-center text-sm text-slate-400">Todavía no subiste ninguna factura.</td></tr>
+              <tr><td colSpan={7} className="px-4 py-6 text-center text-sm text-slate-400">Todavía no subiste ninguna factura.</td></tr>
             )}
             {(invoicesQuery.data ?? []).map(row => (
               <tr key={row.id} className="border-t border-slate-100">
                 <td className="px-4 py-2.5 capitalize">{formatPeriodLabel(row.period)}</td>
                 <td className="px-4 py-2.5 text-right tabular-nums">{row.hoursTotal?.toFixed(2) ?? "—"}</td>
                 <td className="px-4 py-2.5 text-right tabular-nums">{formatARS(row.computedTotalCostARS)}</td>
+                <td className="px-4 py-2.5 text-right tabular-nums text-blue-700">{formatUSD(row.computedTotalCostUSD)}</td>
                 <td className="px-4 py-2.5">
                   <a href={row.fileUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-indigo-600 hover:underline">
                     <FileText className="h-3.5 w-3.5" />

@@ -122,7 +122,7 @@ import { CoverageCalculator } from "./domain/coverage";
 import { eq, and, or, isNull, isNotNull, desc, sql, asc, gte, lte, inArray } from "drizzle-orm";
 import { reinitializeDatabase } from "./reinit-data";
 import { upload, uploadDocument, uploadInvoice, deleteOldFile } from "./upload";
-import { personalMonthlyInvoices, externalProviders as externalProvidersTable, providerProjectAccess as providerProjectAccessTable } from "@shared/schema";
+import { personalMonthlyInvoices, externalProviders as externalProvidersTable, providerProjectAccess as providerProjectAccessTable, exchangeRates } from "@shared/schema";
 import { sanitizeInput } from "./input-sanitization";
 import { setupAuth, hashPassword } from "./auth";
 import { requireProjectUnlocked, projectIdFromTimeEntry } from "./middleware/projectLocked";
@@ -9080,13 +9080,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
       totalCostARS += Number(r.totalCost) || 0;
     }
 
+    // Compute USD total: if personnel bills in USD, use hourlyRate * hours; otherwise convert ARS via period FX
+    let totalCostUSD = 0;
+    const billingCurrency = (personnelRow as any).billingCurrency ?? 'ARS';
+    if (billingCurrency === 'USD') {
+      const usdRate = personnelRow.hourlyRate ?? 0;
+      totalCostUSD = hours * usdRate;
+    } else {
+      const [yyyy, mm] = period.split("-").map(Number);
+      const fxRow = await db.select({ rate: exchangeRates.rate })
+        .from(exchangeRates)
+        .where(and(
+          eq(exchangeRates.year, yyyy),
+          eq(exchangeRates.month, mm),
+          eq(exchangeRates.isActive, true),
+        ))
+        .orderBy(desc(exchangeRates.updatedAt))
+        .limit(1);
+      const fxRate = fxRow.length > 0 ? Number(fxRow[0].rate) : 0;
+      totalCostUSD = fxRate > 0 ? Math.round((totalCostARS / fxRate) * 100) / 100 : 0;
+    }
+
     return {
       period,
       userId,
       personnelId: personnelRow.id,
       hours,
       totalCostARS,
-      totalCostUSD: 0, // podría calcularse con exchange rate del mes; por ahora ARS puro
+      totalCostUSD,
+      billingCurrency,
       entryCount: rows.length,
     };
   }
@@ -19724,6 +19746,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
           sql`${timeEntries.date} <= ${weekEndDate.toISOString()}`
         ));
 
+      // Get tasks with estimatedHours assigned to each person overlapping this week
+      const weekStartISO = weekStartDate.toISOString().split('T')[0];
+      const weekEndISO = weekEndDate.toISOString().split('T')[0];
+      const weekTasks = await db.select({
+        assigneeId: tasks.assigneeId,
+        estimatedHours: tasks.estimatedHours,
+      }).from(tasks).where(
+        and(
+          sql`${tasks.assigneeId} IS NOT NULL`,
+          sql`${tasks.estimatedHours} IS NOT NULL`,
+          sql`${tasks.estimatedHours} > 0`,
+          sql`${tasks.status} NOT IN ('done', 'cancelled')`,
+          sql`(
+            (${tasks.dueDate} IS NOT NULL AND ${tasks.dueDate} >= ${weekStartISO} AND ${tasks.dueDate} <= ${weekEndISO})
+            OR
+            (${tasks.startDate} IS NOT NULL AND ${tasks.startDate} >= ${weekStartISO} AND ${tasks.startDate} <= ${weekEndISO})
+          )`
+        )
+      );
+      const taskHoursMap: Record<number, number> = {};
+      for (const t of weekTasks) {
+        if (t.assigneeId && t.estimatedHours) {
+          taskHoursMap[t.assigneeId] = (taskHoursMap[t.assigneeId] || 0) + t.estimatedHours;
+        }
+      }
+
       // Get absences that overlap this week
       const weekStartStr = weekStartDate.toISOString().split('T')[0];
       const weekEndStr = weekEndDate.toISOString().split('T')[0];
@@ -19757,6 +19805,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const actualHours = personEntries.reduce((sum, e) => sum + (e.hours || 0), 0);
         const idleHours = Math.max(0, maxCapacity - actualHours);
 
+        const estimatedTaskHours = Math.round((taskHoursMap[person.id] || 0) * 100) / 100;
         return {
           personnelId: person.id,
           name: person.name,
@@ -19764,6 +19813,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           maxCapacity: Math.round(maxCapacity * 100) / 100,
           hasOverride: overrideMap[person.id] !== undefined,
           actualHours: Math.round(actualHours * 100) / 100,
+          estimatedTaskHours,
           idleHours: Math.round(idleHours * 100) / 100,
           utilizationPct: maxCapacity > 0 ? Math.round((actualHours / maxCapacity) * 100) : 0,
           isOverloaded: actualHours > maxCapacity,
