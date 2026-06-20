@@ -26,6 +26,7 @@ import { cn } from "@/lib/utils";
 import { TaskStatusBadge } from "@/components/ui/status-badge";
 import { TASK_STATUS_CONFIG, BOARD_STATUS_COLUMNS } from "@/constants/task-statuses";
 import TaskDetailPanel from "./TaskDetailPanel";
+import { ErrorBoundary } from "@/components/error-boundary";
 import { toast } from "@/hooks/use-toast";
 import {
   DndContext, DragEndEvent, DragOverlay, DragStartEvent, DragOverEvent,
@@ -422,8 +423,32 @@ function TaskRow({ task, allPersonnel, onOpen, onToggle, onDateSet, onAssignee, 
         {/* Title */}
         <div className="flex-1 min-w-0 px-2 py-3 flex items-center gap-1.5">
           <div className={cn("w-2 h-2 rounded-full flex-shrink-0", PRIORITY_DOT[task.priority] || "bg-gray-200")} />
-          {task.status !== "todo" && task.status !== "done" && task.status !== "cancelled" && (
-            <TaskStatusBadge status={task.status} size="xs" />
+          {task.status !== "todo" && task.status !== "done" && (
+            <Popover>
+              <PopoverTrigger asChild>
+                <button
+                  onClick={e => e.stopPropagation()}
+                  className="flex-shrink-0"
+                >
+                  <TaskStatusBadge status={task.status} size="xs" />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-36 p-1 shadow-lg" align="start" onClick={e => e.stopPropagation()}>
+                {(["todo","in_progress","blocked","done"] as const).map(s => (
+                  <button
+                    key={s}
+                    className={cn(
+                      "w-full text-left text-xs px-2 py-1.5 rounded hover:bg-accent flex items-center gap-2 transition-colors",
+                      task.status === s && "bg-primary/10 font-medium"
+                    )}
+                    onClick={() => onStatusChange?.(task.id, s)}
+                  >
+                    <span className={cn("w-2 h-2 rounded-full flex-shrink-0", TASK_STATUS_CONFIG[s].dot)} />
+                    {TASK_STATUS_CONFIG[s].label}
+                  </button>
+                ))}
+              </PopoverContent>
+            </Popover>
           )}
           {renaming ? (
             <Input
@@ -534,25 +559,6 @@ function TaskRow({ task, allPersonnel, onOpen, onToggle, onDateSet, onAssignee, 
           </Popover>
         </div>
 
-        {/* Colaboradores */}
-        <div className="w-24 px-2 flex-shrink-0 flex items-center gap-0.5">
-          {collaborators.slice(0, 3).map(c => (
-            <Tooltip key={c.id}>
-              <TooltipTrigger asChild>
-                <Avatar className="h-5 w-5 -ml-1 first:ml-0 ring-1 ring-background">
-                  <AvatarFallback className={cn("text-[8px] text-white", getAvatarColor(c.id))}>
-                    {getInitials(c.name)}
-                  </AvatarFallback>
-                </Avatar>
-              </TooltipTrigger>
-              <TooltipContent side="top"><p>{c.name}</p></TooltipContent>
-            </Tooltip>
-          ))}
-          {collaborators.length > 3 && (
-            <span className="text-[9px] text-muted-foreground ml-0.5">+{collaborators.length - 3}</span>
-          )}
-        </div>
-
         {/* Fecha entrega / rango */}
         <div className="w-32 px-1 flex-shrink-0 text-xs flex items-center">
           <InlineDateButton
@@ -636,15 +642,15 @@ function TaskRow({ task, allPersonnel, onOpen, onToggle, onDateSet, onAssignee, 
                   <>
                     <DropdownMenuLabel className="text-xs text-muted-foreground py-1">Estado</DropdownMenuLabel>
                     <DropdownMenuSeparator />
-                    {Object.entries(TASK_STATUS_CONFIG)
-                      .filter(([k]) => k !== task.status)
-                      .map(([status, cfg]) => (
+                    {(["todo","in_progress","blocked","done"] as const)
+                      .filter(s => s !== task.status)
+                      .map(s => (
                         <DropdownMenuItem
-                          key={status}
-                          onClick={e => { e.stopPropagation(); onStatusChange(task.id, status); }}
+                          key={s}
+                          onClick={e => { e.stopPropagation(); onStatusChange(task.id, s); }}
                         >
-                          <span className={cn("w-2 h-2 rounded-full mr-2 flex-shrink-0", cfg.dot)} />
-                          {cfg.label}
+                          <span className={cn("w-2 h-2 rounded-full mr-2 flex-shrink-0", TASK_STATUS_CONFIG[s].dot)} />
+                          {TASK_STATUS_CONFIG[s].label}
                         </DropdownMenuItem>
                       ))}
                   </>
@@ -759,7 +765,7 @@ function SectionBlock({ sectionName, tasks, projectId, allPersonnel, projectMemb
       {!isFirst && <div className="h-px bg-border/60" />}
       {/* Section header row */}
       <div
-        className="flex items-center border-b border-border bg-muted/50 hover:bg-muted/70 cursor-pointer transition-colors group"
+        className="flex items-center border-b border-border bg-muted/60 hover:bg-muted/80 cursor-pointer transition-colors group border-l-2 border-l-primary/40"
         onClick={() => !renamingSection && setCollapsed(!collapsed)}
       >
         {/* Drag handle for section */}
@@ -793,7 +799,7 @@ function SectionBlock({ sectionName, tasks, projectId, allPersonnel, projectMemb
               className="h-6 text-sm font-bold border-primary bg-background w-48 px-1.5"
             />
           ) : (
-            <span className="font-bold text-sm text-foreground tracking-tight">{sectionName}</span>
+            <span className="font-semibold text-xs text-foreground uppercase tracking-wider">{sectionName}</span>
           )}
           {rootTasks.length > 0 && (
             <div className="flex items-center gap-1.5">
@@ -1654,7 +1660,6 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
                   <div className="w-5 flex-shrink-0" />
                   <div className="flex-1 px-2 py-2.5">Nombre de tarea</div>
                   <div className="w-28 px-2 flex-shrink-0 py-2.5">Responsable</div>
-                  <div className="w-24 px-2 flex-shrink-0 py-2.5">Colaboradores</div>
                   <div className="w-32 px-2 flex-shrink-0 py-2.5">Fechas</div>
                   <div className="w-24 px-2 flex-shrink-0 py-2.5">Tiempo real</div>
                   <div className="w-28 px-2 flex-shrink-0 py-2.5">Cliente</div>
@@ -1727,14 +1732,29 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
         </div>
       )}
 
-      <TaskDetailPanel
-        taskId={selectedTaskId}
-        open={!!selectedTaskId}
-        onClose={() => { setSelectedTaskId(null); setFocusTime(false); }}
-        onUpdate={refetch}
-        initialFocusTime={focusTime}
-        onNavigateToTask={(id) => setSelectedTaskId(id)}
-      />
+      <ErrorBoundary
+        key={selectedTaskId ?? 'closed'}
+        fallback={
+          <div className="fixed inset-y-0 right-0 w-full sm:max-w-xl bg-background border-l border-border p-6 flex flex-col items-center justify-center gap-4 z-50">
+            <p className="text-sm text-muted-foreground text-center">No se pudo cargar el detalle de la tarea.</p>
+            <button
+              className="text-xs text-primary underline"
+              onClick={() => setSelectedTaskId(null)}
+            >
+              Cerrar
+            </button>
+          </div>
+        }
+      >
+        <TaskDetailPanel
+          taskId={selectedTaskId}
+          open={!!selectedTaskId}
+          onClose={() => { setSelectedTaskId(null); setFocusTime(false); }}
+          onUpdate={refetch}
+          initialFocusTime={focusTime}
+          onNavigateToTask={(id) => setSelectedTaskId(id)}
+        />
+      </ErrorBoundary>
     </div>
   );
 }

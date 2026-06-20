@@ -46,8 +46,8 @@ export default function TaskCalendarView({ projectId }: Props) {
   });
 
   const rootTasks = (data?.tasks || []).filter(t => !t.parentTaskId);
-  const tasksWithDate = rootTasks.filter(t => t.dueDate);
-  const tasksWithoutDate = rootTasks.filter(t => !t.dueDate && t.status !== "cancelled" && t.status !== "done");
+  const tasksWithDate = rootTasks.filter(t => t.dueDate || t.startDate);
+  const tasksWithoutDate = rootTasks.filter(t => !t.dueDate && !t.startDate && t.status !== "cancelled" && t.status !== "done");
 
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(currentMonth);
@@ -71,8 +71,17 @@ export default function TaskCalendarView({ projectId }: Props) {
   const isTaskOverdue = (t: CalTask, d: Date) =>
     d < today && t.status !== "done" && t.status !== "cancelled";
 
+  const parseLocalDate = (s: string) => new Date(s.slice(0, 10) + "T00:00:00");
+
   const getTasksForDay = (d: Date) =>
-    tasksWithDate.filter(t => isSameDay(new Date(t.dueDate!.slice(0, 10) + "T00:00:00"), d));
+    tasksWithDate.filter(t => {
+      const due   = t.dueDate   ? parseLocalDate(t.dueDate)   : null;
+      const start = t.startDate ? parseLocalDate(t.startDate) : null;
+      if (due && start) return d >= start && d <= due;
+      if (due)          return isSameDay(due, d);
+      if (start)        return isSameDay(start, d);
+      return false;
+    });
 
   return (
     <div className="pt-4 pb-8">

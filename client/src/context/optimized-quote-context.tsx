@@ -401,11 +401,26 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
       quotationData.inflation.rateProjectionMode, quotationData.inflation.projectStartDate,
       estimatedRatesData, currentYear]);
 
-  // Returns the month key actually being used in auto-mode (null if no data found)
+  // Returns the month key actually being used in auto-mode (null if no data found).
+  // Picks the most recent month where the majority of ARS-billed active personnel
+  // have a non-zero rate (avoids returning a month with only partial/estimated data).
   const getResolvedSalaryMonth = useCallback((): string | null => {
     if (quotationData.salaryMonth) return quotationData.salaryMonth;
+    const today = new Date().toISOString().slice(0, 10);
+    const arsBilledActive = personnel.filter((p: any) => {
+      const until = p.activeUntil;
+      const isActive = !until || until >= today;
+      const isARS = !p.billingCurrency || p.billingCurrency === 'ARS';
+      return isActive && isARS;
+    });
+    const threshold = arsBilledActive.length > 0 ? Math.ceil(arsBilledActive.length * 0.5) : 1;
     for (const m of CURRENT_OR_PAST_MONTHS_DESC) {
-      if (personnel.some((p: any) => (p as any)[`${m}HourlyRateARS`] > 0)) return m;
+      const withData = arsBilledActive.filter((p: any) => ((p as any)[`${m}HourlyRateARS`] ?? 0) > 0).length;
+      if (withData >= threshold) return m;
+    }
+    // Fallback: any person has data
+    for (const m of CURRENT_OR_PAST_MONTHS_DESC) {
+      if (personnel.some((p: any) => ((p as any)[`${m}HourlyRateARS`] ?? 0) > 0)) return m;
     }
     return null;
   }, [personnel, quotationData.salaryMonth]);

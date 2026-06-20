@@ -23,7 +23,7 @@ type HoursSummary = {
   entries: any[];
   byWeek: { week: string; hours: number }[];
   byProject: { name: string; hours: number }[];
-  byPerson: { name: string; hours: number }[];
+  byPerson: { name: string; hours: number; estimatedHours: number }[];
 };
 
 const QUICK_FILTERS = [
@@ -334,21 +334,26 @@ export default function HoursDashboardPage() {
                 <thead>
                   <tr className="border-b bg-muted/10">
                     <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">Colaborador</th>
-                    {summary.byProject.slice(0, 6).map(p => (
-                      <th key={p.name} className="text-center px-3 py-2.5 text-xs font-semibold text-muted-foreground max-w-[100px]">
+                    {summary.byProject.slice(0, 5).map(p => (
+                      <th key={p.name} className="text-center px-3 py-2.5 text-xs font-semibold text-muted-foreground max-w-[90px]">
                         <span className="block truncate" title={p.name}>{p.name}</span>
                       </th>
                     ))}
-                    <th className="text-right px-4 py-2.5 text-xs font-semibold text-muted-foreground">Total</th>
+                    <th className="text-right px-3 py-2.5 text-xs font-semibold text-muted-foreground">Estimadas</th>
+                    <th className="text-right px-4 py-2.5 text-xs font-semibold text-muted-foreground">Reales</th>
+                    <th className="text-right px-4 py-2.5 text-xs font-semibold text-muted-foreground">Δ</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
                   {summary.byPerson.map((person) => {
                     const personEntries = summary.entries.filter((e: any) => e.personnelName === person.name);
+                    const est = person.estimatedHours || 0;
+                    const real = person.hours;
+                    const delta = real - est;
                     return (
                       <tr key={person.name} className="hover:bg-accent/30 transition-colors">
                         <td className="px-4 py-2.5 font-medium text-foreground text-xs">{person.name}</td>
-                        {summary.byProject.slice(0, 6).map(proj => {
+                        {summary.byProject.slice(0, 5).map(proj => {
                           const ph = personEntries.filter((e: any) => e.projectName === proj.name).reduce((acc: number, e: any) => acc + e.hours, 0);
                           return (
                             <td key={proj.name} className="text-center px-3 py-2.5 text-xs text-muted-foreground">
@@ -356,16 +361,33 @@ export default function HoursDashboardPage() {
                             </td>
                           );
                         })}
-                        <td className="text-right px-4 py-2.5 font-bold text-foreground text-xs">{person.hours.toFixed(1)}h</td>
+                        <td className="text-right px-3 py-2.5 text-xs text-muted-foreground">
+                          {est > 0 ? `${est.toFixed(1)}h` : <span className="text-muted-foreground/40">—</span>}
+                        </td>
+                        <td className="text-right px-4 py-2.5 font-bold text-foreground text-xs">{real.toFixed(1)}h</td>
+                        <td className="text-right px-4 py-2.5 text-xs">
+                          {est > 0 ? (
+                            <span className={cn(
+                              "font-medium",
+                              delta > 2 ? "text-orange-600" : delta < -2 ? "text-green-600" : "text-muted-foreground"
+                            )}>
+                              {delta > 0 ? "+" : ""}{delta.toFixed(1)}h
+                            </span>
+                          ) : <span className="text-muted-foreground/40">—</span>}
+                        </td>
                       </tr>
                     );
                   })}
                   <tr className="bg-muted/20 font-semibold">
                     <td className="px-4 py-2.5 text-xs text-foreground">Total</td>
-                    {summary.byProject.slice(0, 6).map(proj => (
+                    {summary.byProject.slice(0, 5).map(proj => (
                       <td key={proj.name} className="text-center px-3 py-2.5 text-xs text-foreground">{proj.hours.toFixed(1)}h</td>
                     ))}
+                    <td className="text-right px-3 py-2.5 text-xs text-foreground">
+                      {summary.byPerson.reduce((s, p) => s + (p.estimatedHours || 0), 0).toFixed(1)}h
+                    </td>
                     <td className="text-right px-4 py-2.5 text-xs text-foreground">{totalHours.toFixed(1)}h</td>
+                    <td />
                   </tr>
                 </tbody>
               </table>

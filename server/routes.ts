@@ -17764,7 +17764,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Enrich entries with task/personnel info
       const allPersonnel = await db.select({ id: personnel.id, name: personnel.name }).from(personnel);
-      const allTasks = await db.select({ id: tasks.id, title: tasks.title, projectId: tasks.projectId }).from(tasks);
+      const allTasks = await db.select({ id: tasks.id, title: tasks.title, projectId: tasks.projectId, assigneeId: tasks.assigneeId, estimatedHours: tasks.estimatedHours }).from(tasks);
       
       const projectsWithNames = await db.execute(sql`
         SELECT ap.id, q.project_name, c.name as client_name
@@ -17809,12 +17809,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const byProject = Object.values(byProjectMap).sort((a, b) => b.hours - a.hours);
 
-      // By person
-      const byPersonMap: Record<number, { name: string; hours: number }> = {};
+      // By person (real hours)
+      const byPersonMap: Record<number, { name: string; hours: number; estimatedHours: number }> = {};
       for (const e of enriched) {
-        if (!byPersonMap[e.personnelId]) byPersonMap[e.personnelId] = { name: e.personnelName, hours: 0 };
+        if (!byPersonMap[e.personnelId]) byPersonMap[e.personnelId] = { name: e.personnelName, hours: 0, estimatedHours: 0 };
         byPersonMap[e.personnelId].hours += e.hours;
       }
+
+      // Estimated hours: sum tasks.estimatedHours for each assignee in the filtered project scope
+      const scopeProjectIds = projectId
+        ? [parseInt(projectId as string)]
+        : [...new Set(allTasks.map(t => t.projectId).filter(Boolean) as number[])];
+      for (const t of allTasks) {
+        if (!t.assigneeId || !t.estimatedHours || t.estimatedHours <= 0) continue;
+        if (t.projectId && !scopeProjectIds.includes(t.projectId)) continue;
+        if (!byPersonMap[t.assigneeId]) {
+          const p = allPersonnel.find(p => p.id === t.assigneeId);
+          if (!p) continue;
+          byPersonMap[t.assigneeId] = { name: p.name, hours: 0, estimatedHours: 0 };
+        }
+        byPersonMap[t.assigneeId].estimatedHours += t.estimatedHours;
+      }
+
       const byPerson = Object.values(byPersonMap).sort((a, b) => b.hours - a.hours);
 
       res.json({ entries: enriched, byWeek, byProject, byPerson });

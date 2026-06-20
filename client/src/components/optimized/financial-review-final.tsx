@@ -204,16 +204,16 @@ export default function FinancialReviewFinal() {
     finalBaseAfterInflationARS = subtotalWithComplexityARS;
   }
 
-  const platformCostARS = quotationData.financials.platformCost || 0;
+  const platformCostARS = quotationData.financials?.platformCost ?? 0;
   // toolsCost is stored in USD — multiply by safeRate to get the ARS equivalent
-  const toolsCostUSD_stored = quotationData.financials.toolsCost || 0;
+  const toolsCostUSD_stored = quotationData.financials?.toolsCost ?? 0;
   const toolsCostARS = toolsCostUSD_stored * safeRate;
   const subtotalWithPlatformARS = finalBaseAfterInflationARS + platformCostARS;
 
   // Check if we're in manual pricing mode
   let finalTotalARS, marginAmountARS, discountAmountARS, subtotalWithMarginARS, subtotalWithPlatformAndToolsARS;
   
-  if (quotationData.financials.priceMode === 'manual' && quotationData.financials.manualPrice) {
+  if (quotationData.financials?.priceMode === 'manual' && quotationData.financials?.manualPrice) {
     // Manual pricing mode - work backwards from final price
     // The manual price is the final price AFTER discount and tools
     finalTotalARS = quotationData.financials.manualPrice;
