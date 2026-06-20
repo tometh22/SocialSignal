@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { authFetch } from "@/lib/queryClient";
 import { Link } from "wouter";
@@ -6,11 +7,15 @@ import { Badge } from "@/components/ui/badge";
 import { usePermissions } from "@/hooks/use-permissions";
 import { useAuth } from "@/hooks/use-auth";
 import { computeAlerts, THRESHOLDS, type Alert } from "@/lib/smart-alerts";
+import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
+import { es } from "date-fns/locale";
+import { cn } from "@/lib/utils";
+import { TASK_STATUS_CONFIG, type TaskStatus } from "@/constants/task-statuses";
 import {
   Briefcase, FileText, Target, Users, ClipboardList, BarChart2,
   Plus, TrendingUp, Gauge, CalendarCheck, LayoutDashboard, Building2,
   CheckSquare, Calendar, ArrowRight, AlertTriangle, AlertCircle,
-  Info, Lightbulb, ChevronRight, Zap
+  Info, Lightbulb, ChevronRight, Zap, Clock, ListTodo
 } from "lucide-react";
 
 interface QuickLink {
@@ -70,6 +75,54 @@ export default function HomeDashboard() {
   }));
 
   const { alerts, insights, summary } = computeAlerts(projectsForAlerts);
+
+  // Personal data for "Mi semana"
+  const now = new Date();
+  const weekStart = startOfWeek(now, { weekStartsOn: 1 });
+  const weekEnd = endOfWeek(now, { weekStartsOn: 1 });
+  const monthStart = startOfMonth(now);
+  const monthEnd = endOfMonth(now);
+
+  const { data: myTasksData } = useQuery<{ tasks: any[]; personnelId: number | null }>({
+    queryKey: ["/api/tasks/my-tasks", "active"],
+    queryFn: () => authFetch("/api/tasks/my-tasks?status=in_progress").then(r => r.json()),
+  });
+  const { data: myTodoData } = useQuery<{ tasks: any[]; personnelId: number | null }>({
+    queryKey: ["/api/tasks/my-tasks", "todo"],
+    queryFn: () => authFetch("/api/tasks/my-tasks?status=todo").then(r => r.json()),
+  });
+
+  const myPersonnelId = myTasksData?.personnelId;
+
+  const weekParams = new URLSearchParams({
+    dateFrom: weekStart.toISOString(), dateTo: weekEnd.toISOString(),
+    ...(myPersonnelId ? { personnelId: String(myPersonnelId) } : {}),
+  });
+  const monthParams = new URLSearchParams({
+    dateFrom: monthStart.toISOString(), dateTo: monthEnd.toISOString(),
+    ...(myPersonnelId ? { personnelId: String(myPersonnelId) } : {}),
+  });
+
+  const { data: weekHours } = useQuery<{ byPerson: { hours: number }[] }>({
+    queryKey: ["/api/tasks/hours-summary", "week", myPersonnelId],
+    queryFn: () => authFetch(`/api/tasks/hours-summary?${weekParams}`).then(r => r.json()),
+    enabled: !!myPersonnelId,
+  });
+  const { data: monthHours } = useQuery<{ byPerson: { hours: number }[] }>({
+    queryKey: ["/api/tasks/hours-summary", "month", myPersonnelId],
+    queryFn: () => authFetch(`/api/tasks/hours-summary?${monthParams}`).then(r => r.json()),
+    enabled: !!myPersonnelId,
+  });
+
+  const myWeekHours = weekHours?.byPerson?.reduce((s, p) => s + p.hours, 0) ?? 0;
+  const myMonthHours = monthHours?.byPerson?.reduce((s, p) => s + p.hours, 0) ?? 0;
+
+  const myActiveTasks = (myTasksData?.tasks || []).filter(t => !t.parentTaskId);
+  const myTodoTasks = (myTodoData?.tasks || []).filter(t => !t.parentTaskId);
+  const myAllTasks = [...myActiveTasks, ...myTodoTasks].slice(0, 8);
+
+  const [showAllMyTasks, setShowAllMyTasks] = useState(false);
+  const displayedMyTasks = showAllMyTasks ? myAllTasks : myAllTasks.slice(0, 5);
 
   const greeting = () => {
     const hour = new Date().getHours();
@@ -269,6 +322,87 @@ export default function HomeDashboard() {
           </Card>
         )}
       </div>
+
+      {/* Mi semana */}
+      {myPersonnelId && (
+        <div className="space-y-3">
+          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+            <ListTodo className="h-4 w-4" />
+            Mi semana
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="bg-card rounded-xl border p-4 flex items-center gap-3">
+              <div className="bg-primary/10 p-2.5 rounded-lg">
+                <Clock className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-foreground">{myWeekHours.toFixed(1)}h</p>
+                <p className="text-xs text-muted-foreground">Horas esta semana</p>
+              </div>
+            </div>
+            <div className="bg-card rounded-xl border p-4 flex items-center gap-3">
+              <div className="bg-blue-500/10 p-2.5 rounded-lg">
+                <BarChart2 className="h-5 w-5 text-blue-500" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-foreground">{myMonthHours.toFixed(1)}h</p>
+                <p className="text-xs text-muted-foreground">Horas este mes</p>
+              </div>
+            </div>
+            <div className="bg-card rounded-xl border p-4 flex items-center gap-3">
+              <div className="bg-amber-500/10 p-2.5 rounded-lg">
+                <CheckSquare className="h-5 w-5 text-amber-500" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-foreground">{myActiveTasks.length}</p>
+                <p className="text-xs text-muted-foreground">Tareas en curso</p>
+              </div>
+            </div>
+          </div>
+          {myAllTasks.length > 0 && (
+            <div className="bg-card rounded-xl border overflow-hidden">
+              <div className="px-4 py-3 border-b bg-muted/20 flex items-center justify-between">
+                <h3 className="text-sm font-semibold">Mis tareas activas</h3>
+                <Link href="/tasks">
+                  <span className="text-xs text-primary hover:underline cursor-pointer flex items-center gap-0.5">
+                    Ver todas <ChevronRight className="h-3 w-3" />
+                  </span>
+                </Link>
+              </div>
+              <div className="divide-y divide-border">
+                {displayedMyTasks.map((t: any) => {
+                  const cfg = TASK_STATUS_CONFIG[t.status as TaskStatus];
+                  const isOverdue = t.dueDate && new Date(t.dueDate) < now && t.status !== 'done';
+                  return (
+                    <div key={t.id} className="px-4 py-2.5 flex items-center gap-3 hover:bg-accent/20 transition-colors">
+                      <span className={cn("w-2 h-2 rounded-full flex-shrink-0", cfg?.dot || "bg-gray-400")} />
+                      <span className="flex-1 text-sm text-foreground truncate">{t.title}</span>
+                      {t.estimatedHours > 0 && (
+                        <span className="text-xs text-muted-foreground flex-shrink-0">{t.estimatedHours}h est.</span>
+                      )}
+                      {t.dueDate && (
+                        <span className={cn("text-xs flex-shrink-0", isOverdue ? "text-red-600 font-medium" : "text-muted-foreground")}>
+                          {format(new Date(t.dueDate.slice(0,10) + 'T00:00:00'), "d MMM", { locale: es })}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              {myAllTasks.length > 5 && (
+                <div className="px-4 py-2 border-t bg-muted/10">
+                  <button
+                    className="text-xs text-primary hover:underline"
+                    onClick={() => setShowAllMyTasks(v => !v)}
+                  >
+                    {showAllMyTasks ? "Ver menos" : `+${myAllTasks.length - 5} tareas más`}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Sections */}
       {renderSection("Comercial", commercialLinks)}
