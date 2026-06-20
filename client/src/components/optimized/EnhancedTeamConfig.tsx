@@ -544,8 +544,16 @@ const EnhancedTeamConfig: React.FC = () => {
                     }`}
                   >
                     <div className="flex items-center w-full">
-                      <div className="flex-grow">
-                        <div className="font-medium">{person.name}</div>
+                      <div className="flex-grow min-w-0">
+                        <div className="font-medium flex items-center gap-1 flex-wrap">
+                          <span className="truncate">{person.name}</span>
+                          {(person as any).billingCurrency === 'USD' && (
+                            <span className={`text-[10px] px-1 py-0 rounded font-semibold flex-shrink-0 ${isSelected ? 'bg-white/20 text-white' : 'bg-green-100 text-green-700'}`}>USD</span>
+                          )}
+                          {(person as any).billingCurrency === 'mixed' && (
+                            <span className={`text-[10px] px-1 py-0 rounded font-semibold flex-shrink-0 ${isSelected ? 'bg-white/20 text-white' : 'bg-yellow-100 text-yellow-700'}`}>MIX</span>
+                          )}
+                        </div>
                         <div className={`${isSelected ? 'text-green-200' : 'text-gray-500'}`}>
                           ${getPersonnelRate(person.id, currency).toLocaleString('es-AR')} {currencyLabel}/h
                         </div>
@@ -648,11 +656,16 @@ const EnhancedTeamConfig: React.FC = () => {
                                 <User className="h-3 w-3" />
                                 <span>{(() => {
                                   if (!member.personnelId) return 'Sin asignar';
-                                  console.log('👤 Looking for personnel:', { personnelId: member.personnelId, availablePersonnel: availablePersonnel.length });
                                   const foundPerson = availablePersonnel.find(p => p.id === member.personnelId);
-                                  console.log('👤 Found person:', foundPerson);
                                   return foundPerson?.name || `Personal ${member.personnelId}`;
                                 })()}</span>
+                                {(() => {
+                                  const p = availablePersonnel.find(p => p.id === member.personnelId);
+                                  const bc = (p as any)?.billingCurrency;
+                                  if (bc === 'USD') return <span className="text-[10px] px-1 rounded bg-green-100 text-green-700 font-semibold">USD</span>;
+                                  if (bc === 'mixed') return <span className="text-[10px] px-1 rounded bg-yellow-100 text-yellow-700 font-semibold">MIX</span>;
+                                  return null;
+                                })()}
                               </div>
                             </div>
 

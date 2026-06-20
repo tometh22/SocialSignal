@@ -6,13 +6,16 @@ import { useQuery } from '@tanstack/react-query';
  */
 export const useCurrency = () => {
   // Obtener tipo de cambio actual desde la base de datos
-  const { data: exchangeRate = 1200, isLoading: exchangeRateLoading } = useQuery({
+  const { data: rateData, isLoading: exchangeRateLoading } = useQuery({
     queryKey: ['/api/admin/system-config'],
     select: (data: any[]) => {
-      const exchangeRateConfig = data?.find(config => config.configKey === 'usd_exchange_rate');
-      return exchangeRateConfig?.configValue || 1200;
+      const cfg = data?.find(config => config.configKey === 'usd_exchange_rate');
+      return cfg ? { value: cfg.configValue || 1200, description: cfg.description || null, updatedAt: cfg.updatedAt || null } : null;
     }
   });
+  const exchangeRate: number = rateData?.value ?? 1200;
+  const exchangeRateSource: string | null = rateData?.description ?? null;
+  const exchangeRateUpdatedAt: string | null = rateData?.updatedAt ?? null;
 
   // Función para convertir de USD a la moneda especificada
   const convertFromUSD = (amountUSD: number, toCurrency: string): number => {
@@ -53,6 +56,8 @@ export const useCurrency = () => {
   return {
     exchangeRate,
     exchangeRateLoading,
+    exchangeRateSource,
+    exchangeRateUpdatedAt,
     convertFromUSD,
     convertToUSD,
     formatCurrency,

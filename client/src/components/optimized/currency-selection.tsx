@@ -13,7 +13,7 @@ import { useAuth } from '@/hooks/use-auth';
 
 const CurrencySelection: React.FC = () => {
   const { quotationData, updateQuotationData, totalAmount, nextStep, baseCost, complexityAdjustment, markupAmount } = useOptimizedQuote();
-  const { exchangeRate, formatCurrency } = useCurrency();
+  const { exchangeRate, formatCurrency, exchangeRateSource, exchangeRateUpdatedAt } = useCurrency();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const { user } = useAuth();
@@ -211,15 +211,28 @@ const CurrencySelection: React.FC = () => {
             </div>
           ) : (
             <div className="flex items-center justify-between gap-2">
-              <div className={`flex items-center gap-2 ${isRateOverridden ? 'text-amber-800' : 'text-blue-800'}`}>
+              <div className={`flex items-center gap-2 flex-wrap ${isRateOverridden ? 'text-amber-800' : 'text-blue-800'}`}>
                 <Info className="h-4 w-4 flex-shrink-0" />
                 <span className="text-sm font-medium">
-                  Tipo de cambio: 1 USD = {effectiveRate.toLocaleString('es-AR')} ARS
+                  1 USD = {effectiveRate.toLocaleString('es-AR')} ARS
                 </span>
-                {isRateOverridden && (
+                {isRateOverridden ? (
                   <Badge variant="outline" className="text-xs border-amber-400 text-amber-700 bg-amber-100">
                     Manual
                   </Badge>
+                ) : exchangeRateSource ? (
+                  <Badge variant="outline" className="text-xs border-blue-300 text-blue-700 bg-blue-50">
+                    {exchangeRateSource}
+                  </Badge>
+                ) : (
+                  <Badge variant="outline" className="text-xs border-blue-300 text-blue-600 bg-blue-50">
+                    Mercado
+                  </Badge>
+                )}
+                {!isRateOverridden && exchangeRateUpdatedAt && (
+                  <span className="text-[11px] text-blue-600/70">
+                    Act. {new Date(exchangeRateUpdatedAt).toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })}
+                  </span>
                 )}
               </div>
               <div className="flex items-center gap-1">

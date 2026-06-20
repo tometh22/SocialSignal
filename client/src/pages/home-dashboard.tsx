@@ -119,10 +119,20 @@ export default function HomeDashboard() {
 
   const myActiveTasks = (myTasksData?.tasks || []).filter(t => !t.parentTaskId);
   const myTodoTasks = (myTodoData?.tasks || []).filter(t => !t.parentTaskId);
-  const myAllTasks = [...myActiveTasks, ...myTodoTasks].slice(0, 8);
 
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const myOverdueTasks = [...myActiveTasks, ...myTodoTasks].filter(t =>
+    t.dueDate && new Date(t.dueDate.slice(0, 10) + 'T00:00:00') < today
+  );
+  const myPendingTasks = [...myActiveTasks, ...myTodoTasks].filter(t =>
+    !t.dueDate || new Date(t.dueDate.slice(0, 10) + 'T00:00:00') >= today
+  );
+
+  const [taskTab, setTaskTab] = useState<'active' | 'overdue'>('active');
   const [showAllMyTasks, setShowAllMyTasks] = useState(false);
-  const displayedMyTasks = showAllMyTasks ? myAllTasks : myAllTasks.slice(0, 5);
+  const tabTasks = taskTab === 'overdue' ? myOverdueTasks : myPendingTasks;
+  const displayedMyTasks = showAllMyTasks ? tabTasks : tabTasks.slice(0, 5);
 
   const greeting = () => {
     const hour = new Date().getHours();
@@ -359,43 +369,69 @@ export default function HomeDashboard() {
               </div>
             </div>
           </div>
-          {myAllTasks.length > 0 && (
+          {(myPendingTasks.length > 0 || myOverdueTasks.length > 0) && (
             <div className="bg-card rounded-xl border overflow-hidden">
               <div className="px-4 py-3 border-b bg-muted/20 flex items-center justify-between">
-                <h3 className="text-sm font-semibold">Mis tareas activas</h3>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => { setTaskTab('active'); setShowAllMyTasks(false); }}
+                    className={cn(
+                      "text-xs px-2.5 py-1 rounded-md font-medium transition-colors",
+                      taskTab === 'active' ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    Activas {myPendingTasks.length > 0 && <span className="ml-1 opacity-70">({myPendingTasks.length})</span>}
+                  </button>
+                  <button
+                    onClick={() => { setTaskTab('overdue'); setShowAllMyTasks(false); }}
+                    className={cn(
+                      "text-xs px-2.5 py-1 rounded-md font-medium transition-colors",
+                      taskTab === 'overdue' ? "bg-red-600 text-white" : "text-muted-foreground hover:text-foreground",
+                      myOverdueTasks.length > 0 && taskTab !== 'overdue' && "text-red-600"
+                    )}
+                  >
+                    Vencidas {myOverdueTasks.length > 0 && <span className="ml-1 opacity-80">({myOverdueTasks.length})</span>}
+                  </button>
+                </div>
                 <Link href="/tasks">
                   <span className="text-xs text-primary hover:underline cursor-pointer flex items-center gap-0.5">
                     Ver todas <ChevronRight className="h-3 w-3" />
                   </span>
                 </Link>
               </div>
-              <div className="divide-y divide-border">
-                {displayedMyTasks.map((t: any) => {
-                  const cfg = TASK_STATUS_CONFIG[t.status as TaskStatus];
-                  const isOverdue = t.dueDate && new Date(t.dueDate) < now && t.status !== 'done';
-                  return (
-                    <div key={t.id} className="px-4 py-2.5 flex items-center gap-3 hover:bg-accent/20 transition-colors">
-                      <span className={cn("w-2 h-2 rounded-full flex-shrink-0", cfg?.dot || "bg-gray-400")} />
-                      <span className="flex-1 text-sm text-foreground truncate">{t.title}</span>
-                      {t.estimatedHours > 0 && (
-                        <span className="text-xs text-muted-foreground flex-shrink-0">{t.estimatedHours}h est.</span>
-                      )}
-                      {t.dueDate && (
-                        <span className={cn("text-xs flex-shrink-0", isOverdue ? "text-red-600 font-medium" : "text-muted-foreground")}>
-                          {format(new Date(t.dueDate.slice(0,10) + 'T00:00:00'), "d MMM", { locale: es })}
-                        </span>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-              {myAllTasks.length > 5 && (
+              {displayedMyTasks.length === 0 ? (
+                <div className="px-4 py-6 text-center text-xs text-muted-foreground">
+                  {taskTab === 'overdue' ? "Sin tareas vencidas" : "Sin tareas activas"}
+                </div>
+              ) : (
+                <div className="divide-y divide-border">
+                  {displayedMyTasks.map((t: any) => {
+                    const cfg = TASK_STATUS_CONFIG[t.status as TaskStatus];
+                    const isOverdue = t.dueDate && new Date(t.dueDate.slice(0, 10) + 'T00:00:00') < today && t.status !== 'done';
+                    return (
+                      <div key={t.id} className="px-4 py-2.5 flex items-center gap-3 hover:bg-accent/20 transition-colors">
+                        <span className={cn("w-2 h-2 rounded-full flex-shrink-0", cfg?.dot || "bg-gray-400")} />
+                        <span className="flex-1 text-sm text-foreground truncate">{t.title}</span>
+                        {t.estimatedHours > 0 && (
+                          <span className="text-xs text-muted-foreground flex-shrink-0">{t.estimatedHours}h est.</span>
+                        )}
+                        {t.dueDate && (
+                          <span className={cn("text-xs flex-shrink-0", isOverdue ? "text-red-600 font-medium" : "text-muted-foreground")}>
+                            {format(new Date(t.dueDate.slice(0, 10) + 'T00:00:00'), "d MMM", { locale: es })}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              {tabTasks.length > 5 && (
                 <div className="px-4 py-2 border-t bg-muted/10">
                   <button
                     className="text-xs text-primary hover:underline"
                     onClick={() => setShowAllMyTasks(v => !v)}
                   >
-                    {showAllMyTasks ? "Ver menos" : `+${myAllTasks.length - 5} tareas más`}
+                    {showAllMyTasks ? "Ver menos" : `+${tabTasks.length - 5} más`}
                   </button>
                 </div>
               )}
