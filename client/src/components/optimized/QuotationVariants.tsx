@@ -72,6 +72,9 @@ export function QuotationVariants({
   });
   const [isSaving, setIsSaving] = useState(false);
   const [isFinalizing, setIsFinalizing] = useState(false);
+  const [variantTeamHours, setVariantTeamHours] = useState<Record<string, number>>({});
+  const [variantInputText, setVariantInputText] = useState<Record<string, string>>({});
+  const [expandedTeamVariant, setExpandedTeamVariant] = useState<number | null>(null);
   const { toast } = useToast();
   const { saveQuotation } = useOptimizedQuote();
   const [, setLocation] = useLocation();
@@ -478,28 +481,29 @@ export function QuotationVariants({
     }
   };
 
-  const calculateTeamHours = (variant: QuotationVariant) => {
-    // Calculate team hours based on base cost and average hourly rate
-    const avgHourlyRate = 25; // Average rate in USD equivalent
-    const estimatedHours = Math.round(variant.baseCost / avgHourlyRate);
-    
-    // Ensure we return a valid number
-    return isNaN(estimatedHours) ? 0 : Math.max(0, estimatedHours);
+  const getDefaultMemberHours = (variant: QuotationVariant, member: TeamMember): number => {
+    if (!baseCost || baseCost === 0 || !member.hours) return member.hours || 0;
+    return Math.round(member.hours * (variant.baseCost / baseCost) * 2) / 2;
   };
 
-  const calculateTeamSize = (variant: QuotationVariant) => {
-    // Estimar tamaño del equipo basándose en el nivel de complejidad
-    const baseTeamSize = baseTeamMembers?.length || 3; // Default to 3 if no team members
-    
-    // Safely handle complexity calculation
-    if (!complexityAdjustment || complexityAdjustment === 0) {
-      // If no complexity adjustment, use ratio based on cost
-      const costRatio = variant.totalAmount / totalAmount;
-      return Math.max(1, Math.round(baseTeamSize * costRatio));
-    }
-    
-    const complexityFactor = variant.complexityAdjustment / complexityAdjustment;
-    return Math.max(1, Math.round(baseTeamSize * complexityFactor));
+  const getEffectiveMemberHours = (variant: QuotationVariant, member: TeamMember): number => {
+    const key = `${variant.id}-${member.id}`;
+    return variantTeamHours[key] ?? getDefaultMemberHours(variant, member);
+  };
+
+  const computeVariantCostFromTeam = (variant: QuotationVariant): number => {
+    if (!baseTeamMembers?.length) return variant.baseCost;
+    return baseTeamMembers.reduce((sum, m) => sum + getEffectiveMemberHours(variant, m) * (m.rate || 0), 0);
+  };
+
+  const computeVariantTotal = (variant: QuotationVariant): number => {
+    if (!baseTeamMembers?.length) return variant.totalAmount;
+    return computeVariantCostFromTeam(variant) * (quotationData?.financials?.marginFactor || 2.0);
+  };
+
+  const getVariantTotalHours = (variant: QuotationVariant): number => {
+    if (!baseTeamMembers?.length) return 0;
+    return baseTeamMembers.reduce((sum, m) => sum + getEffectiveMemberHours(variant, m), 0);
   };
 
   if (loading) {
@@ -649,56 +653,79 @@ export function QuotationVariants({
               {/* Precio Principal */}
               <div className="text-center py-4 bg-gray-50 rounded-lg">
                 <div className="text-2xl font-bold text-gray-900">
-                  {formatCurrency(variant.totalAmount)}
+                  {formatCurrency(computeVariantTotal(variant))}
                 </div>
                 <div className="text-sm text-gray-500">Precio Total</div>
               </div>
 
-              {/* Métricas Clave */}
+              {/* Métricas reales del equipo */}
               <div className="grid grid-cols-3 gap-3 text-center">
                 <div className="space-y-1">
-                  <div className="flex items-center justify-center text-blue-600">
-                    <Users className="h-4 w-4" />
-                  </div>
-                  <div className="text-sm font-medium">{calculateTeamSize(variant)}</div>
+                  <div className="flex items-center justify-center text-blue-600"><Users className="h-4 w-4" /></div>
+                  <div className="text-sm font-medium">{baseTeamMembers?.length || 0}</div>
                   <div className="text-xs text-gray-500">Personas</div>
                 </div>
                 <div className="space-y-1">
-                  <div className="flex items-center justify-center text-green-600">
-                    <Clock className="h-4 w-4" />
-                  </div>
-                  <div className="text-sm font-medium">{calculateTeamHours(variant)}h</div>
+                  <div className="flex items-center justify-center text-green-600"><Clock className="h-4 w-4" /></div>
+                  <div className="text-sm font-medium">{getVariantTotalHours(variant).toFixed(0)}h</div>
                   <div className="text-xs text-gray-500">Horas</div>
                 </div>
                 <div className="space-y-1">
-                  <div className="flex items-center justify-center text-purple-600">
-                    <DollarSign className="h-4 w-4" />
-                  </div>
-                  <div className="text-sm font-medium">
-                    {formatCurrency(variant.baseCost)}
-                  </div>
-                  <div className="text-xs text-gray-500">Base</div>
+                  <div className="flex items-center justify-center text-purple-600"><DollarSign className="h-4 w-4" /></div>
+                  <div className="text-sm font-medium">{formatCurrency(computeVariantCostFromTeam(variant))}</div>
+                  <div className="text-xs text-gray-500">Costo</div>
                 </div>
               </div>
 
+              {/* Equipo por variante — expandible */}
+              {baseTeamMembers?.length > 0 && (
+                <>
+                  <button
+                    onClick={e => { e.stopPropagation(); setExpandedTeamVariant(v => v === variant.id ? null : variant.id); }}
+                    className="w-full text-xs text-indigo-600 hover:text-indigo-800 flex items-center justify-center gap-1 py-1"
+                  >
+                    <Users className="h-3 w-3" />
+                    {expandedTeamVariant === variant.id ? 'Ocultar equipo' : 'Ver / ajustar equipo'}
+                  </button>
+                  {expandedTeamVariant === variant.id && (
+                    <div className="border rounded-lg p-2 space-y-1.5 bg-gray-50" onClick={e => e.stopPropagation()}>
+                      <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Horas por persona</div>
+                      {baseTeamMembers.map(m => {
+                        const inputKey = `${variant.id}-${m.id}`;
+                        return (
+                          <div key={m.id} className="flex items-center gap-2 text-xs">
+                            <span className="flex-1 truncate text-gray-700">{m.personnelName || m.roleName}</span>
+                            <input
+                              type="number" min={0} step={1}
+                              value={variantInputText[inputKey] ?? String(getEffectiveMemberHours(variant, m))}
+                              onChange={e => { e.stopPropagation(); setVariantInputText(prev => ({ ...prev, [inputKey]: e.target.value })); }}
+                              onBlur={e => {
+                                e.stopPropagation();
+                                const v = parseFloat(e.target.value);
+                                setVariantTeamHours(prev => ({ ...prev, [inputKey]: isNaN(v) ? getDefaultMemberHours(variant, m) : Math.max(0, v) }));
+                                setVariantInputText(prev => { const n = { ...prev }; delete n[inputKey]; return n; });
+                              }}
+                              onClick={e => e.stopPropagation()}
+                              className="w-14 border rounded text-center py-0.5 px-1 text-xs bg-white"
+                            />
+                            <span className="text-gray-400">h</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </>
+              )}
+
               {/* Indicador de Diferencia */}
               <div className="flex justify-center">
-                {variant.totalAmount > quotationData.totalAmount ? (
-                  <Badge variant="secondary" className="bg-green-100 text-green-800">
-                    <TrendingUp className="h-3 w-3 mr-1" />
-                    +{Math.round(((variant.totalAmount / quotationData.totalAmount) - 1) * 100)}%
-                  </Badge>
-                ) : variant.totalAmount < quotationData.totalAmount ? (
-                  <Badge variant="secondary" className="bg-red-100 text-red-800">
-                    <TrendingDown className="h-3 w-3 mr-1" />
-                    {Math.round(((variant.totalAmount / quotationData.totalAmount) - 1) * 100)}%
-                  </Badge>
-                ) : (
-                  <Badge variant="secondary" className="bg-gray-100 text-gray-800">
-                    <Minus className="h-3 w-3 mr-1" />
-                    Base
-                  </Badge>
-                )}
+                {(() => {
+                  const varTotal = computeVariantTotal(variant);
+                  const diff = totalAmount > 0 ? Math.round(((varTotal / totalAmount) - 1) * 100) : 0;
+                  if (diff > 0) return <Badge variant="secondary" className="bg-green-100 text-green-800"><TrendingUp className="h-3 w-3 mr-1" />+{diff}%</Badge>;
+                  if (diff < 0) return <Badge variant="secondary" className="bg-red-100 text-red-800"><TrendingDown className="h-3 w-3 mr-1" />{diff}%</Badge>;
+                  return <Badge variant="secondary" className="bg-gray-100 text-gray-800"><Minus className="h-3 w-3 mr-1" />Base</Badge>;
+                })()}
               </div>
 
               {/* Botón de Acción */}
