@@ -18,7 +18,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useCurrency } from "@/hooks/use-currency";
-import { Loader2, Check, Pencil, X, ExternalLink } from "lucide-react";
+import { Loader2, Check, X, ExternalLink, ChevronDown } from "lucide-react";
 import { Link } from "wouter";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -42,11 +42,10 @@ export default function MonthlyClosing() {
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth());
   const [contractFilter, setContractFilter] = useState<string>("all");
-  // hoursOverrides: personnelId → override string (empty = use default)
-  const [hoursOverrides, setHoursOverrides] = useState<Record<number, string>>({});
-  // editingHours: personnelId currently showing the inline input
-  const [editingHours, setEditingHours] = useState<number | null>(null);
-  const [editingInput, setEditingInput] = useState<string>("");
+  // Category-based hours adjustments per person
+  type HoursAdj = { vacaciones: number; epicalGeneral: number; discrecional: number };
+  const [hoursAdjustments, setHoursAdjustments] = useState<Record<number, HoursAdj>>({});
+  const [expandedAdj, setExpandedAdj] = useState<number | null>(null);
   // Per-row mutation tracking
   const [closingPersonnelId, setClosingPersonnelId] = useState<number | null>(null);
   // Re-close confirmation target
@@ -107,37 +106,31 @@ export default function MonthlyClosing() {
     return { rate: person.hourlyRateARS || person.hourlyRate || 0, isEstimated: false };
   };
 
-  // Effective base hours for a person: override > default by contract type
+  const getAdj = (personnelId: number): HoursAdj =>
+    hoursAdjustments[personnelId] ?? { vacaciones: 0, epicalGeneral: 0, discrecional: 0 };
+
+  const setAdj = (personnelId: number, field: keyof HoursAdj, value: string) => {
+    const parsed = parseFloat(value);
+    const v = isNaN(parsed) ? 0 : parsed;
+    setHoursAdjustments(prev => ({ ...prev, [personnelId]: { ...getAdj(personnelId), [field]: v } }));
+  };
+
+  const resetAdj = (personnelId: number) => {
+    setHoursAdjustments(prev => { const n = { ...prev }; delete n[personnelId]; return n; });
+    setExpandedAdj(null);
+  };
+
+  const hasAdjustment = (personnelId: number): boolean => {
+    const adj = hoursAdjustments[personnelId];
+    return !!adj && (adj.vacaciones > 0 || adj.epicalGeneral > 0 || adj.discrecional !== 0);
+  };
+
+  // Effective base hours for a person: default adjusted by category deductions
   const effectiveBaseHours = (person: any): number => {
-    const override = hoursOverrides[person.id];
-    if (override !== undefined && override !== "") {
-      const parsed = parseFloat(override);
-      if (!isNaN(parsed) && parsed >= 0) return parsed;
-    }
-    return defaultBaseHours(person);
-  };
-
-  const handleStartEditHours = (person: any) => {
-    setEditingInput(String(effectiveBaseHours(person)));
-    setEditingHours(person.id);
-  };
-
-  const handleConfirmHours = (personnelId: number) => {
-    setHoursOverrides((prev) => ({ ...prev, [personnelId]: editingInput }));
-    setEditingHours(null);
-  };
-
-  const handleCancelEditHours = () => {
-    setEditingHours(null);
-    setEditingInput("");
-  };
-
-  const handleResetHours = (personnelId: number) => {
-    setHoursOverrides((prev) => {
-      const next = { ...prev };
-      delete next[personnelId];
-      return next;
-    });
+    const base = defaultBaseHours(person);
+    const adj = hoursAdjustments[person.id];
+    if (!adj) return base;
+    return Math.max(0, base - (adj.vacaciones || 0) - (adj.epicalGeneral || 0) + (adj.discrecional || 0));
   };
 
   const doClose = (person: any) => {
@@ -237,8 +230,7 @@ export default function MonthlyClosing() {
     return type === contractFilter;
   });
 
-  // Unsaved changes: any entry in hoursOverrides with a non-empty value
-  const hasUnsavedChanges = Object.keys(hoursOverrides).length > 0;
+  const hasUnsavedChanges = Object.keys(hoursAdjustments).some(pid => hasAdjustment(Number(pid)));
 
   // Loading state
   const isLoading = personnelLoading || closingsLoading;
@@ -348,7 +340,6 @@ export default function MonthlyClosing() {
                 {filteredPersonnel.map((p: any) => {
                   const closing = getClosing(p.id);
                   const baseHrs = effectiveBaseHours(p);
-                  const hasOverride = hoursOverrides[p.id] !== undefined && hoursOverrides[p.id] !== "";
                   const cost = getCostDisplay(p);
                   const billing = getBillingCurrency(p);
                   const isRowPending = closingPersonnelId === p.id && closeMutation.isPending;
@@ -374,70 +365,60 @@ export default function MonthlyClosing() {
                         </Badge>
                       </td>
                       <td className="text-center py-2 px-3">
-                        {editingHours === p.id ? (
-                          <div className="flex items-center gap-1 justify-center">
-                            <Input
-                              type="number"
-                              value={editingInput}
-                              onChange={(e) => setEditingInput(e.target.value)}
-                              className="w-20 h-7 text-sm text-center"
-                              min={0}
-                              step={1}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") handleConfirmHours(p.id);
-                                if (e.key === "Escape") handleCancelEditHours();
-                              }}
-                              autoFocus
-                            />
-                            <span className="text-xs text-muted-foreground">h</span>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => handleConfirmHours(p.id)}
-                              className="h-6 w-6 p-0 text-green-600"
-                            >
-                              <Check className="h-3 w-3" />
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={handleCancelEditHours}
-                              className="h-6 w-6 p-0 text-gray-500"
-                            >
-                              <X className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-1 justify-center group">
-                            <span className={hasOverride ? "font-semibold text-amber-700" : ""}>
-                              {baseHrs}h
-                            </span>
-                            {hasOverride && (
-                              <Badge variant="outline" className="text-xs border-amber-400 text-amber-600 px-1 py-0">
-                                Manual
-                              </Badge>
+                        <div className="relative">
+                          <button
+                            className={`flex items-center gap-1 justify-center mx-auto text-sm font-medium hover:text-primary transition-colors ${hasAdjustment(p.id) ? "text-amber-700" : ""}`}
+                            onClick={() => setExpandedAdj(prev => prev === p.id ? null : p.id)}
+                          >
+                            {baseHrs}h
+                            {hasAdjustment(p.id) && (
+                              <Badge variant="outline" className="text-[10px] border-amber-400 text-amber-600 px-1 py-0">Aj.</Badge>
                             )}
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => handleStartEditHours(p)}
-                              className="h-5 w-5 p-0 text-muted-foreground opacity-0 group-hover:opacity-100"
-                            >
-                              <Pencil className="h-3 w-3" />
-                            </Button>
-                            {hasOverride && (
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => handleResetHours(p.id)}
-                                className="h-5 w-5 p-0 text-muted-foreground opacity-0 group-hover:opacity-100"
-                                title="Restaurar horas base"
-                              >
-                                <X className="h-3 w-3" />
-                              </Button>
-                            )}
-                          </div>
-                        )}
+                            <ChevronDown className={`h-3 w-3 text-muted-foreground transition-transform ${expandedAdj === p.id ? "rotate-180" : ""}`} />
+                          </button>
+                          {expandedAdj === p.id && (
+                            <div className="absolute z-10 mt-1 left-1/2 -translate-x-1/2 w-52 rounded-lg border bg-background shadow-lg p-3 text-xs space-y-2">
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="font-semibold text-foreground">Ajustar horas base</span>
+                                <button onClick={() => setExpandedAdj(null)} className="text-muted-foreground hover:text-foreground">
+                                  <X className="h-3 w-3" />
+                                </button>
+                              </div>
+                              <div className="text-[10px] text-muted-foreground mb-1">
+                                Base contractual: {defaultBaseHours(p)}h
+                              </div>
+                              {([
+                                { key: "vacaciones" as const, label: "Vacaciones −" },
+                                { key: "epicalGeneral" as const, label: "Epical General −" },
+                                { key: "discrecional" as const, label: "Ajuste discrecional ±" },
+                              ] as const).map(({ key, label }) => (
+                                <div key={key} className="flex items-center justify-between gap-2">
+                                  <span className="text-muted-foreground flex-1">{label}</span>
+                                  <Input
+                                    type="number"
+                                    min={key === "discrecional" ? undefined : 0}
+                                    step={1}
+                                    value={getAdj(p.id)[key] || ""}
+                                    onChange={(e) => setAdj(p.id, key, e.target.value)}
+                                    className="w-16 h-6 text-xs text-center"
+                                    placeholder="0"
+                                  />
+                                </div>
+                              ))}
+                              <div className="border-t pt-2 flex items-center justify-between">
+                                <span className="font-semibold text-foreground">{effectiveBaseHours(p)}h total</span>
+                                {hasAdjustment(p.id) && (
+                                  <button
+                                    onClick={() => resetAdj(p.id)}
+                                    className="text-[10px] text-muted-foreground hover:text-red-600 underline"
+                                  >
+                                    Resetear
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
                       </td>
                       <td className="text-center py-2 px-3">
                         {(() => {

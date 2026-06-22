@@ -15,7 +15,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
   DropdownMenuLabel
 } from "@/components/ui/dropdown-menu";
-import { Loader2, Users, Trash2, Plus, ChevronLeft, ChevronRight, List, LayoutGrid, Share2, Filter, ArrowUpDown, Layers, MoreHorizontal, Search, X, Check, BarChart2, TrendingUp, ChevronDown, CalendarDays } from "lucide-react";
+import { Loader2, Users, Trash2, Plus, ChevronLeft, ChevronRight, List, LayoutGrid, Share2, Filter, ArrowUpDown, Layers, MoreHorizontal, Search, X, Check, BarChart2, TrendingUp, ChevronDown, CalendarDays, LayoutList, Clock, CheckCircle2, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
 import { usePermissions } from "@/hooks/use-permissions";
@@ -67,10 +67,10 @@ export default function ProjectTasksPage({ params }: Props) {
   const [membersOpen, setMembersOpen] = useState(false);
   const [addPersonnelId, setAddPersonnelId] = useState<string>("none");
   const [addRole, setAddRole] = useState("member");
-  const [view, setView_] = useState<"list" | "board" | "panel" | "calendar">(
-    () => (localStorage.getItem(`projectView:${projectId}`) as "list" | "board" | "panel" | "calendar") || "list"
+  const [view, setView_] = useState<"list" | "board" | "panel" | "calendar" | "summary">(
+    () => (localStorage.getItem(`projectView:${projectId}`) as "list" | "board" | "panel" | "calendar" | "summary") || "list"
   );
-  const setView = (v: "list" | "board" | "panel" | "calendar") => {
+  const setView = (v: "list" | "board" | "panel" | "calendar" | "summary") => {
     setView_(v);
     localStorage.setItem(`projectView:${projectId}`, v);
   };
@@ -91,6 +91,17 @@ export default function ProjectTasksPage({ params }: Props) {
     queryKey: ["/api/tasks-personnel"],
     queryFn: () => authFetch("/api/tasks-personnel").then(r => r.json()),
   });
+
+  const { data: summaryTasks } = useQuery<{ tasks: any[] }>({
+    queryKey: ["/api/tasks/project", projectId, "summary"],
+    queryFn: () => authFetch(`/api/tasks/project/${projectId}`).then(r => r.json()),
+    enabled: view === "summary" && !!projectId,
+    staleTime: 60_000,
+  });
+  const allSummaryTasks = summaryTasks?.tasks || [];
+  const totalEstimatedHours = allSummaryTasks.reduce((s: number, t: any) => s + (t.estimatedHours || 0), 0);
+  const completedCount = allSummaryTasks.filter((t: any) => t.status === "done").length;
+  const pendingCount = allSummaryTasks.filter((t: any) => t.status !== "done" && t.status !== "cancelled").length;
 
   // Sync local members from server data (after refetch, reset override)
   useEffect(() => {
@@ -393,12 +404,24 @@ export default function ProjectTasksPage({ params }: Props) {
                 <CalendarDays className="h-3.5 w-3.5" />
                 Calendario
               </button>
+              <button
+                className={cn(
+                  "flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 transition-colors",
+                  view === "summary"
+                    ? "border-primary text-primary"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
+                )}
+                onClick={() => setView("summary")}
+              >
+                <LayoutList className="h-3.5 w-3.5" />
+                Resumen
+              </button>
             </div>
           </div>
         </div>
 
         {/* Toolbar */}
-        {view !== "panel" && view !== "calendar" && (
+        {view !== "panel" && view !== "calendar" && view !== "summary" && (
         <div className="flex items-center justify-between py-2 border-b border-border gap-2">
           {view === "list" ? (
             <Button
@@ -564,8 +587,139 @@ export default function ProjectTasksPage({ params }: Props) {
           <TaskCalendarView projectId={projectId} />
         )}
 
+        {/* Summary view */}
+        {view === "summary" && (
+          <div className="pt-6 space-y-6">
+            {/* Stats cards */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="rounded-xl border bg-card p-4">
+                <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1"><LayoutList className="h-3.5 w-3.5" />Total</div>
+                <div className="text-2xl font-bold">{allSummaryTasks.length}</div>
+                <div className="text-xs text-muted-foreground">tareas</div>
+              </div>
+              <div className="rounded-xl border bg-card p-4">
+                <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1"><CheckCircle2 className="h-3.5 w-3.5 text-green-600" />Completadas</div>
+                <div className="text-2xl font-bold text-green-700">{completedCount}</div>
+                <div className="text-xs text-muted-foreground">finalizadas</div>
+              </div>
+              <div className="rounded-xl border bg-card p-4">
+                <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1"><AlertCircle className="h-3.5 w-3.5 text-amber-500" />Pendientes</div>
+                <div className="text-2xl font-bold text-amber-700">{pendingCount}</div>
+                <div className="text-xs text-muted-foreground">en curso</div>
+              </div>
+              <div className="rounded-xl border bg-card p-4">
+                <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1"><Clock className="h-3.5 w-3.5 text-blue-600" />Horas est.</div>
+                <div className="text-2xl font-bold text-blue-700">{totalEstimatedHours.toFixed(0)}h</div>
+                <div className="text-xs text-muted-foreground">estimadas</div>
+              </div>
+            </div>
+
+            {/* Progress */}
+            {allSummaryTasks.length > 0 && (
+              <div className="rounded-xl border bg-card p-4">
+                <div className="flex items-center justify-between text-sm mb-2">
+                  <span className="font-medium">Progreso general</span>
+                  <span className="text-muted-foreground">{Math.round((completedCount / allSummaryTasks.length) * 100)}%</span>
+                </div>
+                <div className="h-2 rounded-full bg-muted overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-primary transition-all duration-700"
+                    style={{ width: `${Math.round((completedCount / allSummaryTasks.length) * 100)}%` }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Hours comparison */}
+            {(totalEstimatedHours > 0 || project.totalHours > 0) && (
+              <div className="rounded-xl border bg-card p-4">
+                <h3 className="text-sm font-semibold mb-3">Horas: estimadas vs. reales</h3>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-xs mb-1">
+                    <span className="text-muted-foreground">Estimadas</span>
+                    <span className="font-medium">{totalEstimatedHours.toFixed(1)}h</span>
+                  </div>
+                  <div className="h-2 rounded-full bg-muted overflow-hidden">
+                    <div className="h-full rounded-full bg-blue-400" style={{ width: "100%" }} />
+                  </div>
+                  <div className="flex items-center justify-between text-xs mb-1 mt-2">
+                    <span className="text-muted-foreground">Reales registradas</span>
+                    <span className={`font-medium ${totalEstimatedHours > 0 && project.totalHours > totalEstimatedHours ? "text-red-600" : "text-green-700"}`}>
+                      {project.totalHours.toFixed(1)}h
+                      {totalEstimatedHours > 0 && (
+                        <span className="ml-1 text-muted-foreground font-normal">
+                          ({Math.round((project.totalHours / totalEstimatedHours) * 100)}%)
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                  <div className="h-2 rounded-full bg-muted overflow-hidden">
+                    <div
+                      className={`h-full rounded-full ${project.totalHours > totalEstimatedHours && totalEstimatedHours > 0 ? "bg-red-400" : "bg-green-400"}`}
+                      style={{ width: totalEstimatedHours > 0 ? `${Math.min(100, Math.round((project.totalHours / totalEstimatedHours) * 100))}%` : "100%" }}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Team */}
+            {members.length > 0 && (
+              <div className="rounded-xl border bg-card p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-semibold">Equipo del proyecto</h3>
+                  <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setMembersOpen(true)}>
+                    <Users className="h-3 w-3 mr-1" />Gestionar
+                  </Button>
+                </div>
+                <div className="space-y-2">
+                  {members.map(m => (
+                    <div key={m.personnelId} className="flex items-center gap-3">
+                      <div className={cn("h-7 w-7 rounded-full flex items-center justify-center text-white text-xs font-semibold", dotColor)}>
+                        {getInitials(m.name)}
+                      </div>
+                      <span className="text-sm">{m.name}</span>
+                      <Badge variant="outline" className={cn("text-[10px] h-4 px-1.5 ml-auto", m.role === "owner" ? "text-amber-700 border-amber-300" : "text-muted-foreground")}>
+                        {m.role === "owner" ? "Responsable" : "Miembro"}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Project info */}
+            <div className="rounded-xl border bg-card p-4">
+              <h3 className="text-sm font-semibold mb-3">Info del proyecto</h3>
+              <div className="space-y-2 text-sm">
+                {project.clientName && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Cliente</span>
+                    <span className="font-medium">{project.clientName}</span>
+                  </div>
+                )}
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Estado</span>
+                  <span className="font-medium">{PROJECT_STATUS_CONFIG[project.status]?.label || project.status}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">ID</span>
+                  <span className="font-mono text-xs text-muted-foreground">#{project.id}</span>
+                </div>
+                {isOperations && projectId < 1_000_000 && (
+                  <Link href={`/active-projects/${projectId}`}>
+                    <Button variant="outline" size="sm" className="w-full mt-2 h-8 text-xs gap-1.5 border-indigo-200 text-indigo-700 hover:bg-indigo-50">
+                      <TrendingUp className="h-3 w-3" />Ver Rentabilidad
+                    </Button>
+                  </Link>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Task list / board */}
-        {view !== "panel" && view !== "calendar" && (
+        {view !== "panel" && view !== "calendar" && view !== "summary" && (
           <div className="pt-4">
             <ProjectTaskList
               projectId={projectId}

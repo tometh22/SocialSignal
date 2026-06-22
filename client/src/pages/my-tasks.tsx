@@ -74,9 +74,13 @@ function getProjectStyle(projectId?: number | null) {
   return PROJECT_PALETTE[projectId % PROJECT_PALETTE.length];
 }
 
+function parseLocalDate(s: string): Date {
+  return new Date(s.slice(0, 10) + 'T00:00:00');
+}
+
 function taskIsOnDay(task: Task, day: Date): boolean {
-  const due = task.dueDate ? parseISO(task.dueDate) : null;
-  const start = task.startDate ? parseISO(task.startDate) : null;
+  const due = task.dueDate ? parseLocalDate(task.dueDate) : null;
+  const start = task.startDate ? parseLocalDate(task.startDate) : null;
 
   if (!due && !start) return false;
 
