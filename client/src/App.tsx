@@ -124,7 +124,7 @@ function AppRoutes() {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   useEffect(() => {
-    document.title = "Mind | Epical";
+    document.title = "ODA";
     // Remover dark mode del documento general (para contenido principal)
     document.documentElement.classList.remove('dark');
     document.body.classList.remove('dark');

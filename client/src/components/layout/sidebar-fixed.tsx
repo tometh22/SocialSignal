@@ -348,10 +348,8 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
         <div className="flex items-center justify-between p-2.5 border-b border-border">
           {!isCollapsed && (
             <div className="flex items-center gap-2.5">
-              <div className="h-7 w-7 rounded-lg bg-primary flex items-center justify-center shadow-sm">
-                <span className="text-primary-foreground text-sm font-bold">M</span>
-              </div>
-              <h1 className="text-base font-bold text-foreground">Mind</h1>
+              <img src="/oda-logo.png" alt="ODA" className="h-7 w-7 object-contain rounded-lg" />
+              <h1 className="text-base font-bold text-foreground">ODA</h1>
             </div>
           )}
 
