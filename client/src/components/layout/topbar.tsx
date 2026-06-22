@@ -219,12 +219,18 @@ export default function Topbar({ onMenuClick }: TopbarProps = {}) {
 
   return (
     <>
-      <div className="topbar h-12 px-2 sm:px-4 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 flex items-center justify-between sticky top-0 z-20 w-full shadow-sm gap-2">
+      <div className="topbar h-12 px-2 sm:px-4 border-b border-white/10 bg-black flex items-center justify-between sticky top-0 z-20 w-full shadow-md gap-2">
+        {/* Logo ODA — siempre visible */}
+        <Link href="/" className="flex items-center gap-2 flex-shrink-0 mr-1">
+          <img src="/oda-logo.png" alt="ODA" className="h-7 w-7 object-contain" />
+          <span className="hidden sm:inline text-sm font-bold text-white tracking-tight">ODA</span>
+        </Link>
+
         {/* Botón hamburguesa - sólo en mobile */}
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8 lg:hidden text-muted-foreground hover:text-foreground hover:bg-accent flex-shrink-0"
+          className="h-8 w-8 lg:hidden text-white/60 hover:text-white hover:bg-white/10 flex-shrink-0"
           onClick={onMenuClick}
           aria-label="Abrir menú"
         >
@@ -233,25 +239,25 @@ export default function Topbar({ onMenuClick }: TopbarProps = {}) {
 
         {/* Breadcrumbs minimalistas - en mobile sólo el último */}
         <div className="flex items-center min-w-0 flex-1">
-          <div className="flex items-center text-sm text-foreground min-w-0">
+          <div className="flex items-center text-sm min-w-0">
             {/* Desktop: breadcrumb completo */}
             <div className="hidden sm:flex items-center min-w-0">
               {breadcrumbs.map((crumb, i) => (
                 <div key={i} className="flex items-center min-w-0">
-                  {i > 0 && <ChevronRight className="h-3 w-3 mx-1.5 text-muted-foreground flex-shrink-0" />}
+                  {i > 0 && <ChevronRight className="h-3 w-3 mx-1.5 text-white/30 flex-shrink-0" />}
                   {i < breadcrumbs.length - 1 ? (
-                    <Link href={crumb.path} className="hover:text-foreground transition-colors font-medium text-muted-foreground truncate">
+                    <Link href={crumb.path} className="hover:text-white transition-colors font-medium text-white/50 truncate">
                       {crumb.name}
                     </Link>
                   ) : (
-                    <span className="font-semibold text-foreground truncate">{crumb.name}</span>
+                    <span className="font-semibold text-white truncate">{crumb.name}</span>
                   )}
                 </div>
               ))}
             </div>
             {/* Mobile: sólo la página actual */}
             <div className="sm:hidden min-w-0">
-              <span className="font-semibold text-foreground truncate block">
+              <span className="font-semibold text-white truncate block">
                 {breadcrumbs[breadcrumbs.length - 1]?.name}
               </span>
             </div>
@@ -261,15 +267,15 @@ export default function Topbar({ onMenuClick }: TopbarProps = {}) {
         {/* Acciones compactas */}
         <div className="flex items-center space-x-1 flex-shrink-0">
           {/* Búsqueda global */}
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-accent"
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 text-white/60 hover:text-white hover:bg-white/10"
             onClick={() => setIsSearchOpen(true)}
           >
             <Search className="h-4 w-4" />
           </Button>
-          
+
           {/* Chat / Mensajes - oculto en mobile chico */}
           <div className="hidden sm:flex">
             <MessagesPopup />
@@ -283,7 +289,7 @@ export default function Topbar({ onMenuClick }: TopbarProps = {}) {
           {/* Notificaciones */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8 relative text-muted-foreground hover:text-foreground hover:bg-accent">
+              <Button variant="ghost" size="icon" className="h-8 w-8 relative text-white/60 hover:text-white hover:bg-white/10">
                 <Bell className="h-4 w-4" />
                 {unreadCount > 0 && (
                   <span className="absolute -top-0.5 -right-0.5 h-2 w-2 bg-red-500 rounded-full" />
@@ -370,12 +376,12 @@ export default function Topbar({ onMenuClick }: TopbarProps = {}) {
           </DropdownMenu>
           
           {/* Separador vertical - oculto en mobile */}
-          <div className="hidden sm:block h-4 w-px bg-border mx-2"></div>
+          <div className="hidden sm:block h-4 w-px bg-white/20 mx-2"></div>
 
           {/* Menu de usuario */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="h-8 pl-1 sm:pl-2 sm:pr-3 gap-2 hover:bg-accent text-foreground">
+              <Button variant="ghost" className="h-8 pl-1 sm:pl-2 sm:pr-3 gap-2 hover:bg-white/10 text-white">
                 {isLoading ? (
                   <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                 ) : (
@@ -386,7 +392,7 @@ export default function Topbar({ onMenuClick }: TopbarProps = {}) {
                       </AvatarFallback>
                       {user?.avatar && <AvatarImage src={user.avatar} />}
                     </Avatar>
-                    <span className="hidden sm:inline text-sm font-medium text-foreground">
+                    <span className="hidden sm:inline text-sm font-medium text-white">
                       {user ? user.firstName : 'Usuario'}
                     </span>
                   </>
