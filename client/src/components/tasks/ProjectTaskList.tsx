@@ -423,14 +423,16 @@ function TaskRow({ task, allPersonnel, onOpen, onToggle, onDateSet, onAssignee, 
         {/* Title */}
         <div className="flex-1 min-w-0 px-2 py-3 flex items-center gap-1.5">
           <div className={cn("w-2 h-2 rounded-full flex-shrink-0", PRIORITY_DOT[task.priority] || "bg-gray-200")} />
-          {task.status !== "todo" && task.status !== "done" && (
+          {!isDone && (
             <Popover>
               <PopoverTrigger asChild>
                 <button
                   onClick={e => e.stopPropagation()}
                   className="flex-shrink-0"
                 >
-                  <TaskStatusBadge status={task.status} size="xs" />
+                  {task.status === "todo"
+                    ? <span className="text-[9px] text-muted-foreground/50 hover:text-muted-foreground border border-dashed border-muted-foreground/30 hover:border-muted-foreground/60 rounded px-1 py-0.5 transition-colors">estado</span>
+                    : <TaskStatusBadge status={task.status} size="xs" />}
                 </button>
               </PopoverTrigger>
               <PopoverContent className="w-36 p-1 shadow-lg" align="start" onClick={e => e.stopPropagation()}>
