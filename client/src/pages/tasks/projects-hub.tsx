@@ -112,7 +112,7 @@ function ProjectCard({ project, myPersonnelId, onJoin, onLeave, joining, leaving
                 "flex-shrink-0 h-6 px-2 rounded-md text-[11px] font-medium transition-all duration-150 border",
                 isMember
                   ? "text-green-700 bg-green-50 border-green-200 hover:bg-red-50 hover:text-red-600 hover:border-red-200"
-                  : "text-muted-foreground bg-transparent border-border hover:bg-primary/5 hover:text-primary hover:border-primary/30"
+                  : "text-muted-foreground bg-transparent border-border hover:bg-muted hover:text-foreground hover:border-slate-200"
               )}
             >
               {isMember ? (

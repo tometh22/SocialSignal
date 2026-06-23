@@ -757,7 +757,7 @@ const ProjectAnalyticsView: React.FC = () => {
                 </BreadcrumbList>
               </Breadcrumb>
 
-              <h1 className="text-2xl font-bold tracking-tight">
+              <h1 className="text-2xl font-semibold tracking-tight">
                 {project?.quotation?.projectName || "Cargando proyecto..."}
               </h1>
 

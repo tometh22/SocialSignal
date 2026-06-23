@@ -28,6 +28,7 @@ import {
   Menu
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/use-auth";
 import { reviewApi, reviewKeys, type ReviewRoomSummary } from "@/lib/review-api";
 
@@ -275,14 +276,21 @@ export default function Topbar({ onMenuClick }: TopbarProps = {}) {
         {/* Acciones compactas */}
         <div className="flex items-center space-x-1 flex-shrink-0">
           {/* Búsqueda global */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 text-white/60 hover:text-white hover:bg-white/10"
-            onClick={() => setIsSearchOpen(true)}
-          >
-            <Search className="h-4 w-4" />
-          </Button>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-white/60 hover:text-white hover:bg-white/10"
+                  onClick={() => setIsSearchOpen(true)}
+                >
+                  <Search className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">Buscar (⌘K)</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
 
           {/* Chat / Mensajes - oculto en mobile chico */}
           <div className="hidden sm:flex">

@@ -67,7 +67,7 @@ export default function CashflowPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Cashflow</h1>
+        <h1 className="text-2xl font-semibold">Cashflow</h1>
         <p className="text-muted-foreground text-sm">Movimientos bancarios importados desde el Excel MAESTRO</p>
       </div>
 

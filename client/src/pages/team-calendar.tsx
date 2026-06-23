@@ -163,7 +163,7 @@ export default function TeamCalendarPage() {
                       "flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs border transition-colors",
                       selectedAssigneeId === aid.toString()
                         ? `${style.bg} ${style.text} border-transparent font-medium`
-                        : "bg-card border-border hover:border-primary/50"
+                        : "bg-card border-border hover:border-slate-200 hover:shadow-sm"
                     )}
                     onClick={() => setSelectedAssigneeId(selectedAssigneeId === aid.toString() ? "all" : aid.toString())}
                   >

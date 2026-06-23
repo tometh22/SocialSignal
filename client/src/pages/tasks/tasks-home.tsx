@@ -587,7 +587,7 @@ export default function TasksHomePage() {
             <div className="grid grid-cols-2 gap-2 px-4 pb-2 flex-1">
               {recentProjects.map(proj => (
                 <Link key={proj.id} href={`/tasks/projects/${proj.id}`}>
-                  <div className="rounded-lg border border-border/60 hover:border-primary/40 hover:shadow-sm hover:bg-accent/20 transition-all duration-200 p-3 cursor-pointer group h-full">
+                  <div className="rounded-lg border border-border/60 hover:border-slate-200 hover:shadow-sm hover:bg-muted/30 transition-all duration-200 p-3 cursor-pointer group h-full">
                     <div className="flex items-start gap-2 mb-2">
                       <span className={cn(
                         "inline-flex w-7 h-7 rounded-lg flex-shrink-0 items-center justify-center text-white text-xs font-bold shadow-sm",

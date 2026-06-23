@@ -154,29 +154,29 @@ export default function HomeDashboard() {
   };
 
   const commercialLinks: QuickLink[] = [
-    { href: "/optimized-quote", title: "Nueva Cotización", description: "Crear una cotización", icon: Plus, color: "bg-green-500", permission: "quotations" },
-    { href: "/quotations", title: "Cotizaciones", description: `${quotationStats?.pending || 0} pendientes`, icon: FileText, color: "bg-blue-500", permission: "quotations" },
-    { href: "/crm", title: "CRM Ventas", description: "Pipeline de prospectos", icon: Target, color: "bg-purple-500", permission: "crm" },
-    { href: "/clients", title: "Clientes", description: "Base de clientes", icon: Building2, color: "bg-indigo-500", permission: "crm" },
+    { href: "/optimized-quote", title: "Nueva Cotización", description: "Crear una cotización", icon: Plus, color: "bg-[#D72638]", permission: "quotations" },
+    { href: "/quotations", title: "Cotizaciones", description: `${quotationStats?.pending || 0} pendientes`, icon: FileText, color: "bg-[#D72638]", permission: "quotations" },
+    { href: "/crm", title: "CRM Ventas", description: "Pipeline de prospectos", icon: Target, color: "bg-[#D72638]", permission: "crm" },
+    { href: "/clients", title: "Clientes", description: "Base de clientes", icon: Building2, color: "bg-[#D72638]", permission: "crm" },
   ];
 
   const projectLinks: QuickLink[] = [
-    { href: "/active-projects", title: "Rentabilidad", description: `${projectCount || 0} proyectos activos`, icon: Briefcase, color: "bg-orange-500", permission: "projects" },
-    { href: "/review", title: "Review", description: "Salas colaborativas de seguimiento semanal", icon: ClipboardList, color: "bg-indigo-500", permission: "status" },
-    { href: "/tasks", title: "Tareas", description: "Gestión de tareas", icon: CheckSquare, color: "bg-cyan-500", permission: "projects" },
-    { href: "/tasks/hours-dashboard", title: "Panel de Horas", description: "Horas por persona", icon: BarChart2, color: "bg-amber-500", permission: "projects" },
+    { href: "/active-projects", title: "Rentabilidad", description: `${projectCount || 0} proyectos activos`, icon: Briefcase, color: "bg-slate-600", permission: "projects" },
+    { href: "/review", title: "Review", description: "Salas colaborativas de seguimiento semanal", icon: ClipboardList, color: "bg-slate-600", permission: "status" },
+    { href: "/tasks", title: "Tareas", description: "Gestión de tareas", icon: CheckSquare, color: "bg-slate-600", permission: "projects" },
+    { href: "/tasks/hours-dashboard", title: "Panel de Horas", description: "Horas por persona", icon: BarChart2, color: "bg-slate-600", permission: "projects" },
   ];
 
   const operationsLinks: QuickLink[] = [
-    { href: "/operations/capacity", title: "Capacidad Semanal", description: "Capacidad por persona", icon: Gauge, color: "bg-rose-500" },
-    { href: "/operations/monthly-closing", title: "Cierre Mensual", description: "Reconciliación de horas", icon: CalendarCheck, color: "bg-pink-500" },
-    { href: "/operations/estimated-rates", title: "Valor Hora", description: "Proyección de rates", icon: TrendingUp, color: "bg-fuchsia-500" },
-    { href: "/operations/holidays", title: "Feriados", description: "Gestión de feriados", icon: Calendar, color: "bg-violet-500" },
+    { href: "/operations/capacity", title: "Capacidad Semanal", description: "Capacidad por persona", icon: Gauge, color: "bg-indigo-600" },
+    { href: "/operations/monthly-closing", title: "Cierre Mensual", description: "Reconciliación de horas", icon: CalendarCheck, color: "bg-indigo-600" },
+    { href: "/operations/estimated-rates", title: "Valor Hora", description: "Proyección de rates", icon: TrendingUp, color: "bg-indigo-600" },
+    { href: "/operations/holidays", title: "Feriados", description: "Gestión de feriados", icon: Calendar, color: "bg-indigo-600" },
   ];
 
   const renderLinkCard = (link: QuickLink) => (
     <Link key={link.href} href={link.href}>
-      <Card className="group hover:shadow-md transition-all cursor-pointer border hover:border-primary/30 h-full">
+      <Card className="group hover:shadow-md hover:border-slate-200 transition-shadow cursor-pointer border h-full">
         <CardContent className="p-4 flex items-center gap-3">
           <div className={`${link.color} p-2.5 rounded-lg text-white flex-shrink-0`}>
             <link.icon className="h-5 w-5" />
@@ -209,7 +209,7 @@ export default function HomeDashboard() {
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-3xl font-bold">
+          <h1 className="text-2xl font-semibold">
             {greeting()}, {user?.firstName || "Usuario"}
           </h1>
           <p className="text-muted-foreground mt-1">
@@ -296,38 +296,38 @@ export default function HomeDashboard() {
         {hasPermission('projects') && (
           <Card>
             <CardContent className="p-4 text-center">
-              <div className="text-3xl font-bold text-primary">{projectCount || 0}</div>
-              <div className="text-xs text-muted-foreground mt-1">Proyectos Activos</div>
+              <div className="text-xs text-muted-foreground mb-1">Proyectos Activos</div>
+              <div className="text-2xl font-semibold tabular-nums text-primary">{projectCount || 0}</div>
             </CardContent>
           </Card>
         )}
         {hasPermission('quotations') && (
           <Card>
             <CardContent className="p-4 text-center">
-              <div className="text-3xl font-bold text-amber-600">{quotationStats?.pending || 0}</div>
-              <div className="text-xs text-muted-foreground mt-1">Cotizaciones Pendientes</div>
+              <div className="text-xs text-muted-foreground mb-1">Cotizaciones Pendientes</div>
+              <div className="text-2xl font-semibold tabular-nums text-amber-600">{quotationStats?.pending || 0}</div>
             </CardContent>
           </Card>
         )}
         {hasPermission('quotations') && (
           <Card>
             <CardContent className="p-4 text-center">
-              <div className="text-3xl font-bold text-blue-600">{quotationStats?.draft || 0}</div>
-              <div className="text-xs text-muted-foreground mt-1">Borradores</div>
+              <div className="text-xs text-muted-foreground mb-1">Borradores</div>
+              <div className="text-2xl font-semibold tabular-nums text-slate-600">{quotationStats?.draft || 0}</div>
             </CardContent>
           </Card>
         )}
         {hasPermission('projects') && (
           <Card>
             <CardContent className="p-4 text-center">
-              <div className="text-3xl font-bold text-slate-700">
+              <div className="text-xs text-muted-foreground mb-1">Alertas Críticas</div>
+              <div className="text-2xl font-semibold tabular-nums">
                 {summary.critical > 0 ? (
                   <span className="text-red-600">{summary.critical}</span>
                 ) : (
                   <span className="text-emerald-600">0</span>
                 )}
               </div>
-              <div className="text-xs text-muted-foreground mt-1">Alertas Críticas</div>
             </CardContent>
           </Card>
         )}
@@ -346,26 +346,26 @@ export default function HomeDashboard() {
                 <Clock className="h-5 w-5 text-primary" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-foreground">{myWeekHours.toFixed(1)}h</p>
                 <p className="text-xs text-muted-foreground">Horas esta semana</p>
+                <p className="text-2xl font-semibold tabular-nums text-foreground">{myWeekHours.toFixed(1)}h</p>
               </div>
             </div>
             <div className="bg-card rounded-xl border p-4 flex items-center gap-3">
-              <div className="bg-blue-500/10 p-2.5 rounded-lg">
-                <BarChart2 className="h-5 w-5 text-blue-500" />
+              <div className="bg-slate-500/10 p-2.5 rounded-lg">
+                <BarChart2 className="h-5 w-5 text-slate-500" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-foreground">{myMonthHours.toFixed(1)}h</p>
                 <p className="text-xs text-muted-foreground">Horas este mes</p>
+                <p className="text-2xl font-semibold tabular-nums text-foreground">{myMonthHours.toFixed(1)}h</p>
               </div>
             </div>
             <div className="bg-card rounded-xl border p-4 flex items-center gap-3">
-              <div className="bg-amber-500/10 p-2.5 rounded-lg">
-                <CheckSquare className="h-5 w-5 text-amber-500" />
+              <div className="bg-indigo-500/10 p-2.5 rounded-lg">
+                <CheckSquare className="h-5 w-5 text-indigo-500" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-foreground">{myActiveTasks.length}</p>
                 <p className="text-xs text-muted-foreground">Tareas en curso</p>
+                <p className="text-2xl font-semibold tabular-nums text-foreground">{myActiveTasks.length}</p>
               </div>
             </div>
           </div>

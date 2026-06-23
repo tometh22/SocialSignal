@@ -129,7 +129,7 @@ export default function HoursDashboardPage() {
     <div className="space-y-5">
       {/* Header */}
       <div>
-        <h1 className="text-xl font-bold text-foreground">Panel de Horas</h1>
+        <h1 className="text-xl font-semibold text-foreground">Panel de Horas</h1>
         <p className="text-sm text-muted-foreground">Horas registradas en tareas por persona y proyecto</p>
       </div>
 

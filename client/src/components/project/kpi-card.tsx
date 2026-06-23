@@ -63,7 +63,7 @@ export const KpiCard: React.FC<KpiCardProps> = ({
       <div 
         className={cn(
           "flex flex-col border rounded-lg p-3 bg-card hover:shadow-sm transition-all",
-          onClick ? "cursor-pointer hover:border-primary/50" : ""
+          onClick ? "cursor-pointer hover:border-slate-200 hover:shadow-sm transition-shadow" : ""
         )}
         onClick={onClick}
       >
@@ -129,7 +129,7 @@ export const KpiCard: React.FC<KpiCardProps> = ({
     return (
       <Card className={cn(
         "border bg-card hover:shadow-sm transition-shadow overflow-hidden",
-        onClick ? "cursor-pointer hover:border-primary/50" : ""
+        onClick ? "cursor-pointer hover:border-slate-200 hover:shadow-sm transition-shadow" : ""
       )}
       onClick={onClick}>
         <CardContent className="p-3">
@@ -161,7 +161,7 @@ export const KpiCard: React.FC<KpiCardProps> = ({
   return (
     <Card className={cn(
       "border bg-card shadow-sm hover:shadow-md transition-shadow", 
-      onClick ? "cursor-pointer hover:border-primary/50" : ""
+      onClick ? "cursor-pointer hover:border-slate-200 hover:shadow-sm transition-shadow" : ""
     )}
     onClick={onClick}>
       <CardContent className="p-5">

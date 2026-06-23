@@ -193,7 +193,7 @@ export default function QuarterlyNpsSurvey() {
       </div>
 
       <div className="mb-6">
-        <h1 className="text-2xl font-bold">{`Encuesta NPS Trimestral - ${client?.name || 'Cliente'}`}</h1>
+        <h1 className="text-2xl font-semibold">{`Encuesta NPS Trimestral - ${client?.name || 'Cliente'}`}</h1>
         <p className="text-gray-600">Carga los resultados de la encuesta de satisfacción trimestral</p>
       </div>
 

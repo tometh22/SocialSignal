@@ -189,7 +189,7 @@ export default function AdminUsersPage() {
     <div className="p-6 max-w-6xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Gestión de Usuarios</h1>
+          <h1 className="text-2xl font-semibold text-foreground">Gestión de Usuarios</h1>
           <p className="text-muted-foreground mt-1">
             Administrá los usuarios y sus permisos de acceso a cada sección del sistema.
           </p>

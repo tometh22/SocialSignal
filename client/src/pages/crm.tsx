@@ -1027,7 +1027,7 @@ export default function CRMPage() {
             <Target className="w-5 h-5 text-white" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-slate-900">CRM Ventas</h1>
+            <h1 className="text-xl font-semibold text-slate-900">CRM Ventas</h1>
             <p className="text-sm text-slate-500">Pipeline y seguimiento de prospectos</p>
           </div>
         </div>

@@ -281,6 +281,7 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
           <TooltipTrigger asChild>
             <Link
               href={item.href}
+              title={isCollapsed ? item.title : undefined}
               className={cn(
                 "flex items-center px-3 py-2 rounded-xl text-sm transition-colors duration-150 relative group",
                 isActive
@@ -485,7 +486,8 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
         </div>
 
         {/* Navegación principal */}
-        <div className="flex-1 px-2 py-3 overflow-y-auto">
+        <div className="flex-1 relative min-h-0">
+        <div className="h-full px-2 py-3 overflow-y-auto">
           <nav className="space-y-3">
             {filteredNavSections.map((section) => (
               <div key={section.title || '__top__'}>
@@ -748,6 +750,8 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
               </div>
             ))}
           </nav>
+        </div>
+        <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-[#111827] to-transparent" />
         </div>
 
         {/* Footer */}

@@ -289,7 +289,7 @@ export default function CRMLeadPage({ params }: { params: { id: string } }) {
             <div className="flex items-center gap-3">
               {!editingName ? (
                 <div className="flex items-center gap-2 group/name">
-                  <h1 className="text-xl font-bold text-slate-900">{lead.companyName}</h1>
+                  <h1 className="text-xl font-semibold text-slate-900">{lead.companyName}</h1>
                   <button onClick={() => { setTempName(lead.companyName); setEditingName(true); }}
                     className="opacity-0 group-hover/name:opacity-100 text-slate-400 hover:text-indigo-600 transition-all">
                     <Edit3 className="w-3.5 h-3.5" />

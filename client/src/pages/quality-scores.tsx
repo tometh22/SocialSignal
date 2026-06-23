@@ -213,7 +213,7 @@ const QualityScoresPage = () => {
   if (!clientId) {
     return (
       <div className="flex flex-col items-center justify-center h-screen">
-        <h1 className="text-2xl font-bold mb-4">Cliente no especificado</h1>
+        <h1 className="text-2xl font-semibold mb-4">Cliente no especificado</h1>
         <Button onClick={() => navigate("/clients")}>
           <ArrowLeft className="mr-2 h-4 w-4" />
           Volver a Clientes

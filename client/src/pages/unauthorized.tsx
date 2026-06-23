@@ -10,7 +10,7 @@ export default function UnauthorizedPage() {
       <div className="h-16 w-16 rounded-full bg-destructive/10 flex items-center justify-center">
         <ShieldX className="h-8 w-8 text-destructive" />
       </div>
-      <h1 className="text-2xl font-bold text-foreground">Acceso restringido</h1>
+      <h1 className="text-2xl font-semibold text-foreground">Acceso restringido</h1>
       <p className="text-muted-foreground max-w-md">
         No tenés permiso para ver esta sección. Contactá al administrador si creés que esto es un error.
       </p>

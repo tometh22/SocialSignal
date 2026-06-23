@@ -353,7 +353,7 @@ export default function EditDeliverable() {
           <ArrowLeft className="h-4 w-4 mr-2" />
           Volver
         </Button>
-        <h1 className="text-2xl font-bold">Editar Entregable MODO</h1>
+        <h1 className="text-2xl font-semibold">Editar Entregable MODO</h1>
       </div>
 
       <Card className="border shadow-sm">
