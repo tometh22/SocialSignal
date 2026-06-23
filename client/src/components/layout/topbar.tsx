@@ -220,10 +220,18 @@ export default function Topbar({ onMenuClick }: TopbarProps = {}) {
   return (
     <>
       <div className="topbar h-12 px-2 sm:px-4 border-b border-white/10 bg-black flex items-center justify-between sticky top-0 z-20 w-full shadow-md gap-2">
-        {/* Logo ODA — siempre visible */}
+        {/* Logo Mind — siempre visible */}
         <Link href="/" className="flex items-center gap-2 flex-shrink-0 mr-1">
-          <img src="/oda-logo.png" alt="ODA" className="h-7 w-7 object-contain" />
-          <span className="hidden sm:inline text-sm font-bold text-white tracking-tight">ODA</span>
+          <svg viewBox="0 0 28 28" fill="none" className="h-7 w-7 flex-shrink-0" aria-label="Mind">
+            <polyline points="4,24 4,7 14,17 24,7 24,24" stroke="white" strokeWidth="1.5" strokeOpacity="0.7" fill="none" strokeLinejoin="round" strokeLinecap="round"/>
+            <circle cx="4" cy="24" r="2" fill="white" fillOpacity="0.85"/>
+            <circle cx="4" cy="7" r="2" fill="white" fillOpacity="0.85"/>
+            <circle cx="14" cy="17" r="2" fill="white" fillOpacity="0.85"/>
+            <circle cx="24" cy="7" r="2" fill="white" fillOpacity="0.85"/>
+            <circle cx="24" cy="24" r="2" fill="white" fillOpacity="0.85"/>
+            <circle cx="20" cy="3.5" r="2.5" fill="#D72638"/>
+          </svg>
+          <span className="hidden sm:inline text-sm font-bold text-white tracking-tight">mind</span>
         </Link>
 
         {/* Botón hamburguesa - sólo en mobile */}
