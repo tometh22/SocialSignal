@@ -122,7 +122,7 @@ export default function Topbar({ onMenuClick }: TopbarProps = {}) {
 
   // Función para generar la ruta de migas de pan
   const generateBreadcrumbs = () => {
-    if (location === '/') return [{ name: 'Dashboard', path: '/' }];
+    if (location === '/') return [{ name: 'Inicio', path: '/' }];
 
     // Dividir la ruta actual
     const paths = location.split('/').filter(Boolean);
