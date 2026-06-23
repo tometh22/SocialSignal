@@ -751,47 +751,9 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
         </div>
 
         {/* Footer */}
-        <div className="border-t border-white/10 p-2">
-          <div className="flex items-center gap-2">
-            <Avatar className="h-6 w-6">
-              <AvatarImage src={user?.avatar || ""} />
-              <AvatarFallback className="bg-[#D72638] text-white text-xs font-semibold">
-                {getUserInitials()}
-              </AvatarFallback>
-            </Avatar>
-
-            {!isCollapsed && (
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-medium text-white truncate">
-                  {user?.firstName} {user?.lastName}
-                </p>
-                <div className="flex items-center gap-1">
-                  <div className="h-1.5 w-1.5 rounded-full bg-green-400"></div>
-                  <span className="text-xs text-white/40">
-                    {isAdmin ? "Administrador" : "Online"}
-                  </span>
-                </div>
-              </div>
-            )}
-
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => logoutMutation.mutate()}
-                  className="h-6 w-6 p-0 hover:bg-white/10 hover:text-white text-white/40"
-                >
-                  <LogOut className="h-3 w-3" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="right">
-                Cerrar sesión
-              </TooltipContent>
-            </Tooltip>
-          </div>
+        <div className="border-t border-white/10 px-2 py-2.5">
           {!isCollapsed && (
-            <p className="text-[9px] text-white/20 mt-2 px-1">Powered by Epical</p>
+            <p className="text-[9px] text-white/20 px-1 pb-1.5">Powered by Epical</p>
           )}
         </div>
       </div>
