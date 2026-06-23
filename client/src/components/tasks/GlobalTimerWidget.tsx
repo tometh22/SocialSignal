@@ -61,6 +61,8 @@ export default function GlobalTimerWidget() {
       queryClient.invalidateQueries({ queryKey: ["/api/tasks", pendingTaskId] });
       queryClient.invalidateQueries({ queryKey: ["/api/tasks/hours-summary"] });
       queryClient.invalidateQueries({ queryKey: ["/api/tasks/my-tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/capacity/weekly"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks/hours-dashboard"] });
       toast({ title: `${hours}h registradas`, description: "Tiempo guardado correctamente" });
       setConfirmOpen(false);
     } catch {

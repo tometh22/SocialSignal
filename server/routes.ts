@@ -8583,7 +8583,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Obtener resumen de costos de un proyecto
   // Obtener resumen de costos para un periodo específico (mes, trimestre, etc.)
-  app.get("/api/projects/:id/cost-summary/period", async (req, res) => {
+  app.get("/api/projects/:id/cost-summary/period", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "Invalid project ID" });
 
@@ -8721,7 +8721,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Mantener el endpoint original para compatibilidad
-  app.get("/api/projects/:id/cost-summary", async (req, res) => {
+  app.get("/api/projects/:id/cost-summary", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "Invalid project ID" });
 
@@ -9949,7 +9949,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Obtener todos los entregables de un proyecto específico (para calidad de puntuaciones)
-  app.get("/api/projects/:projectId/deliverables", async (req, res) => {
+  app.get("/api/projects/:projectId/deliverables", requireAuth, async (req, res) => {
     const projectId = parseInt(req.params.projectId);
     if (isNaN(projectId)) {
       return res.status(400).json({ message: "ID de proyecto inválido" });
@@ -11366,7 +11366,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   };
 
   // Ruta para obtener cotización con conversión automática
-  app.get("/api/quotations/:id/display/:currency", async (req, res) => {
+  app.get("/api/quotations/:id/display/:currency", requireAuth, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const currency = req.params.currency;
@@ -12980,8 +12980,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Obtener clientes desde Google Sheets (stub, lista de nombres de columna C pestaña Activo)
+  app.get("/api/google-sheets/clients", requireAuth, async (req, res) => {
+    try {
+      res.json({
+        success: true,
+        message: "Listado de clientes desde Google Sheets",
+        data: [] as string[],
+        count: 0
+      });
+    } catch (error) {
+      res.status(500).json({ success: false, message: "Error al obtener clientes desde Google Sheets" });
+    }
+  });
+
+  // Obtener proyectos importados desde Google Sheets
+  app.get("/api/google-sheets/projects", requireAuth, async (req, res) => {
+    try {
+      res.json({
+        success: true,
+        projects: []
+      });
+    } catch (error) {
+      res.status(500).json({ success: false, message: "Error al obtener proyectos desde Google Sheets" });
+    }
+  });
+
+  // Importar clientes desde Google Sheets
+  app.post("/api/google-sheets/import-clients", requireAuth, async (req, res) => {
+    try {
+      res.json({
+        success: true,
+        message: "Función disponible próximamente",
+        imported: 0,
+        updated: 0,
+        totalProcessed: 0
+      });
+    } catch (error) {
+      res.status(500).json({ success: false, message: "Error al importar clientes desde Google Sheets" });
+    }
+  });
+
+  // Importar proyectos desde Google Sheets
+  app.post("/api/google-sheets/import-projects", requireAuth, async (req, res) => {
+    try {
+      res.json({
+        success: true,
+        message: "Función disponible próximamente",
+        imported: 0,
+        updated: 0,
+        totalProcessed: 0
+      });
+    } catch (error) {
+      res.status(500).json({ success: false, message: "Error al importar proyectos desde Google Sheets" });
+    }
+  });
+
   // ==================== DIRECT COSTS SYNC ====================
-  
+
   // Sincronizar datos desde Excel MAESTRO manualmente
   app.post("/api/direct-costs/sync", requireAuth, async (req, res) => {
     try {
@@ -13019,7 +13075,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Obtener costos directos desde base de datos
-  app.get("/api/direct-costs", async (req, res) => {
+  app.get("/api/direct-costs", requireAuth, async (req, res) => {
     try {
       console.log('📊 Obteniendo costos directos desde base de datos...');
       

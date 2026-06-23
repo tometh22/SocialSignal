@@ -710,7 +710,18 @@ export default function CRMLeadPage({ params }: { params: { id: string } }) {
                   <div className="flex gap-2">
                     <Button size="sm" variant="outline" className="flex-1" onClick={() => setReminderOpen(false)}>Cancelar</Button>
                     <Button size="sm" className="flex-1 bg-amber-600 text-white"
-                      onClick={() => addReminder.mutate({ ...newReminder, dueDate: new Date(newReminder.dueDate).toISOString() })}
+                      onClick={() => {
+                        if (!newReminder.dueDate) {
+                          toast({ title: 'Fecha requerida', variant: 'destructive' });
+                          return;
+                        }
+                        const dueDate = new Date(newReminder.dueDate);
+                        if (isNaN(dueDate.getTime())) {
+                          toast({ title: 'Fecha inválida', variant: 'destructive' });
+                          return;
+                        }
+                        addReminder.mutate({ ...newReminder, dueDate: dueDate.toISOString() });
+                      }}
                       disabled={!newReminder.description || !newReminder.dueDate || addReminder.isPending}>
                       Crear
                     </Button>

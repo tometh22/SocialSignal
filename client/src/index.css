@@ -924,11 +924,11 @@ body.dark::before {
     --radius: 0.5rem;
 
     /* Colores de gráficas armonizados */
-    --chart-1: var(--color-primary-hue) 80% 45%;
-    --chart-2: var(--color-accent-hue) 70% 40%;
-    --chart-3: var(--color-success-hue) 60% 45%;
-    --chart-4: var(--color-warning-hue) 80% 50%;
-    --chart-5: var(--color-error-hue) 75% 50%;
+    --chart-1: 354 70% 50%;
+    --chart-2: 210 70% 50%;
+    --chart-3: 150 60% 45%;
+    --chart-4: 40 80% 50%;
+    --chart-5: 280 60% 55%;
 
     /* Variables para el sidebar — Graphite #111827 */
     --sidebar-background: 221 39% 11%;

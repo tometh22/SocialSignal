@@ -144,6 +144,18 @@ export default function MonthlyClosing() {
       });
       return;
     }
+    const billing = getBillingCurrency(person);
+    let totalCost: number;
+    if (billing === 'USD') {
+      // rate is already in USD; totalCost stored in ARS equivalent for consistency
+      totalCost = hrs * (person.hourlyRateUSD ?? rate) * (exchangeRate || 1);
+    } else if (billing === 'mixed') {
+      // rate is USD; convert full amount to ARS
+      totalCost = hrs * rate * (exchangeRate || 1);
+    } else {
+      // ARS billing: rate is in ARS
+      totalCost = hrs * (person.hourlyRateARS ?? rate);
+    }
     const existing = getClosing(person.id);
     setClosingPersonnelId(person.id);
     closeMutation.mutate({
@@ -153,7 +165,7 @@ export default function MonthlyClosing() {
       actualHours: existing?.actualHours || hrs,
       adjustedHours: hrs,
       hourlyRate: rate,
-      totalCost: hrs * rate,
+      totalCost,
       exchangeRateAtClose: exchangeRate || null,
     });
   };

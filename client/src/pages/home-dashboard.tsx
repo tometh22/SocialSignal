@@ -445,7 +445,7 @@ export default function HomeDashboard() {
       {renderSection("Proyectos", projectLinks)}
       {isOperations && renderSection("Operaciones", operationsLinks)}
       {renderSection("Dashboard y Admin", [
-        { href: "/dashboard", title: "Dashboard Ejecutivo", description: "KPIs financieros", icon: LayoutDashboard, color: "bg-emerald-500", permission: "dashboard" },
+        { href: "/dashboard", title: "Dashboard Ejecutivo", description: "KPIs financieros", icon: LayoutDashboard, color: "bg-slate-600", permission: "dashboard" },
         { href: "/admin/users", title: "Usuarios", description: "Usuarios y permisos", icon: Users, color: "bg-slate-500", permission: "admin" },
       ])}
     </div>

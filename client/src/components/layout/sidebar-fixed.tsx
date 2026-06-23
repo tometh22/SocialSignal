@@ -539,7 +539,7 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
                                     "flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs transition-all duration-150",
                                     isActive
                                       ? "bg-white/10 text-[#D72638] font-semibold"
-                                      : "text-white/60 hover:text-white hover:bg-white/8"
+                                      : "text-white/60 hover:text-white hover:bg-white/10"
                                   )}
                                 >
                                   <span className={cn(
@@ -653,7 +653,7 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
                                     "flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs transition-all duration-150",
                                     isActive
                                       ? "bg-white/10 text-white font-semibold"
-                                      : "text-white/60 hover:text-white hover:bg-white/8",
+                                      : "text-white/60 hover:text-white hover:bg-white/10",
                                   )}
                                 >
                                   <span

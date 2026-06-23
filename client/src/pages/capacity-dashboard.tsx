@@ -69,7 +69,8 @@ export default function CapacityDashboard() {
     ? allPersonnel
     : allPersonnel.filter((p: any) => {
         const fullName = `${user?.firstName ?? ""} ${user?.lastName ?? ""}`.trim().toLowerCase();
-        return fullName && p.name.toLowerCase() === fullName;
+        const normalize = (s: string) => s.trim().toLowerCase().replace(/\s+/g, ' ');
+        return fullName && normalize(p.name) === normalize(fullName);
       });
 
   const handleStartEdit = (p: any) => {

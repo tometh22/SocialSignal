@@ -132,10 +132,10 @@ function NewLeadModal({ onSuccess, stages, open: externalOpen, onOpenChange: ext
   const [form, setForm] = useState(emptyForm);
 
   useEffect(() => {
-    if (open) {
-      setForm({ ...emptyForm, stage: initialStage ?? defaultStage });
-    }
-  }, [open, initialStage]);
+    if (!open) return;
+    const firstStage = stages.find(s => s.key !== 'won' && s.key !== 'lost')?.key ?? 'new';
+    setForm({ companyName: '', stage: initialStage ?? firstStage, source: '', estimatedValueUsd: '', notes: '', contactName: '', contactEmail: '', contactPhone: '', contactPosition: '' });
+  }, [open, initialStage, stages]);
 
   const mutation = useMutation({
     mutationFn: (data: any) => apiRequest('/api/crm/leads', 'POST', data),
@@ -974,14 +974,16 @@ export default function CRMPage() {
       });
   };
 
-  const handleDeleteLead = (id: number) => {
+  const handleDeleteLead = async (id: number) => {
+    const removed = (localLeads ?? []).find(l => l.id === id);
     setLocalLeads(prev => (prev ?? []).filter(l => l.id !== id));
-    apiRequest(`/api/crm/leads/${id}`, 'DELETE')
-      .then(() => queryClient.invalidateQueries({ queryKey: ['/api/crm/stats'] }))
-      .catch(() => {
-        toast({ title: 'Error al eliminar el lead', variant: 'destructive' });
-        refetch().then(r => { if (r.data) setLocalLeads(r.data); });
-      });
+    try {
+      await apiRequest(`/api/crm/leads/${id}`, 'DELETE');
+      queryClient.invalidateQueries({ queryKey: ['/api/crm/stats'] });
+    } catch {
+      if (removed) setLocalLeads(prev => [...(prev ?? []), removed]);
+      toast({ title: 'Error al eliminar el lead', variant: 'destructive' });
+    }
   };
 
   const handleLeadClick = (id: number) => navigate(`/crm/${id}`);
