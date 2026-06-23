@@ -284,11 +284,12 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
               className={cn(
                 "flex items-center px-3 py-2.5 rounded-xl text-sm transition-all duration-200 relative group",
                 isActive
-                  ? "bg-primary text-primary-foreground shadow-lg"
-                  : "text-muted-foreground hover:text-white hover:bg-gradient-to-r hover:from-purple-500 hover:to-purple-600 border border-transparent",
+                  ? "bg-white/10 text-white"
+                  : "text-white/60 hover:text-white hover:bg-white/8",
                 isCollapsed && "justify-center px-2"
               )}
             >
+              {isActive && <span className="absolute left-0 top-1/4 h-1/2 w-[3px] rounded-r bg-[#D72638]" />}
               <div className="flex items-center flex-1 min-w-0">
                 <Icon className={cn("h-4 w-4 flex-shrink-0", isCollapsed ? "mx-auto" : "mr-3")} />
 
@@ -302,8 +303,8 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
                           className={cn(
                             "h-4 px-1.5 text-xs font-medium",
                             isActive
-                              ? "bg-primary-foreground/20 text-primary-foreground"
-                              : "bg-primary/10 text-primary"
+                              ? "bg-white/20 text-white"
+                              : "bg-white/10 text-white/70"
                           )}
                         >
                           {item.badge}
@@ -312,7 +313,7 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
                       {item.status === 'new' && (
                         <div className={cn(
                           "h-2 w-2 rounded-full",
-                          isActive ? "bg-primary-foreground" : "bg-green-500"
+                          isActive ? "bg-white" : "bg-green-400"
                         )} />
                       )}
                     </div>
@@ -338,18 +339,39 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
   return (
     <TooltipProvider>
       <div className={cn(
-        "flex flex-col bg-background shadow-sm",
+        "flex flex-col bg-[#111827] shadow-xl",
         mobileMode
           ? "h-full w-full"
-          : "h-screen border-r border-border transition-all duration-300",
+          : "h-screen border-r border-white/10 transition-all duration-300",
         !mobileMode && (isCollapsed ? "w-16" : "w-56")
       )}>
         {/* Header */}
-        <div className="flex items-center justify-between p-2.5 border-b border-border">
+        <div className="flex items-center justify-between p-2.5 border-b border-white/10">
           {!isCollapsed && (
             <div className="flex items-center gap-2.5">
-              <img src="/oda-logo.png" alt="ODA" className="h-7 w-7 object-contain rounded-lg" />
-              <h1 className="text-base font-bold text-foreground">ODA</h1>
+              <svg viewBox="0 0 28 28" fill="none" className="h-7 w-7 flex-shrink-0" aria-label="Mind">
+                <polyline points="4,24 4,7 14,17 24,7 24,24" stroke="white" strokeWidth="1.5" strokeOpacity="0.7" fill="none" strokeLinejoin="round" strokeLinecap="round"/>
+                <circle cx="4" cy="24" r="2" fill="white" fillOpacity="0.85"/>
+                <circle cx="4" cy="7" r="2" fill="white" fillOpacity="0.85"/>
+                <circle cx="14" cy="17" r="2" fill="white" fillOpacity="0.85"/>
+                <circle cx="24" cy="7" r="2" fill="white" fillOpacity="0.85"/>
+                <circle cx="24" cy="24" r="2" fill="white" fillOpacity="0.85"/>
+                <circle cx="20" cy="3.5" r="2.5" fill="#D72638"/>
+              </svg>
+              <h1 className="text-base font-bold text-white tracking-tight">mind</h1>
+            </div>
+          )}
+          {isCollapsed && (
+            <div className="mx-auto">
+              <svg viewBox="0 0 28 28" fill="none" className="h-7 w-7" aria-label="Mind">
+                <polyline points="4,24 4,7 14,17 24,7 24,24" stroke="white" strokeWidth="1.5" strokeOpacity="0.7" fill="none" strokeLinejoin="round" strokeLinecap="round"/>
+                <circle cx="4" cy="24" r="2" fill="white" fillOpacity="0.85"/>
+                <circle cx="4" cy="7" r="2" fill="white" fillOpacity="0.85"/>
+                <circle cx="14" cy="17" r="2" fill="white" fillOpacity="0.85"/>
+                <circle cx="24" cy="7" r="2" fill="white" fillOpacity="0.85"/>
+                <circle cx="24" cy="24" r="2" fill="white" fillOpacity="0.85"/>
+                <circle cx="20" cy="3.5" r="2.5" fill="#D72638"/>
+              </svg>
             </div>
           )}
 
@@ -360,9 +382,9 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-6 w-6 p-0 hover:bg-accent relative"
+                  className="h-6 w-6 p-0 hover:bg-white/10 relative"
                 >
-                  <Bell className={cn("h-3.5 w-3.5", totalDue > 0 ? "text-amber-500" : "text-muted-foreground")} />
+                  <Bell className={cn("h-3.5 w-3.5", totalDue > 0 ? "text-amber-400" : "text-white/50")} />
                   {totalDue > 0 && (
                     <span className="absolute -top-1 -right-1 h-3.5 w-3.5 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center leading-none">
                       {totalDue > 9 ? "9+" : totalDue}
@@ -454,9 +476,9 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
                 variant="ghost"
                 size="sm"
                 onClick={() => setIsCollapsed(!isCollapsed)}
-                className="h-6 w-6 p-0 hover:bg-accent"
+                className="h-6 w-6 p-0 hover:bg-white/10"
               >
-                <ChevronRight className={cn("h-3 w-3 transition-transform text-muted-foreground", isCollapsed ? "" : "rotate-180")} />
+                <ChevronRight className={cn("h-3 w-3 transition-transform text-white/50", isCollapsed ? "" : "rotate-180")} />
               </Button>
             )}
           </div>
@@ -468,7 +490,7 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
             {filteredNavSections.map((section) => (
               <div key={section.title || '__top__'}>
                 {!isCollapsed && section.title && (
-                  <h3 className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-widest mb-1.5 px-3">
+                  <h3 className="text-[10px] font-semibold text-white/30 uppercase tracking-widest mb-1.5 px-3">
                     {section.title}
                   </h3>
                 )}
@@ -484,7 +506,7 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
                         <div className="flex items-center justify-between px-3 py-1">
                           <button
                             onClick={() => setProjectsExpanded(v => !v)}
-                            className="flex items-center gap-1 text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-widest hover:text-muted-foreground transition-colors flex-1"
+                            className="flex items-center gap-1 text-[10px] font-semibold text-white/30 uppercase tracking-widest hover:text-white/60 transition-colors flex-1"
                           >
                             <span>Proyectos</span>
                             {projectsExpanded
@@ -493,7 +515,7 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
                             }
                           </button>
                           <button
-                            className="h-4 w-4 flex items-center justify-center rounded hover:bg-accent text-muted-foreground hover:text-primary transition-colors"
+                            className="h-4 w-4 flex items-center justify-center rounded hover:bg-white/10 text-white/40 hover:text-white transition-colors"
                             onClick={() => setNewProjectOpen(true)}
                             title="Nuevo proyecto"
                           >
@@ -514,8 +536,8 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
                                   className={cn(
                                     "flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs transition-all duration-150",
                                     isActive
-                                      ? "bg-primary/10 text-primary font-semibold"
-                                      : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
+                                      ? "bg-white/10 text-[#D72638] font-semibold"
+                                      : "text-white/60 hover:text-white hover:bg-white/8"
                                   )}
                                 >
                                   <span className={cn(
@@ -528,7 +550,7 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
                                   {proj.pendingCount > 0 && (
                                     <span className={cn(
                                       "h-4 min-w-[16px] px-1 rounded-full text-[9px] font-bold flex items-center justify-center flex-shrink-0",
-                                      isActive ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+                                      isActive ? "bg-[#D72638] text-white" : "bg-white/10 text-white/60"
                                     )}>
                                       {proj.pendingCount}
                                     </span>
@@ -538,7 +560,7 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
                             })}
                             <Link
                               href="/tasks/projects"
-                              className="flex items-center gap-2 px-2 py-1 rounded-lg text-xs text-muted-foreground/50 hover:text-primary transition-colors"
+                              className="flex items-center gap-2 px-2 py-1 rounded-lg text-xs text-white/30 hover:text-white/60 transition-colors"
                             >
                               <FolderOpen className="h-3.5 w-3.5 flex-shrink-0" />
                               <span>Ver todos</span>
@@ -553,7 +575,7 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="h-8 w-full justify-center p-0 hover:bg-accent text-muted-foreground"
+                              className="h-8 w-full justify-center p-0 hover:bg-white/10 text-white/40"
                               onClick={() => setNewProjectOpen(true)}
                             >
                               <Plus className="h-3.5 w-3.5" />
@@ -573,10 +595,10 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
                       <>
                         <div
                           className={cn(
-                            "flex items-stretch rounded-xl text-sm transition-all duration-200 group",
+                            "flex items-stretch rounded-xl text-sm transition-all duration-200 group relative",
                             isStatusActive && !currentPath.includes('/')
-                              ? "bg-primary text-primary-foreground shadow-lg"
-                              : "text-muted-foreground hover:text-white hover:bg-gradient-to-r hover:from-purple-500 hover:to-purple-600",
+                              ? "bg-white/10 text-white"
+                              : "text-white/60 hover:text-white hover:bg-white/10",
                           )}
                         >
                           <Link
@@ -591,8 +613,8 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
                                 className={cn(
                                   "h-4 px-1.5 text-xs font-medium ml-2",
                                   currentPath === '/review'
-                                    ? "bg-primary-foreground/20 text-primary-foreground"
-                                    : "bg-amber-100 text-amber-800",
+                                    ? "bg-white/20 text-white"
+                                    : "bg-amber-500/20 text-amber-300",
                                 )}
                               >
                                 {totalReviewPending}
@@ -611,9 +633,9 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
                         </div>
 
                         {reviewsExpanded && (
-                          <div className="space-y-0.5 mt-1 ml-2 pl-2 border-l border-border/60">
+                          <div className="space-y-0.5 mt-1 ml-2 pl-2 border-l border-white/10">
                             {sidebarRooms.length === 0 && (
-                              <div className="px-2 py-1 text-[10px] text-muted-foreground/60 italic">
+                              <div className="px-2 py-1 text-[10px] text-white/30 italic">
                                 Sin salas todavía
                               </div>
                             )}
@@ -628,8 +650,8 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
                                   className={cn(
                                     "flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs transition-all duration-150",
                                     isActive
-                                      ? "bg-indigo-500/10 text-indigo-700 font-semibold"
-                                      : "text-muted-foreground hover:text-foreground hover:bg-accent/50",
+                                      ? "bg-white/10 text-white font-semibold"
+                                      : "text-white/60 hover:text-white hover:bg-white/8",
                                   )}
                                 >
                                   <span
@@ -643,7 +665,7 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
                                   <span className="truncate flex-1 font-medium">{room.name}</span>
                                   {isPrivate && (
                                     <span
-                                      className="text-[9px] font-semibold uppercase tracking-wide text-slate-500 flex-shrink-0"
+                                      className="text-[9px] font-semibold uppercase tracking-wide text-white/40 flex-shrink-0"
                                       title="Sala personal"
                                     >
                                       Tú
@@ -653,7 +675,7 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
                                     <span
                                       className={cn(
                                         "inline-flex items-center gap-0.5 h-4 px-1.5 rounded-full text-[9px] font-bold flex-shrink-0",
-                                        isActive ? "bg-indigo-600 text-white" : "bg-indigo-100 text-indigo-700",
+                                        isActive ? "bg-white/20 text-white" : "bg-white/10 text-white/60",
                                       )}
                                       title={`${room.unreadCommentsCount} comentario${room.unreadCommentsCount === 1 ? '' : 's'} nuevo${room.unreadCommentsCount === 1 ? '' : 's'}`}
                                     >
@@ -665,7 +687,7 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
                                     <span
                                       className={cn(
                                         "h-4 min-w-[16px] px-1 rounded-full text-[9px] font-bold flex items-center justify-center flex-shrink-0",
-                                        isActive ? "bg-indigo-600 text-white" : "bg-amber-100 text-amber-800",
+                                        isActive ? "bg-white/20 text-white" : "bg-amber-500/20 text-amber-300",
                                       )}
                                       title={`${room.pendingCount} decisión${room.pendingCount === 1 ? '' : 'es'} pendiente${room.pendingCount === 1 ? '' : 's'}`}
                                     >
@@ -678,7 +700,7 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
                             {reviewRooms.length > MAX_SIDEBAR_ROOMS && (
                               <Link
                                 href="/review"
-                                className="flex items-center gap-2 px-2 py-1 rounded-lg text-xs text-muted-foreground/50 hover:text-indigo-600 transition-colors"
+                                className="flex items-center gap-2 px-2 py-1 rounded-lg text-xs text-white/30 hover:text-white/60 transition-colors"
                               >
                                 <FolderOpen className="h-3.5 w-3.5 flex-shrink-0" />
                                 <span>Ver todas ({reviewRooms.length})</span>
@@ -705,8 +727,8 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
                               className={cn(
                                 "flex items-center justify-center px-2 py-2.5 rounded-xl transition-all duration-200 relative",
                                 isStatusActive
-                                  ? "bg-primary text-primary-foreground shadow-lg"
-                                  : "text-muted-foreground hover:text-white hover:bg-gradient-to-r hover:from-purple-500 hover:to-purple-600",
+                                  ? "bg-white/10 text-white"
+                                  : "text-white/60 hover:text-white hover:bg-white/10",
                               )}
                             >
                               <ClipboardList className="h-4 w-4" />
@@ -729,23 +751,23 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
         </div>
 
         {/* Footer */}
-        <div className="border-t border-border p-2">
+        <div className="border-t border-white/10 p-2">
           <div className="flex items-center gap-2">
             <Avatar className="h-6 w-6">
               <AvatarImage src={user?.avatar || ""} />
-              <AvatarFallback className="bg-primary text-primary-foreground text-xs font-semibold">
+              <AvatarFallback className="bg-[#D72638] text-white text-xs font-semibold">
                 {getUserInitials()}
               </AvatarFallback>
             </Avatar>
 
             {!isCollapsed && (
               <div className="flex-1 min-w-0">
-                <p className="text-xs font-medium text-foreground truncate">
+                <p className="text-xs font-medium text-white truncate">
                   {user?.firstName} {user?.lastName}
                 </p>
                 <div className="flex items-center gap-1">
-                  <div className="h-1.5 w-1.5 rounded-full bg-green-500"></div>
-                  <span className="text-xs text-muted-foreground">
+                  <div className="h-1.5 w-1.5 rounded-full bg-green-400"></div>
+                  <span className="text-xs text-white/40">
                     {isAdmin ? "Administrador" : "Online"}
                   </span>
                 </div>
@@ -758,7 +780,7 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
                   variant="ghost"
                   size="sm"
                   onClick={() => logoutMutation.mutate()}
-                  className="h-6 w-6 p-0 hover:bg-destructive/10 hover:text-destructive"
+                  className="h-6 w-6 p-0 hover:bg-white/10 hover:text-white text-white/40"
                 >
                   <LogOut className="h-3 w-3" />
                 </Button>
@@ -768,6 +790,9 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
               </TooltipContent>
             </Tooltip>
           </div>
+          {!isCollapsed && (
+            <p className="text-[9px] text-white/20 mt-2 px-1">Powered by Epical</p>
+          )}
         </div>
       </div>
 
