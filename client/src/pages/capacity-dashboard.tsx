@@ -10,12 +10,14 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { usePermissions } from "@/hooks/use-permissions";
+import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { Loader2, Pencil, Check, X, RotateCcw } from "lucide-react";
 
 export default function CapacityDashboard() {
   const { isOperations } = usePermissions();
+  const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [resetTarget, setResetTarget] = useState<{ personnelId: number; name: string } | null>(null);
@@ -59,8 +61,16 @@ export default function CapacityDashboard() {
     onError: () => toast({ title: "Error al restablecer", variant: "destructive" }),
   });
 
-  const personnel = data?.personnel || [];
+  const allPersonnel = data?.personnel || [];
   const totals = data?.totals;
+
+  // Team members only see their own row; operations sees everyone
+  const personnel = isOperations
+    ? allPersonnel
+    : allPersonnel.filter((p: any) => {
+        const fullName = `${user?.firstName ?? ""} ${user?.lastName ?? ""}`.trim().toLowerCase();
+        return fullName && p.name.toLowerCase() === fullName;
+      });
 
   const handleStartEdit = (p: any) => {
     setEditingCapacityInput(String(p.maxCapacity));
@@ -151,7 +161,9 @@ export default function CapacityDashboard() {
           </CardHeader>
           <CardContent>
             {personnel.length === 0 ? (
-              <div className="text-center py-12 text-muted-foreground">No hay personal configurado esta semana</div>
+              <div className="text-center py-12 text-muted-foreground">
+                {isOperations ? "No hay personal configurado esta semana" : "No se encontró tu registro de capacidad para esta semana"}
+              </div>
             ) : (
               <table className="w-full text-sm">
                 <thead>
