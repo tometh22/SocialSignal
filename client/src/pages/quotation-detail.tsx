@@ -197,16 +197,15 @@ const QuotationDetail: React.FC = () => {
       .catch(() => {});
   }, [quotationId, refreshKey]);
 
-  // Si no hay ID válido, redireccionar
-  if (!quotationId) {
-    toast({
-      title: "Error",
-      description: "ID de cotización no válido",
-      variant: "destructive",
-    });
-    setLocation('/manage-quotes');
-    return null;
-  }
+  // Si no hay ID válido, redireccionar (via effect para no llamar side-effects en render)
+  useEffect(() => {
+    if (!quotationId) {
+      toast({ title: "Error", description: "ID de cotización no válido", variant: "destructive" });
+      setLocation('/manage-quotes');
+    }
+  }, [quotationId]);
+
+  if (!quotationId) return null;
 
   // Formatear moneda
   const formatCurrency = (amount: number) => {

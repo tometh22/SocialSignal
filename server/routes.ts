@@ -3804,62 +3804,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Personnel historical costs routes
-  app.get("/api/personnel-historical-costs", requireAuth, async (req, res) => {
-    try {
-      const historicalCosts = await db
-        .select()
-        .from(personnelHistoricalCosts)
-        .where(eq(personnelHistoricalCosts.isActive, true))
-        .orderBy(personnelHistoricalCosts.personnelId, personnelHistoricalCosts.year, personnelHistoricalCosts.month);
-      
-      res.json(historicalCosts);
-    } catch (error) {
-      console.error("Error fetching historical costs:", error);
-      res.status(500).json({ message: "Failed to fetch historical costs" });
-    }
-  });
-
-  app.post("/api/personnel-historical-costs", requireAuth, async (req, res) => {
-    try {
-      const { personnelId, year, month, hourlyRateARS, monthlySalaryARS, hourlyRateUSD, monthlySalaryUSD, adjustmentReason, notes } = req.body;
-      
-      // Insert or update historical cost
-      const result = await db
-        .insert(personnelHistoricalCosts)
-        .values({
-          personnelId,
-          year,
-          month,
-          hourlyRateARS: hourlyRateARS?.toString(),
-          monthlySalaryARS: monthlySalaryARS?.toString(),
-          hourlyRateUSD: hourlyRateUSD?.toString(),
-          monthlySalaryUSD: monthlySalaryUSD?.toString(),
-          adjustmentReason,
-          notes,
-          createdBy: req.user?.id || 1
-        })
-        .onConflictDoUpdate({
-          target: [personnelHistoricalCosts.personnelId, personnelHistoricalCosts.year, personnelHistoricalCosts.month],
-          set: {
-            hourlyRateARS: hourlyRateARS?.toString(),
-            monthlySalaryARS: monthlySalaryARS?.toString(),
-            hourlyRateUSD: hourlyRateUSD?.toString(),
-            monthlySalaryUSD: monthlySalaryUSD?.toString(),
-            adjustmentReason,
-            notes,
-            updatedAt: new Date(),
-            updatedBy: req.user?.id || 1
-          }
-        })
-        .returning();
-      
-      res.status(201).json(result[0]);
-    } catch (error) {
-      console.error("Error creating historical cost:", error);
-      res.status(500).json({ message: "Failed to create historical cost" });
-    }
-  });
-
   // Personnel routes
   app.get("/api/personnel", requireAuth, async (_, res) => {
     try {
@@ -9023,6 +8967,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Admin route para reinicializar la base de datos con los nuevos datos
   app.post("/api/admin/reinit-database", requireAuth, async (req, res) => {
+    if (!req.user?.isAdmin) return res.status(403).json({ message: "Admin access required" });
     try {
       await reinitializeDatabase();
       res.json({ message: "Database reinitialized successfully" });
@@ -19523,7 +19468,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // These endpoints expose pre-calculated views for Looker Studio or any BI tool.
   // Connect via Looker's "Community Connector" or use the PostgreSQL direct connector.
 
-  app.get("/api/bi/pnl-mensual", async (_req: Request, res: Response) => {
+  app.get("/api/bi/pnl-mensual", requireAuth, async (_req: Request, res: Response) => {
     try {
       const result = await pool.query("SELECT * FROM vw_looker_pnl_mensual");
       res.json(result.rows);
@@ -19533,7 +19478,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/bi/proyectos-mensual", async (_req: Request, res: Response) => {
+  app.get("/api/bi/proyectos-mensual", requireAuth, async (_req: Request, res: Response) => {
     try {
       const result = await pool.query("SELECT * FROM vw_looker_proyectos_mensual");
       res.json(result.rows);
@@ -19543,7 +19488,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/bi/costos-mensual", async (_req: Request, res: Response) => {
+  app.get("/api/bi/costos-mensual", requireAuth, async (_req: Request, res: Response) => {
     try {
       const result = await pool.query("SELECT * FROM vw_looker_costos_mensual");
       res.json(result.rows);
@@ -19553,7 +19498,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/bi/equipo-mensual", async (_req: Request, res: Response) => {
+  app.get("/api/bi/equipo-mensual", requireAuth, async (_req: Request, res: Response) => {
     try {
       const result = await pool.query("SELECT * FROM vw_looker_equipo_mensual");
       res.json(result.rows);
@@ -19563,7 +19508,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/bi/cashflow", async (_req: Request, res: Response) => {
+  app.get("/api/bi/cashflow", requireAuth, async (_req: Request, res: Response) => {
     try {
       const result = await pool.query("SELECT * FROM vw_looker_cashflow");
       res.json(result.rows);
@@ -19573,7 +19518,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/bi/revenue-por-cliente", async (_req: Request, res: Response) => {
+  app.get("/api/bi/revenue-por-cliente", requireAuth, async (_req: Request, res: Response) => {
     try {
       const result = await pool.query("SELECT * FROM vw_looker_revenue_por_cliente");
       res.json(result.rows);

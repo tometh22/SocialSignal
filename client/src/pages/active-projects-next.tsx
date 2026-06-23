@@ -861,7 +861,7 @@ export default function ActiveProjectsNext() {
         const rb = b.metrics.revenueUSDNormalized ?? b.metrics.revenueDisplay ?? 0;
         return rb - ra;
       });
-  }, [data?.projects, search, activeOnly, period, statusFilter]);
+  }, [data?.projects, search, activeOnly, period, statusFilter, categoryFilter]);
 
   // Group by client — clients with worst health bubble up
   const clientGroups = useMemo(() => {

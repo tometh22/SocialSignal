@@ -16,17 +16,21 @@ export default function GlobalTimerWidget() {
   const [pendingDesc, setPendingDesc] = useState("");
   const [pendingTaskId, setPendingTaskId] = useState<number | null>(null);
   const [pendingPersonnelId, setPendingPersonnelId] = useState<number | null>(null);
+  const [pendingTaskTitle, setPendingTaskTitle] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
-  if (!isRunning || !timerData) return null;
+  // Keep mounted while dialog is open even if timer stopped
+  if (!isRunning && !confirmOpen) return null;
 
   const handleStop = () => {
+    const snapshotTitle = timerData?.taskTitle ?? "";
     const result = stopTimer();
     if (!result) return;
     setPendingHours(String(result.hours));
     setPendingDesc("");
     setPendingTaskId(result.taskId);
     setPendingPersonnelId(result.personnelId);
+    setPendingTaskTitle(snapshotTitle);
     setConfirmOpen(true);
   };
 
@@ -66,9 +70,8 @@ export default function GlobalTimerWidget() {
     }
   };
 
-  const taskLabel = timerData.taskTitle.length > 28
-    ? timerData.taskTitle.slice(0, 28) + "…"
-    : timerData.taskTitle;
+  const displayTitle = (isRunning && timerData ? timerData.taskTitle : pendingTaskTitle) ?? "";
+  const taskLabel = displayTitle.length > 28 ? displayTitle.slice(0, 28) + "…" : displayTitle;
 
   return (
     <>
@@ -104,7 +107,7 @@ export default function GlobalTimerWidget() {
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-3 py-1">
-            <p className="text-sm text-muted-foreground truncate">{timerData.taskTitle}</p>
+            <p className="text-sm text-muted-foreground truncate">{displayTitle}</p>
             <div>
               <label className="text-xs text-muted-foreground mb-1 block">Horas</label>
               <Input
