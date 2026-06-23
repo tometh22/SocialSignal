@@ -282,10 +282,10 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
             <Link
               href={item.href}
               className={cn(
-                "flex items-center px-3 py-2.5 rounded-xl text-sm transition-all duration-200 relative group",
+                "flex items-center px-3 py-2 rounded-xl text-sm transition-colors duration-150 relative group",
                 isActive
-                  ? "bg-white/10 text-white"
-                  : "text-white/60 hover:text-white hover:bg-white/8",
+                  ? "bg-white/[0.13] text-white"
+                  : "text-white/60 hover:text-white hover:bg-white/10",
                 isCollapsed && "justify-center px-2"
               )}
             >
@@ -490,7 +490,7 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
             {filteredNavSections.map((section) => (
               <div key={section.title || '__top__'}>
                 {!isCollapsed && section.title && (
-                  <h3 className="text-[10px] font-semibold text-white/30 uppercase tracking-widest mb-1.5 px-3">
+                  <h3 className="text-[11px] font-semibold text-white/30 uppercase tracking-wider mb-1.5 px-3">
                     {section.title}
                   </h3>
                 )}

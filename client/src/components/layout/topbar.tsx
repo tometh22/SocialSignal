@@ -182,7 +182,7 @@ export default function Topbar({ onMenuClick }: TopbarProps = {}) {
     // Para rutas que entran a una página standalone (ej. /active-projects/:id),
     // omitimos el "Dashboard" inicial: la cabecera queda más limpia.
     const startsInStandalone = standalonePages.includes(paths[0]);
-    const breadcrumbs = startsInStandalone ? [] : [{ name: 'Dashboard', path: '/' }];
+    const breadcrumbs: { name: string; path: string }[] = [];
     let currentPath = '';
 
     paths.forEach((path, index) => {
@@ -219,7 +219,7 @@ export default function Topbar({ onMenuClick }: TopbarProps = {}) {
 
   return (
     <>
-      <div className="topbar h-12 px-2 sm:px-4 border-b border-white/10 bg-black flex items-center justify-between sticky top-0 z-20 w-full shadow-md gap-2">
+      <div className="topbar h-14 px-2 sm:px-4 border-b border-white/10 bg-[#0d1117] flex items-center justify-between sticky top-0 z-20 w-full shadow-md gap-2">
         {/* Logo Mind — solo en mobile (en desktop lo muestra el sidebar) */}
         <Link href="/" className="lg:hidden flex items-center gap-2 flex-shrink-0 mr-1">
           <svg viewBox="0 0 28 28" fill="none" className="h-7 w-7 flex-shrink-0" aria-label="Mind">

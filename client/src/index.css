@@ -900,9 +900,9 @@ body.dark::before {
     --muted: 210 20% 92%;
     --muted-foreground: 210 25% 45%;
 
-    /* Color de acento armonizado */
-    --accent: var(--color-accent-hue) 70% 40%;
-    --accent-foreground: 0 0% 100%;
+    /* Acento neutro — cool gray (evita purple de shadcn) */
+    --accent: 210 10% 92%;
+    --accent-foreground: 210 25% 15%;
 
     /* Colores semánticos más suaves */
     --destructive: 0 75% 50%;
