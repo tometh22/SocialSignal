@@ -303,14 +303,41 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
     staleTime: 5 * 60 * 1000,
   });
 
-  // Personnel filtered to exclude inactive (activeUntil passed)
+  // Reference date for "is this person active?" checks. A person is excluded from
+  // a quotation when their activeUntil date is on/before the month being quoted —
+  // not just relative to today — so cotizaciones futuras no incluyen personas que
+  // ya no van a estar (ej. Sol a partir de mayo 2026). Falls back to today.
+  const quoteReferenceDate = useMemo(() => {
+    const MONTH_NAMES = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
+    // 1) Explicit project start date
+    const start = quotationData.inflation.projectStartDate;
+    if (start) {
+      const d = new Date(start);
+      if (!isNaN(d.getTime())) {
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
+      }
+    }
+    // 2) Selected salary month key like "may2026"
+    const sm = quotationData.salaryMonth;
+    if (sm) {
+      const m = MONTH_NAMES.findIndex((n) => sm.startsWith(n));
+      const year = parseInt(sm.replace(/[a-z]/gi, ''), 10);
+      if (m >= 0 && Number.isFinite(year)) {
+        return `${year}-${String(m + 1).padStart(2, '0')}-01`;
+      }
+    }
+    // 3) Fallback: today
+    return new Date().toISOString().slice(0, 10);
+  }, [quotationData.inflation.projectStartDate, quotationData.salaryMonth]);
+
+  // Personnel filtered to exclude those inactive as of the quoted month.
   const filteredPersonnel = useMemo(() => {
-    const today = new Date().toISOString().slice(0, 10);
     return personnel.filter((p: any) => {
       const until = p.activeUntil;
-      return !until || until >= today;
+      // Excluded when activeUntil is on/before the quoted month start.
+      return !until || until > quoteReferenceDate;
     });
-  }, [personnel]);
+  }, [personnel, quoteReferenceDate]);
 
   // All historical months, newest → oldest. Used for explicit month lookups (when a
   // specific month is selected — including future projections).
@@ -406,10 +433,9 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
   // have a non-zero rate (avoids returning a month with only partial/estimated data).
   const getResolvedSalaryMonth = useCallback((): string | null => {
     if (quotationData.salaryMonth) return quotationData.salaryMonth;
-    const today = new Date().toISOString().slice(0, 10);
     const arsBilledActive = personnel.filter((p: any) => {
       const until = p.activeUntil;
-      const isActive = !until || until >= today;
+      const isActive = !until || until > quoteReferenceDate;
       const isARS = !p.billingCurrency || p.billingCurrency === 'ARS';
       return isActive && isARS;
     });
@@ -423,7 +449,7 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
       if (personnel.some((p: any) => ((p as any)[`${m}HourlyRateARS`] ?? 0) > 0)) return m;
     }
     return null;
-  }, [personnel, quotationData.salaryMonth]);
+  }, [personnel, quotationData.salaryMonth, quoteReferenceDate]);
 
   // Force recalculation function with debouncing
   const forceRecalculate = useCallback(() => {

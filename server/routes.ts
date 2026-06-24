@@ -127,6 +127,7 @@ import { sanitizeInput } from "./input-sanitization";
 import { setupAuth, hashPassword } from "./auth";
 import { requireProjectUnlocked, projectIdFromTimeEntry } from "./middleware/projectLocked";
 import { requireRole, requireProvider, requireProviderCanAccessProject } from "./middleware/requireRole";
+import { requirePermission } from "./middleware/requirePermission";
 import { createReviewRoomsRouter } from "./routes-review-rooms";
 import { createLedgerRouter } from "./routes-ledger";
 import { reviewRooms, reviewRoomMembers, capacityOverrides } from "@shared/schema";
@@ -8290,6 +8291,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
     ).catch(() => {});
   }
 
+  // Computes ARS costing for a task time entry so PM-logged hours feed rentabilidad.
+  // - rate: person.hourlyRateARS if set, else USD hourlyRate × period FX.
+  // - billable: true only when the task maps to a billable active project.
+  async function computeTaskEntryCost(
+    personnelId: number,
+    taskProjectId: number | null | undefined,
+    date: Date,
+    hours: number,
+  ): Promise<{ hourlyRateAtTime: number | null; totalCost: number | null; billable: boolean; exchangeRateId: number | null }> {
+    const [person] = await db.select().from(personnel).where(eq(personnel.id, personnelId));
+    if (!person) return { hourlyRateAtTime: null, totalCost: null, billable: false, exchangeRateId: null };
+
+    // Resolve billable from the linked active project (own/internal projects → not billable)
+    let billable = false;
+    if (taskProjectId) {
+      const [proj] = await db
+        .select({ category: activeProjects.projectCategory })
+        .from(activeProjects)
+        .where(eq(activeProjects.id, taskProjectId));
+      if (proj) billable = proj.category !== "internal";
+    }
+
+    // Resolve ARS rate
+    let rateARS = (person.hourlyRateARS && person.hourlyRateARS > 0) ? person.hourlyRateARS : 0;
+    let exchangeRateId: number | null = null;
+    if (rateARS === 0 && person.hourlyRate && person.hourlyRate > 0) {
+      const [fx] = await db
+        .select({ id: exchangeRates.id, rate: exchangeRates.rate })
+        .from(exchangeRates)
+        .where(and(
+          eq(exchangeRates.year, date.getFullYear()),
+          eq(exchangeRates.month, date.getMonth() + 1),
+          eq(exchangeRates.isActive, true),
+        ))
+        .limit(1);
+      const fxRate = fx ? parseFloat(fx.rate.toString()) : 0;
+      if (fxRate > 0) {
+        rateARS = person.hourlyRate * fxRate;
+        exchangeRateId = fx.id;
+      }
+    }
+
+    const hourlyRateAtTime = rateARS > 0 ? rateARS : null;
+    const totalCost = hourlyRateAtTime != null ? hours * hourlyRateAtTime : null;
+    return { hourlyRateAtTime, totalCost, billable, exchangeRateId };
+  }
+
   // Crear un nuevo registro de horas
   app.post("/api/time-entries", requireAuth, requireProjectUnlocked(), async (req, res) => {
     try {
@@ -9018,12 +9066,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
         lte(timeEntries.date, end),
       ));
 
+    // Also include hours logged against tasks (PM module)
+    const taskRows = await db
+      .select({
+        hours: taskTimeEntries.hours,
+        totalCost: taskTimeEntries.totalCost,
+      })
+      .from(taskTimeEntries)
+      .where(and(
+        eq(taskTimeEntries.personnelId, personnelRow.id),
+        gte(taskTimeEntries.date, start),
+        lte(taskTimeEntries.date, end),
+      ));
+
     let hours = 0;
     let totalCostARS = 0;
-    for (const r of rows) {
+    for (const r of [...rows, ...taskRows]) {
       hours += Number(r.hours) || 0;
       totalCostARS += Number(r.totalCost) || 0;
     }
+
+    // Available hours for the month = weekdays minus holidays × daily hours (by contract)
+    const monthlyHours = (personnelRow as any).monthlyHours || 160;
+    const dailyHours = monthlyHours / 20;
+    const monthHolidays = await db.select({ date: holidays.date })
+      .from(holidays)
+      .where(eq(holidays.year, yyyy));
+    const holidaySet = new Set((monthHolidays || []).map((h: any) => (h.date || "").slice(0, 10)));
+    let workdays = 0;
+    const dCursor = new Date(yyyy, mm - 1, 1);
+    while (dCursor.getMonth() === mm - 1) {
+      const dow = dCursor.getDay();
+      const key = `${dCursor.getFullYear()}-${String(dCursor.getMonth() + 1).padStart(2, "0")}-${String(dCursor.getDate()).padStart(2, "0")}`;
+      if (dow !== 0 && dow !== 6 && !holidaySet.has(key)) workdays++;
+      dCursor.setDate(dCursor.getDate() + 1);
+    }
+    const availableHours = Math.round(workdays * dailyHours);
 
     // Compute USD total: if personnel bills in USD, use hourlyRate * hours; otherwise convert ARS via period FX
     let totalCostUSD = 0;
@@ -9054,7 +9132,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       totalCostARS,
       totalCostUSD,
       billingCurrency,
-      entryCount: rows.length,
+      availableHours,
+      contractType: (personnelRow as any).contractType ?? "full-time",
+      entryCount: rows.length + taskRows.length,
     };
   }
 
@@ -16466,7 +16546,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /api/exchange-rates - Create new exchange rate
-  app.post("/api/exchange-rates", requireAuth, async (req, res) => {
+  app.post("/api/exchange-rates", requireAuth, requirePermission("operations"), async (req, res) => {
     try {
       const { exchangeRates, insertExchangeRateSchema } = await import('../shared/schema');
       
@@ -16490,7 +16570,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // PATCH /api/exchange-rates/:id - Update exchange rate
-  app.patch("/api/exchange-rates/:id", requireAuth, async (req, res) => {
+  app.patch("/api/exchange-rates/:id", requireAuth, requirePermission("operations"), async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
@@ -16572,7 +16652,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /api/exchange-rates/sync-blue - Sincroniza dólar blue del día desde dolarapi.com
-  app.post("/api/exchange-rates/sync-blue", requireAuth, async (req, res) => {
+  app.post("/api/exchange-rates/sync-blue", requireAuth, requirePermission("operations"), async (req, res) => {
     try {
       const userId = req.user?.id;
       if (!userId) return res.status(401).json({ message: "No autenticado" });
@@ -16595,7 +16675,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // POST /api/exchange-rates/import-rem - Importa estimaciones REM BCRA en bloque
   // Body: { estimates: Array<{ year: number, month: number, rate: number }> }
-  app.post("/api/exchange-rates/import-rem", requireAuth, async (req, res) => {
+  app.post("/api/exchange-rates/import-rem", requireAuth, requirePermission("operations"), async (req, res) => {
     try {
       const userId = req.user?.id;
       if (!userId) return res.status(401).json({ message: "No autenticado" });
@@ -16617,7 +16697,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // DELETE /api/exchange-rates/:id - Delete exchange rate
-  app.delete("/api/exchange-rates/:id", requireAuth, async (req, res) => {
+  app.delete("/api/exchange-rates/:id", requireAuth, requirePermission("operations"), async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
@@ -18006,8 +18086,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!task) return res.status(404).json({ message: "Tarea no encontrada" });
 
       const data = insertTaskTimeEntrySchema.parse({ ...req.body, taskId, createdBy: user.id });
-      const [created] = await db.insert(taskTimeEntries).values(data).returning();
-      
+
+      // Compute costing so these hours feed rentabilidad (fact_labor_month).
+      // Use the linked active project (subtasks inherit the parent's project).
+      const linkedProjectId = task.projectId ?? (task.parentTaskId
+        ? (await db.select({ projectId: tasks.projectId }).from(tasks).where(eq(tasks.id, task.parentTaskId)))[0]?.projectId
+        : null);
+      const costing = await computeTaskEntryCost(data.personnelId, linkedProjectId, data.date, data.hours);
+
+      const [created] = await db.insert(taskTimeEntries).values({ ...data, ...costing }).returning();
+
       // Update logged hours on task
       const totalResult = await db.execute(sql`SELECT COALESCE(SUM(hours), 0) as total FROM task_time_entries WHERE task_id = ${taskId}`);
       const total = (totalResult.rows[0] as any).total;
@@ -18025,6 +18113,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await db.update(tasks).set({ loggedHours: parentHours, updatedAt: new Date() }).where(eq(tasks.id, task.parentTaskId));
       }
 
+      // Rebuild rentabilidad for the affected month (fire-and-forget, app mode only)
+      triggerLaborRebuild(data.date);
+
       res.json(created);
     } catch (error: any) {
       if (error.name === "ZodError") return res.status(400).json({ message: "Datos inválidos", errors: error.errors });
@@ -18038,6 +18129,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { taskId, entryId } = req.params;
       const tid = parseInt(taskId);
       const [task] = await db.select().from(tasks).where(eq(tasks.id, tid));
+      const [deletedEntry] = await db.select().from(taskTimeEntries).where(eq(taskTimeEntries.id, parseInt(entryId)));
       await db.delete(taskTimeEntries).where(eq(taskTimeEntries.id, parseInt(entryId)));
       const totalResult = await db.execute(sql`SELECT COALESCE(SUM(hours), 0) as total FROM task_time_entries WHERE task_id = ${tid}`);
       const total = (totalResult.rows[0] as any).total;
@@ -18054,6 +18146,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const parentHours = parseFloat((parentTotal.rows[0] as any).total);
         await db.update(tasks).set({ loggedHours: parentHours, updatedAt: new Date() }).where(eq(tasks.id, task.parentTaskId));
       }
+
+      // Rebuild rentabilidad for the affected month (fire-and-forget, app mode only)
+      if (deletedEntry?.date) triggerLaborRebuild(deletedEntry.date);
 
       res.json({ message: "Entrada eliminada" });
     } catch (error) {
@@ -18332,11 +18427,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           clientName: null,
           status: 'active',
           colorIndex: op.color_index,
+          briefUrl: null,
           source: 'own',
         };
       } else {
         const projectResult = await db.execute(sql`
-          SELECT ap.id, q.project_name as name, c.name as client_name, ap.status
+          SELECT ap.id, q.project_name as name, c.name as client_name, ap.status, ap.brief_url
           FROM active_projects ap
           JOIN quotations q ON q.id = ap.quotation_id
           JOIN clients c ON c.id = ap.client_id
@@ -18349,6 +18445,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           name: p.name,
           clientName: p.client_name,
           status: p.status,
+          briefUrl: p.brief_url ?? null,
           source: 'active_project',
         };
       }
@@ -18392,13 +18489,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/tasks/projects/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const projectId = parseInt(req.params.id);
-      const { status } = req.body;
-      if (!status) return res.status(400).json({ message: "status requerido" });
+      const { status, briefUrl } = req.body;
+      if (status === undefined && briefUrl === undefined) {
+        return res.status(400).json({ message: "status o briefUrl requerido" });
+      }
 
       if (projectId < OWN_PROJECT_OFFSET) {
-        await db.execute(sql`UPDATE active_projects SET status = ${status} WHERE id = ${projectId}`);
+        if (status !== undefined) {
+          await db.execute(sql`UPDATE active_projects SET status = ${status} WHERE id = ${projectId}`);
+        }
+        if (briefUrl !== undefined) {
+          await db.execute(sql`UPDATE active_projects SET brief_url = ${briefUrl || null} WHERE id = ${projectId}`);
+        }
       }
-      // Own projects don't have a persistent status field — no-op
+      // Own projects don't have a persistent status/brief field — no-op
 
       res.json({ success: true });
     } catch (error) {
@@ -19627,6 +19731,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) { res.status(500).json({ message: "Error fetching monthly closings" }); }
   });
 
+  // Real hours per person for a month (time_entries + task_time_entries), to auto-fill the closing
+  app.get("/api/monthly-closings/real-hours", requireAuth, async (req, res) => {
+    try {
+      const year = req.query.year ? parseInt(req.query.year as string) : new Date().getFullYear();
+      const month = req.query.month ? parseInt(req.query.month as string) : (new Date().getMonth() + 1);
+      const start = new Date(year, month - 1, 1);
+      const end = new Date(year, month, 0, 23, 59, 59, 999);
+      const rows = await db.execute(sql`
+        SELECT personnel_id, COALESCE(SUM(hours), 0) AS hours FROM (
+          SELECT personnel_id, hours FROM time_entries WHERE date >= ${start} AND date <= ${end}
+          UNION ALL
+          SELECT personnel_id, hours FROM task_time_entries WHERE date >= ${start} AND date <= ${end}
+        ) combined
+        GROUP BY personnel_id
+      `);
+      const map: Record<number, number> = {};
+      for (const r of rows.rows as any[]) map[Number(r.personnel_id)] = parseFloat(r.hours) || 0;
+      res.json(map);
+    } catch (error) {
+      console.error("Error fetching real hours:", error);
+      res.status(500).json({ message: "Error fetching real hours" });
+    }
+  });
+
   app.post("/api/monthly-closings", requireAuth, async (req, res) => {
     try {
       const data = insertMonthlyClosingSchema.parse({ ...req.body, closedBy: req.user?.id });
@@ -19639,6 +19767,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             hourlyRate: data.hourlyRate,
             totalCost: data.totalCost,
             exchangeRateAtClose: data.exchangeRateAtClose,
+            adjustments: data.adjustments,
             notes: data.notes,
             closedBy: data.closedBy,
           }
@@ -19660,7 +19789,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) { res.status(500).json({ message: "Error fetching estimated rates" }); }
   });
 
-  app.post("/api/estimated-rates", requireAuth, async (req, res) => {
+  app.post("/api/estimated-rates", requireAuth, requirePermission("operations"), async (req, res) => {
     try {
       const data = insertEstimatedRateSchema.parse({ ...req.body, createdBy: req.user?.id });
       const [rate] = await db.insert(estimatedRates).values(data)

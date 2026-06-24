@@ -53,10 +53,8 @@ type Project = { id: number; name: string; client_name: string };
 const STATUS_OPTIONS = [
   { value: "todo",        label: "Pendiente",   bg: "bg-gray-100 hover:bg-gray-200 text-gray-700",       active: "bg-gray-600 text-white" },
   { value: "in_progress", label: "En curso",    bg: "bg-blue-50 hover:bg-blue-100 text-blue-700",        active: "bg-blue-600 text-white" },
-  { value: "in_review",   label: "En revisión", bg: "bg-violet-50 hover:bg-violet-100 text-violet-700",  active: "bg-violet-600 text-white" },
   { value: "blocked",     label: "Bloqueado",   bg: "bg-orange-50 hover:bg-orange-100 text-orange-700",  active: "bg-orange-600 text-white" },
   { value: "done",        label: "Completada",  bg: "bg-green-50 hover:bg-green-100 text-green-700",     active: "bg-green-600 text-white" },
-  { value: "cancelled",   label: "Cancelada",   bg: "bg-red-50 hover:bg-red-100 text-red-700",           active: "bg-red-600 text-white" },
 ];
 
 const PRIORITY_OPTIONS = [

@@ -22,30 +22,32 @@ interface CalTask {
 }
 
 interface Props {
-  projectId: number;
+  projectId?: number;
+  // When provided, render these tasks directly instead of fetching by project.
+  tasks?: CalTask[];
 }
 
 const STATUS_CHIP: Record<string, string> = {
   todo:        "bg-gray-100 text-gray-700 border-gray-200",
   in_progress: "bg-blue-100 text-blue-700 border-blue-200",
-  in_review:   "bg-violet-100 text-violet-700 border-violet-200",
   blocked:     "bg-orange-100 text-orange-700 border-orange-200",
   done:        "bg-green-100 text-green-700 border-green-200 line-through",
-  cancelled:   "bg-red-50 text-red-400 border-red-200 line-through",
 };
 
 const WEEK_DAYS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 
-export default function TaskCalendarView({ projectId }: Props) {
+export default function TaskCalendarView({ projectId, tasks: tasksProp }: Props) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
 
   const { data } = useQuery<{ tasks: CalTask[] }>({
     queryKey: ["/api/tasks/project", projectId],
     queryFn: () => authFetch(`/api/tasks/project/${projectId}`).then(r => r.json()),
     staleTime: 30_000,
+    enabled: tasksProp === undefined && projectId !== undefined,
   });
 
-  const rootTasks = (data?.tasks || []).filter(t => !t.parentTaskId);
+  const sourceTasks = tasksProp ?? data?.tasks ?? [];
+  const rootTasks = sourceTasks.filter(t => !t.parentTaskId);
   const tasksWithDate = rootTasks.filter(t => t.dueDate || t.startDate);
   const tasksWithoutDate = rootTasks.filter(t => !t.dueDate && !t.startDate && t.status !== "cancelled" && t.status !== "done");
 

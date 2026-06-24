@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Edit, Trash2, Calendar, TrendingUp, DollarSign } from "lucide-react";
+import { Plus, Edit, Trash2, Calendar, TrendingUp, DollarSign, RefreshCw, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -81,6 +81,8 @@ export function ExchangeRateManager() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingRate, setEditingRate] = useState<ExchangeRate | null>(null);
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
+  const [isRemDialogOpen, setIsRemDialogOpen] = useState(false);
+  const [remText, setRemText] = useState("");
   const { toast } = useToast();
 
   // Consulta para obtener tipos de cambio
@@ -162,6 +164,83 @@ export function ExchangeRateManager() {
     },
   });
 
+  // Sincronizar dólar Blue de hoy (API pública dolarapi.com)
+  const syncBlueMutation = useMutation({
+    mutationFn: () => apiRequest("/api/exchange-rates/sync-blue", "POST"),
+    onSuccess: (result: any) => {
+      toast({
+        title: "Blue sincronizado",
+        description: result?.rate
+          ? `Dólar blue de hoy: ${formatCurrency(Number(result.rate))}`
+          : "Tipo de cambio blue actualizado.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/exchange-rates"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error al sincronizar Blue",
+        description: error.message || "No se pudo obtener el dólar blue",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Importar estimaciones REM (BCRA) en bloque
+  const importRemMutation = useMutation({
+    mutationFn: (estimates: { year: number; month: number; rate: number }[]) =>
+      apiRequest("/api/exchange-rates/import-rem", "POST", { estimates }),
+    onSuccess: (result: any) => {
+      toast({
+        title: "REM importado",
+        description: `Se importaron ${result?.count ?? 0} estimaciones del REM.`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/exchange-rates"] });
+      setIsRemDialogOpen(false);
+      setRemText("");
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error al importar REM",
+        description: error.message || "No se pudo importar el REM",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Parsea filas "año,mes,tasa" o "año-mes,tasa" (una por línea, separadores , ; o tab)
+  const handleImportRem = () => {
+    const estimates: { year: number; month: number; rate: number }[] = [];
+    const lines = remText.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    for (const line of lines) {
+      const parts = line.split(/[,;\t]+/).map((p) => p.trim());
+      let year: number, month: number, rate: number;
+      if (parts.length >= 3) {
+        year = parseInt(parts[0], 10);
+        month = parseInt(parts[1], 10);
+        rate = parseFloat(parts[2].replace(/\./g, "").replace(",", "."));
+      } else if (parts.length === 2 && parts[0].includes("-")) {
+        const [y, m] = parts[0].split("-");
+        year = parseInt(y, 10);
+        month = parseInt(m, 10);
+        rate = parseFloat(parts[1].replace(/\./g, "").replace(",", "."));
+      } else {
+        continue;
+      }
+      if (Number.isFinite(year) && month >= 1 && month <= 12 && Number.isFinite(rate) && rate > 0) {
+        estimates.push({ year, month, rate });
+      }
+    }
+    if (estimates.length === 0) {
+      toast({
+        title: "Sin datos válidos",
+        description: "Usá el formato: año, mes, tasa (una fila por línea).",
+        variant: "destructive",
+      });
+      return;
+    }
+    importRemMutation.mutate(estimates);
+  };
+
   const handleSubmit = (data: ExchangeRateFormData) => {
     if (editingRate) {
       updateMutation.mutate({ id: editingRate.id, data });
@@ -239,6 +318,18 @@ export function ExchangeRateManager() {
               ))}
             </SelectContent>
           </Select>
+          <Button
+            variant="outline"
+            onClick={() => syncBlueMutation.mutate()}
+            disabled={syncBlueMutation.isPending}
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${syncBlueMutation.isPending ? "animate-spin" : ""}`} />
+            Sync Blue hoy
+          </Button>
+          <Button variant="outline" onClick={() => setIsRemDialogOpen(true)}>
+            <Upload className="h-4 w-4 mr-2" />
+            Importar REM
+          </Button>
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
               <Button>
@@ -427,6 +518,33 @@ export function ExchangeRateManager() {
                   </div>
                 </form>
               </Form>
+            </DialogContent>
+          </Dialog>
+
+          {/* Dialog: importar estimaciones REM */}
+          <Dialog open={isRemDialogOpen} onOpenChange={setIsRemDialogOpen}>
+            <DialogContent className="sm:max-w-[500px]">
+              <DialogHeader>
+                <DialogTitle>Importar estimaciones REM (BCRA)</DialogTitle>
+                <DialogDescription>
+                  Pegá las estimaciones del REM, una por línea, con el formato{" "}
+                  <span className="font-mono">año, mes, tasa</span>. Se guardan como tipo "estimated", fuente REM.
+                </DialogDescription>
+              </DialogHeader>
+              <textarea
+                className="w-full h-40 rounded-md border border-input bg-background p-3 text-sm font-mono"
+                placeholder={"2026, 7, 1480\n2026, 8, 1525\n2026, 9, 1570"}
+                value={remText}
+                onChange={(e) => setRemText(e.target.value)}
+              />
+              <div className="flex justify-end space-x-2">
+                <Button type="button" variant="outline" onClick={() => setIsRemDialogOpen(false)}>
+                  Cancelar
+                </Button>
+                <Button onClick={handleImportRem} disabled={importRemMutation.isPending}>
+                  {importRemMutation.isPending ? "Importando..." : "Importar"}
+                </Button>
+              </div>
             </DialogContent>
           </Dialog>
         </div>
