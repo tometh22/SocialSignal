@@ -20,6 +20,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
 import { usePermissions } from "@/hooks/use-permissions";
 import ProjectTaskList from "@/components/tasks/ProjectTaskList";
+import { PROJECT_ROLE_OPTIONS, projectRoleLabel } from "@/constants/project-roles";
 
 const PROJECT_STATUS_CONFIG: Record<string, { label: string; className: string }> = {
   "active":    { label: "Activo",     className: "text-green-700 border-green-300 bg-green-50 hover:bg-green-100" },
@@ -40,6 +41,8 @@ type TaskProject = {
   taskCount: number;
   pendingCount: number;
   totalHours: number;
+  briefUrl?: string | null;
+  source?: string;
   members: ProjectMember[];
 };
 type Personnel = { id: number; name: string; email?: string | null };
@@ -173,6 +176,16 @@ export default function ProjectTasksPage({ params }: Props) {
       toast({ title: "Estado del proyecto actualizado" });
     },
   });
+
+  const updateBriefUrlMutation = useMutation({
+    mutationFn: (briefUrl: string) => apiRequest(`/api/tasks/projects/${projectId}`, "PUT", { briefUrl }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks/projects", projectId] });
+      toast({ title: "Brief actualizado" });
+    },
+  });
+  const [briefEditing, setBriefEditing] = useState(false);
+  const [briefDraft, setBriefDraft] = useState("");
 
   const handleShare = () => {
     navigator.clipboard.writeText(window.location.href);
@@ -680,7 +693,7 @@ export default function ProjectTasksPage({ params }: Props) {
                       </div>
                       <span className="text-sm">{m.name}</span>
                       <Badge variant="outline" className={cn("text-[10px] h-4 px-1.5 ml-auto", m.role === "owner" ? "text-amber-700 border-amber-300" : "text-muted-foreground")}>
-                        {m.role === "owner" ? "Responsable" : "Miembro"}
+                        {projectRoleLabel(m.role)}
                       </Badge>
                     </div>
                   ))}
@@ -706,6 +719,43 @@ export default function ProjectTasksPage({ params }: Props) {
                   <span className="text-muted-foreground">ID</span>
                   <span className="font-mono text-xs text-muted-foreground">#{project.id}</span>
                 </div>
+                {/* Brief interno */}
+                {project.source !== "own" && (
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-muted-foreground">Brief interno</span>
+                    {briefEditing ? (
+                      <div className="flex items-center gap-1">
+                        <Input
+                          autoFocus
+                          value={briefDraft}
+                          onChange={e => setBriefDraft(e.target.value)}
+                          placeholder="https://..."
+                          className="h-7 text-xs w-48"
+                          onKeyDown={e => {
+                            if (e.key === "Enter") { updateBriefUrlMutation.mutate(briefDraft.trim()); setBriefEditing(false); }
+                            if (e.key === "Escape") setBriefEditing(false);
+                          }}
+                        />
+                        <Button size="sm" className="h-7 text-xs" onClick={() => { updateBriefUrlMutation.mutate(briefDraft.trim()); setBriefEditing(false); }}>
+                          OK
+                        </Button>
+                      </div>
+                    ) : project.briefUrl ? (
+                      <div className="flex items-center gap-2">
+                        <a href={project.briefUrl} target="_blank" rel="noopener noreferrer" className="font-medium text-indigo-600 hover:underline truncate max-w-[160px]">
+                          Abrir brief
+                        </a>
+                        <button className="text-xs text-muted-foreground hover:text-foreground" onClick={() => { setBriefDraft(project.briefUrl || ""); setBriefEditing(true); }}>
+                          editar
+                        </button>
+                      </div>
+                    ) : (
+                      <button className="text-xs text-indigo-600 hover:underline" onClick={() => { setBriefDraft(""); setBriefEditing(true); }}>
+                        + Agregar link
+                      </button>
+                    )}
+                  </div>
+                )}
                 {isOperations && projectId < 1_000_000 && (
                   <Link href={`/active-projects/${projectId}`}>
                     <Button variant="outline" size="sm" className="w-full mt-2 h-8 text-xs gap-1.5 border-indigo-200 text-indigo-700 hover:bg-indigo-50">
@@ -777,8 +827,9 @@ export default function ProjectTasksPage({ params }: Props) {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="owner">Responsable</SelectItem>
-                    <SelectItem value="member">Miembro</SelectItem>
+                    {PROJECT_ROLE_OPTIONS.map(r => (
+                      <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
                 <Button
@@ -818,7 +869,7 @@ export default function ProjectTasksPage({ params }: Props) {
                           : "text-muted-foreground"
                       )}
                     >
-                      {m.role === "owner" ? "Responsable" : "Miembro"}
+                      {projectRoleLabel(m.role)}
                     </Badge>
                   </div>
                   <Button

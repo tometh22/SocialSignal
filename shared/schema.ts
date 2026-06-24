@@ -942,6 +942,7 @@ export const monthlyClosings = pgTable("monthly_closings", {
   hourlyRate: doublePrecision("hourly_rate").notNull(), // valor hora al cierre
   totalCost: doublePrecision("total_cost").notNull(), // adjustedHours * hourlyRate
   exchangeRateAtClose: doublePrecision("exchange_rate_at_close"), // ARS/USD al momento del cierre
+  adjustments: jsonb("adjustments").$type<Record<string, number>>(), // ajustes de horas por categoría (vacaciones, feriados, etc.)
   notes: text("notes"),
   closedBy: integer("closed_by").references(() => users.id, { onDelete: 'set null' }),
   closedAt: timestamp("closed_at").notNull().defaultNow(),
@@ -1020,6 +1021,9 @@ export const activeProjects = pgTable("active_projects", {
   // Campo para tipo de proyecto (facturable vs interno)
   projectCategory: text("project_category").notNull().default("billable"), // billable, internal
 
+  // Link a brief interno (Google Doc, Notion, etc.) — mostrado en el tab Resumen
+  briefUrl: text("brief_url"),
+
   // Campo para marcar proyectos como terminados/archivados
   isFinished: boolean("is_finished").default(false), // indica si el proyecto ha sido marcado como terminado
 
@@ -1073,6 +1077,7 @@ export const insertActiveProjectSchema = baseInsertActiveProjectSchema.extend({
   budget: z.number().nullable().optional(),
   selectedVariantId: z.number().nullable().optional(),
   projectCategory: z.enum(["billable", "internal"]).default("billable"),
+  briefUrl: z.string().nullable().optional(),
 
   // Estados granulares + campos de cierre
   status: z.enum(PROJECT_STATUSES).default("active").optional(),
@@ -1667,7 +1672,7 @@ export const insertTaskSchema = createInsertSchema(tasks).omit({
   dueDate: z.union([z.date(), z.string().transform((str) => new Date(str))]).optional().nullable(),
   completedAt: z.union([z.date(), z.string().transform((str) => new Date(str))]).optional().nullable(),
   collaboratorIds: z.array(z.number()).optional().default([]),
-  status: z.enum(["todo", "in_progress", "in_review", "blocked", "done", "cancelled"]).default("todo"),
+  status: z.enum(["todo", "in_progress", "blocked", "done"]).default("todo"),
   priority: z.enum(["low", "medium", "high", "urgent"]).default("medium"),
 });
 
@@ -1682,6 +1687,12 @@ export const taskTimeEntries = pgTable("task_time_entries", {
   date: timestamp("date").notNull(),
   hours: doublePrecision("hours").notNull(),
   description: text("description"),
+  // Costing fields (computed server-side on insert) so task hours feed rentabilidad
+  // (fact_labor_month) just like time_entries do.
+  hourlyRateAtTime: doublePrecision("hourly_rate_at_time"), // ARS per hour at log time
+  totalCost: doublePrecision("total_cost"), // hours * hourlyRateAtTime (ARS)
+  billable: boolean("billable").notNull().default(true), // false for internal/own-project tasks
+  exchangeRateId: integer("exchange_rate_id").references(() => exchangeRates.id),
   createdBy: integer("created_by").references(() => users.id, { onDelete: 'set null' }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
@@ -1689,6 +1700,10 @@ export const taskTimeEntries = pgTable("task_time_entries", {
 export const insertTaskTimeEntrySchema = createInsertSchema(taskTimeEntries).omit({
   id: true,
   createdAt: true,
+  hourlyRateAtTime: true,
+  totalCost: true,
+  billable: true,
+  exchangeRateId: true,
 }).extend({
   date: z.union([z.date(), z.string().transform((str) => new Date(str))]),
   hours: z.number().min(0.25, "El mínimo son 15 minutos (0.25 horas)"),

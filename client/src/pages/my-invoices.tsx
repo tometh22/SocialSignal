@@ -129,7 +129,8 @@ export default function MyInvoices() {
     <div className="mx-auto max-w-4xl p-5 sm:p-8">
       <h1 className="text-2xl font-semibold text-slate-900 mb-1">Mis facturas</h1>
       <p className="text-sm text-slate-500 mb-6">
-        Subí la factura de cada mes. Solo vos la ves. El total sugerido se calcula desde tus horas cargadas.
+        Subí la factura de cada mes. Solo vos la ves. El total sugerido se calcula desde tus horas cargadas;
+        compará con tus horas disponibles del mes (días hábiles sin feriados) para detectar horas no cargadas.
       </p>
 
       {/* Hero: resumen del mes */}
@@ -140,9 +141,15 @@ export default function MyInvoices() {
           </div>
           <div className="text-2xl font-semibold text-slate-800 tabular-nums">
             {summaryQuery.data ? summaryQuery.data.hours.toFixed(2) : "—"}
+            {(summaryQuery.data as any)?.availableHours > 0 && (
+              <span className="text-sm font-normal text-slate-400"> / {(summaryQuery.data as any).availableHours}h</span>
+            )}
           </div>
           <div className="text-[11px] text-slate-400 mt-1">
             {summaryQuery.data?.entryCount ?? 0} registros
+            {(summaryQuery.data as any)?.availableHours > 0 && (
+              <> · {Math.round((summaryQuery.data!.hours / (summaryQuery.data as any).availableHours) * 100)}% de disponibles</>
+            )}
           </div>
         </div>
         <div className="rounded-xl border border-slate-200 bg-white p-4">

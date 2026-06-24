@@ -21,6 +21,7 @@ interface Personnel {
   name: string;
   roleId: number;
   hourlyRate: number;
+  activeUntil?: string | null;
 }
 
 interface TeamMember {
@@ -103,15 +104,19 @@ const TeamMemberSelector: React.FC<TeamMemberSelectorProps> = ({
 
   // Actualizar los datos al cambiar el modo de selección
   useEffect(() => {
-    // Cuando cambiamos a modo por personal, ya no necesitamos filtrar
+    const today = new Date().toISOString().slice(0, 10);
+    // Excluir personas inactivas (activeUntil ya pasó) en cualquier modo
+    const activePersonnel = personnel.filter(
+      (person) => !person.activeUntil || person.activeUntil > today
+    );
+    // Cuando cambiamos a modo por personal, ya no necesitamos filtrar por rol
     if (selectionMode === 'personnel') {
-      // Mostrar todo el personal disponible sin filtrar por rol
-      setFilteredPersonnel(personnel);
-    } 
+      setFilteredPersonnel(activePersonnel);
+    }
     // Cuando cambiamos a modo por rol, filtramos por el rol seleccionado
     else if (selectionMode === 'role' && selectedRole) {
       const roleId = Number(selectedRole);
-      const filtered = personnel.filter(person => person.roleId === roleId);
+      const filtered = activePersonnel.filter(person => person.roleId === roleId);
       setFilteredPersonnel(filtered);
     } else {
       setFilteredPersonnel([]);

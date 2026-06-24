@@ -218,17 +218,19 @@ export function createLedgerRouter(requireAuth: any) {
       const rows = await db.select()
         .from(cashflowTransactions)
         .where(sql`${cashflowTransactions.fecha} <= ${cutoff}`)
-        .orderBy(desc(cashflowTransactions.fecha))
-        .limit(1000);
+        .orderBy(asc(cashflowTransactions.fecha));
 
-      // Saldos acumulados por banco (last known balance)
+      // Saldos acumulados por banco, calculados sumando ingresos/egresos hasta la fecha
+      // (las columnas saldo* nunca se populan en la importación, así que se computa acá).
       const balances: Record<string, number> = { Santander: 0, BOA: 0, Caja: 0 };
+      let totalUSD = 0;
       for (const r of rows) {
-        if (r.banco && r.saldoSantander) balances.Santander = parseFloat(r.saldoSantander);
-        if (r.banco && r.saldoBOA) balances.BOA = parseFloat(r.saldoBOA);
-        if (r.banco && r.saldoCaja) balances.Caja = parseFloat(r.saldoCaja);
+        const amt = parseFloat(r.montoUSD ?? "0") || 0;
+        const signed = r.tipoMovimiento === "Egreso" ? -amt : amt;
+        const banco = r.banco || "Otros";
+        balances[banco] = (balances[banco] ?? 0) + signed;
+        totalUSD += signed;
       }
-      const totalUSD = Object.values(balances).reduce((s, v) => s + v, 0);
       res.json({ date, balances, totalUSD });
     } catch (error: any) {
       res.status(500).json({ message: error.message });

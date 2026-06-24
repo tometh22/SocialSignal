@@ -7,7 +7,7 @@
 import { db } from '../db';
 import {
   timeEntries, personnel, roles, activeProjects, clients, quotations,
-  exchangeRates, systemConfig, factLaborMonth,
+  exchangeRates, systemConfig, factLaborMonth, tasks, taskTimeEntries,
 } from '@shared/schema';
 import { eq, and, gte, lte, or, isNull } from 'drizzle-orm';
 import { canon, generateProjectKey } from '../utils/normalize';
@@ -33,6 +33,7 @@ interface Aggregate {
   totalCostARS: number;
   rateSum: number;
   rateCount: number;
+  fromTask: boolean;
 }
 
 /**
@@ -159,6 +160,7 @@ export async function buildFactLaborFromTimeEntries(
         totalCostARS: 0,
         rateSum: 0,
         rateCount: 0,
+        fromTask: false,
       });
     }
 
@@ -176,6 +178,77 @@ export async function buildFactLaborFromTimeEntries(
     }
   }
 
+  // Also fold in hours logged against tasks (PM module). Only tasks linked to a
+  // real active project participate; internal/own-project tasks have no client
+  // and are excluded from fact_labor_month.
+  const taskRows = await db
+    .select({
+      projectId: tasks.projectId,
+      personnelId: taskTimeEntries.personnelId,
+      hours: taskTimeEntries.hours,
+      totalCost: taskTimeEntries.totalCost,
+      hourlyRateAtTime: taskTimeEntries.hourlyRateAtTime,
+      billable: taskTimeEntries.billable,
+      personnelName: personnel.name,
+      roleName: roles.name,
+      clientName: clients.name,
+      quotationProjectName: quotations.projectName,
+      subprojectName: activeProjects.subprojectName,
+    })
+    .from(taskTimeEntries)
+    .innerJoin(tasks, eq(taskTimeEntries.taskId, tasks.id))
+    .innerJoin(personnel, eq(taskTimeEntries.personnelId, personnel.id))
+    .innerJoin(activeProjects, eq(tasks.projectId, activeProjects.id))
+    .innerJoin(clients, eq(activeProjects.clientId, clients.id))
+    .leftJoin(roles, eq(personnel.roleId, roles.id))
+    .leftJoin(quotations, eq(activeProjects.quotationId, quotations.id))
+    .where(
+      and(
+        gte(taskTimeEntries.date, startDate),
+        lte(taskTimeEntries.date, endDate),
+      ),
+    );
+
+  for (const row of taskRows) {
+    if (row.projectId == null) continue;
+    const key = `${row.projectId}::${row.personnelId}`;
+    const projectName =
+      row.quotationProjectName ||
+      row.subprojectName ||
+      `proyecto_${row.projectId}`;
+
+    if (!aggregates.has(key)) {
+      aggregates.set(key, {
+        projectId: row.projectId,
+        personnelId: row.personnelId,
+        clientName: row.clientName,
+        projectName,
+        personnelName: row.personnelName,
+        roleName: row.roleName ?? null,
+        totalHours: 0,
+        billableHours: 0,
+        totalCostARS: 0,
+        rateSum: 0,
+        rateCount: 0,
+        fromTask: false,
+      });
+    }
+
+    const agg = aggregates.get(key)!;
+    const hours = row.hours ?? 0;
+    const cost = row.totalCost ?? 0;
+    const rate = row.hourlyRateAtTime ?? 0;
+
+    agg.totalHours += hours;
+    if (row.billable === true) agg.billableHours += hours;
+    agg.totalCostARS += cost;
+    if (rate > 0) {
+      agg.rateSum += rate;
+      agg.rateCount += 1;
+    }
+    agg.fromTask = true;
+  }
+
   let inserted = 0;
   let updated = 0;
 
@@ -188,6 +261,7 @@ export async function buildFactLaborFromTimeEntries(
       const costUSD = periodFx > 0 ? agg.totalCostARS / periodFx : 0;
 
       const flags: string[] = ['source_app'];
+      if (agg.fromTask) flags.push('source_task');
       if (periodFx === 0) flags.push('missing_fx');
       flags.push('no_target_hours');
 

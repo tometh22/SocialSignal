@@ -105,8 +105,7 @@ export default function HoursDashboardPage() {
   });
 
   const totalHours = summary?.byPerson.reduce((acc, p) => acc + p.hours, 0) || 0;
-  const topProject = summary?.byProject[0];
-  const topPerson = summary?.byPerson[0];
+  const totalEstimatedHours = summary?.byPerson.reduce((acc, p) => acc + (p.estimatedHours || 0), 0) || 0;
 
   const weeklyData = (summary?.byWeek || []).map(w => ({
     week: format(new Date(w.week), "dd/MM", { locale: es }),
@@ -114,7 +113,38 @@ export default function HoursDashboardPage() {
     label: formatHoursLabel(w.hours),
   }));
 
-  const avgPerWeek = weeklyData.length > 0 ? totalHours / weeklyData.length : 0;
+  // Holidays for the relevant years to compute available hours (sin feriados)
+  const rangeYears = Array.from(new Set([
+    dateFrom ? new Date(dateFrom).getFullYear() : new Date().getFullYear(),
+    dateTo ? new Date(dateTo).getFullYear() : new Date().getFullYear(),
+  ]));
+  const { data: holidaysData = [] } = useQuery<any[]>({
+    queryKey: ["/api/holidays", rangeYears.join(",")],
+    queryFn: async () => {
+      const all = await Promise.all(rangeYears.map(y =>
+        authFetch(`/api/holidays?year=${y}`).then(r => r.json())
+      ));
+      return all.flat();
+    },
+  });
+
+  // Available hours = weekdays in range minus holidays, × 8h (full-time baseline)
+  const availableHours = (() => {
+    if (!dateFrom || !dateTo) return 0;
+    const holidaySet = new Set(
+      (holidaysData || []).map((h: any) => (h.date || "").slice(0, 10))
+    );
+    let workdays = 0;
+    const d = new Date(new Date(dateFrom).getFullYear(), new Date(dateFrom).getMonth(), new Date(dateFrom).getDate());
+    const end = new Date(dateTo);
+    while (d <= end) {
+      const dow = d.getDay();
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      if (dow !== 0 && dow !== 6 && !holidaySet.has(key)) workdays++;
+      d.setDate(d.getDate() + 1);
+    }
+    return workdays * 8;
+  })();
 
   // Sorted entries for table
   const allEntries = (summary?.entries || []).slice().sort((a: any, b: any) =>
@@ -208,11 +238,11 @@ export default function HoursDashboardPage() {
       ) : (
         <>
           {/* KPI cards */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
             <div className="bg-card rounded-xl border p-4">
               <div className="flex items-center gap-2 mb-2">
                 <Clock className="h-4 w-4 text-primary" />
-                <p className="text-xs text-muted-foreground font-medium">Total de horas</p>
+                <p className="text-xs text-muted-foreground font-medium">Total de horas reales</p>
               </div>
               <p className="text-2xl font-bold text-foreground">{totalHours.toFixed(1)}h</p>
               <p className="text-xs text-muted-foreground mt-1">{summary.entries.length} entradas registradas</p>
@@ -220,29 +250,24 @@ export default function HoursDashboardPage() {
 
             <div className="bg-card rounded-xl border p-4">
               <div className="flex items-center gap-2 mb-2">
-                <BarChart3 className="h-4 w-4 text-indigo-500" />
-                <p className="text-xs text-muted-foreground font-medium">Promedio semanal</p>
+                <TrendingUp className="h-4 w-4 text-blue-500" />
+                <p className="text-xs text-muted-foreground font-medium">Horas estimadas totales</p>
               </div>
-              <p className="text-2xl font-bold text-foreground">{avgPerWeek.toFixed(1)}h</p>
-              <p className="text-xs text-muted-foreground mt-1">{weeklyData.length} semanas</p>
+              <p className="text-2xl font-bold text-foreground">{totalEstimatedHours.toFixed(1)}h</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                {totalEstimatedHours > 0
+                  ? `${Math.round((totalHours / totalEstimatedHours) * 100)}% consumido`
+                  : "Sin estimación cargada"}
+              </p>
             </div>
 
             <div className="bg-card rounded-xl border p-4">
               <div className="flex items-center gap-2 mb-2">
-                <User className="h-4 w-4 text-purple-500" />
-                <p className="text-xs text-muted-foreground font-medium">Mayor cargador</p>
+                <BarChart3 className="h-4 w-4 text-green-500" />
+                <p className="text-xs text-muted-foreground font-medium">Horas disponibles</p>
               </div>
-              <p className="text-2xl font-bold text-foreground">{topPerson ? topPerson.hours.toFixed(1) : "0"}h</p>
-              {topPerson && <p className="text-xs text-muted-foreground mt-1 truncate">{topPerson.name}</p>}
-            </div>
-
-            <div className="bg-card rounded-xl border p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <Briefcase className="h-4 w-4 text-green-500" />
-                <p className="text-xs text-muted-foreground font-medium">Proyecto líder</p>
-              </div>
-              <p className="text-2xl font-bold text-foreground">{topProject ? topProject.hours.toFixed(1) : "0"}h</p>
-              {topProject && <p className="text-xs text-muted-foreground mt-1 truncate">{topProject.name}</p>}
+              <p className="text-2xl font-bold text-foreground">{availableHours}h</p>
+              <p className="text-xs text-muted-foreground mt-1">Días hábiles del período sin feriados · base full-time (8h)</p>
             </div>
           </div>
 

@@ -11,6 +11,7 @@ import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-f
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { TASK_STATUS_CONFIG, type TaskStatus } from "@/constants/task-statuses";
+import TaskCalendarView from "@/components/tasks/TaskCalendarView";
 import {
   Briefcase, FileText, Target, Users, ClipboardList, BarChart2,
   Plus, TrendingUp, Gauge, CalendarCheck, LayoutDashboard, Building2,
@@ -116,6 +117,27 @@ export default function HomeDashboard() {
 
   const myWeekHours = weekHours?.byPerson?.reduce((s, p) => s + p.hours, 0) ?? 0;
   const myMonthHours = monthHours?.byPerson?.reduce((s, p) => s + p.hours, 0) ?? 0;
+
+  // Enriched tasks (with project/client names) for the member's active projects + calendar
+  const { data: myCalendarTasks = [] } = useQuery<any[]>({
+    queryKey: ["/api/tasks/team-calendar", "me", myPersonnelId],
+    queryFn: () => authFetch(`/api/tasks/team-calendar?assigneeId=${myPersonnelId}`).then(r => r.json()),
+    enabled: !!myPersonnelId,
+  });
+
+  // Distinct active projects from the member's non-done tasks
+  const myActiveProjects = (() => {
+    const map = new Map<string, { name: string; clientName: string | null; pending: number }>();
+    for (const t of myCalendarTasks) {
+      if (t.status === "done" || t.parentTaskId) continue;
+      const name = t.projectName || "Sin proyecto";
+      const key = `${t.projectId}:${name}`;
+      const entry = map.get(key) || { name, clientName: t.clientName ?? null, pending: 0 };
+      entry.pending += 1;
+      map.set(key, entry);
+    }
+    return Array.from(map.values()).sort((a, b) => b.pending - a.pending);
+  })();
 
   const myActiveTasks = (myTasksData?.tasks || []).filter(t => !t.parentTaskId);
   const myTodoTasks = (myTodoData?.tasks || []).filter(t => !t.parentTaskId);
@@ -437,6 +459,37 @@ export default function HomeDashboard() {
               )}
             </div>
           )}
+
+          {/* Proyectos activos del miembro */}
+          {myActiveProjects.length > 0 && (
+            <div className="bg-card rounded-xl border overflow-hidden">
+              <div className="px-4 py-3 border-b bg-muted/20 flex items-center gap-2">
+                <Briefcase className="h-4 w-4 text-slate-500" />
+                <span className="text-sm font-medium text-foreground">Proyectos activos</span>
+                <span className="text-xs text-muted-foreground">({myActiveProjects.length})</span>
+              </div>
+              <div className="divide-y divide-border">
+                {myActiveProjects.map((p, i) => (
+                  <div key={i} className="px-4 py-2.5 flex items-center gap-3 hover:bg-accent/20 transition-colors">
+                    <span className="flex-1 text-sm text-foreground truncate">
+                      {p.clientName ? <span className="text-muted-foreground">{p.clientName} · </span> : null}
+                      {p.name}
+                    </span>
+                    <span className="text-xs text-muted-foreground flex-shrink-0">{p.pending} pendiente{p.pending !== 1 ? "s" : ""}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Calendario de mis tareas */}
+          <div className="bg-card rounded-xl border p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Calendar className="h-4 w-4 text-indigo-500" />
+              <span className="text-sm font-medium text-foreground">Mi calendario</span>
+            </div>
+            <TaskCalendarView tasks={myCalendarTasks} />
+          </div>
         </div>
       )}
 

@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { type LucideIcon, Loader2, AlertCircle, CheckCircle2, Clock, ListTodo, Users, Layers, Flag, Timer } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { isAfter, parseISO, startOfDay } from "date-fns";
+import { projectRoleLabel } from "@/constants/project-roles";
 
 type Task = {
   id: number;
@@ -44,8 +45,8 @@ const PRIORITY_COLOR: Record<string, string> = {
 const STATUS_LABEL: Record<string, string> = {
   todo: "Pendiente",
   in_progress: "En progreso",
+  blocked: "Bloqueado",
   done: "Completada",
-  cancelled: "Cancelada",
 };
 
 function getInitials(name: string) {
@@ -258,7 +259,7 @@ export default function ProjectOverviewPanel({ projectId, members, projectColor 
                       </td>
                       <td className="px-3 py-3 hidden md:table-cell">
                         <Badge variant="outline" className="text-[10px] h-4 px-1.5">
-                          {m.role === "owner" ? "Responsable" : "Miembro"}
+                          {projectRoleLabel(m.role)}
                         </Badge>
                       </td>
                       <td className="px-3 py-3 text-center font-medium text-foreground">{m.total}</td>

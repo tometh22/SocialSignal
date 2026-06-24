@@ -478,13 +478,13 @@ function TaskRow({ task, allPersonnel, onOpen, onToggle, onDateSet, onAssignee, 
             <Tooltip>
               <TooltipTrigger asChild>
                 <span
-                  className={cn("text-sm truncate transition-all duration-150", isDone && "line-through text-muted-foreground")}
-                  onDoubleClick={e => { e.stopPropagation(); setRenameValue(task.title); setRenaming(true); }}
+                  className={cn("text-sm truncate transition-all duration-150 cursor-text rounded px-0.5 hover:bg-accent/60", isDone && "line-through text-muted-foreground")}
+                  onClick={e => { e.stopPropagation(); setRenameValue(task.title); setRenaming(true); }}
                 >
                   {task.title}
                 </span>
               </TooltipTrigger>
-              <TooltipContent side="bottom" className="max-w-xs">{task.title}</TooltipContent>
+              <TooltipContent side="bottom" className="max-w-xs">Click para renombrar · {task.title}</TooltipContent>
             </Tooltip>
           )}
           {hasSubtasks && !isSubtask && (
@@ -801,7 +801,12 @@ function SectionBlock({ sectionName, tasks, projectId, allPersonnel, projectMemb
               className="h-6 text-sm font-bold border-primary bg-background w-48 px-1.5"
             />
           ) : (
-            <span className="font-semibold text-xs text-foreground uppercase tracking-wider">{sectionName}</span>
+            <span
+              className="font-semibold text-xs text-foreground uppercase tracking-wider cursor-text rounded px-0.5 hover:bg-accent/60"
+              onClick={e => { e.stopPropagation(); setNewSectionName(sectionName); setRenamingSection(true); }}
+            >
+              {sectionName}
+            </span>
           )}
           {rootTasks.length > 0 && (
             <div className="flex items-center gap-1.5">
@@ -1052,7 +1057,6 @@ function SortableSectionBlock(props: SectionBlockProps & { sectionName: string; 
 const BOARD_COLUMNS = [
   { status: "todo",        label: "Por hacer",   dot: "bg-gray-400",    ring: "border-t-gray-300",    empty: "Acá aparecerán las tareas nuevas" },
   { status: "in_progress", label: "En curso",    dot: "bg-blue-500",    ring: "border-t-blue-400",    empty: "Mové una tarea aquí para comenzar" },
-  { status: "in_review",   label: "En revisión", dot: "bg-violet-500",  ring: "border-t-violet-400",  empty: "Tareas esperando aprobación del cliente" },
   { status: "blocked",     label: "Bloqueado",   dot: "bg-orange-500",  ring: "border-t-orange-400",  empty: "Tareas que necesitan desbloquearse" },
   { status: "done",        label: "Completado",  dot: "bg-green-500",   ring: "border-t-green-400",   empty: "Las tareas finalizadas aparecen aquí" },
 ];
@@ -1252,6 +1256,7 @@ interface Props {
 export default function ProjectTaskList({ projectId, projectMembers = [], view = "list", clientName, onQuickAddTrigger = 0, filterText = "", sortBy = 'default', groupBy = 'section' }: Props) {
   const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
   const [focusTime, setFocusTime] = useState(false);
+  const [sectionFilter, setSectionFilter] = useState<string>("all");
   const [showAddSection, setShowAddSection] = useState(false);
   const [newSectionName, setNewSectionName] = useState("");
   const [firstSectionAutoAdd, setFirstSectionAutoAdd] = useState(0);
@@ -1475,6 +1480,11 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
     return [...saved, ...newOnes];
   })();
 
+  // Section filter: aislar una sección/entregable puntual (solo agrupación por sección)
+  const visibleSectionNames = (groupBy === 'section' && sectionFilter !== 'all')
+    ? orderedSectionNames.filter(s => s === sectionFilter)
+    : orderedSectionNames;
+
   const totalTasks = allTasks.filter(t => !t.parentTaskId).length;
   const doneTasks = allTasks.filter(t => t.status === "done" && !t.parentTaskId).length;
 
@@ -1628,7 +1638,20 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
       ) : (
         // ─── List view ────────────────────────────────────────────────
         <div>
-          <div className="flex items-center justify-end pb-2 mb-1">
+          <div className="flex items-center justify-between gap-2 pb-2 mb-1">
+            {groupBy === 'section' && orderedSectionNames.length > 0 ? (
+              <Select value={sectionFilter} onValueChange={setSectionFilter}>
+                <SelectTrigger className="h-7 text-xs w-56">
+                  <SelectValue placeholder="Todas las secciones" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas las secciones</SelectItem>
+                  {orderedSectionNames.map(s => (
+                    <SelectItem key={s} value={s}>{s}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : <div />}
             <Button size="sm" className="h-7 text-xs" onClick={() => setShowAddSection(true)}>
               <Plus className="h-3 w-3 mr-1" />Nueva sección
             </Button>
@@ -1668,10 +1691,10 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
                 </div>
 
                 <SortableContext
-                  items={orderedSectionNames.map(s => `section:${s}`)}
+                  items={visibleSectionNames.map(s => `section:${s}`)}
                   strategy={verticalListSortingStrategy}
                 >
-                  {orderedSectionNames.map((section, idx) => (
+                  {visibleSectionNames.map((section, idx) => (
                     <SortableSectionBlock
                       key={section}
                       sectionName={section}

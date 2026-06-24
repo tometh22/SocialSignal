@@ -503,6 +503,30 @@ async function applyPendingMigrations() {
       CREATE INDEX IF NOT EXISTS "idx_cap_override_week" ON "capacity_overrides"("week_start");
     `);
 
+    // 0029 Diagnóstico de Mind — task_time_entries costing fields (feed rentabilidad)
+    await run('0029 task_time_entries costing', `
+      ALTER TABLE "task_time_entries" ADD COLUMN IF NOT EXISTS "hourly_rate_at_time" double precision;
+      ALTER TABLE "task_time_entries" ADD COLUMN IF NOT EXISTS "total_cost" double precision;
+      ALTER TABLE "task_time_entries" ADD COLUMN IF NOT EXISTS "billable" boolean NOT NULL DEFAULT true;
+      ALTER TABLE "task_time_entries" ADD COLUMN IF NOT EXISTS "exchange_rate_id" integer REFERENCES "exchange_rates"("id");
+    `);
+
+    // 0030 Diagnóstico de Mind — simplify task statuses (in_review→in_progress, cancelled→done)
+    await run('0030 task_status simplify', `
+      UPDATE "tasks" SET "status" = 'in_progress' WHERE "status" = 'in_review';
+      UPDATE "tasks" SET "status" = 'done' WHERE "status" = 'cancelled';
+    `);
+
+    // 0031 Diagnóstico de Mind — brief URL on active projects
+    await run('0031 active_projects brief_url', `
+      ALTER TABLE "active_projects" ADD COLUMN IF NOT EXISTS "brief_url" text;
+    `);
+
+    // 0032 Diagnóstico de Mind — persist closing hour adjustments
+    await run('0032 monthly_closings adjustments', `
+      ALTER TABLE "monthly_closings" ADD COLUMN IF NOT EXISTS "adjustments" jsonb;
+    `);
+
   } finally {
     client.release();
   }
@@ -609,10 +633,19 @@ const port = Number(process.env.PORT || 5000);
     await initializeDatabase();
     console.log("💾 Database initialized successfully");
 
-    // TEMPORARILY DISABLED: Auto-sync services causing OOM
-    // Start automatic synchronization service
-    // autoSyncService.start();
-    // console.log("🔄 Sincronización automática iniciada (cada 30 minutos)");
+    // Start automatic synchronization service (Excel/Google Sheets → ledger/cashflow).
+    // Re-enabled per ops request. Guarded so a missing Google Sheets credential or a
+    // sync failure can't crash startup. Set DISABLE_AUTO_SYNC=true to turn it off.
+    if (process.env.DISABLE_AUTO_SYNC === "true") {
+      console.log("⏸️  Auto-sync deshabilitado por DISABLE_AUTO_SYNC=true");
+    } else {
+      try {
+        autoSyncService.start();
+        console.log("🔄 Sincronización automática iniciada (cada 30 minutos)");
+      } catch (e: any) {
+        console.error("⚠️  No se pudo iniciar el auto-sync:", e?.message);
+      }
+    }
 
     // Lightweight Resumen Ejecutivo sync (every 2 hours + on startup)
     const { startResumenEjecutivoSync } = await import("./jobs/resumen-ejecutivo-sync");

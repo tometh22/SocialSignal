@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, Fragment } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -13,7 +13,7 @@ import { usePermissions } from "@/hooks/use-permissions";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { Loader2, Pencil, Check, X, RotateCcw } from "lucide-react";
+import { Loader2, Pencil, Check, X, RotateCcw, ChevronRight, ChevronDown } from "lucide-react";
 
 export default function CapacityDashboard() {
   const { isOperations } = usePermissions();
@@ -29,6 +29,18 @@ export default function CapacityDashboard() {
 
   const [editingCapacityId, setEditingCapacityId] = useState<number | null>(null);
   const [editingCapacityInput, setEditingCapacityInput] = useState<string>("");
+
+  // Expandable per-person task breakdown (Proyecto > sección > tarea)
+  const [expandedPersonId, setExpandedPersonId] = useState<number | null>(null);
+  const [editingEstTaskId, setEditingEstTaskId] = useState<number | null>(null);
+  const [editingEstInput, setEditingEstInput] = useState<string>("");
+
+  // Week boundaries (Mon..Sun) for filtering tasks active in the week
+  const weekEndStr = (() => {
+    const d = new Date(weekStart + "T00:00:00");
+    d.setDate(d.getDate() + 6);
+    return d.toISOString().split("T")[0];
+  })();
 
   const queryKey = ["/api/capacity/weekly", weekStart];
 
@@ -60,6 +72,53 @@ export default function CapacityDashboard() {
     },
     onError: () => toast({ title: "Error al restablecer", variant: "destructive" }),
   });
+
+  // All tasks enriched with project/section names, for the per-person weekly breakdown
+  const { data: allTasks = [] } = useQuery<any[]>({
+    queryKey: ["/api/tasks/team-calendar", "capacity"],
+    queryFn: () => fetch("/api/tasks/team-calendar", { credentials: "include" }).then((r) => r.json()),
+  });
+
+  const updateEstimate = useMutation({
+    mutationFn: (vars: { taskId: number; estimatedHours: number }) =>
+      apiRequest(`/api/tasks/${vars.taskId}`, "PUT", { estimatedHours: vars.estimatedHours }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks/team-calendar"] });
+      queryClient.invalidateQueries({ queryKey });
+      toast({ title: "Horas estimadas actualizadas" });
+    },
+    onError: () => toast({ title: "Error al actualizar estimación", variant: "destructive" }),
+  });
+
+  // Tasks of a person active during the selected week (start..due overlaps week), excl. done/subtasks
+  const tasksForPersonInWeek = (personnelId: number) => {
+    const ws = weekStart;
+    const we = weekEndStr;
+    return allTasks.filter((t: any) => {
+      if (t.assigneeId !== personnelId || t.parentTaskId || t.status === "done") return false;
+      const start = t.startDate ? String(t.startDate).slice(0, 10) : null;
+      const due = t.dueDate ? String(t.dueDate).slice(0, 10) : null;
+      if (!start && !due) return true; // undated active tasks always show
+      const s = start || due!;
+      const e = due || start!;
+      return s <= we && e >= ws; // overlap
+    });
+  };
+
+  // Group a person's tasks: Proyecto > sección > tareas
+  const groupTasks = (tasks: any[]) => {
+    const projects = new Map<string, { projectName: string; clientName: string | null; sections: Map<string, any[]> }>();
+    for (const t of tasks) {
+      const pName = t.projectName || "Sin proyecto";
+      const pKey = `${t.projectId}:${pName}`;
+      if (!projects.has(pKey)) projects.set(pKey, { projectName: pName, clientName: t.clientName ?? null, sections: new Map() });
+      const proj = projects.get(pKey)!;
+      const sName = t.sectionName || "General";
+      if (!proj.sections.has(sName)) proj.sections.set(sName, []);
+      proj.sections.get(sName)!.push(t);
+    }
+    return projects;
+  };
 
   const allPersonnel = data?.personnel || [];
   const totals = data?.totals;
@@ -178,10 +237,22 @@ export default function CapacityDashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {personnel.map((p: any) => (
-                    <tr key={p.personnelId} className="border-b hover:bg-muted/30 group">
+                  {personnel.map((p: any) => {
+                    const isExpanded = expandedPersonId === p.personnelId;
+                    const personTasks = isExpanded ? tasksForPersonInWeek(p.personnelId) : [];
+                    const grouped = isExpanded ? groupTasks(personTasks) : null;
+                    return (
+                    <Fragment key={p.personnelId}>
+                    <tr className="border-b hover:bg-muted/30 group">
                       <td className="py-2 px-3 font-medium">
                         <div className="flex items-center gap-1.5 flex-wrap">
+                          <button
+                            className="text-muted-foreground hover:text-foreground"
+                            onClick={() => setExpandedPersonId(isExpanded ? null : p.personnelId)}
+                            title="Ver tareas de la semana"
+                          >
+                            {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                          </button>
                           {p.name}
                           {p.isAbsent && (
                             <span className="text-[10px] bg-amber-100 text-amber-700 rounded px-1.5 py-0.5">En ausencia</span>
@@ -275,7 +346,87 @@ export default function CapacityDashboard() {
                         </Badge>
                       </td>
                     </tr>
-                  ))}
+                    {isExpanded && (
+                      <tr className="bg-muted/20">
+                        <td colSpan={isOperations ? 6 : 5} className="px-3 py-3">
+                          {personTasks.length === 0 ? (
+                            <div className="text-xs text-muted-foreground py-2 pl-6">
+                              Sin tareas activas esta semana ({weekStart} → {weekEndStr}).
+                            </div>
+                          ) : (
+                            <div className="space-y-3 pl-6">
+                              {Array.from(grouped!.values()).map((proj, pi) => (
+                                <div key={pi}>
+                                  <div className="text-xs font-semibold text-foreground">
+                                    {proj.clientName ? <span className="text-muted-foreground">{proj.clientName} · </span> : null}
+                                    {proj.projectName}
+                                  </div>
+                                  {Array.from(proj.sections.entries()).map(([sName, sTasks], si) => (
+                                    <div key={si} className="mt-1 pl-3">
+                                      <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{sName}</div>
+                                      <div className="mt-0.5">
+                                        {sTasks.map((t: any) => (
+                                          <div key={t.id} className="flex items-center gap-2 py-0.5 pl-3 text-xs">
+                                            <span className="flex-1 truncate text-foreground">{t.title}</span>
+                                            {editingEstTaskId === t.id ? (
+                                              <div className="flex items-center gap-1">
+                                                <Input
+                                                  type="number"
+                                                  value={editingEstInput}
+                                                  onChange={e => setEditingEstInput(e.target.value)}
+                                                  className="w-16 h-6 text-xs text-center"
+                                                  min={0}
+                                                  step={0.5}
+                                                  autoFocus
+                                                  onKeyDown={e => {
+                                                    if (e.key === "Enter") {
+                                                      const v = parseFloat(editingEstInput);
+                                                      if (!isNaN(v) && v >= 0) updateEstimate.mutate({ taskId: t.id, estimatedHours: v });
+                                                      setEditingEstTaskId(null);
+                                                    }
+                                                    if (e.key === "Escape") setEditingEstTaskId(null);
+                                                  }}
+                                                />
+                                                <span className="text-muted-foreground">h</span>
+                                                <Button size="sm" variant="ghost" className="h-5 w-5 p-0 text-green-600"
+                                                  onClick={() => {
+                                                    const v = parseFloat(editingEstInput);
+                                                    if (!isNaN(v) && v >= 0) updateEstimate.mutate({ taskId: t.id, estimatedHours: v });
+                                                    setEditingEstTaskId(null);
+                                                  }}>
+                                                  <Check className="h-3 w-3" />
+                                                </Button>
+                                                <Button size="sm" variant="ghost" className="h-5 w-5 p-0" onClick={() => setEditingEstTaskId(null)}>
+                                                  <X className="h-3 w-3" />
+                                                </Button>
+                                              </div>
+                                            ) : (
+                                              <button
+                                                className="flex items-center gap-1 text-muted-foreground hover:text-primary"
+                                                onClick={() => { setEditingEstInput(String(t.estimatedHours ?? "")); setEditingEstTaskId(t.id); }}
+                                                title="Editar horas estimadas"
+                                              >
+                                                <span className={t.estimatedHours ? "text-foreground" : "text-muted-foreground/50"}>
+                                                  {t.estimatedHours ? `${t.estimatedHours}h est.` : "+ estimar"}
+                                                </span>
+                                                <Pencil className="h-2.5 w-2.5" />
+                                              </button>
+                                            )}
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    )}
+                    </Fragment>
+                    );
+                  })}
                 </tbody>
               </table>
             )}

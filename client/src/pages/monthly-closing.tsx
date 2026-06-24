@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -43,7 +43,7 @@ export default function MonthlyClosing() {
   const [month, setMonth] = useState(now.getMonth());
   const [contractFilter, setContractFilter] = useState<string>("all");
   // Category-based hours adjustments per person
-  type HoursAdj = { vacaciones: number; epicalGeneral: number; discrecional: number };
+  type HoursAdj = { vacaciones: number; feriados: number; epicalGeneral: number; discrecional: number };
   const [hoursAdjustments, setHoursAdjustments] = useState<Record<number, HoursAdj>>({});
   const [expandedAdj, setExpandedAdj] = useState<number | null>(null);
   // Per-row mutation tracking
@@ -72,6 +72,52 @@ export default function MonthlyClosing() {
         headers: { "Content-Type": "application/json" },
       }).then((r) => r.json()),
   });
+  // Real hours logged per person for the month (time_entries + task_time_entries)
+  const { data: realHoursMap = {} } = useQuery<Record<number, number>>({
+    queryKey: ["/api/monthly-closings/real-hours", year, month + 1],
+    queryFn: () =>
+      fetch(`/api/monthly-closings/real-hours?year=${year}&month=${month + 1}`, {
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+      }).then((r) => r.json()),
+  });
+  // Holidays for the year, to deduct from base hours
+  const { data: holidaysData = [] } = useQuery<any[]>({
+    queryKey: ["/api/holidays", year],
+    queryFn: () =>
+      fetch(`/api/holidays?year=${year}`, {
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+      }).then((r) => r.json()),
+  });
+
+  // Number of holidays falling on weekdays in the selected month
+  const monthHolidayCount = (holidaysData || []).filter((h: any) => {
+    const d = new Date(h.date + (h.date?.length === 10 ? "T00:00:00" : ""));
+    if (isNaN(d.getTime())) return false;
+    const dow = d.getDay();
+    return d.getFullYear() === year && d.getMonth() === month && dow !== 0 && dow !== 6;
+  }).length;
+
+  // Rehydrate saved adjustments when closings load (so manual edits survive reload)
+  useEffect(() => {
+    if (!closings) return;
+    const restored: Record<number, HoursAdj> = {};
+    for (const c of closings) {
+      if (c.adjustments && typeof c.adjustments === "object") {
+        restored[c.personnelId] = {
+          vacaciones: c.adjustments.vacaciones || 0,
+          feriados: c.adjustments.feriados || 0,
+          epicalGeneral: c.adjustments.epicalGeneral || 0,
+          discrecional: c.adjustments.discrecional || 0,
+        };
+      }
+    }
+    if (Object.keys(restored).length > 0) {
+      setHoursAdjustments((prev) => ({ ...restored, ...prev }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [closings]);
 
   const closeMutation = useMutation({
     mutationFn: (data: any) => apiRequest("/api/monthly-closings", "POST", data),
@@ -107,7 +153,7 @@ export default function MonthlyClosing() {
   };
 
   const getAdj = (personnelId: number): HoursAdj =>
-    hoursAdjustments[personnelId] ?? { vacaciones: 0, epicalGeneral: 0, discrecional: 0 };
+    hoursAdjustments[personnelId] ?? { vacaciones: 0, feriados: 0, epicalGeneral: 0, discrecional: 0 };
 
   const setAdj = (personnelId: number, field: keyof HoursAdj, value: string) => {
     const parsed = parseFloat(value);
@@ -122,7 +168,7 @@ export default function MonthlyClosing() {
 
   const hasAdjustment = (personnelId: number): boolean => {
     const adj = hoursAdjustments[personnelId];
-    return !!adj && (adj.vacaciones > 0 || adj.epicalGeneral > 0 || adj.discrecional !== 0);
+    return !!adj && (adj.vacaciones > 0 || adj.feriados > 0 || adj.epicalGeneral > 0 || adj.discrecional !== 0);
   };
 
   // Effective base hours for a person: default adjusted by category deductions
@@ -130,7 +176,13 @@ export default function MonthlyClosing() {
     const base = defaultBaseHours(person);
     const adj = hoursAdjustments[person.id];
     if (!adj) return base;
-    return Math.max(0, base - (adj.vacaciones || 0) - (adj.epicalGeneral || 0) + (adj.discrecional || 0));
+    return Math.max(0, base - (adj.vacaciones || 0) - (adj.feriados || 0) - (adj.epicalGeneral || 0) + (adj.discrecional || 0));
+  };
+
+  // Suggested feriado hours for a person this month (holidays × daily hours)
+  const feriadoHoursFor = (person: any): number => {
+    const dailyHours = (defaultBaseHours(person) || 160) / 20;
+    return Math.round(monthHolidayCount * dailyHours);
   };
 
   const doClose = (person: any) => {
@@ -146,27 +198,24 @@ export default function MonthlyClosing() {
     }
     const billing = getBillingCurrency(person);
     let totalCost: number;
-    if (billing === 'USD') {
+    if (billing === 'USD' || billing === 'mixed') {
       // rate is already in USD; totalCost stored in ARS equivalent for consistency
-      totalCost = hrs * (person.hourlyRateUSD ?? rate) * (exchangeRate || 1);
-    } else if (billing === 'mixed') {
-      // rate is USD; convert full amount to ARS
       totalCost = hrs * rate * (exchangeRate || 1);
     } else {
       // ARS billing: rate is in ARS
-      totalCost = hrs * (person.hourlyRateARS ?? rate);
+      totalCost = hrs * rate;
     }
-    const existing = getClosing(person.id);
     setClosingPersonnelId(person.id);
     closeMutation.mutate({
       personnelId: person.id,
       year,
       month: month + 1,
-      actualHours: existing?.actualHours || hrs,
+      actualHours: realHoursMap[person.id] ?? hrs,
       adjustedHours: hrs,
       hourlyRate: rate,
       totalCost,
       exchangeRateAtClose: exchangeRate || null,
+      adjustments: hoursAdjustments[person.id] ?? null,
     });
   };
 
@@ -342,6 +391,7 @@ export default function MonthlyClosing() {
                   <th className="text-center py-2 px-3">Contrato</th>
                   <th className="text-center py-2 px-3">Facturación</th>
                   <th className="text-center py-2 px-3">Hs Base</th>
+                  <th className="text-center py-2 px-3">Hs Reales</th>
                   <th className="text-center py-2 px-3">Valor Hora</th>
                   <th className="text-center py-2 px-3">Costo Final</th>
                   <th className="text-center py-2 px-3">Estado</th>
@@ -399,8 +449,22 @@ export default function MonthlyClosing() {
                               <div className="text-[10px] text-muted-foreground mb-1">
                                 Base contractual: {defaultBaseHours(p)}h
                               </div>
+                              {monthHolidayCount > 0 && (
+                                <div className="flex items-center justify-between gap-2 rounded bg-muted/50 px-1.5 py-1">
+                                  <span className="text-[10px] text-muted-foreground">
+                                    {monthHolidayCount} feriado(s) este mes (≈{feriadoHoursFor(p)}h)
+                                  </span>
+                                  <button
+                                    className="text-[10px] text-primary hover:underline"
+                                    onClick={() => setAdj(p.id, "feriados", String(feriadoHoursFor(p)))}
+                                  >
+                                    Aplicar
+                                  </button>
+                                </div>
+                              )}
                               {([
                                 { key: "vacaciones" as const, label: "Vacaciones −" },
+                                { key: "feriados" as const, label: "Feriados −" },
                                 { key: "epicalGeneral" as const, label: "Epical General −" },
                                 { key: "discrecional" as const, label: "Ajuste discrecional ±" },
                               ] as const).map(({ key, label }) => (
@@ -431,6 +495,17 @@ export default function MonthlyClosing() {
                             </div>
                           )}
                         </div>
+                      </td>
+                      <td className="text-center py-2 px-3">
+                        {(() => {
+                          const real = realHoursMap[p.id] ?? 0;
+                          const over = real > baseHrs;
+                          return (
+                            <span className={over ? "text-red-600 font-medium" : real > 0 ? "text-foreground" : "text-muted-foreground"} title="Horas reales cargadas (tareas + time entries)">
+                              {real.toFixed(1)}h
+                            </span>
+                          );
+                        })()}
                       </td>
                       <td className="text-center py-2 px-3">
                         {(() => {
