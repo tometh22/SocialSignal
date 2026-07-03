@@ -543,14 +543,11 @@ export class DatabaseStorage implements IStorage {
 
   // **VALIDACIÓN CRÍTICA 2: PREVENIR RELACIONES CIRCULARES EN PROYECTOS**
   async createActiveProject(project: InsertActiveProject): Promise<ActiveProject> {
-    // Validar relaciones parent-child para evitar ciclos
-    if (project.parentProjectId && project.quotationId != null) {
-      const isValidParent = await this.validateProjectHierarchy(project.parentProjectId, project.quotationId);
-      if (!isValidParent) {
-        throw new Error("La relación padre-hijo crearía un ciclo en la jerarquía de proyectos");
-      }
-    }
-
+    // Nota: un proyecto recién insertado no tiene descendientes, por lo que no puede
+    // formar un ciclo en la jerarquía. La validación anti-ciclo sólo aplica al cambiar
+    // el parentProjectId de un proyecto existente (ver updateActiveProject). El chequeo
+    // previo acá estaba mal invocado (pasaba quotationId donde se espera un projectId) y
+    // rechazaba subproyectos válidos que heredan la cotización del padre.
     const [newProject] = await db.insert(activeProjects).values(project).returning();
     return newProject;
   }
@@ -2860,7 +2857,9 @@ export class DatabaseStorage implements IStorage {
       const template = await this.getRecurringTemplate(templateId);
       if (!template) throw new Error("Template not found");
 
-      const parentProject = await this.getActiveProject(parentProjectId);
+      // Fetch the parent row directly (getActiveProject inner-joins quotations, so a
+      // macro created without cotización would be invisible and break auto-generation).
+      const [parentProject] = await db.select().from(activeProjects).where(eq(activeProjects.id, parentProjectId));
       if (!parentProject) throw new Error("Parent project not found");
 
       const generatedProjects: ActiveProject[] = [];

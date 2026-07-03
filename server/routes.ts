@@ -8712,22 +8712,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
               ? await db.select().from(quotations).where(eq(quotations.id, subproject.quotationId))
               : [];
 
-            // Obtener entradas de tiempo para el subproyecto
-            const timeEntryData = await db.select({
-              timeEntry: timeEntries,
-              personnel: personnel
-            })
-            .from(timeEntries)
-            .innerJoin(personnel, eq(timeEntries.personnelId, personnel.id))
-            .where(eq(timeEntries.projectId, subproject.id));
-
-            // Calcular costo actual
-            let actualCost = 0;
-            for (const entry of timeEntryData) {
-              if (entry.timeEntry.billable) {
-                actualCost += entry.personnel.hourlyRate * entry.timeEntry.hours;
-              }
-            }
+            // Costo real desde fact_labor_month (fuente unificada de rentabilidad:
+            // incluye horas de time_entries Y del módulo de Tareas, con tipo de cambio
+            // aplicado). Antes se leía sólo time_entries × hourlyRate USD sin FX, lo que
+            // ignoraba las horas cargadas en Tareas y subestimaba el costo del fee.
+            const laborRows = await db
+              .select({ costUSD: factLaborMonth.costUSD })
+              .from(factLaborMonth)
+              .where(eq(factLaborMonth.projectId, subproject.id));
+            const actualCost = laborRows.reduce((sum, r) => sum + Number(r.costUSD || 0), 0);
 
             return {
               id: subproject.id,
