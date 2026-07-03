@@ -527,6 +527,37 @@ async function applyPendingMigrations() {
       ALTER TABLE "monthly_closings" ADD COLUMN IF NOT EXISTS "adjustments" jsonb;
     `);
 
+    // ---- Reconciliación de drift de esquema en prod (migraciones nunca aplicadas) ----
+
+    // 0017: permitir proyectos sin cotización (DROP NOT NULL es idempotente).
+    // Sin esto, "crear proyecto sin cotización" (y la auto-generación de fees) falla.
+    await run('0017 active_projects quotation optional', `
+      ALTER TABLE "active_projects" ALTER COLUMN "quotation_id" DROP NOT NULL;
+    `);
+
+    // 0020: fact_labor_month.unresolved_person. Sin esto el ETL de rentabilidad de
+    // modo-app (incluidas las horas de Tareas) falla al insertar.
+    await run('0020 fact_labor unresolved_person', `
+      ALTER TABLE "fact_labor_month" ADD COLUMN IF NOT EXISTS "unresolved_person" boolean NOT NULL DEFAULT false;
+      UPDATE "fact_labor_month" SET "unresolved_person" = true WHERE "person_id" IS NULL;
+    `);
+
+    // Unique constraint que el upsert del ETL necesita (ON CONFLICT). Guardado con DO
+    // para ser idempotente.
+    await run('fact_labor unique (project,person,period)', `
+      DO $$ BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint
+          WHERE conrelid = 'fact_labor_month'::regclass
+            AND conname = 'fact_labor_month_project_person_period_uq'
+        ) THEN
+          ALTER TABLE "fact_labor_month"
+            ADD CONSTRAINT "fact_labor_month_project_person_period_uq"
+            UNIQUE ("project_id", "person_key", "period_key");
+        END IF;
+      END $$;
+    `);
+
   } finally {
     client.release();
   }
