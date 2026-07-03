@@ -15,6 +15,10 @@ import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { formatCurrency } from '@/lib/utils';
 import { 
@@ -41,6 +45,48 @@ const AlwaysOnProjectView = () => {
   const [editMode, setEditMode] = useState<boolean>(false);
   const [deliverables, setDeliverables] = useState<Deliverable[]>([]);
   const [additionalCost, setAdditionalCost] = useState<number>(0);
+
+  // Generar meses (auto-generar subproyectos desde una plantilla recurrente)
+  const [genOpen, setGenOpen] = useState<boolean>(false);
+  const [genTemplateId, setGenTemplateId] = useState<string>('');
+  const now = new Date();
+  const [genStartMonth, setGenStartMonth] = useState<string>(
+    `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  );
+  const [genMonths, setGenMonths] = useState<string>('3');
+
+  // Plantillas recurrentes del proyecto (para elegir cuál usar al generar meses)
+  const { data: templates = [] } = useQuery<any[]>({
+    queryKey: ['/api/projects', projectId, 'recurring-templates'],
+    queryFn: () => apiRequest(`/api/projects/${projectId}/recurring-templates`, 'GET'),
+    enabled: !!projectId,
+  });
+
+  // Construye una fecha al primer día del mes, mediodía UTC (evita corrimiento por timezone)
+  const monthToUTCNoon = (ym: string, addMonths = 0): string => {
+    const [y, m] = ym.split('-').map(Number);
+    const idx = (m - 1) + addMonths;
+    const year = y + Math.floor(idx / 12);
+    const month = (idx % 12) + 1;
+    return `${year}-${String(month).padStart(2, '0')}-01T12:00:00.000Z`;
+  };
+
+  const generateMonthsMutation = useMutation({
+    mutationFn: () =>
+      apiRequest(`/api/projects/${projectId}/auto-generate`, 'POST', {
+        templateId: Number(genTemplateId),
+        periodStart: monthToUTCNoon(genStartMonth, 0),
+        periodEnd: monthToUTCNoon(genStartMonth, Number(genMonths) - 1),
+      }),
+    onSuccess: (created: any[]) => {
+      toast({ title: 'Meses generados', description: `Se crearon ${created?.length ?? 0} subproyecto(s).` });
+      queryClient.invalidateQueries({ queryKey: ['/api/projects'] });
+      setGenOpen(false);
+    },
+    onError: (e: any) => {
+      toast({ title: 'Error al generar meses', description: e?.message || 'Intentá de nuevo', variant: 'destructive' });
+    },
+  });
 
   // Consulta del proyecto
   const { data: project, isLoading, error } = useQuery({
@@ -228,12 +274,82 @@ const AlwaysOnProjectView = () => {
               </Button>
             </>
           ) : (
-            <Button onClick={() => setEditMode(true)}>
-              Editar proyecto
-            </Button>
+            <>
+              <Link href={`/recurring-templates/${projectId}`}>
+                <Button variant="outline">
+                  <Repeat className="h-4 w-4 mr-2" />Plantilla recurrente
+                </Button>
+              </Link>
+              <Button variant="outline" onClick={() => setGenOpen(true)}>
+                <Calendar className="h-4 w-4 mr-2" />Generar meses
+              </Button>
+              <Button onClick={() => setEditMode(true)}>
+                Editar proyecto
+              </Button>
+            </>
           )}
         </div>
       </div>
+
+      {/* Dialog: generar subproyectos mensuales desde una plantilla recurrente */}
+      <Dialog open={genOpen} onOpenChange={setGenOpen}>
+        <DialogContent className="sm:max-w-[460px]">
+          <DialogHeader>
+            <DialogTitle>Generar meses del fee</DialogTitle>
+            <DialogDescription>
+              Crea un subproyecto por mes (cada uno con su ciclo de vida) a partir de una plantilla recurrente.
+            </DialogDescription>
+          </DialogHeader>
+          {templates.length === 0 ? (
+            <div className="text-sm text-muted-foreground space-y-3">
+              <p>Este fee todavía no tiene una plantilla recurrente. Creá una primero.</p>
+              <Link href={`/recurring-templates/${projectId}`}>
+                <Button className="w-full"><Repeat className="h-4 w-4 mr-2" />Crear plantilla recurrente</Button>
+              </Link>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="space-y-1.5">
+                <Label>Plantilla</Label>
+                <Select value={genTemplateId} onValueChange={setGenTemplateId}>
+                  <SelectTrigger><SelectValue placeholder="Elegí la plantilla" /></SelectTrigger>
+                  <SelectContent>
+                    {templates.map((t: any) => (
+                      <SelectItem key={t.id} value={String(t.id)}>{t.templateName || t.template_name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>Mes de inicio</Label>
+                  <Input type="month" value={genStartMonth} onChange={(e) => setGenStartMonth(e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Cantidad de meses</Label>
+                  <Select value={genMonths} onValueChange={setGenMonths}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {Array.from({ length: 12 }, (_, i) => i + 1).map((n) => (
+                        <SelectItem key={n} value={String(n)}>{n}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <Button variant="outline" onClick={() => setGenOpen(false)}>Cancelar</Button>
+                <Button
+                  onClick={() => generateMonthsMutation.mutate()}
+                  disabled={!genTemplateId || generateMonthsMutation.isPending}
+                >
+                  {generateMonthsMutation.isPending ? 'Generando...' : 'Generar'}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList>
