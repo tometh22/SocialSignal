@@ -8,7 +8,7 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { Link } from "wouter";
-import { AlertTriangle, BarChart3, TrendingUp, Receipt, ListTodo, Users, LayoutDashboard, ArrowRight } from "lucide-react";
+import { AlertTriangle, BarChart3, TrendingUp, Receipt, ListTodo, Users, LayoutDashboard, ArrowRight, Repeat } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
@@ -434,6 +434,19 @@ export default function ProjectDetail() {
           prevMarkup={unifiedData.previousPeriod?.metrics?.markup ?? undefined}
         />
       </div>
+
+      {/* ── Acceso a la vista Always-On (fees recurrentes) ────────── */}
+      {(unifiedData.project as any)?.isAlwaysOnMacro && (
+        <Link href={`/always-on-project/${pid}`}>
+          <div className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 cursor-pointer hover:bg-blue-100 transition-colors">
+            <div className="flex items-center gap-2 text-sm text-blue-800">
+              <Repeat className="h-4 w-4" />
+              <span>Este es un fee recurrente (Always-On). Gestioná los meses y la vista consolidada acá.</span>
+            </div>
+            <span className="flex items-center gap-1 text-sm font-medium text-blue-700">Abrir vista Always-On <ArrowRight className="h-4 w-4" /></span>
+          </div>
+        </Link>
+      )}
 
       {/* ── Tabs ─────────────────────────────────────────────────── */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
