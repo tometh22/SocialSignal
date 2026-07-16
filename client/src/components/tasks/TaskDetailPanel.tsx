@@ -341,6 +341,18 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
     queryFn: () => authFetch("/api/tasks-projects").then(r => r.json()),
   });
 
+  const { data: projectDetail } = useQuery<{ members: { personnelId: number; name: string; role: string }[] }>({
+    queryKey: ["/api/tasks/projects", task?.projectId],
+    queryFn: () => authFetch(`/api/tasks/projects/${task!.projectId}`).then(r => r.json()),
+    enabled: !!task?.projectId,
+  });
+  // Solo miembros del proyecto son asignables; si el proyecto no tiene miembros
+  // registrados todavía, se cae al listado completo para no bloquear la asignación.
+  const projectMemberIds = (projectDetail?.members || []).map(m => m.personnelId);
+  const assignablePersonnel = projectMemberIds.length > 0
+    ? allPersonnel.filter(p => projectMemberIds.includes(p.id))
+    : allPersonnel;
+
   const { data: weeklyEstimates = [], refetch: refetchEstimates } = useQuery<any[]>({
     queryKey: ["/api/tasks", taskId, "weekly-estimates"],
     queryFn: () => authFetch(`/api/tasks/${taskId}/weekly-estimates`).then(r => r.json()),
@@ -629,7 +641,7 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="none">Sin asignar</SelectItem>
-                        {allPersonnel.map(p => (
+                        {assignablePersonnel.map(p => (
                           <SelectItem key={p.id} value={p.id.toString()}>
                             <div className="flex items-center gap-2">
                               <Avatar className="h-4 w-4">

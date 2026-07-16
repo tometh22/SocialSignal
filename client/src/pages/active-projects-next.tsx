@@ -308,6 +308,7 @@ function KPIBar({ data, isOperations }: { data?: ProjectsApi; isOperations: bool
       label: "Facturación (USD)",
       value: formatUSD(data?.summary?.periodRevenueUSD),
       icon: <DollarSign className="h-4 w-4" />,
+      hidden: !isOperations,
     },
     {
       label: "Ganancia (USD)",
@@ -509,9 +510,9 @@ function TableHeader({ isOperations }: { isOperations: boolean }) {
   const cols = [
     { label: "Proyecto", align: "text-left", cls: "pl-4 pr-3" },
     { label: "Status", align: "text-left", cls: "px-3" },
-    { label: "Revenue", align: "text-right", cls: "px-3" },
     ...(isOperations
       ? [
+          { label: "Revenue", align: "text-right", cls: "px-3" },
           { label: "Costo", align: "text-right", cls: "px-3" },
           { label: "Markup", align: "text-right", cls: "px-3" },
           { label: "Margen", align: "text-right", cls: "px-3" },
@@ -661,14 +662,13 @@ function ProjectRow({
         </div>
       </td>
 
-      {/* Revenue */}
-      <td className="py-2.5 px-3 text-right tabular-nums text-sm text-slate-700 font-medium">
-        {formatUSD(revenue)}
-      </td>
-
       {/* Ops-only */}
       {isOperations && (
         <>
+          {/* Revenue */}
+          <td className="py-2.5 px-3 text-right tabular-nums text-sm text-slate-700 font-medium">
+            {formatUSD(revenue)}
+          </td>
           <td className="py-2.5 px-3 text-right tabular-nums text-sm text-slate-500">
             {formatUSD(cost)}
           </td>

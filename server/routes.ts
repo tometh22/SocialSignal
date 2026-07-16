@@ -8240,6 +8240,98 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // GET /api/projects/:id/profitability-time-entries — para la pantalla de
+  // Rentabilidad únicamente. A diferencia de /api/time-entries/project/:id
+  // (que alimenta la pantalla legacy de gestión de horas y espera SOLO filas
+  // de time_entries), este endpoint combina time_entries + las horas cargadas
+  // en el módulo de Tareas (task_time_entries), sin alterar el endpoint legacy.
+  // No descarta ninguna hora: si una persona tiene carga en ambas fuentes el
+  // mismo mes, se informa en `warnings` para que Operaciones lo revise, en vez
+  // de asumir automáticamente cuál es la duplicada (evita perder horas reales).
+  app.get("/api/projects/:id/profitability-time-entries", requireAuth, async (req, res) => {
+    const projectId = parseInt(req.params.id);
+    if (isNaN(projectId)) return res.status(400).json({ message: "Invalid project ID" });
+
+    try {
+      const legacyRows = await db
+        .select({
+          id: timeEntries.id,
+          personnelId: timeEntries.personnelId,
+          hours: timeEntries.hours,
+          description: timeEntries.description,
+          date: timeEntries.date,
+          personnelName: personnel.name,
+        })
+        .from(timeEntries)
+        .leftJoin(personnel, eq(timeEntries.personnelId, personnel.id))
+        .where(eq(timeEntries.projectId, projectId))
+        .orderBy(desc(timeEntries.date));
+
+      const { getTaskTimeEntriesForProject } = await import("./domain/taskHoursCost");
+      const { entries: taskEntries } = await getTaskTimeEntriesForProject(projectId);
+
+      const legacyMonthKeys = new Map<string, { personnelId: number; personnelName: string | null; year: number; month: number }>();
+      for (const e of legacyRows) {
+        const d = new Date(e.date);
+        legacyMonthKeys.set(`${e.personnelId}-${d.getFullYear()}-${d.getMonth()}`, {
+          personnelId: e.personnelId, personnelName: e.personnelName, year: d.getFullYear(), month: d.getMonth() + 1,
+        });
+      }
+
+      const warnings: { personnelId: number; personnelName: string | null; year: number; month: number }[] = [];
+      const taskMonthKeys = new Set<string>();
+      for (const e of taskEntries) {
+        const key = `${e.personnelId}-${e.date.getFullYear()}-${e.date.getMonth()}`;
+        taskMonthKeys.add(key);
+      }
+      for (const [key, info] of legacyMonthKeys) {
+        if (taskMonthKeys.has(key)) warnings.push(info);
+      }
+
+      const entries = [
+        ...legacyRows.map(e => ({
+          id: e.id,
+          personnelId: e.personnelId,
+          personnelName: e.personnelName,
+          hours: e.hours,
+          description: e.description,
+          date: e.date,
+          source: "legacy" as const,
+        })),
+        ...taskEntries.map(e => ({
+          id: e.id,
+          personnelId: e.personnelId,
+          personnelName: e.personnelName,
+          hours: e.hours,
+          description: e.description,
+          date: e.date,
+          source: "task" as const,
+        })),
+      ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+      res.json({ entries, warnings });
+    } catch (error) {
+      console.error("Error fetching profitability time entries:", error);
+      res.status(500).json({ message: "Failed to fetch profitability time entries" });
+    }
+  });
+
+  // GET /api/tasks/planned-hours/:projectId — suma de las estimaciones semanales
+  // de planificación (task_weekly_estimates) para las tareas de este proyecto.
+  // Se muestra junto a (no en reemplazo de) la estimación fija de la cotización.
+  app.get("/api/tasks/planned-hours/:projectId", requireAuth, async (req, res) => {
+    const projectId = parseInt(req.params.projectId);
+    if (isNaN(projectId)) return res.status(400).json({ message: "Invalid project ID" });
+    try {
+      const { getProjectPlannedHoursFromWeeklyEstimates } = await import("./domain/taskHoursCost");
+      const plannedHours = await getProjectPlannedHoursFromWeeklyEstimates(projectId);
+      res.json({ plannedHours });
+    } catch (error) {
+      console.error("Error fetching planned hours from weekly estimates:", error);
+      res.status(500).json({ message: "Failed to fetch planned hours" });
+    }
+  });
+
   // Obtener registros de horas por persona
   app.get("/api/time-entries/personnel/:personnelId", requireAuth, async (req, res) => {
     const personnelId = parseInt(req.params.personnelId);
