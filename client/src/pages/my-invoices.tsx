@@ -27,6 +27,8 @@ type MonthSummary = {
   totalCostARS: number;
   totalCostUSD: number;
   billingCurrency?: string;
+  usdFraction?: number;
+  isClosed?: boolean;
   entryCount: number;
 };
 
@@ -133,6 +135,12 @@ export default function MyInvoices() {
         compará con tus horas disponibles del mes (días hábiles sin feriados) para detectar horas no cargadas.
       </p>
 
+      {summaryQuery.data?.isClosed && (
+        <div className="mb-4 inline-flex items-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-200 px-3 py-1 text-xs text-emerald-700">
+          Mes cerrado en Cierre Mensual — estos valores ya son definitivos
+        </div>
+      )}
+
       {/* Hero: resumen del mes */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-6">
         <div className="rounded-xl border border-slate-200 bg-white p-4">
@@ -154,7 +162,10 @@ export default function MyInvoices() {
         </div>
         <div className="rounded-xl border border-slate-200 bg-white p-4">
           <div className="flex items-center gap-2 text-xs text-slate-500 mb-1">
-            <DollarSign className="h-3.5 w-3.5" /> Total (ARS)
+            <DollarSign className="h-3.5 w-3.5" />
+            {summaryQuery.data?.billingCurrency === 'mixed'
+              ? `ARS (${Math.round((1 - (summaryQuery.data?.usdFraction ?? 0)) * 100)}%)`
+              : "Total (ARS)"}
           </div>
           <div className="text-2xl font-semibold text-emerald-700 tabular-nums">
             {summaryQuery.data ? formatARS(summaryQuery.data.totalCostARS) : "—"}
@@ -162,7 +173,10 @@ export default function MyInvoices() {
         </div>
         <div className="rounded-xl border border-slate-200 bg-white p-4">
           <div className="flex items-center gap-2 text-xs text-slate-500 mb-1">
-            <DollarSign className="h-3.5 w-3.5" /> Total (USD)
+            <DollarSign className="h-3.5 w-3.5" />
+            {summaryQuery.data?.billingCurrency === 'mixed'
+              ? `USD (${Math.round((summaryQuery.data?.usdFraction ?? 0) * 100)}%)`
+              : "Total (USD)"}
           </div>
           <div className="text-2xl font-semibold text-blue-700 tabular-nums">
             {summaryQuery.data ? formatUSD(summaryQuery.data.totalCostUSD) : "—"}
@@ -170,7 +184,10 @@ export default function MyInvoices() {
           {summaryQuery.data?.billingCurrency === 'USD' && (
             <div className="text-[11px] text-blue-400 mt-1">Tarifa USD directa</div>
           )}
-          {summaryQuery.data?.billingCurrency !== 'USD' && summaryQuery.data?.totalCostUSD === 0 && (
+          {summaryQuery.data?.billingCurrency === 'mixed' && (
+            <div className="text-[11px] text-blue-400 mt-1">Facturación mixta</div>
+          )}
+          {summaryQuery.data?.billingCurrency === 'ARS' && summaryQuery.data?.totalCostUSD === 0 && (
             <div className="text-[11px] text-slate-400 mt-1">Sin TC del mes</div>
           )}
         </div>

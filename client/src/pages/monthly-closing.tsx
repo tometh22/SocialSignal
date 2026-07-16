@@ -240,15 +240,21 @@ export default function MonthlyClosing() {
   const getBillingCurrency = (person: any): string => person.billingCurrency ?? "ARS";
   const getUsdFraction = (person: any): number => person.usdBillingFraction ?? 0;
 
-  // Cost display: returns {arsText, usdText} based on billing modality
+  // Cost display: returns {arsText, usdText} based on billing modality.
+  // Si la persona ya tiene un cierre guardado para este mes, se usan los
+  // valores congelados al cierre (horas, tarifa, TC) en vez de recalcular en
+  // vivo — así esta tabla siempre coincide con lo que ve la persona en "Mis
+  // Facturas" (que también lee del registro de cierre una vez cerrado).
   const getCostDisplay = (person: any) => {
-    const hrs = effectiveBaseHours(person);
-    const { rate } = getEffectiveRate(person); // ARS or USD depending on billingCurrency
+    const closing = getClosing(person.id);
+    const hrs = closing ? closing.adjustedHours : effectiveBaseHours(person);
     const billing = getBillingCurrency(person);
+    const rate = closing ? closing.hourlyRate : getEffectiveRate(person).rate; // ARS o USD según billingCurrency
+    const fx = closing?.exchangeRateAtClose || exchangeRate;
 
     if (billing === "USD") {
       const costUSD = hrs * rate;
-      const costARS = costUSD * exchangeRate;
+      const costARS = costUSD * fx;
       return {
         primary: `USD ${costUSD.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`,
         secondary: `≈ ARS ${costARS.toLocaleString("es-AR", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`,
@@ -256,10 +262,13 @@ export default function MonthlyClosing() {
     }
 
     if (billing === "mixed") {
+      // `rate` está en USD/hora (igual que en el caso "USD" puro). El total en
+      // USD se calcula directo; la porción facturada en ARS debe convertirse
+      // al tipo de cambio del período, no quedar en unidades de USD.
       const usdFraction = getUsdFraction(person);
-      const costTotal = hrs * rate;
-      const costUSD = costTotal * usdFraction;
-      const costARS = costTotal * (1 - usdFraction);
+      const costTotalUSD = hrs * rate;
+      const costUSD = costTotalUSD * usdFraction;
+      const costARS = costTotalUSD * (1 - usdFraction) * fx;
       return {
         primary: `USD ${costUSD.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`,
         secondary: `+ ARS ${costARS.toLocaleString("es-AR", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`,
@@ -276,7 +285,8 @@ export default function MonthlyClosing() {
 
   const getRateDisplay = (person: any): { text: string; isEstimated: boolean } => {
     const billing = getBillingCurrency(person);
-    const { rate, isEstimated } = getEffectiveRate(person);
+    const closing = getClosing(person.id);
+    const { rate, isEstimated } = closing ? { rate: closing.hourlyRate, isEstimated: false } : getEffectiveRate(person);
     let text: string;
     if (billing === "USD") text = `USD ${rate.toLocaleString("en-US")}`;
     else if (billing === "mixed") text = `USD ${rate.toLocaleString("en-US")} (mixto)`;
@@ -401,7 +411,7 @@ export default function MonthlyClosing() {
               <tbody>
                 {filteredPersonnel.map((p: any) => {
                   const closing = getClosing(p.id);
-                  const baseHrs = effectiveBaseHours(p);
+                  const baseHrs = closing ? closing.adjustedHours : effectiveBaseHours(p);
                   const cost = getCostDisplay(p);
                   const billing = getBillingCurrency(p);
                   const isRowPending = closingPersonnelId === p.id && closeMutation.isPending;

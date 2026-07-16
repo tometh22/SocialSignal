@@ -9138,37 +9138,102 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const [yyyy, mm] = period.split("-").map(Number);
     const start = new Date(yyyy, mm - 1, 1);
     const end = new Date(yyyy, mm, 1);
+    const billingCurrency = (personnelRow as any).billingCurrency ?? 'ARS';
+    const usdFraction = (personnelRow as any).usdBillingFraction ?? 0;
 
-    const rows = await db
-      .select({
-        hours: timeEntries.hours,
-        totalCost: timeEntries.totalCost,
-      })
-      .from(timeEntries)
-      .where(and(
-        eq(timeEntries.personnelId, personnelRow.id),
-        gte(timeEntries.date, start),
-        lte(timeEntries.date, end),
+    async function getPeriodFxRate(): Promise<number> {
+      const fxRow = await db.select({ rate: exchangeRates.rate })
+        .from(exchangeRates)
+        .where(and(
+          eq(exchangeRates.year, yyyy),
+          eq(exchangeRates.month, mm),
+          eq(exchangeRates.isActive, true),
+        ))
+        .orderBy(desc(exchangeRates.updatedAt))
+        .limit(1);
+      return fxRow.length > 0 ? Number(fxRow[0].rate) : 0;
+    }
+
+    // Splits a total ARS-equivalent cost into { totalCostARS, totalCostUSD } per
+    // billing modality, so "Mis Facturas" always shows what to invoice in each
+    // currency (matching the Cierre Mensual logic in monthly-closing.tsx) instead
+    // of double-counting or ignoring the USD/ARS mix.
+    function splitByBillingCurrency(totalCostARSFull: number, hoursForUSD: number, usdHourlyRate: number, fxRate: number) {
+      if (billingCurrency === 'USD') {
+        return { totalCostARS: totalCostARSFull, totalCostUSD: hoursForUSD * usdHourlyRate };
+      }
+      if (billingCurrency === 'mixed') {
+        const totalUSDEquivalent = hoursForUSD * usdHourlyRate;
+        const totalCostUSD = totalUSDEquivalent * usdFraction;
+        const totalCostARS = Math.round(totalCostARSFull * (1 - usdFraction));
+        return { totalCostARS, totalCostUSD: Math.round(totalCostUSD * 100) / 100 };
+      }
+      // ARS
+      const totalCostUSD = fxRate > 0 ? Math.round((totalCostARSFull / fxRate) * 100) / 100 : 0;
+      return { totalCostARS: totalCostARSFull, totalCostUSD };
+    }
+
+    // If the month is already closed in Cierre Mensual, that record is the
+    // source of truth (horas ajustadas, TC al cierre) — no recalcular en vivo,
+    // para que "Mis Facturas" siempre coincida con lo que ya cerró Operaciones.
+    const [closing] = await db.select().from(monthlyClosings).where(and(
+      eq(monthlyClosings.personnelId, personnelRow.id),
+      eq(monthlyClosings.year, yyyy),
+      eq(monthlyClosings.month, mm),
+    ));
+
+    let hours: number;
+    let entryCount: number;
+    let totalCostARSFull: number;
+    let usdHourlyRate: number;
+    let fxRate: number;
+
+    if (closing) {
+      hours = closing.adjustedHours;
+      // Las horas facturables ya vienen del cierre (ajustadas), pero seguimos
+      // contando los registros reales cargados en el mes para que "N registros"
+      // no aparezca en 0 y desoriente a la persona.
+      const [legacyCount] = await db.select({ count: sql<number>`COUNT(*)` }).from(timeEntries).where(and(
+        eq(timeEntries.personnelId, personnelRow.id), gte(timeEntries.date, start), lte(timeEntries.date, end),
       ));
-
-    // Also include hours logged against tasks (PM module)
-    const taskRows = await db
-      .select({
-        hours: taskTimeEntries.hours,
-        totalCost: taskTimeEntries.totalCost,
-      })
-      .from(taskTimeEntries)
-      .where(and(
-        eq(taskTimeEntries.personnelId, personnelRow.id),
-        gte(taskTimeEntries.date, start),
-        lte(taskTimeEntries.date, end),
+      const [taskCount] = await db.select({ count: sql<number>`COUNT(*)` }).from(taskTimeEntries).where(and(
+        eq(taskTimeEntries.personnelId, personnelRow.id), gte(taskTimeEntries.date, start), lte(taskTimeEntries.date, end),
       ));
+      entryCount = (Number(legacyCount?.count) || 0) + (Number(taskCount?.count) || 0);
+      totalCostARSFull = closing.totalCost;
+      usdHourlyRate = billingCurrency === 'ARS' ? 0 : closing.hourlyRate;
+      fxRate = closing.exchangeRateAtClose || await getPeriodFxRate();
+    } else {
+      const rows = await db
+        .select({ hours: timeEntries.hours, totalCost: timeEntries.totalCost })
+        .from(timeEntries)
+        .where(and(
+          eq(timeEntries.personnelId, personnelRow.id),
+          gte(timeEntries.date, start),
+          lte(timeEntries.date, end),
+        ));
 
-    let hours = 0;
-    let totalCostARS = 0;
-    for (const r of [...rows, ...taskRows]) {
-      hours += Number(r.hours) || 0;
-      totalCostARS += Number(r.totalCost) || 0;
+      // Also include hours logged against tasks (PM module)
+      const taskRows = await db
+        .select({ hours: taskTimeEntries.hours, totalCost: taskTimeEntries.totalCost })
+        .from(taskTimeEntries)
+        .where(and(
+          eq(taskTimeEntries.personnelId, personnelRow.id),
+          gte(taskTimeEntries.date, start),
+          lte(taskTimeEntries.date, end),
+        ));
+
+      let liveHours = 0;
+      let liveTotalCostARS = 0;
+      for (const r of [...rows, ...taskRows]) {
+        liveHours += Number(r.hours) || 0;
+        liveTotalCostARS += Number(r.totalCost) || 0;
+      }
+      hours = liveHours;
+      entryCount = rows.length + taskRows.length;
+      totalCostARSFull = liveTotalCostARS;
+      usdHourlyRate = personnelRow.hourlyRate ?? 0;
+      fxRate = await getPeriodFxRate();
     }
 
     // Available hours for the month = weekdays minus holidays × daily hours (by contract)
@@ -9188,26 +9253,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     const availableHours = Math.round(workdays * dailyHours);
 
-    // Compute USD total: if personnel bills in USD, use hourlyRate * hours; otherwise convert ARS via period FX
-    let totalCostUSD = 0;
-    const billingCurrency = (personnelRow as any).billingCurrency ?? 'ARS';
-    if (billingCurrency === 'USD') {
-      const usdRate = personnelRow.hourlyRate ?? 0;
-      totalCostUSD = hours * usdRate;
-    } else {
-      const [yyyy, mm] = period.split("-").map(Number);
-      const fxRow = await db.select({ rate: exchangeRates.rate })
-        .from(exchangeRates)
-        .where(and(
-          eq(exchangeRates.year, yyyy),
-          eq(exchangeRates.month, mm),
-          eq(exchangeRates.isActive, true),
-        ))
-        .orderBy(desc(exchangeRates.updatedAt))
-        .limit(1);
-      const fxRate = fxRow.length > 0 ? Number(fxRow[0].rate) : 0;
-      totalCostUSD = fxRate > 0 ? Math.round((totalCostARS / fxRate) * 100) / 100 : 0;
-    }
+    const { totalCostARS, totalCostUSD } = splitByBillingCurrency(totalCostARSFull, hours, usdHourlyRate, fxRate);
 
     return {
       period,
@@ -9217,9 +9263,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       totalCostARS,
       totalCostUSD,
       billingCurrency,
+      usdFraction: billingCurrency === 'mixed' ? usdFraction : undefined,
+      isClosed: !!closing,
       availableHours,
       contractType: (personnelRow as any).contractType ?? "full-time",
-      entryCount: rows.length + taskRows.length,
+      entryCount,
     };
   }
 
