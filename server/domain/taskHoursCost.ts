@@ -1,5 +1,5 @@
 import { db } from "../db";
-import { tasks, taskTimeEntries, personnel, exchangeRates } from "@shared/schema";
+import { tasks, taskTimeEntries, taskWeeklyEstimates, personnel, exchangeRates } from "@shared/schema";
 import { eq, and, gte, lte, inArray, sql } from "drizzle-orm";
 
 const MONTH_NAMES = ["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"];
@@ -169,4 +169,78 @@ export async function getTaskHoursCost(options: {
   }));
 
   return { projects };
+}
+
+// Hours-only shape (no cost fields) used by the Rentabilidad screen's
+// GET /api/projects/:id/profitability-time-entries, which needs task hours
+// merged alongside legacy time_entries but recomputes cost itself from the
+// personnel query — keeping cost fields out of this response avoids the
+// ARS/USD ambiguity of mixing task_time_entries' ARS-denominated
+// hourlyRateAtTime with legacy entries of uncertain currency.
+export interface ProjectTaskHourEntry {
+  id: number;
+  personnelId: number;
+  personnelName: string | null;
+  hours: number;
+  description: string | null;
+  date: Date;
+  source: "task";
+}
+
+// Offset applied to task_time_entries.id so its rows never collide with a
+// real time_entries.id (both are serial PKs starting at 1) when merged
+// into one array on the client.
+const TASK_ENTRY_ID_OFFSET = 1_000_000_000;
+
+/**
+ * Returns the task_time_entries logged against this project's tasks, mapped
+ * to a hours-only shape for the Rentabilidad screen.
+ */
+export async function getTaskTimeEntriesForProject(projectId: number): Promise<{
+  entries: ProjectTaskHourEntry[];
+}> {
+  const projectTasks = await db.select({ id: tasks.id })
+    .from(tasks)
+    .where(eq(tasks.projectId, projectId));
+
+  if (projectTasks.length === 0) return { entries: [] };
+
+  const taskIds = projectTasks.map(t => t.id);
+  const rows = await db.select({
+    id: taskTimeEntries.id,
+    personnelId: taskTimeEntries.personnelId,
+    hours: taskTimeEntries.hours,
+    description: taskTimeEntries.description,
+    date: taskTimeEntries.date,
+    personnelName: personnel.name,
+  })
+    .from(taskTimeEntries)
+    .innerJoin(personnel, eq(taskTimeEntries.personnelId, personnel.id))
+    .where(inArray(taskTimeEntries.taskId, taskIds));
+
+  const entries: ProjectTaskHourEntry[] = rows.map(r => ({
+    id: TASK_ENTRY_ID_OFFSET + r.id,
+    personnelId: r.personnelId,
+    personnelName: r.personnelName,
+    hours: r.hours,
+    description: r.description,
+    date: new Date(r.date),
+    source: "task",
+  }));
+
+  return { entries };
+}
+
+/**
+ * Sums every weekly planning estimate (task_weekly_estimates) entered for
+ * this project's tasks. Unlike the quotation's fixed estimatedHours, this
+ * reflects the team's week-by-week re-estimation as the work evolves.
+ */
+export async function getProjectPlannedHoursFromWeeklyEstimates(projectId: number): Promise<number> {
+  const [row] = await db.select({ total: sql<number>`COALESCE(SUM(${taskWeeklyEstimates.estimatedHours}), 0)` })
+    .from(taskWeeklyEstimates)
+    .innerJoin(tasks, eq(taskWeeklyEstimates.taskId, tasks.id))
+    .where(eq(tasks.projectId, projectId));
+
+  return Math.round((Number(row?.total) || 0) * 100) / 100;
 }

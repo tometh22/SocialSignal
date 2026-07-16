@@ -355,6 +355,7 @@ function NewTaskRow({ projectId, sectionName, onCreated, onCancel, allPersonnel,
 interface TaskRowProps {
   task: Task;
   allPersonnel: Personnel[];
+  projectMembers?: { personnelId: number; name: string; role: string }[];
   onOpen: (id: number, focusTime?: boolean) => void;
   onToggle: (task: Task) => void;
   onDateSet: (taskId: number, d: Date | undefined) => void;
@@ -371,12 +372,16 @@ interface TaskRowProps {
   isDragging?: boolean;
 }
 
-function TaskRow({ task, allPersonnel, onOpen, onToggle, onDateSet, onAssignee, onRename, onStatusChange, onDuplicate, isSubtask = false, clientName, subtaskMap, expandedSubtasks, onToggleSubtasks, dragHandleProps, isDragging }: TaskRowProps) {
+function TaskRow({ task, allPersonnel, projectMembers = [], onOpen, onToggle, onDateSet, onAssignee, onRename, onStatusChange, onDuplicate, isSubtask = false, clientName, subtaskMap, expandedSubtasks, onToggleSubtasks, dragHandleProps, isDragging }: TaskRowProps) {
   const [assigneeOpen, setAssigneeOpen] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState("");
   const assignee = allPersonnel.find(p => p.id === task.assigneeId);
   const collaborators = allPersonnel.filter(p => (task.collaboratorIds || []).includes(p.id));
+  // Solo miembros del proyecto son asignables; si el proyecto no tiene miembros
+  // registrados todavía, se cae al listado completo para no bloquear la asignación.
+  const memberIds = projectMembers.map(m => m.personnelId);
+  const assignableList = memberIds.length > 0 ? allPersonnel.filter(p => memberIds.includes(p.id)) : allPersonnel;
   const overdue = !!isOverdue(task);
   const dueSoon = isDueSoon(task);
   const dueThisWeek = isDueThisWeek(task);
@@ -538,7 +543,7 @@ function TaskRow({ task, allPersonnel, onOpen, onToggle, onDateSet, onAssignee, 
                   <div className="w-5 h-5 rounded-full border border-dashed border-muted-foreground/40 flex-shrink-0" />
                   <span className="text-muted-foreground">Sin asignar</span>
                 </button>
-                {allPersonnel.map(p => (
+                {assignableList.map(p => (
                   <button
                     key={p.id}
                     className={cn(
@@ -882,6 +887,7 @@ function SectionBlock({ sectionName, tasks, projectId, allPersonnel, projectMemb
               taskId={task.id}
               task={task}
               allPersonnel={allPersonnel}
+              projectMembers={projectMembers}
               onOpenTask={onOpenTask}
               onToggleTask={onToggleTask}
               onDateSet={onDateSet}
@@ -912,6 +918,7 @@ function SectionBlock({ sectionName, tasks, projectId, allPersonnel, projectMemb
                   key={task.id}
                   task={task}
                   allPersonnel={allPersonnel}
+                  projectMembers={projectMembers}
                   onOpen={onOpenTask}
                   onToggle={onToggleTask}
                   onDateSet={onDateSet}
@@ -976,10 +983,11 @@ function SectionBlock({ sectionName, tasks, projectId, allPersonnel, projectMemb
 
 // ─── Sortable wrappers ──────────────────────────────────────────────────────
 
-function SortableTaskRow({ taskId, task, allPersonnel, onOpenTask, onToggleTask, onDateSet, onAssignee, onRename, onStatusChange, onDuplicate, clientName, subtaskMap, expandedSubtasks, onToggleSubtasks }: {
+function SortableTaskRow({ taskId, task, allPersonnel, projectMembers, onOpenTask, onToggleTask, onDateSet, onAssignee, onRename, onStatusChange, onDuplicate, clientName, subtaskMap, expandedSubtasks, onToggleSubtasks }: {
   taskId: number;
   task: Task;
   allPersonnel: Personnel[];
+  projectMembers?: { personnelId: number; name: string; role: string }[];
   onOpenTask: (id: number, ft?: boolean) => void;
   onToggleTask: (task: Task) => void;
   onDateSet: (taskId: number, d: Date | undefined) => void;
@@ -1002,6 +1010,7 @@ function SortableTaskRow({ taskId, task, allPersonnel, onOpenTask, onToggleTask,
       <TaskRow
         task={task}
         allPersonnel={allPersonnel}
+        projectMembers={projectMembers}
         onOpen={onOpenTask}
         onToggle={onToggleTask}
         onDateSet={onDateSet}
@@ -1021,6 +1030,7 @@ function SortableTaskRow({ taskId, task, allPersonnel, onOpenTask, onToggleTask,
           key={sub.id}
           task={sub}
           allPersonnel={allPersonnel}
+          projectMembers={projectMembers}
           onOpen={onOpenTask}
           onToggle={onToggleTask}
           onDateSet={onDateSet}

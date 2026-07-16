@@ -60,6 +60,8 @@ interface ProjectAnalyticsProps {
   onTimeFilterChange: (filter: string) => void;
   isLoading: boolean;
   timeFilter: string;
+  /** Suma de las estimaciones semanales de planificación (task_weekly_estimates), además de la estimación fija de la cotización */
+  plannedHoursFromWeeklyEstimates?: number;
 }
 
 const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
@@ -77,7 +79,8 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
   onExpandChart,
   onTimeFilterChange,
   isLoading,
-  timeFilter
+  timeFilter,
+  plannedHoursFromWeeklyEstimates
 }) => {
   const [activeTab, setActiveTab] = useState("overview");
   
@@ -174,8 +177,13 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
               <CardContent className="p-4 pt-0">
                 <div className="text-2xl font-bold">{formatNumber(projectMetrics?.actualHours || 0, 1)}h</div>
                 <div className="text-xs text-muted-foreground mt-1">
-                  de {formatNumber(projectMetrics?.plannedHours || 0, 0)}h planificadas
+                  de {formatNumber(projectMetrics?.plannedHours || 0, 0)}h planificadas (cotización)
                 </div>
+                {typeof plannedHoursFromWeeklyEstimates === "number" && plannedHoursFromWeeklyEstimates > 0 && (
+                  <div className="text-xs text-muted-foreground">
+                    {formatNumber(plannedHoursFromWeeklyEstimates, 0)}h según planificación semanal
+                  </div>
+                )}
               </CardContent>
             </Card>
 

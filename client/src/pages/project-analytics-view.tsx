@@ -79,16 +79,14 @@ interface ActiveProject {
 
 interface TimeEntry {
   id: number;
-  projectId: number;
   personnelId: number;
   date: string;
   hours: number;
   description: string | null;
-  approved: boolean;
-  billable: boolean;
-  hourlyRate?: number;
-  hourlyRateAtTime?: number;
+  billable?: boolean;
   createdAt?: string;
+  personnelName?: string;
+  source?: "legacy" | "task";
 }
 
 interface Personnel {
@@ -154,8 +152,18 @@ const ProjectAnalyticsView: React.FC = () => {
     enabled: !!parsedProjectId,
   });
 
-  const { data: timeEntries = [], isLoading: isLoadingTimeEntries } = useQuery<TimeEntry[]>({
-    queryKey: [`/api/time-entries/project/${parsedProjectId}`],
+  const { data: profitabilityData, isLoading: isLoadingTimeEntries } = useQuery<{
+    entries: TimeEntry[];
+    warnings: { personnelId: number; personnelName: string | null; year: number; month: number }[];
+  }>({
+    queryKey: [`/api/projects/${parsedProjectId}/profitability-time-entries`],
+    enabled: !!parsedProjectId,
+  });
+  const timeEntries = profitabilityData?.entries ?? [];
+  const duplicateWarnings = profitabilityData?.warnings ?? [];
+
+  const { data: weeklyPlannedData } = useQuery<{ plannedHours: number }>({
+    queryKey: [`/api/tasks/planned-hours/${parsedProjectId}`],
     enabled: !!parsedProjectId,
   });
 
@@ -912,6 +920,17 @@ const ProjectAnalyticsView: React.FC = () => {
               </div>
             )}
 
+            {duplicateWarnings.length > 0 && (
+              <Alert className="mt-3 border-amber-300 bg-amber-50">
+                <AlertTitle className="text-amber-800 text-sm">Posibles horas duplicadas</AlertTitle>
+                <AlertDescription className="text-amber-700 text-xs">
+                  {duplicateWarnings.length} persona{duplicateWarnings.length !== 1 ? "s" : ""} tiene{duplicateWarnings.length === 1 ? "" : "n"} horas
+                  cargadas tanto en el registro manual como en Tareas para el mismo mes
+                  ({duplicateWarnings.map(w => `${w.personnelName || w.personnelId} (${w.month}/${w.year})`).join(", ")}).
+                  Revisar para evitar contar el mismo trabajo dos veces.
+                </AlertDescription>
+              </Alert>
+            )}
 
 </div>
             <ProjectAnalytics
@@ -930,6 +949,7 @@ const ProjectAnalyticsView: React.FC = () => {
               onTimeFilterChange={handleTimeFilterChange}
               isLoading={isLoading}
               timeFilter={timeFilter}
+              plannedHoursFromWeeklyEstimates={weeklyPlannedData?.plannedHours}
             />
           </div>
         </div>
