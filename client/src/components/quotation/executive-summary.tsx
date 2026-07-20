@@ -23,13 +23,23 @@ const ANALYSIS_LABELS: Record<string, string> = {
 
 export function ExecutiveSummary() {
   const { quotationData, baseCost, totalAmount, markupAmount } = useOptimizedQuote();
-  const { formatCurrency } = useCurrency();
+  const { formatCurrency, exchangeRate } = useCurrency();
   const [copied, setCopied] = useState(false);
 
   const client = quotationData.client;
   const project = quotationData.project;
   const team = quotationData.teamMembers || [];
   const currency = quotationData.quotationCurrency || 'ARS';
+
+  // baseCost/totalAmount del contexto siempre están en ARS (ver
+  // optimized-quote-context.tsx). Si la cotización se eligió en USD, hay que
+  // convertir antes de formatear — de lo contrario se muestra el número ARS
+  // etiquetado como si fuera USD (mismo bug ya corregido en currency-selection.tsx).
+  const effectiveRate = quotationData.exchangeRateSnapshot && quotationData.exchangeRateSnapshot > 0
+    ? quotationData.exchangeRateSnapshot
+    : exchangeRate;
+  const toDisplayCurrency = (amountARS: number) =>
+    currency === 'USD' && effectiveRate > 0 ? amountARS / effectiveRate : amountARS;
 
   const expiryDate = new Date();
   expiryDate.setDate(expiryDate.getDate() + 30);
@@ -40,7 +50,7 @@ export function ExecutiveSummary() {
   const projectTypeLabel = PROJECT_TYPE_LABELS[project?.type] || project?.type || '';
   const analysisLabel = ANALYSIS_LABELS[quotationData.analysisType] || quotationData.analysisType || '';
 
-  const fmt = (n: number) => formatCurrency(n, currency);
+  const fmt = (n: number) => formatCurrency(toDisplayCurrency(n), currency);
 
   // Email template
   const emailTemplate = `Estimado/a ${client?.contactName || 'cliente'},

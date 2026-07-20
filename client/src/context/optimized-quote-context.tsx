@@ -1161,6 +1161,17 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
         throw new Error("Debe agregar al menos un miembro al equipo antes de finalizar la cotización");
       }
 
+      // baseCost/complexityAdjustment/markupAmount/totalAmount siempre están
+      // en ARS internamente; si la cotización se eligió en USD hay que
+      // convertir antes de persistir (mismo criterio que handleDirectFinalize
+      // en currency-selection.tsx), para que quotation-detail.tsx no muestre
+      // el número ARS crudo etiquetado como USD.
+      const saveExchangeRate = quotationData.exchangeRateSnapshot || exchangeRate || 1;
+      const toStoredCurrency = (amountARS: number) =>
+        quotationData.quotationCurrency === 'USD' && saveExchangeRate > 0
+          ? amountARS / saveExchangeRate
+          : amountARS;
+
       const quotationPayload = {
         clientId: quotationData.client.id,
         projectName: quotationData.project.name,
@@ -1171,11 +1182,11 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
         countriesCovered: quotationData.countriesCovered || '1',
         clientEngagement: quotationData.clientEngagement || 'medium',
         templateId: quotationData.template?.id || null,
-        baseCost: baseCost || 0,
-        complexityAdjustment: complexityAdjustment || 0,
-        markupAmount: markupAmount || 0,
+        baseCost: toStoredCurrency(baseCost || 0),
+        complexityAdjustment: toStoredCurrency(complexityAdjustment || 0),
+        markupAmount: toStoredCurrency(markupAmount || 0),
         marginFactor: quotationData.financials.marginFactor || 2.0,
-        totalAmount: totalAmount || 0,
+        totalAmount: toStoredCurrency(totalAmount || 0),
         platformCost: quotationData.financials.platformCost || 0,
         deviationPercentage: quotationData.financials.deviationPercentage || 0,
         discountPercentage: quotationData.financials.discountPercentage || 0,

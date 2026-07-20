@@ -90,20 +90,23 @@ const CurrencySelection: React.FC = () => {
 
       // Los valores ya están disponibles desde el contexto
 
-      // Ajustar los montos según la moneda seleccionada
+      // Ajustar los montos según la moneda seleccionada.
+      // Los valores internos del contexto (totalAmount, baseCost, etc.) ya
+      // están en ARS (ver optimized-quote-context.tsx, "Keep costs in
+      // original currency (ARS)"), así que solo hay que convertir cuando la
+      // cotización final se guarda en USD — dividiendo por el TC efectivo.
       let finalTotalAmount = totalAmount;
       let finalBaseCost = baseCost;
-      let finalComplexityAdjustment = complexityAdjustment; 
+      let finalComplexityAdjustment = complexityAdjustment;
       let finalMarkupAmount = markupAmount;
 
-      if (quotationData.quotationCurrency === 'ARS') {
-        // Internal values are in USD, convert to ARS for storage using effective rate
-        finalTotalAmount = totalAmount * effectiveRate;
-        finalBaseCost = baseCost * effectiveRate;
-        finalComplexityAdjustment = complexityAdjustment * effectiveRate;
-        finalMarkupAmount = markupAmount * effectiveRate;
+      if (quotationData.quotationCurrency === 'USD' && effectiveRate > 0) {
+        finalTotalAmount = totalAmount / effectiveRate;
+        finalBaseCost = baseCost / effectiveRate;
+        finalComplexityAdjustment = complexityAdjustment / effectiveRate;
+        finalMarkupAmount = markupAmount / effectiveRate;
       }
-      // If USD, values are already in USD - no conversion needed
+      // If ARS, values are already in ARS - no conversion needed
 
       // Crear cotización con el formato correcto que espera el API
       const finalQuotationData = {
@@ -167,8 +170,9 @@ const CurrencySelection: React.FC = () => {
     }
   };
 
-  const totalInUSD = totalAmount;
-  const totalInARS = totalAmount * effectiveRate;
+  // totalAmount ya está en ARS (ver comentario en handleDirectFinalize).
+  const totalInARS = totalAmount;
+  const totalInUSD = effectiveRate > 0 ? totalAmount / effectiveRate : 0;
 
   return (
     <div className="space-y-6">
