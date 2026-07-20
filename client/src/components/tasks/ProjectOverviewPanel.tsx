@@ -1,7 +1,9 @@
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { authFetch } from "@/lib/queryClient";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { type LucideIcon, Loader2, AlertCircle, CheckCircle2, Clock, ListTodo, Users, Layers, Flag, Timer } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { isAfter, parseISO, startOfDay } from "date-fns";
@@ -79,6 +81,15 @@ function StatCard({ icon: Icon, label, value, sub, color }: {
 }
 
 export default function ProjectOverviewPanel({ projectId, members, projectColor }: Props) {
+  const [selectedSection, setSelectedSection] = useState<string>("all");
+
+  // Si el usuario navega de un proyecto a otro sin desmontar este componente,
+  // el filtro de sección no debe quedar "colgado" apuntando a una sección
+  // que puede no existir en el proyecto nuevo.
+  useEffect(() => {
+    setSelectedSection("all");
+  }, [projectId]);
+
   const { data, isLoading } = useQuery<{ tasks: Task[]; sections: Record<string, Task[]> }>({
     queryKey: ["/api/tasks/project", projectId],
     queryFn: () => authFetch(`/api/tasks/project/${projectId}`).then((r) => r.json()),
@@ -93,7 +104,10 @@ export default function ProjectOverviewPanel({ projectId, members, projectColor 
     );
   }
 
-  const allTasks: Task[] = (data?.tasks || []).filter((t) => !t.parentTaskId);
+  const allSectionNames = Object.keys(data?.sections || {});
+  const allTasks: Task[] = (data?.tasks || [])
+    .filter((t) => !t.parentTaskId)
+    .filter((t) => selectedSection === "all" || (t.sectionName || "General") === selectedSection);
   const today = startOfDay(new Date());
 
   const total = allTasks.length;
@@ -110,7 +124,7 @@ export default function ProjectOverviewPanel({ projectId, members, projectColor 
   const completionPct = total > 0 ? Math.round((done / total) * 100) : 0;
 
   const sections = data?.sections || {};
-  const sectionNames = Object.keys(sections);
+  const sectionNames = allSectionNames;
 
   const priorityBreakdown = ["urgent", "high", "medium", "low"].map((p) => ({
     key: p,
@@ -138,6 +152,24 @@ export default function ProjectOverviewPanel({ projectId, members, projectColor 
 
   return (
     <div className="space-y-6 py-4">
+      {/* Filtro por sección: por defecto el panel muestra todo el proyecto */}
+      {allSectionNames.length > 1 && (
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground">Ver:</span>
+          <Select value={selectedSection} onValueChange={setSelectedSection}>
+            <SelectTrigger className="h-8 w-56 text-sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Proyecto completo</SelectItem>
+              {allSectionNames.map((name) => (
+                <SelectItem key={name} value={name}>{name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
         <StatCard icon={ListTodo} label="Total tareas" value={total} />
@@ -310,7 +342,15 @@ export default function ProjectOverviewPanel({ projectId, members, projectColor 
             {sectionBreakdown.map((s) => {
               const pct = s.total > 0 ? Math.round((s.done / s.total) * 100) : 0;
               return (
-                <div key={s.name} className="flex items-center gap-4 px-5 py-3.5 hover:bg-muted/20 transition-colors">
+                <button
+                  type="button"
+                  key={s.name}
+                  onClick={() => setSelectedSection(prev => prev === s.name ? "all" : s.name)}
+                  className={cn(
+                    "w-full flex items-center gap-4 px-5 py-3.5 hover:bg-muted/20 transition-colors text-left",
+                    selectedSection === s.name && "bg-primary/5"
+                  )}
+                >
                   <span className="text-sm font-medium text-foreground w-36 flex-shrink-0 truncate">{s.name}</span>
                   <div className="flex-1 flex items-center gap-3">
                     <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden">
@@ -331,7 +371,7 @@ export default function ProjectOverviewPanel({ projectId, members, projectColor 
                       {formatHours(s.logged)}
                     </span>
                   )}
-                </div>
+                </button>
               );
             })}
           </div>

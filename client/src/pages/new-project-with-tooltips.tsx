@@ -48,6 +48,7 @@ const formSchema = z.object({
   clientId: z.number({ required_error: "El cliente es requerido" }),
   status: z.string().min(1, "El estado es requerido"),
   projectCategory: z.enum(["billable", "internal"]).default("billable"),
+  internalType: z.enum(["capacitacion", "automatizacion", "demo", "prospeccion", "otro"]).optional(),
   trackingFrequency: z.string().min(1, "La frecuencia es requerida"),
   startDate: z.date(),
   expectedEndDate: z.date().optional(),
@@ -166,7 +167,11 @@ export default function NewProjectWithTooltips() {
   });
 
   const onSubmit = (data: FormData) => {
-    createProjectMutation.mutate(data);
+    // internalType solo aplica a proyectos internos; si el usuario lo eligió
+    // y después volvió a "Facturable", react-hook-form conserva el valor
+    // aunque el campo deje de renderizarse — se limpia acá antes de enviar.
+    const payload = data.projectCategory === "internal" ? data : { ...data, internalType: undefined };
+    createProjectMutation.mutate(payload);
   };
 
   if (quotationsLoading || clientsLoading) {
@@ -352,6 +357,34 @@ export default function NewProjectWithTooltips() {
                       </FormItem>
                     )}
                   />
+
+                  {/* Subtipo de proyecto interno */}
+                  {form.watch("projectCategory") === "internal" && (
+                    <FormField
+                      control={form.control}
+                      name="internalType"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Tipo de proyecto interno</FormLabel>
+                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Seleccionar tipo" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="capacitacion">Capacitación</SelectItem>
+                              <SelectItem value="automatizacion">Automatización</SelectItem>
+                              <SelectItem value="demo">Demo</SelectItem>
+                              <SelectItem value="prospeccion">Prospección</SelectItem>
+                              <SelectItem value="otro">Otro</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
 
                   {/* Frecuencia */}
                   <FormField

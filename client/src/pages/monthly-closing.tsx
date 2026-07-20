@@ -171,12 +171,25 @@ export default function MonthlyClosing() {
     return !!adj && (adj.vacaciones > 0 || adj.feriados > 0 || adj.epicalGeneral > 0 || adj.discrecional !== 0);
   };
 
-  // Effective base hours for a person: default adjusted by category deductions
+  // Effective base hours for a person: default adjusted by category deductions.
+  // No aplica a freelance — ver effectiveHours.
   const effectiveBaseHours = (person: any): number => {
     const base = defaultBaseHours(person);
     const adj = hoursAdjustments[person.id];
     if (!adj) return base;
     return Math.max(0, base - (adj.vacaciones || 0) - (adj.feriados || 0) - (adj.epicalGeneral || 0) + (adj.discrecional || 0));
+  };
+
+  // Horas a facturar: para full-time/part-time es la base ajustada (fija,
+  // independiente de cuánto trabajaron). Para freelance el cálculo debe ser
+  // lineal por horas reales trabajadas, sin piso/techo de horas base — no
+  // tiene sentido ajustar por feriados/vacaciones a alguien que factura
+  // exactamente lo que trabajó.
+  const effectiveHours = (person: any): number => {
+    if ((person.contractType || "full-time").toLowerCase() === "freelance") {
+      return realHoursMap[person.id] ?? 0;
+    }
+    return effectiveBaseHours(person);
   };
 
   // Suggested feriado hours for a person this month (holidays × daily hours)
@@ -186,7 +199,7 @@ export default function MonthlyClosing() {
   };
 
   const doClose = (person: any) => {
-    const hrs = effectiveBaseHours(person);
+    const hrs = effectiveHours(person);
     const { rate } = getEffectiveRate(person);
     if (rate <= 0) {
       toast({
@@ -247,7 +260,7 @@ export default function MonthlyClosing() {
   // Facturas" (que también lee del registro de cierre una vez cerrado).
   const getCostDisplay = (person: any) => {
     const closing = getClosing(person.id);
-    const hrs = closing ? closing.adjustedHours : effectiveBaseHours(person);
+    const hrs = closing ? closing.adjustedHours : effectiveHours(person);
     const billing = getBillingCurrency(person);
     const rate = closing ? closing.hourlyRate : getEffectiveRate(person).rate; // ARS o USD según billingCurrency
     const fx = closing?.exchangeRateAtClose || exchangeRate;
@@ -411,7 +424,7 @@ export default function MonthlyClosing() {
               <tbody>
                 {filteredPersonnel.map((p: any) => {
                   const closing = getClosing(p.id);
-                  const baseHrs = closing ? closing.adjustedHours : effectiveBaseHours(p);
+                  const baseHrs = closing ? closing.adjustedHours : effectiveHours(p);
                   const cost = getCostDisplay(p);
                   const billing = getBillingCurrency(p);
                   const isRowPending = closingPersonnelId === p.id && closeMutation.isPending;
@@ -437,6 +450,12 @@ export default function MonthlyClosing() {
                         </Badge>
                       </td>
                       <td className="text-center py-2 px-3">
+                        {(p.contractType || "full-time").toLowerCase() === "freelance" ? (
+                          // Freelance: horas reales trabajadas, sin ajustes de horas base (no aplica).
+                          <span className="text-sm font-medium" title="Cálculo lineal por horas reales trabajadas">
+                            {baseHrs}h <span className="text-[10px] text-muted-foreground">(real)</span>
+                          </span>
+                        ) : (
                         <div className="relative">
                           <button
                             className={`flex items-center gap-1 justify-center mx-auto text-sm font-medium hover:text-primary transition-colors ${hasAdjustment(p.id) ? "text-amber-700" : ""}`}
@@ -505,11 +524,12 @@ export default function MonthlyClosing() {
                             </div>
                           )}
                         </div>
+                        )}
                       </td>
                       <td className="text-center py-2 px-3">
                         {(() => {
                           const real = realHoursMap[p.id] ?? 0;
-                          const over = real > baseHrs;
+                          const over = (p.contractType || "full-time").toLowerCase() === "freelance" ? false : real > baseHrs;
                           return (
                             <span className={over ? "text-red-600 font-medium" : real > 0 ? "text-foreground" : "text-muted-foreground"} title="Horas reales cargadas (tareas + time entries)">
                               {real.toFixed(1)}h

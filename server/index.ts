@@ -576,6 +576,12 @@ async function applyPendingMigrations() {
         ON "client_billing_entities"("client_id") WHERE "is_default" = true;
     `);
 
+    // 0030_active_projects_internal_type: subtipo para proyectos internos no
+    // facturables (capacitación, automatización, demo, etc.)
+    await run('0030 active_projects internal_type', `
+      ALTER TABLE "active_projects" ADD COLUMN IF NOT EXISTS "internal_type" TEXT;
+    `);
+
   } finally {
     client.release();
   }
