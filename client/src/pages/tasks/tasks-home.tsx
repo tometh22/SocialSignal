@@ -14,6 +14,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { usePermissions } from "@/hooks/use-permissions";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import TaskCalendarView from "@/components/tasks/TaskCalendarView";
 
 type Task = {
   id: number;
@@ -623,6 +624,25 @@ export default function TasksHomePage() {
               </Button>
             </Link>
           </div>
+        </div>
+      </div>
+
+      {/* Calendario de mis tareas — embebido en la home (estilo Asana), apilado
+          debajo de Mis tareas y Proyectos. Muestra el período (inicio→entrega)
+          de cada tarea asignada. */}
+      <div className="bg-card rounded-xl border shadow-sm overflow-hidden">
+        <div className="flex items-center gap-2 px-4 pt-4 pb-2">
+          <CalendarIcon className="h-4 w-4 text-primary" />
+          <h2 className="text-sm font-semibold">Mi calendario</h2>
+          <span className="text-xs text-muted-foreground hidden sm:inline">· tus tareas por día</span>
+          <Link href="/tasks/my-tasks" className="ml-auto">
+            <Button variant="ghost" size="sm" className="h-6 text-xs text-muted-foreground hover:text-primary px-2">
+              Ver todo <ChevronRight className="h-3 w-3 ml-0.5" />
+            </Button>
+          </Link>
+        </div>
+        <div className="px-2 pb-3">
+          <TaskCalendarView tasks={myTasks as any} />
         </div>
       </div>
 

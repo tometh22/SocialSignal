@@ -1016,6 +1016,10 @@ export const activeProjects = pgTable("active_projects", {
   id: serial("id").primaryKey(),
   quotationId: integer("quotation_id").references(() => quotations.id), // nullable — projects can be created without a quotation
   clientId: integer("client_id").notNull().references(() => clients.id),
+  // Nombre propio del proyecto. Se usa cuando NO hay cotización (proyectos internos,
+  // demos, o creados desde Tareas). Cuando hay cotización, el nombre canónico sigue
+  // saliendo de quotations.project_name; este campo actúa como fallback: COALESCE(name, project_name).
+  name: text("name"),
   status: text("status").notNull().default("active"), // active, completed, cancelled, on-hold, delivered, invoiced, voided
   startDate: timestamp("start_date").notNull(),
   expectedEndDate: timestamp("expected_end_date"),
@@ -3906,6 +3910,31 @@ export const insertPersonalMonthlyInvoiceSchema = createInsertSchema(personalMon
 
 export type PersonalMonthlyInvoice = typeof personalMonthlyInvoices.$inferSelect;
 export type InsertPersonalMonthlyInvoice = z.infer<typeof insertPersonalMonthlyInvoiceSchema>;
+
+// Tipo de cambio propio de cada persona por período, para "Mis Facturas". No depende
+// del TC de Operaciones: cada uno usa el TC de su banco. Para quienes facturan mixto
+// (parte USD / parte ARS) hay dos TC: uno para valuar el tramo USD y otro el tramo ARS.
+export const personalFxOverrides = pgTable("personal_fx_overrides", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  period: varchar("period", { length: 7 }).notNull(), // YYYY-MM
+  fxUsd: doublePrecision("fx_usd"), // TC para valuar el tramo USD → ARS (y ARS→USD en facturación ARS)
+  fxArs: doublePrecision("fx_ars"), // TC para valuar el tramo ARS → USD (solo mixto)
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (t) => ({
+  uqUserPeriod: unique("personal_fx_overrides_user_period_unique").on(t.userId, t.period),
+  idxUser: index("idx_pfx_user").on(t.userId),
+}));
+
+export const insertPersonalFxOverrideSchema = createInsertSchema(personalFxOverrides).omit({
+  id: true,
+  updatedAt: true,
+}).extend({
+  period: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, "Formato YYYY-MM"),
+});
+
+export type PersonalFxOverride = typeof personalFxOverrides.$inferSelect;
+export type InsertPersonalFxOverride = z.infer<typeof insertPersonalFxOverrideSchema>;
 
 // ==================== PROVEEDORES EXTERNOS ====================
 // Un proveedor externo es un usuario con role='external_provider' que accede sólo

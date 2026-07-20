@@ -44,6 +44,14 @@ export default function NewProjectDialog({ open, onClose }: Props) {
   const [colorIndex, setColorIndex] = useState(0);
   const [privacy, setPrivacy] = useState<"team" | "private">("team");
   const [activeProjectId, setActiveProjectId] = useState<string>("none");
+  const [clientId, setClientId] = useState<string>("none");
+
+  const { data: clientsRaw } = useQuery<any[]>({
+    queryKey: ["/api/clients"],
+    queryFn: () => authFetch("/api/clients").then(r => r.json()),
+    enabled: open,
+  });
+  const clients = Array.isArray(clientsRaw) ? clientsRaw : [];
 
   const { data: taskProjectsRaw } = useQuery<any[]>({
     queryKey: ["/api/tasks/projects"],
@@ -82,6 +90,7 @@ export default function NewProjectDialog({ open, onClose }: Props) {
     setColorIndex(0);
     setPrivacy("team");
     setActiveProjectId("none");
+    setClientId("none");
   };
 
   const handleCreate = () => {
@@ -96,6 +105,9 @@ export default function NewProjectDialog({ open, onClose }: Props) {
       if (!name.trim()) return;
       createMutation.mutate({
         name: name.trim(),
+        // Con cliente → proyecto unificado (aparece en Vista de Proyectos y Tareas).
+        // Sin cliente → lista de tareas propia.
+        clientId: clientId !== "none" ? parseInt(clientId) : undefined,
         colorIndex,
         privacy,
         personnelId: myPersonnel?.id,
@@ -151,6 +163,27 @@ export default function NewProjectDialog({ open, onClose }: Props) {
             </Select>
             <p className="text-xs text-muted-foreground">Si elegís un proyecto de cliente, el nombre y las tareas se vinculan a ese proyecto.</p>
           </div>
+
+          {/* Client selector — crea un proyecto unificado (aparece en Vista de Proyectos) */}
+          {activeProjectId === "none" && (
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium">Cliente <span className="text-muted-foreground font-normal">(opcional)</span></Label>
+              <Select value={clientId} onValueChange={setClientId}>
+                <SelectTrigger className="h-9 text-sm">
+                  <SelectValue placeholder="Sin cliente (lista propia)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Sin cliente (lista propia)</SelectItem>
+                  {clients.map((c: any) => (
+                    <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Con cliente, el proyecto aparece también en <span className="font-medium">Vista de Proyectos</span> (sin cotización). Sin cliente, queda como lista de tareas propia.
+              </p>
+            </div>
+          )}
 
           {/* Color */}
           <div className="space-y-2">

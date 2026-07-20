@@ -46,6 +46,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 const formSchema = z.object({
   quotationId: z.number().optional(),
   clientId: z.number({ required_error: "El cliente es requerido" }),
+  name: z.string().optional(),
   status: z.string().min(1, "El estado es requerido"),
   projectCategory: z.enum(["billable", "internal"]).default("billable"),
   internalType: z.enum(["capacitacion", "automatizacion", "demo", "prospeccion", "otro"]).optional(),
@@ -167,10 +168,16 @@ export default function NewProjectWithTooltips() {
   });
 
   const onSubmit = (data: FormData) => {
+    // Sin cotización, el nombre es obligatorio (no hay quotations.project_name del cual tomarlo).
+    if (!data.quotationId && !(data.name && data.name.trim())) {
+      form.setError("name", { message: "Poné un nombre al proyecto (no hay cotización de la cual tomarlo)" });
+      return;
+    }
     // internalType solo aplica a proyectos internos; si el usuario lo eligió
     // y después volvió a "Facturable", react-hook-form conserva el valor
     // aunque el campo deje de renderizarse — se limpia acá antes de enviar.
-    const payload = data.projectCategory === "internal" ? data : { ...data, internalType: undefined };
+    const cleaned = data.projectCategory === "internal" ? data : { ...data, internalType: undefined };
+    const payload = { ...cleaned, name: cleaned.name?.trim() || undefined };
     createProjectMutation.mutate(payload);
   };
 
@@ -268,6 +275,28 @@ export default function NewProjectWithTooltips() {
                     </FormItem>
                   )}
                 />
+
+                {/* Nombre del proyecto – requerido cuando no hay cotización (el nombre
+                    no puede salir de quotations.project_name). Con cotización, opcional. */}
+                {!form.watch('quotationId') && (
+                  <FormField
+                    control={form.control}
+                    name="name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Nombre del proyecto</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="Ej. Fee mensual, Demo interno, Automatización…"
+                            value={field.value ?? ""}
+                            onChange={field.onChange}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
 
                 {/* Client selector – shown only when no quotation is selected */}
                 {!form.watch('quotationId') && (

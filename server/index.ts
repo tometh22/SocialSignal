@@ -582,6 +582,51 @@ async function applyPendingMigrations() {
       ALTER TABLE "active_projects" ADD COLUMN IF NOT EXISTS "internal_type" TEXT;
     `);
 
+    // 0033 Diagnóstico de Mind — ajustes de datos de personas (antes en el script
+    // manual server/scripts/fix-personnel-diagnostic.ts). Idempotentes: solo escriben
+    // si el valor difiere, matchean por nombre (case-insensitive).
+    //  - Ali Crosa y Sandra Alice facturan en USD.
+    //  - Sol no debe aparecer en cotizaciones desde mayo 2026.
+    //  - Cata Astiz dada de baja: no debe aparecer desde junio 2026.
+    await run('0033 personnel Ali Crosa → USD', `
+      UPDATE "personnel" SET "billing_currency" = 'USD'
+      WHERE "name" ILIKE '%ali%cros%' AND "billing_currency" IS DISTINCT FROM 'USD';
+    `);
+    await run('0033 personnel Sandra Alice → USD', `
+      UPDATE "personnel" SET "billing_currency" = 'USD'
+      WHERE "name" ILIKE '%sandra%' AND "billing_currency" IS DISTINCT FROM 'USD';
+    `);
+    await run('0033 personnel Sol → activeUntil 2026-05-01', `
+      UPDATE "personnel" SET "active_until" = '2026-05-01'
+      WHERE "name" ILIKE 'sol %' AND "active_until" IS DISTINCT FROM '2026-05-01';
+    `);
+    await run('0033 personnel Cata Astiz → activeUntil 2026-06-01', `
+      UPDATE "personnel" SET "active_until" = '2026-06-01'
+      WHERE "name" ILIKE '%cata%astiz%' AND "active_until" IS DISTINCT FROM '2026-06-01';
+    `);
+
+    // 0035 Diagnóstico de Mind — nombre propio de active_projects. Permite crear
+    // proyectos sin cotización (el nombre ya no depende de quotations.project_name) y
+    // que aparezcan en el módulo de Tareas. COALESCE(name, project_name) en los listados.
+    await run('0035 active_projects name', `
+      ALTER TABLE "active_projects" ADD COLUMN IF NOT EXISTS "name" TEXT;
+    `);
+
+    // 0034 Diagnóstico de Mind — TC propio por persona/período para "Mis Facturas"
+    // (independiente del TC de Operaciones; dos TC para quienes facturan mixto).
+    await run('0034 personal_fx_overrides table', `
+      CREATE TABLE IF NOT EXISTS "personal_fx_overrides" (
+        "id" SERIAL PRIMARY KEY,
+        "user_id" INTEGER NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
+        "period" VARCHAR(7) NOT NULL,
+        "fx_usd" DOUBLE PRECISION,
+        "fx_ars" DOUBLE PRECISION,
+        "updated_at" TIMESTAMP NOT NULL DEFAULT now(),
+        CONSTRAINT "personal_fx_overrides_user_period_unique" UNIQUE("user_id","period")
+      );
+      CREATE INDEX IF NOT EXISTS "idx_pfx_user" ON "personal_fx_overrides"("user_id");
+    `);
+
   } finally {
     client.release();
   }
@@ -634,9 +679,17 @@ app.use(cors({
 
 const isProduction = process.env.NODE_ENV === 'production';
 
-// Health check endpoint
+// Health check endpoint. Incluye el commit deployado (Railway lo expone en
+// RAILWAY_GIT_COMMIT_SHA) para poder verificar rápido si el deploy está actualizado:
+//   curl https://mind.epical.digital/api/health
 app.get("/api/health", (req, res) => {
-  res.json({ status: "ok", timestamp: new Date().toISOString() });
+  res.json({
+    status: "ok",
+    timestamp: new Date().toISOString(),
+    commit: process.env.RAILWAY_GIT_COMMIT_SHA || process.env.RENDER_GIT_COMMIT || process.env.GIT_COMMIT || "unknown",
+    branch: process.env.RAILWAY_GIT_BRANCH || process.env.RENDER_GIT_BRANCH || "unknown",
+    deployedAt: process.env.RAILWAY_DEPLOYMENT_ID || "unknown",
+  });
 });
 
 // ==================== LOOKER STUDIO / BI ENDPOINTS ====================
