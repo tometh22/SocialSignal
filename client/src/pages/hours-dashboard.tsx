@@ -80,7 +80,9 @@ export default function HoursDashboardPage() {
   const [page, setPage] = useState(0);
 
   const { dateFrom, dateTo } = quickFilter === "custom"
-    ? { dateFrom: customFrom ? new Date(customFrom).toISOString() : "", dateTo: customTo ? new Date(customTo).toISOString() : "" }
+    // Parsear el input date-only como fecha LOCAL (agregar "T00:00:00"), no como UTC,
+    // para que la ventana de días hábiles no se corra un día (timezone).
+    ? { dateFrom: customFrom ? new Date(customFrom + "T00:00:00").toISOString() : "", dateTo: customTo ? new Date(customTo + "T00:00:00").toISOString() : "" }
     : getDateRange(quickFilter);
 
   const { data: allPersonnel = [] } = useQuery<Personnel[]>({
@@ -174,7 +176,7 @@ export default function HoursDashboardPage() {
       // Freelance u persona sin jornada base → no se muestran horas disponibles.
       if (!me) return { availableHours: 0, absenceWorkdays: absentWorkdays, availableBasis: "freelance (sin jornada base)" };
       const daily = me.dailyHours || 8;
-      const label = me.contractType === "part-time" ? "part-time (6h/día)" : `full-time (${daily}h/día)`;
+      const label = `${me.contractType === "part-time" ? "part-time" : "full-time"} (${daily}h/día)`;
       return { availableHours: Math.round((workdays - absentWorkdays) * daily), absenceWorkdays: absentWorkdays, availableBasis: label };
     }
 

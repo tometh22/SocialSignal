@@ -16,11 +16,13 @@ import { ilike, eq } from "drizzle-orm";
 
 type Patch = { match: string; set: Partial<typeof personnel.$inferInsert>; label: string };
 
+// Nombres anclados por nombre completo para no matchear a otras personas
+// (ej. "Alessandra"/"Cassandra" con un "%sandra%").
 const PATCHES: Patch[] = [
-  { match: "%ali%cros%", set: { billingCurrency: "USD" }, label: "Ali Crosa → billingCurrency=USD" },
-  { match: "%sandra%", set: { billingCurrency: "USD" }, label: "Sandra Alice → billingCurrency=USD" },
-  { match: "sol %", set: { activeUntil: "2026-05-01" }, label: "Sol → activeUntil=2026-05-01" },
-  { match: "%cata%astiz%", set: { activeUntil: "2026-06-01" }, label: "Cata Astiz → activeUntil=2026-06-01" },
+  { match: "ali crosa%", set: { billingCurrency: "USD" }, label: "Ali Crosa → billingCurrency=USD" },
+  { match: "sandra alice%", set: { billingCurrency: "USD" }, label: "Sandra Alice → billingCurrency=USD" },
+  { match: "sol ayala%", set: { activeUntil: "2026-05-01" }, label: "Sol Ayala → activeUntil=2026-05-01" },
+  { match: "cata astiz%", set: { activeUntil: "2026-06-01" }, label: "Cata Astiz → activeUntil=2026-06-01" },
 ];
 
 async function main() {
