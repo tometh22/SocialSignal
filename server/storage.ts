@@ -1341,50 +1341,62 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getActiveProjectsByClient(clientId: number): Promise<(ActiveProject & { quotation: Quotation })[]> {
-    const clientQuotations = await db.select().from(quotations).where(eq(quotations.clientId, clientId));
-    const clientQuotationIds = clientQuotations.map(q => q.id);
+    // Filtra por activeProjects.clientId (no por las cotizaciones del cliente), con
+    // LEFT JOIN, para incluir también los proyectos sin cotización de ese cliente.
+    const projects = await db.select({
+      project: activeProjects,
+      quotation: quotations,
+    })
+    .from(activeProjects)
+    .leftJoin(quotations, eq(activeProjects.quotationId, quotations.id))
+    .where(eq(activeProjects.clientId, clientId));
 
-    const result = [];
-    for (const quotationId of clientQuotationIds) {
-      const projects = await db.select({
-        project: activeProjects,
-        quotation: quotations
-      })
-      .from(activeProjects)
-      .innerJoin(quotations, eq(activeProjects.quotationId, quotations.id))
-      .where(eq(quotations.id, quotationId));
-
-      for (const item of projects) {
-        result.push({
-          ...item.project,
-          quotation: item.quotation
-        });
-      }
-    }
-
-    return result;
+    return projects.map(item => {
+      const quotation = item.quotation
+        ? item.quotation
+        : ({
+            id: null,
+            projectName: item.project.name || "Proyecto sin nombre",
+            clientId: item.project.clientId,
+            totalAmount: item.project.budget ?? 0,
+          } as any);
+      return {
+        ...item.project,
+        quotation,
+      };
+    });
   }
 
   async getActiveProject(id: number): Promise<(ActiveProject & { quotation: Quotation & { client?: Client } }) | undefined> {
+    // LEFT JOIN a quotations (igual que getActiveProjects): un proyecto sin cotización
+    // debe resolverse (abrir/borrar/costos), no dar 404. El cliente sale de
+    // activeProjects.clientId. Sin cotización se sintetiza un stub mínimo.
     const projects = await db.select({
       project: activeProjects,
       quotation: quotations,
       client: clients
     })
     .from(activeProjects)
-    .innerJoin(quotations, eq(activeProjects.quotationId, quotations.id))
-    .leftJoin(clients, eq(quotations.clientId, clients.id))
+    .leftJoin(quotations, eq(activeProjects.quotationId, quotations.id))
+    .leftJoin(clients, eq(activeProjects.clientId, clients.id))
     .where(eq(activeProjects.id, id));
 
     if (projects.length === 0) return undefined;
 
     const item = projects[0];
+    const client = item.client || undefined;
+    const quotation = item.quotation
+      ? { ...item.quotation, client }
+      : ({
+          id: null,
+          projectName: item.project.name || "Proyecto sin nombre",
+          clientId: item.project.clientId,
+          totalAmount: item.project.budget ?? 0,
+          client,
+        } as any);
     return {
       ...item.project,
-      quotation: {
-        ...item.quotation,
-        client: item.client || undefined
-      }
+      quotation,
     };
   }
 

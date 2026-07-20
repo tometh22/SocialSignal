@@ -3747,8 +3747,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await tx.execute(sql`UPDATE client_modo_comments SET client_id = ${targetId} WHERE client_id = ${sourceId}`);
         await tx.execute(sql`UPDATE quarterly_nps_surveys SET client_id = ${targetId} WHERE client_id = ${sourceId}`);
 
-        // Tablas con FK opcional
-        await tx.execute(sql`UPDATE google_sheets_sales SET client_id = ${targetId} WHERE client_id = ${sourceId}`);
+        // Tablas con FK opcional. En google_sheets_sales el P&L por cliente lee por
+        // NOMBRE (client_name), así que además de reasignar client_id hay que
+        // renombrar al del target para que la facturación consolide.
+        await tx.execute(sql`UPDATE google_sheets_sales SET client_id = ${targetId}, client_name = ${target.name} WHERE client_id = ${sourceId}`);
         await tx.execute(sql`UPDATE crm_leads SET client_id = ${targetId} WHERE client_id = ${sourceId}`);
         await tx.execute(sql`UPDATE activo_entries SET cliente_id = ${targetId} WHERE cliente_id = ${sourceId}`);
 
@@ -9309,8 +9311,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       ));
       if (row) savedFx = { fxUsd: row.fxUsd, fxArs: row.fxArs };
     }
-    const personalFxUsd = fxOverride?.fxUsd ?? savedFx.fxUsd ?? null;
-    const personalFxArs = fxOverride?.fxArs ?? savedFx.fxArs ?? null;
+    // let: si el mes está cerrado se anulan más abajo para respetar el TC del cierre.
+    let personalFxUsd = fxOverride?.fxUsd ?? savedFx.fxUsd ?? null;
+    let personalFxArs = fxOverride?.fxArs ?? savedFx.fxArs ?? null;
 
     async function getPeriodFxRate(): Promise<number> {
       const fxRow = await db.select({ rate: exchangeRates.rate })
@@ -9362,6 +9365,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       eq(monthlyClosings.year, yyyy),
       eq(monthlyClosings.month, mm),
     ));
+
+    // Mes cerrado = valores definitivos. Se ignora el TC propio de la persona para
+    // no contradecir el TC del cierre (Cierre Mensual es la fuente de verdad).
+    if (closing) {
+      personalFxUsd = null;
+      personalFxArs = null;
+    }
 
     let hours: number;
     let entryCount: number;
@@ -18235,7 +18245,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Enrich entries with task/personnel info
       const allPersonnel = await db.select({ id: personnel.id, name: personnel.name }).from(personnel);
-      const allTasks = await db.select({ id: tasks.id, title: tasks.title, projectId: tasks.projectId, assigneeId: tasks.assigneeId, estimatedHours: tasks.estimatedHours }).from(tasks);
+      const allTasks = await db.select({ id: tasks.id, title: tasks.title, projectId: tasks.projectId, assigneeId: tasks.assigneeId, estimatedHours: tasks.estimatedHours, parentTaskId: tasks.parentTaskId }).from(tasks);
       
       const projectsWithNames = await db.execute(sql`
         SELECT ap.id, COALESCE(ap.name, q.project_name) as project_name, c.name as client_name
@@ -18278,10 +18288,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (!byProjectMap[key]) byProjectMap[key] = { name: key, hours: 0, estimatedHours: 0 };
         byProjectMap[key].hours += e.hours;
       }
-      // Horas estimadas por proyecto: suma de tasks.estimatedHours dentro del scope
-      // filtrado (y de la persona, si se filtró por persona).
+      // Scope de proyectos: el proyecto filtrado, o todos los que tienen tareas.
+      const scopeProjectIds = projectId
+        ? [parseInt(projectId as string)]
+        : [...new Set(allTasks.map(t => t.projectId).filter(Boolean) as number[])];
+
+      // Horas estimadas por proyecto: mismo scope que las reales (proyecto y persona),
+      // y SOLO tareas raíz (excluye subtareas) para reconciliar con byPerson y no
+      // doble-contar padre + hijos. (Las estimadas son all-time por tarea, no por fecha.)
       for (const t of allTasks) {
         if (!t.estimatedHours || t.estimatedHours <= 0) continue;
+        if (t.parentTaskId) continue; // subtareas no suman al total del proyecto
+        if (t.projectId && !scopeProjectIds.includes(t.projectId)) continue;
         if (personnelId && t.assigneeId !== parseInt(personnelId as string)) continue;
         const proj = t.projectId ? projectMap.get(t.projectId) : null;
         const key = proj?.name || "Sin proyecto";
@@ -18298,11 +18316,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Estimated hours: sum tasks.estimatedHours for each assignee in the filtered project scope
-      const scopeProjectIds = projectId
-        ? [parseInt(projectId as string)]
-        : [...new Set(allTasks.map(t => t.projectId).filter(Boolean) as number[])];
       for (const t of allTasks) {
         if (!t.assigneeId || !t.estimatedHours || t.estimatedHours <= 0) continue;
+        if (t.parentTaskId) continue; // subtareas no suman (consistencia con byProject)
         if (t.projectId && !scopeProjectIds.includes(t.projectId)) continue;
         if (!byPersonMap[t.assigneeId]) {
           const p = allPersonnel.find(p => p.id === t.assigneeId);
@@ -18326,6 +18342,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const activeTeam = teamRows
         .filter(p => (p.contractType ?? 'full-time') !== 'freelance')
         .filter(p => !p.activeUntil || p.activeUntil > today)
+        // Excluir a quien tenga 0 horas base (licencia/pausa): no aporta capacidad
+        // y con `|| 160` inflaría las disponibles del equipo.
+        .filter(p => p.monthlyHours == null || p.monthlyHours > 0)
         .map(p => ({
           id: p.id, name: p.name,
           contractType: p.contractType ?? 'full-time',
