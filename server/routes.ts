@@ -6,9 +6,10 @@ import { z } from "zod";
 import { getDateRangeForFilter } from "./utils/dateRange";
 import { parseMoneyAuto } from "./utils/money";
 import { projectKey, normalizeKey } from "./utils/normalize";
-import { 
-  insertClientSchema, 
-  insertRoleSchema, 
+import {
+  insertClientSchema,
+  insertClientBillingEntitySchema,
+  insertRoleSchema,
   insertPersonnelSchema, 
   insertReportTemplateSchema, 
   insertQuotationSchema,
@@ -54,6 +55,7 @@ import {
   clientModoComments,
   activeProjects,
   clients,
+  clientBillingEntities,
   quotations,
   quotationVariants,
   timeEntries,
@@ -3696,6 +3698,79 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting client:", error);
       res.status(500).json({ message: "Failed to delete client" });
+    }
+  });
+
+  // Entidades de facturación de un cliente (razón social / país / tax id).
+  // Un mismo cliente puede tener más de una, para casos como Uber facturando
+  // bajo entidades distintas según el proyecto.
+  app.get("/api/clients/:id/billing-entities", requireAuth, async (req, res) => {
+    const clientId = parseInt(req.params.id);
+    if (isNaN(clientId)) return res.status(400).json({ message: "Invalid client ID" });
+    try {
+      const entities = await db.select().from(clientBillingEntities)
+        .where(eq(clientBillingEntities.clientId, clientId))
+        .orderBy(desc(clientBillingEntities.isDefault), clientBillingEntities.id);
+      res.json(entities);
+    } catch (error) {
+      console.error("Error fetching client billing entities:", error);
+      res.status(500).json({ message: "Failed to fetch billing entities" });
+    }
+  });
+
+  app.post("/api/clients/:id/billing-entities", requireAuth, async (req, res) => {
+    const clientId = parseInt(req.params.id);
+    if (isNaN(clientId)) return res.status(400).json({ message: "Invalid client ID" });
+    try {
+      const parsed = insertClientBillingEntitySchema.parse({ ...req.body, clientId });
+      const created = await db.transaction(async (tx) => {
+        if (parsed.isDefault) {
+          await tx.update(clientBillingEntities).set({ isDefault: false }).where(eq(clientBillingEntities.clientId, clientId));
+        }
+        const [row] = await tx.insert(clientBillingEntities).values(parsed).returning();
+        return row;
+      });
+      res.status(201).json(created);
+    } catch (error: any) {
+      if (error?.issues) return res.status(400).json({ message: "Datos inválidos", issues: error.issues });
+      console.error("Error creating client billing entity:", error);
+      res.status(500).json({ message: "Failed to create billing entity" });
+    }
+  });
+
+  app.patch("/api/clients/billing-entities/:entityId", requireAuth, async (req, res) => {
+    const entityId = parseInt(req.params.entityId);
+    if (isNaN(entityId)) return res.status(400).json({ message: "Invalid billing entity ID" });
+    try {
+      const [existing] = await db.select().from(clientBillingEntities).where(eq(clientBillingEntities.id, entityId));
+      if (!existing) return res.status(404).json({ message: "Billing entity not found" });
+
+      const parsed = insertClientBillingEntitySchema.partial().parse(req.body);
+      const updated = await db.transaction(async (tx) => {
+        if (parsed.isDefault) {
+          await tx.update(clientBillingEntities).set({ isDefault: false }).where(eq(clientBillingEntities.clientId, existing.clientId));
+        }
+        const [row] = await tx.update(clientBillingEntities).set(parsed)
+          .where(eq(clientBillingEntities.id, entityId)).returning();
+        return row;
+      });
+      res.json(updated);
+    } catch (error: any) {
+      if (error?.issues) return res.status(400).json({ message: "Datos inválidos", issues: error.issues });
+      console.error("Error updating client billing entity:", error);
+      res.status(500).json({ message: "Failed to update billing entity" });
+    }
+  });
+
+  app.delete("/api/clients/billing-entities/:entityId", requireAuth, async (req, res) => {
+    const entityId = parseInt(req.params.entityId);
+    if (isNaN(entityId)) return res.status(400).json({ message: "Invalid billing entity ID" });
+    try {
+      await db.delete(clientBillingEntities).where(eq(clientBillingEntities.id, entityId));
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting client billing entity:", error);
+      res.status(500).json({ message: "Failed to delete billing entity" });
     }
   });
 

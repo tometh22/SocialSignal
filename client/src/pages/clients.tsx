@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { useImageRefresh } from "@/contexts/ImageRefreshContext";
-import type { Client, InsertClient } from "@shared/schema";
+import type { Client, InsertClient, ClientBillingEntity } from "@shared/schema";
 
 // Componente de imagen robusto para logos
 const ClientLogo = ({ client }: { client: Client }) => {
@@ -70,6 +70,123 @@ const clientSchema = z.object({
 });
 
 type ClientFormValues = z.infer<typeof clientSchema>;
+
+// Entidades de facturación (razón social / país / tax id) de un cliente.
+// Permite que un mismo cliente (ej. Uber) facture bajo más de una entidad.
+function BillingEntitiesSection({ clientId }: { clientId: number }) {
+  const { toast } = useToast();
+  const [razonSocial, setRazonSocial] = useState("");
+  const [country, setCountry] = useState("");
+  const [taxId, setTaxId] = useState("");
+
+  const entitiesQuery = useQuery<ClientBillingEntity[]>({
+    queryKey: [`/api/clients/${clientId}/billing-entities`],
+  });
+
+  const addMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`/api/clients/${clientId}/billing-entities`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json", ...getAuthHeader() },
+        body: JSON.stringify({ razonSocial, country: country || null, taxId: taxId || null, isDefault: false }),
+      });
+      if (!res.ok) throw new Error("Error al agregar entidad de facturación");
+      return res.json();
+    },
+    onSuccess: () => {
+      setRazonSocial(""); setCountry(""); setTaxId("");
+      queryClient.invalidateQueries({ queryKey: [`/api/clients/${clientId}/billing-entities`] });
+    },
+    onError: () => toast({ title: "No se pudo agregar la entidad", variant: "destructive" }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (entityId: number) => {
+      const res = await fetch(`/api/clients/billing-entities/${entityId}`, {
+        method: "DELETE",
+        credentials: "include",
+        headers: { ...getAuthHeader() },
+      });
+      if (!res.ok) throw new Error("Error al eliminar");
+      return res.json();
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: [`/api/clients/${clientId}/billing-entities`] }),
+    onError: () => toast({ title: "No se pudo eliminar la entidad", variant: "destructive" }),
+  });
+
+  const setDefaultMutation = useMutation({
+    mutationFn: async (entityId: number) => {
+      const res = await fetch(`/api/clients/billing-entities/${entityId}`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json", ...getAuthHeader() },
+        body: JSON.stringify({ isDefault: true }),
+      });
+      if (!res.ok) throw new Error("Error al actualizar");
+      return res.json();
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: [`/api/clients/${clientId}/billing-entities`] }),
+    onError: () => toast({ title: "No se pudo marcar como predeterminada", variant: "destructive" }),
+  });
+
+  return (
+    <div className="border-t pt-4 mt-2">
+      <p className="text-sm font-medium mb-2">Entidades de facturación</p>
+      <p className="text-xs text-muted-foreground mb-3">
+        Razones sociales bajo las que este cliente puede facturar (ej. entidades distintas por país).
+      </p>
+      <div className="space-y-2 mb-3">
+        {(entitiesQuery.data ?? []).map(entity => (
+          <div key={entity.id} className="flex items-center justify-between gap-2 rounded-md border px-3 py-1.5 text-sm">
+            <div>
+              <span className="font-medium">{entity.razonSocial}</span>
+              {entity.country && <span className="text-muted-foreground"> · {entity.country}</span>}
+              {entity.taxId && <span className="text-muted-foreground"> · {entity.taxId}</span>}
+              {entity.isDefault && <span className="ml-2 text-xs text-primary">Predeterminada</span>}
+            </div>
+            <div className="flex items-center gap-2">
+              {!entity.isDefault && (
+                <button
+                  type="button"
+                  className="text-xs text-muted-foreground hover:text-primary"
+                  onClick={() => setDefaultMutation.mutate(entity.id)}
+                >
+                  Predeterminar
+                </button>
+              )}
+              <button
+                type="button"
+                className="text-xs text-destructive hover:underline"
+                onClick={() => deleteMutation.mutate(entity.id)}
+              >
+                Eliminar
+              </button>
+            </div>
+          </div>
+        ))}
+        {entitiesQuery.data?.length === 0 && (
+          <p className="text-xs text-muted-foreground">Todavía no hay entidades de facturación cargadas.</p>
+        )}
+      </div>
+      <div className="grid grid-cols-3 gap-2">
+        <Input placeholder="Razón social" value={razonSocial} onChange={e => setRazonSocial(e.target.value)} />
+        <Input placeholder="País" value={country} onChange={e => setCountry(e.target.value)} />
+        <Input placeholder="CUIT / Tax ID" value={taxId} onChange={e => setTaxId(e.target.value)} />
+      </div>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="mt-2"
+        disabled={!razonSocial.trim() || addMutation.isPending}
+        onClick={() => addMutation.mutate()}
+      >
+        Agregar entidad
+      </Button>
+    </div>
+  );
+}
 
 export default function Clients() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -605,6 +722,10 @@ export default function Clients() {
                   </FormItem>
                 )}
               />
+
+              {isEditing && editingClient && (
+                <BillingEntitiesSection clientId={editingClient.id} />
+              )}
 
               <DialogFooter className="mt-4">
                 <Button variant="outline" type="button" onClick={() => setDialogOpen(false)}>

@@ -1,7 +1,7 @@
-import { pgTable, text, serial, integer, boolean, timestamp, doublePrecision, json, numeric, varchar, unique, pgEnum, jsonb, index, primaryKey } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, doublePrecision, json, numeric, varchar, unique, uniqueIndex, pgEnum, jsonb, index, primaryKey } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 
 // ==================== USUARIOS ====================
 // Tabla de usuarios
@@ -200,6 +200,35 @@ export const insertClientSchema = createInsertSchema(clients).pick({
 }).extend({
   createdBy: z.number().int().nullable().optional(),
 });
+
+// Entidades de facturación de un cliente: un mismo cliente (ej. "Uber") puede
+// facturar bajo más de una razón social/país (ej. Uber Argentina S.R.L. vs
+// Uber Technologies Inc.).
+export const clientBillingEntities = pgTable("client_billing_entities", {
+  id: serial("id").primaryKey(),
+  clientId: integer("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
+  razonSocial: text("razon_social").notNull(),
+  country: text("country"),
+  taxId: text("tax_id"), // CUIT/EIN/etc.
+  isDefault: boolean("is_default").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  // Respaldo a nivel DB de la regla "solo una entidad default por cliente"
+  // (la app ya desmarca las demás dentro de una transacción antes de marcar
+  // una nueva). Documentado acá para que un futuro `drizzle-kit push` no lo
+  // borre por no verlo declarado en el schema.
+  oneDefaultPerClient: uniqueIndex("uq_client_billing_entities_one_default")
+    .on(table.clientId)
+    .where(sql`${table.isDefault} = true`),
+}));
+
+export const insertClientBillingEntitySchema = createInsertSchema(clientBillingEntities).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type ClientBillingEntity = typeof clientBillingEntities.$inferSelect;
+export type InsertClientBillingEntity = z.infer<typeof insertClientBillingEntitySchema>;
 
 // ==================== ROLES ====================
 // Team roles table
