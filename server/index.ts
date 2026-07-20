@@ -679,9 +679,16 @@ app.use(cors({
 
 const isProduction = process.env.NODE_ENV === 'production';
 
-// Health check endpoint
+// Health check endpoint. Incluye el commit deployado (Render lo expone en
+// RENDER_GIT_COMMIT) para poder verificar rápido si el deploy está actualizado:
+//   curl https://<tu-app>/api/health
 app.get("/api/health", (req, res) => {
-  res.json({ status: "ok", timestamp: new Date().toISOString() });
+  res.json({
+    status: "ok",
+    timestamp: new Date().toISOString(),
+    commit: process.env.RENDER_GIT_COMMIT || process.env.GIT_COMMIT || "unknown",
+    branch: process.env.RENDER_GIT_BRANCH || "unknown",
+  });
 });
 
 // ==================== LOOKER STUDIO / BI ENDPOINTS ====================
