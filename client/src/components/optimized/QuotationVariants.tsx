@@ -126,20 +126,15 @@ export function QuotationVariants({
       return;
     }
 
-    // CRITICAL FIX: Los valores ya vienen calculados en la moneda correcta del contexto
-    // NO multiplicar por exchange rate porque causaría valores erróneos
-    let adjustedBaseCost = baseCost;
-    let adjustedComplexityAdjustment = complexityAdjustment;
-    let adjustedMarkupAmount = markupAmount;
-    let adjustedTotalAmount = totalAmount;
-
-    console.log('💰 Using values as-is (already in correct currency):', {
-      baseCost: adjustedBaseCost,
-      complexityAdjustment: adjustedComplexityAdjustment,
-      markupAmount: adjustedMarkupAmount,
-      totalAmount: adjustedTotalAmount,
-      currency: quotationData.quotationCurrency
-    });
+    // baseCost/complexityAdjustment/markupAmount/totalAmount (props) siempre
+    // están en ARS — convertir acá a la moneda de visualización, igual que se
+    // hace al persistir (toStoredCurrency), para que estas variantes locales
+    // queden en la misma unidad que las que vienen de la DB una vez guardadas
+    // (así formatCurrency solo necesita poner el label, sin volver a convertir).
+    let adjustedBaseCost = toStoredCurrency(baseCost);
+    let adjustedComplexityAdjustment = toStoredCurrency(complexityAdjustment);
+    let adjustedMarkupAmount = toStoredCurrency(markupAmount);
+    let adjustedTotalAmount = toStoredCurrency(totalAmount);
     
     // IMPORTANTE: Intermedio es la BASE (cotización original sin cambios)
     // Básico y Full usan MISMO markup factor pero ajustan solo costo base
@@ -195,6 +190,17 @@ export function QuotationVariants({
     setLoading(false);
   };
 
+  // baseCost/complexityAdjustment/markupAmount/totalAmount (props) siempre
+  // están en ARS (ver optimized-quote-context.tsx). Antes de persistir una
+  // variante hay que convertir a la moneda elegida, igual que saveQuotation
+  // en el contexto — si no, las variantes quedan guardadas en ARS crudo
+  // etiquetadas como USD.
+  const variantExchangeRate = quotationData.exchangeRateSnapshot || exchangeRate || 1;
+  const toStoredCurrency = (amountARS: number) =>
+    quotationData.quotationCurrency === 'USD' && variantExchangeRate > 0
+      ? amountARS / variantExchangeRate
+      : amountARS;
+
   const createDefaultVariants = async () => {
     // IMPORTANTE: Aplicar MISMO markup pero ajustar solo costos base
     const baseMarkupFactor = quotationData.financials.marginFactor || 2.0;
@@ -237,10 +243,10 @@ export function QuotationVariants({
           variantName: variant.name,
           variantDescription: variant.description,
           variantOrder: variant.order,
-          baseCost: adjustedBaseCost,
-          complexityAdjustment: adjustedComplexity,
-          markupAmount: adjustedMarkup,
-          totalAmount: adjustedTotal,
+          baseCost: toStoredCurrency(adjustedBaseCost),
+          complexityAdjustment: toStoredCurrency(adjustedComplexity),
+          markupAmount: toStoredCurrency(adjustedMarkup),
+          totalAmount: toStoredCurrency(adjustedTotal),
           isSelected: variant.name === 'Intermedio' // Select intermediate as default
         });
       }
@@ -274,16 +280,19 @@ export function QuotationVariants({
       setIsCreating(true);
       const adjustmentFactor = 1 + (newVariant.adjustmentPercentage / 100);
       
+      // Convertido a la moneda de visualización acá mismo (no solo al persistir),
+      // para que quede en la misma unidad que el resto de `variants` en el
+      // estado local (createLocalVariants) cuando la cotización todavía no se guardó.
       const variantData = {
         id: -(variants.length + 1), // Use negative ID for local variants
         quotationId: quotationId || 0,
         variantName: newVariant.name,
         variantDescription: newVariant.description,
         variantOrder: variants.length + 1,
-        baseCost: baseCost * adjustmentFactor,
-        complexityAdjustment: complexityAdjustment * adjustmentFactor,
-        markupAmount: markupAmount * adjustmentFactor,
-        totalAmount: totalAmount * adjustmentFactor,
+        baseCost: toStoredCurrency(baseCost * adjustmentFactor),
+        complexityAdjustment: toStoredCurrency(complexityAdjustment * adjustmentFactor),
+        markupAmount: toStoredCurrency(markupAmount * adjustmentFactor),
+        totalAmount: toStoredCurrency(totalAmount * adjustmentFactor),
         isSelected: false,
         createdAt: new Date().toISOString()
       };
@@ -385,27 +394,17 @@ export function QuotationVariants({
 
   const formatCurrency = (amount: number) => {
     const isARS = quotationData.quotationCurrency === 'ARS';
-    
-    // IMPORTANTE: Las variantes están guardadas en USD, pero necesitamos mostrarlas en la moneda elegida
-    let finalAmount = amount;
-    if (isARS) {
-      finalAmount = amount * exchangeRate; // Convertir USD a ARS
-    }
-    
-    console.log('🪙 formatCurrency conversion:', {
-      originalAmount: amount,
-      currency: quotationData.quotationCurrency,
-      exchangeRate,
-      finalAmount,
-      isARS
-    });
-    
+
+    // Las variantes en `variants` (locales o recién fetcheadas de la DB) ya
+    // están en la moneda de visualización — se convirtieron una sola vez al
+    // crearlas (createLocalVariants/createDefaultVariants/createCustomVariant
+    // vía toStoredCurrency). Acá solo se etiqueta, sin volver a convertir.
     return new Intl.NumberFormat(isARS ? 'es-AR' : 'en-US', {
       style: 'currency',
       currency: isARS ? 'ARS' : 'USD',
       minimumFractionDigits: isARS ? 0 : 2,
       maximumFractionDigits: isARS ? 0 : 2,
-    }).format(finalAmount);
+    }).format(amount);
   };
 
   const handleSave = async () => {
@@ -483,7 +482,9 @@ export function QuotationVariants({
 
   const getDefaultMemberHours = (variant: QuotationVariant, member: TeamMember): number => {
     if (!baseCost || baseCost === 0 || !member.hours) return member.hours || 0;
-    return Math.round(member.hours * (variant.baseCost / baseCost) * 2) / 2;
+    // variant.baseCost está en la moneda de visualización; baseCost (prop) está
+    // en ARS crudo — convertirlo antes del ratio para no mezclar unidades.
+    return Math.round(member.hours * (variant.baseCost / toStoredCurrency(baseCost)) * 2) / 2;
   };
 
   const getEffectiveMemberHours = (variant: QuotationVariant, member: TeamMember): number => {
@@ -492,8 +493,13 @@ export function QuotationVariants({
   };
 
   const computeVariantCostFromTeam = (variant: QuotationVariant): number => {
+    // Fallback: variant.baseCost ya está en la moneda de visualización
+    // (convertido al persistir/crear la variante).
     if (!baseTeamMembers?.length) return variant.baseCost;
-    return baseTeamMembers.reduce((sum, m) => sum + getEffectiveMemberHours(variant, m) * (m.rate || 0), 0);
+    // member.rate siempre está en ARS (getPersonnelRate) — convertir antes de
+    // devolver, para que el resultado quede en la misma unidad que el fallback.
+    const totalARS = baseTeamMembers.reduce((sum, m) => sum + getEffectiveMemberHours(variant, m) * (m.rate || 0), 0);
+    return toStoredCurrency(totalARS);
   };
 
   const computeVariantTotal = (variant: QuotationVariant): number => {
@@ -721,7 +727,10 @@ export function QuotationVariants({
               <div className="flex justify-center">
                 {(() => {
                   const varTotal = computeVariantTotal(variant);
-                  const diff = totalAmount > 0 ? Math.round(((varTotal / totalAmount) - 1) * 100) : 0;
+                  // varTotal ya está en la moneda de visualización; totalAmount
+                  // (prop) sigue en ARS crudo — convertir antes del ratio.
+                  const baseTotalDisplay = toStoredCurrency(totalAmount);
+                  const diff = baseTotalDisplay > 0 ? Math.round(((varTotal / baseTotalDisplay) - 1) * 100) : 0;
                   if (diff > 0) return <Badge variant="secondary" className="bg-green-100 text-green-800"><TrendingUp className="h-3 w-3 mr-1" />+{diff}%</Badge>;
                   if (diff < 0) return <Badge variant="secondary" className="bg-red-100 text-red-800"><TrendingDown className="h-3 w-3 mr-1" />{diff}%</Badge>;
                   return <Badge variant="secondary" className="bg-gray-100 text-gray-800"><Minus className="h-3 w-3 mr-1" />Base</Badge>;
@@ -791,10 +800,12 @@ export function QuotationVariants({
                           const baseVariant = variants.find(v => v.variantName === 'Básico') || variants[0];
                           if (!baseVariant) return <span>-</span>;
                           
-                          // IMPORTANTE: Aplicar conversión de moneda ANTES de calcular diferencias
+                          // variant.totalAmount y baseVariant.totalAmount ya están en la
+                          // moneda de visualización (ver toStoredCurrency) — no hay que
+                          // volver a convertir para comparar.
                           const isARS = quotationData.quotationCurrency === 'ARS';
-                          const convertedVariantAmount = isARS ? variant.totalAmount * exchangeRate : variant.totalAmount;
-                          const convertedBaseAmount = isARS ? baseVariant.totalAmount * exchangeRate : baseVariant.totalAmount;
+                          const convertedVariantAmount = variant.totalAmount;
+                          const convertedBaseAmount = baseVariant.totalAmount;
                           
                           if (convertedVariantAmount > convertedBaseAmount) {
                             const percentDiff = Math.round(((convertedVariantAmount / convertedBaseAmount) - 1) * 100);
