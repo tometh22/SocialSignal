@@ -128,22 +128,42 @@ export default function HoursDashboardPage() {
     },
   });
 
-  // Available hours = weekdays in range minus holidays, × 8h (full-time baseline)
-  const availableHours = (() => {
-    if (!dateFrom || !dateTo) return 0;
+  // Ausencias de la persona seleccionada (vacaciones, licencias) — solo tiene
+  // sentido restarlas de "horas disponibles" cuando se filtra a una persona
+  // puntual; con "todo el equipo" seleccionado no hay una única persona cuyas
+  // ausencias restar de un baseline de 8h/día.
+  const { data: absencesData = [] } = useQuery<any[]>({
+    queryKey: ["/api/personnel-absences", selectedPersonnelId],
+    queryFn: () => authFetch(`/api/personnel-absences?personnelId=${selectedPersonnelId}`).then(r => r.json()),
+    enabled: selectedPersonnelId !== "all",
+  });
+
+  // Available hours = weekdays in range minus feriados y ausencias, × 8h (full-time baseline)
+  const { availableHours, absenceWorkdays } = (() => {
+    if (!dateFrom || !dateTo) return { availableHours: 0, absenceWorkdays: 0 };
     const holidaySet = new Set(
       (holidaysData || []).map((h: any) => (h.date || "").slice(0, 10))
     );
+    // Comparación por string YYYY-MM-DD (igual que holidaySet), no por Date,
+    // para no perder el último día del rango por corrimiento de timezone.
+    const absenceRanges = selectedPersonnelId !== "all"
+      ? absencesData.map((a: any) => ({ start: (a.startDate || "").slice(0, 10), end: (a.endDate || "").slice(0, 10) }))
+      : [];
+    const isAbsent = (dateKey: string) => absenceRanges.some(r => dateKey >= r.start && dateKey <= r.end);
     let workdays = 0;
+    let absentWorkdays = 0;
     const d = new Date(new Date(dateFrom).getFullYear(), new Date(dateFrom).getMonth(), new Date(dateFrom).getDate());
     const end = new Date(dateTo);
     while (d <= end) {
       const dow = d.getDay();
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-      if (dow !== 0 && dow !== 6 && !holidaySet.has(key)) workdays++;
+      if (dow !== 0 && dow !== 6 && !holidaySet.has(key)) {
+        workdays++;
+        if (isAbsent(key)) absentWorkdays++;
+      }
       d.setDate(d.getDate() + 1);
     }
-    return workdays * 8;
+    return { availableHours: (workdays - absentWorkdays) * 8, absenceWorkdays: absentWorkdays };
   })();
 
   // Sorted entries for table
@@ -267,7 +287,9 @@ export default function HoursDashboardPage() {
                 <p className="text-xs text-muted-foreground font-medium">Horas disponibles</p>
               </div>
               <p className="text-2xl font-bold text-foreground">{availableHours}h</p>
-              <p className="text-xs text-muted-foreground mt-1">Días hábiles del período sin feriados · base full-time (8h)</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Días hábiles del período sin feriados{absenceWorkdays > 0 ? ` ni ausencias (-${absenceWorkdays}d)` : ""} · base full-time (8h)
+              </p>
             </div>
           </div>
 

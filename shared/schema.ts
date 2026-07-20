@@ -1049,6 +1049,10 @@ export const activeProjects = pgTable("active_projects", {
 
   // Campo para tipo de proyecto (facturable vs interno)
   projectCategory: text("project_category").notNull().default("billable"), // billable, internal
+  // Subtipo para proyectos internos (capacitación, automatización, demo, etc.),
+  // para poder analizar la inversión interna por tipo. Solo aplica cuando
+  // projectCategory === 'internal'.
+  internalType: text("internal_type"),
 
   // Link a brief interno (Google Doc, Notion, etc.) — mostrado en el tab Resumen
   briefUrl: text("brief_url"),
@@ -1106,6 +1110,7 @@ export const insertActiveProjectSchema = baseInsertActiveProjectSchema.extend({
   budget: z.number().nullable().optional(),
   selectedVariantId: z.number().nullable().optional(),
   projectCategory: z.enum(["billable", "internal"]).default("billable"),
+  internalType: z.enum(["capacitacion", "automatizacion", "demo", "prospeccion", "otro"]).nullable().optional(),
   briefUrl: z.string().nullable().optional(),
 
   // Estados granulares + campos de cierre
