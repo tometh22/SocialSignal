@@ -1067,11 +1067,12 @@ export default function ActiveProjectsNext() {
                   Ver todos los proyectos →
                 </button>
               )}
-              {(search || statusFilter !== "all") && (
+              {(search || statusFilter !== "all" || categoryFilter !== "all") && (
                 <button
                   onClick={() => {
                     setSearch("");
                     setStatusFilter("all");
+                    setCategoryFilter("all");
                   }}
                   className="mt-2 ml-3 text-indigo-600 hover:underline text-sm"
                 >

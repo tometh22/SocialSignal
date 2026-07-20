@@ -177,7 +177,9 @@ export default function NewProjectWithTooltips() {
     // y después volvió a "Facturable", react-hook-form conserva el valor
     // aunque el campo deje de renderizarse — se limpia acá antes de enviar.
     const cleaned = data.projectCategory === "internal" ? data : { ...data, internalType: undefined };
-    const payload = { ...cleaned, name: cleaned.name?.trim() || undefined };
+    // Con cotización el nombre canónico sale de la cotización; no mandar `name` para
+    // no pisar quotations.project_name vía COALESCE(name, project_name).
+    const payload = { ...cleaned, name: data.quotationId ? undefined : (cleaned.name?.trim() || undefined) };
     createProjectMutation.mutate(payload);
   };
 

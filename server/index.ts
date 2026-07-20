@@ -583,26 +583,30 @@ async function applyPendingMigrations() {
     `);
 
     // 0033 Diagnóstico de Mind — ajustes de datos de personas (antes en el script
-    // manual server/scripts/fix-personnel-diagnostic.ts). Idempotentes: solo escriben
-    // si el valor difiere, matchean por nombre (case-insensitive).
+    // manual server/scripts/fix-personnel-diagnostic.ts).
     //  - Ali Crosa y Sandra Alice facturan en USD.
-    //  - Sol no debe aparecer en cotizaciones desde mayo 2026.
+    //  - Sol Ayala no debe aparecer en cotizaciones desde mayo 2026.
     //  - Cata Astiz dada de baja: no debe aparecer desde junio 2026.
-    await run('0033 personnel Ali Crosa → USD', `
-      UPDATE "personnel" SET "billing_currency" = 'USD'
-      WHERE "name" ILIKE '%ali%cros%' AND "billing_currency" IS DISTINCT FROM 'USD';
+    // Corre UNA SOLA VEZ (gate por applied_data_patches) para NO revertir ediciones
+    // manuales posteriores en cada boot. Nombres anclados por nombre completo para no
+    // matchear a otras personas (ej. "Alessandra"/"Cassandra" con un %sandra%).
+    await run('0033 applied_data_patches table', `
+      CREATE TABLE IF NOT EXISTS "applied_data_patches" (
+        "name" TEXT PRIMARY KEY,
+        "applied_at" TIMESTAMP NOT NULL DEFAULT now()
+      );
     `);
-    await run('0033 personnel Sandra Alice → USD', `
-      UPDATE "personnel" SET "billing_currency" = 'USD'
-      WHERE "name" ILIKE '%sandra%' AND "billing_currency" IS DISTINCT FROM 'USD';
-    `);
-    await run('0033 personnel Sol → activeUntil 2026-05-01', `
-      UPDATE "personnel" SET "active_until" = '2026-05-01'
-      WHERE "name" ILIKE 'sol %' AND "active_until" IS DISTINCT FROM '2026-05-01';
-    `);
-    await run('0033 personnel Cata Astiz → activeUntil 2026-06-01', `
-      UPDATE "personnel" SET "active_until" = '2026-06-01'
-      WHERE "name" ILIKE '%cata%astiz%' AND "active_until" IS DISTINCT FROM '2026-06-01';
+    await run('0033 personnel diagnostic (run-once)', `
+      DO $$
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM applied_data_patches WHERE name = '0033_personnel_diagnostic') THEN
+          UPDATE "personnel" SET "billing_currency" = 'USD' WHERE "name" ILIKE 'ali crosa%';
+          UPDATE "personnel" SET "billing_currency" = 'USD' WHERE "name" ILIKE 'sandra alice%';
+          UPDATE "personnel" SET "active_until" = '2026-05-01' WHERE "name" ILIKE 'sol ayala%';
+          UPDATE "personnel" SET "active_until" = '2026-06-01' WHERE "name" ILIKE 'cata astiz%';
+          INSERT INTO applied_data_patches (name) VALUES ('0033_personnel_diagnostic');
+        END IF;
+      END $$;
     `);
 
     // 0035 Diagnóstico de Mind — nombre propio de active_projects. Permite crear
