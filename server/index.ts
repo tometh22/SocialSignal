@@ -679,15 +679,16 @@ app.use(cors({
 
 const isProduction = process.env.NODE_ENV === 'production';
 
-// Health check endpoint. Incluye el commit deployado (Render lo expone en
-// RENDER_GIT_COMMIT) para poder verificar rápido si el deploy está actualizado:
-//   curl https://<tu-app>/api/health
+// Health check endpoint. Incluye el commit deployado (Railway lo expone en
+// RAILWAY_GIT_COMMIT_SHA) para poder verificar rápido si el deploy está actualizado:
+//   curl https://mind.epical.digital/api/health
 app.get("/api/health", (req, res) => {
   res.json({
     status: "ok",
     timestamp: new Date().toISOString(),
-    commit: process.env.RENDER_GIT_COMMIT || process.env.GIT_COMMIT || "unknown",
-    branch: process.env.RENDER_GIT_BRANCH || "unknown",
+    commit: process.env.RAILWAY_GIT_COMMIT_SHA || process.env.RENDER_GIT_COMMIT || process.env.GIT_COMMIT || "unknown",
+    branch: process.env.RAILWAY_GIT_BRANCH || process.env.RENDER_GIT_BRANCH || "unknown",
+    deployedAt: process.env.RAILWAY_DEPLOYMENT_ID || "unknown",
   });
 });
 
