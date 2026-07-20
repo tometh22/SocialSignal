@@ -927,6 +927,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`❌ PROBLEM: aggregatorResponse.summary is ${aggregatorResponse?.summary}, period is ${aggregatorResponse?.period}`);
       }
 
+      // Adjuntar categoría (facturable/interno) y subtipo interno a cada proyecto,
+      // para el badge "INTERNO · <tipo>" y el filtro por tipo en Vista de Proyectos.
+      try {
+        if (Array.isArray(aggregatorResponse?.projects)) {
+          const catRows = await db.select({
+            id: activeProjects.id,
+            projectCategory: activeProjects.projectCategory,
+            internalType: activeProjects.internalType,
+          }).from(activeProjects);
+          const catMap = new Map(catRows.map(r => [r.id, r]));
+          for (const proj of aggregatorResponse.projects as any[]) {
+            const meta = catMap.get(proj.projectId);
+            proj.projectCategory = meta?.projectCategory ?? 'billable';
+            proj.internalType = meta?.internalType ?? null;
+          }
+        }
+      } catch (e) {
+        console.warn('⚠️ No se pudo adjuntar projectCategory/internalType:', (e as Error)?.message);
+      }
+
       return res.json(aggregatorResponse);
 
     } catch (error) {
