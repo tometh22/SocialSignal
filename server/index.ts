@@ -558,6 +558,24 @@ async function applyPendingMigrations() {
       END $$;
     `);
 
+    // 0029_client_billing_entities: entidades de facturación por cliente
+    // (razón social/país/tax id), para clientes que facturan bajo más de una
+    // entidad (ej. Uber). Sin esto, GET/POST /api/clients/:id/billing-entities falla.
+    await run('0029 client_billing_entities table', `
+      CREATE TABLE IF NOT EXISTS "client_billing_entities" (
+        "id" SERIAL PRIMARY KEY,
+        "client_id" INTEGER NOT NULL REFERENCES "clients"("id") ON DELETE CASCADE,
+        "razon_social" TEXT NOT NULL,
+        "country" TEXT,
+        "tax_id" TEXT,
+        "is_default" BOOLEAN NOT NULL DEFAULT false,
+        "created_at" TIMESTAMP NOT NULL DEFAULT now()
+      );
+      CREATE INDEX IF NOT EXISTS "idx_client_billing_entities_client" ON "client_billing_entities"("client_id");
+      CREATE UNIQUE INDEX IF NOT EXISTS "uq_client_billing_entities_one_default"
+        ON "client_billing_entities"("client_id") WHERE "is_default" = true;
+    `);
+
   } finally {
     client.release();
   }
