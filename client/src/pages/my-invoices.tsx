@@ -26,6 +26,11 @@ type MonthSummary = {
   hours: number;
   totalCostARS: number;
   totalCostUSD: number;
+  grandTotalARS?: number;
+  grandTotalUSD?: number;
+  fxUsd?: number;
+  fxArs?: number;
+  opsFxRate?: number;
   billingCurrency?: string;
   usdFraction?: number;
   isClosed?: boolean;
@@ -79,6 +84,39 @@ export default function MyInvoices() {
       const res = await authFetch(`/api/me/invoices/summary?period=${period}`);
       if (!res.ok) throw new Error("Error al cargar resumen");
       return res.json();
+    },
+  });
+
+  // TC propio de la persona (de su banco). Se inicializa desde el resumen.
+  const [fxUsdInput, setFxUsdInput] = useState<string>("");
+  const [fxArsInput, setFxArsInput] = useState<string>("");
+  React.useEffect(() => {
+    setFxUsdInput(summaryQuery.data?.fxUsd != null ? String(summaryQuery.data.fxUsd) : "");
+    setFxArsInput(summaryQuery.data?.fxArs != null ? String(summaryQuery.data.fxArs) : "");
+  }, [period, summaryQuery.data?.fxUsd, summaryQuery.data?.fxArs]);
+
+  const fxMutation = useMutation({
+    mutationFn: async () => {
+      const res = await authFetch("/api/me/invoices/fx", {
+        method: "PUT",
+        body: JSON.stringify({
+          period,
+          fxUsd: fxUsdInput.trim() === "" ? null : Number(fxUsdInput),
+          fxArs: fxArsInput.trim() === "" ? null : Number(fxArsInput),
+        }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.message ?? "Error al guardar TC");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "TC guardado", description: "Se recalculó tu total con tu tipo de cambio." });
+      qc.invalidateQueries({ queryKey: ["/api/me/invoices/summary", period] });
+    },
+    onError: (err: Error) => {
+      toast({ title: "No se pudo guardar el TC", description: err.message, variant: "destructive" });
     },
   });
 
@@ -202,6 +240,88 @@ export default function MyInvoices() {
           <div className="text-[11px] text-slate-400 mt-1 capitalize">{formatPeriodLabel(period)}</div>
         </div>
       </div>
+
+      {/* TC propio de la persona (de su banco). No depende de Operaciones. */}
+      {summaryQuery.data && summaryQuery.data.personnelId != null && (
+        <div className="rounded-xl border border-slate-200 bg-white p-5 mb-6">
+          <h2 className="text-sm font-semibold text-slate-700 mb-1">Tu tipo de cambio</h2>
+          <p className="text-xs text-slate-500 mb-3">
+            Usá el TC de tu banco para valuar tu factura. No depende del TC de Operaciones.
+            {summaryQuery.data.opsFxRate ? (
+              <> TC de referencia de Operaciones: <span className="tabular-nums">{summaryQuery.data.opsFxRate.toLocaleString("es-AR")}</span>.</>
+            ) : null}
+          </p>
+
+          <div className="flex flex-wrap items-end gap-4">
+            <div>
+              <label className="block text-xs text-slate-500 mb-1">
+                {summaryQuery.data.billingCurrency === 'mixed'
+                  ? "TC tramo USD (ARS por USD)"
+                  : summaryQuery.data.billingCurrency === 'USD'
+                    ? "TC para valuar en ARS (ARS por USD)"
+                    : "Tu TC (ARS por USD)"}
+              </label>
+              <input
+                type="number"
+                inputMode="decimal"
+                min={0}
+                step="0.01"
+                value={fxUsdInput}
+                disabled={summaryQuery.data.isClosed}
+                onChange={e => setFxUsdInput(e.target.value)}
+                placeholder={summaryQuery.data.opsFxRate ? String(summaryQuery.data.opsFxRate) : "1445"}
+                className="w-40 rounded-lg border border-slate-200 px-3 py-1.5 text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-indigo-400 disabled:bg-slate-50"
+              />
+            </div>
+
+            {summaryQuery.data.billingCurrency === 'mixed' && (
+              <div>
+                <label className="block text-xs text-slate-500 mb-1">TC tramo ARS (ARS por USD)</label>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  min={0}
+                  step="0.01"
+                  value={fxArsInput}
+                  disabled={summaryQuery.data.isClosed}
+                  onChange={e => setFxArsInput(e.target.value)}
+                  placeholder={summaryQuery.data.opsFxRate ? String(summaryQuery.data.opsFxRate) : "1445"}
+                  className="w-40 rounded-lg border border-slate-200 px-3 py-1.5 text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-indigo-400 disabled:bg-slate-50"
+                />
+              </div>
+            )}
+
+            {!summaryQuery.data.isClosed && (
+              <button
+                onClick={() => fxMutation.mutate()}
+                disabled={fxMutation.isPending}
+                className="rounded-lg bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60"
+              >
+                {fxMutation.isPending ? "Guardando…" : "Guardar TC"}
+              </button>
+            )}
+          </div>
+
+          {/* Total unificado con el TC propio */}
+          {(summaryQuery.data.grandTotalARS != null || summaryQuery.data.grandTotalUSD != null) && (
+            <div className="mt-4 flex flex-wrap gap-6 border-t border-slate-100 pt-3 text-sm">
+              <div>
+                <div className="text-[11px] text-slate-500">Total unificado (ARS)</div>
+                <div className="font-semibold text-emerald-700 tabular-nums">{formatARS(summaryQuery.data.grandTotalARS)}</div>
+              </div>
+              <div>
+                <div className="text-[11px] text-slate-500">Total unificado (USD)</div>
+                <div className="font-semibold text-blue-700 tabular-nums">{formatUSD(summaryQuery.data.grandTotalUSD)}</div>
+              </div>
+              {summaryQuery.data.billingCurrency === 'mixed' && (
+                <div className="text-[11px] text-slate-400 self-end">
+                  Suma el tramo USD y el tramo ARS valuados con tus TC.
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Upload form */}
       <div className="rounded-xl border border-slate-200 bg-white p-5 mb-8">

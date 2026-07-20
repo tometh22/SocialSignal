@@ -22,8 +22,9 @@ const CHART_COLORS = ["#6366f1", "#8b5cf6", "#ec4899", "#f59e0b", "#10b981", "#3
 type HoursSummary = {
   entries: any[];
   byWeek: { week: string; hours: number }[];
-  byProject: { name: string; hours: number }[];
+  byProject: { name: string; hours: number; estimatedHours: number }[];
   byPerson: { name: string; hours: number; estimatedHours: number }[];
+  activeTeam?: { id: number; name: string; contractType: string; dailyHours: number }[];
 };
 
 const QUICK_FILTERS = [
@@ -138,9 +139,13 @@ export default function HoursDashboardPage() {
     enabled: selectedPersonnelId !== "all",
   });
 
-  // Available hours = weekdays in range minus feriados y ausencias, × 8h (full-time baseline)
-  const { availableHours, absenceWorkdays } = (() => {
-    if (!dateFrom || !dateTo) return { availableHours: 0, absenceWorkdays: 0 };
+  // Horas disponibles = días hábiles del rango (sin feriados/ausencias) × horas diarias
+  // por contrato. Con una persona filtrada usa SU jornada (full=8h, part-time=6h) y
+  // resta sus ausencias; con "todo el equipo" suma la jornada de cada persona activa
+  // (freelance excluido, no tiene capacidad base).
+  const activeTeam = summary?.activeTeam ?? [];
+  const { availableHours, absenceWorkdays, availableBasis } = (() => {
+    if (!dateFrom || !dateTo) return { availableHours: 0, absenceWorkdays: 0, availableBasis: "" };
     const holidaySet = new Set(
       (holidaysData || []).map((h: any) => (h.date || "").slice(0, 10))
     );
@@ -163,7 +168,23 @@ export default function HoursDashboardPage() {
       }
       d.setDate(d.getDate() + 1);
     }
-    return { availableHours: (workdays - absentWorkdays) * 8, absenceWorkdays: absentWorkdays };
+
+    if (selectedPersonnelId !== "all") {
+      const me = activeTeam.find(p => String(p.id) === selectedPersonnelId);
+      // Freelance u persona sin jornada base → no se muestran horas disponibles.
+      if (!me) return { availableHours: 0, absenceWorkdays: absentWorkdays, availableBasis: "freelance (sin jornada base)" };
+      const daily = me.dailyHours || 8;
+      const label = me.contractType === "part-time" ? "part-time (6h/día)" : `full-time (${daily}h/día)`;
+      return { availableHours: Math.round((workdays - absentWorkdays) * daily), absenceWorkdays: absentWorkdays, availableBasis: label };
+    }
+
+    // Todo el equipo: suma de jornadas diarias × días hábiles (freelance excluido).
+    const dailySum = activeTeam.reduce((acc, p) => acc + (p.dailyHours || 0), 0);
+    return {
+      availableHours: Math.round(workdays * dailySum),
+      absenceWorkdays: 0,
+      availableBasis: `${activeTeam.length} personas activas (sin freelance)`,
+    };
   })();
 
   // Sorted entries for table
@@ -288,7 +309,7 @@ export default function HoursDashboardPage() {
               </div>
               <p className="text-2xl font-bold text-foreground">{availableHours}h</p>
               <p className="text-xs text-muted-foreground mt-1">
-                Días hábiles del período sin feriados{absenceWorkdays > 0 ? ` ni ausencias (-${absenceWorkdays}d)` : ""} · base full-time (8h)
+                Días hábiles sin feriados{absenceWorkdays > 0 ? ` ni ausencias (-${absenceWorkdays}d)` : ""}{availableBasis ? ` · ${availableBasis}` : ""}
               </p>
             </div>
           </div>
@@ -326,7 +347,7 @@ export default function HoursDashboardPage() {
             <div className="bg-card rounded-xl border p-4">
               <h3 className="text-sm font-semibold mb-4 flex items-center gap-2">
                 <PieChart className="h-4 w-4 text-primary" />
-                Tiempo por proyecto
+                Tiempo por proyecto <span className="text-xs font-normal text-muted-foreground">· real vs estimado</span>
               </h3>
               {summary.byProject.length > 0 ? (
                 <div className="flex items-center gap-4">
@@ -353,13 +374,26 @@ export default function HoursDashboardPage() {
                     </RPieChart>
                   </ResponsiveContainer>
                   <div className="flex-1 space-y-1.5 overflow-y-auto max-h-[200px]">
-                    {summary.byProject.map((p, i) => (
-                      <div key={p.name} className="flex items-center gap-2 text-xs">
-                        <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: CHART_COLORS[i % CHART_COLORS.length] }} />
-                        <span className="flex-1 truncate text-muted-foreground">{p.name}</span>
-                        <span className="font-semibold text-foreground flex-shrink-0">{p.hours.toFixed(1)}h</span>
-                      </div>
-                    ))}
+                    {summary.byProject.map((p, i) => {
+                      const est = p.estimatedHours || 0;
+                      const delta = p.hours - est;
+                      return (
+                        <div key={p.name} className="flex items-center gap-2 text-xs">
+                          <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: CHART_COLORS[i % CHART_COLORS.length] }} />
+                          <span className="flex-1 truncate text-muted-foreground" title={p.name}>{p.name}</span>
+                          <span className="font-semibold text-foreground flex-shrink-0 tabular-nums">{p.hours.toFixed(1)}h</span>
+                          <span className="text-muted-foreground/60 flex-shrink-0 tabular-nums w-16 text-right">
+                            {est > 0 ? `/ ${est.toFixed(1)}h` : "/ —"}
+                          </span>
+                          <span className={cn(
+                            "flex-shrink-0 tabular-nums w-12 text-right font-medium",
+                            est <= 0 ? "text-muted-foreground/40" : delta > 2 ? "text-orange-600" : delta < -2 ? "text-green-600" : "text-muted-foreground"
+                          )}>
+                            {est > 0 ? `${delta > 0 ? "+" : ""}${delta.toFixed(1)}` : ""}
+                          </span>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               ) : (

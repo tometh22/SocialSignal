@@ -196,6 +196,9 @@ export default function Clients() {
   const [deletingClients, setDeletingClients] = useState<Set<number>>(new Set());
   const [deletedClients, setDeletedClients] = useState<Set<number>>(new Set());
   const [newClients, setNewClients] = useState<Client[]>([]);
+  const [mergeOpen, setMergeOpen] = useState(false);
+  const [mergeTargetId, setMergeTargetId] = useState<string>("");
+  const [mergeSourceId, setMergeSourceId] = useState<string>("");
   const { toast } = useToast();
   const { forceRefresh } = useImageRefresh();
 
@@ -411,6 +414,35 @@ export default function Clients() {
     },
   });
 
+  // Mutación para fusionar (deduplicar) dos clientes
+  const mergeMutation = useMutation({
+    mutationFn: async ({ targetId, sourceId }: { targetId: number; sourceId: number }) => {
+      const res = await fetch(`/api/clients/${targetId}/merge`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+        body: JSON.stringify({ sourceId }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ message: 'Error al fusionar' }));
+        throw new Error(err.message || `Error ${res.status}`);
+      }
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/clients'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/active-projects'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/quotations'] });
+      setMergeOpen(false);
+      setMergeTargetId("");
+      setMergeSourceId("");
+      toast({ title: "Clientes fusionados", description: data?.message || "Se fusionaron los clientes." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error al fusionar", description: error.message, variant: "destructive" });
+    },
+  });
+
   // Configuración del formulario
   const form = useForm<ClientFormValues>({
     resolver: zodResolver(clientSchema),
@@ -517,8 +549,15 @@ export default function Clients() {
               <UserPlus className="mr-2 h-4 w-4" />
               Añadir Nuevo Cliente
             </Button>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
+              onClick={() => { setMergeTargetId(""); setMergeSourceId(""); setMergeOpen(true); }}
+            >
+              <Users className="mr-2 h-4 w-4" />
+              Fusionar duplicados
+            </Button>
+            <Button
+              variant="outline"
               onClick={() => importClientsMutation.mutate()}
               disabled={importClientsMutation.isPending}
             >
@@ -740,6 +779,67 @@ export default function Clients() {
               </DialogFooter>
             </form>
           </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog para fusionar (deduplicar) clientes */}
+      <Dialog open={mergeOpen} onOpenChange={setMergeOpen}>
+        <DialogContent className="sm:max-w-[520px]">
+          <DialogHeader>
+            <DialogTitle>Fusionar clientes duplicados</DialogTitle>
+            <DialogDescription>
+              Reasigna proyectos, cotizaciones, entidades de facturación y demás datos del
+              cliente duplicado al cliente que se conserva, y elimina el duplicado. Esta acción
+              no se puede deshacer.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-1">
+              <label className="text-sm font-medium">Cliente que se conserva (destino)</label>
+              <select
+                className="w-full border rounded-md h-10 px-3 text-sm bg-background"
+                value={mergeTargetId}
+                onChange={(e) => setMergeTargetId(e.target.value)}
+              >
+                <option value="">Seleccionar cliente…</option>
+                {allClients
+                  .filter((c: Client) => !deletedClients.has(c.id))
+                  .map((c: Client) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+              </select>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-sm font-medium">Cliente duplicado (se elimina)</label>
+              <select
+                className="w-full border rounded-md h-10 px-3 text-sm bg-background"
+                value={mergeSourceId}
+                onChange={(e) => setMergeSourceId(e.target.value)}
+              >
+                <option value="">Seleccionar cliente…</option>
+                {allClients
+                  .filter((c: Client) => !deletedClients.has(c.id) && String(c.id) !== mergeTargetId)
+                  .map((c: Client) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+              </select>
+            </div>
+          </div>
+
+          <DialogFooter className="mt-4">
+            <Button variant="outline" type="button" onClick={() => setMergeOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              disabled={!mergeTargetId || !mergeSourceId || mergeTargetId === mergeSourceId || mergeMutation.isPending}
+              onClick={() => mergeMutation.mutate({ targetId: Number(mergeTargetId), sourceId: Number(mergeSourceId) })}
+            >
+              {mergeMutation.isPending ? "Fusionando…" : "Fusionar"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </>

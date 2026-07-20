@@ -3,8 +3,11 @@
  *
  * - Ali Crosa y Sandra Alice facturan en USD → billingCurrency = 'USD'.
  * - Sol no debe aparecer en cotizaciones a partir de mayo 2026 → activeUntil = '2026-05-01'.
+ * - Cata Astiz dada de baja: no debe aparecer desde junio 2026 → activeUntil = '2026-06-01'.
  *
  * Idempotente: matchea por nombre (case-insensitive, parcial) y solo escribe si cambia.
+ * NOTA: estos mismos ajustes ahora corren automáticamente al arranque del server
+ * (ver migración 0033 en server/index.ts). Este script queda como respaldo manual.
  * Ejecutar con: tsx server/scripts/fix-personnel-diagnostic.ts
  */
 import { db } from "../db";
@@ -17,6 +20,7 @@ const PATCHES: Patch[] = [
   { match: "%ali%cros%", set: { billingCurrency: "USD" }, label: "Ali Crosa → billingCurrency=USD" },
   { match: "%sandra%", set: { billingCurrency: "USD" }, label: "Sandra Alice → billingCurrency=USD" },
   { match: "sol %", set: { activeUntil: "2026-05-01" }, label: "Sol → activeUntil=2026-05-01" },
+  { match: "%cata%astiz%", set: { activeUntil: "2026-06-01" }, label: "Cata Astiz → activeUntil=2026-06-01" },
 ];
 
 async function main() {

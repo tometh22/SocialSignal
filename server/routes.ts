@@ -124,7 +124,7 @@ import { CoverageCalculator } from "./domain/coverage";
 import { eq, and, or, isNull, isNotNull, desc, sql, asc, gte, lte, inArray } from "drizzle-orm";
 import { reinitializeDatabase } from "./reinit-data";
 import { upload, uploadDocument, uploadInvoice, deleteOldFile } from "./upload";
-import { personalMonthlyInvoices, externalProviders as externalProvidersTable, providerProjectAccess as providerProjectAccessTable, exchangeRates } from "@shared/schema";
+import { personalMonthlyInvoices, personalFxOverrides, externalProviders as externalProvidersTable, providerProjectAccess as providerProjectAccessTable, exchangeRates } from "@shared/schema";
 import { sanitizeInput } from "./input-sanitization";
 import { setupAuth, hashPassword } from "./auth";
 import { requireProjectUnlocked, projectIdFromTimeEntry } from "./middleware/projectLocked";
@@ -3701,6 +3701,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Fusionar (deduplicar) dos clientes: reasigna todo lo del cliente `sourceId`
+  // al cliente destino `:id` y elimina el duplicado. Resuelve el caso de "dos Uber"
+  // / "Keeway" repetidos. Todo en una transacción.
+  app.post("/api/clients/:id/merge", requireAuth, async (req, res) => {
+    const targetId = parseInt(req.params.id);
+    const sourceId = parseInt(req.body?.sourceId);
+    if (isNaN(targetId) || isNaN(sourceId)) {
+      return res.status(400).json({ message: "IDs de cliente inválidos" });
+    }
+    if (targetId === sourceId) {
+      return res.status(400).json({ message: "No se puede fusionar un cliente consigo mismo" });
+    }
+    try {
+      const [target] = await db.select().from(clients).where(eq(clients.id, targetId));
+      const [source] = await db.select().from(clients).where(eq(clients.id, sourceId));
+      if (!target) return res.status(404).json({ message: "Cliente destino no encontrado" });
+      if (!source) return res.status(404).json({ message: "Cliente a fusionar no encontrado" });
+
+      await db.transaction(async (tx) => {
+        // Tablas con FK obligatoria a clients.id
+        await tx.execute(sql`UPDATE quotations SET client_id = ${targetId} WHERE client_id = ${sourceId}`);
+        await tx.execute(sql`UPDATE active_projects SET client_id = ${targetId} WHERE client_id = ${sourceId}`);
+        await tx.execute(sql`UPDATE deliverables SET client_id = ${targetId} WHERE client_id = ${sourceId}`);
+        await tx.execute(sql`UPDATE client_modo_comments SET client_id = ${targetId} WHERE client_id = ${sourceId}`);
+        await tx.execute(sql`UPDATE quarterly_nps_surveys SET client_id = ${targetId} WHERE client_id = ${sourceId}`);
+
+        // Tablas con FK opcional
+        await tx.execute(sql`UPDATE google_sheets_sales SET client_id = ${targetId} WHERE client_id = ${sourceId}`);
+        await tx.execute(sql`UPDATE crm_leads SET client_id = ${targetId} WHERE client_id = ${sourceId}`);
+        await tx.execute(sql`UPDATE activo_entries SET cliente_id = ${targetId} WHERE cliente_id = ${sourceId}`);
+
+        // Alias ETL: evitar violar el unique (client_id, alias_norm) descartando los
+        // alias del source que ya existan en el target antes de reasignar.
+        await tx.execute(sql`DELETE FROM dim_client_alias WHERE client_id = ${sourceId} AND alias_norm IN (SELECT alias_norm FROM dim_client_alias WHERE client_id = ${targetId})`);
+        await tx.execute(sql`UPDATE dim_client_alias SET client_id = ${targetId} WHERE client_id = ${sourceId}`);
+        await tx.execute(sql`DELETE FROM dim_project_alias WHERE client_id = ${sourceId} AND alias_norm IN (SELECT alias_norm FROM dim_project_alias WHERE client_id = ${targetId})`);
+        await tx.execute(sql`UPDATE dim_project_alias SET client_id = ${targetId} WHERE client_id = ${sourceId}`);
+
+        // Entidades de facturación: si el target ya tiene una default, las que llegan
+        // pierden el flag para no violar el índice único parcial (una default por cliente).
+        await tx.execute(sql`UPDATE client_billing_entities SET is_default = false WHERE client_id = ${sourceId} AND EXISTS (SELECT 1 FROM client_billing_entities WHERE client_id = ${targetId} AND is_default = true)`);
+        await tx.execute(sql`UPDATE client_billing_entities SET client_id = ${targetId} WHERE client_id = ${sourceId}`);
+
+        // Finalmente, eliminar el cliente duplicado.
+        await tx.execute(sql`DELETE FROM clients WHERE id = ${sourceId}`);
+      });
+
+      res.json({ success: true, message: `Cliente "${source.name}" fusionado en "${target.name}"`, targetId, mergedId: sourceId });
+    } catch (error) {
+      console.error("Error merging clients:", error);
+      res.status(500).json({ message: "No se pudo fusionar el cliente" });
+    }
+  });
+
   // Entidades de facturación de un cliente (razón social / país / tax id).
   // Un mismo cliente puede tener más de una, para casos como Uber facturando
   // bajo entidades distintas según el proyecto.
@@ -7166,7 +7220,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const projectsFlattened = allProjects.map(p => ({
         ...p,
         clientName: p.quotation?.client?.name || null,
-        name: p.quotation?.projectName || null
+        name: p.quotation?.projectName || (p as any).name || null
       }));
 
       // Filtrar los proyectos según el parámetro
@@ -7899,13 +7953,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const project = await storage.createActiveProject(validatedData);
 
       // Copiar automáticamente el equipo de la cotización al proyecto recién creado
-      try {
-        console.log(`📋 Copiando equipo automáticamente desde cotización ${validatedData.quotationId} al proyecto ${project.id}`);
-        const baseTeam = await storage.copyQuotationTeamToProject(Number(validatedData.quotationId), project.id);
-        console.log(`✅ Equipo copiado automáticamente: ${baseTeam.length} miembros`);
-      } catch (teamError) {
-        console.warn('⚠️ Error al copiar equipo automáticamente, pero proyecto creado exitosamente:', teamError);
-        // No fallar la creación del proyecto si hay error copiando el equipo
+      // (solo si el proyecto está vinculado a una cotización).
+      if (validatedData.quotationId) {
+        try {
+          console.log(`📋 Copiando equipo automáticamente desde cotización ${validatedData.quotationId} al proyecto ${project.id}`);
+          const baseTeam = await storage.copyQuotationTeamToProject(Number(validatedData.quotationId), project.id);
+          console.log(`✅ Equipo copiado automáticamente: ${baseTeam.length} miembros`);
+        } catch (teamError) {
+          console.warn('⚠️ Error al copiar equipo automáticamente, pero proyecto creado exitosamente:', teamError);
+          // No fallar la creación del proyecto si hay error copiando el equipo
+        }
       }
       
       res.status(201).json(project);
@@ -9188,8 +9245,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // =========== FACTURA MENSUAL PERSONAL ===========
   // Endpoints para que cada usuario gestione su factura del mes (una por mes).
 
-  // Helper: suma horas/costos del mes a partir de timeEntries
-  async function getMonthlyPersonalSummary(userId: number, period: string) {
+  // Helper: suma horas/costos del mes a partir de timeEntries.
+  // fxOverride permite usar el TC propio de la persona (de su banco) en vez del de
+  // Operaciones. fxUsd valúa el tramo USD y fxArs el tramo ARS (facturación mixta).
+  async function getMonthlyPersonalSummary(
+    userId: number,
+    period: string,
+    fxOverride?: { fxUsd?: number | null; fxArs?: number | null },
+  ) {
     // Period is YYYY-MM. First look up the personnel row that maps to this user (if any)
     // via the users.email match. Si no existe personnel, devuelve ceros.
     const user = await storage.getUser(userId);
@@ -9216,6 +9279,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const billingCurrency = (personnelRow as any).billingCurrency ?? 'ARS';
     const usdFraction = (personnelRow as any).usdBillingFraction ?? 0;
 
+    // TC propio de la persona para este período (de su banco). Si no llega por
+    // parámetro, se lee el guardado. Cae al TC de Operaciones cuando no hay propio.
+    let savedFx: { fxUsd?: number | null; fxArs?: number | null } = {};
+    if (!fxOverride) {
+      const [row] = await db.select().from(personalFxOverrides).where(and(
+        eq(personalFxOverrides.userId, userId),
+        eq(personalFxOverrides.period, period),
+      ));
+      if (row) savedFx = { fxUsd: row.fxUsd, fxArs: row.fxArs };
+    }
+    const personalFxUsd = fxOverride?.fxUsd ?? savedFx.fxUsd ?? null;
+    const personalFxArs = fxOverride?.fxArs ?? savedFx.fxArs ?? null;
+
     async function getPeriodFxRate(): Promise<number> {
       const fxRow = await db.select({ rate: exchangeRates.rate })
         .from(exchangeRates)
@@ -9234,18 +9310,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     // currency (matching the Cierre Mensual logic in monthly-closing.tsx) instead
     // of double-counting or ignoring the USD/ARS mix.
     function splitByBillingCurrency(totalCostARSFull: number, hoursForUSD: number, usdHourlyRate: number, fxRate: number) {
+      // TC efectivos: el propio de la persona prevalece; si no cargó ninguno, el de ops.
+      const effUsdFx = personalFxUsd && personalFxUsd > 0 ? personalFxUsd : fxRate;
+      const effArsFx = personalFxArs && personalFxArs > 0 ? personalFxArs : fxRate;
+
       if (billingCurrency === 'USD') {
-        return { totalCostARS: totalCostARSFull, totalCostUSD: hoursForUSD * usdHourlyRate };
+        const totalCostUSD = Math.round(hoursForUSD * usdHourlyRate * 100) / 100;
+        // ARS informativo: se valúa con el TC propio si lo cargó.
+        const totalCostARS = effUsdFx > 0 ? Math.round(totalCostUSD * effUsdFx) : totalCostARSFull;
+        return { totalCostARS, totalCostUSD, grandTotalARS: totalCostARS, grandTotalUSD: totalCostUSD };
       }
       if (billingCurrency === 'mixed') {
-        const totalUSDEquivalent = hoursForUSD * usdHourlyRate;
-        const totalCostUSD = totalUSDEquivalent * usdFraction;
-        const totalCostARS = Math.round(totalCostARSFull * (1 - usdFraction));
-        return { totalCostARS, totalCostUSD: Math.round(totalCostUSD * 100) / 100 };
+        const usdTramoUSD = Math.round(hoursForUSD * usdHourlyRate * usdFraction * 100) / 100;
+        const arsTramoARS = Math.round(totalCostARSFull * (1 - usdFraction));
+        // Total unificado en cada moneda usando los TC propios (dos TC): el tramo USD
+        // se pasa a ARS con effUsdFx y el tramo ARS se pasa a USD con effArsFx.
+        const grandTotalARS = arsTramoARS + (effUsdFx > 0 ? Math.round(usdTramoUSD * effUsdFx) : 0);
+        const grandTotalUSD = usdTramoUSD + (effArsFx > 0 ? Math.round((arsTramoARS / effArsFx) * 100) / 100 : 0);
+        return { totalCostARS: arsTramoARS, totalCostUSD: usdTramoUSD, grandTotalARS, grandTotalUSD };
       }
       // ARS
-      const totalCostUSD = fxRate > 0 ? Math.round((totalCostARSFull / fxRate) * 100) / 100 : 0;
-      return { totalCostARS: totalCostARSFull, totalCostUSD };
+      const totalCostUSD = effUsdFx > 0 ? Math.round((totalCostARSFull / effUsdFx) * 100) / 100 : 0;
+      return { totalCostARS: totalCostARSFull, totalCostUSD, grandTotalARS: totalCostARSFull, grandTotalUSD: totalCostUSD };
     }
 
     // If the month is already closed in Cierre Mensual, that record is the
@@ -9328,7 +9414,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     const availableHours = Math.round(workdays * dailyHours);
 
-    const { totalCostARS, totalCostUSD } = splitByBillingCurrency(totalCostARSFull, hours, usdHourlyRate, fxRate);
+    const { totalCostARS, totalCostUSD, grandTotalARS, grandTotalUSD } = splitByBillingCurrency(totalCostARSFull, hours, usdHourlyRate, fxRate);
 
     return {
       period,
@@ -9337,8 +9423,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       hours,
       totalCostARS,
       totalCostUSD,
+      grandTotalARS,
+      grandTotalUSD,
       billingCurrency,
       usdFraction: billingCurrency === 'mixed' ? usdFraction : undefined,
+      // TC propio de la persona (echo) y TC de ops del período como referencia.
+      fxUsd: personalFxUsd ?? undefined,
+      fxArs: personalFxArs ?? undefined,
+      opsFxRate: fxRate || undefined,
       isClosed: !!closing,
       availableHours,
       contractType: (personnelRow as any).contractType ?? "full-time",
@@ -9373,6 +9465,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error calculando resumen mensual personal:", error);
       res.status(500).json({ message: "Error al calcular resumen" });
+    }
+  });
+
+  // TC propio de la persona por período (para "Mis Facturas"). GET devuelve el guardado.
+  app.get("/api/me/invoices/fx", requireAuth, async (req, res) => {
+    try {
+      const period = typeof req.query.period === "string" ? req.query.period : "";
+      if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(period)) {
+        return res.status(400).json({ message: "Formato de período inválido (YYYY-MM)" });
+      }
+      const [row] = await db.select().from(personalFxOverrides).where(and(
+        eq(personalFxOverrides.userId, req.user!.id),
+        eq(personalFxOverrides.period, period),
+      ));
+      res.json(row ?? { period, fxUsd: null, fxArs: null });
+    } catch (error) {
+      console.error("Error obteniendo TC personal:", error);
+      res.status(500).json({ message: "Error al obtener TC" });
+    }
+  });
+
+  // PUT upsert del TC propio. Acepta fxUsd y/o fxArs (null para limpiar).
+  app.put("/api/me/invoices/fx", requireAuth, async (req, res) => {
+    try {
+      const period = String(req.body?.period ?? "");
+      if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(period)) {
+        return res.status(400).json({ message: "Formato de período inválido (YYYY-MM)" });
+      }
+      const parseRate = (v: any): number | null => {
+        if (v === null || v === undefined || v === "") return null;
+        const n = Number(v);
+        return isFinite(n) && n > 0 ? n : null;
+      };
+      const fxUsd = parseRate(req.body?.fxUsd);
+      const fxArs = parseRate(req.body?.fxArs);
+      const [row] = await db.insert(personalFxOverrides)
+        .values({ userId: req.user!.id, period, fxUsd, fxArs })
+        .onConflictDoUpdate({
+          target: [personalFxOverrides.userId, personalFxOverrides.period],
+          set: { fxUsd, fxArs, updatedAt: new Date() },
+        })
+        .returning();
+      // Devolver el resumen recalculado con el TC recién guardado.
+      const summary = await getMonthlyPersonalSummary(req.user!.id, period, { fxUsd, fxArs });
+      res.json({ fx: row, summary });
+    } catch (error) {
+      console.error("Error guardando TC personal:", error);
+      res.status(500).json({ message: "Error al guardar TC" });
     }
   });
 
@@ -17920,9 +18060,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Get project names from quotations
       const projectsWithNames = await db.execute(sql`
-        SELECT ap.id, q.project_name, c.name as client_name
+        SELECT ap.id, COALESCE(ap.name, q.project_name) as project_name, c.name as client_name
         FROM active_projects ap
-        JOIN quotations q ON q.id = ap.quotation_id
+        LEFT JOIN quotations q ON q.id = ap.quotation_id
         JOIN clients c ON c.id = ap.client_id
       `);
       const projectMap = new Map((projectsWithNames.rows as any[]).map(p => [p.id, { name: p.project_name, client: p.client_name }]));
@@ -18078,9 +18218,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const allTasks = await db.select({ id: tasks.id, title: tasks.title, projectId: tasks.projectId, assigneeId: tasks.assigneeId, estimatedHours: tasks.estimatedHours }).from(tasks);
       
       const projectsWithNames = await db.execute(sql`
-        SELECT ap.id, q.project_name, c.name as client_name
+        SELECT ap.id, COALESCE(ap.name, q.project_name) as project_name, c.name as client_name
         FROM active_projects ap
-        JOIN quotations q ON q.id = ap.quotation_id
+        LEFT JOIN quotations q ON q.id = ap.quotation_id
         JOIN clients c ON c.id = ap.client_id
       `);
       const projectMap = new Map((projectsWithNames.rows as any[]).map(p => [p.id, { name: p.project_name, client: p.client_name }]));
@@ -18111,12 +18251,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const byWeek = Object.entries(byWeekMap).map(([week, hours]) => ({ week, hours })).sort((a, b) => a.week.localeCompare(b.week));
 
-      // By project
-      const byProjectMap: Record<string, { name: string; hours: number }> = {};
+      // By project (real hours + estimated hours para comparar estimado vs real)
+      const byProjectMap: Record<string, { name: string; hours: number; estimatedHours: number }> = {};
       for (const e of enriched) {
         const key = e.projectName;
-        if (!byProjectMap[key]) byProjectMap[key] = { name: key, hours: 0 };
+        if (!byProjectMap[key]) byProjectMap[key] = { name: key, hours: 0, estimatedHours: 0 };
         byProjectMap[key].hours += e.hours;
+      }
+      // Horas estimadas por proyecto: suma de tasks.estimatedHours dentro del scope
+      // filtrado (y de la persona, si se filtró por persona).
+      for (const t of allTasks) {
+        if (!t.estimatedHours || t.estimatedHours <= 0) continue;
+        if (personnelId && t.assigneeId !== parseInt(personnelId as string)) continue;
+        const proj = t.projectId ? projectMap.get(t.projectId) : null;
+        const key = proj?.name || "Sin proyecto";
+        if (!byProjectMap[key]) byProjectMap[key] = { name: key, hours: 0, estimatedHours: 0 };
+        byProjectMap[key].estimatedHours += t.estimatedHours;
       }
       const byProject = Object.values(byProjectMap).sort((a, b) => b.hours - a.hours);
 
@@ -18144,7 +18294,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const byPerson = Object.values(byPersonMap).sort((a, b) => b.hours - a.hours);
 
-      res.json({ entries: enriched, byWeek, byProject, byPerson });
+      // Equipo activo (sin freelance) con horas diarias por contrato, para calcular
+      // "horas disponibles" del equipo (full=8h/día, part-time=6h/día). Freelance no
+      // tiene capacidad base, por eso se excluye del cálculo de disponibles.
+      const today = new Date().toISOString().slice(0, 10);
+      const teamRows = await db.select({
+        id: personnel.id, name: personnel.name,
+        contractType: personnel.contractType, monthlyHours: personnel.monthlyHours,
+        activeUntil: personnel.activeUntil,
+      }).from(personnel);
+      const activeTeam = teamRows
+        .filter(p => (p.contractType ?? 'full-time') !== 'freelance')
+        .filter(p => !p.activeUntil || p.activeUntil > today)
+        .map(p => ({
+          id: p.id, name: p.name,
+          contractType: p.contractType ?? 'full-time',
+          dailyHours: Math.round(((p.monthlyHours || 160) / 20) * 100) / 100,
+        }));
+
+      res.json({ entries: enriched, byWeek, byProject, byPerson, activeTeam });
     } catch (error) {
       console.error("Error hours-summary:", error);
       res.status(500).json({ message: "Error al obtener resumen de horas" });
@@ -18487,9 +18655,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/tasks/projects", requireAuth, async (req: Request, res: Response) => {
     try {
       const projectsResult = await db.execute(sql`
-        SELECT 
+        SELECT
           ap.id,
-          q.project_name as name,
+          COALESCE(ap.name, q.project_name) as name,
           c.name as client_name,
           ap.status,
           COUNT(DISTINCT t.id) as task_count,
@@ -18497,12 +18665,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           MAX(t.updated_at) as last_activity,
           'active_project' as source
         FROM active_projects ap
-        JOIN quotations q ON q.id = ap.quotation_id
+        LEFT JOIN quotations q ON q.id = ap.quotation_id
         JOIN clients c ON c.id = ap.client_id
         LEFT JOIN tasks t ON t.project_id = ap.id
         WHERE ap.status = 'active'
-        GROUP BY ap.id, q.project_name, c.name, ap.status
-        ORDER BY c.name, q.project_name
+        GROUP BY ap.id, ap.name, q.project_name, c.name, ap.status
+        ORDER BY c.name, COALESCE(ap.name, q.project_name)
       `);
 
       // Include own task projects (id offset by 1,000,000 to avoid collisions)
@@ -18575,7 +18743,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // POST /api/tasks/projects/create — crear nuevo proyecto de tareas
   app.post("/api/tasks/projects/create", requireAuth, async (req: Request, res: Response) => {
     try {
-      const { name, activeProjectId, colorIndex = 0, privacy = "team", personnelId } = req.body;
+      const { name, activeProjectId, clientId, colorIndex = 0, privacy = "team", personnelId } = req.body;
 
       if (activeProjectId) {
         // Join existing active project — add user as owner member
@@ -18585,6 +18753,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ON CONFLICT (project_id, personnel_id) DO UPDATE SET role = 'owner'
         `);
         return res.json({ id: activeProjectId, type: 'active_project' });
+      }
+
+      // Si se eligió un cliente, creamos un PROYECTO UNIFICADO (active_projects) sin
+      // cotización, en vez de un task_own_projects. Así el proyecto de cliente creado
+      // desde Tareas aparece también en Vista de Proyectos (misma entidad).
+      if (clientId) {
+        if (!name || !name.trim()) return res.status(400).json({ message: "El nombre es requerido" });
+        const apResult = await db.execute(sql`
+          INSERT INTO active_projects (client_id, name, status, start_date, tracking_frequency, project_category)
+          VALUES (${parseInt(clientId)}, ${name.trim()}, 'active', NOW(), 'weekly', 'billable')
+          RETURNING id
+        `);
+        const apId = (apResult.rows[0] as any).id;
+        if (personnelId) {
+          await db.execute(sql`
+            INSERT INTO task_project_members (project_id, personnel_id, role)
+            VALUES (${apId}, ${personnelId}, 'owner')
+            ON CONFLICT (project_id, personnel_id) DO UPDATE SET role = 'owner'
+          `);
+        }
+        return res.json({ id: apId, type: 'active_project' });
       }
 
       // Create standalone task project
@@ -18640,9 +18829,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         };
       } else {
         const projectResult = await db.execute(sql`
-          SELECT ap.id, q.project_name as name, c.name as client_name, ap.status, ap.brief_url
+          SELECT ap.id, COALESCE(ap.name, q.project_name) as name, c.name as client_name, ap.status, ap.brief_url
           FROM active_projects ap
-          JOIN quotations q ON q.id = ap.quotation_id
+          LEFT JOIN quotations q ON q.id = ap.quotation_id
           JOIN clients c ON c.id = ap.client_id
           WHERE ap.id = ${projectId}
         `);

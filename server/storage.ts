@@ -1306,23 +1306,38 @@ export class DatabaseStorage implements IStorage {
 
   // Active project operations
   async getActiveProjects(): Promise<(ActiveProject & { quotation: Quotation & { client?: Client } })[]> {
+    // LEFT JOIN a quotations: los proyectos SIN cotización (internos, demos, o creados
+    // desde Tareas) también deben aparecer. El cliente se resuelve por
+    // activeProjects.clientId (siempre presente), no por la cotización.
     const projects = await db.select({
       project: activeProjects,
       quotation: quotations,
       client: clients
     })
     .from(activeProjects)
-    .innerJoin(quotations, eq(activeProjects.quotationId, quotations.id))
-    .leftJoin(clients, eq(quotations.clientId, clients.id))
+    .leftJoin(quotations, eq(activeProjects.quotationId, quotations.id))
+    .leftJoin(clients, eq(activeProjects.clientId, clients.id))
     .where(eq(activeProjects.isFinished, false));
 
-    return projects.map(item => ({
-      ...item.project,
-      quotation: {
-        ...item.quotation,
-        client: item.client || undefined
-      }
-    }));
+    return projects.map(item => {
+      const client = item.client || undefined;
+      // Sin cotización sintetizamos una mínima para no romper consumidores que leen
+      // project.quotation.projectName / clientId / client. El nombre sale del campo
+      // propio del proyecto.
+      const quotation = item.quotation
+        ? { ...item.quotation, client }
+        : ({
+            id: null,
+            projectName: item.project.name || "Proyecto sin nombre",
+            clientId: item.project.clientId,
+            totalAmount: item.project.budget ?? 0,
+            client,
+          } as any);
+      return {
+        ...item.project,
+        quotation,
+      };
+    });
   }
 
   async getActiveProjectsByClient(clientId: number): Promise<(ActiveProject & { quotation: Quotation })[]> {
