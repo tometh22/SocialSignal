@@ -25,6 +25,7 @@ type HoursSummary = {
   byProject: { name: string; hours: number; estimatedHours: number }[];
   byPerson: { name: string; hours: number; estimatedHours: number }[];
   activeTeam?: { id: number; name: string; contractType: string; dailyHours: number }[];
+  estimationByProject?: { name: string; realHours: number; estimatedHours: number; delta: number }[];
 };
 
 const QUICK_FILTERS = [
@@ -108,7 +109,11 @@ export default function HoursDashboardPage() {
   });
 
   const totalHours = summary?.byPerson.reduce((acc, p) => acc + p.hours, 0) || 0;
-  const totalEstimatedHours = summary?.byPerson.reduce((acc, p) => acc + (p.estimatedHours || 0), 0) || 0;
+  // Calidad de estimación: person-agnóstica y all-time (real acumulado de la tarea vs
+  // estimado de la tarea). Distinto de las horas reales del período (capacidad).
+  const estByProject = summary?.estimationByProject || [];
+  const estTotalEstimated = estByProject.reduce((acc, p) => acc + (p.estimatedHours || 0), 0);
+  const estTotalReal = estByProject.reduce((acc, p) => acc + (p.realHours || 0), 0);
 
   const weeklyData = (summary?.byWeek || []).map(w => ({
     week: format(new Date(w.week), "dd/MM", { locale: es }),
@@ -296,10 +301,10 @@ export default function HoursDashboardPage() {
                 <TrendingUp className="h-4 w-4 text-blue-500" />
                 <p className="text-xs text-muted-foreground font-medium">Horas estimadas totales</p>
               </div>
-              <p className="text-2xl font-bold text-foreground">{totalEstimatedHours.toFixed(1)}h</p>
+              <p className="text-2xl font-bold text-foreground">{estTotalEstimated.toFixed(1)}h</p>
               <p className="text-xs text-muted-foreground mt-1">
-                {totalEstimatedHours > 0
-                  ? `${Math.round((totalHours / totalEstimatedHours) * 100)}% consumido`
+                {estTotalEstimated > 0
+                  ? `${Math.round((estTotalReal / estTotalEstimated) * 100)}% consumido (real acumulado)`
                   : "Sin estimación cargada"}
               </p>
             </div>
@@ -349,7 +354,7 @@ export default function HoursDashboardPage() {
             <div className="bg-card rounded-xl border p-4">
               <h3 className="text-sm font-semibold mb-4 flex items-center gap-2">
                 <PieChart className="h-4 w-4 text-primary" />
-                Tiempo por proyecto <span className="text-xs font-normal text-muted-foreground">· real vs estimado</span>
+                Tiempo por proyecto <span className="text-xs font-normal text-muted-foreground">· horas del período</span>
               </h3>
               {summary.byProject.length > 0 ? (
                 <div className="flex items-center gap-4">
@@ -376,26 +381,13 @@ export default function HoursDashboardPage() {
                     </RPieChart>
                   </ResponsiveContainer>
                   <div className="flex-1 space-y-1.5 overflow-y-auto max-h-[200px]">
-                    {summary.byProject.map((p, i) => {
-                      const est = p.estimatedHours || 0;
-                      const delta = p.hours - est;
-                      return (
-                        <div key={p.name} className="flex items-center gap-2 text-xs">
-                          <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: CHART_COLORS[i % CHART_COLORS.length] }} />
-                          <span className="flex-1 truncate text-muted-foreground" title={p.name}>{p.name}</span>
-                          <span className="font-semibold text-foreground flex-shrink-0 tabular-nums">{p.hours.toFixed(1)}h</span>
-                          <span className="text-muted-foreground/60 flex-shrink-0 tabular-nums w-16 text-right">
-                            {est > 0 ? `/ ${est.toFixed(1)}h` : "/ —"}
-                          </span>
-                          <span className={cn(
-                            "flex-shrink-0 tabular-nums w-12 text-right font-medium",
-                            est <= 0 ? "text-muted-foreground/40" : delta > 2 ? "text-orange-600" : delta < -2 ? "text-green-600" : "text-muted-foreground"
-                          )}>
-                            {est > 0 ? `${delta > 0 ? "+" : ""}${delta.toFixed(1)}` : ""}
-                          </span>
-                        </div>
-                      );
-                    })}
+                    {summary.byProject.map((p, i) => (
+                      <div key={p.name} className="flex items-center gap-2 text-xs">
+                        <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: CHART_COLORS[i % CHART_COLORS.length] }} />
+                        <span className="flex-1 truncate text-muted-foreground" title={p.name}>{p.name}</span>
+                        <span className="font-semibold text-foreground flex-shrink-0 tabular-nums">{p.hours.toFixed(1)}h</span>
+                      </div>
+                    ))}
                   </div>
                 </div>
               ) : (
@@ -404,12 +396,54 @@ export default function HoursDashboardPage() {
             </div>
           </div>
 
+          {/* Calidad de estimación por proyecto — estimado vs real acumulado (all-time)
+              anclado a la tarea, independiente de quién cargó las horas. */}
+          {estByProject.length > 0 && (
+            <div className="bg-card rounded-xl border p-4">
+              <h3 className="text-sm font-semibold mb-1 flex items-center gap-2">
+                <TrendingUp className="h-4 w-4 text-primary" />
+                Calidad de estimación por proyecto
+              </h3>
+              <p className="text-xs text-muted-foreground mb-3">Estimado vs real acumulado de las tareas (all-time). Δ = real − estimado.</p>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b bg-muted/10">
+                      <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground">Proyecto</th>
+                      <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground">Estimado</th>
+                      <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground">Real</th>
+                      <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground">Δ</th>
+                      <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground">Consumo</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {estByProject.map((p) => {
+                      const pct = p.estimatedHours > 0 ? Math.round((p.realHours / p.estimatedHours) * 100) : null;
+                      return (
+                        <tr key={p.name} className="hover:bg-accent/20 transition-colors">
+                          <td className="px-3 py-2 text-xs font-medium text-foreground max-w-[220px]"><span className="truncate block" title={p.name}>{p.name}</span></td>
+                          <td className="px-3 py-2 text-xs text-right text-muted-foreground tabular-nums">{p.estimatedHours > 0 ? `${p.estimatedHours.toFixed(1)}h` : "—"}</td>
+                          <td className="px-3 py-2 text-xs text-right font-semibold text-foreground tabular-nums">{p.realHours.toFixed(1)}h</td>
+                          <td className={cn(
+                            "px-3 py-2 text-xs text-right font-medium tabular-nums",
+                            p.estimatedHours <= 0 ? "text-muted-foreground/40" : p.delta > 2 ? "text-orange-600" : p.delta < -2 ? "text-green-600" : "text-muted-foreground"
+                          )}>{p.estimatedHours > 0 ? `${p.delta > 0 ? "+" : ""}${p.delta.toFixed(1)}h` : "—"}</td>
+                          <td className="px-3 py-2 text-xs text-right text-muted-foreground tabular-nums">{pct != null ? `${pct}%` : "—"}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
           {/* By person matrix */}
           <div className="bg-card rounded-xl border overflow-hidden">
             <div className="px-4 py-3 border-b bg-muted/20">
               <h3 className="text-sm font-semibold flex items-center gap-2">
                 <TrendingUp className="h-4 w-4 text-primary" />
-                Detalle por colaborador
+                Detalle por colaborador <span className="text-xs font-normal text-muted-foreground">· horas cargadas del período</span>
               </h3>
             </div>
             <div className="overflow-x-auto">
@@ -422,17 +456,13 @@ export default function HoursDashboardPage() {
                         <span className="block truncate" title={p.name}>{p.name}</span>
                       </th>
                     ))}
-                    <th className="text-right px-3 py-2.5 text-xs font-semibold text-muted-foreground">Estimadas</th>
                     <th className="text-right px-4 py-2.5 text-xs font-semibold text-muted-foreground">Reales</th>
-                    <th className="text-right px-4 py-2.5 text-xs font-semibold text-muted-foreground">Δ</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
                   {summary.byPerson.map((person) => {
                     const personEntries = summary.entries.filter((e: any) => e.personnelName === person.name);
-                    const est = person.estimatedHours || 0;
                     const real = person.hours;
-                    const delta = real - est;
                     return (
                       <tr key={person.name} className="hover:bg-accent/30 transition-colors">
                         <td className="px-4 py-2.5 font-medium text-foreground text-xs">{person.name}</td>
@@ -444,20 +474,7 @@ export default function HoursDashboardPage() {
                             </td>
                           );
                         })}
-                        <td className="text-right px-3 py-2.5 text-xs text-muted-foreground">
-                          {est > 0 ? `${est.toFixed(1)}h` : <span className="text-muted-foreground/40">—</span>}
-                        </td>
                         <td className="text-right px-4 py-2.5 font-bold text-foreground text-xs">{real.toFixed(1)}h</td>
-                        <td className="text-right px-4 py-2.5 text-xs">
-                          {est > 0 ? (
-                            <span className={cn(
-                              "font-medium",
-                              delta > 2 ? "text-orange-600" : delta < -2 ? "text-green-600" : "text-muted-foreground"
-                            )}>
-                              {delta > 0 ? "+" : ""}{delta.toFixed(1)}h
-                            </span>
-                          ) : <span className="text-muted-foreground/40">—</span>}
-                        </td>
                       </tr>
                     );
                   })}
@@ -466,11 +483,7 @@ export default function HoursDashboardPage() {
                     {summary.byProject.slice(0, 5).map(proj => (
                       <td key={proj.name} className="text-center px-3 py-2.5 text-xs text-foreground">{proj.hours.toFixed(1)}h</td>
                     ))}
-                    <td className="text-right px-3 py-2.5 text-xs text-foreground">
-                      {summary.byPerson.reduce((s, p) => s + (p.estimatedHours || 0), 0).toFixed(1)}h
-                    </td>
                     <td className="text-right px-4 py-2.5 text-xs text-foreground">{totalHours.toFixed(1)}h</td>
-                    <td />
                   </tr>
                 </tbody>
               </table>
