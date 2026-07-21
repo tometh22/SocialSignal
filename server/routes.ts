@@ -3752,7 +3752,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // renombrar al del target para que la facturación consolide.
         await tx.execute(sql`UPDATE google_sheets_sales SET client_id = ${targetId}, client_name = ${target.name} WHERE client_id = ${sourceId}`);
         await tx.execute(sql`UPDATE crm_leads SET client_id = ${targetId} WHERE client_id = ${sourceId}`);
-        await tx.execute(sql`UPDATE activo_entries SET cliente_id = ${targetId} WHERE cliente_id = ${sourceId}`);
+        // activo_entries (ledger) puede no existir en todos los entornos (su migración
+        // es opcional). Guardado por existencia para no abortar la transacción.
+        const activoChk = await tx.execute(sql`SELECT to_regclass('public.activo_entries') IS NOT NULL AS exists`);
+        if ((activoChk.rows?.[0] as any)?.exists) {
+          await tx.execute(sql`UPDATE activo_entries SET cliente_id = ${targetId} WHERE cliente_id = ${sourceId}`);
+        }
 
         // Alias ETL: evitar violar el unique (client_id, alias_norm) descartando los
         // alias del source que ya existan en el target antes de reasignar.
