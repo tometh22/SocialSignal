@@ -631,6 +631,110 @@ async function applyPendingMigrations() {
       CREATE INDEX IF NOT EXISTS "idx_pfx_user" ON "personal_fx_overrides"("user_id");
     `);
 
+    // 0036 Diagnóstico de Mind — tablas del ledger de Finanzas (Activo/Pasivo/
+    // Provisiones/Cashflow). Estaban definidas en shared/schema.ts pero nunca se
+    // crearon en prod → el módulo Finanzas rompía. Idempotentes.
+    await run('0036 activo_entries', `
+      CREATE TABLE IF NOT EXISTS "activo_entries" (
+        "id" SERIAL PRIMARY KEY,
+        "period_key" VARCHAR(7) NOT NULL,
+        "tipo_activo" VARCHAR(50),
+        "concepto" TEXT,
+        "cliente_id" INTEGER REFERENCES "clients"("id") ON DELETE SET NULL,
+        "cliente_nombre" TEXT,
+        "monto_ars" NUMERIC(14,2),
+        "monto_usd" NUMERIC(12,2),
+        "cotizacion" NUMERIC(10,4),
+        "monto_total_usd" NUMERIC(12,2),
+        "fecha_facturacion" TIMESTAMP,
+        "fecha_pago" TIMESTAMP,
+        "fecha_vencimiento" TIMESTAMP,
+        "vencido" BOOLEAN DEFAULT false,
+        "cobrado_al_cierre" BOOLEAN DEFAULT false,
+        "nro_factura" VARCHAR(100),
+        "razon_social" TEXT,
+        "override_manual" BOOLEAN DEFAULT false,
+        "imported_at" TIMESTAMP DEFAULT now(),
+        "import_batch" VARCHAR(100),
+        "created_at" TIMESTAMP NOT NULL DEFAULT now(),
+        "updated_at" TIMESTAMP NOT NULL DEFAULT now()
+      );
+      CREATE INDEX IF NOT EXISTS "idx_activo_period" ON "activo_entries"("period_key");
+      CREATE INDEX IF NOT EXISTS "idx_activo_cliente" ON "activo_entries"("cliente_nombre");
+    `);
+    await run('0036 pasivo_entries', `
+      CREATE TABLE IF NOT EXISTS "pasivo_entries" (
+        "id" SERIAL PRIMARY KEY,
+        "period_key" VARCHAR(7) NOT NULL,
+        "detalle" TEXT NOT NULL,
+        "subtipo_costo" VARCHAR(60),
+        "concepto" TEXT,
+        "descripcion" TEXT,
+        "monto_ars" NUMERIC(14,2),
+        "monto_usd" NUMERIC(12,2),
+        "cotizacion" NUMERIC(10,4),
+        "monto_total_usd" NUMERIC(12,2),
+        "fecha_emision" TIMESTAMP,
+        "fecha_pago" TIMESTAMP,
+        "fecha_vencimiento" TIMESTAMP,
+        "vencido" BOOLEAN DEFAULT false,
+        "pagado_al_cierre" BOOLEAN DEFAULT false,
+        "override_manual" BOOLEAN DEFAULT false,
+        "imported_at" TIMESTAMP DEFAULT now(),
+        "import_batch" VARCHAR(100),
+        "created_at" TIMESTAMP NOT NULL DEFAULT now(),
+        "updated_at" TIMESTAMP NOT NULL DEFAULT now()
+      );
+      CREATE INDEX IF NOT EXISTS "idx_pasivo_period" ON "pasivo_entries"("period_key");
+      CREATE INDEX IF NOT EXISTS "idx_pasivo_subtipo" ON "pasivo_entries"("subtipo_costo");
+    `);
+    await run('0036 provision_entries', `
+      CREATE TABLE IF NOT EXISTS "provision_entries" (
+        "id" SERIAL PRIMARY KEY,
+        "period_key" VARCHAR(7) NOT NULL,
+        "project_id" INTEGER REFERENCES "active_projects"("id") ON DELETE SET NULL,
+        "cliente_nombre" TEXT,
+        "tipo" VARCHAR(20) NOT NULL,
+        "monto_costo" NUMERIC(12,2),
+        "monto_provision" NUMERIC(12,2),
+        "criterio" TEXT,
+        "mes_aplicacion" VARCHAR(7),
+        "unwound_amount" NUMERIC(12,2),
+        "imported_at" TIMESTAMP DEFAULT now(),
+        "import_batch" VARCHAR(100),
+        "created_at" TIMESTAMP NOT NULL DEFAULT now(),
+        "created_by" INTEGER REFERENCES "users"("id") ON DELETE SET NULL
+      );
+      CREATE INDEX IF NOT EXISTS "idx_provision_period" ON "provision_entries"("period_key");
+      CREATE INDEX IF NOT EXISTS "idx_provision_project" ON "provision_entries"("project_id");
+    `);
+    await run('0036 cashflow_transactions', `
+      CREATE TABLE IF NOT EXISTS "cashflow_transactions" (
+        "id" SERIAL PRIMARY KEY,
+        "fecha" TIMESTAMP NOT NULL,
+        "period_key" VARCHAR(7) NOT NULL,
+        "tipo_movimiento" VARCHAR(10) NOT NULL,
+        "banco" VARCHAR(30),
+        "moneda" VARCHAR(3),
+        "cliente_nombre" TEXT,
+        "detalle_operacion" TEXT,
+        "concepto" TEXT,
+        "monto_ars" NUMERIC(14,2),
+        "cotizacion" NUMERIC(10,4),
+        "monto_usd" NUMERIC(12,2),
+        "saldo_santander" NUMERIC(14,2),
+        "saldo_boa" NUMERIC(14,2),
+        "saldo_caja" NUMERIC(14,2),
+        "saldo_total_usd" NUMERIC(14,2),
+        "imported_at" TIMESTAMP DEFAULT now(),
+        "import_batch" VARCHAR(100),
+        "created_at" TIMESTAMP NOT NULL DEFAULT now()
+      );
+      CREATE INDEX IF NOT EXISTS "idx_cashflow_period" ON "cashflow_transactions"("period_key");
+      CREATE INDEX IF NOT EXISTS "idx_cashflow_fecha" ON "cashflow_transactions"("fecha");
+      CREATE INDEX IF NOT EXISTS "idx_cashflow_banco" ON "cashflow_transactions"("banco");
+    `);
+
   } finally {
     client.release();
   }
