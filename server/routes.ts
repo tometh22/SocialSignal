@@ -9345,7 +9345,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       if (billingCurrency === 'mixed') {
         const usdTramoUSD = Math.round(hoursForUSD * usdHourlyRate * usdFraction * 100) / 100;
-        const arsTramoARS = Math.round(totalCostARSFull * (1 - usdFraction));
+        // El tramo ARS se valúa UNIFORME desde la tarifa USD×TC (mismo criterio que el
+        // Cierre Mensual), para que el total no "salte" al cerrar. Fallback a la fórmula
+        // vieja (fracción del costo acumulado) cuando no hay TC con el cual expresarlo.
+        const arsTramoARS = effArsFx > 0
+          ? Math.round(hoursForUSD * usdHourlyRate * (1 - usdFraction) * effArsFx)
+          : Math.round(totalCostARSFull * (1 - usdFraction));
         // Total unificado en cada moneda usando los TC propios (dos TC): el tramo USD
         // se pasa a ARS con effUsdFx y el tramo ARS se pasa a USD con effArsFx.
         const grandTotalARS = arsTramoARS + (effUsdFx > 0 ? Math.round(usdTramoUSD * effUsdFx) : 0);
@@ -18245,7 +18250,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Enrich entries with task/personnel info
       const allPersonnel = await db.select({ id: personnel.id, name: personnel.name }).from(personnel);
-      const allTasks = await db.select({ id: tasks.id, title: tasks.title, projectId: tasks.projectId, assigneeId: tasks.assigneeId, estimatedHours: tasks.estimatedHours, parentTaskId: tasks.parentTaskId }).from(tasks);
+      const allTasks = await db.select({ id: tasks.id, title: tasks.title, projectId: tasks.projectId, assigneeId: tasks.assigneeId, estimatedHours: tasks.estimatedHours, parentTaskId: tasks.parentTaskId, loggedHours: tasks.loggedHours }).from(tasks);
       
       const projectsWithNames = await db.execute(sql`
         SELECT ap.id, COALESCE(ap.name, q.project_name) as project_name, c.name as client_name
@@ -18320,6 +18325,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (!t.assigneeId || !t.estimatedHours || t.estimatedHours <= 0) continue;
         if (t.parentTaskId) continue; // subtareas no suman (consistencia con byProject)
         if (t.projectId && !scopeProjectIds.includes(t.projectId)) continue;
+        // Consistencia con byProject: al filtrar por persona, contar solo sus asignadas.
+        if (personnelId && t.assigneeId !== parseInt(personnelId as string)) continue;
         if (!byPersonMap[t.assigneeId]) {
           const p = allPersonnel.find(p => p.id === t.assigneeId);
           if (!p) continue;
@@ -18329,6 +18336,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const byPerson = Object.values(byPersonMap).sort((a, b) => b.hours - a.hours);
+
+      // Calidad de estimación por proyecto (person-agnóstica, all-time). Ancla estimado
+      // y real a la MISMA tarea: estimated = Σ tasks.estimatedHours (solo raíz, en scope),
+      // real = Σ tasks.loggedHours de esas tareas (todas las personas, all-time). Evita el
+      // cruce cargador≠asignado del panel por-persona. loggedHours ya hace rollup del hijo,
+      // por eso se suma solo la raíz para no doble-contar.
+      const estMap: Record<string, { name: string; realHours: number; estimatedHours: number }> = {};
+      for (const t of allTasks) {
+        if (t.parentTaskId) continue;
+        if (t.projectId && !scopeProjectIds.includes(t.projectId)) continue;
+        const est = t.estimatedHours || 0;
+        const real = t.loggedHours || 0;
+        if (est <= 0 && real <= 0) continue;
+        const proj = t.projectId ? projectMap.get(t.projectId) : null;
+        const key = proj?.name || "Sin proyecto";
+        if (!estMap[key]) estMap[key] = { name: key, realHours: 0, estimatedHours: 0 };
+        estMap[key].estimatedHours += est;
+        estMap[key].realHours += real;
+      }
+      const estimationByProject = Object.values(estMap)
+        .map(p => ({ ...p, realHours: Math.round(p.realHours * 100) / 100, estimatedHours: Math.round(p.estimatedHours * 100) / 100, delta: Math.round((p.realHours - p.estimatedHours) * 100) / 100 }))
+        .sort((a, b) => b.estimatedHours - a.estimatedHours);
 
       // Equipo activo (sin freelance) con horas diarias por contrato, para calcular
       // "horas disponibles" del equipo (full=8h/día, part-time=6h/día). Freelance no
@@ -18351,7 +18380,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           dailyHours: Math.round(((p.monthlyHours || 160) / 20) * 100) / 100,
         }));
 
-      res.json({ entries: enriched, byWeek, byProject, byPerson, activeTeam });
+      res.json({ entries: enriched, byWeek, byProject, byPerson, activeTeam, estimationByProject });
     } catch (error) {
       console.error("Error hours-summary:", error);
       res.status(500).json({ message: "Error al obtener resumen de horas" });
