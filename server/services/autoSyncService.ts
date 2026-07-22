@@ -474,10 +474,16 @@ export class AutoSyncService {
       const currYear = now.getFullYear();
       const prevMonth = now.getMonth() === 0 ? 12 : now.getMonth();
       const prevYear = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
-      const periods = [
+      const allPeriods = [
         `${currYear}-${String(currMonth).padStart(2, '0')}`,
         `${prevYear}-${String(prevMonth).padStart(2, '0')}`,
       ];
+
+      // Cutover Excel→App: desde el cutover, el ledger (activo/pasivo/cashflow/
+      // provisiones) se carga a mano en la app — no pisar esos períodos con Excel.
+      const { getCutoverDate } = await import('../etl/time-entries-to-fact-labor');
+      const cutoverDate = await getCutoverDate();
+      const periods = cutoverDate ? allPeriods.filter(p => p < cutoverDate) : allPeriods;
 
       console.log(`📒 Syncing ledger tables for periods: ${periods.join(', ')}`);
 

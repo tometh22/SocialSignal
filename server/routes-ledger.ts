@@ -13,6 +13,7 @@ import {
   insertActivoEntrySchema,
   insertPasivoEntrySchema,
   insertProvisionEntrySchema,
+  insertCashflowTransactionSchema,
 } from "@shared/schema";
 import { eq, and, sql, desc, asc } from "drizzle-orm";
 import { storage } from "./storage";
@@ -58,6 +59,17 @@ export function createLedgerRouter(requireAuth: any) {
       const pendiente = total - cobrado;
 
       res.json({ total, cobrado, pendiente, vencido, count: rows.length });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  router.post("/activo", requireAuth, async (req, res) => {
+    try {
+      const parsed = insertActivoEntrySchema.safeParse({ ...req.body, overrideManual: true });
+      if (!parsed.success) return res.status(400).json({ message: parsed.error.message });
+      const [created] = await db.insert(activoEntries).values(parsed.data).returning();
+      res.status(201).json(created);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -124,6 +136,17 @@ export function createLedgerRouter(requireAuth: any) {
       }
 
       res.json({ total, pagado, pendiente, vencido, bySubtipo, count: rows.length });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  router.post("/pasivo", requireAuth, async (req, res) => {
+    try {
+      const parsed = insertPasivoEntrySchema.safeParse({ ...req.body, overrideManual: true });
+      if (!parsed.success) return res.status(400).json({ message: parsed.error.message });
+      const [created] = await db.insert(pasivoEntries).values(parsed.data).returning();
+      res.status(201).json(created);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -203,6 +226,34 @@ export function createLedgerRouter(requireAuth: any) {
         : await db.select().from(cashflowTransactions).orderBy(asc(cashflowTransactions.fecha));
 
       res.json(rows);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  router.post("/cashflow", requireAuth, async (req, res) => {
+    try {
+      const parsed = insertCashflowTransactionSchema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ message: parsed.error.message });
+      const [created] = await db.insert(cashflowTransactions).values(parsed.data).returning();
+      res.status(201).json(created);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  router.patch("/cashflow/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid id" });
+      const parsed = insertCashflowTransactionSchema.partial().safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ message: parsed.error.message });
+      const [updated] = await db.update(cashflowTransactions)
+        .set(parsed.data)
+        .where(eq(cashflowTransactions.id, id))
+        .returning();
+      if (!updated) return res.status(404).json({ message: "Not found" });
+      res.json(updated);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
