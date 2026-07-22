@@ -10,6 +10,15 @@ import { toPeriodKey, normKey, parseNum, prefer, normHours, needsAntiX100, gener
 import { resolveRCRow } from './sot-project-resolver';
 import { updateProvisionsinFactCostMonth, getProvisionSummaryByPeriod } from './provisions';
 
+// Dynamic import (evita ciclo estático: time-entries-to-fact-labor.ts importa
+// `ensurePeriod` de este archivo). Cutover de Excel→App: períodos >= cutover
+// los maneja la app (horas nativas); el ETL del Excel los saltea para no pisarlos.
+async function isPeriodExcelFrozen(periodKey: string): Promise<boolean> {
+  const { getCutoverDate } = await import('./time-entries-to-fact-labor');
+  const cutoverDate = await getCutoverDate();
+  return !!cutoverDate && periodKey >= cutoverDate;
+}
+
 // ==================== PROJECT ID RESOLVER ====================
 
 /**
@@ -246,10 +255,17 @@ export async function processDirectCostsToFactLabor(rows: CostoDirectoRow[]): Pr
         skipped++;
         continue;
       }
-      
+
+      // Cutover Excel→App: desde el cutover el costo/horas lo maneja
+      // buildFactLaborFromTimeEntries (horas nativas de la app) — no pisar.
+      if (await isPeriodExcelFrozen(periodKey)) {
+        skipped++;
+        continue;
+      }
+
       // Asegurar período
       await ensurePeriod(periodKey);
-      
+
       // 3) Horas con ANTI×100
       const targetRaw = parseNum(row['Cantidad de horas objetivo']);
       let asanaRaw = parseNum(row['Cantidad de horas reales Asana']);
@@ -605,7 +621,14 @@ export async function processCostsByPeriod(rows: CostoDirectoRow[]): Promise<voi
         skipped++;
         continue;
       }
-      
+
+      // Cutover Excel→App: desde el cutover, los costos por período los carga
+      // la app (ledger de Finanzas) — no pisar esos períodos con el Excel.
+      if (await isPeriodExcelFrozen(periodKey)) {
+        skipped++;
+        continue;
+      }
+
       const tipoCostoRaw = row['Tipo de Costo'] || row['Tipo de Coste'] || row['Tipo Costo'] || '';
       const tipoCostoNorm = tipoCostoRaw.trim().toLowerCase();
       
@@ -1082,10 +1105,17 @@ export async function processRendimientoClienteToFactRC(rows: RendimientoCliente
         skipped++;
         continue;
       }
-      
+
+      // Cutover Excel→App: desde el mes de cutover, el revenue lo carga la app
+      // (facturación manual), no el Excel — no pisar esos períodos.
+      if (await isPeriodExcelFrozen(periodKey)) {
+        skipped++;
+        continue;
+      }
+
       // Asegurar período
       await ensurePeriod(periodKey);
-      
+
       // 2) Valores
       const revenueUSD = parseNum(row['Facturación [USD]']);
       const costUSD = parseNum(row['Costos [USD]']);
