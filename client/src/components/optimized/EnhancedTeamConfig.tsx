@@ -382,9 +382,24 @@ const EnhancedTeamConfig: React.FC = () => {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="current">Foto del mes seleccionado</SelectItem>
-              <SelectItem value="projected">Tarifa estimada proyectada</SelectItem>
-              <SelectItem value="annual_avg">Promedio anual estimado</SelectItem>
+              <SelectItem value="current">
+                <div className="flex flex-col">
+                  <span>Foto del mes seleccionado</span>
+                  <span className="text-[11px] text-muted-foreground">Usa el valor hora real del mes elegido (Admin → Personal).</span>
+                </div>
+              </SelectItem>
+              <SelectItem value="projected">
+                <div className="flex flex-col">
+                  <span>Tarifa estimada proyectada</span>
+                  <span className="text-[11px] text-muted-foreground">Usa la proyección de Valor Hora Estimada para el mes del proyecto.</span>
+                </div>
+              </SelectItem>
+              <SelectItem value="annual_avg">
+                <div className="flex flex-col">
+                  <span>Promedio anual estimado</span>
+                  <span className="text-[11px] text-muted-foreground">Promedia las tarifas estimadas del año — ideal para proyectos largos.</span>
+                </div>
+              </SelectItem>
             </SelectContent>
           </Select>
         </CardContent>

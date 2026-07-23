@@ -59,7 +59,12 @@ export default function HolidaysManagement() {
   return (
     <div className="p-6 space-y-6 max-w-2xl mx-auto">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Gestión de Feriados</h1>
+        <div>
+          <h1 className="text-2xl font-semibold">Gestión de Feriados</h1>
+          <p className="text-sm text-muted-foreground">
+            Los feriados descuentan días hábiles de la capacidad semanal del equipo y de las horas base del cierre mensual.
+          </p>
+        </div>
         <Input
           type="number"
           value={year}

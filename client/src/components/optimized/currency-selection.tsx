@@ -225,11 +225,19 @@ const CurrencySelection: React.FC = () => {
                     Manual
                   </Badge>
                 ) : exchangeRateSource ? (
-                  <Badge variant="outline" className="text-xs border-blue-300 text-blue-700 bg-blue-50">
+                  <Badge
+                    variant="outline"
+                    className="text-xs border-blue-300 text-blue-700 bg-blue-50 cursor-help"
+                    title={`Fuente del tipo de cambio: ${exchangeRateSource}. "Blue" se usa para meses cerrados; "REM" (estimación del BCRA) para proyecciones futuras. Podés editarlo manualmente con el lápiz.`}
+                  >
                     {exchangeRateSource}
                   </Badge>
                 ) : (
-                  <Badge variant="outline" className="text-xs border-blue-300 text-blue-600 bg-blue-50">
+                  <Badge
+                    variant="outline"
+                    className="text-xs border-blue-300 text-blue-600 bg-blue-50 cursor-help"
+                    title="Tipo de cambio de mercado. Podés editarlo manualmente con el lápiz para usar una referencia estimada (ej. REM)."
+                  >
                     Mercado
                   </Badge>
                 )}

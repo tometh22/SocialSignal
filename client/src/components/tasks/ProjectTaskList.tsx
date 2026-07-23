@@ -600,7 +600,7 @@ function TaskRow({ task, allPersonnel, projectMembers = [], onOpen, onToggle, on
             </span>
           )}
           <button
-            className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity"
+            className="ml-auto opacity-50 hover:opacity-100 hover:bg-primary/10 rounded p-0.5 transition-all"
             onClick={e => { e.stopPropagation(); onOpen(task.id, true); }}
             title="Registrar horas"
           >
@@ -1617,11 +1617,25 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
             <div className="flex items-center gap-2 pb-3 mb-1">
               <span className="text-sm font-medium text-foreground">{totalTasks} tareas</span>
               <span className="text-xs text-muted-foreground">· {doneTasks} completadas</span>
+              {orderedSectionNames.length > 0 && (
+                <Select value={sectionFilter} onValueChange={setSectionFilter}>
+                  <SelectTrigger className="h-7 text-xs w-52 ml-auto">
+                    <SelectValue placeholder="Todas las secciones" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas las secciones</SelectItem>
+                    {orderedSectionNames.map(s => (
+                      <SelectItem key={s} value={s}>{s}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
             <div className="flex gap-3 overflow-x-auto pb-2">
               {BOARD_COLUMNS.map(col => {
                 const colTasks = allTasks
                   .filter(t => !t.parentTaskId)
+                  .filter(t => sectionFilter === 'all' || (t.sectionName || 'General') === sectionFilter)
                   .map(t => boardStatusOverrides[t.id] ? { ...t, status: boardStatusOverrides[t.id] } : t)
                   .filter(t => t.status === col.status);
                 return (

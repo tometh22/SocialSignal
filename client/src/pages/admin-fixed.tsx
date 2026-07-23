@@ -1192,6 +1192,42 @@ export default function Admin() {
                             </TooltipProvider>
                           </div>
                         </TableHead>
+                        <TableHead>
+                          <div className="flex items-center gap-1">
+                            Moneda
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <HelpCircle className="h-3 w-3 text-gray-400 cursor-help" />
+                                </TooltipTrigger>
+                                <TooltipContent className="max-w-xs">
+                                  <p className="text-sm">
+                                    Moneda de facturación de la persona: ARS, USD o Mixto (parte USD / parte ARS).
+                                    Determina cómo se muestra su valor hora en cotizaciones y cierre mensual.
+                                  </p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </div>
+                        </TableHead>
+                        <TableHead>
+                          <div className="flex items-center gap-1">
+                            Activo hasta
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <HelpCircle className="h-3 w-3 text-gray-400 cursor-help" />
+                                </TooltipTrigger>
+                                <TooltipContent className="max-w-xs">
+                                  <p className="text-sm">
+                                    Fecha de baja. Si se completa, la persona deja de aparecer en nuevas
+                                    cotizaciones y proyectos desde ese mes en adelante. Vacío = sin límite.
+                                  </p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </div>
+                        </TableHead>
                         <TableHead>Acciones</TableHead>
                       </TableRow>
                     </TableHeader>

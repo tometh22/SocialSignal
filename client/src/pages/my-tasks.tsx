@@ -138,6 +138,9 @@ export default function MyTasksPage() {
 
   const tasksByDay = (day: Date) => activeTasks.filter(t => taskIsOnDay(t, day));
 
+  // Tareas activas sin fecha: no caen en ningún día del calendario.
+  const datelessTasks = activeTasks.filter(t => !t.startDate && !t.dueDate);
+
   const tasksByProject: Record<string, Task[]> = {};
   for (const task of activeTasks) {
     const proj = allProjects.find(p => p.id === task.projectId);
@@ -338,6 +341,30 @@ export default function MyTasksPage() {
                     );
                   })}
                 </div>
+
+                {datelessTasks.length > 0 && (
+                  <div className="border-t px-4 py-3 bg-muted/10">
+                    <p className="text-xs font-semibold text-muted-foreground mb-2">
+                      Sin fecha ({datelessTasks.length}) — no aparecen en el calendario hasta asignarles fecha
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {datelessTasks.map(task => {
+                        const proj = allProjects.find(p => p.id === task.projectId);
+                        const style = getProjectStyle(task.projectId);
+                        return (
+                          <button
+                            key={task.id}
+                            className={cn("text-xs px-2 py-1 rounded cursor-pointer border-l-2", style.bg, style.border, style.text)}
+                            onClick={() => setSelectedTaskId(task.id)}
+                            title={proj ? `${proj.clientName} · ${proj.name}` : undefined}
+                          >
+                            {task.title}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 

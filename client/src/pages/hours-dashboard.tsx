@@ -13,6 +13,7 @@ import {
   PieChart as RPieChart, Pie, Cell
 } from "recharts";
 import { cn } from "@/lib/utils";
+import { usePermissions } from "@/hooks/use-permissions";
 
 type Personnel = { id: number; name: string };
 type Project = { id: number; name: string; client_name: string };
@@ -73,6 +74,7 @@ function formatHoursLabel(hours: number) {
 const PAGE_SIZE = 20;
 
 export default function HoursDashboardPage() {
+  const { isOperations } = usePermissions();
   const [selectedPersonnelId, setSelectedPersonnelId] = useState<string>("all");
   const [selectedProjectId, setSelectedProjectId] = useState<string>("all");
   const [quickFilter, setQuickFilter] = useState<string>("this_month");
@@ -286,7 +288,7 @@ export default function HoursDashboardPage() {
       ) : (
         <>
           {/* KPI cards */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+          <div className={cn("grid grid-cols-1 gap-3", isOperations ? "lg:grid-cols-3" : "lg:grid-cols-2")}>
             <div className="bg-card rounded-xl border p-4">
               <div className="flex items-center gap-2 mb-2">
                 <Clock className="h-4 w-4 text-primary" />
@@ -309,16 +311,18 @@ export default function HoursDashboardPage() {
               </p>
             </div>
 
-            <div className="bg-card rounded-xl border p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <BarChart3 className="h-4 w-4 text-green-500" />
-                <p className="text-xs text-muted-foreground font-medium">Horas disponibles</p>
+            {isOperations && (
+              <div className="bg-card rounded-xl border p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <BarChart3 className="h-4 w-4 text-green-500" />
+                  <p className="text-xs text-muted-foreground font-medium">Horas disponibles</p>
+                </div>
+                <p className="text-2xl font-bold text-foreground">{availableHours}h</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Días hábiles sin feriados{absenceWorkdays > 0 ? ` ni ausencias (-${absenceWorkdays}d)` : ""}{availableBasis ? ` · ${availableBasis}` : ""}
+                </p>
               </div>
-              <p className="text-2xl font-bold text-foreground">{availableHours}h</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                Días hábiles sin feriados{absenceWorkdays > 0 ? ` ni ausencias (-${absenceWorkdays}d)` : ""}{availableBasis ? ` · ${availableBasis}` : ""}
-              </p>
-            </div>
+            )}
           </div>
 
           {/* Charts */}
