@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
-  CalendarIcon, Clock, Plus, Trash2, User, Users, Check, X, ChevronRight, Loader2, Flag, Timer, Pencil
+  CalendarIcon, Clock, Plus, Trash2, User, Check, X, ChevronRight, Loader2, Flag, Timer, Pencil
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useActiveTimer, formatElapsed } from "@/hooks/useActiveTimer";
@@ -543,7 +543,6 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
 
   const assignee = allPersonnel.find(p => p.id === task?.assigneeId);
   const project = allProjects.find(p => p.id === task?.projectId);
-  const collaborators = allPersonnel.filter(p => (task?.collaboratorIds || []).includes(p.id));
   const loggedH = task?.loggedHours || 0;
 
   return (
@@ -675,60 +674,6 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
                       </SelectContent>
                     </Select>
                   </div>
-
-                  {/* Colaboradores — ocultado según feedback (se removió de la lista y del detalle) */}
-                  {false && (
-                  <div className="flex items-start gap-3">
-                    <div className="w-28 flex-shrink-0 pt-1">
-                      <p className="text-[11px] text-muted-foreground flex items-center gap-1"><Users className="h-3 w-3" />Colaboradores</p>
-                    </div>
-                    <div className="flex-1 flex items-center gap-1.5 flex-wrap">
-                      {collaborators.map(c => (
-                        <div key={c.id} className="flex items-center gap-1 bg-primary/10 border border-primary/20 rounded-full pl-0.5 pr-2 py-0.5 text-xs">
-                          <Avatar className="h-5 w-5 flex-shrink-0">
-                            <AvatarFallback className={cn("text-[8px] text-white", getAvatarColor(c.id))}>
-                              {getInitials(c.name)}
-                            </AvatarFallback>
-                          </Avatar>
-                          <span className="text-foreground font-medium">{c.name}</span>
-                          <button
-                            className="ml-0.5 text-muted-foreground hover:text-red-500 transition-colors"
-                            onClick={() => {
-                              const current = task.collaboratorIds || [];
-                              updateMutation.mutate({ collaboratorIds: current.filter(id => id !== c.id) });
-                            }}
-                          >
-                            <X className="h-3 w-3" />
-                          </button>
-                        </div>
-                      ))}
-                      <Select onValueChange={v => {
-                        const current = task.collaboratorIds || [];
-                        if (!current.includes(parseInt(v))) {
-                          updateMutation.mutate({ collaboratorIds: [...current, parseInt(v)] });
-                        }
-                      }}>
-                        <SelectTrigger className="h-7 w-auto border-dashed text-xs px-2 text-muted-foreground hover:bg-accent">
-                          <Plus className="h-3 w-3 mr-1" />Agregar
-                        </SelectTrigger>
-                        <SelectContent>
-                          {allPersonnel.filter(p => !(task.collaboratorIds || []).includes(p.id) && p.id !== task.assigneeId).map(p => (
-                            <SelectItem key={p.id} value={p.id.toString()}>
-                              <div className="flex items-center gap-2">
-                                <Avatar className="h-4 w-4">
-                                  <AvatarFallback className={cn("text-[7px] text-white", getAvatarColor(p.id))}>
-                                    {getInitials(p.name)}
-                                  </AvatarFallback>
-                                </Avatar>
-                                {p.name}
-                              </div>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  )}
 
                   {/* Fechas */}
                   <div className="flex items-center gap-3">

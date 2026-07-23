@@ -25,7 +25,6 @@ import MyInvoices from "@/pages/my-invoices";
 import AdminProviders from "@/pages/admin-providers";
 import ProviderDashboard from "@/pages/provider/dashboard";
 import EditProject from "@/pages/edit-project";
-import ProjectFinancialManagement from "@/pages/project-financial-management";
 
 // Analytics & Specialized Pages
 import ProjectAnalyticsView from "@/pages/project-analytics-view";
@@ -199,7 +198,6 @@ function AppRoutes() {
                   <ProtectedRoute path="/active-projects/:id/edit" component={EditProject} requiredPermission="projects" />
                   <ProtectedRoute path="/active-projects/:id" component={ProjectDetail} requiredPermission="projects" />
                   <ProtectedRoute path="/active-projects/:id/time-entries" component={TimeEntries} requiredPermission="projects" />
-                  <ProtectedRoute path="/active-projects/:projectId/financial-management" component={ProjectFinancialManagement} requiredPermission="projects" />
                   <ProtectedRoute path="/projects/:id" component={({ params }: { params: { id: string } }) => <Redirect to={`/active-projects/${params.id}`} />} />
                   <ProtectedRoute path="/project-settings/:id" component={ProjectSettings} requiredPermission="projects" />
                   <ProtectedRoute path="/time-entries/project/:projectId" component={TimeEntries} requiredPermission="projects" />
