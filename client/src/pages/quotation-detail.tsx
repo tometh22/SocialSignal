@@ -566,7 +566,15 @@ const QuotationDetail: React.FC = () => {
                           )}
                         >
                           <TableCell className="font-medium text-slate-700 py-2 text-sm">{getRoleName(member.personnelId)}</TableCell>
-                          <TableCell className="text-slate-600 py-2 text-sm">{getPersonnelName(member.personnelId)}</TableCell>
+                          <TableCell className="text-slate-600 py-2 text-sm">
+                            {getPersonnelName(member.personnelId)}
+                            {(() => {
+                              const billing = (personnel.find(p => p.id === member.personnelId) as any)?.billingCurrency;
+                              if (billing === 'USD') return <Badge variant="outline" className="ml-1.5 text-[10px] border-green-400 text-green-700 py-0 px-1">USD</Badge>;
+                              if (billing === 'mixed') return <Badge variant="outline" className="ml-1.5 text-[10px] border-amber-400 text-amber-700 py-0 px-1">Mixto</Badge>;
+                              return null;
+                            })()}
+                          </TableCell>
                           <TableCell className="text-right font-medium text-slate-700 py-2 text-sm">{member.hours}</TableCell>
                           <TableCell className="text-right text-slate-600 py-2 text-sm">{formatCurrency(member.rate)}</TableCell>
                           <TableCell className="text-right font-bold text-slate-800 py-2 text-sm">{formatCurrency(member.cost)}</TableCell>

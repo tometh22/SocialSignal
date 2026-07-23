@@ -308,8 +308,9 @@ export default function ProjectDetail() {
   const [location] = useLocation();
   const projectId = location.split("/")[2];
   const pid = parseInt(projectId || "0", 10);
-  const { isOperations } = usePermissions();
+  const { isOperations, hasPermission } = usePermissions();
   const canSeeCosts = isOperations;
+  const canSeeAnalytics = hasPermission('finance');
 
   const urlParams = new URLSearchParams(window.location.search);
   const periodFromUrl = urlParams.get("period") ?? undefined;
@@ -444,6 +445,19 @@ export default function ProjectDetail() {
               <span>Este es un fee recurrente (Always-On). Gestioná los meses y la vista consolidada acá.</span>
             </div>
             <span className="flex items-center gap-1 text-sm font-medium text-blue-700">Abrir vista Always-On <ArrowRight className="h-4 w-4" /></span>
+          </div>
+        </Link>
+      )}
+
+      {/* ── Acceso a Analytics (desvíos de costo y tiempo) ────────── */}
+      {canSeeAnalytics && (
+        <Link href={`/project-analytics/${pid}`}>
+          <div className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 cursor-pointer hover:bg-violet-100 transition-colors">
+            <div className="flex items-center gap-2 text-sm text-violet-800">
+              <TrendingUp className="h-4 w-4" />
+              <span>Analítica avanzada: desviaciones de costo y tiempo, estimado vs. real por deliverable.</span>
+            </div>
+            <span className="flex items-center gap-1 text-sm font-medium text-violet-700">Ver analytics <ArrowRight className="h-4 w-4" /></span>
           </div>
         </Link>
       )}

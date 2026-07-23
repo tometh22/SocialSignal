@@ -203,14 +203,18 @@ export default function EstimatedRates() {
 
       <div className="flex items-start gap-3 rounded-md border border-amber-200 bg-amber-50 p-3">
         <Info className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
-        <div className="text-sm text-amber-900">
-          <strong>Las tarifas proyectadas acá se usan en el{" "}
-          <Link href="/operations/monthly-closing" className="underline font-medium">Cierre Mensual</Link>
-          </strong>{" "}si existe una tarifa para el mes seleccionado (en lugar de la tarifa base del personal). Los valores hora que usan las cotizaciones se editan en{" "}
-          <Link href="/admin" className="underline font-medium">
-            Admin → Personal
-          </Link>{" "}
-          (grilla de Costos Históricos por mes).
+        <div className="text-sm text-amber-900 space-y-1">
+          <p>
+            <strong>Estas tarifas proyectadas se usan en el{" "}
+            <Link href="/operations/monthly-closing" className="underline font-medium">Cierre Mensual</Link></strong>{" "}
+            (si hay tarifa para el mes) y también en las{" "}
+            <strong>Cotizaciones</strong> cuando elegís el modo <em>"Tarifa estimada proyectada"</em> o <em>"Promedio anual estimado"</em>.
+          </p>
+          <p>
+            En cambio, el modo <em>"Foto del mes"</em> de una cotización usa la tarifa base real de{" "}
+            <Link href="/admin" className="underline font-medium">Admin → Personal</Link>{" "}
+            (grilla de Costos Históricos), que es la columna <strong>Actual (Config)</strong> de abajo.
+          </p>
         </div>
       </div>
 
@@ -226,7 +230,12 @@ export default function EstimatedRates() {
             <thead>
               <tr className="border-b">
                 <th className="text-left py-2 px-2 sticky left-0 bg-white">Persona</th>
-                <th className="text-center py-2 px-1 text-xs">Actual</th>
+                <th
+                  className="text-center py-2 px-1 text-xs"
+                  title="Tarifa base vigente, tomada de Admin → Personal (Configuración). Es la única fuente: los meses que dejes vacíos usan este valor."
+                >
+                  Actual (Config)
+                </th>
                 {MONTHS.map((m, i) => (
                   <th key={i} className="text-center py-2 px-1 text-xs">{m}</th>
                 ))}
@@ -240,7 +249,10 @@ export default function EstimatedRates() {
                 return (
                   <tr key={p.id} className="border-b hover:bg-muted/30">
                     <td className="py-1 px-2 font-medium sticky left-0 bg-white text-xs">{p.name}</td>
-                    <td className="text-center py-1 px-1 text-xs text-muted-foreground">
+                    <td
+                      className="text-center py-1 px-1 text-xs text-muted-foreground"
+                      title="Valor base desde Admin → Personal. Los meses vacíos usan este mismo número."
+                    >
                       ${currentRate.toLocaleString()}
                     </td>
                     {MONTHS.map((_, m) => {
@@ -304,6 +316,8 @@ export default function EstimatedRates() {
           </table>
           <p className="text-xs text-muted-foreground mt-2">
             * Solo se muestran empleados de tiempo completo. Los freelancers tienen tarifas por cotización.
+            Los meses que dejes vacíos toman automáticamente el valor de la columna <strong>Actual (Config)</strong>,
+            que es la misma tarifa base de Admin → Personal — así no hay diferencias entre módulos.
           </p>
         </CardContent>
       </Card>

@@ -18,7 +18,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useCurrency } from "@/hooks/use-currency";
-import { Loader2, Check, X, ExternalLink, ChevronDown } from "lucide-react";
+import { Loader2, Check, X, ExternalLink, ChevronDown, Copy, Download } from "lucide-react";
 import { Link } from "wouter";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -307,12 +307,99 @@ export default function MonthlyClosing() {
     return { text, isEstimated };
   };
 
+  // Raw (numeric) cost split for export — mirrors getCostDisplay's logic but
+  // returns numbers instead of formatted strings.
+  const getCostRaw = (person: any): { costUSD: number; costARS: number } => {
+    const closing = getClosing(person.id);
+    const hrs = closing ? closing.adjustedHours : effectiveHours(person);
+    const billing = getBillingCurrency(person);
+    const rate = closing ? closing.hourlyRate : getEffectiveRate(person).rate;
+    const fx = closing?.exchangeRateAtClose || exchangeRate || 1;
+    if (billing === "USD") {
+      const costUSD = hrs * rate;
+      return { costUSD, costARS: costUSD * fx };
+    }
+    if (billing === "mixed") {
+      const usdFraction = getUsdFraction(person);
+      const totalUSD = hrs * rate;
+      return { costUSD: totalUSD * usdFraction, costARS: totalUSD * (1 - usdFraction) * fx };
+    }
+    return { costUSD: 0, costARS: hrs * rate };
+  };
+
   // Filter personnel
   const filteredPersonnel = (personnel || []).filter((p: any) => {
     if (contractFilter === "all") return true;
     const type = (p.contractType || "full-time").toLowerCase();
     return type === contractFilter;
   });
+
+  // Build export matrix (header + rows). Numeric columns stay numeric so they
+  // paste into Excel as numbers, ready for the honorarios sheet.
+  const EXPORT_HEADERS = [
+    "Persona", "Contrato", "Facturación", "Hs Base", "Hs Reales",
+    "Valor Hora", "Moneda Tarifa", "Costo USD", "Costo ARS", "Estado",
+  ];
+  const buildExportRows = (): (string | number)[][] => {
+    return filteredPersonnel.map((p: any) => {
+      const closing = getClosing(p.id);
+      const baseHrs = closing ? closing.adjustedHours : effectiveHours(p);
+      const realHrs = realHoursMap[p.id] ?? 0;
+      const billing = getBillingCurrency(p);
+      const { rate } = closing ? { rate: closing.hourlyRate } : getEffectiveRate(p);
+      const { costUSD, costARS } = getCostRaw(p);
+      const rateCurrency = billing === "ARS" ? "ARS" : "USD";
+      return [
+        p.name,
+        p.contractType || "full-time",
+        billing === "mixed" ? "Mixto" : billing,
+        Math.round(baseHrs * 100) / 100,
+        Math.round(realHrs * 100) / 100,
+        Math.round(rate * 100) / 100,
+        rateCurrency,
+        Math.round(costUSD),
+        Math.round(costARS),
+        closing ? "Cerrado" : "Pendiente",
+      ];
+    });
+  };
+
+  const handleCopyForExcel = async () => {
+    const rows = buildExportRows();
+    if (rows.length === 0) {
+      toast({ title: "Nada para copiar", variant: "destructive" });
+      return;
+    }
+    // Tab-separated → pega en columnas al hacer Ctrl+V en Excel/Sheets
+    const tsv = [EXPORT_HEADERS, ...rows].map((r) => r.join("\t")).join("\n");
+    try {
+      await navigator.clipboard.writeText(tsv);
+      toast({ title: "Copiado", description: `${rows.length} filas listas para pegar en el Excel de honorarios.` });
+    } catch {
+      toast({ title: "No se pudo copiar", description: "Tu navegador bloqueó el portapapeles. Probá con Descargar CSV.", variant: "destructive" });
+    }
+  };
+
+  const handleDownloadCsv = () => {
+    const rows = buildExportRows();
+    if (rows.length === 0) {
+      toast({ title: "Nada para exportar", variant: "destructive" });
+      return;
+    }
+    const esc = (v: string | number) => {
+      const s = String(v);
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const csv = [EXPORT_HEADERS, ...rows].map((r) => r.map(esc).join(",")).join("\n");
+    // BOM para que Excel respete acentos
+    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `cierre-${year}-${String(month + 1).padStart(2, "0")}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   const hasUnsavedChanges = Object.keys(hoursAdjustments).some(pid => hasAdjustment(Number(pid)));
 
@@ -364,6 +451,24 @@ export default function MonthlyClosing() {
           </p>
         </div>
         <div className="flex gap-2 flex-wrap">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleCopyForExcel}
+            disabled={filteredPersonnel.length === 0}
+            title="Copia la tabla en formato tabulado para pegar directo en el Excel de honorarios (Ctrl+V)"
+          >
+            <Copy className="h-4 w-4 mr-1" /> Copiar para Excel
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleDownloadCsv}
+            disabled={filteredPersonnel.length === 0}
+            title="Descargar la tabla como archivo CSV"
+          >
+            <Download className="h-4 w-4 mr-1" /> CSV
+          </Button>
           <Select value={contractFilter} onValueChange={setContractFilter}>
             <SelectTrigger className="w-44"><SelectValue placeholder="Tipo de contrato" /></SelectTrigger>
             <SelectContent>
@@ -475,8 +580,8 @@ export default function MonthlyClosing() {
                                   <X className="h-3 w-3" />
                                 </button>
                               </div>
-                              <div className="text-[10px] text-muted-foreground mb-1">
-                                Base contractual: {defaultBaseHours(p)}h
+                              <div className="text-[10px] text-muted-foreground mb-1" title="Las horas base surgen de las Horas Mensuales configuradas en Admin → Personal (o 160 full-time / 120 part-time por defecto). Ajustá acá con las deducciones o el ajuste discrecional.">
+                                Base contractual: {defaultBaseHours(p)}h <span className="underline decoration-dotted">(de Admin → Personal)</span>
                               </div>
                               {monthHolidayCount > 0 && (
                                 <div className="flex items-center justify-between gap-2 rounded bg-muted/50 px-1.5 py-1">

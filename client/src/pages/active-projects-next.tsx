@@ -8,7 +8,7 @@ import { usePermissions } from "@/hooks/use-permissions";
 import {
   RefreshCcw, Search, ChevronDown, ChevronRight,
   Filter, DollarSign, TrendingUp, Clock, BriefcaseBusiness, ExternalLink, Download,
-  Plus, Database,
+  Plus, Database, Lock, Unlock,
 } from "lucide-react";
 import { Link } from "wouter";
 
@@ -593,10 +593,16 @@ function ProjectStatusToggle({
           : "¿Marcar este proyecto como cerrado?";
         if (window.confirm(msg)) mutation.mutate();
       }}
-      title={isFinished ? "Reabrir proyecto" : "Marcar como cerrado"}
-      className="text-[10px] text-slate-400 hover:text-indigo-600 underline disabled:opacity-50"
+      title={isFinished ? "Reabrir proyecto (permite volver a cargar horas/costos)" : "Marcar como cerrado (congela horas y costos)"}
+      className={cn(
+        "inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-md border font-medium transition-colors disabled:opacity-50",
+        isFinished
+          ? "border-emerald-200 text-emerald-600 hover:bg-emerald-50 hover:border-emerald-300"
+          : "border-slate-200 text-slate-500 hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-300"
+      )}
     >
-      {mutation.isPending ? "…" : isFinished ? "reabrir" : "cerrar"}
+      {isFinished ? <Unlock className="h-3 w-3" /> : <Lock className="h-3 w-3" />}
+      {mutation.isPending ? "…" : isFinished ? "Reabrir" : "Cerrar"}
     </button>
   );
 }

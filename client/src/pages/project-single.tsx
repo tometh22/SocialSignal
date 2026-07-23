@@ -21,6 +21,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ProjectDataProvider, useProjectData } from '@/contexts/ProjectDataProvider';
+import { usePermissions } from '@/hooks/use-permissions';
 
 // 🎯 COMPONENTES DE PESTAÑAS según handoff
 import DashboardTab from '@/components/project-tabs/DashboardTab';
@@ -145,8 +146,13 @@ function ProjectHeader() {
 // 🎯 NAVEGACIÓN ENTRE PESTAÑAS según handoff
 function ProjectTabs() {
   const [activeTab, setActiveTab] = useState('dashboard');
+  const { isOperations } = usePermissions();
 
-  const tabs = [
+  // Solapas con información comercial/financiera sensible: solo Operaciones.
+  // El equipo que carga horas no debe ver Ingresos / Costos / Financiero.
+  const SENSITIVE_TABS = ['ingresos', 'costos', 'financiero'];
+
+  const allTabs = [
     { id: 'dashboard', label: 'Dashboard', icon: BarChart3 },
     { id: 'equipo', label: 'Equipo', icon: Users },
     { id: 'performance', label: 'Performance', icon: TrendingUp },
@@ -157,11 +163,16 @@ function ProjectTabs() {
     { id: 'operacional', label: 'Operacional', icon: Cog },
   ];
 
+  const tabs = allTabs.filter((t) => isOperations || !SENSITIVE_TABS.includes(t.id));
+
   return (
     <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1">
       {/* 🎯 NAVEGACIÓN HORIZONTAL */}
       <div className="border-b bg-gray-50 px-6">
-        <TabsList className="grid w-full grid-cols-8 bg-transparent h-auto p-0">
+        <TabsList
+          className="grid w-full bg-transparent h-auto p-0"
+          style={{ gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))` }}
+        >
           {tabs.map((tab) => (
             <TabsTrigger
               key={tab.id}

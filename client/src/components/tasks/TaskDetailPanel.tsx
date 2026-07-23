@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
-  CalendarIcon, Clock, Plus, Trash2, User, Users, Check, X, ChevronRight, Loader2, Flag, Timer
+  CalendarIcon, Clock, Plus, Trash2, User, Users, Check, X, ChevronRight, Loader2, Flag, Timer, Pencil
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useActiveTimer, formatElapsed } from "@/hooks/useActiveTimer";
@@ -291,6 +291,8 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
   const [showTimeLog, setShowTimeLog] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [subtaskTimePanelId, setSubtaskTimePanelId] = useState<number | null>(null);
+  const [renamingSubtaskId, setRenamingSubtaskId] = useState<number | null>(null);
+  const [subtaskNameValue, setSubtaskNameValue] = useState("");
   const [subLogHours, setSubLogHours] = useState("");
   const [subLogDate, setSubLogDate] = useState(new Date().toISOString().slice(0, 10));
   const [subLogDesc, setSubLogDesc] = useState("");
@@ -459,6 +461,23 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
       toast({ title: "Horas registradas en subtarea" });
     },
   });
+
+  const renameSubtaskMutation = useMutation({
+    mutationFn: ({ id, title }: { id: number; title: string }) =>
+      apiRequest(`/api/tasks/${id}`, "PUT", { title }),
+    onSuccess: () => {
+      refetchTask();
+      if (task?.projectId) {
+        queryClient.invalidateQueries({ queryKey: ["/api/tasks/project", task.projectId] });
+      }
+    },
+  });
+
+  const saveSubtaskName = (id: number) => {
+    const trimmed = subtaskNameValue.trim();
+    if (trimmed) renameSubtaskMutation.mutate({ id, title: trimmed });
+    setRenamingSubtaskId(null);
+  };
 
   const handleLogSubtaskTime = (subtaskId: number) => {
     const parsed = parseHoursInput(subLogHours);
@@ -657,7 +676,8 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
                     </Select>
                   </div>
 
-                  {/* Colaboradores */}
+                  {/* Colaboradores — ocultado según feedback (se removió de la lista y del detalle) */}
+                  {false && (
                   <div className="flex items-start gap-3">
                     <div className="w-28 flex-shrink-0 pt-1">
                       <p className="text-[11px] text-muted-foreground flex items-center gap-1"><Users className="h-3 w-3" />Colaboradores</p>
@@ -708,6 +728,7 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
                       </Select>
                     </div>
                   </div>
+                  )}
 
                   {/* Fechas */}
                   <div className="flex items-center gap-3">
@@ -791,6 +812,16 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
                       </Popover>
                     </div>
                   </div>
+
+                  {/* Aviso: inicio posterior a entrega */}
+                  {task.startDate && task.dueDate && new Date(task.startDate) > new Date(task.dueDate) && (
+                    <div className="flex items-center gap-3">
+                      <div className="w-28 flex-shrink-0" />
+                      <p className="text-[11px] text-red-600 flex items-center gap-1">
+                        <X className="h-3 w-3" /> La fecha de inicio es posterior a la de entrega.
+                      </p>
+                    </div>
+                  )}
 
                   {/* Prioridad */}
                   <div className="flex items-center gap-3">
@@ -897,20 +928,50 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
                                   .then(() => refetchTask());
                               }}
                             />
-                            <span
-                              className={cn(
-                                "text-sm flex-1 cursor-pointer hover:text-primary transition-colors",
-                                sub.status === "done" ? "line-through text-muted-foreground" : ""
-                              )}
-                              onClick={() => onNavigateToTask?.(sub.id)}
-                            >
-                              {sub.title}
-                            </span>
+                            {renamingSubtaskId === sub.id ? (
+                              <Input
+                                autoFocus
+                                value={subtaskNameValue}
+                                onChange={e => setSubtaskNameValue(e.target.value)}
+                                onBlur={() => saveSubtaskName(sub.id)}
+                                onKeyDown={e => {
+                                  if (e.key === "Enter") saveSubtaskName(sub.id);
+                                  if (e.key === "Escape") setRenamingSubtaskId(null);
+                                }}
+                                onClick={e => e.stopPropagation()}
+                                className="h-6 text-sm flex-1 py-0"
+                              />
+                            ) : (
+                              <span
+                                className={cn(
+                                  "text-sm flex-1 cursor-pointer hover:text-primary transition-colors",
+                                  sub.status === "done" ? "line-through text-muted-foreground" : ""
+                                )}
+                                onClick={() => onNavigateToTask?.(sub.id)}
+                              >
+                                {sub.title}
+                              </span>
+                            )}
+                            {renamingSubtaskId !== sub.id && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                title="Renombrar subtarea"
+                                className="h-5 w-5 p-0 opacity-50 hover:opacity-100 text-muted-foreground hover:text-primary flex-shrink-0"
+                                onClick={e => {
+                                  e.stopPropagation();
+                                  setSubtaskNameValue(sub.title);
+                                  setRenamingSubtaskId(sub.id);
+                                }}
+                              >
+                                <Pencil className="h-3 w-3" />
+                              </Button>
+                            )}
                             <Button
                               variant="ghost"
                               size="sm"
                               title="Registrar horas"
-                              className="h-5 w-5 p-0 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-primary flex-shrink-0"
+                              className="h-5 w-5 p-0 opacity-50 hover:opacity-100 text-muted-foreground hover:text-primary flex-shrink-0"
                               onClick={e => {
                                 e.stopPropagation();
                                 setSubtaskTimePanelId(subtaskTimePanelId === sub.id ? null : sub.id);
@@ -924,7 +985,7 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
                           </div>
                           {subtaskTimePanelId === sub.id && (
                             <div className="px-3 py-2.5 bg-accent/10 border-t border-border space-y-2">
-                              <p className="text-[10px] text-muted-foreground font-medium">Registrar horas en: <span className="text-foreground">{sub.title}</span></p>
+                              <p className="text-[10px] text-muted-foreground font-medium">Registrar horas en: <span className="text-foreground">{sub.title}</span> <span className="text-muted-foreground">(múltiplos de 15 min)</span></p>
                               <div className="grid grid-cols-2 gap-2">
                                 <Input
                                   autoFocus
@@ -932,7 +993,7 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
                                   onChange={e => setSubLogHours(e.target.value)}
                                   onKeyDown={e => { if (e.key === "Enter") handleLogSubtaskTime(sub.id); if (e.key === "Escape") setSubtaskTimePanelId(null); }}
                                   className="h-7 text-xs"
-                                  placeholder="ej: 1.5 · 1h30"
+                                  placeholder="ej: 0.25 · 1.5 · 1h30"
                                 />
                                 <Input type="date" value={subLogDate} onChange={e => setSubLogDate(e.target.value)} className="h-7 text-xs" />
                               </div>
