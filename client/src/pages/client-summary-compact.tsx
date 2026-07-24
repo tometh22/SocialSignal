@@ -494,7 +494,9 @@ export default function ClientSummaryCompact() {
                       <Briefcase className="h-4 w-4 mr-2 text-blue-600" />
                       Proyectos Activos ({metrics.activeProjects})
                     </span>
-                    <Button size="sm" variant="outline" className="text-xs">Nuevo Proyecto</Button>
+                    <Link href="/active-projects">
+                      <Button size="sm" variant="outline" className="text-xs">Vista de Proyectos</Button>
+                    </Link>
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -535,9 +537,11 @@ export default function ClientSummaryCompact() {
                     {(activeProjects as any[]).length === 0 && (
                       <div className="text-center py-8">
                         <div className="text-gray-500">No hay proyectos activos</div>
-                        <Button className="mt-4" size="sm">
-                          Crear Nuevo Proyecto
-                        </Button>
+                        <Link href="/active-projects">
+                          <Button className="mt-4" size="sm">
+                            Ir a Vista de Proyectos
+                          </Button>
+                        </Link>
                       </div>
                     )}
                   </div>

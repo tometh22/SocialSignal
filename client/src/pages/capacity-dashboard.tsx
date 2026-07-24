@@ -75,13 +75,15 @@ export default function CapacityDashboard() {
 
   // All tasks enriched with project/section names, for the per-person weekly breakdown
   const { data: allTasks = [] } = useQuery<any[]>({
-    queryKey: ["/api/tasks/team-calendar", "capacity"],
-    queryFn: () => fetch("/api/tasks/team-calendar", { credentials: "include" }).then((r) => r.json()),
+    queryKey: ["/api/tasks/team-calendar", "capacity", weekStart],
+    queryFn: () => fetch(`/api/tasks/team-calendar?weekStart=${weekStart}`, { credentials: "include" }).then((r) => r.json()),
   });
 
   const updateEstimate = useMutation({
     mutationFn: (vars: { taskId: number; estimatedHours: number }) =>
-      apiRequest(`/api/tasks/${vars.taskId}`, "PUT", { estimatedHours: vars.estimatedHours }),
+      vars.estimatedHours === 0
+        ? apiRequest(`/api/tasks/${vars.taskId}/weekly-estimates/${weekStart}`, "DELETE")
+        : apiRequest(`/api/tasks/${vars.taskId}/weekly-estimates`, "POST", { weekStart, estimatedHours: vars.estimatedHours }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/tasks/team-calendar"] });
       queryClient.invalidateQueries({ queryKey });
@@ -403,11 +405,11 @@ export default function CapacityDashboard() {
                                             ) : (
                                               <button
                                                 className="flex items-center gap-1 text-muted-foreground hover:text-primary"
-                                                onClick={() => { setEditingEstInput(String(t.estimatedHours ?? "")); setEditingEstTaskId(t.id); }}
+                                                onClick={() => { setEditingEstInput(String(t.estimatedHoursForWeek ?? "")); setEditingEstTaskId(t.id); }}
                                                 title="Editar horas estimadas"
                                               >
-                                                <span className={t.estimatedHours ? "text-foreground" : "text-muted-foreground/50"}>
-                                                  {t.estimatedHours ? `${t.estimatedHours}h est.` : "+ estimar"}
+                                                <span className={t.estimatedHoursForWeek ? "text-foreground" : "text-muted-foreground/50"}>
+                                                  {t.estimatedHoursForWeek ? `${t.estimatedHoursForWeek}h est.` : "+ estimar"}
                                                 </span>
                                                 <Pencil className="h-2.5 w-2.5" />
                                               </button>

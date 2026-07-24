@@ -20,6 +20,33 @@ import { storage } from "./storage";
 
 export function createLedgerRouter(requireAuth: any) {
   const router = Router();
+  const normalizedUSD = (row: {
+    montoTotalUSD?: string | null;
+    montoUSD?: string | null;
+    montoARS?: string | null;
+    cotizacion?: string | null;
+  }) => {
+    const explicitTotal = parseFloat(row.montoTotalUSD ?? "");
+    if (Number.isFinite(explicitTotal)) return explicitTotal;
+    const usd = parseFloat(row.montoUSD ?? "");
+    if (Number.isFinite(usd)) return usd;
+    const ars = parseFloat(row.montoARS ?? "");
+    const fx = parseFloat(row.cotizacion ?? "");
+    return Number.isFinite(ars) && Number.isFinite(fx) && fx > 0 ? ars / fx : 0;
+  };
+  const normalizedUSDForWrite = (row: {
+    montoUSD?: string | null;
+    montoARS?: string | null;
+    cotizacion?: string | null;
+  }): string | null => {
+    const usd = parseFloat(row.montoUSD ?? "");
+    if (Number.isFinite(usd)) return String(usd);
+    const ars = parseFloat(row.montoARS ?? "");
+    const fx = parseFloat(row.cotizacion ?? "");
+    return Number.isFinite(ars) && Number.isFinite(fx) && fx > 0
+      ? String(ars / fx)
+      : null;
+  };
 
   // ==================== ACTIVO ====================
 
@@ -37,7 +64,7 @@ export function createLedgerRouter(requireAuth: any) {
         ? await db.select().from(activoEntries).where(and(...conditions)).orderBy(desc(activoEntries.createdAt))
         : await db.select().from(activoEntries).orderBy(desc(activoEntries.createdAt));
 
-      res.json(rows);
+      res.json(rows.map((row) => ({ ...row, montoTotalUSD: normalizedUSD(row) })));
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -53,9 +80,9 @@ export function createLedgerRouter(requireAuth: any) {
         ? await db.select().from(activoEntries).where(and(...conditions))
         : await db.select().from(activoEntries);
 
-      const total = rows.reduce((s, r) => s + parseFloat(r.montoTotalUSD ?? r.montoUSD ?? "0"), 0);
-      const cobrado = rows.filter(r => r.cobradoAlCierre).reduce((s, r) => s + parseFloat(r.montoTotalUSD ?? r.montoUSD ?? "0"), 0);
-      const vencido = rows.filter(r => r.vencido && !r.cobradoAlCierre).reduce((s, r) => s + parseFloat(r.montoTotalUSD ?? r.montoUSD ?? "0"), 0);
+      const total = rows.reduce((s, r) => s + normalizedUSD(r), 0);
+      const cobrado = rows.filter(r => r.cobradoAlCierre).reduce((s, r) => s + normalizedUSD(r), 0);
+      const vencido = rows.filter(r => r.vencido && !r.cobradoAlCierre).reduce((s, r) => s + normalizedUSD(r), 0);
       const pendiente = total - cobrado;
 
       res.json({ total, cobrado, pendiente, vencido, count: rows.length });
@@ -68,7 +95,11 @@ export function createLedgerRouter(requireAuth: any) {
     try {
       const parsed = insertActivoEntrySchema.safeParse({ ...req.body, overrideManual: true });
       if (!parsed.success) return res.status(400).json({ message: parsed.error.message });
-      const [created] = await db.insert(activoEntries).values(parsed.data).returning();
+      const values = {
+        ...parsed.data,
+        montoTotalUSD: normalizedUSDForWrite(parsed.data),
+      };
+      const [created] = await db.insert(activoEntries).values(values).returning();
       res.status(201).json(created);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -81,8 +112,14 @@ export function createLedgerRouter(requireAuth: any) {
       if (isNaN(id)) return res.status(400).json({ message: "Invalid id" });
       const parsed = insertActivoEntrySchema.partial().safeParse(req.body);
       if (!parsed.success) return res.status(400).json({ message: parsed.error.message });
+      const [existing] = await db.select().from(activoEntries).where(eq(activoEntries.id, id)).limit(1);
+      if (!existing) return res.status(404).json({ message: "Not found" });
+      const monetaryChanged = ["montoARS", "montoUSD", "cotizacion"].some((key) => key in parsed.data);
+      const monetaryValues = monetaryChanged
+        ? { montoTotalUSD: normalizedUSDForWrite({ ...existing, ...parsed.data }) }
+        : {};
       const [updated] = await db.update(activoEntries)
-        .set({ ...parsed.data, overrideManual: true, updatedAt: new Date() })
+        .set({ ...parsed.data, ...monetaryValues, overrideManual: true, updatedAt: new Date() })
         .where(eq(activoEntries.id, id))
         .returning();
       if (!updated) return res.status(404).json({ message: "Not found" });
@@ -108,7 +145,7 @@ export function createLedgerRouter(requireAuth: any) {
         ? await db.select().from(pasivoEntries).where(and(...conditions)).orderBy(desc(pasivoEntries.createdAt))
         : await db.select().from(pasivoEntries).orderBy(desc(pasivoEntries.createdAt));
 
-      res.json(rows);
+      res.json(rows.map((row) => ({ ...row, montoTotalUSD: normalizedUSD(row) })));
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -124,15 +161,15 @@ export function createLedgerRouter(requireAuth: any) {
         ? await db.select().from(pasivoEntries).where(and(...conditions))
         : await db.select().from(pasivoEntries);
 
-      const total = rows.reduce((s, r) => s + parseFloat(r.montoTotalUSD ?? r.montoUSD ?? "0"), 0);
-      const pagado = rows.filter(r => r.pagadoAlCierre).reduce((s, r) => s + parseFloat(r.montoTotalUSD ?? r.montoUSD ?? "0"), 0);
-      const vencido = rows.filter(r => r.vencido && !r.pagadoAlCierre).reduce((s, r) => s + parseFloat(r.montoTotalUSD ?? r.montoUSD ?? "0"), 0);
+      const total = rows.reduce((s, r) => s + normalizedUSD(r), 0);
+      const pagado = rows.filter(r => r.pagadoAlCierre).reduce((s, r) => s + normalizedUSD(r), 0);
+      const vencido = rows.filter(r => r.vencido && !r.pagadoAlCierre).reduce((s, r) => s + normalizedUSD(r), 0);
       const pendiente = total - pagado;
 
       const bySubtipo: Record<string, number> = {};
       for (const r of rows) {
         const key = r.subtipoCosto || "Sin subtipo";
-        bySubtipo[key] = (bySubtipo[key] || 0) + parseFloat(r.montoTotalUSD ?? r.montoUSD ?? "0");
+        bySubtipo[key] = (bySubtipo[key] || 0) + normalizedUSD(r);
       }
 
       res.json({ total, pagado, pendiente, vencido, bySubtipo, count: rows.length });
@@ -145,7 +182,11 @@ export function createLedgerRouter(requireAuth: any) {
     try {
       const parsed = insertPasivoEntrySchema.safeParse({ ...req.body, overrideManual: true });
       if (!parsed.success) return res.status(400).json({ message: parsed.error.message });
-      const [created] = await db.insert(pasivoEntries).values(parsed.data).returning();
+      const values = {
+        ...parsed.data,
+        montoTotalUSD: normalizedUSDForWrite(parsed.data),
+      };
+      const [created] = await db.insert(pasivoEntries).values(values).returning();
       res.status(201).json(created);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -158,8 +199,14 @@ export function createLedgerRouter(requireAuth: any) {
       if (isNaN(id)) return res.status(400).json({ message: "Invalid id" });
       const parsed = insertPasivoEntrySchema.partial().safeParse(req.body);
       if (!parsed.success) return res.status(400).json({ message: parsed.error.message });
+      const [existing] = await db.select().from(pasivoEntries).where(eq(pasivoEntries.id, id)).limit(1);
+      if (!existing) return res.status(404).json({ message: "Not found" });
+      const monetaryChanged = ["montoARS", "montoUSD", "cotizacion"].some((key) => key in parsed.data);
+      const monetaryValues = monetaryChanged
+        ? { montoTotalUSD: normalizedUSDForWrite({ ...existing, ...parsed.data }) }
+        : {};
       const [updated] = await db.update(pasivoEntries)
-        .set({ ...parsed.data, overrideManual: true, updatedAt: new Date() })
+        .set({ ...parsed.data, ...monetaryValues, overrideManual: true, updatedAt: new Date() })
         .where(eq(pasivoEntries.id, id))
         .returning();
       if (!updated) return res.status(404).json({ message: "Not found" });

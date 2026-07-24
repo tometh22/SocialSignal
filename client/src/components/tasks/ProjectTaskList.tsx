@@ -49,6 +49,8 @@ type Task = {
   startDate?: string | null;
   dueDate?: string | null;
   estimatedHours?: number | null;
+  estimatedHoursTotal?: number;
+  estimatedHoursForWeek?: number;
   loggedHours?: number;
   status: string;
   priority: string;
@@ -267,6 +269,7 @@ interface NewTaskRowProps {
 function NewTaskRow({ projectId, sectionName, onCreated, onCancel, allPersonnel, projectMembers = [], defaultStatus = "todo" }: NewTaskRowProps) {
   const [title, setTitle] = useState("");
   const [assigneeId, setAssigneeId] = useState<string>("none");
+  const [startDate, setStartDate] = useState<Date | undefined>();
   const [dueDate, setDueDate] = useState<Date | undefined>();
 
   const createMutation = useMutation({
@@ -281,6 +284,7 @@ function NewTaskRow({ projectId, sectionName, onCreated, onCancel, allPersonnel,
       projectId,
       sectionName,
       assigneeId: assigneeId !== "none" ? parseInt(assigneeId) : null,
+      startDate: startDate?.toISOString() || null,
       dueDate: dueDate?.toISOString() || null,
       status: defaultStatus,
       priority: "medium",
@@ -289,7 +293,6 @@ function NewTaskRow({ projectId, sectionName, onCreated, onCancel, allPersonnel,
 
   const memberIds = projectMembers.map(m => m.personnelId);
   const memberPersonnel = allPersonnel.filter(p => memberIds.includes(p.id));
-  const otherPersonnel = allPersonnel.filter(p => !memberIds.includes(p.id));
 
   return (
     <div className="flex items-center border-b border-border hover:bg-accent/20 transition-colors">
@@ -314,26 +317,30 @@ function NewTaskRow({ projectId, sectionName, onCreated, onCancel, allPersonnel,
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="none">Sin asignar</SelectItem>
-            {memberPersonnel.length > 0 && (
-              <>
-                <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Miembros del proyecto</div>
-                {memberPersonnel.map(p => (
-                  <SelectItem key={p.id} value={p.id.toString()}>{p.name}</SelectItem>
-                ))}
-                {otherPersonnel.length > 0 && <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide border-t mt-1">Equipo</div>}
-              </>
-            )}
-            {otherPersonnel.map(p => (
+            {memberPersonnel.map(p => (
               <SelectItem key={p.id} value={p.id.toString()}>{p.name}</SelectItem>
             ))}
+            {memberPersonnel.length === 0 && (
+              <div className="px-2 py-1.5 text-xs text-muted-foreground">Agregá miembros al proyecto primero</div>
+            )}
           </SelectContent>
         </Select>
       </div>
-      <div className="w-32 px-2 flex-shrink-0">
+      <div className="w-40 px-1 flex-shrink-0 flex gap-1">
         <Popover>
           <PopoverTrigger asChild>
-            <Button variant="ghost" size="sm" className="h-7 w-full text-xs justify-start font-normal">
-              {dueDate ? format(dueDate, "d MMM", { locale: es }) : <CalendarIcon className="h-3 w-3 text-muted-foreground" />}
+            <Button variant="ghost" size="sm" className="h-7 flex-1 px-1 text-[10px] font-normal">
+              {startDate ? format(startDate, "d MMM", { locale: es }) : "Inicio"}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0">
+            <Calendar mode="single" selected={startDate} onSelect={setStartDate} locale={es} />
+          </PopoverContent>
+        </Popover>
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="ghost" size="sm" className="h-7 flex-1 px-1 text-[10px] font-normal">
+              {dueDate ? format(dueDate, "d MMM", { locale: es }) : "Fin"}
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-auto p-0">
@@ -378,15 +385,15 @@ function TaskRow({ task, allPersonnel, projectMembers = [], onOpen, onToggle, on
   const [renameValue, setRenameValue] = useState("");
   const assignee = allPersonnel.find(p => p.id === task.assigneeId);
   const collaborators = allPersonnel.filter(p => (task.collaboratorIds || []).includes(p.id));
-  // Solo miembros del proyecto son asignables; si el proyecto no tiene miembros
-  // registrados todavía, se cae al listado completo para no bloquear la asignación.
+  // La asignación es una propiedad del equipo del proyecto, nunca del directorio global.
   const memberIds = projectMembers.map(m => m.personnelId);
-  const assignableList = memberIds.length > 0 ? allPersonnel.filter(p => memberIds.includes(p.id)) : allPersonnel;
+  const assignableList = allPersonnel.filter(p => memberIds.includes(p.id));
   const overdue = !!isOverdue(task);
   const dueSoon = isDueSoon(task);
   const dueThisWeek = isDueThisWeek(task);
   const isDone = task.status === "done";
   const loggedH = task.loggedHours || 0;
+  const plannedH = task.estimatedHoursTotal ?? 0;
   const subtaskCount = task.subtaskCount || 0;
   const hasSubtasks = subtaskCount > 0;
   const isExpanded = expandedSubtasks?.has(task.id) || false;
@@ -581,17 +588,17 @@ function TaskRow({ task, allPersonnel, projectMembers = [], onOpen, onToggle, on
 
         {/* Tiempo real */}
         <div className="w-24 px-2 flex-shrink-0 text-xs flex items-center gap-1">
-          {loggedH > 0 ? (
+          {loggedH > 0 || plannedH > 0 ? (
             <>
               <Clock className="h-3 w-3 text-muted-foreground flex-shrink-0" />
               <span className={cn(
                 "font-medium",
-                task.estimatedHours && loggedH > task.estimatedHours ? "text-red-500" : "text-foreground"
+                plannedH > 0 && loggedH > plannedH ? "text-red-500" : "text-foreground"
               )}>
                 {formatHours(loggedH)}
               </span>
-              {task.estimatedHours && (
-                <span className="text-muted-foreground">/{task.estimatedHours}h</span>
+              {plannedH > 0 && (
+                <span className="text-muted-foreground">/{plannedH}h</span>
               )}
             </>
           ) : (
@@ -642,24 +649,6 @@ function TaskRow({ task, allPersonnel, projectMembers = [], onOpen, onToggle, on
                     <DropdownMenuItem onClick={() => onDuplicate(task)}>
                       <ListTodo className="h-3.5 w-3.5 mr-2" />Duplicar
                     </DropdownMenuItem>
-                  </>
-                )}
-                {onStatusChange && onDuplicate && <DropdownMenuSeparator />}
-                {onStatusChange && (
-                  <>
-                    <DropdownMenuLabel className="text-xs text-muted-foreground py-1">Estado</DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    {(["todo","in_progress","blocked","done"] as const)
-                      .filter(s => s !== task.status)
-                      .map(s => (
-                        <DropdownMenuItem
-                          key={s}
-                          onClick={e => { e.stopPropagation(); onStatusChange(task.id, s); }}
-                        >
-                          <span className={cn("w-2 h-2 rounded-full mr-2 flex-shrink-0", TASK_STATUS_CONFIG[s].dot)} />
-                          {TASK_STATUS_CONFIG[s].label}
-                        </DropdownMenuItem>
-                      ))}
                   </>
                 )}
               </DropdownMenuContent>
@@ -1191,7 +1180,7 @@ function BoardColumn({ label, dot, ring, empty, status, tasks, allPersonnel, pro
         </div>
         <div className="flex items-center gap-1.5">
           {(() => {
-            const estH = tasks.reduce((s, t) => s + (t.estimatedHours || 0), 0);
+            const estH = tasks.reduce((sum, task) => sum + Number(task.estimatedHoursTotal ?? 0), 0);
             const logH = tasks.reduce((s, t) => s + (t.loggedHours || 0), 0);
             if (estH > 0 || logH > 0) {
               return (
@@ -1375,6 +1364,16 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
     onSuccess: () => { refetch(); invalidateRelated(); },
   });
 
+  const copyWeeklyEstimates = async (sourceTaskId: number, targetTaskId: number) => {
+    const estimates = await apiRequest(`/api/tasks/${sourceTaskId}/weekly-estimates`, "GET");
+    for (const estimate of estimates || []) {
+      await apiRequest(`/api/tasks/${targetTaskId}/weekly-estimates`, "POST", {
+        weekStart: estimate.weekStart,
+        estimatedHours: estimate.estimatedHours,
+      });
+    }
+  };
+
   const handleDuplicateTask = async (task: Task) => {
     const allRaw = data?.tasks || [];
     const newTask = await apiRequest("/api/tasks", "POST", {
@@ -1384,24 +1383,24 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
       assigneeId: task.assigneeId,
       priority: task.priority,
       status: "todo",
-      estimatedHours: task.estimatedHours,
       dueDate: task.dueDate,
       startDate: task.startDate,
       parentTaskId: task.parentTaskId,
     });
+    await copyWeeklyEstimates(task.id, newTask.id);
     if (!task.parentTaskId) {
       const subtasks = allRaw.filter((t: Task) => t.parentTaskId === task.id);
       for (const sub of subtasks) {
-        await apiRequest("/api/tasks", "POST", {
+        const newSubtask = await apiRequest("/api/tasks", "POST", {
           title: sub.title,
           projectId: sub.projectId,
           sectionName: sub.sectionName,
           assigneeId: sub.assigneeId,
           priority: sub.priority,
           status: "todo",
-          estimatedHours: sub.estimatedHours,
           parentTaskId: newTask.id,
         });
+        await copyWeeklyEstimates(sub.id, newSubtask.id);
       }
     }
     refetch();
@@ -1420,22 +1419,22 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
         assigneeId: task.assigneeId,
         priority: task.priority,
         status: "todo",
-        estimatedHours: task.estimatedHours,
         dueDate: task.dueDate,
         startDate: task.startDate,
       });
+      await copyWeeklyEstimates(task.id, newTask.id);
       const subtasks = allRaw.filter((t: Task) => t.parentTaskId === task.id);
       for (const sub of subtasks) {
-        await apiRequest("/api/tasks", "POST", {
+        const newSubtask = await apiRequest("/api/tasks", "POST", {
           title: sub.title,
           projectId: sub.projectId,
           sectionName: `${sectionName} (copia)`,
           assigneeId: sub.assigneeId,
           priority: sub.priority,
           status: "todo",
-          estimatedHours: sub.estimatedHours,
           parentTaskId: newTask.id,
         });
+        await copyWeeklyEstimates(sub.id, newSubtask.id);
       }
     }
     refetch();

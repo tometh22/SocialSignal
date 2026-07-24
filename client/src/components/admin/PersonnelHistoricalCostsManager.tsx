@@ -3,7 +3,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Link } from "wouter";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -70,12 +69,16 @@ export function PersonnelHistoricalCostsManager({ onClose }: PersonnelHistorical
     mutationFn: (data: PersonnelHistoricalCostFormData) => 
       apiRequest("/api/personnel-historical-costs", {
         method: "POST",
-        body: JSON.stringify(data),
+        body: data,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/personnel-historical-costs"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/personnel"] });
       form.reset();
       setShowForm(false);
+    },
+    onError: (error: Error) => {
+      form.setError("root", { message: error.message });
     },
   });
 
@@ -83,13 +86,17 @@ export function PersonnelHistoricalCostsManager({ onClose }: PersonnelHistorical
     mutationFn: ({ id, data }: { id: number; data: Partial<PersonnelHistoricalCostFormData> }) =>
       apiRequest(`/api/personnel-historical-costs/${id}`, {
         method: "PATCH",
-        body: JSON.stringify(data),
+        body: data,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/personnel-historical-costs"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/personnel"] });
       setEditingCost(null);
       form.reset();
       setShowForm(false);
+    },
+    onError: (error: Error) => {
+      form.setError("root", { message: error.message });
     },
   });
 
@@ -100,6 +107,10 @@ export function PersonnelHistoricalCostsManager({ onClose }: PersonnelHistorical
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/personnel-historical-costs"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/personnel"] });
+    },
+    onError: (error: Error) => {
+      form.setError("root", { message: error.message });
     },
   });
 
@@ -147,8 +158,7 @@ export function PersonnelHistoricalCostsManager({ onClose }: PersonnelHistorical
           <div>
             <CardTitle className="text-xl font-bold">Costos Históricos de Personal</CardTitle>
             <p className="text-sm text-muted-foreground mt-1">
-              Costos históricos reales ·{" "}
-              <Link to="/operations/estimated-rates" className="text-blue-600 underline">Ver tarifas estimadas →</Link>
+              Fuente única de tarifas para Administración, Cotizaciones y Cierre mensual.
             </p>
           </div>
         </div>
@@ -331,6 +341,12 @@ export function PersonnelHistoricalCostsManager({ onClose }: PersonnelHistorical
                       </FormItem>
                     )}
                   />
+
+                  {form.formState.errors.root?.message && (
+                    <p className="md:col-span-2 text-sm text-destructive">
+                      {form.formState.errors.root.message}
+                    </p>
+                  )}
 
                   <div className="md:col-span-2 flex justify-end gap-2">
                     <Button 

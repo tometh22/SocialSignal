@@ -102,7 +102,10 @@ export default function ProjectTasksPage({ params }: Props) {
     staleTime: 60_000,
   });
   const allSummaryTasks = summaryTasks?.tasks || [];
-  const totalEstimatedHours = allSummaryTasks.reduce((s: number, t: any) => s + (t.estimatedHours || 0), 0);
+  const totalEstimatedHours = allSummaryTasks.reduce(
+    (sum: number, task: any) => sum + Number(task.estimatedHoursTotal ?? 0),
+    0,
+  );
   const completedCount = allSummaryTasks.filter((t: any) => t.status === "done").length;
   const pendingCount = allSummaryTasks.filter((t: any) => t.status !== "done" && t.status !== "cancelled").length;
 
@@ -167,15 +170,6 @@ export default function ProjectTasksPage({ params }: Props) {
     if (addPersonnelId === "none") return;
     addMemberMutation.mutate({ personnelId: parseInt(addPersonnelId), role: addRole });
   };
-
-  const updateProjectStatusMutation = useMutation({
-    mutationFn: (status: string) => apiRequest(`/api/tasks/projects/${projectId}`, "PUT", { status }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/tasks/projects", projectId] });
-      queryClient.invalidateQueries({ queryKey: ["/api/tasks/projects"] });
-      toast({ title: "Estado del proyecto actualizado" });
-    },
-  });
 
   const updateBriefUrlMutation = useMutation({
     mutationFn: (briefUrl: string) => apiRequest(`/api/tasks/projects/${projectId}`, "PUT", { briefUrl }),
@@ -247,30 +241,6 @@ export default function ProjectTasksPage({ params }: Props) {
                     <h1 className="text-xl font-bold text-foreground truncate">{project.name}</h1>
                     {(() => {
                       const cfg = PROJECT_STATUS_CONFIG[project.status] || PROJECT_STATUS_CONFIG["active"];
-                      if (isOperations) {
-                        return (
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <button className={cn("inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-medium border flex-shrink-0 transition-colors", cfg.className)}>
-                                {cfg.label}
-                                <ChevronDown className="h-2.5 w-2.5" />
-                              </button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="start" className="w-40">
-                              {Object.entries(PROJECT_STATUS_CONFIG).map(([status, c]) => (
-                                <DropdownMenuItem
-                                  key={status}
-                                  onClick={() => updateProjectStatusMutation.mutate(status)}
-                                  className={cn(project.status === status && "font-semibold")}
-                                >
-                                  {project.status === status && <Check className="h-3 w-3 mr-1.5 flex-shrink-0" />}
-                                  {c.label}
-                                </DropdownMenuItem>
-                              ))}
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        );
-                      }
                       return (
                         <Badge variant="outline" className={cn("text-[10px] flex-shrink-0", cfg.className)}>
                           {cfg.label}
@@ -304,19 +274,6 @@ export default function ProjectTasksPage({ params }: Props) {
                     </div>
                   )}
                 </div>
-
-                {isOperations && projectId < 1_000_000 /* active_project */ && (
-                  <Link href={`/active-projects/${projectId}`}>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-7 text-xs gap-1.5 border-indigo-200 text-indigo-700 hover:bg-indigo-50 hover:border-indigo-300"
-                    >
-                      <TrendingUp className="h-3 w-3" />
-                      Rentabilidad
-                    </Button>
-                  </Link>
-                )}
 
                 <Button
                   variant="outline"
@@ -755,13 +712,6 @@ export default function ProjectTasksPage({ params }: Props) {
                       </button>
                     )}
                   </div>
-                )}
-                {isOperations && projectId < 1_000_000 && (
-                  <Link href={`/active-projects/${projectId}`}>
-                    <Button variant="outline" size="sm" className="w-full mt-2 h-8 text-xs gap-1.5 border-indigo-200 text-indigo-700 hover:bg-indigo-50">
-                      <TrendingUp className="h-3 w-3" />Ver Rentabilidad
-                    </Button>
-                  </Link>
                 )}
               </div>
             </div>

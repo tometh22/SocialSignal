@@ -1,17 +1,15 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { queryClient, apiRequest, authFetch } from "@/lib/queryClient";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { FolderOpen, Clock, ChevronRight, CalendarIcon, Check, Plus, Loader2 } from "lucide-react";
+import { FolderOpen, Clock, ChevronRight, CalendarIcon, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
-import { usePermissions } from "@/hooks/use-permissions";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import TaskCalendarView from "@/components/tasks/TaskCalendarView";
@@ -276,26 +274,13 @@ function TabBar({
 // ── Main page ─────────────────────────────────────────────────────────
 export default function TasksHomePage() {
   const { user } = useAuth();
-  const { isOperations } = usePermissions();
   const [myTab, setMyTab] = useState<TabValue>("upcoming");
-  const [assignedTab, setAssignedTab] = useState<TabValue>("upcoming");
   const [showAllMy, setShowAllMy] = useState(false);
-  const [showAllAssigned, setShowAllAssigned] = useState(false);
   const [hidingTaskId, setHidingTaskId] = useState<number | null>(null);
-  const [quickTitle, setQuickTitle] = useState("");
-  const [quickInputFocused, setQuickInputFocused] = useState(false);
-  const [quickDueDate, setQuickDueDate] = useState<Date | undefined>(undefined);
-  const [quickDateOpen, setQuickDateOpen] = useState(false);
-  const quickInputRef = useRef<HTMLInputElement>(null);
 
   const { data: myTasksResponse, refetch: refetchMyTasks } = useQuery({
     queryKey: ["/api/tasks/my-tasks"],
     queryFn: () => authFetch("/api/tasks/my-tasks").then(r => r.json()),
-  });
-
-  const { data: allTasksData } = useQuery<Task[]>({
-    queryKey: ["/api/tasks"],
-    queryFn: () => authFetch("/api/tasks").then(r => r.json()),
   });
 
   const { data: rawProjects } = useQuery({
@@ -303,9 +288,12 @@ export default function TasksHomePage() {
     queryFn: () => authFetch("/api/tasks/projects").then(r => r.json()),
   });
 
-  const { data: personnel = [] } = useQuery<{ id: number; name: string; email?: string | null }[]>({
-    queryKey: ["/api/tasks-personnel"],
-    queryFn: () => authFetch("/api/tasks-personnel").then(r => r.json()),
+  const { data: myHours = { weekHours: 0, monthHours: 0 } } = useQuery<{
+    weekHours: number;
+    monthHours: number;
+  }>({
+    queryKey: ["/api/tasks/my-hours"],
+    queryFn: () => authFetch("/api/tasks/my-hours").then(r => r.json()),
   });
 
   const invalidateRelated = () => {
@@ -334,34 +322,6 @@ export default function TasksHomePage() {
     onSuccess: () => { refetchMyTasks(); invalidateRelated(); },
   });
 
-  const quickCreateMutation = useMutation({
-    mutationFn: ({ title, assigneeId, dueDate }: { title: string; assigneeId?: number; dueDate?: string }) =>
-      apiRequest("/api/tasks", "POST", {
-        title,
-        status: "todo",
-        priority: "medium",
-        sectionName: "General",
-        ...(assigneeId ? { assigneeId } : {}),
-        ...(dueDate ? { dueDate } : {}),
-      }),
-    onSuccess: () => {
-      setQuickTitle("");
-      setQuickDueDate(undefined);
-      refetchMyTasks();
-      queryClient.invalidateQueries({ queryKey: ["/api/tasks/my-tasks"] });
-      invalidateRelated();
-    },
-  });
-
-  const handleQuickCreate = () => {
-    if (!quickTitle.trim()) return;
-    quickCreateMutation.mutate({
-      title: quickTitle.trim(),
-      assigneeId: myPersonnel?.id,
-      dueDate: quickDueDate ? quickDueDate.toISOString() : undefined,
-    });
-  };
-
   const handleToggle = useCallback((task: Task) => {
     if (task.status !== "done") {
       setHidingTaskId(task.id);
@@ -375,10 +335,7 @@ export default function TasksHomePage() {
 
   const raw = myTasksResponse as any;
   const myTasks: Task[] = Array.isArray(raw) ? raw : Array.isArray(raw?.tasks) ? raw.tasks : [];
-  const allTasks: Task[] = Array.isArray(allTasksData) ? allTasksData : [];
   const projects: TaskProject[] = Array.isArray(rawProjects) ? rawProjects : [];
-
-  const myPersonnel = personnel.find(p => user?.email && p.email === user.email);
 
   const taskCounts = {
     upcoming: myTasks.filter(t => t.status !== "done" && t.status !== "cancelled" && t.status !== "in_progress" && t.status !== "in_review" && t.status !== "blocked" && !isOverdue(t)).length,
@@ -394,27 +351,16 @@ export default function TasksHomePage() {
     return t.status !== "done" && t.status !== "cancelled" && t.status !== "in_progress" && t.status !== "in_review" && t.status !== "blocked" && !isOverdue(t);
   });
 
-  const assignedByMe = allTasks.filter(t =>
-    user && t.createdBy === user.id &&
-    myPersonnel && t.assigneeId && t.assigneeId !== myPersonnel.id
-  );
-  const assignedCounts = {
-    upcoming: assignedByMe.filter(t => t.status !== "done" && t.status !== "cancelled" && t.status !== "in_progress" && t.status !== "in_review" && t.status !== "blocked" && !isOverdue(t)).length,
-    in_progress: assignedByMe.filter(t => t.status === "in_progress" || t.status === "in_review" || t.status === "blocked").length,
-    overdue: assignedByMe.filter(t => !!isOverdue(t) && t.status !== "done").length,
-    done: assignedByMe.filter(t => t.status === "done").length,
-  };
-  const filteredAssigned = assignedByMe.filter(t => {
-    if (assignedTab === "done") return t.status === "done";
-    if (assignedTab === "overdue") return !!isOverdue(t) && t.status !== "done";
-    if (assignedTab === "in_progress") return t.status === "in_progress" || t.status === "in_review" || t.status === "blocked";
-    return t.status !== "done" && t.status !== "cancelled" && t.status !== "in_progress" && t.status !== "in_review" && t.status !== "blocked" && !isOverdue(t);
-  });
-
   const recentProjects = projects.slice(0, 6);
+  const recentProjectGroups = Object.entries(
+    recentProjects.reduce<Record<string, TaskProject[]>>((groups, project) => {
+      const client = project.clientName || "Epical";
+      (groups[client] ??= []).push(project);
+      return groups;
+    }, {}),
+  );
   const firstName = user?.firstName || "Usuario";
   const MY_LIMIT = 6;
-  const ASSIGNED_LIMIT = 6;
 
   return (
     <div className="space-y-5 max-w-6xl mx-auto">
@@ -431,6 +377,17 @@ export default function TasksHomePage() {
           <h1 className="text-xl font-bold text-foreground leading-tight">
             {getGreeting()}, {firstName}
           </h1>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div className="rounded-xl border bg-card p-4 shadow-sm">
+          <p className="text-xs text-muted-foreground">Horas cargadas esta semana</p>
+          <p className="mt-1 text-2xl font-bold tabular-nums">{myHours.weekHours.toFixed(2)}h</p>
+        </div>
+        <div className="rounded-xl border bg-card p-4 shadow-sm">
+          <p className="text-xs text-muted-foreground">Horas cargadas este mes</p>
+          <p className="mt-1 text-2xl font-bold tabular-nums">{myHours.monthHours.toFixed(2)}h</p>
         </div>
       </div>
 
@@ -457,75 +414,6 @@ export default function TasksHomePage() {
           </div>
           <div className="px-4">
             <TabBar active={myTab} onChange={t => { setMyTab(t); setShowAllMy(false); }} counts={taskCounts} />
-          </div>
-
-          {/* Quick create inline */}
-          <div className={cn(
-            "flex items-center gap-2 px-3 py-2 border-b border-border/50 transition-all",
-            quickInputFocused && "bg-accent/20"
-          )}>
-            <div className={cn(
-              "flex-shrink-0 w-4 h-4 rounded-full border-2 border-dashed border-muted-foreground/30 flex items-center justify-center transition-colors",
-              quickInputFocused && "border-primary/40"
-            )}>
-              {quickCreateMutation.isPending && <Loader2 className="h-2 w-2 animate-spin text-primary" />}
-            </div>
-            <Input
-              ref={quickInputRef}
-              value={quickTitle}
-              onChange={e => setQuickTitle(e.target.value)}
-              onFocus={() => setQuickInputFocused(true)}
-              onBlur={() => setQuickInputFocused(false)}
-              onKeyDown={e => {
-                if (e.key === "Enter") handleQuickCreate();
-                if (e.key === "Escape") { setQuickTitle(""); quickInputRef.current?.blur(); }
-              }}
-              placeholder="Agregar tarea..."
-              className="border-none shadow-none bg-transparent text-xs h-auto py-0 px-0 focus-visible:ring-0 placeholder:text-muted-foreground/50 flex-1"
-            />
-            {quickTitle && (
-              <>
-                <Popover open={quickDateOpen} onOpenChange={setQuickDateOpen}>
-                  <PopoverTrigger asChild>
-                    <button className={cn(
-                      "flex-shrink-0 flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border transition-colors",
-                      quickDueDate
-                        ? "border-primary/30 text-primary bg-primary/5"
-                        : "border-border text-muted-foreground hover:text-foreground hover:border-border/60"
-                    )}>
-                      <CalendarIcon className="h-2.5 w-2.5" />
-                      {quickDueDate ? format(quickDueDate, "d MMM", { locale: es }) : "Fecha"}
-                    </button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="end">
-                    <Calendar
-                      mode="single"
-                      selected={quickDueDate}
-                      onSelect={d => { setQuickDueDate(d); setQuickDateOpen(false); }}
-                      locale={es}
-                    />
-                    {quickDueDate && (
-                      <div className="px-3 pb-2">
-                        <button
-                          onClick={() => { setQuickDueDate(undefined); setQuickDateOpen(false); }}
-                          className="text-[11px] text-muted-foreground hover:text-foreground underline underline-offset-2"
-                        >
-                          Quitar fecha
-                        </button>
-                      </div>
-                    )}
-                  </PopoverContent>
-                </Popover>
-                <Button
-                  size="sm"
-                  className="h-5 text-[10px] px-2 flex-shrink-0"
-                  onClick={handleQuickCreate}
-                  disabled={quickCreateMutation.isPending}
-                >
-                  Crear
-                </Button>
-              </>
-            )}
           </div>
 
           <div className="flex-1 divide-y divide-border/60 min-h-[160px]">
@@ -585,35 +473,29 @@ export default function TasksHomePage() {
               <p className="text-xs text-muted-foreground">Sin proyectos con tareas activas</p>
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-2 px-4 pb-2 flex-1">
-              {recentProjects.map(proj => (
-                <Link key={proj.id} href={`/tasks/projects/${proj.id}`}>
-                  <div className="rounded-lg border border-border/60 hover:border-slate-200 hover:shadow-sm hover:bg-muted/30 transition-all duration-200 p-3 cursor-pointer group h-full">
-                    <div className="flex items-start gap-2 mb-2">
-                      <span className={cn(
-                        "inline-flex w-7 h-7 rounded-lg flex-shrink-0 items-center justify-center text-white text-xs font-bold shadow-sm",
-                        getProjectColor(proj.id)
-                      )}>
-                        {getInitial(proj.clientName)}
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-xs font-semibold leading-tight truncate group-hover:text-primary transition-colors">{proj.name}</p>
-                        <p className="text-[10px] text-muted-foreground truncate mt-0.5">{proj.clientName}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      {proj.pendingCount > 0 ? (
-                        <span className="text-[10px] text-muted-foreground">
-                          <span className="font-semibold text-foreground">{proj.pendingCount}</span> pendientes
-                        </span>
-                      ) : (
-                        <span className="text-[10px] text-green-600 font-medium flex items-center gap-0.5">
-                          <Check className="h-2.5 w-2.5" />Al día
-                        </span>
-                      )}
-                    </div>
+            <div className="space-y-3 px-4 pb-2 flex-1">
+              {recentProjectGroups.map(([clientName, clientProjects]) => (
+                <div key={clientName}>
+                  <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    {clientName}
+                  </p>
+                  <div className="space-y-1">
+                    {clientProjects.map((proj) => (
+                      <Link key={proj.id} href={`/tasks/projects/${proj.id}`}>
+                        <div className="flex items-center gap-2 rounded-lg border border-border/60 p-2 hover:bg-muted/30">
+                          <span className={cn(
+                            "inline-flex h-6 w-6 items-center justify-center rounded-md text-[10px] font-bold text-white",
+                            getProjectColor(proj.id),
+                          )}>
+                            {getInitial(clientName)}
+                          </span>
+                          <span className="min-w-0 flex-1 truncate text-xs font-medium">{proj.name}</span>
+                          <span className="text-[10px] text-muted-foreground">{proj.pendingCount} pendientes</span>
+                        </div>
+                      </Link>
+                    ))}
                   </div>
-                </Link>
+                </div>
               ))}
             </div>
           )}
@@ -646,88 +528,6 @@ export default function TasksHomePage() {
         </div>
       </div>
 
-      {/* Assigned by me widget — only visible to operations/admin */}
-      {isOperations && <div className="bg-card rounded-xl border shadow-sm overflow-hidden">
-        <div className="flex items-center justify-between px-4 pt-4 pb-1">
-          <div className="flex items-center gap-2">
-            <Clock className="h-4 w-4 text-primary" />
-            <h2 className="text-sm font-semibold">Tareas que asigné</h2>
-            <span className="text-xs text-muted-foreground hidden sm:inline">· supervisá el avance del equipo</span>
-          </div>
-        </div>
-        <div className="px-4">
-          <TabBar active={assignedTab} onChange={t => { setAssignedTab(t); setShowAllAssigned(false); }} counts={assignedCounts} />
-        </div>
-
-        <div className="divide-y divide-border/60 min-h-[80px]">
-          {filteredAssigned.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-8 text-center px-4">
-              <Clock className="h-6 w-6 text-muted-foreground/30 mb-1.5" />
-              <p className="text-xs text-muted-foreground">
-                {assignedTab === "done"
-                  ? "Ninguna tarea asignada ha sido completada aún"
-                  : assignedTab === "overdue"
-                  ? "Ninguna tarea asignada está vencida"
-                  : assignedTab === "in_progress"
-                  ? "Ninguna tarea asignada está en curso"
-                  : "No hay tareas pendientes que hayas asignado a otros"}
-              </p>
-            </div>
-          ) : (
-            <>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-                {(showAllAssigned ? filteredAssigned : filteredAssigned.slice(0, ASSIGNED_LIMIT)).map(task => {
-                  const overdue = !!isOverdue(task);
-                  const isDone = task.status === "done";
-                  return (
-                    <div
-                      key={task.id}
-                      className="flex items-center gap-3 px-4 py-2.5 hover:bg-accent/20 transition-colors border-b border-border/40 last:border-0 group"
-                    >
-                      <div className={cn(
-                        "flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center",
-                        isDone
-                          ? "bg-green-500 border-green-500"
-                          : "border-muted-foreground/30"
-                      )}>
-                        {isDone && <Check className="h-2.5 w-2.5 text-white" strokeWidth={3} />}
-                      </div>
-                      <div className="flex-1 min-w-0 flex items-center gap-1 overflow-hidden">
-                        <span className={cn("text-sm truncate leading-5", isDone && "line-through text-muted-foreground")}>
-                          {task.title}
-                        </span>
-                        {(task.clientName || task.projectName) && (
-                          <span className="text-[11px] text-muted-foreground/50 flex-shrink-0 hidden sm:inline">
-                            · {task.clientName || task.projectName}
-                          </span>
-                        )}
-                      </div>
-                      {task.dueDate && (
-                        <span className={cn(
-                          "text-[11px] flex-shrink-0",
-                          overdue ? "text-red-500 font-medium" : "text-muted-foreground"
-                        )}>
-                          {format(new Date(task.dueDate), "d MMM", { locale: es })}
-                        </span>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-              {filteredAssigned.length > ASSIGNED_LIMIT && (
-                <button
-                  className="w-full px-4 py-2.5 text-xs text-muted-foreground hover:text-primary transition-colors text-left"
-                  onClick={() => setShowAllAssigned(!showAllAssigned)}
-                >
-                  {showAllAssigned
-                    ? "Mostrar menos"
-                    : `Mostrar ${filteredAssigned.length - ASSIGNED_LIMIT} más`}
-                </button>
-              )}
-            </>
-          )}
-        </div>
-      </div>}
     </div>
   );
 }

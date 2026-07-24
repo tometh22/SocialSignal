@@ -5,7 +5,13 @@ import { db, pool } from "./db";
 import { z } from "zod";
 import { getDateRangeForFilter } from "./utils/dateRange";
 import { parseMoneyAuto } from "./utils/money";
+import { currentCivilWeekRange, formatCivilDate, parseCivilDate } from "./utils/civil-date";
 import { projectKey, normalizeKey } from "./utils/normalize";
+import {
+  canonicalRateErrorMessage,
+  resolveCanonicalPersonnelRate,
+} from "./domain/personnel-rate";
+import { aggregateWeeklyEstimatesByTask } from "@shared/utils/taskEstimates";
 import {
   insertClientSchema,
   insertClientBillingEntitySchema,
@@ -98,8 +104,10 @@ import {
   taskTimeEntries,
   taskComments,
   taskWeeklyEstimates,
+  taskProjectMembers,
   insertTaskSchema,
   insertTaskTimeEntrySchema,
+  insertTaskWeeklyEstimateSchema,
   projectStatusReviews,
   projectReviewNotes,
   reviewItemReadState,
@@ -110,8 +118,6 @@ import {
   insertHolidaySchema,
   monthlyClosings,
   insertMonthlyClosingSchema,
-  estimatedRates,
-  insertEstimatedRateSchema,
   personnelAbsences,
   insertPersonnelAbsenceSchema,
   quotationTeamMembers,
@@ -4071,7 +4077,96 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return p.activeUntil >= today;
       });
 
-      res.json(activePersonnel);
+      // personnel_historical_costs is the canonical source for rates. Keep the
+      // legacy month-shaped fields in the response during the transition so old
+      // consumers cannot silently show stale data.
+      const [historicalRows, activeExchangeRates] = await Promise.all([
+        db.select()
+          .from(personnelHistoricalCosts)
+          .where(eq(personnelHistoricalCosts.isActive, true))
+          .orderBy(
+            asc(personnelHistoricalCosts.personnelId),
+            desc(personnelHistoricalCosts.year),
+            desc(personnelHistoricalCosts.month),
+          ),
+        db.select().from(exchangeRates).where(eq(exchangeRates.isActive, true)),
+      ]);
+      const exchangeRateById = new Map(
+        activeExchangeRates.map((rate) => [rate.id, Number(rate.rate)]),
+      );
+      const exchangeRateByPeriod = new Map(
+        activeExchangeRates.map((rate) => [`${rate.year}-${rate.month}`, Number(rate.rate)]),
+      );
+      const normalizeRate = (row: typeof historicalRows[number]) => {
+        const hourlyRateARS = row.hourlyRateARS == null ? null : Number(row.hourlyRateARS);
+        const exchangeRate = row.exchangeRateId
+          ? exchangeRateById.get(row.exchangeRateId)
+          : exchangeRateByPeriod.get(`${row.year}-${row.month}`);
+        const hourlyRateUSD = row.hourlyRateUSD != null
+          ? Number(row.hourlyRateUSD)
+          : hourlyRateARS != null && exchangeRate && exchangeRate > 0
+            ? hourlyRateARS / exchangeRate
+            : null;
+        return {
+          ...row,
+          exchangeRate: exchangeRate ?? null,
+          hourlyRateARS,
+          hourlyRateUSD,
+          monthlySalaryARS: row.monthlySalaryARS == null ? null : Number(row.monthlySalaryARS),
+          monthlySalaryUSD: row.monthlySalaryUSD == null
+            ? null
+            : Number(row.monthlySalaryUSD),
+        };
+      };
+      const monthKeys = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+      const byPerson = new Map<number, typeof historicalRows>();
+      for (const row of historicalRows) {
+        const rows = byPerson.get(row.personnelId) ?? [];
+        rows.push(row);
+        byPerson.set(row.personnelId, rows);
+      }
+      const now = new Date();
+      const currentPeriodNumber = now.getFullYear() * 100 + (now.getMonth() + 1);
+      const normalizedPersonnel = activePersonnel.map((person: any) => {
+        const rows = (byPerson.get(person.id) ?? []).map(normalizeRate);
+        const currentRate = rows.find((row) => row.year * 100 + row.month <= currentPeriodNumber);
+        const historicalRates = rows.map((row) => ({
+          year: row.year,
+          month: row.month,
+          periodKey: `${row.year}-${String(row.month).padStart(2, "0")}`,
+          hourlyRateARS: row.hourlyRateARS,
+          hourlyRateUSD: row.hourlyRateUSD,
+          monthlySalaryARS: row.monthlySalaryARS,
+          monthlySalaryUSD: row.monthlySalaryUSD,
+          exchangeRate: row.exchangeRate,
+        }));
+        const normalized: any = {
+          ...person,
+          currentHourlyRateARS: currentRate?.hourlyRateARS == null ? null : Number(currentRate.hourlyRateARS),
+          currentHourlyRateUSD: currentRate?.hourlyRateUSD == null ? null : Number(currentRate.hourlyRateUSD),
+          currentMonthlySalaryARS: currentRate?.monthlySalaryARS == null ? null : Number(currentRate.monthlySalaryARS),
+          currentMonthlySalaryUSD: currentRate?.monthlySalaryUSD == null ? null : Number(currentRate.monthlySalaryUSD),
+          ratePeriod: currentRate ? `${currentRate.year}-${String(currentRate.month).padStart(2, "0")}` : null,
+          historicalRates,
+        };
+        // Never leak stale month-shaped values from personnel. Compatibility
+        // aliases below are rebuilt exclusively from canonical history rows.
+        for (const key of Object.keys(normalized)) {
+          if (/^(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\d{4}(HourlyRateARS|MonthlySalaryARS)$/.test(key)) {
+            delete normalized[key];
+          }
+        }
+        for (const row of rows) {
+          const prefix = `${monthKeys[row.month - 1]}${row.year}`;
+          if (row.hourlyRateARS != null) normalized[`${prefix}HourlyRateARS`] = Number(row.hourlyRateARS);
+          if (row.monthlySalaryARS != null) normalized[`${prefix}MonthlySalaryARS`] = Number(row.monthlySalaryARS);
+        }
+        normalized.hourlyRateARS = normalized.currentHourlyRateARS;
+        normalized.hourlyRate = normalized.currentHourlyRateUSD;
+        return normalized;
+      });
+
+      res.json(normalizedPersonnel);
     } catch (error: any) {
       console.error("Error fetching personnel:", error?.message || error);
       res.status(500).json({ message: error?.message || "Error fetching personnel" });
@@ -4093,12 +4188,76 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const person = await storage.getPersonnelById(id);
     if (!person) return res.status(404).json({ message: "Personnel not found" });
 
-    res.json(person);
+    const [rawRateRows, activeExchangeRates] = await Promise.all([
+      db.select()
+        .from(personnelHistoricalCosts)
+        .where(and(
+          eq(personnelHistoricalCosts.personnelId, id),
+          eq(personnelHistoricalCosts.isActive, true),
+        ))
+        .orderBy(
+          desc(personnelHistoricalCosts.year),
+          desc(personnelHistoricalCosts.month),
+        ),
+      db.select().from(exchangeRates).where(eq(exchangeRates.isActive, true)),
+    ]);
+    const exchangeRateById = new Map(activeExchangeRates.map((rate) => [rate.id, Number(rate.rate)]));
+    const exchangeRateByPeriod = new Map(
+      activeExchangeRates.map((rate) => [`${rate.year}-${rate.month}`, Number(rate.rate)]),
+    );
+    const rateRows = rawRateRows.map((rate) => {
+      const hourlyRateARS = rate.hourlyRateARS == null ? null : Number(rate.hourlyRateARS);
+      const exchangeRate = rate.exchangeRateId
+        ? exchangeRateById.get(rate.exchangeRateId)
+        : exchangeRateByPeriod.get(`${rate.year}-${rate.month}`);
+      return {
+        ...rate,
+        exchangeRate: exchangeRate ?? null,
+        hourlyRateARS,
+        hourlyRateUSD: rate.hourlyRateUSD != null
+          ? Number(rate.hourlyRateUSD)
+          : hourlyRateARS != null && exchangeRate && exchangeRate > 0
+            ? hourlyRateARS / exchangeRate
+            : null,
+      };
+    });
+    const now = new Date();
+    const currentPeriod = now.getFullYear() * 100 + (now.getMonth() + 1);
+    const currentRate = rateRows.find((rate) => rate.year * 100 + rate.month <= currentPeriod);
+    const normalizedPerson: any = {
+      ...person,
+      currentHourlyRateARS: currentRate?.hourlyRateARS == null ? null : Number(currentRate.hourlyRateARS),
+      currentHourlyRateUSD: currentRate?.hourlyRateUSD == null ? null : Number(currentRate.hourlyRateUSD),
+      currentMonthlySalaryARS: currentRate?.monthlySalaryARS == null ? null : Number(currentRate.monthlySalaryARS),
+      currentMonthlySalaryUSD: currentRate?.monthlySalaryUSD == null ? null : Number(currentRate.monthlySalaryUSD),
+      ratePeriod: currentRate ? `${currentRate.year}-${String(currentRate.month).padStart(2, "0")}` : null,
+      historicalRates: rateRows.map((rate) => ({
+        year: rate.year,
+        month: rate.month,
+        periodKey: `${rate.year}-${String(rate.month).padStart(2, "0")}`,
+        hourlyRateARS: rate.hourlyRateARS == null ? null : Number(rate.hourlyRateARS),
+        hourlyRateUSD: rate.hourlyRateUSD == null ? null : Number(rate.hourlyRateUSD),
+        monthlySalaryARS: rate.monthlySalaryARS == null ? null : Number(rate.monthlySalaryARS),
+        monthlySalaryUSD: rate.monthlySalaryUSD == null ? null : Number(rate.monthlySalaryUSD),
+        exchangeRate: rate.exchangeRate,
+      })),
+      hourlyRateARS: currentRate?.hourlyRateARS == null ? null : Number(currentRate.hourlyRateARS),
+      hourlyRate: currentRate?.hourlyRateUSD == null ? null : Number(currentRate.hourlyRateUSD),
+    };
+    for (const key of Object.keys(normalizedPerson)) {
+      if (/^(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\d{4}(HourlyRateARS|MonthlySalaryARS)$/.test(key)) {
+        delete normalizedPerson[key];
+      }
+    }
+    res.json(normalizedPerson);
   });
 
   app.post("/api/personnel", requireAuth, async (req, res) => {
     try {
-      const validatedData = insertPersonnelSchema.parse(req.body);
+      const incoming = { ...req.body, hourlyRate: 0 };
+      delete incoming.hourlyRateARS;
+      delete incoming.monthlyFixedSalary;
+      const validatedData = insertPersonnelSchema.parse(incoming);
       const person = await storage.createPersonnel(validatedData);
       res.status(201).json(person);
     } catch (error) {
@@ -4162,50 +4321,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`✅ [${personName}] Monthly hours validation passed: ${data.monthlyHours}h`);
       }
 
+      // Legacy rate/salary columns are read-only compatibility fields. All
+      // operational values are written through personnel_historical_costs.
+      delete data.hourlyRate;
+      delete data.hourlyRateARS;
+      delete data.monthlyFixedSalary;
+
       const validatedData = insertPersonnelSchema.partial().parse(data);
+      // Las columnas mensuales de personnel quedan únicamente como compatibilidad
+      // de lectura. Toda edición histórica debe pasar por personnel_historical_costs.
+      for (const key of Object.keys(validatedData)) {
+        if (/^(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\d{4}(HourlyRateARS|MonthlySalaryARS)$/.test(key)) {
+          delete (validatedData as any)[key];
+        }
+      }
       console.log(`🔧 [${personName}] PATCH /api/personnel/${id} - Validated data:`, validatedData);
 
-      // Detectar si el usuario modificó manualmente la tarifa por hora, las horas
-      // o el sueldo fijo. El cliente envía siempre los tres valores actuales, así
-      // que solo tratamos como "cambio" los que difieren del valor actual en DB.
-      const hourlyRateExplicitlyChanged =
-        validatedData.hourlyRate !== undefined &&
-        currentPerson !== undefined &&
-        validatedData.hourlyRate !== currentPerson.hourlyRate;
-      const monthlyHoursChanged =
-        validatedData.monthlyHours !== undefined &&
-        currentPerson !== undefined &&
-        validatedData.monthlyHours !== currentPerson.monthlyHours;
-      const monthlyFixedSalaryChanged =
-        validatedData.monthlyFixedSalary !== undefined &&
-        currentPerson !== undefined &&
-        validatedData.monthlyFixedSalary !== currentPerson.monthlyFixedSalary;
-
-      // Recalcular la tarifa por hora solo si el usuario NO cambió hourlyRate
-      // manualmente y sí cambió monthlyHours o monthlyFixedSalary.
-      if (!hourlyRateExplicitlyChanged && (monthlyHoursChanged || monthlyFixedSalaryChanged)) {
-        const effectiveHours = validatedData.monthlyHours ?? currentPerson?.monthlyHours ?? 0;
-        const effectiveSalary = validatedData.monthlyFixedSalary ?? currentPerson?.monthlyFixedSalary ?? 0;
-        if (effectiveHours > 0 && effectiveSalary > 0) {
-          const newHourlyRate = Math.round(effectiveSalary / effectiveHours);
-          validatedData.hourlyRate = newHourlyRate;
-          console.log(`🔧 [${personName}] Auto-calculating hourlyRate: ${effectiveSalary} ÷ ${effectiveHours} = ${newHourlyRate}`);
-
-          // Replicar la tarifa en el campo histórico del mes actual si existe.
-          const currentDate = new Date();
-          const currentYear = currentDate.getFullYear();
-          const currentMonth = currentDate.getMonth();
-          const monthNames = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
-          const historicalField = `${monthNames[currentMonth]}${currentYear}HourlyRateARS` as keyof typeof currentPerson;
-          if (currentPerson && currentPerson[historicalField] !== null && currentPerson[historicalField] !== undefined) {
-            (validatedData as any)[historicalField] = newHourlyRate;
-            console.log(`🔧 [${personName}] Also updating historical field ${String(historicalField)} to ${newHourlyRate}`);
-          }
-        }
-      } else if (hourlyRateExplicitlyChanged) {
-        console.log(`🔧 [${personName}] Respecting manually-entered hourlyRate: ${validatedData.hourlyRate}`);
-      }
-      
       const updatedPerson = await storage.updatePersonnel(id, validatedData);
       console.log(`🔧 [${personName}] PATCH /api/personnel/${id} - Updated person:`, updatedPerson);
 
@@ -4237,10 +4368,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const rateFields = getHistoricalRateFields(year);
 
-      const [sheetRows, allPersonnel, aliasRows] = await Promise.all([
+      const [sheetRows, allPersonnel, aliasRows, historicalRows] = await Promise.all([
         fetchValorHoraForYear(year),
         db.select().from(personnel).orderBy(personnel.name),
         db.select().from(sheetPersonnelAliases),
+        db.select().from(personnelHistoricalCosts).where(and(
+          eq(personnelHistoricalCosts.year, year),
+          eq(personnelHistoricalCosts.isActive, true),
+        )),
       ]);
 
       const aliasBySheetName = new Map<string, number | null>();
@@ -4251,6 +4386,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       for (const p of allPersonnel) {
         personnelByName.set(p.name.trim().toLowerCase(), p.id);
       }
+      const historicalByPersonMonth = new Map(
+        historicalRows.map((rate) => [
+          `${rate.personnelId}-${rate.month}`,
+          rate.hourlyRateARS == null ? null : Number(rate.hourlyRateARS),
+        ]),
+      );
+      const monthNumber: Record<string, number> = {
+        jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6,
+        jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12,
+      };
 
       type PreviewRow = {
         sheetName: string;
@@ -4276,12 +4421,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         const proposedChanges: PreviewRow["proposedChanges"] = [];
         if (match && "personnelId" in match) {
-          const person = allPersonnel.find((p) => p.id === (match as any).personnelId);
-          if (person) {
+          const personnelId = (match as any).personnelId as number;
+          if (allPersonnel.some((person) => person.id === personnelId)) {
             for (const field of rateFields) {
               const next = row.monthlyRates[field.replace("HourlyRateARS", "")];
               if (next === undefined) continue;
-              const current = (person as any)[field] as number | null;
+              const fieldMatch = field.match(/^([a-z]{3})\d{4}HourlyRateARS$/);
+              const month = fieldMatch ? monthNumber[fieldMatch[1]] : undefined;
+              const current = month
+                ? historicalByPersonMonth.get(`${personnelId}-${month}`) ?? null
+                : null;
               if (current !== next) {
                 proposedChanges.push({ field, current: current ?? null, next });
               }
@@ -4309,7 +4458,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Helper: apply rate rows to personnelHistoricalCosts (and legacy personnel columns) for a given year.
+  // Helper: apply rate rows exclusively to personnelHistoricalCosts for a given year.
   async function applyRateRows(
     sheetRows: { sheetName: string; monthlyRates: Record<string, number> }[],
     applyToSet: Set<string> | null, // null = apply all matched
@@ -4804,6 +4953,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  const quotationTeamPayloadSchema = insertQuotationTeamMemberSchema
+    .omit({ quotationId: true })
+    .superRefine((member, context) => {
+      if (!member.personnelId && !member.roleId) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["roleId"],
+          message: "El integrante debe referenciar una persona o un rol",
+        });
+      }
+    });
+  const quotationTeamRequestSchema = z.object({
+    teamMembers: z.array(quotationTeamPayloadSchema),
+  });
+
+  async function validateQuotationTeamReferences(teamMembers: z.infer<typeof quotationTeamPayloadSchema>[]) {
+    const personnelIds = [...new Set(teamMembers.flatMap((member) => member.personnelId ? [member.personnelId] : []))];
+    const roleIds = [...new Set(teamMembers.flatMap((member) => member.roleId ? [member.roleId] : []))];
+    const [validPersonnel, validRoles] = await Promise.all([
+      personnelIds.length > 0
+        ? db.select({ id: personnel.id }).from(personnel).where(inArray(personnel.id, personnelIds))
+        : [],
+      roleIds.length > 0
+        ? db.select({ id: roles.id }).from(roles).where(inArray(roles.id, roleIds))
+        : [],
+    ]);
+    const validPersonnelIds = new Set(validPersonnel.map((record) => record.id));
+    const validRoleIds = new Set(validRoles.map((record) => record.id));
+    const issues: z.ZodIssue[] = [];
+    teamMembers.forEach((member, index) => {
+      if (member.personnelId && !validPersonnelIds.has(member.personnelId)) {
+        issues.push({
+          code: z.ZodIssueCode.custom,
+          path: ["teamMembers", index, "personnelId"],
+          message: "La persona seleccionada no existe",
+        });
+      }
+      if (member.roleId && !validRoleIds.has(member.roleId)) {
+        issues.push({
+          code: z.ZodIssueCode.custom,
+          path: ["teamMembers", index, "roleId"],
+          message: "El rol seleccionado no existe",
+        });
+      }
+    });
+    if (issues.length > 0) throw new z.ZodError(issues);
+  }
+
   app.post("/api/quotations", requireAuth, async (req, res) => {
     try {
       console.log('📥 POST /api/quotations - Request body:', JSON.stringify(req.body, null, 2));
@@ -4811,7 +5008,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         // Validar datos con Zod
         console.log('🔍 Validating quotation data...');
-        const validatedData = insertQuotationSchema.parse(req.body);
+        const { teamMembers: rawTeamMembers, ...rawQuotation } = req.body ?? {};
+        const validatedData = insertQuotationSchema.parse(rawQuotation);
+        const validatedTeam = quotationTeamRequestSchema
+          .parse({ teamMembers: rawTeamMembers })
+          .teamMembers;
+        await validateQuotationTeamReferences(validatedTeam);
         console.log('✅ Validation successful:', JSON.stringify(validatedData, null, 2));
 
         // Crear cotización — expiresAt default = ahora + 30 días si no viene en payload
@@ -4820,7 +5022,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           exp.setDate(exp.getDate() + 30);
           (validatedData as any).expiresAt = exp;
         }
-        const quotation = await storage.createQuotation(validatedData);
+        const quotation = await db.transaction(async (tx) => {
+          const [created] = await tx.insert(quotations).values(validatedData).returning();
+          if (validatedTeam.length > 0) {
+            await tx.insert(quotationTeamMembers).values(
+              validatedTeam.map((member) => ({ ...member, quotationId: created.id })),
+            );
+          }
+          return created;
+        });
 
         // Si viene de un lead CRM, registrar actividad automáticamente
         if (validatedData.leadId) {
@@ -4881,10 +5091,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         // Validar datos con Zod
         console.log('🔍 Validating quotation data for update...');
-        const validatedData = insertQuotationSchema.parse(req.body);
+        const { teamMembers: rawTeamMembers, ...rawQuotation } = req.body ?? {};
+        const validatedData = insertQuotationSchema.parse(rawQuotation);
+        const validatedTeam = quotationTeamRequestSchema
+          .parse({ teamMembers: rawTeamMembers })
+          .teamMembers;
+        await validateQuotationTeamReferences(validatedTeam);
 
-        // Actualizar cotización
-        const updatedQuotation = await storage.updateQuotation(id, validatedData);
+        // Cotización y equipo forman una única unidad: nunca dejamos un guardado
+        // exitoso con integrantes faltantes.
+        const updatedQuotation = await db.transaction(async (tx) => {
+          const [updated] = await tx.update(quotations)
+            .set(validatedData)
+            .where(eq(quotations.id, id))
+            .returning();
+          if (!updated) throw new Error("Quotation not found");
+          await tx.delete(quotationTeamMembers)
+            .where(eq(quotationTeamMembers.quotationId, id));
+          if (validatedTeam.length > 0) {
+            await tx.insert(quotationTeamMembers).values(
+              validatedTeam.map((member) => ({ ...member, quotationId: id })),
+            );
+          }
+          return updated;
+        });
 
         res.json(updatedQuotation);
       } catch (validationError) {
@@ -7944,6 +8174,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const validatedData = insertActiveProjectSchema.parse(processedData);
 
+      if (validatedData.projectCategory === "internal") {
+        const [epicalClient] = await db
+          .select({ id: clients.id })
+          .from(clients)
+          .where(sql`LOWER(TRIM(${clients.name})) = 'epical'`)
+          .limit(1);
+        if (!epicalClient) {
+          return res.status(503).json({
+            message: "No existe el cliente interno Epical. Aplicá la migración de Feedback Mind V2.",
+          });
+        }
+        // This is a server invariant, not a frontend convention: every demo,
+        // training or automation project belongs to Epical and is unquoted.
+        validatedData.clientId = epicalClient.id;
+        validatedData.quotationId = null;
+        validatedData.internalType = validatedData.internalType || "otro";
+      }
+
       // Quotation is optional — projects can be created without one (demos, internal, etc.)
       const quotation = validatedData.quotationId
         ? await storage.getQuotation(Number(validatedData.quotationId))
@@ -8543,7 +8791,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   }
 
   // Computes ARS costing for a task time entry so PM-logged hours feed rentabilidad.
-  // - rate: person.hourlyRateARS if set, else USD hourlyRate × period FX.
+  // - rate: canonical historical ARS rate, else historical USD rate × period FX.
   // - billable: true only when the task maps to a billable active project.
   async function computeTaskEntryCost(
     personnelId: number,
@@ -8564,34 +8812,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (proj) billable = proj.category !== "internal";
     }
 
-    // Resolve ARS rate
-    let rateARS = (person.hourlyRateARS && person.hourlyRateARS > 0) ? person.hourlyRateARS : 0;
-    let exchangeRateId: number | null = null;
-    if (rateARS === 0 && person.hourlyRate && person.hourlyRate > 0) {
-      const [fx] = await db
-        .select({ id: exchangeRates.id, rate: exchangeRates.rate })
-        .from(exchangeRates)
-        .where(and(
-          eq(exchangeRates.year, date.getFullYear()),
-          eq(exchangeRates.month, date.getMonth() + 1),
-          eq(exchangeRates.isActive, true),
-        ))
-        .limit(1);
-      const fxRate = fx ? parseFloat(fx.rate.toString()) : 0;
-      if (fxRate > 0) {
-        rateARS = person.hourlyRate * fxRate;
-        exchangeRateId = fx.id;
-      }
-    }
-
-    const hourlyRateAtTime = rateARS > 0 ? rateARS : null;
+    const canonicalRate = await resolveCanonicalPersonnelRate(personnelId, date);
+    const hourlyRateAtTime = canonicalRate.hourlyRateARS;
     const totalCost = hourlyRateAtTime != null ? hours * hourlyRateAtTime : null;
-    return { hourlyRateAtTime, totalCost, billable, exchangeRateId };
+    return {
+      hourlyRateAtTime,
+      totalCost,
+      billable,
+      exchangeRateId: canonicalRate.exchangeRateId,
+    };
   }
 
   // Crear un nuevo registro de horas
   app.post("/api/time-entries", requireAuth, requireProjectUnlocked(), async (req, res) => {
     try {
+      const user = (req as any).user;
       // Adaptar fechas si vienen como strings ISO
       const processedData = {
         ...req.body,
@@ -8601,20 +8836,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
         approvedDate: req.body.approvedDate ? new Date(req.body.approvedDate) : undefined
       };
 
-      // Verificar que la persona existe para obtener el valor hora actual si no se proporciona
-      const person = await storage.getPersonnelById(processedData.personnelId);
-      if (!person) {
-        return res.status(404).json({ message: "Personal no encontrado" });
-      }
+      if ((processedData.entryType ?? "hours") === "hours") {
+        const [loggingPerson] = user?.email
+          ? await db.select({ id: personnel.id }).from(personnel)
+              .where(sql`LOWER(TRIM(${personnel.email})) = LOWER(TRIM(${user.email}))`)
+              .limit(1)
+          : [];
+        if (!loggingPerson) {
+          return res.status(422).json({
+            message: "Tu usuario no está vinculado a Personal. Operaciones debe configurar el mismo email antes de cargar horas.",
+            errors: [{ path: ["personnelId"], message: "Usuario sin vínculo con Personal" }],
+          });
+        }
 
-      // Si no se proporciona hourlyRateAtTime, usar el valor actual
-      if (!processedData.hourlyRateAtTime) {
-        processedData.hourlyRateAtTime = person.hourlyRate || 50;
-      }
-
-      // Solo calcular si faltan datos completamente
-      if (processedData.entryType === "hours" && (processedData.totalCost === undefined || processedData.totalCost === null)) {
-        processedData.totalCost = (processedData.hours || 0) * (processedData.hourlyRateAtTime || 0);
+        // Identity, rate and cost are server-owned invariants.
+        processedData.personnelId = loggingPerson.id;
+        const canonicalRate = await resolveCanonicalPersonnelRate(
+          loggingPerson.id,
+          processedData.date ?? new Date(),
+        );
+        const rateError = canonicalRateErrorMessage(canonicalRate, processedData.date ?? new Date());
+        if (rateError || canonicalRate.hourlyRateARS == null) {
+          return res.status(422).json({
+            message: rateError ?? "No se pudo resolver la tarifa histórica.",
+            errors: [{ path: ["hourlyRateAtTime"], message: rateError ?? "Tarifa histórica faltante" }],
+          });
+        }
+        processedData.hourlyRateAtTime = canonicalRate.hourlyRateARS;
+        processedData.totalCost = (processedData.hours || 0) * canonicalRate.hourlyRateARS;
+        processedData.exchangeRateId = canonicalRate.exchangeRateId;
       } else if (processedData.entryType === "cost" && (processedData.hours === undefined || processedData.hours === null)) {
         processedData.hours = (processedData.totalCost || 0) / (processedData.hourlyRateAtTime || 1);
       }
@@ -8646,7 +8896,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...processedData,
         approved: true,
         approvedDate: new Date(),
-        approvedBy: processedData.personnelId // Auto-aprobado por la persona que registra
+        approvedBy: processedData.personnelId,
+        createdBy: user?.id,
       };
 
       const validatedData = insertTimeEntrySchema.parse(dataWithDefaults);
@@ -8707,7 +8958,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (isNaN(id)) return res.status(400).json({ message: "Invalid time entry ID" });
 
     try {
-      const validatedData = insertTimeEntrySchema.partial().parse(req.body);
+      const existingEntry = await storage.getTimeEntryById(id);
+      if (!existingEntry) {
+        return res.status(404).json({ message: "Time entry not found" });
+      }
+      const sanitizedInput = { ...req.body };
+      delete sanitizedInput.personnelId;
+      delete sanitizedInput.hourlyRateAtTime;
+      delete sanitizedInput.totalCost;
+      delete sanitizedInput.exchangeRateId;
+      const validatedData = insertTimeEntrySchema.partial().parse(sanitizedInput);
 
       // Validate positive hours if provided
       if (validatedData.hours !== undefined && validatedData.hours <= 0) {
@@ -8727,6 +8987,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (new Date(validatedData.startDate) > new Date(validatedData.endDate)) {
           return res.status(400).json({ message: "La fecha de inicio debe ser anterior a la fecha de fin" });
         }
+      }
+
+      if (existingEntry.entryType === "hours") {
+        const effectiveDate = validatedData.date ?? existingEntry.date;
+        const effectiveHours = validatedData.hours ?? existingEntry.hours;
+        const canonicalRate = await resolveCanonicalPersonnelRate(
+          existingEntry.personnelId,
+          new Date(effectiveDate),
+        );
+        const rateError = canonicalRateErrorMessage(canonicalRate, new Date(effectiveDate));
+        if (rateError || canonicalRate.hourlyRateARS == null) {
+          return res.status(422).json({
+            message: rateError ?? "No se pudo resolver la tarifa histórica.",
+            errors: [{ path: ["hourlyRateAtTime"], message: rateError ?? "Tarifa histórica faltante" }],
+          });
+        }
+        validatedData.hourlyRateAtTime = canonicalRate.hourlyRateARS;
+        validatedData.totalCost = effectiveHours * canonicalRate.hourlyRateARS;
+        validatedData.exchangeRateId = canonicalRate.exchangeRateId;
       }
 
       const updatedEntry = await storage.updateTimeEntry(id, validatedData);
@@ -9174,6 +9453,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Invalid data", errors: error.errors });
       }
+      if ((error as any)?.code === "23505") {
+        return res.status(409).json({
+          message: "Ya existe un registro de costo histórico para este personal en el período especificado",
+        });
+      }
       res.status(500).json({ message: "Failed to create personnel historical cost" });
     }
   });
@@ -9192,7 +9476,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const result = await db
         .update(personnelHistoricalCosts)
-        .set(validatedData)
+        .set({ ...validatedData, updatedAt: new Date() })
         .where(and(eq(personnelHistoricalCosts.id, id), eq(personnelHistoricalCosts.isActive, true)))
         .returning();
 
@@ -9205,6 +9489,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Error updating personnel historical cost:", error);
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      }
+      if ((error as any)?.code === "23505") {
+        return res.status(409).json({
+          message: "Ya existe un registro de costo histórico para este personal en el período especificado",
+        });
       }
       res.status(500).json({ message: "Failed to update personnel historical cost" });
     }
@@ -9433,8 +9722,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       hours = liveHours;
       entryCount = rows.length + taskRows.length;
       totalCostARSFull = liveTotalCostARS;
-      usdHourlyRate = personnelRow.hourlyRate ?? 0;
-      fxRate = await getPeriodFxRate();
+      const canonicalRate = await resolveCanonicalPersonnelRate(
+        personnelRow.id,
+        new Date(yyyy, mm - 1, 1),
+      );
+      fxRate = canonicalRate.exchangeRate ?? await getPeriodFxRate();
+      usdHourlyRate = canonicalRate.hourlyRateUSD
+        ?? (canonicalRate.hourlyRateARS != null && fxRate > 0
+          ? canonicalRate.hourlyRateARS / fxRate
+          : 0);
     }
 
     // Available hours for the month = weekdays minus holidays × daily hours (by contract)
@@ -18033,7 +18329,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ==================== MÓDULO DE GESTIÓN DE TAREAS ====================
-  const OWN_PROJECT_OFFSET = 1_000_000;
 
   // GET /api/tasks — lista filtrable
   app.get("/api/tasks", requireAuth, async (req: Request, res: Response) => {
@@ -18049,7 +18344,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const result = conditions.length > 0
         ? await db.select().from(tasks).where(and(...conditions)).orderBy(asc(tasks.position), asc(tasks.createdAt))
         : await db.select().from(tasks).orderBy(asc(tasks.position), asc(tasks.createdAt));
-      res.json(result);
+      const taskIds = result.map((task) => task.id);
+      const estimateRows = taskIds.length > 0
+        ? await db.select().from(taskWeeklyEstimates)
+            .where(inArray(taskWeeklyEstimates.taskId, taskIds))
+        : [];
+      const estimatesByTask = aggregateWeeklyEstimatesByTask(estimateRows);
+      const estimatesForCurrentWeek = aggregateWeeklyEstimatesByTask(
+        estimateRows,
+        currentCivilWeekRange(),
+      );
+      res.json(result.map((task) => ({
+        ...task,
+        estimatedHoursTotal: estimatesByTask.get(task.id) ?? 0,
+        estimatedHoursForWeek: estimatesForCurrentWeek.get(task.id) ?? 0,
+      })));
     } catch (error) {
       res.status(500).json({ message: "Error al obtener tareas" });
     }
@@ -18060,20 +18369,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const user = (req as any).user;
       const personnelRecord = user?.email
-        ? await db.select().from(personnel).where(eq(personnel.email, user.email)).limit(1)
+        ? await db.select().from(personnel)
+            .where(sql`LOWER(TRIM(${personnel.email})) = LOWER(TRIM(${user.email}))`)
+            .limit(1)
         : [];
       
       let myTasks: any[] = [];
       if (personnelRecord.length > 0) {
         const pid = personnelRecord[0].id;
         const { status, dateFrom, dateTo } = req.query;
-        let conditions: any[] = [eq(tasks.assigneeId, pid)];
+        let conditions: any[] = [
+          or(
+            eq(tasks.assigneeId, pid),
+            sql`COALESCE(${tasks.collaboratorIds}, '[]'::jsonb) @> ${JSON.stringify([pid])}::jsonb`,
+          ),
+        ];
         if (status && status !== 'all') conditions.push(eq(tasks.status, status as string));
         if (dateFrom) conditions.push(gte(tasks.dueDate, new Date(dateFrom as string)));
         if (dateTo) conditions.push(lte(tasks.dueDate, new Date(dateTo as string)));
         myTasks = await db.select().from(tasks).where(and(...conditions)).orderBy(asc(tasks.dueDate), asc(tasks.position));
       }
-      
+
+      const myTaskIds = myTasks.map((task) => task.id);
+      const myEstimateRows = myTaskIds.length > 0
+        ? await db.select().from(taskWeeklyEstimates)
+            .where(inArray(taskWeeklyEstimates.taskId, myTaskIds))
+        : [];
+      const myEstimatesByTask = aggregateWeeklyEstimatesByTask(myEstimateRows);
+      const myEstimatesForCurrentWeek = aggregateWeeklyEstimatesByTask(
+        myEstimateRows,
+        currentCivilWeekRange(),
+      );
+      myTasks = myTasks.map((task) => ({
+        ...task,
+        estimatedHoursTotal: myEstimatesByTask.get(task.id) ?? 0,
+        estimatedHoursForWeek: myEstimatesForCurrentWeek.get(task.id) ?? 0,
+      }));
+
       res.json({ tasks: myTasks, personnelId: personnelRecord[0]?.id || null });
     } catch (error) {
       res.status(500).json({ message: "Error al obtener mis tareas" });
@@ -18096,7 +18428,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Enrich with assignee info
       const allPersonnel = await db.select({ id: personnel.id, name: personnel.name }).from(personnel);
-      const allProjects = await db.select({ id: activeProjects.id }).from(activeProjects);
       
       // Get project names from quotations
       const projectsWithNames = await db.execute(sql`
@@ -18106,19 +18437,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
         JOIN clients c ON c.id = ap.client_id
       `);
       const projectMap = new Map((projectsWithNames.rows as any[]).map(p => [p.id, { name: p.project_name, client: p.client_name }]));
-
-      // Also enrich standalone task projects
-      const ownProjectNames = await db.execute(sql`SELECT id, name FROM task_own_projects`);
-      for (const p of ownProjectNames.rows as any[]) {
-        projectMap.set(p.id + OWN_PROJECT_OFFSET, { name: p.name, client: null });
-      }
       const personnelMap = new Map(allPersonnel.map(p => [p.id, p.name]));
+      const calendarTaskIds = result.map((task) => task.id);
+      const calendarEstimates = calendarTaskIds.length > 0
+        ? await db.select().from(taskWeeklyEstimates)
+            .where(inArray(taskWeeklyEstimates.taskId, calendarTaskIds))
+        : [];
+      const requestedWeek = typeof req.query.weekStart === "string"
+        ? req.query.weekStart
+        : currentCivilWeekRange().dateFrom;
+      const calendarEstimateMap = new Map<number, { total: number; week: number }>();
+      for (const estimate of calendarEstimates) {
+        const current = calendarEstimateMap.get(estimate.taskId) ?? { total: 0, week: 0 };
+        current.total += estimate.estimatedHours;
+        if (estimate.weekStart === requestedWeek) current.week += estimate.estimatedHours;
+        calendarEstimateMap.set(estimate.taskId, current);
+      }
 
       const enriched = result.map(t => ({
         ...t,
         assigneeName: t.assigneeId ? personnelMap.get(t.assigneeId) : null,
         projectName: t.projectId ? projectMap.get(t.projectId)?.name : null,
         clientName: t.projectId ? projectMap.get(t.projectId)?.client : null,
+        estimatedHoursTotal: calendarEstimateMap.get(t.id)?.total ?? 0,
+        estimatedHoursForWeek: calendarEstimateMap.get(t.id)?.week ?? 0,
       }));
 
       res.json(enriched);
@@ -18135,6 +18477,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(eq(tasks.projectId, parseInt(projectId)))
         .orderBy(asc(tasks.sectionName), asc(tasks.position), asc(tasks.createdAt));
 
+      const taskIds = result.map((task) => task.id);
+      const estimateRows = taskIds.length > 0
+        ? await db.select().from(taskWeeklyEstimates)
+            .where(inArray(taskWeeklyEstimates.taskId, taskIds))
+        : [];
+      const requestedWeek = typeof req.query.weekStart === "string"
+        ? req.query.weekStart
+        : currentCivilWeekRange().dateFrom;
+      const estimatesByTask = new Map<number, { total: number; week: number }>();
+      for (const estimate of estimateRows) {
+        const current = estimatesByTask.get(estimate.taskId) ?? { total: 0, week: 0 };
+        current.total += estimate.estimatedHours;
+        if (estimate.weekStart === requestedWeek) current.week += estimate.estimatedHours;
+        estimatesByTask.set(estimate.taskId, current);
+      }
+
       // Calcular subtaskCount para cada tarea
       const subtaskCounts: Record<number, number> = {};
       for (const task of result) {
@@ -18142,7 +18500,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           subtaskCounts[task.parentTaskId] = (subtaskCounts[task.parentTaskId] || 0) + 1;
         }
       }
-      const enrichedTasks = result.map(t => ({ ...t, subtaskCount: subtaskCounts[t.id] || 0 }));
+      const enrichedTasks = result.map(t => ({
+        ...t,
+        subtaskCount: subtaskCounts[t.id] || 0,
+        estimatedHoursTotal: estimatesByTask.get(t.id)?.total ?? 0,
+        estimatedHoursForWeek: estimatesByTask.get(t.id)?.week ?? 0,
+      }));
       
       // Agrupar por sección
       const sections: Record<string, any[]> = {};
@@ -18255,7 +18618,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Enrich entries with task/personnel info
       const allPersonnel = await db.select({ id: personnel.id, name: personnel.name }).from(personnel);
-      const allTasks = await db.select({ id: tasks.id, title: tasks.title, projectId: tasks.projectId, assigneeId: tasks.assigneeId, estimatedHours: tasks.estimatedHours, parentTaskId: tasks.parentTaskId, loggedHours: tasks.loggedHours }).from(tasks);
+      const allTasks = await db.select({
+        id: tasks.id,
+        title: tasks.title,
+        projectId: tasks.projectId,
+        assigneeId: tasks.assigneeId,
+      }).from(tasks);
+      const allTaskIds = allTasks.map((task) => task.id);
+      const weeklyEstimateRows = allTaskIds.length > 0
+        ? await db.select().from(taskWeeklyEstimates)
+            .where(inArray(taskWeeklyEstimates.taskId, allTaskIds))
+        : [];
+      const weeklyEstimatesByTask = aggregateWeeklyEstimatesByTask(weeklyEstimateRows, {
+        dateFrom: typeof dateFrom === "string" ? dateFrom : null,
+        dateTo: typeof dateTo === "string" ? dateTo : null,
+      });
       
       const projectsWithNames = await db.execute(sql`
         SELECT ap.id, COALESCE(ap.name, q.project_name) as project_name, c.name as client_name
@@ -18303,18 +18680,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ? [parseInt(projectId as string)]
         : [...new Set(allTasks.map(t => t.projectId).filter(Boolean) as number[])];
 
-      // Horas estimadas por proyecto: mismo scope que las reales (proyecto y persona),
-      // y SOLO tareas raíz (excluye subtareas) para reconciliar con byPerson y no
-      // doble-contar padre + hijos. (Las estimadas son all-time por tarea, no por fecha.)
+      // Weekly estimates are the only planned-hours source and use the same
+      // project/person/date scope as the real entries.
       for (const t of allTasks) {
-        if (!t.estimatedHours || t.estimatedHours <= 0) continue;
-        if (t.parentTaskId) continue; // subtareas no suman al total del proyecto
+        const estimatedHours = weeklyEstimatesByTask.get(t.id) ?? 0;
+        if (estimatedHours <= 0) continue;
         if (t.projectId && !scopeProjectIds.includes(t.projectId)) continue;
         if (personnelId && t.assigneeId !== parseInt(personnelId as string)) continue;
         const proj = t.projectId ? projectMap.get(t.projectId) : null;
         const key = proj?.name || "Sin proyecto";
         if (!byProjectMap[key]) byProjectMap[key] = { name: key, hours: 0, estimatedHours: 0 };
-        byProjectMap[key].estimatedHours += t.estimatedHours;
+        byProjectMap[key].estimatedHours += estimatedHours;
       }
       const byProject = Object.values(byProjectMap).sort((a, b) => b.hours - a.hours);
 
@@ -18325,34 +18701,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
         byPersonMap[e.personnelId].hours += e.hours;
       }
 
-      // Estimated hours: sum tasks.estimatedHours for each assignee in the filtered project scope
+      // Estimated hours by assignee from task_weekly_estimates.
       for (const t of allTasks) {
-        if (!t.assigneeId || !t.estimatedHours || t.estimatedHours <= 0) continue;
-        if (t.parentTaskId) continue; // subtareas no suman (consistencia con byProject)
+        const estimatedHours = weeklyEstimatesByTask.get(t.id) ?? 0;
+        if (!t.assigneeId || estimatedHours <= 0) continue;
         if (t.projectId && !scopeProjectIds.includes(t.projectId)) continue;
-        // Consistencia con byProject: al filtrar por persona, contar solo sus asignadas.
         if (personnelId && t.assigneeId !== parseInt(personnelId as string)) continue;
         if (!byPersonMap[t.assigneeId]) {
           const p = allPersonnel.find(p => p.id === t.assigneeId);
           if (!p) continue;
           byPersonMap[t.assigneeId] = { name: p.name, hours: 0, estimatedHours: 0 };
         }
-        byPersonMap[t.assigneeId].estimatedHours += t.estimatedHours;
+        byPersonMap[t.assigneeId].estimatedHours += estimatedHours;
       }
 
       const byPerson = Object.values(byPersonMap).sort((a, b) => b.hours - a.hours);
 
-      // Calidad de estimación por proyecto (person-agnóstica, all-time). Ancla estimado
-      // y real a la MISMA tarea: estimated = Σ tasks.estimatedHours (solo raíz, en scope),
-      // real = Σ tasks.loggedHours de esas tareas (todas las personas, all-time). Evita el
-      // cruce cargador≠asignado del panel por-persona. loggedHours ya hace rollup del hijo,
-      // por eso se suma solo la raíz para no doble-contar.
+      // Estimation quality anchors planned and real time to the same tasks and
+      // requested period. Real entries are summed directly to avoid parent
+      // roll-up double counting.
       const estMap: Record<string, { name: string; realHours: number; estimatedHours: number }> = {};
+      const realByTask = new Map<number, number>();
+      for (const entry of entries) {
+        realByTask.set(entry.taskId, (realByTask.get(entry.taskId) ?? 0) + entry.hours);
+      }
       for (const t of allTasks) {
-        if (t.parentTaskId) continue;
         if (t.projectId && !scopeProjectIds.includes(t.projectId)) continue;
-        const est = t.estimatedHours || 0;
-        const real = t.loggedHours || 0;
+        if (personnelId && t.assigneeId !== parseInt(personnelId as string)) continue;
+        const est = weeklyEstimatesByTask.get(t.id) ?? 0;
+        const real = realByTask.get(t.id) ?? 0;
         if (est <= 0 && real <= 0) continue;
         const proj = t.projectId ? projectMap.get(t.projectId) : null;
         const key = proj?.name || "Sin proyecto";
@@ -18392,6 +18769,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/tasks/my-hours", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const user = (req as any).user;
+      const [person] = user?.email
+        ? await db.select({ id: personnel.id }).from(personnel)
+            .where(sql`LOWER(TRIM(${personnel.email})) = LOWER(TRIM(${user.email}))`)
+            .limit(1)
+        : [];
+      if (!person) return res.json({ personnelId: null, weekHours: 0, monthHours: 0 });
+      const result = await db.execute(sql`
+        SELECT
+          COALESCE(SUM(hours) FILTER (
+            WHERE date >= date_trunc('week', CURRENT_DATE)
+              AND date < date_trunc('week', CURRENT_DATE) + interval '7 days'
+          ), 0)::float AS week_hours,
+          COALESCE(SUM(hours) FILTER (
+            WHERE date >= date_trunc('month', CURRENT_DATE)
+              AND date < date_trunc('month', CURRENT_DATE) + interval '1 month'
+          ), 0)::float AS month_hours
+        FROM task_time_entries
+        WHERE personnel_id = ${person.id}
+      `);
+      const row = result.rows[0] as any;
+      res.json({
+        personnelId: person.id,
+        weekHours: Number(row?.week_hours) || 0,
+        monthHours: Number(row?.month_hours) || 0,
+      });
+    } catch (error) {
+      console.error("Error fetching my task hours:", error);
+      res.status(500).json({ message: "Error al obtener horas cargadas" });
+    }
+  });
+
   // GET /api/tasks/:id — obtener tarea individual con sus entradas de tiempo
   app.get("/api/tasks/:id(\\d+)", requireAuth, async (req: Request, res: Response) => {
     try {
@@ -18401,8 +18812,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const timeLog = await db.select().from(taskTimeEntries).where(eq(taskTimeEntries.taskId, parseInt(id))).orderBy(desc(taskTimeEntries.date));
       const subtasks = await db.select().from(tasks).where(eq(tasks.parentTaskId, parseInt(id))).orderBy(asc(tasks.position));
-      
-      res.json({ ...task, timeEntries: timeLog, subtasks });
+      const relatedTaskIds = [task.id, ...subtasks.map((subtask) => subtask.id)];
+      const estimateRows = await db.select().from(taskWeeklyEstimates)
+        .where(inArray(taskWeeklyEstimates.taskId, relatedTaskIds));
+      const estimatesByTask = aggregateWeeklyEstimatesByTask(estimateRows);
+      const estimatesForCurrentWeek = aggregateWeeklyEstimatesByTask(
+        estimateRows,
+        currentCivilWeekRange(),
+      );
+
+      res.json({
+        ...task,
+        estimatedHoursTotal: estimatesByTask.get(task.id) ?? 0,
+        estimatedHoursForWeek: estimatesForCurrentWeek.get(task.id) ?? 0,
+        timeEntries: timeLog,
+        subtasks: subtasks.map((subtask) => ({
+          ...subtask,
+          estimatedHoursTotal: estimatesByTask.get(subtask.id) ?? 0,
+          estimatedHoursForWeek: estimatesForCurrentWeek.get(subtask.id) ?? 0,
+        })),
+      });
     } catch (error) {
       res.status(500).json({ message: "Error al obtener tarea" });
     }
@@ -18412,7 +18841,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/tasks", requireAuth, async (req: Request, res: Response) => {
     try {
       const user = (req as any).user;
-      const data = insertTaskSchema.parse({ ...req.body, createdBy: user.id });
+      const incoming: any = { ...req.body, createdBy: user.id };
+      // Weekly estimates are the sole planning source. Legacy estimatedHours is
+      // accepted neither on creation nor update.
+      delete incoming.estimatedHours;
+      if (incoming.parentTaskId) {
+        const [parent] = await db.select({
+          projectId: tasks.projectId,
+          sectionName: tasks.sectionName,
+        }).from(tasks).where(eq(tasks.id, Number(incoming.parentTaskId)));
+        if (!parent) return res.status(400).json({ message: "La tarea padre no existe" });
+        incoming.projectId = parent.projectId;
+        incoming.sectionName = parent.sectionName || "General";
+      } else {
+        if (!incoming.projectId) {
+          return res.status(400).json({ message: "Toda tarea debe pertenecer a un proyecto" });
+        }
+        incoming.sectionName = incoming.sectionName?.trim() || "General";
+      }
+      const data = insertTaskSchema.parse(incoming);
+      if (data.startDate && data.dueDate && data.startDate > data.dueDate) {
+        return res.status(400).json({ message: "La fecha de inicio no puede ser posterior a la fecha de fin" });
+      }
+      const assignmentIds = [data.assigneeId, ...(data.collaboratorIds ?? [])].filter(
+        (id): id is number => typeof id === "number",
+      );
+      if (data.projectId && assignmentIds.length > 0) {
+        const memberships = await db.select({ personnelId: taskProjectMembers.personnelId })
+          .from(taskProjectMembers)
+          .where(and(
+            eq(taskProjectMembers.projectId, data.projectId),
+            inArray(taskProjectMembers.personnelId, assignmentIds),
+          ));
+        if (new Set(memberships.map((membership) => membership.personnelId)).size !== new Set(assignmentIds).size) {
+          return res.status(400).json({ message: "Responsables y colaboradores deben ser miembros del proyecto" });
+        }
+      }
       if (!req.body.parentTaskId && data.projectId) {
         const sectionFilter = data.sectionName
           ? eq(tasks.sectionName, data.sectionName)
@@ -18456,7 +18920,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Whitelist of editable fields — never allow overwriting id, createdBy, loggedHours, etc.
       const ALLOWED_FIELDS = [
         'title', 'description', 'status', 'priority', 'assigneeId', 'collaboratorIds',
-        'startDate', 'dueDate', 'estimatedHours', 'sectionName', 'parentTaskId', 'position'
+        'startDate', 'dueDate', 'sectionName', 'parentTaskId', 'position'
       ];
       
       const taskId = parseInt(id);
@@ -18481,6 +18945,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (updates.startDate && typeof updates.startDate === 'string') updates.startDate = new Date(updates.startDate);
       if (updates.dueDate === null) updates.dueDate = null;
       if (updates.startDate === null) updates.startDate = null;
+      const [existingTask] = await db.select({
+        startDate: tasks.startDate,
+        dueDate: tasks.dueDate,
+        projectId: tasks.projectId,
+        parentTaskId: tasks.parentTaskId,
+      }).from(tasks).where(eq(tasks.id, taskId));
+      if (!existingTask) return res.status(404).json({ message: "Tarea no encontrada" });
+
+      const effectiveParentId = updates.parentTaskId === undefined
+        ? existingTask.parentTaskId
+        : updates.parentTaskId;
+      let effectiveProjectId = existingTask.projectId;
+      if (effectiveParentId != null) {
+        const [parent] = await db.select({
+          projectId: tasks.projectId,
+          sectionName: tasks.sectionName,
+        }).from(tasks).where(eq(tasks.id, Number(effectiveParentId)));
+        if (!parent) return res.status(400).json({ message: "La tarea padre no existe" });
+        // Subtasks always inherit both invariants, including when they are
+        // re-parented or somebody tries to edit their section directly.
+        updates.projectId = parent.projectId;
+        updates.sectionName = parent.sectionName || "General";
+        effectiveProjectId = parent.projectId;
+      } else if (updates.sectionName !== undefined) {
+        updates.sectionName = updates.sectionName?.trim() || "General";
+      }
+
+      const effectiveStart = updates.startDate === undefined ? existingTask?.startDate : updates.startDate;
+      const effectiveDue = updates.dueDate === undefined ? existingTask?.dueDate : updates.dueDate;
+      if (effectiveStart && effectiveDue && effectiveStart > effectiveDue) {
+        return res.status(400).json({ message: "La fecha de inicio no puede ser posterior a la fecha de fin" });
+      }
+      const assignmentIds = [updates.assigneeId, ...(updates.collaboratorIds ?? [])].filter(
+        (personnelId): personnelId is number => typeof personnelId === "number",
+      );
+      if (effectiveProjectId && assignmentIds.length > 0) {
+        const memberships = await db.select({ personnelId: taskProjectMembers.personnelId })
+          .from(taskProjectMembers)
+          .where(and(
+            eq(taskProjectMembers.projectId, effectiveProjectId),
+            inArray(taskProjectMembers.personnelId, assignmentIds),
+          ));
+        if (new Set(memberships.map((membership) => membership.personnelId)).size !== new Set(assignmentIds).size) {
+          return res.status(400).json({ message: "Responsables y colaboradores deben ser miembros del proyecto" });
+        }
+      }
       
       const [updated] = await db.update(tasks).set(updates).where(eq(tasks.id, parseInt(id))).returning();
       if (!updated) return res.status(404).json({ message: "Tarea no encontrada" });
@@ -18534,7 +19044,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const [task] = await db.select().from(tasks).where(eq(tasks.id, taskId));
       if (!task) return res.status(404).json({ message: "Tarea no encontrada" });
 
-      const data = insertTaskTimeEntrySchema.parse({ ...req.body, taskId, createdBy: user.id });
+      const [loggingPerson] = user?.email
+        ? await db.select({ id: personnel.id }).from(personnel)
+            .where(sql`LOWER(TRIM(${personnel.email})) = LOWER(TRIM(${user.email}))`)
+            .limit(1)
+        : [];
+      if (!loggingPerson) {
+        return res.status(400).json({
+          message: "Tu usuario no está vinculado a Personal. Operaciones debe configurar el mismo email antes de cargar horas.",
+        });
+      }
+      const data = insertTaskTimeEntrySchema.parse({
+        ...req.body,
+        personnelId: loggingPerson.id,
+        taskId,
+        createdBy: user.id,
+      });
 
       // Compute costing so these hours feed rentabilidad (fact_labor_month).
       // Use the linked active project (subtasks inherit the parent's project).
@@ -18542,6 +19067,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ? (await db.select({ projectId: tasks.projectId }).from(tasks).where(eq(tasks.id, task.parentTaskId)))[0]?.projectId
         : null);
       const costing = await computeTaskEntryCost(data.personnelId, linkedProjectId, data.date, data.hours);
+      if (costing.hourlyRateAtTime == null || costing.totalCost == null) {
+        const canonicalRate = await resolveCanonicalPersonnelRate(data.personnelId, data.date);
+        return res.status(422).json({
+          message: canonicalRateErrorMessage(canonicalRate, data.date)
+            ?? "No se pudo resolver la tarifa histórica para registrar las horas.",
+          errors: [{
+            path: ["hourlyRateAtTime"],
+            message: "Configurá la tarifa histórica en Configuración > Personal.",
+          }],
+        });
+      }
 
       const [created] = await db.insert(taskTimeEntries).values({ ...data, ...costing }).returning();
 
@@ -18568,6 +19104,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(created);
     } catch (error: any) {
       if (error.name === "ZodError") return res.status(400).json({ message: "Datos inválidos", errors: error.errors });
+      console.error("Error al registrar horas:", error);
       res.status(500).json({ message: "Error al registrar horas" });
     }
   });
@@ -18675,18 +19212,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/tasks/:id/weekly-estimates", requireAuth, async (req: Request, res: Response) => {
     try {
       const taskId = parseInt(req.params.id);
-      const { weekStart, estimatedHours } = req.body;
-      if (!weekStart || estimatedHours === undefined) return res.status(400).json({ message: "weekStart y estimatedHours son requeridos" });
       const createdBy = (req as any).user?.id ?? null;
-      const rows = await db.execute(sql`
-        INSERT INTO task_weekly_estimates (task_id, week_start, estimated_hours, created_by)
-        VALUES (${taskId}, ${weekStart}, ${estimatedHours}, ${createdBy})
-        ON CONFLICT (task_id, week_start)
-        DO UPDATE SET estimated_hours = EXCLUDED.estimated_hours
-        RETURNING *
-      `);
-      res.status(201).json(rows.rows[0]);
+      const data = insertTaskWeeklyEstimateSchema.parse({
+        ...req.body,
+        taskId,
+        createdBy,
+      });
+      const weekDate = parseCivilDate(data.weekStart);
+      if (weekDate.getDay() !== 1) {
+        return res.status(400).json({
+          message: "La fecha de la estimación debe ser un lunes",
+          errors: [{ path: ["weekStart"], message: "Seleccioná el lunes de la semana" }],
+        });
+      }
+      const [saved] = await db.insert(taskWeeklyEstimates)
+        .values(data)
+        .onConflictDoUpdate({
+          target: [taskWeeklyEstimates.taskId, taskWeeklyEstimates.weekStart],
+          set: {
+            estimatedHours: data.estimatedHours,
+            createdBy: data.createdBy,
+          },
+        })
+        .returning();
+      res.status(201).json(saved);
     } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Estimación inválida", errors: error.errors });
+      }
       res.status(500).json({ message: "Error al guardar estimación semanal" });
     }
   });
@@ -18709,9 +19262,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/tasks-projects", requireAuth, async (req: Request, res: Response) => {
     try {
       const result = await db.execute(sql`
-        SELECT ap.id, q.project_name as name, c.name as client_name, ap.status
+        SELECT ap.id, COALESCE(ap.name, q.project_name) as name, c.name as client_name, ap.status
         FROM active_projects ap
-        JOIN quotations q ON q.id = ap.quotation_id
+        LEFT JOIN quotations q ON q.id = ap.quotation_id
         JOIN clients c ON c.id = ap.client_id
         WHERE ap.status = 'active'
         ORDER BY c.name, q.project_name
@@ -18724,7 +19277,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ==================== TASK PROJECT HUB ENDPOINTS ====================
 
-  // GET /api/tasks/projects — lista de proyectos con stats y miembros (active_projects + task_own_projects)
+  // GET /api/tasks/projects — lista unificada de proyectos activos con stats y miembros
   app.get("/api/tasks/projects", requireAuth, async (req: Request, res: Response) => {
     try {
       const projectsResult = await db.execute(sql`
@@ -18746,22 +19299,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ORDER BY c.name, COALESCE(ap.name, q.project_name)
       `);
 
-      // Include own task projects (id offset by 1,000,000 to avoid collisions)
-      const ownProjectsResult = await db.execute(sql`
-        SELECT 
-          top.id,
-          top.name,
-          top.color_index,
-          top.privacy,
-          top.created_by_personnel_id,
-          COUNT(DISTINCT t.id) as task_count,
-          COUNT(DISTINCT CASE WHEN t.status NOT IN ('done', 'cancelled') THEN t.id END) as pending_count
-        FROM task_own_projects top
-        LEFT JOIN tasks t ON t.project_id = (top.id + ${OWN_PROJECT_OFFSET})
-        GROUP BY top.id, top.name, top.color_index, top.privacy, top.created_by_personnel_id
-        ORDER BY top.created_at DESC
-      `);
-
       const membersResult = await db.execute(sql`
         SELECT tpm.project_id, tpm.personnel_id, tpm.role, p.name as personnel_name
         FROM task_project_members tpm
@@ -18779,8 +19316,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      const PALETTE = ["blue", "purple", "green", "orange", "pink", "teal", "indigo", "rose"];
-
       const projects = (projectsResult.rows as any[]).map(p => ({
         id: p.id,
         name: p.name,
@@ -18793,20 +19328,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         source: 'active_project',
       }));
 
-      const ownProjects = (ownProjectsResult.rows as any[]).map(p => ({
-        id: p.id + OWN_PROJECT_OFFSET,
-        name: p.name,
-        clientName: "—",
-        status: 'active',
-        taskCount: parseInt(p.task_count) || 0,
-        pendingCount: parseInt(p.pending_count) || 0,
-        members: membersByProject[p.id + OWN_PROJECT_OFFSET] || [],
-        source: 'own',
-        colorIndex: p.color_index,
-      }));
-
-      const combined = [...projects, ...ownProjects];
-      res.json(combined);
+      res.json(projects);
     } catch (error) {
       console.error("Error en GET /api/tasks/projects:", error);
       res.status(500).json({ message: "Error al obtener proyectos" });
@@ -18816,7 +19338,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // POST /api/tasks/projects/create — crear nuevo proyecto de tareas
   app.post("/api/tasks/projects/create", requireAuth, async (req: Request, res: Response) => {
     try {
-      const { name, activeProjectId, clientId, colorIndex = 0, privacy = "team", personnelId } = req.body;
+      const { activeProjectId, personnelId } = req.body;
 
       if (activeProjectId) {
         // Join existing active project — add user as owner member
@@ -18828,46 +19350,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.json({ id: activeProjectId, type: 'active_project' });
       }
 
-      // Si se eligió un cliente, creamos un PROYECTO UNIFICADO (active_projects) sin
-      // cotización, en vez de un task_own_projects. Así el proyecto de cliente creado
-      // desde Tareas aparece también en Vista de Proyectos (misma entidad).
-      if (clientId) {
-        if (!name || !name.trim()) return res.status(400).json({ message: "El nombre es requerido" });
-        const apResult = await db.execute(sql`
-          INSERT INTO active_projects (client_id, name, status, start_date, tracking_frequency, project_category)
-          VALUES (${parseInt(clientId)}, ${name.trim()}, 'active', NOW(), 'weekly', 'billable')
-          RETURNING id
-        `);
-        const apId = (apResult.rows[0] as any).id;
-        if (personnelId) {
-          await db.execute(sql`
-            INSERT INTO task_project_members (project_id, personnel_id, role)
-            VALUES (${apId}, ${personnelId}, 'owner')
-            ON CONFLICT (project_id, personnel_id) DO UPDATE SET role = 'owner'
-          `);
-        }
-        return res.json({ id: apId, type: 'active_project' });
-      }
-
-      // Create standalone task project
-      const result = await db.execute(sql`
-        INSERT INTO task_own_projects (name, color_index, privacy, created_by_personnel_id)
-        VALUES (${name}, ${colorIndex}, ${privacy}, ${personnelId || null})
-        RETURNING id
-      `);
-      const newId = (result.rows[0] as any).id;
-      const offsetId = newId + OWN_PROJECT_OFFSET;
-
-      // Auto-add creator as owner member
-      if (personnelId) {
-        await db.execute(sql`
-          INSERT INTO task_project_members (project_id, personnel_id, role)
-          VALUES (${offsetId}, ${personnelId}, 'owner')
-          ON CONFLICT (project_id, personnel_id) DO UPDATE SET role = 'owner'
-        `);
-      }
-
-      res.json({ id: offsetId, type: 'own' });
+      return res.status(410).json({
+        message: "Los proyectos se crean únicamente desde Vista de proyectos",
+        createUrl: "/active-projects/new",
+      });
     } catch (error) {
       console.error("Error en POST /api/tasks/projects/create:", error);
       res.status(500).json({ message: "Error al crear proyecto" });
@@ -18878,47 +19364,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/tasks/projects/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const projectId = parseInt(req.params.id);
-      const isOwnProject = projectId >= OWN_PROJECT_OFFSET;
-
-      let projectRow: any;
-
-      if (isOwnProject) {
-        const realId = projectId - OWN_PROJECT_OFFSET;
-        const ownResult = await db.execute(sql`
-          SELECT id, name, color_index, privacy, created_by_personnel_id
-          FROM task_own_projects
-          WHERE id = ${realId}
-        `);
-        if (!ownResult.rows.length) return res.status(404).json({ message: "Proyecto no encontrado" });
-        const op = ownResult.rows[0] as any;
-        projectRow = {
-          id: projectId,
-          name: op.name,
-          clientName: null,
-          status: 'active',
-          colorIndex: op.color_index,
-          briefUrl: null,
-          source: 'own',
-        };
-      } else {
-        const projectResult = await db.execute(sql`
-          SELECT ap.id, COALESCE(ap.name, q.project_name) as name, c.name as client_name, ap.status, ap.brief_url
-          FROM active_projects ap
-          LEFT JOIN quotations q ON q.id = ap.quotation_id
-          JOIN clients c ON c.id = ap.client_id
-          WHERE ap.id = ${projectId}
-        `);
-        if (!projectResult.rows.length) return res.status(404).json({ message: "Proyecto no encontrado" });
-        const p = projectResult.rows[0] as any;
-        projectRow = {
-          id: p.id,
-          name: p.name,
-          clientName: p.client_name,
-          status: p.status,
-          briefUrl: p.brief_url ?? null,
-          source: 'active_project',
-        };
-      }
+      const projectResult = await db.execute(sql`
+        SELECT ap.id, COALESCE(ap.name, q.project_name) as name, c.name as client_name, ap.status, ap.brief_url
+        FROM active_projects ap
+        LEFT JOIN quotations q ON q.id = ap.quotation_id
+        JOIN clients c ON c.id = ap.client_id
+        WHERE ap.id = ${projectId}
+      `);
+      if (!projectResult.rows.length) return res.status(404).json({ message: "Proyecto no encontrado" });
+      const p = projectResult.rows[0] as any;
+      const projectRow = {
+        id: p.id,
+        name: p.name,
+        clientName: p.client_name,
+        status: p.status,
+        briefUrl: p.brief_url ?? null,
+        source: 'active_project',
+      };
 
       const membersResult = await db.execute(sql`
         SELECT tpm.personnel_id, tpm.role, p.name as personnel_name
@@ -18960,19 +19422,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const projectId = parseInt(req.params.id);
       const { status, briefUrl } = req.body;
-      if (status === undefined && briefUrl === undefined) {
-        return res.status(400).json({ message: "status o briefUrl requerido" });
+      if (status !== undefined) {
+        return res.status(400).json({
+          message: "El estado del proyecto se administra únicamente desde Vista de proyectos",
+        });
+      }
+      if (briefUrl === undefined) {
+        return res.status(400).json({ message: "briefUrl requerido" });
       }
 
-      if (projectId < OWN_PROJECT_OFFSET) {
-        if (status !== undefined) {
-          await db.execute(sql`UPDATE active_projects SET status = ${status} WHERE id = ${projectId}`);
-        }
-        if (briefUrl !== undefined) {
-          await db.execute(sql`UPDATE active_projects SET brief_url = ${briefUrl || null} WHERE id = ${projectId}`);
-        }
-      }
-      // Own projects don't have a persistent status/brief field — no-op
+      await db.execute(sql`UPDATE active_projects SET brief_url = ${briefUrl || null} WHERE id = ${projectId}`);
 
       res.json({ success: true });
     } catch (error) {
@@ -20227,7 +20686,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/monthly-closings", requireAuth, async (req, res) => {
     try {
-      const data = insertMonthlyClosingSchema.parse({ ...req.body, closedBy: req.user?.id });
+      const parsed = insertMonthlyClosingSchema.parse({ ...req.body, closedBy: req.user?.id });
+      const [person] = await db
+        .select({ billingCurrency: personnel.billingCurrency })
+        .from(personnel)
+        .where(eq(personnel.id, parsed.personnelId))
+        .limit(1);
+      if (!person) {
+        return res.status(404).json({ message: "Personal no encontrado" });
+      }
+
+      const closingDate = new Date(parsed.year, parsed.month - 1, 1);
+      const canonicalRate = await resolveCanonicalPersonnelRate(parsed.personnelId, closingDate);
+      const rateError = canonicalRateErrorMessage(canonicalRate, closingDate);
+      if (rateError || canonicalRate.hourlyRateARS == null) {
+        return res.status(422).json({
+          message: rateError ?? "No se pudo resolver la tarifa histórica del período.",
+          errors: [{ path: ["hourlyRate"], message: rateError ?? "Tarifa histórica faltante" }],
+        });
+      }
+
+      const [periodFx] = await db
+        .select({ rate: exchangeRates.rate })
+        .from(exchangeRates)
+        .where(and(
+          eq(exchangeRates.year, parsed.year),
+          eq(exchangeRates.month, parsed.month),
+          eq(exchangeRates.isActive, true),
+        ))
+        .orderBy(desc(exchangeRates.updatedAt))
+        .limit(1);
+      const exchangeRateAtClose = canonicalRate.exchangeRate ?? (periodFx ? Number(periodFx.rate) : null);
+      const billingCurrency = person.billingCurrency ?? "ARS";
+      const usesUsdRate = billingCurrency === "USD" || billingCurrency === "mixed";
+      const hourlyRate = usesUsdRate
+        ? canonicalRate.hourlyRateUSD
+          ?? (exchangeRateAtClose && exchangeRateAtClose > 0
+            ? canonicalRate.hourlyRateARS / exchangeRateAtClose
+            : null)
+        : canonicalRate.hourlyRateARS;
+      if (hourlyRate == null || hourlyRate <= 0 || (usesUsdRate && (!exchangeRateAtClose || exchangeRateAtClose <= 0))) {
+        return res.status(422).json({
+          message: usesUsdRate
+            ? "No hay una tarifa USD o cotización activa para cerrar el período."
+            : "No hay una tarifa ARS vigente para cerrar el período.",
+          errors: [{ path: ["hourlyRate"], message: "Tarifa canónica no disponible" }],
+        });
+      }
+
+      // Rate, FX and total are server-owned snapshots. The client only supplies
+      // hours and adjustments; this prevents stale or tampered legacy rates.
+      const data = {
+        ...parsed,
+        hourlyRate,
+        exchangeRateAtClose,
+        totalCost: parsed.adjustedHours * hourlyRate * (usesUsdRate ? exchangeRateAtClose! : 1),
+      };
       const [closing] = await db.insert(monthlyClosings).values(data)
         .onConflictDoUpdate({
           target: [monthlyClosings.personnelId, monthlyClosings.year, monthlyClosings.month],
@@ -20254,29 +20768,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/estimated-rates", requireAuth, async (req, res) => {
     try {
       const year = req.query.year ? parseInt(req.query.year as string) : new Date().getFullYear();
-      const result = await db.select().from(estimatedRates).where(eq(estimatedRates.year, year));
-      res.json(result);
+      const result = await db.select().from(personnelHistoricalCosts).where(and(
+        eq(personnelHistoricalCosts.year, year),
+        eq(personnelHistoricalCosts.isActive, true),
+      ));
+      res.json(result.map((rate) => ({
+        id: rate.id,
+        personnelId: rate.personnelId,
+        year: rate.year,
+        month: rate.month,
+        estimatedRateARS: rate.hourlyRateARS == null ? null : Number(rate.hourlyRateARS),
+        source: "personnel_historical_costs",
+      })));
     } catch (error) { res.status(500).json({ message: "Error fetching estimated rates" }); }
   });
 
   app.post("/api/estimated-rates", requireAuth, requirePermission("operations"), async (req, res) => {
-    try {
-      const data = insertEstimatedRateSchema.parse({ ...req.body, createdBy: req.user?.id });
-      const [rate] = await db.insert(estimatedRates).values(data)
-        .onConflictDoUpdate({
-          target: [estimatedRates.personnelId, estimatedRates.year, estimatedRates.month],
-          set: {
-            estimatedRateARS: data.estimatedRateARS,
-            adjustmentPct: data.adjustmentPct,
-            notes: data.notes,
-          }
-        })
-        .returning();
-      res.status(201).json(rate);
-    } catch (error) {
-      if (error instanceof z.ZodError) return res.status(400).json({ message: "Datos inválidos", errors: error.errors });
-      res.status(500).json({ message: "Error creating estimated rate" });
-    }
+    res.status(410).json({
+      message: "Las tarifas se administran únicamente desde Configuración > Personal",
+      manageUrl: "/admin",
+    });
   });
 
   // ==================== PERSONNEL ABSENCES ====================
@@ -20317,64 +20828,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/capacity/weekly", requireAuth, async (req, res) => {
     try {
       const weekStart = req.query.weekStart as string; // YYYY-MM-DD
+      const weekStartDate = weekStart
+        ? parseCivilDate(weekStart)
+        : new Date();
       const allPersonnel = await db.select().from(personnel);
-      const year = weekStart ? new Date(weekStart).getFullYear() : new Date().getFullYear();
+      const year = weekStartDate.getFullYear();
       const holidaysList = await db.select().from(holidays).where(eq(holidays.year, year));
 
       // Load capacity overrides for this week
-      const weekKey = weekStart || new Date().toISOString().split('T')[0];
+      const weekKey = weekStart || formatCivilDate(weekStartDate);
       const overrideRows = await db.select().from(capacityOverrides)
         .where(eq(capacityOverrides.weekStart, weekKey));
       const overrideMap: Record<number, number> = {};
       for (const row of overrideRows) overrideMap[row.personnelId] = row.maxHours;
 
       // Calculate working days in the week (5 - holidays in that week)
-      const weekStartDate = weekStart ? new Date(weekStart) : new Date();
       const weekEndDate = new Date(weekStartDate);
       weekEndDate.setDate(weekEndDate.getDate() + 6);
 
       const holidaysInWeek = holidaysList.filter(h => {
-        const hDate = new Date(h.date);
+        const hDate = new Date(`${h.date}T00:00:00`);
         return hDate >= weekStartDate && hDate <= weekEndDate;
       });
       const workingDays = 5 - holidaysInWeek.length;
 
       // Get time entries for this week
-      const entries = await db.select().from(timeEntries)
+      const legacyEntries = await db.select({
+        personnelId: timeEntries.personnelId,
+        hours: timeEntries.hours,
+      }).from(timeEntries)
         .where(and(
           sql`${timeEntries.date} >= ${weekStartDate.toISOString()}`,
           sql`${timeEntries.date} <= ${weekEndDate.toISOString()}`
         ));
+      const taskEntries = await db.select({
+        personnelId: taskTimeEntries.personnelId,
+        hours: taskTimeEntries.hours,
+      }).from(taskTimeEntries)
+        .where(and(
+          sql`${taskTimeEntries.date} >= ${weekStartDate.toISOString()}`,
+          sql`${taskTimeEntries.date} <= ${weekEndDate.toISOString()}`
+        ));
+      const entries = [...legacyEntries, ...taskEntries];
 
-      // Get tasks with estimatedHours assigned to each person overlapping this week
-      const weekStartISO = weekStartDate.toISOString().split('T')[0];
-      const weekEndISO = weekEndDate.toISOString().split('T')[0];
-      const weekTasks = await db.select({
-        assigneeId: tasks.assigneeId,
-        estimatedHours: tasks.estimatedHours,
-      }).from(tasks).where(
-        and(
-          sql`${tasks.assigneeId} IS NOT NULL`,
-          sql`${tasks.estimatedHours} IS NOT NULL`,
-          sql`${tasks.estimatedHours} > 0`,
-          sql`${tasks.status} NOT IN ('done', 'cancelled')`,
-          sql`(
-            (${tasks.dueDate} IS NOT NULL AND ${tasks.dueDate} >= ${weekStartISO} AND ${tasks.dueDate} <= ${weekEndISO})
-            OR
-            (${tasks.startDate} IS NOT NULL AND ${tasks.startDate} >= ${weekStartISO} AND ${tasks.startDate} <= ${weekEndISO})
-          )`
-        )
-      );
+      // Weekly estimates are the canonical planned-hours source.
+      const weekStartISO = formatCivilDate(weekStartDate);
+      const weekTasks = await db.execute(sql`
+        SELECT t.assignee_id, SUM(twe.estimated_hours)::float AS estimated_hours
+        FROM task_weekly_estimates twe
+        JOIN tasks t ON t.id = twe.task_id
+        WHERE twe.week_start = ${weekStartISO}
+          AND t.assignee_id IS NOT NULL
+          AND t.status NOT IN ('done', 'cancelled')
+        GROUP BY t.assignee_id
+      `);
       const taskHoursMap: Record<number, number> = {};
-      for (const t of weekTasks) {
-        if (t.assigneeId && t.estimatedHours) {
-          taskHoursMap[t.assigneeId] = (taskHoursMap[t.assigneeId] || 0) + t.estimatedHours;
+      for (const row of weekTasks.rows as any[]) {
+        const assigneeId = Number(row.assignee_id);
+        const estimatedHours = Number(row.estimated_hours) || 0;
+        if (assigneeId && estimatedHours) {
+          taskHoursMap[assigneeId] = estimatedHours;
         }
       }
 
       // Get absences that overlap this week
-      const weekStartStr = weekStartDate.toISOString().split('T')[0];
-      const weekEndStr = weekEndDate.toISOString().split('T')[0];
+      const weekStartStr = formatCivilDate(weekStartDate);
+      const weekEndStr = formatCivilDate(weekEndDate);
       const absencesList = await db.select().from(personnelAbsences)
         .where(and(
           sql`${personnelAbsences.startDate} <= ${weekEndStr}`,

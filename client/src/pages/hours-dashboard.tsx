@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { authFetch } from "@/lib/queryClient";
+import { apiRequest } from "@/lib/queryClient";
 import { format, startOfWeek, endOfWeek, subWeeks, startOfMonth, endOfMonth, subMonths } from "date-fns";
 import { es } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
@@ -85,17 +85,20 @@ export default function HoursDashboardPage() {
   const { dateFrom, dateTo } = quickFilter === "custom"
     // Parsear el input date-only como fecha LOCAL (agregar "T00:00:00"), no como UTC,
     // para que la ventana de días hábiles no se corra un día (timezone).
-    ? { dateFrom: customFrom ? new Date(customFrom + "T00:00:00").toISOString() : "", dateTo: customTo ? new Date(customTo + "T00:00:00").toISOString() : "" }
+    ? {
+        dateFrom: customFrom ? new Date(customFrom + "T00:00:00").toISOString() : "",
+        dateTo: customTo ? new Date(customTo + "T23:59:59.999").toISOString() : "",
+      }
     : getDateRange(quickFilter);
 
   const { data: allPersonnel = [] } = useQuery<Personnel[]>({
     queryKey: ["/api/tasks-personnel"],
-    queryFn: () => authFetch("/api/tasks-personnel").then(r => r.json()),
+    queryFn: () => apiRequest("/api/tasks-personnel", "GET"),
   });
 
   const { data: allProjects = [] } = useQuery<Project[]>({
     queryKey: ["/api/tasks-projects"],
-    queryFn: () => authFetch("/api/tasks-projects").then(r => r.json()),
+    queryFn: () => apiRequest("/api/tasks-projects", "GET"),
   });
 
   const params = new URLSearchParams();
@@ -106,11 +109,11 @@ export default function HoursDashboardPage() {
 
   const { data: summary, isLoading } = useQuery<HoursSummary>({
     queryKey: ["/api/tasks/hours-summary", selectedPersonnelId, selectedProjectId, dateFrom, dateTo],
-    queryFn: () => authFetch(`/api/tasks/hours-summary?${params}`).then(r => r.json()),
+    queryFn: () => apiRequest(`/api/tasks/hours-summary?${params}`, "GET"),
     enabled: !!(dateFrom && dateTo),
   });
 
-  const totalHours = summary?.byPerson.reduce((acc, p) => acc + p.hours, 0) || 0;
+  const totalHours = summary?.byPerson?.reduce((acc, p) => acc + p.hours, 0) || 0;
   // Calidad de estimación: person-agnóstica y all-time (real acumulado de la tarea vs
   // estimado de la tarea). Distinto de las horas reales del período (capacidad).
   const estByProject = summary?.estimationByProject || [];
@@ -132,7 +135,7 @@ export default function HoursDashboardPage() {
     queryKey: ["/api/holidays", rangeYears.join(",")],
     queryFn: async () => {
       const all = await Promise.all(rangeYears.map(y =>
-        authFetch(`/api/holidays?year=${y}`).then(r => r.json())
+        apiRequest(`/api/holidays?year=${y}`, "GET")
       ));
       return all.flat();
     },
@@ -144,7 +147,7 @@ export default function HoursDashboardPage() {
   // ausencias restar de un baseline de 8h/día.
   const { data: absencesData = [] } = useQuery<any[]>({
     queryKey: ["/api/personnel-absences", selectedPersonnelId],
-    queryFn: () => authFetch(`/api/personnel-absences?personnelId=${selectedPersonnelId}`).then(r => r.json()),
+    queryFn: () => apiRequest(`/api/personnel-absences?personnelId=${selectedPersonnelId}`, "GET"),
     enabled: selectedPersonnelId !== "all",
   });
 

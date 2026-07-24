@@ -5,6 +5,7 @@ import { initializeDatabase } from "./init-data";
 import { storage } from "./storage";
 import { autoSyncService } from "./services/autoSyncService";
 import { pool } from "./db";
+import { feedbackMindV2MigrationSql } from "./migrations/feedback-mind-v2";
 import cors from 'cors';
 import { execSync } from 'child_process';
 
@@ -96,7 +97,7 @@ async function applyPendingMigrations() {
     await run('0006 holidays table', `
       CREATE TABLE IF NOT EXISTS holidays (
         id          SERIAL PRIMARY KEY,
-        date        TIMESTAMP NOT NULL,
+        date        DATE NOT NULL,
         name        TEXT NOT NULL,
         is_national BOOLEAN NOT NULL DEFAULT TRUE,
         year        INTEGER NOT NULL,
@@ -117,20 +118,6 @@ async function applyPendingMigrations() {
         closed_by     INTEGER REFERENCES users(id),
         closed_at     TIMESTAMP NOT NULL DEFAULT NOW(),
         CONSTRAINT unique_person_month_closing UNIQUE(personnel_id, year, month)
-      );
-    `);
-    await run('0006 estimated_rates table', `
-      CREATE TABLE IF NOT EXISTS estimated_rates (
-        id                  SERIAL PRIMARY KEY,
-        personnel_id        INTEGER NOT NULL REFERENCES personnel(id),
-        year                INTEGER NOT NULL,
-        month               INTEGER NOT NULL,
-        estimated_rate_ars  DOUBLE PRECISION NOT NULL,
-        adjustment_pct      DOUBLE PRECISION,
-        notes               TEXT,
-        created_at          TIMESTAMP NOT NULL DEFAULT NOW(),
-        created_by          INTEGER REFERENCES users(id),
-        CONSTRAINT unique_person_month_rate UNIQUE(personnel_id, year, month)
       );
     `);
     await run('0006 personnel_aliases table', `
@@ -734,6 +721,11 @@ async function applyPendingMigrations() {
       CREATE INDEX IF NOT EXISTS "idx_cashflow_fecha" ON "cashflow_transactions"("fecha");
       CREATE INDEX IF NOT EXISTS "idx_cashflow_banco" ON "cashflow_transactions"("banco");
     `);
+
+    // Feedback Mind V2 closure runs after every prerequisite/table-repair above.
+    // Keeping it last makes a single production startup sufficient even when
+    // quotation_id was still NOT NULL or the finance ledger did not yet exist.
+    await run('0031 feedback_mind_v2 closure', feedbackMindV2MigrationSql);
 
   } finally {
     client.release();

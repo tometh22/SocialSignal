@@ -65,7 +65,6 @@ import {
   Filter,
   MoreHorizontal,
   User,
-  Users,
   DollarSign,
   Timer,
   Edit3,
@@ -77,7 +76,6 @@ import {
 import { format, addDays, subDays } from "date-fns";
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
-import BulkTimeForm from "@/components/forms/BulkTimeForm";
 import EditTimeForm from "@/components/forms/EditTimeForm";
 
 // Interfaces
@@ -142,12 +140,12 @@ const PersonAvatar: React.FC<{ name: string; className?: string }> = ({ name, cl
 
 // Formulario de registro compacto
 const CompactTimeForm: React.FC<{
-  personnel: Personnel[] | undefined;
+  currentPersonnel: Personnel | null;
   projectId: number;
   onSuccess: () => void;
   onCancel: () => void;
   updateLocalEntries: (entry: TimeEntry) => void;
-}> = ({ personnel, projectId, onSuccess, onCancel, updateLocalEntries }) => {
+}> = ({ currentPersonnel, projectId, onSuccess, onCancel, updateLocalEntries }) => {
   const [showUnquotedDialog, setShowUnquotedDialog] = useState(false);
   const [unquotedPersonnel, setUnquotedPersonnel] = useState<Personnel | null>(null);
   const [pendingFormData, setPendingFormData] = useState<z.infer<typeof formSchema> | null>(null);
@@ -155,12 +153,18 @@ const CompactTimeForm: React.FC<{
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
+      personnelId: currentPersonnel?.id,
       date: new Date(),
       hours: 8,
       billable: true,
       componentId: null,
     },
   });
+  useEffect(() => {
+    if (currentPersonnel?.id) {
+      form.setValue("personnelId", currentPersonnel.id);
+    }
+  }, [currentPersonnel?.id, form]);
 
   // Query para obtener datos completos del proyecto (equipo cotizado)
   const { data: projectData } = useQuery<{ quotation?: { team?: { personnelId: number; personnelName: string }[] } }>({
@@ -170,21 +174,13 @@ const CompactTimeForm: React.FC<{
 
   const createTimeEntryMutation = useMutation({
     mutationFn: async (data: z.infer<typeof formSchema>) => {
-      // Obtener la tarifa horaria de la persona seleccionada
-      const selectedPerson = personnel?.find(p => p.id === data.personnelId);
-      const hourlyRate = selectedPerson?.hourlyRate || 10; // Default mínimo
-      const totalCost = data.hours * hourlyRate;
-      
       return apiRequest("/api/time-entries", "POST", {
         projectId,
-        personnelId: data.personnelId,
         componentId: data.componentId || null,
         date: data.date.toISOString(),
         hours: data.hours,
         description: data.description || null,
         billable: data.billable,
-        totalCost,
-        hourlyRateAtTime: hourlyRate,
         entryType: 'hours' as const,
       });
     },
@@ -270,7 +266,7 @@ const CompactTimeForm: React.FC<{
   const onSubmit = async (data: z.infer<typeof formSchema>) => {
     // Verificar si la persona está cotizada
     if (!isPersonnelQuoted(data.personnelId)) {
-      const selectedPerson = personnel?.find(p => p.id === data.personnelId);
+      const selectedPerson = currentPersonnel?.id === data.personnelId ? currentPersonnel : null;
       if (selectedPerson) {
         // Persona no cotizada - mostrar diálogo
         setUnquotedPersonnel(selectedPerson);
@@ -323,38 +319,30 @@ const CompactTimeForm: React.FC<{
             )}
           />
 
-          {/* Línea 1: Persona y Fecha(s) */}
+          {!currentPersonnel && (
+            <Alert variant="destructive">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription>
+                Tu usuario no está vinculado a Personal. Pedile a Operaciones que configure el mismo email.
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {/* Línea 1: identidad autenticada y fecha(s) */}
           <div className="grid grid-cols-2 gap-3">
-            <FormField
-              control={form.control}
-              name="personnelId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-sm">Persona</FormLabel>
-                  <Select
-                    onValueChange={(value) => field.onChange(parseInt(value))}
-                    defaultValue={field.value?.toString()}
-                  >
-                    <FormControl>
-                      <SelectTrigger className="h-9">
-                        <SelectValue placeholder="Seleccionar" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {personnel?.map((p) => (
-                        <SelectItem key={p.id} value={p.id.toString()}>
-                          <div className="flex items-center gap-2">
-                            <PersonAvatar name={p.name} className="h-5 w-5" />
-                            <span className="text-sm">{p.name}</span>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <FormItem>
+              <FormLabel className="text-sm">Persona</FormLabel>
+              <div className="h-9 rounded-md border bg-muted/30 px-3 flex items-center gap-2 text-sm">
+                {currentPersonnel ? (
+                  <>
+                    <PersonAvatar name={currentPersonnel.name} className="h-5 w-5" />
+                    <span>{currentPersonnel.name}</span>
+                  </>
+                ) : (
+                  <span className="text-muted-foreground">Sin vínculo con Personal</span>
+                )}
+              </div>
+            </FormItem>
 
             <FormField
               control={form.control}
@@ -541,7 +529,7 @@ const CompactTimeForm: React.FC<{
             <Button variant="outline" type="button" onClick={onCancel} size="sm">
               Cancelar
             </Button>
-            <Button type="submit" disabled={isPending} size="sm">
+            <Button type="submit" disabled={isPending || !currentPersonnel} size="sm">
               {isPending ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -582,7 +570,6 @@ const TimeEntries: React.FC = () => {
   const projectId = parseInt((params as any).id || (params as any).projectId || '0') || 0;
 
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [entryToDelete, setEntryToDelete] = useState<number | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -637,6 +624,12 @@ const TimeEntries: React.FC = () => {
   const { data: personnel } = useQuery<Personnel[]>({
     queryKey: ['/api/personnel'],
   });
+  const { data: myHoursIdentity } = useQuery<{ personnelId: number | null }>({
+    queryKey: ["/api/tasks/my-hours"],
+  });
+  const currentPersonnel = personnel?.find(
+    (person) => person.id === myHoursIdentity?.personnelId,
+  ) ?? null;
 
   // Query para obtener el equipo original de la cotización
   const { data: quotationTeam } = useQuery<QuotationTeamMember[]>({
@@ -987,14 +980,6 @@ const TimeEntries: React.FC = () => {
                     <Plus className="mr-2 h-4 w-4" />
                     Nuevo Registro
                   </Button>
-                  <Button 
-                    onClick={() => setBulkDialogOpen(true)} 
-                    variant="outline" 
-                    className="border-blue-600 text-blue-600 hover:bg-blue-50"
-                  >
-                    <Users className="mr-2 h-4 w-4" />
-                    Registro Masivo
-                  </Button>
                 </div>
               </div>
             </div>
@@ -1307,36 +1292,11 @@ const TimeEntries: React.FC = () => {
                   </DialogDescription>
                 </DialogHeader>
                 <CompactTimeForm
-                  personnel={personnel}
+                  currentPersonnel={currentPersonnel}
                   projectId={projectId}
                   onSuccess={() => setDialogOpen(false)}
                   onCancel={() => setDialogOpen(false)}
                   updateLocalEntries={updateLocalEntries}
-                />
-              </DialogContent>
-            </Dialog>
-
-            {/* Diálogo de registro masivo */}
-            <Dialog open={bulkDialogOpen} onOpenChange={setBulkDialogOpen}>
-              <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
-                <DialogHeader>
-                  <DialogTitle className="flex items-center gap-2">
-                    <Users className="h-5 w-5 text-blue-600" />
-                    Registro Masivo de Horas
-                  </DialogTitle>
-                  <DialogDescription>
-                    Registra horas para múltiples personas del equipo de forma simultánea
-                  </DialogDescription>
-                </DialogHeader>
-                <BulkTimeForm
-                  personnel={personnel || []}
-                  projectId={projectId}
-                  onSuccess={() => setBulkDialogOpen(false)}
-                  onCancel={() => setBulkDialogOpen(false)}
-                  updateLocalEntries={(entries) => {
-                    // Actualizar con múltiples entradas
-                    entries.forEach(entry => updateLocalEntries(entry));
-                  }}
                 />
               </DialogContent>
             </Dialog>

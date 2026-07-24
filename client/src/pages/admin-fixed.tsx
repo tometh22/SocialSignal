@@ -82,6 +82,7 @@ import { RoleSummary } from "@/components/admin/role-summary";
 import { TemplateCost } from "@/components/admin/template-cost";
 import { CostMultipliersManager } from "@/components/cost-multipliers-manager";
 import { ExchangeRateManager } from "@/components/admin/ExchangeRateManager";
+import { PersonnelHistoricalCostsManager } from "@/components/admin/PersonnelHistoricalCostsManager";
 
 
 import { 
@@ -107,10 +108,8 @@ const roleSchema = z.object({
 const personnelSchema = z.object({
   name: z.string().min(1, "El nombre es requerido"),
   roleId: z.coerce.number().min(1, "Debe seleccionar un rol"),
-  hourlyRate: z.coerce.number().min(0, "La tarifa debe ser mayor o igual a 0"),
   email: z.string().email().optional().or(z.literal("")),
   contractType: z.enum(["full-time", "part-time", "freelance"]).default("full-time"),
-  monthlyFixedSalary: z.coerce.number().min(0).optional(),
   includeInRealCosts: z.boolean().default(true)
 });
 
@@ -277,9 +276,7 @@ export default function Admin() {
     defaultValues: {
       name: "",
       email: "",
-      hourlyRate: 0,
       contractType: "full-time",
-      monthlyFixedSalary: 0,
       includeInRealCosts: true
     }
   });
@@ -750,9 +747,7 @@ export default function Admin() {
       name: "",
       email: "",
       roleId: 0,
-      hourlyRate: 0,
       contractType: "full-time",
-      monthlyFixedSalary: 0,
       includeInRealCosts: true
     });
     setCurrentPersonnel(null);
@@ -765,9 +760,7 @@ export default function Admin() {
       name: personnel.name,
       email: personnel.email || "",
       roleId: personnel.roleId,
-      hourlyRate: personnel.hourlyRate,
       contractType: (personnel.contractType as "full-time" | "part-time" | "freelance") || "full-time",
-      monthlyFixedSalary: personnel.monthlyFixedSalary || 0,
       includeInRealCosts: personnel.includeInRealCosts ?? true
     });
     setCurrentPersonnel(personnel);
@@ -779,7 +772,9 @@ export default function Admin() {
     if (isEditing && currentPersonnel) {
       updatePersonnelMutation.mutate({ id: currentPersonnel.id, data: values });
     } else {
-      createPersonnelMutation.mutate(values);
+      // The legacy column is required for backwards-compatible rows but is not
+      // a rate source. The canonical rate is added below in historical costs.
+      createPersonnelMutation.mutate({ ...values, hourlyRate: 0 });
     }
   };
 
@@ -919,60 +914,7 @@ export default function Admin() {
 
   const currentExchangeRate = systemConfig.find(c => c.configKey === 'usd_exchange_rate')?.configValue || 1100;
 
-  // Meses históricos en orden descendente. Mantener sincronizado con
-  // HISTORICAL_MONTHS_DESC en optimized-quote-context.tsx e
-  // inline-edit-personnel.tsx.
-  const HISTORICAL_MONTHS_DESC = [
-    'dec2026', 'nov2026', 'oct2026', 'sep2026', 'aug2026', 'jul2026',
-    'jun2026', 'may2026', 'apr2026', 'mar2026', 'feb2026', 'jan2026',
-    'dec2025', 'nov2025', 'oct2025', 'sep2025', 'aug2025', 'jul2025',
-    'jun2025', 'may2025', 'apr2025', 'mar2025', 'feb2025', 'jan2025'
-  ];
-
-  // Subset desde el mes actual hacia atrás. Para las "summary cards" sólo
-  // queremos considerar valores vigentes — no proyecciones de meses futuros
-  // que el sync deja cargadas.
-  const currentOrPastMonths = (): string[] => {
-    const now = new Date();
-    const monthNames = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
-    const currentKey = `${monthNames[now.getMonth()]}${now.getFullYear()}`;
-    const idx = HISTORICAL_MONTHS_DESC.indexOf(currentKey);
-    if (idx === -1) return HISTORICAL_MONTHS_DESC;
-    return HISTORICAL_MONTHS_DESC.slice(idx);
-  };
-
-  // Tarifa vigente: último valor del mes actual hacia atrás.
-  const getCurrentHourlyRate = (person: any) => {
-    for (const month of currentOrPastMonths()) {
-      const value = person[`${month}HourlyRateARS`];
-      if (value && value > 0) return value;
-    }
-    return person.hourlyRate || 0;
-  };
-
-  // Sueldo vigente: si la tarifa más reciente es de un mes posterior al
-  // último sueldo cargado, derivamos sueldo = tarifa × horas. Sin esto, la
-  // summary mostraba un sueldo viejo después de un sync que sólo actualiza
-  // la tarifa.
-  const getCurrentMonthlySalary = (person: any) => {
-    const months = currentOrPastMonths();
-    let rateIdx = -1;
-    let salaryIdx = -1;
-    for (let i = 0; i < months.length; i++) {
-      const m = months[i];
-      if (rateIdx === -1 && (person[`${m}HourlyRateARS`] || 0) > 0) rateIdx = i;
-      if (salaryIdx === -1 && (person[`${m}MonthlySalaryARS`] || 0) > 0) salaryIdx = i;
-      if (rateIdx !== -1 && salaryIdx !== -1) break;
-    }
-    if (salaryIdx !== -1 && (rateIdx === -1 || salaryIdx <= rateIdx)) {
-      return person[`${months[salaryIdx]}MonthlySalaryARS`];
-    }
-    if (rateIdx !== -1) {
-      const hours = person.monthlyHours || 160;
-      return person[`${months[rateIdx]}HourlyRateARS`] * hours;
-    }
-    return person.monthlyFixedSalary || 0;
-  };
+  const getCurrentHourlyRate = (person: any) => Number(person.currentHourlyRateARS) || 0;
 
   // Ordenar datos por tarifa de mayor a menor (usando tarifa actual calculada)
   const sortedRoles = roles ? [...roles].sort((a, b) => (b.defaultRate || 0) - (a.defaultRate || 0)) : [];
@@ -1093,7 +1035,7 @@ export default function Admin() {
               <div className="flex justify-between items-center">
                 <div>
                   <CardTitle className="heading-card">Personal del Equipo</CardTitle>
-                  <CardDescription>Gestiona el personal y sus tarifas por defecto</CardDescription>
+                  <CardDescription>Gestioná los datos contractuales; las tarifas se administran en la fuente histórica de abajo.</CardDescription>
                 </div>
                 <div className="flex items-center gap-2">
                   <SheetsSyncDialog />
@@ -1241,89 +1183,16 @@ export default function Admin() {
                             email: person.email || '',
                             roleId: person.roleId,
                             roleName: getRoleName(person.roleId),
-                            hourlyRate: getCurrentHourlyRate(person),
                             contractType: person.contractType,
-                            monthlyFixedSalary: getCurrentMonthlySalary(person),
+                            currentHourlyRateARS: person.currentHourlyRateARS,
+                            currentHourlyRateUSD: person.currentHourlyRateUSD,
+                            currentMonthlySalaryARS: person.currentMonthlySalaryARS,
+                            ratePeriod: person.ratePeriod,
                             monthlyHours: person.monthlyHours,
                             includeInRealCosts: person.includeInRealCosts,
-                            // Historical contract types
-                            jan2025ContractType: person.jan2025ContractType,
-                            feb2025ContractType: person.feb2025ContractType,
-                            mar2025ContractType: person.mar2025ContractType,
-                            apr2025ContractType: person.apr2025ContractType,
-                            may2025ContractType: person.may2025ContractType,
-                            jun2025ContractType: person.jun2025ContractType,
-                            jul2025ContractType: person.jul2025ContractType,
-                            aug2025ContractType: person.aug2025ContractType,
-                            sep2025ContractType: person.sep2025ContractType,
-                            oct2025ContractType: person.oct2025ContractType,
-                            nov2025ContractType: person.nov2025ContractType,
-                            dec2025ContractType: person.dec2025ContractType,
-                            // Historical hourly rates
-                            jan2025HourlyRateARS: person.jan2025HourlyRateARS,
-                            feb2025HourlyRateARS: person.feb2025HourlyRateARS,
-                            mar2025HourlyRateARS: person.mar2025HourlyRateARS,
-                            apr2025HourlyRateARS: person.apr2025HourlyRateARS,
-                            may2025HourlyRateARS: person.may2025HourlyRateARS,
-                            jun2025HourlyRateARS: person.jun2025HourlyRateARS,
-                            jul2025HourlyRateARS: person.jul2025HourlyRateARS,
-                            aug2025HourlyRateARS: person.aug2025HourlyRateARS,
-                            sep2025HourlyRateARS: person.sep2025HourlyRateARS,
-                            oct2025HourlyRateARS: person.oct2025HourlyRateARS,
-                            nov2025HourlyRateARS: person.nov2025HourlyRateARS,
-                            dec2025HourlyRateARS: person.dec2025HourlyRateARS,
-                            // Historical monthly salaries
-                            jan2025MonthlySalaryARS: person.jan2025MonthlySalaryARS,
-                            feb2025MonthlySalaryARS: person.feb2025MonthlySalaryARS,
-                            mar2025MonthlySalaryARS: person.mar2025MonthlySalaryARS,
-                            apr2025MonthlySalaryARS: person.apr2025MonthlySalaryARS,
-                            may2025MonthlySalaryARS: person.may2025MonthlySalaryARS,
-                            jun2025MonthlySalaryARS: person.jun2025MonthlySalaryARS,
-                            jul2025MonthlySalaryARS: person.jul2025MonthlySalaryARS,
-                            aug2025MonthlySalaryARS: person.aug2025MonthlySalaryARS,
-                            sep2025MonthlySalaryARS: person.sep2025MonthlySalaryARS,
-                            oct2025MonthlySalaryARS: person.oct2025MonthlySalaryARS,
-                            nov2025MonthlySalaryARS: person.nov2025MonthlySalaryARS,
-                            dec2025MonthlySalaryARS: person.dec2025MonthlySalaryARS,
-                            // Historical contract types 2026
-                            jan2026ContractType: person.jan2026ContractType,
-                            feb2026ContractType: person.feb2026ContractType,
-                            mar2026ContractType: person.mar2026ContractType,
-                            apr2026ContractType: person.apr2026ContractType,
-                            may2026ContractType: person.may2026ContractType,
-                            jun2026ContractType: person.jun2026ContractType,
-                            jul2026ContractType: person.jul2026ContractType,
-                            aug2026ContractType: person.aug2026ContractType,
-                            sep2026ContractType: person.sep2026ContractType,
-                            oct2026ContractType: person.oct2026ContractType,
-                            nov2026ContractType: person.nov2026ContractType,
-                            dec2026ContractType: person.dec2026ContractType,
-                            // Historical hourly rates 2026
-                            jan2026HourlyRateARS: person.jan2026HourlyRateARS,
-                            feb2026HourlyRateARS: person.feb2026HourlyRateARS,
-                            mar2026HourlyRateARS: person.mar2026HourlyRateARS,
-                            apr2026HourlyRateARS: person.apr2026HourlyRateARS,
-                            may2026HourlyRateARS: person.may2026HourlyRateARS,
-                            jun2026HourlyRateARS: person.jun2026HourlyRateARS,
-                            jul2026HourlyRateARS: person.jul2026HourlyRateARS,
-                            aug2026HourlyRateARS: person.aug2026HourlyRateARS,
-                            sep2026HourlyRateARS: person.sep2026HourlyRateARS,
-                            oct2026HourlyRateARS: person.oct2026HourlyRateARS,
-                            nov2026HourlyRateARS: person.nov2026HourlyRateARS,
-                            dec2026HourlyRateARS: person.dec2026HourlyRateARS,
-                            // Historical monthly salaries 2026
-                            jan2026MonthlySalaryARS: person.jan2026MonthlySalaryARS,
-                            feb2026MonthlySalaryARS: person.feb2026MonthlySalaryARS,
-                            mar2026MonthlySalaryARS: person.mar2026MonthlySalaryARS,
-                            apr2026MonthlySalaryARS: person.apr2026MonthlySalaryARS,
-                            may2026MonthlySalaryARS: person.may2026MonthlySalaryARS,
-                            jun2026MonthlySalaryARS: person.jun2026MonthlySalaryARS,
-                            jul2026MonthlySalaryARS: person.jul2026MonthlySalaryARS,
-                            aug2026MonthlySalaryARS: person.aug2026MonthlySalaryARS,
-                            sep2026MonthlySalaryARS: person.sep2026MonthlySalaryARS,
-                            oct2026MonthlySalaryARS: person.oct2026MonthlySalaryARS,
-                            nov2026MonthlySalaryARS: person.nov2026MonthlySalaryARS,
-                            dec2026MonthlySalaryARS: person.dec2026MonthlySalaryARS
+                            billingCurrency: person.billingCurrency,
+                            usdBillingFraction: person.usdBillingFraction,
+                            activeUntil: person.activeUntil,
                           }}
                           roles={roles || []} 
                         />
@@ -1348,31 +1217,17 @@ export default function Admin() {
                 <div className="flex justify-between items-center text-sm">
                   <span className="text-slate-500">Total: {sortedPersonnel.length} personal configurado</span>
                   <span className="text-blue-600 font-medium">
-                    Tarifa promedio: ${(sortedPersonnel.reduce((sum, person) => sum + getCurrentHourlyRate(person), 0) / sortedPersonnel.length).toFixed(2)}/hr
+                    Tarifa promedio: ARS {(sortedPersonnel.reduce((sum, person) => sum + getCurrentHourlyRate(person), 0) / sortedPersonnel.length).toFixed(2)}/h
                   </span>
                 </div>
               </div>
             )}
           </Card>
 
-          {/* Sección de Costos Históricos - Solo si hay personal */}
+          {/* Fuente única de tarifas y sueldos históricos */}
           {sortedPersonnel && sortedPersonnel.length > 0 && (
             <div className="mt-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <div className="h-1 w-8 bg-gradient-to-r from-green-500 to-green-600 rounded"></div>
-                  <h2 className="text-lg font-semibold text-gray-900">Gestión de Costos Históricos</h2>
-                </div>
-                <div className="text-sm text-gray-500">
-                  Haz clic en el botón ⌄ junto a cada persona para ver y editar costos históricos
-                </div>  
-              </div>
-              <div className="p-4 bg-green-50 rounded-lg border-l-4 border-green-400">
-                <p className="text-sm text-green-800">
-                  <strong>💡 Nuevo:</strong> Los costos históricos ahora se manejan directamente en la tabla de personal.
-                  Haz clic en el botón verde de expansión (⌄) junto a cualquier persona para ver y editar sus costos mensuales en ARS.
-                </p>
-              </div>
+              <PersonnelHistoricalCostsManager />
             </div>
           )}
         </TabsContent>
@@ -1848,51 +1703,6 @@ export default function Admin() {
                         <SelectItem value="freelance">Freelance</SelectItem>
                       </SelectContent>
                     </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={personnelForm.control}
-                name="hourlyRate"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Tarifa por Hora USD</FormLabel>
-                    <FormControl>
-                      <Input 
-                        type="number" 
-                        step="1"
-                        placeholder="5000" 
-                        {...field} 
-                      />
-                    </FormControl>
-                    <FormDescription>
-                      Tarifa en dólares por hora para cotizaciones en USD.
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={personnelForm.control}
-                name="monthlyFixedSalary"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Sueldo Mensual Fijo (ARS)</FormLabel>
-                    <FormControl>
-                      <Input 
-                        type="number" 
-                        step="1"
-                        placeholder="500000" 
-                        {...field}
-                        disabled={personnelForm.watch("contractType") !== "full-time"}
-                      />
-                    </FormControl>
-                    <FormDescription>
-                      Solo aplica para empleados full-time.
-                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}

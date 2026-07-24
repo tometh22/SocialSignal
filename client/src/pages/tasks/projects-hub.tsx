@@ -9,7 +9,6 @@ import { Loader2, Search, Plus, Check, Users, LayoutGrid, List, AlertCircle, Bar
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
 import { toast } from "@/hooks/use-toast";
-import NewProjectDialog from "@/components/tasks/NewProjectDialog";
 
 type ProjectMember = { personnelId: number; name: string; role: string };
 type TaskProject = {
@@ -493,7 +492,6 @@ export default function ProjectsHubPage() {
   const [search, setSearch] = useState("");
   const [gridMode, setGridMode] = useState<"grid" | "list">("grid");
   const [view, setView] = useState<"projects" | "panel">("projects");
-  const [newProjectOpen, setNewProjectOpen] = useState(false);
   const { user } = useAuth();
 
   const { data: projects = [], isLoading, isError, refetch } = useQuery<TaskProject[], Error, TaskProject[]>({
@@ -539,8 +537,13 @@ export default function ProjectsHubPage() {
     (p.clientName || "").toLowerCase().includes(search.toLowerCase())
   );
 
-  const myProjects = filtered.filter(p => myPersonnelId && p.members.some(m => m.personnelId === myPersonnelId));
-  const otherProjects = filtered.filter(p => !myPersonnelId || !p.members.some(m => m.personnelId === myPersonnelId));
+  const clientGroups = Object.entries(
+    filtered.reduce<Record<string, TaskProject[]>>((groups, project) => {
+      const client = project.clientName && project.clientName !== "—" ? project.clientName : "Epical";
+      (groups[client] ??= []).push(project);
+      return groups;
+    }, {}),
+  ).sort(([a], [b]) => a.localeCompare(b, "es"));
 
   if (isLoading) {
     return (
@@ -601,10 +604,12 @@ export default function ProjectsHubPage() {
             </>
           )}
 
-          <Button size="sm" className="h-8 text-sm gap-1.5" onClick={() => setNewProjectOpen(true)}>
-            <Plus className="h-3.5 w-3.5" />
-            Nuevo proyecto
-          </Button>
+          <Link href="/active-projects">
+            <Button size="sm" variant="outline" className="h-8 text-sm gap-1.5">
+              <Plus className="h-3.5 w-3.5" />
+              Ir a Vista de proyectos
+            </Button>
+          </Link>
         </div>
       </div>
 
@@ -642,16 +647,23 @@ export default function ProjectsHubPage() {
       {/* Project list / grid */}
       {view === "projects" && (
         <>
-          {/* My projects */}
-          {myProjects.length > 0 && (
-            <div>
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Mis proyectos</p>
+          {clientGroups.map(([clientName, clientProjects]) => (
+            <section key={clientName}>
+              <div className="mb-3 flex items-center gap-2">
+                <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-primary text-xs font-bold text-primary-foreground">
+                  {clientName.charAt(0).toUpperCase()}
+                </span>
+                <div>
+                  <h2 className="text-sm font-semibold">{clientName}</h2>
+                  <p className="text-[11px] text-muted-foreground">{clientProjects.length} proyectos</p>
+                </div>
+              </div>
               <div className={cn(
                 gridMode === "grid"
                   ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"
                   : "flex flex-col gap-2"
               )}>
-                {myProjects.map(project => (
+                {clientProjects.map(project => (
                   <ProjectCard
                     key={project.id}
                     project={project}
@@ -663,34 +675,8 @@ export default function ProjectsHubPage() {
                   />
                 ))}
               </div>
-            </div>
-          )}
-
-          {/* Other projects */}
-          {otherProjects.length > 0 && (
-            <div>
-              {myProjects.length > 0 && (
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Todos los proyectos</p>
-              )}
-              <div className={cn(
-                gridMode === "grid"
-                  ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"
-                  : "flex flex-col gap-2"
-              )}>
-                {otherProjects.map(project => (
-                  <ProjectCard
-                    key={project.id}
-                    project={project}
-                    myPersonnelId={myPersonnelId}
-                    onJoin={() => myPersonnelId && joinMutation.mutate({ projectId: project.id, personnelId: myPersonnelId })}
-                    onLeave={() => myPersonnelId && leaveMutation.mutate({ projectId: project.id, personnelId: myPersonnelId })}
-                    joining={joinMutation.isPending}
-                    leaving={leaveMutation.isPending}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
+            </section>
+          ))}
 
           {filtered.length === 0 && (
             <div className="text-center py-20">
@@ -704,16 +690,17 @@ export default function ProjectsHubPage() {
                 {search ? "Probá con otro término de búsqueda" : "Creá tu primer proyecto para empezar a organizar tareas"}
               </p>
               {!search && (
-                <Button size="sm" onClick={() => setNewProjectOpen(true)}>
-                  <Plus className="h-4 w-4 mr-1.5" />Nuevo proyecto
-                </Button>
+                <Link href="/active-projects">
+                  <Button size="sm">
+                    <Plus className="h-4 w-4 mr-1.5" />Ir a Vista de proyectos
+                  </Button>
+                </Link>
               )}
             </div>
           )}
         </>
       )}
 
-      <NewProjectDialog open={newProjectOpen} onClose={() => setNewProjectOpen(false)} />
     </div>
   );
 }

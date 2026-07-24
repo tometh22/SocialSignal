@@ -15,8 +15,9 @@
  */
 
 const BASE_URL = 'http://localhost:5000';
+const describeIntegration = process.env.RUN_INTEGRATION_TESTS === '1' ? describe : describe.skip;
 
-describe('Costs SoT - Golden Values (Agosto 2025)', () => {
+describeIntegration('Costs SoT - Golden Values (Agosto 2025)', () => {
   
   test('Warner Fee Marketing debe retornar USD 7,005.20', async () => {
     const response = await fetch(`${BASE_URL}/api/costs?period=2025-08&source=fresh`);
@@ -102,7 +103,7 @@ describe('Costs SoT - Golden Values (Agosto 2025)', () => {
   });
 });
 
-describe('Costs SoT - Business Rules', () => {
+describeIntegration('Costs SoT - Business Rules', () => {
   
   test('FX rate para agosto 2025 debe ser 1345', async () => {
     const response = await fetch(`${BASE_URL}/api/costs?period=2025-08&source=fresh`);

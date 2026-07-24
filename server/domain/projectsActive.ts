@@ -23,6 +23,7 @@ import {
 } from "@shared/schema";
 
 import { resolvePeriod } from "@shared/utils/timePeriod";
+import { isProjectCreatedRecently } from "@shared/utils/projectActivity";
 
 import { parseMoneyUnified } from "../utils/money";
 import { canon, generateProjectKey, generateCanonicalFields } from "../utils/normalize";
@@ -96,6 +97,8 @@ interface ProjectData {
   projectName: string;
   clientName: string;
   projectKey: string;
+  projectCategory?: 'billable' | 'internal';
+  internalType?: string | null;
   sales: SalesRecord[];
   costs: CostRecord[];
   quotation?: any; // Include quotation data for project type mapping
@@ -103,6 +106,7 @@ interface ProjectData {
   lifecycle?: {
     status?: string;
     isFinished?: boolean;
+    createdAt?: Date | string | null;
     deliveredAt?: Date | string | null;
     invoicedAt?: Date | string | null;
     closedAt?: Date | string | null;
@@ -153,8 +157,13 @@ export class ActiveProjectsAggregator {
     console.log(`📊 Metrics calculated for ${projectItems.length} projects`);
 
     // 6. Filter by activity if requested
+    const selectedMonth = period.start.substring(0, 7);
     const filteredProjects = onlyActiveInPeriod 
-      ? projectItems.filter(p => p.flags.hasSales || p.flags.hasCosts || p.flags.hasHours)
+      ? projectItems.filter((project) => {
+          if (project.flags.hasSales || project.flags.hasCosts || project.flags.hasHours) return true;
+          if (!project.createdAt || project.isFinished) return false;
+          return isProjectCreatedRecently(project.createdAt, selectedMonth);
+        })
       : projectItems;
     console.log(`📊 Final projects: ${filteredProjects.length} (filtered: ${onlyActiveInPeriod})`);
 
@@ -484,12 +493,15 @@ export class ActiveProjectsAggregator {
         projectName: actualProjectName,
         clientName: clientName,
         projectKey: canonicalFields.projectKey,
+        projectCategory: project.projectCategory ?? 'billable',
+        internalType: project.internalType ?? null,
         sales: [],
         costs: [],
         quotation: project.quotation, // Include quotation for project type mapping
         lifecycle: {
           status: project.status,
           isFinished: project.isFinished,
+          createdAt: project.createdAt ?? null,
           deliveredAt: project.deliveredAt ?? null,
           invoicedAt: project.invoicedAt ?? null,
           closedAt: project.closedAt ?? null,
@@ -909,6 +921,9 @@ export class ActiveProjectsAggregator {
         startMonthKey,
         endMonthKey,
         lastActivity,
+        createdAt: lifecycle.createdAt ? new Date(lifecycle.createdAt as any).toISOString() : null,
+        projectCategory: projectData.projectCategory ?? 'billable',
+        internalType: projectData.internalType ?? null,
         isFinished,
         supportsRollup: true,  // All projects support rollup queries
         allowFinish: !isFinished,  // Can mark as finished if not already finished

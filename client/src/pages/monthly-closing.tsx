@@ -56,14 +56,6 @@ export default function MonthlyClosing() {
   const { exchangeRate } = useCurrency();
 
   const { data: personnel, isLoading: personnelLoading } = useQuery<any[]>({ queryKey: ["/api/personnel"] });
-  const { data: estimatedRates = [] } = useQuery<any[]>({
-    queryKey: ["/api/estimated-rates", year],
-    queryFn: () =>
-      fetch(`/api/estimated-rates?year=${year}`, {
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-      }).then((r) => r.json()),
-  });
   const { data: closings, isLoading: closingsLoading } = useQuery<any[]>({
     queryKey: ["/api/monthly-closings", year, month + 1],
     queryFn: () =>
@@ -136,20 +128,19 @@ export default function MonthlyClosing() {
   const getClosing = (personnelId: number) =>
     closings?.find((c: any) => c.personnelId === personnelId);
 
-  // Returns the best available rate for the selected month: estimated > base by billing currency
+  // Historical costs synced from Personal are the single rate source.
   const getEffectiveRate = (person: any): { rate: number; isEstimated: boolean } => {
-    const est = estimatedRates.find(
-      (r: any) => r.personnelId === person.id && r.month === month + 1
-    );
-    if (est?.estimatedRateARS && est.estimatedRateARS > 0) {
-      return { rate: Number(est.estimatedRateARS), isEstimated: true };
-    }
+    const selectedPeriod = year * 100 + month + 1;
+    const monthly = [...(person.historicalRates ?? [])]
+      .filter((item: any) => item.year * 100 + item.month <= selectedPeriod)
+      .sort((left: any, right: any) =>
+        (right.year * 100 + right.month) - (left.year * 100 + left.month)
+      )[0];
     const billing = person.billingCurrency ?? "ARS";
     if (billing === "USD" || billing === "mixed") {
-      return { rate: person.hourlyRate || 0, isEstimated: false };
+      return { rate: monthly?.hourlyRateUSD || 0, isEstimated: false };
     }
-    // ARS: prefer the ARS-specific rate, fall back to hourlyRate only as last resort
-    return { rate: person.hourlyRateARS || person.hourlyRate || 0, isEstimated: false };
+    return { rate: monthly?.hourlyRateARS || 0, isEstimated: false };
   };
 
   const getAdj = (personnelId: number): HoursAdj =>
@@ -204,7 +195,7 @@ export default function MonthlyClosing() {
     if (rate <= 0) {
       toast({
         title: "Sin tarifa configurada",
-        description: `${person.name} no tiene tarifa para ${MONTHS[month]} ${year}. Configurala en Valor Hora Estimada o en Admin → Personal.`,
+        description: `${person.name} no tiene tarifa para ${MONTHS[month]} ${year}. Configurala en Configuración → Personal.`,
         variant: "destructive",
       });
       return;
@@ -445,8 +436,8 @@ export default function MonthlyClosing() {
           <h1 className="text-2xl font-bold">Cierre Mensual de Horas</h1>
           <p className="text-muted-foreground">
             Reconciliación: ajustar horas reales a horas contractuales para facturación.{" "}
-            <Link href="/operations/estimated-rates" className="inline-flex items-center gap-1 text-primary hover:underline text-sm">
-              Gestionar tarifas proyectadas <ExternalLink className="h-3 w-3" />
+            <Link href="/admin" className="inline-flex items-center gap-1 text-primary hover:underline text-sm">
+              Gestionar tarifas en Personal <ExternalLink className="h-3 w-3" />
             </Link>
           </p>
         </div>
@@ -695,13 +686,6 @@ export default function MonthlyClosing() {
                 })}
               </tbody>
             </table>
-          )}
-          {estimatedRates.some((r: any) => r.month === month + 1) && (
-            <p className="text-xs text-muted-foreground mt-2">
-              * Tarifa proyectada para {MONTHS[month]} {year} (configurada en{" "}
-              <Link href="/operations/estimated-rates" className="text-primary hover:underline">Valor Hora Estimada</Link>
-              ). Los valores sin * usan la tarifa base del personal.
-            </p>
           )}
         </CardContent>
       </Card>

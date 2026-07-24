@@ -1,4 +1,5 @@
 import { QueryClient } from "@tanstack/react-query";
+import { parseApiError } from "./api-error";
 
 type FetcherOptions = {
   on401?: "throw" | "returnNull";
@@ -98,19 +99,8 @@ export const defaultQueryFn = async ({ queryKey }: { queryKey: readonly unknown[
   });
   
   if (!response.ok) {
-    const errorMessage = await response
-      .text()
-      .then(text => {
-        try {
-          const json = JSON.parse(text);
-          return json.message || text;
-        } catch (e) {
-          return text;
-        }
-      })
-      .catch(() => "Error desconocido");
-    
-    throw new Error(errorMessage);
+    const errorText = await response.text().catch(() => "");
+    throw parseApiError(response.status, errorText);
   }
   
   if (response.status === 204) {
@@ -152,19 +142,8 @@ export function getQueryFn({ on401 = "throw" }: FetcherOptions = {}) {
         return null;
       }
       
-      const errorMessage = await response
-        .text()
-        .then(text => {
-          try {
-            const json = JSON.parse(text);
-            return json.message || text;
-          } catch (e) {
-            return text;
-          }
-        })
-        .catch(() => "Error desconocido");
-      
-      throw new Error(errorMessage);
+      const errorText = await response.text().catch(() => "");
+      throw parseApiError(response.status, errorText);
     }
     
     if (response.status === 204) {
@@ -224,15 +203,7 @@ export async function apiRequest(
       const errorText = await response.text();
       console.error(`API Error: ${method} ${url} status ${response.status}`, errorText);
       
-      let errorMessage;
-      try {
-        const json = JSON.parse(errorText);
-        errorMessage = json.message || errorText;
-      } catch (e) {
-        errorMessage = errorText || "Error desconocido";
-      }
-      
-      throw new Error(errorMessage);
+      throw parseApiError(response.status, errorText);
     }
     
     if (response.status === 204) {

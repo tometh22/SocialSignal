@@ -4,7 +4,7 @@
  * coincidan con las del Excel "Seguimiento Financiero/Económico".
  */
 
-import { describe, test, expect } from '@jest/globals';
+import { describe, test, expect } from 'vitest';
 import {
   validatePeriodKey,
   calculateOperativoKPIs,

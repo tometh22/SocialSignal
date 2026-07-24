@@ -12,7 +12,6 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CalendarIcon, Loader2, Save, Edit3, Clock, DollarSign } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -83,22 +82,17 @@ export default function EditTimeForm({
   });
 
   const selectedPersonnel = personnel.find(p => p.id === form.watch('personnelId'));
-  const calculatedCost = selectedPersonnel ? form.watch('hours') * selectedPersonnel.hourlyRate : 0;
 
   const updateTimeEntryMutation = useMutation({
     mutationFn: async (data: EditTimeFormData) => {
-      const person = personnel.find(p => p.id === data.personnelId);
       return apiRequest(`/api/time-entries/${entry.id}`, {
         method: "PATCH",
         body: {
-          personnelId: data.personnelId,
           date: format(data.date, "yyyy-MM-dd"),
           hours: data.hours,
           description: data.description,
           billable: data.billable,
           componentId: data.componentId,
-          totalCost: person ? data.hours * person.hourlyRate : undefined,
-          hourlyRateAtTime: person?.hourlyRate,
         }
       });
     },
@@ -150,29 +144,9 @@ export default function EditTimeForm({
         {/* Persona */}
         <div>
           <Label htmlFor="personnelId">Persona</Label>
-          <Select
-            value={form.watch('personnelId')?.toString()}
-            onValueChange={(value) => form.setValue('personnelId', parseInt(value))}
-          >
-            <SelectTrigger className="mt-1">
-              <SelectValue placeholder="Seleccionar persona" />
-            </SelectTrigger>
-            <SelectContent>
-              {personnel.map((person) => (
-                <SelectItem key={person.id} value={person.id.toString()}>
-                  <div className="flex items-center justify-between w-full">
-                    <span>{person.name}</span>
-                    <Badge variant="outline" className="ml-2">
-                      ${person.hourlyRate}/h
-                    </Badge>
-                  </div>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {form.formState.errors.personnelId && (
-            <p className="text-sm text-red-600 mt-1">{form.formState.errors.personnelId.message}</p>
-          )}
+          <div className="mt-1 h-10 rounded-md border bg-muted/30 px-3 flex items-center text-sm">
+            {selectedPersonnel?.name || `Personal #${entry.personnelId}`}
+          </div>
         </div>
 
         {/* Fecha */}
@@ -244,20 +218,12 @@ export default function EditTimeForm({
           </div>
         </div>
 
-        {/* Costo calculado */}
-        {selectedPersonnel && (
-          <div className="bg-green-50 p-3 rounded-lg">
-            <div className="flex items-center gap-2">
-              <DollarSign className="h-4 w-4 text-green-600" />
-              <span className="text-sm font-medium text-green-800">
-                Costo calculado: ${calculatedCost.toFixed(2)}
-              </span>
-              <span className="text-xs text-green-600">
-                ({form.watch('hours')}h × ${selectedPersonnel.hourlyRate}/h)
-              </span>
-            </div>
+        <div className="bg-green-50 p-3 rounded-lg">
+          <div className="flex items-center gap-2 text-sm text-green-800">
+            <DollarSign className="h-4 w-4 text-green-600" />
+            La tarifa histórica y el costo se recalculan en el servidor para la fecha seleccionada.
           </div>
-        )}
+        </div>
 
         {/* Componente */}
         <div>

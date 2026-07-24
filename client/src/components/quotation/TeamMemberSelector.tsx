@@ -160,24 +160,10 @@ const TeamMemberSelector: React.FC<TeamMemberSelectorProps> = ({
         // Actualizamos el rol automáticamente
         setSelectedRole(personData.roleId.toString());
         
-        // SOLUCIÓN PARA MATÍAS - Nivel de depuración alto
-        
-        // Forzar valor directo con conversión explícita a números
-        const idNumerico = Number(personnelId);
-        
-        if (idNumerico === 46) {
-          // Usamos setTimeout para asegurar que esta acción ocurre después del renderizado
-          setTimeout(() => {
-            setRate("9.20");
-          }, 100);
-        } else {
-          // Actualizamos la tarifa con la tarifa personal específica desde el servidor
-          
-          // Asegurar que se usa el valor exacto con decimales del servidor
-          // Convertir el número a cadena con exactamente 2 decimales
-          const rateWithPrecision = Number(personData.hourlyRate).toFixed(2);
-          setRate(rateWithPrecision);
-        }
+        // La tarifa proviene de personnel_historical_costs a través del DTO
+        // normalizado; no hay excepciones por persona.
+        const currentRate = personData.currentHourlyRateUSD ?? personData.hourlyRate;
+        setRate(Number(currentRate || 0).toFixed(2));
       } catch (error) {
         console.error("Error al obtener datos actualizados del personal:", error);
         
@@ -187,7 +173,9 @@ const TeamMemberSelector: React.FC<TeamMemberSelectorProps> = ({
           setSelectedRole(person.roleId.toString());
           
           // Usar el mismo formato con precisión decimal exacta
-          const fallbackRateWithPrecision = Number(person.hourlyRate).toFixed(2);
+          const fallbackRateWithPrecision = Number(
+            (person as any).currentHourlyRateUSD ?? person.hourlyRate ?? 0,
+          ).toFixed(2);
           setRate(fallbackRateWithPrecision);
         }
       }

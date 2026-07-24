@@ -18,6 +18,8 @@ type Task = {
   assigneeId?: number | null;
   dueDate?: string | null;
   estimatedHours?: number | null;
+  estimatedHoursTotal?: number;
+  estimatedHoursForWeek?: number;
   loggedHours?: number;
   parentTaskId?: number | null;
 };
@@ -105,7 +107,8 @@ export default function ProjectOverviewPanel({ projectId, members, projectColor 
   }
 
   const allSectionNames = Object.keys(data?.sections || {});
-  const allTasks: Task[] = (data?.tasks || [])
+  const allProjectTasks: Task[] = data?.tasks || [];
+  const allTasks: Task[] = allProjectTasks
     .filter((t) => !t.parentTaskId)
     .filter((t) => selectedSection === "all" || (t.sectionName || "General") === selectedSection);
   const today = startOfDay(new Date());
@@ -119,7 +122,10 @@ export default function ProjectOverviewPanel({ projectId, members, projectColor 
   ).length;
   const unassigned = allTasks.filter((t) => !t.assigneeId && t.status !== "done").length;
   const totalLogged = allTasks.reduce((s, t) => s + (t.loggedHours || 0), 0);
-  const totalEstimated = allTasks.reduce((s, t) => s + (t.estimatedHours || 0), 0);
+  const totalEstimated = allProjectTasks.reduce(
+    (sum, task) => sum + Number(task.estimatedHoursTotal ?? 0),
+    0,
+  );
 
   const completionPct = total > 0 ? Math.round((done / total) * 100) : 0;
 
@@ -139,7 +145,9 @@ export default function ProjectOverviewPanel({ projectId, members, projectColor 
     const mDone = mTasks.filter((t) => t.status === "done").length;
     const mPending = mTasks.filter((t) => t.status !== "done" && t.status !== "cancelled").length;
     const mLogged = mTasks.reduce((s, t) => s + (t.loggedHours || 0), 0);
-    const mEstimated = mTasks.reduce((s, t) => s + (t.estimatedHours || 0), 0);
+    const mEstimated = allProjectTasks
+      .filter((task) => task.assigneeId === m.personnelId)
+      .reduce((sum, task) => sum + Number(task.estimatedHoursTotal ?? 0), 0);
     return { ...m, total: mTasks.length, done: mDone, pending: mPending, logged: mLogged, estimated: mEstimated };
   }).sort((a, b) => b.total - a.total);
 

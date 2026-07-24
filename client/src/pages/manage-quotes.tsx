@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Search, FileText, CheckCircle, AlertCircle, Clock, Edit, Eye, Trash2, PenLine, Plus, X, MessageCircle, Filter, Loader2, Building2, Calendar, DollarSign, TrendingUp, Zap, Users, Handshake, Briefcase, Target, ThumbsDown, TrendingDown, AlertOctagon } from "lucide-react";
+import { Search, FileText, CheckCircle, AlertCircle, Clock, Edit, Eye, Trash2, PenLine, Plus, X, MessageCircle, Filter, Loader2, Calendar, DollarSign, TrendingUp, Zap, Users, Handshake, Briefcase, Target, ThumbsDown, TrendingDown, AlertOctagon } from "lucide-react";
 import { LossReasonDialog } from "@/components/quotation/loss-reason-dialog";
 import { PageLayout } from "@/components/ui/page-layout";
 import { Loader } from "@/components/ui/loader";
@@ -34,7 +34,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Link } from 'wouter';
-import ProjectTeamConfiguration from '@/components/project/project-team-configuration';
 
 // Interfaces para los datos del cliente
 interface Client {
@@ -135,16 +134,12 @@ export default function ManageQuotes() {
   const [selectedQuote, setSelectedQuote] = useState<Quotation | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [createProjectDialogOpen, setCreateProjectDialogOpen] = useState(false);
-  const [approvedQuote, setApprovedQuote] = useState<Quotation | null>(null);
   const [newStatus, setNewStatus] = useState<string | null>(null);
   const [associatedProjects, setAssociatedProjects] = useState<any[]>([]);
   const [checkingProjects, setCheckingProjects] = useState(false);
   const [deletingQuoteId, setDeletingQuoteId] = useState<number | null>(null);
-  const [showTeamConfiguration, setShowTeamConfiguration] = useState(false);
   const [lossReasonQuote, setLossReasonQuote] = useState<Quotation | null>(null);
   const [markingLost, setMarkingLost] = useState(false);
-  const [teamConfigurationData, setTeamConfigurationData] = useState<any[]>([]);
   const { toast } = useToast();
 
   // Función auxiliar para obtener el nombre del cliente por ID
@@ -174,6 +169,13 @@ export default function ManageQuotes() {
           return dateB - dateA;
         })
     : [];
+  const quotationGroups = Object.entries(
+    filteredQuotations.reduce<Record<string, Quotation[]>>((groups, quote) => {
+      const clientName = getClient(quote.clientId)?.name || "Cliente sin identificar";
+      (groups[clientName] ??= []).push(quote);
+      return groups;
+    }, {}),
+  ).sort(([a], [b]) => a.localeCompare(b, "es"));
 
   const handleStatusChange = async () => {
     if (!selectedQuote || !newStatus) return;
@@ -193,16 +195,10 @@ export default function ManageQuotes() {
       setDialogOpen(false);
 
       if (newStatus === 'approved') {
-        try {
-          const response = await authFetch(`/api/quotations/${selectedQuote.id}`, {
-            credentials: 'include'
-          });
-          setApprovedQuote(response.ok ? await response.json() : selectedQuote);
-        } catch {
-          setApprovedQuote(selectedQuote);
-        }
-        
-        setCreateProjectDialogOpen(true);
+        toast({
+          title: "Cotización lista",
+          description: "Si corresponde, creá el proyecto desde Vista de Proyectos.",
+        });
       }
 
       refetch();
@@ -246,143 +242,6 @@ export default function ManageQuotes() {
       setCheckingProjects(false);
       setDeleteDialogOpen(true);
     }
-  };
-
-  const handleCreateProject = async () => {
-    if (!approvedQuote) return;
-
-    // First, check if the quotation has only role-based team members
-    try {
-      const quotationTeamResponse = await authFetch(`/api/quotation-team/${approvedQuote.id}`, {
-        credentials: 'include'
-      });
-      
-      if (quotationTeamResponse.ok) {
-        const quotationTeam = await quotationTeamResponse.json();
-        const hasOnlyRoles = quotationTeam.every((member: any) => member.personnelId === null);
-        
-        if (hasOnlyRoles && quotationTeam.length > 0) {
-          // Show team configuration component
-          setShowTeamConfiguration(true);
-          setCreateProjectDialogOpen(false);
-          return;
-        }
-      }
-      
-      // If no role-only members or request failed, proceed with normal project creation
-      await createProjectWithCurrentTeam();
-    } catch (error) {
-      console.error('Error checking quotation team:', error);
-      // Fallback to normal project creation
-      await createProjectWithCurrentTeam();
-    }
-  };
-
-  const createProjectWithCurrentTeam = async () => {
-    if (!approvedQuote) return;
-
-    try {
-      const projectData = {
-        name: approvedQuote.projectName,
-        clientId: approvedQuote.clientId,
-        quotationId: approvedQuote.id,
-        description: `Proyecto basado en cotización aprobada: ${approvedQuote.projectName}`,
-        budget: approvedQuote.totalAmount,
-        status: 'active',
-        startDate: new Date().toISOString().split('T')[0],
-        estimatedHours: 0
-      };
-
-      const createdProject = await apiRequest('/api/active-projects', 'POST', projectData);
-
-      // Copiar automáticamente el equipo de la cotización al proyecto
-      try {
-        await apiRequest(`/api/projects/${createdProject.id}/copy-quotation-team`, 'POST');
-      } catch (teamError) {
-        console.error('Error copying quotation team to project:', teamError);
-        // No fallar la creación del proyecto si falla la copia del equipo
-      }
-
-      toast({
-        title: "Proyecto creado exitosamente",
-        description: `El proyecto "${approvedQuote.projectName}" ha sido creado con su equipo asignado y está listo para comenzar.`,
-      });
-
-      setCreateProjectDialogOpen(false);
-      setApprovedQuote(null);
-      navigate(`/projects/${createdProject.id}`);
-    } catch (error) {
-      console.error('Error al crear proyecto:', error);
-      toast({
-        title: "Error",
-        description: "No se pudo crear el proyecto. Inténtalo de nuevo.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleTeamConfigurationComplete = async (teamConfiguration: any[]) => {
-    if (!approvedQuote) return;
-
-    try {
-      // First, create the project
-      const projectData = {
-        name: approvedQuote.projectName,
-        clientId: approvedQuote.clientId,
-        quotationId: approvedQuote.id,
-        description: `Proyecto basado en cotización aprobada: ${approvedQuote.projectName}`,
-        budget: approvedQuote.totalAmount,
-        status: 'active',
-        startDate: new Date().toISOString().split('T')[0],
-        estimatedHours: 0
-      };
-
-      const createdProject = await apiRequest('/api/active-projects', 'POST', projectData);
-
-      // Update quotation team members with the configured personnel
-      for (const config of teamConfiguration) {
-        await apiRequest(`/api/quotation-team/${approvedQuote.id}/assign-personnel`, 'PATCH', {
-          roleId: config.roleId,
-          personnelId: config.personnelId,
-          hours: config.hours,
-          rate: config.rate
-        });
-      }
-
-      // Copy the updated team to the project
-      await apiRequest(`/api/projects/${createdProject.id}/copy-quotation-team`, 'POST');
-
-      toast({
-        title: "Proyecto creado exitosamente",
-        description: `El proyecto "${approvedQuote.projectName}" ha sido creado con el equipo configurado y está listo para comenzar.`,
-      });
-
-      setShowTeamConfiguration(false);
-      setApprovedQuote(null);
-      navigate(`/projects/${createdProject.id}`);
-    } catch (error) {
-      console.error('Error al crear proyecto con configuración de equipo:', error);
-      toast({
-        title: "Error",
-        description: "No se pudo crear el proyecto. Inténtalo de nuevo.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleTeamConfigurationCancel = () => {
-    setShowTeamConfiguration(false);
-    setCreateProjectDialogOpen(true);
-  };
-
-  const handleSkipProjectCreation = () => {
-    setCreateProjectDialogOpen(false);
-    setApprovedQuote(null);
-
-    toast({
-      title: "Cotización aprobada",
-      description: "La cotización ha sido aprobada. Puedes crear el proyecto más tarde desde la sección de proyectos.",
-    });
   };
 
   const handleDeleteQuotation = async () => {
@@ -826,8 +685,20 @@ export default function ManageQuotes() {
                 </div>
               ) : filteredQuotations.length > 0 ? (
 
-                <div className="grid grid-cols-1 gap-4 p-6">
-                  {filteredQuotations.map((quote, index) => {
+                <div className="space-y-7 p-6">
+                  {quotationGroups.map(([clientName, clientQuotes]) => (
+                    <section key={clientName}>
+                      <div className="mb-3 flex items-center gap-3 border-b border-slate-200 pb-2">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-800 text-xs font-bold text-white">
+                          {clientName.charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                          <h3 className="text-sm font-semibold text-slate-900">{clientName}</h3>
+                          <p className="text-xs text-slate-500">{clientQuotes.length} cotizaciones</p>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-1 gap-4">
+                  {clientQuotes.map((quote, index) => {
                     const client = getClient(quote.clientId);
                     const createdDate = new Date(quote.createdAt).toLocaleDateString('es-ES', {
                       day: '2-digit',
@@ -1051,16 +922,13 @@ export default function ManageQuotes() {
                                   
                                   {quote.status === 'approved' && !quotationProjects[quote.id] && (
                                     <Button
-                                      variant="default"
+                                      variant="outline"
                                       size="sm"
-                                      onClick={() => {
-                                        setApprovedQuote(quote);
-                                        setCreateProjectDialogOpen(true);
-                                      }}
-                                      className="h-8 px-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium"
+                                      onClick={() => navigate("/active-projects")}
+                                      className="h-8 px-3 text-xs font-medium"
                                     >
-                                      <Plus className="h-3.5 w-3.5 mr-1.5" />
-                                      Crear Proyecto
+                                      <Briefcase className="h-3.5 w-3.5 mr-1.5" />
+                                      Ir a Proyectos
                                     </Button>
                                   )}
                                   
@@ -1106,6 +974,9 @@ export default function ManageQuotes() {
                       </Card>
                     );
                   })}
+                      </div>
+                    </section>
+                  ))}
                 </div>
 
               ) : (
@@ -1310,109 +1181,6 @@ export default function ManageQuotes() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      {/* Create Project Dialog with improved styling */}
-      <Dialog open={createProjectDialogOpen} onOpenChange={setCreateProjectDialogOpen}>
-        <DialogContent className="sm:max-w-md rounded-2xl border-0 shadow-2xl">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-lg font-semibold">
-              <CheckCircle className="h-5 w-5 text-emerald-600" />
-              Cotización Aprobada
-            </DialogTitle>
-            <DialogDescription className="text-gray-600">
-              La cotización ha sido aprobada exitosamente. ¿Deseas crear un proyecto basado en esta cotización?
-            </DialogDescription>
-          </DialogHeader>
-
-          {approvedQuote && (
-            <div className="py-4">
-              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-6">
-                <h4 className="font-semibold text-emerald-900 mb-4 flex items-center">
-                  <Building2 className="h-4 w-4 mr-2" />
-                  Detalles del proyecto a crear:
-                </h4>
-                <div className="space-y-3 text-sm text-emerald-800">
-                  <div className="flex justify-between items-center">
-                    <span>Nombre del proyecto:</span>
-                    <span className="font-medium">{approvedQuote.projectName}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span>Cliente:</span>
-                    <div className="flex items-center gap-2">
-                      {(() => {
-                        const client = getClient(approvedQuote.clientId);
-                        return client?.logoUrl ? (
-                          <div className="w-6 h-6 rounded overflow-hidden flex-shrink-0">
-                            <img 
-                              src={client.logoUrl} 
-                              alt={`${client.name} logo`} 
-                              className="h-full w-full object-contain"
-                              onError={(e) => {
-                                e.currentTarget.style.display = 'none';
-                              }}
-                            />
-                          </div>
-                        ) : (
-                          <div className="w-6 h-6 bg-emerald-600 rounded-full flex items-center justify-center text-white text-xs font-bold">
-                            {getClientName(approvedQuote.clientId).charAt(0)}
-                          </div>
-                        );
-                      })()}
-                      <span className="font-medium">{getClientName(approvedQuote.clientId)}</span>
-                    </div>
-                  </div>
-                  <div className="border-t border-emerald-200 pt-3 space-y-2">
-                    {(() => {
-const baseCostTotal = approvedQuote.baseCost + (approvedQuote.complexityAdjustment || 0);
-                      const finalAmount = approvedQuote.totalAmount || 0;
-                      const marginAmount = finalAmount - baseCostTotal;
-
-                      return (
-                        <>
-                          <div className="flex justify-between">
-                            <span>Costo estimado:</span>
-                            <span className="font-mono">${baseCostTotal.toFixed(0)}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>Precio al cliente:</span>
-                            <span className="font-bold text-emerald-900 font-mono">${finalAmount.toFixed(0)}</span>
-                          </div>
-                          <div className="flex justify-between text-xs">
-                            <span>Margen de ganancia:</span>
-                            <span className="font-medium">
-                              ${marginAmount > 0 ? marginAmount.toFixed(0) : '0'}
-                            </span>
-                          </div>
-                        </>
-                      );
-                    })()}
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          <DialogFooter className="gap-3">
-            <Button variant="outline" onClick={handleSkipProjectCreation} className="rounded-xl">
-              Crear más tarde
-            </Button>
-            <Button onClick={handleCreateProject} className="rounded-xl bg-emerald-600 hover:bg-emerald-700">
-              <Plus className="h-4 w-4 mr-2" />
-              Crear Proyecto Ahora
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Team Configuration Modal */}
-      {showTeamConfiguration && approvedQuote && (
-        <ProjectTeamConfiguration
-          quotationId={approvedQuote.id}
-          quotationName={approvedQuote.projectName}
-          onConfigurationComplete={handleTeamConfigurationComplete}
-          onCancel={handleTeamConfigurationCancel}
-        />
-      )}
 
       {/* Loss Reason Dialog */}
       <LossReasonDialog

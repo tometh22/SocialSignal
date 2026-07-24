@@ -47,13 +47,13 @@ export default function HolidaysManagement() {
     addMutation.mutate({
       date: newDate,
       name: newName.trim(),
-      year: new Date(newDate).getFullYear(),
+      year: Number(newDate.slice(0, 4)),
       isNational: true,
     });
   };
 
   const sorted = (holidays || []).sort((a: any, b: any) =>
-    new Date(a.date).getTime() - new Date(b.date).getTime()
+    String(a.date).localeCompare(String(b.date))
   );
 
   return (
@@ -109,7 +109,7 @@ export default function HolidaysManagement() {
                 <div key={h.id} className="flex items-center justify-between py-2 px-3 rounded hover:bg-muted/30 border">
                   <div className="flex items-center gap-3">
                     <span className="text-sm font-mono text-muted-foreground">
-                      {new Date(h.date).toLocaleDateString("es-AR", { day: "2-digit", month: "short" })}
+                      {new Date(`${String(h.date).slice(0, 10)}T00:00:00`).toLocaleDateString("es-AR", { day: "2-digit", month: "short" })}
                     </span>
                     <span className="font-medium">{h.name}</span>
                   </div>

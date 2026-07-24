@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, doublePrecision, json, numeric, varchar, unique, uniqueIndex, pgEnum, jsonb, index, primaryKey } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, date, doublePrecision, json, numeric, varchar, unique, uniqueIndex, pgEnum, jsonb, index, primaryKey } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations, sql } from "drizzle-orm";
@@ -701,6 +701,10 @@ export const insertQuotationSchema = baseInsertQuotationSchema.extend({
     z.undefined(),
     z.null().transform(() => undefined)
   ]).optional(),
+  exchangeRateAtQuote: z.union([z.number(), z.string()])
+    .transform((value) => String(value))
+    .nullable()
+    .optional(),
   proposalLink: z.string().nullable().optional(),
 });
 
@@ -775,15 +779,15 @@ export const quotationTeamMembers = pgTable("quotation_team_members", {
 export const insertQuotationTeamMemberSchema = createInsertSchema(quotationTeamMembers).omit({
   id: true,
 }).extend({
-  personnelId: z.number().nullable().optional(),
-  quotationId: z.number(),
-  variantId: z.number().nullable().optional(),
-  roleId: z.number().nullable().optional(),
-  hours: z.number(),
-  rate: z.number(),
-  cost: z.number(),
-  fte: z.number().nullable().optional(),
-  dedication: z.number().nullable().optional()
+  personnelId: z.number().int().positive().nullable().optional(),
+  quotationId: z.number().int().positive(),
+  variantId: z.number().int().positive().nullable().optional(),
+  roleId: z.number().int().positive().nullable().optional(),
+  hours: z.number().finite().nonnegative(),
+  rate: z.number().finite().nonnegative(),
+  cost: z.number().finite().nonnegative(),
+  fte: z.number().finite().nonnegative().nullable().optional(),
+  dedication: z.number().finite().min(0).max(100).nullable().optional()
 });
 
 export type QuotationTeamMember = typeof quotationTeamMembers.$inferSelect;
@@ -923,7 +927,7 @@ export type InsertExchangeRate = z.infer<typeof insertExchangeRateSchema>;
 // ==================== FERIADOS Y DISPONIBILIDAD ====================
 export const holidays = pgTable("holidays", {
   id: serial("id").primaryKey(),
-  date: timestamp("date").notNull(),
+  date: date("date").notNull(),
   name: text("name").notNull(),
   isNational: boolean("is_national").notNull().default(true),
   year: integer("year").notNull(),
@@ -934,7 +938,7 @@ export const insertHolidaySchema = createInsertSchema(holidays).omit({
   id: true,
   createdAt: true,
 }).extend({
-  date: z.union([z.date(), z.string().transform((str) => new Date(str))]),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "La fecha debe usar YYYY-MM-DD"),
 });
 
 export type Holiday = typeof holidays.$inferSelect;
@@ -986,29 +990,6 @@ export const insertMonthlyClosingSchema = createInsertSchema(monthlyClosings).om
 
 export type MonthlyClosing = typeof monthlyClosings.$inferSelect;
 export type InsertMonthlyClosing = z.infer<typeof insertMonthlyClosingSchema>;
-
-// ==================== VALOR HORA ESTIMADO ====================
-export const estimatedRates = pgTable("estimated_rates", {
-  id: serial("id").primaryKey(),
-  personnelId: integer("personnel_id").notNull().references(() => personnel.id),
-  year: integer("year").notNull(),
-  month: integer("month").notNull(), // 1-12
-  estimatedRateARS: doublePrecision("estimated_rate_ars").notNull(),
-  adjustmentPct: doublePrecision("adjustment_pct"), // ej: 8.5 para ajuste trimestral
-  notes: text("notes"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  createdBy: integer("created_by").references(() => users.id, { onDelete: 'set null' }),
-}, (table) => ({
-  uniquePersonMonthRate: unique("unique_person_month_rate").on(table.personnelId, table.year, table.month),
-}));
-
-export const insertEstimatedRateSchema = createInsertSchema(estimatedRates).omit({
-  id: true,
-  createdAt: true,
-});
-
-export type EstimatedRate = typeof estimatedRates.$inferSelect;
-export type InsertEstimatedRate = z.infer<typeof insertEstimatedRateSchema>;
 
 // ==================== PROYECTOS ACTIVOS ====================
 // Proyectos Activos
@@ -1682,8 +1663,8 @@ export const tasks = pgTable("tasks", {
   id: serial("id").primaryKey(),
   title: text("title").notNull(),
   description: text("description"),
-  projectId: integer("project_id"),
-  sectionName: text("section_name").default("General"),
+  projectId: integer("project_id").notNull().references(() => activeProjects.id, { onDelete: "cascade" }),
+  sectionName: text("section_name").notNull().default("General"),
   assigneeId: integer("assignee_id").references(() => personnel.id),
   collaboratorIds: jsonb("collaborator_ids").$type<number[]>().default([]),
   startDate: timestamp("start_date"),
@@ -1757,9 +1738,17 @@ export const taskWeeklyEstimates = pgTable("task_weekly_estimates", {
   estimatedHours: doublePrecision("estimated_hours").notNull(),
   createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+}, (table) => ({
+  uniqueTaskWeek: unique("task_weekly_estimates_task_week_unique")
+    .on(table.taskId, table.weekStart),
+}));
 
-export const insertTaskWeeklyEstimateSchema = createInsertSchema(taskWeeklyEstimates).omit({ id: true, createdAt: true });
+export const insertTaskWeeklyEstimateSchema = createInsertSchema(taskWeeklyEstimates)
+  .omit({ id: true, createdAt: true })
+  .extend({
+    weekStart: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "La semana debe usar YYYY-MM-DD"),
+    estimatedHours: z.number().positive("Las horas estimadas deben ser mayores a cero"),
+  });
 export type TaskWeeklyEstimate = typeof taskWeeklyEstimates.$inferSelect;
 
 export const taskComments = pgTable("task_comments", {
@@ -1777,11 +1766,14 @@ export type InsertTaskComment = z.infer<typeof insertTaskCommentSchema>;
 // Miembros asignados a proyectos dentro del módulo de tareas
 export const taskProjectMembers = pgTable("task_project_members", {
   id: serial("id").primaryKey(),
-  projectId: integer("project_id").notNull(),
+  projectId: integer("project_id").notNull().references(() => activeProjects.id, { onDelete: "cascade" }),
   personnelId: integer("personnel_id").notNull().references(() => personnel.id, { onDelete: "cascade" }),
   role: text("role").notNull().default("member"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+}, (table) => ({
+  uniqueProjectPersonnel: unique("task_project_members_project_personnel_unique")
+    .on(table.projectId, table.personnelId),
+}));
 
 export const insertTaskProjectMemberSchema = createInsertSchema(taskProjectMembers).omit({
   id: true,
@@ -1790,24 +1782,6 @@ export const insertTaskProjectMemberSchema = createInsertSchema(taskProjectMembe
 
 export type TaskProjectMember = typeof taskProjectMembers.$inferSelect;
 export type InsertTaskProjectMember = z.infer<typeof insertTaskProjectMemberSchema>;
-
-// Standalone task projects (without an active_project base)
-export const taskOwnProjects = pgTable("task_own_projects", {
-  id: serial("id").primaryKey(),
-  name: text("name").notNull(),
-  colorIndex: integer("color_index").notNull().default(0),
-  privacy: text("privacy").notNull().default("team"),
-  createdByPersonnelId: integer("created_by_personnel_id").references(() => personnel.id, { onDelete: "set null" }),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-});
-
-export const insertTaskOwnProjectSchema = createInsertSchema(taskOwnProjects).omit({
-  id: true,
-  createdAt: true,
-});
-
-export type TaskOwnProject = typeof taskOwnProjects.$inferSelect;
-export type InsertTaskOwnProject = z.infer<typeof insertTaskOwnProjectSchema>;
 
 // ==================== RELACIONES ====================
 
@@ -2586,13 +2560,32 @@ export const personnelHistoricalCosts = pgTable("personnel_historical_costs", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
   createdBy: integer("created_by").references(() => users.id, { onDelete: 'set null' }),
   updatedBy: integer("updated_by").references(() => users.id, { onDelete: 'set null' }),
-});
+}, (table) => ({
+  oneActiveRatePerPeriod: uniqueIndex("personnel_historical_costs_active_period_unique")
+    .on(table.personnelId, table.year, table.month)
+    .where(sql`${table.isActive} = true`),
+}));
 
-export const insertPersonnelHistoricalCostSchema = createInsertSchema(personnelHistoricalCosts).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
+const normalizedOptionalNumeric = z.union([
+  z.number().finite().nonnegative(),
+  z.string().refine(
+    (value) => value.trim() !== "" && Number.isFinite(Number(value)) && Number(value) >= 0,
+    "El valor debe ser un número mayor o igual a cero",
+  ),
+]).transform((value) => String(value)).nullable().optional();
+
+export const insertPersonnelHistoricalCostSchema = createInsertSchema(personnelHistoricalCosts)
+  .omit({
+    id: true,
+    createdAt: true,
+    updatedAt: true,
+  })
+  .extend({
+    hourlyRateARS: normalizedOptionalNumeric,
+    monthlySalaryARS: normalizedOptionalNumeric,
+    hourlyRateUSD: normalizedOptionalNumeric,
+    monthlySalaryUSD: normalizedOptionalNumeric,
+  });
 
 export type PersonnelHistoricalCost = typeof personnelHistoricalCosts.$inferSelect;
 export type InsertPersonnelHistoricalCost = z.infer<typeof insertPersonnelHistoricalCostSchema>;
@@ -2802,6 +2795,9 @@ export const activeProjectItemSchema = z.object({
   startMonthKey: z.string().optional(),  // YYYY-MM
   endMonthKey: z.string().optional(),    // YYYY-MM
   lastActivity: z.string().optional(),   // YYYY-MM
+  createdAt: z.string().nullable().optional(),
+  projectCategory: z.enum(['billable', 'internal']).optional(),
+  internalType: z.string().nullable().optional(),
   isFinished: z.boolean().optional(),
   supportsRollup: z.boolean().optional(),
   allowFinish: z.boolean().optional(),
