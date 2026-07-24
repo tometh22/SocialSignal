@@ -391,7 +391,7 @@ const EnhancedTeamConfig: React.FC = () => {
               <SelectItem value="projected">
                 <div className="flex flex-col">
                   <span>Tarifa estimada proyectada</span>
-                  <span className="text-[11px] text-muted-foreground">Usa la proyección de Valor Hora Estimada para el mes del proyecto.</span>
+                  <span className="text-[11px] text-muted-foreground">Usa el historial sincronizado de Personal para el mes del proyecto.</span>
                 </div>
               </SelectItem>
               <SelectItem value="annual_avg">

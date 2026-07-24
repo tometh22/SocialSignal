@@ -176,10 +176,17 @@ export default function NewProjectWithTooltips() {
     // internalType solo aplica a proyectos internos; si el usuario lo eligió
     // y después volvió a "Facturable", react-hook-form conserva el valor
     // aunque el campo deje de renderizarse — se limpia acá antes de enviar.
-    const cleaned = data.projectCategory === "internal" ? data : { ...data, internalType: undefined };
+    const epicalClient = clients.find((client: any) => client.name?.trim().toLowerCase() === "epical");
+    if (data.projectCategory === "internal" && !epicalClient) {
+      form.setError("clientId", { message: "No existe el cliente interno Epical. Ejecutá las migraciones antes de continuar." });
+      return;
+    }
+    const cleaned = data.projectCategory === "internal"
+      ? { ...data, clientId: epicalClient.id, quotationId: undefined }
+      : { ...data, internalType: undefined };
     // Con cotización el nombre canónico sale de la cotización; no mandar `name` para
     // no pisar quotations.project_name vía COALESCE(name, project_name).
-    const payload = { ...cleaned, name: data.quotationId ? undefined : (cleaned.name?.trim() || undefined) };
+    const payload = { ...cleaned, name: cleaned.quotationId ? undefined : (cleaned.name?.trim() || undefined) };
     createProjectMutation.mutate(payload);
   };
 
@@ -373,7 +380,17 @@ export default function NewProjectWithTooltips() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Tipo de proyecto</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <Select
+                          onValueChange={(value) => {
+                            field.onChange(value);
+                            if (value === "internal") {
+                              const epical = clients.find((client: any) => client.name?.trim().toLowerCase() === "epical");
+                              form.setValue("quotationId", undefined);
+                              if (epical) form.setValue("clientId", epical.id, { shouldValidate: true });
+                            }
+                          }}
+                          defaultValue={field.value}
+                        >
                           <FormControl>
                             <SelectTrigger>
                               <SelectValue />

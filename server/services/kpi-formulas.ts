@@ -1,4 +1,11 @@
-import { pool } from '../db';
+// Keep formula imports side-effect free for unit tests. Database access is
+// loaded only when a data fetcher actually runs.
+const pool = {
+  query: async (queryText: string, values?: unknown[]) => {
+    const { pool: databasePool } = await import("../db");
+    return databasePool.query(queryText, values);
+  },
+};
 
 /**
  * CENTRALIZED KPI FORMULAS

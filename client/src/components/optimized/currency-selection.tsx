@@ -8,6 +8,7 @@ import { useCurrency } from '@/hooks/use-currency';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
+import { getApiErrorMessage } from '@/lib/api-error';
 import { useLocation } from 'wouter';
 import { useAuth } from '@/hooks/use-auth';
 
@@ -137,7 +138,14 @@ const CurrencySelection: React.FC = () => {
         quotationCurrency: quotationData.quotationCurrency,
         exchangeRateAtQuote: effectiveRate,
         usdExchangeRate: effectiveRate,
-        createdBy: user?.id ?? 1
+        createdBy: user?.id ?? 1,
+        teamMembers: quotationData.teamMembers.map((member) => ({
+          roleId: member.roleId,
+          personnelId: member.personnelId,
+          hours: member.hours || 0,
+          rate: member.rate || 0,
+          cost: (member.hours || 0) * (member.rate || 0),
+        })),
       };
 
       console.log('🚀 Sending quotation data:', finalQuotationData);
@@ -158,7 +166,7 @@ const CurrencySelection: React.FC = () => {
 
     } catch (error: any) {
       console.error('Error al finalizar cotización:', error);
-      const errorMessage = error.message || 'Error desconocido';
+      const errorMessage = getApiErrorMessage(error, "Error desconocido");
       
       toast({
         title: "Error al finalizar",

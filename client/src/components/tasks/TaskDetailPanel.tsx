@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest, authFetch } from "@/lib/queryClient";
+import { getApiErrorMessage } from "@/lib/api-error";
 import { format, formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "@/hooks/use-toast";
@@ -37,6 +38,8 @@ type Task = {
   startDate?: string | null;
   dueDate?: string | null;
   estimatedHours?: number | null;
+  estimatedHoursTotal?: number;
+  estimatedHoursForWeek?: number;
   loggedHours?: number;
   status: string;
   priority: string;
@@ -348,36 +351,49 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
     queryFn: () => authFetch(`/api/tasks/projects/${task!.projectId}`).then(r => r.json()),
     enabled: !!task?.projectId,
   });
-  // Solo miembros del proyecto son asignables; si el proyecto no tiene miembros
-  // registrados todavía, se cae al listado completo para no bloquear la asignación.
+  // Solo los miembros explícitos del proyecto pueden ser responsables.
   const projectMemberIds = (projectDetail?.members || []).map(m => m.personnelId);
-  const assignablePersonnel = projectMemberIds.length > 0
-    ? allPersonnel.filter(p => projectMemberIds.includes(p.id))
-    : allPersonnel;
+  const assignablePersonnel = allPersonnel.filter(p => projectMemberIds.includes(p.id));
 
   const { data: weeklyEstimates = [], refetch: refetchEstimates } = useQuery<any[]>({
     queryKey: ["/api/tasks", taskId, "weekly-estimates"],
     queryFn: () => authFetch(`/api/tasks/${taskId}/weekly-estimates`).then(r => r.json()),
     enabled: !!taskId,
   });
+  const weeklyEstimatedHoursTotal = weeklyEstimates.reduce(
+    (sum: number, estimate: any) => sum + Number(estimate.estimatedHours ?? 0),
+    0,
+  );
 
   const addEstimateMutation = useMutation({
     mutationFn: (data: { weekStart: string; estimatedHours: number }) =>
       apiRequest(`/api/tasks/${taskId}/weekly-estimates`, "POST", data),
     onSuccess: () => {
       refetchEstimates();
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks/project"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks/hours-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/capacity/weekly"] });
       setShowAddEstimate(false);
       setNewEstHours("");
       setNewEstWeek(getMondayOf(new Date()));
       toast({ title: "Estimación guardada" });
     },
-    onError: () => toast({ title: "Error al guardar", variant: "destructive" }),
+    onError: (error) => toast({
+      title: "Error al guardar",
+      description: getApiErrorMessage(error, "No se pudo guardar la estimación."),
+      variant: "destructive",
+    }),
   });
 
   const deleteEstimateMutation = useMutation({
     mutationFn: (weekStart: string) =>
       apiRequest(`/api/tasks/${taskId}/weekly-estimates/${weekStart}`, "DELETE"),
-    onSuccess: () => refetchEstimates(),
+    onSuccess: () => {
+      refetchEstimates();
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks/project"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks/hours-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/capacity/weekly"] });
+    },
   });
 
   const handleSaveEstimate = () => {
@@ -443,6 +459,13 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
       }
       setLogHours(""); setLogDesc(""); setShowTimeLog(false);
       toast({ title: "Horas registradas" });
+    },
+    onError: (error: any) => {
+      toast({
+        variant: "destructive",
+        title: "No se pudieron registrar las horas",
+        description: error?.message || "Revisá que tu usuario esté vinculado a Personal.",
+      });
     },
   });
 
@@ -530,7 +553,7 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
       toast({ variant: "destructive", title: "Mínimo 15 min", description: "El registro mínimo es 0.25h (15 min)." });
       return;
     }
-    logTimeMutation.mutate({ personnelId: task?.assigneeId, date: logDate, hours, description: logDesc });
+    logTimeMutation.mutate({ date: logDate, hours, description: logDesc });
   };
 
   const handleDescBlur = (value: string) => {
@@ -606,21 +629,13 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
                     </h2>
                   )}
 
-                  {/* Status pills */}
+                  {/* El estado se edita desde el control izquierdo de la lista. */}
                   <div className="flex items-center gap-1.5 mt-3 flex-wrap">
                     <span className="text-[10px] text-muted-foreground uppercase tracking-wide mr-1">Estado</span>
-                    {STATUS_OPTIONS.map(s => (
-                      <button
-                        key={s.value}
-                        onClick={() => updateMutation.mutate({ status: s.value })}
-                        className={cn(
-                          "px-2.5 py-0.5 rounded-full text-xs font-medium transition-all",
-                          task.status === s.value ? s.active : s.bg
-                        )}
-                      >
-                        {s.label}
-                      </button>
-                    ))}
+                    {(() => {
+                      const status = STATUS_OPTIONS.find((option) => option.value === task.status) ?? STATUS_OPTIONS[0];
+                      return <span className={cn("px-2.5 py-0.5 rounded-full text-xs font-medium", status.active)}>{status.label}</span>;
+                    })()}
                   </div>
                   {task.updatedAt && (
                     <p className="text-[10px] text-muted-foreground mt-1">
@@ -787,36 +802,6 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
                           {p.label}
                         </button>
                       ))}
-                    </div>
-                  </div>
-
-                  {/* Horas estimadas */}
-                  <div className="flex items-center gap-3">
-                    <div className="w-28 flex-shrink-0">
-                      <p className="text-[11px] text-muted-foreground flex items-center gap-1"><Clock className="h-3 w-3" />Horas est.</p>
-                    </div>
-                    <div className="flex items-center gap-2 flex-1">
-                      <Input
-                        key={`est-${taskId}-${task.estimatedHours}`}
-                        type="number"
-                        min="0"
-                        step="0.5"
-                        defaultValue={task.estimatedHours?.toString() || ""}
-                        onBlur={e => updateMutation.mutate({ estimatedHours: e.target.value ? parseFloat(e.target.value) : null })}
-                        className="h-7 text-xs w-20 border-dashed"
-                        placeholder="0"
-                      />
-                      <span className="text-xs text-muted-foreground">horas</span>
-                      {loggedH > 0 && (
-                        <span className={cn(
-                          "text-xs px-2 py-0.5 rounded-full font-medium",
-                          task.estimatedHours && loggedH > task.estimatedHours
-                            ? "bg-red-100 text-red-700"
-                            : "bg-green-100 text-green-700"
-                        )}>
-                          {formatHours(loggedH)} registradas
-                        </span>
-                      )}
                     </div>
                   </div>
 
@@ -994,7 +979,7 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
                         Horas est. por semana
                         {weeklyEstimates.length > 0 && (
                           <span className="ml-1.5 text-muted-foreground font-normal">
-                            {weeklyEstimates.length} {weeklyEstimates.length === 1 ? "semana" : "semanas"}
+                            {weeklyEstimates.length} {weeklyEstimates.length === 1 ? "semana" : "semanas"} · {formatHours(weeklyEstimatedHoursTotal)}
                           </span>
                         )}
                       </p>
@@ -1041,16 +1026,16 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
                         <p className="text-xs text-muted-foreground italic px-3 py-2">Sin estimaciones semanales</p>
                       )}
                       {weeklyEstimates.map((est: any) => (
-                        <div key={est.week_start} className="flex items-center gap-2 px-3 py-2 hover:bg-accent/20 group text-xs">
+                        <div key={est.weekStart} className="flex items-center gap-2 px-3 py-2 hover:bg-accent/20 group text-xs">
                           <CalendarIcon className="h-3 w-3 text-muted-foreground flex-shrink-0" />
                           <span className="text-muted-foreground flex-shrink-0">
-                            Sem. {format(new Date(est.week_start + "T00:00:00"), "d MMM yyyy", { locale: es })}
+                            Sem. {format(new Date(est.weekStart + "T00:00:00"), "d MMM yyyy", { locale: es })}
                           </span>
-                          <span className="font-semibold text-primary ml-auto">{est.estimated_hours}h</span>
+                          <span className="font-semibold text-primary ml-auto">{est.estimatedHours}h</span>
                           <Button
                             variant="ghost" size="sm"
                             className="h-5 w-5 p-0 opacity-0 group-hover:opacity-100 text-red-500 flex-shrink-0"
-                            onClick={() => deleteEstimateMutation.mutate(est.week_start)}
+                            onClick={() => deleteEstimateMutation.mutate(est.weekStart)}
                           >
                             <Trash2 className="h-3 w-3" />
                           </Button>

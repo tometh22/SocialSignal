@@ -88,5 +88,7 @@ export const normMonth = (m: string | number): number => {
   
   // Formato tradicional "mmm" (ej: "ene", "ago")
   const k = str.slice(0, 3);
-  return map[k] ?? Number(str) ?? 0;
+  if (map[k] != null) return map[k];
+  const numericMonth = Number(str);
+  return Number.isFinite(numericMonth) ? numericMonth : 0;
 };

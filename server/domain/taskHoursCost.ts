@@ -1,18 +1,7 @@
 import { db } from "../db";
 import { tasks, taskTimeEntries, taskWeeklyEstimates, personnel, exchangeRates } from "@shared/schema";
 import { eq, and, gte, lte, inArray, sql } from "drizzle-orm";
-
-const MONTH_NAMES = ["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"];
-
-function getPersonnelMonthField(person: Record<string, any>, year: number, month: number, type: "hourly" | "salary" | "contract"): any {
-  if (year === 2025 && month >= 1 && month <= 12) {
-    const prefix = MONTH_NAMES[month - 1] + "2025";
-    if (type === "hourly") return person[`${prefix}HourlyRateARS`];
-    if (type === "salary") return person[`${prefix}MonthlySalaryARS`];
-    if (type === "contract") return person[`${prefix}ContractType`];
-  }
-  return null;
-}
+import { resolveCanonicalPersonnelRate } from "./personnel-rate";
 
 export interface PersonHoursCost {
   personnelId: number;
@@ -67,7 +56,11 @@ export async function getTaskHoursCost(options: {
 
   const personnelIds = [...new Set(filteredEntries.map(e => e.personnelId).filter(Boolean))] as number[];
   const allPersonnel = personnelIds.length > 0
-    ? await db.select().from(personnel).where(inArray(personnel.id, personnelIds))
+    ? await db.select({
+        id: personnel.id,
+        name: personnel.name,
+        contractType: personnel.contractType,
+      }).from(personnel).where(inArray(personnel.id, personnelIds))
     : [];
 
   const personnelMap: Record<number, any> = {};
@@ -84,57 +77,69 @@ export async function getTaskHoursCost(options: {
     const [y, m] = ym.split("-").map(Number);
     const [row] = await db.select({ rate: exchangeRates.rate })
       .from(exchangeRates)
-      .where(and(eq(exchangeRates.year, y), eq(exchangeRates.month, m)))
+      .where(and(
+        eq(exchangeRates.year, y),
+        eq(exchangeRates.month, m),
+        eq(exchangeRates.isActive, true),
+      ))
       .limit(1);
     if (row?.rate) {
       fxMap[ym] = Number(row.rate);
     }
   }
+  const exchangeRateIds = [...new Set(
+    filteredEntries
+      .map((entry) => entry.exchangeRateId)
+      .filter((id): id is number => typeof id === "number"),
+  )];
+  const referencedExchangeRates = exchangeRateIds.length > 0
+    ? await db.select({ id: exchangeRates.id, rate: exchangeRates.rate })
+        .from(exchangeRates)
+        .where(inArray(exchangeRates.id, exchangeRateIds))
+    : [];
+  const fxById = new Map(
+    referencedExchangeRates.map((rate) => [rate.id, Number(rate.rate)]),
+  );
 
   const projectMap: Record<number, { byPerson: Record<number, PersonHoursCost>; totalHours: number; totalCostUSD: number }> = {};
 
   for (const entry of filteredEntries) {
     const pid = taskProjectMap[entry.taskId];
     if (pid === null || pid === undefined) continue;
-    if (pid >= 1_000_000) continue;
-
     const person = entry.personnelId ? personnelMap[entry.personnelId] : null;
     const d = new Date(entry.date);
     const year = d.getFullYear();
     const month = d.getMonth() + 1;
     const fxKey = `${year}-${month}`;
-    const fx = fxMap[fxKey] || 1000;
+    const fx = (entry.exchangeRateId ? fxById.get(entry.exchangeRateId) : null)
+      ?? fxMap[fxKey]
+      ?? null;
 
     let costUSD = 0;
     let rateLabel = "sin tarifa";
-    let contractType = "desconocido";
+    const contractType = person?.contractType || "desconocido";
 
     if (person) {
-      const monthlyContractType = getPersonnelMonthField(person, year, month, "contract") || person.contractType || "full-time";
-      contractType = monthlyContractType;
+      let hourlyRateARS = entry.hourlyRateAtTime == null
+        ? null
+        : Number(entry.hourlyRateAtTime);
+      let totalCostARS = entry.totalCost == null
+        ? null
+        : Number(entry.totalCost);
 
-      if (monthlyContractType === "full-time") {
-        const monthlySalaryARS = getPersonnelMonthField(person, year, month, "salary") || person.monthlyFixedSalary;
-        if (monthlySalaryARS && monthlySalaryARS > 0) {
-          const hourlyARS = monthlySalaryARS / 160;
-          costUSD = (entry.hours * hourlyARS) / fx;
-          rateLabel = `ARS ${Math.round(hourlyARS).toLocaleString()}/h`;
-        } else if (person.hourlyRateARS && person.hourlyRateARS > 0) {
-          costUSD = (entry.hours * person.hourlyRateARS) / fx;
-          rateLabel = `ARS ${Math.round(person.hourlyRateARS).toLocaleString()}/h`;
-        } else {
-          costUSD = entry.hours * (person.hourlyRate || 0);
-          rateLabel = `USD ${person.hourlyRate || 0}/h`;
-        }
-      } else {
-        const hourlyRateARS = getPersonnelMonthField(person, year, month, "hourly") || person.hourlyRateARS;
-        if (hourlyRateARS && hourlyRateARS > 0) {
-          costUSD = (entry.hours * hourlyRateARS) / fx;
-          rateLabel = `ARS ${Math.round(hourlyRateARS).toLocaleString()}/h`;
-        } else {
-          costUSD = entry.hours * (person.hourlyRate || 0);
-          rateLabel = `USD ${person.hourlyRate || 0}/h`;
-        }
+      if (!(hourlyRateARS && hourlyRateARS > 0) || totalCostARS == null) {
+        const canonicalRate = await resolveCanonicalPersonnelRate(entry.personnelId, d);
+        hourlyRateARS = canonicalRate.hourlyRateARS;
+        totalCostARS = hourlyRateARS == null ? null : entry.hours * hourlyRateARS;
+      }
+
+      if (hourlyRateARS != null && hourlyRateARS > 0) {
+        rateLabel = `ARS ${Math.round(hourlyRateARS).toLocaleString("es-AR")}/h`;
+      }
+      if (totalCostARS != null && fx != null && fx > 0) {
+        costUSD = totalCostARS / fx;
+      } else if (totalCostARS != null) {
+        rateLabel = `${rateLabel} · sin cotización ${fxKey}`;
       }
     }
 

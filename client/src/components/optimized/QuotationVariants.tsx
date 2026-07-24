@@ -10,6 +10,7 @@ import { Plus, Copy, Trash2, Check, X, TrendingUp, TrendingDown, Minus, Users, C
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { apiRequest } from '@/lib/queryClient';
+import { getApiErrorMessage } from '@/lib/api-error';
 import { useToast } from '@/hooks/use-toast';
 import { useOptimizedQuote } from '@/context/optimized-quote-context';
 import { useLocation } from 'wouter';
@@ -419,7 +420,7 @@ export function QuotationVariants({
       console.error("Error al guardar:", error);
       toast({
         title: "Error al guardar",
-        description: "No se pudo guardar la cotización.",
+        description: getApiErrorMessage(error, "No se pudo guardar la cotización."),
         variant: "destructive",
       });
     } finally {
@@ -469,7 +470,7 @@ export function QuotationVariants({
       console.error("❌ Error stack:", error.stack);
       console.error("❌ quotationData at error:", quotationData);
       
-      const errorMessage = error.message || 'Error desconocido';
+      const errorMessage = getApiErrorMessage(error, "Error desconocido");
       toast({
         title: "Error al finalizar",
         description: `No se pudo finalizar la cotización: ${errorMessage}`,

@@ -292,16 +292,7 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
     staleTime: 0, // Force fresh data after fixes
   });
 
-  // Fetch estimated rates only when rate projection mode requires them
-  const needsEstimatedRates = ['projected', 'annual_avg'].includes(
-    quotationData.inflation.rateProjectionMode ?? 'current'
-  );
   const currentYear = new Date().getFullYear();
-  const { data: estimatedRatesData = [] } = useQuery<any[]>({
-    queryKey: ["/api/estimated-rates", currentYear],
-    enabled: needsEstimatedRates,
-    staleTime: 5 * 60 * 1000,
-  });
 
   // Reference date for "is this person active?" checks. A person is excluded from
   // a quotation when their activeUntil date is on/before the month being quoted —
@@ -339,94 +330,73 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
     });
   }, [personnel, quoteReferenceDate]);
 
-  // All historical months, newest → oldest. Used for explicit month lookups (when a
-  // specific month is selected — including future projections).
-  const HISTORICAL_MONTHS_DESC = [
-    'dec2026', 'nov2026', 'oct2026', 'sep2026', 'aug2026', 'jul2026',
-    'jun2026', 'may2026', 'apr2026', 'mar2026', 'feb2026', 'jan2026',
-    'dec2025', 'nov2025', 'oct2025', 'sep2025', 'aug2025', 'jul2025',
-    'jun2025', 'may2025', 'apr2025', 'mar2025', 'feb2025', 'jan2025'
-  ];
+  const MONTH_NAMES = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
+  const parseSalaryMonth = (value: string | null | undefined) => {
+    const match = value?.match(/^([a-z]{3})(\d{4})$/);
+    if (!match) return null;
+    const month = MONTH_NAMES.indexOf(match[1]) + 1;
+    return month > 0 ? { year: Number(match[2]), month } : null;
+  };
+  const salaryMonthKey = (year: number, month: number) => `${MONTH_NAMES[month - 1]}${year}`;
 
-  // Months up to and including the current calendar month (newest first).
-  // Used when salaryMonth is null ("más reciente disponible") so that future
-  // projected rates don't override the real most-recent value.
-  const CURRENT_OR_PAST_MONTHS_DESC = (() => {
-    const now = new Date();
-    const MONTH_NAMES = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
-    const currentKey = `${MONTH_NAMES[now.getMonth()]}${now.getFullYear()}`;
-    const idx = HISTORICAL_MONTHS_DESC.indexOf(currentKey);
-    return idx === -1 ? HISTORICAL_MONTHS_DESC : HISTORICAL_MONTHS_DESC.slice(idx);
-  })();
+  const resolvePersonnelRate = useCallback((
+    person: Personnel,
+    currency: string,
+    targetMonth: string | null | undefined,
+    rateMode: "current" | "projected" | "annual_avg",
+    projectStartDate?: Date | null,
+  ): number => {
+    const personBillingCurrency = (person as any).billingCurrency ?? 'ARS';
+    const useUsd = currency === 'USD'
+      || personBillingCurrency === 'USD'
+      || personBillingCurrency === 'mixed';
+    const field = useUsd ? "hourlyRateUSD" : "hourlyRateARS";
+    const historicalRates = [...((person as any).historicalRates ?? [])]
+      .sort((left: any, right: any) =>
+        (right.year * 100 + right.month) - (left.year * 100 + left.month)
+      );
+
+    if (rateMode === 'annual_avg') {
+      const averageYear = projectStartDate?.getFullYear() ?? currentYear;
+      const personRates = historicalRates.filter((r: any) =>
+        r.year === averageYear && Number(r[field]) > 0
+      );
+      if (personRates.length > 0) {
+        return personRates.reduce((sum: number, rate: any) => sum + Number(rate[field]), 0)
+          / personRates.length;
+      }
+      return 0;
+    }
+
+    const parsedMonth = parseSalaryMonth(targetMonth);
+    const referenceDate = rateMode === "projected" && projectStartDate
+      ? projectStartDate
+      : parsedMonth
+        ? new Date(parsedMonth.year, parsedMonth.month - 1, 1)
+        : new Date();
+    const referencePeriod = referenceDate.getFullYear() * 100 + referenceDate.getMonth() + 1;
+    const applicable = historicalRates.find((rate: any) =>
+      rate.year * 100 + rate.month <= referencePeriod && Number(rate[field]) > 0
+    );
+    return applicable ? Number(applicable[field]) : 0;
+  }, [currentYear]);
 
   const getPersonnelRate = useCallback((personnelId: number, targetCurrency?: string, targetMonth?: string | null) => {
     if (!personnel || personnel.length === 0) return 0;
     const person = personnel.find(p => p.id === personnelId);
     if (!person) return 0;
-
-    const currency = targetCurrency || quotationData.quotationCurrency || 'ARS';
-
-    // Personnel who bill in USD always return their USD rate regardless of quotation currency,
-    // so their cost is always denominated in USD and converted to ARS by the caller.
-    const personBillingCurrency = (person as any).billingCurrency ?? 'ARS';
-    if (currency === 'USD' || personBillingCurrency === 'USD' || personBillingCurrency === 'mixed') {
-      const usdRate = person.hourlyRate;
-      if (usdRate && usdRate > 0) return usdRate;
-      return 50;
-    }
-
-    const rateMode = quotationData.inflation.rateProjectionMode ?? 'current';
-
-    // Projected mode: use estimated rate for the project start month
-    if (rateMode === 'projected' && estimatedRatesData.length > 0) {
-      const startDate = quotationData.inflation.projectStartDate
-        ? new Date(quotationData.inflation.projectStartDate)
-        : new Date();
-      const rate = estimatedRatesData.find((r: any) =>
-        r.personnelId === personnelId &&
-        r.year === startDate.getFullYear() &&
-        r.month === startDate.getMonth() + 1
-      );
-      if (rate?.estimatedRateARS > 0) return rate.estimatedRateARS;
-    }
-
-    // Annual average mode: average of all estimated rates for the year
-    if (rateMode === 'annual_avg' && estimatedRatesData.length > 0) {
-      const personRates = estimatedRatesData.filter((r: any) =>
-        r.personnelId === personnelId && r.year === currentYear && r.estimatedRateARS > 0
-      );
-      if (personRates.length > 0) {
-        return personRates.reduce((s: number, r: any) => s + r.estimatedRateARS, 0) / personRates.length;
-      }
-    }
-
-    const month = targetMonth ?? quotationData.salaryMonth;
-
-    // 1) Si la cotización fija un mes específico, intentar ese mes primero.
-    if (month) {
-      const exact = (person as any)[`${month}HourlyRateARS`];
-      if (exact && exact > 0) return exact;
-      // If the explicit month has no data, fall through to the full list
-      // (includes future projections since the user explicitly chose that month).
-      for (const m of HISTORICAL_MONTHS_DESC) {
-        const value = (person as any)[`${m}HourlyRateARS`];
-        if (value && value > 0) return value;
-      }
-    } else {
-      // 2) Auto mode: use only current or past months so that future projected
-      // rates don't override the real most-recent value.
-      for (const m of CURRENT_OR_PAST_MONTHS_DESC) {
-        const value = (person as any)[`${m}HourlyRateARS`];
-        if (value && value > 0) return value;
-      }
-    }
-
-    if (person.hourlyRateARS && person.hourlyRateARS > 0) return person.hourlyRateARS;
-
-    return 5000;
+    const rawProjectStart = quotationData.inflation.projectStartDate;
+    const projectStartDate = rawProjectStart ? new Date(rawProjectStart) : null;
+    return resolvePersonnelRate(
+      person,
+      targetCurrency || quotationData.quotationCurrency || "ARS",
+      targetMonth ?? quotationData.salaryMonth,
+      quotationData.inflation.rateProjectionMode ?? "current",
+      projectStartDate && !Number.isNaN(projectStartDate.getTime()) ? projectStartDate : null,
+    );
   }, [personnel, quotationData.quotationCurrency, quotationData.salaryMonth,
       quotationData.inflation.rateProjectionMode, quotationData.inflation.projectStartDate,
-      estimatedRatesData, currentYear]);
+      resolvePersonnelRate]);
 
   // Returns the month key actually being used in auto-mode (null if no data found).
   // Picks the most recent month where the majority of ARS-billed active personnel
@@ -440,13 +410,25 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
       return isActive && isARS;
     });
     const threshold = arsBilledActive.length > 0 ? Math.ceil(arsBilledActive.length * 0.5) : 1;
-    for (const m of CURRENT_OR_PAST_MONTHS_DESC) {
-      const withData = arsBilledActive.filter((p: any) => ((p as any)[`${m}HourlyRateARS`] ?? 0) > 0).length;
-      if (withData >= threshold) return m;
+    const currentPeriod = new Date().getFullYear() * 100 + new Date().getMonth() + 1;
+    const availablePeriods = [...new Set(personnel.flatMap((person: any) =>
+      (person.historicalRates ?? [])
+        .filter((rate: any) => rate.year * 100 + rate.month <= currentPeriod && rate.hourlyRateARS > 0)
+        .map((rate: any) => rate.year * 100 + rate.month),
+    ))].sort((a, b) => b - a);
+    for (const period of availablePeriods) {
+      const year = Math.floor(period / 100);
+      const month = period % 100;
+      const withData = arsBilledActive.filter((person: any) =>
+        (person.historicalRates ?? []).some((rate: any) =>
+          rate.year === year && rate.month === month && rate.hourlyRateARS > 0),
+      ).length;
+      if (withData >= threshold) return salaryMonthKey(year, month);
     }
     // Fallback: any person has data
-    for (const m of CURRENT_OR_PAST_MONTHS_DESC) {
-      if (personnel.some((p: any) => ((p as any)[`${m}HourlyRateARS`] ?? 0) > 0)) return m;
+    const latestPeriod = availablePeriods[0];
+    if (latestPeriod) {
+      return salaryMonthKey(Math.floor(latestPeriod / 100), latestPeriod % 100);
     }
     return null;
   }, [personnel, quotationData.salaryMonth, quoteReferenceDate]);
@@ -812,25 +794,15 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
         if (member.personnelId) {
           const person = personnel?.find(p => p.id === member.personnelId);
           if (person) {
-            if (newCurrency === 'USD') {
-              newRate = (person.hourlyRate && person.hourlyRate > 0) ? person.hourlyRate : 50;
-            } else {
-              if (prev.salaryMonth) {
-                const exact = (person as any)[`${prev.salaryMonth}HourlyRateARS`];
-                if (exact && exact > 0) {
-                  newRate = exact;
-                }
-              }
-              if (newRate === member.rate) {
-                for (const m of HISTORICAL_MONTHS_DESC) {
-                  const value = (person as any)[`${m}HourlyRateARS`];
-                  if (value && value > 0) { newRate = value; break; }
-                }
-              }
-              if (newRate === member.rate && person.hourlyRateARS && person.hourlyRateARS > 0) {
-                newRate = person.hourlyRateARS;
-              }
-            }
+            const rawStart = prev.inflation.projectStartDate;
+            const startDate = rawStart ? new Date(rawStart) : null;
+            newRate = resolvePersonnelRate(
+              person,
+              newCurrency,
+              prev.salaryMonth,
+              prev.inflation.rateProjectionMode ?? "current",
+              startDate && !Number.isNaN(startDate.getTime()) ? startDate : null,
+            );
           }
         } else if (member.roleId) {
           const role = roles?.find(r => r.id === member.roleId);
@@ -845,7 +817,7 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
       return { ...prev, quotationCurrency: newCurrency, teamMembers: updatedMembers };
     });
     forceRecalculate();
-  }, [forceRecalculate, personnel, roles]);
+  }, [forceRecalculate, personnel, resolvePersonnelRate, roles]);
 
   // Cambia el mes histórico a considerar y re-aplica tarifas a los
   // miembros del equipo que tengan personnelId, usando el rate del mes
@@ -857,36 +829,27 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
     console.log('📅 Updating salaryMonth to:', salaryMonth);
     setQuotationData(prev => {
       const currency = prev.quotationCurrency || 'ARS';
-      if (currency !== 'ARS') {
-        return { ...prev, salaryMonth };
-      }
       const updatedMembers = prev.teamMembers.map(member => {
         if (!member.personnelId) return member;
         const person = personnel?.find(p => p.id === member.personnelId);
         if (!person) return member;
-
-        let newRate: number | null = null;
-        if (salaryMonth) {
-          const exact = (person as any)[`${salaryMonth}HourlyRateARS`];
-          if (exact && exact > 0) newRate = exact;
-        }
-        if (newRate === null) {
-          for (const m of HISTORICAL_MONTHS_DESC) {
-            const value = (person as any)[`${m}HourlyRateARS`];
-            if (value && value > 0) { newRate = value; break; }
-          }
-        }
-        if (newRate === null && person.hourlyRateARS && person.hourlyRateARS > 0) {
-          newRate = person.hourlyRateARS;
-        }
-        if (newRate === null) return member;
+        const rawStart = prev.inflation.projectStartDate;
+        const startDate = rawStart ? new Date(rawStart) : null;
+        const newRate = resolvePersonnelRate(
+          person,
+          currency,
+          salaryMonth,
+          prev.inflation.rateProjectionMode ?? "current",
+          startDate && !Number.isNaN(startDate.getTime()) ? startDate : null,
+        );
+        if (newRate <= 0) return member;
 
         return { ...member, rate: newRate, cost: member.hours * newRate };
       });
       return { ...prev, salaryMonth, teamMembers: updatedMembers };
     });
     forceRecalculate();
-  }, [personnel, forceRecalculate]);
+  }, [personnel, forceRecalculate, resolvePersonnelRate]);
 
   const updateAnalysisType = useCallback((analysisType: string) => {
     console.log('📝 Updating analysis type:', analysisType);
@@ -959,7 +922,7 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
       }
     }
 
-    if (!defaultRate) {
+    if (!defaultRate && !member.personnelId) {
       defaultRate = currency === 'USD' ? 50 : 5000;
     }
 
@@ -1204,7 +1167,14 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
         proposalLink: quotationData.proposalLink || null,
         leadId: quotationData.leadId || null,
         salaryMonth: quotationData.salaryMonth ?? null,
-        status: status
+        status: status,
+        teamMembers: quotationData.teamMembers.map((member) => ({
+          roleId: member.roleId,
+          personnelId: member.personnelId,
+          hours: member.hours || 0,
+          rate: member.rate || 0,
+          cost: (member.hours || 0) * (member.rate || 0),
+        })),
       };
 
       console.log('📤 Saving quotation with payload:', quotationPayload);
@@ -1241,10 +1211,6 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
         // Actualizar cotización existente
         console.log(`🔄 Updating existing quotation ID: ${quotationData.id}`);
 
-        // Eliminar miembros del equipo existentes antes de agregar nuevos
-        await apiRequest(`/api/quotation-team/${quotationData.id}`, 'DELETE');
-        console.log('🗑️ Existing team members cleared');
-
         savedQuotation = await apiRequest(`/api/quotations/${quotationData.id}`, 'PUT', quotationPayload);
         console.log('✅ Quotation updated:', savedQuotation);
       } else {
@@ -1255,62 +1221,6 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
 
         // Actualizar el ID en el contexto después de crear
         setQuotationData(prev => ({ ...prev, id: savedQuotation.id }));
-      }
-
-      // Save team members with proper validation
-      console.log('👥 Saving team members:', quotationData.teamMembers);
-      console.log('📊 Total team members to save:', quotationData.teamMembers.length);
-      console.log('🔍 Team members detail:', JSON.stringify(quotationData.teamMembers, null, 2));
-
-      // Verificar si hay miembros para guardar
-      if (!quotationData.teamMembers || quotationData.teamMembers.length === 0) {
-        console.warn('⚠️ No team members to save!');
-        console.warn('🔍 quotationData full state:', quotationData);
-        return savedQuotation;
-      }
-
-      for (const member of quotationData.teamMembers) {
-        // CRITICAL DEBUG - Track roleId through the process
-        console.log('🚨 CRITICAL DEBUG - Processing member:', {
-          memberId: member.id,
-          originalRoleId: member.roleId,
-          personnelId: member.personnelId,
-          fullMember: member
-        });
-
-        // IMPORTANTE: Mantener el personnelId tal como está, incluso si es genérico
-        // No convertir a null aquí, dejar que el backend lo maneje si es necesario
-        let finalPersonnelId = member.personnelId;
-
-        if (finalPersonnelId) {
-          const person = personnel.find(p => p.id === finalPersonnelId);
-          if (person && person.name.includes('Member')) {
-            console.log('⚠️ Detected generic personnel, but keeping ID for storage:', person.name, finalPersonnelId);
-          }
-        }
-
-        const teamMemberPayload = {
-          quotationId: savedQuotation.id,
-          roleId: member.roleId,
-          personnelId: finalPersonnelId, // Use cleaned personnel ID
-          hours: member.hours || 0,
-          rate: member.rate || 0,
-          cost: (member.hours || 0) * (member.rate || 0) // Ensure cost is calculated
-        };
-
-        console.log('👤 Saving team member:', teamMemberPayload);
-        console.log('🔍 DEBUG - Original member object:', member);
-        console.log('🔍 DEBUG - Member roleId type:', typeof member.roleId, 'value:', member.roleId);
-        console.log('🚨 CRITICAL - Payload roleId:', teamMemberPayload.roleId);
-
-        try {
-          await apiRequest('/api/quotation-team', 'POST', teamMemberPayload);
-          console.log('✅ Team member saved successfully');
-        } catch (memberError) {
-          console.error('❌ Error saving team member:', memberError);
-          console.error('❌ Failed payload:', teamMemberPayload);
-          // Continue saving other members even if one fails
-        }
       }
 
       // Track successful quotation completion for draft management

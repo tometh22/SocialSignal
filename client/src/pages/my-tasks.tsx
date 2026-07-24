@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest, authFetch } from "@/lib/queryClient";
 import { format, startOfWeek, endOfWeek, addWeeks, subWeeks, eachDayOfInterval, isSameDay, isToday, isWithinInterval, parseISO } from "date-fns";
@@ -6,11 +7,10 @@ import { es } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
-  ChevronLeft, ChevronRight, Plus, Calendar, List, Clock, Flag, Loader2, Check
+  ChevronLeft, ChevronRight, Calendar, List, Clock, Flag, Loader2, Check
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import TaskDetailPanel from "@/components/tasks/TaskDetailPanel";
@@ -99,10 +99,6 @@ export default function MyTasksPage() {
   const [currentWeek, setCurrentWeek] = useState(new Date());
   const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
   const [statusFilter, setStatusFilter] = useState("active");
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [createDate, setCreateDate] = useState<string | null>(null);
-  const [newTaskTitle, setNewTaskTitle] = useState("");
-  const [newTaskProjectId, setNewTaskProjectId] = useState<string>("none");
   const [overflowDay, setOverflowDay] = useState<string | null>(null);
 
   const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 });
@@ -126,11 +122,6 @@ export default function MyTasksPage() {
     onSuccess: () => refetch(),
   });
 
-  const createMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("/api/tasks", "POST", data),
-    onSuccess: () => { refetch(); setShowCreateModal(false); setNewTaskTitle(""); setCreateDate(null); },
-  });
-
   const tasks = myData?.tasks || [];
   const activeTasks = statusFilter === "active"
     ? tasks.filter(t => t.status !== "done" && t.status !== "cancelled")
@@ -148,23 +139,6 @@ export default function MyTasksPage() {
     if (!tasksByProject[key]) tasksByProject[key] = [];
     tasksByProject[key].push(task);
   }
-
-  const handleQuickCreate = (date: Date) => {
-    setCreateDate(date.toISOString());
-    setShowCreateModal(true);
-  };
-
-  const handleCreateTask = () => {
-    if (!newTaskTitle.trim()) return;
-    createMutation.mutate({
-      title: newTaskTitle.trim(),
-      projectId: newTaskProjectId !== "none" ? parseInt(newTaskProjectId) : null,
-      dueDate: createDate,
-      assigneeId: myData?.personnelId,
-      status: "todo",
-      priority: "medium",
-    });
-  };
 
   const MAX_VISIBLE = 4;
 
@@ -200,9 +174,6 @@ export default function MyTasksPage() {
               </Button>
             </div>
 
-            <Button size="sm" className="h-8 text-xs" onClick={() => { setCreateDate(null); setShowCreateModal(true); }}>
-              <Plus className="h-3.5 w-3.5 mr-1" />Nueva tarea
-            </Button>
           </div>
         </div>
 
@@ -330,12 +301,6 @@ export default function MyTasksPage() {
                             </Popover>
                           )}
 
-                          <button
-                            className="w-full text-[10px] text-muted-foreground hover:text-primary flex items-center gap-0.5 px-1 py-0.5 rounded hover:bg-accent/50 transition-colors opacity-0 hover:opacity-100 focus:opacity-100 group-hover:opacity-100"
-                            onClick={() => handleQuickCreate(day)}
-                          >
-                            <Plus className="h-2.5 w-2.5" />Agregar
-                          </button>
                         </div>
                       </div>
                     );
@@ -374,9 +339,9 @@ export default function MyTasksPage() {
                   <div className="text-center py-12 bg-card rounded-xl border">
                     <Calendar className="h-12 w-12 text-muted-foreground/30 mx-auto mb-3" />
                     <p className="text-sm text-muted-foreground">No tenés tareas asignadas</p>
-                    <Button size="sm" className="mt-3" onClick={() => setShowCreateModal(true)}>
-                      <Plus className="h-3.5 w-3.5 mr-1" />Crear primera tarea
-                    </Button>
+                    <Link href="/tasks/projects">
+                      <Button size="sm" className="mt-3">Ir a proyectos</Button>
+                    </Link>
                   </div>
                 ) : (
                   Object.entries(tasksByProject).map(([projectLabel, projectTasks]) => {
@@ -449,54 +414,6 @@ export default function MyTasksPage() {
               </div>
             )}
           </>
-        )}
-
-        {/* Quick create modal */}
-        {showCreateModal && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-card rounded-xl shadow-xl border w-full max-w-md p-5">
-              <h3 className="font-bold text-base mb-4">Nueva tarea</h3>
-              <div className="space-y-3">
-                <Input
-                  autoFocus
-                  value={newTaskTitle}
-                  onChange={e => setNewTaskTitle(e.target.value)}
-                  onKeyDown={e => { if (e.key === "Enter") handleCreateTask(); if (e.key === "Escape") { setShowCreateModal(false); setNewTaskTitle(""); } }}
-                  placeholder="Nombre de la tarea..."
-                  className="h-9"
-                />
-                <Select value={newTaskProjectId} onValueChange={setNewTaskProjectId}>
-                  <SelectTrigger className="h-9 text-sm">
-                    <SelectValue placeholder="Seleccionar proyecto (opcional)" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Sin proyecto</SelectItem>
-                    {allProjects.map(p => (
-                      <SelectItem key={p.id} value={p.id.toString()}>{p.clientName} · {p.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {newTaskProjectId !== "none" && (() => {
-                  const proj = allProjects.find(p => p.id === parseInt(newTaskProjectId));
-                  return proj?.clientName ? (
-                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                      <span>Cliente:</span>
-                      <Badge variant="outline" className="text-xs px-1.5 py-0 font-normal">{proj.clientName}</Badge>
-                    </div>
-                  ) : null;
-                })()}
-                {createDate && (
-                  <p className="text-xs text-muted-foreground">Fecha: {format(new Date(createDate), "dd MMMM yyyy", { locale: es })}</p>
-                )}
-              </div>
-              <div className="flex justify-end gap-2 mt-4">
-                <Button variant="ghost" size="sm" onClick={() => { setShowCreateModal(false); setNewTaskTitle(""); }}>Cancelar</Button>
-                <Button size="sm" onClick={handleCreateTask} disabled={!newTaskTitle.trim() || createMutation.isPending}>
-                  {createMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Crear tarea"}
-                </Button>
-              </div>
-            </div>
-          </div>
         )}
 
         <TaskDetailPanel

@@ -11,6 +11,8 @@ import {
   Plus, Database, Lock, Unlock,
 } from "lucide-react";
 import { Link } from "wouter";
+import { cn } from "@/lib/utils";
+import { isProjectCreatedRecently } from "@shared/utils/projectActivity";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -55,6 +57,7 @@ export type ProjectItem = {
   startMonthKey?: string;
   endMonthKey?: string;
   lastActivity?: string;
+  createdAt?: string | null;
   isFinished?: boolean;
   supportsRollup?: boolean;
   allowFinish?: boolean;
@@ -251,6 +254,7 @@ function transformBackendResponse(backendData: any): ProjectsApi {
       startMonthKey: p.startMonthKey,
       endMonthKey: p.endMonthKey,
       lastActivity: p.lastActivity,
+      createdAt: p.createdAt ?? null,
       isFinished: p.isFinished,
       supportsRollup: p.supportsRollup,
       allowFinish: p.allowFinish,
@@ -304,6 +308,9 @@ function isRecentlyActive(p: ProjectItem, period: string): boolean {
     const [lY, lM] = p.lastActivity.split("-").map(Number);
     const diff = (pY - lY) * 12 + (pM - lM);
     return diff <= 2;
+  }
+  if (p.createdAt) {
+    return isProjectCreatedRecently(p.createdAt, period);
   }
   return false;
 }

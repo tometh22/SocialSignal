@@ -10,7 +10,6 @@ import { useAuth } from "@/hooks/use-auth";
 import { usePermissions, AppSection } from "@/hooks/use-permissions";
 import { Badge } from "@/components/ui/badge";
 import { authFetch } from "@/lib/queryClient";
-import NewProjectDialog from "@/components/tasks/NewProjectDialog";
 import CreateReviewDialog from "@/components/review/CreateReviewDialog";
 import { reviewApi, reviewKeys, roomColor, type ReviewRoomSummary } from "@/lib/review-api";
 
@@ -37,7 +36,6 @@ import {
   ClipboardList,
   Gauge,
   CalendarCheck,
-  TrendingUp,
   Calendar,
   Receipt,
   MessageSquare,
@@ -99,7 +97,7 @@ interface SidebarFixedProps {
 export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps = {}) {
   const { user, logoutMutation } = useAuth();
   const { hasPermission } = usePermissions();
-  const [currentPath] = useLocation();
+  const [currentPath, setLocation] = useLocation();
   // En mobile (dentro del drawer) nunca está colapsado - el cierre se hace cerrando el drawer
   const [isCollapsedState, setIsCollapsed] = useState(false);
   const isCollapsed = mobileMode ? false : isCollapsedState;
@@ -107,7 +105,6 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
   const [crmOverdue, setCrmOverdue] = useState(0);
   const [dueReminders, setDueReminders] = useState<DueReminder[]>([]);
   const [bellOpen, setBellOpen] = useState(false);
-  const [newProjectOpen, setNewProjectOpen] = useState(false);
   const [projectsExpanded, setProjectsExpanded] = useState(false);
   const [reviewsExpanded, setReviewsExpanded] = useState(true);
   const [newReviewOpen, setNewReviewOpen] = useState(false);
@@ -233,7 +230,6 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
         { href: "/tasks/hours-dashboard", title: "Panel de Horas", icon: BarChart2, description: "Horas por persona y proyecto", permission: 'projects' as AppSection },
         { href: "/operations/capacity", title: "Capacidad Semanal", icon: Gauge, description: "Capacidad operativa por persona", permission: 'operations' as AppSection },
         { href: "/operations/monthly-closing", title: "Cierre Mensual", icon: CalendarCheck, description: "Cierre de horas del mes", permission: 'operations' as AppSection },
-        { href: "/operations/estimated-rates", title: "Valor Hora Estimada", icon: TrendingUp, description: "Proyección de tarifas para cierre y cotizaciones", permission: 'operations' as AppSection },
         { href: "/operations/holidays", title: "Feriados", icon: Calendar, description: "Gestión de feriados", permission: 'operations' as AppSection },
         { href: "/operations/absences", title: "Ausencias", icon: UserX, description: "Vacaciones y licencias del equipo", permission: 'operations' as AppSection },
       ]
@@ -505,7 +501,7 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
                   <div className="mt-1">
                     {!isCollapsed ? (
                       <>
-                        <div className="flex items-center justify-between px-3 py-1">
+                        <div className="flex items-center px-3 py-1">
                           <button
                             onClick={() => setProjectsExpanded(v => !v)}
                             className="flex items-center gap-1 text-[10px] font-semibold text-white/30 uppercase tracking-widest hover:text-white/60 transition-colors flex-1"
@@ -515,13 +511,6 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
                               ? <ChevronDown className="h-3 w-3 ml-1" />
                               : <ChevronRight className="h-3 w-3 ml-1" />
                             }
-                          </button>
-                          <button
-                            className="h-4 w-4 flex items-center justify-center rounded hover:bg-white/10 text-white/40 hover:text-white transition-colors"
-                            onClick={() => setNewProjectOpen(true)}
-                            title="Nuevo proyecto"
-                          >
-                            <Plus className="h-3 w-3" />
                           </button>
                         </div>
 
@@ -570,23 +559,7 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
                           </div>
                         )}
                       </>
-                    ) : (
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-8 w-full justify-center p-0 hover:bg-white/10 text-white/40"
-                              onClick={() => setNewProjectOpen(true)}
-                            >
-                              <Plus className="h-3.5 w-3.5" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent side="right">Nuevo proyecto</TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    )}
+                    ) : null}
                   </div>
                 )}
 
@@ -762,7 +735,6 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
         </div>
       </div>
 
-      <NewProjectDialog open={newProjectOpen} onClose={() => setNewProjectOpen(false)} />
       <CreateReviewDialog open={newReviewOpen} onClose={() => setNewReviewOpen(false)} />
     </TooltipProvider>
   );

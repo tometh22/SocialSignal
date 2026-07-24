@@ -4224,19 +4224,25 @@ class GoogleSheetsWorkingService {
       }
 
       const headers: string[] = response.data.values[0].map((h: any) => String(h || '').trim());
+      const normalizedHeaders = headers.map((header) =>
+        header.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase()
+      );
       const importBatch = `activo_${periodKey}_${Date.now()}`;
 
       for (let i = 1; i < response.data.values.length; i++) {
         const row = response.data.values[i];
         if (!row || row.length === 0) continue;
 
-        const get = (name: string) => {
-          const idx = headers.findIndex(h => h.toLowerCase().includes(name.toLowerCase()));
-          return idx >= 0 ? String(row[idx] || '').trim() : '';
+        const get = (...names: string[]) => {
+          const normalizedNames = names.map((name) =>
+            name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase()
+          );
+          const idx = normalizedHeaders.findIndex((header) => normalizedNames.includes(header));
+          return idx >= 0 ? row[idx] : '';
         };
 
         const rowPeriod = (() => {
-          const mesRaw = get('mes') || get('period') || get('fecha');
+          const mesRaw = get('mes', 'periodo', 'fecha');
           if (!mesRaw) return null;
           const d = new Date(mesRaw);
           if (!isNaN(d.getTime())) return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
@@ -4245,11 +4251,13 @@ class GoogleSheetsWorkingService {
 
         if (rowPeriod && rowPeriod !== periodKey) continue;
 
-        const concepto = get('concepto') || get('detalle') || get('descripcion');
-        const clienteNombre = get('cliente') || get('razon social') || get('razon');
-        const montoARSRaw = parseFloat((get('monto ars') || get('ars') || '0').replace(/[^0-9.-]/g, '')) || null;
-        const montoUSDRaw = parseFloat((get('monto usd') || get('usd') || '0').replace(/[^0-9.-]/g, '')) || null;
-        const nroFactura = get('factura') || get('nro') || get('numero') || null;
+        const concepto = String(get('concepto', 'detalle', 'descripcion') || '').trim();
+        const clienteNombre = String(get('cliente', 'razon social') || '').trim();
+        const montoARSRaw = parseMoneySmart(get('monto ars', 'importe ars', 'ars')) || null;
+        const montoUSDRaw = parseMoneySmart(get('monto usd', 'importe usd', 'usd')) || null;
+        const cotizacionRaw = parseMoneySmart(get('cotizacion', 'tipo de cambio', 'tc')) || null;
+        const montoTotalUSD = montoUSDRaw || (montoARSRaw && cotizacionRaw ? montoARSRaw / cotizacionRaw : null);
+        const nroFactura = String(get('factura', 'nro factura', 'numero factura') || '').trim() || null;
 
         if (!concepto && !clienteNombre) continue;
 
@@ -4267,6 +4275,8 @@ class GoogleSheetsWorkingService {
             clienteNombre: clienteNombre || null,
             montoARS: montoARSRaw ? String(montoARSRaw) : null,
             montoUSD: montoUSDRaw ? String(montoUSDRaw) : null,
+            cotizacion: cotizacionRaw ? String(cotizacionRaw) : null,
+            montoTotalUSD: montoTotalUSD ? String(montoTotalUSD) : null,
             nroFactura,
             importBatch,
           };
@@ -4311,19 +4321,25 @@ class GoogleSheetsWorkingService {
       }
 
       const headers: string[] = response.data.values[0].map((h: any) => String(h || '').trim());
+      const normalizedHeaders = headers.map((header) =>
+        header.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase()
+      );
       const importBatch = `pasivo_${periodKey}_${Date.now()}`;
 
       for (let i = 1; i < response.data.values.length; i++) {
         const row = response.data.values[i];
         if (!row || row.length === 0) continue;
 
-        const get = (name: string) => {
-          const idx = headers.findIndex(h => h.toLowerCase().includes(name.toLowerCase()));
-          return idx >= 0 ? String(row[idx] || '').trim() : '';
+        const get = (...names: string[]) => {
+          const normalizedNames = names.map((name) =>
+            name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase()
+          );
+          const idx = normalizedHeaders.findIndex((header) => normalizedNames.includes(header));
+          return idx >= 0 ? row[idx] : '';
         };
 
         const rowPeriod = (() => {
-          const mesRaw = get('mes') || get('period') || get('fecha emision');
+          const mesRaw = get('mes', 'periodo', 'fecha emision');
           if (!mesRaw) return null;
           const d = new Date(mesRaw);
           if (!isNaN(d.getTime())) return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
@@ -4332,13 +4348,15 @@ class GoogleSheetsWorkingService {
 
         if (rowPeriod && rowPeriod !== periodKey) continue;
 
-        const detalle = get('detalle') || get('persona') || get('proveedor') || get('nombre');
+        const detalle = String(get('detalle', 'persona', 'proveedor', 'nombre') || '').trim();
         if (!detalle) continue;
 
-        const subtipoCosto = get('subtipo') || get('tipo costo') || null;
-        const montoARSRaw = parseFloat((get('monto ars') || get('ars') || '0').replace(/[^0-9.-]/g, '')) || null;
-        const montoUSDRaw = parseFloat((get('monto usd') || get('usd') || '0').replace(/[^0-9.-]/g, '')) || null;
-        const fechaEmisionRaw = get('emision') || get('fecha emision') || null;
+        const subtipoCosto = String(get('subtipo', 'tipo costo', 'subtipo costo') || '').trim() || null;
+        const montoARSRaw = parseMoneySmart(get('monto ars', 'importe ars', 'ars')) || null;
+        const montoUSDRaw = parseMoneySmart(get('monto usd', 'importe usd', 'usd')) || null;
+        const cotizacionRaw = parseMoneySmart(get('cotizacion', 'tipo de cambio', 'tc')) || null;
+        const montoTotalUSD = montoUSDRaw || (montoARSRaw && cotizacionRaw ? montoARSRaw / cotizacionRaw : null);
+        const fechaEmisionRaw = get('emision', 'fecha emision') || null;
         const fechaEmision = fechaEmisionRaw ? (() => { const d = new Date(fechaEmisionRaw); return isNaN(d.getTime()) ? null : d; })() : null;
 
         try {
@@ -4358,6 +4376,8 @@ class GoogleSheetsWorkingService {
             subtipoCosto: subtipoCosto || null,
             montoARS: montoARSRaw ? String(montoARSRaw) : null,
             montoUSD: montoUSDRaw ? String(montoUSDRaw) : null,
+            cotizacion: cotizacionRaw ? String(cotizacionRaw) : null,
+            montoTotalUSD: montoTotalUSD ? String(montoTotalUSD) : null,
             fechaEmision,
             importBatch,
           };

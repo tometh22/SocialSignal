@@ -14,7 +14,7 @@ import { TASK_STATUS_CONFIG, type TaskStatus } from "@/constants/task-statuses";
 import TaskCalendarView from "@/components/tasks/TaskCalendarView";
 import {
   Briefcase, FileText, Target, Users, ClipboardList, BarChart2,
-  Plus, TrendingUp, Gauge, CalendarCheck, LayoutDashboard, Building2,
+  Plus, Gauge, CalendarCheck, LayoutDashboard, Building2,
   CheckSquare, Calendar, ArrowRight, AlertTriangle, AlertCircle,
   Info, Lightbulb, ChevronRight, Zap, Clock, ListTodo, UserX
 } from "lucide-react";
@@ -192,7 +192,6 @@ export default function HomeDashboard() {
   const operationsLinks: QuickLink[] = [
     { href: "/operations/capacity", title: "Capacidad Semanal", description: "Capacidad por persona", icon: Gauge, color: "bg-indigo-600" },
     { href: "/operations/monthly-closing", title: "Cierre Mensual", description: "Reconciliación de horas", icon: CalendarCheck, color: "bg-indigo-600" },
-    { href: "/operations/estimated-rates", title: "Valor Hora", description: "Proyección de rates", icon: TrendingUp, color: "bg-indigo-600" },
     { href: "/operations/holidays", title: "Feriados", description: "Gestión de feriados", icon: Calendar, color: "bg-indigo-600" },
     { href: "/operations/absences", title: "Ausencias", description: "Vacaciones y licencias", icon: UserX, color: "bg-indigo-600" },
   ];
