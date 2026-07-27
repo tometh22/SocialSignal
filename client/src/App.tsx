@@ -3,72 +3,72 @@ import { Toaster } from "@/components/ui/toaster";
 import GlobalTimerWidget from "@/components/tasks/GlobalTimerWidget";
 import ErrorBoundary from "@/components/error-boundary";
 import NotFound from "@/pages/not-found";
+import { lazy, Suspense, useEffect, useState } from "react";
 // Core Pages
-import ExecutiveDashboardV2 from "@/pages/executive-dashboard-v2";
-import OptimizedQuote from "@/pages/optimized-quote";
+const ExecutiveDashboardV2 = lazy(() => import("@/pages/executive-dashboard-v2"));
+const OptimizedQuote = lazy(() => import("@/pages/optimized-quote"));
 import { OptimizedQuoteProvider } from "@/context/optimized-quote-context";
-import ManageQuotes from "@/pages/manage-quotes";
-import QuotationDetail from "@/pages/quotation-detail";
-import QuoteRedirect from "@/pages/quote-redirect";
-import Clients from "@/pages/clients";
-import Admin from "@/pages/admin-fixed";
-import AdminInflation from "@/pages/admin-inflation";
-import AdminDataSources from "@/pages/admin-data-sources";
+const ManageQuotes = lazy(() => import("@/pages/manage-quotes"));
+const QuotationDetail = lazy(() => import("@/pages/quotation-detail"));
+const QuoteRedirect = lazy(() => import("@/pages/quote-redirect"));
+const Clients = lazy(() => import("@/pages/clients"));
+const Admin = lazy(() => import("@/pages/admin-fixed"));
+const AdminInflation = lazy(() => import("@/pages/admin-inflation"));
+const AdminDataSources = lazy(() => import("@/pages/admin-data-sources"));
 
 // Project Management Pages
-import ActiveProjectsNext from "@/pages/active-projects-next";
-import ProjectDetail from "@/pages/project-detail";
-import ProjectSettings from "@/pages/project-settings";
-import NewProjectWithTooltips from "@/pages/new-project-with-tooltips";
-import TimeEntries from "@/pages/time-entries";
-import MyInvoices from "@/pages/my-invoices";
-import AdminProviders from "@/pages/admin-providers";
-import ProviderDashboard from "@/pages/provider/dashboard";
-import EditProject from "@/pages/edit-project";
+const ActiveProjectsNext = lazy(() => import("@/pages/active-projects-next"));
+const ProjectDetail = lazy(() => import("@/pages/project-detail"));
+const ProjectSettings = lazy(() => import("@/pages/project-settings"));
+const NewProjectWithTooltips = lazy(() => import("@/pages/new-project-with-tooltips"));
+const TimeEntries = lazy(() => import("@/pages/time-entries"));
+const MyInvoices = lazy(() => import("@/pages/my-invoices"));
+const AdminProviders = lazy(() => import("@/pages/admin-providers"));
+const ProviderDashboard = lazy(() => import("@/pages/provider/dashboard"));
+const EditProject = lazy(() => import("@/pages/edit-project"));
 
 // Analytics & Specialized Pages
-import ProjectAnalyticsView from "@/pages/project-analytics-view";
-import ClientSummaryCompact from "@/pages/client-summary-compact";
-import QualityScores from "@/pages/quality-scores";
-import QuarterlyNpsSurvey from "@/pages/quarterly-nps-survey";
-import CurrencyDemo from "@/pages/currency-demo";
-import GoogleSheetsManager from "@/pages/google-sheets-manager";
-import ExecutiveOperativo from "@/pages/Executive/Operativo";
-import ExecutiveFinanciero from "@/pages/Executive/Financiero";
-import CRMPage from "@/pages/crm";
-import CRMLeadPage from "@/pages/crm-lead";
-import StatusSemanalPage from "@/pages/status-semanal";
-import ReviewHubPage from "@/pages/review/hub";
-import ReviewRoomPage from "@/pages/review/room";
-import ActivoPage from "@/pages/activo";
-import PasivoPage from "@/pages/pasivo";
-import ProvisionsPage from "@/pages/provisions";
-import CashflowPage from "@/pages/cashflow";
-import ClientPnlPage from "@/pages/client-pnl";
+const ProjectAnalyticsView = lazy(() => import("@/pages/project-analytics-view"));
+const ClientSummaryCompact = lazy(() => import("@/pages/client-summary-compact"));
+const QualityScores = lazy(() => import("@/pages/quality-scores"));
+const QuarterlyNpsSurvey = lazy(() => import("@/pages/quarterly-nps-survey"));
+const CurrencyDemo = lazy(() => import("@/pages/currency-demo"));
+const GoogleSheetsManager = lazy(() => import("@/pages/google-sheets-manager"));
+const ExecutiveOperativo = lazy(() => import("@/pages/Executive/Operativo"));
+const ExecutiveFinanciero = lazy(() => import("@/pages/Executive/Financiero"));
+const CRMPage = lazy(() => import("@/pages/crm"));
+const CRMLeadPage = lazy(() => import("@/pages/crm-lead"));
+const ReviewHubPage = lazy(() => import("@/pages/review/hub"));
+const ReviewRoomPage = lazy(() => import("@/pages/review/room"));
+const ActivoPage = lazy(() => import("@/pages/activo"));
+const PasivoPage = lazy(() => import("@/pages/pasivo"));
+const ProvisionsPage = lazy(() => import("@/pages/provisions"));
+const CashflowPage = lazy(() => import("@/pages/cashflow"));
+const ClientPnlPage = lazy(() => import("@/pages/client-pnl"));
 
 // Task Management Module
-import MyTasksPage from "@/pages/my-tasks";
-import TeamCalendarPage from "@/pages/team-calendar";
-import HoursDashboardPage from "@/pages/hours-dashboard";
-import ProjectsHubPage from "@/pages/tasks/projects-hub";
-import ProjectTasksPage from "@/pages/tasks/project-tasks-page";
-import TasksHomePage from "@/pages/tasks/tasks-home";
+const MyTasksPage = lazy(() => import("@/pages/my-tasks"));
+const TeamCalendarPage = lazy(() => import("@/pages/team-calendar"));
+const HoursDashboardPage = lazy(() => import("@/pages/hours-dashboard"));
+const ProjectsHubPage = lazy(() => import("@/pages/tasks/projects-hub"));
+const ProjectTasksPage = lazy(() => import("@/pages/tasks/project-tasks-page"));
+const TasksHomePage = lazy(() => import("@/pages/tasks/tasks-home"));
 
 
 // Authentication & Utilities
 import AuthPage from "@/pages/auth-page";
-import EditDeliverable from "@/pages/edit-deliverable";
-import EditRobustnessPage from "@/pages/edit-robustness";
-import AlwaysOnProjectView from "@/pages/always-on-project-view";
-import RecurringTemplatesPage from "@/pages/recurring-templates";
-import AdminUsersPage from "@/pages/admin-users";
-import CapacityDashboard from "@/pages/capacity-dashboard";
-import MonthlyClosing from "@/pages/monthly-closing";
-import EstimatedRates from "@/pages/estimated-rates";
-import HolidaysManagement from "@/pages/holidays-management";
-import PersonnelAbsences from "@/pages/personnel-absences";
+const EditDeliverable = lazy(() => import("@/pages/edit-deliverable"));
+const EditRobustnessPage = lazy(() => import("@/pages/edit-robustness"));
+const AlwaysOnProjectView = lazy(() => import("@/pages/always-on-project-view"));
+const RecurringTemplatesPage = lazy(() => import("@/pages/recurring-templates"));
+const AdminUsersPage = lazy(() => import("@/pages/admin-users"));
+const CapacityDashboard = lazy(() => import("@/pages/capacity-dashboard"));
+const MonthlyClosing = lazy(() => import("@/pages/monthly-closing"));
+const EstimatedRates = lazy(() => import("@/pages/estimated-rates"));
+const HolidaysManagement = lazy(() => import("@/pages/holidays-management"));
+const PersonnelAbsences = lazy(() => import("@/pages/personnel-absences"));
 import HomeDashboard from "@/pages/home-dashboard";
-import UnauthorizedPage from "@/pages/unauthorized";
+const UnauthorizedPage = lazy(() => import("@/pages/unauthorized"));
 import SidebarFixed from "@/components/layout/sidebar-fixed";
 import Topbar from "@/components/layout/topbar";
 import { Sheet, SheetContent, SheetTitle, SheetDescription } from "@/components/ui/sheet";
@@ -76,8 +76,6 @@ import { AuthProvider } from "@/hooks/use-auth";
 import { ChatProvider } from "@/hooks/use-chat";
 import { ProtectedRoute } from "@/lib/protected-route";
 import { ImageRefreshProvider } from "@/contexts/ImageRefreshContext";
-
-import { useEffect, useState } from "react";
 
 // Wrapper para procesar parámetros de consulta para OptimizedQuote
 function OptimizedQuoteWrapper() {
@@ -117,6 +115,21 @@ function OptimizedQuotePathWrapper({ params }: { params: { id: string } }) {
   );
 }
 
+function AppRouteFallback() {
+  return (
+    <div className="mx-auto max-w-[1440px] space-y-4" role="status" aria-label="Cargando pantalla">
+      <div className="h-40 animate-pulse rounded-3xl border border-white/80 bg-white/75" />
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {[0, 1, 2, 3].map((item) => (
+          <div key={item} className="h-24 animate-pulse rounded-2xl border border-white/80 bg-white/70" />
+        ))}
+      </div>
+      <div className="h-72 animate-pulse rounded-2xl border border-white/80 bg-white/70" />
+      <span className="sr-only">Cargando…</span>
+    </div>
+  );
+}
+
 function AppRoutes() {
   // Set document title - permite modo claro para contenido principal pero mantiene sidebar oscura
   const [location] = useLocation();
@@ -141,7 +154,7 @@ function AppRoutes() {
       <Route path="/auth" component={AuthPage} />
 
       <Route path="*">
-        <div className="flex h-[100dvh] overflow-hidden bg-background">
+        <div className="app-shell flex h-[100dvh] overflow-hidden bg-background">
           {/* Sidebar permanente en desktop */}
           <div className="hidden lg:flex">
             <SidebarFixed />
@@ -163,8 +176,9 @@ function AppRoutes() {
 
           <div className="flex flex-col flex-1 overflow-hidden min-w-0">
             <Topbar onMenuClick={() => setMobileSidebarOpen(true)} />
-            <main className="flex-1 overflow-y-auto overflow-x-hidden">
-              <div className="max-w-full p-3 sm:p-4">
+            <main className="app-main flex-1 overflow-y-auto overflow-x-hidden">
+              <div className="app-content max-w-full p-3 sm:p-5 lg:p-6">
+                <Suspense fallback={<AppRouteFallback />}>
                 <Switch>
                   {/* Unauthorized */}
                   <Route path="/unauthorized" component={UnauthorizedPage} />
@@ -269,6 +283,7 @@ function AppRoutes() {
                   
                   <Route component={NotFound} />
                 </Switch>
+                </Suspense>
               </div>
             </main>
           </div>

@@ -5,9 +5,10 @@ import { queryClient, apiRequest, authFetch } from "@/lib/queryClient";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { PageHeading, SectionHeading } from "@/components/layout/page-heading";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { FolderOpen, Clock, ChevronRight, CalendarIcon, Check } from "lucide-react";
+import { FolderOpen, Clock, ChevronRight, CalendarIcon, Check, ListTodo, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
 import { format } from "date-fns";
@@ -82,6 +83,8 @@ function CircleCheck({
   return (
     <button
       onClick={onClick}
+      type="button"
+      aria-label={checked ? "Marcar tarea como pendiente" : "Marcar tarea como completada"}
       className={cn(
         "flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center",
         "transition-all duration-200 ease-in-out focus:outline-none",
@@ -122,9 +125,11 @@ function DateButton({
       <PopoverTrigger asChild>
         <button
           onClick={e => { e.stopPropagation(); setOpen(true); }}
+          type="button"
+          aria-label={date ? `Cambiar fecha: ${format(new Date(date), "d MMM", { locale: es })}` : "Asignar fecha"}
           className={cn(
             "flex items-center gap-1 px-1.5 py-0.5 rounded text-xs transition-all duration-150",
-            "opacity-0 group-hover:opacity-100",
+            "opacity-100 sm:opacity-0 sm:group-hover:opacity-100",
             date ? (
               overdue
                 ? "text-red-500 font-medium opacity-100 hover:bg-red-50"
@@ -235,7 +240,7 @@ function TabBar({
   counts: { upcoming: number; in_progress: number; overdue: number; done: number };
 }) {
   return (
-    <div className="flex gap-0 border-b border-border">
+    <div className="flex max-w-full gap-0 overflow-x-auto border-b border-border">
       {([
         ["upcoming",    "Próximas"],
         ["in_progress", "En curso"],
@@ -363,39 +368,61 @@ export default function TasksHomePage() {
   const MY_LIMIT = 6;
 
   return (
-    <div className="space-y-5 max-w-6xl mx-auto">
-      {/* Greeting header */}
-      <div className="flex items-center gap-3">
-        <Avatar className="h-10 w-10 ring-2 ring-primary/20 flex-shrink-0">
-          <AvatarImage src={(user as any)?.avatar || ""} />
-          <AvatarFallback className="bg-primary text-primary-foreground text-sm font-bold">
-            {user?.firstName?.charAt(0)}{user?.lastName?.charAt(0)}
-          </AvatarFallback>
-        </Avatar>
-        <div>
-          <p className="text-xs text-muted-foreground">{capitalize(formatDateFull())}</p>
-          <h1 className="text-xl font-bold text-foreground leading-tight">
-            {getGreeting()}, {firstName}
-          </h1>
-        </div>
-      </div>
+    <div className="mx-auto max-w-[1320px] space-y-6">
+      <PageHeading
+        eyebrow={capitalize(formatDateFull())}
+        title={<>{getGreeting()}, {firstName}.</>}
+        description="Tu centro de ejecución: prioridades, proyectos y calendario organizados para que el trabajo avance."
+        actions={
+          <>
+            <Button asChild variant="outline">
+              <Link href="/tasks/projects"><FolderOpen className="h-4 w-4" />Proyectos</Link>
+            </Button>
+            <Button asChild>
+              <Link href="/tasks/my-tasks"><ListTodo className="h-4 w-4" />Ver mis tareas</Link>
+            </Button>
+          </>
+        }
+        aside={
+          <div className="flex h-full min-w-52 flex-col justify-center rounded-2xl border border-indigo-100 bg-indigo-50/60 p-4">
+            <div className="flex items-center gap-2 text-xs font-semibold text-indigo-700">
+              <Sparkles className="h-4 w-4" />Foco de hoy
+            </div>
+            <p className="mt-2 text-3xl font-bold tracking-[-0.05em] text-indigo-950">
+              {taskCounts.in_progress}
+            </p>
+            <p className="text-[11px] text-indigo-700/70">tareas actualmente en curso</p>
+          </div>
+        }
+      />
 
-      <div className="grid grid-cols-2 gap-4">
-        <div className="rounded-xl border bg-card p-4 shadow-sm">
-          <p className="text-xs text-muted-foreground">Horas cargadas esta semana</p>
-          <p className="mt-1 text-2xl font-bold tabular-nums">{myHours.weekHours.toFixed(2)}h</p>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="mind-kpi flex items-center gap-4 p-4 sm:p-5">
+          <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-primary/[0.08] text-primary">
+            <Clock className="h-5 w-5" />
+          </div>
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Horas esta semana</p>
+            <p className="mt-1 text-2xl font-bold tracking-[-0.04em] tabular-nums">{myHours.weekHours.toFixed(2)}h</p>
+          </div>
         </div>
-        <div className="rounded-xl border bg-card p-4 shadow-sm">
-          <p className="text-xs text-muted-foreground">Horas cargadas este mes</p>
-          <p className="mt-1 text-2xl font-bold tabular-nums">{myHours.monthHours.toFixed(2)}h</p>
+        <div className="mind-kpi flex items-center gap-4 p-4 sm:p-5">
+          <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-indigo-500/[0.08] text-indigo-600">
+            <CalendarIcon className="h-5 w-5" />
+          </div>
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Horas este mes</p>
+            <p className="mt-1 text-2xl font-bold tracking-[-0.04em] tabular-nums">{myHours.monthHours.toFixed(2)}h</p>
+          </div>
         </div>
       </div>
 
       {/* Top two-column widgets */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <SectionHeading title="Tu espacio de trabajo" description="Tareas asignadas y proyectos recientes, en contexto." />
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
 
         {/* My Tasks widget */}
-        <div className="bg-card rounded-xl border shadow-sm overflow-hidden flex flex-col">
+        <div className="mind-panel overflow-hidden flex flex-col">
           <div className="flex items-center justify-between px-4 pt-4 pb-1">
             <div className="flex items-center gap-2">
               <Avatar className="h-6 w-6">
@@ -454,7 +481,7 @@ export default function TasksHomePage() {
         </div>
 
         {/* Projects widget */}
-        <div className="bg-card rounded-xl border shadow-sm overflow-hidden flex flex-col">
+        <div className="mind-panel overflow-hidden flex flex-col">
           <div className="flex items-center justify-between px-4 pt-4 pb-3">
             <div className="flex items-center gap-2">
               <FolderOpen className="h-4 w-4 text-primary" />
@@ -482,7 +509,7 @@ export default function TasksHomePage() {
                   <div className="space-y-1">
                     {clientProjects.map((proj) => (
                       <Link key={proj.id} href={`/tasks/projects/${proj.id}`}>
-                        <div className="flex items-center gap-2 rounded-lg border border-border/60 p-2 hover:bg-muted/30">
+                        <div className="mind-interactive-card flex items-center gap-2 rounded-xl border border-border/60 p-2.5 hover:bg-muted/30">
                           <span className={cn(
                             "inline-flex h-6 w-6 items-center justify-center rounded-md text-[10px] font-bold text-white",
                             getProjectColor(proj.id),
@@ -512,7 +539,7 @@ export default function TasksHomePage() {
       {/* Calendario de mis tareas — embebido en la home (estilo Asana), apilado
           debajo de Mis tareas y Proyectos. Muestra el período (inicio→entrega)
           de cada tarea asignada. */}
-      <div className="bg-card rounded-xl border shadow-sm overflow-hidden">
+      <div className="mind-panel overflow-hidden">
         <div className="flex items-center gap-2 px-4 pt-4 pb-2">
           <CalendarIcon className="h-4 w-4 text-primary" />
           <h2 className="text-sm font-semibold">Mi calendario</h2>
