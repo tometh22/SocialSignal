@@ -13,6 +13,8 @@ import {
 import { Link } from "wouter";
 import { cn } from "@/lib/utils";
 import { isProjectCreatedRecently } from "@shared/utils/projectActivity";
+import { Button } from "@/components/ui/button";
+import { PageHeading } from "@/components/layout/page-heading";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -414,7 +416,7 @@ function Controls({
   }, [period, setPeriod]);
 
   return (
-    <div className="sticky top-0 z-20 -mx-3 sm:-mx-5 lg:-mx-8 px-3 sm:px-5 lg:px-8 py-3 mb-6 bg-white/90 backdrop-blur border-b border-slate-100 flex flex-wrap gap-2 items-center">
+    <div className="sticky top-3 z-20 mb-6 mt-4 flex flex-wrap items-center gap-2 rounded-2xl border border-white/80 bg-white/90 p-3 shadow-lg shadow-slate-900/[0.04] backdrop-blur-xl">
       {/* Period navigation */}
       <div className="flex items-center gap-1">
         <button
@@ -450,13 +452,13 @@ function Controls({
       <div className="flex-1 min-w-0" />
 
       {/* Search */}
-      <div className="relative">
+      <div className="relative w-full sm:w-auto">
         <Search className="absolute left-2.5 top-2 h-4 w-4 text-slate-400 pointer-events-none" />
         <input
           value={search}
           onChange={e => setSearch(e.target.value)}
           placeholder="Buscar proyecto o cliente…"
-          className="w-52 rounded-lg border border-slate-200 pl-8 pr-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white"
+          className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-8 pr-3 text-sm shadow-sm focus:border-primary/50 focus:outline-none focus:ring-4 focus:ring-primary/10 sm:w-56"
         />
       </div>
 
@@ -464,7 +466,7 @@ function Controls({
       <select
         value={statusFilter}
         onChange={e => setStatusFilter(e.target.value as LifecycleStatus | "all")}
-        className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+        className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600 shadow-sm focus:border-primary/50 focus:outline-none focus:ring-4 focus:ring-primary/10"
       >
         <option value="all">Todos los estados</option>
         <option value="active">Activos</option>
@@ -480,7 +482,7 @@ function Controls({
       <select
         value={categoryFilter}
         onChange={e => setCategoryFilter(e.target.value)}
-        className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+        className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600 shadow-sm focus:border-primary/50 focus:outline-none focus:ring-4 focus:ring-primary/10"
       >
         <option value="all">Todos los tipos</option>
         <option value="billable">Facturables</option>
@@ -776,7 +778,7 @@ function ClientGroup({
       : "text-red-600";
 
   return (
-    <div className="rounded-xl border border-slate-200 overflow-hidden shadow-sm mb-2">
+    <div className="mind-panel mb-3 overflow-hidden">
       <button
         onClick={() => setOpen(o => !o)}
         className="w-full flex items-center gap-2.5 px-4 py-2.5 bg-slate-50 hover:bg-slate-100 transition-colors text-left"
@@ -921,56 +923,55 @@ export default function ActiveProjectsNext() {
   const hasCritical = filtered.some(p => getHealth(p.metrics.markup) === "red");
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
-      <div className="mx-auto max-w-7xl p-3 sm:p-5 lg:p-8">
-        {/* Header */}
-        <div className="mb-4 flex items-start justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-3 flex-wrap">
-              <h1 className="text-2xl font-semibold text-slate-900">Vista de Proyectos</h1>
-              {hasCritical && (
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-red-50 px-2.5 py-1 text-[11px] font-medium text-red-700 ring-1 ring-red-200">
-                  <span className="h-1.5 w-1.5 rounded-full bg-red-500 inline-block animate-pulse" />
-                  Proyectos críticos
-                </span>
+    <div className="min-h-full">
+      <div className="mx-auto max-w-[1440px]">
+        <PageHeading
+          eyebrow="Portfolio operativo"
+          title="Vista de proyectos"
+          description={
+            <>
+              {filtered.length} proyecto{filtered.length !== 1 ? "s" : ""} en {periodToLabel(period)}
+              {typeof data?.summary?.periodAvgMarginPercent === "number" && filtered.length > 0
+                ? ` · Margen promedio ${data.summary.periodAvgMarginPercent.toFixed(1)}%`
+                : ""}
+            </>
+          }
+          actions={
+            <Button asChild>
+              <Link href="/active-projects/new">
+                <Plus className="h-4 w-4" />Nuevo proyecto
+              </Link>
+            </Button>
+          }
+          aside={
+            <div className={cn(
+              "flex h-full min-w-48 flex-col justify-center rounded-2xl border p-4",
+              hasCritical ? "border-red-100 bg-red-50/70" : "border-emerald-100 bg-emerald-50/70",
+            )}>
+              <div className={cn(
+                "flex items-center gap-2 text-xs font-semibold",
+                hasCritical ? "text-red-700" : "text-emerald-700",
+              )}>
+                <span className={cn(
+                  "h-2 w-2 rounded-full",
+                  hasCritical ? "bg-red-500 shadow-[0_0_0_4px_rgba(239,68,68,0.10)]" : "bg-emerald-500",
+                )} />
+                {hasCritical ? "Atención requerida" : "Portfolio saludable"}
+              </div>
+              <p className={cn(
+                "mt-2 text-sm font-semibold",
+                hasCritical ? "text-red-900" : "text-emerald-900",
+              )}>
+                {hasCritical ? "Hay proyectos críticos" : "Sin desvíos críticos"}
+              </p>
+              {data?.summary?.dataFreshness && (
+                <p className="mt-1 text-[10px] text-slate-500">
+                  Datos del {new Date(data.summary.dataFreshness).toLocaleDateString("es", { day: "numeric", month: "short" })}
+                </p>
               )}
             </div>
-            <p className="text-sm text-slate-400 mt-0.5">
-              {filtered.length} proyecto{filtered.length !== 1 ? "s" : ""} •{" "}
-              <span className="capitalize">{periodToLabel(period)}</span>
-              {typeof data?.summary?.periodAvgMarginPercent === "number" && filtered.length > 0 && (
-                <>
-                  {" • "}
-                  Margen promedio{" "}
-                  <span className="font-medium text-slate-600 tabular-nums">
-                    {data.summary.periodAvgMarginPercent.toFixed(1)}%
-                  </span>
-                </>
-              )}
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2 flex-shrink-0">
-            {data?.summary?.dataFreshness && (
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-medium text-emerald-700 ring-1 ring-emerald-200">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse inline-block" />
-                {new Date(data.summary.dataFreshness).toLocaleDateString("es", {
-                  day: "numeric",
-                  month: "short",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
-              </span>
-            )}
-            <Link
-              href="/active-projects/new"
-              className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-sm font-medium px-3 py-1.5 transition-colors shadow-sm"
-            >
-              <Plus className="h-4 w-4" />
-              Nuevo proyecto
-            </Link>
-          </div>
-        </div>
+          }
+        />
 
         {/* Controls */}
         <Controls
@@ -1012,7 +1013,7 @@ export default function ActiveProjectsNext() {
 
         {/* Semaphore legend (ops only) */}
         {isOperations && !isLoading && (
-          <div className="flex items-center gap-5 text-xs text-slate-400 mb-3">
+          <div className="mb-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-slate-400">
             <span className="font-medium text-slate-500">Semáforo:</span>
             <span className="flex items-center gap-1.5">
               <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 inline-block" />

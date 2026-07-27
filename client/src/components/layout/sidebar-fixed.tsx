@@ -5,13 +5,13 @@ import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useAuth } from "@/hooks/use-auth";
 import { usePermissions, AppSection } from "@/hooks/use-permissions";
 import { Badge } from "@/components/ui/badge";
 import { authFetch } from "@/lib/queryClient";
 import CreateReviewDialog from "@/components/review/CreateReviewDialog";
 import { reviewApi, reviewKeys, roomColor, type ReviewRoomSummary } from "@/lib/review-api";
+import BrandMark from "@/components/layout/brand-mark";
 
 import {
   ChevronRight,
@@ -24,9 +24,6 @@ import {
   LogOut,
   Target,
   Plus,
-  Bell,
-  AlertCircle,
-  Clock,
   Users,
   CheckSquare,
   CalendarDays,
@@ -79,17 +76,6 @@ type NavItem = {
   permission?: AppSection;
 };
 
-type DueReminder = {
-  id: number | string;
-  description: string;
-  dueDate: string;
-  leadId: number;
-  leadName: string | null;
-  isOverdue: boolean;
-  type?: 'manual' | 'inactivity';
-  daysSince?: number;
-};
-
 interface SidebarFixedProps {
   mobileMode?: boolean;
 }
@@ -103,8 +89,6 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
   const isCollapsed = mobileMode ? false : isCollapsedState;
   const [projectCount, setProjectCount] = useState(0);
   const [crmOverdue, setCrmOverdue] = useState(0);
-  const [dueReminders, setDueReminders] = useState<DueReminder[]>([]);
-  const [bellOpen, setBellOpen] = useState(false);
   const [projectsExpanded, setProjectsExpanded] = useState(false);
   const [reviewsExpanded, setReviewsExpanded] = useState(true);
   const [newReviewOpen, setNewReviewOpen] = useState(false);
@@ -131,24 +115,12 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
     } catch {}
   };
 
-  const fetchDueReminders = async () => {
-    try {
-      const response = await authFetch('/api/crm/reminders/due');
-      if (response.ok) {
-        const data = await response.json();
-        setDueReminders(data);
-      }
-    } catch {}
-  };
-
   useEffect(() => {
     fetchProjectCount();
     fetchCrmStats();
-    fetchDueReminders();
     const interval = setInterval(() => {
       fetchProjectCount();
       fetchCrmStats();
-      fetchDueReminders();
     }, 60000);
     return () => clearInterval(interval);
   }, []);
@@ -279,20 +251,20 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
               href={item.href}
               title={isCollapsed ? item.title : undefined}
               className={cn(
-                "flex items-center px-3 py-2 rounded-xl text-sm transition-colors duration-150 relative group",
+                "flex min-h-10 items-center rounded-xl px-3 py-2 text-[13px] transition-all duration-200 relative group",
                 isActive
-                  ? "bg-white/[0.13] text-white"
-                  : "text-white/60 hover:text-white hover:bg-white/10",
+                  ? "bg-gradient-to-r from-white/[0.14] to-white/[0.08] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
+                  : "text-white/58 hover:text-white hover:bg-white/[0.075]",
                 isCollapsed && "justify-center px-2"
               )}
             >
-              {isActive && <span className="absolute left-0 top-1/4 h-1/2 w-[3px] rounded-r bg-[#D72638]" />}
+              {isActive && <span className="absolute -left-0.5 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-full bg-[#f43f5e] shadow-[0_0_12px_rgba(244,63,94,0.75)]" />}
               <div className="flex items-center flex-1 min-w-0">
-                <Icon className={cn("h-4 w-4 flex-shrink-0", isCollapsed ? "mx-auto" : "mr-3")} />
+                <Icon className={cn("h-[17px] w-[17px] flex-shrink-0 transition-transform duration-200 group-hover:scale-105", isCollapsed ? "mx-auto" : "mr-3")} />
 
                 {!isCollapsed && (
                   <div className="flex items-center justify-between flex-1">
-                    <span className="truncate font-medium">{item.title}</span>
+                    <span className="truncate font-medium tracking-[-0.01em]">{item.title}</span>
                     <div className="flex items-center gap-1.5 ml-2">
                       {item.badge && (
                         <Badge
@@ -330,150 +302,36 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
     );
   };
 
-  const totalDue = dueReminders.length;
-  const overdueCount = dueReminders.filter(r => r.isOverdue).length;
-
   return (
     <TooltipProvider>
       <div className={cn(
-        "flex flex-col bg-[#111827] shadow-xl",
+        "relative flex flex-col overflow-hidden bg-[#0b0f17] shadow-[12px_0_40px_-30px_rgba(15,23,42,0.65)]",
         mobileMode
           ? "h-full w-full"
-          : "h-screen border-r border-white/10 transition-all duration-300",
-        !mobileMode && (isCollapsed ? "w-16" : "w-56")
+          : "h-screen border-r border-white/[0.07] transition-[width] duration-300 ease-out",
+        !mobileMode && (isCollapsed ? "w-[72px]" : "w-[264px]")
       )}>
+        <div className="pointer-events-none absolute -left-20 -top-20 h-64 w-64 rounded-full bg-rose-500/[0.06] blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-28 -right-24 h-64 w-64 rounded-full bg-indigo-500/[0.05] blur-3xl" />
         {/* Header */}
-        <div className="flex items-center justify-between p-2.5 border-b border-white/10">
+        <div className="relative z-10 flex h-[72px] items-center justify-between border-b border-white/[0.07] px-3.5">
           {!isCollapsed && (
-            <div className="flex items-center gap-2.5">
-              <svg viewBox="0 0 28 28" fill="none" className="h-7 w-7 flex-shrink-0" aria-label="Mind">
-                <polyline points="4,24 4,7 14,17 24,7 24,24" stroke="white" strokeWidth="1.5" strokeOpacity="0.7" fill="none" strokeLinejoin="round" strokeLinecap="round"/>
-                <circle cx="4" cy="24" r="2" fill="white" fillOpacity="0.85"/>
-                <circle cx="4" cy="7" r="2" fill="white" fillOpacity="0.85"/>
-                <circle cx="14" cy="17" r="2" fill="white" fillOpacity="0.85"/>
-                <circle cx="24" cy="7" r="2" fill="white" fillOpacity="0.85"/>
-                <circle cx="24" cy="24" r="2" fill="white" fillOpacity="0.85"/>
-                <circle cx="20" cy="3.5" r="2.5" fill="#D72638"/>
-              </svg>
-              <h1 className="text-base font-bold text-white tracking-tight">mind</h1>
-            </div>
+            <BrandMark />
           )}
           {isCollapsed && (
             <div className="mx-auto">
-              <svg viewBox="0 0 28 28" fill="none" className="h-7 w-7" aria-label="Mind">
-                <polyline points="4,24 4,7 14,17 24,7 24,24" stroke="white" strokeWidth="1.5" strokeOpacity="0.7" fill="none" strokeLinejoin="round" strokeLinecap="round"/>
-                <circle cx="4" cy="24" r="2" fill="white" fillOpacity="0.85"/>
-                <circle cx="4" cy="7" r="2" fill="white" fillOpacity="0.85"/>
-                <circle cx="14" cy="17" r="2" fill="white" fillOpacity="0.85"/>
-                <circle cx="24" cy="7" r="2" fill="white" fillOpacity="0.85"/>
-                <circle cx="24" cy="24" r="2" fill="white" fillOpacity="0.85"/>
-                <circle cx="20" cy="3.5" r="2.5" fill="#D72638"/>
-              </svg>
+              <BrandMark showWordmark={false} compact />
             </div>
           )}
 
           <div className="flex items-center gap-1">
-            {/* Bell icon with popover */}
-            <Popover open={bellOpen} onOpenChange={setBellOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 w-6 p-0 hover:bg-white/10 relative"
-                >
-                  <Bell className={cn("h-3.5 w-3.5", totalDue > 0 ? "text-amber-400" : "text-white/50")} />
-                  {totalDue > 0 && (
-                    <span className="absolute -top-1 -right-1 h-3.5 w-3.5 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center leading-none">
-                      {totalDue > 9 ? "9+" : totalDue}
-                    </span>
-                  )}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent
-                side="right"
-                align="start"
-                className="w-80 p-0 shadow-lg"
-              >
-                <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-                  <div className="flex items-center gap-2">
-                    <Bell className="h-4 w-4 text-amber-500" />
-                    <span className="font-semibold text-sm">Alertas CRM</span>
-                  </div>
-                  {totalDue > 0 && (
-                    <Badge variant="destructive" className="text-xs h-5 px-1.5">
-                      {totalDue}
-                    </Badge>
-                  )}
-                </div>
-
-                {totalDue === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-8 text-center px-4">
-                    <Bell className="h-8 w-8 text-muted-foreground/40 mb-2" />
-                    <p className="text-sm text-muted-foreground">Sin alertas pendientes</p>
-                  </div>
-                ) : (
-                  <div className="max-h-80 overflow-y-auto divide-y divide-border">
-                    {dueReminders.map((reminder) => (
-                      <Link
-                        key={String(reminder.id)}
-                        href={`/crm/${reminder.leadId}`}
-                        onClick={() => setBellOpen(false)}
-                        className="block px-4 py-3 hover:bg-accent transition-colors cursor-pointer"
-                      >
-                        <div className="flex items-start gap-2.5">
-                          <div className={cn(
-                            "mt-0.5 flex-shrink-0 h-5 w-5 rounded-full flex items-center justify-center",
-                            reminder.type === 'inactivity'
-                              ? "bg-orange-100 text-orange-600"
-                              : reminder.isOverdue
-                                ? "bg-red-100 text-red-600"
-                                : "bg-amber-100 text-amber-600"
-                          )}>
-                            {reminder.type === 'inactivity'
-                              ? <Clock className="h-3 w-3" />
-                              : reminder.isOverdue
-                                ? <AlertCircle className="h-3 w-3" />
-                                : <Clock className="h-3 w-3" />
-                            }
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-1.5">
-                              <p className={cn(
-                                "text-xs font-semibold truncate",
-                                reminder.type === 'inactivity' ? "text-orange-600" : reminder.isOverdue ? "text-red-600" : "text-amber-600"
-                              )}>
-                                {reminder.leadName || `Lead #${reminder.leadId}`}
-                              </p>
-                              {reminder.type === 'inactivity' && (
-                                <span className="text-[10px] bg-orange-100 text-orange-600 px-1 rounded font-medium shrink-0">auto</span>
-                              )}
-                            </div>
-                            <p className="text-xs text-foreground truncate mt-0.5">
-                              {reminder.description}
-                            </p>
-                            {reminder.type !== 'inactivity' && (
-                              <p className={cn(
-                                "text-xs mt-1 font-medium",
-                                reminder.isOverdue ? "text-red-500" : "text-amber-500"
-                              )}>
-                                {reminder.isOverdue ? "Vencido — " : "Vence "}{new Date(reminder.dueDate).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' })}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      </Link>
-                    ))}
-                  </div>
-                )}
-              </PopoverContent>
-            </Popover>
-
             {!mobileMode && (
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setIsCollapsed(!isCollapsed)}
-                className="h-6 w-6 p-0 hover:bg-white/10"
+                className="h-8 w-8 p-0 text-white/50 hover:bg-white/10 hover:text-white"
+                aria-label={isCollapsed ? "Expandir navegación" : "Contraer navegación"}
               >
                 <ChevronRight className={cn("h-3 w-3 transition-transform text-white/50", isCollapsed ? "" : "rotate-180")} />
               </Button>
@@ -482,17 +340,17 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
         </div>
 
         {/* Navegación principal */}
-        <div className="flex-1 relative min-h-0">
-        <div className="h-full px-2 py-3 overflow-y-auto">
-          <nav className="space-y-3">
+        <div className="relative z-10 flex-1 min-h-0">
+        <div className="h-full px-2.5 py-4 overflow-y-auto">
+          <nav className="space-y-5">
             {filteredNavSections.map((section) => (
               <div key={section.title || '__top__'}>
                 {!isCollapsed && section.title && (
-                  <h3 className="text-[11px] font-semibold text-white/30 uppercase tracking-wider mb-1.5 px-3">
+                  <h3 className="mb-2 px-3 text-[9px] font-bold uppercase tracking-[0.18em] text-white/28">
                     {section.title}
                   </h3>
                 )}
-                <div className="space-y-0.5">
+                <div className="space-y-1">
                   {section.items.map((item) => renderNavLink(item))}
                 </div>
 
@@ -724,13 +582,26 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
             ))}
           </nav>
         </div>
-        <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-[#111827] to-transparent" />
+        <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-[#0b0f17] to-transparent" />
         </div>
 
         {/* Footer */}
-        <div className="border-t border-white/10 px-2 py-2.5">
+        <div className="relative z-10 border-t border-white/[0.07] px-3 py-3">
           {!isCollapsed && (
-            <p className="text-[9px] text-white/20 px-1 pb-1.5">Powered by Epical</p>
+            <div className="flex items-center gap-2.5 rounded-xl border border-white/[0.06] bg-white/[0.035] px-2.5 py-2">
+              <Avatar className="h-7 w-7 border border-white/10">
+                <AvatarFallback className="bg-white/10 text-[9px] font-bold text-white">
+                  {getUserInitials()}
+                </AvatarFallback>
+                {user?.avatar && <AvatarImage src={user.avatar} />}
+              </Avatar>
+              <div className="min-w-0">
+                <p className="truncate text-[11px] font-semibold text-white/75">
+                  {user ? `${user.firstName} ${user.lastName}` : "Mind"}
+                </p>
+                <p className="truncate text-[9px] uppercase tracking-[0.12em] text-white/28">Powered by Epical</p>
+              </div>
+            </div>
           )}
         </div>
       </div>

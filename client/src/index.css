@@ -1713,3 +1713,272 @@ body.dark::before {
   z-index: -1;
   margin: -20px;
 }
+
+/* ========================================
+   MIND PRODUCT SYSTEM — 2026
+   Shared application polish. Kept at the end intentionally so legacy screens
+   inherit a coherent product surface while they are migrated incrementally.
+   ======================================== */
+
+:root {
+  --background: 220 24% 97%;
+  --foreground: 222 36% 13%;
+  --card: 0 0% 100%;
+  --card-foreground: 222 36% 13%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222 36% 13%;
+  --primary: 353 72% 51%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 220 22% 95%;
+  --secondary-foreground: 222 30% 18%;
+  --muted: 220 21% 94%;
+  --muted-foreground: 218 13% 45%;
+  --accent: 220 22% 94%;
+  --accent-foreground: 222 30% 18%;
+  --border: 220 18% 88%;
+  --input: 220 18% 86%;
+  --ring: 353 72% 51%;
+  --radius: 0.75rem;
+  --content-max-width: 1440px;
+  --sidebar-width: 264px;
+}
+
+html {
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+}
+
+::selection {
+  background: hsl(var(--primary) / 0.16);
+  color: hsl(var(--foreground));
+}
+
+.app-shell {
+  isolation: isolate;
+  background:
+    radial-gradient(circle at 78% -10%, hsl(var(--primary) / 0.045), transparent 28rem),
+    hsl(var(--background));
+}
+
+.app-main {
+  position: relative;
+  scroll-behavior: smooth;
+  scrollbar-gutter: stable;
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.36), rgba(255, 255, 255, 0)),
+    radial-gradient(circle at 1px 1px, rgba(100, 116, 139, 0.085) 1px, transparent 0);
+  background-size: auto, 24px 24px;
+}
+
+.app-main::before {
+  content: "";
+  position: fixed;
+  z-index: -1;
+  inset: 3.5rem 0 0;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0.20), rgba(248, 250, 252, 0.82) 34%, #f7f8fb 100%);
+}
+
+.app-content {
+  min-height: 100%;
+}
+
+.app-content h1,
+.app-content h2,
+.app-content h3,
+.app-content h4,
+.app-content h5,
+.app-content h6 {
+  margin-top: 0;
+}
+
+.app-content h1 {
+  letter-spacing: -0.035em;
+}
+
+.mind-page-heading {
+  position: relative;
+  display: flex;
+  min-height: 148px;
+  align-items: stretch;
+  gap: 2rem;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.82);
+  border-radius: 1.5rem;
+  padding: 1.5rem;
+  background:
+    linear-gradient(120deg, rgba(255, 255, 255, 0.97), rgba(255, 255, 255, 0.78)),
+    hsl(var(--card));
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.03),
+    0 24px 60px -42px rgba(15, 23, 42, 0.38);
+}
+
+.mind-page-heading::after {
+  content: "";
+  position: absolute;
+  inset: auto 1.5rem 0;
+  height: 1px;
+  background: linear-gradient(90deg, hsl(var(--primary) / 0.45), hsl(var(--primary) / 0.05) 26%, transparent 70%);
+}
+
+.mind-page-title {
+  margin: 0 !important;
+  font-size: clamp(1.7rem, 2.4vw, 2.35rem) !important;
+  line-height: 1.08 !important;
+  font-weight: 740 !important;
+  letter-spacing: -0.045em !important;
+  color: hsl(var(--foreground));
+}
+
+.mind-page-description {
+  max-width: 48rem;
+  margin: 0.6rem 0 0;
+  color: hsl(var(--muted-foreground));
+  font-size: 0.92rem;
+  line-height: 1.55;
+}
+
+.mind-section-title {
+  margin: 0 !important;
+  font-size: 1rem !important;
+  line-height: 1.35 !important;
+  font-weight: 680 !important;
+  letter-spacing: -0.02em !important;
+  color: hsl(var(--foreground));
+}
+
+.mind-panel {
+  border: 1px solid hsl(var(--border) / 0.72);
+  border-radius: 1.25rem;
+  background: hsl(var(--card) / 0.94);
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.025),
+    0 12px 32px -28px rgba(15, 23, 42, 0.32);
+}
+
+.mind-interactive-card {
+  transition:
+    transform 180ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    background-color 180ms ease;
+}
+
+.mind-interactive-card:hover {
+  transform: translateY(-2px);
+  border-color: hsl(var(--primary) / 0.20);
+  box-shadow:
+    0 2px 4px rgba(15, 23, 42, 0.035),
+    0 18px 44px -28px rgba(15, 23, 42, 0.28);
+}
+
+.mind-kpi {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid hsl(var(--border) / 0.72);
+  border-radius: 1.15rem;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 10px 34px -30px rgba(15, 23, 42, 0.40);
+}
+
+.mind-kpi::after {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.9), transparent);
+}
+
+.mind-empty-state {
+  display: flex;
+  min-height: 10rem;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  text-align: center;
+  color: hsl(var(--muted-foreground));
+}
+
+.mind-empty-state > svg,
+.mind-empty-state > div:first-child {
+  margin-bottom: 0.75rem;
+}
+
+[data-radix-popper-content-wrapper] {
+  z-index: 60 !important;
+}
+
+button,
+a,
+[role="button"] {
+  -webkit-tap-highlight-color: transparent;
+}
+
+:focus-visible {
+  scroll-margin: 5rem;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(100, 116, 139, 0.32) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: rgba(100, 116, 139, 0.32);
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.48);
+  background-clip: padding-box;
+}
+
+@media (min-width: 640px) {
+  .mind-page-heading {
+    min-height: 162px;
+    padding: 2rem;
+  }
+}
+
+@media (max-width: 639px) {
+  .mind-page-heading {
+    min-height: auto;
+    border-radius: 1.15rem;
+    padding: 1.25rem;
+  }
+
+  .app-content {
+    padding-bottom: 5.5rem;
+  }
+
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

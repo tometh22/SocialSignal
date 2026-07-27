@@ -4,6 +4,8 @@ import { authFetch } from "@/lib/queryClient";
 import { Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { PageHeading, SectionHeading } from "@/components/layout/page-heading";
 import { usePermissions } from "@/hooks/use-permissions";
 import { useAuth } from "@/hooks/use-auth";
 import { computeAlerts, THRESHOLDS, type Alert } from "@/lib/smart-alerts";
@@ -198,16 +200,16 @@ export default function HomeDashboard() {
 
   const renderLinkCard = (link: QuickLink) => (
     <Link key={link.href} href={link.href}>
-      <Card className="group hover:shadow-md hover:border-slate-200 transition-shadow cursor-pointer border h-full">
-        <CardContent className="p-4 flex items-center gap-3">
-          <div className={`${link.color} p-2.5 rounded-lg text-white flex-shrink-0`}>
+      <Card className="mind-interactive-card group h-full cursor-pointer overflow-hidden">
+        <CardContent className="flex items-center gap-3.5 p-4">
+          <div className={`${link.color} grid h-10 w-10 flex-shrink-0 place-items-center rounded-xl text-white shadow-lg shadow-slate-900/10 transition-transform duration-200 group-hover:scale-105`}>
             <link.icon className="h-5 w-5" />
           </div>
           <div className="flex-1 min-w-0">
-            <div className="font-medium text-sm group-hover:text-primary transition-colors">{link.title}</div>
-            <div className="text-xs text-muted-foreground truncate">{link.description}</div>
+            <div className="text-sm font-semibold tracking-[-0.01em] text-foreground transition-colors group-hover:text-primary">{link.title}</div>
+            <div className="mt-0.5 truncate text-[11px] text-muted-foreground">{link.description}</div>
           </div>
-          <ArrowRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+          <ArrowRight className="h-4 w-4 flex-shrink-0 -translate-x-1 text-primary opacity-0 transition-all group-hover:translate-x-0 group-hover:opacity-100" />
         </CardContent>
       </Card>
     </Link>
@@ -217,49 +219,71 @@ export default function HomeDashboard() {
     const filtered = links.filter(l => !l.permission || hasPermission(l.permission as any));
     if (filtered.length === 0) return null;
     return (
-      <div key={title}>
-        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">{title}</h2>
+      <section key={title} className="space-y-3">
+        <SectionHeading title={title} />
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {filtered.map(renderLinkCard)}
         </div>
-      </div>
+      </section>
     );
   };
 
   return (
-    <div className="p-6 space-y-8 max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold">
-            {greeting()}, {user?.firstName || "Usuario"}
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Bienvenido a Mind. Accedé rápidamente a las secciones principales.
-          </p>
-        </div>
-        {summary.critical > 0 && (
-          <Badge variant="outline" className="border-red-200 bg-red-50 text-red-700 px-3 py-1.5 text-sm animate-pulse">
-            <AlertTriangle className="h-3.5 w-3.5 mr-1.5" />
-            {summary.critical} alerta{summary.critical > 1 ? 's' : ''} crítica{summary.critical > 1 ? 's' : ''}
-          </Badge>
-        )}
-      </div>
+    <div className="mx-auto max-w-[1440px] space-y-8">
+      <PageHeading
+        eyebrow="Workspace personal"
+        title={<>{greeting()}, {user?.firstName || "Usuario"}.</>}
+        description="Tu operación, proyectos y prioridades en un solo lugar. Empezá por lo que necesita atención hoy."
+        actions={
+          <>
+            {hasPermission("projects") && (
+              <Button asChild variant="outline">
+                <Link href="/tasks"><CheckSquare className="h-4 w-4" />Mis tareas</Link>
+              </Button>
+            )}
+            {hasPermission("quotations") && (
+              <Button asChild>
+                <Link href="/optimized-quote"><Plus className="h-4 w-4" />Nueva cotización</Link>
+              </Button>
+            )}
+          </>
+        }
+        aside={
+          summary.critical > 0 ? (
+            <div className="flex h-full min-w-44 flex-col justify-center rounded-2xl border border-red-100 bg-red-50/70 p-4">
+              <div className="flex items-center gap-2 text-xs font-semibold text-red-700">
+                <AlertTriangle className="h-4 w-4" />Atención requerida
+              </div>
+              <p className="mt-2 text-3xl font-bold tracking-[-0.05em] text-red-700">{summary.critical}</p>
+              <p className="text-[11px] text-red-600/80">alertas críticas activas</p>
+            </div>
+          ) : (
+            <div className="flex h-full min-w-44 flex-col justify-center rounded-2xl border border-emerald-100 bg-emerald-50/70 p-4">
+              <div className="flex items-center gap-2 text-xs font-semibold text-emerald-700">
+                <Zap className="h-4 w-4" />Portfolio saludable
+              </div>
+              <p className="mt-2 text-sm font-semibold text-emerald-900">Sin alertas críticas</p>
+              <p className="mt-1 text-[11px] text-emerald-700/70">Todo bajo control</p>
+            </div>
+          )
+        }
+      />
 
       {/* Smart Alerts */}
       {alerts.length > 0 && hasPermission('projects') && (
         <div className="space-y-3">
-          <div className="flex items-center gap-2">
-            <Zap className="h-4 w-4 text-amber-500" />
-            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Alertas Inteligentes</h2>
-            <Badge variant="secondary" className="text-xs">
+          <SectionHeading
+            icon={<Zap className="h-4 w-4" />}
+            title="Alertas inteligentes"
+            description="Señales que conviene revisar antes de que se conviertan en desvíos."
+            action={<Badge variant="secondary" className="text-xs">
               {summary.critical > 0 && <span className="text-red-600 mr-1">{summary.critical} criticas</span>}
               {summary.warning > 0 && <span className="text-amber-600">{summary.warning} warnings</span>}
-            </Badge>
-          </div>
-          <div className="space-y-2">
+            </Badge>}
+          />
+          <div className="grid gap-2 lg:grid-cols-2">
             {alerts.slice(0, 5).map(alert => (
-              <div key={alert.id} className={`flex items-start gap-3 p-3 rounded-lg border ${alertBg(alert.type)}`}>
+              <div key={alert.id} className={`mind-interactive-card flex items-start gap-3 rounded-xl border p-3.5 ${alertBg(alert.type)}`}>
                 {alertIcon(alert.type)}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
@@ -314,36 +338,36 @@ export default function HomeDashboard() {
       )}
 
       {/* Quick Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {hasPermission('projects') && (
-          <Card>
-            <CardContent className="p-4 text-center">
-              <div className="text-xs text-muted-foreground mb-1">Proyectos Activos</div>
-              <div className="text-2xl font-semibold tabular-nums text-primary">{projectCount || 0}</div>
+          <Card className="mind-kpi">
+            <CardContent className="p-4 sm:p-5">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Proyectos activos</div>
+              <div className="mt-2 text-3xl font-bold tracking-[-0.05em] tabular-nums text-primary">{projectCount || 0}</div>
             </CardContent>
           </Card>
         )}
         {hasPermission('quotations') && (
-          <Card>
-            <CardContent className="p-4 text-center">
-              <div className="text-xs text-muted-foreground mb-1">Cotizaciones Pendientes</div>
-              <div className="text-2xl font-semibold tabular-nums text-amber-600">{quotationStats?.pending || 0}</div>
+          <Card className="mind-kpi">
+            <CardContent className="p-4 sm:p-5">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Cotizaciones pendientes</div>
+              <div className="mt-2 text-3xl font-bold tracking-[-0.05em] tabular-nums text-amber-600">{quotationStats?.pending || 0}</div>
             </CardContent>
           </Card>
         )}
         {hasPermission('quotations') && (
-          <Card>
-            <CardContent className="p-4 text-center">
-              <div className="text-xs text-muted-foreground mb-1">Borradores</div>
-              <div className="text-2xl font-semibold tabular-nums text-slate-600">{quotationStats?.draft || 0}</div>
+          <Card className="mind-kpi">
+            <CardContent className="p-4 sm:p-5">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Borradores</div>
+              <div className="mt-2 text-3xl font-bold tracking-[-0.05em] tabular-nums text-slate-700">{quotationStats?.draft || 0}</div>
             </CardContent>
           </Card>
         )}
         {hasPermission('projects') && (
-          <Card>
-            <CardContent className="p-4 text-center">
-              <div className="text-xs text-muted-foreground mb-1">Alertas Críticas</div>
-              <div className="text-2xl font-semibold tabular-nums">
+          <Card className="mind-kpi">
+            <CardContent className="p-4 sm:p-5">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Alertas críticas</div>
+              <div className="mt-2 text-3xl font-bold tracking-[-0.05em] tabular-nums">
                 {summary.critical > 0 ? (
                   <span className="text-red-600">{summary.critical}</span>
                 ) : (
@@ -358,10 +382,7 @@ export default function HomeDashboard() {
       {/* Mi semana */}
       {myPersonnelId && (
         <div className="space-y-3">
-          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-            <ListTodo className="h-4 w-4" />
-            Mi semana
-          </h2>
+          <SectionHeading icon={<ListTodo className="h-4 w-4" />} title="Mi semana" description="Horas, foco y entregas de tu agenda actual." />
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="bg-card rounded-xl border p-4 flex items-center gap-3">
               <div className="bg-primary/10 p-2.5 rounded-lg">

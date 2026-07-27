@@ -513,7 +513,6 @@ export default function ManageQuotes() {
       actions={
         <Button
           onClick={() => navigate("/optimized-quote")}
-          className="bg-blue-600 hover:bg-blue-700"
         >
           <Plus className="mr-2 h-4 w-4" />
           Nueva Cotización
@@ -521,10 +520,10 @@ export default function ManageQuotes() {
       }
     >
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+        <div className="relative z-10 mx-auto max-w-[1440px]">
           {/* Stats Cards - Diseño más compacto y profesional */}
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
-            <Card className="bg-white border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200">
+            <Card className="mind-kpi mind-interactive-card">
               <CardContent className="p-4">
                 <div className="flex items-center space-x-3">
                   <div className="h-10 w-10 bg-indigo-100 rounded-lg flex items-center justify-center">
@@ -538,7 +537,7 @@ export default function ManageQuotes() {
               </CardContent>
             </Card>
 
-            <Card className="bg-white border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200">
+            <Card className="mind-kpi mind-interactive-card">
               <CardContent className="p-4">
                 <div className="flex items-center space-x-3">
                   <div className="h-10 w-10 bg-emerald-100 rounded-lg flex items-center justify-center">
@@ -552,7 +551,7 @@ export default function ManageQuotes() {
               </CardContent>
             </Card>
 
-            <Card className="bg-white border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200">
+            <Card className="mind-kpi mind-interactive-card">
               <CardContent className="p-4">
                 <div className="flex items-center space-x-3">
                   <div className="h-10 w-10 bg-amber-100 rounded-lg flex items-center justify-center">
@@ -566,7 +565,7 @@ export default function ManageQuotes() {
               </CardContent>
             </Card>
 
-            <Card className="bg-white border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200">
+            <Card className="mind-kpi mind-interactive-card">
               <CardContent className="p-4">
                 <div className="flex items-center space-x-3">
                   <div className="h-10 w-10 bg-blue-100 rounded-lg flex items-center justify-center">
@@ -582,7 +581,7 @@ export default function ManageQuotes() {
               </CardContent>
             </Card>
 
-            <Card className="bg-white border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200">
+            <Card className="mind-kpi mind-interactive-card">
               <CardContent className="p-4">
                 <div className="flex items-center space-x-3">
                   <div className="h-10 w-10 bg-green-100 rounded-lg flex items-center justify-center">
@@ -597,7 +596,7 @@ export default function ManageQuotes() {
               </CardContent>
             </Card>
 
-            <Card className="bg-white border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200">
+            <Card className="mind-kpi mind-interactive-card">
               <CardContent className="p-4">
                 <div className="flex items-center space-x-3">
                   <div className="h-10 w-10 bg-red-100 rounded-lg flex items-center justify-center">
@@ -638,21 +637,21 @@ export default function ManageQuotes() {
           )}
 
           {/* Filters mejorados */}
-          <Card className="bg-white shadow-lg border-0 mb-6">
+          <Card className="mind-panel mb-6">
             <CardContent className="p-4 lg:p-6">
               <div className="flex flex-col sm:flex-row gap-4">
                 <div className="relative flex-1">
                   <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
                   <Input
                     placeholder="Buscar por nombre de proyecto..."
-                    className="pl-12 h-11 border-gray-200 rounded-lg bg-gray-50 focus:bg-white transition-colors text-sm"
+                    className="h-11 bg-slate-50/70 pl-12 text-sm"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                   />
                 </div>
                 <div className="w-full sm:w-56">
                   <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger className="h-11 border-gray-200 rounded-lg bg-gray-50 focus:bg-white text-sm">
+                    <SelectTrigger className="h-11 bg-slate-50/70 text-sm">
                       <Filter className="h-4 w-4 mr-2 text-gray-400" />
                       <SelectValue placeholder="Filtrar por estado" />
                     </SelectTrigger>
@@ -671,8 +670,8 @@ export default function ManageQuotes() {
           </Card>
 
           {/* Main Content Card */}
-          <Card className="bg-white shadow-lg border-0 rounded-xl overflow-hidden mb-8">
-            <CardHeader className="bg-gradient-to-r from-slate-50 to-slate-100 border-b border-slate-200 py-4">
+          <Card className="mind-panel mb-8 overflow-hidden">
+            <CardHeader className="border-b border-slate-200 bg-slate-50/70 py-4">
               <CardTitle className="text-lg font-semibold text-slate-800 flex items-center">
                 <Users className="h-5 w-5 mr-2 text-slate-600" />
                 Lista de Cotizaciones
@@ -685,7 +684,7 @@ export default function ManageQuotes() {
                 </div>
               ) : filteredQuotations.length > 0 ? (
 
-                <div className="space-y-7 p-6">
+                <div className="space-y-7 p-3 sm:p-6">
                   {quotationGroups.map(([clientName, clientQuotes]) => (
                     <section key={clientName}>
                       <div className="mb-3 flex items-center gap-3 border-b border-slate-200 pb-2">
@@ -716,9 +715,9 @@ export default function ManageQuotes() {
                     const teamMembersCount = teamCounts[quote.id] ?? 0;
 
                     return (
-                      <Card key={quote.id} className="group bg-white border border-gray-200 hover:border-blue-300 hover:shadow-lg transition-all duration-200 overflow-hidden relative">
+                      <Card key={quote.id} className="mind-interactive-card group relative overflow-hidden">
                         {/* Status badges - NEW LOCATION: Top right corner */}
-                        <div className="absolute top-3 right-3 flex flex-col items-end gap-2 z-10">
+                        <div className="relative z-10 flex flex-wrap items-center gap-2 border-b border-border/60 bg-slate-50/60 px-4 py-3 lg:absolute lg:right-3 lg:top-3 lg:flex-col lg:items-end lg:border-0 lg:bg-transparent lg:p-0">
                           {getStatusBadge(quote.status, quote)}
                           {!isQuoteExpired(quote) && getExpiryBadge(quote)}
                           {(quote as any).leadId && (
@@ -763,7 +762,7 @@ export default function ManageQuotes() {
                           }`} />
                           
                           <CardContent className="flex-1 p-5">
-                            <div className="flex items-start justify-between gap-4">
+                            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                               {/* Main content area */}
                               <div className="flex items-start gap-4 flex-1">
                                 {/* Client Logo */}
@@ -836,7 +835,7 @@ export default function ManageQuotes() {
                               </div>
 
                               {/* Value and actions section */}
-                              <div className="flex flex-col items-end gap-3">
+                              <div className="flex w-full flex-col items-start gap-3 border-t border-border/60 pt-4 lg:w-auto lg:items-end lg:border-0 lg:pt-0">
                                 <div className="text-right">
                                   {/* Price section with better visual hierarchy */}
                                   <div className="mb-3">
