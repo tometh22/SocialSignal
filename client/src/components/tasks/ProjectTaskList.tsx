@@ -1082,7 +1082,7 @@ const PRIORITY_LEFT_BORDER: Record<string, string> = {
   urgent: "border-l-red-500",
 };
 
-function BoardCard({ task, allPersonnel, onOpen, onStatusChange }: { task: Task; allPersonnel: Personnel[]; onOpen: (id: number) => void; onStatusChange: (taskId: number, status: string) => void }) {
+function BoardCard({ task, allPersonnel, onOpen }: { task: Task; allPersonnel: Personnel[]; onOpen: (id: number) => void }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `board-card:${task.id}`,
     data: { taskId: task.id, fromStatus: task.status },
@@ -1109,27 +1109,6 @@ function BoardCard({ task, allPersonnel, onOpen, onStatusChange }: { task: Task;
         <p className={cn("text-sm font-medium leading-snug flex-1 min-w-0", isDone && "line-through text-muted-foreground")} title={task.title}>
           {task.title}
         </p>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button
-              className="flex-shrink-0 p-0.5 rounded hover:bg-accent opacity-0 group-hover:opacity-100 transition-opacity"
-              onClick={e => e.stopPropagation()}
-              onPointerDown={e => e.stopPropagation()}
-            >
-              <MoreHorizontal className="h-3.5 w-3.5 text-muted-foreground" />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-44">
-            <DropdownMenuLabel className="text-xs text-muted-foreground py-1">Estado</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            {BOARD_COLUMNS.filter(c => c.status !== task.status).map(col => (
-              <DropdownMenuItem key={col.status} onClick={e => { e.stopPropagation(); onStatusChange(task.id, col.status); }}>
-                <span className={cn("w-2 h-2 rounded-full mr-2 flex-shrink-0", col.dot)} />
-                {col.label}
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
       </div>
       <div className="flex items-center justify-between gap-1">
         <div className="flex items-center gap-1.5 flex-wrap">
@@ -1209,7 +1188,7 @@ function BoardColumn({ label, dot, ring, empty, status, tasks, allPersonnel, pro
 
         {tasks.map(task => (
           <div key={task.id} className="group">
-            <BoardCard task={task} allPersonnel={allPersonnel} onOpen={onOpen} onStatusChange={onStatusChange} />
+            <BoardCard task={task} allPersonnel={allPersonnel} onOpen={onOpen} />
           </div>
         ))}
 

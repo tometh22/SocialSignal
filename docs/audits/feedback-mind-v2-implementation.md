@@ -7,7 +7,7 @@ Base original: `origin/main` en `d77d0956`
 
 - Puntos implementados en frontend y backend: **31/31**
 - TypeScript: **aprobado**
-- Suite automatizada: **88 aprobados, 11 omitidos por depender de datos de integración**
+- Suite automatizada: **89 aprobados, 11 omitidos por depender de datos de integración**
 - Build de producción: **aprobado**
 - Migración `0031_feedback_mind_v2.sql`: **aprobada dos veces consecutivas**
 - Smoke autenticado con PostgreSQL: **aprobado**
@@ -45,7 +45,7 @@ contratos, persistencia y recorridos protegidos sí se probaron contra PostgreSQ
 | 20 | ✅ | Horas pertenecen al usuario autenticado, no al responsable ni al ID enviado por cliente; se informa si el usuario no está vinculado a Personal. | Smoke: se envió `personnelId=2`, se guardó `personnelId=1`, tarifa ARS 25.000 y costo ARS 62.500. |
 | 21 | ✅ | Múltiples estimaciones semanales con upsert por tarea/semana. | Smoke con `10h + 6h`. |
 | 22 | ✅ | Selectores y API permiten responsables/colaboradores sólo entre miembros del proyecto, sin fallback. | Revisión frontend/backend. |
-| 23 | ✅ | Un solo editor de estado visible en la lista; panel y menú quedaron sin editor duplicado. | Revisión de componentes y build. |
+| 23 | ✅ | Un solo editor de estado visible en la lista; panel y menú quedaron sin editor duplicado. En tablero, el estado cambia únicamente mediante drag entre columnas. | Regresión automática, E2E estático de componentes y build. |
 | 24 | ✅ | Rentabilidad se retiró del proyecto interno de Tareas. | Búsqueda de accesos. |
 | 25 | ✅ | Unique/FK de miembros y alta idempotente con `ON CONFLICT`. | Migración dos veces; dos altas dejaron una sola fila. |
 | 26 | ✅ | Panel de Horas consume las cargas de tareas con identidad/costo correctos. | Persistencia autenticada aprobada y contrato del panel revisado. |
@@ -63,7 +63,7 @@ npm run check
 
 npm test
 ✅ 7 archivos: 6 aprobados, 1 omitido
-✅ 88 tests aprobados, 11 omitidos
+✅ 89 tests aprobados, 11 omitidos
 
 npm run build
 ✅ Vite y bundle del servidor completados
@@ -94,6 +94,18 @@ smoke autenticado
 Los 11 tests omitidos no son fallos: nueve son golden tests que sólo se habilitan
 con `RUN_INTEGRATION_TESTS=1` y datos externos, y dos cubren estados de autenticación
 que la suite marca explícitamente como `skip`.
+
+## Revalidación E2E del 27 de julio de 2026
+
+- PostgreSQL 16 efímero, aplicación real y sesión admin autenticada.
+- 17 grupos funcionales aprobados, 0 fallas.
+- Punto 23 corregido: se retiró el cambio de estado del menú de `BoardCard`;
+  el control izquierdo de la lista y el drag del tablero actualizan el mismo estado.
+- Regresión nueva: verifica que `BoardCard` no exponga `onStatusChange` ni un menú
+  “Estado”, y que `handleBoardStatusChange` siga conectado al drag-and-drop.
+- Sincronización real del Máster reintentada: Google continúa respondiendo
+  `invalid_grant: Invalid JWT Signature`.
+- Navegador integrado reintentado: no había ninguna instancia disponible.
 
 ## Migraciones y despliegue
 
