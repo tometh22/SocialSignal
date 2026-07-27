@@ -1,4 +1,5 @@
 import { describe, expect, test } from "vitest";
+import { readFileSync } from "node:fs";
 import {
   insertHolidaySchema,
   insertPersonnelHistoricalCostSchema,
@@ -175,4 +176,26 @@ describe("structured API errors", () => {
     expect(getApiErrorMessage(error)).toContain("Equipo · integrante 2 · persona");
     expect(getApiErrorMessage(error)).toContain("La persona seleccionada no existe");
   });
+});
+
+test("task status has one list editor while board status changes only through drag and drop", () => {
+  const source = readFileSync(
+    new URL("../client/src/components/tasks/ProjectTaskList.tsx", import.meta.url),
+    "utf8",
+  );
+  const taskRow = source.slice(
+    source.indexOf("function TaskRow"),
+    source.indexOf("function SectionBlock"),
+  );
+  const boardCard = source.slice(
+    source.indexOf("function BoardCard"),
+    source.indexOf("function BoardColumn"),
+  );
+
+  expect(taskRow).toContain("<PopoverTrigger asChild>");
+  expect(taskRow).toContain("onStatusChange?.(task.id, s)");
+  expect(boardCard).toContain("useDraggable");
+  expect(boardCard).not.toContain("onStatusChange");
+  expect(boardCard).not.toContain(">Estado</DropdownMenuLabel>");
+  expect(source).toContain("handleBoardStatusChange(taskId, toStatus)");
 });
