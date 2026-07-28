@@ -17,6 +17,7 @@ import EnhancedTeamConfig from '@/components/optimized/EnhancedTeamConfig';
 import OptimizedFinancialReview from '@/components/optimized/financial-review-final';
 import DeliverableConfiguration from '@/components/quotation/DeliverableConfiguration';
 import QuotationErrorBoundary from '@/components/quotation-error-boundary';
+import { getApiErrorMessage } from '@/lib/api-error';
 import { QuotationVariants } from '@/components/optimized/QuotationVariants';
 import CurrencySelection from '@/components/optimized/currency-selection';
 import { ExecutiveSummary } from '@/components/quotation/executive-summary';
@@ -237,7 +238,7 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
       setLocation('/manage-quotes');
     } catch (error) {
       console.error("❌ Error al guardar:", error);
-      const errorMessage = error instanceof Error ? error.message : "Error desconocido";
+      const errorMessage = getApiErrorMessage(error, "Error desconocido");
       toast({
         title: "Error al guardar",
         description: `No se pudo guardar la cotización: ${errorMessage}`,

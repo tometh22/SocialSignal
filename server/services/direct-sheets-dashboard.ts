@@ -28,6 +28,26 @@ function parseMoney(val: string | undefined | null): number | null {
   return isNaN(n) ? null : n;
 }
 
+// Activo/Pasivo Total viene pre-calculado en la hoja. Si difiere demasiado de la
+// suma de sus partes (bug reportado: "está haciendo alguna multiplicación" /
+// tomando ARS como si fuera USD), se prioriza la suma de partes en vez de
+// confiar ciegamente en la celda de la hoja.
+function reconcileTotal(parts: Array<number | null>, sheetTotal: number | null, label: string): number | null {
+  const known = parts.filter((v): v is number => v != null);
+  const sum = known.length > 0 ? known.reduce((a, b) => a + b, 0) : null;
+  if (sum == null) return sheetTotal;
+  if (sheetTotal == null) return sum;
+  if (sum === 0) return sheetTotal;
+  const ratio = sheetTotal / sum;
+  if (ratio < 0.8 || ratio > 1.2) {
+    console.warn(
+      `[direct-sheets-dashboard] ${label} inconsistente: hoja=${sheetTotal} suma de partes=${sum} (ratio ${ratio.toFixed(2)}). Usando la suma de partes.`
+    );
+    return sum;
+  }
+  return sheetTotal;
+}
+
 function parsePercent(val: string | undefined | null): number | null {
   if (!val || val === '' || val === '-') return null;
   let s = String(val).trim().replace('%', '').replace(',', '.');
@@ -208,6 +228,13 @@ async function fetchDashboardRows(): Promise<MonthData[]> {
       ? Math.round((ventasDelMes / impliedCosts) * 100) / 100
       : null);
 
+    const activoLiquido = parseMoney(row[COL.ACTIVO_LIQUIDO]);
+    const activoMedPlazo = parseMoney(row[COL.ACTIVO_MP_CRYPTO]);
+    const clientesACobrar = parseMoney(row[COL.CLIENTES_COBRAR]);
+    const pasivoImpuestosUSA = parseMoney(row[COL.PASIVO_IMP_USA]);
+    const pasivoFacturacionAdelantada = parseMoney(row[COL.PASIVO_FACT_ADEL]);
+    const pasivoProveedores = parseMoney(row[COL.PASIVO_PROVEEDORES]);
+
     allData.push({
       periodKey,
       year,
@@ -221,14 +248,22 @@ async function fetchDashboardRows(): Promise<MonthData[]> {
       margenNeto: parsePercent(row[COL.MARGEN_NETO]),
       markup,
       proyeccionResultado: parseMoney(row[COL.PROYECCION]),
-      activoLiquido: parseMoney(row[COL.ACTIVO_LIQUIDO]),
-      activoMedPlazo: parseMoney(row[COL.ACTIVO_MP_CRYPTO]),
-      clientesACobrar: parseMoney(row[COL.CLIENTES_COBRAR]),
-      activoTotal: parseMoney(row[COL.ACTIVO_TOTAL]),
-      pasivoImpuestosUSA: parseMoney(row[COL.PASIVO_IMP_USA]),
-      pasivoFacturacionAdelantada: parseMoney(row[COL.PASIVO_FACT_ADEL]),
-      pasivoProveedores: parseMoney(row[COL.PASIVO_PROVEEDORES]),
-      pasivoTotal: parseMoney(row[COL.PASIVO_TOTAL]),
+      activoLiquido,
+      activoMedPlazo,
+      clientesACobrar,
+      activoTotal: reconcileTotal(
+        [activoLiquido, activoMedPlazo, clientesACobrar],
+        parseMoney(row[COL.ACTIVO_TOTAL]),
+        `Activo Total (${periodKey})`
+      ),
+      pasivoImpuestosUSA,
+      pasivoFacturacionAdelantada,
+      pasivoProveedores,
+      pasivoTotal: reconcileTotal(
+        [pasivoImpuestosUSA, pasivoFacturacionAdelantada, pasivoProveedores],
+        parseMoney(row[COL.PASIVO_TOTAL]),
+        `Pasivo Total (${periodKey})`
+      ),
       balanceNeto: parseMoney(row[COL.BALANCE_NETO]),
       cashflow: parseMoney(row[COL.CASHFLOW]),
       cashflow60Dias: parseMoney(row[COL.CASHFLOW_60]),

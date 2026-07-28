@@ -85,6 +85,20 @@ export function authFetch(url: string, options: RequestInit = {}): Promise<Respo
   });
 }
 
+// authFetch() itself doesn't check response.ok — callers that do
+// `authFetch(url).then(r => r.json())` directly would otherwise treat a 404/500
+// error payload as valid data (react-query never sees an error state). Use this
+// wherever a queryFn needs authFetch's URL-rewriting but must still fail loudly.
+export async function authFetchJson<T = any>(url: string, options: RequestInit = {}): Promise<T> {
+  const response = await authFetch(url, options);
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => "");
+    throw parseApiError(response.status, errorText);
+  }
+  if (response.status === 204) return null as T;
+  return response.json();
+}
+
 // Default query function that will be used by react-query
 export const defaultQueryFn = async ({ queryKey }: { queryKey: readonly unknown[] }) => {
   const rawUrl = Array.isArray(queryKey) ? queryKey[0] : queryKey;
