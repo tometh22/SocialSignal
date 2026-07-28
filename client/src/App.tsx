@@ -76,6 +76,11 @@ import { AuthProvider } from "@/hooks/use-auth";
 import { ChatProvider } from "@/hooks/use-chat";
 import { ProtectedRoute } from "@/lib/protected-route";
 import { ImageRefreshProvider } from "@/contexts/ImageRefreshContext";
+import {
+  FINANCE_SUMMARY_ACCESS_SECTIONS,
+  HOME_ACCESS_SECTIONS,
+  HOURS_DASHBOARD_ACCESS_SECTIONS,
+} from "@/hooks/use-permissions";
 
 // Wrapper para procesar parámetros de consulta para OptimizedQuote
 function OptimizedQuoteWrapper() {
@@ -183,8 +188,8 @@ function AppRoutes() {
                   <Route path="/unauthorized" component={UnauthorizedPage} />
 
                   {/* Core Application Routes */}
-                  <ProtectedRoute path="/" component={HomeDashboard} requiredPermission="dashboard" />
-                  <ProtectedRoute path="/dashboard" component={ExecutiveDashboardV2} requiredPermission="dashboard" />
+                  <ProtectedRoute path="/" component={HomeDashboard} requiredAnyPermission={HOME_ACCESS_SECTIONS} />
+                  <ProtectedRoute path="/dashboard" component={ExecutiveDashboardV2} requiredAnyPermission={FINANCE_SUMMARY_ACCESS_SECTIONS} />
                   <ProtectedRoute path="/dashboard-legacy" component={() => <Redirect to="/dashboard" />} />
                   <ProtectedRoute path="/executive-dashboard-new" component={() => <Redirect to="/dashboard" />} />
                   <ProtectedRoute path="/executive/operativo" component={ExecutiveOperativo} requiredPermission="dashboard" />
@@ -235,7 +240,7 @@ function AppRoutes() {
                   <ProtectedRoute path="/tasks" component={TasksHomePage} requiredPermission="projects" />
                   <ProtectedRoute path="/tasks/my-tasks" component={MyTasksPage} requiredPermission="projects" />
                   <ProtectedRoute path="/tasks/team-calendar" component={TeamCalendarPage} requiredPermission="projects" />
-                  <ProtectedRoute path="/tasks/hours-dashboard" component={HoursDashboardPage} requiredPermission="projects" />
+                  <ProtectedRoute path="/tasks/hours-dashboard" component={HoursDashboardPage} requiredAnyPermission={HOURS_DASHBOARD_ACCESS_SECTIONS} />
                   <ProtectedRoute path="/tasks/projects" component={ProjectsHubPage} requiredPermission="projects" />
                   <ProtectedRoute path="/tasks/projects/:id" component={ProjectTasksPage} requiredPermission="projects" />
 

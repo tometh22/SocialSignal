@@ -1046,8 +1046,7 @@ body.dark::before {
     font-size: var(--font-size-4xl);
     line-height: var(--line-height-tight);
     font-weight: var(--font-weight-bold);
-    margin-top: var(--spacing-xl);
-    margin-bottom: var(--spacing-lg);
+    margin: 0;
     letter-spacing: var(--tracking-tight);
   }
 
@@ -1055,8 +1054,7 @@ body.dark::before {
     font-size: var(--font-size-3xl);
     line-height: var(--line-height-tight);
     font-weight: var(--font-weight-semibold);
-    margin-top: var(--spacing-lg);
-    margin-bottom: var(--spacing-md);
+    margin: 0;
     letter-spacing: var(--tracking-tight);
   }
 
@@ -1064,32 +1062,28 @@ body.dark::before {
     font-size: var(--font-size-2xl);
     line-height: var(--line-height-snug);
     font-weight: var(--font-weight-semibold);
-    margin-top: var(--spacing-lg);
-    margin-bottom: var(--spacing-md);
+    margin: 0;
   }
 
   h4, .h4 {
     font-size: var(--font-size-xl);
     line-height: var(--line-height-snug);
     font-weight: var(--font-weight-medium);
-    margin-top: var(--spacing-md);
-    margin-bottom: var(--spacing-sm);
+    margin: 0;
   }
 
   h5, .h5 {
     font-size: var(--font-size-lg);
     line-height: var(--line-height-normal);
     font-weight: var(--font-weight-medium);
-    margin-top: var(--spacing-md);
-    margin-bottom: var(--spacing-sm);
+    margin: 0;
   }
 
   h6, .h6 {
     font-size: var(--font-size-base);
     line-height: var(--line-height-normal);
     font-weight: var(--font-weight-medium);
-    margin-top: var(--spacing-md);
-    margin-bottom: var(--spacing-sm);
+    margin: 0;
     text-transform: uppercase;
     letter-spacing: var(--tracking-wide);
   }
@@ -1153,10 +1147,13 @@ body.dark::before {
     text-transform: uppercase;
   }
 
-  /* Mejora para la legibilidad en párrafos */
+  /*
+   * El chrome de producto controla su propio ritmo. Los márgenes editoriales y
+   * el ancho de lectura viven exclusivamente dentro de `.prose`.
+   */
   p {
-    margin-bottom: var(--spacing-md);
-    max-width: 70ch; /* Mejora la legibilidad limitando el ancho */
+    margin: 0;
+    max-width: none;
   }
 
   /* Clases de Texto Especiales */
@@ -1905,6 +1902,101 @@ body {
 .mind-empty-state > svg,
 .mind-empty-state > div:first-child {
   margin-bottom: 0.75rem;
+}
+
+/*
+ * Product layout primitives
+ * -------------------------
+ * These rules deliberately focus on relationships that are awkward to express
+ * as one-off utilities: safe auto-fit grids, container-aware header flow and
+ * consistent minimum touch targets.
+ */
+.ui-metric-grid {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+  gap: 1rem;
+}
+
+.ui-compact-page-header {
+  display: grid;
+  min-width: 0;
+  align-items: center;
+  gap: 1rem;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.ui-compact-page-header-actions :is(
+  button,
+  a[href],
+  [role="button"],
+  [role="combobox"]
+) {
+  min-height: 2.75rem;
+}
+
+.ui-toolbar-panel {
+  display: grid;
+  min-width: 0;
+  align-items: end;
+  gap: 0.75rem;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.ui-toolbar-controls {
+  display: grid;
+  min-width: 0;
+  align-items: end;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
+  gap: 0.75rem;
+}
+
+.ui-toolbar-controls :is(
+  button,
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  [role="button"],
+  [role="combobox"]
+),
+.ui-toolbar-actions :is(
+  button,
+  a[href],
+  [role="button"],
+  [role="combobox"]
+),
+.ui-empty-state-actions :is(
+  button,
+  a[href],
+  [role="button"]
+) {
+  min-height: 2.75rem;
+}
+
+.ui-empty-state > * {
+  margin-inline: auto;
+}
+
+/* Editorial spacing is opt-in. Application chrome remains alignment-safe. */
+.prose {
+  max-width: 70ch;
+}
+
+.prose :where(p):not(:where([class~="not-prose"], [class~="not-prose"] *)) {
+  max-width: none;
+}
+
+@media (min-width: 768px) {
+  .ui-compact-page-header {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .ui-toolbar-panel {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .ui-toolbar-intro {
+    grid-column: 1 / -1;
+  }
 }
 
 [data-radix-popper-content-wrapper] {
