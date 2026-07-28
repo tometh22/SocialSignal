@@ -128,8 +128,25 @@ protegidos respondieron 401 correctamente sin sesión.
 - Ajuste al contrato real de Sheets: commit `3ef0bd9a`, PR
   [#161](https://github.com/tometh22/SocialSignal/pull/161), merge
   `730951437f3a78794cd654d45a5d1c26540cfe94`.
+- Observabilidad, normalización manual e informe productivo: commit
+  `e9eb93cd`, PR
+  [#162](https://github.com/tometh22/SocialSignal/pull/162), merge
+  `58569bc1669a702aef60573f13625ba81afdd616`.
 - Railway: servicio `mind-epical-web`, deployment
-  `be98857f-732d-4a7d-a193-0c07dc7e58bd`, estado `SUCCESS`.
+  `f4a6b6d5-4e57-40be-9986-dd1b6ebb61a1`, estado `SUCCESS`.
+
+### Monitoreo de estabilidad
+
+La ventana se ejecutó del `2026-07-28T02:53:02Z` al
+`2026-07-28T03:58:07Z` (65 minutos completos).
+
+- Ciclo automático `03:21:49Z`: Activo 5/5 y Pasivo 108/108, todos los
+  estados preservados, cero errores.
+- Ciclo automático `03:51:50Z`: Activo 5/5 y Pasivo 108/108, todos los
+  estados preservados, cero errores.
+- Corte final `03:58:24Z`: 5 filas de Activo, 108 de Pasivo, un batch vigente
+  por dataset y totales sin cambios.
+- Cero respuestas HTTP 5xx durante los 70 minutos consultados.
 
 ### Validaciones pendientes o deuda observada
 
@@ -139,6 +156,3 @@ protegidos respondieron 401 correctamente sin sesión.
 - El pipeline ETL legacy de proyectos confirmados continúa registrando errores
   de `ON CONFLICT` por una restricción faltante. No afectó el ledger ni produjo
   5xx en el smoke financiero, pero debe tratarse como deuda independiente.
-- La estabilidad inmediata quedó probada con dos sincronizaciones completas.
-  El control temporal de 65 minutos se registra al finalizar el siguiente ciclo
-  automático.
