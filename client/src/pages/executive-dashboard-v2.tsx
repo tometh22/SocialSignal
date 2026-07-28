@@ -6,6 +6,10 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { CompactPageHeader } from "@/components/ui/compact-page-header";
+import { MetricCard, MetricGrid } from "@/components/ui/metric-card";
+import { PageShell } from "@/components/ui/page-shell";
+import { ToolbarPanel } from "@/components/ui/toolbar-panel";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -28,6 +32,25 @@ const fmtShort = (n: number | null | undefined) =>
 
 const fmtPct = (n: number | null | undefined) =>
   n == null ? "—" : `${n.toFixed(2)}%`;
+
+function InfoTip({ label, children, side = "bottom" }: { label: string; children: string; side?: "bottom" | "right" }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          aria-label={label}
+          className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+        >
+          <Info className="h-3.5 w-3.5" />
+        </button>
+      </TooltipTrigger>
+      <TooltipContent side={side} className="max-w-[240px] text-xs leading-snug">
+        {children}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
 
 export default function ExecutiveDashboardV2() {
   const now = new Date();
@@ -76,22 +99,28 @@ export default function ExecutiveDashboardV2() {
     : null;
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold">Dashboard Ejecutivo</h1>
-          <p className="text-sm text-muted-foreground">
-            Datos en tiempo real desde Google Sheets — misma fuente que Looker Studio
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
+    <PageShell width="wide" spacing="compact">
+      <CompactPageHeader
+        eyebrow="Finanzas"
+        title="Resumen financiero"
+        description="Indicadores ejecutivos en tiempo real desde la fuente financiera maestra."
+        icon={<Wallet className="h-5 w-5" />}
+      />
+
+      <ToolbarPanel
+        title="Período"
+        description="Compará un mes, trimestre, año o rango personalizado."
+        ariaLabel="Selector de período financiero"
+      >
+        <div className="flex min-w-0 flex-col gap-3 xl:flex-row xl:items-center">
           {/* Mode toggle */}
-          <div className="flex rounded-md border overflow-hidden text-sm">
+          <div className="grid grid-cols-2 overflow-hidden rounded-xl border text-sm sm:flex">
             {(["month", "quarter", "year", "custom"] as const).map((mode) => (
               <button
                 key={mode}
-                className={`px-3 py-1.5 font-medium transition-colors ${viewMode === mode ? "bg-indigo-600 text-white" : "bg-white text-slate-600 hover:bg-slate-50"}`}
+                type="button"
+                aria-pressed={viewMode === mode}
+                className={`min-h-11 px-3 py-2 font-medium transition-colors focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 ${viewMode === mode ? "bg-primary text-primary-foreground" : "bg-white text-slate-600 hover:bg-slate-50"}`}
                 onClick={() => setViewMode(mode)}
               >
                 {mode === "month" ? "Mes" : mode === "quarter" ? "Trimestre" : mode === "year" ? "Año" : "Personalizado"}
@@ -101,22 +130,22 @@ export default function ExecutiveDashboardV2() {
 
           {/* Selectors — change based on mode */}
           {viewMode === "custom" ? (
-            <div className="flex items-center gap-1 text-sm">
+            <div className="grid min-w-0 grid-cols-2 gap-2 text-sm sm:flex sm:flex-wrap sm:items-center">
               <Select value={String(customStartMonth)} onValueChange={(v) => setCustomStartMonth(parseInt(v))}>
-                <SelectTrigger className="w-20"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-11 w-full sm:w-24" aria-label="Mes inicial"><SelectValue /></SelectTrigger>
                 <SelectContent>{MONTHS.map((m, i) => <SelectItem key={i} value={String(i + 1)}>{m}</SelectItem>)}</SelectContent>
               </Select>
               <Select value={String(customStartYear)} onValueChange={(v) => setCustomStartYear(parseInt(v))}>
-                <SelectTrigger className="w-20"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-11 w-full sm:w-24" aria-label="Año inicial"><SelectValue /></SelectTrigger>
                 <SelectContent>{[2024, 2025, 2026].map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
               </Select>
-              <span className="text-slate-400 px-1">→</span>
+              <span className="hidden px-1 text-slate-400 sm:inline" aria-hidden="true">→</span>
               <Select value={String(customEndMonth)} onValueChange={(v) => setCustomEndMonth(parseInt(v))}>
-                <SelectTrigger className="w-20"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-11 w-full sm:w-24" aria-label="Mes final"><SelectValue /></SelectTrigger>
                 <SelectContent>{MONTHS.map((m, i) => <SelectItem key={i} value={String(i + 1)}>{m}</SelectItem>)}</SelectContent>
               </Select>
               <Select value={String(customEndYear)} onValueChange={(v) => setCustomEndYear(parseInt(v))}>
-                <SelectTrigger className="w-20"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-11 w-full sm:w-24" aria-label="Año final"><SelectValue /></SelectTrigger>
                 <SelectContent>{[2024, 2025, 2026].map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
               </Select>
             </div>
@@ -124,28 +153,28 @@ export default function ExecutiveDashboardV2() {
             <>
               {viewMode === "month" && (
                 <Select value={String(selectedMonth)} onValueChange={(v) => setSelectedMonth(parseInt(v))}>
-                  <SelectTrigger className="w-24"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="h-11 w-28" aria-label="Mes"><SelectValue /></SelectTrigger>
                   <SelectContent>{MONTHS.map((m, i) => <SelectItem key={i} value={String(i + 1)}>{m}</SelectItem>)}</SelectContent>
                 </Select>
               )}
               {viewMode === "quarter" && (
                 <Select value={String(selectedQuarter)} onValueChange={(v) => setSelectedQuarter(parseInt(v))}>
-                  <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="h-11 w-48" aria-label="Trimestre"><SelectValue /></SelectTrigger>
                   <SelectContent>{QUARTERS.map(q => <SelectItem key={q.value} value={String(q.value)}>{q.label}</SelectItem>)}</SelectContent>
                 </Select>
               )}
               <Select value={String(selectedYear)} onValueChange={(v) => setSelectedYear(parseInt(v))}>
-                <SelectTrigger className="w-20"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-11 w-24" aria-label="Año"><SelectValue /></SelectTrigger>
                 <SelectContent>{[2024, 2025, 2026].map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
               </Select>
             </>
           )}
 
-          <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching}>
+          <Button variant="outline" size="icon" className="h-11 w-11" onClick={() => refetch()} disabled={isFetching} aria-label="Actualizar resumen financiero">
             <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
           </Button>
         </div>
-      </div>
+      </ToolbarPanel>
 
       {isLoading ? (
         <div className="flex items-center justify-center min-h-[40vh]">
@@ -193,65 +222,67 @@ export default function ExecutiveDashboardV2() {
                 Rango personalizado · {(d as any)._rangeMonthCount ?? "?"} meses
               </Badge>
             )}
-            <span className="text-xs text-muted-foreground">Period key: {d.periodKey}</span>
           </div>
 
           {/* KPI Cards */}
           <TooltipProvider delayDuration={200}>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+          <MetricGrid>
             {[
               {
                 label: "EBIT Operativo",
                 value: fmt(d.ebitOperativo), pct: fmtPct(d.margenOperativo),
                 color: kpiColor(d.ebitOperativo, 0), icon: TrendingUp,
+                tone: d.ebitOperativo == null ? "neutral" as const : d.ebitOperativo >= 0 ? "success" as const : "danger" as const,
                 tooltip: "Ventas − Costos directos e indirectos. Mide la rentabilidad operativa antes de impuestos. Objetivo: >15% de margen.",
               },
               {
                 label: viewMode === "quarter" ? "Ventas del Trimestre" : viewMode === "year" ? "Ventas del Año" : viewMode === "custom" ? "Ventas del Período" : "Ventas del Mes",
                 value: fmt(d.ventasDelMes), pct: null, color: "text-emerald-700", icon: DollarSign,
+                tone: "success" as const,
                 tooltip: "Total facturado sin IVA en el período seleccionado. Fuente: columna 'Ventas del mes' del sheet Resumen Ejecutivo.",
               },
               {
                 label: "Cashflow",
                 value: fmt(d.cashflow), pct: null, color: kpiColor(d.cashflow, 0),
                 icon: d.cashflow && d.cashflow >= 0 ? ArrowUp : ArrowDown,
+                tone: d.cashflow == null ? "neutral" as const : d.cashflow >= 0 ? "success" as const : "danger" as const,
                 tooltip: "Dinero que realmente entró y salió de la cuenta en el período. Puede ser mayor al Beneficio Neto por cobros de facturas anteriores o anticipos de clientes.",
               },
               {
                 label: "Margen Neto",
                 value: fmtPct(d.margenNeto), pct: null, color: kpiColor(d.margenNeto, 15), icon: BarChart3,
+                tone: d.margenNeto == null ? "neutral" as const : d.margenNeto >= 15 ? "success" as const : d.margenNeto >= 0 ? "warning" as const : "danger" as const,
                 tooltip: "Beneficio Neto / Ventas × 100. Porcentaje de cada dólar de venta que queda como ganancia final después de todos los costos e impuestos.",
               },
               {
                 label: "Markup",
-                value: d.markup != null ? d.markup.toFixed(2) : "—", pct: null, color: kpiColor(d.markup, 2.5), icon: TrendingUp,
+                value: d.markup != null ? `${d.markup.toFixed(2)}×` : "—", pct: null, color: kpiColor(d.markup, 2.5), icon: TrendingUp,
+                tone: d.markup == null ? "neutral" as const : d.markup >= 2.5 ? "success" as const : d.markup >= 0 ? "warning" as const : "danger" as const,
                 tooltip: "Ventas / Costos Directos del equipo. Indica cuántas veces los ingresos superan el costo directo. Estándar Epical: ≥2.5x. Excelente: ≥3.0x.",
               },
               {
                 label: "Beneficio Neto",
                 value: fmt(d.beneficioNeto), pct: null, color: kpiColor(d.beneficioNeto, 0), icon: Wallet,
+                tone: d.beneficioNeto == null ? "neutral" as const : d.beneficioNeto >= 0 ? "success" as const : "danger" as const,
                 tooltip: "EBIT − Impuestos. Ganancia final del período después de todos los costos e impuestos. Equivale al Margen Neto aplicado sobre las ventas.",
               },
             ].map((kpi, i) => (
-              <Card key={i} className="relative overflow-hidden">
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{kpi.label}</span>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Info className="h-3.5 w-3.5 text-slate-300 hover:text-slate-500 cursor-help flex-shrink-0" />
-                      </TooltipTrigger>
-                      <TooltipContent side="bottom" className="max-w-[220px] text-xs leading-snug">
-                        {kpi.tooltip}
-                      </TooltipContent>
-                    </Tooltip>
-                  </div>
-                  <div className={`text-xl font-bold tabular-nums ${kpi.color}`}>{kpi.value}</div>
-                  {kpi.pct && <div className="text-xs text-muted-foreground mt-0.5">{kpi.pct}</div>}
-                </CardContent>
-              </Card>
+              <MetricCard
+                key={i}
+                label={(
+                  <span className="flex min-w-0 items-center justify-between gap-2">
+                    <span>{kpi.label}</span>
+                    <InfoTip label={`Más información sobre ${kpi.label}`}>{kpi.tooltip}</InfoTip>
+                  </span>
+                )}
+                value={kpi.value}
+                icon={<kpi.icon className="h-5 w-5" />}
+                detail={kpi.pct}
+                tone={kpi.tone}
+                aria-label={`${kpi.label}: ${kpi.value}`}
+              />
             ))}
-          </div>
+          </MetricGrid>
           </TooltipProvider>
 
           {/* P&L + Balance */}
@@ -275,14 +306,7 @@ export default function ExecutiveDashboardV2() {
                   <div key={i} className={`flex items-center justify-between py-2 px-3 rounded ${row.bold ? "bg-slate-50 border font-semibold" : ""}`}>
                     <div className="flex items-center gap-1.5">
                       <span className={`text-sm ${row.bold ? "" : "text-muted-foreground"}`}>{row.label}</span>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Info className="h-3 w-3 text-slate-300 hover:text-slate-500 cursor-help flex-shrink-0" />
-                        </TooltipTrigger>
-                        <TooltipContent side="right" className="max-w-[200px] text-xs leading-snug">
-                          {row.tooltip}
-                        </TooltipContent>
-                      </Tooltip>
+                      <InfoTip label={`Más información sobre ${row.label}`} side="right">{row.tooltip}</InfoTip>
                     </div>
                     <div className="flex items-center gap-3">
                       <span className={`text-sm tabular-nums ${row.negative ? "text-red-500" : kpiColor(row.value, 0)}`}>
@@ -319,14 +343,7 @@ export default function ExecutiveDashboardV2() {
                     <div key={i} className={`flex justify-between items-center py-1.5 px-3 rounded text-sm ${row.bold ? "bg-slate-50 border font-semibold" : ""}`}>
                       <div className="flex items-center gap-1.5">
                         <span className={row.bold ? "" : "text-muted-foreground"}>{row.label}</span>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Info className="h-3 w-3 text-slate-300 hover:text-slate-500 cursor-help flex-shrink-0" />
-                          </TooltipTrigger>
-                          <TooltipContent side="right" className="max-w-[210px] text-xs leading-snug">
-                            {row.tooltip}
-                          </TooltipContent>
-                        </Tooltip>
+                        <InfoTip label={`Más información sobre ${row.label}`} side="right">{row.tooltip}</InfoTip>
                       </div>
                       <span className={`tabular-nums ${row.negative ? "text-red-500" : kpiColor(row.value, 0)}`}>
                         {fmt(row.value)}
@@ -364,14 +381,9 @@ export default function ExecutiveDashboardV2() {
                         <div className="flex justify-between py-1 px-3 text-sm">
                           <div className="flex items-center gap-1.5">
                             <span className="text-muted-foreground">Proyección resultado</span>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Info className="h-3 w-3 text-slate-300 hover:text-slate-500 cursor-help flex-shrink-0" />
-                              </TooltipTrigger>
-                              <TooltipContent side="right" className="max-w-[210px] text-xs leading-snug">
-                                Resultado proyectado del período según el Excel Maestro (Resumen Ejecutivo).
-                              </TooltipContent>
-                            </Tooltip>
+                            <InfoTip label="Más información sobre la proyección de resultado" side="right">
+                              Resultado proyectado del período según el Excel Maestro (Resumen Ejecutivo).
+                            </InfoTip>
                           </div>
                           <span className={`tabular-nums font-medium ${kpiColor(d.proyeccionResultado, 0)}`}>{fmt(d.proyeccionResultado)}</span>
                         </div>
@@ -613,6 +625,6 @@ export default function ExecutiveDashboardV2() {
           )}
         </>
       )}
-    </div>
+    </PageShell>
   );
 }

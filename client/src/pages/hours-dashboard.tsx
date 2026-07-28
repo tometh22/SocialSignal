@@ -1,12 +1,19 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { Link } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { format, startOfWeek, endOfWeek, subWeeks, startOfMonth, endOfMonth, subMonths } from "date-fns";
 import { es } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { CompactPageHeader } from "@/components/ui/compact-page-header";
+import { EmptyState } from "@/components/ui/empty-state";
+import { MetricCard, MetricGrid } from "@/components/ui/metric-card";
+import { PageShell } from "@/components/ui/page-shell";
+import { ToolbarPanel } from "@/components/ui/toolbar-panel";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Loader2, BarChart3, PieChart, Clock, TrendingUp, User, Briefcase, ChevronLeft, ChevronRight } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, LabelList, ResponsiveContainer,
@@ -209,24 +216,29 @@ export default function HoursDashboardPage() {
   const handleFilterChange = () => setPage(0);
 
   return (
-    <div className="space-y-5">
-      {/* Header */}
-      <div>
-        <h1 className="text-xl font-semibold text-foreground">Panel de Horas</h1>
-        <p className="text-sm text-muted-foreground">Horas registradas en tareas por persona y proyecto</p>
-      </div>
+    <PageShell width="wide" spacing="compact">
+      <CompactPageHeader
+        eyebrow="Operaciones"
+        title="Panel de horas"
+        description="Analizá las horas registradas por período, persona y proyecto."
+        icon={<Clock className="h-5 w-5" />}
+      />
 
       {/* Filters */}
-      <div className="bg-card rounded-xl border p-4 space-y-3">
-        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Filtros</p>
-        <div className="flex flex-wrap gap-2 items-center">
+      <ToolbarPanel
+        title="Filtros"
+        description="Elegí un período rápido o combiná filtros para profundizar el análisis."
+        ariaLabel="Filtros del panel de horas"
+      >
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
           <div className="flex items-center gap-1.5 flex-wrap">
             {QUICK_FILTERS.map(f => (
               <Button
                 key={f.value}
                 variant={quickFilter === f.value ? "default" : "outline"}
                 size="sm"
-                className="h-7 text-xs"
+                aria-pressed={quickFilter === f.value}
+                className="h-10 text-xs"
                 onClick={() => { setQuickFilter(f.value); handleFilterChange(); }}
               >
                 {f.label}
@@ -235,7 +247,8 @@ export default function HoursDashboardPage() {
             <Button
               variant={quickFilter === "custom" ? "default" : "outline"}
               size="sm"
-              className="h-7 text-xs"
+              aria-pressed={quickFilter === "custom"}
+              className="h-10 text-xs"
               onClick={() => setQuickFilter("custom")}
             >
               Personalizado
@@ -243,90 +256,103 @@ export default function HoursDashboardPage() {
           </div>
 
           {quickFilter === "custom" && (
-            <div className="flex items-center gap-2">
-              <Input type="date" value={customFrom} onChange={e => { setCustomFrom(e.target.value); handleFilterChange(); }} className="h-7 text-xs w-36" />
-              <span className="text-xs text-muted-foreground">a</span>
-              <Input type="date" value={customTo} onChange={e => { setCustomTo(e.target.value); handleFilterChange(); }} className="h-7 text-xs w-36" />
+            <div className="grid w-full min-w-0 gap-2 sm:w-auto sm:grid-cols-2">
+              <div className="space-y-1">
+                <Label htmlFor="hours-date-from" className="text-xs text-muted-foreground">Desde</Label>
+                <Input id="hours-date-from" type="date" value={customFrom} onChange={e => { setCustomFrom(e.target.value); handleFilterChange(); }} className="h-11 w-full text-sm sm:w-40" />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="hours-date-to" className="text-xs text-muted-foreground">Hasta</Label>
+                <Input id="hours-date-to" type="date" value={customTo} onChange={e => { setCustomTo(e.target.value); handleFilterChange(); }} className="h-11 w-full text-sm sm:w-40" />
+              </div>
             </div>
           )}
         </div>
 
-        <div className="flex items-center gap-3 flex-wrap">
-          <Select value={selectedPersonnelId} onValueChange={v => { setSelectedPersonnelId(v); handleFilterChange(); }}>
-            <SelectTrigger className="h-8 w-44 text-xs">
-              <SelectValue placeholder="Todas las personas" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todas las personas</SelectItem>
-              {allPersonnel.map(p => (
-                <SelectItem key={p.id} value={p.id.toString()}>{p.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <div className="grid w-full min-w-0 gap-3 sm:grid-cols-2 lg:w-auto">
+          <div className="min-w-0 space-y-1">
+            <Label className="text-xs text-muted-foreground">Persona</Label>
+            <Select value={selectedPersonnelId} onValueChange={v => { setSelectedPersonnelId(v); handleFilterChange(); }}>
+              <SelectTrigger className="h-11 w-full text-sm lg:w-56" aria-label="Filtrar por persona">
+                <SelectValue placeholder="Todas las personas" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas las personas</SelectItem>
+                {allPersonnel.map(p => (
+                  <SelectItem key={p.id} value={p.id.toString()}>{p.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
-          <Select value={selectedProjectId} onValueChange={v => { setSelectedProjectId(v); handleFilterChange(); }}>
-            <SelectTrigger className="h-8 w-52 text-xs">
-              <SelectValue placeholder="Todos los proyectos" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos los proyectos</SelectItem>
-              {allProjects.map(p => (
-                <SelectItem key={p.id} value={p.id.toString()}>{p.client_name} · {p.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="min-w-0 space-y-1">
+            <Label className="text-xs text-muted-foreground">Proyecto</Label>
+            <Select value={selectedProjectId} onValueChange={v => { setSelectedProjectId(v); handleFilterChange(); }}>
+              <SelectTrigger className="h-11 w-full text-sm lg:w-72" aria-label="Filtrar por proyecto">
+                <SelectValue placeholder="Todos los proyectos" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos los proyectos</SelectItem>
+                {allProjects.map(p => (
+                  <SelectItem key={p.id} value={p.id.toString()}>{p.client_name} · {p.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
-      </div>
+      </ToolbarPanel>
 
       {isLoading ? (
         <div className="flex items-center justify-center py-20">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
       ) : !summary || summary.entries.length === 0 ? (
-        <div className="text-center py-16 bg-card rounded-xl border">
-          <Clock className="h-14 w-14 text-muted-foreground/30 mx-auto mb-3" />
-          <p className="text-sm font-medium text-muted-foreground">No hay horas registradas en el período seleccionado</p>
-          <p className="text-xs text-muted-foreground/70 mt-1">Las horas se registran desde el panel de cada tarea</p>
-        </div>
+        <EmptyState
+          announce
+          icon={<Clock className="h-5 w-5" />}
+          title="No hay horas registradas"
+          description="No encontramos registros para los filtros elegidos. Podés cambiar el período o cargar horas desde una tarea."
+          action={(
+            <Button asChild>
+              <Link href="/tasks">Ir a mis tareas</Link>
+            </Button>
+          )}
+        />
       ) : (
         <>
           {/* KPI cards */}
-          <div className={cn("grid grid-cols-1 gap-3", isOperations ? "lg:grid-cols-3" : "lg:grid-cols-2")}>
-            <div className="bg-card rounded-xl border p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <Clock className="h-4 w-4 text-primary" />
-                <p className="text-xs text-muted-foreground font-medium">Total de horas reales</p>
-              </div>
-              <p className="text-2xl font-bold text-foreground">{totalHours.toFixed(1)}h</p>
-              <p className="text-xs text-muted-foreground mt-1">{summary.entries.length} entradas registradas</p>
-            </div>
+          <MetricGrid className={cn(isOperations && "xl:grid-cols-3")}>
+            <MetricCard
+              label="Total de horas reales"
+              value={`${totalHours.toFixed(1)}h`}
+              valueLabel={`${totalHours.toFixed(1)} horas reales`}
+              icon={<Clock className="h-5 w-5" />}
+              detail={`${summary.entries.length} entradas registradas`}
+              tone="primary"
+            />
 
-            <div className="bg-card rounded-xl border p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <TrendingUp className="h-4 w-4 text-blue-500" />
-                <p className="text-xs text-muted-foreground font-medium">Horas estimadas totales</p>
-              </div>
-              <p className="text-2xl font-bold text-foreground">{estTotalEstimated.toFixed(1)}h</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                {estTotalEstimated > 0
-                  ? `${Math.round((estTotalReal / estTotalEstimated) * 100)}% consumido (real acumulado)`
-                  : "Sin estimación cargada"}
-              </p>
-            </div>
+            <MetricCard
+              label="Horas estimadas totales"
+              value={`${estTotalEstimated.toFixed(1)}h`}
+              valueLabel={`${estTotalEstimated.toFixed(1)} horas estimadas`}
+              icon={<TrendingUp className="h-5 w-5" />}
+              detail={estTotalEstimated > 0
+                ? `${Math.round((estTotalReal / estTotalEstimated) * 100)}% consumido (real acumulado)`
+                : "Sin estimación cargada"}
+              tone="info"
+            />
 
             {isOperations && (
-              <div className="bg-card rounded-xl border p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <BarChart3 className="h-4 w-4 text-green-500" />
-                  <p className="text-xs text-muted-foreground font-medium">Horas disponibles</p>
-                </div>
-                <p className="text-2xl font-bold text-foreground">{availableHours}h</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Días hábiles sin feriados{absenceWorkdays > 0 ? ` ni ausencias (-${absenceWorkdays}d)` : ""}{availableBasis ? ` · ${availableBasis}` : ""}
-                </p>
-              </div>
+              <MetricCard
+                label="Horas disponibles"
+                value={`${availableHours}h`}
+                valueLabel={`${availableHours} horas disponibles`}
+                icon={<BarChart3 className="h-5 w-5" />}
+                detail={`Días hábiles sin feriados${absenceWorkdays > 0 ? ` ni ausencias (-${absenceWorkdays}d)` : ""}${availableBasis ? ` · ${availableBasis}` : ""}`}
+                tone="success"
+              />
             )}
-          </div>
+          </MetricGrid>
 
           {/* Charts */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -565,6 +591,6 @@ export default function HoursDashboardPage() {
           </div>
         </>
       )}
-    </div>
+    </PageShell>
   );
 }

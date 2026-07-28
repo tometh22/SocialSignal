@@ -197,7 +197,7 @@ export default function ManageQuotes() {
       if (newStatus === 'approved') {
         toast({
           title: "Cotización lista",
-          description: "Si corresponde, creá el proyecto desde Vista de Proyectos.",
+          description: "Si corresponde, creá el proyecto desde Proyectos.",
         });
       }
 

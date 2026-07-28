@@ -20,6 +20,7 @@ import {
   Loader2,
   LogOut,
   Menu,
+  Receipt,
   Search,
   Settings,
   Sparkles,
@@ -27,6 +28,7 @@ import {
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/use-auth";
+import { usePermissions } from "@/hooks/use-permissions";
 import { authFetch } from "@/lib/queryClient";
 import { reviewApi, reviewKeys, type ReviewRoomSummary } from "@/lib/review-api";
 import { GlobalSearch } from "@/components/features/global-search";
@@ -89,8 +91,8 @@ const routeLabels: Record<string, string> = {
   pasivo: "Pasivo",
   provisions: "Provisiones",
   cashflow: "Cashflow",
-  crm: "CRM Ventas",
-  dashboard: "Dashboard ejecutivo",
+  crm: "CRM",
+  dashboard: "Resumen financiero",
   "my-invoices": "Mis facturas",
 };
 
@@ -113,11 +115,13 @@ export default function Topbar({ onMenuClick }: TopbarProps = {}) {
   const [location] = useLocation();
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const { user, logoutMutation, isLoading } = useAuth();
+  const { hasPermission } = usePermissions();
 
   const { data: reviewRooms = [] } = useQuery<ReviewRoomSummary[]>({
     queryKey: reviewKeys.list(),
     queryFn: reviewApi.listRooms,
     staleTime: 60_000,
+    enabled: hasPermission("status"),
   });
 
   const { data: reminders = [] } = useQuery<DueReminder[]>({
@@ -129,6 +133,7 @@ export default function Topbar({ onMenuClick }: TopbarProps = {}) {
       return Array.isArray(data) ? data : [];
     },
     staleTime: 60_000,
+    enabled: hasPermission("crm"),
   });
 
   useEffect(() => {
@@ -173,6 +178,7 @@ export default function Topbar({ onMenuClick }: TopbarProps = {}) {
     ? `${user.firstName.charAt(0)}${user.lastName.charAt(0)}`.toUpperCase()
     : "--";
   const overdueCount = reminders.filter((reminder) => reminder.isOverdue).length;
+  const isProvider = (user as any)?.role === "external_provider";
 
   return (
     <>
@@ -364,6 +370,14 @@ export default function Topbar({ onMenuClick }: TopbarProps = {}) {
                     </div>
                   </div>
                   <DropdownMenuSeparator />
+                  {!isProvider && (
+                    <DropdownMenuItem asChild className="rounded-xl">
+                      <Link href="/my-invoices" className="flex items-center gap-2">
+                        <Receipt className="h-4 w-4" />
+                        <span>Mis facturas</span>
+                      </Link>
+                    </DropdownMenuItem>
+                  )}
                   {(user as any).isAdmin && (
                     <DropdownMenuItem asChild className="rounded-xl">
                       <Link href="/admin" className="flex items-center gap-2">

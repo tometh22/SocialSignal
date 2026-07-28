@@ -6,36 +6,35 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/use-auth";
-import { usePermissions, AppSection } from "@/hooks/use-permissions";
+import {
+  FINANCE_SUMMARY_ACCESS_SECTIONS,
+  HOME_ACCESS_SECTIONS,
+  HOURS_DASHBOARD_ACCESS_SECTIONS,
+  usePermissions,
+  AppSection,
+} from "@/hooks/use-permissions";
 import { Badge } from "@/components/ui/badge";
 import { authFetch } from "@/lib/queryClient";
-import CreateReviewDialog from "@/components/review/CreateReviewDialog";
-import { reviewApi, reviewKeys, roomColor, type ReviewRoomSummary } from "@/lib/review-api";
+import { reviewApi, reviewKeys, type ReviewRoomSummary } from "@/lib/review-api";
 import BrandMark from "@/components/layout/brand-mark";
 
 import {
   ChevronRight,
-  ChevronDown,
   LayoutDashboard,
   FileText,
   Briefcase,
   Building2,
   Settings,
-  LogOut,
   Target,
-  Plus,
   Users,
   CheckSquare,
-  CalendarDays,
   BarChart2,
-  FolderOpen,
   Home,
   ClipboardList,
   Gauge,
   CalendarCheck,
   Calendar,
   Receipt,
-  MessageSquare,
   UserX,
   CircleArrowDown,
   CircleArrowUp,
@@ -43,28 +42,6 @@ import {
   ShieldAlert,
   Database,
 } from "lucide-react";
-
-const PROJECT_ICON_COLORS = [
-  { bg: "bg-blue-500", text: "text-white" },
-  { bg: "bg-purple-500", text: "text-white" },
-  { bg: "bg-green-500", text: "text-white" },
-  { bg: "bg-orange-500", text: "text-white" },
-  { bg: "bg-pink-500", text: "text-white" },
-  { bg: "bg-teal-500", text: "text-white" },
-  { bg: "bg-indigo-500", text: "text-white" },
-  { bg: "bg-rose-500", text: "text-white" },
-];
-
-function getProjectIconColor(id: number) {
-  return PROJECT_ICON_COLORS[id % PROJECT_ICON_COLORS.length];
-}
-
-type TaskProjectSummary = {
-  id: number;
-  name: string;
-  clientName: string;
-  pendingCount: number;
-};
 
 type NavItem = {
   href: string;
@@ -74,6 +51,7 @@ type NavItem = {
   status?: 'new';
   description?: string;
   permission?: AppSection;
+  anyPermissions?: readonly AppSection[];
 };
 
 interface SidebarFixedProps {
@@ -81,17 +59,16 @@ interface SidebarFixedProps {
 }
 
 export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps = {}) {
-  const { user, logoutMutation } = useAuth();
-  const { hasPermission } = usePermissions();
-  const [currentPath, setLocation] = useLocation();
+  const { user } = useAuth();
+  const { hasPermission, hasAnyPermission } = usePermissions();
+  const [currentPath] = useLocation();
   // En mobile (dentro del drawer) nunca está colapsado - el cierre se hace cerrando el drawer
   const [isCollapsedState, setIsCollapsed] = useState(false);
   const isCollapsed = mobileMode ? false : isCollapsedState;
   const [projectCount, setProjectCount] = useState(0);
   const [crmOverdue, setCrmOverdue] = useState(0);
-  const [projectsExpanded, setProjectsExpanded] = useState(false);
-  const [reviewsExpanded, setReviewsExpanded] = useState(true);
-  const [newReviewOpen, setNewReviewOpen] = useState(false);
+  const canSeeProjects = hasPermission("projects");
+  const canSeeCrm = hasPermission("crm");
 
   const fetchProjectCount = async () => {
     try {
@@ -116,30 +93,23 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
   };
 
   useEffect(() => {
-    fetchProjectCount();
-    fetchCrmStats();
+    if (canSeeProjects) fetchProjectCount();
+    else setProjectCount(0);
+    if (canSeeCrm) fetchCrmStats();
+    else setCrmOverdue(0);
+    if (!canSeeProjects && !canSeeCrm) return;
+
     const interval = setInterval(() => {
-      fetchProjectCount();
-      fetchCrmStats();
+      if (canSeeProjects) fetchProjectCount();
+      if (canSeeCrm) fetchCrmStats();
     }, 60000);
     return () => clearInterval(interval);
-  }, []);
+  }, [canSeeCrm, canSeeProjects]);
 
   const getUserInitials = () => {
     if (!user) return "US";
     return `${user.firstName.charAt(0)}${user.lastName.charAt(0)}`;
   };
-
-  const isAdmin = (user as any)?.isAdmin;
-
-  const { data: rawTaskProjects } = useQuery<TaskProjectSummary[]>({
-    queryKey: ["/api/tasks/projects"],
-    queryFn: () => authFetch("/api/tasks/projects").then(r => r.json()),
-    staleTime: 60000,
-  });
-  const taskProjects: TaskProjectSummary[] = Array.isArray(rawTaskProjects) ? rawTaskProjects : [];
-  const MAX_SIDEBAR_PROJECTS = 8;
-  const sidebarProjects = taskProjects.slice(0, MAX_SIDEBAR_PROJECTS);
 
   const { data: rawReviewRooms } = useQuery<ReviewRoomSummary[]>({
     queryKey: reviewKeys.list(),
@@ -148,16 +118,7 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
     enabled: hasPermission('status'),
   });
   const reviewRooms: ReviewRoomSummary[] = Array.isArray(rawReviewRooms) ? rawReviewRooms : [];
-  const MAX_SIDEBAR_ROOMS = 5;
-  const sidebarRooms = [...reviewRooms]
-    .sort((a, b) => {
-      const av = a.lastVisitedAt ? new Date(a.lastVisitedAt).getTime() : 0;
-      const bv = b.lastVisitedAt ? new Date(b.lastVisitedAt).getTime() : 0;
-      return bv - av;
-    })
-    .slice(0, MAX_SIDEBAR_ROOMS);
   const totalReviewPending = reviewRooms.reduce((acc, r) => acc + (r.pendingCount || 0), 0);
-  const isStatusActive = currentPath === '/review' || currentPath.startsWith('/review/');
 
   // Si el usuario es un proveedor externo, mostramos un sidebar restringido
   // con solo el panel del proveedor y sus facturas.
@@ -177,57 +138,52 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
     {
       title: "",
       items: [
-        { href: "/", title: "Inicio", icon: Home, description: "Accesos directos y resumen", permission: 'dashboard' as AppSection },
-        { href: "/dashboard", title: "Dashboard Ejecutivo", icon: LayoutDashboard, description: "KPIs financieros y operativos", permission: 'dashboard' as AppSection },
+        { href: "/", title: "Inicio", icon: Home, description: "Resumen personal", anyPermissions: HOME_ACCESS_SECTIONS },
       ]
     },
     {
       title: "Comercial",
       items: [
-        { href: "/crm", title: "CRM Ventas", icon: Target, badge: crmOverdue > 0 ? crmOverdue.toString() : undefined, description: "Pipeline de prospectos", permission: 'crm' as AppSection },
-        { href: "/quotations", title: "Cotizaciones", icon: FileText, description: "Gestionar cotizaciones", permission: 'quotations' as AppSection },
+        { href: "/crm", title: "CRM", icon: Target, badge: crmOverdue > 0 ? crmOverdue.toString() : undefined, description: "Pipeline comercial", permission: 'crm' as AppSection },
         { href: "/clients", title: "Clientes", icon: Building2, description: "Base de clientes", permission: 'crm' as AppSection },
+        { href: "/quotations", title: "Cotizaciones", icon: FileText, description: "Gestionar cotizaciones", permission: 'quotations' as AppSection },
       ]
     },
     {
       title: "Proyectos",
       items: [
-        { href: "/active-projects", title: "Vista de Proyectos", icon: Briefcase, badge: projectCount > 0 ? projectCount.toString() : undefined, description: "Proyectos activos y rentabilidad", permission: 'projects' as AppSection },
+        { href: "/active-projects", title: "Proyectos", icon: Briefcase, badge: projectCount > 0 ? projectCount.toString() : undefined, description: "Gestión y rentabilidad", permission: 'projects' as AppSection },
         { href: "/tasks", title: "Tareas", icon: CheckSquare, description: "Gestión de tareas", permission: 'projects' as AppSection },
+        { href: "/review", title: "Status", icon: ClipboardList, badge: totalReviewPending > 0 ? totalReviewPending.toString() : undefined, description: "Seguimiento y decisiones", permission: 'status' as AppSection },
       ]
     },
     {
       title: "Operaciones",
       items: [
-        { href: "/tasks/hours-dashboard", title: "Panel de Horas", icon: BarChart2, description: "Horas por persona y proyecto", permission: 'projects' as AppSection },
-        { href: "/operations/capacity", title: "Capacidad Semanal", icon: Gauge, description: "Capacidad operativa por persona", permission: 'operations' as AppSection },
-        { href: "/operations/monthly-closing", title: "Cierre Mensual", icon: CalendarCheck, description: "Cierre de horas del mes", permission: 'operations' as AppSection },
-        { href: "/operations/holidays", title: "Feriados", icon: Calendar, description: "Gestión de feriados", permission: 'operations' as AppSection },
+        { href: "/tasks/hours-dashboard", title: "Panel de horas", icon: BarChart2, description: "Horas por persona y proyecto", anyPermissions: HOURS_DASHBOARD_ACCESS_SECTIONS },
+        { href: "/operations/capacity", title: "Capacidad", icon: Gauge, description: "Capacidad semanal del equipo", permission: 'operations' as AppSection },
+        { href: "/operations/monthly-closing", title: "Cierre mensual", icon: CalendarCheck, description: "Cierre de horas del mes", permission: 'operations' as AppSection },
         { href: "/operations/absences", title: "Ausencias", icon: UserX, description: "Vacaciones y licencias del equipo", permission: 'operations' as AppSection },
+        { href: "/operations/holidays", title: "Feriados", icon: Calendar, description: "Gestión de feriados", permission: 'operations' as AppSection },
       ]
     },
     {
       title: "Finanzas",
       items: [
+        { href: "/dashboard", title: "Resumen financiero", icon: LayoutDashboard, description: "KPIs económicos y operativos", anyPermissions: FINANCE_SUMMARY_ACCESS_SECTIONS },
+        { href: "/finance/cashflow", title: "Cashflow", icon: Wallet, description: "Movimientos y saldos bancarios", permission: 'finance' as AppSection },
         { href: "/finance/activo", title: "Activo", icon: CircleArrowUp, description: "Cuentas a cobrar y activos líquidos", permission: 'finance' as AppSection },
         { href: "/finance/pasivo", title: "Pasivo", icon: CircleArrowDown, description: "Cuentas a pagar y deudas", permission: 'finance' as AppSection },
         { href: "/finance/provisions", title: "Provisiones", icon: ShieldAlert, description: "Provisiones y contingencias", permission: 'finance' as AppSection },
-        { href: "/finance/cashflow", title: "Cashflow", icon: Wallet, description: "Movimientos y saldos bancarios", permission: 'finance' as AppSection },
       ]
     },
     {
-      title: "Mi cuenta",
+      title: "Administración",
       items: [
-        { href: "/my-invoices", title: "Mis facturas", icon: Receipt, description: "Subí tu factura mensual" },
-      ]
-    },
-    {
-      title: "Admin",
-      items: [
+        { href: "/admin", title: "Configuración", icon: Settings, description: "Administración general", permission: 'admin' as AppSection },
         { href: "/admin/users", title: "Usuarios", icon: Users, description: "Usuarios y permisos", permission: 'admin' as AppSection },
         { href: "/admin/providers", title: "Proveedores", icon: Building2, description: "Proveedores externos y su acceso a proyectos", permission: 'admin' as AppSection },
-        { href: "/admin/data-sources", title: "Fuente de datos", icon: Database, description: "Toggle Excel / Registros de la app", permission: 'admin' as AppSection },
-        { href: "/admin", title: "Configuración", icon: Settings, description: "Administración", permission: 'admin' as AppSection }
+        { href: "/admin/data-sources", title: "Fuentes de datos", icon: Database, description: "Origen de los datos", permission: 'admin' as AppSection },
       ]
     }
   ];
@@ -235,13 +191,22 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
   const filteredNavSections = navSections.map(section => ({
     ...section,
     items: section.items.filter((item: NavItem) =>
-      !item.permission || hasPermission(item.permission)
+      (!item.permission || hasPermission(item.permission))
+      && (!item.anyPermissions || hasAnyPermission(item.anyPermissions))
     )
   })).filter(section => section.items.length > 0);
+  const visibleNavItems = filteredNavSections.flatMap(section => section.items);
 
   const renderNavLink = (item: NavItem) => {
     const Icon = item.icon || LayoutDashboard;
-    const isActive = currentPath === item.href;
+    const matchesPath = (href: string) =>
+      currentPath === href || (href !== "/" && currentPath.startsWith(`${href}/`));
+    const isActive = matchesPath(item.href)
+      && !visibleNavItems.some(candidate =>
+        candidate.href !== item.href
+        && candidate.href.length > item.href.length
+        && matchesPath(candidate.href)
+      );
 
     return (
       <TooltipProvider key={item.href}>
@@ -251,7 +216,7 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
               href={item.href}
               title={isCollapsed ? item.title : undefined}
               className={cn(
-                "flex min-h-10 items-center rounded-xl px-3 py-2 text-[13px] transition-all duration-200 relative group",
+                "relative flex min-h-11 items-center rounded-xl px-3 py-2 text-[13px] transition-all duration-200 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400/50",
                 isActive
                   ? "bg-gradient-to-r from-white/[0.14] to-white/[0.08] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
                   : "text-white/[0.68] hover:text-white hover:bg-white/[0.075]",
@@ -330,7 +295,7 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
                 variant="ghost"
                 size="sm"
                 onClick={() => setIsCollapsed(!isCollapsed)}
-                className="h-8 w-8 p-0 text-white/50 hover:bg-white/10 hover:text-white"
+                className="h-11 w-11 p-0 text-white/50 hover:bg-white/10 hover:text-white"
                 aria-label={isCollapsed ? "Expandir navegación" : "Contraer navegación"}
               >
                 <ChevronRight className={cn("h-3 w-3 transition-transform text-white/50", isCollapsed ? "" : "rotate-180")} />
@@ -346,238 +311,13 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
             {filteredNavSections.map((section) => (
               <div key={section.title || '__top__'}>
                 {!isCollapsed && section.title && (
-                  <h3 className="mb-2 px-3 text-[9px] font-bold uppercase tracking-[0.18em] text-white/[0.52]">
+                  <h3 className="mb-2 px-3 text-[11px] font-bold uppercase tracking-[0.15em] text-white/[0.58]">
                     {section.title}
                   </h3>
                 )}
                 <div className="space-y-1">
                   {section.items.map((item) => renderNavLink(item))}
                 </div>
-
-                {/* Collapsible project list — only under Tareas section */}
-                {section.title === "Tareas" && taskProjects.length > 0 && (
-                  <div className="mt-1">
-                    {!isCollapsed ? (
-                      <>
-                        <div className="flex items-center px-3 py-1">
-                          <button
-                            onClick={() => setProjectsExpanded(v => !v)}
-                            className="flex items-center gap-1 text-[10px] font-semibold text-white/50 uppercase tracking-widest hover:text-white/70 transition-colors flex-1"
-                          >
-                            <span>Proyectos</span>
-                            {projectsExpanded
-                              ? <ChevronDown className="h-3 w-3 ml-1" />
-                              : <ChevronRight className="h-3 w-3 ml-1" />
-                            }
-                          </button>
-                        </div>
-
-                        {projectsExpanded && (
-                          <div className="space-y-0.5 mt-0.5 ml-1">
-                            {sidebarProjects.map(proj => {
-                              const color = getProjectIconColor(proj.id);
-                              const isActive = currentPath === `/tasks/projects/${proj.id}`;
-                              const initial = proj.clientName.charAt(0).toUpperCase();
-                              return (
-                                <Link
-                                  key={proj.id}
-                                  href={`/tasks/projects/${proj.id}`}
-                                  className={cn(
-                                    "flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs transition-all duration-150",
-                                    isActive
-                                      ? "bg-white/10 text-[#D72638] font-semibold"
-                                      : "text-white/60 hover:text-white hover:bg-white/10"
-                                  )}
-                                >
-                                  <span className={cn(
-                                    "inline-flex flex-shrink-0 items-center justify-center rounded-md font-bold w-5 h-5 text-[9px]",
-                                    color.bg, color.text
-                                  )}>
-                                    {initial}
-                                  </span>
-                                  <span className="truncate flex-1 font-medium">{proj.name}</span>
-                                  {proj.pendingCount > 0 && (
-                                    <span className={cn(
-                                      "h-4 min-w-[16px] px-1 rounded-full text-[9px] font-bold flex items-center justify-center flex-shrink-0",
-                                      isActive ? "bg-[#D72638] text-white" : "bg-white/10 text-white/60"
-                                    )}>
-                                      {proj.pendingCount}
-                                    </span>
-                                  )}
-                                </Link>
-                              );
-                            })}
-                            <Link
-                              href="/tasks/projects"
-                              className="flex items-center gap-2 px-2 py-1 rounded-lg text-xs text-white/50 hover:text-white/70 transition-colors"
-                            >
-                              <FolderOpen className="h-3.5 w-3.5 flex-shrink-0" />
-                              <span>Ver todos</span>
-                            </Link>
-                          </div>
-                        )}
-                      </>
-                    ) : null}
-                  </div>
-                )}
-
-                {/* Status group — single collapsible nav with rooms + create CTA */}
-                {section.title === 'Proyectos' && hasPermission('status') && (
-                  <div className="mt-1">
-                    {!isCollapsed ? (
-                      <>
-                        <div
-                          className={cn(
-                            "flex items-stretch rounded-xl text-sm transition-all duration-200 group relative",
-                            currentPath === '/review'
-                              ? "bg-white/10 text-white"
-                              : "text-white/60 hover:text-white hover:bg-white/10",
-                          )}
-                        >
-                          <Link
-                            href="/review"
-                            className="flex items-center flex-1 min-w-0 px-3 py-2.5 rounded-l-xl"
-                          >
-                            <ClipboardList className="h-4 w-4 flex-shrink-0 mr-3" />
-                            <span className="truncate font-medium flex-1">Status</span>
-                            {totalReviewPending > 0 && (
-                              <Badge
-                                variant="secondary"
-                                className={cn(
-                                  "h-4 px-1.5 text-xs font-medium ml-2",
-                                  currentPath === '/review'
-                                    ? "bg-white/20 text-white"
-                                    : "bg-amber-500/20 text-amber-300",
-                                )}
-                              >
-                                {totalReviewPending}
-                              </Badge>
-                            )}
-                          </Link>
-                          <button
-                            onClick={() => setReviewsExpanded((v) => !v)}
-                            className="flex items-center justify-center px-2 rounded-r-xl hover:bg-black/10 transition-colors"
-                            aria-label={reviewsExpanded ? 'Colapsar salas' : 'Expandir salas'}
-                          >
-                            {reviewsExpanded
-                              ? <ChevronDown className="h-3.5 w-3.5" />
-                              : <ChevronRight className="h-3.5 w-3.5" />}
-                          </button>
-                        </div>
-
-                        {reviewsExpanded && (
-                          <div className="space-y-0.5 mt-1 ml-2 pl-2 border-l border-white/10">
-                            {sidebarRooms.length === 0 && (
-                              <div className="px-2 py-1 text-[10px] text-white/50 italic">
-                                Sin salas todavía
-                              </div>
-                            )}
-                            {sidebarRooms.map((room) => {
-                              const color = roomColor(room.colorIndex);
-                              const isActive = currentPath === `/review/${room.id}`;
-                              const isPrivate = room.privacy === 'private';
-                              return (
-                                <Link
-                                  key={room.id}
-                                  href={`/review/${room.id}`}
-                                  className={cn(
-                                    "flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs transition-all duration-150",
-                                    isActive
-                                      ? "bg-white/10 text-white font-semibold"
-                                      : "text-white/60 hover:text-white hover:bg-white/10",
-                                  )}
-                                >
-                                  <span
-                                    className={cn(
-                                      "inline-flex flex-shrink-0 items-center justify-center rounded-md text-white font-bold w-5 h-5 text-[10px]",
-                                      color.chip,
-                                    )}
-                                  >
-                                    {room.emoji || room.name.charAt(0).toUpperCase()}
-                                  </span>
-                                  <span className="truncate flex-1 font-medium">{room.name}</span>
-                                  {isPrivate && (
-                                    <span
-                                      className="text-[9px] font-semibold uppercase tracking-wide text-white/50 flex-shrink-0"
-                                      title="Sala personal"
-                                    >
-                                      Tú
-                                    </span>
-                                  )}
-                                  {room.unreadCommentsCount > 0 && (
-                                    <span
-                                      className={cn(
-                                        "inline-flex items-center gap-0.5 h-4 px-1.5 rounded-full text-[9px] font-bold flex-shrink-0",
-                                        isActive ? "bg-white/20 text-white" : "bg-white/10 text-white/60",
-                                      )}
-                                      title={`${room.unreadCommentsCount} comentario${room.unreadCommentsCount === 1 ? '' : 's'} nuevo${room.unreadCommentsCount === 1 ? '' : 's'}`}
-                                    >
-                                      <MessageSquare className="h-2.5 w-2.5" />
-                                      {room.unreadCommentsCount}
-                                    </span>
-                                  )}
-                                  {room.pendingCount > 0 && (
-                                    <span
-                                      className={cn(
-                                        "h-4 min-w-[16px] px-1 rounded-full text-[9px] font-bold flex items-center justify-center flex-shrink-0",
-                                        isActive ? "bg-white/20 text-white" : "bg-amber-500/20 text-amber-300",
-                                      )}
-                                      title={`${room.pendingCount} decisión${room.pendingCount === 1 ? '' : 'es'} pendiente${room.pendingCount === 1 ? '' : 's'}`}
-                                    >
-                                      {room.pendingCount}
-                                    </span>
-                                  )}
-                                </Link>
-                              );
-                            })}
-                            {reviewRooms.length > MAX_SIDEBAR_ROOMS && (
-                              <Link
-                                href="/review"
-                                className="flex items-center gap-2 px-2 py-1 rounded-lg text-xs text-white/50 hover:text-white/70 transition-colors"
-                              >
-                                <FolderOpen className="h-3.5 w-3.5 flex-shrink-0" />
-                                <span>Ver todas ({reviewRooms.length})</span>
-                              </Link>
-                            )}
-                            <button
-                              onClick={() => setNewReviewOpen(true)}
-                              className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-medium text-indigo-300 transition-colors hover:bg-white/[0.07] hover:text-indigo-200"
-                            >
-                              <span className="inline-flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md border border-dashed border-indigo-300/60 text-indigo-300">
-                                <Plus className="h-3 w-3" />
-                              </span>
-                              <span>Nueva sala de status</span>
-                            </button>
-                          </div>
-                        )}
-                      </>
-                    ) : (
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Link
-                              href="/review"
-                              className={cn(
-                                "flex items-center justify-center px-2 py-2.5 rounded-xl transition-all duration-200 relative",
-                                isStatusActive
-                                  ? "bg-white/10 text-white"
-                                  : "text-white/60 hover:text-white hover:bg-white/10",
-                              )}
-                            >
-                              <ClipboardList className="h-4 w-4" />
-                              {totalReviewPending > 0 && (
-                                <span className="absolute -top-0.5 -right-0.5 h-3.5 min-w-[14px] px-1 rounded-full bg-amber-500 text-white text-[9px] font-bold flex items-center justify-center">
-                                  {totalReviewPending}
-                                </span>
-                              )}
-                            </Link>
-                          </TooltipTrigger>
-                          <TooltipContent side="right">Status{totalReviewPending > 0 ? ` (${totalReviewPending})` : ''}</TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    )}
-                  </div>
-                )}
               </div>
             ))}
           </nav>
@@ -606,7 +346,6 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
         </div>
       </div>
 
-      <CreateReviewDialog open={newReviewOpen} onClose={() => setNewReviewOpen(false)} />
     </TooltipProvider>
   );
 }
