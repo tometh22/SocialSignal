@@ -447,6 +447,28 @@ export async function processDirectCostsToFactLabor(rows: CostoDirectoRow[]): Pr
         ...rateResolution.flags.reduce((acc, flag) => ({ ...acc, [flag]: true }), {})
       });
       
+      // 6.5) Guard final: numeric(10,2)/numeric(12,2) en fact_labor_month no toleran
+      // valores fuera de rango (ej. tarifa mal tipeada como monto mensual, o parseo
+      // sin awareness de locale que infla ×100). Sin esto, el INSERT explota con
+      // "numeric field overflow" (22003) y ensucia los logs con un stack trace por
+      // fila, en vez de un warning accionable — y la fila queda sin escribir de
+      // todas formas, así que es mejor detectarlo antes y loguear qué se saltea.
+      const RATE_MAX = 99_999_999.99;   // numeric(10,2)
+      const COST_MAX = 9_999_999_999.99; // numeric(12,2)
+      const overflowField = rateARS > RATE_MAX ? 'hourlyRateARS'
+        : costARS > COST_MAX ? 'costARS'
+        : costUSD > COST_MAX ? 'costUSD'
+        : null;
+      if (overflowField) {
+        console.warn(
+          `⚠️ Fila de costo directo salteada por valor fuera de rango en "${overflowField}" ` +
+          `(cliente="${clientRaw}", proyecto="${projectRaw}", persona="${personRaw}", periodo=${periodKey}): ` +
+          `rateARS=${rateARS}, costARS=${costARS}, costUSD=${costUSD}`
+        );
+        skipped++;
+        continue;
+      }
+
       // 7) Upsert fact_labor_month
       await db.insert(factLaborMonth)
         .values({

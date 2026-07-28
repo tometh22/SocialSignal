@@ -324,7 +324,7 @@ class GoogleSheetsWorkingService {
         console.warn('⚠️ Google Sheets client not available, returning empty costos data');
         return [];
       }
-      const range = 'Costos directos e indirectos!A:Z';
+      const range = `'Costos directos e indirectos'!A:Z`;
 
       console.log('🔄 Obteniendo datos RAW del Excel MAESTRO (FORMATTED_VALUE)...');
       console.log(`📊 Spreadsheet ID: ${this.spreadsheetId}`);
@@ -592,7 +592,7 @@ class GoogleSheetsWorkingService {
         console.warn('⚠️ Google Sheets client not available, returning empty proyectos data');
         return [];
       }
-      const range = 'Proyectos confirmados y estimados!A:Z';
+      const range = `'Proyectos confirmados y estimados'!A:Z`;
 
       console.log('🔄 Obteniendo proyectos confirmados del Excel MAESTRO...');
       console.log(`📊 Spreadsheet ID: ${this.spreadsheetId}`);
@@ -1221,7 +1221,7 @@ class GoogleSheetsWorkingService {
         console.warn('⚠️ Google Sheets client not available, returning empty ventas data');
         return [];
       }
-      const range = 'Ventas Tomi!A:Z'; // Extendido para capturar todas las columnas
+      const range = `'Ventas Tomi'!A:Z`; // Extendido para capturar todas las columnas
 
       console.log('🔄 Obteniendo ventas desde Ventas Tomi...');
       console.log(`📊 Spreadsheet ID: ${this.spreadsheetId}`);
@@ -1451,7 +1451,7 @@ class GoogleSheetsWorkingService {
       }
 
       // Leer datos de la pestaña "Costos directos e indirectos"
-      const range = 'Costos directos e indirectos!A:R'; // Extendido a R para incluir montos USD convertidos
+      const range = `'Costos directos e indirectos'!A:R`; // Extendido a R para incluir montos USD convertidos
       console.log('📋 Range:', range);
 
       const response = await sheets.spreadsheets.values.get({
@@ -4428,7 +4428,7 @@ class GoogleSheetsWorkingService {
 
       const response = await sheets.spreadsheets.values.get({
         spreadsheetId: this.spreadsheetId,
-        range: 'Provisión Pasivo!A:Z',
+        range: `'Provisión Pasivo'!A:Z`,
       }).catch(() => null);
 
       if (!response?.data.values || response.data.values.length < 2) {

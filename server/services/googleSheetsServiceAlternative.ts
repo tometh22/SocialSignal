@@ -100,7 +100,7 @@ class GoogleSheetsServiceAlternative {
    */
   async getCostosDirectosIndirectos(): Promise<CostoDirectoIndirecto[]> {
     try {
-      const range = 'Costos directos e indirectos!A:Z'; // Rango amplio para capturar toda la data
+      const range = `'Costos directos e indirectos'!A:Z`; // Rango amplio para capturar toda la data
       
       const response = await this.sheets.spreadsheets.values.get({
         spreadsheetId: this.spreadsheetId,
