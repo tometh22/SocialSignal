@@ -484,13 +484,20 @@ export class AutoSyncService {
       const { getCutoverDate } = await import('../etl/time-entries-to-fact-labor');
       const cutoverDate = await getCutoverDate();
       const periods = cutoverDate ? allPeriods.filter(p => p < cutoverDate) : allPeriods;
+      const currentPeriod = allPeriods[0];
+      const snapshotPeriods = cutoverDate && currentPeriod >= cutoverDate ? [] : [currentPeriod];
 
-      console.log(`📒 Syncing ledger tables for periods: ${periods.join(', ')}`);
+      console.log(`📒 Syncing ledger snapshots for ${snapshotPeriods.join(', ') || 'none'}; historical tables for ${periods.join(', ') || 'none'}`);
 
-      for (const period of periods) {
+      for (const period of snapshotPeriods) {
         await Promise.allSettled([
           googleSheetsWorkingService.importActivoEntries(storage, period),
           googleSheetsWorkingService.importPasivoEntries(storage, period),
+        ]);
+      }
+
+      for (const period of periods) {
+        await Promise.allSettled([
           googleSheetsWorkingService.importCashflowTransactions(storage, period),
           googleSheetsWorkingService.importProvisionEntries(storage, period),
         ]);

@@ -20,20 +20,31 @@ import { storage } from "./storage";
 
 export function createLedgerRouter(requireAuth: any) {
   const router = Router();
-  const normalizedUSD = (row: {
-    montoTotalUSD?: string | null;
-    montoUSD?: string | null;
-    montoARS?: string | null;
-    cotizacion?: string | null;
-  }) => {
-    const explicitTotal = parseFloat(row.montoTotalUSD ?? "");
-    if (Number.isFinite(explicitTotal)) return explicitTotal;
-    const usd = parseFloat(row.montoUSD ?? "");
-    if (Number.isFinite(usd)) return usd;
-    const ars = parseFloat(row.montoARS ?? "");
-    const fx = parseFloat(row.cotizacion ?? "");
-    return Number.isFinite(ars) && Number.isFinite(fx) && fx > 0 ? ars / fx : 0;
+  const parseLedgerQuery = (query: Record<string, unknown>) => {
+    const period = typeof query.period === "string" ? query.period : "";
+    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(period)) {
+      return { error: "period debe usar el formato YYYY-MM" } as const;
+    }
+    const rawPage = Number(query.page ?? 1);
+    const rawPageSize = Number(query.pageSize ?? 50);
+    const page = Number.isInteger(rawPage) && rawPage > 0 ? rawPage : 1;
+    const pageSize = Number.isInteger(rawPageSize)
+      ? Math.min(100, Math.max(1, rawPageSize))
+      : 50;
+    return { period, page, pageSize } as const;
   };
+  const activoUSD = sql<number>`COALESCE(
+    ${activoEntries.montoTotalUSD}::double precision,
+    ${activoEntries.montoUSD}::double precision,
+    ${activoEntries.montoARS}::double precision / NULLIF(${activoEntries.cotizacion}::double precision, 0),
+    0
+  )`;
+  const pasivoUSD = sql<number>`COALESCE(
+    ${pasivoEntries.montoTotalUSD}::double precision,
+    ${pasivoEntries.montoUSD}::double precision,
+    ${pasivoEntries.montoARS}::double precision / NULLIF(${pasivoEntries.cotizacion}::double precision, 0),
+    0
+  )`;
   const normalizedUSDForWrite = (row: {
     montoUSD?: string | null;
     montoARS?: string | null;
@@ -52,19 +63,48 @@ export function createLedgerRouter(requireAuth: any) {
 
   router.get("/activo", requireAuth, async (req, res) => {
     try {
+      const pagination = parseLedgerQuery(req.query);
+      if ("error" in pagination) return res.status(400).json({ message: pagination.error });
       const { period, estado, cliente } = req.query as Record<string, string>;
-      const conditions: any[] = [];
-      if (period) conditions.push(eq(activoEntries.periodKey, period));
+      const { page, pageSize } = pagination;
+      const conditions: any[] = [eq(activoEntries.periodKey, pagination.period)];
       if (estado === "cobrado") conditions.push(eq(activoEntries.cobradoAlCierre, true));
       if (estado === "pendiente") conditions.push(eq(activoEntries.cobradoAlCierre, false));
       if (estado === "vencido") conditions.push(eq(activoEntries.vencido, true));
       if (cliente) conditions.push(eq(activoEntries.clienteNombre, cliente));
 
-      const rows = conditions.length
-        ? await db.select().from(activoEntries).where(and(...conditions)).orderBy(desc(activoEntries.createdAt))
-        : await db.select().from(activoEntries).orderBy(desc(activoEntries.createdAt));
-
-      res.json(rows.map((row) => ({ ...row, montoTotalUSD: normalizedUSD(row) })));
+      const where = and(...conditions);
+      const [items, totalResult] = await Promise.all([
+        db.select({
+          id: activoEntries.id,
+          periodKey: activoEntries.periodKey,
+          concepto: activoEntries.concepto,
+          clienteNombre: activoEntries.clienteNombre,
+          nroFactura: activoEntries.nroFactura,
+          fechaVencimiento: activoEntries.fechaVencimiento,
+          vencido: activoEntries.vencido,
+          cobradoAlCierre: activoEntries.cobradoAlCierre,
+          overrideManual: activoEntries.overrideManual,
+          montoTotalUSD: activoUSD,
+        }).from(activoEntries)
+          .where(where)
+          .orderBy(desc(activoEntries.createdAt), desc(activoEntries.id))
+          .limit(pageSize)
+          .offset((page - 1) * pageSize),
+        db.select({ total: sql<number>`COUNT(*)::integer` })
+          .from(activoEntries)
+          .where(where),
+      ]);
+      const total = Number(totalResult[0]?.total ?? 0);
+      res.json({
+        items,
+        pagination: {
+          page,
+          pageSize,
+          total,
+          totalPages: Math.ceil(total / pageSize),
+        },
+      });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -72,20 +112,25 @@ export function createLedgerRouter(requireAuth: any) {
 
   router.get("/activo/summary", requireAuth, async (req, res) => {
     try {
-      const { period } = req.query as Record<string, string>;
-      const conditions: any[] = [];
-      if (period) conditions.push(eq(activoEntries.periodKey, period));
-
-      const rows = conditions.length
-        ? await db.select().from(activoEntries).where(and(...conditions))
-        : await db.select().from(activoEntries);
-
-      const total = rows.reduce((s, r) => s + normalizedUSD(r), 0);
-      const cobrado = rows.filter(r => r.cobradoAlCierre).reduce((s, r) => s + normalizedUSD(r), 0);
-      const vencido = rows.filter(r => r.vencido && !r.cobradoAlCierre).reduce((s, r) => s + normalizedUSD(r), 0);
-      const pendiente = total - cobrado;
-
-      res.json({ total, cobrado, pendiente, vencido, count: rows.length });
+      const parsed = parseLedgerQuery(req.query);
+      if ("error" in parsed) return res.status(400).json({ message: parsed.error });
+      const [summary] = await db.select({
+        total: sql<number>`COALESCE(SUM(${activoUSD}), 0)::double precision`,
+        cobrado: sql<number>`COALESCE(SUM(${activoUSD}) FILTER (WHERE ${activoEntries.cobradoAlCierre} = true), 0)::double precision`,
+        vencido: sql<number>`COALESCE(SUM(${activoUSD}) FILTER (
+          WHERE ${activoEntries.vencido} = true AND COALESCE(${activoEntries.cobradoAlCierre}, false) = false
+        ), 0)::double precision`,
+        count: sql<number>`COUNT(*)::integer`,
+      }).from(activoEntries).where(eq(activoEntries.periodKey, parsed.period));
+      const total = Number(summary?.total ?? 0);
+      const cobrado = Number(summary?.cobrado ?? 0);
+      res.json({
+        total,
+        cobrado,
+        pendiente: total - cobrado,
+        vencido: Number(summary?.vencido ?? 0),
+        count: Number(summary?.count ?? 0),
+      });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -118,8 +163,15 @@ export function createLedgerRouter(requireAuth: any) {
       const monetaryValues = monetaryChanged
         ? { montoTotalUSD: normalizedUSDForWrite({ ...existing, ...parsed.data }) }
         : {};
+      const changedKeys = Object.keys(parsed.data);
+      const statusOnly = changedKeys.length > 0 && changedKeys.every((key) => key === "cobradoAlCierre");
       const [updated] = await db.update(activoEntries)
-        .set({ ...parsed.data, ...monetaryValues, overrideManual: true, updatedAt: new Date() })
+        .set({
+          ...parsed.data,
+          ...monetaryValues,
+          overrideManual: existing.overrideManual || !statusOnly,
+          updatedAt: new Date(),
+        })
         .where(eq(activoEntries.id, id))
         .returning();
       if (!updated) return res.status(404).json({ message: "Not found" });
@@ -133,19 +185,48 @@ export function createLedgerRouter(requireAuth: any) {
 
   router.get("/pasivo", requireAuth, async (req, res) => {
     try {
+      const pagination = parseLedgerQuery(req.query);
+      if ("error" in pagination) return res.status(400).json({ message: pagination.error });
       const { period, subtipo, estado } = req.query as Record<string, string>;
-      const conditions: any[] = [];
-      if (period) conditions.push(eq(pasivoEntries.periodKey, period));
+      const { page, pageSize } = pagination;
+      const conditions: any[] = [eq(pasivoEntries.periodKey, pagination.period)];
       if (subtipo) conditions.push(eq(pasivoEntries.subtipoCosto, subtipo));
       if (estado === "pagado") conditions.push(eq(pasivoEntries.pagadoAlCierre, true));
       if (estado === "pendiente") conditions.push(eq(pasivoEntries.pagadoAlCierre, false));
       if (estado === "vencido") conditions.push(eq(pasivoEntries.vencido, true));
 
-      const rows = conditions.length
-        ? await db.select().from(pasivoEntries).where(and(...conditions)).orderBy(desc(pasivoEntries.createdAt))
-        : await db.select().from(pasivoEntries).orderBy(desc(pasivoEntries.createdAt));
-
-      res.json(rows.map((row) => ({ ...row, montoTotalUSD: normalizedUSD(row) })));
+      const where = and(...conditions);
+      const [items, totalResult] = await Promise.all([
+        db.select({
+          id: pasivoEntries.id,
+          periodKey: pasivoEntries.periodKey,
+          detalle: pasivoEntries.detalle,
+          subtipoCosto: pasivoEntries.subtipoCosto,
+          fechaEmision: pasivoEntries.fechaEmision,
+          fechaVencimiento: pasivoEntries.fechaVencimiento,
+          vencido: pasivoEntries.vencido,
+          pagadoAlCierre: pasivoEntries.pagadoAlCierre,
+          overrideManual: pasivoEntries.overrideManual,
+          montoTotalUSD: pasivoUSD,
+        }).from(pasivoEntries)
+          .where(where)
+          .orderBy(desc(pasivoEntries.createdAt), desc(pasivoEntries.id))
+          .limit(pageSize)
+          .offset((page - 1) * pageSize),
+        db.select({ total: sql<number>`COUNT(*)::integer` })
+          .from(pasivoEntries)
+          .where(where),
+      ]);
+      const total = Number(totalResult[0]?.total ?? 0);
+      res.json({
+        items,
+        pagination: {
+          page,
+          pageSize,
+          total,
+          totalPages: Math.ceil(total / pageSize),
+        },
+      });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -153,26 +234,39 @@ export function createLedgerRouter(requireAuth: any) {
 
   router.get("/pasivo/summary", requireAuth, async (req, res) => {
     try {
-      const { period } = req.query as Record<string, string>;
-      const conditions: any[] = [];
-      if (period) conditions.push(eq(pasivoEntries.periodKey, period));
-
-      const rows = conditions.length
-        ? await db.select().from(pasivoEntries).where(and(...conditions))
-        : await db.select().from(pasivoEntries);
-
-      const total = rows.reduce((s, r) => s + normalizedUSD(r), 0);
-      const pagado = rows.filter(r => r.pagadoAlCierre).reduce((s, r) => s + normalizedUSD(r), 0);
-      const vencido = rows.filter(r => r.vencido && !r.pagadoAlCierre).reduce((s, r) => s + normalizedUSD(r), 0);
-      const pendiente = total - pagado;
-
-      const bySubtipo: Record<string, number> = {};
-      for (const r of rows) {
-        const key = r.subtipoCosto || "Sin subtipo";
-        bySubtipo[key] = (bySubtipo[key] || 0) + normalizedUSD(r);
-      }
-
-      res.json({ total, pagado, pendiente, vencido, bySubtipo, count: rows.length });
+      const parsed = parseLedgerQuery(req.query);
+      if ("error" in parsed) return res.status(400).json({ message: parsed.error });
+      const periodCondition = eq(pasivoEntries.periodKey, parsed.period);
+      const [summaryRows, subtipoRows] = await Promise.all([
+        db.select({
+          total: sql<number>`COALESCE(SUM(${pasivoUSD}), 0)::double precision`,
+          pagado: sql<number>`COALESCE(SUM(${pasivoUSD}) FILTER (WHERE ${pasivoEntries.pagadoAlCierre} = true), 0)::double precision`,
+          vencido: sql<number>`COALESCE(SUM(${pasivoUSD}) FILTER (
+            WHERE ${pasivoEntries.vencido} = true AND COALESCE(${pasivoEntries.pagadoAlCierre}, false) = false
+          ), 0)::double precision`,
+          count: sql<number>`COUNT(*)::integer`,
+        }).from(pasivoEntries).where(periodCondition),
+        db.select({
+          subtipo: sql<string>`COALESCE(${pasivoEntries.subtipoCosto}, 'Sin subtipo')`,
+          total: sql<number>`COALESCE(SUM(${pasivoUSD}), 0)::double precision`,
+        }).from(pasivoEntries)
+          .where(periodCondition)
+          .groupBy(pasivoEntries.subtipoCosto),
+      ]);
+      const summary = summaryRows[0];
+      const total = Number(summary?.total ?? 0);
+      const pagado = Number(summary?.pagado ?? 0);
+      const bySubtipo = Object.fromEntries(
+        subtipoRows.map((row) => [row.subtipo, Number(row.total)]),
+      );
+      res.json({
+        total,
+        pagado,
+        pendiente: total - pagado,
+        vencido: Number(summary?.vencido ?? 0),
+        bySubtipo,
+        count: Number(summary?.count ?? 0),
+      });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -205,8 +299,15 @@ export function createLedgerRouter(requireAuth: any) {
       const monetaryValues = monetaryChanged
         ? { montoTotalUSD: normalizedUSDForWrite({ ...existing, ...parsed.data }) }
         : {};
+      const changedKeys = Object.keys(parsed.data);
+      const statusOnly = changedKeys.length > 0 && changedKeys.every((key) => key === "pagadoAlCierre");
       const [updated] = await db.update(pasivoEntries)
-        .set({ ...parsed.data, ...monetaryValues, overrideManual: true, updatedAt: new Date() })
+        .set({
+          ...parsed.data,
+          ...monetaryValues,
+          overrideManual: existing.overrideManual || !statusOnly,
+          updatedAt: new Date(),
+        })
         .where(eq(pasivoEntries.id, id))
         .returning();
       if (!updated) return res.status(404).json({ message: "Not found" });

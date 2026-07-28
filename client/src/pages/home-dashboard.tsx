@@ -46,28 +46,27 @@ export default function HomeDashboard() {
   });
 
   // Fetch projects for smart alerts
-  const { data: projectsRaw } = useQuery<any[] | { projects: any[] }>({
-    queryKey: ["/api/projects/alerts-data"],
-    queryFn: () => authFetch("/api/active-projects")
-      .then(r => r.ok ? r.json() : []).catch(() => []),
+  const { data: projectsRaw } = useQuery<{ projects: any[] }>({
+    queryKey: ["/api/projects/alerts-summary"],
+    queryFn: () => authFetch("/api/projects/alerts-summary")
+      .then(r => r.ok ? r.json() : { projects: [] }).catch(() => ({ projects: [] })),
     enabled: hasPermission('projects'),
   });
 
-  // Compute alerts from project data - ensure we have an array
-  const projectsList = Array.isArray(projectsRaw) ? projectsRaw : (projectsRaw?.projects || []);
+  const projectsList = projectsRaw?.projects || [];
   const projectsForAlerts = projectsList.map((p: any) => ({
     projectId: p.projectId || p.id,
     projectName: p.projectName || p.name || 'Sin nombre',
     clientName: p.clientName || '',
-    revenue: p.metrics?.revenueDisplay || p.metrics?.revenue || 0,
-    cost: p.metrics?.costDisplay || p.metrics?.cost || 0,
-    markup: p.metrics?.markup || p.metrics?.markupRatio || 0,
-    margin: p.metrics?.margin || 0,
-    budget: p.metrics?.budget || 0,
-    budgetUsed: p.metrics?.budgetUtilization || 0,
-    totalHours: p.metrics?.totalHours || 0,
-    estimatedHours: p.metrics?.estimatedHours || 0,
-    teamSize: p.metrics?.teamSize || 0,
+    revenue: p.revenue || 0,
+    cost: p.cost || 0,
+    markup: p.markup || 0,
+    margin: p.margin || 0,
+    budget: p.budget || 0,
+    budgetUsed: p.budgetUsed || 0,
+    totalHours: p.totalHours || 0,
+    estimatedHours: p.estimatedHours || 0,
+    teamSize: p.teamSize || 0,
     status: p.status || 'active',
   }));
 

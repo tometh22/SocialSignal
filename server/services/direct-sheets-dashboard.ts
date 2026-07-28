@@ -4,6 +4,7 @@
  * Works exactly like Looker Studio: fetch → parse → display.
  */
 import { google } from 'googleapis';
+import { StaleDataCache } from '../utils/stale-data-cache';
 
 const SPREADSHEET_ID = '1FZLFmTQQOSYQns2cOYlM86UGEH7EHZsJOFegyDR7quc';
 const SHEET_NAME = 'Resumen Ejecutivo';
@@ -161,16 +162,11 @@ function aggregateMonths(
   };
 }
 
-export async function fetchResumenEjecutivoDirectly(
-  filterYear?: number,
-  filterMonth?: number,
-  filterQuarter?: number,
-  filterYearTotal?: boolean,
-  filterStartYear?: number,
-  filterStartMonth?: number,
-  filterEndYear?: number,
-  filterEndMonth?: number,
-): Promise<{ data: MonthData[]; filtered: MonthData | null; available: string[] }> {
+const DASHBOARD_CACHE_TTL_MS = 5 * 60 * 1000;
+const DASHBOARD_STALE_TTL_MS = 60 * 60 * 1000;
+let dashboardCacheStatus = { stale: false, fetchedAt: null as number | null };
+
+async function fetchDashboardRows(): Promise<MonthData[]> {
   const sheets = createSheetsClient();
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId: SPREADSHEET_ID,
@@ -179,16 +175,8 @@ export async function fetchResumenEjecutivoDirectly(
   });
 
   const rows = response.data.values;
-  if (!rows || rows.length < 2) {
-    return { data: [], filtered: null, available: [] };
-  }
+  if (!rows || rows.length < 2) return [];
 
-  // Column indices based on actual Excel structure (verified from debug endpoint)
-  // [0]Mes [1]Año [2]Cierre [3]Activo Líquido [4]Activo MP Crypto [5]Activo MP Clientes
-  // [6]Activo Total [7]Pasivo Impuestos USA [8]Provisión Pasivo Facturación [9]Pasivo Proveedores
-  // [10]Pasivo Total [11]Balance Neto [12]Balance 60d [13]Ventas del mes [14]EBIT
-  // [15]Beneficio Neto [16]Margen operativo [17]Margen Neto [18]MarkUp
-  // [19]Proyección resultado [20]Chasflow [21]CashFlow+60días [22]NOTAS
   const COL = {
     MES: 0, AÑO: 1, CIERRE: 2,
     ACTIVO_LIQUIDO: 3, ACTIVO_MP_CRYPTO: 4, CLIENTES_COBRAR: 5, ACTIVO_TOTAL: 6,
@@ -198,30 +186,23 @@ export async function fetchResumenEjecutivoDirectly(
     MARGEN_OP: 16, MARGEN_NETO: 17, MARKUP: 18,
     PROYECCION: 19, CASHFLOW: 20, CASHFLOW_60: 21,
   };
-
   const allData: MonthData[] = [];
 
   for (let i = 1; i < rows.length; i++) {
     const row = rows[i];
     if (!row || row.length < 2) continue;
-
     const mesLabel = String(row[COL.MES] || '').trim();
     const yearStr = String(row[COL.AÑO] || '').trim();
     if (!mesLabel || !yearStr) continue;
-
     const month = parseMonthLabel(mesLabel);
     const year = parseInt(yearStr);
     if (!month || isNaN(year)) continue;
-
     const periodKey = `${year}-${String(month).padStart(2, '0')}`;
-
     const cierreRaw = String(row[COL.CIERRE] || '').trim().toLowerCase();
     const cierre = ['sí', 'si', 'true', 'verdadero', '1', 'yes', 'x', '✓', 'ok', 'cerrado'].includes(cierreRaw);
-
     const ventasDelMes = parseMoney(row[COL.VENTAS]);
     const ebitOperativo = parseMoney(row[COL.EBIT]);
     const sheetMarkup = parseMoney(row[COL.MARKUP]);
-    // Fallback: derive markup from ventas and implicit costs when sheet value is missing
     const impliedCosts = ventasDelMes != null && ebitOperativo != null ? ventasDelMes - ebitOperativo : null;
     const markup = sheetMarkup ?? (ventasDelMes != null && impliedCosts != null && impliedCosts > 0
       ? Math.round((ventasDelMes / impliedCosts) * 100) / 100
@@ -233,7 +214,6 @@ export async function fetchResumenEjecutivoDirectly(
       month,
       monthLabel: mesLabel,
       cierre,
-      // P&L
       ventasDelMes,
       ebitOperativo,
       beneficioNeto: parseMoney(row[COL.BENEFICIO_NETO]),
@@ -241,7 +221,6 @@ export async function fetchResumenEjecutivoDirectly(
       margenNeto: parsePercent(row[COL.MARGEN_NETO]),
       markup,
       proyeccionResultado: parseMoney(row[COL.PROYECCION]),
-      // Balance
       activoLiquido: parseMoney(row[COL.ACTIVO_LIQUIDO]),
       activoMedPlazo: parseMoney(row[COL.ACTIVO_MP_CRYPTO]),
       clientesACobrar: parseMoney(row[COL.CLIENTES_COBRAR]),
@@ -251,11 +230,43 @@ export async function fetchResumenEjecutivoDirectly(
       pasivoProveedores: parseMoney(row[COL.PASIVO_PROVEEDORES]),
       pasivoTotal: parseMoney(row[COL.PASIVO_TOTAL]),
       balanceNeto: parseMoney(row[COL.BALANCE_NETO]),
-      // Cashflow
       cashflow: parseMoney(row[COL.CASHFLOW]),
       cashflow60Dias: parseMoney(row[COL.CASHFLOW_60]),
     });
   }
+  return allData;
+}
+
+const dashboardDataCache = new StaleDataCache(
+  fetchDashboardRows,
+  DASHBOARD_CACHE_TTL_MS,
+  DASHBOARD_STALE_TTL_MS,
+  Date.now,
+  (error) => {
+    console.warn(
+      '⚠️ Dashboard refresh failed; stale snapshot retained:',
+      error instanceof Error ? error.message : error,
+    );
+  },
+);
+
+export function getExecutiveDashboardCacheStatus() {
+  return dashboardCacheStatus;
+}
+
+export async function fetchResumenEjecutivoDirectly(
+  filterYear?: number,
+  filterMonth?: number,
+  filterQuarter?: number,
+  filterYearTotal?: boolean,
+  filterStartYear?: number,
+  filterStartMonth?: number,
+  filterEndYear?: number,
+  filterEndMonth?: number,
+): Promise<{ data: MonthData[]; filtered: MonthData | null; available: string[] }> {
+  const cached = await dashboardDataCache.get();
+  dashboardCacheStatus = { stale: cached.stale, fetchedAt: cached.fetchedAt };
+  const allData = cached.data;
 
   // Filter
   const available = allData.map(d => d.periodKey);

@@ -1,13 +1,14 @@
 import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { DollarSign, AlertCircle, Clock, CheckCircle } from "lucide-react";
+import { DollarSign, AlertCircle, Clock, CheckCircle, ChevronLeft, ChevronRight } from "lucide-react";
 
 const MONTHS = Array.from({ length: 12 }, (_, i) => ({
   value: String(i + 1).padStart(2, "0"),
@@ -20,25 +21,34 @@ function fmtUSD(n: number) {
   return new Intl.NumberFormat("es-AR", { style: "currency", currency: "USD", minimumFractionDigits: 0 }).format(n);
 }
 
+type LedgerPage<T> = {
+  items: T[];
+  pagination: { page: number; pageSize: number; total: number; totalPages: number };
+};
+
 export default function PasivoPage() {
   const [year, setYear] = useState(String(new Date().getFullYear()));
   const [month, setMonth] = useState(String(new Date().getMonth() + 1).padStart(2, "0"));
   const [estado, setEstado] = useState("todos");
   const [subtipo, setSubtipo] = useState("todos");
+  const [page, setPage] = useState(1);
   const { toast } = useToast();
   const qc = useQueryClient();
 
   const period = `${year}-${month}`;
 
-  const { data: rows = [], isLoading } = useQuery<any[]>({
-    queryKey: ["/api/pasivo", period, estado, subtipo],
+  const { data, isLoading, isFetching, isError, refetch } = useQuery<LedgerPage<any>>({
+    queryKey: ["/api/pasivo", period, estado, subtipo, page],
     queryFn: () => {
-      const params = new URLSearchParams({ period });
+      const params = new URLSearchParams({ period, page: String(page), pageSize: "50" });
       if (estado !== "todos") params.set("estado", estado);
       if (subtipo !== "todos") params.set("subtipo", subtipo);
       return apiRequest(`/api/pasivo?${params}`, "GET");
     },
+    placeholderData: keepPreviousData,
   });
+  const rows = data?.items ?? [];
+  const pagination = data?.pagination;
 
   const { data: summary } = useQuery<any>({
     queryKey: ["/api/pasivo/summary", period],
@@ -65,19 +75,19 @@ export default function PasivoPage() {
 
       {/* Filtros */}
       <div className="flex gap-3 flex-wrap">
-        <Select value={month} onValueChange={setMonth}>
+        <Select value={month} onValueChange={(value) => { setMonth(value); setPage(1); }}>
           <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
           <SelectContent>
             {MONTHS.map(m => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}
           </SelectContent>
         </Select>
-        <Select value={year} onValueChange={setYear}>
+        <Select value={year} onValueChange={(value) => { setYear(value); setPage(1); }}>
           <SelectTrigger className="w-24"><SelectValue /></SelectTrigger>
           <SelectContent>
             {YEARS.map(y => <SelectItem key={y} value={y}>{y}</SelectItem>)}
           </SelectContent>
         </Select>
-        <Select value={estado} onValueChange={setEstado}>
+        <Select value={estado} onValueChange={(value) => { setEstado(value); setPage(1); }}>
           <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="todos">Todos los estados</SelectItem>
@@ -129,7 +139,7 @@ export default function PasivoPage() {
               {subtipoEntries.sort(([, a], [, b]) => b - a).map(([key, val]) => (
                 <button
                   key={key}
-                  onClick={() => setSubtipo(subtipo === key ? "todos" : key)}
+                  onClick={() => { setSubtipo(subtipo === key ? "todos" : key); setPage(1); }}
                   className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
                     subtipo === key ? "bg-primary text-primary-foreground" : "bg-secondary hover:bg-secondary/80"
                   }`}
@@ -146,67 +156,109 @@ export default function PasivoPage() {
       <Card>
         <CardContent className="p-0">
           {isLoading ? (
-            <div className="flex items-center justify-center h-32 text-muted-foreground">Cargando...</div>
+            <div className="space-y-3 p-5" aria-label="Cargando cuentas a pagar">
+              {Array.from({ length: 6 }).map((_, index) => (
+                <Skeleton key={index} className="h-10 w-full" />
+              ))}
+            </div>
+          ) : isError ? (
+            <div className="flex min-h-40 flex-col items-center justify-center gap-3 px-6 text-center">
+              <p className="text-sm font-medium">No pudimos cargar las cuentas a pagar.</p>
+              <Button variant="outline" size="sm" onClick={() => refetch()}>Reintentar</Button>
+            </div>
           ) : rows.length === 0 ? (
             <div className="flex items-center justify-center h-32 text-muted-foreground">
               No hay registros para {period}
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Detalle</TableHead>
-                  <TableHead>Subtipo</TableHead>
-                  <TableHead>Emisión</TableHead>
-                  <TableHead>Vencimiento</TableHead>
-                  <TableHead className="text-right">Monto USD</TableHead>
-                  <TableHead>Estado</TableHead>
-                  <TableHead></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {rows.map((row: any) => (
-                  <TableRow key={row.id}>
-                    <TableCell className="font-medium max-w-[200px] truncate">{row.detalle}</TableCell>
-                    <TableCell>
-                      {row.subtipoCosto ? (
-                        <Badge variant="outline" className="text-xs">{row.subtipoCosto}</Badge>
-                      ) : "-"}
-                    </TableCell>
-                    <TableCell className="text-sm">
-                      {row.fechaEmision ? new Date(row.fechaEmision).toLocaleDateString("es-AR") : "-"}
-                    </TableCell>
-                    <TableCell className="text-sm">
-                      {row.fechaVencimiento ? new Date(row.fechaVencimiento).toLocaleDateString("es-AR") : "-"}
-                    </TableCell>
-                    <TableCell className="text-right font-mono">
-                      {fmtUSD(parseFloat(row.montoTotalUSD ?? row.montoUSD ?? "0"))}
-                    </TableCell>
-                    <TableCell>
-                      {row.pagadoAlCierre ? (
-                        <Badge className="bg-green-100 text-green-800">Pagado</Badge>
-                      ) : row.vencido ? (
-                        <Badge variant="destructive">Vencido</Badge>
-                      ) : (
-                        <Badge variant="secondary">Pendiente</Badge>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {!row.pagadoAlCierre && row.id && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => markPagadoMutation.mutate(row.id)}
-                          disabled={markPagadoMutation.isPending}
-                        >
-                          Marcar pagado
-                        </Button>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            <>
+              <div className={`overflow-x-auto transition-opacity ${isFetching ? "opacity-60" : "opacity-100"}`}>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Detalle</TableHead>
+                      <TableHead>Subtipo</TableHead>
+                      <TableHead>Emisión</TableHead>
+                      <TableHead>Vencimiento</TableHead>
+                      <TableHead className="text-right">Monto USD</TableHead>
+                      <TableHead>Estado</TableHead>
+                      <TableHead>Fuente</TableHead>
+                      <TableHead className="text-right">Acción</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {rows.map((row: any) => (
+                      <TableRow key={row.id}>
+                        <TableCell className="max-w-[240px] truncate font-medium">{row.detalle}</TableCell>
+                        <TableCell>
+                          {row.subtipoCosto ? (
+                            <Badge variant="outline" className="text-xs">{row.subtipoCosto}</Badge>
+                          ) : "-"}
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {row.fechaEmision ? new Date(row.fechaEmision).toLocaleDateString("es-AR") : "-"}
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {row.fechaVencimiento ? new Date(row.fechaVencimiento).toLocaleDateString("es-AR") : "-"}
+                        </TableCell>
+                        <TableCell className="text-right font-mono">
+                          {fmtUSD(Number(row.montoTotalUSD ?? 0))}
+                        </TableCell>
+                        <TableCell>
+                          {row.pagadoAlCierre ? (
+                            <Badge className="bg-green-100 text-green-800">Pagado</Badge>
+                          ) : row.vencido ? (
+                            <Badge variant="destructive">Vencido</Badge>
+                          ) : (
+                            <Badge variant="secondary">Pendiente</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="text-xs">
+                            {row.overrideManual ? "Manual" : "Máster"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {!row.pagadoAlCierre && row.id && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => markPagadoMutation.mutate(row.id)}
+                              disabled={markPagadoMutation.isPending}
+                            >
+                              Marcar pagado
+                            </Button>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              <div className="flex flex-col gap-3 border-t px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+                <span className="text-muted-foreground">
+                  {pagination?.total ?? 0} registros · Página {pagination?.page ?? 1} de {Math.max(1, pagination?.totalPages ?? 1)}
+                </span>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPage((current) => Math.max(1, current - 1))}
+                    disabled={page <= 1 || isFetching}
+                  >
+                    <ChevronLeft className="mr-1 h-4 w-4" /> Anterior
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPage((current) => current + 1)}
+                    disabled={page >= (pagination?.totalPages ?? 1) || isFetching}
+                  >
+                    Siguiente <ChevronRight className="ml-1 h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>

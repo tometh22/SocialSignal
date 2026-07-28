@@ -4,6 +4,7 @@ import path from 'path';
 import { parseDec } from '../../shared/parse-utils';
 import { buildPeriod, normalizeMonth } from '../../shared/utils/dateNormalization';
 import { parseMoneySmart } from '../utils/money';
+import { parseActivoSnapshot, parsePasivoSnapshot } from '../domain/ledger-snapshot';
 
 interface CostoDirectoIndirecto {
   persona: string;
@@ -4202,14 +4203,14 @@ class GoogleSheetsWorkingService {
     return null;
   }
 
-  async importActivoEntries(storage: any, periodKey: string): Promise<{ inserted: number; updated: number; errors: string[] }> {
+  async importActivoEntries(_storage: any, periodKey: string): Promise<{ inserted: number; updated: number; errors: string[] }> {
     const errors: string[] = [];
     let inserted = 0;
     let updated = 0;
     try {
       const { db } = await import('../db');
       const { activoEntries } = await import('@shared/schema');
-      const { eq, and } = await import('drizzle-orm');
+      const { eq, and, sql } = await import('drizzle-orm');
 
       const sheets = this.createSheetsClientFromJSON();
       if (!sheets) return { inserted, updated, errors: ['Google Sheets client not available'] };
@@ -4223,90 +4224,79 @@ class GoogleSheetsWorkingService {
         return { inserted, updated, errors: [`No data found in Activo sheet for ${periodKey}`] };
       }
 
-      const headers: string[] = response.data.values[0].map((h: any) => String(h || '').trim());
-      const normalizedHeaders = headers.map((header) =>
-        header.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase()
-      );
+      const snapshot = parseActivoSnapshot(response.data.values, periodKey);
+      if (snapshot.rows.length === 0) {
+        return {
+          inserted,
+          updated,
+          errors: [`Activo snapshot for ${periodKey} contained no valid rows; existing data was preserved`],
+        };
+      }
       const importBatch = `activo_${periodKey}_${Date.now()}`;
 
-      for (let i = 1; i < response.data.values.length; i++) {
-        const row = response.data.values[i];
-        if (!row || row.length === 0) continue;
-
-        const get = (...names: string[]) => {
-          const normalizedNames = names.map((name) =>
-            name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase()
-          );
-          const idx = normalizedHeaders.findIndex((header) => normalizedNames.includes(header));
-          return idx >= 0 ? row[idx] : '';
-        };
-
-        const rowPeriod = (() => {
-          const mesRaw = get('mes', 'periodo', 'fecha');
-          if (!mesRaw) return null;
-          const d = new Date(mesRaw);
-          if (!isNaN(d.getTime())) return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-          return null;
-        })();
-
-        if (rowPeriod && rowPeriod !== periodKey) continue;
-
-        const concepto = String(get('concepto', 'detalle', 'descripcion') || '').trim();
-        const clienteNombre = String(get('cliente', 'razon social') || '').trim();
-        const montoARSRaw = parseMoneySmart(get('monto ars', 'importe ars', 'ars')) || null;
-        const montoUSDRaw = parseMoneySmart(get('monto usd', 'importe usd', 'usd')) || null;
-        const cotizacionRaw = parseMoneySmart(get('cotizacion', 'tipo de cambio', 'tc')) || null;
-        const montoTotalUSD = montoUSDRaw || (montoARSRaw && cotizacionRaw ? montoARSRaw / cotizacionRaw : null);
-        const nroFactura = String(get('factura', 'nro factura', 'numero factura') || '').trim() || null;
-
-        if (!concepto && !clienteNombre) continue;
-
-        try {
-          const existing = nroFactura
-            ? await db.select({ id: activoEntries.id })
-                .from(activoEntries)
-                .where(and(eq(activoEntries.periodKey, periodKey), eq(activoEntries.nroFactura, nroFactura)))
-                .limit(1)
-            : [];
-
-          const entry: any = {
-            periodKey,
-            concepto: concepto || null,
-            clienteNombre: clienteNombre || null,
-            montoARS: montoARSRaw ? String(montoARSRaw) : null,
-            montoUSD: montoUSDRaw ? String(montoUSDRaw) : null,
-            cotizacion: cotizacionRaw ? String(cotizacionRaw) : null,
-            montoTotalUSD: montoTotalUSD ? String(montoTotalUSD) : null,
-            nroFactura,
-            importBatch,
-          };
-
-          if (existing.length > 0) {
-            await db.update(activoEntries).set(entry).where(eq(activoEntries.id, existing[0].id));
-            updated++;
-          } else {
-            await db.insert(activoEntries).values(entry);
-            inserted++;
-          }
-        } catch (rowErr: any) {
-          errors.push(`Row ${i}: ${rowErr.message}`);
+      await db.transaction(async (tx) => {
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`ledger:activo:${periodKey}`}))`);
+        const cleanupTable = await tx.execute(sql`
+          SELECT to_regclass('public.ledger_cleanup_runs')::text AS table_name
+        `);
+        if (!(cleanupTable.rows[0] as any)?.table_name) {
+          throw new Error('Ledger cleanup pending: Activo snapshot replacement is paused');
         }
-      }
+        const cleanupMarker = await tx.execute(sql`
+          SELECT 1
+          FROM ledger_cleanup_runs
+          WHERE name = '0032_ledger_snapshot_performance_202607'
+          LIMIT 1
+        `);
+        if (cleanupMarker.rows.length === 0) {
+          throw new Error('Ledger cleanup pending: Activo snapshot replacement is paused');
+        }
+        const current = await tx.select({
+          sourceRowKey: activoEntries.sourceRowKey,
+          cobradoAlCierre: activoEntries.cobradoAlCierre,
+        }).from(activoEntries).where(and(
+          eq(activoEntries.periodKey, periodKey),
+          sql`COALESCE(${activoEntries.overrideManual}, false) = false`,
+          sql`${activoEntries.sourceRowKey} IS NOT NULL`,
+        ));
+        const preservedState = new Map(
+          current
+            .filter((row) => row.sourceRowKey)
+            .map((row) => [row.sourceRowKey!, Boolean(row.cobradoAlCierre)]),
+        );
+
+        await tx.delete(activoEntries).where(and(
+          eq(activoEntries.periodKey, periodKey),
+          sql`COALESCE(${activoEntries.overrideManual}, false) = false`,
+        ));
+
+        const rows = snapshot.rows.map((row) => ({
+          ...row,
+          cobradoAlCierre: preservedState.get(row.sourceRowKey) ?? false,
+          importBatch,
+          overrideManual: false,
+          importedAt: new Date(),
+          updatedAt: new Date(),
+        }));
+        await tx.insert(activoEntries).values(rows);
+        inserted = rows.length;
+        updated = rows.filter((row) => preservedState.has(row.sourceRowKey)).length;
+      });
     } catch (err: any) {
       errors.push(err.message);
     }
-    console.log(`✅ Activo ${periodKey}: ${inserted} inserted, ${updated} updated`);
+    console.log(`✅ Activo snapshot ${periodKey}: ${inserted} current rows, ${updated} states preserved, ${errors.length} errors`);
     return { inserted, updated, errors };
   }
 
-  async importPasivoEntries(storage: any, periodKey: string): Promise<{ inserted: number; updated: number; errors: string[] }> {
+  async importPasivoEntries(_storage: any, periodKey: string): Promise<{ inserted: number; updated: number; errors: string[] }> {
     const errors: string[] = [];
     let inserted = 0;
     let updated = 0;
     try {
       const { db } = await import('../db');
       const { pasivoEntries } = await import('@shared/schema');
-      const { eq, and } = await import('drizzle-orm');
+      const { eq, and, sql } = await import('drizzle-orm');
 
       const sheets = this.createSheetsClientFromJSON();
       if (!sheets) return { inserted, updated, errors: ['Google Sheets client not available'] };
@@ -4320,83 +4310,68 @@ class GoogleSheetsWorkingService {
         return { inserted, updated, errors: [`No data found in Pasivo sheet for ${periodKey}`] };
       }
 
-      const headers: string[] = response.data.values[0].map((h: any) => String(h || '').trim());
-      const normalizedHeaders = headers.map((header) =>
-        header.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase()
-      );
+      const snapshot = parsePasivoSnapshot(response.data.values, periodKey);
+      if (snapshot.rows.length === 0) {
+        return {
+          inserted,
+          updated,
+          errors: [`Pasivo snapshot for ${periodKey} contained no valid rows; existing data was preserved`],
+        };
+      }
       const importBatch = `pasivo_${periodKey}_${Date.now()}`;
 
-      for (let i = 1; i < response.data.values.length; i++) {
-        const row = response.data.values[i];
-        if (!row || row.length === 0) continue;
-
-        const get = (...names: string[]) => {
-          const normalizedNames = names.map((name) =>
-            name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase()
-          );
-          const idx = normalizedHeaders.findIndex((header) => normalizedNames.includes(header));
-          return idx >= 0 ? row[idx] : '';
-        };
-
-        const rowPeriod = (() => {
-          const mesRaw = get('mes', 'periodo', 'fecha emision');
-          if (!mesRaw) return null;
-          const d = new Date(mesRaw);
-          if (!isNaN(d.getTime())) return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-          return null;
-        })();
-
-        if (rowPeriod && rowPeriod !== periodKey) continue;
-
-        const detalle = String(get('detalle', 'persona', 'proveedor', 'nombre') || '').trim();
-        if (!detalle) continue;
-
-        const subtipoCosto = String(get('subtipo', 'tipo costo', 'subtipo costo') || '').trim() || null;
-        const montoARSRaw = parseMoneySmart(get('monto ars', 'importe ars', 'ars')) || null;
-        const montoUSDRaw = parseMoneySmart(get('monto usd', 'importe usd', 'usd')) || null;
-        const cotizacionRaw = parseMoneySmart(get('cotizacion', 'tipo de cambio', 'tc')) || null;
-        const montoTotalUSD = montoUSDRaw || (montoARSRaw && cotizacionRaw ? montoARSRaw / cotizacionRaw : null);
-        const fechaEmisionRaw = get('emision', 'fecha emision') || null;
-        const fechaEmision = fechaEmisionRaw ? (() => { const d = new Date(fechaEmisionRaw); return isNaN(d.getTime()) ? null : d; })() : null;
-
-        try {
-          const existing = fechaEmision
-            ? await db.select({ id: pasivoEntries.id })
-                .from(pasivoEntries)
-                .where(and(
-                  eq(pasivoEntries.periodKey, periodKey),
-                  eq(pasivoEntries.detalle, detalle),
-                ))
-                .limit(1)
-            : [];
-
-          const entry: any = {
-            periodKey,
-            detalle,
-            subtipoCosto: subtipoCosto || null,
-            montoARS: montoARSRaw ? String(montoARSRaw) : null,
-            montoUSD: montoUSDRaw ? String(montoUSDRaw) : null,
-            cotizacion: cotizacionRaw ? String(cotizacionRaw) : null,
-            montoTotalUSD: montoTotalUSD ? String(montoTotalUSD) : null,
-            fechaEmision,
-            importBatch,
-          };
-
-          if (existing.length > 0) {
-            await db.update(pasivoEntries).set(entry).where(eq(pasivoEntries.id, existing[0].id));
-            updated++;
-          } else {
-            await db.insert(pasivoEntries).values(entry);
-            inserted++;
-          }
-        } catch (rowErr: any) {
-          errors.push(`Row ${i}: ${rowErr.message}`);
+      await db.transaction(async (tx) => {
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`ledger:pasivo:${periodKey}`}))`);
+        const cleanupTable = await tx.execute(sql`
+          SELECT to_regclass('public.ledger_cleanup_runs')::text AS table_name
+        `);
+        if (!(cleanupTable.rows[0] as any)?.table_name) {
+          throw new Error('Ledger cleanup pending: Pasivo snapshot replacement is paused');
         }
-      }
+        const cleanupMarker = await tx.execute(sql`
+          SELECT 1
+          FROM ledger_cleanup_runs
+          WHERE name = '0032_ledger_snapshot_performance_202607'
+          LIMIT 1
+        `);
+        if (cleanupMarker.rows.length === 0) {
+          throw new Error('Ledger cleanup pending: Pasivo snapshot replacement is paused');
+        }
+        const current = await tx.select({
+          sourceRowKey: pasivoEntries.sourceRowKey,
+          pagadoAlCierre: pasivoEntries.pagadoAlCierre,
+        }).from(pasivoEntries).where(and(
+          eq(pasivoEntries.periodKey, periodKey),
+          sql`COALESCE(${pasivoEntries.overrideManual}, false) = false`,
+          sql`${pasivoEntries.sourceRowKey} IS NOT NULL`,
+        ));
+        const preservedState = new Map(
+          current
+            .filter((row) => row.sourceRowKey)
+            .map((row) => [row.sourceRowKey!, Boolean(row.pagadoAlCierre)]),
+        );
+
+        await tx.delete(pasivoEntries).where(and(
+          eq(pasivoEntries.periodKey, periodKey),
+          sql`COALESCE(${pasivoEntries.overrideManual}, false) = false`,
+        ));
+
+        const rows = snapshot.rows.map((row) => ({
+          ...row,
+          pagadoAlCierre: preservedState.get(row.sourceRowKey) ?? false,
+          importBatch,
+          overrideManual: false,
+          importedAt: new Date(),
+          updatedAt: new Date(),
+        }));
+        await tx.insert(pasivoEntries).values(rows);
+        inserted = rows.length;
+        updated = rows.filter((row) => preservedState.has(row.sourceRowKey)).length;
+      });
     } catch (err: any) {
       errors.push(err.message);
     }
-    console.log(`✅ Pasivo ${periodKey}: ${inserted} inserted, ${updated} updated`);
+    console.log(`✅ Pasivo snapshot ${periodKey}: ${inserted} current rows, ${updated} states preserved, ${errors.length} errors`);
     return { inserted, updated, errors };
   }
 

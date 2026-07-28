@@ -675,6 +675,20 @@ async function applyPendingMigrations() {
       CREATE INDEX IF NOT EXISTS "idx_pasivo_period" ON "pasivo_entries"("period_key");
       CREATE INDEX IF NOT EXISTS "idx_pasivo_subtipo" ON "pasivo_entries"("subtipo_costo");
     `);
+    await run('0037 ledger snapshot identity', `
+      ALTER TABLE "activo_entries" ADD COLUMN IF NOT EXISTS "source_row_key" VARCHAR(80);
+      ALTER TABLE "pasivo_entries" ADD COLUMN IF NOT EXISTS "source_row_key" VARCHAR(80);
+      CREATE UNIQUE INDEX IF NOT EXISTS "uq_activo_imported_source"
+        ON "activo_entries"("period_key", "source_row_key")
+        WHERE "source_row_key" IS NOT NULL AND "override_manual" = false;
+      CREATE UNIQUE INDEX IF NOT EXISTS "uq_pasivo_imported_source"
+        ON "pasivo_entries"("period_key", "source_row_key")
+        WHERE "source_row_key" IS NOT NULL AND "override_manual" = false;
+      CREATE INDEX IF NOT EXISTS "idx_activo_period_created"
+        ON "activo_entries"("period_key", "created_at" DESC);
+      CREATE INDEX IF NOT EXISTS "idx_pasivo_period_created"
+        ON "pasivo_entries"("period_key", "created_at" DESC);
+    `);
     await run('0036 provision_entries', `
       CREATE TABLE IF NOT EXISTS "provision_entries" (
         "id" SERIAL PRIMARY KEY,

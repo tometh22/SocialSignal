@@ -29,4 +29,8 @@ describe("Home personal simplificada", () => {
     expect(home).toContain("grid grid-cols-2 gap-3 xl:grid-cols-4");
     expect(home).not.toContain("lg:grid-cols-4");
   });
+  test("usa el resumen liviano de alertas y no descarga el endpoint legacy", () => {
+    expect(home).toContain('authFetch("/api/projects/alerts-summary")');
+    expect(home).not.toContain('authFetch("/api/active-projects")');
+  });
 });
