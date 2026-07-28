@@ -4010,6 +4010,7 @@ export const activoEntries = pgTable("activo_entries", {
   nroFactura: varchar("nro_factura", { length: 100 }),
   razonSocial: text("razon_social"),
   overrideManual: boolean("override_manual").default(false),
+  sourceRowKey: varchar("source_row_key", { length: 80 }),
   importedAt: timestamp("imported_at").defaultNow(),
   importBatch: varchar("import_batch", { length: 100 }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -4017,6 +4018,9 @@ export const activoEntries = pgTable("activo_entries", {
 }, (t) => ({
   idxPeriod: index("idx_activo_period").on(t.periodKey),
   idxCliente: index("idx_activo_cliente").on(t.clienteNombre),
+  uqImportedSource: uniqueIndex("uq_activo_imported_source")
+    .on(t.periodKey, t.sourceRowKey)
+    .where(sql`${t.sourceRowKey} IS NOT NULL AND ${t.overrideManual} = false`),
 }));
 
 export const insertActivoEntrySchema = createInsertSchema(activoEntries).omit({ id: true, createdAt: true, updatedAt: true, importedAt: true });
@@ -4041,6 +4045,7 @@ export const pasivoEntries = pgTable("pasivo_entries", {
   vencido: boolean("vencido").default(false),
   pagadoAlCierre: boolean("pagado_al_cierre").default(false),
   overrideManual: boolean("override_manual").default(false),
+  sourceRowKey: varchar("source_row_key", { length: 80 }),
   importedAt: timestamp("imported_at").defaultNow(),
   importBatch: varchar("import_batch", { length: 100 }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -4048,6 +4053,9 @@ export const pasivoEntries = pgTable("pasivo_entries", {
 }, (t) => ({
   idxPeriod: index("idx_pasivo_period").on(t.periodKey),
   idxSubtipo: index("idx_pasivo_subtipo").on(t.subtipoCosto),
+  uqImportedSource: uniqueIndex("uq_pasivo_imported_source")
+    .on(t.periodKey, t.sourceRowKey)
+    .where(sql`${t.sourceRowKey} IS NOT NULL AND ${t.overrideManual} = false`),
 }));
 
 export const insertPasivoEntrySchema = createInsertSchema(pasivoEntries).omit({ id: true, createdAt: true, updatedAt: true, importedAt: true });

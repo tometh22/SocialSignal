@@ -6044,6 +6044,85 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Lightweight, batched portfolio projection for Home smart alerts.
+  // Deliberately avoids the legacy /api/active-projects enrichment pipeline.
+  app.get("/api/projects/alerts-summary", requireAuth, async (_req, res) => {
+    const startedAt = Date.now();
+    try {
+      const { rows } = await pool.query(`
+        WITH time_rollup AS (
+          SELECT
+            project_id,
+            COALESCE(SUM(hours), 0)::double precision AS total_hours,
+            COALESCE(SUM(total_cost), 0)::double precision AS total_cost
+          FROM time_entries
+          GROUP BY project_id
+        ),
+        direct_rollup AS (
+          SELECT
+            project_id,
+            COALESCE(SUM(monto_total_usd), 0)::double precision AS total_cost,
+            COALESCE(SUM(horas_reales_asana), 0)::double precision AS total_hours
+          FROM direct_costs
+          WHERE project_id IS NOT NULL
+          GROUP BY project_id
+        ),
+        estimate_rollup AS (
+          SELECT
+            quotation_id,
+            COALESCE(SUM(hours), 0)::double precision AS estimated_hours,
+            COUNT(DISTINCT personnel_id)::integer AS team_size
+          FROM quotation_team_members
+          WHERE variant_id IS NULL
+          GROUP BY quotation_id
+        )
+        SELECT
+          p.id AS "projectId",
+          COALESCE(NULLIF(p.name, ''), q.project_name, 'Sin nombre') AS "projectName",
+          COALESCE(c.name, '') AS "clientName",
+          p.status,
+          COALESCE(NULLIF(p.budget, 0), q.total_amount, 0)::double precision AS revenue,
+          COALESCE(NULLIF(dr.total_cost, 0), tr.total_cost, 0)::double precision AS cost,
+          COALESCE(NULLIF(dr.total_hours, 0), tr.total_hours, 0)::double precision AS "totalHours",
+          COALESCE(er.estimated_hours, 0)::double precision AS "estimatedHours",
+          COALESCE(er.team_size, 0)::integer AS "teamSize"
+        FROM active_projects p
+        LEFT JOIN quotations q ON q.id = p.quotation_id
+        LEFT JOIN clients c ON c.id = p.client_id
+        LEFT JOIN time_rollup tr ON tr.project_id = p.id
+        LEFT JOIN direct_rollup dr ON dr.project_id = p.id
+        LEFT JOIN estimate_rollup er ON er.quotation_id = p.quotation_id
+        WHERE p.parent_project_id IS NULL
+          AND COALESCE(p.is_finished, false) = false
+          AND p.status = 'active'
+        ORDER BY p.updated_at DESC, p.id DESC
+      `);
+
+      const projects = rows.map((row: any) => {
+        const revenue = Number(row.revenue ?? 0);
+        const cost = Number(row.cost ?? 0);
+        return {
+          ...row,
+          revenue,
+          cost,
+          markup: cost > 0 ? revenue / cost : 0,
+          margin: revenue > 0 ? ((revenue - cost) / revenue) * 100 : 0,
+          budget: revenue,
+          budgetUsed: revenue > 0 ? (cost / revenue) * 100 : 0,
+          totalHours: Number(row.totalHours ?? 0),
+          estimatedHours: Number(row.estimatedHours ?? 0),
+          teamSize: Number(row.teamSize ?? 0),
+        };
+      });
+      res.setHeader('Cache-Control', 'private, max-age=60, stale-while-revalidate=120');
+      res.setHeader('Server-Timing', `projects-alerts;dur=${Date.now() - startedAt}`);
+      res.json({ projects });
+    } catch (error) {
+      console.error("Error fetching project alerts summary:", error);
+      res.status(500).json({ message: "Failed to fetch project alerts summary", projects: [] });
+    }
+  });
+
   // Excel MAESTRO Coverage Health Endpoint
   app.get("/api/health/excel-coverage", requireAuth, async (req, res) => {
     try {
@@ -6104,8 +6183,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const startMonth = p('startMonth');
       const endYear = p('endYear');
       const endMonth = p('endMonth');
-      const { fetchResumenEjecutivoDirectly } = await import('./services/direct-sheets-dashboard');
+      const {
+        fetchResumenEjecutivoDirectly,
+        getExecutiveDashboardCacheStatus,
+      } = await import('./services/direct-sheets-dashboard');
       const result = await fetchResumenEjecutivoDirectly(year, month, quarter, yearTotal, startYear, startMonth, endYear, endMonth);
+      const cacheStatus = getExecutiveDashboardCacheStatus();
+      res.setHeader('Cache-Control', 'private, max-age=60, stale-while-revalidate=300');
+      res.setHeader('X-Data-Stale', cacheStatus.stale ? 'true' : 'false');
+      if (cacheStatus.fetchedAt) {
+        res.setHeader('X-Data-Fetched-At', new Date(cacheStatus.fetchedAt).toISOString());
+      }
       res.json(result);
     } catch (error: any) {
       console.error('❌ Direct sheets dashboard error:', error?.message || error);
@@ -7545,206 +7633,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           console.log(`🔍 Projects after activity-based filtering: ${projects.length}`);
 
-          // Enriquecer proyectos con datos calculados para el período específico
-          for (let i = 0; i < projects.length; i++) {
-            const project = projects[i];
-            
-            // Obtener time entries del período para este proyecto
-            const periodTimeEntries = await db
-              .select()
-              .from(timeEntries)
-              .where(sql`time_entries.project_id = ${project.id} AND time_entries.date >= ${dateRange.startDate} AND time_entries.date <= ${dateRange.endDate}`);
-            
-            // 🎯 CORREGIDO: Calcular métricas del período incluyendo Excel MAESTRO
-            let periodHours = periodTimeEntries.reduce((sum, entry) => sum + (entry.hours || 0), 0);
-            let periodCost = periodTimeEntries.reduce((sum, entry) => sum + (entry.totalCost || 0), 0);
-            let periodBilling = 0;
-            
-            // 🎯 NUEVO: Agregar datos del Excel MAESTRO al cálculo
-            const projectDirectCosts = await getFilteredDirectCosts(project.id, timeFilter, dateRange);
-            
-            if (projectDirectCosts && projectDirectCosts.length > 0) {
-              // ✅ USAR CAMPOS EXACTOS: Sumar costos directamente del Excel (ya convertidos)
-              const excelCost = projectDirectCosts.reduce((sum, cost) => {
-                // montoTotalUSD ya está convertido en el Excel (Columna R)
-                const montoUSD = cost.montoTotalUSD ? parseFloat(cost.montoTotalUSD.toString()) : 0;
-                return sum + (isNaN(montoUSD) ? 0 : montoUSD);
-              }, 0);
-              const excelHours = projectDirectCosts.reduce((sum, cost) => sum + (cost.horasRealesAsana || 0), 0);
-              
-              periodCost += excelCost;
-              periodHours += excelHours;
-              
-              console.log(`📊 Excel MAESTRO data added to project ${project.id}:`, {
-                excelCost,
-                excelHours,
-                totalPeriodCost: periodCost,
-                totalPeriodHours: periodHours
-              });
-            }
-            
-            // Determinar tipo de proyecto
-            const isAlwaysOn = project.quotation?.projectType === 'always-on' || 
-                             project.quotation?.projectType === 'fee-mensual' ||
-                             project.isAlwaysOnMacro;
-            
-            if (isAlwaysOn) {
-              // Para proyectos Always-On: Calcular cuántos meses completos abarca el filtro
-              const monthsInPeriod = getMonthsInFilter(timeFilter);
-              
-              if (monthsInPeriod > 0) {
-                // Valores mensuales base del proyecto
-                const monthlyAmount = project.quotation?.totalAmount || 0;
-                const monthlyHours = 0; // Default value since totalHours doesn't exist
-                const monthlyCost = project.quotation?.baseCost || monthlyAmount * 0.7; // Estimación si no hay baseCost
-                
-                // Multiplicar por el número de meses del período
-                periodBilling = monthlyAmount * monthsInPeriod;
-                periodCost = monthlyCost * monthsInPeriod;
-                
-                // Para las horas, usar las registradas realmente (más preciso)
-                console.log(`📊 Always-On project ${project.id} - ${monthsInPeriod} months:`, {
-                  monthlyAmount,
-                  periodBilling,
-                  actualHours: periodHours,
-                  monthlyHours,
-                  estimatedHours: monthlyHours * monthsInPeriod
-                });
-              } else {
-                // Fallback a cálculo basado en registros reales
-                const billableEntries = periodTimeEntries.filter(entry => entry.billable);
-                periodBilling = billableEntries.reduce((sum, entry) => sum + (entry.totalCost || 0), 0);
-              }
-            } else {
-              // Para proyectos One-Shot: Solo usar registros reales del período
-              const billableEntries = periodTimeEntries.filter(entry => entry.billable);
-              periodBilling = billableEntries.reduce((sum, entry) => sum + (entry.totalCost || 0), 0);
-              
-              console.log(`📊 One-Shot project ${project.id} - actual period data:`, {
-                periodHours,
-                periodCost,
-                periodBilling
-              });
-            }
-            
-            // Añadir datos del período al proyecto
-            (projects[i] as any).periodMetrics = {
-              hours: periodHours,
-              cost: periodCost,
-              billing: periodBilling,
-              entries: periodTimeEntries.length,
-              dateRange: {
-                start: dateRange.startDate,
-                end: dateRange.endDate
-              }
-            };
-          }
-          
-          console.log(`📊 Enriched ${projects.length} projects with period metrics`);
+          // The legacy list is intentionally lightweight. Period profitability lives
+          // in /api/projects; keeping it here caused an N+1 query storm per project.
+          res.setHeader('Cache-Control', 'private, max-age=60, stale-while-revalidate=120');
+          return res.json(projects);
         }
       }
 
-      // 🎯 NUEVO: Enriquecer TODOS los proyectos con datos del Excel MAESTRO
-      // (No solo cuando hay filtro temporal)
-      console.log(`📊 Enriching all ${projects.length} projects with Excel MAESTRO data...`);
-      
-      for (let i = 0; i < projects.length; i++) {
-        const project = projects[i];
-        
-        // 🎯 NUEVO: Calcular horas estimadas de la cotización
-        let estimatedHours = 0;
-        if (project.quotation) {
-          try {
-            const quotationTeam = await storage.getQuotationTeamMembers(project.quotation.id);
-            estimatedHours = quotationTeam.reduce((total, member) => total + (member.hours || 0), 0);
-            console.log(`🔢 Project ${project.id} estimated hours from quotation:`, estimatedHours);
-          } catch (error) {
-            console.error(`⚠️ Error calculating estimated hours for project ${project.id}:`, error);
-          }
-        }
-        
-        // 🎯 CHECKLIST: Usar Costs SoT en lugar de datos en bruto de Excel
-        // Obtener costos usando el sistema SoT corregido
-        try {
-          // 🎯 GUARD: Validar que el proyecto tiene clientName y name antes de llamar SoT
-          if (!project.clientName || !project.name) {
-            console.log(`⚠️ Skipping Costs SoT for project ${project.id}: missing clientName or name`);
-            continue;
-          }
-          
-          // Obtener costos desde el sistema SoT corregido
-          const _dr = timeFilter && timeFilter !== 'all' ? getDateRangeForFilter(timeFilter) : null;
-          const periodKey = _dr?.startDate
-            ? `${_dr.startDate.getFullYear()}-${String(_dr.startDate.getMonth() + 1).padStart(2, '0')}`
-            : '2025-08';
-          const projectCostResult = await costs.getCostsForProject(project.clientName, project.name, periodKey as any);
-          
-          if (projectCostResult) {
-            // Usar datos del Costs SoT que ya está corregido
-            const excelTotalCost = projectCostResult.costUSDNormalized;
-            
-            // Para horas, mantener el cálculo directo desde Excel por ahora
-            const allDirectCosts = await storage.getDirectCostsByProject(project.id);
-            const excelTotalHours = allDirectCosts ? allDirectCosts.reduce((sum, cost) => sum + (cost.horasRealesAsana || 0), 0) : 0;
-          
-            console.log(`📊 Project ${project.id} Excel MAESTRO data:`, {
-              costEntries: allDirectCosts ? allDirectCosts.length : 0,
-              totalCost: excelTotalCost,
-              totalHours: excelTotalHours
-            });
-            
-            // 🎯 CORREGIDO: Agregar datos del Excel MAESTRO Y horas estimadas al proyecto
-            (projects[i] as any).excelMAESTROData = {
-              totalCost: excelTotalCost,
-              totalHours: excelTotalHours,
-              entries: allDirectCosts ? allDirectCosts.length : 0
-            };
-            
-            if (project.quotation) {
-              (projects[i] as any).quotation = {
-                ...project.quotation,
-                estimatedHours: estimatedHours
-              };
-            }
-          } else {
-            // 🎯 Para proyectos sin costos SoT, agregar solo las horas estimadas
-            if (project.quotation && estimatedHours > 0) {
-              (projects[i] as any).quotation = {
-                ...project.quotation,
-                estimatedHours: estimatedHours
-              };
-            }
-          }
-        } catch (error) {
-          console.error(`⚠️ Error enriching project ${project.id} with Costs SoT:`, error);
-          // Fallback: usar datos originales si hay error
-          const allDirectCosts = await storage.getDirectCostsByProject(project.id);
-          if (allDirectCosts && allDirectCosts.length > 0) {
-            (projects[i] as any).excelMAESTROData = {
-              totalCost: 0, // Evitar usar datos inflados
-              totalHours: allDirectCosts.reduce((sum, cost) => sum + (cost.horasRealesAsana || 0), 0),
-              entries: allDirectCosts.length
-            };
-          }
-        }
-      }
-
-      // [TEMPORAL] Precios dinámicos deshabilitados - problema con esquema de Google Sheets billing
-      console.log(`💰 Using original quotation prices (dynamic pricing temporarily disabled)`);
-      for (let i = 0; i < projects.length; i++) {
-        const project = projects[i];
-        if (project.quotation) {
-          // Marcar todos los proyectos como usando precios originales
-          if (project.quotation) {
-            (projects[i] as any).quotation = {
-              ...project.quotation,
-              priceSource: 'original_quotation'
-            };
-          }
-        }
-      }
-
-      res.json(projects);
+      // Most legacy consumers only need project/client/quotation identity. Return
+      // the batched storage result before the historical per-project enrichment.
+      res.setHeader('Cache-Control', 'private, max-age=60, stale-while-revalidate=120');
+      return res.json(projects);
     } catch (error) {
       console.error("Error fetching active projects:", error);
       res.status(500).json({ message: "Failed to fetch active projects" });
