@@ -316,7 +316,7 @@ export default function HomeDashboard() {
       )}
 
       {/* AI Insights */}
-      {insights.length > 0 && hasPermission('projects') && (
+      {projectsForAlerts.length > 0 && insights.length > 0 && hasPermission('projects') && (
         <Card className="border-indigo-100 bg-gradient-to-r from-indigo-50/30 to-purple-50/30">
           <CardContent className="p-4">
             <div className="flex items-center gap-2 mb-2">

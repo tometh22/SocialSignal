@@ -52,7 +52,7 @@ Unificar la experiencia de Mind y elevarla a nivel producto: moderna, clara, con
 - `git diff --check`: aprobado.
 - Build de producción: aprobado.
 - Bundle principal: reducido de 2.567 kB a 677 kB minificado (aprox. 74% menos); las pantallas secundarias quedaron divididas en chunks por ruta.
-- Suite automática: 94 tests aprobados, 11 omitidos por fixtures/entorno y 0 fallidos.
+- Suite automática: 97 tests aprobados, 11 omitidos por fixtures/entorno y 0 fallidos.
 - Tests de regresión UI añadidos para:
   - impedir alertas demo hardcodeadas;
   - verificar datos reales de CRM;
@@ -63,6 +63,43 @@ Unificar la experiencia de Mind y elevarla a nivel producto: moderna, clara, con
   - mantener brand y page heading compartidos.
   - conservar lazy loading y fallback accesible entre rutas.
 - El smoke visual por navegador integrado quedó pendiente porque Conductor no expuso ninguna sesión de navegador en el workspace. No se sustituyó por un navegador externo para evitar una validación no equivalente.
+
+## Revisión visual de regresiones
+
+La captura de producción recibida el 27 de julio expuso problemas que la primera pasada no había detectado. Se hizo una segunda auditoría transversal del shell, overlays, encabezados y puntos de quiebre.
+
+### Causas encontradas
+
+- Una regla legacy `body.sidebar-dark .topbar` ganaba por especificidad y volvía oscura la topbar nueva, pero sus textos seguían usando colores para fondo claro.
+- Clases como `text-white/58` y `text-white/28` no pertenecían a la escala configurada de Tailwind y no generaban CSS en producción.
+- El resumen lateral de `PageHeading` aparecía desde `lg`, justo cuando el ancho útil se reduce por la sidebar, y competía con títulos y acciones.
+- Los estados de las cotizaciones usaban posición absoluta en desktop y podían cubrir datos de la card cuando había varios badges.
+- El mini header del detalle de proyecto era `fixed`, ocupaba todo el viewport y se superponía a sidebar y topbar.
+- El backdrop del diálogo usaba otra opacidad no generada (`bg-slate-950/55`).
+- La búsqueda global y los alert dialogs no estaban contenidos de forma segura en viewports bajos.
+
+### Correcciones
+
+- Se eliminó el tema global `sidebar-dark`; la superficie oscura quedó encapsulada en la sidebar.
+- La navegación usa opacidades arbitrarias válidas. El contraste calculado del link inactivo es 9.05:1 y el de etiquetas secundarias es al menos 5.33:1 sobre `#0b0f17`.
+- `PageHeading` ahora distribuye contenido con grid, pasa las acciones a una fila segura en anchos intermedios y muestra el aside solamente desde 1536 px.
+- `SectionHeading` apila título y acción en mobile.
+- La búsqueda completa aparece desde `xl`; antes de ese ancho se conserva el botón compacto.
+- Badges de cotizaciones y estados permanecen en el flujo del documento.
+- El mini header de proyecto es sticky dentro del scroll de contenido, sin invadir el shell.
+- Diálogos, confirmaciones y búsqueda global respetan el alto dinámico del viewport, permiten scroll y usan overlays compilados.
+- La búsqueda global cierra con `Escape` o click en el backdrop y bloquea el scroll de fondo.
+- Tablas de proyectos tienen ancho mínimo y scroll horizontal explícito en vez de comprimir columnas.
+- Los insights de portfolio no muestran un mensaje de “sin proyectos” cuando el KPI proviene de otra fuente con proyectos activos.
+
+### Validación de la segunda pasada
+
+- TypeScript: aprobado.
+- Build de producción: aprobado.
+- Suite completa: 97 aprobados, 11 omitidos y 0 fallidos.
+- Regresiones UI dedicadas: 8 aprobadas.
+- CSS compilado inspeccionado: presentes `text-white/[0.68]`, `text-white/[0.52]` y `bg-slate-950/[0.55]`; ausente `text-white/58`.
+- El navegador integrado continuó sin sesiones disponibles (`[]`), por lo que esta segunda pasada se validó contra la captura, el CSS final compilado y pruebas automatizadas, no mediante clicks autenticados.
 
 ## Alcance
 

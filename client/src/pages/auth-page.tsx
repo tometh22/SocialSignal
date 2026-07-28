@@ -77,13 +77,13 @@ export default function AuthPage() {
           <BrandMark className="relative z-10" />
 
           <div className="relative z-10 my-auto max-w-lg">
-            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-white/55">
+            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-white/[0.62]">
               <Sparkles className="h-3.5 w-3.5 text-rose-400" />Operating intelligence
             </div>
             <h1 className="m-0 text-[3.25rem] font-bold leading-[1.02] tracking-[-0.06em] text-white">
-              Decisiones claras.<br /><span className="text-white/45">Ejecución impecable.</span>
+              Decisiones claras.<br /><span className="text-white/[0.55]">Ejecución impecable.</span>
             </h1>
-            <p className="mt-6 max-w-md text-base leading-7 text-white/48">
+            <p className="mt-6 max-w-md text-base leading-7 text-white/[0.62]">
               El sistema operativo de Epical para conectar estrategia, proyectos, rentabilidad y equipo.
             </p>
 
@@ -93,8 +93,8 @@ export default function AuthPage() {
                 "Señales accionables en tiempo real",
                 "Trazabilidad de punta a punta",
               ].map((item) => (
-                <div key={item} className="flex items-center gap-3 text-sm font-medium text-white/64">
-                  <span className="grid h-6 w-6 place-items-center rounded-lg border border-emerald-400/15 bg-emerald-400/[0.08] text-emerald-400">
+                <div key={item} className="flex items-center gap-3 text-sm font-medium text-white/[0.7]">
+                  <span className="grid h-6 w-6 place-items-center rounded-lg border border-emerald-400/[0.15] bg-emerald-400/[0.08] text-emerald-400">
                     <CheckCircle2 className="h-3.5 w-3.5" />
                   </span>
                   {item}
@@ -103,7 +103,7 @@ export default function AuthPage() {
             </div>
           </div>
 
-          <p className="relative z-10 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/24">
+          <p className="relative z-10 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/[0.42]">
             Built by Epical Digital
           </p>
         </section>

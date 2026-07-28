@@ -27,15 +27,15 @@ export function PageHeading({
             {eyebrow}
           </div>
         )}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div className="mind-page-heading-main">
           <div className="min-w-0">
             <h1 className="mind-page-title">{title}</h1>
             {description && <p className="mind-page-description">{description}</p>}
           </div>
-          {actions && <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>}
+          {actions && <div className="mind-page-heading-actions">{actions}</div>}
         </div>
       </div>
-      {aside && <div className="relative z-10 hidden shrink-0 lg:block">{aside}</div>}
+      {aside && <div className="mind-page-heading-aside relative z-10 hidden 2xl:block">{aside}</div>}
       <div className="pointer-events-none absolute -right-20 -top-28 h-64 w-64 rounded-full bg-primary/[0.055] blur-3xl" />
       <div className="pointer-events-none absolute -bottom-28 right-36 h-52 w-52 rounded-full bg-indigo-500/[0.045] blur-3xl" />
     </section>
@@ -58,7 +58,7 @@ export function SectionHeading({
   className,
 }: SectionHeadingProps) {
   return (
-    <div className={cn("flex items-end justify-between gap-4", className)}>
+    <div className={cn("flex flex-col items-stretch gap-3 sm:flex-row sm:items-end sm:justify-between sm:gap-4", className)}>
       <div className="flex min-w-0 items-start gap-3">
         {icon && (
           <div className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-xl border border-primary/10 bg-primary/[0.07] text-primary">
@@ -70,7 +70,7 @@ export function SectionHeading({
           {description && <p className="mt-1 text-sm text-muted-foreground">{description}</p>}
         </div>
       </div>
-      {action && <div className="shrink-0">{action}</div>}
+      {action && <div className="shrink-0 self-start">{action}</div>}
     </div>
   );
 }

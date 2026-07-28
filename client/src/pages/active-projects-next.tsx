@@ -781,7 +781,7 @@ function ClientGroup({
     <div className="mind-panel mb-3 overflow-hidden">
       <button
         onClick={() => setOpen(o => !o)}
-        className="w-full flex items-center gap-2.5 px-4 py-2.5 bg-slate-50 hover:bg-slate-100 transition-colors text-left"
+        className="flex w-full flex-wrap items-center gap-2.5 bg-slate-50 px-4 py-2.5 text-left transition-colors hover:bg-slate-100"
       >
         <span className="text-slate-400 flex-shrink-0">
           {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
@@ -817,7 +817,7 @@ function ClientGroup({
 
       {open && (
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className={cn("w-full text-sm", isOperations ? "min-w-[880px]" : "min-w-[560px]")}>
             <TableHeader isOperations={isOperations} />
             <tbody>
               {projects.map(p => (

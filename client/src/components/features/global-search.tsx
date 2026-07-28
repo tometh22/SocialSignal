@@ -66,6 +66,23 @@ export function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
     }
   }, [isOpen]);
 
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const previousOverflow = document.body.style.overflow;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isOpen, onClose]);
+
   // Generar resultados de búsqueda inteligente
   const searchResults = useMemo(() => {
     if (!searchTerm.trim()) return [];
@@ -265,15 +282,23 @@ export function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
   const typeCounts = getTypeCounts();
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-start justify-center p-4 z-50">
-      <Card className="w-full max-w-4xl max-h-[80vh] mt-20 shadow-2xl">
-        <CardHeader className="pb-3">
+    <div
+      className="fixed inset-0 z-[70] flex items-start justify-center bg-slate-950/[0.55] p-3 backdrop-blur-[3px] sm:p-6"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Búsqueda global"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <Card className="flex max-h-[calc(100dvh-1.5rem)] w-full max-w-4xl flex-col overflow-hidden shadow-2xl sm:mt-8 sm:max-h-[calc(100dvh-4rem)]">
+        <CardHeader className="shrink-0 pb-3">
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2">
               <Search className="h-5 w-5" />
               Búsqueda Global Inteligente
             </CardTitle>
-            <Button variant="ghost" size="sm" onClick={onClose}>
+            <Button variant="ghost" size="sm" onClick={onClose} aria-label="Cerrar búsqueda">
               <X className="h-4 w-4" />
             </Button>
           </div>
@@ -330,7 +355,7 @@ export function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
           </div>
         </CardHeader>
 
-        <CardContent className="pt-0">
+        <CardContent className="min-h-0 flex-1 overflow-y-auto pt-0">
           {searchTerm.trim() === '' ? (
             <div className="text-center py-12 text-gray-500">
               <Search className="h-12 w-12 mx-auto mb-3 text-gray-300" />
@@ -345,23 +370,25 @@ export function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
             </div>
           ) : (
             <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className="grid w-full grid-cols-5">
-                <TabsTrigger value="all" className="text-xs">
-                  Todos ({searchResults.length})
-                </TabsTrigger>
-                <TabsTrigger value="client" className="text-xs">
-                  Clientes ({groupedResults.client.length})
-                </TabsTrigger>
-                <TabsTrigger value="project" className="text-xs">
-                  Proyectos ({groupedResults.project.length})
-                </TabsTrigger>
-                <TabsTrigger value="quotation" className="text-xs">
-                  Cotizaciones ({groupedResults.quotation.length})
-                </TabsTrigger>
-                <TabsTrigger value="deliverable" className="text-xs">
-                  Entregables ({groupedResults.deliverable.length})
-                </TabsTrigger>
-              </TabsList>
+              <div className="overflow-x-auto pb-1">
+                <TabsList className="grid min-w-[36rem] w-full grid-cols-5">
+                  <TabsTrigger value="all" className="text-xs">
+                    Todos ({searchResults.length})
+                  </TabsTrigger>
+                  <TabsTrigger value="client" className="text-xs">
+                    Clientes ({groupedResults.client.length})
+                  </TabsTrigger>
+                  <TabsTrigger value="project" className="text-xs">
+                    Proyectos ({groupedResults.project.length})
+                  </TabsTrigger>
+                  <TabsTrigger value="quotation" className="text-xs">
+                    Cotizaciones ({groupedResults.quotation.length})
+                  </TabsTrigger>
+                  <TabsTrigger value="deliverable" className="text-xs">
+                    Entregables ({groupedResults.deliverable.length})
+                  </TabsTrigger>
+                </TabsList>
+              </div>
 
               <ScrollArea className="h-96 mt-4">
                 <TabsContent value="all" className="mt-0">
