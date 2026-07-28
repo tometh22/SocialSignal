@@ -522,6 +522,33 @@ async function applyPendingMigrations() {
       ALTER TABLE "active_projects" ALTER COLUMN "quotation_id" DROP NOT NULL;
     `);
 
+    // 0019: task_weekly_estimates nunca se creó en prod (migración de drizzle-kit
+    // nunca ejecutada ahí — confirmado en producción: "relation task_weekly_estimates
+    // does not exist"). Sin esto, TODO el módulo de Capacidad semanal y las
+    // estimaciones múltiples por tarea fallan en runtime aunque el código esté bien.
+    await run('0019 task_weekly_estimates table', `
+      CREATE TABLE IF NOT EXISTS "task_weekly_estimates" (
+        "id" SERIAL PRIMARY KEY,
+        "task_id" INTEGER NOT NULL REFERENCES "tasks"("id") ON DELETE CASCADE,
+        "week_start" TEXT NOT NULL,
+        "estimated_hours" DOUBLE PRECISION NOT NULL,
+        "created_by" INTEGER REFERENCES "users"("id") ON DELETE SET NULL,
+        "created_at" TIMESTAMP NOT NULL DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS "idx_task_weekly_estimates_task_id" ON "task_weekly_estimates"("task_id");
+      DO $$ BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint
+          WHERE conrelid = 'task_weekly_estimates'::regclass
+            AND conname = 'task_weekly_estimates_task_week_unique'
+        ) THEN
+          ALTER TABLE "task_weekly_estimates"
+            ADD CONSTRAINT "task_weekly_estimates_task_week_unique"
+            UNIQUE ("task_id", "week_start");
+        END IF;
+      END $$;
+    `);
+
     // 0020: fact_labor_month.unresolved_person. Sin esto el ETL de rentabilidad de
     // modo-app (incluidas las horas de Tareas) falla al insertar.
     await run('0020 fact_labor unresolved_person', `
