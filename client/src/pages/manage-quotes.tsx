@@ -716,8 +716,8 @@ export default function ManageQuotes() {
 
                     return (
                       <Card key={quote.id} className="mind-interactive-card group relative overflow-hidden">
-                        {/* Status badges - NEW LOCATION: Top right corner */}
-                        <div className="relative z-10 flex flex-wrap items-center gap-2 border-b border-border/60 bg-slate-50/60 px-4 py-3 lg:absolute lg:right-3 lg:top-3 lg:flex-col lg:items-end lg:border-0 lg:bg-transparent lg:p-0">
+                        {/* Status stays in document flow so variable badge counts never cover quotation data. */}
+                        <div className="relative z-10 flex flex-wrap items-center gap-2 border-b border-border/60 bg-slate-50/60 px-4 py-3">
                           {getStatusBadge(quote.status, quote)}
                           {!isQuoteExpired(quote) && getExpiryBadge(quote)}
                           {(quote as any).leadId && (

@@ -223,7 +223,7 @@ export default function Topbar({ onMenuClick }: TopbarProps = {}) {
           <button
             type="button"
             onClick={() => setIsSearchOpen(true)}
-            className="hidden h-9 min-w-52 items-center gap-2 rounded-xl border border-slate-200/90 bg-slate-50/80 px-3 text-left text-xs font-medium text-slate-500 shadow-sm transition-all hover:border-slate-300 hover:bg-white hover:text-slate-700 md:flex"
+            className="hidden h-9 min-w-52 items-center gap-2 rounded-xl border border-slate-200/90 bg-slate-50/80 px-3 text-left text-xs font-medium text-slate-500 shadow-sm transition-all hover:border-slate-300 hover:bg-white hover:text-slate-700 xl:flex"
             aria-label="Abrir búsqueda global"
           >
             <Search className="h-3.5 w-3.5" />
@@ -239,7 +239,7 @@ export default function Topbar({ onMenuClick }: TopbarProps = {}) {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-9 w-9 md:hidden"
+                  className="h-9 w-9 xl:hidden"
                   onClick={() => setIsSearchOpen(true)}
                   aria-label="Buscar"
                 >

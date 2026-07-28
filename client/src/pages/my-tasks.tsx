@@ -214,7 +214,7 @@ export default function MyTasksPage() {
                     const isOverflowOpen = overflowDay === dayKey;
 
                     return (
-                      <div key={dayKey} className={cn("min-h-[200px]", isCurrentDay && "bg-primary/3")}>
+                      <div key={dayKey} className={cn("min-h-[200px]", isCurrentDay && "bg-primary/[0.03]")}>
                         {/* Day header */}
                         <div className={cn("px-2 py-2 border-b text-center", isCurrentDay && "bg-primary/5")}>
                           <p className="text-xs text-muted-foreground uppercase font-medium">{format(day, "EEE", { locale: es })}</p>

@@ -439,7 +439,7 @@ export default function ProjectTasksPage({ params }: Props) {
               className={cn(
                 "h-8 text-xs gap-1.5 transition-colors",
                 showFilter
-                  ? "text-primary bg-primary/10 hover:bg-primary/15"
+                  ? "text-primary bg-primary/10 hover:bg-primary/[0.15]"
                   : "text-muted-foreground"
               )}
               onClick={() => {

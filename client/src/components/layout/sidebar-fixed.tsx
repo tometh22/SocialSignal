@@ -254,7 +254,7 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
                 "flex min-h-10 items-center rounded-xl px-3 py-2 text-[13px] transition-all duration-200 relative group",
                 isActive
                   ? "bg-gradient-to-r from-white/[0.14] to-white/[0.08] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
-                  : "text-white/58 hover:text-white hover:bg-white/[0.075]",
+                  : "text-white/[0.68] hover:text-white hover:bg-white/[0.075]",
                 isCollapsed && "justify-center px-2"
               )}
             >
@@ -346,7 +346,7 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
             {filteredNavSections.map((section) => (
               <div key={section.title || '__top__'}>
                 {!isCollapsed && section.title && (
-                  <h3 className="mb-2 px-3 text-[9px] font-bold uppercase tracking-[0.18em] text-white/28">
+                  <h3 className="mb-2 px-3 text-[9px] font-bold uppercase tracking-[0.18em] text-white/[0.52]">
                     {section.title}
                   </h3>
                 )}
@@ -362,7 +362,7 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
                         <div className="flex items-center px-3 py-1">
                           <button
                             onClick={() => setProjectsExpanded(v => !v)}
-                            className="flex items-center gap-1 text-[10px] font-semibold text-white/30 uppercase tracking-widest hover:text-white/60 transition-colors flex-1"
+                            className="flex items-center gap-1 text-[10px] font-semibold text-white/50 uppercase tracking-widest hover:text-white/70 transition-colors flex-1"
                           >
                             <span>Proyectos</span>
                             {projectsExpanded
@@ -409,7 +409,7 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
                             })}
                             <Link
                               href="/tasks/projects"
-                              className="flex items-center gap-2 px-2 py-1 rounded-lg text-xs text-white/30 hover:text-white/60 transition-colors"
+                              className="flex items-center gap-2 px-2 py-1 rounded-lg text-xs text-white/50 hover:text-white/70 transition-colors"
                             >
                               <FolderOpen className="h-3.5 w-3.5 flex-shrink-0" />
                               <span>Ver todos</span>
@@ -429,7 +429,7 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
                         <div
                           className={cn(
                             "flex items-stretch rounded-xl text-sm transition-all duration-200 group relative",
-                            isStatusActive && !currentPath.includes('/')
+                            currentPath === '/review'
                               ? "bg-white/10 text-white"
                               : "text-white/60 hover:text-white hover:bg-white/10",
                           )}
@@ -468,7 +468,7 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
                         {reviewsExpanded && (
                           <div className="space-y-0.5 mt-1 ml-2 pl-2 border-l border-white/10">
                             {sidebarRooms.length === 0 && (
-                              <div className="px-2 py-1 text-[10px] text-white/30 italic">
+                              <div className="px-2 py-1 text-[10px] text-white/50 italic">
                                 Sin salas todavía
                               </div>
                             )}
@@ -498,7 +498,7 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
                                   <span className="truncate flex-1 font-medium">{room.name}</span>
                                   {isPrivate && (
                                     <span
-                                      className="text-[9px] font-semibold uppercase tracking-wide text-white/40 flex-shrink-0"
+                                      className="text-[9px] font-semibold uppercase tracking-wide text-white/50 flex-shrink-0"
                                       title="Sala personal"
                                     >
                                       Tú
@@ -533,7 +533,7 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
                             {reviewRooms.length > MAX_SIDEBAR_ROOMS && (
                               <Link
                                 href="/review"
-                                className="flex items-center gap-2 px-2 py-1 rounded-lg text-xs text-white/30 hover:text-white/60 transition-colors"
+                                className="flex items-center gap-2 px-2 py-1 rounded-lg text-xs text-white/50 hover:text-white/70 transition-colors"
                               >
                                 <FolderOpen className="h-3.5 w-3.5 flex-shrink-0" />
                                 <span>Ver todas ({reviewRooms.length})</span>
@@ -541,9 +541,9 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
                             )}
                             <button
                               onClick={() => setNewReviewOpen(true)}
-                              className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 transition-colors font-medium"
+                              className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-medium text-indigo-300 transition-colors hover:bg-white/[0.07] hover:text-indigo-200"
                             >
-                              <span className="inline-flex flex-shrink-0 items-center justify-center rounded-md w-5 h-5 border border-dashed border-indigo-300 text-indigo-500">
+                              <span className="inline-flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md border border-dashed border-indigo-300/60 text-indigo-300">
                                 <Plus className="h-3 w-3" />
                               </span>
                               <span>Nueva sala de status</span>
@@ -599,7 +599,7 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
                 <p className="truncate text-[11px] font-semibold text-white/75">
                   {user ? `${user.firstName} ${user.lastName}` : "Mind"}
                 </p>
-                <p className="truncate text-[9px] uppercase tracking-[0.12em] text-white/28">Powered by Epical</p>
+                <p className="truncate text-[9px] uppercase tracking-[0.12em] text-white/[0.52]">Powered by Epical</p>
               </div>
             </div>
           )}

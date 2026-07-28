@@ -41,11 +41,11 @@ export default function BrandMark({
         <div className="min-w-0 leading-none">
           <div className="flex items-center gap-2">
             <span className="text-[17px] font-bold tracking-[-0.035em] text-white">mind</span>
-            <span className="rounded-full border border-white/10 bg-white/[0.07] px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.16em] text-white/45">
+            <span className="rounded-full border border-white/10 bg-white/[0.07] px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.16em] text-white/[0.52]">
               OS
             </span>
           </div>
-          <p className="mt-1 text-[9px] font-medium tracking-[0.06em] text-white/35">
+          <p className="mt-1 text-[9px] font-medium tracking-[0.06em] text-white/[0.52]">
             EPICAL INTELLIGENCE
           </p>
         </div>
