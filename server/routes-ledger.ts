@@ -17,6 +17,7 @@ import {
 } from "@shared/schema";
 import { eq, and, sql, desc, asc } from "drizzle-orm";
 import { storage } from "./storage";
+import { parseMoneySmart } from "./utils/money";
 
 export function createLedgerRouter(requireAuth: any) {
   const router = Router();
@@ -50,13 +51,34 @@ export function createLedgerRouter(requireAuth: any) {
     montoARS?: string | null;
     cotizacion?: string | null;
   }): string | null => {
-    const usd = parseFloat(row.montoUSD ?? "");
-    if (Number.isFinite(usd)) return String(usd);
-    const ars = parseFloat(row.montoARS ?? "");
-    const fx = parseFloat(row.cotizacion ?? "");
-    return Number.isFinite(ars) && Number.isFinite(fx) && fx > 0
+    const usd = row.montoUSD == null || String(row.montoUSD).trim() === ""
+      ? null
+      : parseMoneySmart(row.montoUSD);
+    if (usd != null && Number.isFinite(usd)) return String(usd);
+    const ars = row.montoARS == null || String(row.montoARS).trim() === ""
+      ? null
+      : parseMoneySmart(row.montoARS);
+    const fx = row.cotizacion == null || String(row.cotizacion).trim() === ""
+      ? null
+      : parseMoneySmart(row.cotizacion);
+    return ars != null && fx != null && Number.isFinite(ars) && Number.isFinite(fx) && fx > 0
       ? String(ars / fx)
       : null;
+  };
+  const normalizeLedgerMoneyInput = (body: Record<string, unknown>) => {
+    const normalized = { ...body };
+    for (const key of ["montoARS", "montoUSD", "cotizacion", "montoTotalUSD"]) {
+      const value = normalized[key];
+      if (
+        value == null
+        || (typeof value === "string" && value.trim() === "")
+        || !/\d/.test(String(value))
+      ) {
+        continue;
+      }
+      normalized[key] = String(parseMoneySmart(value));
+    }
+    return normalized;
   };
 
   // ==================== ACTIVO ====================
@@ -138,7 +160,10 @@ export function createLedgerRouter(requireAuth: any) {
 
   router.post("/activo", requireAuth, async (req, res) => {
     try {
-      const parsed = insertActivoEntrySchema.safeParse({ ...req.body, overrideManual: true });
+      const parsed = insertActivoEntrySchema.safeParse({
+        ...normalizeLedgerMoneyInput(req.body),
+        overrideManual: true,
+      });
       if (!parsed.success) return res.status(400).json({ message: parsed.error.message });
       const values = {
         ...parsed.data,
@@ -155,7 +180,7 @@ export function createLedgerRouter(requireAuth: any) {
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) return res.status(400).json({ message: "Invalid id" });
-      const parsed = insertActivoEntrySchema.partial().safeParse(req.body);
+      const parsed = insertActivoEntrySchema.partial().safeParse(normalizeLedgerMoneyInput(req.body));
       if (!parsed.success) return res.status(400).json({ message: parsed.error.message });
       const [existing] = await db.select().from(activoEntries).where(eq(activoEntries.id, id)).limit(1);
       if (!existing) return res.status(404).json({ message: "Not found" });
@@ -274,7 +299,10 @@ export function createLedgerRouter(requireAuth: any) {
 
   router.post("/pasivo", requireAuth, async (req, res) => {
     try {
-      const parsed = insertPasivoEntrySchema.safeParse({ ...req.body, overrideManual: true });
+      const parsed = insertPasivoEntrySchema.safeParse({
+        ...normalizeLedgerMoneyInput(req.body),
+        overrideManual: true,
+      });
       if (!parsed.success) return res.status(400).json({ message: parsed.error.message });
       const values = {
         ...parsed.data,
@@ -291,7 +319,7 @@ export function createLedgerRouter(requireAuth: any) {
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) return res.status(400).json({ message: "Invalid id" });
-      const parsed = insertPasivoEntrySchema.partial().safeParse(req.body);
+      const parsed = insertPasivoEntrySchema.partial().safeParse(normalizeLedgerMoneyInput(req.body));
       if (!parsed.success) return res.status(400).json({ message: parsed.error.message });
       const [existing] = await db.select().from(pasivoEntries).where(eq(pasivoEntries.id, id)).limit(1);
       if (!existing) return res.status(404).json({ message: "Not found" });
