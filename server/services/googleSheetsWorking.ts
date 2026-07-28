@@ -4,7 +4,12 @@ import path from 'path';
 import { parseDec } from '../../shared/parse-utils';
 import { buildPeriod, normalizeMonth } from '../../shared/utils/dateNormalization';
 import { parseMoneySmart } from '../utils/money';
-import { parseActivoSnapshot, parsePasivoSnapshot } from '../domain/ledger-snapshot';
+import {
+  activoBusinessKey,
+  parseActivoSnapshot,
+  parsePasivoSnapshot,
+  pasivoBusinessKey,
+} from '../domain/ledger-snapshot';
 
 interface CostoDirectoIndirecto {
   persona: string;
@@ -4254,16 +4259,24 @@ class GoogleSheetsWorkingService {
         const current = await tx.select({
           sourceRowKey: activoEntries.sourceRowKey,
           cobradoAlCierre: activoEntries.cobradoAlCierre,
+          concepto: activoEntries.concepto,
+          clienteNombre: activoEntries.clienteNombre,
+          montoARS: activoEntries.montoARS,
+          montoUSD: activoEntries.montoUSD,
+          cotizacion: activoEntries.cotizacion,
+          nroFactura: activoEntries.nroFactura,
         }).from(activoEntries).where(and(
           eq(activoEntries.periodKey, periodKey),
           sql`COALESCE(${activoEntries.overrideManual}, false) = false`,
-          sql`${activoEntries.sourceRowKey} IS NOT NULL`,
         ));
-        const preservedState = new Map(
-          current
-            .filter((row) => row.sourceRowKey)
-            .map((row) => [row.sourceRowKey!, Boolean(row.cobradoAlCierre)]),
-        );
+        const preservedState = new Map<string, boolean>();
+        for (const row of current) {
+          const businessKey = row.sourceRowKey?.split(':')[0] ?? activoBusinessKey(row);
+          preservedState.set(
+            businessKey,
+            (preservedState.get(businessKey) ?? false) || Boolean(row.cobradoAlCierre),
+          );
+        }
 
         await tx.delete(activoEntries).where(and(
           eq(activoEntries.periodKey, periodKey),
@@ -4272,7 +4285,8 @@ class GoogleSheetsWorkingService {
 
         const rows = snapshot.rows.map((row) => ({
           ...row,
-          cobradoAlCierre: preservedState.get(row.sourceRowKey) ?? false,
+          cobradoAlCierre: preservedState.get(row.sourceRowKey.split(':')[0])
+            ?? row.cobradoAlCierre,
           importBatch,
           overrideManual: false,
           importedAt: new Date(),
@@ -4280,7 +4294,7 @@ class GoogleSheetsWorkingService {
         }));
         await tx.insert(activoEntries).values(rows);
         inserted = rows.length;
-        updated = rows.filter((row) => preservedState.has(row.sourceRowKey)).length;
+        updated = rows.filter((row) => preservedState.has(row.sourceRowKey.split(':')[0])).length;
       });
     } catch (err: any) {
       errors.push(err.message);
@@ -4340,16 +4354,24 @@ class GoogleSheetsWorkingService {
         const current = await tx.select({
           sourceRowKey: pasivoEntries.sourceRowKey,
           pagadoAlCierre: pasivoEntries.pagadoAlCierre,
+          detalle: pasivoEntries.detalle,
+          subtipoCosto: pasivoEntries.subtipoCosto,
+          montoARS: pasivoEntries.montoARS,
+          montoUSD: pasivoEntries.montoUSD,
+          cotizacion: pasivoEntries.cotizacion,
+          fechaEmision: pasivoEntries.fechaEmision,
         }).from(pasivoEntries).where(and(
           eq(pasivoEntries.periodKey, periodKey),
           sql`COALESCE(${pasivoEntries.overrideManual}, false) = false`,
-          sql`${pasivoEntries.sourceRowKey} IS NOT NULL`,
         ));
-        const preservedState = new Map(
-          current
-            .filter((row) => row.sourceRowKey)
-            .map((row) => [row.sourceRowKey!, Boolean(row.pagadoAlCierre)]),
-        );
+        const preservedState = new Map<string, boolean>();
+        for (const row of current) {
+          const businessKey = row.sourceRowKey?.split(':')[0] ?? pasivoBusinessKey(row);
+          preservedState.set(
+            businessKey,
+            (preservedState.get(businessKey) ?? false) || Boolean(row.pagadoAlCierre),
+          );
+        }
 
         await tx.delete(pasivoEntries).where(and(
           eq(pasivoEntries.periodKey, periodKey),
@@ -4358,7 +4380,8 @@ class GoogleSheetsWorkingService {
 
         const rows = snapshot.rows.map((row) => ({
           ...row,
-          pagadoAlCierre: preservedState.get(row.sourceRowKey) ?? false,
+          pagadoAlCierre: preservedState.get(row.sourceRowKey.split(':')[0])
+            ?? row.pagadoAlCierre,
           importBatch,
           overrideManual: false,
           importedAt: new Date(),
@@ -4366,7 +4389,7 @@ class GoogleSheetsWorkingService {
         }));
         await tx.insert(pasivoEntries).values(rows);
         inserted = rows.length;
-        updated = rows.filter((row) => preservedState.has(row.sourceRowKey)).length;
+        updated = rows.filter((row) => preservedState.has(row.sourceRowKey.split(':')[0])).length;
       });
     } catch (err: any) {
       errors.push(err.message);

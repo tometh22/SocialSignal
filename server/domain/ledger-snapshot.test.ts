@@ -56,6 +56,125 @@ describe("ledger snapshots", () => {
   test("parses civil periods without UTC month drift", () => {
     expect(parseSheetPeriod("17/07/2026")).toBe("2026-07");
     expect(parseSheetPeriod("2026-01-01")).toBe("2026-01");
+    expect(parseSheetPeriod("01 ene", 2026)).toBe("2026-01");
+    expect(parseSheetPeriod("15 julio", "2026")).toBe("2026-07");
     expect(parseSheetPeriod("invalid")).toBeNull();
+  });
+
+  test("parses the production Activo contract and selects only the requested month", () => {
+    const values = [
+      [
+        "Concepto/Banco",
+        "Tipo de Activo",
+        "Cliente",
+        "Mes",
+        "Año",
+        "Cobrado/No Cobrado AL CIERRE",
+        "Fecha de pago/Nota de credito",
+        "Vencido",
+        "Fecha Facturación",
+        "Nro de Factura/Comprobante",
+        "Razón Social/Cliente",
+        "Detalle",
+        "Fecha de vencimiento",
+        "Moneda original ARS",
+        "Moneda original USD",
+        "Cotización",
+        "Monto Total USD",
+      ],
+      [
+        "Clientes a cobrar",
+        "Clientes a cobrar",
+        "Acme",
+        "01 jul",
+        2026,
+        "Cobrado",
+        "",
+        "A término",
+        "",
+        "A-1",
+        "ACME SA",
+        "",
+        46200,
+        1_500_000,
+        "",
+        1_250,
+        1_200,
+      ],
+      ["Banco", "Activo Líquido", "", "01 jun", 2026, "", "", "", "", "", "", "", "", "", 100, "", 100],
+    ];
+
+    const snapshot = parseActivoSnapshot(values, "2026-07");
+
+    expect(snapshot.rows).toHaveLength(1);
+    expect(snapshot.skipped).toBe(1);
+    expect(snapshot.rows[0]).toMatchObject({
+      concepto: "Clientes a cobrar",
+      tipoActivo: "Clientes a cobrar",
+      clienteNombre: "Acme",
+      montoARS: "1500000",
+      montoUSD: null,
+      cotizacion: "1250",
+      montoTotalUSD: "1200",
+      cobradoAlCierre: true,
+      vencido: false,
+      nroFactura: "A-1",
+      razonSocial: "ACME SA",
+    });
+  });
+
+  test("parses the production Pasivo contract, spreadsheet dates and negative state", () => {
+    const values = [
+      [
+        "Detalle",
+        "Subtipo de costo",
+        "Mes",
+        "Año",
+        "Pagado/No Pagado AL CIERRE",
+        "Fecha de pago",
+        "Fecha emisión",
+        "Concepto/Detalle",
+        "Descripción/Factura",
+        "Fecha de vencimiento",
+        "Moneda original ARS",
+        "Moneda original USD",
+        "Cotización",
+        "Monto Total USD",
+        "Vencido",
+      ],
+      [
+        "Proveedor Uno",
+        "Equipo",
+        "01 jul",
+        2026,
+        "No Pagado",
+        "",
+        46200,
+        "Honorarios",
+        "Factura C-1",
+        46230,
+        500_000,
+        "",
+        1_250,
+        400,
+        "Vencido",
+      ],
+    ];
+
+    const snapshot = parsePasivoSnapshot(values, "2026-07");
+
+    expect(snapshot.rows).toHaveLength(1);
+    expect(snapshot.rows[0]).toMatchObject({
+      detalle: "Proveedor Uno",
+      subtipoCosto: "Equipo",
+      montoARS: "500000",
+      montoTotalUSD: "400",
+      pagadoAlCierre: false,
+      vencido: true,
+      concepto: "Honorarios",
+      descripcion: "Factura C-1",
+    });
+    expect(snapshot.rows[0].fechaEmision).toBeInstanceOf(Date);
+    expect(snapshot.rows[0].fechaVencimiento).toBeInstanceOf(Date);
   });
 });
