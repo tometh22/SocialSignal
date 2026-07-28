@@ -19,7 +19,7 @@ export default function WhatIsReviewBanner() {
   return (
     <div className="relative bg-gradient-to-r from-indigo-50 via-white to-indigo-50 border border-indigo-100 rounded-xl p-5 mb-6">
       <button
-        className="absolute top-3 right-3 text-slate-400 hover:text-slate-600"
+        className="absolute right-2 top-2 grid h-11 w-11 place-items-center rounded-xl text-slate-400 transition-colors hover:bg-white/80 hover:text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/40"
         onClick={dismiss}
         aria-label="Cerrar"
       >
@@ -38,7 +38,7 @@ export default function WhatIsReviewBanner() {
         <Column
           icon={<FolderKanban className="h-5 w-5 text-slate-600" />}
           accent="text-slate-700"
-          title="Vista de Proyectos"
+          title="Proyectos"
           subtitle="Rentabilidad y ciclo de vida"
           bullets={["Todos los proyectos activos", "Siempre un proyecto real"]}
           question="¿Cuánto vale esto?"

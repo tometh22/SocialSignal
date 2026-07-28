@@ -7,6 +7,7 @@ import {
 import { User as UserType } from "@shared/schema";
 import { queryClient } from "../lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { getFirstAllowedRouteForUser } from "@/lib/first-allowed-route";
 
 type AuthContextType = {
   user: UserType | null;
@@ -115,20 +116,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         variant: "default",
       });
 
-      const getFirstRoute = (user: any): string => {
-        if (user.role === 'external_provider') return '/provider/dashboard';
-        if (user.isAdmin) return '/';
-        const perms: string[] = user.permissions || [];
-        if (perms.includes('dashboard')) return '/';
-        if (perms.includes('crm')) return '/crm';
-        if (perms.includes('quotations')) return '/quotations';
-        if (perms.includes('projects')) return '/active-projects';
-        if (perms.includes('finance')) return '/statistics';
-        return '/my-invoices';
-      };
-
       setTimeout(() => {
-        window.location.href = getFirstRoute(userData);
+        window.location.href = getFirstAllowedRouteForUser(userData as any);
       }, 100);
     },
     onError: (error) => {

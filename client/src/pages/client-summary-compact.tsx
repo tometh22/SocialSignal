@@ -495,7 +495,7 @@ export default function ClientSummaryCompact() {
                       Proyectos Activos ({metrics.activeProjects})
                     </span>
                     <Link href="/active-projects">
-                      <Button size="sm" variant="outline" className="text-xs">Vista de Proyectos</Button>
+                      <Button size="sm" variant="outline" className="text-xs">Proyectos</Button>
                     </Link>
                   </CardTitle>
                 </CardHeader>
@@ -539,7 +539,7 @@ export default function ClientSummaryCompact() {
                         <div className="text-gray-500">No hay proyectos activos</div>
                         <Link href="/active-projects">
                           <Button className="mt-4" size="sm">
-                            Ir a Vista de Proyectos
+                            Ir a Proyectos
                           </Button>
                         </Link>
                       </div>

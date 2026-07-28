@@ -6,17 +6,20 @@ import { Route, Redirect, RouteProps } from "wouter";
 interface ProtectedRouteProps extends RouteProps {
   component: React.ComponentType<any>;
   requiredPermission?: AppSection;
+  /** Grants the route when the user has at least one listed permission. */
+  requiredAnyPermission?: readonly AppSection[];
 }
 
 export function ProtectedRoute({
   path,
   component: Component,
   requiredPermission,
+  requiredAnyPermission,
   children,
   ...rest
 }: ProtectedRouteProps) {
   const { user, loading } = useAuth();
-  const { hasPermission, getFirstAllowedRoute } = usePermissions();
+  const { hasPermission, hasAnyPermission } = usePermissions();
 
   if (loading) {
     return (
@@ -37,6 +40,14 @@ export function ProtectedRoute({
   }
 
   if (user && requiredPermission && !hasPermission(requiredPermission)) {
+    return (
+      <Route path={path}>
+        <Redirect to="/unauthorized" />
+      </Route>
+    );
+  }
+
+  if (user && requiredAnyPermission && !hasAnyPermission(requiredAnyPermission)) {
     return (
       <Route path={path}>
         <Redirect to="/unauthorized" />

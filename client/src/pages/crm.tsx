@@ -5,6 +5,10 @@ import { useLocation } from "wouter";
 import { queryClient, apiRequest, authFetch } from "@/lib/queryClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { CompactPageHeader } from "@/components/ui/compact-page-header";
+import { MetricCard, MetricGrid } from "@/components/ui/metric-card";
+import { PageShell } from "@/components/ui/page-shell";
+import { ToolbarPanel } from "@/components/ui/toolbar-panel";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -24,6 +28,7 @@ import {
   pointerWithin,
   rectIntersection,
   CollisionDetection,
+  KeyboardSensor,
   PointerSensor,
   useSensor,
   useSensors,
@@ -37,6 +42,7 @@ import {
 import {
   SortableContext,
   horizontalListSortingStrategy,
+  sortableKeyboardCoordinates,
   verticalListSortingStrategy,
   useSortable,
   arrayMove,
@@ -368,7 +374,10 @@ function StageManagerDialog({ stages, onRefresh }: { stages: CrmStage[]; onRefre
 
   useEffect(() => { setLocalStages(stages); }, [stages]);
 
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
@@ -851,7 +860,10 @@ export default function CRMPage() {
     if (localLeads === null && !leadsLoading) setLocalLeads(fetchedLeads);
   }, [fetchedLeads, localLeads, leadsLoading]);
 
-  const columnSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
+  const columnSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
 
   // useRef so handleDragEnd always reads the latest target stage,
   // even if React hasn't committed the localLeads update yet.
@@ -1021,22 +1033,17 @@ export default function CRMPage() {
   const leadsForStage = (stage: Stage) => leads.filter(l => l.stage === stage);
 
   return (
-    <div className="space-y-5">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-indigo-600 rounded-xl shadow-sm">
-            <Target className="w-5 h-5 text-white" />
-          </div>
-          <div>
-            <h1 className="text-xl font-semibold text-slate-900">CRM Ventas</h1>
-            <p className="text-sm text-slate-500">Pipeline y seguimiento de prospectos</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
+    <PageShell width="full" spacing="compact">
+      <CompactPageHeader
+        eyebrow="Comercial"
+        title="CRM de ventas"
+        description="Gestioná el pipeline y los próximos pasos de cada oportunidad."
+        icon={<Target className="h-5 w-5" />}
+        actions={(
+          <>
           <StageManagerDialog stages={stages} onRefresh={refetchStages} />
-          <Button variant="outline" size="sm" onClick={handleRefresh} className="gap-1.5">
-            <RefreshCw className="w-3.5 h-3.5" /> Actualizar
+          <Button variant="outline" onClick={handleRefresh} className="gap-1.5">
+            <RefreshCw className="h-4 w-4" /> Actualizar
           </Button>
           <NewLeadModal onSuccess={handleRefresh} stages={stages} />
           <NewLeadModal
@@ -1046,69 +1053,48 @@ export default function CRMPage() {
             onOpenChange={(v) => { if (!v) setQuickAddStage(null); }}
             initialStage={quickAddStage ?? undefined}
           />
-        </div>
-      </div>
+          </>
+        )}
+      />
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="border-slate-200">
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className="p-2 bg-indigo-50 rounded-lg">
-              <TrendingUp className="w-5 h-5 text-indigo-600" />
-            </div>
-            <div>
-              <p className="text-xs text-slate-500 font-medium">Leads Activos</p>
-              <p className="text-2xl font-bold text-slate-800">{statsLoading ? '—' : (stats?.totalActive ?? 0)}</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-slate-200">
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className="p-2 bg-emerald-50 rounded-lg">
-              <DollarSign className="w-5 h-5 text-emerald-600" />
-            </div>
-            <div>
-              <p className="text-xs text-slate-500 font-medium">Pipeline Total</p>
-              <p className="text-2xl font-bold text-slate-800">{statsLoading ? '—' : fmtUsd(stats?.totalPipelineUsd)}</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-slate-200">
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className="p-2 bg-green-50 rounded-lg">
-              <Trophy className="w-5 h-5 text-green-600" />
-            </div>
-            <div>
-              <p className="text-xs text-slate-500 font-medium">Ganados este mes</p>
-              <p className="text-2xl font-bold text-slate-800">{statsLoading ? '—' : (stats?.wonThisMonth ?? 0)}</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className={`border-slate-200 ${(stats?.overdueReminders ?? 0) > 0 ? 'border-orange-200 bg-orange-50/30' : ''}`}>
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className={`p-2 rounded-lg ${(stats?.overdueReminders ?? 0) > 0 ? 'bg-orange-100' : 'bg-slate-100'}`}>
-              <AlertCircle className={`w-5 h-5 ${(stats?.overdueReminders ?? 0) > 0 ? 'text-orange-600' : 'text-slate-500'}`} />
-            </div>
-            <div>
-              <p className="text-xs text-slate-500 font-medium">Follow-ups vencidos</p>
-              <p className={`text-2xl font-bold ${(stats?.overdueReminders ?? 0) > 0 ? 'text-orange-600' : 'text-slate-800'}`}>
-                {statsLoading ? '—' : (stats?.overdueReminders ?? 0)}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      <MetricGrid>
+        <MetricCard
+          label="Leads activos"
+          value={statsLoading ? "—" : (stats?.totalActive ?? 0)}
+          icon={<TrendingUp className="h-5 w-5" />}
+          tone="primary"
+        />
+        <MetricCard
+          label="Pipeline total"
+          value={statsLoading ? "—" : fmtUsd(stats?.totalPipelineUsd)}
+          icon={<DollarSign className="h-5 w-5" />}
+          tone="success"
+        />
+        <MetricCard
+          label="Ganados este mes"
+          value={statsLoading ? "—" : (stats?.wonThisMonth ?? 0)}
+          icon={<Trophy className="h-5 w-5" />}
+          tone="success"
+        />
+        <MetricCard
+          label="Follow-ups vencidos"
+          value={statsLoading ? "—" : (stats?.overdueReminders ?? 0)}
+          icon={<AlertCircle className="h-5 w-5" />}
+          tone={(stats?.overdueReminders ?? 0) > 0 ? "warning" : "neutral"}
+        />
+      </MetricGrid>
 
       {/* Toolbar */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <div className="relative flex-1 max-w-xs">
+      <ToolbarPanel title="Pipeline" description="Buscá oportunidades, filtrá etapas o cambiá la visualización.">
+        <div className="relative min-w-0 flex-1 sm:min-w-64">
           <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <Input placeholder="Buscar empresa..." value={search}
+          <Input aria-label="Buscar empresa" placeholder="Buscar empresa..." value={search}
             onChange={e => setSearch(e.target.value)}
-            className="pl-9 border-slate-200" />
+            className="h-11 pl-9 border-slate-200" />
         </div>
         <Select value={stageFilter} onValueChange={setStageFilter}>
-          <SelectTrigger className="w-44 border-slate-200">
+          <SelectTrigger aria-label="Filtrar por etapa" className="h-11 w-full border-slate-200 sm:w-52">
             <SelectValue placeholder="Todas las etapas" />
           </SelectTrigger>
           <SelectContent>
@@ -1123,23 +1109,27 @@ export default function CRMPage() {
         <div className="flex items-center bg-slate-100 rounded-lg p-0.5">
           <button
             onClick={() => setViewMode('kanban')}
-            className={`p-1.5 rounded-md transition-colors ${viewMode === 'kanban' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}
+            aria-label="Ver pipeline como tablero"
+            aria-pressed={viewMode === 'kanban'}
+            className={`grid h-10 w-10 place-items-center rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 ${viewMode === 'kanban' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}
           >
             <LayoutGrid className="w-4 h-4" />
           </button>
           <button
             onClick={() => setViewMode('list')}
-            className={`p-1.5 rounded-md transition-colors ${viewMode === 'list' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}
+            aria-label="Ver pipeline como lista"
+            aria-pressed={viewMode === 'list'}
+            className={`grid h-10 w-10 place-items-center rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 ${viewMode === 'list' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}
           >
             <List className="w-4 h-4" />
           </button>
         </div>
         {activeDrag?.type === 'card' && (
-          <span className="text-xs text-indigo-600 font-medium animate-pulse">
+          <span className="text-xs text-indigo-600 font-medium animate-pulse" role="status">
             Arrastrando — soltá en una columna para mover
           </span>
         )}
-      </div>
+      </ToolbarPanel>
 
       {/* Main content */}
       {leadsLoading ? (
@@ -1209,6 +1199,6 @@ export default function CRMPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </PageShell>
   );
 }

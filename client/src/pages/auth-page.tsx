@@ -10,6 +10,7 @@ import { useLocation } from 'wouter';
 import { Eye, EyeOff, AlertCircle, Mail, Lock, ArrowRight, CheckCircle2, Sparkles } from 'lucide-react';
 import { motion } from 'framer-motion';
 import BrandMark from '@/components/layout/brand-mark';
+import { getFirstAllowedRouteForUser } from '@/lib/first-allowed-route';
 
 export default function AuthPage() {
   const [, setLocation] = useLocation();
@@ -22,7 +23,7 @@ export default function AuthPage() {
 
   useEffect(() => {
     if (user && !loading) {
-      setLocation('/');
+      setLocation(getFirstAllowedRouteForUser(user as any));
     }
   }, [user, loading, setLocation]);
 
