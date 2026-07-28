@@ -87,6 +87,11 @@ export default function CapacityDashboard() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/tasks/team-calendar"] });
       queryClient.invalidateQueries({ queryKey });
+      // La tarea dentro del proyecto (y el resumen de horas) leen la misma tabla
+      // task_weekly_estimates — sin esto, el "reloj" de la tarea en el proyecto
+      // queda con el valor viejo hasta que su cache de 5 min expire.
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks/project"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks/hours-summary"] });
       toast({ title: "Horas estimadas actualizadas" });
     },
     onError: () => toast({ title: "Error al actualizar estimación", variant: "destructive" }),

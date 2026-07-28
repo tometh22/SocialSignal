@@ -18,6 +18,7 @@ import ToolsAndPricing from "@/components/optimized/tools-and-pricing";
 import { Separator } from "@/components/ui/separator";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { getApiErrorMessage } from "@/lib/api-error";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { 
   Users, 
@@ -305,7 +306,7 @@ export default function FinancialReviewFinal() {
       navigate('/manage-quotes');
     } catch (error) {
       console.error("Error al guardar:", error);
-      const errorMessage = error instanceof Error ? error.message : "Error desconocido";
+      const errorMessage = getApiErrorMessage(error, "Error desconocido");
       toast({
         title: "Error al guardar",
         description: `No se pudo guardar la cotización: ${errorMessage}`,
@@ -354,7 +355,7 @@ export default function FinancialReviewFinal() {
 
     } catch (error) {
       console.error("❌ Error al guardar borrador:", error);
-      const errorMessage = error instanceof Error ? error.message : "Error desconocido";
+      const errorMessage = getApiErrorMessage(error, "Error desconocido");
 
       // Verificar si es un error de sesión
       if (errorMessage.includes('No autenticado') || errorMessage.includes('401')) {
@@ -433,7 +434,7 @@ export default function FinancialReviewFinal() {
       navigate('/manage-quotes');
     } catch (error) {
       console.error("❌ Error al finalizar cotización:", error);
-      const errorMessage = error instanceof Error ? error.message : "Error desconocido";
+      const errorMessage = getApiErrorMessage(error, "Error desconocido");
 
       // Verificar si es un error de sesión
       if (errorMessage.includes('No autenticado') || errorMessage.includes('401')) {

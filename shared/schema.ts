@@ -932,7 +932,9 @@ export const holidays = pgTable("holidays", {
   isNational: boolean("is_national").notNull().default(true),
   year: integer("year").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+}, (table) => ({
+  uniqueDateName: unique("unique_holiday_date_name").on(table.date, table.name),
+}));
 
 export const insertHolidaySchema = createInsertSchema(holidays).omit({
   id: true,

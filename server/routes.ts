@@ -20528,8 +20528,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/holidays", requireAuth, async (req, res) => {
     try {
       const data = insertHolidaySchema.parse(req.body);
-      const [holiday] = await db.insert(holidays).values(data).returning();
-      res.status(201).json(holiday);
+      const [holiday] = await db.insert(holidays).values(data)
+        .onConflictDoNothing({ target: [holidays.date, holidays.name] })
+        .returning();
+      if (holiday) return res.status(201).json(holiday);
+      const [existing] = await db.select().from(holidays)
+        .where(and(eq(holidays.date, data.date), eq(holidays.name, data.name)));
+      res.status(200).json(existing);
     } catch (error) {
       if (error instanceof z.ZodError) return res.status(400).json({ message: "Datos inválidos", errors: error.errors });
       res.status(500).json({ message: "Error creating holiday" });

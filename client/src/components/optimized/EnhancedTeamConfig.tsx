@@ -54,6 +54,24 @@ const SALARY_MONTH_OPTIONS: { value: string; label: string }[] = [
 ];
 const SALARY_MONTH_AUTO = '__auto__';
 
+const RATE_PROJECTION_OPTIONS: { value: 'current' | 'projected' | 'annual_avg'; label: string; description: string }[] = [
+  {
+    value: 'current',
+    label: 'Foto del mes seleccionado',
+    description: 'Usa el valor hora real del mes elegido (Admin → Personal).',
+  },
+  {
+    value: 'projected',
+    label: 'Tarifa estimada proyectada',
+    description: 'Usa el historial sincronizado de Personal para el mes del proyecto.',
+  },
+  {
+    value: 'annual_avg',
+    label: 'Promedio anual estimado',
+    description: 'Promedia las tarifas estimadas del año — ideal para proyectos largos.',
+  },
+];
+
 const EnhancedTeamConfig: React.FC = () => {
   const {
     quotationData,
@@ -374,34 +392,28 @@ const EnhancedTeamConfig: React.FC = () => {
               Cómo se calculan las tarifas del equipo para esta cotización.
             </p>
           </div>
-          <Select
-            value={quotationData.inflation.rateProjectionMode ?? 'current'}
-            onValueChange={(v) => updateInflation({ rateProjectionMode: v as any })}
-          >
-            <SelectTrigger className="w-full md:w-64 bg-white">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="current">
-                <div className="flex flex-col">
-                  <span>Foto del mes seleccionado</span>
-                  <span className="text-[11px] text-muted-foreground">Usa el valor hora real del mes elegido (Admin → Personal).</span>
-                </div>
-              </SelectItem>
-              <SelectItem value="projected">
-                <div className="flex flex-col">
-                  <span>Tarifa estimada proyectada</span>
-                  <span className="text-[11px] text-muted-foreground">Usa el historial sincronizado de Personal para el mes del proyecto.</span>
-                </div>
-              </SelectItem>
-              <SelectItem value="annual_avg">
-                <div className="flex flex-col">
-                  <span>Promedio anual estimado</span>
-                  <span className="text-[11px] text-muted-foreground">Promedia las tarifas estimadas del año — ideal para proyectos largos.</span>
-                </div>
-              </SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="w-full md:w-64 flex flex-col gap-1">
+            <Select
+              value={quotationData.inflation.rateProjectionMode ?? 'current'}
+              onValueChange={(v) => updateInflation({ rateProjectionMode: v as any })}
+            >
+              <SelectTrigger className="w-full bg-white">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {RATE_PROJECTION_OPTIONS.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-[11px] text-blue-700 leading-snug">
+              {RATE_PROJECTION_OPTIONS.find(
+                (opt) => opt.value === (quotationData.inflation.rateProjectionMode ?? 'current')
+              )?.description}
+            </p>
+          </div>
         </CardContent>
       </Card>
 

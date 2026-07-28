@@ -741,6 +741,30 @@ async function applyPendingMigrations() {
     // quotation_id was still NOT NULL or the finance ledger did not yet exist.
     await run('0031 feedback_mind_v2 closure', feedbackMindV2MigrationSql);
 
+    // 0033: feriados duplicados (mismo date+name insertado más de una vez desde el
+    // formulario) — borra duplicados conservando la fila más antigua y agrega la
+    // restricción única que faltaba, para que el POST /api/holidays deje de poder
+    // recrearlos.
+    await run('0033 holidays dedupe + unique constraint', `
+      DELETE FROM holidays h
+      USING holidays dup
+      WHERE h.date = dup.date
+        AND h.name = dup.name
+        AND h.id > dup.id;
+
+      DO $$ BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint
+          WHERE conrelid = 'holidays'::regclass
+            AND conname = 'unique_holiday_date_name'
+        ) THEN
+          ALTER TABLE "holidays"
+            ADD CONSTRAINT "unique_holiday_date_name"
+            UNIQUE ("date", "name");
+        END IF;
+      END $$;
+    `);
+
   } finally {
     client.release();
   }

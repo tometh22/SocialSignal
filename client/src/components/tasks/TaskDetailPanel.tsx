@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient, apiRequest, authFetch } from "@/lib/queryClient";
+import { queryClient, apiRequest, authFetch, authFetchJson } from "@/lib/queryClient";
 import { getApiErrorMessage } from "@/lib/api-error";
 import { format, formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
@@ -139,7 +139,7 @@ function CommentsSection({ taskId, allPersonnel }: { taskId: number; allPersonne
 
   const { data: comments = [], refetch } = useQuery<any[]>({
     queryKey: ["/api/tasks", taskId, "comments"],
-    queryFn: () => authFetch(`/api/tasks/${taskId}/comments`).then(r => r.json()),
+    queryFn: () => authFetchJson(`/api/tasks/${taskId}/comments`),
     enabled: !!taskId,
   });
 
@@ -328,27 +328,28 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
     };
   }, [open, initialFocusTime]);
 
-  const { data: task, isLoading, refetch: refetchTask } = useQuery<Task>({
+  const { data: task, isLoading, isError: isTaskError, error: taskError, refetch: refetchTask } = useQuery<Task>({
     queryKey: ["/api/tasks", taskId],
-    queryFn: () => authFetch(`/api/tasks/${taskId}`).then(r => r.json()),
+    queryFn: () => authFetchJson<Task>(`/api/tasks/${taskId}`),
     enabled: !!taskId,
     staleTime: Infinity,
     refetchOnReconnect: false,
+    retry: 1,
   });
 
   const { data: allPersonnel = [] } = useQuery<Personnel[]>({
     queryKey: ["/api/tasks-personnel"],
-    queryFn: () => authFetch("/api/tasks-personnel").then(r => r.json()),
+    queryFn: () => authFetchJson<Personnel[]>("/api/tasks-personnel"),
   });
 
   const { data: allProjects = [] } = useQuery<Project[]>({
     queryKey: ["/api/tasks-projects"],
-    queryFn: () => authFetch("/api/tasks-projects").then(r => r.json()),
+    queryFn: () => authFetchJson<Project[]>("/api/tasks-projects"),
   });
 
   const { data: projectDetail } = useQuery<{ members: { personnelId: number; name: string; role: string }[] }>({
     queryKey: ["/api/tasks/projects", task?.projectId],
-    queryFn: () => authFetch(`/api/tasks/projects/${task!.projectId}`).then(r => r.json()),
+    queryFn: () => authFetchJson(`/api/tasks/projects/${task!.projectId}`),
     enabled: !!task?.projectId,
   });
   // Solo los miembros explícitos del proyecto pueden ser responsables.
@@ -357,7 +358,7 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
 
   const { data: weeklyEstimates = [], refetch: refetchEstimates } = useQuery<any[]>({
     queryKey: ["/api/tasks", taskId, "weekly-estimates"],
-    queryFn: () => authFetch(`/api/tasks/${taskId}/weekly-estimates`).then(r => r.json()),
+    queryFn: () => authFetchJson<any[]>(`/api/tasks/${taskId}/weekly-estimates`),
     enabled: !!taskId,
   });
   const weeklyEstimatedHoursTotal = weeklyEstimates.reduce(
@@ -562,7 +563,7 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
     updateMutation.mutate({ description: value || null });
   };
 
-  if (!task && !isLoading) return null;
+  if (!taskId) return null;
 
   const assignee = allPersonnel.find(p => p.id === task?.assigneeId);
   const project = allProjects.find(p => p.id === task?.projectId);
@@ -572,7 +573,16 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
     <>
       <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
         <SheetContent className="w-full sm:max-w-xl overflow-y-auto p-0 flex flex-col" side="right">
-          {isLoading || !task ? (
+          {isTaskError ? (
+            <div className="flex flex-col items-center justify-center flex-1 gap-3 text-center px-6">
+              <p className="text-sm text-destructive">
+                {getApiErrorMessage(taskError, "No se pudo cargar el detalle de la tarea.")}
+              </p>
+              <Button variant="outline" size="sm" onClick={() => refetchTask()}>
+                Reintentar
+              </Button>
+            </div>
+          ) : isLoading || !task ? (
             <div className="flex items-center justify-center flex-1 text-muted-foreground">
               <Loader2 className="h-6 w-6 animate-spin mr-2" />Cargando...
             </div>
