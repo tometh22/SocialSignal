@@ -4212,6 +4212,9 @@ class GoogleSheetsWorkingService {
     const errors: string[] = [];
     let inserted = 0;
     let updated = 0;
+    let read = 0;
+    let skipped = 0;
+    let deleted = 0;
     try {
       const { db } = await import('../db');
       const { activoEntries } = await import('@shared/schema');
@@ -4230,6 +4233,8 @@ class GoogleSheetsWorkingService {
       }
 
       const snapshot = parseActivoSnapshot(response.data.values, periodKey);
+      read = snapshot.read;
+      skipped = snapshot.skipped;
       if (snapshot.rows.length === 0) {
         return {
           inserted,
@@ -4278,10 +4283,11 @@ class GoogleSheetsWorkingService {
           );
         }
 
-        await tx.delete(activoEntries).where(and(
+        const deletedRows = await tx.delete(activoEntries).where(and(
           eq(activoEntries.periodKey, periodKey),
           sql`COALESCE(${activoEntries.overrideManual}, false) = false`,
-        ));
+        )).returning({ id: activoEntries.id });
+        deleted = deletedRows.length;
 
         const rows = snapshot.rows.map((row) => ({
           ...row,
@@ -4299,7 +4305,10 @@ class GoogleSheetsWorkingService {
     } catch (err: any) {
       errors.push(err.message);
     }
-    console.log(`✅ Activo snapshot ${periodKey}: ${inserted} current rows, ${updated} states preserved, ${errors.length} errors`);
+    console.log(
+      `✅ Activo snapshot ${periodKey}: read=${read}, valid=${inserted}, skipped=${skipped}, `
+      + `inserted=${inserted}, updated=${updated}, deleted=${deleted}, errors=${errors.length}`,
+    );
     return { inserted, updated, errors };
   }
 
@@ -4307,6 +4316,9 @@ class GoogleSheetsWorkingService {
     const errors: string[] = [];
     let inserted = 0;
     let updated = 0;
+    let read = 0;
+    let skipped = 0;
+    let deleted = 0;
     try {
       const { db } = await import('../db');
       const { pasivoEntries } = await import('@shared/schema');
@@ -4325,6 +4337,8 @@ class GoogleSheetsWorkingService {
       }
 
       const snapshot = parsePasivoSnapshot(response.data.values, periodKey);
+      read = snapshot.read;
+      skipped = snapshot.skipped;
       if (snapshot.rows.length === 0) {
         return {
           inserted,
@@ -4373,10 +4387,11 @@ class GoogleSheetsWorkingService {
           );
         }
 
-        await tx.delete(pasivoEntries).where(and(
+        const deletedRows = await tx.delete(pasivoEntries).where(and(
           eq(pasivoEntries.periodKey, periodKey),
           sql`COALESCE(${pasivoEntries.overrideManual}, false) = false`,
-        ));
+        )).returning({ id: pasivoEntries.id });
+        deleted = deletedRows.length;
 
         const rows = snapshot.rows.map((row) => ({
           ...row,
@@ -4394,7 +4409,10 @@ class GoogleSheetsWorkingService {
     } catch (err: any) {
       errors.push(err.message);
     }
-    console.log(`✅ Pasivo snapshot ${periodKey}: ${inserted} current rows, ${updated} states preserved, ${errors.length} errors`);
+    console.log(
+      `✅ Pasivo snapshot ${periodKey}: read=${read}, valid=${inserted}, skipped=${skipped}, `
+      + `inserted=${inserted}, updated=${updated}, deleted=${deleted}, errors=${errors.length}`,
+    );
     return { inserted, updated, errors };
   }
 
