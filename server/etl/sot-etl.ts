@@ -455,15 +455,17 @@ export async function processDirectCostsToFactLabor(rows: CostoDirectoRow[]): Pr
       // todas formas, así que es mejor detectarlo antes y loguear qué se saltea.
       const RATE_MAX = 99_999_999.99;   // numeric(10,2)
       const COST_MAX = 9_999_999_999.99; // numeric(12,2)
+      const FX_MAX = 999_999.9999;       // numeric(10,4)
       const overflowField = rateARS > RATE_MAX ? 'hourlyRateARS'
         : costARS > COST_MAX ? 'costARS'
         : costUSD > COST_MAX ? 'costUSD'
+        : fxToUse > FX_MAX ? 'fx'
         : null;
       if (overflowField) {
         console.warn(
           `⚠️ Fila de costo directo salteada por valor fuera de rango en "${overflowField}" ` +
           `(cliente="${clientRaw}", proyecto="${projectRaw}", persona="${personRaw}", periodo=${periodKey}): ` +
-          `rateARS=${rateARS}, costARS=${costARS}, costUSD=${costUSD}`
+          `rateARS=${rateARS}, costARS=${costARS}, costUSD=${costUSD}, fx=${fxToUse}`
         );
         skipped++;
         continue;
