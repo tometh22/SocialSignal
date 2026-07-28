@@ -591,36 +591,6 @@ body.dark {
   background-attachment: fixed;
 }
 
-/* Estilos para mantener las barras oscuras pero el contenido claro */
-body.sidebar-dark .topbar {
-  background-color: hsl(265, 35%, 15%);
-  color: hsl(220, 15%, 95%);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-body.sidebar-dark .sidebar {
-  background-color: hsl(265, 35%, 15%);
-  color: hsl(220, 15%, 95%);
-  border-right: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-/* Estilos para textos y elementos en las barras oscuras */
-body.sidebar-dark .topbar,
-body.sidebar-dark .topbar * {
-  --foreground: 220 15% 95%;
-  --muted-foreground: 220 15% 75%;
-  --accent: 260 25% 20%;
-  --accent-foreground: 220 15% 95%;
-}
-
-body.sidebar-dark .sidebar,
-body.sidebar-dark .sidebar * {
-  --foreground: 220 15% 95%;
-  --muted-foreground: 220 15% 75%;
-  --accent: 260 25% 20%;
-  --accent-foreground: 220 15% 95%;
-}
-
 /* Efectos mejorados para la sidebar */
 .sidebar .group:hover {
   transform-origin: left center;
@@ -1786,6 +1756,12 @@ body {
 
 .app-content {
   min-height: 100%;
+  min-width: 0;
+}
+
+.app-content > * {
+  min-width: 0;
+  max-width: 100%;
 }
 
 .app-content h1,
@@ -1803,10 +1779,11 @@ body {
 
 .mind-page-heading {
   position: relative;
-  display: flex;
-  min-height: 148px;
+  display: grid;
+  min-height: 136px;
+  grid-template-columns: minmax(0, 1fr);
   align-items: stretch;
-  gap: 2rem;
+  gap: 1.25rem;
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.82);
   border-radius: 1.5rem;
@@ -1842,6 +1819,25 @@ body {
   color: hsl(var(--muted-foreground));
   font-size: 0.92rem;
   line-height: 1.55;
+}
+
+.mind-page-heading-main {
+  display: grid;
+  min-width: 0;
+  align-items: end;
+  gap: 1rem;
+}
+
+.mind-page-heading-actions {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.mind-page-heading-aside {
+  min-width: 0;
 }
 
 .mind-section-title {
@@ -1949,8 +1945,21 @@ a,
 
 @media (min-width: 640px) {
   .mind-page-heading {
-    min-height: 162px;
-    padding: 2rem;
+    min-height: 144px;
+    padding: 1.75rem;
+  }
+}
+
+@media (min-width: 1280px) {
+  .mind-page-heading-main {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+}
+
+@media (min-width: 1536px) {
+  .mind-page-heading {
+    grid-template-columns: minmax(0, 1fr) minmax(11rem, 13rem);
+    gap: 1.5rem;
   }
 }
 

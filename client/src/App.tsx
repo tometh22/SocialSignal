@@ -131,17 +131,16 @@ function AppRouteFallback() {
 }
 
 function AppRoutes() {
-  // Set document title - permite modo claro para contenido principal pero mantiene sidebar oscura
+  // Keep the document in light mode. The sidebar owns its dark surface locally,
+  // so global theme classes cannot leak into the topbar or page content.
   const [location] = useLocation();
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   useEffect(() => {
     document.title = "mind";
-    // Remover dark mode del documento general (para contenido principal)
     document.documentElement.classList.remove('dark');
     document.body.classList.remove('dark');
-    // Pero dejamos la clase sidebar-dark que mantendrá la estética oscura solo en el sidebar
-    document.body.classList.add('sidebar-dark');
+    document.body.classList.remove('sidebar-dark');
   }, []);
 
   // Cerrar el sidebar mobile cuando cambia la ruta

@@ -162,10 +162,10 @@ function StickyHeader({
     score >= 70 ? "bg-emerald-500" : score >= 50 ? "bg-amber-400" : score >= 30 ? "bg-orange-500" : "bg-red-500";
 
   return (
-    <div className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-      visible ? "translate-y-0 opacity-100" : "-translate-y-full opacity-0"
-    }`}>
-      <div className="bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-sm">
+    <div className="sticky top-0 z-20 h-0 overflow-visible">
+      <div className={`rounded-b-xl border-x border-b border-slate-200 bg-white/95 shadow-sm backdrop-blur-md transition-all duration-300 ${
+        visible ? "pointer-events-auto translate-y-0 opacity-100" : "pointer-events-none -translate-y-full opacity-0"
+      }`}>
         <div className="w-full px-4 py-2 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Link href="/active-projects">
