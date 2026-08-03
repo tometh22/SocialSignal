@@ -52,6 +52,9 @@ function pathLabel(path: Array<string | number> | undefined): string {
       hours: "horas",
       rate: "tarifa",
       cost: "costo",
+      date: "fecha",
+      hourlyRate: "tarifa por hora",
+      hourlyRateAtTime: "tarifa histórica",
       exchangeRateAtQuote: "cotización",
     };
     return known[part] ?? part;

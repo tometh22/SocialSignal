@@ -10,6 +10,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
+import type { DateRange } from "react-day-picker";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuLabel
@@ -123,19 +124,27 @@ function getAvatarColor(id: number) {
   return AVATAR_COLORS[id % AVATAR_COLORS.length];
 }
 
+function parseCivilTaskDate(value?: string | null) {
+  if (!value) return undefined;
+  const [year, month, day] = value.slice(0, 10).split("-").map(Number);
+  if (![year, month, day].every(Number.isFinite)) return undefined;
+  return new Date(year, month - 1, day);
+}
+
 function isOverdue(task: Task) {
-  return task.dueDate && new Date(task.dueDate) < new Date() && task.status !== "done";
+  const dueDate = parseCivilTaskDate(task.dueDate);
+  return dueDate && dueDate < new Date() && task.status !== "done";
 }
 
 function isDueSoon(task: Task) {
   if (!task.dueDate || task.status === "done" || isOverdue(task)) return false;
-  const diff = new Date(task.dueDate).getTime() - new Date().getTime();
+  const diff = parseCivilTaskDate(task.dueDate)!.getTime() - new Date().getTime();
   return diff >= 0 && diff < 2 * 24 * 60 * 60 * 1000;
 }
 
 function isDueThisWeek(task: Task) {
   if (!task.dueDate || task.status === "done" || isOverdue(task) || isDueSoon(task)) return false;
-  const diff = new Date(task.dueDate).getTime() - new Date().getTime();
+  const diff = parseCivilTaskDate(task.dueDate)!.getTime() - new Date().getTime();
   return diff >= 0 && diff < 7 * 24 * 60 * 60 * 1000;
 }
 
@@ -175,12 +184,12 @@ function sortTaskList(tasks: Task[], sortBy: string, allPersonnel: Personnel[]):
 function formatDateRange(startDate?: string | null, dueDate?: string | null) {
   if (!startDate && !dueDate) return null;
   if (startDate && dueDate) {
-    const s = format(new Date(startDate), "d MMM", { locale: es });
-    const d = format(new Date(dueDate), "d MMM", { locale: es });
+    const s = format(parseCivilTaskDate(startDate)!, "d MMM", { locale: es });
+    const d = format(parseCivilTaskDate(dueDate)!, "d MMM", { locale: es });
     return `${s} – ${d}`;
   }
-  if (dueDate) return format(new Date(dueDate), "d MMM", { locale: es });
-  if (startDate) return `${format(new Date(startDate), "d MMM", { locale: es })} →`;
+  if (dueDate) return format(parseCivilTaskDate(dueDate)!, "d MMM", { locale: es });
+  if (startDate) return `${format(parseCivilTaskDate(startDate)!, "d MMM", { locale: es })} →`;
   return null;
 }
 
@@ -202,11 +211,69 @@ function CircleCheck({ checked, onClick }: { checked: boolean; onClick: (e: Reac
   );
 }
 
+function QuickHoursButton({ taskId }: { taskId: number }) {
+  const [open, setOpen] = useState(false);
+  const [manual, setManual] = useState("");
+  const [timerStartedAt, setTimerStartedAt] = useState<number | null>(null);
+  const [timerSeconds, setTimerSeconds] = useState(0);
+  const logMutation = useMutation({
+    mutationFn: (hours: number) => apiRequest(`/api/tasks/${taskId}/time`, "POST", {
+      date: format(new Date(), "yyyy-MM-dd"),
+      hours,
+      description: "Carga rápida",
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks/hours-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks/my-hours"] });
+      setManual("");
+      setOpen(false);
+    },
+  });
+
+  useEffect(() => {
+    if (!timerStartedAt) return;
+    const interval = window.setInterval(() => setTimerSeconds(Math.floor((Date.now() - timerStartedAt) / 1000)), 1000);
+    return () => window.clearInterval(interval);
+  }, [timerStartedAt]);
+
+  const saveManual = () => {
+    const hours = Number(manual.replace(",", "."));
+    if (Number.isFinite(hours) && hours > 0) logMutation.mutate(Math.round(hours * 4) / 4);
+  };
+  const stopTimer = () => {
+    const hours = Math.round((timerSeconds / 3600) * 4) / 4;
+    setTimerStartedAt(null);
+    setTimerSeconds(0);
+    if (hours > 0) logMutation.mutate(hours);
+  };
+
+  return <Popover open={open} onOpenChange={setOpen}>
+    <PopoverTrigger asChild>
+      <button className="ml-auto opacity-50 hover:opacity-100 hover:bg-primary/10 rounded p-0.5 transition-all" onClick={(e) => e.stopPropagation()} title="Carga rápida de horas">
+        <Clock className="h-3 w-3 text-primary" />
+      </button>
+    </PopoverTrigger>
+    <PopoverContent className="w-56 p-3" onClick={(e) => e.stopPropagation()}>
+      <p className="text-xs font-semibold mb-2">Cargar horas</p>
+      <div className="grid grid-cols-4 gap-1 mb-2">
+        {[0.25, 0.5, 0.75, 1].map((hours) => <Button key={hours} size="sm" variant="outline" className="h-7 px-1 text-[10px]" onClick={() => logMutation.mutate(hours)}>{hours * 60}m</Button>)}
+      </div>
+      <div className="flex gap-1 mb-2">
+        <Input value={manual} onChange={(e) => setManual(e.target.value)} placeholder="Horas" className="h-7 text-xs" />
+        <Button size="sm" className="h-7 text-xs" onClick={saveManual}>Guardar</Button>
+      </div>
+      {timerStartedAt ? <Button size="sm" variant="destructive" className="w-full h-7 text-xs" onClick={stopTimer}>Detener ({Math.floor(timerSeconds / 60)}m)</Button> :
+        <Button size="sm" variant="secondary" className="w-full h-7 text-xs" onClick={() => setTimerStartedAt(Date.now())}>Iniciar temporizador</Button>}
+    </PopoverContent>
+  </Popover>;
+}
+
 function InlineDateButton({ startDate, dueDate, taskId, onSet, overdue, dueSoon, dueThisWeek }: {
   startDate?: string | null;
   dueDate?: string | null;
   taskId: number;
-  onSet: (taskId: number, d: Date | undefined) => void;
+  onSet: (taskId: number, range: DateRange | undefined) => void;
   overdue: boolean;
   dueSoon?: boolean;
   dueThisWeek?: boolean;
@@ -237,9 +304,9 @@ function InlineDateButton({ startDate, dueDate, taskId, onSet, overdue, dueSoon,
       </PopoverTrigger>
       <PopoverContent className="w-auto p-0 shadow-lg" onClick={e => e.stopPropagation()}>
         <Calendar
-          mode="single"
-          selected={dueDate ? new Date(dueDate) : undefined}
-          onSelect={d => { onSet(taskId, d); setOpen(false); }}
+          mode="range"
+          selected={{ from: parseCivilTaskDate(startDate), to: parseCivilTaskDate(dueDate) }}
+          onSelect={(range) => { onSet(taskId, range); if (range?.from && range?.to) setOpen(false); }}
           locale={es}
           initialFocus
         />
@@ -271,6 +338,7 @@ function NewTaskRow({ projectId, sectionName, onCreated, onCancel, allPersonnel,
   const [assigneeId, setAssigneeId] = useState<string>("none");
   const [startDate, setStartDate] = useState<Date | undefined>();
   const [dueDate, setDueDate] = useState<Date | undefined>();
+  const [dateRangeOpen, setDateRangeOpen] = useState(false);
 
   const createMutation = useMutation({
     mutationFn: (data: any) => apiRequest("/api/tasks", "POST", data),
@@ -284,8 +352,8 @@ function NewTaskRow({ projectId, sectionName, onCreated, onCancel, allPersonnel,
       projectId,
       sectionName,
       assigneeId: assigneeId !== "none" ? parseInt(assigneeId) : null,
-      startDate: startDate?.toISOString() || null,
-      dueDate: dueDate?.toISOString() || null,
+      startDate: startDate ? format(startDate, "yyyy-MM-dd") : null,
+      dueDate: dueDate ? format(dueDate, "yyyy-MM-dd") : null,
       status: defaultStatus,
       priority: "medium",
     });
@@ -326,25 +394,32 @@ function NewTaskRow({ projectId, sectionName, onCreated, onCancel, allPersonnel,
           </SelectContent>
         </Select>
       </div>
-      <div className="w-40 px-1 flex-shrink-0 flex gap-1">
-        <Popover>
+      <div className="w-40 px-1 flex-shrink-0">
+        <Popover open={dateRangeOpen} onOpenChange={setDateRangeOpen}>
           <PopoverTrigger asChild>
-            <Button variant="ghost" size="sm" className="h-7 flex-1 px-1 text-[10px] font-normal">
-              {startDate ? format(startDate, "d MMM", { locale: es }) : "Inicio"}
+            <Button variant="ghost" size="sm" className="h-7 w-full px-1 text-[10px] font-normal">
+              {startDate && dueDate
+                ? `${format(startDate, "d MMM", { locale: es })} – ${format(dueDate, "d MMM", { locale: es })}`
+                : "Definir rango"}
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-auto p-0">
-            <Calendar mode="single" selected={startDate} onSelect={setStartDate} locale={es} />
-          </PopoverContent>
-        </Popover>
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button variant="ghost" size="sm" className="h-7 flex-1 px-1 text-[10px] font-normal">
-              {dueDate ? format(dueDate, "d MMM", { locale: es }) : "Fin"}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0">
-            <Calendar mode="single" selected={dueDate} onSelect={setDueDate} locale={es} />
+            <Calendar
+              mode="range"
+              selected={{ from: startDate, to: dueDate }}
+              onSelect={(range) => {
+                setStartDate(range?.from);
+                setDueDate(range?.to);
+                if (range?.from && range?.to) setDateRangeOpen(false);
+              }}
+              locale={es}
+            />
+            {(startDate || dueDate) && <div className="border-t p-2">
+              <Button variant="ghost" size="sm" className="h-7 w-full text-xs text-muted-foreground"
+                onClick={() => { setStartDate(undefined); setDueDate(undefined); }}>
+                Quitar rango
+              </Button>
+            </div>}
           </PopoverContent>
         </Popover>
       </div>
@@ -365,7 +440,7 @@ interface TaskRowProps {
   projectMembers?: { personnelId: number; name: string; role: string }[];
   onOpen: (id: number, focusTime?: boolean) => void;
   onToggle: (task: Task) => void;
-  onDateSet: (taskId: number, d: Date | undefined) => void;
+  onDateSet: (taskId: number, range: DateRange | undefined) => void;
   onAssignee: (taskId: number, assigneeId: number | null) => void;
   onRename?: (taskId: number, newTitle: string) => void;
   onStatusChange?: (taskId: number, status: string) => void;
@@ -606,11 +681,8 @@ function TaskRow({ task, allPersonnel, projectMembers = [], onOpen, onToggle, on
               <Clock className="h-3 w-3" />
             </span>
           )}
-          <button
-            className="ml-auto opacity-50 hover:opacity-100 hover:bg-primary/10 rounded p-0.5 transition-all"
-            onClick={e => { e.stopPropagation(); onOpen(task.id, true); }}
-            title="Registrar horas"
-          >
+          <QuickHoursButton taskId={task.id} />
+          <button className="opacity-50 hover:opacity-100 hover:bg-primary/10 rounded p-0.5 transition-all" onClick={e => { e.stopPropagation(); onOpen(task.id, true); }} title="Abrir detalle de horas">
             <Clock className="h-3 w-3 text-primary" />
           </button>
         </div>
@@ -668,7 +740,7 @@ interface SectionBlockProps {
   projectMembers?: { personnelId: number; name: string; role: string }[];
   onOpenTask: (id: number, focusTime?: boolean) => void;
   onToggleTask: (task: Task) => void;
-  onDateSet: (taskId: number, d: Date | undefined) => void;
+  onDateSet: (taskId: number, range: DateRange | undefined) => void;
   onAssignee: (taskId: number, assigneeId: number | null) => void;
   onRename?: (taskId: number, newTitle: string) => void;
   onStatusChange?: (taskId: number, status: string) => void;
@@ -979,7 +1051,7 @@ function SortableTaskRow({ taskId, task, allPersonnel, projectMembers, onOpenTas
   projectMembers?: { personnelId: number; name: string; role: string }[];
   onOpenTask: (id: number, ft?: boolean) => void;
   onToggleTask: (task: Task) => void;
-  onDateSet: (taskId: number, d: Date | undefined) => void;
+  onDateSet: (taskId: number, range: DateRange | undefined) => void;
   onAssignee: (taskId: number, assigneeId: number | null) => void;
   onRename?: (taskId: number, newTitle: string) => void;
   onStatusChange?: (taskId: number, status: string) => void;
@@ -1123,7 +1195,7 @@ function BoardCard({ task, allPersonnel, onOpen }: { task: Task; allPersonnel: P
               overdue ? "text-red-500 font-semibold" : "text-muted-foreground"
             )}>
               <CalendarIcon className="h-2.5 w-2.5" />
-              {format(new Date(task.dueDate), "d MMM", { locale: es })}
+              {format(parseCivilTaskDate(task.dueDate)!, "d MMM", { locale: es })}
             </span>
           )}
         </div>
@@ -1297,13 +1369,16 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
   });
 
   const dateMutation = useMutation({
-    mutationFn: ({ taskId, date }: { taskId: number; date: Date | undefined }) =>
-      apiRequest(`/api/tasks/${taskId}`, "PUT", { dueDate: date ? date.toISOString() : null }),
+    mutationFn: ({ taskId, range }: { taskId: number; range: DateRange | undefined }) =>
+      apiRequest(`/api/tasks/${taskId}`, "PUT", {
+        startDate: range?.from ? format(range.from, "yyyy-MM-dd") : null,
+        dueDate: range?.to ? format(range.to, "yyyy-MM-dd") : null,
+      }),
     onSuccess: () => { refetch(); invalidateRelated(); },
   });
 
-  const handleDateSet = (taskId: number, d: Date | undefined) => {
-    dateMutation.mutate({ taskId, date: d });
+  const handleDateSet = (taskId: number, range: DateRange | undefined) => {
+    dateMutation.mutate({ taskId, range });
   };
 
   const inlineUpdateMutation = useMutation({

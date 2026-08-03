@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { getApiErrorMessage } from "@/lib/api-error";
 import { useCurrency } from "@/hooks/use-currency";
 import { Loader2, Check, X, ExternalLink, ChevronDown, Copy, Download } from "lucide-react";
 import { Link } from "wouter";
@@ -82,6 +83,13 @@ export default function MonthlyClosing() {
         headers: { "Content-Type": "application/json" },
       }).then((r) => r.json()),
   });
+  const { data: absencesData = [] } = useQuery<any[]>({
+    queryKey: ["/api/personnel-absences", "monthly-closing"],
+    queryFn: () => fetch("/api/personnel-absences", {
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+    }).then((r) => r.json()),
+  });
 
   // Number of holidays falling on weekdays in the selected month
   const monthHolidayCount = (holidaysData || []).filter((h: any) => {
@@ -90,6 +98,28 @@ export default function MonthlyClosing() {
     const dow = d.getDay();
     return d.getFullYear() === year && d.getMonth() === month && dow !== 0 && dow !== 6;
   }).length;
+
+  // Día Epical is a paid absence: it reduces contractual capacity but never
+  // removes real time already logged. Count civil weekdays only and de-dupe
+  // overlapping absence ranges before converting days to contractual hours.
+  const epicalDayHoursFor = (person: any): number => {
+    if ((person.contractType || "full-time").toLowerCase() === "freelance") return 0;
+    const monthStart = new Date(year, month, 1);
+    const monthEnd = new Date(year, month + 1, 0);
+    const days = new Set<string>();
+    for (const absence of absencesData || []) {
+      if (absence.type !== "epical_day" || absence.personnelId !== person.id) continue;
+      const start = new Date(`${String(absence.startDate).slice(0, 10)}T00:00:00`);
+      const end = new Date(`${String(absence.endDate).slice(0, 10)}T00:00:00`);
+      const from = new Date(Math.max(start.getTime(), monthStart.getTime()));
+      const to = new Date(Math.min(end.getTime(), monthEnd.getTime()));
+      for (const day = new Date(from); day <= to; day.setDate(day.getDate() + 1)) {
+        if (day.getDay() !== 0 && day.getDay() !== 6) days.add(format(day, "yyyy-MM-dd"));
+      }
+    }
+    const dailyHours = defaultBaseHours(person) / 20;
+    return Math.round(days.size * dailyHours * 100) / 100;
+  };
 
   // Rehydrate saved adjustments when closings load (so manual edits survive reload)
   useEffect(() => {
@@ -117,8 +147,12 @@ export default function MonthlyClosing() {
       queryClient.invalidateQueries({ queryKey: ["/api/monthly-closings"] });
       toast({ title: "Cierre guardado" });
     },
-    onError: () => {
-      toast({ title: "Error", description: "No se pudo guardar el cierre", variant: "destructive" });
+    onError: (error) => {
+      toast({
+        title: "No se pudo guardar el cierre",
+        description: getApiErrorMessage(error, "Revisá la tarifa histórica del período."),
+        variant: "destructive",
+      });
     },
     onSettled: () => {
       setClosingPersonnelId(null);
@@ -159,7 +193,9 @@ export default function MonthlyClosing() {
 
   const hasAdjustment = (personnelId: number): boolean => {
     const adj = hoursAdjustments[personnelId];
-    return !!adj && (adj.vacaciones > 0 || adj.feriados > 0 || adj.epicalGeneral > 0 || adj.discrecional !== 0);
+    const person = personnel?.find((candidate: any) => candidate.id === personnelId);
+    return (!!adj && (adj.vacaciones > 0 || adj.feriados > 0 || adj.epicalGeneral > 0 || adj.discrecional !== 0))
+      || (!!person && epicalDayHoursFor(person) > 0);
   };
 
   // Effective base hours for a person: default adjusted by category deductions.
@@ -167,8 +203,9 @@ export default function MonthlyClosing() {
   const effectiveBaseHours = (person: any): number => {
     const base = defaultBaseHours(person);
     const adj = hoursAdjustments[person.id];
-    if (!adj) return base;
-    return Math.max(0, base - (adj.vacaciones || 0) - (adj.feriados || 0) - (adj.epicalGeneral || 0) + (adj.discrecional || 0));
+    const autoEpicalHours = epicalDayHoursFor(person);
+    if (!adj) return Math.max(0, base - autoEpicalHours);
+    return Math.max(0, base - (adj.vacaciones || 0) - (adj.feriados || 0) - (adj.epicalGeneral || 0) - autoEpicalHours + (adj.discrecional || 0));
   };
 
   // Horas a facturar: para full-time/part-time es la base ajustada (fija,
@@ -201,6 +238,11 @@ export default function MonthlyClosing() {
       return;
     }
     const billing = getBillingCurrency(person);
+    const manualAdjustments = hoursAdjustments[person.id];
+    const autoEpicalHours = epicalDayHoursFor(person);
+    const adjustments = manualAdjustments || autoEpicalHours > 0
+      ? { ...(manualAdjustments || { vacaciones: 0, feriados: 0, epicalGeneral: 0, discrecional: 0 }), epicalGeneral: (manualAdjustments?.epicalGeneral || 0) + autoEpicalHours }
+      : null;
     let totalCost: number;
     if (billing === 'USD' || billing === 'mixed') {
       // rate is already in USD; totalCost stored in ARS equivalent for consistency
@@ -219,7 +261,7 @@ export default function MonthlyClosing() {
       hourlyRate: rate,
       totalCost,
       exchangeRateAtClose: exchangeRate || null,
-      adjustments: hoursAdjustments[person.id] ?? null,
+      adjustments,
     });
   };
 
@@ -587,10 +629,15 @@ export default function MonthlyClosing() {
                                   </button>
                                 </div>
                               )}
+                              {epicalDayHoursFor(p) > 0 && (
+                                <div className="rounded bg-emerald-50 px-1.5 py-1 text-[10px] text-emerald-700">
+                                  Día Epical registrado: −{epicalDayHoursFor(p)}h
+                                </div>
+                              )}
                               {([
                                 { key: "vacaciones" as const, label: "Vacaciones −" },
                                 { key: "feriados" as const, label: "Feriados −" },
-                                { key: "epicalGeneral" as const, label: "Epical General −" },
+                                { key: "epicalGeneral" as const, label: "Día Epical manual −" },
                                 { key: "discrecional" as const, label: "Ajuste discrecional ±" },
                               ] as const).map(({ key, label }) => (
                                 <div key={key} className="flex items-center justify-between gap-2">
@@ -637,7 +684,7 @@ export default function MonthlyClosing() {
                         {(() => {
                           const { text, isEstimated } = getRateDisplay(p);
                           return (
-                            <span className={isEstimated ? "text-blue-600" : ""} title={isEstimated ? "Tarifa proyectada del mes" : "Tarifa base de personal"}>
+                            <span className={isEstimated ? "text-blue-600" : ""} title={isEstimated ? "Tarifa histórica estimada por falta de dato del período" : "Tarifa histórica de personal"}>
                               {text}{isEstimated && " *"}
                             </span>
                           );

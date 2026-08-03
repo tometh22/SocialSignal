@@ -13,6 +13,7 @@ const ABSENCE_TYPES: Record<string, string> = {
   vacation: "Vacaciones",
   sick: "Enfermedad",
   other: "Otro",
+  epical_day: "Día Epical",
 };
 
 export default function PersonnelAbsencesPage() {
@@ -100,6 +101,7 @@ export default function PersonnelAbsencesPage() {
                   <SelectItem value="vacation">Vacaciones</SelectItem>
                   <SelectItem value="sick">Enfermedad</SelectItem>
                   <SelectItem value="other">Otro</SelectItem>
+                  <SelectItem value="epical_day">Día Epical (reduce capacidad)</SelectItem>
                 </SelectContent>
               </Select>
             </div>

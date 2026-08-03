@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Search, FileText, CheckCircle, AlertCircle, Clock, Edit, Eye, Trash2, PenLine, Plus, X, MessageCircle, Filter, Loader2, Calendar, DollarSign, TrendingUp, Zap, Users, Handshake, Briefcase, Target, ThumbsDown, TrendingDown, AlertOctagon } from "lucide-react";
+import { Search, FileText, CheckCircle, AlertCircle, Clock, Edit, Eye, Trash2, PenLine, Plus, X, MessageCircle, Filter, Loader2, Calendar, DollarSign, TrendingUp, Zap, Users, Handshake, Briefcase, Target, ThumbsDown, TrendingDown, AlertOctagon, ChevronDown, FolderOpen, List } from "lucide-react";
 import { LossReasonDialog } from "@/components/quotation/loss-reason-dialog";
 import { PageLayout } from "@/components/ui/page-layout";
 import { Loader } from "@/components/ui/loader";
@@ -140,6 +140,8 @@ export default function ManageQuotes() {
   const [deletingQuoteId, setDeletingQuoteId] = useState<number | null>(null);
   const [lossReasonQuote, setLossReasonQuote] = useState<Quotation | null>(null);
   const [markingLost, setMarkingLost] = useState(false);
+  const [collapsedQuoteClients, setCollapsedQuoteClients] = useState<Set<string>>(new Set());
+  const [quoteView, setQuoteView] = useState<"folders" | "list">("folders");
   const { toast } = useToast();
 
   // Función auxiliar para obtener el nombre del cliente por ID
@@ -672,9 +674,16 @@ export default function ManageQuotes() {
           {/* Main Content Card */}
           <Card className="mind-panel mb-8 overflow-hidden">
             <CardHeader className="border-b border-slate-200 bg-slate-50/70 py-4">
-              <CardTitle className="text-lg font-semibold text-slate-800 flex items-center">
-                <Users className="h-5 w-5 mr-2 text-slate-600" />
-                Lista de Cotizaciones
+              <CardTitle className="text-lg font-semibold text-slate-800 flex items-center justify-between gap-3">
+                <span className="flex items-center"><Users className="h-5 w-5 mr-2 text-slate-600" />Lista de Cotizaciones</span>
+                <span className="flex items-center rounded-md border bg-white p-0.5">
+                  <Button type="button" variant={quoteView === "folders" ? "secondary" : "ghost"} size="sm" className="h-7 px-2 text-xs" onClick={() => setQuoteView("folders")}>
+                    <FolderOpen className="mr-1 h-3.5 w-3.5" />Carpetas
+                  </Button>
+                  <Button type="button" variant={quoteView === "list" ? "secondary" : "ghost"} size="sm" className="h-7 px-2 text-xs" onClick={() => setQuoteView("list")}>
+                    <List className="mr-1 h-3.5 w-3.5" />Lista
+                  </Button>
+                </span>
               </CardTitle>
             </CardHeader>
             <CardContent className="p-0">
@@ -685,9 +694,14 @@ export default function ManageQuotes() {
               ) : filteredQuotations.length > 0 ? (
 
                 <div className="space-y-7 p-3 sm:p-6">
-                  {quotationGroups.map(([clientName, clientQuotes]) => (
+                  {(quoteView === "folders" ? quotationGroups : [["__all__", filteredQuotations] as [string, Quotation[]]]).map(([clientName, clientQuotes]) => (
                     <section key={clientName}>
-                      <div className="mb-3 flex items-center gap-3 border-b border-slate-200 pb-2">
+                      {quoteView === "folders" && <button className="mb-3 flex w-full items-center gap-3 border-b border-slate-200 pb-2 text-left" onClick={() => setCollapsedQuoteClients((previous) => {
+                        const next = new Set(previous);
+                        next.has(clientName) ? next.delete(clientName) : next.add(clientName);
+                        return next;
+                      })}>
+                        <ChevronDown className={cn("h-4 w-4 transition-transform", collapsedQuoteClients.has(clientName) && "-rotate-90")} />
                         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-800 text-xs font-bold text-white">
                           {clientName.charAt(0).toUpperCase()}
                         </div>
@@ -695,8 +709,8 @@ export default function ManageQuotes() {
                           <h3 className="text-sm font-semibold text-slate-900">{clientName}</h3>
                           <p className="text-xs text-slate-500">{clientQuotes.length} cotizaciones</p>
                         </div>
-                      </div>
-                      <div className="grid grid-cols-1 gap-4">
+                      </button>}
+                      {(quoteView === "list" || !collapsedQuoteClients.has(clientName)) && <div className="grid grid-cols-1 gap-4">
                   {clientQuotes.map((quote, index) => {
                     const client = getClient(quote.clientId);
                     const createdDate = new Date(quote.createdAt).toLocaleDateString('es-ES', {
@@ -973,7 +987,7 @@ export default function ManageQuotes() {
                       </Card>
                     );
                   })}
-                      </div>
+                      </div>}
                     </section>
                   ))}
                 </div>

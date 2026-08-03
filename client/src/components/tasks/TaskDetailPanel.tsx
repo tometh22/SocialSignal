@@ -15,6 +15,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
+import type { DateRange } from "react-day-picker";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle
@@ -77,6 +78,13 @@ function getInitials(name: string) {
 }
 function getAvatarColor(id: number) {
   return AVATAR_COLORS[id % AVATAR_COLORS.length];
+}
+
+function parseCivilTaskDate(value?: string | null) {
+  if (!value) return undefined;
+  const [year, month, day] = value.slice(0, 10).split("-").map(Number);
+  if (![year, month, day].every(Number.isFinite)) return undefined;
+  return new Date(year, month - 1, day);
 }
 
 function ProjectColorDot({ projectId }: { projectId?: number | null }) {
@@ -302,8 +310,7 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
   const [showAddEstimate, setShowAddEstimate] = useState(false);
   const [newEstWeek, setNewEstWeek] = useState(() => getMondayOf(new Date()));
   const [newEstHours, setNewEstHours] = useState("");
-  const [startDateOpen, setStartDateOpen] = useState(false);
-  const [dueDateOpen, setDueDateOpen] = useState(false);
+  const [dateRangeOpen, setDateRangeOpen] = useState(false);
   const descTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { isRunning, activeTaskId, elapsedSeconds, startTimer, stopTimer } = useActiveTimer();
 
@@ -313,8 +320,7 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
       setShowTimeLog(false);
       setEditingTitle(false);
       setShowAddSubtask(false);
-      setStartDateOpen(false);
-      setDueDateOpen(false);
+      setDateRangeOpen(false);
       setSubtaskTimePanelId(null);
       setSubLogHours("");
       setSubLogDesc("");
@@ -451,21 +457,28 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
 
   const logTimeMutation = useMutation({
     mutationFn: (data: any) => apiRequest(`/api/tasks/${taskId}/time`, "POST", data),
-    onSuccess: () => {
+    onSuccess: (created: any) => {
       refetchTask();
       onUpdate?.();
       queryClient.invalidateQueries({ queryKey: ["/api/tasks/hours-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks/my-hours"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/monthly-closings/real-hours"] });
       if (task?.projectId) {
         queryClient.invalidateQueries({ queryKey: ["/api/tasks/project", task.projectId] });
       }
       setLogHours(""); setLogDesc(""); setShowTimeLog(false);
-      toast({ title: "Horas registradas" });
+      toast({
+        title: "Horas registradas",
+        description: created?.costingWarning
+          ? `${created.costingWarning} Podés completar la tarifa histórica desde Configuración > Personal.`
+          : undefined,
+      });
     },
-    onError: (error: any) => {
+    onError: (error) => {
       toast({
         variant: "destructive",
         title: "No se pudieron registrar las horas",
-        description: error?.message || "Revisá que tu usuario esté vinculado a Personal.",
+        description: getApiErrorMessage(error, "Revisá que tu usuario esté vinculado a Personal."),
       });
     },
   });
@@ -480,9 +493,18 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
         queryClient.invalidateQueries({ queryKey: ["/api/tasks/project", task.projectId] });
       }
       queryClient.invalidateQueries({ queryKey: ["/api/tasks/hours-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks/my-hours"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/monthly-closings/real-hours"] });
       setSubtaskTimePanelId(null);
       setSubLogHours(""); setSubLogDesc("");
       toast({ title: "Horas registradas en subtarea" });
+    },
+    onError: (error) => {
+      toast({
+        variant: "destructive",
+        title: "No se pudieron registrar las horas",
+        description: getApiErrorMessage(error, "Revisá que tu usuario esté vinculado a Personal."),
+      });
     },
   });
 
@@ -706,76 +728,55 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
                       <p className="text-[11px] text-muted-foreground flex items-center gap-1"><CalendarIcon className="h-3 w-3" />Fechas</p>
                     </div>
                     <div className="flex items-center gap-2 flex-1">
-                      {/* Fecha inicio */}
-                      <Popover open={startDateOpen} onOpenChange={setStartDateOpen}>
-                        <PopoverTrigger asChild>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-7 text-xs justify-start font-normal border-dashed min-w-[70px]"
-                            onClick={() => setStartDateOpen(true)}
-                          >
-                            {task.startDate ? format(new Date(task.startDate), "d MMM", { locale: es }) : "Inicio"}
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" side="bottom" align="start">
-                          <Calendar
-                            mode="single"
-                            selected={task.startDate ? new Date(task.startDate) : undefined}
-                            onSelect={d => {
-                              updateMutation.mutate({ startDate: d ? d.toISOString() : null });
-                              setStartDateOpen(false);
-                            }}
-                            locale={es}
-                            initialFocus
-                          />
-                          {task.startDate && (
-                            <div className="p-2 border-t">
-                              <Button variant="ghost" size="sm" className="w-full h-7 text-xs text-muted-foreground"
-                                onClick={() => { updateMutation.mutate({ startDate: null }); setStartDateOpen(false); }}>
-                                Quitar fecha inicio
-                              </Button>
-                            </div>
-                          )}
-                        </PopoverContent>
-                      </Popover>
-
-                      <span className="text-muted-foreground text-sm">→</span>
-
-                      {/* Fecha fin */}
-                      <Popover open={dueDateOpen} onOpenChange={setDueDateOpen}>
+                      <Popover open={dateRangeOpen} onOpenChange={setDateRangeOpen}>
                         <PopoverTrigger asChild>
                           <Button
                             variant="outline"
                             size="sm"
                             className={cn(
-                              "h-7 text-xs justify-start font-normal border-dashed min-w-[70px]",
-                              task.dueDate && new Date(task.dueDate) < new Date() && task.status !== "done"
+                              "h-7 text-xs justify-start font-normal border-dashed",
+                              "min-w-[150px]",
+                              task.dueDate && parseCivilTaskDate(task.dueDate)! < new Date() && task.status !== "done"
                                 ? "border-red-300 text-red-600"
                                 : ""
                             )}
-                            onClick={() => setDueDateOpen(true)}
+                            onClick={() => setDateRangeOpen(true)}
                           >
-                            {task.dueDate ? format(new Date(task.dueDate), "d MMM", { locale: es }) : "Fin"}
+                            {task.startDate || task.dueDate
+                              ? `${task.startDate ? format(parseCivilTaskDate(task.startDate)!, "d MMM", { locale: es }) : "Inicio"} → ${task.dueDate ? format(parseCivilTaskDate(task.dueDate)!, "d MMM", { locale: es }) : "Fin"}`
+                              : "Definir rango"}
                           </Button>
                         </PopoverTrigger>
                         <PopoverContent className="w-auto p-0" side="bottom" align="start">
                           <Calendar
-                            mode="single"
-                            selected={task.dueDate ? new Date(task.dueDate) : undefined}
-                            onSelect={d => {
-                              updateMutation.mutate({ dueDate: d ? d.toISOString() : null });
-                              setDueDateOpen(false);
+                            mode="range"
+                            selected={{
+                              from: parseCivilTaskDate(task.startDate),
+                              to: parseCivilTaskDate(task.dueDate),
+                            }}
+                            onSelect={(range: DateRange | undefined) => {
+                              if (!range?.from || !range?.to) return;
+                              updateMutation.mutate({
+                                startDate: format(range.from, "yyyy-MM-dd"),
+                                dueDate: format(range.to, "yyyy-MM-dd"),
+                              });
+                              setDateRangeOpen(false);
                             }}
                             locale={es}
                             initialFocus
                           />
-                          {task.dueDate && (
+                          {(task.startDate || task.dueDate) && (
                             <div className="p-2 border-t">
-                              <Button variant="ghost" size="sm" className="w-full h-7 text-xs text-muted-foreground"
-                                onClick={() => { updateMutation.mutate({ dueDate: null }); setDueDateOpen(false); }}>
-                                Quitar fecha fin
-                              </Button>
+                              <div className="flex gap-1">
+                                {task.startDate && <Button variant="ghost" size="sm" className="h-7 flex-1 px-2 text-[11px] text-muted-foreground"
+                                  onClick={() => updateMutation.mutate({ startDate: null })}>
+                                  Quitar inicio
+                                </Button>}
+                                {task.dueDate && <Button variant="ghost" size="sm" className="h-7 flex-1 px-2 text-[11px] text-muted-foreground"
+                                  onClick={() => updateMutation.mutate({ dueDate: null })}>
+                                  Quitar fin
+                                </Button>}
+                              </div>
                             </div>
                           )}
                         </PopoverContent>
@@ -784,7 +785,7 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
                   </div>
 
                   {/* Aviso: inicio posterior a entrega */}
-                  {task.startDate && task.dueDate && new Date(task.startDate) > new Date(task.dueDate) && (
+                  {task.startDate && task.dueDate && parseCivilTaskDate(task.startDate)! > parseCivilTaskDate(task.dueDate)! && (
                     <div className="flex items-center gap-3">
                       <div className="w-28 flex-shrink-0" />
                       <p className="text-[11px] text-red-600 flex items-center gap-1">

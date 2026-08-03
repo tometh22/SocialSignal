@@ -54,16 +54,11 @@ const SALARY_MONTH_OPTIONS: { value: string; label: string }[] = [
 ];
 const SALARY_MONTH_AUTO = '__auto__';
 
-const RATE_PROJECTION_OPTIONS: { value: 'current' | 'projected' | 'annual_avg'; label: string; description: string }[] = [
+const RATE_PROJECTION_OPTIONS: { value: 'current' | 'annual_avg'; label: string; description: string }[] = [
   {
     value: 'current',
     label: 'Foto del mes seleccionado',
     description: 'Usa el valor hora real del mes elegido (Admin → Personal).',
-  },
-  {
-    value: 'projected',
-    label: 'Tarifa estimada proyectada',
-    description: 'Usa el historial sincronizado de Personal para el mes del proyecto.',
   },
   {
     value: 'annual_avg',
@@ -114,11 +109,23 @@ const EnhancedTeamConfig: React.FC = () => {
   const getCorrectRate = (person: Personnel, role?: Role): number => {
     const rate = getPersonnelRate(person.id, currency);
     if (rate && rate > 0) return rate;
-    if (currency === 'USD') {
-      return (role as any)?.defaultRateUsd || 50;
-    }
-    if (role && role.defaultRate && role.defaultRate > 0) return role.defaultRate;
-    return 5000;
+    // A selected person without a historical rate must remain unresolved so
+    // the UI can surface the missing data; a role/default fallback would make
+    // the quotation look valid while costing it with an invented value.
+    return 0;
+  };
+
+  const isReferenceConversion = (person: Personnel) => {
+    if (currency !== "ARS") return false;
+    const rates = ((person as any).historicalRates ?? []) as any[];
+    return rates.some((rate) => Number(rate.hourlyRateUSD) > 0) &&
+      !rates.some((rate) => Number(rate.hourlyRateARS) > 0);
+  };
+
+  const isReferenceConversionMissingFx = (person: Personnel) => {
+    if (!isReferenceConversion(person)) return false;
+    const rates = ((person as any).historicalRates ?? []) as any[];
+    return !rates.some((rate) => Number(rate.hourlyRateUSD) > 0 && Number(rate.exchangeRate) > 0);
   };
 
   // Sincronizar con el contexto
@@ -346,19 +353,19 @@ const EnhancedTeamConfig: React.FC = () => {
 
       {/* Mes de salarios a considerar */}
       <Card className="border-amber-200 bg-amber-50/40">
-        <CardContent className="py-3 px-4 flex flex-col md:flex-row md:items-center md:justify-between gap-2">
-          <div>
+        <CardContent className="py-3 px-4 flex flex-col md:flex-row md:items-center md:justify-center gap-4">
+          <div className="text-center md:max-w-xl">
             <Label className="text-sm font-medium text-amber-900">Mes de salarios a considerar</Label>
             <p className="text-xs text-amber-700">
               Se usará como tarifa por defecto al agregar personas. Podés ajustar manualmente cada fila después.
             </p>
           </div>
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-col items-center gap-1">
             <Select
               value={quotationData.salaryMonth ?? SALARY_MONTH_AUTO}
               onValueChange={(value) => updateSalaryMonth(value === SALARY_MONTH_AUTO ? null : value)}
             >
-              <SelectTrigger className="w-full md:w-56 bg-white">
+              <SelectTrigger className="w-full md:w-56 bg-white text-center">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -383,13 +390,13 @@ const EnhancedTeamConfig: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* Proyección de tarifas */}
+      {/* Fuente del valor hora */}
       <Card className="border-blue-200 bg-blue-50/40">
-        <CardContent className="py-3 px-4 flex flex-col md:flex-row md:items-center md:justify-between gap-2">
-          <div>
-            <Label className="text-sm font-medium text-blue-900">Proyección de tarifas</Label>
+        <CardContent className="py-3 px-4 flex flex-col md:flex-row md:items-center md:justify-center gap-4">
+          <div className="text-center md:max-w-xl">
+            <Label className="text-sm font-medium text-blue-900">Fuente del valor hora</Label>
             <p className="text-xs text-blue-700">
-              Cómo se calculan las tarifas del equipo para esta cotización.
+              Elegí la foto mensual o el promedio anual para esta cotización.
             </p>
           </div>
           <div className="w-full md:w-64 flex flex-col gap-1">
@@ -582,7 +589,11 @@ const EnhancedTeamConfig: React.FC = () => {
                           )}
                         </div>
                         <div className={`${isSelected ? 'text-green-200' : 'text-gray-500'}`}>
-                          ${getPersonnelRate(person.id, currency).toLocaleString('es-AR')} {currencyLabel}/h
+                          {getPersonnelRate(person.id, currency) > 0
+                            ? `$${getPersonnelRate(person.id, currency).toLocaleString('es-AR')} ${currencyLabel}/h`
+                            : "Sin tarifa histórica"}
+                          {isReferenceConversion(person) && !isReferenceConversionMissingFx(person) && <span className="ml-1 text-[10px]">(ref. USD→ARS)</span>}
+                          {isReferenceConversionMissingFx(person) && <span className="ml-1 text-[10px] text-amber-600">(falta tipo de cambio)</span>}
                         </div>
                       </div>
                       {isSelected && (
@@ -689,9 +700,13 @@ const EnhancedTeamConfig: React.FC = () => {
                                 {(() => {
                                   const p = availablePersonnel.find(p => p.id === member.personnelId);
                                   const bc = (p as any)?.billingCurrency;
-                                  if (bc === 'USD') return <span className="text-[10px] px-1 rounded bg-green-100 text-green-700 font-semibold">USD</span>;
-                                  if (bc === 'mixed') return <span className="text-[10px] px-1 rounded bg-yellow-100 text-yellow-700 font-semibold">MIX</span>;
-                                  return null;
+                                  if (!p) return null;
+                                  return <>
+                                    {bc === 'USD' && <span className="text-[10px] px-1 rounded bg-green-100 text-green-700 font-semibold">USD</span>}
+                                    {bc === 'mixed' && <span className="text-[10px] px-1 rounded bg-yellow-100 text-yellow-700 font-semibold">MIX</span>}
+                                    {isReferenceConversion(p) && !isReferenceConversionMissingFx(p) && <span className="text-[10px] px-1 rounded bg-blue-100 text-blue-700 font-semibold">ref. USD→ARS</span>}
+                                    {isReferenceConversionMissingFx(p) && <span className="text-[10px] px-1 rounded bg-amber-100 text-amber-700 font-semibold">sin FX</span>}
+                                  </>;
                                 })()}
                               </div>
                             </div>

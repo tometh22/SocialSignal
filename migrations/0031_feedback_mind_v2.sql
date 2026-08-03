@@ -61,6 +61,31 @@ ALTER TABLE holidays
   ALTER COLUMN date TYPE date
   USING date::date;
 
+ALTER TABLE personnel
+  ADD COLUMN IF NOT EXISTS current_role TEXT,
+  ADD COLUMN IF NOT EXISTS sublevel TEXT,
+  ADD COLUMN IF NOT EXISTS legacy_role TEXT;
+
+ALTER TABLE personnel
+  ALTER COLUMN monthly_hours DROP NOT NULL;
+
+UPDATE personnel
+SET monthly_hours = NULL
+WHERE contract_type = 'freelance'
+  AND (monthly_hours IS NULL OR monthly_hours = 160);
+
+UPDATE personnel
+SET current_role = NULL,
+    sublevel = NULL
+WHERE contract_type = 'freelance';
+
+ALTER TABLE personnel_absences
+  DROP CONSTRAINT IF EXISTS personnel_absences_type_check;
+
+ALTER TABLE personnel_absences
+  ADD CONSTRAINT personnel_absences_type_check
+  CHECK (type IN ('vacation', 'sick', 'other', 'epical_day'));
+
 INSERT INTO clients(name)
 SELECT 'Epical'
 WHERE NOT EXISTS (

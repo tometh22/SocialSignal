@@ -254,11 +254,16 @@ export const personnel = pgTable("personnel", {
   name: text("name").notNull(),
   email: text("email"), // Email opcional
   roleId: integer("role_id").notNull().references(() => roles.id),
+  // Rol vigente y subnivel provenientes de la mirada Nueva Epica.
+  // roleId se conserva como compatibilidad para cotizaciones y templates legacy.
+  currentRole: text("current_role"),
+  sublevel: text("sublevel"),
+  legacyRole: text("legacy_role"),
   hourlyRate: doublePrecision("hourly_rate").notNull(), // USD per hour
   hourlyRateARS: doublePrecision("hourly_rate_ars"), // ARS per hour for local projects
   contractType: text("contract_type").notNull().default("full-time"), // 'full-time', 'part-time', 'freelance'
   monthlyFixedSalary: doublePrecision("monthly_fixed_salary"), // For full-time employees
-  monthlyHours: doublePrecision("monthly_hours").default(160).notNull(), // Standard monthly hours for full-time employees (160 = 8h/day * 20 working days)
+  monthlyHours: doublePrecision("monthly_hours").default(160), // Null para freelancers sin capacidad contractual
   includeInRealCosts: boolean("include_in_real_costs").notNull().default(true), // Whether to include in real cost calculations
   billingCurrency: text("billing_currency").notNull().default("ARS"), // 'ARS' | 'USD' | 'mixed'
   usdBillingFraction: doublePrecision("usd_billing_fraction").default(0), // 0-1, fraction billed in USD (e.g. 0.9 = 90% USD). Only relevant when billingCurrency='mixed'
@@ -452,6 +457,9 @@ export const insertPersonnelSchema = createInsertSchema(personnel).pick({
   name: true,
   email: true,
   roleId: true,
+  currentRole: true,
+  sublevel: true,
+  legacyRole: true,
   hourlyRate: true,
   hourlyRateARS: true,
   contractType: true,
@@ -584,6 +592,7 @@ export const insertPersonnelSchema = createInsertSchema(personnel).pick({
     .min(40, "Las horas mensuales deben ser al menos 40")
     .max(300, "Las horas mensuales no pueden exceder 300")
     .int("Las horas mensuales deben ser un número entero")
+    .nullable()
     .optional(),
   contractType: z.enum(["full-time", "part-time", "freelance"]).default("full-time")
 });
@@ -952,7 +961,7 @@ export const personnelAbsences = pgTable("personnel_absences", {
   personnelId: integer("personnel_id").notNull().references(() => personnel.id, { onDelete: 'cascade' }),
   startDate: text("start_date").notNull(), // YYYY-MM-DD
   endDate: text("end_date").notNull(),     // YYYY-MM-DD
-  type: text("type").notNull().default('vacation'), // 'vacation' | 'sick' | 'other'
+  type: text("type").notNull().default('vacation'), // 'vacation' | 'sick' | 'other' | 'epical_day'
   notes: text("notes"),
   createdBy: integer("created_by").references(() => users.id, { onDelete: 'set null' }),
   createdAt: timestamp("created_at").notNull().defaultNow(),

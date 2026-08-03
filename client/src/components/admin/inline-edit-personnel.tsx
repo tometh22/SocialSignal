@@ -14,6 +14,9 @@ interface PersonnelRow {
   email?: string | null;
   roleId: number;
   roleName: string;
+  currentRole?: string | null;
+  sublevel?: string | null;
+  legacyRole?: string | null;
   contractType?: string;
   monthlyHours?: number;
   includeInRealCosts?: boolean;
@@ -141,6 +144,7 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
         </td>
         <td className="px-6 py-4 text-xs text-muted-foreground">Administrar abajo</td>
         <td className="px-6 py-4 text-xs text-muted-foreground">Administrar abajo</td>
+        <td className="px-6 py-4 text-xs text-muted-foreground">—</td>
         <td className="px-6 py-4">
           {form.contractType === "freelance" ? "—" : (
             <Input type="number" min={40} max={300} value={form.monthlyHours} onChange={(event) => setForm({ ...form, monthlyHours: event.target.value })} />
@@ -179,7 +183,8 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
     <tr className="border-b hover:bg-muted/50">
       <td className="px-6 py-4 font-medium">{person.name}</td>
       <td className="px-6 py-4 text-sm text-muted-foreground">{person.email || "—"}</td>
-      <td className="px-6 py-4 text-sm">{person.roleName}</td>
+      <td className="px-6 py-4 text-sm">{(person.contractType === "freelance" ? person.legacyRole : person.currentRole || person.roleName) || "—"}</td>
+      <td className="px-6 py-4 text-sm">{person.sublevel || "—"}</td>
       <td className="px-6 py-4 text-sm">{contractLabel[person.contractType ?? "full-time"]}</td>
       <td className="px-6 py-4 text-sm">
         <div>{money(person.currentHourlyRateARS)} ARS/h</div>
