@@ -49,7 +49,9 @@ export function PersonnelHistoricalCostsManager({ onClose }: PersonnelHistorical
       year: new Date().getFullYear(),
       month: new Date().getMonth() + 1,
       hourlyRateARS: 0,
+      monthlySalaryARS: undefined,
       hourlyRateUSD: 0,
+      monthlySalaryUSD: undefined,
       adjustmentReason: "",
       notes: "",
     },
@@ -128,7 +130,9 @@ export function PersonnelHistoricalCostsManager({ onClose }: PersonnelHistorical
     form.setValue("year", cost.year);
     form.setValue("month", cost.month);
     form.setValue("hourlyRateARS", cost.hourlyRateARS != null ? Number(cost.hourlyRateARS) : undefined);
+    form.setValue("monthlySalaryARS", cost.monthlySalaryARS != null ? Number(cost.monthlySalaryARS) : undefined);
     form.setValue("hourlyRateUSD", cost.hourlyRateUSD != null ? Number(cost.hourlyRateUSD) : 0);
+    form.setValue("monthlySalaryUSD", cost.monthlySalaryUSD != null ? Number(cost.monthlySalaryUSD) : undefined);
     form.setValue("adjustmentReason", cost.adjustmentReason || "");
     form.setValue("notes", cost.notes || "");
     setShowForm(true);
@@ -310,6 +314,36 @@ export function PersonnelHistoricalCostsManager({ onClose }: PersonnelHistorical
 
                   <FormField
                     control={form.control}
+                    name="monthlySalaryARS"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Sueldo Mensual (ARS) - Informativo</FormLabel>
+                        <FormControl>
+                          <Input type="number" step="0.01" {...field} value={field.value ?? ""}
+                            onChange={(e) => field.onChange(e.target.value === "" ? undefined : parseFloat(e.target.value))} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="monthlySalaryUSD"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Sueldo Mensual (USD) - Informativo</FormLabel>
+                        <FormControl>
+                          <Input type="number" step="0.01" {...field} value={field.value ?? ""}
+                            onChange={(e) => field.onChange(e.target.value === "" ? undefined : parseFloat(e.target.value))} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
                     name="adjustmentReason"
                     render={({ field }) => (
                       <FormItem>
@@ -397,68 +431,30 @@ export function PersonnelHistoricalCostsManager({ onClose }: PersonnelHistorical
               </Button>
             </Card>
           ) : (
-            <div className="grid gap-4">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm border-collapse">
+                    <thead><tr className="border-b text-left text-muted-foreground">
+                      <th className="p-2">Persona</th><th className="p-2">Período</th><th className="p-2">Sueldo ARS</th>
+                      <th className="p-2">Sueldo USD</th><th className="p-2">Valor hora ARS</th><th className="p-2">Valor hora USD</th><th className="p-2" />
+                    </tr></thead>
+                    <tbody>
               {historicalCosts.map((cost) => (
-                <Card key={cost.id} className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <div className="flex items-center gap-2">
-                        <Users className="h-4 w-4 text-blue-600" />
-                        <span className="font-medium">{getPersonnelName(cost.personnelId)}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Clock className="h-4 w-4 text-green-600" />
-                        <span className="text-sm text-muted-foreground">
-                          {monthNames[cost.month - 1]} {cost.year}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <DollarSign className="h-4 w-4 text-emerald-600" />
-                        <span className="font-mono text-sm">
-                          ${(cost.hourlyRateARS || 0).toLocaleString()} ARS/h
-                        </span>
-                      </div>
-                      {cost.hourlyRateUSD && (
-                        <span className="font-mono text-sm text-muted-foreground">
-                          (${cost.hourlyRateUSD.toLocaleString()} USD/h)
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleEdit(cost)}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleDelete(cost.id)}
-                        disabled={deleteCostMutation.isPending}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                  {(cost.adjustmentReason || cost.notes) && (
-                    <div className="mt-3 pl-6 space-y-1">
-                      {cost.adjustmentReason && (
-                        <p className="text-sm text-muted-foreground">
-                          <strong>Razón:</strong> {cost.adjustmentReason}
-                        </p>
-                      )}
-                      {cost.notes && (
-                        <p className="text-sm text-muted-foreground">
-                          <strong>Notas:</strong> {cost.notes}
-                        </p>
-                      )}
-                    </div>
-                  )}
-                </Card>
+                <tr key={cost.id} className="border-b hover:bg-muted/40">
+                  <td className="p-2 font-medium">{getPersonnelName(cost.personnelId)}</td>
+                  <td className="p-2 text-muted-foreground">{monthNames[cost.month - 1]} {cost.year}</td>
+                  <td className="p-2">{cost.monthlySalaryARS == null ? "—" : `$${Number(cost.monthlySalaryARS).toLocaleString("es-AR")}`}</td>
+                  <td className="p-2">{cost.monthlySalaryUSD == null ? "—" : `$${Number(cost.monthlySalaryUSD).toLocaleString("en-US")}`}</td>
+                  <td className="p-2">{cost.hourlyRateARS == null ? "—" : `${Number(cost.hourlyRateARS).toLocaleString("es-AR")} ARS/h`}</td>
+                  <td className="p-2">{cost.hourlyRateUSD == null ? "—" : `${Number(cost.hourlyRateUSD).toLocaleString("en-US")} USD/h`}</td>
+                  <td className="p-2"><div className="flex items-center gap-1">
+                      <Button size="sm" variant="outline" onClick={() => handleEdit(cost)}><Edit className="h-4 w-4" /></Button>
+                      <Button size="sm" variant="outline" onClick={() => handleDelete(cost.id)} disabled={deleteCostMutation.isPending}><Trash2 className="h-4 w-4" /></Button>
+                  </div></td>
+                </tr>
               ))}
-            </div>
+                    </tbody>
+                  </table>
+                </div>
           )}
         </div>
       </CardContent>

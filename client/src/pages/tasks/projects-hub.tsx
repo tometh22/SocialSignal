@@ -5,9 +5,10 @@ import { queryClient, apiRequest, authFetch } from "@/lib/queryClient";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Loader2, Search, Plus, Check, Users, LayoutGrid, List, AlertCircle, BarChart2, CheckCircle2, Clock, ListTodo, TrendingUp, ArrowRight } from "lucide-react";
+import { Loader2, Search, Plus, Check, Users, FolderOpen, LayoutGrid, List, AlertCircle, BarChart2, CheckCircle2, Clock, ListTodo, TrendingUp, ArrowRight, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
+import { usePermissions } from "@/hooks/use-permissions";
 import { toast } from "@/hooks/use-toast";
 
 type ProjectMember = { personnelId: number; name: string; role: string };
@@ -474,8 +475,8 @@ function GeneralPanel({ projects }: { projects: TaskProject[] }) {
 
 // ─── Data Fetch ──────────────────────────────────────────────────────────────
 
-async function fetchProjects(): Promise<TaskProject[]> {
-  const res = await authFetch("/api/tasks/projects");
+async function fetchProjects(url = "/api/tasks/projects"): Promise<TaskProject[]> {
+  const res = await authFetch(url);
   if (!res.ok) {
     throw new Error(`Error ${res.status} al obtener proyectos`);
   }
@@ -490,13 +491,16 @@ async function fetchProjects(): Promise<TaskProject[]> {
 
 export default function ProjectsHubPage() {
   const [search, setSearch] = useState("");
-  const [gridMode, setGridMode] = useState<"grid" | "list">("grid");
+  const [projectView, setProjectView] = useState<"folders" | "list">("folders");
   const [view, setView] = useState<"projects" | "panel">("projects");
+  const [statusFilter, setStatusFilter] = useState<"active" | "inactive" | "all">("active");
+  const [collapsedClients, setCollapsedClients] = useState<Set<string>>(new Set());
   const { user } = useAuth();
+  const { isOperations } = usePermissions();
 
   const { data: projects = [], isLoading, isError, refetch } = useQuery<TaskProject[], Error, TaskProject[]>({
-    queryKey: ["/api/tasks/projects"],
-    queryFn: fetchProjects,
+    queryKey: ["/api/tasks/projects", statusFilter, view, isOperations],
+    queryFn: () => fetchProjects(`/api/tasks/projects?status=${statusFilter}&scope=${isOperations && view === "panel" ? "all" : "mine"}`),
     retry: 2,
     staleTime: 0,
     select: (data) => Array.isArray(data) ? data : [],
@@ -573,6 +577,13 @@ export default function ProjectsHubPage() {
             {projects.length} proyectos · {projects.reduce((a, p) => a + p.pendingCount, 0)} tareas pendientes
           </p>
         </div>
+        {isOperations && (
+          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as any)} className="h-9 rounded-md border bg-background px-3 text-sm">
+            <option value="active">Activos</option>
+            <option value="inactive">Inactivos</option>
+            <option value="all">Activos e inactivos</option>
+          </select>
+        )}
 
         <div className="flex items-center gap-2 flex-wrap">
           {view === "projects" && (
@@ -589,16 +600,18 @@ export default function ProjectsHubPage() {
 
               <div className="flex items-center border rounded-lg overflow-hidden">
                 <button
-                  onClick={() => setGridMode("grid")}
-                  className={cn("px-2.5 py-1.5 transition-colors", gridMode === "grid" ? "bg-primary text-primary-foreground" : "hover:bg-accent text-muted-foreground")}
+                  onClick={() => setProjectView("folders")}
+                  aria-label="Ver proyectos por carpetas de cliente"
+                  className={cn("flex items-center gap-1 px-2.5 py-1.5 text-xs transition-colors", projectView === "folders" ? "bg-primary text-primary-foreground" : "hover:bg-accent text-muted-foreground")}
                 >
-                  <LayoutGrid className="h-3.5 w-3.5" />
+                  <FolderOpen className="h-3.5 w-3.5" />Carpetas
                 </button>
                 <button
-                  onClick={() => setGridMode("list")}
-                  className={cn("px-2.5 py-1.5 transition-colors", gridMode === "list" ? "bg-primary text-primary-foreground" : "hover:bg-accent text-muted-foreground")}
+                  onClick={() => setProjectView("list")}
+                  aria-label="Ver proyectos en lista"
+                  className={cn("flex items-center gap-1 px-2.5 py-1.5 text-xs transition-colors", projectView === "list" ? "bg-primary text-primary-foreground" : "hover:bg-accent text-muted-foreground")}
                 >
-                  <List className="h-3.5 w-3.5" />
+                  <List className="h-3.5 w-3.5" />Lista
                 </button>
               </div>
             </>
@@ -627,7 +640,7 @@ export default function ProjectsHubPage() {
           <LayoutGrid className="h-3.5 w-3.5" />
           Proyectos
         </button>
-        <button
+        {isOperations && <button
           className={cn(
             "flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 transition-colors",
             view === "panel"
@@ -638,7 +651,7 @@ export default function ProjectsHubPage() {
         >
           <BarChart2 className="h-3.5 w-3.5" />
           Panel general
-        </button>
+        </button>}
       </div>
 
       {/* Panel general */}
@@ -647,9 +660,14 @@ export default function ProjectsHubPage() {
       {/* Project list / grid */}
       {view === "projects" && (
         <>
-          {clientGroups.map(([clientName, clientProjects]) => (
+          {projectView === "folders" && clientGroups.map(([clientName, clientProjects]) => (
             <section key={clientName}>
-              <div className="mb-3 flex items-center gap-2">
+              <button className="mb-3 flex w-full items-center gap-2 text-left" onClick={() => setCollapsedClients((previous) => {
+                const next = new Set(previous);
+                next.has(clientName) ? next.delete(clientName) : next.add(clientName);
+                return next;
+              })}>
+                <ChevronDown className={cn("h-4 w-4 transition-transform", collapsedClients.has(clientName) && "-rotate-90")} />
                 <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-primary text-xs font-bold text-primary-foreground">
                   {clientName.charAt(0).toUpperCase()}
                 </span>
@@ -657,11 +675,9 @@ export default function ProjectsHubPage() {
                   <h2 className="text-sm font-semibold">{clientName}</h2>
                   <p className="text-[11px] text-muted-foreground">{clientProjects.length} proyectos</p>
                 </div>
-              </div>
-              <div className={cn(
-                gridMode === "grid"
-                  ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"
-                  : "flex flex-col gap-2"
+              </button>
+              {!collapsedClients.has(clientName) && <div className={cn(
+                "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"
               )}>
                 {clientProjects.map(project => (
                   <ProjectCard
@@ -674,9 +690,23 @@ export default function ProjectsHubPage() {
                     leaving={leaveMutation.isPending}
                   />
                 ))}
-              </div>
+              </div>}
             </section>
           ))}
+
+          {projectView === "list" && <div className="flex flex-col gap-2">
+            {filtered.map(project => (
+              <ProjectCard
+                key={project.id}
+                project={project}
+                myPersonnelId={myPersonnelId}
+                onJoin={() => myPersonnelId && joinMutation.mutate({ projectId: project.id, personnelId: myPersonnelId })}
+                onLeave={() => myPersonnelId && leaveMutation.mutate({ projectId: project.id, personnelId: myPersonnelId })}
+                joining={joinMutation.isPending}
+                leaving={leaveMutation.isPending}
+              />
+            ))}
+          </div>}
 
           {filtered.length === 0 && (
             <div className="text-center py-20">

@@ -165,8 +165,7 @@ export default function FinancialReviewFinal() {
   let totalInflationPercentage = 0;
   let monthsToProject = 0;
 
-  const rateMode = quotationData.inflation.rateProjectionMode ??
-    (quotationData.inflation.applyInflationAdjustment ? "projected" : "current");
+  const rateMode = quotationData.inflation.rateProjectionMode === "annual_avg" ? "annual_avg" : "current";
 
   if (rateMode !== "current" && quotationData.inflation.applyInflationAdjustment) {
     const annualInflationRate = quotationData.inflation.inflationMethod === 'manual'
@@ -177,15 +176,7 @@ export default function FinancialReviewFinal() {
 
     let inflationFactor = 1;
 
-    if (rateMode === "projected" && quotationData.inflation.projectStartDate) {
-      const startDate = new Date(quotationData.inflation.projectStartDate);
-      const currentDate = new Date();
-      monthsToProject = (startDate.getFullYear() - currentDate.getFullYear()) * 12 +
-                       (startDate.getMonth() - currentDate.getMonth());
-      if (monthsToProject > 0) {
-        inflationFactor = Math.pow(1 + monthlyRateDecimal, monthsToProject);
-      }
-    } else if (rateMode === "annual_avg") {
+    if (rateMode === "annual_avg") {
       // Promedio anual: factor compuesto evaluado al punto medio del año (mes 6).
       // Aproxima el valor hora "promedio" de una persona durante los 12 meses del proyecto.
       monthsToProject = 6;
@@ -1062,11 +1053,11 @@ export default function FinancialReviewFinal() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="font-medium">Modo de proyección del valor hora</Label>
+                    <Label className="font-medium">Fuente del valor hora</Label>
                     <Select
-                      value={quotationData.inflation.rateProjectionMode ?? "projected"}
+                      value={quotationData.inflation.rateProjectionMode === "annual_avg" ? "annual_avg" : "current"}
                       onValueChange={(value) =>
-                        updateInflation({ rateProjectionMode: value as "current" | "projected" | "annual_avg" })
+                        updateInflation({ rateProjectionMode: value as "current" | "annual_avg" })
                       }
                     >
                       <SelectTrigger className="border-orange-200 focus:border-orange-400">
@@ -1074,12 +1065,11 @@ export default function FinancialReviewFinal() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="current">Valor actual (foto del mes)</SelectItem>
-                        <SelectItem value="projected">Proyectado al mes del proyecto</SelectItem>
                         <SelectItem value="annual_avg">Promedio anual</SelectItem>
                       </SelectContent>
                     </Select>
                     <p className="text-[11px] text-orange-700/80">
-                      Seleccioná si el valor hora debe ser el actual, el proyectado al mes de arranque, o el promedio anual estimado del equipo.
+                      Seleccioná si el valor hora debe ser la foto del mes o el promedio anual estimado del equipo.
                     </p>
                   </div>
 

@@ -32,6 +32,9 @@ export default function HolidaysManagement() {
       setNewName("");
       toast({ title: "Feriado agregado" });
     },
+    onError: (error: Error) => {
+      toast({ title: "Ese feriado ya existe", description: error.message, variant: "destructive" });
+    },
   });
 
   const deleteMutation = useMutation({

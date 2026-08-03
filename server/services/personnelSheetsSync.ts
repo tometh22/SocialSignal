@@ -26,6 +26,9 @@ const SPANISH_MONTHS: Record<string, string> = {
 export interface ParsedSheetRow {
   sheetName: string;
   monthlyRates: Record<string, number>; // { jan2026: 11562.5, feb2026: 12137.85, ... }
+  currentRole?: string | null;
+  sublevel?: string | null;
+  legacyRole?: string | null;
 }
 
 function buildSheetsClient() {
@@ -82,6 +85,9 @@ export function parseMoney(raw: unknown): number | null {
     }
   } else if (hasComma) {
     s = s.replace(",", ".");
+  } else if (hasDot && /^\d{1,3}(?:\.\d{3})+$/.test(s)) {
+    // Argentine thousands notation without decimal separator: 10.000.
+    s = s.replace(/\./g, "");
   }
   const n = parseFloat(s);
   return isFinite(n) && n > 0 ? n : null;
@@ -109,6 +115,20 @@ export function parseValorHoraSection(rows: string[][], year: number): ParsedShe
 
   const subHeader = rows[yearRowIdx] ?? [];
   const dateRow = rows[yearRowIdx + 1] ?? [];
+
+  // The master has changed layout over time. Read role metadata by header label
+  // when it is present instead of relying on fixed column numbers.
+  const metadataColumn = (labels: string[]): number => {
+    for (let r = Math.max(0, yearRowIdx - 3); r <= yearRowIdx + 2; r++) {
+      const row = rows[r] ?? [];
+      const index = row.findIndex((cell) => labels.includes(String(cell ?? "").trim().toLowerCase()));
+      if (index >= 0) return index;
+    }
+    return -1;
+  };
+  const roleCol = metadataColumn(["rol", "role"]);
+  const sublevelCol = metadataColumn(["subnivel", "sublevel"]);
+  const legacyRoleCol = metadataColumn(["rol viejo", "rol viejo/a", "legacy role"]);
 
   // Mapear índice de columna → campo {mmm}{yyyy}
   const monthByCol = new Map<number, string>();
@@ -167,7 +187,14 @@ export function parseValorHoraSection(rows: string[][], year: number): ParsedShe
 
     if (!name || isSectionLabel) continue;
 
-    result.push({ sheetName: name, monthlyRates });
+    const cell = (column: number) => column >= 0 ? String(rows[r]?.[column] ?? "").trim() || null : null;
+    result.push({
+      sheetName: name,
+      monthlyRates,
+      currentRole: cell(roleCol),
+      sublevel: cell(sublevelCol),
+      legacyRole: cell(legacyRoleCol),
+    });
   }
 
   return result;

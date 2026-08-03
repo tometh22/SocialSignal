@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { PageHeading, SectionHeading } from "@/components/layout/page-heading";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { FolderOpen, Clock, ChevronRight, CalendarIcon, Check, ListTodo, Sparkles } from "lucide-react";
+import { FolderOpen, Clock, ChevronRight, ChevronDown, CalendarIcon, Check, ListTodo, List, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
 import { format } from "date-fns";
@@ -62,12 +62,20 @@ function formatDateFull() {
   return format(new Date(), "EEEE, d 'de' MMMM", { locale: es });
 }
 
+function parseCivilTaskDate(value?: string | null) {
+  if (!value) return undefined;
+  const [year, month, day] = value.slice(0, 10).split("-").map(Number);
+  if (![year, month, day].every(Number.isFinite)) return undefined;
+  return new Date(year, month - 1, day);
+}
+
 function capitalize(str: string) {
   return str.charAt(0).toUpperCase() + str.slice(1);
 }
 
 function isOverdue(task: Task) {
-  return task.dueDate && new Date(task.dueDate) < new Date() && task.status !== "done";
+  const dueDate = parseCivilTaskDate(task.dueDate);
+  return dueDate && dueDate < new Date() && task.status !== "done";
 }
 
 // ── Animated circle checkbox ──────────────────────────────────────────
@@ -126,7 +134,7 @@ function DateButton({
         <button
           onClick={e => { e.stopPropagation(); setOpen(true); }}
           type="button"
-          aria-label={date ? `Cambiar fecha: ${format(new Date(date), "d MMM", { locale: es })}` : "Asignar fecha"}
+          aria-label={date ? `Cambiar fecha: ${format(parseCivilTaskDate(date)!, "d MMM", { locale: es })}` : "Asignar fecha"}
           className={cn(
             "flex items-center gap-1 px-1.5 py-0.5 rounded text-xs transition-all duration-150",
             "opacity-100 sm:opacity-0 sm:group-hover:opacity-100",
@@ -138,7 +146,7 @@ function DateButton({
           )}
         >
           {date ? (
-            <span>{format(new Date(date), "d MMM", { locale: es })}</span>
+            <span>{format(parseCivilTaskDate(date)!, "d MMM", { locale: es })}</span>
           ) : (
             <CalendarIcon className="h-3.5 w-3.5" />
           )}
@@ -147,7 +155,7 @@ function DateButton({
       <PopoverContent className="w-auto p-0 shadow-lg" onClick={e => e.stopPropagation()}>
         <Calendar
           mode="single"
-          selected={date ? new Date(date) : undefined}
+          selected={parseCivilTaskDate(date)}
           onSelect={d => {
             onSet(taskId, d);
             setOpen(false);
@@ -282,6 +290,8 @@ export default function TasksHomePage() {
   const [myTab, setMyTab] = useState<TabValue>("upcoming");
   const [showAllMy, setShowAllMy] = useState(false);
   const [hidingTaskId, setHidingTaskId] = useState<number | null>(null);
+  const [collapsedProjectClients, setCollapsedProjectClients] = useState<Set<string>>(new Set());
+  const [projectView, setProjectView] = useState<"folders" | "list">("folders");
 
   const { data: myTasksResponse, refetch: refetchMyTasks } = useQuery({
     queryKey: ["/api/tasks/my-tasks"],
@@ -322,7 +332,7 @@ export default function TasksHomePage() {
   const dateMutation = useMutation({
     mutationFn: ({ taskId, date }: { taskId: number; date: Date | undefined }) =>
       apiRequest(`/api/tasks/${taskId}`, "PUT", {
-        dueDate: date ? date.toISOString() : null,
+        dueDate: date ? format(date, "yyyy-MM-dd") : null,
       }),
     onSuccess: () => { refetchMyTasks(); invalidateRelated(); },
   });
@@ -487,11 +497,23 @@ export default function TasksHomePage() {
               <FolderOpen className="h-4 w-4 text-primary" />
               <h2 className="text-sm font-semibold">Proyectos</h2>
             </div>
-            <Link href="/tasks/projects">
-              <Button variant="ghost" size="sm" className="h-6 text-xs text-muted-foreground hover:text-primary px-2">
-                Mostrar más <ChevronRight className="h-3 w-3 ml-0.5" />
-              </Button>
-            </Link>
+            <div className="flex items-center gap-1">
+              <div className="flex items-center rounded-md border p-0.5">
+                <button type="button" aria-label="Ver proyectos por carpetas" onClick={() => setProjectView("folders")}
+                  className={cn("rounded px-1.5 py-1 text-[10px]", projectView === "folders" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted")}>
+                  <FolderOpen className="h-3 w-3" />
+                </button>
+                <button type="button" aria-label="Ver proyectos en lista" onClick={() => setProjectView("list")}
+                  className={cn("rounded px-1.5 py-1 text-[10px]", projectView === "list" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted")}>
+                  <List className="h-3 w-3" />
+                </button>
+              </div>
+              <Link href="/tasks/projects">
+                <Button variant="ghost" size="sm" className="h-6 text-xs text-muted-foreground hover:text-primary px-2">
+                  Mostrar más <ChevronRight className="h-3 w-3 ml-0.5" />
+                </Button>
+              </Link>
+            </div>
           </div>
 
           {projects.length === 0 ? (
@@ -501,12 +523,17 @@ export default function TasksHomePage() {
             </div>
           ) : (
             <div className="space-y-3 px-4 pb-2 flex-1">
-              {recentProjectGroups.map(([clientName, clientProjects]) => (
+              {projectView === "folders" && recentProjectGroups.map(([clientName, clientProjects]) => (
                 <div key={clientName}>
-                  <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  <button className="mb-1.5 flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground" onClick={() => setCollapsedProjectClients((previous) => {
+                    const next = new Set(previous);
+                    next.has(clientName) ? next.delete(clientName) : next.add(clientName);
+                    return next;
+                  })}>
+                    <ChevronDown className={cn("h-3 w-3 transition-transform", collapsedProjectClients.has(clientName) && "-rotate-90")} />
                     {clientName}
-                  </p>
-                  <div className="space-y-1">
+                  </button>
+                  {!collapsedProjectClients.has(clientName) && <div className="space-y-1">
                     {clientProjects.map((proj) => (
                       <Link key={proj.id} href={`/tasks/projects/${proj.id}`}>
                         <div className="mind-interactive-card flex items-center gap-2 rounded-xl border border-border/60 p-2.5 hover:bg-muted/30">
@@ -521,8 +548,19 @@ export default function TasksHomePage() {
                         </div>
                       </Link>
                     ))}
-                  </div>
+                  </div>}
                 </div>
+              ))}
+              {projectView === "list" && recentProjects.map((proj) => (
+                <Link key={proj.id} href={`/tasks/projects/${proj.id}`}>
+                  <div className="mind-interactive-card flex items-center gap-2 rounded-xl border border-border/60 p-2.5 hover:bg-muted/30">
+                    <span className={cn("inline-flex h-6 w-6 items-center justify-center rounded-md text-[10px] font-bold text-white", getProjectColor(proj.id))}>
+                      {getInitial(proj.clientName || proj.name)}
+                    </span>
+                    <span className="min-w-0 flex-1 truncate text-xs font-medium">{proj.name}</span>
+                    <span className="text-[10px] text-muted-foreground">{proj.pendingCount} pendientes</span>
+                  </div>
+                </Link>
               ))}
             </div>
           )}

@@ -59,7 +59,7 @@ export interface QuotationData {
     inflationMethod: string;
     manualInflationRate: number;
     projectStartDate: string;
-    rateProjectionMode?: "current" | "projected" | "annual_avg";
+  rateProjectionMode?: "current" | "annual_avg";
   };
   customization?: string;
   proposalLink?: string; // Link a la propuesta original
@@ -343,13 +343,11 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
     person: Personnel,
     currency: string,
     targetMonth: string | null | undefined,
-    rateMode: "current" | "projected" | "annual_avg",
+    rateMode: "current" | "annual_avg",
     projectStartDate?: Date | null,
   ): number => {
     const personBillingCurrency = (person as any).billingCurrency ?? 'ARS';
-    const useUsd = currency === 'USD'
-      || personBillingCurrency === 'USD'
-      || personBillingCurrency === 'mixed';
+    const useUsd = currency === 'USD';
     const field = useUsd ? "hourlyRateUSD" : "hourlyRateARS";
     const historicalRates = [...((person as any).historicalRates ?? [])]
       .sort((left: any, right: any) =>
@@ -365,20 +363,35 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
         return personRates.reduce((sum: number, rate: any) => sum + Number(rate[field]), 0)
           / personRates.length;
       }
-      return 0;
+      const fallbackField = useUsd ? "hourlyRateARS" : "hourlyRateUSD";
+      const fallbackRates = historicalRates.filter((r: any) => r.year === averageYear && Number(r[fallbackField]) > 0 && Number(r.exchangeRate) > 0);
+      if (fallbackRates.length === 0) return 0;
+      return fallbackRates.reduce((sum: number, rate: any) => {
+        const value = Number(rate[fallbackField]);
+        const fx = Number(rate.exchangeRate);
+        return sum + (useUsd ? value / fx : value * fx);
+      }, 0) / fallbackRates.length;
     }
 
     const parsedMonth = parseSalaryMonth(targetMonth);
-    const referenceDate = rateMode === "projected" && projectStartDate
-      ? projectStartDate
-      : parsedMonth
+    const referenceDate = parsedMonth
         ? new Date(parsedMonth.year, parsedMonth.month - 1, 1)
         : new Date();
     const referencePeriod = referenceDate.getFullYear() * 100 + referenceDate.getMonth() + 1;
     const applicable = historicalRates.find((rate: any) =>
       rate.year * 100 + rate.month <= referencePeriod && Number(rate[field]) > 0
     );
-    return applicable ? Number(applicable[field]) : 0;
+    if (applicable) return Number(applicable[field]);
+    if (!useUsd) {
+      const usdRate = historicalRates.find((rate: any) => rate.year * 100 + rate.month <= referencePeriod && Number(rate.hourlyRateUSD) > 0);
+      const fx = Number(usdRate?.exchangeRate);
+      if (usdRate && fx > 0) return Number(usdRate.hourlyRateUSD) * fx;
+    } else {
+      const arsRate = historicalRates.find((rate: any) => rate.year * 100 + rate.month <= referencePeriod && Number(rate.hourlyRateARS) > 0);
+      const fx = Number(arsRate?.exchangeRate);
+      if (arsRate && fx > 0) return Number(arsRate.hourlyRateARS) / fx;
+    }
+    return 0;
   }, [currentYear]);
 
   const getPersonnelRate = useCallback((personnelId: number, targetCurrency?: string, targetMonth?: string | null) => {
@@ -1074,7 +1087,7 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
           inflationMethod: quotation.inflationMethod || "manual",
           manualInflationRate: Number(quotation.manualInflationRate || 0),
           projectStartDate: quotation.projectStartDate ? new Date(quotation.projectStartDate).toISOString().split('T')[0] : "",
-          rateProjectionMode: ((quotation as any).rateProjectionMode as "current" | "projected" | "annual_avg") || (quotation.applyInflationAdjustment ? "projected" : "current"),
+          rateProjectionMode: ((quotation as any).rateProjectionMode === "annual_avg" ? "annual_avg" : "current") as "current" | "annual_avg",
         },
         proposalLink: quotation.proposalLink || undefined,
         salaryMonth: quotation.salaryMonth ?? null
@@ -1168,13 +1181,25 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
         leadId: quotationData.leadId || null,
         salaryMonth: quotationData.salaryMonth ?? null,
         status: status,
-        teamMembers: quotationData.teamMembers.map((member) => ({
-          roleId: member.roleId,
-          personnelId: member.personnelId,
-          hours: member.hours || 0,
-          rate: member.rate || 0,
-          cost: (member.hours || 0) * (member.rate || 0),
-        })),
+        // The UI uses 0 as the empty role sentinel when a member is selected
+        // directly by person. The API contract uses null for an absent role;
+        // sending 0 made otherwise valid quotations fail with "Invalid
+        // quotation data" before the transaction started.
+        teamMembers: quotationData.teamMembers.map((member) => {
+          const hours = Number(member.hours);
+          const rate = Number(member.rate);
+          const roleId = Number(member.roleId);
+          const personnelId = Number(member.personnelId);
+          return {
+            roleId: Number.isInteger(roleId) && roleId > 0 ? roleId : null,
+            personnelId: Number.isInteger(personnelId) && personnelId > 0 ? personnelId : null,
+            hours: Number.isFinite(hours) && hours >= 0 ? hours : 0,
+            rate: Number.isFinite(rate) && rate >= 0 ? rate : 0,
+            cost: Number.isFinite(hours) && hours >= 0 && Number.isFinite(rate) && rate >= 0
+              ? hours * rate
+              : 0,
+          };
+        }),
       };
 
       console.log('📤 Saving quotation with payload:', quotationPayload);

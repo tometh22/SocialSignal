@@ -211,6 +211,44 @@ export default function Admin() {
     refetchOnWindowFocus: true,
   });
 
+  const forceSyncMutation = useMutation({
+    mutationFn: () => apiRequest("/api/personnel/sheets-sync/auto-apply", {
+      method: "POST",
+      body: {},
+    }),
+    onSuccess: async (result: any) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["/api/personnel"] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/personnel-historical-costs"] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/quotations"] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/capacity"] }),
+      ]);
+      await refetchPersonnel();
+      const errors = Object.entries(result?.summary ?? {}).filter(([, value]: any) => value?.error);
+      if (errors.length > 0) {
+        const describeSyncError = (error: unknown) => String(error).includes("invalid_grant")
+          ? "Google rechazó las credenciales; renová la cuenta de servicio antes de sincronizar."
+          : String(error);
+        toast({
+          title: "Sincronización incompleta",
+          description: errors.map(([year, value]: any) => `${year}: ${describeSyncError(value.error)}`).join(" · "),
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Datos actualizados",
+          description: `${result?.totalUpdated ?? 0} personas y ${result?.totalCells ?? 0} tarifas actualizadas.`,
+        });
+      }
+    },
+    onError: (error: Error) => {
+      const message = error.message.includes("invalid_grant")
+        ? "Google rechazó las credenciales. Hay que renovar la cuenta de servicio antes de sincronizar."
+        : error.message;
+      toast({ title: "No se pudieron refrescar los datos", description: message, variant: "destructive" });
+    },
+  });
+
   // DEBUG: Log personnel data when it changes
   useEffect(() => {
     if (personnel) {
@@ -224,11 +262,7 @@ export default function Admin() {
   }, [personnel]);
 
   // Force refresh handler
-  const handleForceRefresh = () => {
-    console.log("🔄 FORCE REFRESH TRIGGERED");
-    queryClient.invalidateQueries({ queryKey: ["/api/personnel"] });
-    refetchPersonnel();
-  };
+  const handleForceRefresh = () => forceSyncMutation.mutate();
 
 
 
@@ -936,9 +970,10 @@ export default function Admin() {
           </div>
           <button 
             onClick={handleForceRefresh}
+            disabled={forceSyncMutation.isPending}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
           >
-            🔄 Refrescar Datos
+            {forceSyncMutation.isPending ? "⏳ Sincronizando…" : "🔄 Refrescar Datos"}
           </button>
         </div>
       </div>
@@ -1062,7 +1097,8 @@ export default function Admin() {
                       <TableRow>
                         <TableHead>Nombre</TableHead>
                         <TableHead>Email</TableHead>
-                        <TableHead>Rol</TableHead>
+                        <TableHead>Rol actual</TableHead>
+                        <TableHead>Subnivel</TableHead>
                         <TableHead>
                           <div className="flex items-center gap-1">
                             Tipo Contrato
@@ -1108,9 +1144,8 @@ export default function Admin() {
                                 </TooltipTrigger>
                                 <TooltipContent className="max-w-xs">
                                   <p className="text-sm">
-                                    Horas de trabajo mensuales para empleados Full-time. 
-                                    Se usa para calcular la tarifa por hora automáticamente 
-                                    basada en el sueldo fijo mensual.
+                                    Capacidad contractual mensual para empleados fijos (por ejemplo 120 o 160 horas).
+                                    Es independiente del sueldo informativo y del valor hora histórico.
                                   </p>
                                 </TooltipContent>
                               </Tooltip>
@@ -1183,6 +1218,9 @@ export default function Admin() {
                             email: person.email || '',
                             roleId: person.roleId,
                             roleName: getRoleName(person.roleId),
+                            currentRole: person.currentRole,
+                            sublevel: person.sublevel,
+                            legacyRole: person.legacyRole,
                             contractType: person.contractType,
                             currentHourlyRateARS: person.currentHourlyRateARS,
                             currentHourlyRateUSD: person.currentHourlyRateUSD,

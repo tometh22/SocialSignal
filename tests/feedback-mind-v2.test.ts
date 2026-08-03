@@ -20,6 +20,7 @@ import {
   weeklyEstimateOverlapsRange,
 } from "../shared/utils/taskEstimates";
 import { ApiError, getApiErrorMessage, parseApiError } from "../client/src/lib/api-error";
+import { parseValorHoraSection } from "../server/services/personnelSheetsSync";
 
 test("quotation contract accepts numeric exchangeRateAtQuote and normalizes it for numeric columns", () => {
   const parsed = insertQuotationSchema.parse({
@@ -198,4 +199,133 @@ test("task status has one list editor while board status changes only through dr
   expect(boardCard).not.toContain("onStatusChange");
   expect(boardCard).not.toContain(">Estado</DropdownMenuLabel>");
   expect(source).toContain("handleBoardStatusChange(taskId, toStatus)");
+});
+
+test("task hours remain loadable when historical costing is unavailable", () => {
+  const routes = readFileSync(
+    new URL("../server/routes.ts", import.meta.url),
+    "utf8",
+  );
+  const endpoint = routes.slice(
+    routes.indexOf('app.post("/api/tasks/:id/time"'),
+    routes.indexOf('// DELETE /api/tasks/:taskId/time/:entryId'),
+  );
+
+  expect(endpoint).toContain("let costingWarning");
+  expect(endpoint).toContain("res.json({ ...created, costingWarning })");
+  expect(endpoint).not.toContain("return res.status(422)");
+  expect(endpoint).toContain("parseCivilDate(rawDate)");
+});
+
+test("task detail does not depend on optional estimate columns", () => {
+  const routes = readFileSync(
+    new URL("../server/routes.ts", import.meta.url),
+    "utf8",
+  );
+  const endpoint = routes.slice(
+    routes.indexOf('// GET /api/tasks/:id — obtener tarea individual'),
+    routes.indexOf('// POST /api/tasks — crear tarea'),
+  );
+
+  expect(endpoint).toContain("taskTimeEntries.description");
+  expect(endpoint).toContain("weekly estimates unavailable");
+  expect(endpoint).toContain("No se pudo cargar el detalle de la tarea");
+});
+
+test("quotation team payload treats an empty role sentinel as absent", () => {
+  const context = readFileSync(
+    new URL("../client/src/context/optimized-quote-context.tsx", import.meta.url),
+    "utf8",
+  );
+
+  expect(context).toContain("Number.isInteger(roleId) && roleId > 0 ? roleId : null");
+  expect(insertQuotationTeamMemberSchema.safeParse({
+    quotationId: 1,
+    personnelId: 2,
+    roleId: null,
+    hours: 10,
+    rate: 100,
+    cost: 1000,
+  }).success).toBe(true);
+});
+
+test("Google personnel rows capture current role, sublevel and legacy freelance role", () => {
+  const rows = [
+    ["2026", "Rol", "SUBNIVEL", "Rol Viejo", "Valor Hora Ajustada"],
+    ["", "", "", "", "01 ene 2026"],
+    ["Ana", "Senior", "S2", "Analista vieja", "$10.000"],
+    ["", "", "", "", ""],
+    ["", "", "", "", ""],
+  ];
+  const parsed = parseValorHoraSection(rows, 2026);
+  expect(parsed[0]).toMatchObject({
+    sheetName: "Ana",
+    currentRole: "Senior",
+    sublevel: "S2",
+    legacyRole: "Analista vieja",
+    monthlyRates: { jan2026: 10000 },
+  });
+});
+
+test("salary remains informational and freelance capacity can be null", () => {
+  const parsed = insertPersonnelHistoricalCostSchema.parse({
+    personnelId: 1,
+    year: 2026,
+    month: 8,
+    monthlySalaryARS: 1200000,
+    hourlyRateARS: 10000,
+  });
+  expect(parsed.monthlySalaryARS).toBe("1200000");
+  const schema = readFileSync(new URL("../shared/schema.ts", import.meta.url), "utf8");
+  expect(schema).toContain('monthlyHours: doublePrecision("monthly_hours").default(160)');
+  expect(schema).not.toContain('monthlyHours: doublePrecision("monthly_hours").default(160).notNull()');
+});
+
+test("quote projection exposes only snapshot and annual average", () => {
+  const enhanced = readFileSync(new URL("../client/src/components/optimized/EnhancedTeamConfig.tsx", import.meta.url), "utf8");
+  const review = readFileSync(new URL("../client/src/components/optimized/financial-review-final.tsx", import.meta.url), "utf8");
+  expect(enhanced).not.toContain("Tarifa estimada proyectada");
+  expect(review).not.toContain("Proyectado al mes del proyecto");
+  expect(enhanced).toContain("Promedio anual estimado");
+});
+
+test("project visibility and duplicate holiday rules are enforced server-side", () => {
+  const routes = readFileSync(new URL("../server/routes.ts", import.meta.url), "utf8");
+  const projects = routes.slice(routes.indexOf('app.get("/api/tasks/projects"'), routes.indexOf('// POST /api/tasks/projects/create'));
+  expect(projects).toContain("task_project_members");
+  expect(projects).toContain("collaborator_ids @>");
+  expect(projects).toContain("requestedStatus");
+  const holidays = routes.slice(routes.indexOf('app.post("/api/holidays"'), routes.indexOf('app.delete("/api/holidays/:id"'));
+  expect(holidays).toContain("status(409)");
+  expect(holidays).toContain("sameDate");
+});
+
+test("hours dashboard reads both legacy and task time sources", () => {
+  const routes = readFileSync(new URL("../server/routes.ts", import.meta.url), "utf8");
+  const endpoint = routes.slice(
+    routes.indexOf('app.get("/api/tasks/hours-summary"'),
+    routes.indexOf('app.get("/api/tasks/my-hours"'),
+  );
+  expect(endpoint).toContain("db.select().from(taskTimeEntries)");
+  expect(endpoint).toContain("db.select().from(timeEntries)");
+  expect(endpoint).toContain('source: "legacy"');
+});
+
+test("quotation validation no longer exposes the generic invalid-data message", () => {
+  const routes = readFileSync(new URL("../server/routes.ts", import.meta.url), "utf8");
+  const quotationRoutes = routes.slice(
+    routes.indexOf('app.post("/api/quotations"'),
+    routes.indexOf('app.patch("/api/quotations/:id/status"'),
+  );
+  expect(quotationRoutes).not.toContain('message: "Invalid quotation data"');
+  expect(quotationRoutes).toContain("revisá el detalle de errores por campo");
+});
+
+test("task dates use a civil range in detail and list editors", () => {
+  const detail = readFileSync(new URL("../client/src/components/tasks/TaskDetailPanel.tsx", import.meta.url), "utf8");
+  const list = readFileSync(new URL("../client/src/components/tasks/ProjectTaskList.tsx", import.meta.url), "utf8");
+  expect(detail).toContain('mode="range"');
+  expect(detail).toContain('format(range.from, "yyyy-MM-dd")');
+  expect(detail).not.toContain('startDate: d ? d.toISOString()');
+  expect(list).toContain('selected={{ from: parseCivilTaskDate(startDate), to: parseCivilTaskDate(dueDate) }}');
 });
