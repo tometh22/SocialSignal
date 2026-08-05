@@ -20,7 +20,7 @@ import {
   weeklyEstimateOverlapsRange,
 } from "../shared/utils/taskEstimates";
 import { ApiError, getApiErrorMessage, parseApiError } from "../client/src/lib/api-error";
-import { parseValorHoraSection } from "../server/services/personnelSheetsSync";
+import { describeSheetsSyncError, parseValorHoraSection } from "../server/services/personnelSheetsSync";
 import { deriveHourlyRatesFromSalary } from "../shared/utils/personnel-cost";
 
 test("quotation contract accepts numeric exchangeRateAtQuote and normalizes it for numeric columns", () => {
@@ -403,4 +403,42 @@ test("home hours include task and legacy time entries", () => {
   expect(myHours).toContain("FROM task_time_entries");
   expect(myHours).toContain("FROM time_entries");
   expect(myHours).toContain("UNION ALL");
+});
+
+test("creator-owned unassigned tasks stay visible in personal surfaces", () => {
+  const routes = readFileSync(new URL("../server/routes.ts", import.meta.url), "utf8");
+  const myTasks = routes.slice(
+    routes.indexOf('app.get("/api/tasks/my-tasks"'),
+    routes.indexOf('// GET /api/tasks/team-calendar'),
+  );
+  const calendar = routes.slice(
+    routes.indexOf('app.get("/api/tasks/team-calendar"'),
+    routes.indexOf('// GET /api/tasks/project/:projectId'),
+  );
+  for (const endpoint of [myTasks, calendar]) {
+    expect(endpoint).toContain("tasks.createdBy");
+    expect(endpoint).toContain("isNull(tasks.assigneeId)");
+    expect(endpoint).toContain("jsonb_array_length");
+  }
+});
+
+test("Home uses the membership-scoped project hierarchy and exposes link problems", () => {
+  const home = readFileSync(new URL("../client/src/pages/home-dashboard.tsx", import.meta.url), "utf8");
+  const auth = readFileSync(new URL("../server/auth.ts", import.meta.url), "utf8");
+  expect(home).toContain("/api/tasks/projects?status=active&scope=mine");
+  expect(home).toContain("homeProjectView");
+  expect(home).toContain("personnelLinked === false");
+  expect(auth).toContain("personnelLinked: Boolean(linkedPersonnel)");
+  expect(auth).toContain("trim().toLowerCase()");
+});
+
+test("Google sync auth failures are actionable and never look successful", () => {
+  const invalid = describeSheetsSyncError(new Error("invalid_grant: Invalid JWT Signature"));
+  expect(invalid.code).toBe("GOOGLE_AUTH_INVALID");
+  expect(invalid.message).toContain("GOOGLE_PRIVATE_KEY");
+  expect(invalid.action).toContain("No se aplicaron cambios");
+
+  const generic = describeSheetsSyncError(new Error("timeout"));
+  expect(generic.code).toBe("GOOGLE_SYNC_FAILED");
+  expect(generic.retryable).toBe(true);
 });

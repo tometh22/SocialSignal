@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import { getApiErrorMessage } from "@/lib/api-error";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -84,6 +85,15 @@ function formatARS(value: number | null): string {
 interface CreateForm {
   roleId: string;
   contractType: string;
+}
+
+function syncErrorDescription(error: unknown) {
+  const payload = (error as any)?.payload;
+  if (payload?.action) return `${getApiErrorMessage(error)} ${payload.action}`;
+  if (/invalid_grant|invalid jwt|jwt signature/i.test(getApiErrorMessage(error))) {
+    return "Google rechazó las credenciales del Máster. Verificá GOOGLE_CLIENT_EMAIL y GOOGLE_PRIVATE_KEY en Railway y el acceso de la cuenta al Sheet. No se aplicaron cambios.";
+  }
+  return getApiErrorMessage(error, "No se pudo leer Google Sheets. No se aplicaron cambios.");
 }
 
 export function SheetsSyncDialog() {
@@ -185,7 +195,7 @@ export function SheetsSyncDialog() {
     onError: (error) => {
       toast({
         title: "Error al sincronizar",
-        description: error.message,
+        description: syncErrorDescription(error),
         variant: "destructive",
       });
     },
@@ -303,7 +313,11 @@ export function SheetsSyncDialog() {
 
         {previewQuery.isError && (
           <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
-            Error leyendo el sheet: {(previewQuery.error as Error).message}
+            <div>{syncErrorDescription(previewQuery.error)}</div>
+            <Button variant="outline" size="sm" className="mt-2" onClick={() => previewQuery.refetch()} disabled={previewQuery.isFetching}>
+              {previewQuery.isFetching && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Reintentar lectura
+            </Button>
           </div>
         )}
 

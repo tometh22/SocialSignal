@@ -125,7 +125,7 @@ import {
   quotationTemplates,
   sheetPersonnelAliases,
 } from "@shared/schema";
-import { fetchValorHora2026, fetchValorHoraForYear, getHistoricalRateFields, HISTORICAL_RATE_FIELDS_2026, findPersonnelIdFuzzy } from "./services/personnelSheetsSync";
+import { fetchValorHora2026, fetchValorHoraForYear, getHistoricalRateFields, HISTORICAL_RATE_FIELDS_2026, findPersonnelIdFuzzy, describeSheetsSyncError } from "./services/personnelSheetsSync";
 import { ActiveProjectsAggregator } from "./domain/projectsActive";import { resolveTimeFilter } from "./services/time";
 import { CoverageCalculator } from "./domain/coverage";
 import { eq, and, or, isNull, isNotNull, desc, sql, asc, gte, lte, inArray } from "drizzle-orm";
@@ -4518,7 +4518,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       console.error("Error en sheets-sync preview:", error);
-      res.status(500).json({ message: (error as Error).message || "Error obteniendo preview" });
+      const syncError = describeSheetsSyncError(error);
+      res.status(502).json(syncError);
     }
   });
 
@@ -4654,7 +4655,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ year, ...result });
     } catch (error) {
       console.error("Error en sheets-sync apply:", error);
-      res.status(500).json({ message: (error as Error).message || "Error aplicando sync" });
+      const syncError = describeSheetsSyncError(error);
+      res.status(502).json(syncError);
     }
   });
 
@@ -4684,7 +4686,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const r = await applyRateRows(sheetRows, null, year, aliasBySheetName, personnelByName, allPersonnel);
           summary[year] = r;
         } catch (err) {
-          summary[year] = { updatedPersonnel: 0, cellsUpdated: 0, skipped: [], error: String(err) };
+          const syncError = describeSheetsSyncError(err);
+          summary[year] = {
+            updatedPersonnel: 0,
+            cellsUpdated: 0,
+            skipped: [],
+            error: `${syncError.message} ${syncError.action}`,
+          };
         }
       }
 
@@ -4694,7 +4702,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ years: rawYears, summary, totalUpdated, totalCells });
     } catch (error) {
       console.error("Error en sheets-sync auto-apply:", error);
-      res.status(500).json({ message: (error as Error).message || "Error en auto-apply" });
+      res.status(502).json(describeSheetsSyncError(error));
     }
   });
 
@@ -18477,15 +18485,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         : [];
       
       let myTasks: any[] = [];
-      if (personnelRecord.length > 0) {
-        const pid = personnelRecord[0].id;
+      {
+        const pid = personnelRecord[0]?.id;
         const { status, dateFrom, dateTo } = req.query;
-        let conditions: any[] = [
-          or(
-            eq(tasks.assigneeId, pid),
-            sql`COALESCE(${tasks.collaboratorIds}, '[]'::jsonb) @> ${JSON.stringify([pid])}::jsonb`,
-          ),
-        ];
+        // A task created by the current user without assignee/collaborators is
+        // still part of their personal workload. This closes the gap where a
+        // freshly-created task disappeared from Mis tareas until someone was
+        // assigned manually.
+        const createdUnassigned = and(
+          eq(tasks.createdBy, user?.id),
+          isNull(tasks.assigneeId),
+          sql`jsonb_array_length(COALESCE(${tasks.collaboratorIds}, '[]'::jsonb)) = 0`,
+        );
+        const assignmentConditions = pid
+          ? or(
+              eq(tasks.assigneeId, pid),
+              sql`COALESCE(${tasks.collaboratorIds}, '[]'::jsonb) @> ${JSON.stringify([pid])}::jsonb`,
+              createdUnassigned,
+            )
+          : createdUnassigned;
+        let conditions: any[] = [assignmentConditions];
         if (status && status !== 'all') conditions.push(eq(tasks.status, status as string));
         if (dateFrom || dateTo) {
           const from = dateFrom ? new Date(dateFrom as string) : new Date(0);
@@ -18549,7 +18568,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (assigneeId) {
         const parsedAssigneeId = parseInt(assigneeId as string);
         if (isNaN(parsedAssigneeId)) return res.status(400).json({ message: "Responsable inválido" });
-        conditions.push(or(
+        const currentUser = (req as any).user;
+        const currentPersonnel = currentUser?.email
+          ? await db.select({ id: personnel.id }).from(personnel)
+              .where(sql`LOWER(TRIM(${personnel.email})) = LOWER(TRIM(${currentUser.email}))`)
+              .limit(1)
+          : [];
+        const includeCreatedUnassigned = Number(currentPersonnel[0]?.id) === parsedAssigneeId;
+        conditions.push(includeCreatedUnassigned ? or(
+          eq(tasks.assigneeId, parsedAssigneeId),
+          sql`COALESCE(${tasks.collaboratorIds}, '[]'::jsonb) @> jsonb_build_array(${parsedAssigneeId})`,
+          and(
+            eq(tasks.createdBy, currentUser?.id),
+            isNull(tasks.assigneeId),
+            sql`jsonb_array_length(COALESCE(${tasks.collaboratorIds}, '[]'::jsonb)) = 0`,
+          ),
+        ) : or(
           eq(tasks.assigneeId, parsedAssigneeId),
           sql`COALESCE(${tasks.collaboratorIds}, '[]'::jsonb) @> jsonb_build_array(${parsedAssigneeId})`,
         ));
@@ -19492,7 +19526,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const currentUser = req.user as any;
       const isOperations = !!currentUser?.isAdmin || (currentUser?.permissions || []).includes("operations");
       const personnelMatch = currentUser?.email
-        ? await db.execute(sql`SELECT id FROM personnel WHERE lower(email) = lower(${currentUser.email}) LIMIT 1`)
+        ? await db.execute(sql`SELECT id FROM personnel WHERE lower(trim(email)) = lower(trim(${currentUser.email})) LIMIT 1`)
         : { rows: [] } as any;
       const myPersonnelId = Number((personnelMatch.rows as any[])[0]?.id || 0);
       const requestedStatus = isOperations ? String(req.query.status || "active") : "active";
@@ -19531,7 +19565,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const currentUser = req.user as any;
       const isOperations = !!currentUser?.isAdmin || (currentUser?.permissions || []).includes("operations");
       const personnelMatch = currentUser?.email
-        ? await db.execute(sql`SELECT id FROM personnel WHERE lower(email) = lower(${currentUser.email}) LIMIT 1`)
+        ? await db.execute(sql`SELECT id FROM personnel WHERE lower(trim(email)) = lower(trim(${currentUser.email})) LIMIT 1`)
         : { rows: [] } as any;
       const myPersonnelId = Number((personnelMatch.rows as any[])[0]?.id || 0);
       const requestedStatus = isOperations ? String(req.query.status || "active") : "active";

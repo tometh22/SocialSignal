@@ -10,14 +10,20 @@ import { useToast } from "@/hooks/use-toast";
 import { getFirstAllowedRouteForUser } from "@/lib/first-allowed-route";
 
 type AuthContextType = {
-  user: UserType | null;
+  user: AuthUser | null;
   isLoading: boolean;
   error: Error | null;
-  loginMutation: UseMutationResult<UserType, Error, LoginData>;
+  loginMutation: UseMutationResult<AuthUser, Error, LoginData>;
   logoutMutation: UseMutationResult<void, Error, void>;
-  login: (email: string, password: string) => Promise<UserType>;
+  login: (email: string, password: string) => Promise<AuthUser>;
   logout: () => Promise<void>;
   loading: boolean;
+};
+
+export type AuthUser = UserType & {
+  personnelId?: number | null;
+  personnelName?: string | null;
+  personnelLinked?: boolean;
 };
 
 type LoginData = {
@@ -37,7 +43,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const { data: user, isLoading, error } = useQuery({
     queryKey: ["/api/current-user"],
-    queryFn: async (): Promise<UserType | null> => {
+    queryFn: async (): Promise<AuthUser | null> => {
       try {
         const response = await fetch("/api/current-user", {
           credentials: 'include',
@@ -76,7 +82,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   });
 
   const loginMutation = useMutation({
-    mutationFn: async (credentials: { email: string; password: string }): Promise<UserType> => {
+    mutationFn: async (credentials: { email: string; password: string }): Promise<AuthUser> => {
       console.log('🔐 Attempting login for:', credentials.email);
 
       const response = await fetch('/api/login', {
