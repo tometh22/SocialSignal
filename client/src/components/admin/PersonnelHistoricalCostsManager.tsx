@@ -191,7 +191,7 @@ export function PersonnelHistoricalCostsManager({ onClose }: PersonnelHistorical
           <div>
             <CardTitle className="text-xl font-bold">Costos Históricos de Personal</CardTitle>
             <p className="text-sm text-muted-foreground mt-1">
-              Fuente única de tarifas para Administración, Cotizaciones y Cierre mensual.
+              Tabla comparable por persona y mes: sueldo mensual, horas contractuales y valor hora calculado para Administración, Cotizaciones y Cierre mensual.
             </p>
           </div>
         </div>

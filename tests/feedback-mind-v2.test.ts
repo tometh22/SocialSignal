@@ -442,3 +442,15 @@ test("Google sync auth failures are actionable and never look successful", () =>
   expect(generic.code).toBe("GOOGLE_SYNC_FAILED");
   expect(generic.retryable).toBe(true);
 });
+
+test("personnel screen exposes editable current salary and historical cost table", () => {
+  const inline = readFileSync(new URL("../client/src/components/admin/inline-edit-personnel.tsx", import.meta.url), "utf8");
+  const admin = readFileSync(new URL("../client/src/pages/admin-fixed.tsx", import.meta.url), "utf8");
+  const manager = readFileSync(new URL("../client/src/components/admin/PersonnelHistoricalCostsManager.tsx", import.meta.url), "utf8");
+  const routes = readFileSync(new URL("../server/routes.ts", import.meta.url), "utf8");
+  expect(inline).toContain("monthlySalaryARS");
+  expect(inline).toContain("/api/personnel-historical-costs");
+  expect(admin).toContain("#personal-cost-history");
+  expect(manager).toContain("Tabla comparable por persona y mes");
+  expect(routes).toContain("currentCostId: currentRate?.id ?? null");
+});
