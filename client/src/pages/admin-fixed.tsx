@@ -1073,6 +1073,9 @@ export default function Admin() {
                   <CardDescription>Gestioná los datos contractuales; las tarifas se administran en la fuente histórica de abajo.</CardDescription>
                 </div>
                 <div className="flex items-center gap-2">
+                  <a href="#personal-cost-history" className="rounded-md border px-3 py-2 text-sm text-muted-foreground hover:bg-muted">
+                    Ver costos históricos
+                  </a>
                   <SheetsSyncDialog />
                   <Button onClick={openNewPersonnelDialog} disabled={!roles || roles.length === 0}>
                     <PlusCircle className="mr-2 h-4 w-4" />
@@ -1225,6 +1228,8 @@ export default function Admin() {
                             currentHourlyRateARS: person.currentHourlyRateARS,
                             currentHourlyRateUSD: person.currentHourlyRateUSD,
                             currentMonthlySalaryARS: person.currentMonthlySalaryARS,
+                            currentMonthlySalaryUSD: person.currentMonthlySalaryUSD,
+                            currentCostId: person.currentCostId,
                             ratePeriod: person.ratePeriod,
                             monthlyHours: person.monthlyHours,
                             includeInRealCosts: person.includeInRealCosts,
@@ -1264,7 +1269,7 @@ export default function Admin() {
 
           {/* Fuente única de tarifas y sueldos históricos */}
           {sortedPersonnel && sortedPersonnel.length > 0 && (
-            <div className="mt-6">
+            <div id="personal-cost-history" className="mt-6 scroll-mt-6">
               <PersonnelHistoricalCostsManager />
             </div>
           )}

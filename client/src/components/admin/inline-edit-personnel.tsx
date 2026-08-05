@@ -26,6 +26,8 @@ interface PersonnelRow {
   currentHourlyRateARS?: number | null;
   currentHourlyRateUSD?: number | null;
   currentMonthlySalaryARS?: number | null;
+  currentMonthlySalaryUSD?: number | null;
+  currentCostId?: number | null;
   ratePeriod?: string | null;
 }
 
@@ -54,6 +56,8 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
     billingCurrency: person.billingCurrency ?? "ARS",
     usdBillingFraction: String(person.usdBillingFraction ?? 0),
     activeUntil: person.activeUntil ?? "",
+    monthlySalaryARS: person.currentMonthlySalaryARS == null ? "" : String(person.currentMonthlySalaryARS),
+    monthlySalaryUSD: person.currentMonthlySalaryUSD == null ? "" : String(person.currentMonthlySalaryUSD),
   });
 
   useEffect(() => {
@@ -67,16 +71,18 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
       billingCurrency: person.billingCurrency ?? "ARS",
       usdBillingFraction: String(person.usdBillingFraction ?? 0),
       activeUntil: person.activeUntil ?? "",
+      monthlySalaryARS: person.currentMonthlySalaryARS == null ? "" : String(person.currentMonthlySalaryARS),
+      monthlySalaryUSD: person.currentMonthlySalaryUSD == null ? "" : String(person.currentMonthlySalaryUSD),
     });
   }, [person]);
 
   const updateMutation = useMutation({
-    mutationFn: () => {
+    mutationFn: async () => {
       const monthlyHours = Number(form.monthlyHours);
       if (form.contractType !== "freelance" && (!Number.isFinite(monthlyHours) || monthlyHours < 40 || monthlyHours > 300)) {
         throw new Error("Las horas mensuales deben estar entre 40 y 300");
       }
-      return apiRequest(`/api/personnel/${person.id}`, "PATCH", {
+      await apiRequest(`/api/personnel/${person.id}`, "PATCH", {
         name: form.name.trim(),
         email: form.email.trim(),
         roleId: Number(form.roleId),
@@ -87,6 +93,29 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
         usdBillingFraction: Number(form.usdBillingFraction) || 0,
         activeUntil: form.activeUntil || null,
       });
+
+      const salaryARS = form.monthlySalaryARS === "" ? null : Number(form.monthlySalaryARS);
+      const salaryUSD = form.monthlySalaryUSD === "" ? null : Number(form.monthlySalaryUSD);
+      const hoursChanged = (form.contractType === "freelance" ? null : monthlyHours) !== (person.monthlyHours ?? null);
+      if (hoursChanged || (salaryARS !== (person.currentMonthlySalaryARS ?? null)) || (salaryUSD !== (person.currentMonthlySalaryUSD ?? null))) {
+        const now = new Date();
+        const costPayload = {
+          monthlyHours: form.contractType === "freelance" ? null : monthlyHours,
+          monthlySalaryARS: salaryARS,
+          monthlySalaryUSD: salaryUSD,
+          adjustmentReason: "Actualización desde Personal",
+        };
+        if (person.currentCostId) {
+          await apiRequest(`/api/personnel-historical-costs/${person.currentCostId}`, "PATCH", costPayload);
+        } else if (salaryARS != null || salaryUSD != null) {
+          await apiRequest("/api/personnel-historical-costs", "POST", {
+            personnelId: person.id,
+            year: now.getFullYear(),
+            month: now.getMonth() + 1,
+            ...costPayload,
+          });
+        }
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/personnel"] });
@@ -142,7 +171,12 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
             </SelectContent>
           </Select>
         </td>
-        <td className="px-6 py-4 text-xs text-muted-foreground">Administrar abajo</td>
+        <td className="px-6 py-4">
+          <div className="space-y-1">
+            <Input type="number" min={0} step="0.01" placeholder="ARS/mes" value={form.monthlySalaryARS} onChange={(event) => setForm({ ...form, monthlySalaryARS: event.target.value })} />
+            <Input type="number" min={0} step="0.01" placeholder="USD/mes" value={form.monthlySalaryUSD} onChange={(event) => setForm({ ...form, monthlySalaryUSD: event.target.value })} />
+          </div>
+        </td>
         <td className="px-6 py-4 text-xs text-muted-foreground">Administrar abajo</td>
         <td className="px-6 py-4 text-xs text-muted-foreground">—</td>
         <td className="px-6 py-4">
@@ -190,7 +224,10 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
         <div>{money(person.currentHourlyRateARS)} ARS/h</div>
         <div className="text-xs text-muted-foreground">{money(person.currentHourlyRateUSD, "en-US")} USD/h · {person.ratePeriod ?? "sin período"}</div>
       </td>
-      <td className="px-6 py-4 text-sm">{money(person.currentMonthlySalaryARS)} ARS/mes</td>
+      <td className="px-6 py-4 text-sm">
+        <div>{money(person.currentMonthlySalaryARS)} ARS/mes</div>
+        <div className="text-xs text-muted-foreground">{money(person.currentMonthlySalaryUSD, "en-US")} USD/mes</div>
+      </td>
       <td className="px-6 py-4 text-sm">{person.contractType === "freelance" ? "—" : `${person.monthlyHours ?? 0}h/mes`}</td>
       <td className="px-6 py-4 text-center">{person.includeInRealCosts === false ? <X className="mx-auto h-4 w-4 text-red-600" /> : <Check className="mx-auto h-4 w-4 text-green-600" />}</td>
       <td className="px-6 py-4 text-sm">{person.billingCurrency ?? "ARS"}</td>

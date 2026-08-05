@@ -4148,7 +4148,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ...person,
           currentHourlyRateARS: currentRate?.hourlyRateARS == null ? null : Number(currentRate.hourlyRateARS),
           currentHourlyRateUSD: currentRate?.hourlyRateUSD == null ? null : Number(currentRate.hourlyRateUSD),
-          currentMonthlySalaryARS: currentRate?.monthlySalaryARS == null ? null : Number(currentRate.monthlySalaryARS),
+          currentCostId: currentRate?.id ?? null,
+          // Keep showing a legacy fixed salary when a historical row has not
+          // been created yet. New edits always write the canonical history.
+          currentMonthlySalaryARS: currentRate?.monthlySalaryARS == null
+            ? (person.monthlyFixedSalary == null ? null : Number(person.monthlyFixedSalary))
+            : Number(currentRate.monthlySalaryARS),
           currentMonthlySalaryUSD: currentRate?.monthlySalaryUSD == null ? null : Number(currentRate.monthlySalaryUSD),
           ratePeriod: currentRate ? `${currentRate.year}-${String(currentRate.month).padStart(2, "0")}` : null,
           historicalRates,
