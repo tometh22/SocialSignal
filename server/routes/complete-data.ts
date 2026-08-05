@@ -62,8 +62,124 @@ async function resolveProjectKey(projectKey: string): Promise<number | null> {
   return activeProject?.id ?? null;
 }
 
+/**
+ * Project detail is also consumed by team members.  Hiding the Finanzas tab in
+ * the client is not enough: the complete-data endpoint must not serialize
+ * prices, costs, rates, revenue or margin data to a non-Operations user.
+ */
+function redactFinancialProjectData(payload: any, canSeeFinancials: boolean) {
+  if (canSeeFinancials) return payload;
+
+  const redactTeamMember = (member: any) => {
+    const safeMember = { ...member };
+    for (const key of [
+      "costARS", "costUSD", "hourlyRateARS", "rate", "cost",
+      "actualCost", "estimatedCost", "budgetedCost", "assignedPrice",
+    ]) delete safeMember[key];
+    if (safeMember.personnel) {
+      safeMember.personnel = { ...safeMember.personnel };
+      delete safeMember.personnel.hourlyRate;
+    }
+    return safeMember;
+  };
+
+  const project = payload.project
+    ? { ...payload.project }
+    : payload.project;
+  if (project) {
+    delete project.revenueDisplay;
+    delete project.costDisplay;
+    delete project.cotizacion;
+    delete project.currencyNative;
+    delete project.budgetUtilization;
+  }
+
+  const quotation = payload.quotation
+    ? { ...payload.quotation }
+    : payload.quotation;
+  if (quotation) {
+    delete quotation.baseCost;
+    delete quotation.totalAmount;
+    delete quotation.totalAmountNative;
+    delete quotation.markupAmount;
+    delete quotation.marginFactor;
+    if (Array.isArray(quotation.team)) {
+      quotation.team = quotation.team.map(redactTeamMember);
+    }
+  }
+
+  const actuals = payload.actuals
+    ? { ...payload.actuals }
+    : payload.actuals;
+  if (actuals) {
+    delete actuals.totalWorkedCost;
+    if (Array.isArray(actuals.teamBreakdown)) {
+      actuals.teamBreakdown = actuals.teamBreakdown.map(redactTeamMember);
+    }
+  }
+
+  const summary = payload.summary
+    ? { ...payload.summary }
+    : payload.summary;
+  if (summary) {
+    for (const key of [
+      "teamCostUSD", "revenueUSD", "markupUSD", "costDisplay",
+      "revenueDisplay", "currencyNative", "markup", "margin",
+    ]) delete summary[key];
+  }
+
+  const previousPeriod = payload.previousPeriod
+    ? { ...payload.previousPeriod }
+    : payload.previousPeriod;
+  if (previousPeriod?.metrics) {
+    previousPeriod.metrics = { ...previousPeriod.metrics };
+    for (const key of ["revenueUSD", "teamCostUSD", "markup", "margin"]) {
+      delete previousPeriod.metrics[key];
+    }
+  }
+
+  const metrics = payload.metrics ? { ...payload.metrics } : payload.metrics;
+  if (metrics) {
+    delete metrics.markup;
+    delete metrics.margin;
+    delete metrics.budgetUtilization;
+    delete metrics.costDeviation;
+  }
+  const teamBreakdown = Array.isArray(payload.teamBreakdown)
+    ? payload.teamBreakdown.map(redactTeamMember)
+    : payload.teamBreakdown;
+
+  return {
+    ...payload,
+    project,
+    quotation,
+    actuals,
+    summary,
+    metrics,
+    teamBreakdown,
+    previousPeriod,
+    // These are legacy aliases of the same financial values.
+    estimatedCost: undefined,
+    totalCost: undefined,
+    totalRealRevenue: undefined,
+    markup: undefined,
+    views: undefined,
+    analysis: undefined,
+    directCosts: undefined,
+    costsDisplay: undefined,
+    ingresos: undefined,
+    costos: undefined,
+  };
+}
+
 export async function completeDataHandler(req: Request, res: Response) {
   try {
+    const currentUser = req.user as any;
+    const canSeeFinancials = Boolean(
+      currentUser?.isAdmin ||
+      currentUser?.role === "admin" ||
+      (Array.isArray(currentUser?.permissions) && currentUser.permissions.includes("operations")),
+    );
     const projectId = String(req.params.id ?? req.query.projectId ?? '');
     const timeFilterQuery = String(req.query.timeFilter ?? '');
     const periodQuery = String(req.query.period ?? '');
@@ -219,7 +335,7 @@ export async function completeDataHandler(req: Request, res: Response) {
           actualCost: Number(m.costUSD || 0)
         }));
 
-        return res.json({
+        return res.json(redactFinancialProjectData({
           view,
           lifetimeMode: true,
           project: {
@@ -258,7 +374,7 @@ export async function completeDataHandler(req: Request, res: Response) {
           workedHours: lifetimeHoursAsana,
           totalCost: costDisplay,
           totalRealRevenue: revenueDisplay
-        });
+        }, canSeeFinancials));
       } catch (error) {
         console.error(`❌ LIFETIME AGGREGATION ERROR:`, error);
         return res.status(500).json({
@@ -364,7 +480,7 @@ export async function completeDataHandler(req: Request, res: Response) {
           }
         }
 
-        return res.json({
+        return res.json(redactFinancialProjectData({
           view,
           project: {
             id: projectData.id, clientId: projectData.clientId, status: projectData.status,
@@ -402,7 +518,7 @@ export async function completeDataHandler(req: Request, res: Response) {
           totalCost: viewData.costDisplay,
           totalRealRevenue: viewData.revenueDisplay,
           previousPeriod: previousPeriodData
-        });
+        }, canSeeFinancials));
       } else {
         console.warn(`⚠️ VIEW-AGGREGATOR: No data for ${view} view (project ${resolvedProjectId}, period ${period}), falling back to legacy mode`);
       }
@@ -659,7 +775,7 @@ export async function completeDataHandler(req: Request, res: Response) {
       }
     }
 
-    return res.json({
+    return res.json(redactFinancialProjectData({
       view,
       project: {
         id: projectData.id, clientId: projectData.clientId, status: projectData.status,
@@ -689,7 +805,7 @@ export async function completeDataHandler(req: Request, res: Response) {
       totalCost: legacy.totalCost,
       totalRealRevenue: summary.revenueUSD,
       previousPeriod: previousPeriodData
-    });
+    }, canSeeFinancials));
   } catch (e: any) {
     console.error('❌ COMPLETE-DATA ERROR:', e.message);
     return res.status(500).json({ error: 'complete-data failed', detail: e?.message });

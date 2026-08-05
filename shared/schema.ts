@@ -985,6 +985,14 @@ export const monthlyClosings = pgTable("monthly_closings", {
   adjustedHours: doublePrecision("adjusted_hours").notNull(), // horas ajustadas para facturación (ej: 160)
   hourlyRate: doublePrecision("hourly_rate").notNull(), // valor hora al cierre
   totalCost: doublePrecision("total_cost").notNull(), // adjustedHours * hourlyRate
+  // Invoice-currency snapshots. `totalCost` remains the legacy ARS-equivalent
+  // total; these fields make ARS/USD/mixed closing values explicit and stable.
+  billingCurrency: text("billing_currency").notNull().default("ARS"),
+  usdBillingFraction: doublePrecision("usd_billing_fraction").notNull().default(0),
+  totalCostARS: doublePrecision("total_cost_ars"), // ARS invoice tranche
+  totalCostUSD: doublePrecision("total_cost_usd"), // USD invoice tranche
+  grandTotalARS: doublePrecision("grand_total_ars"), // both tranches valued in ARS
+  grandTotalUSD: doublePrecision("grand_total_usd"), // both tranches valued in USD
   exchangeRateAtClose: doublePrecision("exchange_rate_at_close"), // ARS/USD al momento del cierre
   adjustments: jsonb("adjustments").$type<Record<string, number>>(), // ajustes de horas por categoría (vacaciones, feriados, etc.)
   notes: text("notes"),

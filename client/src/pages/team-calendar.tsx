@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { authFetch } from "@/lib/queryClient";
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, startOfWeek, endOfWeek, isSameDay, isSameMonth, isToday, addMonths, subMonths, isWithinInterval, parseISO } from "date-fns";
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, startOfWeek, endOfWeek, isSameMonth, isToday, addMonths, subMonths, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -18,6 +18,7 @@ type Task = {
   title: string;
   projectId?: number | null;
   assigneeId?: number | null;
+  collaboratorIds?: number[];
   assigneeName?: string | null;
   projectName?: string | null;
   clientName?: string | null;
@@ -54,13 +55,11 @@ function getInitials(name: string) {
 }
 
 function taskIsOnDay(task: Task, day: Date): boolean {
-  const due = task.dueDate ? parseISO(task.dueDate) : null;
-  const start = task.startDate ? parseISO(task.startDate) : null;
-  if (!due && !start) return false;
-  if (start && due) return isWithinInterval(day, { start, end: due });
-  if (due) return isSameDay(day, due);
-  if (start) return isSameDay(day, start);
-  return false;
+  const dayKey = format(day, "yyyy-MM-dd");
+  const startKey = task.startDate ? format(parseISO(task.startDate), "yyyy-MM-dd") : null;
+  const dueKey = task.dueDate ? format(parseISO(task.dueDate), "yyyy-MM-dd") : null;
+  if (!startKey && !dueKey) return false;
+  return (!startKey || startKey <= dayKey) && (!dueKey || dueKey >= dayKey);
 }
 
 export default function TeamCalendarPage() {
@@ -104,7 +103,9 @@ export default function TeamCalendarPage() {
   const totalTasks = tasks.length;
   const doneTasks = tasks.filter(t => t.status === "done").length;
 
-  const activeAssigneeIds = Array.from(new Set(tasks.map(t => t.assigneeId).filter(Boolean))) as number[];
+  const activeAssigneeIds = Array.from(new Set(
+    tasks.flatMap(t => [t.assigneeId, ...(t.collaboratorIds || [])]).filter(Boolean),
+  )) as number[];
 
   const WEEKDAYS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
   const MAX_VISIBLE = 3;
