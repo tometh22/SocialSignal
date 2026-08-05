@@ -351,3 +351,39 @@ test("task dates use a civil range in detail and list editors", () => {
   expect(detail).not.toContain('startDate: d ? d.toISOString()');
   expect(list).toContain('selected={{ from: parseCivilTaskDate(startDate), to: parseCivilTaskDate(dueDate) }}');
 });
+
+test("project complete-data redacts financial fields for non-Operations users", () => {
+  const completeData = readFileSync(new URL("../server/routes/complete-data.ts", import.meta.url), "utf8");
+  expect(completeData).toContain("redactFinancialProjectData");
+  expect(completeData).toContain("canSeeFinancials");
+  expect(completeData).toContain("delete quotation.totalAmount");
+  expect(completeData).toContain("delete safeMember.personnel.hourlyRate");
+  expect(completeData).toContain("ingresos: undefined");
+});
+
+test("calendar date windows overlap task ranges and include collaborators", () => {
+  const routes = readFileSync(new URL("../server/routes.ts", import.meta.url), "utf8");
+  const calendar = routes.slice(
+    routes.indexOf('app.get("/api/tasks/team-calendar"'),
+    routes.indexOf('// GET /api/tasks/project/:projectId'),
+  );
+  expect(calendar).toContain("isNotNull(tasks.startDate)");
+  expect(calendar).toContain("isNull(tasks.dueDate)");
+  expect(calendar).toContain("collaboratorIds");
+  expect(calendar).toContain("jsonb_build_array");
+  expect(calendar).toContain("COALESCE(${tasks.startDate}, ${tasks.dueDate})");
+});
+
+test("monthly closing persists one canonical ARS/USD snapshot", () => {
+  const schema = readFileSync(new URL("../shared/schema.ts", import.meta.url), "utf8");
+  const routes = readFileSync(new URL("../server/routes.ts", import.meta.url), "utf8");
+  const closing = schema.slice(schema.indexOf("export const monthlyClosings"), schema.indexOf("// ==================== PROYECTOS ACTIVOS"));
+  const endpoint = routes.slice(routes.indexOf('app.post("/api/monthly-closings"'), routes.indexOf('// ==================== ESTIMATED RATES CRUD'));
+  for (const field of ["billingCurrency", "usdBillingFraction", "totalCostARS", "totalCostUSD", "grandTotalARS", "grandTotalUSD"]) {
+    expect(closing).toContain(field);
+    expect(endpoint).toContain(field);
+  }
+  expect(endpoint).toContain("totalCost: grandTotalARS");
+  expect(endpoint).toContain("billingCurrency: data.billingCurrency");
+  expect(endpoint).toContain("grandTotalUSD: data.grandTotalUSD");
+});

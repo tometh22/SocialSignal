@@ -9631,8 +9631,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const [yyyy, mm] = period.split("-").map(Number);
     const start = new Date(yyyy, mm - 1, 1);
     const end = new Date(yyyy, mm, 1);
-    const billingCurrency = (personnelRow as any).billingCurrency ?? 'ARS';
-    const usdFraction = (personnelRow as any).usdBillingFraction ?? 0;
+    let billingCurrency = (personnelRow as any).billingCurrency ?? 'ARS';
+    let usdFraction = (personnelRow as any).usdBillingFraction ?? 0;
 
     // TC propio de la persona para este período (de su banco). Si no llega por
     // parámetro, se lee el guardado. Cae al TC de Operaciones cuando no hay propio.
@@ -9707,6 +9707,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     // Mes cerrado = valores definitivos. Se ignora el TC propio de la persona para
     // no contradecir el TC del cierre (Cierre Mensual es la fuente de verdad).
     if (closing) {
+      if (closing.billingCurrency) billingCurrency = closing.billingCurrency;
+      if (closing.usdBillingFraction != null) usdFraction = Number(closing.usdBillingFraction);
       personalFxUsd = null;
       personalFxArs = null;
     }
@@ -9789,7 +9791,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     const availableHours = Math.round(workdays * dailyHours);
 
-    const { totalCostARS, totalCostUSD, grandTotalARS, grandTotalUSD } = splitByBillingCurrency(totalCostARSFull, hours, usdHourlyRate, fxRate);
+    const hasClosingSnapshot = Boolean(
+      closing &&
+      closing.totalCostARS != null &&
+      closing.totalCostUSD != null &&
+      closing.grandTotalARS != null &&
+      closing.grandTotalUSD != null,
+    );
+    const { totalCostARS, totalCostUSD, grandTotalARS, grandTotalUSD } = hasClosingSnapshot
+      ? {
+          totalCostARS: Number(closing!.totalCostARS),
+          totalCostUSD: Number(closing!.totalCostUSD),
+          grandTotalARS: Number(closing!.grandTotalARS),
+          grandTotalUSD: Number(closing!.grandTotalUSD),
+        }
+      : splitByBillingCurrency(totalCostARSFull, hours, usdHourlyRate, fxRate);
 
     return {
       period,
@@ -18493,14 +18509,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { dateFrom, dateTo, assigneeId, projectId } = req.query;
       let conditions: any[] = [];
-      if (dateFrom) conditions.push(gte(tasks.dueDate, new Date(dateFrom as string)));
-      if (dateTo) conditions.push(lte(tasks.dueDate, new Date(dateTo as string)));
-      if (assigneeId) conditions.push(eq(tasks.assigneeId, parseInt(assigneeId as string)));
+      if (dateFrom || dateTo) {
+        const from = dateFrom ? new Date(dateFrom as string) : new Date(0);
+        const to = dateTo ? new Date(dateTo as string) : new Date(8640000000000000);
+        if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) {
+          return res.status(400).json({ message: "Rango de fechas inválido" });
+        }
+
+        // A task occupies the whole civil range from startDate through dueDate.
+        // A task with only one endpoint is still visible on that endpoint and
+        // remains visible for open-ended overlap queries. Undated tasks are not
+        // calendar events when a date window is explicitly requested.
+        conditions.push(and(
+          or(isNotNull(tasks.startDate), isNotNull(tasks.dueDate)),
+          or(isNull(tasks.startDate), lte(tasks.startDate, to)),
+          or(isNull(tasks.dueDate), gte(tasks.dueDate, from)),
+        ));
+      }
+      if (assigneeId) {
+        const parsedAssigneeId = parseInt(assigneeId as string);
+        if (isNaN(parsedAssigneeId)) return res.status(400).json({ message: "Responsable inválido" });
+        conditions.push(or(
+          eq(tasks.assigneeId, parsedAssigneeId),
+          sql`COALESCE(${tasks.collaboratorIds}, '[]'::jsonb) @> jsonb_build_array(${parsedAssigneeId})`,
+        ));
+      }
       if (projectId) conditions.push(eq(tasks.projectId, parseInt(projectId as string)));
 
       const result = conditions.length > 0
-        ? await db.select().from(tasks).where(and(...conditions)).orderBy(asc(tasks.dueDate))
-        : await db.select().from(tasks).orderBy(asc(tasks.dueDate));
+        ? await db.select().from(tasks).where(and(...conditions)).orderBy(asc(sql`COALESCE(${tasks.startDate}, ${tasks.dueDate})`), asc(tasks.dueDate))
+        : await db.select().from(tasks).orderBy(asc(sql`COALESCE(${tasks.startDate}, ${tasks.dueDate})`), asc(tasks.dueDate));
 
       // Enrich with assignee info
       const allPersonnel = await db.select({ id: personnel.id, name: personnel.name }).from(personnel);
@@ -20907,7 +20945,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const parsed = insertMonthlyClosingSchema.parse({ ...req.body, closedBy: req.user?.id });
       const [person] = await db
-        .select({ billingCurrency: personnel.billingCurrency })
+        .select({
+          billingCurrency: personnel.billingCurrency,
+          usdBillingFraction: personnel.usdBillingFraction,
+        })
         .from(personnel)
         .where(eq(personnel.id, parsed.personnelId))
         .limit(1);
@@ -20953,13 +20994,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      // Persist one authoritative invoice snapshot for every billing modality.
+      // `totalCost` stays the legacy ARS-equivalent total, while the explicit
+      // fields prevent Cierre, Finanzas and Mi cuenta from reconstructing a
+      // mixed 90/10 split differently after the month is closed.
+      const usdFraction = billingCurrency === "USD"
+        ? 1
+        : billingCurrency === "mixed"
+          ? Math.min(1, Math.max(0, Number(person.usdBillingFraction ?? 0)))
+          : 0;
+      const fx = exchangeRateAtClose && exchangeRateAtClose > 0 ? exchangeRateAtClose : null;
+      const hourlyRateUSD = canonicalRate.hourlyRateUSD
+        ?? (canonicalRate.hourlyRateARS != null && fx ? canonicalRate.hourlyRateARS / fx : null);
+      const hourlyRateARS = canonicalRate.hourlyRateARS
+        ?? (hourlyRateUSD != null && fx ? hourlyRateUSD * fx : null);
+      const invoiceTotalUSD = hourlyRateUSD != null
+        ? parsed.adjustedHours * hourlyRateUSD * usdFraction
+        : 0;
+      const invoiceTotalARS = hourlyRateARS != null
+        ? parsed.adjustedHours * hourlyRateARS * (1 - usdFraction)
+        : 0;
+      const grandTotalARS = invoiceTotalARS + (fx ? invoiceTotalUSD * fx : 0);
+      const grandTotalUSD = invoiceTotalUSD + (fx ? invoiceTotalARS / fx : 0);
+
       // Rate, FX and total are server-owned snapshots. The client only supplies
       // hours and adjustments; this prevents stale or tampered legacy rates.
       const data = {
         ...parsed,
         hourlyRate,
         exchangeRateAtClose,
-        totalCost: parsed.adjustedHours * hourlyRate * (usesUsdRate ? exchangeRateAtClose! : 1),
+        billingCurrency,
+        usdBillingFraction: usdFraction,
+        totalCostARS: invoiceTotalARS,
+        totalCostUSD: invoiceTotalUSD,
+        grandTotalARS,
+        grandTotalUSD,
+        totalCost: grandTotalARS,
       };
       const [closing] = await db.insert(monthlyClosings).values(data)
         .onConflictDoUpdate({
@@ -20969,6 +21039,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
             adjustedHours: data.adjustedHours,
             hourlyRate: data.hourlyRate,
             totalCost: data.totalCost,
+            billingCurrency: data.billingCurrency,
+            usdBillingFraction: data.usdBillingFraction,
+            totalCostARS: data.totalCostARS,
+            totalCostUSD: data.totalCostUSD,
+            grandTotalARS: data.grandTotalARS,
+            grandTotalUSD: data.grandTotalUSD,
             exchangeRateAtClose: data.exchangeRateAtClose,
             adjustments: data.adjustments,
             notes: data.notes,

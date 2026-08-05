@@ -803,6 +803,28 @@ async function applyPendingMigrations() {
       END $$;
     `);
 
+    // 0034: snapshot the exact ARS/USD/mixed invoice split at monthly close.
+    // Existing closings are backfilled as legacy ARS totals and remain readable.
+    await run('0034 monthly_closings currency snapshot', `
+      ALTER TABLE "monthly_closings"
+        ADD COLUMN IF NOT EXISTS "billing_currency" text NOT NULL DEFAULT 'ARS',
+        ADD COLUMN IF NOT EXISTS "usd_billing_fraction" double precision NOT NULL DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS "total_cost_ars" double precision,
+        ADD COLUMN IF NOT EXISTS "total_cost_usd" double precision,
+        ADD COLUMN IF NOT EXISTS "grand_total_ars" double precision,
+        ADD COLUMN IF NOT EXISTS "grand_total_usd" double precision;
+
+      UPDATE "monthly_closings"
+      SET "total_cost_ars" = COALESCE("total_cost_ars", "total_cost"),
+          "total_cost_usd" = COALESCE("total_cost_usd", 0),
+          "grand_total_ars" = COALESCE("grand_total_ars", "total_cost"),
+          "grand_total_usd" = COALESCE("grand_total_usd", 0)
+      WHERE "total_cost_ars" IS NULL
+         OR "total_cost_usd" IS NULL
+         OR "grand_total_ars" IS NULL
+         OR "grand_total_usd" IS NULL;
+    `);
+
   } finally {
     client.release();
   }
