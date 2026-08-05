@@ -342,7 +342,12 @@ function NewTaskRow({ projectId, sectionName, onCreated, onCancel, allPersonnel,
 
   const createMutation = useMutation({
     mutationFn: (data: any) => apiRequest("/api/tasks", "POST", data),
-    onSuccess: () => { onCreated(); },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks/my-tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks/team-calendar"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks/projects"] });
+      onCreated();
+    },
   });
 
   const handleCreate = () => {
