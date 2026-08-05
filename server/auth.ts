@@ -159,6 +159,10 @@ export function setupAuth(app: Express, storage: IStorage) {
       req.session.userId = user.id;
       console.log(`✅ Session established for user ID: ${user.id}, sessionID: ${req.sessionID}`);
 
+      const personnelRows = await storage.getPersonnel();
+      const linkedPersonnel = personnelRows.find((person) =>
+        person.email?.trim().toLowerCase() === user.email.trim().toLowerCase(),
+      );
       const userResponse = {
         id: user.id,
         firstName: user.firstName,
@@ -169,6 +173,9 @@ export function setupAuth(app: Express, storage: IStorage) {
         isActive: user.isActive,
         permissions: (user as any).permissions || [],
         role: (user as any).role || (user.isAdmin ? 'admin' : 'member'),
+        personnelId: linkedPersonnel?.id ?? null,
+        personnelName: linkedPersonnel?.name ?? null,
+        personnelLinked: Boolean(linkedPersonnel),
         sessionToken: req.sessionID,
       };
 
@@ -230,7 +237,22 @@ export function setupAuth(app: Express, storage: IStorage) {
       }
 
       const { password, ...userWithoutPassword } = user;
-      res.status(200).json(userWithoutPassword);
+      // Expose the canonical Personal link once so every screen can make the
+      // same decision. Matching is deliberately normalized, but never fuzzy:
+      // an unlinked user must be fixed by Operations instead of being linked
+      // to the wrong person.
+      const personnelRows = user.email
+        ? await storage.getPersonnel()
+        : [];
+      const linkedPersonnel = personnelRows.find((person) =>
+        person.email?.trim().toLowerCase() === user.email.trim().toLowerCase(),
+      );
+      res.status(200).json({
+        ...userWithoutPassword,
+        personnelId: linkedPersonnel?.id ?? null,
+        personnelName: linkedPersonnel?.name ?? null,
+        personnelLinked: Boolean(linkedPersonnel),
+      });
     } catch (error) {
       console.error("Error al obtener usuario actual:", error);
       res.status(500).json({ message: "Error en el servidor" });

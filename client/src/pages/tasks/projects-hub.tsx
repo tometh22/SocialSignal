@@ -532,8 +532,11 @@ export default function ProjectsHubPage() {
     },
   });
 
-  const myPersonnel = personnel.find(p => user?.email && p.email === user.email);
-  const myPersonnelId = myPersonnel?.id;
+  // Prefer the server-resolved canonical link. The fallback keeps older
+  // sessions working and normalizes whitespace/case consistently.
+  const myPersonnel = personnel.find(p => user?.personnelId && p.id === user.personnelId)
+    ?? personnel.find(p => user?.email && p.email?.trim().toLowerCase() === user.email.trim().toLowerCase());
+  const myPersonnelId = user?.personnelLinked === false ? undefined : myPersonnel?.id;
 
   const filtered = projects.filter(p =>
     !search ||

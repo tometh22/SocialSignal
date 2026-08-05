@@ -18,8 +18,18 @@ import { TASK_STATUS_CONFIG, type TaskStatus } from "@/constants/task-statuses";
 import TaskCalendarView from "@/components/tasks/TaskCalendarView";
 import {
   Briefcase, BarChart2, Plus, CheckSquare, Calendar, AlertTriangle,
-  AlertCircle, Info, Lightbulb, ChevronRight, Zap, Clock, ListTodo
+  AlertCircle, Info, Lightbulb, ChevronRight, Zap, Clock, ListTodo,
+  FolderOpen, List, ChevronDown
 } from "lucide-react";
+
+type HomeProject = {
+  id: number;
+  name: string;
+  clientName: string | null;
+  pendingCount: number;
+  taskCount: number;
+  status: string;
+};
 
 export default function HomeDashboard() {
   const { user } = useAuth();
@@ -122,6 +132,19 @@ export default function HomeDashboard() {
     enabled: !!myPersonnelId,
   });
 
+  // Use the same membership-scoped project source as the Projects hub. The
+  // legacy Home implementation derived projects only from calendar tasks,
+  // hiding projects where the user was a member but had no dated task yet.
+  const { data: homeProjects = [] } = useQuery<HomeProject[]>({
+    queryKey: ["/api/tasks/projects", "home"],
+    queryFn: async () => {
+      const response = await authFetch("/api/tasks/projects?status=active&scope=mine");
+      if (!response.ok) throw new Error("No se pudieron cargar los proyectos");
+      return response.json();
+    },
+    enabled: canAccessTasks,
+  });
+
   // Distinct active projects from the member's non-done tasks
   const myActiveProjects = (() => {
     const map = new Map<string, { name: string; clientName: string | null; pending: number }>();
@@ -150,6 +173,8 @@ export default function HomeDashboard() {
 
   const [taskTab, setTaskTab] = useState<'active' | 'overdue'>('active');
   const [showAllMyTasks, setShowAllMyTasks] = useState(false);
+  const [homeProjectView, setHomeProjectView] = useState<'folders' | 'list'>('folders');
+  const [collapsedHomeClients, setCollapsedHomeClients] = useState<Set<string>>(new Set());
   const tabTasks = taskTab === 'overdue' ? myOverdueTasks : myPendingTasks;
   const displayedMyTasks = showAllMyTasks ? tabTasks : tabTasks.slice(0, 5);
 
@@ -317,6 +342,17 @@ export default function HomeDashboard() {
       )}
 
       {/* Mi semana */}
+      {canAccessTasks && user?.personnelLinked === false && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-600" />
+            <div>
+              <p className="font-medium">Tu usuario todavía no está vinculado a Personal.</p>
+              <p className="mt-0.5 text-xs text-amber-800">Pedile a Operaciones que configure el mismo email en Personal para ver tareas y cargar horas.</p>
+            </div>
+          </div>
+        </div>
+      )}
       {myPersonnelId && (
         <div className="space-y-3">
           <SectionHeading icon={<ListTodo className="h-4 w-4" />} title="Mi semana" description="Horas, foco y entregas de tu agenda actual." />
@@ -418,25 +454,38 @@ export default function HomeDashboard() {
             </div>
           )}
 
-          {/* Proyectos activos del miembro */}
-          {myActiveProjects.length > 0 && (
+          {/* Proyectos activos del miembro: carpetas Cliente → Proyecto o lista */}
+          {homeProjects.length > 0 && (
             <div className="bg-card rounded-xl border overflow-hidden">
-              <div className="px-4 py-3 border-b bg-muted/20 flex items-center gap-2">
+              <div className="px-4 py-3 border-b bg-muted/20 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
                 <Briefcase className="h-4 w-4 text-slate-500" />
                 <span className="text-sm font-medium text-foreground">Proyectos activos</span>
-                <span className="text-xs text-muted-foreground">({myActiveProjects.length})</span>
+                <span className="text-xs text-muted-foreground">({homeProjects.length})</span>
+                </div>
+                <div className="flex items-center gap-1 rounded-md border bg-background p-0.5">
+                  <button aria-label="Ver proyectos por carpetas" onClick={() => setHomeProjectView('folders')} className={cn("rounded p-1", homeProjectView === 'folders' ? "bg-primary/10 text-primary" : "text-muted-foreground")}><FolderOpen className="h-3.5 w-3.5" /></button>
+                  <button aria-label="Ver proyectos en lista" onClick={() => setHomeProjectView('list')} className={cn("rounded p-1", homeProjectView === 'list' ? "bg-primary/10 text-primary" : "text-muted-foreground")}><List className="h-3.5 w-3.5" /></button>
+                </div>
               </div>
-              <div className="divide-y divide-border">
-                {myActiveProjects.map((p, i) => (
-                  <div key={i} className="px-4 py-2.5 flex items-center gap-3 hover:bg-accent/20 transition-colors">
-                    <span className="flex-1 text-sm text-foreground truncate">
-                      {p.clientName ? <span className="text-muted-foreground">{p.clientName} · </span> : null}
-                      {p.name}
-                    </span>
-                    <span className="text-xs text-muted-foreground flex-shrink-0">{p.pending} pendiente{p.pending !== 1 ? "s" : ""}</span>
-                  </div>
-                ))}
-              </div>
+              {homeProjectView === 'list' ? (
+                <div className="divide-y divide-border">{homeProjects.map((p) => (
+                  <Link key={p.id} href={`/tasks/projects/${p.id}`} className="flex items-center gap-3 px-4 py-2.5 hover:bg-accent/20 transition-colors">
+                    <span className="flex-1 truncate text-sm text-foreground">{p.clientName ? <span className="text-muted-foreground">{p.clientName} · </span> : null}{p.name}</span>
+                    <span className="flex-shrink-0 text-xs text-muted-foreground">{p.pendingCount} pendiente{p.pendingCount !== 1 ? "s" : ""}</span>
+                  </Link>
+                ))}</div>
+              ) : (
+                <div className="divide-y divide-border">{Object.entries(homeProjects.reduce<Record<string, HomeProject[]>>((groups, project) => { const client = project.clientName || "Epical"; (groups[client] ??= []).push(project); return groups; }, {})).sort(([a], [b]) => a.localeCompare(b, 'es')).map(([client, projects]) => {
+                  const collapsed = collapsedHomeClients.has(client);
+                  return <div key={client}>
+                    <button className="flex w-full items-center gap-2 px-4 py-2 text-left text-xs font-semibold text-muted-foreground hover:bg-accent/20" onClick={() => setCollapsedHomeClients((current) => { const next = new Set(current); if (next.has(client)) next.delete(client); else next.add(client); return next; })}>
+                      <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", collapsed && "-rotate-90")} /> <span className="flex-1">{client}</span><span>{projects.length}</span>
+                    </button>
+                    {!collapsed && projects.map((p) => <Link key={p.id} href={`/tasks/projects/${p.id}`} className="flex items-center gap-3 border-t px-7 py-2.5 hover:bg-accent/20"><span className="flex-1 truncate text-sm">{p.name}</span><span className="text-xs text-muted-foreground">{p.pendingCount} pendiente{p.pendingCount !== 1 ? "s" : ""}</span></Link>)}
+                  </div>;
+                })}</div>
+              )}
             </div>
           )}
 

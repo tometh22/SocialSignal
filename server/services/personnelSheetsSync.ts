@@ -31,6 +31,34 @@ export interface ParsedSheetRow {
   legacyRole?: string | null;
 }
 
+/**
+ * Convierte los errores de Google en una respuesta segura y accionable para la
+ * interfaz. En particular, invalid_grant suele significar que Railway tiene
+ * una clave vencida/malformada: reintentar sin corregir la variable sólo
+ * confunde al usuario y puede dar la impresión de que el sync se aplicó.
+ */
+export function describeSheetsSyncError(error: unknown) {
+  const detail = error instanceof Error ? error.message : String(error ?? "");
+  const normalized = detail.toLowerCase();
+  if (normalized.includes("invalid_grant") || normalized.includes("invalid jwt") || normalized.includes("jwt signature")) {
+    return {
+      code: "GOOGLE_AUTH_INVALID",
+      message: "Google rechazó las credenciales del Máster. Verificá GOOGLE_CLIENT_EMAIL y GOOGLE_PRIVATE_KEY en Railway, y que esa cuenta tenga acceso al Google Sheet.",
+      action: "Corregí las variables en Railway y volvé a intentar. No se aplicaron cambios.",
+      detail,
+      retryable: false,
+    };
+  }
+
+  return {
+    code: "GOOGLE_SYNC_FAILED",
+    message: "No se pudo leer Google Sheets. No se aplicaron cambios.",
+    action: "Revisá el acceso al Sheet y volvé a intentar.",
+    detail,
+    retryable: true,
+  };
+}
+
 function buildSheetsClient() {
   let credentials: any;
   if (process.env.GOOGLE_PRIVATE_KEY && process.env.GOOGLE_CLIENT_EMAIL) {
