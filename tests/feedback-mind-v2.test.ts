@@ -21,6 +21,7 @@ import {
 } from "../shared/utils/taskEstimates";
 import { ApiError, getApiErrorMessage, parseApiError } from "../client/src/lib/api-error";
 import { parseValorHoraSection } from "../server/services/personnelSheetsSync";
+import { deriveHourlyRatesFromSalary } from "../shared/utils/personnel-cost";
 
 test("quotation contract accepts numeric exchangeRateAtQuote and normalizes it for numeric columns", () => {
   const parsed = insertQuotationSchema.parse({
@@ -279,6 +280,27 @@ test("salary remains informational and freelance capacity can be null", () => {
   const schema = readFileSync(new URL("../shared/schema.ts", import.meta.url), "utf8");
   expect(schema).toContain('monthlyHours: doublePrecision("monthly_hours").default(160)');
   expect(schema).not.toContain('monthlyHours: doublePrecision("monthly_hours").default(160).notNull()');
+});
+
+test("changing salary or monthly hours derives the hourly values", () => {
+  expect(deriveHourlyRatesFromSalary({ monthlySalaryARS: 1_600_000, monthlyHours: 160 }))
+    .toEqual({ hourlyRateARS: 10_000 });
+  expect(deriveHourlyRatesFromSalary({ monthlySalaryUSD: 3_200, monthlyHours: 160 }))
+    .toEqual({ hourlyRateUSD: 20 });
+  expect(deriveHourlyRatesFromSalary({ monthlySalaryARS: 1_600_000, monthlyHours: 120 }))
+    .toEqual({ hourlyRateARS: 13_333.33 });
+  expect(deriveHourlyRatesFromSalary({ monthlySalaryARS: 1_600_000, monthlyHours: null }))
+    .toEqual({});
+});
+
+test("personnel updates keep the current historical cost aligned when hours change", () => {
+  const routes = readFileSync(new URL("../server/routes.ts", import.meta.url), "utf8");
+  const endpoint = routes.slice(
+    routes.indexOf('app.patch("/api/personnel/:id"'),
+    routes.indexOf('app.get("/api/personnel/:id/dependencies"'),
+  );
+  expect(endpoint).toContain("deriveHourlyRatesFromSalary");
+  expect(endpoint).toContain("monthlySalaryARS: currentCost.monthlySalaryARS");
 });
 
 test("quote projection exposes only snapshot and annual average", () => {

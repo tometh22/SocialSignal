@@ -1145,7 +1145,7 @@ export default function Admin() {
                                 <TooltipContent className="max-w-xs">
                                   <p className="text-sm">
                                     Capacidad contractual mensual para empleados fijos (por ejemplo 120 o 160 horas).
-                                    Es independiente del sueldo informativo y del valor hora histórico.
+                                    Junto con el sueldo mensual define el valor hora: cambiar cualquiera de los dos recalcula el valor hora histórico vigente.
                                   </p>
                                 </TooltipContent>
                               </Tooltip>

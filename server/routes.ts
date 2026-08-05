@@ -12,6 +12,7 @@ import {
   resolveCanonicalPersonnelRate,
 } from "./domain/personnel-rate";
 import { aggregateWeeklyEstimatesByTask } from "@shared/utils/taskEstimates";
+import { deriveHourlyRatesFromSalary } from "@shared/utils/personnel-cost";
 import {
   insertClientSchema,
   insertClientBillingEntitySchema,
@@ -4353,6 +4354,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!updatedPerson) {
         console.error(`❌ [${personName}] Personnel not found after update`);
         return res.status(404).json({ message: "Personnel not found" });
+      }
+
+      // Monthly hours and salary are the inputs for the current cost. Keep the
+      // effective historical row in sync when hours change, without touching
+      // older periods or freelancers that have no contractual capacity.
+      if (Object.prototype.hasOwnProperty.call(validatedData, "monthlyHours") && updatedPerson.monthlyHours != null) {
+        const currentPeriod = new Date().getFullYear() * 100 + (new Date().getMonth() + 1);
+        const [currentCost] = await db.select()
+          .from(personnelHistoricalCosts)
+          .where(and(
+            eq(personnelHistoricalCosts.personnelId, id),
+            eq(personnelHistoricalCosts.isActive, true),
+            sql`(${personnelHistoricalCosts.year} * 100 + ${personnelHistoricalCosts.month}) <= ${currentPeriod}`,
+          ))
+          .orderBy(desc(personnelHistoricalCosts.year), desc(personnelHistoricalCosts.month))
+          .limit(1);
+
+        if (currentCost) {
+          const derivedRates = deriveHourlyRatesFromSalary({
+            monthlyHours: updatedPerson.monthlyHours,
+            monthlySalaryARS: currentCost.monthlySalaryARS,
+            monthlySalaryUSD: currentCost.monthlySalaryUSD,
+          });
+          if (Object.keys(derivedRates).length > 0) {
+            await db.update(personnelHistoricalCosts)
+              .set({
+                hourlyRateARS: derivedRates.hourlyRateARS == null ? undefined : String(derivedRates.hourlyRateARS),
+                hourlyRateUSD: derivedRates.hourlyRateUSD == null ? undefined : String(derivedRates.hourlyRateUSD),
+                updatedAt: new Date(),
+              })
+              .where(eq(personnelHistoricalCosts.id, currentCost.id));
+          }
+        }
       }
 
       console.log(`✅ [${personName}] Sending response with monthlyHours: ${updatedPerson.monthlyHours}`);
@@ -9368,8 +9402,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Crear nuevo costo histórico
   app.post("/api/personnel-historical-costs", requireAuth, async (req, res) => {
     try {
+      const [person] = await db.select({ monthlyHours: personnel.monthlyHours, contractType: personnel.contractType })
+        .from(personnel)
+        .where(eq(personnel.id, Number(req.body.personnelId)));
+      if (!person) return res.status(400).json({ message: "La persona seleccionada no existe" });
+
+      const hasMonthlyHours = Object.prototype.hasOwnProperty.call(req.body, "monthlyHours");
+      const requestedMonthlyHours = hasMonthlyHours && req.body.monthlyHours != null
+        ? Number(req.body.monthlyHours)
+        : req.body.monthlyHours;
+      if (requestedMonthlyHours != null && (!Number.isInteger(requestedMonthlyHours) || requestedMonthlyHours < 0)) {
+        return res.status(400).json({ message: "Las horas mensuales deben ser un número entero mayor o igual a cero" });
+      }
+      if (requestedMonthlyHours != null && person.contractType !== "freelance" && (requestedMonthlyHours < 40 || requestedMonthlyHours > 300)) {
+        return res.status(400).json({ message: "Las horas mensuales deben estar entre 40 y 300 horas" });
+      }
+
+      const derivedRates = deriveHourlyRatesFromSalary({
+        monthlyHours: hasMonthlyHours
+          ? requestedMonthlyHours
+          : person.monthlyHours,
+        monthlySalaryARS: req.body.monthlySalaryARS,
+        monthlySalaryUSD: req.body.monthlySalaryUSD,
+      });
       const validatedData = insertPersonnelHistoricalCostSchema.parse({
         ...req.body,
+        ...derivedRates,
         createdBy: req.user?.id
       });
 
@@ -9390,6 +9448,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const result = await db.insert(personnelHistoricalCosts).values(validatedData).returning();
+      if (hasMonthlyHours) {
+        await db.update(personnel)
+          .set({ monthlyHours: requestedMonthlyHours == null ? null : requestedMonthlyHours })
+          .where(eq(personnel.id, Number(req.body.personnelId)));
+      }
       res.status(201).json(result[0]);
     } catch (error) {
       console.error("Error creating personnel historical cost:", error);
@@ -9411,8 +9474,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (isNaN(id)) return res.status(400).json({ message: "Invalid cost ID" });
 
     try {
+      const [currentCost] = await db.select()
+        .from(personnelHistoricalCosts)
+        .where(and(eq(personnelHistoricalCosts.id, id), eq(personnelHistoricalCosts.isActive, true)));
+      if (!currentCost) return res.status(404).json({ message: "Personnel historical cost not found" });
+
+      const [person] = await db.select({ monthlyHours: personnel.monthlyHours, contractType: personnel.contractType })
+        .from(personnel)
+        .where(eq(personnel.id, currentCost.personnelId));
+      const hasMonthlyHours = Object.prototype.hasOwnProperty.call(req.body, "monthlyHours");
+      const requestedMonthlyHours = hasMonthlyHours && req.body.monthlyHours != null
+        ? Number(req.body.monthlyHours)
+        : req.body.monthlyHours;
+      if (requestedMonthlyHours != null && (!Number.isInteger(requestedMonthlyHours) || requestedMonthlyHours < 0)) {
+        return res.status(400).json({ message: "Las horas mensuales deben ser un número entero mayor o igual a cero" });
+      }
+      if (requestedMonthlyHours != null && person?.contractType !== "freelance" && (requestedMonthlyHours < 40 || requestedMonthlyHours > 300)) {
+        return res.status(400).json({ message: "Las horas mensuales deben estar entre 40 y 300 horas" });
+      }
+      const mergedCost = { ...currentCost, ...req.body };
+      const derivedRates = deriveHourlyRatesFromSalary({
+        monthlyHours: hasMonthlyHours
+          ? requestedMonthlyHours
+          : person?.monthlyHours,
+        monthlySalaryARS: mergedCost.monthlySalaryARS,
+        monthlySalaryUSD: mergedCost.monthlySalaryUSD,
+      });
       const validatedData = insertPersonnelHistoricalCostSchema.partial().parse({
         ...req.body,
+        ...derivedRates,
         updatedBy: req.user?.id,
         updatedAt: new Date()
       });
@@ -9425,6 +9515,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (result.length === 0) {
         return res.status(404).json({ message: "Personnel historical cost not found" });
+      }
+
+      if (hasMonthlyHours) {
+        await db.update(personnel)
+          .set({ monthlyHours: requestedMonthlyHours == null ? null : requestedMonthlyHours })
+          .where(eq(personnel.id, currentCost.personnelId));
       }
 
       res.json(result[0]);
