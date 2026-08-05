@@ -18430,8 +18430,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (assigneeId) conditions.push(eq(tasks.assigneeId, parseInt(assigneeId as string)));
       if (projectId) conditions.push(eq(tasks.projectId, parseInt(projectId as string)));
       if (status) conditions.push(eq(tasks.status, status as string));
-      if (dateFrom) conditions.push(gte(tasks.dueDate, new Date(dateFrom as string)));
-      if (dateTo) conditions.push(lte(tasks.dueDate, new Date(dateTo as string)));
+      if (dateFrom || dateTo) {
+        const from = dateFrom ? new Date(dateFrom as string) : new Date(0);
+        const to = dateTo ? new Date(dateTo as string) : new Date(8640000000000000);
+        if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) {
+          return res.status(400).json({ message: "Rango de fechas inválido" });
+        }
+        conditions.push(and(
+          or(isNotNull(tasks.startDate), isNotNull(tasks.dueDate)),
+          or(isNull(tasks.startDate), lte(tasks.startDate, to)),
+          or(isNull(tasks.dueDate), gte(tasks.dueDate, from)),
+        ));
+      }
 
       const result = conditions.length > 0
         ? await db.select().from(tasks).where(and(...conditions)).orderBy(asc(tasks.position), asc(tasks.createdAt))
@@ -18477,8 +18487,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ),
         ];
         if (status && status !== 'all') conditions.push(eq(tasks.status, status as string));
-        if (dateFrom) conditions.push(gte(tasks.dueDate, new Date(dateFrom as string)));
-        if (dateTo) conditions.push(lte(tasks.dueDate, new Date(dateTo as string)));
+        if (dateFrom || dateTo) {
+          const from = dateFrom ? new Date(dateFrom as string) : new Date(0);
+          const to = dateTo ? new Date(dateTo as string) : new Date(8640000000000000);
+          if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) {
+            return res.status(400).json({ message: "Rango de fechas inválido" });
+          }
+          conditions.push(and(
+            or(isNotNull(tasks.startDate), isNotNull(tasks.dueDate)),
+            or(isNull(tasks.startDate), lte(tasks.startDate, to)),
+            or(isNull(tasks.dueDate), gte(tasks.dueDate, from)),
+          ));
+        }
         myTasks = await db.select().from(tasks).where(and(...conditions)).orderBy(asc(tasks.dueDate), asc(tasks.position));
       }
 
@@ -18952,15 +18972,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const result = await db.execute(sql`
         SELECT
           COALESCE(SUM(hours) FILTER (
-            WHERE date >= date_trunc('week', CURRENT_DATE)
-              AND date < date_trunc('week', CURRENT_DATE) + interval '7 days'
+            WHERE entry_date >= date_trunc('week', CURRENT_DATE)
+              AND entry_date < date_trunc('week', CURRENT_DATE) + interval '7 days'
           ), 0)::float AS week_hours,
           COALESCE(SUM(hours) FILTER (
-            WHERE date >= date_trunc('month', CURRENT_DATE)
-              AND date < date_trunc('month', CURRENT_DATE) + interval '1 month'
+            WHERE entry_date >= date_trunc('month', CURRENT_DATE)
+              AND entry_date < date_trunc('month', CURRENT_DATE) + interval '1 month'
           ), 0)::float AS month_hours
-        FROM task_time_entries
-        WHERE personnel_id = ${person.id}
+        FROM (
+          SELECT hours, date AS entry_date
+          FROM task_time_entries
+          WHERE personnel_id = ${person.id}
+          UNION ALL
+          SELECT hours, date AS entry_date
+          FROM time_entries
+          WHERE personnel_id = ${person.id}
+        ) AS all_time_entries
       `);
       const row = result.rows[0] as any;
       res.json({

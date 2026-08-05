@@ -387,3 +387,20 @@ test("monthly closing persists one canonical ARS/USD snapshot", () => {
   expect(endpoint).toContain("billingCurrency: data.billingCurrency");
   expect(endpoint).toContain("grandTotalUSD: data.grandTotalUSD");
 });
+
+test("task creation invalidates personal task surfaces", () => {
+  const taskList = readFileSync(new URL("../client/src/components/tasks/ProjectTaskList.tsx", import.meta.url), "utf8");
+  expect(taskList).toContain('queryClient.invalidateQueries({ queryKey: ["/api/tasks/my-tasks"] })');
+  expect(taskList).toContain('queryClient.invalidateQueries({ queryKey: ["/api/tasks/team-calendar"] })');
+});
+
+test("home hours include task and legacy time entries", () => {
+  const routes = readFileSync(new URL("../server/routes.ts", import.meta.url), "utf8");
+  const myHours = routes.slice(
+    routes.indexOf('app.get("/api/tasks/my-hours"'),
+    routes.indexOf('// GET /api/tasks/:id — obtener tarea individual'),
+  );
+  expect(myHours).toContain("FROM task_time_entries");
+  expect(myHours).toContain("FROM time_entries");
+  expect(myHours).toContain("UNION ALL");
+});
