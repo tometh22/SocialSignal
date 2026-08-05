@@ -45,14 +45,28 @@ export function HistoricalCostsTable({ personnel }: HistoricalCostsTableProps) {
   };
 
   const updateCostMutation = useMutation({
-    mutationFn: async (data: { 
-      personnelId: number; 
-      updates: Record<string, number | null> 
+    mutationFn: async (data: {
+      personnelId: number;
+      month: number;
+      field: "hourlyRateARS" | "monthlySalaryARS";
+      value: number | null;
     }) => {
-      return apiRequest(`/api/personnel/${data.personnelId}`, {
-        method: "PATCH",
-        body: JSON.stringify(data.updates),
-      });
+      const existing = historicalCosts.find((cost) =>
+        cost.personnelId === data.personnelId && cost.month === data.month && cost.year === 2025,
+      );
+      const monthlyHours = personnel.find((person) => person.id === data.personnelId)?.monthlyHours ?? null;
+      const payload = { [data.field]: data.value, monthlyHours };
+      return existing
+        ? apiRequest(`/api/personnel-historical-costs/${existing.id}`, { method: "PATCH", body: payload })
+        : apiRequest("/api/personnel-historical-costs", {
+            method: "POST",
+            body: {
+              personnelId: data.personnelId,
+              year: 2025,
+              month: data.month,
+              ...payload,
+            },
+          });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/personnel"] });
@@ -90,10 +104,16 @@ export function HistoricalCostsTable({ personnel }: HistoricalCostsTableProps) {
         return;
       }
 
-      updateCostMutation.mutate({
-        personnelId,
-        updates: { [field]: numericValue }
-      });
+      const match = field.match(/^(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)2025(HourlyRateARS|MonthlySalaryARS)$/);
+      if (!match) return;
+      const monthByKey: Record<string, number> = {
+        jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6,
+        jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12,
+      };
+      const month = monthByKey[match[1]];
+      const canonicalField = match[2] === "HourlyRateARS" ? "hourlyRateARS" : "monthlySalaryARS";
+      if (!month) return;
+      updateCostMutation.mutate({ personnelId, month, field: canonicalField, value: numericValue });
     }
 
     // Remove from editing state
