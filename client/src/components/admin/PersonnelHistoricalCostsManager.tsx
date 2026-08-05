@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
@@ -7,17 +7,19 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Trash2, DollarSign, Clock, Users, TrendingUp, Edit, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import type { Personnel, PersonnelHistoricalCost } from "@shared/schema";
+import { deriveHourlyRatesFromSalary } from "@shared/utils/personnel-cost";
 
 const personnelHistoricalCostSchema = z.object({
   personnelId: z.number().min(1, "Debe seleccionar una persona"),
   year: z.number().min(2020, "Año debe ser mayor a 2020").max(2030, "Año debe ser menor a 2030"),
   month: z.number().min(1, "Mes debe ser entre 1 y 12").max(12, "Mes debe ser entre 1 y 12"),
+  monthlyHours: z.number().min(0, "Las horas mensuales no pueden ser negativas").int("Las horas mensuales deben ser enteras").nullable().optional(),
   hourlyRateARS: z.number().min(0, "Tarifa por hora ARS debe ser positiva").optional(),
   monthlySalaryARS: z.number().min(0, "Salario mensual ARS debe ser positivo").optional(),
   hourlyRateUSD: z.number().min(0, "Tarifa por hora USD debe ser positiva").optional(),
@@ -25,7 +27,8 @@ const personnelHistoricalCostSchema = z.object({
   adjustmentReason: z.string().optional(),
   notes: z.string().optional(),
 }).refine((data) => {
-  return data.hourlyRateARS || data.monthlySalaryARS || data.hourlyRateUSD || data.monthlySalaryUSD;
+  return [data.hourlyRateARS, data.monthlySalaryARS, data.hourlyRateUSD, data.monthlySalaryUSD]
+    .some((value) => value != null);
 }, {
   message: "Debe especificar al menos una tarifa o salario",
   path: ["hourlyRateARS"]
@@ -48,9 +51,10 @@ export function PersonnelHistoricalCostsManager({ onClose }: PersonnelHistorical
       personnelId: 0,
       year: new Date().getFullYear(),
       month: new Date().getMonth() + 1,
-      hourlyRateARS: 0,
+      monthlyHours: undefined,
+      hourlyRateARS: undefined,
       monthlySalaryARS: undefined,
-      hourlyRateUSD: 0,
+      hourlyRateUSD: undefined,
       monthlySalaryUSD: undefined,
       adjustmentReason: "",
       notes: "",
@@ -65,6 +69,30 @@ export function PersonnelHistoricalCostsManager({ onClose }: PersonnelHistorical
   const { data: historicalCosts = [] } = useQuery<PersonnelHistoricalCost[]>({
     queryKey: ["/api/personnel-historical-costs"],
   });
+
+  const selectedPersonnelId = useWatch({ control: form.control, name: "personnelId" });
+  const monthlyHours = useWatch({ control: form.control, name: "monthlyHours" });
+  const monthlySalaryARS = useWatch({ control: form.control, name: "monthlySalaryARS" });
+  const monthlySalaryUSD = useWatch({ control: form.control, name: "monthlySalaryUSD" });
+  const selectedPerson = personnel.find((person) => person.id === selectedPersonnelId);
+
+  useEffect(() => {
+    if (!showForm || selectedPersonnelId <= 0) return;
+    const personHours = selectedPerson?.monthlyHours ?? null;
+    if (monthlyHours === undefined && personHours !== null) {
+      form.setValue("monthlyHours", personHours);
+    }
+  }, [form, monthlyHours, selectedPerson, selectedPersonnelId, showForm]);
+
+  useEffect(() => {
+    const derivedRates = deriveHourlyRatesFromSalary({ monthlyHours, monthlySalaryARS, monthlySalaryUSD });
+    if (derivedRates.hourlyRateARS !== undefined) {
+      form.setValue("hourlyRateARS", derivedRates.hourlyRateARS, { shouldValidate: true });
+    }
+    if (derivedRates.hourlyRateUSD !== undefined) {
+      form.setValue("hourlyRateUSD", derivedRates.hourlyRateUSD, { shouldValidate: true });
+    }
+  }, [form, monthlyHours, monthlySalaryARS, monthlySalaryUSD]);
 
   // Mutations
   const createCostMutation = useMutation({
@@ -129,9 +157,10 @@ export function PersonnelHistoricalCostsManager({ onClose }: PersonnelHistorical
     form.setValue("personnelId", cost.personnelId);
     form.setValue("year", cost.year);
     form.setValue("month", cost.month);
+    form.setValue("monthlyHours", personnel.find((person) => person.id === cost.personnelId)?.monthlyHours ?? null);
     form.setValue("hourlyRateARS", cost.hourlyRateARS != null ? Number(cost.hourlyRateARS) : undefined);
     form.setValue("monthlySalaryARS", cost.monthlySalaryARS != null ? Number(cost.monthlySalaryARS) : undefined);
-    form.setValue("hourlyRateUSD", cost.hourlyRateUSD != null ? Number(cost.hourlyRateUSD) : 0);
+    form.setValue("hourlyRateUSD", cost.hourlyRateUSD != null ? Number(cost.hourlyRateUSD) : undefined);
     form.setValue("monthlySalaryUSD", cost.monthlySalaryUSD != null ? Number(cost.monthlySalaryUSD) : undefined);
     form.setValue("adjustmentReason", cost.adjustmentReason || "");
     form.setValue("notes", cost.notes || "");
@@ -205,7 +234,12 @@ export function PersonnelHistoricalCostsManager({ onClose }: PersonnelHistorical
                       <FormItem>
                         <FormLabel>Persona</FormLabel>
                         <Select 
-                          onValueChange={(value) => field.onChange(parseInt(value))}
+                          onValueChange={(value) => {
+                            const personnelId = parseInt(value);
+                            field.onChange(personnelId);
+                            const person = personnel.find((candidate) => candidate.id === personnelId);
+                            form.setValue("monthlyHours", person?.monthlyHours ?? null);
+                          }}
                           value={field.value?.toString()}
                         >
                           <FormControl>
@@ -276,16 +310,43 @@ export function PersonnelHistoricalCostsManager({ onClose }: PersonnelHistorical
 
                   <FormField
                     control={form.control}
+                    name="monthlyHours"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Horas mensuales contractuales</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            min="0"
+                            step="1"
+                            placeholder="Sin capacidad (freelance)"
+                            {...field}
+                            value={field.value ?? ""}
+                            onChange={(event) => field.onChange(event.target.value === "" ? null : parseFloat(event.target.value))}
+                          />
+                        </FormControl>
+                        <p className="text-xs text-muted-foreground">
+                          Cambiar sueldo u horas recalcula automáticamente el valor hora.
+                        </p>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
                     name="hourlyRateARS"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Tarifa por Hora (ARS)</FormLabel>
+                        <FormLabel>Valor hora ARS {monthlySalaryARS != null && Number(monthlyHours) > 0 ? "(calculado)" : ""}</FormLabel>
                         <FormControl>
                           <Input 
                             type="number" 
                             step="0.01"
+                            readOnly={monthlySalaryARS != null && Number(monthlyHours) > 0}
                             {...field}
-                            onChange={(e) => field.onChange(parseFloat(e.target.value))}
+                            value={field.value ?? ""}
+                            onChange={(e) => field.onChange(e.target.value === "" ? undefined : parseFloat(e.target.value))}
                           />
                         </FormControl>
                         <FormMessage />
@@ -298,11 +359,12 @@ export function PersonnelHistoricalCostsManager({ onClose }: PersonnelHistorical
                     name="hourlyRateUSD"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Tarifa por Hora (USD) - Opcional</FormLabel>
+                        <FormLabel>Valor hora USD {monthlySalaryUSD != null && Number(monthlyHours) > 0 ? "(calculado)" : "- Opcional"}</FormLabel>
                         <FormControl>
                           <Input 
                             type="number" 
                             step="0.01"
+                            readOnly={monthlySalaryUSD != null && Number(monthlyHours) > 0}
                             {...field}
                             onChange={(e) => field.onChange(parseFloat(e.target.value) || undefined)}
                           />
@@ -317,7 +379,7 @@ export function PersonnelHistoricalCostsManager({ onClose }: PersonnelHistorical
                     name="monthlySalaryARS"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Sueldo Mensual (ARS) - Informativo</FormLabel>
+                        <FormLabel>Sueldo Mensual (ARS)</FormLabel>
                         <FormControl>
                           <Input type="number" step="0.01" {...field} value={field.value ?? ""}
                             onChange={(e) => field.onChange(e.target.value === "" ? undefined : parseFloat(e.target.value))} />
@@ -332,7 +394,7 @@ export function PersonnelHistoricalCostsManager({ onClose }: PersonnelHistorical
                     name="monthlySalaryUSD"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Sueldo Mensual (USD) - Informativo</FormLabel>
+                        <FormLabel>Sueldo Mensual (USD)</FormLabel>
                         <FormControl>
                           <Input type="number" step="0.01" {...field} value={field.value ?? ""}
                             onChange={(e) => field.onChange(e.target.value === "" ? undefined : parseFloat(e.target.value))} />
@@ -435,7 +497,7 @@ export function PersonnelHistoricalCostsManager({ onClose }: PersonnelHistorical
                   <table className="w-full text-sm border-collapse">
                     <thead><tr className="border-b text-left text-muted-foreground">
                       <th className="p-2">Persona</th><th className="p-2">Período</th><th className="p-2">Sueldo ARS</th>
-                      <th className="p-2">Sueldo USD</th><th className="p-2">Valor hora ARS</th><th className="p-2">Valor hora USD</th><th className="p-2" />
+                      <th className="p-2">Sueldo USD</th><th className="p-2">Horas/mes</th><th className="p-2">Valor hora ARS</th><th className="p-2">Valor hora USD</th><th className="p-2" />
                     </tr></thead>
                     <tbody>
               {historicalCosts.map((cost) => (
@@ -444,6 +506,7 @@ export function PersonnelHistoricalCostsManager({ onClose }: PersonnelHistorical
                   <td className="p-2 text-muted-foreground">{monthNames[cost.month - 1]} {cost.year}</td>
                   <td className="p-2">{cost.monthlySalaryARS == null ? "—" : `$${Number(cost.monthlySalaryARS).toLocaleString("es-AR")}`}</td>
                   <td className="p-2">{cost.monthlySalaryUSD == null ? "—" : `$${Number(cost.monthlySalaryUSD).toLocaleString("en-US")}`}</td>
+                  <td className="p-2">{personnel.find((person) => person.id === cost.personnelId)?.monthlyHours ?? "—"}</td>
                   <td className="p-2">{cost.hourlyRateARS == null ? "—" : `${Number(cost.hourlyRateARS).toLocaleString("es-AR")} ARS/h`}</td>
                   <td className="p-2">{cost.hourlyRateUSD == null ? "—" : `${Number(cost.hourlyRateUSD).toLocaleString("en-US")} USD/h`}</td>
                   <td className="p-2"><div className="flex items-center gap-1">
