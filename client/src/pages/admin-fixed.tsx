@@ -83,6 +83,7 @@ import { TemplateCost } from "@/components/admin/template-cost";
 import { CostMultipliersManager } from "@/components/cost-multipliers-manager";
 import { ExchangeRateManager } from "@/components/admin/ExchangeRateManager";
 import { PersonnelHistoricalCostsManager } from "@/components/admin/PersonnelHistoricalCostsManager";
+import { HistoricalCostsTable } from "@/components/admin/HistoricalCostsTable";
 
 
 import { 
@@ -1076,6 +1077,9 @@ export default function Admin() {
                   <a href="#personal-cost-history" className="rounded-md border px-3 py-2 text-sm text-muted-foreground hover:bg-muted">
                     Ver costos históricos
                   </a>
+                  <a href="#personal-cost-history-grid" className="rounded-md border px-3 py-2 text-sm text-muted-foreground hover:bg-muted">
+                    Ver tabla mensual
+                  </a>
                   <SheetsSyncDialog />
                   <Button onClick={openNewPersonnelDialog} disabled={!roles || roles.length === 0}>
                     <PlusCircle className="mr-2 h-4 w-4" />
@@ -1268,6 +1272,11 @@ export default function Admin() {
           </Card>
 
           {/* Fuente única de tarifas y sueldos históricos */}
+          {sortedPersonnel && sortedPersonnel.length > 0 && (
+            <div id="personal-cost-history-grid" className="mt-6 scroll-mt-6">
+              <HistoricalCostsTable personnel={personnel ?? []} />
+            </div>
+          )}
           {sortedPersonnel && sortedPersonnel.length > 0 && (
             <div id="personal-cost-history" className="mt-6 scroll-mt-6">
               <PersonnelHistoricalCostsManager />
