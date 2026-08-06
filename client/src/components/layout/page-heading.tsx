@@ -19,7 +19,10 @@ export function PageHeading({
   className,
 }: PageHeadingProps) {
   return (
-    <section className={cn("mind-page-heading", className)}>
+    <section
+      className={cn("mind-page-heading", className)}
+      data-has-aside={aside ? "true" : "false"}
+    >
       <div className="relative z-10 flex min-w-0 flex-1 flex-col justify-center">
         {eyebrow && (
           <div className="mb-3 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.18em] text-primary">

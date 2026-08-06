@@ -2049,7 +2049,7 @@ a,
 }
 
 @media (min-width: 1536px) {
-  .mind-page-heading {
+  .mind-page-heading[data-has-aside="true"] {
     grid-template-columns: minmax(0, 1fr) minmax(11rem, 13rem);
     gap: 1.5rem;
   }
