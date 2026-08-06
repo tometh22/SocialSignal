@@ -15,6 +15,7 @@ import { Search, FileText, CheckCircle, AlertCircle, Clock, Edit, Eye, Trash2, P
 import { LossReasonDialog } from "@/components/quotation/loss-reason-dialog";
 import { PageLayout } from "@/components/ui/page-layout";
 import { Loader } from "@/components/ui/loader";
+import { MetricCard, MetricGrid } from "@/components/ui/metric-card";
 import {
   Dialog,
   DialogContent,
@@ -522,97 +523,53 @@ export default function ManageQuotes() {
       }
     >
 
-        <div className="relative z-10 mx-auto max-w-[1440px]">
-          {/* Stats Cards - Diseño más compacto y profesional */}
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
-            <Card className="mind-kpi mind-interactive-card">
-              <CardContent className="p-4">
-                <div className="flex items-center space-x-3">
-                  <div className="h-10 w-10 bg-indigo-100 rounded-lg flex items-center justify-center">
-                    <FileText className="h-5 w-5 text-indigo-600" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-xs font-medium text-gray-500 uppercase">Total</p>
-                    <p className="text-xl font-bold text-gray-900">{stats.total}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="mind-kpi mind-interactive-card">
-              <CardContent className="p-4">
-                <div className="flex items-center space-x-3">
-                  <div className="h-10 w-10 bg-emerald-100 rounded-lg flex items-center justify-center">
-                    <CheckCircle className="h-5 w-5 text-emerald-600" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-xs font-medium text-gray-500 uppercase">Aprobadas</p>
-                    <p className="text-xl font-bold text-emerald-600">{stats.approved}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="mind-kpi mind-interactive-card">
-              <CardContent className="p-4">
-                <div className="flex items-center space-x-3">
-                  <div className="h-10 w-10 bg-amber-100 rounded-lg flex items-center justify-center">
-                    <Clock className="h-5 w-5 text-amber-600" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-xs font-medium text-gray-500 uppercase">Pendientes</p>
-                    <p className="text-xl font-bold text-amber-600">{stats.pending}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="mind-kpi mind-interactive-card">
-              <CardContent className="p-4">
-                <div className="flex items-center space-x-3">
-                  <div className="h-10 w-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                    <DollarSign className="h-5 w-5 text-blue-600" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-xs font-medium text-gray-500 uppercase">Valor Total</p>
-                    <p className="text-lg font-bold text-blue-600">
-                      ${stats.totalValue.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="mind-kpi mind-interactive-card">
-              <CardContent className="p-4">
-                <div className="flex items-center space-x-3">
-                  <div className="h-10 w-10 bg-green-100 rounded-lg flex items-center justify-center">
-                    <TrendingUp className="h-5 w-5 text-green-600" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-xs font-medium text-gray-500 uppercase">Conversión</p>
-                    <p className="text-xl font-bold text-green-600">{stats.conversionRate.toFixed(1)}%</p>
-                    <p className="text-[10px] text-gray-400">Aprobadas/Total</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="mind-kpi mind-interactive-card">
-              <CardContent className="p-4">
-                <div className="flex items-center space-x-3">
-                  <div className="h-10 w-10 bg-red-100 rounded-lg flex items-center justify-center">
-                    <X className="h-5 w-5 text-red-600" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-xs font-medium text-gray-500 uppercase">Rechazos</p>
-                    <p className="text-xl font-bold text-red-600">{stats.rejectionRate.toFixed(1)}%</p>
-                    <p className="text-[10px] text-gray-400">Rechazadas/Total</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+        <div className="relative z-10 min-w-0">
+          <MetricGrid className="mb-6">
+            <MetricCard
+              label="Total"
+              value={stats.total.toLocaleString("es-AR")}
+              icon={<FileText className="h-5 w-5" />}
+              tone="primary"
+              valueLabel={`${stats.total} cotizaciones en total`}
+            />
+            <MetricCard
+              label="Aprobadas"
+              value={stats.approved.toLocaleString("es-AR")}
+              icon={<CheckCircle className="h-5 w-5" />}
+              tone="success"
+              valueLabel={`${stats.approved} cotizaciones aprobadas`}
+            />
+            <MetricCard
+              label="Pendientes"
+              value={stats.pending.toLocaleString("es-AR")}
+              icon={<Clock className="h-5 w-5" />}
+              tone="warning"
+              valueLabel={`${stats.pending} cotizaciones pendientes`}
+            />
+            <MetricCard
+              label="Valor total"
+              value={`$${stats.totalValue.toLocaleString("es-AR", { maximumFractionDigits: 0 })}`}
+              icon={<DollarSign className="h-5 w-5" />}
+              tone="info"
+              valueLabel={`Valor total: ${stats.totalValue.toLocaleString("es-AR", { maximumFractionDigits: 0 })}`}
+            />
+            <MetricCard
+              label="Conversión"
+              value={`${stats.conversionRate.toFixed(1)}%`}
+              icon={<TrendingUp className="h-5 w-5" />}
+              detail={`${stats.approved} aprobadas de ${stats.total}`}
+              tone="success"
+              valueLabel={`Tasa de conversión: ${stats.conversionRate.toFixed(1)} por ciento`}
+            />
+            <MetricCard
+              label="Rechazos"
+              value={`${stats.rejectionRate.toFixed(1)}%`}
+              icon={<X className="h-5 w-5" />}
+              detail={`${stats.rejected} rechazadas de ${stats.total}`}
+              tone="danger"
+              valueLabel={`Tasa de rechazo: ${stats.rejectionRate.toFixed(1)} por ciento`}
+            />
+          </MetricGrid>
 
           {/* Win/Loss insights bar */}
           {Object.keys(lossReasonBreakdown).length > 0 && (
