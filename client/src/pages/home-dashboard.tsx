@@ -128,7 +128,12 @@ export default function HomeDashboard() {
   // Enriched tasks (with project/client names) for the member's active projects + calendar
   const { data: myCalendarTasks = [] } = useQuery<any[]>({
     queryKey: ["/api/tasks/team-calendar", "me", myPersonnelId],
-    queryFn: () => authFetch(`/api/tasks/team-calendar?assigneeId=${myPersonnelId}`).then(r => r.json()),
+    queryFn: async () => {
+      const response = await authFetch(`/api/tasks/team-calendar?assigneeId=${myPersonnelId}`);
+      if (!response.ok) return [];
+      const payload = await response.json();
+      return Array.isArray(payload) ? payload : [];
+    },
     enabled: !!myPersonnelId,
   });
 

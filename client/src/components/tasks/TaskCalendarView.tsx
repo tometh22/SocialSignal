@@ -46,7 +46,14 @@ export default function TaskCalendarView({ projectId, tasks: tasksProp }: Props)
     enabled: tasksProp === undefined && projectId !== undefined,
   });
 
-  const sourceTasks = tasksProp ?? data?.tasks ?? [];
+  // Calendar endpoints can return an error object when a protected query
+  // fails. Keep the Home usable instead of calling `.filter` on that object
+  // and taking down the whole application error boundary.
+  const sourceTasks = Array.isArray(tasksProp)
+    ? tasksProp
+    : Array.isArray(data?.tasks)
+      ? data.tasks
+      : [];
   const rootTasks = sourceTasks.filter(t => !t.parentTaskId);
   const tasksWithDate = rootTasks.filter(t => t.dueDate || t.startDate);
   const tasksWithoutDate = rootTasks.filter(t => !t.dueDate && !t.startDate && t.status !== "cancelled" && t.status !== "done");
