@@ -1,0 +1,7 @@
+node_modules
+dist
+.context
+.git
+attached_assets
+coverage
+.DS_Store
