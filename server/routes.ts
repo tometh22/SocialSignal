@@ -18426,7 +18426,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             WHERE task_filter.project_id = ap.id
               AND (
                 task_filter.assignee_id = ${personnelId}
-                OR task_filter.collaborator_ids @> jsonb_build_array(${personnelId})
+                OR task_filter.collaborator_ids @> jsonb_build_array(${personnelId}::int)
               )
           )
         )
@@ -18582,7 +18582,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const includeCreatedUnassigned = Number(currentPersonnel[0]?.id) === parsedAssigneeId;
         conditions.push(includeCreatedUnassigned ? or(
           eq(tasks.assigneeId, parsedAssigneeId),
-          sql`COALESCE(${tasks.collaboratorIds}, '[]'::jsonb) @> jsonb_build_array(${parsedAssigneeId})`,
+          sql`COALESCE(${tasks.collaboratorIds}, '[]'::jsonb) @> jsonb_build_array(${parsedAssigneeId}::int)`,
           and(
             eq(tasks.createdBy, currentUser?.id),
             isNull(tasks.assigneeId),
@@ -18590,7 +18590,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ),
         ) : or(
           eq(tasks.assigneeId, parsedAssigneeId),
-          sql`COALESCE(${tasks.collaboratorIds}, '[]'::jsonb) @> jsonb_build_array(${parsedAssigneeId})`,
+          sql`COALESCE(${tasks.collaboratorIds}, '[]'::jsonb) @> jsonb_build_array(${parsedAssigneeId}::int)`,
         ));
       }
       if (projectId) conditions.push(eq(tasks.projectId, parseInt(projectId as string)));
@@ -19545,7 +19545,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               OR EXISTS (SELECT 1 FROM tasks task_filter
                          WHERE task_filter.project_id = ap.id
                            AND (task_filter.assignee_id = ${myPersonnelId}
-                                OR task_filter.collaborator_ids @> jsonb_build_array(${myPersonnelId})))
+                                OR task_filter.collaborator_ids @> jsonb_build_array(${myPersonnelId}::int)))
             )`
           : sql`FALSE`;
       const result = await db.execute(sql`
@@ -19584,7 +19584,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               OR EXISTS (SELECT 1 FROM tasks task_filter
                          WHERE task_filter.project_id = ap.id
                            AND (task_filter.assignee_id = ${myPersonnelId}
-                                OR task_filter.collaborator_ids @> jsonb_build_array(${myPersonnelId})))
+                                OR task_filter.collaborator_ids @> jsonb_build_array(${myPersonnelId}::int)))
             )`
           : sql`FALSE`;
       const projectsResult = await db.execute(sql`
