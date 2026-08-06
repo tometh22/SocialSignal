@@ -46,14 +46,22 @@ const toneClasses: Record<
   },
 };
 
-export interface MetricGridProps extends React.HTMLAttributes<HTMLDivElement> {}
+export interface MetricGridProps extends React.HTMLAttributes<HTMLDivElement> {
+  minColumnWidth?: string;
+}
 
 const MetricGrid = React.forwardRef<HTMLDivElement, MetricGridProps>(
-  ({ className, ...props }, ref) => (
+  ({ className, minColumnWidth, style, ...props }, ref) => (
     <div
       ref={ref}
       data-ui="metric-grid"
       className={cn("ui-metric-grid", className)}
+      style={{
+        ...style,
+        ...(minColumnWidth
+          ? ({ "--metric-grid-min-width": minColumnWidth } as React.CSSProperties)
+          : {}),
+      }}
       {...props}
     />
   ),
@@ -69,6 +77,7 @@ export interface MetricCardProps
   footer?: React.ReactNode;
   tone?: MetricTone;
   valueLabel?: string;
+  valueSize?: "default" | "compact";
 }
 
 const MetricCard = React.forwardRef<HTMLElement, MetricCardProps>(
@@ -81,6 +90,7 @@ const MetricCard = React.forwardRef<HTMLElement, MetricCardProps>(
       footer,
       tone = "neutral",
       valueLabel,
+      valueSize = "default",
       className,
       ...props
     },
@@ -105,17 +115,9 @@ const MetricCard = React.forwardRef<HTMLElement, MetricCardProps>(
         />
 
         <div className="flex min-w-0 items-start justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium leading-5 text-muted-foreground">
-              {label}
-            </p>
-            <div
-              aria-label={valueLabel}
-              className="mt-2 min-w-0 break-words text-2xl font-bold tabular-nums leading-none tracking-[-0.035em] text-foreground sm:text-[1.75rem]"
-            >
-              {value}
-            </div>
-          </div>
+          <p className="min-w-0 flex-1 text-sm font-medium leading-5 text-muted-foreground">
+            {label}
+          </p>
 
           {icon ? (
             <div
@@ -128,6 +130,18 @@ const MetricCard = React.forwardRef<HTMLElement, MetricCardProps>(
               {icon}
             </div>
           ) : null}
+        </div>
+
+        <div
+          aria-label={valueLabel}
+          className={cn(
+            "mt-2 min-w-0 font-bold tabular-nums leading-none tracking-[-0.035em] text-foreground",
+            valueSize === "compact"
+              ? "whitespace-nowrap text-xl sm:text-[1.35rem]"
+              : "break-words text-2xl sm:text-[1.75rem]",
+          )}
+        >
+          {value}
         </div>
 
         {detail ? (

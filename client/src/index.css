@@ -1914,7 +1914,10 @@ body {
 .ui-metric-grid {
   display: grid;
   min-width: 0;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+  grid-template-columns: repeat(
+    auto-fit,
+    minmax(min(100%, var(--metric-grid-min-width, 14rem)), 1fr)
+  );
   gap: 1rem;
 }
 
