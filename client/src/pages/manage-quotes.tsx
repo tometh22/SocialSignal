@@ -524,7 +524,7 @@ export default function ManageQuotes() {
     >
 
         <div className="relative z-10 min-w-0">
-          <MetricGrid className="mb-6">
+          <MetricGrid className="mb-6" minColumnWidth="11rem">
             <MetricCard
               label="Total"
               value={stats.total.toLocaleString("es-AR")}
@@ -551,6 +551,7 @@ export default function ManageQuotes() {
               value={`$${stats.totalValue.toLocaleString("es-AR", { maximumFractionDigits: 0 })}`}
               icon={<DollarSign className="h-5 w-5" />}
               tone="info"
+              valueSize="compact"
               valueLabel={`Valor total: ${stats.totalValue.toLocaleString("es-AR", { maximumFractionDigits: 0 })}`}
             />
             <MetricCard
