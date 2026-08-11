@@ -66,9 +66,10 @@ describe("Mind product UI system", () => {
   test("task controls remain discoverable on touch devices", () => {
     const tasksHome = source("client/src/pages/tasks/tasks-home.tsx");
 
-    expect(tasksHome).toContain("opacity-100 sm:opacity-0 sm:group-hover:opacity-100");
+    expect(tasksHome).not.toContain("sm:opacity-0 sm:group-hover:opacity-100");
     expect(tasksHome).toContain('aria-label={checked ? "Marcar tarea como pendiente"');
-    expect(tasksHome).toContain('aria-label={date ? `Cambiar fecha:');
+    expect(tasksHome).toContain('aria-label={rangeLabel ? `Cambiar período:');
+    expect(tasksHome).toContain('mode="range"');
   });
 
   test("core pages share the same product heading and brand", () => {

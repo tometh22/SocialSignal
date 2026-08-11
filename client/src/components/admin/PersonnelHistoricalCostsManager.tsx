@@ -189,7 +189,7 @@ export function PersonnelHistoricalCostsManager({ onClose }: PersonnelHistorical
         <div className="flex items-center gap-3">
           <TrendingUp className="h-6 w-6 text-green-600" />
           <div>
-            <CardTitle className="text-xl font-bold">Costos Históricos de Personal</CardTitle>
+            <CardTitle className="text-xl font-bold">Historial y proyección de costos de personal</CardTitle>
             <p className="text-sm text-muted-foreground mt-1">
               Tabla comparable por persona y mes: sueldo mensual, horas contractuales y valor hora calculado para Administración, Cotizaciones y Cierre mensual.
             </p>
@@ -221,7 +221,7 @@ export function PersonnelHistoricalCostsManager({ onClose }: PersonnelHistorical
           <Card className="bg-slate-50 border-slate-200">
             <CardHeader>
               <CardTitle className="text-lg">
-                {editingCost ? "Editar Costo Histórico" : "Nuevo Costo Histórico"}
+                {editingCost ? "Editar período de costo" : "Nuevo período de costo"}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -469,10 +469,10 @@ export function PersonnelHistoricalCostsManager({ onClose }: PersonnelHistorical
           </Card>
         )}
 
-        {/* Lista de costos históricos */}
+        {/* Lista de períodos históricos y futuros */}
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold">Costos Históricos Registrados</h3>
+            <h3 className="text-lg font-semibold">Períodos de costo registrados</h3>
             <Badge variant="outline" className="text-sm">
               {historicalCosts.length} registro{historicalCosts.length !== 1 ? 's' : ''}
             </Badge>
@@ -482,10 +482,10 @@ export function PersonnelHistoricalCostsManager({ onClose }: PersonnelHistorical
             <Card className="p-8 text-center">
               <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
               <h3 className="text-lg font-medium text-muted-foreground mb-2">
-                No hay costos históricos registrados
+                No hay períodos de costo registrados
               </h3>
               <p className="text-sm text-muted-foreground mb-4">
-                Comience agregando costos históricos para un mejor análisis de rentabilidad temporal
+                Agregá períodos pasados o futuros para analizar y proyectar la rentabilidad
               </p>
               <Button onClick={() => setShowForm(true)}>
                 <Plus className="h-4 w-4 mr-2" />

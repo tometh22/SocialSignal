@@ -135,6 +135,7 @@ async function runFullPipeline() {
       ]);
       const aliasBySheetName = new Map<string, number | null>(aliasRows.map((a: any) => [a.sheetName, a.personnelId]));
       const personnelByName  = new Map<string, number>(allPersonnel.map((p: any) => [p.name.trim().toLowerCase(), p.id]));
+      const personnelById = new Map<number, any>(allPersonnel.map((p: any) => [p.id, p]));
       const MONTH_NUM2: Record<string, number> = { jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12 };
       const cy = new Date().getFullYear();
       for (const yr of [cy - 1, cy]) {
@@ -154,6 +155,10 @@ async function runFullPipeline() {
               if (!m) continue;
               const month2 = MONTH_NUM2[m[1]]; const yr2 = parseInt(m[2]);
               if (!month2 || !yr2) continue;
+              const isUsdContract = String(personnelById.get(pid)?.billingCurrency || 'ARS').toUpperCase() === 'USD';
+              const rateValues = isUsdContract
+                ? { hourlyRateUSD: String(rate), hourlyRateARS: null, updatedAt: new Date() }
+                : { hourlyRateARS: String(rate), hourlyRateUSD: null, updatedAt: new Date() };
               const ex = await db.select({ id: personnelHistoricalCosts.id })
                 .from(personnelHistoricalCosts)
                 .where(and(
@@ -165,12 +170,14 @@ async function runFullPipeline() {
                 .limit(1);
               if (ex.length > 0) {
                 await db.update(personnelHistoricalCosts)
-                  .set({ hourlyRateARS: String(rate), updatedAt: new Date() })
+                  .set(rateValues)
                   .where(eq(personnelHistoricalCosts.id, ex[0].id));
               } else {
                 await db.insert(personnelHistoricalCosts).values({
                   personnelId: pid, year: yr2, month: month2,
-                  hourlyRateARS: String(rate), isActive: true,
+                  hourlyRateARS: isUsdContract ? null : String(rate),
+                  hourlyRateUSD: isUsdContract ? String(rate) : null,
+                  isActive: true,
                 });
               }
               updated++;

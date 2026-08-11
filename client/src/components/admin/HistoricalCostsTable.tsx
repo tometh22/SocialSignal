@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Personnel, PersonnelHistoricalCost } from "@shared/schema";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import type { Personnel, PersonnelHistoricalCost } from "@shared/schema";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
@@ -10,50 +10,53 @@ interface HistoricalCostsTableProps {
   personnel: Personnel[];
 }
 
+type EditableField = "hourlyRateARS" | "monthlySalaryARS" | "hourlyRateUSD" | "monthlySalaryUSD";
+
+const MONTHS = [
+  "Ene", "Feb", "Mar", "Abr", "May", "Jun",
+  "Jul", "Ago", "Sep", "Oct", "Nov", "Dic",
+];
+
 export function HistoricalCostsTable({ personnel }: HistoricalCostsTableProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const currentYear = new Date().getFullYear();
+  const [selectedYear, setSelectedYear] = useState(currentYear);
   const [editingCells, setEditingCells] = useState<Record<string, string>>({});
 
-  console.log("HistoricalCostsTable rendering with personnel:", personnel?.length || 0);
-
-  // Fetch historical costs from normalized table
   const { data: historicalCosts = [] } = useQuery<PersonnelHistoricalCost[]>({
     queryKey: ["/api/personnel-historical-costs"],
   });
 
-  const months = [
-    { key: 1, label: "Ene 2025" },
-    { key: 2, label: "Feb 2025" },
-    { key: 3, label: "Mar 2025" },
-    { key: 4, label: "Abr 2025" },
-    { key: 5, label: "May 2025" },
-    { key: 6, label: "Jun 2025" },
-    { key: 7, label: "Jul 2025" },
-    { key: 8, label: "Ago 2025" },
-    { key: 9, label: "Sep 2025" },
-    { key: 10, label: "Oct 2025" },
-    { key: 11, label: "Nov 2025" },
-    { key: 12, label: "Dic 2025" },
-  ];
+  const availableYears = useMemo(() => Array.from(new Set([
+    2025,
+    currentYear - 1,
+    currentYear,
+    currentYear + 1,
+    ...historicalCosts.map((cost) => cost.year),
+  ])).sort((left, right) => right - left), [currentYear, historicalCosts]);
 
-  // Helper function to get historical cost for a person/month
-  const getHistoricalCost = (personnelId: number, month: number, type: 'hourlyRate' | 'monthlySalary') => {
-    const cost = historicalCosts.find(c => c.personnelId === personnelId && c.month === month && c.year === 2025);
-    if (!cost) return null;
-    return type === 'hourlyRate' ? cost.hourlyRateARS : cost.monthlySalaryARS;
-  };
+  const costByPersonAndMonth = useMemo(() => new Map(
+    historicalCosts
+      .filter((cost) => cost.year === selectedYear)
+      .map((cost) => [`${cost.personnelId}-${cost.month}`, cost]),
+  ), [historicalCosts, selectedYear]);
 
   const updateCostMutation = useMutation({
     mutationFn: async (data: {
       personnelId: number;
+      year: number;
       month: number;
-      field: "hourlyRateARS" | "monthlySalaryARS";
+      field: EditableField;
       value: number | null;
     }) => {
       const existing = historicalCosts.find((cost) =>
-        cost.personnelId === data.personnelId && cost.month === data.month && cost.year === 2025,
+        cost.personnelId === data.personnelId &&
+        cost.month === data.month &&
+        cost.year === data.year,
       );
+      if (!existing && data.value == null) return null;
+
       const monthlyHours = personnel.find((person) => person.id === data.personnelId)?.monthlyHours ?? null;
       const payload = { [data.field]: data.value, monthlyHours };
       return existing
@@ -62,7 +65,7 @@ export function HistoricalCostsTable({ personnel }: HistoricalCostsTableProps) {
             method: "POST",
             body: {
               personnelId: data.personnelId,
-              year: 2025,
+              year: data.year,
               month: data.month,
               ...payload,
             },
@@ -70,12 +73,13 @@ export function HistoricalCostsTable({ personnel }: HistoricalCostsTableProps) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/personnel"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/personnel-historical-costs"] });
       toast({
         title: "Costos actualizados",
-        description: "Los costos históricos se han guardado correctamente.",
+        description: `La grilla de ${selectedYear} se guardó correctamente.`,
       });
     },
-    onError: (error) => {
+    onError: () => {
       toast({
         title: "Error",
         description: "No se pudieron guardar los costos históricos.",
@@ -84,219 +88,150 @@ export function HistoricalCostsTable({ personnel }: HistoricalCostsTableProps) {
     },
   });
 
-  const handleCellChange = (personnelId: number, field: string, value: string) => {
-    const cellKey = `${personnelId}-${field}`;
-    setEditingCells({ ...editingCells, [cellKey]: value });
+  const cellKey = (personnelId: number, month: number, field: EditableField) =>
+    `${personnelId}-${selectedYear}-${month}-${field}`;
+
+  const getCellValue = (personnelId: number, month: number, field: EditableField) => {
+    const key = cellKey(personnelId, month, field);
+    if (key in editingCells) return editingCells[key];
+    const value = costByPersonAndMonth.get(`${personnelId}-${month}`)?.[field];
+    return value == null ? "" : String(value);
   };
 
-  const handleCellBlur = (personnelId: number, field: string) => {
-    const cellKey = `${personnelId}-${field}`;
-    const value = editingCells[cellKey];
-    
-    if (value !== undefined) {
-      const numericValue = value === "" ? null : parseFloat(value);
-      if (value !== "" && (isNaN(numericValue!) || numericValue! < 0)) {
-        toast({
-          title: "Valor inválido",
-          description: "Por favor ingrese un número válido mayor o igual a 0.",
-          variant: "destructive",
-        });
-        return;
-      }
+  const handleCellChange = (personnelId: number, month: number, field: EditableField, value: string) => {
+    setEditingCells((current) => ({ ...current, [cellKey(personnelId, month, field)]: value }));
+  };
 
-      const match = field.match(/^(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)2025(HourlyRateARS|MonthlySalaryARS)$/);
-      if (!match) return;
-      const monthByKey: Record<string, number> = {
-        jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6,
-        jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12,
-      };
-      const month = monthByKey[match[1]];
-      const canonicalField = match[2] === "HourlyRateARS" ? "hourlyRateARS" : "monthlySalaryARS";
-      if (!month) return;
-      updateCostMutation.mutate({ personnelId, month, field: canonicalField, value: numericValue });
+  const handleCellBlur = (personnelId: number, month: number, field: EditableField) => {
+    const key = cellKey(personnelId, month, field);
+    if (!(key in editingCells)) return;
+    const rawValue = editingCells[key];
+    const value = rawValue === "" ? null : Number(rawValue);
+    if (value != null && (!Number.isFinite(value) || value < 0)) {
+      toast({
+        title: "Valor inválido",
+        description: "Ingresá un número mayor o igual a cero.",
+        variant: "destructive",
+      });
+      return;
     }
-
-    // Remove from editing state
-    const newEditingCells = { ...editingCells };
-    delete newEditingCells[cellKey];
-    setEditingCells(newEditingCells);
-  };
-
-  const getCellValue = (person: Personnel, field: string) => {
-    const cellKey = `${person.id}-${field}`;
-    if (cellKey in editingCells) {
-      return editingCells[cellKey];
-    }
-    const value = (person as any)[field];
-    // Corrección crítica: mostrar valores numéricos reales, incluso 0
-    // Solo mostrar cadena vacía para null o undefined
-    return (value !== null && value !== undefined) ? value.toString() : "";
-  };
-
-  const formatCurrency = (value: number | null) => {
-    if (!value) return "-";
-    return new Intl.NumberFormat("es-AR", {
-      style: "currency",
-      currency: "ARS",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(value);
+    updateCostMutation.mutate({ personnelId, year: selectedYear, month, field, value });
+    setEditingCells((current) => {
+      const next = { ...current };
+      delete next[key];
+      return next;
+    });
   };
 
   if (personnel.length === 0) {
     return (
-      <div className="bg-gray-50 rounded-lg border border-dashed border-gray-300 p-8 text-center">
-        <p className="text-gray-500">
-          Añada personal primero para configurar costos históricos mensuales.
-        </p>
+      <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-8 text-center">
+        <p className="text-gray-500">Añadí personal primero para configurar costos mensuales.</p>
       </div>
     );
   }
 
   return (
     <div className="space-y-4">
-      <div className="bg-white rounded-lg border shadow-sm">
-        <div className="p-4 border-b bg-gray-50">
-          <div className="flex items-center justify-between">
-            <h3 className="text-base font-medium text-gray-900">
-              Año 2025 - {personnel.length} personas
-            </h3>
-            <div className="text-xs text-gray-500">
-              Clic para editar • Valores en ARS
-            </div>
+      <div className="rounded-lg border bg-white shadow-sm">
+        <div className="flex flex-col gap-3 border-b bg-gray-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h3 className="text-base font-medium text-gray-900">Costos mensuales - {selectedYear}</h3>
+            <p className="text-xs text-gray-500">{personnel.length} personas · moneda contractual por persona · guardado al salir de la celda</p>
           </div>
+          <Select value={String(selectedYear)} onValueChange={(value) => setSelectedYear(Number(value))}>
+            <SelectTrigger className="w-36 bg-white" aria-label="Año de costos mensuales">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {availableYears.map((year) => <SelectItem key={year} value={String(year)}>{year}</SelectItem>)}
+            </SelectContent>
+          </Select>
         </div>
 
-        <div className="overflow-x-auto max-h-80 overflow-y-auto border rounded">
-          <table className="min-w-full text-xs">
-            <thead className="bg-gray-100 sticky top-0">
+        <div className="max-h-[32rem] overflow-auto">
+          <table className="min-w-[1520px] text-xs">
+            <thead className="sticky top-0 z-20 bg-gray-100">
               <tr>
-                <th className="px-3 py-2 text-left font-medium text-gray-700 sticky left-0 bg-gray-100 border-r">
-                  Personal
-                </th>
-                <th className="px-2 py-2 text-center font-medium text-gray-700 border-r w-16">
-                  Tipo
-                </th>
-                {months.map((month) => (
-                  <th key={month.key} className="px-2 py-2 text-center font-medium text-gray-700 border-r w-20">
-                    {month.label}
-                  </th>
+                <th className="sticky left-0 z-30 min-w-52 border-r bg-gray-100 px-3 py-2 text-left font-medium text-gray-700">Personal</th>
+                <th className="w-20 border-r px-2 py-2 text-center font-medium text-gray-700">Tipo</th>
+                {MONTHS.map((month, index) => (
+                  <th key={month} className="min-w-24 border-r px-2 py-2 text-center font-medium text-gray-700">{month} {selectedYear}</th>
                 ))}
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {personnel.map((person) => (
-                <>
-                  {/* Fila de tarifa por hora */}
-                  <tr key={`${person.id}-hourly`} className="hover:bg-gray-50">
-                    <td className="px-3 py-1 text-sm font-medium text-gray-900 sticky left-0 bg-white border-r">
-                      <div className="flex items-center gap-2">
-                        <span>{person.name}</span>
-                        <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${
-                          person.contractType === 'full-time' ? 'bg-blue-100 text-blue-800' :
-                          person.contractType === 'part-time' ? 'bg-orange-100 text-orange-800' :
-                          'bg-green-100 text-green-800'
-                        }`}>
-                          {person.contractType === 'full-time' ? 'Full-time' : 
-                           person.contractType === 'part-time' ? 'Part-time' : 
-                           'Freelance'}
-                        </span>
-                      </div>
+            <tbody className="divide-y divide-gray-200 bg-white">
+              {personnel.map((person) => {
+                const usesUSD = (person as any).billingCurrency === "USD";
+                const hourlyField: EditableField = usesUSD ? "hourlyRateUSD" : "hourlyRateARS";
+                const salaryField: EditableField = usesUSD ? "monthlySalaryUSD" : "monthlySalaryARS";
+                const currency = usesUSD ? "USD" : "ARS";
+                return (
+                <Fragment key={person.id}>
+                  <tr className="hover:bg-gray-50">
+                    <td className="sticky left-0 z-10 border-r bg-white px-3 py-2">
+                      <p className="text-sm font-medium text-gray-900">{person.name}</p>
+                      <p className="text-[11px] text-gray-500">
+                        {((person as any).contractType === "freelance" ? (person as any).legacyRole : (person as any).currentRole)
+                          || (person as any).roleName
+                          || "Rol pendiente"}
+                        {(person as any).sublevel ? ` · ${(person as any).sublevel}` : ""}
+                      </p>
                     </td>
-                    <td className="px-2 py-1 text-xs text-gray-600 text-center border-r">
-                      $/hr
-                    </td>
-                    {months.map((month) => {
-                      const field = `${month.key}HourlyRateARS`;
-                      const cellKey = `${person.id}-${field}`;
-                      const isEditing = cellKey in editingCells;
-                      
+                    <td className="border-r px-2 py-1 text-center text-gray-600">{currency}/h</td>
+                    {MONTHS.map((_, index) => {
+                      const month = index + 1;
+                      const key = cellKey(person.id, month, hourlyField);
                       return (
-                        <td key={field} className="px-1 py-2 border-r">
+                        <td key={key} className="border-r px-1 py-1.5">
                           <Input
                             type="number"
                             min="0"
                             step="0.01"
-                            value={getCellValue(person, field)}
-                            onChange={(e) => handleCellChange(person.id, field, e.target.value)}
-                            onBlur={() => handleCellBlur(person.id, field)}
-                            className={`text-center text-xs h-8 border-0 focus:border focus:border-blue-500 ${
-                              isEditing ? "bg-blue-50" : "hover:bg-gray-50"
-                            }`}
-                            placeholder="0"
+                            value={getCellValue(person.id, month, hourlyField)}
+                            onChange={(event) => handleCellChange(person.id, month, hourlyField, event.target.value)}
+                            onBlur={() => handleCellBlur(person.id, month, hourlyField)}
+                            className="h-8 border-0 text-center text-xs hover:bg-gray-50 focus:border focus:border-primary"
+                            placeholder="-"
                           />
                         </td>
                       );
                     })}
                   </tr>
-
-                  {/* Fila de salario mensual - solo para empleados full-time */}
-                  {person.contractType === 'full-time' && (
-                    <tr key={`${person.id}-monthly`} className="hover:bg-gray-50 border-b-2 border-gray-200">
-                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600 sticky left-0 bg-white border-r">
-                        <span className="ml-4 text-xs">Salario Mensual (solo full-time)</span>
-                      </td>
-                      <td className="px-2 py-3 whitespace-nowrap text-xs text-gray-600 text-center border-r">
-                        $/mes
-                      </td>
-                      {months.map((month) => {
-                        const field = `${month.key}MonthlySalaryARS`;
-                        const cellKey = `${person.id}-${field}`;
-                        const isEditing = cellKey in editingCells;
-                        
+                  {person.contractType !== "freelance" && (
+                    <tr className="border-b-2 border-gray-200 hover:bg-gray-50">
+                      <td className="sticky left-0 z-10 border-r bg-white px-3 py-2 text-[11px] text-gray-500">Sueldo mensual</td>
+                      <td className="border-r px-2 py-1 text-center text-gray-600">{currency}/mes</td>
+                      {MONTHS.map((_, index) => {
+                        const month = index + 1;
+                        const key = cellKey(person.id, month, salaryField);
                         return (
-                          <td key={field} className="px-1 py-2 border-r">
+                          <td key={key} className="border-r px-1 py-1.5">
                             <Input
                               type="number"
                               min="0"
                               step="0.01"
-                              value={getCellValue(person, field)}
-                              onChange={(e) => handleCellChange(person.id, field, e.target.value)}
-                              onBlur={() => handleCellBlur(person.id, field)}
-                              className={`text-center text-xs h-8 border-0 focus:border focus:border-blue-500 ${
-                                isEditing ? "bg-blue-50" : "hover:bg-gray-50"
-                              }`}
-                              placeholder="0"
+                              value={getCellValue(person.id, month, salaryField)}
+                              onChange={(event) => handleCellChange(person.id, month, salaryField, event.target.value)}
+                              onBlur={() => handleCellBlur(person.id, month, salaryField)}
+                              className="h-8 border-0 text-center text-xs hover:bg-gray-50 focus:border focus:border-primary"
+                              placeholder="-"
                             />
                           </td>
                         );
                       })}
                     </tr>
                   )}
-                </>
-              ))}
+                </Fragment>
+                );
+              })}
             </tbody>
           </table>
         </div>
-
-        {personnel.length === 0 && (
-          <div className="text-center py-8 text-gray-500">
-            No hay personal registrado.
-          </div>
-        )}
       </div>
 
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <div className="flex items-start">
-          <div className="flex-shrink-0">
-            <svg className="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-            </svg>
-          </div>
-          <div className="ml-3">
-            <h4 className="text-sm font-medium text-blue-800">
-              Información sobre costos históricos
-            </h4>
-            <div className="mt-2 text-sm text-blue-700">
-              <ul className="list-disc list-inside space-y-1">
-                <li>Los costos se guardan automáticamente al salir de cada celda</li>
-                <li>Todos los valores deben estar en pesos argentinos (ARS)</li>
-                <li>Puede dejar celdas vacías para meses sin datos</li>
-                <li>Los costos históricos se usan para análisis de rentabilidad temporal</li>
-              </ul>
-            </div>
-          </div>
-        </div>
+      <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
+        La misma grilla permite consultar y editar años pasados, el año actual y períodos futuros. La tarifa vigente se resuelve desde este historial para cotizaciones, capacidad y cierre mensual.
       </div>
     </div>
   );

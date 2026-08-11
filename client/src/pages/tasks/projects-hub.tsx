@@ -494,13 +494,13 @@ export default function ProjectsHubPage() {
   const [projectView, setProjectView] = useState<"folders" | "list">("folders");
   const [view, setView] = useState<"projects" | "panel">("projects");
   const [statusFilter, setStatusFilter] = useState<"active" | "inactive" | "all">("active");
-  const [collapsedClients, setCollapsedClients] = useState<Set<string>>(new Set());
+  const [expandedClients, setExpandedClients] = useState<Set<string>>(new Set());
   const { user } = useAuth();
   const { isOperations } = usePermissions();
 
   const { data: projects = [], isLoading, isError, refetch } = useQuery<TaskProject[], Error, TaskProject[]>({
     queryKey: ["/api/tasks/projects", statusFilter, view, isOperations],
-    queryFn: () => fetchProjects(`/api/tasks/projects?status=${statusFilter}&scope=${isOperations && view === "panel" ? "all" : "mine"}`),
+    queryFn: () => fetchProjects(`/api/tasks/projects?status=${statusFilter}&scope=${isOperations ? "all" : "mine"}`),
     retry: 2,
     staleTime: 0,
     select: (data) => Array.isArray(data) ? data : [],
@@ -665,12 +665,12 @@ export default function ProjectsHubPage() {
         <>
           {projectView === "folders" && clientGroups.map(([clientName, clientProjects]) => (
             <section key={clientName}>
-              <button className="mb-3 flex w-full items-center gap-2 text-left" onClick={() => setCollapsedClients((previous) => {
+              <button className="mb-3 flex w-full items-center gap-2 text-left" onClick={() => setExpandedClients((previous) => {
                 const next = new Set(previous);
                 next.has(clientName) ? next.delete(clientName) : next.add(clientName);
                 return next;
               })}>
-                <ChevronDown className={cn("h-4 w-4 transition-transform", collapsedClients.has(clientName) && "-rotate-90")} />
+                <ChevronDown className={cn("h-4 w-4 -rotate-90 transition-transform", expandedClients.has(clientName) && "rotate-0")} />
                 <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-primary text-xs font-bold text-primary-foreground">
                   {clientName.charAt(0).toUpperCase()}
                 </span>
@@ -679,7 +679,7 @@ export default function ProjectsHubPage() {
                   <p className="text-[11px] text-muted-foreground">{clientProjects.length} proyectos</p>
                 </div>
               </button>
-              {!collapsedClients.has(clientName) && <div className={cn(
+              {expandedClients.has(clientName) && <div className={cn(
                 "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"
               )}>
                 {clientProjects.map(project => (

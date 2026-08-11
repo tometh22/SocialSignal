@@ -19,6 +19,7 @@ import { Loader2, Users, Trash2, Plus, ChevronLeft, ChevronRight, List, LayoutGr
 import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
 import { usePermissions } from "@/hooks/use-permissions";
+import { useAuth } from "@/hooks/use-auth";
 import ProjectTaskList from "@/components/tasks/ProjectTaskList";
 import { PROJECT_ROLE_OPTIONS, projectRoleLabel } from "@/constants/project-roles";
 
@@ -67,13 +68,16 @@ interface Props {
 export default function ProjectTasksPage({ params }: Props) {
   const projectId = parseInt(params.id);
   const { isOperations } = usePermissions();
+  const { user } = useAuth();
   const [membersOpen, setMembersOpen] = useState(false);
   const [addPersonnelId, setAddPersonnelId] = useState<string>("none");
   const [addRole, setAddRole] = useState("member");
-  const [view, setView_] = useState<"list" | "board" | "panel" | "calendar" | "summary">(
-    () => (localStorage.getItem(`projectView:${projectId}`) as "list" | "board" | "panel" | "calendar" | "summary") || "list"
-  );
-  const setView = (v: "list" | "board" | "panel" | "calendar" | "summary") => {
+  const [view, setView_] = useState<"list" | "board" | "panel" | "calendar">(() => {
+    const stored = localStorage.getItem(`projectView:${projectId}`);
+    if (stored === "summary") return "panel";
+    return stored === "list" || stored === "board" || stored === "panel" || stored === "calendar" ? stored : "list";
+  });
+  const setView = (v: "list" | "board" | "panel" | "calendar") => {
     setView_(v);
     localStorage.setItem(`projectView:${projectId}`, v);
   };
@@ -98,7 +102,7 @@ export default function ProjectTasksPage({ params }: Props) {
   const { data: summaryTasks } = useQuery<{ tasks: any[] }>({
     queryKey: ["/api/tasks/project", projectId, "summary"],
     queryFn: () => authFetch(`/api/tasks/project/${projectId}`).then(r => r.json()),
-    enabled: view === "summary" && !!projectId,
+    enabled: view === "panel" && !!projectId,
     staleTime: 60_000,
   });
   const allSummaryTasks = summaryTasks?.tasks || [];
@@ -117,6 +121,9 @@ export default function ProjectTasksPage({ params }: Props) {
   }, [project?.members]);
 
   const members: ProjectMember[] = localMembers ?? (project?.members ?? []);
+  const canManageProject = isOperations || members.some(
+    (member) => member.personnelId === user?.personnelId && member.role === "owner",
+  );
 
   const addMemberMutation = useMutation({
     mutationFn: ({ personnelId, role }: { personnelId: number; role: string }) =>
@@ -212,21 +219,21 @@ export default function ProjectTasksPage({ params }: Props) {
         {/* ─── Sticky header ─────────────────────────────────────────── */}
         <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-sm pb-0">
           {/* Breadcrumb */}
-          <nav className="flex items-center gap-1.5 text-xs text-muted-foreground py-2">
+          <nav className="flex min-w-0 items-center gap-1.5 overflow-hidden py-2 text-xs text-muted-foreground">
             <Link href="/tasks" className="hover:text-foreground transition-colors">Tareas</Link>
             <ChevronRight className="h-3 w-3" />
             <Link href="/tasks/projects" className="hover:text-foreground transition-colors">Proyectos</Link>
             <ChevronRight className="h-3 w-3" />
-            <span className="text-foreground font-medium">
+            <span className="truncate text-foreground font-medium">
               {project.clientName ? `${project.clientName} · ` : ""}{project.name}
             </span>
           </nav>
 
           {/* Project header */}
           <div className="border-b border-border pb-3 mb-0">
-            <div className="flex items-start justify-between gap-4">
+            <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:gap-4">
               {/* Left: icon + name + client */}
-              <div className="flex items-center gap-3 min-w-0">
+              <div className="flex min-w-0 items-center gap-3">
                 <span className={cn(
                   "inline-flex w-9 h-9 rounded-xl flex-shrink-0 items-center justify-center text-white font-bold text-sm shadow-sm",
                   dotColor
@@ -253,7 +260,7 @@ export default function ProjectTasksPage({ params }: Props) {
               </div>
 
               {/* Right: stats + actions */}
-              <div className="flex items-center gap-2 flex-shrink-0">
+              <div className="flex w-full flex-shrink-0 items-center justify-between gap-2 sm:w-auto sm:justify-start">
                 {/* Member avatars */}
                 <div className="flex items-center gap-0.5">
                   {visibleMembers.map(m => (
@@ -285,15 +292,17 @@ export default function ProjectTasksPage({ params }: Props) {
                   Compartir
                 </Button>
 
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-7 text-xs"
-                  onClick={() => setMembersOpen(true)}
-                >
-                  <Users className="h-3.5 w-3.5 mr-1.5" />
-                  Miembros
-                </Button>
+                {canManageProject && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-xs"
+                    onClick={() => setMembersOpen(true)}
+                  >
+                    <Users className="h-3.5 w-3.5 mr-1.5" />
+                    Miembros
+                  </Button>
+                )}
 
                 {/* Stats */}
                 <div className="hidden lg:flex items-center gap-3 text-xs text-muted-foreground pl-2 border-l">
@@ -360,7 +369,7 @@ export default function ProjectTasksPage({ params }: Props) {
                 onClick={() => setView("panel")}
               >
                 <BarChart2 className="h-3.5 w-3.5" />
-                Panel
+                Gestión
               </button>
               <button
                 className={cn(
@@ -374,24 +383,12 @@ export default function ProjectTasksPage({ params }: Props) {
                 <CalendarDays className="h-3.5 w-3.5" />
                 Calendario
               </button>
-              <button
-                className={cn(
-                  "flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 transition-colors",
-                  view === "summary"
-                    ? "border-primary text-primary"
-                    : "border-transparent text-muted-foreground hover:text-foreground"
-                )}
-                onClick={() => setView("summary")}
-              >
-                <LayoutList className="h-3.5 w-3.5" />
-                Resumen
-              </button>
             </div>
           </div>
         </div>
 
         {/* Toolbar */}
-        {view !== "panel" && view !== "calendar" && view !== "summary" && (
+        {view !== "panel" && view !== "calendar" && (
         <div className="flex items-center justify-between py-2 border-b border-border gap-2">
           {view === "list" ? (
             <Button
@@ -437,7 +434,7 @@ export default function ProjectTasksPage({ params }: Props) {
               variant="ghost"
               size="sm"
               className={cn(
-                "h-8 text-xs gap-1.5 transition-colors",
+                "h-8 w-8 px-0 text-xs gap-1.5 transition-colors sm:w-auto sm:px-3",
                 showFilter
                   ? "text-primary bg-primary/10 hover:bg-primary/[0.15]"
                   : "text-muted-foreground"
@@ -446,25 +443,29 @@ export default function ProjectTasksPage({ params }: Props) {
                 setShowFilter(v => !v);
                 if (showFilter) setFilterText("");
               }}
+              aria-label="Filtrar tareas"
+              title="Filtrar tareas"
             >
               <Filter className="h-3.5 w-3.5" />
-              {filterText ? (
+              <span className="hidden sm:inline">{filterText ? (
                 <span className="font-semibold">
                   Filtro activo
                   <span className="ml-1 bg-primary text-primary-foreground rounded-full text-[9px] px-1.5 leading-none inline-block">
                     {filterText}
                   </span>
                 </span>
-              ) : "Filtrar"}
+              ) : "Filtrar"}</span>
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
                   variant={sortBy !== "default" ? "secondary" : "ghost"}
                   size="sm"
-                  className="h-8 text-xs gap-1.5"
+                  className="h-8 w-8 px-0 text-xs gap-1.5 sm:w-auto sm:px-3"
+                  aria-label="Ordenar tareas"
+                  title="Ordenar tareas"
                 >
-                  <ArrowUpDown className="h-3.5 w-3.5" />Ordenar
+                  <ArrowUpDown className="h-3.5 w-3.5" /><span className="hidden sm:inline">Ordenar</span>
                   {sortBy !== "default" && <span className="w-1.5 h-1.5 rounded-full bg-primary ml-0.5" />}
                 </Button>
               </DropdownMenuTrigger>
@@ -492,9 +493,11 @@ export default function ProjectTasksPage({ params }: Props) {
                 <Button
                   variant={groupBy !== "section" ? "secondary" : "ghost"}
                   size="sm"
-                  className="h-8 text-xs gap-1.5"
+                  className="h-8 w-8 px-0 text-xs gap-1.5 sm:w-auto sm:px-3"
+                  aria-label="Agrupar tareas"
+                  title="Agrupar tareas"
                 >
-                  <Layers className="h-3.5 w-3.5" />Agrupar
+                  <Layers className="h-3.5 w-3.5" /><span className="hidden sm:inline">Agrupar</span>
                   {groupBy !== "section" && <span className="w-1.5 h-1.5 rounded-full bg-primary ml-0.5" />}
                 </Button>
               </DropdownMenuTrigger>
@@ -544,22 +547,14 @@ export default function ProjectTasksPage({ params }: Props) {
         )}
 
         {/* Panel overview */}
-        {view === "panel" && (
+        {view === "panel" && <div className="space-y-6 pt-4">
           <ProjectOverviewPanel
             projectId={projectId}
             members={members}
             projectColor={dotColor}
           />
-        )}
 
-        {/* Calendar view */}
-        {view === "calendar" && (
-          <TaskCalendarView projectId={projectId} />
-        )}
-
-        {/* Summary view */}
-        {view === "summary" && (
-          <div className="pt-6 space-y-6">
+          <div className="space-y-6">
             {/* Stats cards */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <div className="rounded-xl border bg-card p-4">
@@ -680,7 +675,7 @@ export default function ProjectTasksPage({ params }: Props) {
                 {project.source !== "own" && (
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-muted-foreground">Brief interno</span>
-                    {briefEditing ? (
+                    {briefEditing && canManageProject ? (
                       <div className="flex items-center gap-1">
                         <Input
                           autoFocus
@@ -702,24 +697,33 @@ export default function ProjectTasksPage({ params }: Props) {
                         <a href={project.briefUrl} target="_blank" rel="noopener noreferrer" className="font-medium text-indigo-600 hover:underline truncate max-w-[160px]">
                           Abrir brief
                         </a>
-                        <button className="text-xs text-muted-foreground hover:text-foreground" onClick={() => { setBriefDraft(project.briefUrl || ""); setBriefEditing(true); }}>
-                          editar
-                        </button>
+                        {canManageProject && (
+                          <button className="text-xs text-muted-foreground hover:text-foreground" onClick={() => { setBriefDraft(project.briefUrl || ""); setBriefEditing(true); }}>
+                            editar
+                          </button>
+                        )}
                       </div>
-                    ) : (
+                    ) : canManageProject ? (
                       <button className="text-xs text-indigo-600 hover:underline" onClick={() => { setBriefDraft(""); setBriefEditing(true); }}>
                         + Agregar link
                       </button>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
                     )}
                   </div>
                 )}
               </div>
             </div>
           </div>
+        </div>}
+
+        {/* Calendar view */}
+        {view === "calendar" && (
+          <TaskCalendarView projectId={projectId} />
         )}
 
         {/* Task list / board */}
-        {view !== "panel" && view !== "calendar" && view !== "summary" && (
+        {view !== "panel" && view !== "calendar" && (
           <div className="pt-4">
             <ProjectTaskList
               projectId={projectId}
@@ -736,7 +740,7 @@ export default function ProjectTasksPage({ params }: Props) {
       </div>
 
       {/* Members management sheet */}
-      <Sheet open={membersOpen} onOpenChange={setMembersOpen}>
+      {canManageProject && <Sheet open={membersOpen} onOpenChange={setMembersOpen}>
         <SheetContent side="right" className="w-full sm:max-w-md">
           <SheetHeader>
             <SheetTitle className="flex items-center gap-2">
@@ -777,7 +781,7 @@ export default function ProjectTasksPage({ params }: Props) {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {PROJECT_ROLE_OPTIONS.map(r => (
+                    {PROJECT_ROLE_OPTIONS.filter(r => isOperations || r.value !== "owner").map(r => (
                       <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
                     ))}
                   </SelectContent>
@@ -822,21 +826,23 @@ export default function ProjectTasksPage({ params }: Props) {
                       {projectRoleLabel(m.role)}
                     </Badge>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-700 hover:bg-red-50"
-                    onClick={() => removeMemberMutation.mutate(m.personnelId)}
-                    disabled={removeMemberMutation.isPending}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
+                  {(isOperations || m.role !== "owner") && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-700 hover:bg-red-50"
+                      onClick={() => removeMemberMutation.mutate(m.personnelId)}
+                      disabled={removeMemberMutation.isPending}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
                 </div>
               ))}
             </div>
           </div>
         </SheetContent>
-      </Sheet>
+      </Sheet>}
     </TooltipProvider>
   );
 }

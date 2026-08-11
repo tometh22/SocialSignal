@@ -141,7 +141,7 @@ export default function ManageQuotes() {
   const [deletingQuoteId, setDeletingQuoteId] = useState<number | null>(null);
   const [lossReasonQuote, setLossReasonQuote] = useState<Quotation | null>(null);
   const [markingLost, setMarkingLost] = useState(false);
-  const [collapsedQuoteClients, setCollapsedQuoteClients] = useState<Set<string>>(new Set());
+  const [expandedQuoteClients, setExpandedQuoteClients] = useState<Set<string>>(new Set());
   const [quoteView, setQuoteView] = useState<"folders" | "list">("folders");
   const { toast } = useToast();
 
@@ -654,12 +654,12 @@ export default function ManageQuotes() {
                 <div className="space-y-7 p-3 sm:p-6">
                   {(quoteView === "folders" ? quotationGroups : [["__all__", filteredQuotations] as [string, Quotation[]]]).map(([clientName, clientQuotes]) => (
                     <section key={clientName}>
-                      {quoteView === "folders" && <button className="mb-3 flex w-full items-center gap-3 border-b border-slate-200 pb-2 text-left" onClick={() => setCollapsedQuoteClients((previous) => {
+                      {quoteView === "folders" && <button className="mb-3 flex w-full items-center gap-3 border-b border-slate-200 pb-2 text-left" onClick={() => setExpandedQuoteClients((previous) => {
                         const next = new Set(previous);
                         next.has(clientName) ? next.delete(clientName) : next.add(clientName);
                         return next;
                       })}>
-                        <ChevronDown className={cn("h-4 w-4 transition-transform", collapsedQuoteClients.has(clientName) && "-rotate-90")} />
+                        <ChevronDown className={cn("h-4 w-4 -rotate-90 transition-transform", expandedQuoteClients.has(clientName) && "rotate-0")} />
                         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-800 text-xs font-bold text-white">
                           {clientName.charAt(0).toUpperCase()}
                         </div>
@@ -668,7 +668,7 @@ export default function ManageQuotes() {
                           <p className="text-xs text-slate-500">{clientQuotes.length} cotizaciones</p>
                         </div>
                       </button>}
-                      {(quoteView === "list" || !collapsedQuoteClients.has(clientName)) && <div className="grid grid-cols-1 gap-4">
+                      {(quoteView === "list" || expandedQuoteClients.has(clientName)) && <div className="grid grid-cols-1 gap-4">
                   {clientQuotes.map((quote, index) => {
                     const client = getClient(quote.clientId);
                     const createdDate = new Date(quote.createdAt).toLocaleDateString('es-ES', {

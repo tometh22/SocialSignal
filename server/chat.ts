@@ -1,6 +1,5 @@
-import { Express } from "express";
+import { Express, type RequestHandler } from "express";
 import { WebSocketServer, WebSocket } from "ws";
-import { parse } from "url";
 import { storage } from "./storage";
 import { Server } from "http";
 import { User } from "@shared/schema";
@@ -34,20 +33,41 @@ export class ChatManager {
   private connections: ActiveConnection[] = [];
   private wss: WebSocketServer;
 
-  constructor(httpServer: Server, path: string = "/ws") {
-    this.wss = new WebSocketServer({ server: httpServer, path });
+  constructor(
+    httpServer: Server,
+    private readonly resolveUserFromSessionCookie: (cookieHeader: string | undefined) => Promise<User | null>,
+    path: string = "/ws",
+  ) {
+    this.wss = new WebSocketServer({
+      server: httpServer,
+      path,
+      handleProtocols: (protocols) => protocols.has("epical-chat") ? "epical-chat" : false,
+    });
 
-    this.wss.on("connection", (ws, req) => {
+    this.wss.on("connection", async (ws, req) => {
       try {
-        const { query } = parse(req.url || "", true);
-        const userId = Number(query.userId);
+        const origin = req.headers.origin;
+        if (origin) {
+          const forwardedHost = String(req.headers["x-forwarded-host"] || "").split(",")[0]?.trim();
+          const allowedHosts = new Set([String(req.headers.host || ""), forwardedHost].filter(Boolean));
+          if (process.env.CORS_ORIGIN) {
+            try { allowedHosts.add(new URL(process.env.CORS_ORIGIN).host); } catch { /* invalid config is not trusted */ }
+          }
+          let originHost = "";
+          try { originHost = new URL(origin).host; } catch { /* rejected below */ }
+          if (!originHost || !allowedHosts.has(originHost)) {
+            ws.close(1008, "Origen no permitido");
+            return;
+          }
+        }
 
-        if (!userId || isNaN(userId)) {
-          ws.close(1008, "userId no válido");
+        const authenticatedUser = await this.resolveUserFromSessionCookie(req.headers.cookie);
+        if (!authenticatedUser) {
+          ws.close(1008, "Sesión no válida");
           return;
         }
 
-        this.handleConnection(ws, userId, req);
+        this.handleConnection(ws, authenticatedUser.id, req);
       } catch (error) {
         console.error("Error en la conexión WebSocket:", error);
         ws.close(1011, "Error interno");
@@ -307,11 +327,16 @@ export class ChatManager {
 }
 
 // Middleware para establecer usuario en el request
-export function setupChat(app: Express, httpServer: Server) {
-  const chatManager = new ChatManager(httpServer);
+export function setupChat(
+  app: Express,
+  httpServer: Server,
+  requireAuth: RequestHandler,
+  resolveUserFromSessionCookie: (cookieHeader: string | undefined) => Promise<User | null>,
+) {
+  const chatManager = new ChatManager(httpServer, resolveUserFromSessionCookie);
 
   // API para obtener conversaciones de un usuario
-  app.get("/api/conversations", async (req, res) => {
+  app.get("/api/conversations", requireAuth, async (req, res) => {
     try {
       if (!req.user) {
         return res.status(401).json({ message: "No autenticado" });
@@ -326,7 +351,7 @@ export function setupChat(app: Express, httpServer: Server) {
   });
 
   // API para obtener una conversación específica con sus mensajes
-  app.get("/api/conversations/:id", async (req, res) => {
+  app.get("/api/conversations/:id", requireAuth, async (req, res) => {
     try {
       if (!req.user) {
         return res.status(401).json({ message: "No autenticado" });
@@ -353,7 +378,7 @@ export function setupChat(app: Express, httpServer: Server) {
   });
 
   // API para obtener mensajes de una conversación
-  app.get("/api/conversations/:id/messages", async (req, res) => {
+  app.get("/api/conversations/:id/messages", requireAuth, async (req, res) => {
     try {
       if (!req.user) {
         return res.status(401).json({ message: "No autenticado" });

@@ -497,10 +497,12 @@ export function QuotationVariants({
     // Fallback: variant.baseCost ya está en la moneda de visualización
     // (convertido al persistir/crear la variante).
     if (!baseTeamMembers?.length) return variant.baseCost;
-    // member.rate siempre está en ARS (getPersonnelRate) — convertir antes de
-    // devolver, para que el resultado quede en la misma unidad que el fallback.
-    const totalARS = baseTeamMembers.reduce((sum, m) => sum + getEffectiveMemberHours(variant, m) * (m.rate || 0), 0);
-    return toStoredCurrency(totalARS);
+    // member.rate ya está expresado en quotationCurrency (getPersonnelRate),
+    // igual que variant.baseCost; no corresponde volver a convertirlo.
+    return baseTeamMembers.reduce(
+      (sum, member) => sum + getEffectiveMemberHours(variant, member) * (member.rate || 0),
+      0,
+    );
   };
 
   const computeVariantTotal = (variant: QuotationVariant): number => {

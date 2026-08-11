@@ -41,7 +41,7 @@ const OptimizedBasicInfo: React.FC = () => {
       {/* Formulario principal y datos del cliente en un solo componente */}
       <Card className="bg-white border border-neutral-100 shadow-sm overflow-hidden">
         <CardContent className="p-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="mx-auto grid max-w-5xl grid-cols-1 items-stretch gap-6 md:grid-cols-3">
             {/* Panel izquierdo: Cliente y Nombre del Proyecto */}
             <div className="space-y-4 md:col-span-2">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -119,7 +119,7 @@ const OptimizedBasicInfo: React.FC = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                 {/* Tipo de Proyecto */}
                 <div className="space-y-2">
                   <Label htmlFor="project-type" className="text-sm font-medium text-gray-700">Tipo de Proyecto</Label>
@@ -193,13 +193,35 @@ const OptimizedBasicInfo: React.FC = () => {
                     </Select>
                   </div>
                 )}
+
+                <div className="space-y-2">
+                  <Label htmlFor="quotation-currency" className="flex items-center text-sm font-medium text-gray-700">
+                    <DollarSign className="mr-1.5 h-3.5 w-3.5 text-primary/70" />
+                    Moneda de cotización
+                  </Label>
+                  <Select
+                    value={quotationData.quotationCurrency || "ARS"}
+                    onValueChange={updateQuotationCurrency}
+                  >
+                    <SelectTrigger id="quotation-currency" className="h-9 w-full border-neutral-200 bg-white text-gray-800 [&>span]:text-center">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ARS">Pesos argentinos (ARS)</SelectItem>
+                      <SelectItem value="USD">Dólares (USD)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-center text-[11px] text-muted-foreground">
+                    Define desde el inicio cómo se convierten y muestran las tarifas del equipo.
+                  </p>
+                </div>
               </div>
             </div>
 
             {/* Panel derecho: Información del cliente o ayuda contextual */}
-            <div className="md:border-l border-neutral-100 md:pl-6">
+            <div className="flex md:border-l md:border-neutral-100 md:pl-6">
               {quotationData.client ? (
-                <div className="bg-slate-50 p-4 rounded-md">
+                <div className="w-full self-center rounded-md bg-slate-50 p-4">
                   <div className="flex items-center mb-3">
                     <User className="h-4 w-4 mr-2 text-primary" />
                     <h3 className="text-sm font-medium text-gray-700">Información de Contacto</h3>
@@ -252,7 +274,7 @@ const OptimizedBasicInfo: React.FC = () => {
                   </div>
                 </div>
               ) : (
-                <div className="bg-blue-50 p-4 rounded-md h-full flex flex-col justify-center">
+                <div className="flex h-full w-full flex-col justify-center rounded-md bg-blue-50 p-4 text-center">
                   <h3 className="text-sm font-medium text-blue-700 mb-2">Información Inicial</h3>
                   <p className="text-xs text-blue-600">Selecciona un cliente y proporciona un nombre de proyecto para comenzar.</p>
                   <p className="text-xs text-blue-500 mt-2">Los campos marcados con <span className="text-red-500">*</span> son obligatorios.</p>

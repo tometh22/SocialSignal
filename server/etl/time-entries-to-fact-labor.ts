@@ -9,7 +9,7 @@ import {
   timeEntries, personnel, roles, activeProjects, clients, quotations,
   exchangeRates, systemConfig, factLaborMonth, tasks, taskTimeEntries,
 } from '@shared/schema';
-import { eq, and, gte, lte, or, isNull } from 'drizzle-orm';
+import { eq, and, gte, lte, or, isNull, inArray, sql } from 'drizzle-orm';
 import { canon, generateProjectKey } from '../utils/normalize';
 import { ensurePeriod } from './sot-etl';
 
@@ -17,6 +17,7 @@ export interface BuildFactLaborResult {
   periodKey: string;
   inserted: number;
   updated: number;
+  deleted: number;
   errors: string[];
   executionTimeMs: number;
 }
@@ -251,6 +252,35 @@ export async function buildFactLaborFromTimeEntries(
 
   let inserted = 0;
   let updated = 0;
+  let deleted = 0;
+
+  // Remove app-owned facts that no longer have any source entries. Without
+  // this, deleting the final entry for a project/person left a stale monthly
+  // cost forever because the upsert loop simply had nothing to process.
+  const aggregateKeys = new Set(
+    Array.from(aggregates.values()).map((agg) => `${agg.projectId}::${agg.personnelId}`),
+  );
+  const existingAppFacts = await db
+    .select({
+      id: factLaborMonth.id,
+      projectId: factLaborMonth.projectId,
+      personId: factLaborMonth.personId,
+    })
+    .from(factLaborMonth)
+    .where(and(
+      eq(factLaborMonth.periodKey, periodKey),
+      sql`${factLaborMonth.flags} @> '["source_app"]'::jsonb`,
+    ));
+  const staleFactIds = existingAppFacts
+    .filter((fact) => fact.personId == null || !aggregateKeys.has(`${fact.projectId}::${fact.personId}`))
+    .map((fact) => fact.id);
+  if (staleFactIds.length > 0) {
+    const removed = await db
+      .delete(factLaborMonth)
+      .where(inArray(factLaborMonth.id, staleFactIds))
+      .returning({ id: factLaborMonth.id });
+    deleted = removed.length;
+  }
 
   for (const agg of aggregates.values()) {
     try {
@@ -335,6 +365,7 @@ export async function buildFactLaborFromTimeEntries(
     periodKey,
     inserted,
     updated,
+    deleted,
     errors,
     executionTimeMs: Date.now() - startTime,
   };

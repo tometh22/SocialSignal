@@ -14,12 +14,16 @@ import { useAuth } from "@/hooks/use-auth";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import TaskCalendarView from "@/components/tasks/TaskCalendarView";
+import QuickTaskHours from "@/components/tasks/QuickTaskHours";
+import type { DateRange } from "react-day-picker";
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip as ChartTooltip, XAxis, YAxis } from "recharts";
 
 type Task = {
   id: number;
   title: string;
   status: string;
   priority: string;
+  startDate?: string | null;
   dueDate?: string | null;
   projectId?: number | null;
   projectName?: string | null;
@@ -116,17 +120,28 @@ function CircleCheck({
 
 // ── Inline date picker button ─────────────────────────────────────────
 function DateButton({
-  date,
+  startDate,
+  dueDate,
   taskId,
   onSet,
   isOverdue: overdue,
 }: {
-  date?: string | null;
+  startDate?: string | null;
+  dueDate?: string | null;
   taskId: number;
-  onSet: (taskId: number, date: Date | undefined) => void;
+  onSet: (taskId: number, range: DateRange | undefined) => void;
   isOverdue: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  const start = parseCivilTaskDate(startDate);
+  const due = parseCivilTaskDate(dueDate);
+  const rangeLabel = start && due
+    ? `${format(start, "d MMM", { locale: es })} - ${format(due, "d MMM", { locale: es })}`
+    : due
+      ? format(due, "d MMM", { locale: es })
+      : start
+        ? `${format(start, "d MMM", { locale: es })} →`
+        : null;
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -134,19 +149,18 @@ function DateButton({
         <button
           onClick={e => { e.stopPropagation(); setOpen(true); }}
           type="button"
-          aria-label={date ? `Cambiar fecha: ${format(parseCivilTaskDate(date)!, "d MMM", { locale: es })}` : "Asignar fecha"}
+          aria-label={rangeLabel ? `Cambiar período: ${rangeLabel}` : "Asignar período"}
           className={cn(
             "flex items-center gap-1 px-1.5 py-0.5 rounded text-xs transition-all duration-150",
-            "opacity-100 sm:opacity-0 sm:group-hover:opacity-100",
-            date ? (
+            rangeLabel ? (
               overdue
-                ? "text-red-500 font-medium opacity-100 hover:bg-red-50"
-                : "text-muted-foreground opacity-100 hover:bg-accent"
-            ) : "text-muted-foreground/50 hover:text-primary hover:bg-accent"
+                ? "font-medium text-red-500 hover:bg-red-50"
+                : "text-muted-foreground hover:bg-accent"
+            ) : "text-muted-foreground/50 hover:bg-accent hover:text-primary"
           )}
         >
-          {date ? (
-            <span>{format(parseCivilTaskDate(date)!, "d MMM", { locale: es })}</span>
+          {rangeLabel ? (
+            <><CalendarIcon className="h-3 w-3" /><span>{rangeLabel}</span></>
           ) : (
             <CalendarIcon className="h-3.5 w-3.5" />
           )}
@@ -154,16 +168,16 @@ function DateButton({
       </PopoverTrigger>
       <PopoverContent className="w-auto p-0 shadow-lg" onClick={e => e.stopPropagation()}>
         <Calendar
-          mode="single"
-          selected={parseCivilTaskDate(date)}
-          onSelect={d => {
-            onSet(taskId, d);
-            setOpen(false);
+          mode="range"
+          selected={{ from: start, to: due }}
+          onSelect={range => {
+            onSet(taskId, range);
+            if (range?.from && range?.to) setOpen(false);
           }}
           locale={es}
           initialFocus
         />
-        {date && (
+        {(startDate || dueDate) && (
           <div className="p-2 border-t">
             <Button
               variant="ghost"
@@ -171,7 +185,7 @@ function DateButton({
               className="w-full h-7 text-xs text-muted-foreground"
               onClick={() => { onSet(taskId, undefined); setOpen(false); }}
             >
-              Quitar fecha
+              Quitar período
             </Button>
           </div>
         )}
@@ -190,7 +204,7 @@ function HomeTaskRow({
 }: {
   task: Task;
   onToggle: (task: Task) => void;
-  onDateSet: (taskId: number, date: Date | undefined) => void;
+  onDateSet: (taskId: number, range: DateRange | undefined) => void;
   toggling: boolean;
   hidingId: number | null;
 }) {
@@ -211,26 +225,28 @@ function HomeTaskRow({
         onClick={e => { e.stopPropagation(); onToggle(task); }}
       />
 
-      <div className="flex-1 min-w-0 flex items-center gap-1.5 overflow-hidden">
+      <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden">
         <span className={cn(
           "text-sm truncate transition-all duration-200 leading-5",
           isDone ? "line-through text-muted-foreground" : "text-foreground"
         )}>
           {task.title}
         </span>
-        {(task.clientName || task.projectName) && (
-          <span className="text-[11px] text-muted-foreground/50 flex-shrink-0 truncate hidden sm:inline">
-            · {task.clientName || task.projectName}
+        {task.projectName && (
+          <span className="hidden max-w-40 flex-shrink-0 truncate rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground sm:inline">
+            {task.projectName}
           </span>
         )}
       </div>
 
       <DateButton
-        date={task.dueDate}
+        startDate={task.startDate}
+        dueDate={task.dueDate}
         taskId={task.id}
         onSet={onDateSet}
         isOverdue={overdue}
       />
+      <QuickTaskHours taskId={task.id} />
     </div>
   );
 }
@@ -290,7 +306,7 @@ export default function TasksHomePage() {
   const [myTab, setMyTab] = useState<TabValue>("upcoming");
   const [showAllMy, setShowAllMy] = useState(false);
   const [hidingTaskId, setHidingTaskId] = useState<number | null>(null);
-  const [collapsedProjectClients, setCollapsedProjectClients] = useState<Set<string>>(new Set());
+  const [expandedProjectClients, setExpandedProjectClients] = useState<Set<string>>(new Set());
   const [projectView, setProjectView] = useState<"folders" | "list">("folders");
 
   const { data: myTasksResponse, refetch: refetchMyTasks } = useQuery({
@@ -303,9 +319,11 @@ export default function TasksHomePage() {
     queryFn: () => authFetch("/api/tasks/projects").then(r => r.json()),
   });
 
-  const { data: myHours = { weekHours: 0, monthHours: 0 } } = useQuery<{
+  const { data: myHours = { weekHours: 0, monthHours: 0, byProject: [], tasksWithoutHours: [] } } = useQuery<{
     weekHours: number;
     monthHours: number;
+    byProject: { projectId: number; projectName: string; hours: number }[];
+    tasksWithoutHours: { id: number; title: string; projectName: string | null }[];
   }>({
     queryKey: ["/api/tasks/my-hours"],
     queryFn: () => authFetch("/api/tasks/my-hours").then(r => r.json()),
@@ -330,9 +348,10 @@ export default function TasksHomePage() {
   });
 
   const dateMutation = useMutation({
-    mutationFn: ({ taskId, date }: { taskId: number; date: Date | undefined }) =>
+    mutationFn: ({ taskId, range }: { taskId: number; range: DateRange | undefined }) =>
       apiRequest(`/api/tasks/${taskId}`, "PUT", {
-        dueDate: date ? format(date, "yyyy-MM-dd") : null,
+        startDate: range?.from ? format(range.from, "yyyy-MM-dd") : null,
+        dueDate: range?.to ? format(range.to, "yyyy-MM-dd") : null,
       }),
     onSuccess: () => { refetchMyTasks(); invalidateRelated(); },
   });
@@ -344,8 +363,8 @@ export default function TasksHomePage() {
     toggleMutation.mutate(task);
   }, [toggleMutation]);
 
-  const handleDateSet = useCallback((taskId: number, date: Date | undefined) => {
-    dateMutation.mutate({ taskId, date });
+  const handleDateSet = useCallback((taskId: number, range: DateRange | undefined) => {
+    dateMutation.mutate({ taskId, range });
   }, [dateMutation]);
 
   const raw = myTasksResponse as any;
@@ -424,6 +443,52 @@ export default function TasksHomePage() {
             <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Horas este mes</p>
             <p className="mt-1 text-2xl font-bold tracking-[-0.04em] tabular-nums">{myHours.monthHours.toFixed(2)}h</p>
           </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(18rem,1fr)]">
+        <div className="mind-panel p-4 sm:p-5">
+          <div className="mb-4">
+            <h2 className="text-sm font-semibold">Horas del mes por proyecto</h2>
+            <p className="text-xs text-muted-foreground">Tu carga acumulada permite detectar proyectos que quedaron sin registrar.</p>
+          </div>
+          {myHours.byProject.length === 0 ? (
+            <div className="flex h-44 items-center justify-center text-xs text-muted-foreground">Todavía no cargaste horas este mes.</div>
+          ) : (
+            <div className="h-52 w-full" aria-label="Gráfico de horas del mes por proyecto">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={myHours.byProject} margin={{ top: 8, right: 8, left: -18, bottom: 20 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="projectName" tick={{ fontSize: 10 }} angle={-12} textAnchor="end" interval={0} height={46} />
+                  <YAxis tick={{ fontSize: 10 }} allowDecimals={false} />
+                  <ChartTooltip formatter={(value: number) => [`${Number(value).toFixed(2)}h`, "Horas"]} />
+                  <Bar dataKey="hours" fill="#e11d48" radius={[5, 5, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </div>
+
+        <div className="mind-panel overflow-hidden">
+          <div className="border-b px-4 py-3">
+            <h2 className="text-sm font-semibold">Tareas sin horas</h2>
+            <p className="text-xs text-muted-foreground">Pendientes o en curso, todavía sin carga registrada.</p>
+          </div>
+          {myHours.tasksWithoutHours.length === 0 ? (
+            <div className="flex min-h-44 items-center justify-center px-4 text-center text-xs text-muted-foreground">No tenés tareas abiertas sin horas.</div>
+          ) : (
+            <div className="divide-y">
+              {myHours.tasksWithoutHours.slice(0, 6).map((task) => (
+                <div key={task.id} className="flex items-center gap-2 px-4 py-2.5">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-xs font-medium">{task.title}</p>
+                    <p className="truncate text-[11px] text-muted-foreground">{task.projectName || "Sin proyecto"}</p>
+                  </div>
+                  <QuickTaskHours taskId={task.id} />
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
@@ -525,15 +590,15 @@ export default function TasksHomePage() {
             <div className="space-y-3 px-4 pb-2 flex-1">
               {projectView === "folders" && recentProjectGroups.map(([clientName, clientProjects]) => (
                 <div key={clientName}>
-                  <button className="mb-1.5 flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground" onClick={() => setCollapsedProjectClients((previous) => {
+                  <button className="mb-1.5 flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground" onClick={() => setExpandedProjectClients((previous) => {
                     const next = new Set(previous);
                     next.has(clientName) ? next.delete(clientName) : next.add(clientName);
                     return next;
                   })}>
-                    <ChevronDown className={cn("h-3 w-3 transition-transform", collapsedProjectClients.has(clientName) && "-rotate-90")} />
+                    <ChevronDown className={cn("h-3 w-3 -rotate-90 transition-transform", expandedProjectClients.has(clientName) && "rotate-0")} />
                     {clientName}
                   </button>
-                  {!collapsedProjectClients.has(clientName) && <div className="space-y-1">
+                  {expandedProjectClients.has(clientName) && <div className="space-y-1">
                     {clientProjects.map((proj) => (
                       <Link key={proj.id} href={`/tasks/projects/${proj.id}`}>
                         <div className="mind-interactive-card flex items-center gap-2 rounded-xl border border-border/60 p-2.5 hover:bg-muted/30">

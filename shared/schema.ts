@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, date, doublePrecision, json, numeric, varchar, unique, uniqueIndex, pgEnum, jsonb, index, primaryKey } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, date, doublePrecision, json, numeric, varchar, unique, uniqueIndex, pgEnum, jsonb, index, primaryKey, type AnyPgColumn } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations, sql } from "drizzle-orm";
@@ -1692,7 +1692,7 @@ export const tasks = pgTable("tasks", {
   loggedHours: doublePrecision("logged_hours").default(0),
   status: text("status").notNull().default("todo"),
   priority: text("priority").notNull().default("medium"),
-  parentTaskId: integer("parent_task_id"),
+  parentTaskId: integer("parent_task_id").references((): AnyPgColumn => tasks.id, { onDelete: "cascade" }),
   position: integer("position").default(0),
   completedAt: timestamp("completed_at"),
   createdBy: integer("created_by").references(() => users.id, { onDelete: 'set null' }),

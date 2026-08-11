@@ -66,9 +66,9 @@ ALTER TABLE holidays
   USING date::date;
 
 ALTER TABLE personnel
-  ADD COLUMN IF NOT EXISTS current_role TEXT,
-  ADD COLUMN IF NOT EXISTS sublevel TEXT,
-  ADD COLUMN IF NOT EXISTS legacy_role TEXT;
+  ADD COLUMN IF NOT EXISTS "current_role" TEXT,
+  ADD COLUMN IF NOT EXISTS "sublevel" TEXT,
+  ADD COLUMN IF NOT EXISTS "legacy_role" TEXT;
 
 ALTER TABLE personnel
   ALTER COLUMN monthly_hours DROP NOT NULL;
@@ -79,8 +79,7 @@ WHERE contract_type = 'freelance'
   AND (monthly_hours IS NULL OR monthly_hours = 160);
 
 UPDATE personnel
-SET current_role = NULL,
-    sublevel = NULL
+SET "current_role" = NULL
 WHERE contract_type = 'freelance';
 
 ALTER TABLE personnel_absences
