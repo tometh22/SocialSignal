@@ -27,6 +27,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useActiveTimer, formatElapsed } from "@/hooks/useActiveTimer";
 import { roundToQuarterHour } from "@shared/utils/num";
+import { useAuth } from "@/hooks/use-auth";
 
 type Task = {
   id: number;
@@ -292,6 +293,8 @@ interface Props {
 }
 
 export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initialFocusTime = false, onNavigateToTask }: Props) {
+  const { user } = useAuth();
+  const canLogForOthers = !!(user as any)?.isAdmin || ((user as any)?.permissions || []).includes("operations");
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleValue, setTitleValue] = useState("");
   const [showAddSubtask, setShowAddSubtask] = useState(false);
@@ -299,6 +302,11 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
   const [logHours, setLogHours] = useState("");
   const [logDate, setLogDate] = useState(new Date().toISOString().slice(0, 10));
   const [logDesc, setLogDesc] = useState("");
+  const [logPersonnelId, setLogPersonnelId] = useState("");
+  const [editingTimeEntryId, setEditingTimeEntryId] = useState<number | null>(null);
+  const [editTimeHours, setEditTimeHours] = useState("");
+  const [editTimeDate, setEditTimeDate] = useState("");
+  const [editTimeDescription, setEditTimeDescription] = useState("");
   const [showTimeLog, setShowTimeLog] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [subtaskTimePanelId, setSubtaskTimePanelId] = useState<number | null>(null);
@@ -347,6 +355,17 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
     queryKey: ["/api/tasks-personnel"],
     queryFn: () => authFetchJson<Personnel[]>("/api/tasks-personnel"),
   });
+
+  const { data: myHoursIdentity } = useQuery<{ personnelId: number | null }>({
+    queryKey: ["/api/tasks/my-hours"],
+    queryFn: () => authFetchJson("/api/tasks/my-hours"),
+  });
+
+  useEffect(() => {
+    if (!logPersonnelId && myHoursIdentity?.personnelId) {
+      setLogPersonnelId(String(myHoursIdentity.personnelId));
+    }
+  }, [logPersonnelId, myHoursIdentity?.personnelId]);
 
   const { data: allProjects = [] } = useQuery<Project[]>({
     queryKey: ["/api/tasks-projects"],
@@ -549,6 +568,25 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
     },
   });
 
+  const editTimeMutation = useMutation({
+    mutationFn: ({ entryId, data }: { entryId: number; data: { hours: number; date: string; description: string | null } }) =>
+      apiRequest(`/api/tasks/${taskId}/time/${entryId}`, "PATCH", data),
+    onSuccess: () => {
+      refetchTask();
+      onUpdate?.();
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks/hours-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks/my-hours"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/monthly-closings/real-hours"] });
+      setEditingTimeEntryId(null);
+      toast({ title: "Carga de tiempo actualizada" });
+    },
+    onError: (error) => toast({
+      title: "No se pudo editar la carga",
+      description: getApiErrorMessage(error, "Revisá las horas y la fecha."),
+      variant: "destructive",
+    }),
+  });
+
   const deleteMutation = useMutation({
     mutationFn: () => apiRequest(`/api/tasks/${taskId}`, "DELETE"),
     onSuccess: () => {
@@ -576,7 +614,36 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
       toast({ variant: "destructive", title: "Mínimo 15 min", description: "El registro mínimo es 0.25h (15 min)." });
       return;
     }
-    logTimeMutation.mutate({ date: logDate, hours, description: logDesc });
+    logTimeMutation.mutate({
+      date: logDate,
+      hours,
+      description: logDesc,
+      ...(canLogForOthers && logPersonnelId ? { personnelId: Number(logPersonnelId) } : {}),
+    });
+  };
+
+  const startEditingTime = (entry: any) => {
+    setEditingTimeEntryId(entry.id);
+    setEditTimeHours(String(entry.hours));
+    setEditTimeDate(String(entry.date).slice(0, 10));
+    setEditTimeDescription(entry.description || "");
+  };
+
+  const saveEditedTime = () => {
+    if (!editingTimeEntryId) return;
+    const parsed = parseHoursInput(editTimeHours);
+    if (!parsed || parsed <= 0 || !editTimeDate) {
+      toast({ title: "Carga inválida", description: "Ingresá horas y fecha válidas.", variant: "destructive" });
+      return;
+    }
+    editTimeMutation.mutate({
+      entryId: editingTimeEntryId,
+      data: {
+        hours: Math.max(0.25, roundToQuarterHour(parsed)),
+        date: editTimeDate,
+        description: editTimeDescription.trim() || null,
+      },
+    });
   };
 
   const handleDescBlur = (value: string) => {
@@ -1094,7 +1161,7 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
                             size="sm"
                             variant="ghost"
                             className="h-6 text-xs text-muted-foreground hover:text-foreground px-2"
-                            onClick={() => startTimer(task.id, task.title, task.assigneeId ?? null)}
+                            onClick={() => startTimer(task.id, task.title, myHoursIdentity?.personnelId ?? null)}
                           >
                             <Timer className="h-3 w-3 mr-1" />Iniciar
                           </Button>
@@ -1107,6 +1174,17 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
 
                     {showTimeLog && (
                       <div className="px-3 py-3 border-b border-border bg-accent/10 space-y-2.5">
+                        {canLogForOthers && (
+                          <div>
+                            <p className="mb-1 text-[10px] text-muted-foreground">Cargar para</p>
+                            <Select value={logPersonnelId} onValueChange={setLogPersonnelId}>
+                              <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Seleccioná una persona" /></SelectTrigger>
+                              <SelectContent>
+                                {allPersonnel.map((person) => <SelectItem key={person.id} value={String(person.id)}>{person.name}</SelectItem>)}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )}
                         <div className="grid grid-cols-2 gap-2">
                           <div>
                             <p className="text-[10px] text-muted-foreground mb-1">Horas * <span className="text-muted-foreground/70">(múltiplos de 15 min)</span></p>
@@ -1146,20 +1224,34 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
                       {(task.timeEntries || []).length === 0 && !showTimeLog && (
                         <p className="text-xs text-muted-foreground italic px-3 py-2">Sin horas registradas</p>
                       )}
-                      {(task.timeEntries || []).map(entry => (
-                        <div key={entry.id} className="flex items-center gap-2 px-3 py-2 hover:bg-accent/20 group text-xs">
-                          <Clock className="h-3 w-3 text-muted-foreground flex-shrink-0" />
-                          <span className="font-semibold text-primary w-10 flex-shrink-0">{formatHours(entry.hours)}</span>
-                          <span className="text-muted-foreground flex-shrink-0">{format(new Date(entry.date), "dd/MM/yy")}</span>
-                          {entry.description && <span className="text-muted-foreground flex-1 truncate">— {entry.description}</span>}
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-5 w-5 p-0 opacity-0 group-hover:opacity-100 text-red-500 ml-auto flex-shrink-0"
-                            onClick={() => deleteTimeMutation.mutate(entry.id)}
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </Button>
+                      {(task.timeEntries || []).map(entry => editingTimeEntryId === entry.id ? (
+                        <div key={entry.id} className="space-y-2 bg-accent/10 px-3 py-2">
+                          <div className="grid grid-cols-[5rem_1fr] gap-2">
+                            <Input value={editTimeHours} onChange={(event) => setEditTimeHours(event.target.value)} className="h-7 text-xs" aria-label="Horas editadas" />
+                            <Input type="date" value={editTimeDate} onChange={(event) => setEditTimeDate(event.target.value)} className="h-7 text-xs" aria-label="Fecha editada" />
+                          </div>
+                          <Input value={editTimeDescription} onChange={(event) => setEditTimeDescription(event.target.value)} className="h-7 text-xs" placeholder="Descripción" />
+                          <div className="flex gap-1">
+                            <Button size="sm" className="h-6 text-xs" onClick={saveEditedTime} disabled={editTimeMutation.isPending}>Guardar</Button>
+                            <Button size="sm" variant="ghost" className="h-6 text-xs" onClick={() => setEditingTimeEntryId(null)}>Cancelar</Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div key={entry.id} className="group flex items-center gap-2 px-3 py-2 text-xs hover:bg-accent/20">
+                          <Clock className="h-3 w-3 flex-shrink-0 text-muted-foreground" />
+                          <span className="w-10 flex-shrink-0 font-semibold text-primary">{formatHours(entry.hours)}</span>
+                          <span className="flex-shrink-0 text-muted-foreground">{format(new Date(entry.date), "dd/MM/yy")}</span>
+                          <span className="min-w-0 flex-1 truncate text-muted-foreground">
+                            {entry.personnelName ? `${entry.personnelName}${entry.description ? ` · ${entry.description}` : ""}` : entry.description ? `— ${entry.description}` : ""}
+                          </span>
+                          {(canLogForOthers || entry.personnelId === myHoursIdentity?.personnelId) && <>
+                            <Button variant="ghost" size="sm" className="ml-auto h-5 w-5 flex-shrink-0 p-0 text-muted-foreground opacity-0 group-hover:opacity-100" onClick={() => startEditingTime(entry)} title="Editar carga">
+                              <Pencil className="h-3 w-3" />
+                            </Button>
+                            <Button variant="ghost" size="sm" className="h-5 w-5 flex-shrink-0 p-0 text-red-500 opacity-0 group-hover:opacity-100" onClick={() => deleteTimeMutation.mutate(entry.id)} title="Eliminar carga">
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </>}
                         </div>
                       ))}
                     </div>

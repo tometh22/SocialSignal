@@ -6,6 +6,10 @@ import { storage } from "./storage";
 import { autoSyncService } from "./services/autoSyncService";
 import { pool } from "./db";
 import { feedbackMindV2MigrationSql } from "./migrations/feedback-mind-v2";
+import { feedbackMindV27MigrationSql } from "./migrations/feedback-mind-v2-7";
+import { feedbackMindV27ConsistencyMigrationSql } from "./migrations/feedback-mind-v2-7-consistency";
+import { taskHierarchySecurityMigrationSql } from "./migrations/task-hierarchy-security";
+import { quotationHeaderCurrencyRepairMigrationSql } from "./migrations/quotation-header-currency-repair";
 import cors from 'cors';
 import { execSync } from 'child_process';
 
@@ -49,7 +53,7 @@ async function applyPendingMigrations() {
       ALTER TABLE "personnel" ALTER COLUMN "monthly_hours" DROP NOT NULL;
       UPDATE "personnel" SET "monthly_hours" = NULL
       WHERE "contract_type" = 'freelance' AND ("monthly_hours" IS NULL OR "monthly_hours" = 160);
-      UPDATE "personnel" SET "current_role" = NULL, "sublevel" = NULL
+      UPDATE "personnel" SET "current_role" = NULL
       WHERE "contract_type" = 'freelance';
     `);
     await run('0002 personnel_include_in_real_costs', `
@@ -778,6 +782,10 @@ async function applyPendingMigrations() {
     // Keeping it last makes a single production startup sufficient even when
     // quotation_id was still NOT NULL or the finance ledger did not yet exist.
     await run('0031 feedback_mind_v2 closure', feedbackMindV2MigrationSql);
+    await run('0035 feedback_mind_v2_7 closure', feedbackMindV27MigrationSql);
+    await run('0037 feedback_mind_v2_7 consistency', feedbackMindV27ConsistencyMigrationSql);
+    await run('0038 task hierarchy security', taskHierarchySecurityMigrationSql);
+    await run('0039 quotation header currency repair', quotationHeaderCurrencyRepairMigrationSql);
 
     // 0033: feriados duplicados (mismo date+name insertado más de una vez desde el
     // formulario) — borra duplicados conservando la fila más antigua y agrega la
@@ -830,6 +838,62 @@ async function applyPendingMigrations() {
   }
 }
 
+/**
+ * Rebuilds native app labor once after enabling the August 2026 cutover.
+ * The marker is written only after every affected period is rebuilt cleanly,
+ * so an interrupted deploy safely retries on its next startup.
+ */
+async function backfillNativeLaborOnce() {
+  const client = await pool.connect();
+  let periods: string[] = [];
+  try {
+    const marker = await client.query(
+      `SELECT 1 FROM applied_data_patches WHERE name = '0035_native_task_labor_backfill' LIMIT 1`,
+    );
+    if (marker.rowCount) return;
+
+    const config = await client.query(`
+      SELECT
+        MAX(CASE WHEN config_key = 'hours_data_source' THEN config_value END) AS source_mode,
+        MAX(CASE WHEN config_key = 'app_mode_cutover_date' THEN description END) AS cutover_date
+      FROM system_config
+      WHERE config_key IN ('hours_data_source', 'app_mode_cutover_date')
+    `);
+    const sourceMode = Number(config.rows[0]?.source_mode);
+    const cutoverDate = String(config.rows[0]?.cutover_date || '');
+    if (sourceMode !== 1 || !/^\d{4}-\d{2}$/.test(cutoverDate)) return;
+
+    const result = await client.query(`
+      SELECT DISTINCT period_key
+      FROM (
+        SELECT TO_CHAR(date, 'YYYY-MM') AS period_key FROM time_entries
+        UNION
+        SELECT TO_CHAR(date, 'YYYY-MM') AS period_key FROM task_time_entries
+      ) periods
+      WHERE period_key >= $1
+      ORDER BY period_key
+    `, [cutoverDate]);
+    periods = result.rows.map((row) => String(row.period_key));
+  } finally {
+    client.release();
+  }
+
+  const { buildFactLaborFromTimeEntries } = await import('./etl/time-entries-to-fact-labor');
+  for (const period of periods) {
+    const result = await buildFactLaborFromTimeEntries(period);
+    if (result.errors.length > 0) {
+      throw new Error(`No se pudo reconstruir ${period}: ${result.errors.join('; ')}`);
+    }
+    console.log(`✅ Fact labor nativo ${period}: ${result.inserted} insertados, ${result.updated} actualizados`);
+  }
+
+  await pool.query(`
+    INSERT INTO applied_data_patches(name)
+    VALUES ('0035_native_task_labor_backfill')
+    ON CONFLICT (name) DO NOTHING
+  `);
+}
+
 // Note: Session types are declared in server/auth.ts
 
 // Prevent unhandled async rejections from crashing the process.
@@ -852,9 +916,10 @@ app.use((req, res, next) => {
   // Only log API requests and errors, not static files
   if (req.path.startsWith('/api') || req.method !== 'GET') {
     console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
-    // Solo acceder a session después de que esté inicializada
+    // Only record whether a request is authenticated. Session identifiers are
+    // bearer credentials and must never be emitted to application logs.
     if (req.path.startsWith('/api') && req.session) {
-      console.log('Session ID:', req.session.userId || 'undefined');
+      console.log('Authenticated:', Boolean(req.session.userId));
     }
   }
   next();
@@ -917,9 +982,6 @@ app.get("/api/bi/revenue-por-cliente", async (_req, res) => {
   catch (e: any) { res.status(500).json({ message: e.message }); }
 });
 
-// Register all API routes (registerRoutes configura su propia autenticación internamente)
-registerRoutes(app);
-
 const port = Number(process.env.PORT || 5000);
 
 (async () => {
@@ -939,11 +1001,14 @@ const port = Number(process.env.PORT || 5000);
     await initializeDatabase();
     console.log("💾 Database initialized successfully");
 
+    await backfillNativeLaborOnce();
+
     // Start automatic synchronization service (Excel/Google Sheets → ledger/cashflow).
     // Re-enabled per ops request. Guarded so a missing Google Sheets credential or a
     // sync failure can't crash startup. Set DISABLE_AUTO_SYNC=true to turn it off.
-    if (process.env.DISABLE_AUTO_SYNC === "true") {
-      console.log("⏸️  Auto-sync deshabilitado por DISABLE_AUTO_SYNC=true");
+    const backgroundSyncDisabled = process.env.DISABLE_AUTO_SYNC === "true";
+    if (backgroundSyncDisabled) {
+      console.log("⏸️  Sincronizaciones y jobs externos deshabilitados por DISABLE_AUTO_SYNC=true");
     } else {
       try {
         autoSyncService.start();
@@ -951,24 +1016,28 @@ const port = Number(process.env.PORT || 5000);
       } catch (e: any) {
         console.error("⚠️  No se pudo iniciar el auto-sync:", e?.message);
       }
+
+      // Lightweight Resumen Ejecutivo sync (every 2 hours + on startup)
+      const { startResumenEjecutivoSync } = await import("./jobs/resumen-ejecutivo-sync");
+      startResumenEjecutivoSync();
+      console.log("📊 Resumen Ejecutivo auto-sync iniciado (cada 2 horas)");
+
+      // Full SoT pipeline sync — every 6 hours, also runs 60s after startup
+      const { startDailySoTSync } = await import("./jobs/daily-sot-sync");
+      startDailySoTSync();
+      console.log("📅 [SoT Sync] Pipeline completo programado cada 6 horas");
+
+      // Start CRM reminder notifications job
+      const { startReminderNotifications } = await import("./jobs/reminder-notifications");
+      startReminderNotifications();
+      console.log("🔔 Job de notificaciones de recordatorios CRM iniciado");
     }
 
-    // Lightweight Resumen Ejecutivo sync (every 2 hours + on startup)
-    const { startResumenEjecutivoSync } = await import("./jobs/resumen-ejecutivo-sync");
-    startResumenEjecutivoSync();
-    console.log("📊 Resumen Ejecutivo auto-sync iniciado (cada 2 horas)");
-
-    // Full SoT pipeline sync — every 6 hours, also runs 60s after startup
-    const { startDailySoTSync } = await import("./jobs/daily-sot-sync");
-    startDailySoTSync();
-    console.log("📅 [SoT Sync] Pipeline completo programado cada 6 horas");
-
-    // Start CRM reminder notifications job
-    const { startReminderNotifications } = await import("./jobs/reminder-notifications");
-    startReminderNotifications();
-    console.log("🔔 Job de notificaciones de recordatorios CRM iniciado");
-
-    const server = app.listen(port, "0.0.0.0", () => {
+    // Register the routes and bind the exact same HTTP server they use for
+    // WebSocket upgrades. Calling app.listen() here would create a second
+    // server, leaving the chat WebSocket attached to an unbound instance.
+    const server = await registerRoutes(app);
+    server.listen(port, "0.0.0.0", () => {
       console.log(`🚀 Server running on port ${port}`);
     });
 

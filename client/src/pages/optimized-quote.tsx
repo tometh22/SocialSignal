@@ -324,8 +324,8 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
       {/* Progress indicator */}
       <div className="standard-card mb-6">
         <div className="card-content py-4">
-          <div className="flex items-center justify-center">
-            <div className="flex items-center gap-1">
+          <div className="overflow-x-auto">
+            <div className="mx-auto flex w-max min-w-fit items-center gap-1 px-2">
               {steps.map((step, index) => (
                 <div key={step.num} className="flex items-center">
                   <div

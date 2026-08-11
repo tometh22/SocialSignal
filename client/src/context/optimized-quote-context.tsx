@@ -93,7 +93,7 @@ interface OptimizedQuoteContextType {
   updateProjectName: (name: string) => void;
   updateProjectType: (type: string) => void;
   updateProjectDuration: (duration: string) => void;
-  updateQuotationCurrency: (currency: string) => void;
+  updateQuotationCurrency: (currency: string, exchangeRateOverride?: number) => void;
   updateAnalysisType: (type: string) => void;
   updateMentionsVolume: (volume: string) => void;
   updateCountriesCovered: (countries: string) => void;
@@ -281,6 +281,9 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
 
   const queryClient = useQueryClient();
   const { convertToUSD, exchangeRate } = useCurrency();
+  const effectiveExchangeRate = quotationData.exchangeRateSnapshot && quotationData.exchangeRateSnapshot > 0
+    ? quotationData.exchangeRateSnapshot
+    : exchangeRate;
 
   // Get data from queries first
   const { data: roles = [] } = useQuery<Role[]>({
@@ -345,7 +348,11 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
     targetMonth: string | null | undefined,
     rateMode: "current" | "annual_avg",
     projectStartDate?: Date | null,
+    exchangeRateOverride?: number,
   ): number => {
+    const rateExchangeRate = exchangeRateOverride && exchangeRateOverride > 0
+      ? exchangeRateOverride
+      : effectiveExchangeRate;
     const personBillingCurrency = (person as any).billingCurrency ?? 'ARS';
     const useUsd = currency === 'USD';
     const field = useUsd ? "hourlyRateUSD" : "hourlyRateARS";
@@ -364,11 +371,15 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
           / personRates.length;
       }
       const fallbackField = useUsd ? "hourlyRateARS" : "hourlyRateUSD";
-      const fallbackRates = historicalRates.filter((r: any) => r.year === averageYear && Number(r[fallbackField]) > 0 && Number(r.exchangeRate) > 0);
+      const fallbackRates = historicalRates.filter((r: any) =>
+        r.year === averageYear &&
+        Number(r[fallbackField]) > 0 &&
+        (Number(r.exchangeRate) > 0 || rateExchangeRate > 0)
+      );
       if (fallbackRates.length === 0) return 0;
       return fallbackRates.reduce((sum: number, rate: any) => {
         const value = Number(rate[fallbackField]);
-        const fx = Number(rate.exchangeRate);
+        const fx = Number(rate.exchangeRate) || rateExchangeRate;
         return sum + (useUsd ? value / fx : value * fx);
       }, 0) / fallbackRates.length;
     }
@@ -384,15 +395,15 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
     if (applicable) return Number(applicable[field]);
     if (!useUsd) {
       const usdRate = historicalRates.find((rate: any) => rate.year * 100 + rate.month <= referencePeriod && Number(rate.hourlyRateUSD) > 0);
-      const fx = Number(usdRate?.exchangeRate);
+      const fx = Number(usdRate?.exchangeRate) || rateExchangeRate;
       if (usdRate && fx > 0) return Number(usdRate.hourlyRateUSD) * fx;
     } else {
       const arsRate = historicalRates.find((rate: any) => rate.year * 100 + rate.month <= referencePeriod && Number(rate.hourlyRateARS) > 0);
-      const fx = Number(arsRate?.exchangeRate);
+      const fx = Number(arsRate?.exchangeRate) || rateExchangeRate;
       if (arsRate && fx > 0) return Number(arsRate.hourlyRateARS) / fx;
     }
     return 0;
-  }, [currentYear]);
+  }, [currentYear, effectiveExchangeRate]);
 
   const getPersonnelRate = useCallback((personnelId: number, targetCurrency?: string, targetMonth?: string | null) => {
     if (!personnel || personnel.length === 0) return 0;
@@ -590,7 +601,7 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
     console.log('🔧 Template:', quotationData.template?.name);
     console.log('🔧 Financials:', quotationData.financials);
     console.log('🔧 Currency:', quotationData.quotationCurrency);
-    console.log('🔧 Exchange rate:', exchangeRate);
+    console.log('🔧 Exchange rate:', effectiveExchangeRate);
     console.log('🔧 Recalculation trigger:', recalculationTrigger);
 
     if (!quotationData.teamMembers || quotationData.teamMembers.length === 0) {
@@ -602,12 +613,15 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
       return;
     }
 
-    // CRITICAL FIX: Calculate base cost with proper currency handling
+    // Team rates/costs are expressed in the quotation currency. The calculation
+    // core remains ARS so margins, tools and persistence share one canonical unit.
     const calculatedBaseCostARS = quotationData.teamMembers.reduce((sum, member) => {
-      // Member cost is always in ARS (from getPersonnelRate)
-      const memberCost = member.cost || 0;
-      console.log(`👤 Member ${member.id}: cost = ${memberCost} ARS (from stored cost)`);
-      return sum + memberCost;
+      const quotedCost = Number(member.cost) || (Number(member.hours || 0) * Number(member.rate || 0));
+      const memberCostARS = quotationData.quotationCurrency === 'USD'
+        ? quotedCost * effectiveExchangeRate
+        : quotedCost;
+      console.log(`👤 Member ${member.id}: cost = ${memberCostARS} ARS (${quotedCost} ${quotationData.quotationCurrency || 'ARS'})`);
+      return sum + memberCostARS;
     }, 0);
 
     // FIXED: Keep costs in original currency (ARS) instead of converting to USD
@@ -636,7 +650,7 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
       // Keep manual price in ARS (no conversion needed)
       const manualPriceARS = quotationData.financials.manualPrice;
       // toolsCost is stored in USD — convert to ARS before subtracting from an ARS price
-      const toolsCostARS_manual = (quotationData.financials.toolsCost || 0) * (exchangeRate || 1);
+      const toolsCostARS_manual = (quotationData.financials.toolsCost || 0) * (effectiveExchangeRate || 1);
       const priceBeforeTools = manualPriceARS - toolsCostARS_manual;
       calculatedMarkup = priceBeforeTools - subtotalWithComplexity;
       const marginFactor = subtotalWithComplexity > 0 ? (priceBeforeTools / subtotalWithComplexity) : 1;
@@ -670,7 +684,7 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
     }
 
     // Add tools cost AFTER markup — convert from USD to ARS first
-    const toolsCostARS_auto = (quotationData.financials.toolsCost || 0) * (exchangeRate || 1);
+    const toolsCostARS_auto = (quotationData.financials.toolsCost || 0) * (effectiveExchangeRate || 1);
     const subtotalWithTools = subtotalWithMarkup + toolsCostARS_auto;
     console.log(`🔧 Tools cost (added after markup): ${toolsCostARS_auto} ARS (${quotationData.financials.toolsCost || 0} USD × TC), Subtotal with tools: ${subtotalWithTools} ARS`);
 
@@ -749,7 +763,7 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
     console.log(`💰 FINAL VALUES: Base: $${finalBaseCost}, Complexity: $${finalComplexityAdjustment}, Markup: $${finalMarkupAmount}, Total: $${finalTotalAmount}`);
     console.log('💰 === COST CALCULATION END ===');
 
-  }, [quotationData.teamMembers, quotationData.template, quotationData.financials, complexityFactors, roles, recalculationTrigger, exchangeRate]);
+  }, [quotationData.teamMembers, quotationData.template, quotationData.financials, quotationData.quotationCurrency, complexityFactors, roles, recalculationTrigger, effectiveExchangeRate]);
 
   // Navigation functions
   const nextStep = useCallback(() => {
@@ -798,10 +812,13 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
     }));
   }, []);
 
-  const updateQuotationCurrency = useCallback((currency: string = 'ARS') => {
+  const updateQuotationCurrency = useCallback((currency: string = 'ARS', exchangeRateOverride?: number) => {
     console.log('💱 Updating quotation currency to:', currency);
     setQuotationData(prev => {
       const newCurrency = currency;
+      const rateSnapshot = exchangeRateOverride && exchangeRateOverride > 0
+        ? exchangeRateOverride
+        : (prev.exchangeRateSnapshot && prev.exchangeRateSnapshot > 0 ? prev.exchangeRateSnapshot : exchangeRate);
       const updatedMembers = prev.teamMembers.map(member => {
         let newRate = member.rate;
         if (member.personnelId) {
@@ -815,6 +832,7 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
               prev.salaryMonth,
               prev.inflation.rateProjectionMode ?? "current",
               startDate && !Number.isNaN(startDate.getTime()) ? startDate : null,
+              rateSnapshot,
             );
           }
         } else if (member.roleId) {
@@ -827,10 +845,15 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
         }
         return { ...member, rate: newRate, cost: member.hours * newRate };
       });
-      return { ...prev, quotationCurrency: newCurrency, teamMembers: updatedMembers };
+      return {
+        ...prev,
+        quotationCurrency: newCurrency,
+        exchangeRateSnapshot: rateSnapshot > 0 ? rateSnapshot : prev.exchangeRateSnapshot,
+        teamMembers: updatedMembers,
+      };
     });
     forceRecalculate();
-  }, [forceRecalculate, personnel, resolvePersonnelRate, roles]);
+  }, [exchangeRate, forceRecalculate, personnel, resolvePersonnelRate, roles]);
 
   // Cambia el mes histórico a considerar y re-aplica tarifas a los
   // miembros del equipo que tengan personnelId, usando el rate del mes
@@ -1082,6 +1105,9 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
           manualPrice: quotation.manualPrice ? Number(quotation.manualPrice) : undefined
         },
         quotationCurrency: quotation.quotationCurrency || "ARS", // Propiedad requerida en el nivel raíz
+        exchangeRateSnapshot: Number(quotation.exchangeRateAtQuote) > 0
+          ? Number(quotation.exchangeRateAtQuote)
+          : undefined,
         inflation: {
           applyInflationAdjustment: Boolean(quotation.applyInflationAdjustment),
           inflationMethod: quotation.inflationMethod || "manual",
@@ -1176,7 +1202,7 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
         projectStartDate: quotationData.inflation.projectStartDate ? new Date(quotationData.inflation.projectStartDate) : undefined,
         rateProjectionMode: quotationData.inflation.rateProjectionMode || 'current',
         quotationCurrency: quotationData.quotationCurrency || 'ARS',
-        exchangeRateAtQuote: quotationData.exchangeRateSnapshot || null,
+        exchangeRateAtQuote: quotationData.quotationCurrency === 'USD' ? saveExchangeRate : null,
         proposalLink: quotationData.proposalLink || null,
         leadId: quotationData.leadId || null,
         salaryMonth: quotationData.salaryMonth ?? null,

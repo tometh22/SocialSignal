@@ -1,6 +1,6 @@
 import { Express, Request, Response } from "express";
 import session from "express-session";
-import { scrypt, randomBytes, timingSafeEqual } from "crypto";
+import { createHmac, scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { User } from "@shared/schema";
 import type { IStorage } from "./storage";
@@ -64,6 +64,36 @@ function getUserIdFromStore(store: session.Store, sessionId: string): Promise<nu
   });
 }
 
+function readSignedSessionId(cookieHeader: string | undefined, cookieName: string, secret: string): string | null {
+  if (!cookieHeader) return null;
+  const rawCookie = cookieHeader
+    .split(";")
+    .map((part) => part.trim())
+    .find((part) => part.startsWith(`${cookieName}=`))
+    ?.slice(cookieName.length + 1);
+  if (!rawCookie) return null;
+
+  try {
+    const signedValue = decodeURIComponent(rawCookie);
+    if (!signedValue.startsWith("s:")) return null;
+    const valueAndSignature = signedValue.slice(2);
+    const separator = valueAndSignature.lastIndexOf(".");
+    if (separator <= 0) return null;
+    const sessionId = valueAndSignature.slice(0, separator);
+    const suppliedSignature = valueAndSignature.slice(separator + 1);
+    const expectedSignature = createHmac("sha256", secret)
+      .update(sessionId)
+      .digest("base64")
+      .replace(/=+$/, "");
+    const supplied = Buffer.from(suppliedSignature);
+    const expected = Buffer.from(expectedSignature);
+    if (supplied.length !== expected.length || !timingSafeEqual(supplied, expected)) return null;
+    return sessionId;
+  } catch {
+    return null;
+  }
+}
+
 export function setupAuth(app: Express, storage: IStorage) {
   const sessionConfig = {
     secret: process.env.SESSION_SECRET || (() => { console.warn("⚠️ SESSION_SECRET not set — using random secret (sessions won't persist across restarts)"); return randomBytes(32).toString('hex'); })(),
@@ -97,6 +127,19 @@ export function setupAuth(app: Express, storage: IStorage) {
     if (!tokenId) return null;
     return getUserIdFromStore(sessionStore, tokenId);
   }
+
+  const resolveUserFromSessionToken = async (tokenId: string) => {
+    if (!tokenId) return null;
+    const userId = await getUserIdFromStore(sessionStore, tokenId);
+    if (!userId) return null;
+    const user = await storage.getUser(userId);
+    return user?.isActive === false ? null : user ?? null;
+  };
+
+  const resolveUserFromSessionCookie = async (cookieHeader: string | undefined) => {
+    const sessionId = readSignedSessionId(cookieHeader, sessionConfig.name, sessionConfig.secret);
+    return sessionId ? resolveUserFromSessionToken(sessionId) : null;
+  };
 
   // Middleware para verificar autenticación
   const requireAuth = async (req: Request, res: Response, next: Function) => {
@@ -137,12 +180,9 @@ export function setupAuth(app: Express, storage: IStorage) {
     try {
       const { email, password } = req.body;
 
-      console.log(`🔐 Login attempt for: ${email}`);
-
       const user = await storage.getUserByEmail(email);
 
       if (!user) {
-        console.log(`❌ User not found: ${email}`);
         return res.status(401).json({ message: "Credenciales incorrectas" });
       }
 
@@ -157,7 +197,8 @@ export function setupAuth(app: Express, storage: IStorage) {
       }
 
       req.session.userId = user.id;
-      console.log(`✅ Session established for user ID: ${user.id}, sessionID: ${req.sessionID}`);
+      // Never write the session identifier to logs: it is a bearer credential.
+      console.log(`✅ Session established for user ID: ${user.id}`);
 
       const personnelRows = await storage.getPersonnel();
       const linkedPersonnel = personnelRows.find((person) =>
@@ -176,7 +217,6 @@ export function setupAuth(app: Express, storage: IStorage) {
         personnelId: linkedPersonnel?.id ?? null,
         personnelName: linkedPersonnel?.name ?? null,
         personnelLinked: Boolean(linkedPersonnel),
-        sessionToken: req.sessionID,
       };
 
       res.status(200).json(userResponse);
@@ -316,5 +356,5 @@ export function setupAuth(app: Express, storage: IStorage) {
     }
   });
 
-  return { requireAuth };
+  return { requireAuth, resolveUserFromSessionCookie };
 }

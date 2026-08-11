@@ -13,7 +13,7 @@ import { useLocation } from 'wouter';
 import { useAuth } from '@/hooks/use-auth';
 
 const CurrencySelection: React.FC = () => {
-  const { quotationData, updateQuotationData, totalAmount, nextStep, baseCost, complexityAdjustment, markupAmount } = useOptimizedQuote();
+  const { quotationData, updateQuotationCurrency, totalAmount, nextStep, baseCost, complexityAdjustment, markupAmount } = useOptimizedQuote();
   const { exchangeRate, formatCurrency, exchangeRateSource, exchangeRateUpdatedAt } = useCurrency();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
@@ -39,7 +39,7 @@ const CurrencySelection: React.FC = () => {
   const handleConfirmRate = () => {
     const parsed = parseFloat(manualRateInput);
     if (!isNaN(parsed) && parsed > 0) {
-      updateQuotationData({ exchangeRateSnapshot: parsed });
+      updateQuotationCurrency(quotationData.quotationCurrency, parsed);
       toast({
         title: "Tipo de cambio actualizado",
         description: `TC manual: 1 USD = ${parsed.toLocaleString('es-AR')} ARS`,
@@ -54,7 +54,7 @@ const CurrencySelection: React.FC = () => {
   };
 
   const handleResetRate = () => {
-    updateQuotationData({ exchangeRateSnapshot: exchangeRate });
+    updateQuotationCurrency(quotationData.quotationCurrency, exchangeRate);
     toast({
       title: "Tipo de cambio restaurado",
       description: "Usando el tipo de cambio actual del mercado.",
@@ -62,8 +62,8 @@ const CurrencySelection: React.FC = () => {
   };
 
   const handleCurrencyChange = (currency: 'ARS' | 'USD') => {
-    // Preserve manual override if already set; otherwise snapshot market rate
-    updateQuotationData({ quotationCurrency: currency, exchangeRateSnapshot: effectiveRate });
+    // Re-resolve every team rate in the selected currency using this exact FX.
+    updateQuotationCurrency(currency, effectiveRate);
   };
 
   const handleDirectFinalize = async () => {

@@ -158,9 +158,150 @@ import {
 // 🚀 INCOME SOT - Nueva fuente única de verdad para ingresos
 import * as income from './domain/income';
 import { INCOME_SOT_ENABLED, logIncomeSOT } from './domain/income/feature-flag';
+import { createXlsxBuffer } from './utils/xlsx-export';
 
 // 🚀 COSTS SOT - Nueva fuente única de verdad para costos
 import * as costs from './domain/costs';
+
+type TaskAccessContext = {
+  isOperations: boolean;
+  personnelId: number | null;
+};
+
+function isOperationsRequest(req: Request): boolean {
+  const currentUser = req.user as any;
+  return !!currentUser?.isAdmin || (currentUser?.permissions || []).includes("operations");
+}
+
+async function getTaskAccessContext(req: Request): Promise<TaskAccessContext> {
+  if (isOperationsRequest(req)) return { isOperations: true, personnelId: null };
+  const currentUser = req.user as any;
+  if (!currentUser?.email) return { isOperations: false, personnelId: null };
+  const [matched] = await db.select({ id: personnel.id }).from(personnel)
+    .where(sql`LOWER(TRIM(${personnel.email})) = LOWER(TRIM(${currentUser.email}))`)
+    .limit(1);
+  return { isOperations: false, personnelId: matched?.id ?? null };
+}
+
+async function canAccessTaskProject(req: Request, projectId: number): Promise<boolean> {
+  if (!Number.isInteger(projectId) || projectId <= 0) return false;
+  const accessContext = await getTaskAccessContext(req);
+  if (accessContext.isOperations) return true;
+  if (!accessContext.personnelId) return false;
+  const [access] = await db.select({ id: activeProjects.id }).from(activeProjects)
+    .where(and(
+      eq(activeProjects.id, projectId),
+      eq(activeProjects.status, "active"),
+      sql`(
+        EXISTS (
+          SELECT 1 FROM task_project_members member_filter
+          WHERE member_filter.project_id = ${activeProjects.id}
+            AND member_filter.personnel_id = ${accessContext.personnelId}
+        )
+        OR EXISTS (
+          SELECT 1 FROM tasks task_filter
+          WHERE task_filter.project_id = ${activeProjects.id}
+            AND (
+              task_filter.assignee_id = ${accessContext.personnelId}
+              OR task_filter.collaborator_ids @> jsonb_build_array(${accessContext.personnelId}::int)
+            )
+        )
+      )`,
+    ))
+    .limit(1);
+  return Boolean(access);
+}
+
+async function canManageTaskProject(req: Request, projectId: number): Promise<boolean> {
+  if (isOperationsRequest(req)) return true;
+  const accessContext = await getTaskAccessContext(req);
+  if (!accessContext.personnelId) return false;
+  const [owner] = await db.select({ projectId: taskProjectMembers.projectId })
+    .from(taskProjectMembers)
+    .where(and(
+      eq(taskProjectMembers.projectId, projectId),
+      eq(taskProjectMembers.personnelId, accessContext.personnelId),
+      eq(taskProjectMembers.role, "owner"),
+    ))
+    .limit(1);
+  return Boolean(owner);
+}
+
+async function getTaskProjectId(taskId: number): Promise<number | null> {
+  if (!Number.isInteger(taskId) || taskId <= 0) return null;
+  const [task] = await db.select({ projectId: tasks.projectId }).from(tasks)
+    .where(eq(tasks.id, taskId)).limit(1);
+  return task?.projectId ?? null;
+}
+
+async function accessibleTaskProjectIds(req: Request): Promise<number[] | null> {
+  const accessContext = await getTaskAccessContext(req);
+  if (accessContext.isOperations) return null;
+  if (!accessContext.personnelId) return [];
+  const rows = await db.execute(sql`
+    SELECT DISTINCT project.id
+    FROM active_projects project
+    WHERE project.status = 'active'
+      AND (
+        EXISTS (
+          SELECT 1 FROM task_project_members member_filter
+          WHERE member_filter.project_id = project.id
+            AND member_filter.personnel_id = ${accessContext.personnelId}
+        )
+        OR EXISTS (
+          SELECT 1 FROM tasks task_filter
+          WHERE task_filter.project_id = project.id
+            AND (
+              task_filter.assignee_id = ${accessContext.personnelId}
+              OR task_filter.collaborator_ids @> jsonb_build_array(${accessContext.personnelId}::int)
+            )
+        )
+      )
+  `);
+  return (rows.rows as any[]).map((row) => Number(row.id)).filter(Number.isInteger);
+}
+
+const taskUpdatePayloadSchema = z.object({
+  title: z.string().trim().min(1).max(500).optional(),
+  description: z.string().max(20_000).nullable().optional(),
+  status: z.enum(["todo", "in_progress", "blocked", "done"]).optional(),
+  priority: z.enum(["low", "medium", "high", "urgent"]).optional(),
+  assigneeId: z.number().int().positive().nullable().optional(),
+  collaboratorIds: z.array(z.number().int().positive()).max(100).optional(),
+  startDate: z.union([z.string(), z.date(), z.null()]).optional(),
+  dueDate: z.union([z.string(), z.date(), z.null()]).optional(),
+  sectionName: z.string().trim().min(1).max(200).optional(),
+  parentTaskId: z.number().int().positive().nullable().optional(),
+  position: z.number().int().nonnegative().optional(),
+}).strict();
+
+async function recalculateTaskLoggedHours(taskId: number): Promise<void> {
+  await db.execute(sql`
+    WITH RECURSIVE ancestors AS (
+      SELECT id, parent_task_id FROM tasks WHERE id = ${taskId}
+      UNION
+      SELECT parent.id, parent.parent_task_id
+      FROM tasks parent
+      JOIN ancestors child ON child.parent_task_id = parent.id
+    ), descendants(root_id, id) AS (
+      SELECT id, id FROM ancestors
+      UNION
+      SELECT tree.root_id, child.id
+      FROM descendants tree
+      JOIN tasks child ON child.parent_task_id = tree.id
+    ), totals AS (
+      SELECT tree.root_id, COALESCE(SUM(entry.hours), 0)::float AS hours
+      FROM descendants tree
+      LEFT JOIN task_time_entries entry ON entry.task_id = tree.id
+      GROUP BY tree.root_id
+    )
+    UPDATE tasks target
+    SET logged_hours = totals.hours,
+        updated_at = NOW()
+    FROM totals
+    WHERE target.id = totals.root_id
+  `);
+}
 
 // Helper function to convert null values to undefined for Zod validation
 function nullToUndefined(obj: any): any {
@@ -649,7 +790,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const httpServer = createServer(app);
 
   // Setup authentication with storage
-  const { requireAuth } = setupAuth(app, storage);
+  const { requireAuth, resolveUserFromSessionCookie } = setupAuth(app, storage);
 
   // ═══ Review Rooms (multi-sala) ═══════════════════════════════════════════
   app.use('/api/reviews', createReviewRoomsRouter(requireAuth));
@@ -976,7 +1117,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // XLSX export — reusa el aggregator; respeta el filtro de estado y período del cliente.
   app.get('/api/projects/export', requireAuth, async (req, res) => {
     try {
-      const XLSX = await import('xlsx');
       const period = typeof req.query.period === 'string' ? req.query.period : undefined;
       const statusFilter = typeof req.query.status === 'string' ? req.query.status : 'all';
       const q = typeof req.query.q === 'string' ? req.query.q.toLowerCase() : '';
@@ -1005,10 +1145,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           'Horas': (p.metrics as any)?.totalHours ?? 0,
         }));
 
-      const wb = XLSX.utils.book_new();
-      const ws = XLSX.utils.json_to_sheet(rows);
-      XLSX.utils.book_append_sheet(wb, ws, 'Proyectos');
-      const buf: Buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+      const buf = await createXlsxBuffer(rows, 'Proyectos');
 
       const filename = `proyectos-${period ?? 'current'}${statusFilter !== 'all' ? '-' + statusFilter : ''}.xlsx`;
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
@@ -3635,7 +3772,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use('/uploads', express.static(path.join(process.cwd(), 'public/uploads')));
 
   // Chat websocket server
-  setupChat(app, httpServer);
+  setupChat(app, httpServer, requireAuth, resolveUserFromSessionCookie);
 
   // Clients routes
   app.get("/api/clients", requireAuth, async (_, res) => {
@@ -4438,7 +4575,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const historicalByPersonMonth = new Map(
         historicalRows.map((rate) => [
           `${rate.personnelId}-${rate.month}`,
-          rate.hourlyRateARS == null ? null : Number(rate.hourlyRateARS),
+          {
+            ars: rate.hourlyRateARS == null ? null : Number(rate.hourlyRateARS),
+            usd: rate.hourlyRateUSD == null ? null : Number(rate.hourlyRateUSD),
+          },
         ]),
       );
       const monthNumber: Record<string, number> = {
@@ -4475,22 +4615,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (match && "personnelId" in match) {
           const personnelId = (match as any).personnelId as number;
           if (allPersonnel.some((person) => person.id === personnelId)) {
+            const person = allPersonnel.find((candidate) => candidate.id === personnelId);
             for (const field of rateFields) {
               const next = row.monthlyRates[field.replace("HourlyRateARS", "")];
               if (next === undefined) continue;
               const fieldMatch = field.match(/^([a-z]{3})\d{4}HourlyRateARS$/);
               const month = fieldMatch ? monthNumber[fieldMatch[1]] : undefined;
-              const current = month
-                ? historicalByPersonMonth.get(`${personnelId}-${month}`) ?? null
-                : null;
+              const historical = month ? historicalByPersonMonth.get(`${personnelId}-${month}`) : null;
+              const current = person?.billingCurrency === 'USD'
+                ? historical?.usd ?? null
+                : historical?.ars ?? null;
               if (current !== next) {
                 proposedChanges.push({ field, current: current ?? null, next });
               }
             }
-            const person = allPersonnel.find((candidate) => candidate.id === personnelId);
             const metadata = [
               ["currentRole", person?.contractType === "freelance" ? null : row.currentRole ?? null, person?.currentRole ?? null],
-              ["sublevel", person?.contractType === "freelance" ? null : row.sublevel ?? null, person?.sublevel ?? null],
+              ["sublevel", row.sublevel ?? null, person?.sublevel ?? null],
               ["legacyRole", row.legacyRole ?? null, person?.legacyRole ?? null],
             ] as const;
             for (const [field, next, current] of metadata) {
@@ -4575,7 +4716,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const syncedPerson = allPersonnel.find((person) => person.id === pid);
       if (syncedPerson && (row.currentRole || row.sublevel || row.legacyRole)) {
         const roleMetadata = syncedPerson.contractType === "freelance"
-          ? { currentRole: null, sublevel: null, legacyRole: row.legacyRole ?? syncedPerson.legacyRole }
+          ? {
+              currentRole: null,
+              sublevel: row.sublevel ?? syncedPerson.sublevel,
+              legacyRole: row.legacyRole ?? syncedPerson.legacyRole,
+            }
           : {
               currentRole: row.currentRole ?? syncedPerson.currentRole,
               sublevel: row.sublevel ?? syncedPerson.sublevel,
@@ -4603,15 +4748,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .limit(1);
 
         if (existing.length > 0) {
+          const rateUpdate = syncedPerson?.billingCurrency === 'USD'
+            ? { hourlyRateUSD: String(rate), hourlyRateARS: null, updatedAt: new Date() }
+            : { hourlyRateARS: String(rate), updatedAt: new Date() };
           await db.update(personnelHistoricalCosts)
-            .set({ hourlyRateARS: String(rate), updatedAt: new Date() })
+            .set(rateUpdate)
             .where(eq(personnelHistoricalCosts.id, existing[0].id));
         } else {
+          const rateValues = syncedPerson?.billingCurrency === 'USD'
+            ? { hourlyRateUSD: String(rate) }
+            : { hourlyRateARS: String(rate) };
           await db.insert(personnelHistoricalCosts).values({
             personnelId: pid,
             year: yr,
             month,
-            hourlyRateARS: String(rate),
+            ...rateValues,
             adjustmentReason: 'Sync desde Valor Hora Real y Estimada',
           });
         }
@@ -7770,6 +7921,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Obtener registros de tiempo por cliente
   app.get("/api/time-entries/client/:clientId", requireAuth, async (req, res) => {
+    if (!isOperationsRequest(req)) return res.status(403).json({ message: "Acceso exclusivo de Operaciones" });
     const clientId = parseInt(req.params.clientId);
     if (isNaN(clientId)) return res.status(400).json({ message: "Invalid client ID" });
 
@@ -7784,6 +7936,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Obtener resumen de costos por cliente
   app.get("/api/clients/:clientId/cost-summary", requireAuth, async (req, res) => {
+    if (!isOperationsRequest(req)) return res.status(403).json({ message: "Acceso exclusivo de Operaciones" });
     const clientId = parseInt(req.params.clientId);
     if (isNaN(clientId)) return res.status(400).json({ message: "Invalid client ID" });
 
@@ -8530,6 +8683,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Obtener registros de horas con filtros opcionales
   app.get("/api/time-entries", requireAuth, async (req, res) => {
+    if (!isOperationsRequest(req)) return res.status(403).json({ message: "Acceso exclusivo de Operaciones" });
     try {
       const { projectId, startDate, endDate, personnelId } = req.query;
 
@@ -8552,6 +8706,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Obtener registros de horas agrupados por proyecto (para métricas rápidas)
   app.get("/api/time-entries/all-projects", requireAuth, async (req, res) => {
+    if (!isOperationsRequest(req)) return res.status(403).json({ message: "Acceso exclusivo de Operaciones" });
     try {
       const timeFilter = req.query.timeFilter as string;
       
@@ -8609,6 +8764,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (isNaN(projectId)) return res.status(400).json({ message: "Invalid project ID" });
 
     try {
+      if (!isOperationsRequest(req)) return res.status(403).json({ message: "Acceso exclusivo de Operaciones" });
       const entries = await db
         .select({
           id: timeEntries.id,
@@ -8650,6 +8806,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (isNaN(projectId)) return res.status(400).json({ message: "Invalid project ID" });
 
     try {
+      if (!isOperationsRequest(req)) return res.status(403).json({ message: "Acceso exclusivo de Operaciones" });
       const legacyRows = await db
         .select({
           id: timeEntries.id,
@@ -8720,6 +8877,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const projectId = parseInt(req.params.projectId);
     if (isNaN(projectId)) return res.status(400).json({ message: "Invalid project ID" });
     try {
+      if (!(await canAccessTaskProject(req, projectId))) {
+        return res.status(403).json({ message: "No tenés acceso a este proyecto" });
+      }
       const { getProjectPlannedHoursFromWeeklyEstimates } = await import("./domain/taskHoursCost");
       const plannedHours = await getProjectPlannedHoursFromWeeklyEstimates(projectId);
       res.json({ plannedHours });
@@ -8735,6 +8895,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (isNaN(personnelId)) return res.status(400).json({ message: "Invalid personnel ID" });
 
     try {
+      const accessContext = await getTaskAccessContext(req);
+      if (!accessContext.isOperations && accessContext.personnelId !== personnelId) {
+        return res.status(403).json({ message: "Solo podés consultar tus propios registros de horas" });
+      }
       const entries = await storage.getTimeEntriesByPersonnel(personnelId);
       res.json(entries);
     } catch (error) {
@@ -8754,6 +8918,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const entry = await storage.getTimeEntryById(id);
       if (!entry) return res.status(404).json({ message: "Time entry not found" });
 
+      const currentUser = req.user as any;
+      const canManageOthers = !!currentUser?.isAdmin || (currentUser?.permissions || []).includes("operations");
+      const [authenticatedPerson] = currentUser?.email
+        ? await db.select({ id: personnel.id }).from(personnel)
+            .where(sql`LOWER(TRIM(${personnel.email})) = LOWER(TRIM(${currentUser.email}))`)
+            .limit(1)
+        : [];
+      if (!canManageOthers && authenticatedPerson?.id !== entry.personnelId) {
+        return res.status(403).json({ message: "Solo podés consultar tus propios registros de horas" });
+      }
+      if (!(await canAccessTaskProject(req, entry.projectId))) {
+        return res.status(403).json({ message: "No tenés acceso a este proyecto" });
+      }
+
       res.json(entry);
     } catch (error) {
       console.error("Error fetching time entry:", error);
@@ -8761,23 +8939,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Fire-and-forget: rebuild fact_labor_month for the given entry date if app mode is active
-  function triggerLaborRebuild(date: Date | string | null | undefined): void {
+  // Keep fact_labor_month in sync before the write response is returned so
+  // Project view immediately reflects the new hours and their canonical cost.
+  async function triggerLaborRebuild(date: Date | string | null | undefined): Promise<void> {
     if (!date) return;
-    const d = new Date(date as string);
+    const d = typeof date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(date)
+      ? parseCivilDate(date)
+      : new Date(date);
     if (isNaN(d.getTime())) return;
     const periodKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-    Promise.all([
+    const [{ buildFactLaborFromTimeEntries }, { getHoursDataSource }] = await Promise.all([
       import('./etl/time-entries-to-fact-labor'),
       import('./utils/dataSourceMode'),
-    ]).then(([{ buildFactLaborFromTimeEntries }, { getHoursDataSource }]) =>
-      getHoursDataSource().then(mode => {
-        if (mode !== 'app') return;
-        buildFactLaborFromTimeEntries(periodKey)
-          .then(r => console.log(`[fact-labor-auto] ${periodKey} inserted=${r.inserted} updated=${r.updated} errors=${r.errors.length} ms=${r.executionTimeMs}`))
-          .catch(err => console.error('[fact-labor-auto] rebuild error:', err));
-      })
-    ).catch(() => {});
+    ]);
+    if (await getHoursDataSource() !== 'app') return;
+
+    let lastError: unknown;
+    for (let attempt = 1; attempt <= 2; attempt += 1) {
+      try {
+        const result = await buildFactLaborFromTimeEntries(periodKey);
+        console.log(`[fact-labor-auto] ${periodKey} attempt=${attempt} inserted=${result.inserted} updated=${result.updated} deleted=${result.deleted} errors=${result.errors.length} ms=${result.executionTimeMs}`);
+        if (result.errors.length === 0) return;
+        lastError = new Error(`ETL reported ${result.errors.length} row error(s)`);
+      } catch (error) {
+        lastError = error;
+      }
+      console.error(`[fact-labor-auto] ${periodKey} attempt=${attempt} failed:`, lastError);
+    }
+
+    throw new Error(
+      `La carga de horas se guardó, pero no se pudo sincronizar rentabilidad para ${periodKey}`,
+      { cause: lastError },
+    );
+  }
+
+  async function triggerLaborRebuildForDates(
+    dates: Array<Date | string | null | undefined>,
+  ): Promise<void> {
+    const uniquePeriods = new Map<string, Date | string>();
+    for (const date of dates) {
+      if (!date) continue;
+      const parsed = typeof date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(date)
+        ? parseCivilDate(date)
+        : new Date(date);
+      if (isNaN(parsed.getTime())) continue;
+      const periodKey = `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}`;
+      if (!uniquePeriods.has(periodKey)) uniquePeriods.set(periodKey, date);
+    }
+    for (const date of uniquePeriods.values()) await triggerLaborRebuild(date);
   }
 
   // Computes ARS costing for a task time entry so PM-logged hours feed rentabilidad.
@@ -8817,6 +9026,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/time-entries", requireAuth, requireProjectUnlocked(), async (req, res) => {
     try {
       const user = (req as any).user;
+      const requestedProjectId = Number(req.body?.projectId);
+      if (!Number.isInteger(requestedProjectId) || !(await canAccessTaskProject(req, requestedProjectId))) {
+        return res.status(403).json({ message: "No tenés acceso a este proyecto" });
+      }
+      if ((req.body?.entryType ?? "hours") !== "hours" && !isOperationsRequest(req)) {
+        return res.status(403).json({ message: "Solo Operaciones puede registrar costos directos" });
+      }
       // Adaptar fechas si vienen como strings ISO
       const processedData = {
         ...req.body,
@@ -8827,22 +9043,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       if ((processedData.entryType ?? "hours") === "hours") {
-        const [loggingPerson] = user?.email
+        const [authenticatedPerson] = user?.email
           ? await db.select({ id: personnel.id }).from(personnel)
               .where(sql`LOWER(TRIM(${personnel.email})) = LOWER(TRIM(${user.email}))`)
               .limit(1)
           : [];
-        if (!loggingPerson) {
+        if (!authenticatedPerson) {
           return res.status(422).json({
             message: "Tu usuario no está vinculado a Personal. Operaciones debe configurar el mismo email antes de cargar horas.",
             errors: [{ path: ["personnelId"], message: "Usuario sin vínculo con Personal" }],
           });
         }
 
-        // Identity, rate and cost are server-owned invariants.
-        processedData.personnelId = loggingPerson.id;
+        const requestedPersonnelId = Number(req.body?.personnelId);
+        const canLogForOthers = !!user?.isAdmin || (user?.permissions || []).includes("operations");
+        if (requestedPersonnelId > 0 && requestedPersonnelId !== authenticatedPerson.id && !canLogForOthers) {
+          return res.status(403).json({ message: "Solo Operaciones puede cargar horas para otra persona" });
+        }
+        const effectivePersonnelId = requestedPersonnelId > 0 && canLogForOthers
+          ? requestedPersonnelId
+          : authenticatedPerson.id;
+        const [targetPerson] = await db.select({ id: personnel.id }).from(personnel)
+          .where(eq(personnel.id, effectivePersonnelId)).limit(1);
+        if (!targetPerson) return res.status(400).json({ message: "La persona seleccionada no existe" });
+
+        // Identity is server-authorized; rate and cost remain server-owned.
+        processedData.personnelId = effectivePersonnelId;
         const canonicalRate = await resolveCanonicalPersonnelRate(
-          loggingPerson.id,
+          effectivePersonnelId,
           processedData.date ?? new Date(),
         );
         const rateError = canonicalRateErrorMessage(canonicalRate, processedData.date ?? new Date());
@@ -8930,8 +9158,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           "Esta persona no estaba en el equipo original de la cotización" : null
       };
 
+      await triggerLaborRebuild(entry.date);
       res.status(201).json(entryWithMetadata);
-      triggerLaborRebuild(entry.date);
     } catch (error) {
       if (error instanceof z.ZodError) {
         console.error("Error de validación:", error.errors);
@@ -8952,6 +9180,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!existingEntry) {
         return res.status(404).json({ message: "Time entry not found" });
       }
+      const currentUser = req.user as any;
+      const canManageOthers = !!currentUser?.isAdmin || (currentUser?.permissions || []).includes("operations");
+      const [authenticatedPerson] = currentUser?.email
+        ? await db.select({ id: personnel.id }).from(personnel)
+            .where(sql`LOWER(TRIM(${personnel.email})) = LOWER(TRIM(${currentUser.email}))`)
+            .limit(1)
+        : [];
+      if (!canManageOthers && authenticatedPerson?.id !== existingEntry.personnelId) {
+        return res.status(403).json({ message: "Solo podés modificar tus propios registros de horas" });
+      }
+      if (!(await canAccessTaskProject(req, existingEntry.projectId))) {
+        return res.status(403).json({ message: "No tenés acceso a este proyecto" });
+      }
       const sanitizedInput = { ...req.body };
       delete sanitizedInput.personnelId;
       delete sanitizedInput.hourlyRateAtTime;
@@ -8969,6 +9210,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const project = await storage.getActiveProject(validatedData.projectId);
         if (!project) {
           return res.status(404).json({ message: "Proyecto no encontrado" });
+        }
+        if (!(await canAccessTaskProject(req, validatedData.projectId))) {
+          return res.status(403).json({ message: "No tenés acceso al proyecto destino" });
         }
       }
 
@@ -9004,8 +9248,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Time entry not found" });
       }
 
+      await triggerLaborRebuildForDates([existingEntry.date, updatedEntry.date]);
       res.json(updatedEntry);
-      triggerLaborRebuild(updatedEntry.date);
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Invalid time entry data", errors: error.errors });
@@ -9021,15 +9265,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (isNaN(id)) return res.status(400).json({ message: "Invalid time entry ID" });
 
     try {
-      const [entryBeforeDelete] = await db.select({ date: timeEntries.date }).from(timeEntries).where(eq(timeEntries.id, id)).limit(1);
+      const entryBeforeDelete = await storage.getTimeEntryById(id);
+      if (!entryBeforeDelete) {
+        return res.status(404).json({ message: "Time entry not found" });
+      }
+      const currentUser = req.user as any;
+      const canManageOthers = !!currentUser?.isAdmin || (currentUser?.permissions || []).includes("operations");
+      const [authenticatedPerson] = currentUser?.email
+        ? await db.select({ id: personnel.id }).from(personnel)
+            .where(sql`LOWER(TRIM(${personnel.email})) = LOWER(TRIM(${currentUser.email}))`)
+            .limit(1)
+        : [];
+      if (!canManageOthers && authenticatedPerson?.id !== entryBeforeDelete.personnelId) {
+        return res.status(403).json({ message: "Solo podés eliminar tus propios registros de horas" });
+      }
+      if (!(await canAccessTaskProject(req, entryBeforeDelete.projectId))) {
+        return res.status(403).json({ message: "No tenés acceso a este proyecto" });
+      }
       const deleted = await storage.deleteTimeEntry(id);
 
       if (!deleted) {
         return res.status(404).json({ message: "Time entry not found" });
       }
 
+      if (entryBeforeDelete?.date) await triggerLaborRebuild(entryBeforeDelete.date);
       res.json({ success: true, message: "Time entry deleted successfully" });
-      if (entryBeforeDelete?.date) triggerLaborRebuild(entryBeforeDelete.date);
     } catch (error) {
       console.error("Error deleting time entry:", error);
       res.status(500).json({ message: "Failed to delete time entry" });
@@ -9038,6 +9298,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Aprobar un registro de horas
   app.post("/api/time-entries/:id/approve", requireAuth, async (req, res) => {
+    if (!isOperationsRequest(req)) return res.status(403).json({ message: "Acceso exclusivo de Operaciones" });
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "Invalid time entry ID" });
 
@@ -9152,6 +9413,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Obtener resumen de costos de un proyecto
   // Obtener resumen de costos para un periodo específico (mes, trimestre, etc.)
   app.get("/api/projects/:id/cost-summary/period", requireAuth, async (req, res) => {
+    if (!isOperationsRequest(req)) return res.status(403).json({ message: "Acceso exclusivo de Operaciones" });
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "Invalid project ID" });
 
@@ -9283,6 +9545,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Mantener el endpoint original para compatibilidad
   app.get("/api/projects/:id/cost-summary", requireAuth, async (req, res) => {
+    if (!isOperationsRequest(req)) return res.status(403).json({ message: "Acceso exclusivo de Operaciones" });
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "Invalid project ID" });
 
@@ -11918,7 +12181,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       res.json(entry);
-      triggerLaborRebuild(entryDate);
+      await triggerLaborRebuild(entryDate);
     } catch (error) {
       console.error("Error approving quick time entry:", error);
       res.status(500).json({ message: "Failed to approve quick time entry" });
@@ -17096,7 +17359,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const result = await buildFactLaborFromTimeEntries(period, force);
-      console.log(`[rebuild-labor-from-app] period=${period} inserted=${result.inserted} updated=${result.updated} errors=${result.errors.length} ms=${result.executionTimeMs}`);
+      console.log(`[rebuild-labor-from-app] period=${period} inserted=${result.inserted} updated=${result.updated} deleted=${result.deleted} errors=${result.errors.length} ms=${result.executionTimeMs}`);
       res.json(result);
     } catch (error) {
       console.error('[rebuild-labor-from-app] Error:', error);
@@ -18398,48 +18661,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ==================== MÓDULO DE GESTIÓN DE TAREAS ====================
 
-  const canAccessTaskProject = async (req: Request, projectId: number): Promise<boolean> => {
-    const currentUser = req.user as any;
-    const isOperations = !!currentUser?.isAdmin || (currentUser?.permissions || []).includes("operations");
-    if (isOperations) return true;
-    if (!currentUser?.email) return false;
-
-    const personnelMatch = await db.execute(sql`
-      SELECT id FROM personnel WHERE lower(email) = lower(${currentUser.email}) LIMIT 1
-    `);
-    const personnelId = Number((personnelMatch.rows as any[])[0]?.id || 0);
-    if (!personnelId) return false;
-
-    const access = await db.execute(sql`
-      SELECT 1
-      FROM active_projects ap
-      WHERE ap.id = ${projectId}
-        AND ap.status = 'active'
-        AND (
-          EXISTS (
-            SELECT 1 FROM task_project_members member_filter
-            WHERE member_filter.project_id = ap.id
-              AND member_filter.personnel_id = ${personnelId}
-          )
-          OR EXISTS (
-            SELECT 1 FROM tasks task_filter
-            WHERE task_filter.project_id = ap.id
-              AND (
-                task_filter.assignee_id = ${personnelId}
-                OR task_filter.collaborator_ids @> jsonb_build_array(${personnelId}::int)
-              )
-          )
-        )
-      LIMIT 1
-    `);
-    return access.rows.length > 0;
-  };
-
   // GET /api/tasks — lista filtrable
   app.get("/api/tasks", requireAuth, async (req: Request, res: Response) => {
     try {
       const { assigneeId, projectId, status, dateFrom, dateTo } = req.query;
       let conditions: any[] = [];
+      const allowedProjectIds = await accessibleTaskProjectIds(req);
+      if (allowedProjectIds && allowedProjectIds.length === 0) return res.json([]);
+      if (allowedProjectIds) conditions.push(inArray(tasks.projectId, allowedProjectIds));
+      if (projectId && !(await canAccessTaskProject(req, parseInt(projectId as string)))) {
+        return res.status(403).json({ message: "No tenés acceso a este proyecto" });
+      }
       if (assigneeId) conditions.push(eq(tasks.assigneeId, parseInt(assigneeId as string)));
       if (projectId) conditions.push(eq(tasks.projectId, parseInt(projectId as string)));
       if (status) conditions.push(eq(tasks.status, status as string));
@@ -18509,7 +18741,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
               createdUnassigned,
             )
           : createdUnassigned;
+        const allowedProjectIds = await accessibleTaskProjectIds(req);
+        if (allowedProjectIds && allowedProjectIds.length === 0) {
+          return res.json({ tasks: [], personnelId: pid || null });
+        }
         let conditions: any[] = [assignmentConditions];
+        if (allowedProjectIds) conditions.push(inArray(tasks.projectId, allowedProjectIds));
         if (status && status !== 'all') conditions.push(eq(tasks.status, status as string));
         if (dateFrom || dateTo) {
           const from = dateFrom ? new Date(dateFrom as string) : new Date(0);
@@ -18553,6 +18790,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { dateFrom, dateTo, assigneeId, projectId } = req.query;
       let conditions: any[] = [];
+      const allowedProjectIds = await accessibleTaskProjectIds(req);
+      if (allowedProjectIds && allowedProjectIds.length === 0) return res.json([]);
+      if (allowedProjectIds) conditions.push(inArray(tasks.projectId, allowedProjectIds));
       if (dateFrom || dateTo) {
         const from = dateFrom ? new Date(dateFrom as string) : new Date(0);
         const to = dateTo ? new Date(dateTo as string) : new Date(8640000000000000);
@@ -18593,7 +18833,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           sql`COALESCE(${tasks.collaboratorIds}, '[]'::jsonb) @> jsonb_build_array(${parsedAssigneeId}::int)`,
         ));
       }
-      if (projectId) conditions.push(eq(tasks.projectId, parseInt(projectId as string)));
+      if (projectId) {
+        const parsedProjectId = parseInt(projectId as string);
+        if (!Number.isInteger(parsedProjectId)) return res.status(400).json({ message: "Proyecto inválido" });
+        if (!(await canAccessTaskProject(req, parsedProjectId))) {
+          return res.status(403).json({ message: "No tenés acceso a este proyecto" });
+        }
+        conditions.push(eq(tasks.projectId, parsedProjectId));
+      }
 
       const result = conditions.length > 0
         ? await db.select().from(tasks).where(and(...conditions)).orderBy(asc(sql`COALESCE(${tasks.startDate}, ${tasks.dueDate})`), asc(tasks.dueDate))
@@ -18704,6 +18951,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { projectId, oldName, newName } = req.body;
       if (!projectId || !oldName || !newName) return res.status(400).json({ message: "Faltan datos" });
+      if (!(await canManageTaskProject(req, Number(projectId)))) {
+        return res.status(403).json({ message: "Solo responsables del proyecto u Operaciones pueden administrar secciones" });
+      }
       const trimmedNew = newName.trim();
       if (trimmedNew === oldName) return res.json({ message: "Sin cambios" });
 
@@ -18733,6 +18983,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { projectId, sectionName } = req.body;
       if (!projectId || !sectionName) return res.status(400).json({ message: "Faltan datos" });
+      if (!(await canManageTaskProject(req, Number(projectId)))) {
+        return res.status(403).json({ message: "Solo responsables del proyecto u Operaciones pueden administrar secciones" });
+      }
       await db.update(tasks)
         .set({ sectionName: "General" })
         .where(and(eq(tasks.projectId, parseInt(projectId)), eq(tasks.sectionName, sectionName)));
@@ -18758,6 +19011,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const pid = projectId ? parseInt(projectId as string) : undefined;
+      if (!isOperationsRequest(req) && (!pid || !(await canAccessTaskProject(req, pid)))) {
+        return res.status(403).json({ message: "Seleccioná un proyecto al que tengas acceso" });
+      }
       const result = await getTaskHoursCost({ projectId: pid, dateFrom, dateTo });
 
       // Only expose cost data to operations/admin users
@@ -18780,6 +19036,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { personnelId, projectId, dateFrom, dateTo } = req.query;
       const taskConditions: any[] = [];
       const legacyConditions: any[] = [];
+      const accessContext = await getTaskAccessContext(req);
+      if (!accessContext.isOperations) {
+        if (!accessContext.personnelId) return res.status(403).json({ message: "Usuario sin vínculo con Personal" });
+        if (personnelId && Number(personnelId) !== accessContext.personnelId) {
+          return res.status(403).json({ message: "Solo podés consultar tus propias horas" });
+        }
+        taskConditions.push(eq(taskTimeEntries.personnelId, accessContext.personnelId));
+        legacyConditions.push(eq(timeEntries.personnelId, accessContext.personnelId));
+      }
       if (personnelId) {
         const parsedPersonnelId = parseInt(personnelId as string);
         taskConditions.push(eq(taskTimeEntries.personnelId, parsedPersonnelId));
@@ -18797,8 +19062,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       let projectTaskIds: number[] = [];
       if (projectId) {
+        const parsedProjectId = parseInt(projectId as string);
+        if (!(await canAccessTaskProject(req, parsedProjectId))) {
+          return res.status(403).json({ message: "No tenés acceso a este proyecto" });
+        }
         const projectTasks = await db.select({ id: tasks.id }).from(tasks)
-          .where(eq(tasks.projectId, parseInt(projectId as string)));
+          .where(eq(tasks.projectId, parsedProjectId));
         projectTaskIds = projectTasks.map(t => t.id);
         if (projectTaskIds.length > 0) {
           taskConditions.push(inArray(taskTimeEntries.taskId, projectTaskIds));
@@ -18810,7 +19079,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Legacy entries point directly to the project, so they must be
         // queried separately instead of being silently dropped when a
         // project has no task rows.
-        legacyConditions.push(eq(timeEntries.projectId, parseInt(projectId as string)));
+        legacyConditions.push(eq(timeEntries.projectId, parsedProjectId));
       }
 
       const [taskEntries, legacyEntries] = await Promise.all([
@@ -19007,7 +19276,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
             .where(sql`LOWER(TRIM(${personnel.email})) = LOWER(TRIM(${user.email}))`)
             .limit(1)
         : [];
-      if (!person) return res.json({ personnelId: null, weekHours: 0, monthHours: 0 });
+      if (!person) return res.json({
+        personnelId: null,
+        weekHours: 0,
+        monthHours: 0,
+        byProject: [],
+        tasksWithoutHours: [],
+      });
       const result = await db.execute(sql`
         SELECT
           COALESCE(SUM(hours) FILTER (
@@ -19029,10 +19304,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ) AS all_time_entries
       `);
       const row = result.rows[0] as any;
+      const projectHoursResult = await db.execute(sql`
+        SELECT project_id, project_name, ROUND(SUM(hours)::numeric, 2)::float AS hours
+        FROM (
+          SELECT
+            t.project_id,
+            COALESCE(ap.name, q.project_name, 'Sin proyecto') AS project_name,
+            tte.hours
+          FROM task_time_entries tte
+          JOIN tasks t ON t.id = tte.task_id
+          LEFT JOIN active_projects ap ON ap.id = t.project_id
+          LEFT JOIN quotations q ON q.id = ap.quotation_id
+          WHERE tte.personnel_id = ${person.id}
+            AND tte.date >= date_trunc('month', CURRENT_DATE)
+            AND tte.date < date_trunc('month', CURRENT_DATE) + interval '1 month'
+          UNION ALL
+          SELECT
+            te.project_id,
+            COALESCE(ap.name, q.project_name, 'Sin proyecto') AS project_name,
+            te.hours
+          FROM time_entries te
+          LEFT JOIN active_projects ap ON ap.id = te.project_id
+          LEFT JOIN quotations q ON q.id = ap.quotation_id
+          WHERE te.personnel_id = ${person.id}
+            AND te.date >= date_trunc('month', CURRENT_DATE)
+            AND te.date < date_trunc('month', CURRENT_DATE) + interval '1 month'
+        ) monthly_entries
+        GROUP BY project_id, project_name
+        ORDER BY hours DESC, project_name
+      `);
+      const tasksWithoutHoursResult = await db.execute(sql`
+        SELECT
+          t.id,
+          t.title,
+          COALESCE(ap.name, q.project_name) AS project_name
+        FROM tasks t
+        LEFT JOIN active_projects ap ON ap.id = t.project_id
+        LEFT JOIN quotations q ON q.id = ap.quotation_id
+        WHERE t.status NOT IN ('done', 'cancelled')
+          AND (t.assignee_id = ${person.id} OR t.collaborator_ids @> jsonb_build_array(${person.id}::int))
+          AND NOT EXISTS (
+            SELECT 1
+            FROM task_time_entries own_entry
+            WHERE own_entry.task_id = t.id AND own_entry.personnel_id = ${person.id}
+          )
+        ORDER BY t.due_date NULLS LAST, t.updated_at DESC
+        LIMIT 12
+      `);
       res.json({
         personnelId: person.id,
         weekHours: Number(row?.week_hours) || 0,
         monthHours: Number(row?.month_hours) || 0,
+        byProject: (projectHoursResult.rows as any[]).map((project) => ({
+          projectId: Number(project.project_id),
+          projectName: project.project_name,
+          hours: Number(project.hours) || 0,
+        })),
+        tasksWithoutHours: (tasksWithoutHoursResult.rows as any[]).map((task) => ({
+          id: Number(task.id),
+          title: task.title,
+          projectName: task.project_name ?? null,
+        })),
       });
     } catch (error) {
       console.error("Error fetching my task hours:", error);
@@ -19046,6 +19378,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { id } = req.params;
       const [task] = await db.select().from(tasks).where(eq(tasks.id, parseInt(id)));
       if (!task) return res.status(404).json({ message: "Tarea no encontrada" });
+      if (!(await canAccessTaskProject(req, task.projectId))) {
+        return res.status(403).json({ message: "No tenés acceso a esta tarea" });
+      }
       
       // The detail view only needs the display fields below. Keeping this
       // projection explicit makes the panel resilient to an older deployment
@@ -19054,10 +19389,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         id: taskTimeEntries.id,
         taskId: taskTimeEntries.taskId,
         personnelId: taskTimeEntries.personnelId,
+        personnelName: personnel.name,
         date: taskTimeEntries.date,
         hours: taskTimeEntries.hours,
         description: taskTimeEntries.description,
       }).from(taskTimeEntries)
+        .leftJoin(personnel, eq(personnel.id, taskTimeEntries.personnelId))
         .where(eq(taskTimeEntries.taskId, parseInt(id)))
         .orderBy(desc(taskTimeEntries.date));
       const subtasks = await db.select().from(tasks).where(eq(tasks.parentTaskId, parseInt(id))).orderBy(asc(tasks.position));
@@ -19117,6 +19454,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         incoming.sectionName = incoming.sectionName?.trim() || "General";
       }
+      if (!(await canAccessTaskProject(req, Number(incoming.projectId)))) {
+        return res.status(403).json({ message: "No tenés acceso a este proyecto" });
+      }
       const data = insertTaskSchema.parse(incoming);
       if (data.startDate && data.dueDate && data.startDate > data.dueDate) {
         return res.status(400).json({ message: "La fecha de inicio no puede ser posterior a la fecha de fin" });
@@ -19159,6 +19499,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { taskIds, sectionName } = req.body as { taskIds: number[]; sectionName?: string };
       if (!Array.isArray(taskIds) || taskIds.length === 0) return res.status(400).json({ message: "taskIds requeridos" });
+      if (taskIds.length > 500 || !taskIds.every((id) => Number.isInteger(id) && id > 0)) {
+        return res.status(400).json({ message: "Lista de tareas inválida" });
+      }
+      const reorderTasks = await db.select({ id: tasks.id, projectId: tasks.projectId }).from(tasks)
+        .where(inArray(tasks.id, taskIds));
+      if (reorderTasks.length !== new Set(taskIds).size) return res.status(404).json({ message: "Una o más tareas no existen" });
+      const projectIds = [...new Set(reorderTasks.map((task) => task.projectId))];
+      if (projectIds.length !== 1 || !(await canAccessTaskProject(req, projectIds[0]))) {
+        return res.status(403).json({ message: "No se pueden reordenar tareas de proyectos distintos o inaccesibles" });
+      }
       await Promise.all(taskIds.map((id, idx) => {
         const updates: any = { position: idx, updatedAt: new Date() };
         if (sectionName !== undefined) updates.sectionName = sectionName;
@@ -19175,17 +19525,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
       
-      // Whitelist of editable fields — never allow overwriting id, createdBy, loggedHours, etc.
-      const ALLOWED_FIELDS = [
-        'title', 'description', 'status', 'priority', 'assigneeId', 'collaboratorIds',
-        'startDate', 'dueDate', 'sectionName', 'parentTaskId', 'position'
-      ];
-      
       const taskId = parseInt(id);
-      const updates: any = { updatedAt: new Date() };
-      for (const field of ALLOWED_FIELDS) {
-        if (field in req.body) updates[field] = req.body[field];
+      if (!Number.isInteger(taskId)) return res.status(400).json({ message: "Identificador inválido" });
+      const parsedUpdate = taskUpdatePayloadSchema.safeParse(req.body);
+      if (!parsedUpdate.success) {
+        return res.status(400).json({ message: "Datos de tarea inválidos", errors: parsedUpdate.error.errors });
       }
+      const updates: any = { ...parsedUpdate.data, updatedAt: new Date() };
 
       // Prevent circular parent-child relationship
       if (updates.parentTaskId !== undefined && updates.parentTaskId !== null) {
@@ -19203,13 +19549,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (updates.startDate && typeof updates.startDate === 'string') updates.startDate = new Date(updates.startDate);
       if (updates.dueDate === null) updates.dueDate = null;
       if (updates.startDate === null) updates.startDate = null;
+      if (updates.dueDate instanceof Date && Number.isNaN(updates.dueDate.getTime())) {
+        return res.status(400).json({ message: "La fecha de fin no es válida" });
+      }
+      if (updates.startDate instanceof Date && Number.isNaN(updates.startDate.getTime())) {
+        return res.status(400).json({ message: "La fecha de inicio no es válida" });
+      }
       const [existingTask] = await db.select({
         startDate: tasks.startDate,
         dueDate: tasks.dueDate,
         projectId: tasks.projectId,
         parentTaskId: tasks.parentTaskId,
+        assigneeId: tasks.assigneeId,
+        collaboratorIds: tasks.collaboratorIds,
       }).from(tasks).where(eq(tasks.id, taskId));
       if (!existingTask) return res.status(404).json({ message: "Tarea no encontrada" });
+      if (!(await canAccessTaskProject(req, existingTask.projectId))) {
+        return res.status(403).json({ message: "No tenés acceso a esta tarea" });
+      }
 
       const effectiveParentId = updates.parentTaskId === undefined
         ? existingTask.parentTaskId
@@ -19221,6 +19578,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
           sectionName: tasks.sectionName,
         }).from(tasks).where(eq(tasks.id, Number(effectiveParentId)));
         if (!parent) return res.status(400).json({ message: "La tarea padre no existe" });
+        if (!(await canAccessTaskProject(req, parent.projectId))) {
+          return res.status(403).json({ message: "No tenés acceso al proyecto de la tarea padre" });
+        }
+        const cycleCheck = await db.execute(sql`
+          WITH RECURSIVE descendants AS (
+            SELECT id FROM tasks WHERE parent_task_id = ${taskId}
+            UNION
+            SELECT child.id FROM tasks child
+            JOIN descendants parent_descendant ON child.parent_task_id = parent_descendant.id
+          )
+          SELECT 1 FROM descendants WHERE id = ${Number(effectiveParentId)} LIMIT 1
+        `);
+        if (cycleCheck.rows.length > 0) {
+          return res.status(409).json({ message: "La jerarquía solicitada crearía un ciclo" });
+        }
         // Subtasks always inherit both invariants, including when they are
         // re-parented or somebody tries to edit their section directly.
         updates.projectId = parent.projectId;
@@ -19235,7 +19607,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (effectiveStart && effectiveDue && effectiveStart > effectiveDue) {
         return res.status(400).json({ message: "La fecha de inicio no puede ser posterior a la fecha de fin" });
       }
-      const assignmentIds = [updates.assigneeId, ...(updates.collaboratorIds ?? [])].filter(
+      const effectiveAssigneeId = updates.assigneeId === undefined ? existingTask.assigneeId : updates.assigneeId;
+      const effectiveCollaboratorIds = updates.collaboratorIds === undefined
+        ? existingTask.collaboratorIds ?? []
+        : updates.collaboratorIds;
+      const assignmentIds = [effectiveAssigneeId, ...effectiveCollaboratorIds].filter(
         (personnelId): personnelId is number => typeof personnelId === "number",
       );
       if (effectiveProjectId && assignmentIds.length > 0) {
@@ -19252,6 +19628,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const [updated] = await db.update(tasks).set(updates).where(eq(tasks.id, parseInt(id))).returning();
       if (!updated) return res.status(404).json({ message: "Tarea no encontrada" });
+      if (existingTask.parentTaskId !== updated.parentTaskId) {
+        if (existingTask.parentTaskId) await recalculateTaskLoggedHours(existingTask.parentTaskId);
+        if (updated.parentTaskId) await recalculateTaskLoggedHours(updated.parentTaskId);
+      }
       res.json(updated);
     } catch (error) {
       res.status(500).json({ message: "Error al actualizar tarea" });
@@ -19263,29 +19643,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
       const taskId = parseInt(id);
-
-      // Check for parent before deletion (cascade will remove time entries)
+      if (!Number.isInteger(taskId)) return res.status(400).json({ message: "Identificador inválido" });
       const [taskToDelete] = await db
-        .select({ parentTaskId: tasks.parentTaskId })
+        .select({ parentTaskId: tasks.parentTaskId, projectId: tasks.projectId })
         .from(tasks)
         .where(eq(tasks.id, taskId));
+      if (!taskToDelete) return res.status(404).json({ message: "Tarea no encontrada" });
+      if (!(await canManageTaskProject(req, taskToDelete.projectId))) {
+        return res.status(403).json({ message: "Solo responsables del proyecto u Operaciones pueden eliminar tareas" });
+      }
 
-      await db.delete(tasks).where(eq(tasks.id, taskId));
+      // Capture every affected period before the cascade removes task time entries.
+      const affected = await db.execute(sql`
+        WITH RECURSIVE task_tree AS (
+          SELECT id FROM tasks WHERE id = ${taskId}
+          UNION
+          SELECT child.id FROM tasks child
+          JOIN task_tree parent ON child.parent_task_id = parent.id
+        )
+        SELECT tree.id, entry.date
+        FROM task_tree tree
+        LEFT JOIN task_time_entries entry ON entry.task_id = tree.id
+      `);
+      const affectedRows = affected.rows as any[];
+      const taskIds = [...new Set(affectedRows.map((row) => Number(row.id)).filter(Number.isInteger))];
+      await db.transaction(async (tx) => {
+        await tx.delete(taskTimeEntries).where(inArray(taskTimeEntries.taskId, taskIds));
+        await tx.delete(tasks).where(inArray(tasks.id, taskIds));
+      });
 
       // If it was a subtask, recalculate parent's loggedHours
       if (taskToDelete?.parentTaskId) {
-        const parentTotal = await db.execute(sql`
-          SELECT COALESCE(SUM(tte.hours), 0) as total
-          FROM task_time_entries tte
-          JOIN tasks t ON t.id = tte.task_id
-          WHERE t.id = ${taskToDelete.parentTaskId} OR t.parent_task_id = ${taskToDelete.parentTaskId}
-        `);
-        const parentHours = parseFloat((parentTotal.rows[0] as any).total);
-        await db.update(tasks)
-          .set({ loggedHours: parentHours, updatedAt: new Date() })
-          .where(eq(tasks.id, taskToDelete.parentTaskId));
+        await recalculateTaskLoggedHours(taskToDelete.parentTaskId);
       }
 
+      await triggerLaborRebuildForDates(affectedRows.map((row) => row.date));
       res.json({ message: "Tarea eliminada" });
     } catch (error) {
       res.status(500).json({ message: "Error al eliminar tarea" });
@@ -19301,17 +19693,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const taskId = parseInt(id);
       const [task] = await db.select().from(tasks).where(eq(tasks.id, taskId));
       if (!task) return res.status(404).json({ message: "Tarea no encontrada" });
+      if (!(await canAccessTaskProject(req, task.projectId))) {
+        return res.status(403).json({ message: "No tenés acceso a esta tarea" });
+      }
 
-      const [loggingPerson] = user?.email
+      const [authenticatedPerson] = user?.email
         ? await db.select({ id: personnel.id }).from(personnel)
             .where(sql`LOWER(TRIM(${personnel.email})) = LOWER(TRIM(${user.email}))`)
             .limit(1)
         : [];
-      if (!loggingPerson) {
+      if (!authenticatedPerson) {
         return res.status(400).json({
           message: "Tu usuario no está vinculado a Personal. Operaciones debe configurar el mismo email antes de cargar horas.",
         });
       }
+      const requestedPersonnelId = Number(req.body?.personnelId);
+      const canLogForOthers = !!user?.isAdmin || (user?.permissions || []).includes("operations");
+      if (requestedPersonnelId > 0 && requestedPersonnelId !== authenticatedPerson.id && !canLogForOthers) {
+        return res.status(403).json({ message: "Solo Operaciones puede cargar horas para otra persona" });
+      }
+      const effectivePersonnelId = requestedPersonnelId > 0 && canLogForOthers
+        ? requestedPersonnelId
+        : authenticatedPerson.id;
+      const [targetPerson] = await db.select({ id: personnel.id }).from(personnel)
+        .where(eq(personnel.id, effectivePersonnelId)).limit(1);
+      if (!targetPerson) return res.status(400).json({ message: "La persona seleccionada no existe" });
       // A date-only value is a civil date, not a UTC timestamp. Parse it in
       // the application timezone so a Buenos Aires entry cannot move to the
       // previous day when it is stored or rebuilt for monthly rentabilidad.
@@ -19322,7 +19728,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const data = insertTaskTimeEntrySchema.parse({
         ...req.body,
         date: entryDate,
-        personnelId: loggingPerson.id,
+        personnelId: effectivePersonnelId,
         taskId,
         createdBy: user.id,
       });
@@ -19348,25 +19754,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const [created] = await db.insert(taskTimeEntries).values({ ...data, ...costing }).returning();
 
-      // Update logged hours on task
-      const totalResult = await db.execute(sql`SELECT COALESCE(SUM(hours), 0) as total FROM task_time_entries WHERE task_id = ${taskId}`);
-      const total = (totalResult.rows[0] as any).total;
-      await db.update(tasks).set({ loggedHours: parseFloat(total), updatedAt: new Date() }).where(eq(tasks.id, taskId));
-
-      // If this is a subtask, roll up hours to the parent task too
-      if (task.parentTaskId) {
-        const parentTotal = await db.execute(sql`
-          SELECT COALESCE(SUM(tte.hours), 0) as total
-          FROM task_time_entries tte
-          JOIN tasks t ON t.id = tte.task_id
-          WHERE t.id = ${task.parentTaskId} OR t.parent_task_id = ${task.parentTaskId}
-        `);
-        const parentHours = parseFloat((parentTotal.rows[0] as any).total);
-        await db.update(tasks).set({ loggedHours: parentHours, updatedAt: new Date() }).where(eq(tasks.id, task.parentTaskId));
-      }
+      await recalculateTaskLoggedHours(taskId);
+      if (task.parentTaskId) await recalculateTaskLoggedHours(task.parentTaskId);
 
       // Rebuild rentabilidad for the affected month (fire-and-forget, app mode only)
-      triggerLaborRebuild(data.date);
+      await triggerLaborRebuild(data.date);
 
       res.json({ ...created, costingWarning });
     } catch (error: any) {
@@ -19376,32 +19768,104 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // PATCH /api/tasks/:taskId/time/:entryId — corregir horas, fecha o descripción
+  app.patch("/api/tasks/:taskId/time/:entryId", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const taskId = Number(req.params.taskId);
+      const entryId = Number(req.params.entryId);
+      if (!Number.isInteger(taskId) || !Number.isInteger(entryId)) {
+        return res.status(400).json({ message: "Identificador inválido" });
+      }
+      const [task] = await db.select().from(tasks).where(eq(tasks.id, taskId)).limit(1);
+      const [entry] = await db.select().from(taskTimeEntries)
+        .where(and(eq(taskTimeEntries.id, entryId), eq(taskTimeEntries.taskId, taskId)))
+        .limit(1);
+      if (!task || !entry) return res.status(404).json({ message: "Carga de tiempo no encontrada" });
+      if (!(await canAccessTaskProject(req, task.projectId))) {
+        return res.status(403).json({ message: "No tenés acceso a esta tarea" });
+      }
+
+      const user = req.user as any;
+      const [authenticatedPerson] = user?.email
+        ? await db.select({ id: personnel.id }).from(personnel)
+            .where(sql`LOWER(TRIM(${personnel.email})) = LOWER(TRIM(${user.email}))`)
+            .limit(1)
+        : [];
+      const canEditOthers = !!user?.isAdmin || (user?.permissions || []).includes("operations");
+      if (!canEditOthers && authenticatedPerson?.id !== entry.personnelId) {
+        return res.status(403).json({ message: "No podés editar la carga de otra persona" });
+      }
+
+      const hours = req.body?.hours === undefined ? entry.hours : Number(req.body.hours);
+      if (!Number.isFinite(hours) || hours < 0.25) {
+        return res.status(400).json({ message: "Las horas deben ser al menos 0.25" });
+      }
+      const rawDate = req.body?.date;
+      const date = rawDate === undefined
+        ? entry.date
+        : typeof rawDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(rawDate)
+          ? parseCivilDate(rawDate)
+          : new Date(rawDate);
+      if (Number.isNaN(date.getTime())) return res.status(400).json({ message: "La fecha no es válida" });
+      const linkedProjectId = task.projectId ?? (task.parentTaskId
+        ? (await db.select({ projectId: tasks.projectId }).from(tasks).where(eq(tasks.id, task.parentTaskId)))[0]?.projectId
+        : null);
+      const costing = await computeTaskEntryCost(entry.personnelId, linkedProjectId, date, hours);
+      const description = req.body?.description === undefined
+        ? entry.description
+        : typeof req.body.description === "string" && req.body.description.trim()
+          ? req.body.description.trim()
+          : null;
+      const [updated] = await db.update(taskTimeEntries)
+        .set({ date, hours, description, ...costing })
+        .where(eq(taskTimeEntries.id, entryId))
+        .returning();
+
+      await recalculateTaskLoggedHours(taskId);
+      if (task.parentTaskId) await recalculateTaskLoggedHours(task.parentTaskId);
+      await triggerLaborRebuild(entry.date);
+      if (formatCivilDate(entry.date) !== formatCivilDate(updated.date)) {
+        await triggerLaborRebuild(updated.date);
+      }
+      res.json(updated);
+    } catch (error) {
+      console.error("Error al editar carga de tarea:", error);
+      res.status(500).json({ message: "Error al editar la carga de tiempo" });
+    }
+  });
+
   // DELETE /api/tasks/:taskId/time/:entryId — eliminar entrada de horas
   app.delete("/api/tasks/:taskId/time/:entryId", requireAuth, async (req: Request, res: Response) => {
     try {
       const { taskId, entryId } = req.params;
       const tid = parseInt(taskId);
       const [task] = await db.select().from(tasks).where(eq(tasks.id, tid));
-      const [deletedEntry] = await db.select().from(taskTimeEntries).where(eq(taskTimeEntries.id, parseInt(entryId)));
-      await db.delete(taskTimeEntries).where(eq(taskTimeEntries.id, parseInt(entryId)));
-      const totalResult = await db.execute(sql`SELECT COALESCE(SUM(hours), 0) as total FROM task_time_entries WHERE task_id = ${tid}`);
-      const total = (totalResult.rows[0] as any).total;
-      await db.update(tasks).set({ loggedHours: parseFloat(total), updatedAt: new Date() }).where(eq(tasks.id, tid));
-
-      // Roll up to parent task if this was a subtask
-      if (task?.parentTaskId) {
-        const parentTotal = await db.execute(sql`
-          SELECT COALESCE(SUM(tte.hours), 0) as total
-          FROM task_time_entries tte
-          JOIN tasks t ON t.id = tte.task_id
-          WHERE t.id = ${task.parentTaskId} OR t.parent_task_id = ${task.parentTaskId}
-        `);
-        const parentHours = parseFloat((parentTotal.rows[0] as any).total);
-        await db.update(tasks).set({ loggedHours: parentHours, updatedAt: new Date() }).where(eq(tasks.id, task.parentTaskId));
+      const [deletedEntry] = await db.select().from(taskTimeEntries).where(and(
+        eq(taskTimeEntries.id, parseInt(entryId)),
+        eq(taskTimeEntries.taskId, tid),
+      ));
+      if (!task || !deletedEntry) return res.status(404).json({ message: "Carga de tiempo no encontrada" });
+      if (!(await canAccessTaskProject(req, task.projectId))) {
+        return res.status(403).json({ message: "No tenés acceso a esta tarea" });
       }
 
+      const user = req.user as any;
+      const [authenticatedPerson] = user?.email
+        ? await db.select({ id: personnel.id }).from(personnel)
+            .where(sql`LOWER(TRIM(${personnel.email})) = LOWER(TRIM(${user.email}))`)
+            .limit(1)
+        : [];
+      const canDeleteOthers = !!user?.isAdmin || (user?.permissions || []).includes("operations");
+      if (!canDeleteOthers && authenticatedPerson?.id !== deletedEntry.personnelId) {
+        return res.status(403).json({ message: "No podés eliminar la carga de otra persona" });
+      }
+
+      await db.delete(taskTimeEntries).where(eq(taskTimeEntries.id, deletedEntry.id));
+      await recalculateTaskLoggedHours(tid);
+      if (task.parentTaskId) await recalculateTaskLoggedHours(task.parentTaskId);
+
       // Rebuild rentabilidad for the affected month (fire-and-forget, app mode only)
-      if (deletedEntry?.date) triggerLaborRebuild(deletedEntry.date);
+      if (deletedEntry?.date) await triggerLaborRebuild(deletedEntry.date);
 
       res.json({ message: "Entrada eliminada" });
     } catch (error) {
@@ -19412,7 +19876,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // GET /api/tasks-personnel — lista de personnel para el módulo de tareas (no requiere admin)
   app.get("/api/tasks-personnel", requireAuth, async (req: Request, res: Response) => {
     try {
-      const result = await db.select({ id: personnel.id, name: personnel.name, email: personnel.email }).from(personnel).orderBy(asc(personnel.name));
+      const result = await db.select({ id: personnel.id, name: personnel.name }).from(personnel).orderBy(asc(personnel.name));
       res.json(result);
     } catch (error) {
       res.status(500).json({ message: "Error al obtener personal" });
@@ -19423,6 +19887,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/tasks/:id/comments", requireAuth, async (req: Request, res: Response) => {
     try {
       const taskId = parseInt(req.params.id);
+      const projectId = await getTaskProjectId(taskId);
+      if (!projectId) return res.status(404).json({ message: "Tarea no encontrada" });
+      if (!(await canAccessTaskProject(req, projectId))) return res.status(403).json({ message: "No tenés acceso a esta tarea" });
       const rows = await db.execute(sql`
         SELECT tc.id, tc.task_id, tc.author_id, tc.content, tc.created_at,
                u.first_name || ' ' || u.last_name AS author_name
@@ -19443,6 +19910,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const taskId = parseInt(req.params.id);
       const { content } = req.body;
       if (!content?.trim()) return res.status(400).json({ message: "El contenido es requerido" });
+      const projectId = await getTaskProjectId(taskId);
+      if (!projectId) return res.status(404).json({ message: "Tarea no encontrada" });
+      if (!(await canAccessTaskProject(req, projectId))) return res.status(403).json({ message: "No tenés acceso a esta tarea" });
       const authorId = (req as any).user?.id ?? null;
       const [comment] = await db.insert(taskComments).values({ taskId, authorId, content: content.trim() }).returning();
       res.status(201).json(comment);
@@ -19454,7 +19924,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // DELETE /api/tasks/:taskId/comments/:commentId
   app.delete("/api/tasks/:taskId/comments/:commentId", requireAuth, async (req: Request, res: Response) => {
     try {
+      const taskId = parseInt(req.params.taskId);
       const commentId = parseInt(req.params.commentId);
+      const [comment] = await db.select({ taskId: taskComments.taskId, authorId: taskComments.authorId })
+        .from(taskComments).where(and(eq(taskComments.id, commentId), eq(taskComments.taskId, taskId))).limit(1);
+      if (!comment) return res.status(404).json({ message: "Comentario no encontrado" });
+      const projectId = await getTaskProjectId(taskId);
+      if (!projectId || !(await canAccessTaskProject(req, projectId))) return res.status(403).json({ message: "No tenés acceso a esta tarea" });
+      const currentUserId = Number((req.user as any)?.id);
+      if (comment.authorId !== currentUserId && !(await canManageTaskProject(req, projectId))) {
+        return res.status(403).json({ message: "Solo el autor, el responsable del proyecto u Operaciones pueden eliminar el comentario" });
+      }
       await db.delete(taskComments).where(eq(taskComments.id, commentId));
       res.json({ success: true });
     } catch (error) {
@@ -19466,6 +19946,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/tasks/:id/weekly-estimates", requireAuth, async (req: Request, res: Response) => {
     try {
       const taskId = parseInt(req.params.id);
+      const projectId = await getTaskProjectId(taskId);
+      if (!projectId) return res.status(404).json({ message: "Tarea no encontrada" });
+      if (!(await canAccessTaskProject(req, projectId))) return res.status(403).json({ message: "No tenés acceso a esta tarea" });
       const rows = await db.select().from(taskWeeklyEstimates)
         .where(eq(taskWeeklyEstimates.taskId, taskId))
         .orderBy(asc(taskWeeklyEstimates.weekStart));
@@ -19479,6 +19962,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/tasks/:id/weekly-estimates", requireAuth, async (req: Request, res: Response) => {
     try {
       const taskId = parseInt(req.params.id);
+      const projectId = await getTaskProjectId(taskId);
+      if (!projectId) return res.status(404).json({ message: "Tarea no encontrada" });
+      if (!(await canAccessTaskProject(req, projectId))) return res.status(403).json({ message: "No tenés acceso a esta tarea" });
       const createdBy = (req as any).user?.id ?? null;
       const data = insertTaskWeeklyEstimateSchema.parse({
         ...req.body,
@@ -19516,6 +20002,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const taskId = parseInt(req.params.taskId);
       const weekStart = req.params.weekStart;
+      const projectId = await getTaskProjectId(taskId);
+      if (!projectId) return res.status(404).json({ message: "Tarea no encontrada" });
+      if (!(await canAccessTaskProject(req, projectId))) return res.status(403).json({ message: "No tenés acceso a esta tarea" });
       await db.delete(taskWeeklyEstimates).where(
         and(eq(taskWeeklyEstimates.taskId, taskId), eq(taskWeeklyEstimates.weekStart, weekStart))
       );
@@ -19536,7 +20025,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const myPersonnelId = Number((personnelMatch.rows as any[])[0]?.id || 0);
       const requestedStatus = isOperations ? String(req.query.status || "active") : "active";
       const status = requestedStatus === "all" ? sql`TRUE` : sql`ap.status = ${requestedStatus === "inactive" ? "inactive" : "active"}`;
-      const visibility = isOperations && req.query.scope === "all"
+      const visibility = isOperations
         ? sql`TRUE`
         : myPersonnelId > 0
           ? sql`(
@@ -19648,13 +20137,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { activeProjectId, personnelId } = req.body;
 
       if (activeProjectId) {
-        // Join existing active project — add user as owner member
+        const parsedProjectId = Number(activeProjectId);
+        const parsedPersonnelId = Number(personnelId);
+        if (!Number.isInteger(parsedProjectId) || !Number.isInteger(parsedPersonnelId)) {
+          return res.status(400).json({ message: "Proyecto o persona inválidos" });
+        }
+        const accessContext = await getTaskAccessContext(req);
+        if (!accessContext.isOperations) {
+          if (accessContext.personnelId !== parsedPersonnelId) {
+            return res.status(403).json({ message: "No podés incorporar a otra persona" });
+          }
+          if (!(await canAccessTaskProject(req, parsedProjectId))) {
+            return res.status(403).json({ message: "No tenés acceso a este proyecto" });
+          }
+        }
+        const assignedRole = accessContext.isOperations ? 'owner' : 'member';
+        // A regular user may only join themselves as member; owner promotion is
+        // reserved for Operations.
         await db.execute(sql`
           INSERT INTO task_project_members (project_id, personnel_id, role)
-          VALUES (${activeProjectId}, ${personnelId}, 'owner')
-          ON CONFLICT (project_id, personnel_id) DO UPDATE SET role = 'owner'
+          VALUES (${parsedProjectId}, ${parsedPersonnelId}, ${assignedRole})
+          ON CONFLICT (project_id, personnel_id) DO UPDATE SET role = ${assignedRole}
         `);
-        return res.json({ id: activeProjectId, type: 'active_project' });
+        return res.json({ id: parsedProjectId, type: 'active_project' });
       }
 
       return res.status(410).json({
@@ -19741,6 +20246,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (briefUrl === undefined) {
         return res.status(400).json({ message: "briefUrl requerido" });
       }
+      if (!(await canManageTaskProject(req, projectId))) {
+        return res.status(403).json({ message: "Solo responsables del proyecto u Operaciones pueden editar el brief" });
+      }
 
       await db.execute(sql`UPDATE active_projects SET brief_url = ${briefUrl || null} WHERE id = ${projectId}`);
 
@@ -19757,6 +20265,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const projectId = parseInt(req.params.id);
       const { personnelId, role = "member" } = req.body;
       if (!personnelId) return res.status(400).json({ message: "personnelId requerido" });
+      const accessContext = await getTaskAccessContext(req);
+      const isSelfJoin = !accessContext.isOperations
+        && accessContext.personnelId === Number(personnelId)
+        && role === 'member'
+        && await canAccessTaskProject(req, projectId);
+      if (!isSelfJoin && !(await canManageTaskProject(req, projectId))) {
+        return res.status(403).json({ message: "Solo responsables del proyecto u Operaciones pueden administrar miembros" });
+      }
+      if (!['owner', 'member'].includes(role)) return res.status(400).json({ message: "Rol de miembro inválido" });
+      if (role === 'owner' && !isOperationsRequest(req)) {
+        return res.status(403).json({ message: "Solo Operaciones puede asignar responsables" });
+      }
 
       await db.execute(sql`
         INSERT INTO task_project_members (project_id, personnel_id, role)
@@ -19776,6 +20296,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const projectId = parseInt(req.params.id);
       const personnelId = parseInt(req.params.personnelId);
+      const [targetMember] = await db.select({ role: taskProjectMembers.role }).from(taskProjectMembers)
+        .where(and(eq(taskProjectMembers.projectId, projectId), eq(taskProjectMembers.personnelId, personnelId))).limit(1);
+      if (!targetMember) return res.status(404).json({ message: "Miembro no encontrado" });
+      const accessContext = await getTaskAccessContext(req);
+      const isSelfLeave = !accessContext.isOperations
+        && accessContext.personnelId === personnelId
+        && targetMember.role === 'member';
+      if (!isSelfLeave && !(await canManageTaskProject(req, projectId))) {
+        return res.status(403).json({ message: "Solo responsables del proyecto u Operaciones pueden administrar miembros" });
+      }
+      if (targetMember.role === 'owner' && !isOperationsRequest(req)) {
+        return res.status(403).json({ message: "Solo Operaciones puede quitar responsables" });
+      }
       await db.execute(sql`
         DELETE FROM task_project_members
         WHERE project_id = ${projectId} AND personnel_id = ${personnelId}
@@ -21214,10 +21747,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       weekEndDate.setDate(weekEndDate.getDate() + 6);
 
       const holidaysInWeek = holidaysList.filter(h => {
-        const hDate = new Date(`${h.date}T00:00:00`);
-        return hDate >= weekStartDate && hDate <= weekEndDate;
+        const hDate = parseCivilDate(h.date);
+        const dayOfWeek = hDate.getDay();
+        return hDate >= weekStartDate
+          && hDate <= weekEndDate
+          && dayOfWeek !== 0
+          && dayOfWeek !== 6;
       });
-      const workingDays = 5 - holidaysInWeek.length;
+      const holidayDates = new Set(holidaysInWeek.map(h => h.date));
+      const workingDays = Math.max(0, 5 - holidayDates.size);
 
       // Get time entries for this week
       const legacyEntries = await db.select({
@@ -21273,15 +21811,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // Count working days this person is absent this week
         const personAbsences = absencesList.filter(a => a.personnelId === person.id);
-        let absenceDays = 0;
+        const absenceDates = new Set<string>();
         for (const absence of personAbsences) {
-          const absStart = new Date(Math.max(new Date(absence.startDate).getTime(), weekStartDate.getTime()));
-          const absEnd = new Date(Math.min(new Date(absence.endDate).getTime(), weekEndDate.getTime()));
+          const absStart = new Date(Math.max(parseCivilDate(absence.startDate).getTime(), weekStartDate.getTime()));
+          const absEnd = new Date(Math.min(parseCivilDate(absence.endDate).getTime(), weekEndDate.getTime()));
           for (const d = new Date(absStart); d <= absEnd; d.setDate(d.getDate() + 1)) {
             const dow = d.getDay();
-            if (dow !== 0 && dow !== 6) absenceDays++;
+            const dateKey = formatCivilDate(d);
+            if (dow !== 0 && dow !== 6 && !holidayDates.has(dateKey)) {
+              absenceDates.add(dateKey);
+            }
           }
         }
+        const absenceDays = absenceDates.size;
         const absenceHours = absenceDays * dailyHours;
         const maxCapacityCalc = Math.max(0, maxCapacityBase - absenceHours);
         // Apply manual override if set, otherwise use calculated value

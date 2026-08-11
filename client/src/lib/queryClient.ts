@@ -5,10 +5,10 @@ type FetcherOptions = {
   on401?: "throw" | "returnNull";
 };
 
-// Returns Authorization header if a session token exists in sessionStorage
+// Kept as a compatibility helper for existing call sites. Authentication is
+// cookie-only so bearer credentials are never exposed to browser JavaScript.
 export function getAuthHeader(): Record<string, string> {
-  const token = sessionStorage.getItem('auth_token');
-  return token ? { 'Authorization': `Session ${token}` } : {};
+  return {};
 }
 
 // ───────────────────────────────────────────────────────────────────────────

@@ -50,6 +50,9 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
     name: person.name,
     email: person.email ?? "",
     roleId: String(person.roleId),
+    currentRole: person.currentRole ?? "",
+    legacyRole: person.legacyRole ?? "",
+    sublevel: person.sublevel ?? "",
     contractType: person.contractType ?? "full-time",
     monthlyHours: String(person.monthlyHours ?? 160),
     includeInRealCosts: person.includeInRealCosts ?? true,
@@ -65,6 +68,9 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
       name: person.name,
       email: person.email ?? "",
       roleId: String(person.roleId),
+      currentRole: person.currentRole ?? "",
+      legacyRole: person.legacyRole ?? "",
+      sublevel: person.sublevel ?? "",
       contractType: person.contractType ?? "full-time",
       monthlyHours: String(person.monthlyHours ?? 160),
       includeInRealCosts: person.includeInRealCosts ?? true,
@@ -86,6 +92,9 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
         name: form.name.trim(),
         email: form.email.trim(),
         roleId: Number(form.roleId),
+        currentRole: form.contractType === "freelance" ? null : (form.currentRole.trim() || null),
+        legacyRole: form.contractType === "freelance" ? (form.legacyRole.trim() || null) : (person.legacyRole ?? null),
+        sublevel: form.sublevel.trim() || null,
         contractType: form.contractType,
         monthlyHours: form.contractType === "freelance" ? undefined : monthlyHours,
         includeInRealCosts: form.includeInRealCosts,
@@ -156,11 +165,19 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
         <td className="px-6 py-4"><Input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></td>
         <td className="px-6 py-4"><Input type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} /></td>
         <td className="px-6 py-4">
-          <Select value={form.roleId} onValueChange={(roleId) => setForm({ ...form, roleId })}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>{roles.map((role) => <SelectItem key={role.id} value={String(role.id)}>{role.name}</SelectItem>)}</SelectContent>
-          </Select>
+          <div className="min-w-44 space-y-1">
+            <Select value={form.roleId} onValueChange={(roleId) => setForm({ ...form, roleId })}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>{roles.map((role) => <SelectItem key={role.id} value={String(role.id)}>{role.name}</SelectItem>)}</SelectContent>
+            </Select>
+            {form.contractType === "freelance" ? (
+              <Input aria-label="Rol histórico" placeholder="Rol histórico" value={form.legacyRole} onChange={(event) => setForm({ ...form, legacyRole: event.target.value })} />
+            ) : (
+              <Input aria-label="Rol actual" placeholder="Rol actual" value={form.currentRole} onChange={(event) => setForm({ ...form, currentRole: event.target.value })} />
+            )}
+          </div>
         </td>
+        <td className="px-6 py-4"><Input aria-label="Subnivel" placeholder="Subnivel" value={form.sublevel} onChange={(event) => setForm({ ...form, sublevel: event.target.value })} /></td>
         <td className="px-6 py-4">
           <Select value={form.contractType} onValueChange={(contractType) => setForm({ ...form, contractType })}>
             <SelectTrigger><SelectValue /></SelectTrigger>
@@ -171,14 +188,13 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
             </SelectContent>
           </Select>
         </td>
+        <td className="px-6 py-4 text-xs text-muted-foreground">Administrar abajo</td>
         <td className="px-6 py-4">
           <div className="space-y-1">
             <Input type="number" min={0} step="0.01" placeholder="ARS/mes" value={form.monthlySalaryARS} onChange={(event) => setForm({ ...form, monthlySalaryARS: event.target.value })} />
             <Input type="number" min={0} step="0.01" placeholder="USD/mes" value={form.monthlySalaryUSD} onChange={(event) => setForm({ ...form, monthlySalaryUSD: event.target.value })} />
           </div>
         </td>
-        <td className="px-6 py-4 text-xs text-muted-foreground">Administrar abajo</td>
-        <td className="px-6 py-4 text-xs text-muted-foreground">—</td>
         <td className="px-6 py-4">
           {form.contractType === "freelance" ? "—" : (
             <Input type="number" min={40} max={300} value={form.monthlyHours} onChange={(event) => setForm({ ...form, monthlyHours: event.target.value })} />

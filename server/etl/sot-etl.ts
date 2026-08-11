@@ -4,11 +4,12 @@
  */
 
 import { db } from '../db';
-import { dimPeriod, factLaborMonth, factRCMonth, aggProjectMonth, activeProjects, personnel, projectAliases } from '@shared/schema';
+import { dimPeriod, factLaborMonth, factRCMonth, aggProjectMonth, activeProjects, personnel, projectAliases, systemConfig } from '@shared/schema';
 import { eq, and, sql } from 'drizzle-orm';
 import { toPeriodKey, normKey, parseNum, prefer, normHours, needsAntiX100, generateFlags } from './sot-utils';
 import { resolveRCRow } from './sot-project-resolver';
 import { updateProvisionsinFactCostMonth, getProvisionSummaryByPeriod } from './provisions';
+import { normalizeContractualRateToARS } from '../domain/currency-normalization';
 
 // Dynamic import (evita ciclo estático: time-entries-to-fact-labor.ts importa
 // `ensurePeriod` de este archivo). Cutover de Excel→App: períodos >= cutover
@@ -357,11 +358,66 @@ export async function processDirectCostsToFactLabor(rows: CostoDirectoRow[]): Pr
       // 5) Valores y costos con sistema de fallback de tarifas
       // Leer tarifa horaria del Excel (columna N: "Valor Hora")
       const rateARSExcelRaw = row['Valor Hora'] || row['Valor hora ARS'];
-      const rateARSExcel = parseNum(rateARSExcelRaw);
+      const sourceContractualRate = parseNum(rateARSExcelRaw);
+      let rateARSExcel = sourceContractualRate;
       
       // Leer tipo de cambio del Excel - usar nombre correcto "Cotización"
       const fxRaw = row['Cotización'] || row['Tipo de cambio'];
       const fx = parseNum(fxRaw);
+      let fxToUse = fx;
+
+      // "Valor Hora" is the contractual currency in the source sheet. For USD
+      // contractors it is a USD value, not a small ARS value. Resolve the
+      // canonical historical rate so fact_labor_month remains ARS-normalized.
+      const isUsdContract = String(person?.billingCurrency || 'ARS').toUpperCase() === 'USD';
+      let canonicalRateARS: number | null = null;
+      if (isUsdContract && person?.id) {
+        const { resolveCanonicalPersonnelRate } = await import('../domain/personnel-rate');
+        const [periodYear, periodMonth] = periodKey.split('-').map(Number);
+        const canonicalRate = await resolveCanonicalPersonnelRate(
+          person.id,
+          new Date(periodYear, periodMonth - 1, 1),
+        );
+        if (canonicalRate.hourlyRateARS != null && canonicalRate.hourlyRateARS > 0) {
+          canonicalRateARS = canonicalRate.hourlyRateARS;
+        }
+        if (!(fxToUse > 0) && canonicalRate.exchangeRate != null && canonicalRate.exchangeRate > 0) {
+          fxToUse = canonicalRate.exchangeRate;
+        }
+      }
+
+      // Resolve every supported FX source before converting a contractual USD
+      // rate. Converting first would incorrectly fall back to the raw USD number
+      // as though it were ARS whenever the spreadsheet omitted Cotización.
+      if (!(fxToUse > 0)) {
+        const rcFx = await db.query.factRCMonth.findFirst({
+          where: and(
+            eq(factRCMonth.projectId, projectId),
+            eq(factRCMonth.periodKey, periodKey),
+          ),
+        });
+        if (rcFx && parseNum(rcFx.fx) > 0) {
+          fxToUse = parseNum(rcFx.fx);
+          console.log(`💱 FX fallback: Usando FX ${fxToUse} del RC para ${personKey} en ${periodKey}`);
+        }
+      }
+
+      if (!(fxToUse > 0)) {
+        const globalFx = await db.query.systemConfig.findFirst({
+          where: eq(systemConfig.configKey, 'usd_exchange_rate'),
+        });
+        if (globalFx && Number(globalFx.configValue) > 0) {
+          fxToUse = Number(globalFx.configValue);
+          console.log(`💱 FX fallback: Usando configuración global ${fxToUse} para ${personKey} en ${periodKey}`);
+        }
+      }
+
+      rateARSExcel = normalizeContractualRateToARS(
+        sourceContractualRate,
+        person?.billingCurrency,
+        fxToUse,
+        canonicalRateARS,
+      );
       
       // IMPORTANTE: Excel NO tiene "Monto Total ARS", solo "Monto Total USD"
       // Calcular Monto Total ARS = Horas × Valor Hora ARS
@@ -376,7 +432,7 @@ export async function processDirectCostsToFactLabor(rows: CostoDirectoRow[]): Pr
       // 🔍 DEBUG: Log valores leídos del Excel para detectar problemas de parsing
       if (processed < 5) {
         console.log(`📋 [DEBUG Row ${processed}] ${personKey}:`);
-        console.log(`   - Valor Hora (raw): "${rateARSExcelRaw}" → parsed: ${rateARSExcel}`);
+        console.log(`   - Valor Hora (raw): "${rateARSExcelRaw}" → ARS canónico: ${rateARSExcel}`);
         console.log(`   - Tipo cambio (raw): "${fxRaw}" → parsed: ${fx}`);
         console.log(`   - Monto Total ARS: ${totalARSSheet}`);
         console.log(`   - Horas billing: ${billingHours}`);
@@ -416,23 +472,6 @@ export async function processDirectCostsToFactLabor(rows: CostoDirectoRow[]): Pr
       
       const costARS = costARSNormalized.cost;
       
-      // Fallback de FX: priorizar fx del Excel, sino buscar desde fact_rc_month del período
-      let fxToUse = fx;
-      if (fx === 0 || fx === null) {
-        // Buscar FX del período desde fact_rc_month
-        const rcFx = await db.query.factRCMonth.findFirst({
-          where: and(
-            eq(factRCMonth.projectId, projectId),
-            eq(factRCMonth.periodKey, periodKey)
-          )
-        });
-        
-        if (rcFx && parseNum(rcFx.fx) > 0) {
-          fxToUse = parseNum(rcFx.fx);
-          console.log(`💱 FX fallback: Usando FX ${fxToUse} del RC para ${personKey} en ${periodKey}`);
-        }
-      }
-      
       const costUSD = totalUSDSheet || (fxToUse > 0 ? costARS / fxToUse : 0);
       
       // 6) Flags (combinar flags base + flags de fallback de tarifas + ANTI×100 costos)
@@ -442,6 +481,7 @@ export async function processDirectCostsToFactLabor(rows: CostoDirectoRow[]): Pr
         'anti_x100_cost_ars': costARSNormalized.wasNormalized,
         'fallback_billing': !billingRaw,
         'fallback_fx': fx === 0 && fxToUse > 0,
+        'contractual_usd_rate': isUsdContract,
         'derived_cost_ars': !totalARSSheet,
         'derived_cost_usd': !totalUSDSheet,
         ...rateResolution.flags.reduce((acc, flag) => ({ ...acc, [flag]: true }), {})

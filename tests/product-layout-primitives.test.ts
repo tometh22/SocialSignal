@@ -106,9 +106,7 @@ describe("product layout primitives", () => {
     const styles = source("client/src/index.css");
 
     expect(styles).toContain("min-height: 2.75rem;");
-    expect(styles).toContain(
-      "grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));",
-    );
+    expect(styles).toContain("var(--metric-grid-min-width, 14rem)");
     expect(styles).toContain(
       "grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));",
     );

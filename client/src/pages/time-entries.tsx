@@ -77,6 +77,7 @@ import { format, addDays, subDays } from "date-fns";
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import EditTimeForm from "@/components/forms/EditTimeForm";
+import { usePermissions } from "@/hooks/use-permissions";
 
 // Interfaces
 interface Personnel {
@@ -141,11 +142,13 @@ const PersonAvatar: React.FC<{ name: string; className?: string }> = ({ name, cl
 // Formulario de registro compacto
 const CompactTimeForm: React.FC<{
   currentPersonnel: Personnel | null;
+  personnel: Personnel[];
+  canLogForOthers: boolean;
   projectId: number;
   onSuccess: () => void;
   onCancel: () => void;
   updateLocalEntries: (entry: TimeEntry) => void;
-}> = ({ currentPersonnel, projectId, onSuccess, onCancel, updateLocalEntries }) => {
+}> = ({ currentPersonnel, personnel, canLogForOthers, projectId, onSuccess, onCancel, updateLocalEntries }) => {
   const [showUnquotedDialog, setShowUnquotedDialog] = useState(false);
   const [unquotedPersonnel, setUnquotedPersonnel] = useState<Personnel | null>(null);
   const [pendingFormData, setPendingFormData] = useState<z.infer<typeof formSchema> | null>(null);
@@ -176,6 +179,7 @@ const CompactTimeForm: React.FC<{
     mutationFn: async (data: z.infer<typeof formSchema>) => {
       return apiRequest("/api/time-entries", "POST", {
         projectId,
+        personnelId: data.personnelId,
         componentId: data.componentId || null,
         date: data.date.toISOString(),
         hours: data.hours,
@@ -229,6 +233,7 @@ const CompactTimeForm: React.FC<{
       });
 
       form.reset({
+        personnelId: currentPersonnel?.id,
         date: new Date(),
         hours: 8,
         billable: true,
@@ -266,7 +271,7 @@ const CompactTimeForm: React.FC<{
   const onSubmit = async (data: z.infer<typeof formSchema>) => {
     // Verificar si la persona está cotizada
     if (!isPersonnelQuoted(data.personnelId)) {
-      const selectedPerson = currentPersonnel?.id === data.personnelId ? currentPersonnel : null;
+      const selectedPerson = personnel.find((person) => person.id === data.personnelId) ?? null;
       if (selectedPerson) {
         // Persona no cotizada - mostrar diálogo
         setUnquotedPersonnel(selectedPerson);
@@ -330,19 +335,31 @@ const CompactTimeForm: React.FC<{
 
           {/* Línea 1: identidad autenticada y fecha(s) */}
           <div className="grid grid-cols-2 gap-3">
-            <FormItem>
-              <FormLabel className="text-sm">Persona</FormLabel>
-              <div className="h-9 rounded-md border bg-muted/30 px-3 flex items-center gap-2 text-sm">
-                {currentPersonnel ? (
-                  <>
-                    <PersonAvatar name={currentPersonnel.name} className="h-5 w-5" />
-                    <span>{currentPersonnel.name}</span>
-                  </>
-                ) : (
-                  <span className="text-muted-foreground">Sin vínculo con Personal</span>
+            {canLogForOthers ? (
+              <FormField
+                control={form.control}
+                name="personnelId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-sm">Persona</FormLabel>
+                    <Select value={field.value ? String(field.value) : ""} onValueChange={(value) => field.onChange(Number(value))}>
+                      <FormControl><SelectTrigger className="h-9"><SelectValue placeholder="Seleccioná una persona" /></SelectTrigger></FormControl>
+                      <SelectContent>
+                        {personnel.map((person) => <SelectItem key={person.id} value={String(person.id)}>{person.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
                 )}
-              </div>
-            </FormItem>
+              />
+            ) : (
+              <FormItem>
+                <FormLabel className="text-sm">Persona</FormLabel>
+                <div className="flex h-9 items-center gap-2 rounded-md border bg-muted/30 px-3 text-sm">
+                  {currentPersonnel ? <><PersonAvatar name={currentPersonnel.name} className="h-5 w-5" /><span>{currentPersonnel.name}</span></> : <span className="text-muted-foreground">Sin vínculo con Personal</span>}
+                </div>
+              </FormItem>
+            )}
 
             <FormField
               control={form.control}
@@ -562,6 +579,7 @@ const CompactTimeForm: React.FC<{
 
 // Componente principal
 const TimeEntries: React.FC = () => {
+  const { isOperations } = usePermissions();
   const [, setLocation] = useLocation();
   const params = useParams();
 
@@ -1293,6 +1311,8 @@ const TimeEntries: React.FC = () => {
                 </DialogHeader>
                 <CompactTimeForm
                   currentPersonnel={currentPersonnel}
+                  personnel={personnel ?? []}
+                  canLogForOthers={isOperations}
                   projectId={projectId}
                   onSuccess={() => setDialogOpen(false)}
                   onCancel={() => setDialogOpen(false)}

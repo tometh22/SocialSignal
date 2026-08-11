@@ -27,6 +27,7 @@ import { cn } from "@/lib/utils";
 import { TaskStatusBadge } from "@/components/ui/status-badge";
 import { TASK_STATUS_CONFIG, BOARD_STATUS_COLUMNS } from "@/constants/task-statuses";
 import TaskDetailPanel from "./TaskDetailPanel";
+import QuickTaskHours from "./QuickTaskHours";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { toast } from "@/hooks/use-toast";
 import {
@@ -211,64 +212,6 @@ function CircleCheck({ checked, onClick }: { checked: boolean; onClick: (e: Reac
   );
 }
 
-function QuickHoursButton({ taskId }: { taskId: number }) {
-  const [open, setOpen] = useState(false);
-  const [manual, setManual] = useState("");
-  const [timerStartedAt, setTimerStartedAt] = useState<number | null>(null);
-  const [timerSeconds, setTimerSeconds] = useState(0);
-  const logMutation = useMutation({
-    mutationFn: (hours: number) => apiRequest(`/api/tasks/${taskId}/time`, "POST", {
-      date: format(new Date(), "yyyy-MM-dd"),
-      hours,
-      description: "Carga rápida",
-    }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/tasks/hours-summary"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/tasks/my-hours"] });
-      setManual("");
-      setOpen(false);
-    },
-  });
-
-  useEffect(() => {
-    if (!timerStartedAt) return;
-    const interval = window.setInterval(() => setTimerSeconds(Math.floor((Date.now() - timerStartedAt) / 1000)), 1000);
-    return () => window.clearInterval(interval);
-  }, [timerStartedAt]);
-
-  const saveManual = () => {
-    const hours = Number(manual.replace(",", "."));
-    if (Number.isFinite(hours) && hours > 0) logMutation.mutate(Math.round(hours * 4) / 4);
-  };
-  const stopTimer = () => {
-    const hours = Math.round((timerSeconds / 3600) * 4) / 4;
-    setTimerStartedAt(null);
-    setTimerSeconds(0);
-    if (hours > 0) logMutation.mutate(hours);
-  };
-
-  return <Popover open={open} onOpenChange={setOpen}>
-    <PopoverTrigger asChild>
-      <button className="ml-auto opacity-50 hover:opacity-100 hover:bg-primary/10 rounded p-0.5 transition-all" onClick={(e) => e.stopPropagation()} title="Carga rápida de horas">
-        <Clock className="h-3 w-3 text-primary" />
-      </button>
-    </PopoverTrigger>
-    <PopoverContent className="w-56 p-3" onClick={(e) => e.stopPropagation()}>
-      <p className="text-xs font-semibold mb-2">Cargar horas</p>
-      <div className="grid grid-cols-4 gap-1 mb-2">
-        {[0.25, 0.5, 0.75, 1].map((hours) => <Button key={hours} size="sm" variant="outline" className="h-7 px-1 text-[10px]" onClick={() => logMutation.mutate(hours)}>{hours * 60}m</Button>)}
-      </div>
-      <div className="flex gap-1 mb-2">
-        <Input value={manual} onChange={(e) => setManual(e.target.value)} placeholder="Horas" className="h-7 text-xs" />
-        <Button size="sm" className="h-7 text-xs" onClick={saveManual}>Guardar</Button>
-      </div>
-      {timerStartedAt ? <Button size="sm" variant="destructive" className="w-full h-7 text-xs" onClick={stopTimer}>Detener ({Math.floor(timerSeconds / 60)}m)</Button> :
-        <Button size="sm" variant="secondary" className="w-full h-7 text-xs" onClick={() => setTimerStartedAt(Date.now())}>Iniciar temporizador</Button>}
-    </PopoverContent>
-  </Popover>;
-}
-
 function InlineDateButton({ startDate, dueDate, taskId, onSet, overdue, dueSoon, dueThisWeek }: {
   startDate?: string | null;
   dueDate?: string | null;
@@ -369,7 +312,7 @@ function NewTaskRow({ projectId, sectionName, onCreated, onCancel, allPersonnel,
 
   return (
     <div className="flex items-center border-b border-border hover:bg-accent/20 transition-colors">
-      <div className="w-8 flex-shrink-0" />
+      <div className="hidden w-8 flex-shrink-0 sm:block" />
       <div className="w-5 flex-shrink-0 flex items-center justify-center py-2">
         <div className="w-3.5 h-3.5 rounded border border-dashed border-muted-foreground/40" />
       </div>
@@ -383,7 +326,7 @@ function NewTaskRow({ projectId, sectionName, onCreated, onCancel, allPersonnel,
           className="h-7 text-sm border-none bg-transparent focus-visible:ring-0 shadow-none px-0"
         />
       </div>
-      <div className="w-28 px-2 flex-shrink-0">
+      <div className="hidden w-28 px-2 flex-shrink-0 sm:block">
         <Select value={assigneeId} onValueChange={setAssigneeId}>
           <SelectTrigger className="h-7 text-xs border-none bg-transparent shadow-none">
             <SelectValue placeholder="Asignar" />
@@ -399,7 +342,7 @@ function NewTaskRow({ projectId, sectionName, onCreated, onCancel, allPersonnel,
           </SelectContent>
         </Select>
       </div>
-      <div className="w-40 px-1 flex-shrink-0">
+      <div className="hidden w-40 px-1 flex-shrink-0 md:block">
         <Popover open={dateRangeOpen} onOpenChange={setDateRangeOpen}>
           <PopoverTrigger asChild>
             <Button variant="ghost" size="sm" className="h-7 w-full px-1 text-[10px] font-normal">
@@ -428,8 +371,8 @@ function NewTaskRow({ projectId, sectionName, onCreated, onCancel, allPersonnel,
           </PopoverContent>
         </Popover>
       </div>
-      <div className="w-28 px-2 flex-shrink-0" />
-      <div className="w-24 px-2 flex-shrink-0 flex items-center gap-1">
+      <div className="hidden w-28 px-2 flex-shrink-0 xl:block" />
+      <div className="w-20 px-1 flex-shrink-0 flex items-center justify-end gap-1 sm:w-24 sm:px-2">
         <Button size="sm" className="h-6 text-xs px-2" onClick={handleCreate} disabled={createMutation.isPending || !title.trim()}>
           {createMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "OK"}
         </Button>
@@ -493,7 +436,7 @@ function TaskRow({ task, allPersonnel, projectMembers = [], onOpen, onToggle, on
         {!isSubtask && (
           <div
             {...dragHandleProps}
-            className="w-5 flex-shrink-0 flex items-center justify-center py-3 opacity-0 group-hover:opacity-100 cursor-grab active:cursor-grabbing transition-opacity"
+            className="hidden w-5 flex-shrink-0 items-center justify-center py-3 opacity-0 group-hover:opacity-100 cursor-grab active:cursor-grabbing transition-opacity sm:flex"
             onClick={e => e.stopPropagation()}
           >
             <GripVertical className="h-3.5 w-3.5 text-muted-foreground/60" />
@@ -596,7 +539,7 @@ function TaskRow({ task, allPersonnel, projectMembers = [], onOpen, onToggle, on
         </div>
 
         {/* Responsable — inline editable */}
-        <div className="w-28 px-2 flex-shrink-0 flex items-center">
+        <div className="w-12 px-1 flex-shrink-0 flex items-center justify-center sm:w-28 sm:justify-start sm:px-2">
           <Popover open={assigneeOpen} onOpenChange={setAssigneeOpen}>
             <PopoverTrigger asChild>
               <button
@@ -654,7 +597,7 @@ function TaskRow({ task, allPersonnel, projectMembers = [], onOpen, onToggle, on
         </div>
 
         {/* Fecha entrega / rango */}
-        <div className="w-32 px-1 flex-shrink-0 text-xs flex items-center">
+        <div className="hidden w-32 px-1 flex-shrink-0 text-xs items-center md:flex">
           <InlineDateButton
             startDate={task.startDate}
             dueDate={task.dueDate}
@@ -667,7 +610,7 @@ function TaskRow({ task, allPersonnel, projectMembers = [], onOpen, onToggle, on
         </div>
 
         {/* Tiempo real */}
-        <div className="w-24 px-2 flex-shrink-0 text-xs flex items-center gap-1">
+        <div className="hidden w-24 px-2 flex-shrink-0 text-xs items-center gap-1 lg:flex">
           {loggedH > 0 || plannedH > 0 ? (
             <>
               <Clock className="h-3 w-3 text-muted-foreground flex-shrink-0" />
@@ -686,14 +629,11 @@ function TaskRow({ task, allPersonnel, projectMembers = [], onOpen, onToggle, on
               <Clock className="h-3 w-3" />
             </span>
           )}
-          <QuickHoursButton taskId={task.id} />
-          <button className="opacity-50 hover:opacity-100 hover:bg-primary/10 rounded p-0.5 transition-all" onClick={e => { e.stopPropagation(); onOpen(task.id, true); }} title="Abrir detalle de horas">
-            <Clock className="h-3 w-3 text-primary" />
-          </button>
+          <QuickTaskHours taskId={task.id} className="ml-auto" />
         </div>
 
         {/* Cliente tag */}
-        <div className="w-28 px-2 flex-shrink-0">
+        <div className="hidden w-28 px-2 flex-shrink-0 xl:block">
           {clientName && (
             <span className={cn(
               "inline-flex items-center text-[10px] font-medium px-1.5 py-0.5 rounded border truncate max-w-full",
@@ -706,7 +646,7 @@ function TaskRow({ task, allPersonnel, projectMembers = [], onOpen, onToggle, on
 
         {/* Acciones contextuales */}
         {(onStatusChange || onDuplicate) && (
-          <div className="w-8 flex-shrink-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="w-8 flex-shrink-0 flex items-center justify-center opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
@@ -844,7 +784,7 @@ function SectionBlock({ sectionName, tasks, projectId, allPersonnel, projectMemb
         {/* Drag handle for section */}
         <div
           {...dragHandleProps}
-          className="w-5 flex-shrink-0 flex items-center justify-center py-3 opacity-0 group-hover:opacity-100 cursor-grab active:cursor-grabbing transition-opacity"
+          className="hidden w-5 flex-shrink-0 items-center justify-center py-3 opacity-0 group-hover:opacity-100 cursor-grab active:cursor-grabbing transition-opacity sm:flex"
           onClick={e => e.stopPropagation()}
         >
           <GripVertical className="h-3.5 w-3.5 text-muted-foreground/60" />
@@ -891,7 +831,7 @@ function SectionBlock({ sectionName, tasks, projectId, allPersonnel, projectMemb
             </div>
           )}
           {!effectiveCollapsed && (
-            <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 ml-1">
+            <div className="flex items-center gap-0.5 opacity-100 ml-1 transition-opacity sm:opacity-0 sm:group-hover:opacity-100">
               <Button
                 variant="ghost"
                 size="sm"
@@ -935,13 +875,13 @@ function SectionBlock({ sectionName, tasks, projectId, allPersonnel, projectMemb
             </div>
           )}
         </div>
-        <div className="w-28 px-2 flex-shrink-0" />
-        <div className="w-24 px-2 flex-shrink-0" />
-        <div className="w-32 px-2 flex-shrink-0" />
-        <div className="w-24 px-2 flex-shrink-0 text-xs text-muted-foreground font-medium">
+        <div className="w-12 px-1 flex-shrink-0 sm:w-28 sm:px-2" />
+        <div className="hidden w-32 px-2 flex-shrink-0 md:block" />
+        <div className="hidden w-24 px-2 flex-shrink-0 text-xs text-muted-foreground font-medium lg:block">
           {totalLogged > 0 && <span>SUMA {formatHours(totalLogged)}</span>}
         </div>
-        <div className="w-28 px-2 flex-shrink-0" />
+        <div className="hidden w-28 px-2 flex-shrink-0 xl:block" />
+        <div className="w-8 flex-shrink-0" />
       </div>
 
       {!effectiveCollapsed && (
@@ -1763,13 +1703,14 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
               <div className="rounded-xl border border-border overflow-hidden">
                 {/* Column headers */}
                 <div className="flex items-center bg-muted/30 border-b border-border text-xs font-semibold text-muted-foreground">
-                  <div className="w-8 flex-shrink-0" />
+                  <div className="hidden w-8 flex-shrink-0 sm:block" />
                   <div className="w-5 flex-shrink-0" />
                   <div className="flex-1 px-2 py-2.5">Nombre de tarea</div>
-                  <div className="w-28 px-2 flex-shrink-0 py-2.5">Responsable</div>
-                  <div className="w-32 px-2 flex-shrink-0 py-2.5">Fechas</div>
-                  <div className="w-24 px-2 flex-shrink-0 py-2.5">Tiempo real</div>
-                  <div className="w-28 px-2 flex-shrink-0 py-2.5">Cliente</div>
+                  <div className="w-12 px-1 flex-shrink-0 py-2.5 text-center sm:w-28 sm:px-2 sm:text-left"><span className="sr-only sm:not-sr-only">Responsable</span></div>
+                  <div className="hidden w-32 px-2 flex-shrink-0 py-2.5 md:block">Fechas</div>
+                  <div className="hidden w-24 px-2 flex-shrink-0 py-2.5 lg:block">Tiempo real</div>
+                  <div className="hidden w-28 px-2 flex-shrink-0 py-2.5 xl:block">Cliente</div>
+                  <div className="w-8 flex-shrink-0" />
                 </div>
 
                 <SortableContext

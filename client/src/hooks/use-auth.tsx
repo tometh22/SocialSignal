@@ -1,4 +1,4 @@
-import { createContext, useContext, useCallback, ReactNode } from 'react';
+import { createContext, useContext, useCallback, useEffect, ReactNode } from 'react';
 import {
   useQuery,
   useMutation,
@@ -33,13 +33,14 @@ type LoginData = {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-function getAuthHeader(): Record<string, string> {
-  const token = sessionStorage.getItem('auth_token');
-  return token ? { 'Authorization': `Session ${token}` } : {};
-}
-
 export function AuthProvider({ children }: { children: ReactNode }) {
   const { toast } = useToast();
+
+  useEffect(() => {
+    // Remove tokens created by older builds; the signed HttpOnly cookie is now
+    // the sole browser credential.
+    sessionStorage.removeItem('auth_token');
+  }, []);
 
   const { data: user, isLoading, error } = useQuery({
     queryKey: ["/api/current-user"],
@@ -52,7 +53,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           headers: {
             'Content-Type': 'application/json',
             'Cache-Control': 'no-cache',
-            ...getAuthHeader(),
           },
         });
 
@@ -102,19 +102,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const userData = await response.json();
       console.log('✅ Login successful for:', credentials.email);
 
-      // Persist session token for environments where cookies don't propagate (e.g. Replit preview iframe)
-      if (userData.sessionToken) {
-        sessionStorage.setItem('auth_token', userData.sessionToken);
-      }
-
       return userData;
     },
     onSuccess: (userData) => {
       console.log('✅ Login mutation success, setting user data...');
 
-      // Strip sessionToken from cached user data — it's only needed for headers
-      const { sessionToken, ...userForCache } = userData as any;
-      queryClient.setQueryData(["/api/current-user"], userForCache);
+      queryClient.setQueryData(["/api/current-user"], userData);
 
       toast({
         title: "Inicio de sesión exitoso",
@@ -136,9 +129,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const response = await fetch("/api/logout", {
         method: "POST",
         credentials: "include",
-        headers: {
-          ...getAuthHeader(),
-        },
       });
 
       if (!response.ok) {
@@ -146,7 +136,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     },
     onSuccess: () => {
-      sessionStorage.removeItem('auth_token');
       queryClient.setQueryData(["/api/current-user"], null);
       queryClient.clear();
 

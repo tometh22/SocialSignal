@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator';
 import { Personnel, Role } from '@shared/schema';
 import { parseDecimalInput } from '@/lib/number-utils';
+import { useCurrency } from '@/hooks/use-currency';
 import {
   Clock,
   UserPlus,
@@ -68,6 +69,7 @@ const RATE_PROJECTION_OPTIONS: { value: 'current' | 'annual_avg'; label: string;
 ];
 
 const EnhancedTeamConfig: React.FC = () => {
+  const { exchangeRate } = useCurrency();
   const {
     quotationData,
     addTeamMember,
@@ -125,7 +127,8 @@ const EnhancedTeamConfig: React.FC = () => {
   const isReferenceConversionMissingFx = (person: Personnel) => {
     if (!isReferenceConversion(person)) return false;
     const rates = ((person as any).historicalRates ?? []) as any[];
-    return !rates.some((rate) => Number(rate.hourlyRateUSD) > 0 && Number(rate.exchangeRate) > 0);
+    return !(exchangeRate > 0) &&
+      !rates.some((rate) => Number(rate.hourlyRateUSD) > 0 && Number(rate.exchangeRate) > 0);
   };
 
   // Sincronizar con el contexto
@@ -360,12 +363,12 @@ const EnhancedTeamConfig: React.FC = () => {
               Se usará como tarifa por defecto al agregar personas. Podés ajustar manualmente cada fila después.
             </p>
           </div>
-          <div className="flex flex-col items-center gap-1">
+          <div className="flex w-full flex-col items-center gap-1 md:w-64">
             <Select
               value={quotationData.salaryMonth ?? SALARY_MONTH_AUTO}
               onValueChange={(value) => updateSalaryMonth(value === SALARY_MONTH_AUTO ? null : value)}
             >
-              <SelectTrigger className="w-full md:w-56 bg-white text-center">
+              <SelectTrigger className="w-full bg-white [&>span]:w-full [&>span]:text-center">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -399,12 +402,12 @@ const EnhancedTeamConfig: React.FC = () => {
               Elegí la foto mensual o el promedio anual para esta cotización.
             </p>
           </div>
-          <div className="w-full md:w-64 flex flex-col gap-1">
+          <div className="flex w-full flex-col items-center gap-1 md:w-64">
             <Select
               value={quotationData.inflation.rateProjectionMode ?? 'current'}
               onValueChange={(v) => updateInflation({ rateProjectionMode: v as any })}
             >
-              <SelectTrigger className="w-full bg-white">
+              <SelectTrigger className="w-full bg-white [&>span]:w-full [&>span]:text-center">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -415,7 +418,7 @@ const EnhancedTeamConfig: React.FC = () => {
                 ))}
               </SelectContent>
             </Select>
-            <p className="text-[11px] text-blue-700 leading-snug">
+            <p className="text-center text-[11px] leading-snug text-blue-700">
               {RATE_PROJECTION_OPTIONS.find(
                 (opt) => opt.value === (quotationData.inflation.rateProjectionMode ?? 'current')
               )?.description}
@@ -665,15 +668,15 @@ const EnhancedTeamConfig: React.FC = () => {
                     >
                       <Card className="hover:shadow-md transition-all border-l-4 border-l-primary/30">
                         <CardContent className="p-4">
-                          <div className="flex items-center space-x-4">
+                          <div className="grid grid-cols-1 items-center gap-4 md:grid-cols-[auto_minmax(12rem,1fr)_minmax(18rem,auto)_auto]">
                             {/* Drag handle */}
                             <div className="flex-shrink-0">
                               <GripVertical className="h-5 w-5 text-gray-400" />
                             </div>
 
                             {/* Role info */}
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center space-x-2 mb-1">
+                            <div className="min-w-0 text-center">
+                              <div className="mb-1 flex items-center justify-center space-x-2">
                                 <Badge variant="outline" className="font-medium">
                                   {(() => {
                                     const foundRole = availableRoles.find(r => r.id === member.roleId);
@@ -690,7 +693,7 @@ const EnhancedTeamConfig: React.FC = () => {
                                   <Star className="h-3 w-3 text-yellow-500" />
                                 )}
                               </div>
-                              <div className="flex items-center space-x-1 text-sm text-gray-600">
+                              <div className="flex items-center justify-center space-x-1 text-sm text-gray-600">
                                 <User className="h-3 w-3" />
                                 <span>{(() => {
                                   if (!member.personnelId) return 'Sin asignar';

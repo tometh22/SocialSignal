@@ -504,7 +504,7 @@ function Controls({
         }`}
       >
         <Filter className="h-3.5 w-3.5" />
-        {activeOnly ? "Solo con actividad" : "Todos"}
+        {activeOnly ? "Solo con actividad" : "Sin filtro de actividad"}
       </button>
 
       {/* Export */}
@@ -852,8 +852,8 @@ export default function ActiveProjectsNext() {
   const [period, setPeriod] = useState(initialPeriod);
   const [freshToggle, setFreshToggle] = useState(false);
   const [search, setSearch] = useState("");
-  const [activeOnly, setActiveOnly] = useState(true);
-  const [statusFilter, setStatusFilter] = useState<LifecycleStatus | "all">("all");
+  const [activeOnly, setActiveOnly] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<LifecycleStatus | "all">("active");
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
 
   useEffect(() => {
@@ -1104,7 +1104,7 @@ export default function ActiveProjectsNext() {
                 projects={projects}
                 isOperations={isOperations}
                 period={period}
-                defaultOpen={i < 6}
+                defaultOpen={false}
               />
             ))}
           </div>

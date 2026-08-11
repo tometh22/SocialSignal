@@ -109,7 +109,7 @@ export default function AuthPage() {
           </p>
         </section>
 
-        <section className="flex items-center bg-white px-5 py-8 sm:px-12 lg:px-14">
+        <section className="flex flex-col items-center justify-center bg-white px-5 py-8 sm:px-12 lg:px-14">
           <Card className="mx-auto w-full max-w-md border-0 bg-transparent shadow-none">
             <CardHeader className="px-0 pb-7 pt-0 text-left">
               <div className="mb-8 lg:hidden">
@@ -199,7 +199,7 @@ export default function AuthPage() {
             </p>
           </CardContent>
         </Card>
-          <p className="mt-8 text-center text-[10px] font-medium uppercase tracking-[0.12em] text-slate-300">
+          <p className="w-full mt-8 text-center text-[10px] font-medium uppercase tracking-[0.12em] text-slate-300">
             © {new Date().getFullYear()} Epical Digital · Acceso privado
           </p>
         </section>

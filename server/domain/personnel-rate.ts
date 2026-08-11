@@ -1,6 +1,6 @@
 import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "../db";
-import { exchangeRates, personnelHistoricalCosts } from "@shared/schema";
+import { exchangeRates, personnelHistoricalCosts, systemConfig } from "@shared/schema";
 
 export type CanonicalPersonnelRate = {
   hourlyRateARS: number | null;
@@ -15,8 +15,9 @@ export type CanonicalPersonnelRate = {
  * Resolves the historical hourly rate in force on a civil date.
  *
  * personnel_historical_costs is the only rate source. A USD-only rate is
- * converted with the active exchange rate for the entry month. No guessed FX
- * or legacy personnel columns are used.
+ * converted with the active exchange rate for the entry month, falling back to
+ * the explicit global USD/ARS configuration when that month has no FX row.
+ * Legacy personnel rate columns are never used.
  */
 export async function resolveCanonicalPersonnelRate(
   personnelId: number,
@@ -82,13 +83,21 @@ export async function resolveCanonicalPersonnelRate(
         eq(exchangeRates.isActive, true),
       ))
       .limit(1);
-    const exchangeRate = fx ? Number(fx.rate) : null;
+    let exchangeRate = fx ? Number(fx.rate) : null;
+    if (!(exchangeRate && exchangeRate > 0)) {
+      const [globalFx] = await db
+        .select({ rate: systemConfig.configValue })
+        .from(systemConfig)
+        .where(eq(systemConfig.configKey, "usd_exchange_rate"))
+        .limit(1);
+      exchangeRate = globalFx ? Number(globalFx.rate) : null;
+    }
     if (exchangeRate != null && exchangeRate > 0) {
       return {
         hourlyRateARS: hourlyRateUSD * exchangeRate,
         hourlyRateUSD,
         exchangeRate,
-        exchangeRateId: fx.id,
+        exchangeRateId: fx?.id ?? null,
         sourcePeriod,
         error: null,
       };

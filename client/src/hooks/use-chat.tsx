@@ -144,9 +144,10 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       if (cancelled) return;
       setIsConnecting(true);
       const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-      const wsUrl = `${protocol}//${window.location.host}/ws?userId=${user.id}`;
-
-      const ws = new WebSocket(wsUrl);
+      const wsUrl = `${protocol}//${window.location.host}/ws`;
+      // Same-origin WebSockets automatically include the signed HttpOnly
+      // session cookie, so no bearer credential is exposed to JavaScript.
+      const ws = new WebSocket(wsUrl, "epical-chat");
       webSocketRef.current = ws;
 
       ws.onopen = () => {
