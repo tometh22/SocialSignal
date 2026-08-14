@@ -688,6 +688,10 @@ export function createReviewRoomsRouter(requireAuth: RequireAuth): Router {
         eq(weeklyStatusItems.roomId, roomId),
         ...(includeHidden ? [] : [sql`(${weeklyStatusItems.hiddenFromWeekly} IS NOT TRUE)`]),
       );
+      // Drizzle strips the outer qualifier when a table column is interpolated
+      // inside these correlated subqueries. Once a subquery joins users, `id`
+      // becomes ambiguous; in the others it can silently bind to the note id.
+      const outerCustomItemId = sql.raw('"weekly_status_items"."id"');
 
       let items: any[];
       try {
@@ -709,43 +713,43 @@ export function createReviewRoomsRouter(requireAuth: RequireAuth): Router {
           updatedAt: weeklyStatusItems.updatedAt,
           updatedBy: weeklyStatusItems.updatedBy,
           updatedByName: sql<string | null>`(SELECT ${users.firstName} || ' ' || ${users.lastName} FROM ${users} WHERE ${users.id} = ${weeklyStatusItems.updatedBy})`,
-          noteCount: sql<number>`COALESCE((SELECT COUNT(*)::int FROM ${projectReviewNotes} WHERE ${projectReviewNotes.weeklyStatusItemId} = ${weeklyStatusItems.id} AND ${projectReviewNotes.roomId} = ${roomId}), 0)`,
+          noteCount: sql<number>`COALESCE((SELECT COUNT(*)::int FROM ${projectReviewNotes} WHERE ${projectReviewNotes.weeklyStatusItemId} = ${outerCustomItemId} AND ${projectReviewNotes.roomId} = ${roomId}), 0)`,
           unreadCount: sql<number>`COALESCE((
             SELECT COUNT(*)::int FROM ${projectReviewNotes}
-            WHERE ${projectReviewNotes.weeklyStatusItemId} = ${weeklyStatusItems.id}
+            WHERE ${projectReviewNotes.weeklyStatusItemId} = ${outerCustomItemId}
               AND ${projectReviewNotes.roomId} = ${roomId}
               AND ${projectReviewNotes.authorId} IS DISTINCT FROM ${userId}
               AND ${projectReviewNotes.createdAt} > COALESCE(
                 (SELECT last_seen_at FROM ${reviewItemReadState}
-                 WHERE user_id = ${userId} AND target_kind = 'custom' AND target_id = ${weeklyStatusItems.id}),
+                 WHERE user_id = ${userId} AND target_kind = 'custom' AND target_id = ${outerCustomItemId}),
                 'epoch'::timestamp
               )
           ), 0)`,
           lastNoteContent: sql<string | null>`(
             SELECT content FROM ${projectReviewNotes}
-            WHERE ${projectReviewNotes.weeklyStatusItemId} = ${weeklyStatusItems.id}
+            WHERE ${projectReviewNotes.weeklyStatusItemId} = ${outerCustomItemId}
               AND ${projectReviewNotes.roomId} = ${roomId}
             ORDER BY created_at DESC LIMIT 1
           )`,
           lastNoteAt: sql<string | null>`(
             SELECT created_at FROM ${projectReviewNotes}
-            WHERE ${projectReviewNotes.weeklyStatusItemId} = ${weeklyStatusItems.id}
+            WHERE ${projectReviewNotes.weeklyStatusItemId} = ${outerCustomItemId}
               AND ${projectReviewNotes.roomId} = ${roomId}
             ORDER BY created_at DESC LIMIT 1
           )`,
           lastNoteAuthorId: sql<number | null>`(
             SELECT author_id FROM ${projectReviewNotes}
-            WHERE ${projectReviewNotes.weeklyStatusItemId} = ${weeklyStatusItems.id}
+            WHERE ${projectReviewNotes.weeklyStatusItemId} = ${outerCustomItemId}
               AND ${projectReviewNotes.roomId} = ${roomId}
             ORDER BY created_at DESC LIMIT 1
           )`,
           lastNoteAuthorName: sql<string | null>`(
-            SELECT ${users.firstName} || ' ' || ${users.lastName}
-            FROM ${projectReviewNotes}
-            LEFT JOIN ${users} ON ${users.id} = ${projectReviewNotes.authorId}
-            WHERE ${projectReviewNotes.weeklyStatusItemId} = ${weeklyStatusItems.id}
-              AND ${projectReviewNotes.roomId} = ${roomId}
-            ORDER BY ${projectReviewNotes.createdAt} DESC LIMIT 1
+            SELECT review_user.first_name || ' ' || review_user.last_name
+            FROM project_review_notes AS last_note
+            LEFT JOIN users AS review_user ON review_user.id = last_note.author_id
+            WHERE last_note.weekly_status_item_id = ${outerCustomItemId}
+              AND last_note.room_id = ${roomId}
+            ORDER BY last_note.created_at DESC LIMIT 1
           )`,
         }).from(weeklyStatusItems)
           .where(whereConditions)
@@ -770,7 +774,7 @@ export function createReviewRoomsRouter(requireAuth: RequireAuth): Router {
           updatedAt: weeklyStatusItems.updatedAt,
           updatedBy: weeklyStatusItems.updatedBy,
           updatedByName: sql<string | null>`(SELECT ${users.firstName} || ' ' || ${users.lastName} FROM ${users} WHERE ${users.id} = ${weeklyStatusItems.updatedBy})`,
-          noteCount: sql<number>`COALESCE((SELECT COUNT(*)::int FROM ${projectReviewNotes} WHERE ${projectReviewNotes.weeklyStatusItemId} = ${weeklyStatusItems.id} AND ${projectReviewNotes.roomId} = ${roomId}), 0)`,
+          noteCount: sql<number>`COALESCE((SELECT COUNT(*)::int FROM ${projectReviewNotes} WHERE ${projectReviewNotes.weeklyStatusItemId} = ${outerCustomItemId} AND ${projectReviewNotes.roomId} = ${roomId}), 0)`,
           unreadCount: sql<number>`0`,
           lastNoteContent: sql<string | null>`null`,
           lastNoteAt: sql<string | null>`null`,

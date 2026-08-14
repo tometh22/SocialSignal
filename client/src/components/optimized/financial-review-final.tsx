@@ -54,6 +54,7 @@ export default function FinancialReviewFinal() {
     complexityAdjustment,
     markupAmount,
     totalAmount,
+    pricingResult,
     complexityFactors,
     availableRoles,
     availablePersonnel,
@@ -70,9 +71,8 @@ export default function FinancialReviewFinal() {
 
   const [isSaving, setIsSaving] = useState(false);
   const [isSavingDraft, setIsSavingDraft] = useState(false);
-  const [isFinalizing, setIsFinalizing] = useState(false);
-  const [markupMultiplier, setMarkupMultiplier] = useState(quotationData.financials?.marginFactor || 2.0); // Use saved markup or default 2x
-  const [discountPercentage, setDiscountPercentage] = useState(quotationData.financials?.discountPercentage || 0); // Use saved discount or default 0%
+  const markupMultiplier = quotationData.financials?.marginFactor || 2.0;
+  const discountPercentage = quotationData.financials?.discountPercentage || 0;
 
   // Force recalculation when component mounts or data changes
   useEffect(() => {
@@ -81,19 +81,11 @@ export default function FinancialReviewFinal() {
     }
   }, [quotationData.teamMembers, forceRecalculate]);
 
-  // Update markup and discount when quotation data changes
-  useEffect(() => {
-    if (quotationData.financials?.marginFactor) {
-      setMarkupMultiplier(quotationData.financials.marginFactor);
-    }
-    if (quotationData.financials?.discountPercentage !== undefined) {
-      setDiscountPercentage(quotationData.financials.discountPercentage);
-    }
-  }, [quotationData.financials?.marginFactor, quotationData.financials?.discountPercentage]);
-
   // Declare currency hook early so safeRate is available for toolsCostARS conversion below
   const { convertToUSD, exchangeRate } = useCurrency();
-  const safeRate = typeof exchangeRate === 'number' && exchangeRate > 0 ? exchangeRate : 1;
+  const safeRate = quotationData.exchangeRateSnapshot && quotationData.exchangeRateSnapshot > 0
+    ? quotationData.exchangeRateSnapshot
+    : (typeof exchangeRate === 'number' && exchangeRate > 0 ? exchangeRate : 1);
 
   const currencyLabel = quotationData.quotationCurrency || 'ARS';
   const formatFinalCurrency = (amount: number) => 
@@ -114,119 +106,55 @@ export default function FinancialReviewFinal() {
     return person ? person.name : `Personal #${personnelId}`;
   };
 
-  const calculateTeamBaseCost = () => {
-    let cost = 0;
-    quotationData.teamMembers.forEach(member => {
-      // Calculate cost directly from hours and rate in ARS
-      const memberHours = Number(member.hours) || 0;
-      let memberRate = Number(member.rate) || 0;
-      
-      if (member.personnelId) {
-        memberRate = getPersonnelRate(member.personnelId, quotationData.quotationCurrency);
-      }
-      
-      const memberCost = memberHours * memberRate;
-      cost += memberCost;
-      console.log('💰 Team member:', member.id, 'hours:', memberHours, 'rate:', memberRate, 'cost:', memberCost);
-    });
-    console.log('💰 Total team base cost calculated:', cost);
-    console.log('💰 baseCost from context:', baseCost);
-    return cost;
-  };
-
-  const calculateComplexityAdjustment = (teamBaseCost: number) => {
-    let adjustment = 0;
-    adjustment += teamBaseCost * complexityFactors.analysisTypeFactor;
-    adjustment += teamBaseCost * complexityFactors.mentionsVolumeFactor;
-    adjustment += teamBaseCost * complexityFactors.countriesFactor;
-    adjustment += teamBaseCost * complexityFactors.clientEngagementFactor;
-    return adjustment;
-  };
-
   const getComplexityPercentage = () => {
     const totalFactor = Object.values(complexityFactors).reduce((sum, factor) => sum + factor, 0);
     return (totalFactor * 100).toFixed(1);
   };
 
-  // Calculate base values in ARS
-  const teamBaseCostARS = calculateTeamBaseCost();
-  console.log('🔍 Financial Review - baseCost from context:', baseCost);
-  console.log('🔍 Financial Review - teamBaseCost calculated:', teamBaseCostARS);
-  console.log('🔍 Financial Review - teamMembers:', quotationData.teamMembers);
-  
-  const teamComplexityAdjustmentARS = calculateComplexityAdjustment(teamBaseCostARS);
+  // All financial screens consume the exact same pricing result from context.
+  const canonical = pricingResult.canonicalARS;
+  const displayed = pricingResult.display;
+  const teamBaseCostARS = canonical.baseCost;
+  const teamComplexityAdjustmentARS = canonical.complexityAdjustment;
   const subtotalWithComplexityARS = teamBaseCostARS + teamComplexityAdjustmentARS;
 
   // Calculate inflation if applicable - in ARS
   const baseForInflation = subtotalWithComplexityARS;
-  let inflationAdjustmentARS = 0;
-  let inflationProjectedCostARS = baseForInflation;
   let monthlyInflationRate = 0;
   let totalInflationPercentage = 0;
   let monthsToProject = 0;
 
   const rateMode = quotationData.inflation.rateProjectionMode === "annual_avg" ? "annual_avg" : "current";
 
-  if (rateMode !== "current" && quotationData.inflation.applyInflationAdjustment) {
+  let inflationFactor = 1;
+  if (quotationData.inflation.applyInflationAdjustment) {
     const annualInflationRate = quotationData.inflation.inflationMethod === 'manual'
       ? (quotationData.inflation.manualInflationRate || 25)
       : 25;
     const monthlyRateDecimal = Math.pow(1 + (annualInflationRate / 100), 1/12) - 1;
     monthlyInflationRate = monthlyRateDecimal * 100;
-
-    let inflationFactor = 1;
-
     if (rateMode === "annual_avg") {
-      // Promedio anual: factor compuesto evaluado al punto medio del año (mes 6).
-      // Aproxima el valor hora "promedio" de una persona durante los 12 meses del proyecto.
       monthsToProject = 6;
-      inflationFactor = Math.pow(1 + monthlyRateDecimal, 6);
+    } else if (quotationData.inflation.projectStartDate) {
+      const start = new Date(quotationData.inflation.projectStartDate);
+      const now = new Date();
+      monthsToProject = Math.max(0, (start.getFullYear() - now.getFullYear()) * 12 + start.getMonth() - now.getMonth());
     }
-
+    inflationFactor = Math.pow(1 + monthlyRateDecimal, monthsToProject);
     totalInflationPercentage = (inflationFactor - 1) * 100;
-    inflationProjectedCostARS = baseForInflation * inflationFactor;
-    inflationAdjustmentARS = inflationProjectedCostARS - baseForInflation;
   }
-
-  // Calculate final base after inflation (if any)
-  let finalBaseAfterInflationARS = inflationProjectedCostARS;
-
-  // If inflation wasn't applied (mode "current" or toggle off), use the original subtotal
-  if (!quotationData.inflation.applyInflationAdjustment || rateMode === "current") {
-    finalBaseAfterInflationARS = subtotalWithComplexityARS;
-  }
-
-  const platformCostARS = quotationData.financials?.platformCost ?? 0;
-  // toolsCost is stored in USD — multiply by safeRate to get the ARS equivalent
+  const preInflationTotalARS = inflationFactor > 0 ? canonical.total / inflationFactor : canonical.total;
+  const inflationAdjustmentARS = canonical.total - preInflationTotalARS;
+  const finalBaseAfterInflationARS = subtotalWithComplexityARS;
+  const platformCostARS = canonical.platformCost;
   const toolsCostUSD_stored = quotationData.financials?.toolsCost ?? 0;
-  const toolsCostARS = toolsCostUSD_stored * safeRate;
+  const toolsCostARS = canonical.toolsCost;
   const subtotalWithPlatformARS = finalBaseAfterInflationARS + platformCostARS;
-
-  // Check if we're in manual pricing mode
-  let finalTotalARS, marginAmountARS, discountAmountARS, subtotalWithMarginARS, subtotalWithPlatformAndToolsARS;
-  
-  if (quotationData.financials?.priceMode === 'manual' && quotationData.financials?.manualPrice) {
-    // Manual pricing mode - work backwards from final price
-    // The manual price is the final price AFTER discount and tools
-    finalTotalARS = quotationData.financials.manualPrice;
-    // Subtract tools to get the price before tools
-    const priceBeforeToolsARS = finalTotalARS - toolsCostARS;
-    // Calculate subtotal before discount: final / (1 - discount_rate)
-    subtotalWithMarginARS = priceBeforeToolsARS / (1 - (discountPercentage / 100));
-    discountAmountARS = subtotalWithMarginARS - priceBeforeToolsARS;
-    marginAmountARS = subtotalWithMarginARS - subtotalWithPlatformARS;
-    // Add tools back at the end
-    subtotalWithPlatformAndToolsARS = subtotalWithMarginARS + toolsCostARS;
-  } else {
-    // Automatic pricing mode - work forwards from costs
-    // Apply markup BEFORE adding tools
-    subtotalWithMarginARS = subtotalWithPlatformARS * markupMultiplier;
-    marginAmountARS = subtotalWithMarginARS - subtotalWithPlatformARS;
-    // Add tools AFTER markup
-    subtotalWithPlatformAndToolsARS = subtotalWithMarginARS + toolsCostARS;
-    discountAmountARS = subtotalWithPlatformAndToolsARS * (discountPercentage / 100);
-    finalTotalARS = subtotalWithPlatformAndToolsARS - discountAmountARS;
-  }
+  const marginAmountARS = canonical.markupAmount;
+  const discountAmountARS = canonical.discountAmount;
+  const subtotalWithMarginARS = subtotalWithComplexityARS + marginAmountARS;
+  const subtotalWithPlatformAndToolsARS = subtotalWithMarginARS + toolsCostARS + platformCostARS + canonical.deviationAmount;
+  const finalTotalARS = canonical.total;
 
   // Create USD equivalents for calculations that need them
   // useCurrency() and safeRate are declared near the top of this component
@@ -237,28 +165,19 @@ export default function FinancialReviewFinal() {
   const toolsCostUSD = toolsCostUSD_stored; // already in USD — no second conversion needed
   
   // All values are already in ARS - no conversion needed for display
-  const teamBaseCostDisplay = teamBaseCostARS;
-  const teamComplexityAdjustmentDisplay = teamComplexityAdjustmentARS;
+  const teamBaseCostDisplay = displayed.baseCost;
+  const teamComplexityAdjustmentDisplay = displayed.complexityAdjustment;
   const subtotalWithComplexityDisplay = teamBaseCostDisplay + teamComplexityAdjustmentDisplay;
-  const platformCostDisplay = platformCostARS;
-  const toolsCostDisplay = toolsCostARS;
-  const finalBaseAfterInflationDisplay = finalBaseAfterInflationARS;
-  const subtotalWithPlatformDisplay = subtotalWithPlatformARS;
-  const subtotalWithPlatformAndToolsDisplay = subtotalWithPlatformAndToolsARS;
-  const subtotalWithMarginDisplay = subtotalWithMarginARS;
-  const marginAmountDisplay = marginAmountARS;
-  const discountAmountDisplay = discountAmountARS;
-  const finalTotalDisplay = finalTotalARS;
-  const inflationAdjustmentDisplay = inflationAdjustmentARS;
-
-  // Update discount percentage when it changes
-  React.useEffect(() => {
-    console.log('💰 Updating financials with markup:', markupMultiplier, 'discount:', discountPercentage);
-    updateFinancials({
-      discountPercentage: discountPercentage,
-      marginFactor: markupMultiplier,
-    });
-  }, [discountPercentage, markupMultiplier, updateFinancials]);
+  const platformCostDisplay = displayed.platformCost;
+  const toolsCostDisplay = displayed.toolsCost;
+  const finalBaseAfterInflationDisplay = teamBaseCostDisplay + teamComplexityAdjustmentDisplay;
+  const subtotalWithPlatformDisplay = finalBaseAfterInflationDisplay + platformCostDisplay;
+  const subtotalWithMarginDisplay = subtotalWithComplexityDisplay + displayed.markupAmount;
+  const subtotalWithPlatformAndToolsDisplay = subtotalWithMarginDisplay + toolsCostDisplay + platformCostDisplay + displayed.deviationAmount;
+  const marginAmountDisplay = displayed.markupAmount;
+  const discountAmountDisplay = displayed.discountAmount;
+  const finalTotalDisplay = displayed.total;
+  const inflationAdjustmentDisplay = quotationData.quotationCurrency === "USD" ? inflationAdjustmentARS / safeRate : inflationAdjustmentARS;
 
   const handleSaveQuotation = async () => {
     try {
@@ -286,8 +205,7 @@ export default function FinancialReviewFinal() {
 
 
 
-      // Usar la función de guardado del contexto con estado 'pending'
-      await saveQuotation('pending');
+      await saveQuotation('draft');
 
       toast({
         title: "Cotización guardada",
@@ -376,85 +294,6 @@ export default function FinancialReviewFinal() {
       });
     } finally {
       setIsSavingDraft(false);
-    }
-  };
-
-  // Función para finalizar cotización
-  const handleFinalizeQuotation = async () => {
-    try {
-      setIsFinalizing(true);
-      console.log('✅ Finalizando cotización...');
-      console.log('🔍 Current quotationData:', quotationData);
-
-      // Validaciones completas para finalización
-      if (!quotationData.client) {
-        toast({
-          title: "Cliente requerido",
-          description: "Debe seleccionar un cliente antes de finalizar.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      if (!quotationData.project.name?.trim()) {
-        toast({
-          title: "Nombre de proyecto requerido",
-          description: "Debe ingresar el nombre del proyecto antes de finalizar.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      if (quotationData.teamMembers.length === 0) {
-        toast({
-          title: "Equipo requerido",
-          description: "Debe agregar al menos un miembro al equipo antes de finalizar.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Usar la función de guardado del contexto como cotización finalizada
-      await saveQuotation('pending');
-
-      toast({
-        title: "Cotización finalizada",
-        description: "La cotización ha sido finalizada y está lista para el cliente.",
-      });
-
-      navigate('/manage-quotes');
-    } catch (error) {
-      console.error("❌ Error al finalizar cotización:", error);
-      const errorMessage = getApiErrorMessage(error, "Error desconocido");
-
-      // Verificar si es un error de sesión
-      if (errorMessage.includes('No autenticado') || errorMessage.includes('401')) {
-        toast({
-          title: "Sesión expirada",
-          description: "Tu sesión ha expirado. Por favor, inicia sesión nuevamente.",
-          variant: "destructive",
-        });
-        navigate('/auth');
-        return;
-      }
-
-      // Verificar si es un error de cotización no encontrada
-      if (errorMessage.includes('not found') || errorMessage.includes('404')) {
-        toast({
-          title: "Error al finalizar",
-          description: "La cotización no fue encontrada. Se creará una nueva cotización.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      toast({
-        title: "Error al finalizar",
-        description: `No se pudo finalizar la cotización: ${errorMessage}`,
-        variant: "destructive",
-      });
-    } finally {
-      setIsFinalizing(false);
     }
   };
 
@@ -753,7 +592,6 @@ export default function FinancialReviewFinal() {
                             <Slider
                               value={[currentMarkup]}
                               onValueChange={(value) => {
-                                setMarkupMultiplier(value[0]);
                                 updateFinancials({ marginFactor: value[0] });
                               }}
                               min={1.0}
@@ -770,7 +608,6 @@ export default function FinancialReviewFinal() {
                               onChange={(e) => {
                                 const value = parseFloat(e.target.value);
                                 if (!isNaN(value) && value >= 1.0 && value <= 6.0) {
-                                  setMarkupMultiplier(value);
                                   updateFinancials({ marginFactor: value });
                                 }
                               }}
@@ -827,7 +664,6 @@ export default function FinancialReviewFinal() {
                   <Slider
                     value={[discountPercentage]}
                     onValueChange={(value) => {
-                      setDiscountPercentage(value[0]);
                       updateFinancials({ discountPercentage: value[0] });
                     }}
                     min={0}

@@ -1,12 +1,13 @@
 export type PersonnelCostInputs = {
   monthlyHours?: number | string | null;
-  monthlySalaryARS?: number | string | null;
-  monthlySalaryUSD?: number | string | null;
+  hourlyRateARS?: number | string | null;
+  hourlyRateUSD?: number | string | null;
 };
 
-export type DerivedHourlyRates = {
-  hourlyRateARS?: number;
-  hourlyRateUSD?: number;
+export type DerivedMonthlySalaries = {
+  monthlyHoursSnapshot?: number;
+  monthlySalaryARS?: number;
+  monthlySalaryUSD?: number;
 };
 
 function finiteNumber(value: number | string | null | undefined): number | null {
@@ -14,30 +15,27 @@ function finiteNumber(value: number | string | null | undefined): number | null 
   const parsed = typeof value === "number" ? value : Number(value);
   return Number.isFinite(parsed) ? parsed : null;
 }
-
 function roundCurrency(value: number): number {
   return Math.round((value + Number.EPSILON) * 100) / 100;
 }
 
 /**
- * Salary and contractual monthly hours are inputs. Hourly rates are derived
- * values and are recalculated whenever either input changes. A freelancer
- * without contractual hours intentionally does not get a derived rate.
+ * Hourly rates are the canonical cost inputs. Monthly compensation is a
+ * projection derived from the contractual hours snapshot for that period.
  */
-export function deriveHourlyRatesFromSalary(inputs: PersonnelCostInputs): DerivedHourlyRates {
+export function deriveMonthlySalariesFromHourlyRates(inputs: PersonnelCostInputs): DerivedMonthlySalaries {
   const monthlyHours = finiteNumber(inputs.monthlyHours);
   if (monthlyHours == null || monthlyHours <= 0) return {};
 
-  const rates: DerivedHourlyRates = {};
-  const monthlySalaryARS = finiteNumber(inputs.monthlySalaryARS);
-  const monthlySalaryUSD = finiteNumber(inputs.monthlySalaryUSD);
+  const result: DerivedMonthlySalaries = { monthlyHoursSnapshot: monthlyHours };
+  const hourlyRateARS = finiteNumber(inputs.hourlyRateARS);
+  const hourlyRateUSD = finiteNumber(inputs.hourlyRateUSD);
 
-  if (monthlySalaryARS != null && monthlySalaryARS >= 0) {
-    rates.hourlyRateARS = roundCurrency(monthlySalaryARS / monthlyHours);
+  if (hourlyRateARS != null && hourlyRateARS >= 0) {
+    result.monthlySalaryARS = roundCurrency(hourlyRateARS * monthlyHours);
   }
-  if (monthlySalaryUSD != null && monthlySalaryUSD >= 0) {
-    rates.hourlyRateUSD = roundCurrency(monthlySalaryUSD / monthlyHours);
+  if (hourlyRateUSD != null && hourlyRateUSD >= 0) {
+    result.monthlySalaryUSD = roundCurrency(hourlyRateUSD * monthlyHours);
   }
-
-  return rates;
+  return result;
 }

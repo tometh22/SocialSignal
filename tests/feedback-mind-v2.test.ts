@@ -21,7 +21,7 @@ import {
 } from "../shared/utils/taskEstimates";
 import { ApiError, getApiErrorMessage, parseApiError } from "../client/src/lib/api-error";
 import { describeSheetsSyncError, parseValorHoraSection } from "../server/services/personnelSheetsSync";
-import { deriveHourlyRatesFromSalary } from "../shared/utils/personnel-cost";
+import { deriveMonthlySalariesFromHourlyRates } from "../shared/utils/personnel-cost";
 
 test("quotation contract accepts numeric exchangeRateAtQuote and normalizes it for numeric columns", () => {
   const parsed = insertQuotationSchema.parse({
@@ -252,11 +252,11 @@ test("quotation team payload treats an empty role sentinel as absent", () => {
 
 test("Google personnel rows capture current role, sublevel and legacy freelance role", () => {
   const rows = [
-    ["2026", "Rol", "SUBNIVEL", "Rol Viejo", "Valor Hora Ajustada"],
-    ["", "", "", "", "01 ene 2026"],
-    ["Ana", "Senior", "S2", "Analista vieja", "$10.000"],
-    ["", "", "", "", ""],
-    ["", "", "", "", ""],
+    ["2026", "Rol", "SUBNIVEL", "Rol Viejo", "Valor Hora Ajustada", "Sueldo Mensual"],
+    ["", "", "", "", "01 ene 2026", "01 ene 2026"],
+    ["Ana", "Senior", "S2", "Analista vieja", "$10.000", "$1.600.000"],
+    ["", "", "", "", "", ""],
+    ["", "", "", "", "", ""],
   ];
   const parsed = parseValorHoraSection(rows, 2026);
   expect(parsed[0]).toMatchObject({
@@ -265,6 +265,7 @@ test("Google personnel rows capture current role, sublevel and legacy freelance 
     sublevel: "S2",
     legacyRole: "Analista vieja",
     monthlyRates: { jan2026: 10000 },
+    monthlySalaries: { jan2026: 1600000 },
   });
 });
 
@@ -282,14 +283,14 @@ test("salary remains informational and freelance capacity can be null", () => {
   expect(schema).not.toContain('monthlyHours: doublePrecision("monthly_hours").default(160).notNull()');
 });
 
-test("changing salary or monthly hours derives the hourly values", () => {
-  expect(deriveHourlyRatesFromSalary({ monthlySalaryARS: 1_600_000, monthlyHours: 160 }))
-    .toEqual({ hourlyRateARS: 10_000 });
-  expect(deriveHourlyRatesFromSalary({ monthlySalaryUSD: 3_200, monthlyHours: 160 }))
-    .toEqual({ hourlyRateUSD: 20 });
-  expect(deriveHourlyRatesFromSalary({ monthlySalaryARS: 1_600_000, monthlyHours: 120 }))
-    .toEqual({ hourlyRateARS: 13_333.33 });
-  expect(deriveHourlyRatesFromSalary({ monthlySalaryARS: 1_600_000, monthlyHours: null }))
+test("changing hourly values or monthly hours derives monthly salaries", () => {
+  expect(deriveMonthlySalariesFromHourlyRates({ hourlyRateARS: 10_000, monthlyHours: 160 }))
+    .toEqual({ monthlySalaryARS: 1_600_000, monthlyHoursSnapshot: 160 });
+  expect(deriveMonthlySalariesFromHourlyRates({ hourlyRateUSD: 20, monthlyHours: 160 }))
+    .toEqual({ monthlySalaryUSD: 3_200, monthlyHoursSnapshot: 160 });
+  expect(deriveMonthlySalariesFromHourlyRates({ hourlyRateARS: 13_333.33, monthlyHours: 120 }))
+    .toEqual({ monthlySalaryARS: 1_599_999.6, monthlyHoursSnapshot: 120 });
+  expect(deriveMonthlySalariesFromHourlyRates({ hourlyRateARS: 10_000, monthlyHours: null }))
     .toEqual({});
 });
 
@@ -299,8 +300,10 @@ test("personnel updates keep the current historical cost aligned when hours chan
     routes.indexOf('app.patch("/api/personnel/:id"'),
     routes.indexOf('app.get("/api/personnel/:id/dependencies"'),
   );
-  expect(endpoint).toContain("deriveHourlyRatesFromSalary");
-  expect(endpoint).toContain("monthlySalaryARS: currentCost.monthlySalaryARS");
+  expect(endpoint).toContain("deriveMonthlySalariesFromHourlyRates");
+  expect(endpoint).toContain("monthlyHoursSnapshot: derived.monthlyHoursSnapshot ?? null");
+  expect(endpoint).toContain("eq(personnelHistoricalCosts.month, currentMonth)");
+  expect(endpoint).toContain('adjustmentReason: "Cambio de horas contractuales"');
 });
 
 test("quote projection exposes only snapshot and annual average", () => {
@@ -443,14 +446,15 @@ test("Google sync auth failures are actionable and never look successful", () =>
   expect(generic.retryable).toBe(true);
 });
 
-test("personnel screen exposes editable current salary and historical cost table", () => {
+test("personnel screen exposes derived current salary and one historical cost table", () => {
   const inline = readFileSync(new URL("../client/src/components/admin/inline-edit-personnel.tsx", import.meta.url), "utf8");
   const admin = readFileSync(new URL("../client/src/pages/admin-fixed.tsx", import.meta.url), "utf8");
-  const manager = readFileSync(new URL("../client/src/components/admin/PersonnelHistoricalCostsManager.tsx", import.meta.url), "utf8");
+  const table = readFileSync(new URL("../client/src/components/admin/HistoricalCostsTable.tsx", import.meta.url), "utf8");
   const routes = readFileSync(new URL("../server/routes.ts", import.meta.url), "utf8");
-  expect(inline).toContain("monthlySalaryARS");
-  expect(inline).toContain("/api/personnel-historical-costs");
+  expect(inline).toContain("currentMonthlySalaryARS");
+  expect(inline).toContain("Calculado automáticamente");
   expect(admin).toContain("#personal-cost-history");
-  expect(manager).toContain("Tabla comparable por persona y mes");
+  expect(table).toContain("El valor hora es la fuente canónica");
+  expect(admin).not.toContain("PersonnelHistoricalCostsManager");
   expect(routes).toContain("currentCostId: currentRate?.id ?? null");
 });

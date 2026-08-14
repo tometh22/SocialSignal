@@ -116,8 +116,8 @@ export default function MyTasksPage() {
   });
 
   const toggleMutation = useMutation({
-    mutationFn: (task: Task) => apiRequest(`/api/tasks/${task.id}`, "PUT", {
-      status: task.status === "done" ? "todo" : "done",
+    mutationFn: (task: Task) => apiRequest(`/api/tasks/${task.id}/completion`, "POST", {
+      completed: task.status !== "done",
     }),
     onSuccess: () => refetch(),
   });

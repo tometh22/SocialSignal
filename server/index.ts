@@ -10,6 +10,8 @@ import { feedbackMindV27MigrationSql } from "./migrations/feedback-mind-v2-7";
 import { feedbackMindV27ConsistencyMigrationSql } from "./migrations/feedback-mind-v2-7-consistency";
 import { taskHierarchySecurityMigrationSql } from "./migrations/task-hierarchy-security";
 import { quotationHeaderCurrencyRepairMigrationSql } from "./migrations/quotation-header-currency-repair";
+import { feedbackMindV29MigrationSql } from "./migrations/feedback-mind-v2-9";
+import { personnelCostSyncWarningsMigrationSql } from "./migrations/personnel-cost-sync-warnings";
 import cors from 'cors';
 import { execSync } from 'child_process';
 
@@ -531,6 +533,25 @@ async function applyPendingMigrations() {
 
     // ---- Reconciliación de drift de esquema en prod (migraciones nunca aplicadas) ----
 
+    // 0023: algunas bases de Railway se crearon antes de que direct_costs
+    // incorporara subtipo_costo. Drizzle selecciona todas las columnas y, si
+    // falta ésta, el cálculo de cobertura del hub de proyectos falla completo.
+    await run('0023 direct_costs subtipo_costo', `
+      ALTER TABLE "direct_costs" ADD COLUMN IF NOT EXISTS "subtipo_costo" VARCHAR(60);
+      UPDATE "direct_costs"
+      SET "subtipo_costo" = "rol"
+      WHERE "subtipo_costo" IS NULL
+        AND "rol" IN (
+          'Equipo', 'Board', 'Equipo - Bono', 'Board - Bono',
+          'Administración Finanzas', 'Administración Finanzas - Bono',
+          'Suscripciones/Herramientas', 'Impuestos ARG', 'Impuestos USA',
+          'Estudio Contable', 'Otros Proveedores', 'Otros Gastos',
+          'Tarjeta', 'People', 'Comisiones Bancarias', 'Monotributo',
+          'Provisión Pasivo', 'Intereses Oxean', 'Comisiones equipo',
+          'Bonos Total', 'Gastos Varios'
+        );
+    `);
+
     // 0017: permitir proyectos sin cotización (DROP NOT NULL es idempotente).
     // Sin esto, "crear proyecto sin cotización" (y la auto-generación de fees) falla.
     await run('0017 active_projects quotation optional', `
@@ -786,6 +807,8 @@ async function applyPendingMigrations() {
     await run('0037 feedback_mind_v2_7 consistency', feedbackMindV27ConsistencyMigrationSql);
     await run('0038 task hierarchy security', taskHierarchySecurityMigrationSql);
     await run('0039 quotation header currency repair', quotationHeaderCurrencyRepairMigrationSql);
+    await run('0040 feedback_mind_v2_9 closure', feedbackMindV29MigrationSql);
+    await run('0041 personnel cost sync warnings', personnelCostSyncWarningsMigrationSql);
 
     // 0033: feriados duplicados (mismo date+name insertado más de una vez desde el
     // formulario) — borra duplicados conservando la fila más antigua y agrega la

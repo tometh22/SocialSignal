@@ -15,6 +15,7 @@ const Clients = lazy(() => import("@/pages/clients"));
 const Admin = lazy(() => import("@/pages/admin-fixed"));
 const AdminInflation = lazy(() => import("@/pages/admin-inflation"));
 const AdminDataSources = lazy(() => import("@/pages/admin-data-sources"));
+const AdminDefinitions = lazy(() => import("@/pages/admin-definitions"));
 
 // Project Management Pages
 const ActiveProjectsNext = lazy(() => import("@/pages/active-projects-next"));
@@ -80,7 +81,48 @@ import {
   FINANCE_SUMMARY_ACCESS_SECTIONS,
   HOME_ACCESS_SECTIONS,
   HOURS_DASHBOARD_ACCESS_SECTIONS,
+  usePermissions,
 } from "@/hooks/use-permissions";
+
+function PortfolioHubByRole() {
+  const { isOperations } = usePermissions();
+  return isOperations ? <ActiveProjectsNext /> : <Redirect to="/tasks/projects" />;
+}
+
+function TaskProjectsHubByRole() {
+  const { isOperations } = usePermissions();
+  return isOperations ? <Redirect to="/active-projects" /> : <ProjectsHubPage />;
+}
+
+function OperationsOnlyProjectCreate() {
+  const { isOperations } = usePermissions();
+  return isOperations ? <NewProjectWithTooltips /> : <Redirect to="/tasks/projects" />;
+}
+
+function OperationsOnlyProjectDetail() {
+  const { isOperations } = usePermissions();
+  return isOperations ? <ProjectDetail /> : <Redirect to="/tasks/projects" />;
+}
+
+function OperationsOnlyProjectEdit() {
+  const { isOperations } = usePermissions();
+  return isOperations ? <EditProject /> : <Redirect to="/tasks/projects" />;
+}
+
+function OperationsOnlyProjectSettings() {
+  const { isOperations } = usePermissions();
+  return isOperations ? <ProjectSettings /> : <Redirect to="/tasks/projects" />;
+}
+
+function OperationsOnlyProjectTimeEntries() {
+  const { isOperations } = usePermissions();
+  return isOperations ? <TimeEntries /> : <Redirect to="/tasks/projects" />;
+}
+
+function ProjectRedirectByRole({ params }: { params: { id: string } }) {
+  const { isOperations } = usePermissions();
+  return <Redirect to={isOperations ? `/active-projects/${params.id}` : `/tasks/projects/${params.id}`} />;
+}
 
 // Wrapper para procesar parámetros de consulta para OptimizedQuote
 function OptimizedQuoteWrapper() {
@@ -210,15 +252,15 @@ function AppRoutes() {
                   <ProtectedRoute path="/quotation/:id" component={({ params }: { params: { id: string } }) => <Redirect to={`/quotations/${params.id}`} />} />
                   
                   {/* Project Management */}
-                  <ProtectedRoute path="/active-projects" component={ActiveProjectsNext} requiredPermission="projects" />
-                  <ProtectedRoute path="/active-projects-next" component={ActiveProjectsNext} requiredPermission="projects" />
-                  <ProtectedRoute path="/active-projects/new" component={NewProjectWithTooltips} requiredPermission="projects" />
-                  <ProtectedRoute path="/active-projects/:id/edit" component={EditProject} requiredPermission="projects" />
-                  <ProtectedRoute path="/active-projects/:id" component={ProjectDetail} requiredPermission="projects" />
-                  <ProtectedRoute path="/active-projects/:id/time-entries" component={TimeEntries} requiredPermission="projects" />
-                  <ProtectedRoute path="/projects/:id" component={({ params }: { params: { id: string } }) => <Redirect to={`/active-projects/${params.id}`} />} />
-                  <ProtectedRoute path="/project-settings/:id" component={ProjectSettings} requiredPermission="projects" />
-                  <ProtectedRoute path="/time-entries/project/:projectId" component={TimeEntries} requiredPermission="projects" />
+                  <ProtectedRoute path="/active-projects" component={PortfolioHubByRole} requiredPermission="projects" />
+                  <ProtectedRoute path="/active-projects-next" component={PortfolioHubByRole} requiredPermission="projects" />
+                  <ProtectedRoute path="/active-projects/new" component={OperationsOnlyProjectCreate} requiredPermission="projects" />
+                  <ProtectedRoute path="/active-projects/:id/edit" component={OperationsOnlyProjectEdit} requiredPermission="projects" />
+                  <ProtectedRoute path="/active-projects/:id" component={OperationsOnlyProjectDetail} requiredPermission="projects" />
+                  <ProtectedRoute path="/active-projects/:id/time-entries" component={OperationsOnlyProjectTimeEntries} requiredPermission="projects" />
+                  <ProtectedRoute path="/projects/:id" component={ProjectRedirectByRole} requiredPermission="projects" />
+                  <ProtectedRoute path="/project-settings/:id" component={OperationsOnlyProjectSettings} requiredPermission="projects" />
+                  <ProtectedRoute path="/time-entries/project/:projectId" component={OperationsOnlyProjectTimeEntries} requiredPermission="projects" />
 
                   {/* Facturación personal (acceso para todo usuario autenticado) */}
                   <ProtectedRoute path="/my-invoices" component={MyInvoices} />
@@ -241,7 +283,8 @@ function AppRoutes() {
                   <ProtectedRoute path="/tasks/my-tasks" component={MyTasksPage} requiredPermission="projects" />
                   <ProtectedRoute path="/tasks/team-calendar" component={TeamCalendarPage} requiredPermission="projects" />
                   <ProtectedRoute path="/tasks/hours-dashboard" component={HoursDashboardPage} requiredAnyPermission={HOURS_DASHBOARD_ACCESS_SECTIONS} />
-                  <ProtectedRoute path="/tasks/projects" component={ProjectsHubPage} requiredPermission="projects" />
+                  <ProtectedRoute path="/absences" component={PersonnelAbsences} requiredAnyPermission={HOME_ACCESS_SECTIONS} />
+                  <ProtectedRoute path="/tasks/projects" component={TaskProjectsHubByRole} requiredPermission="projects" />
                   <ProtectedRoute path="/tasks/projects/:id" component={ProjectTasksPage} requiredPermission="projects" />
 
                   {/* CRM Ventas */}
@@ -256,6 +299,7 @@ function AppRoutes() {
                   <ProtectedRoute path="/admin/users" component={AdminUsersPage} requiredPermission="admin" />
                   <ProtectedRoute path="/admin/inflation" component={AdminInflation} requiredPermission="admin" />
                   <ProtectedRoute path="/admin/data-sources" component={AdminDataSources} requiredPermission="admin" />
+                  <ProtectedRoute path="/admin/definitions" component={AdminDefinitions} requiredPermission="admin" />
                   <ProtectedRoute path="/admin" component={Admin} requiredPermission="admin" />
 
                   {/* Finance Ledger */}
@@ -270,7 +314,7 @@ function AppRoutes() {
                   <ProtectedRoute path="/operations/monthly-closing" component={MonthlyClosing} requiredPermission="operations" />
                   <ProtectedRoute path="/operations/estimated-rates" component={EstimatedRates} requiredPermission="operations" />
                   <ProtectedRoute path="/operations/holidays" component={HolidaysManagement} requiredPermission="operations" />
-                  <ProtectedRoute path="/operations/absences" component={PersonnelAbsences} requiredPermission="operations" />
+                  <ProtectedRoute path="/operations/absences" component={() => <Redirect to="/absences" />} requiredPermission="operations" />
                   <ProtectedRoute path="/google-sheets" component={GoogleSheetsManager} requiredPermission="admin" />
                   
                   {/* Specialized Tools */}
@@ -282,8 +326,8 @@ function AppRoutes() {
 
                   
                   {/* Legacy Redirects */}
-                  <ProtectedRoute path="/project-details/:id" component={({ params }: { params: { id: string } }) => <Redirect to={`/active-projects/${params.id}`} />} />
-                  <ProtectedRoute path="/project/:id" component={({ params }: { params: { id: string } }) => <Redirect to={`/projects/${params.id}`} />} />
+                  <ProtectedRoute path="/project-details/:id" component={ProjectRedirectByRole} requiredPermission="projects" />
+                  <ProtectedRoute path="/project/:id" component={ProjectRedirectByRole} requiredPermission="projects" />
                   
                   <Route component={NotFound} />
                 </Switch>

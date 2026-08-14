@@ -41,6 +41,7 @@ import {
   Wallet,
   ShieldAlert,
   Database,
+  BookOpen,
 } from "lucide-react";
 
 type NavItem = {
@@ -60,14 +61,14 @@ interface SidebarFixedProps {
 
 export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps = {}) {
   const { user } = useAuth();
-  const { hasPermission, hasAnyPermission } = usePermissions();
+  const { hasPermission, hasAnyPermission, isOperations } = usePermissions();
   const [currentPath] = useLocation();
   // En mobile (dentro del drawer) nunca está colapsado - el cierre se hace cerrando el drawer
   const [isCollapsedState, setIsCollapsed] = useState(false);
   const isCollapsed = mobileMode ? false : isCollapsedState;
   const [projectCount, setProjectCount] = useState(0);
   const [crmOverdue, setCrmOverdue] = useState(0);
-  const canSeeProjects = hasPermission("projects");
+  const canSeeProjects = hasPermission("projects") && isOperations;
   const canSeeCrm = hasPermission("crm");
 
   const fetchProjectCount = async () => {
@@ -139,6 +140,7 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
       title: "",
       items: [
         { href: "/", title: "Inicio", icon: Home, description: "Resumen personal", anyPermissions: HOME_ACCESS_SECTIONS },
+        { href: "/absences", title: "Mis ausencias", icon: UserX, description: "Solicitudes y saldos", anyPermissions: HOME_ACCESS_SECTIONS },
       ]
     },
     {
@@ -152,7 +154,7 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
     {
       title: "Proyectos",
       items: [
-        { href: "/active-projects", title: "Proyectos", icon: Briefcase, badge: projectCount > 0 ? projectCount.toString() : undefined, description: "Gestión y rentabilidad", permission: 'projects' as AppSection },
+        { href: isOperations ? "/active-projects" : "/tasks/projects", title: isOperations ? "Proyectos" : "Mis proyectos", icon: Briefcase, badge: projectCount > 0 ? projectCount.toString() : undefined, description: isOperations ? "Gestión y rentabilidad" : "Proyectos activos asignados", permission: 'projects' as AppSection },
         { href: "/tasks", title: "Tareas", icon: CheckSquare, description: "Gestión de tareas", permission: 'projects' as AppSection },
         { href: "/review", title: "Status", icon: ClipboardList, badge: totalReviewPending > 0 ? totalReviewPending.toString() : undefined, description: "Seguimiento y decisiones", permission: 'status' as AppSection },
       ]
@@ -163,7 +165,6 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
         { href: "/tasks/hours-dashboard", title: "Panel de horas", icon: BarChart2, description: "Horas por persona y proyecto", anyPermissions: HOURS_DASHBOARD_ACCESS_SECTIONS },
         { href: "/operations/capacity", title: "Capacidad", icon: Gauge, description: "Capacidad semanal del equipo", permission: 'operations' as AppSection },
         { href: "/operations/monthly-closing", title: "Cierre mensual", icon: CalendarCheck, description: "Cierre de horas del mes", permission: 'operations' as AppSection },
-        { href: "/operations/absences", title: "Ausencias", icon: UserX, description: "Vacaciones y licencias del equipo", permission: 'operations' as AppSection },
         { href: "/operations/holidays", title: "Feriados", icon: Calendar, description: "Gestión de feriados", permission: 'operations' as AppSection },
       ]
     },
@@ -184,6 +185,7 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
         { href: "/admin/users", title: "Usuarios", icon: Users, description: "Usuarios y permisos", permission: 'admin' as AppSection },
         { href: "/admin/providers", title: "Proveedores", icon: Building2, description: "Proveedores externos y su acceso a proyectos", permission: 'admin' as AppSection },
         { href: "/admin/data-sources", title: "Fuentes de datos", icon: Database, description: "Origen de los datos", permission: 'admin' as AppSection },
+        { href: "/admin/definitions", title: "Definiciones", icon: BookOpen, description: "Reglas de producto versionadas", permission: 'admin' as AppSection },
       ]
     }
   ];

@@ -3,8 +3,9 @@ import { useQuery } from "@tanstack/react-query";
 import { authFetch } from "@/lib/queryClient";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { type LucideIcon, Loader2, AlertCircle, CheckCircle2, Clock, ListTodo, Users, Layers, Flag, Timer } from "lucide-react";
+import { type LucideIcon, Loader2, AlertCircle, CheckCircle2, Clock, ListTodo, Users, Flag, Timer } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { isAfter, parseISO, startOfDay } from "date-fns";
 import { projectRoleLabel } from "@/constants/project-roles";
@@ -30,6 +31,8 @@ interface Props {
   projectId: number;
   members: ProjectMember[];
   projectColor: string;
+  canManageMembers?: boolean;
+  onManageMembers?: () => void;
 }
 
 const PRIORITY_LABEL: Record<string, string> = {
@@ -82,7 +85,7 @@ function StatCard({ icon: Icon, label, value, sub, color }: {
   );
 }
 
-export default function ProjectOverviewPanel({ projectId, members, projectColor }: Props) {
+export default function ProjectOverviewPanel({ projectId, members, projectColor, canManageMembers, onManageMembers }: Props) {
   const [selectedSection, setSelectedSection] = useState<string>("all");
 
   // Si el usuario navega de un proyecto a otro sin desmontar este componente,
@@ -129,9 +132,6 @@ export default function ProjectOverviewPanel({ projectId, members, projectColor 
 
   const completionPct = total > 0 ? Math.round((done / total) * 100) : 0;
 
-  const sections = data?.sections || {};
-  const sectionNames = allSectionNames;
-
   const priorityBreakdown = ["urgent", "high", "medium", "low"].map((p) => ({
     key: p,
     label: PRIORITY_LABEL[p],
@@ -150,13 +150,6 @@ export default function ProjectOverviewPanel({ projectId, members, projectColor 
       .reduce((sum, task) => sum + Number(task.estimatedHoursTotal ?? 0), 0);
     return { ...m, total: mTasks.length, done: mDone, pending: mPending, logged: mLogged, estimated: mEstimated };
   }).sort((a, b) => b.total - a.total);
-
-  const sectionBreakdown = sectionNames.map((name) => {
-    const sTasks = (sections[name] || []).filter((t) => !t.parentTaskId);
-    const sDone = sTasks.filter((t) => t.status === "done").length;
-    const sLogged = sTasks.reduce((s, t) => s + (t.loggedHours || 0), 0);
-    return { name, total: sTasks.length, done: sDone, logged: sLogged };
-  });
 
   return (
     <div className="space-y-6 py-4">
@@ -266,8 +259,13 @@ export default function ProjectOverviewPanel({ projectId, members, projectColor 
         <div className="bg-card border border-border rounded-xl overflow-hidden">
           <div className="flex items-center gap-2 px-5 py-4 border-b border-border">
             <Users className="h-4 w-4 text-muted-foreground" />
-            <h3 className="text-sm font-semibold text-foreground">Personas involucradas</h3>
+            <h3 className="text-sm font-semibold text-foreground">Equipo del proyecto</h3>
             <span className="text-xs text-muted-foreground">({memberStats.length})</span>
+            {canManageMembers && onManageMembers && (
+              <Button variant="outline" size="sm" className="ml-auto h-7 text-xs" onClick={onManageMembers}>
+                Gestionar equipo
+              </Button>
+            )}
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -335,53 +333,6 @@ export default function ProjectOverviewPanel({ projectId, members, projectColor 
                 )}
               </tbody>
             </table>
-          </div>
-        </div>
-      )}
-
-      {/* Section breakdown */}
-      {sectionBreakdown.length > 0 && (
-        <div className="bg-card border border-border rounded-xl overflow-hidden">
-          <div className="flex items-center gap-2 px-5 py-4 border-b border-border">
-            <Layers className="h-4 w-4 text-muted-foreground" />
-            <h3 className="text-sm font-semibold text-foreground">Por sección</h3>
-          </div>
-          <div className="divide-y divide-border">
-            {sectionBreakdown.map((s) => {
-              const pct = s.total > 0 ? Math.round((s.done / s.total) * 100) : 0;
-              return (
-                <button
-                  type="button"
-                  key={s.name}
-                  onClick={() => setSelectedSection(prev => prev === s.name ? "all" : s.name)}
-                  className={cn(
-                    "w-full flex items-center gap-4 px-5 py-3.5 hover:bg-muted/20 transition-colors text-left",
-                    selectedSection === s.name && "bg-primary/5"
-                  )}
-                >
-                  <span className="text-sm font-medium text-foreground w-36 flex-shrink-0 truncate">{s.name}</span>
-                  <div className="flex-1 flex items-center gap-3">
-                    <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden">
-                      <div
-                        className="h-full rounded-full bg-primary/60 transition-all duration-500"
-                        style={{ width: `${pct}%` }}
-                      />
-                    </div>
-                    <span className="text-xs text-muted-foreground w-20 text-right flex-shrink-0">
-                      {s.done}/{s.total} tareas
-                    </span>
-                  </div>
-                  <span className="text-xs font-medium text-foreground w-12 text-right flex-shrink-0">
-                    {pct}%
-                  </span>
-                  {s.logged > 0 && (
-                    <span className="text-xs text-muted-foreground w-14 text-right flex-shrink-0">
-                      {formatHours(s.logged)}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
           </div>
         </div>
       )}

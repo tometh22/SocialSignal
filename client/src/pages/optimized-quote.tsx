@@ -19,7 +19,6 @@ import DeliverableConfiguration from '@/components/quotation/DeliverableConfigur
 import QuotationErrorBoundary from '@/components/quotation-error-boundary';
 import { getApiErrorMessage } from '@/lib/api-error';
 import { QuotationVariants } from '@/components/optimized/QuotationVariants';
-import CurrencySelection from '@/components/optimized/currency-selection';
 import { ExecutiveSummary } from '@/components/quotation/executive-summary';
 import { QuotationTemplatesPicker } from '@/components/quotation/quotation-templates-picker';
 
@@ -177,7 +176,7 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
     };
   }, [user, lastActivity, setLocation, toast]);
 
-  const variantsStep = quotationData.project?.type === 'always-on' ? 8 : 7;
+  const variantsStep = quotationData.project?.type === 'always-on' ? 7 : 6;
 
   const handleNextStep = async () => {
     // Auto-save before entering the variants step if quote not yet saved
@@ -260,14 +259,12 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
     if (quotationData.project?.type === 'always-on') {
       baseSteps.push({ num: 5, title: "Entregables" });
       baseSteps.push({ num: 6, title: "Revisión" });
-      baseSteps.push({ num: 7, title: "Moneda" });
-      baseSteps.push({ num: 8, title: "Variantes" });
-      baseSteps.push({ num: 9, title: "Resumen" });
-    } else {
-      baseSteps.push({ num: 5, title: "Revisión" });
-      baseSteps.push({ num: 6, title: "Moneda" });
       baseSteps.push({ num: 7, title: "Variantes" });
       baseSteps.push({ num: 8, title: "Resumen" });
+    } else {
+      baseSteps.push({ num: 5, title: "Revisión" });
+      baseSteps.push({ num: 6, title: "Variantes" });
+      baseSteps.push({ num: 7, title: "Resumen" });
     }
 
     return baseSteps;
@@ -415,18 +412,13 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
               <OptimizedFinancialReview />
             )}
 
-            {((currentStep === 6 && quotationData.project?.type !== 'always-on') ||
-              (currentStep === 7 && quotationData.project?.type === 'always-on')) && (
-              <CurrencySelection />
-            )}
-
-            {((currentStep === 8 && quotationData.project?.type !== 'always-on') ||
-              (currentStep === 9 && quotationData.project?.type === 'always-on')) && (
+            {((currentStep === 7 && quotationData.project?.type !== 'always-on') ||
+              (currentStep === 8 && quotationData.project?.type === 'always-on')) && (
               <ExecutiveSummary />
             )}
 
-            {((currentStep === 7 && quotationData.project?.type !== 'always-on') ||
-              (currentStep === 8 && quotationData.project?.type === 'always-on')) && (
+            {((currentStep === 6 && quotationData.project?.type !== 'always-on') ||
+              (currentStep === 7 && quotationData.project?.type === 'always-on')) && (
               <QuotationVariants
                 quotationId={quotationData.id || 0}
                 baseTeamMembers={quotationData.teamMembers as any}

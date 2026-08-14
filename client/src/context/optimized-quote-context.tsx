@@ -3,6 +3,10 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Client, ReportTemplate, Role, Personnel, Quotation } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 import { useCurrency } from "@/hooks/use-currency";
+import {
+  calculateQuotationPricing,
+  type QuotationPricingResult,
+} from "@shared/utils/quotation-pricing";
 
 export interface OptimizedTeamMember {
   id: string;
@@ -12,6 +16,17 @@ export interface OptimizedTeamMember {
   rate: number;
   cost: number;
 }
+
+export type QuotationVariantPayload = {
+  variantName: string;
+  variantDescription?: string | null;
+  variantOrder: number;
+  baseCost: number;
+  complexityAdjustment: number;
+  markupAmount: number;
+  totalAmount: number;
+  isSelected: boolean;
+};
 
 export interface ProjectData {
   name: string;
@@ -37,6 +52,7 @@ interface QuotationFinancials {
   toolsCost: number;
   priceMode: 'auto' | 'manual';
   manualPrice?: number;
+  manualPriceCurrency?: 'ARS' | 'USD';
 }
 
 export interface QuotationData {
@@ -65,6 +81,8 @@ export interface QuotationData {
   proposalLink?: string; // Link a la propuesta original
   leadId?: number; // Lead CRM de origen (para integración CRM-Cotizaciones)
   exchangeRateSnapshot?: number; // Tipo de cambio al momento de cotizar (snapshot)
+  pricingVersion?: number;
+  requiresExchangeRateConfirmation?: boolean;
   // Mes histórico (formato 'mmmYYYY', ej. 'aug2025') a usar como tarifa
   // por defecto al agregar personal y al recalcular tarifas. null = "más reciente disponible".
   salaryMonth?: string | null;
@@ -77,6 +95,7 @@ interface OptimizedQuoteContextType {
   complexityAdjustment: number;
   markupAmount: number;
   totalAmount: number;
+  pricingResult: QuotationPricingResult;
   complexityFactors: ComplexityFactors;
   availableRoles: Role[];
   availablePersonnel: Personnel[];
@@ -113,7 +132,10 @@ interface OptimizedQuoteContextType {
 
   // Actions
   loadQuotation: (quotationId: number) => Promise<void>;
-  saveQuotation: (status?: 'draft' | 'pending' | 'approved' | 'rejected' | 'in-negotiation') => Promise<void>;
+  saveQuotation: (
+    status?: 'draft' | 'pending' | 'approved' | 'rejected' | 'in-negotiation',
+    variants?: QuotationVariantPayload[],
+  ) => Promise<any>;
   calculateBaseCost: () => void;
   calculateTotalCost: () => void;
   resetQuotation: () => void;
@@ -169,9 +191,12 @@ const initialQuotationData: QuotationData = {
     // Nuevos campos inicializados
     toolsCost: 0,
     priceMode: 'auto' as const,
-    manualPrice: undefined
+    manualPrice: undefined,
+    manualPriceCurrency: 'ARS',
   },
   quotationCurrency: "ARS", // Siempre en pesos argentinos
+  pricingVersion: 2,
+  requiresExchangeRateConfirmation: false,
   inflation: {
     applyInflationAdjustment: false,
     inflationMethod: "manual",
@@ -276,6 +301,12 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
   const [complexityAdjustment, setComplexityAdjustment] = useState(0);
   const [markupAmount, setMarkupAmount] = useState(0);
   const [totalAmount, setTotalAmount] = useState(0);
+  const [pricingResult, setPricingResult] = useState<QuotationPricingResult>({
+    canonicalARS: { baseCost: 0, complexityAdjustment: 0, markupAmount: 0, toolsCost: 0, platformCost: 0, deviationAmount: 0, discountAmount: 0, total: 0 },
+    display: { baseCost: 0, complexityAdjustment: 0, markupAmount: 0, toolsCost: 0, platformCost: 0, deviationAmount: 0, discountAmount: 0, total: 0 },
+    displayCurrency: "ARS",
+    effectiveMarginFactor: 2,
+  });
   const [currentStep, setCurrentStep] = useState(1);
   const [recalculationTrigger, setRecalculationTrigger] = useState(0);
 
@@ -284,6 +315,12 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
   const effectiveExchangeRate = quotationData.exchangeRateSnapshot && quotationData.exchangeRateSnapshot > 0
     ? quotationData.exchangeRateSnapshot
     : exchangeRate;
+
+  useEffect(() => {
+    if (!quotationData.exchangeRateSnapshot && !quotationData.requiresExchangeRateConfirmation && exchangeRate > 0) {
+      setQuotationData((current) => ({ ...current, exchangeRateSnapshot: exchangeRate }));
+    }
+  }, [exchangeRate, quotationData.exchangeRateSnapshot, quotationData.requiresExchangeRateConfirmation]);
 
   // Get data from queries first
   const { data: roles = [] } = useQuery<Role[]>({
@@ -594,180 +631,51 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
     recalculationTrigger
   ]);
 
-  // Calculate costs with proper recalculation trigger
   useEffect(() => {
-    console.log('💰 === COST CALCULATION START ===');
-    console.log('🔧 Team members:', quotationData.teamMembers);
-    console.log('🔧 Template:', quotationData.template?.name);
-    console.log('🔧 Financials:', quotationData.financials);
-    console.log('🔧 Currency:', quotationData.quotationCurrency);
-    console.log('🔧 Exchange rate:', effectiveExchangeRate);
-    console.log('🔧 Recalculation trigger:', recalculationTrigger);
-
-    if (!quotationData.teamMembers || quotationData.teamMembers.length === 0) {
-      console.log('⚠️ No team members, setting costs to 0');
-      setBaseCost(0);
-      setComplexityAdjustment(0);
-      setMarkupAmount(0);
-      setTotalAmount(0);
-      return;
-    }
-
-    // Team rates/costs are expressed in the quotation currency. The calculation
-    // core remains ARS so margins, tools and persistence share one canonical unit.
-    const calculatedBaseCostARS = quotationData.teamMembers.reduce((sum, member) => {
-      const quotedCost = Number(member.cost) || (Number(member.hours || 0) * Number(member.rate || 0));
-      const memberCostARS = quotationData.quotationCurrency === 'USD'
-        ? quotedCost * effectiveExchangeRate
-        : quotedCost;
-      console.log(`👤 Member ${member.id}: cost = ${memberCostARS} ARS (${quotedCost} ${quotationData.quotationCurrency || 'ARS'})`);
-      return sum + memberCostARS;
-    }, 0);
-
-    // FIXED: Keep costs in original currency (ARS) instead of converting to USD
-    const calculatedBaseCost = calculatedBaseCostARS;
-    console.log(`💵 Calculated base cost: ${calculatedBaseCost} ARS (keeping in original currency)`);
-    setBaseCost(calculatedBaseCost);
-
-    // Calculate complexity adjustment (in ARS)
-    const totalComplexityFactor = Object.values(complexityFactors).reduce((sum, factor) => sum + (factor || 0), 0);
-    const calculatedComplexityAdjustment = calculatedBaseCost * totalComplexityFactor;
-    console.log(`🔧 Complexity adjustment: $${calculatedBaseCost} ARS × ${totalComplexityFactor} = $${calculatedComplexityAdjustment} ARS`);
-    setComplexityAdjustment(calculatedComplexityAdjustment);
-
-    // Calculate subtotal after complexity (in ARS)
-    const subtotalWithComplexity = calculatedBaseCost + calculatedComplexityAdjustment;
-    console.log(`📊 Subtotal with complexity: $${subtotalWithComplexity} ARS`);
-
-    // Declare variables for calculated values
-    let calculatedMarkup = 0;
-    let subtotalWithMarkup = 0;
-
-    // Check if we're in manual pricing mode
-    if (quotationData.financials.priceMode === 'manual' && quotationData.financials.manualPrice) {
-      console.log(`✏️ Manual pricing mode: Target price ARS $${quotationData.financials.manualPrice}`);
-
-      // Keep manual price in ARS (no conversion needed)
-      const manualPriceARS = quotationData.financials.manualPrice;
-      // toolsCost is stored in USD — convert to ARS before subtracting from an ARS price
-      const toolsCostARS_manual = (quotationData.financials.toolsCost || 0) * (effectiveExchangeRate || 1);
-      const priceBeforeTools = manualPriceARS - toolsCostARS_manual;
-      calculatedMarkup = priceBeforeTools - subtotalWithComplexity;
-      const marginFactor = subtotalWithComplexity > 0 ? (priceBeforeTools / subtotalWithComplexity) : 1;
-
-      console.log(`✏️ Manual price markup: $${calculatedMarkup} ARS, Effective margin: ${marginFactor}x`);
-      setMarkupAmount(calculatedMarkup);
-
-      // Update margin factor in the context for display purposes
-      const updatedFinancials = {
-        ...quotationData.financials,
-        marginFactor: marginFactor,
-        marginPercentage: ((marginFactor - 1) * 100)
-      };
-
-      setQuotationData(prev => ({ 
-        ...prev, 
-        financials: updatedFinancials 
-      }));
-
-      subtotalWithMarkup = priceBeforeTools;
-      console.log(`📈 Manual subtotal with markup (before tools): $${subtotalWithMarkup} ARS`);
-    } else {
-      // Calculate markup (margin) normally
-      const marginFactor = quotationData.financials.marginFactor || 2.0;
-      calculatedMarkup = subtotalWithComplexity * (marginFactor - 1);
-      console.log(`💰 Auto markup: $${subtotalWithComplexity} ARS × ${marginFactor - 1} = $${calculatedMarkup} ARS`);
-      setMarkupAmount(calculatedMarkup);
-
-      subtotalWithMarkup = subtotalWithComplexity + calculatedMarkup;
-      console.log(`📈 Auto subtotal with markup: $${subtotalWithMarkup} ARS`);
-    }
-
-    // Add tools cost AFTER markup — convert from USD to ARS first
-    const toolsCostARS_auto = (quotationData.financials.toolsCost || 0) * (effectiveExchangeRate || 1);
-    const subtotalWithTools = subtotalWithMarkup + toolsCostARS_auto;
-    console.log(`🔧 Tools cost (added after markup): ${toolsCostARS_auto} ARS (${quotationData.financials.toolsCost || 0} USD × TC), Subtotal with tools: ${subtotalWithTools} ARS`);
-
-    // Update the variable name for consistency
-    subtotalWithMarkup = subtotalWithTools;
-
-    // Add platform cost
-    const platformCost = quotationData.financials.platformCost || 0;
-    const subtotalWithPlatform = subtotalWithMarkup + platformCost;
-    console.log(`🖥️ Platform cost: ${platformCost} ARS, Subtotal: ${subtotalWithPlatform} ARS`);
-
-    // Apply deviation percentage
-    const deviationPercentage = quotationData.financials.deviationPercentage || 0;
-    const deviationAmount = subtotalWithPlatform * (deviationPercentage / 100);
-    const subtotalWithDeviation = subtotalWithPlatform + deviationAmount;
-    console.log(`📊 Deviation: ${deviationPercentage}% = ${deviationAmount} ARS, Subtotal: ${subtotalWithDeviation} ARS`);
-
-    // Apply discount
-    const discountPercentage = quotationData.financials.discountPercentage || 0;
-    const discountAmount = subtotalWithDeviation * (discountPercentage / 100);
-    const finalTotal = subtotalWithDeviation - discountAmount;
-    console.log(`💸 Discount: ${discountPercentage}% = ${discountAmount} ARS, Final: ${finalTotal} ARS`);
-
-    // Handle inflation if applicable
-    let finalTotalWithInflation = finalTotal;
-    if (quotationData.inflation.applyInflationAdjustment && quotationData.inflation.projectStartDate) {
-      const startDate = new Date(quotationData.inflation.projectStartDate);
-      const currentDate = new Date();
-      const monthsToProject = (startDate.getFullYear() - currentDate.getFullYear()) * 12 + 
-                             (startDate.getMonth() - currentDate.getMonth());
-
-      if (monthsToProject > 0) {
-        let annualInflationRate;
-        if (quotationData.inflation.inflationMethod === 'manual') {
-          annualInflationRate = quotationData.inflation.manualInflationRate || 25;
-        } else {
-          annualInflationRate = 25; // Default
-        }
-
-        const monthlyRateDecimal = Math.pow(1 + (annualInflationRate / 100), 1/12) - 1;
-        const inflationFactor = Math.pow(1 + monthlyRateDecimal, monthsToProject);
-        finalTotalWithInflation = finalTotal * inflationFactor;
-
-        console.log(`📈 Inflation adjustment: ${annualInflationRate}% annual, ${monthsToProject} months = ${finalTotalWithInflation} ARS`);
+    const annualRate = quotationData.inflation.manualInflationRate || 25;
+    let months = 0;
+    if (quotationData.inflation.applyInflationAdjustment) {
+      if (quotationData.inflation.rateProjectionMode === "annual_avg") {
+        months = 6;
+      } else if (quotationData.inflation.projectStartDate) {
+        const start = new Date(quotationData.inflation.projectStartDate);
+        const now = new Date();
+        months = Math.max(0, (start.getFullYear() - now.getFullYear()) * 12 + start.getMonth() - now.getMonth());
       }
     }
-
-    // Additional platform cost from template if selected
-    if (quotationData.template) {
-      const templatePlatformCost = quotationData.template.platformCost || 0;
-      if (templatePlatformCost > 0 && quotationData.financials.platformCost === 0) {
-        // Auto-apply template platform cost if no manual cost is set
-        const updatedFinancials = {
-          ...quotationData.financials,
-          platformCost: templatePlatformCost
-        };
-        setQuotationData(prev => ({ 
-          ...prev, 
-          financials: updatedFinancials 
-        }));
-      }
-    }
-
-    // Ensure all values are properly rounded and consistent
-    const finalBaseCost = Math.round(calculatedBaseCost * 100) / 100;
-    const finalComplexityAdjustment = Math.round(calculatedComplexityAdjustment * 100) / 100;
-    const finalMarkupAmount = Math.round(calculatedMarkup * 100) / 100;
-    const finalTotalAmount = Math.round(finalTotalWithInflation * 100) / 100;
-
-    // Set all calculated values
-    setBaseCost(finalBaseCost);
-    setComplexityAdjustment(finalComplexityAdjustment);
-    setMarkupAmount(finalMarkupAmount);
-    setTotalAmount(finalTotalAmount);
-
-    console.log(`💰 FINAL VALUES: Base: $${finalBaseCost}, Complexity: $${finalComplexityAdjustment}, Markup: $${finalMarkupAmount}, Total: $${finalTotalAmount}`);
-    console.log('💰 === COST CALCULATION END ===');
-
-  }, [quotationData.teamMembers, quotationData.template, quotationData.financials, quotationData.quotationCurrency, complexityFactors, roles, recalculationTrigger, effectiveExchangeRate]);
+    const monthlyInflation = Math.pow(1 + annualRate / 100, 1 / 12) - 1;
+    const inflationFactor = months > 0 ? Math.pow(1 + monthlyInflation, months) : 1;
+    const complexityFactor = Object.values(complexityFactors).reduce((sum, factor) => sum + (factor || 0), 0);
+    const result = calculateQuotationPricing({
+      quotationCurrency: quotationData.quotationCurrency === "USD" ? "USD" : "ARS",
+      exchangeRate: effectiveExchangeRate || 1,
+      team: quotationData.teamMembers.map((member) => ({
+        hours: member.hours,
+        rate: member.rate,
+        cost: member.cost,
+        currency: quotationData.quotationCurrency === "USD" ? "USD" : "ARS",
+      })),
+      complexityFactor,
+      marginFactor: quotationData.financials.marginFactor,
+      toolsCostUSD: quotationData.financials.toolsCost,
+      platformCostARS: quotationData.financials.platformCost,
+      deviationPercentage: quotationData.financials.deviationPercentage,
+      discountPercentage: quotationData.financials.discountPercentage,
+      inflationFactor,
+      priceMode: quotationData.financials.priceMode,
+      manualPrice: quotationData.financials.manualPrice,
+      manualPriceCurrency: quotationData.financials.manualPriceCurrency ?? (quotationData.quotationCurrency === "USD" ? "USD" : "ARS"),
+    });
+    setPricingResult(result);
+    setBaseCost(result.canonicalARS.baseCost);
+    setComplexityAdjustment(result.canonicalARS.complexityAdjustment);
+    setMarkupAmount(result.canonicalARS.markupAmount);
+    setTotalAmount(result.canonicalARS.total);
+  }, [quotationData.teamMembers, quotationData.financials, quotationData.quotationCurrency, quotationData.inflation, complexityFactors, recalculationTrigger, effectiveExchangeRate]);
 
   // Navigation functions
   const nextStep = useCallback(() => {
-    const maxStep = quotationData.project.type === 'always-on' ? 9 : 8;
+    const maxStep = quotationData.project.type === 'always-on' ? 8 : 7;
     if (currentStep < maxStep) {
       setCurrentStep(currentStep + 1);
     }
@@ -780,7 +688,7 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
   }, [currentStep]);
 
   const goToStep = useCallback((step: number) => {
-    const maxStep = quotationData.project.type === 'always-on' ? 9 : 8;
+    const maxStep = quotationData.project.type === 'always-on' ? 8 : 7;
     if (step >= 1 && step <= maxStep) {
       setCurrentStep(step);
     }
@@ -848,7 +756,12 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
       return {
         ...prev,
         quotationCurrency: newCurrency,
-        exchangeRateSnapshot: rateSnapshot > 0 ? rateSnapshot : prev.exchangeRateSnapshot,
+        exchangeRateSnapshot: exchangeRateOverride && exchangeRateOverride > 0
+          ? rateSnapshot
+          : prev.exchangeRateSnapshot,
+        requiresExchangeRateConfirmation: exchangeRateOverride && exchangeRateOverride > 0
+          ? false
+          : prev.requiresExchangeRateConfirmation,
         teamMembers: updatedMembers,
       };
     });
@@ -1102,12 +1015,16 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
           // Nuevos campos cargados de la base de datos
           toolsCost: Number(quotation.toolsCost || 0),
           priceMode: (quotation.priceMode as 'auto' | 'manual') || 'auto',
-          manualPrice: quotation.manualPrice ? Number(quotation.manualPrice) : undefined
+          manualPrice: quotation.manualPrice ? Number(quotation.manualPrice) : undefined,
+          manualPriceCurrency: (quotation.manualPriceCurrency === "USD" ? "USD" : "ARS") as "USD" | "ARS",
         },
         quotationCurrency: quotation.quotationCurrency || "ARS", // Propiedad requerida en el nivel raíz
         exchangeRateSnapshot: Number(quotation.exchangeRateAtQuote) > 0
           ? Number(quotation.exchangeRateAtQuote)
           : undefined,
+        pricingVersion: Number(quotation.pricingVersion || 1),
+        requiresExchangeRateConfirmation: Number(quotation.pricingVersion || 1) < 2
+          || !(Number(quotation.exchangeRateAtQuote) > 0),
         inflation: {
           applyInflationAdjustment: Boolean(quotation.applyInflationAdjustment),
           inflationMethod: quotation.inflationMethod || "manual",
@@ -1134,7 +1051,10 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
     }
   }, [forceRecalculate]);
 
-  const saveQuotation = useCallback(async (status: 'draft' | 'pending' | 'approved' | 'rejected' | 'in-negotiation' = 'draft') => {
+  const saveQuotation = useCallback(async (
+    status: 'draft' | 'pending' | 'approved' | 'rejected' | 'in-negotiation' = 'draft',
+    variants?: QuotationVariantPayload[],
+  ) => {
     try {
       // Validaciones básicas para todos los estados
       if (!quotationData.client?.id) {
@@ -1144,6 +1064,9 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
       if (!quotationData.project.name?.trim()) {
         console.error("❌ Validation failed: Missing project name");
         throw new Error("Debe ingresar el nombre del proyecto");
+      }
+      if (quotationData.requiresExchangeRateConfirmation) {
+        throw new Error("Confirmá un tipo de cambio positivo para migrar esta cotización legacy al pricing actual");
       }
 
       // Para borradores, permitir cotizaciones sin equipo
@@ -1165,8 +1088,7 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
 
       // baseCost/complexityAdjustment/markupAmount/totalAmount siempre están
       // en ARS internamente; si la cotización se eligió en USD hay que
-      // convertir antes de persistir (mismo criterio que handleDirectFinalize
-      // en currency-selection.tsx), para que quotation-detail.tsx no muestre
+      // convertir antes de persistir, para que quotation-detail.tsx no muestre
       // el número ARS crudo etiquetado como USD.
       const saveExchangeRate = quotationData.exchangeRateSnapshot || exchangeRate || 1;
       const toStoredCurrency = (amountARS: number) =>
@@ -1196,13 +1118,15 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
         toolsCost: quotationData.financials.toolsCost || 0,
         priceMode: quotationData.financials.priceMode || 'auto',
         manualPrice: quotationData.financials.manualPrice || null,
+        manualPriceCurrency: quotationData.financials.manualPriceCurrency ?? quotationData.quotationCurrency,
+        pricingVersion: 2,
         applyInflationAdjustment: quotationData.inflation.applyInflationAdjustment || false,
         inflationMethod: quotationData.inflation.inflationMethod || 'manual',
         manualInflationRate: quotationData.inflation.manualInflationRate || 0,
         projectStartDate: quotationData.inflation.projectStartDate ? new Date(quotationData.inflation.projectStartDate) : undefined,
         rateProjectionMode: quotationData.inflation.rateProjectionMode || 'current',
         quotationCurrency: quotationData.quotationCurrency || 'ARS',
-        exchangeRateAtQuote: quotationData.quotationCurrency === 'USD' ? saveExchangeRate : null,
+        exchangeRateAtQuote: saveExchangeRate,
         proposalLink: quotationData.proposalLink || null,
         leadId: quotationData.leadId || null,
         salaryMonth: quotationData.salaryMonth ?? null,
@@ -1226,6 +1150,7 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
               : 0,
           };
         }),
+        ...(variants ? { variants } : {}),
       };
 
       console.log('📤 Saving quotation with payload:', quotationPayload);
@@ -1283,6 +1208,9 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
         localStorage.removeItem('pending-draft-restore');
         console.log(`✅ Quotation completed with status: ${status}, drafts cleared`);
       }
+
+      await queryClient.invalidateQueries({ queryKey: ['/api/quotations'] });
+      await queryClient.invalidateQueries({ queryKey: ['/api/quotations/approved'] });
 
       console.log('🎉 Quotation and team saved successfully');
       return savedQuotation;
@@ -1439,6 +1367,7 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
     complexityAdjustment,
     markupAmount,
     totalAmount,
+    pricingResult,
     complexityFactors,
     availableRoles: roles,
     availablePersonnel: filteredPersonnel,

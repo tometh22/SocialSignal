@@ -14,8 +14,11 @@ describe("Feedback Mind V2.7 — personal y cotizaciones", () => {
     expect(table).toContain("currentYear + 1");
     expect(table).toContain("currentRole");
     expect(table).toContain("sublevel");
-    expect(table).toContain('usesUSD ? "hourlyRateUSD" : "hourlyRateARS"');
-    expect(table).toContain('usesUSD ? "monthlySalaryUSD" : "monthlySalaryARS"');
+    expect(table).toContain('field: "hourlyRateARS"');
+    expect(table).toContain('field: "hourlyRateUSD"');
+    expect(table).toContain('field: "monthlyHoursSnapshot"');
+    expect(table).toContain('billingCurrency === "MIXED"');
+    expect(table).toContain("El sueldo mensual se calcula automáticamente");
     expect(table).not.toContain("cost.year === 2025");
   });
 
@@ -89,10 +92,12 @@ describe("Feedback Mind V2.7 — proyectos y tareas", () => {
 
   test("Panel y Resumen están integrados en una sola vista Gestión", () => {
     const project = source("client/src/pages/tasks/project-tasks-page.tsx");
+    const overview = source("client/src/components/tasks/ProjectOverviewPanel.tsx");
 
     expect(project).toContain("Gestión");
     expect(project).toContain("<ProjectOverviewPanel");
-    expect(project).toContain("Progreso general");
+    expect(overview).toContain("Progreso general");
+    expect(overview).toContain("Equipo del proyecto");
     expect(project).not.toContain('setView("summary")');
     expect(project).toContain('if (stored === "summary") return "panel"');
   });
@@ -126,9 +131,9 @@ describe("Feedback Mind V2.7 — atribución, costos y capacidad", () => {
     expect(rateResolver).toContain('eq(systemConfig.configKey, "usd_exchange_rate")');
     expect(rateResolver).toContain("exchangeRateId: fx?.id ?? null");
     expect(quoteContext).toContain("Number(rate.exchangeRate) || rateExchangeRate");
-    expect(quoteContext).toContain("quotedCost * effectiveExchangeRate");
-    expect(variants).toContain("member.rate ya está expresado en quotationCurrency");
-    expect(variants).not.toContain("return toStoredCurrency(totalARS)");
+    expect(quoteContext).toContain("calculateQuotationPricing");
+    expect(variants).toContain("calculateQuotationPricing");
+    expect(variants).not.toContain("totalARS +=");
   });
 
   test("normaliza una tarifa contractual USD una sola vez", () => {
@@ -140,23 +145,28 @@ describe("Feedback Mind V2.7 — atribución, costos y capacidad", () => {
 
   test("los selectores de moneda comparten recálculo y snapshot", () => {
     const context = source("client/src/context/optimized-quote-context.tsx");
-    const selection = source("client/src/components/optimized/currency-selection.tsx");
+    const basic = source("client/src/components/optimized/basic-info.tsx");
+    const wizard = source("client/src/pages/optimized-quote.tsx");
 
-    expect(selection).toContain("updateQuotationCurrency(currency, effectiveRate)");
-    expect(selection).toContain("updateQuotationCurrency(quotationData.quotationCurrency, parsed)");
-    expect(selection).not.toContain("updateQuotationData({ quotationCurrency: currency");
+    expect(basic).toContain('onValueChange={updateQuotationCurrency}');
+    expect(basic).toContain("updateQuotationCurrency(quotationData.quotationCurrency || \"ARS\", parsedExchangeRate)");
+    expect(basic).toContain("parseLocalizedDecimal");
+    expect(wizard).not.toContain("CurrencySelection");
     expect(context).toContain("exchangeRateSnapshot: Number(quotation.exchangeRateAtQuote)");
-    expect(context).toContain("exchangeRateAtQuote: quotationData.quotationCurrency === 'USD' ? saveExchangeRate : null");
+    expect(context).toContain("exchangeRateAtQuote: saveExchangeRate");
   });
 
   test("sync, hechos y CRUD preservan moneda y eliminan hechos obsoletos", () => {
     const daily = source("server/jobs/daily-sot-sync.ts");
+    const canonicalSync = source("server/services/personnel-cost-sync.ts");
     const factBuilder = source("server/etl/time-entries-to-fact-labor.ts");
     const routes = source("server/routes.ts");
     const migration = source("server/migrations/feedback-mind-v2-7-consistency.ts");
 
-    expect(daily).toContain("isUsdContract");
-    expect(daily).toContain("hourlyRateUSD: String(rate)");
+    expect(daily).toContain("applyCanonicalPersonnelRateRows");
+    expect(canonicalSync).toContain('currency: "ARS" | "USD"');
+    expect(canonicalSync).toContain("hourlyRateUSD = currency === \"USD\" ? rate : existing?.hourlyRateUSD");
+    expect(canonicalSync).toContain("deriveMonthlySalariesFromHourlyRates");
     expect(factBuilder).toContain("staleFactIds");
     expect(factBuilder).toContain(".delete(factLaborMonth)");
     expect(routes).toContain("triggerLaborRebuildForDates([existingEntry.date, updatedEntry.date])");

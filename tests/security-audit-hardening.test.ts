@@ -92,10 +92,12 @@ describe("audit hardening — authorization and hierarchy", () => {
 
   test("project-management actions are hidden when the server would reject them", () => {
     const page = source("client/src/pages/tasks/project-tasks-page.tsx");
+    const routes = source("server/routes.ts");
 
-    expect(page).toContain("const canManageProject = isOperations || members.some");
+    expect(page).toContain("const canManageProject = isOperations;");
     expect(page).toContain("{canManageProject && (");
     expect(page).toContain('PROJECT_ROLE_OPTIONS.filter(r => isOperations || r.value !== "owner")');
+    expect(routes).toContain('return res.status(403).json({ message: "Sólo Operaciones puede administrar miembros" })');
   });
 });
 

@@ -127,63 +127,29 @@ async function runFullPipeline() {
 
     // 4. Hourly rates (personnel_historical_costs)
     try {
-      const { fetchValorHoraForYear, getHistoricalRateFields, findPersonnelIdFuzzy } = await import('../services/personnelSheetsSync');
-      const { sheetPersonnelAliases, personnel, personnelHistoricalCosts } = await import('../../shared/schema');
+      const { fetchValorHoraForYear } = await import('../services/personnelSheetsSync');
+      const { applyCanonicalPersonnelRateRows } = await import('../services/personnel-cost-sync');
+      const { sheetPersonnelAliases, personnel } = await import('../../shared/schema');
       const [aliasRows, allPersonnel] = await Promise.all([
         db.select().from(sheetPersonnelAliases),
         db.select().from(personnel),
       ]);
       const aliasBySheetName = new Map<string, number | null>(aliasRows.map((a: any) => [a.sheetName, a.personnelId]));
       const personnelByName  = new Map<string, number>(allPersonnel.map((p: any) => [p.name.trim().toLowerCase(), p.id]));
-      const personnelById = new Map<number, any>(allPersonnel.map((p: any) => [p.id, p]));
-      const MONTH_NUM2: Record<string, number> = { jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12 };
       const cy = new Date().getFullYear();
       for (const yr of [cy - 1, cy]) {
         try {
           const rows2 = await fetchValorHoraForYear(yr);
-          const rateFields = getHistoricalRateFields(yr);
-          let updated = 0;
-          for (const row of rows2) {
-            let pid = aliasBySheetName.has(row.sheetName)
-              ? (aliasBySheetName.get(row.sheetName) ?? null)
-              : (personnelByName.get(row.sheetName.trim().toLowerCase()) ?? findPersonnelIdFuzzy(row.sheetName, personnelByName));
-            if (!pid) continue;
-            for (const field of rateFields) {
-              const rate = row.monthlyRates[field.replace('HourlyRateARS', '')];
-              if (rate === undefined) continue;
-              const m = field.match(/^([a-z]{3})(\d{4})HourlyRateARS$/);
-              if (!m) continue;
-              const month2 = MONTH_NUM2[m[1]]; const yr2 = parseInt(m[2]);
-              if (!month2 || !yr2) continue;
-              const isUsdContract = String(personnelById.get(pid)?.billingCurrency || 'ARS').toUpperCase() === 'USD';
-              const rateValues = isUsdContract
-                ? { hourlyRateUSD: String(rate), hourlyRateARS: null, updatedAt: new Date() }
-                : { hourlyRateARS: String(rate), hourlyRateUSD: null, updatedAt: new Date() };
-              const ex = await db.select({ id: personnelHistoricalCosts.id })
-                .from(personnelHistoricalCosts)
-                .where(and(
-                  eq(personnelHistoricalCosts.personnelId, pid),
-                  eq(personnelHistoricalCosts.year, yr2),
-                  eq(personnelHistoricalCosts.month, month2),
-                  eq(personnelHistoricalCosts.isActive, true),
-                ))
-                .limit(1);
-              if (ex.length > 0) {
-                await db.update(personnelHistoricalCosts)
-                  .set(rateValues)
-                  .where(eq(personnelHistoricalCosts.id, ex[0].id));
-              } else {
-                await db.insert(personnelHistoricalCosts).values({
-                  personnelId: pid, year: yr2, month: month2,
-                  hourlyRateARS: isUsdContract ? null : String(rate),
-                  hourlyRateUSD: isUsdContract ? String(rate) : null,
-                  isActive: true,
-                });
-              }
-              updated++;
-            }
-          }
-          console.log(`✅ [SoT Sync] Rates ${yr}: ${updated} celdas actualizadas`);
+          const result = await applyCanonicalPersonnelRateRows(
+            rows2,
+            null,
+            yr,
+            aliasBySheetName,
+            personnelByName,
+            allPersonnel,
+            'google-master-daily-job',
+          );
+          console.log(`✅ [SoT Sync] Rates ${yr}: ${result.cellsUpdated} celdas, ${result.warnings.length} advertencias`);
         } catch (e: any) {
           console.warn(`⚠️ [SoT Sync] Rates ${yr} falló:`, e?.message);
         }
