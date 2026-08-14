@@ -54,13 +54,13 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
     legacyRole: person.legacyRole ?? "",
     sublevel: person.sublevel ?? "",
     contractType: person.contractType ?? "full-time",
+    hourlyRateARS: person.currentHourlyRateARS == null ? "" : String(person.currentHourlyRateARS),
+    hourlyRateUSD: person.currentHourlyRateUSD == null ? "" : String(person.currentHourlyRateUSD),
     monthlyHours: String(person.monthlyHours ?? 160),
     includeInRealCosts: person.includeInRealCosts ?? true,
     billingCurrency: person.billingCurrency ?? "ARS",
     usdBillingFraction: String(person.usdBillingFraction ?? 0),
     activeUntil: person.activeUntil ?? "",
-    monthlySalaryARS: person.currentMonthlySalaryARS == null ? "" : String(person.currentMonthlySalaryARS),
-    monthlySalaryUSD: person.currentMonthlySalaryUSD == null ? "" : String(person.currentMonthlySalaryUSD),
   });
 
   useEffect(() => {
@@ -72,23 +72,28 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
       legacyRole: person.legacyRole ?? "",
       sublevel: person.sublevel ?? "",
       contractType: person.contractType ?? "full-time",
+      hourlyRateARS: person.currentHourlyRateARS == null ? "" : String(person.currentHourlyRateARS),
+      hourlyRateUSD: person.currentHourlyRateUSD == null ? "" : String(person.currentHourlyRateUSD),
       monthlyHours: String(person.monthlyHours ?? 160),
       includeInRealCosts: person.includeInRealCosts ?? true,
       billingCurrency: person.billingCurrency ?? "ARS",
       usdBillingFraction: String(person.usdBillingFraction ?? 0),
       activeUntil: person.activeUntil ?? "",
-      monthlySalaryARS: person.currentMonthlySalaryARS == null ? "" : String(person.currentMonthlySalaryARS),
-      monthlySalaryUSD: person.currentMonthlySalaryUSD == null ? "" : String(person.currentMonthlySalaryUSD),
     });
   }, [person]);
 
   const updateMutation = useMutation({
     mutationFn: async () => {
       const monthlyHours = Number(form.monthlyHours);
+      const hourlyRateARS = form.hourlyRateARS === "" ? null : Number(form.hourlyRateARS);
+      const hourlyRateUSD = form.hourlyRateUSD === "" ? null : Number(form.hourlyRateUSD);
       if (form.contractType !== "freelance" && (!Number.isFinite(monthlyHours) || monthlyHours < 40 || monthlyHours > 300)) {
         throw new Error("Las horas mensuales deben estar entre 40 y 300");
       }
-      await apiRequest(`/api/personnel/${person.id}`, "PATCH", {
+      if ((hourlyRateARS != null && (!Number.isFinite(hourlyRateARS) || hourlyRateARS < 0)) || (hourlyRateUSD != null && (!Number.isFinite(hourlyRateUSD) || hourlyRateUSD < 0))) {
+        throw new Error("El valor hora debe ser mayor o igual a cero");
+      }
+      const payload: Record<string, unknown> = {
         name: form.name.trim(),
         email: form.email.trim(),
         roleId: Number(form.roleId),
@@ -101,30 +106,11 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
         billingCurrency: form.billingCurrency,
         usdBillingFraction: Number(form.usdBillingFraction) || 0,
         activeUntil: form.activeUntil || null,
-      });
+      };
+      if (form.billingCurrency !== "USD") payload.hourlyRateARS = hourlyRateARS;
+      if (form.billingCurrency !== "ARS") payload.hourlyRateUSD = hourlyRateUSD;
+      await apiRequest(`/api/personnel/${person.id}`, "PATCH", payload);
 
-      const salaryARS = form.monthlySalaryARS === "" ? null : Number(form.monthlySalaryARS);
-      const salaryUSD = form.monthlySalaryUSD === "" ? null : Number(form.monthlySalaryUSD);
-      const hoursChanged = (form.contractType === "freelance" ? null : monthlyHours) !== (person.monthlyHours ?? null);
-      if (hoursChanged || (salaryARS !== (person.currentMonthlySalaryARS ?? null)) || (salaryUSD !== (person.currentMonthlySalaryUSD ?? null))) {
-        const now = new Date();
-        const costPayload = {
-          monthlyHours: form.contractType === "freelance" ? null : monthlyHours,
-          monthlySalaryARS: salaryARS,
-          monthlySalaryUSD: salaryUSD,
-          adjustmentReason: "Actualización desde Personal",
-        };
-        if (person.currentCostId) {
-          await apiRequest(`/api/personnel-historical-costs/${person.currentCostId}`, "PATCH", costPayload);
-        } else if (salaryARS != null || salaryUSD != null) {
-          await apiRequest("/api/personnel-historical-costs", "POST", {
-            personnelId: person.id,
-            year: now.getFullYear(),
-            month: now.getMonth() + 1,
-            ...costPayload,
-          });
-        }
-      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/personnel"] });
@@ -188,12 +174,16 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
             </SelectContent>
           </Select>
         </td>
-        <td className="px-6 py-4 text-xs text-muted-foreground">Administrar abajo</td>
         <td className="px-6 py-4">
-          <div className="space-y-1">
-            <Input type="number" min={0} step="0.01" placeholder="ARS/mes" value={form.monthlySalaryARS} onChange={(event) => setForm({ ...form, monthlySalaryARS: event.target.value })} />
-            <Input type="number" min={0} step="0.01" placeholder="USD/mes" value={form.monthlySalaryUSD} onChange={(event) => setForm({ ...form, monthlySalaryUSD: event.target.value })} />
+          <div className="min-w-32 space-y-1">
+            {form.billingCurrency !== "USD" && <Input aria-label="Valor hora ARS" type="number" min={0} step="0.01" value={form.hourlyRateARS} onChange={(event) => setForm({ ...form, hourlyRateARS: event.target.value })} placeholder="ARS/h" />}
+            {form.billingCurrency !== "ARS" && <Input aria-label="Valor hora USD" type="number" min={0} step="0.01" value={form.hourlyRateUSD} onChange={(event) => setForm({ ...form, hourlyRateUSD: event.target.value })} placeholder="USD/h" />}
           </div>
+        </td>
+        <td className="px-6 py-4 text-xs text-muted-foreground">
+          <div>ARS {money(form.hourlyRateARS === "" ? null : Number(form.hourlyRateARS) * (Number(form.monthlyHours) || 0))}</div>
+          <div>USD {money(form.hourlyRateUSD === "" ? null : Number(form.hourlyRateUSD) * (Number(form.monthlyHours) || 0), "en-US")}</div>
+          <span className="text-[10px]">Calculado automáticamente</span>
         </td>
         <td className="px-6 py-4">
           {form.contractType === "freelance" ? "—" : (

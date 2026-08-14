@@ -7,6 +7,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Client, projectDurationOptions } from '@shared/schema';
 import { Card, CardContent } from '@/components/ui/card';
 import { User, Calendar, FolderOpen, DollarSign } from 'lucide-react';
+import { parseLocalizedDecimal } from '@shared/utils/quotation-pricing';
 
 const OptimizedBasicInfo: React.FC = () => {
   const {
@@ -17,6 +18,15 @@ const OptimizedBasicInfo: React.FC = () => {
     updateProjectDuration,
     updateQuotationCurrency
   } = useOptimizedQuote();
+  const [exchangeRateInput, setExchangeRateInput] = React.useState(
+    quotationData.exchangeRateSnapshot ? String(quotationData.exchangeRateSnapshot) : "",
+  );
+  React.useEffect(() => {
+    if (quotationData.exchangeRateSnapshot && document.activeElement?.id !== "quotation-exchange-rate") {
+      setExchangeRateInput(String(quotationData.exchangeRateSnapshot));
+    }
+  }, [quotationData.exchangeRateSnapshot]);
+  const parsedExchangeRate = parseLocalizedDecimal(exchangeRateInput);
 
   // Consultar lista de clientes
   const { data: clients, isLoading: isLoadingClients } = useQuery<Client[]>({
@@ -119,7 +129,7 @@ const OptimizedBasicInfo: React.FC = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 {/* Tipo de Proyecto */}
                 <div className="space-y-2">
                   <Label htmlFor="project-type" className="text-sm font-medium text-gray-700">Tipo de Proyecto</Label>
@@ -214,6 +224,35 @@ const OptimizedBasicInfo: React.FC = () => {
                   <p className="text-center text-[11px] text-muted-foreground">
                     Define desde el inicio cómo se convierten y muestran las tarifas del equipo.
                   </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="quotation-exchange-rate" className="text-sm font-medium text-gray-700">
+                    Tipo de cambio USD/ARS
+                  </Label>
+                  <Input
+                    id="quotation-exchange-rate"
+                    inputMode="decimal"
+                    value={exchangeRateInput}
+                    aria-invalid={parsedExchangeRate == null || parsedExchangeRate <= 0}
+                    onChange={(event) => setExchangeRateInput(event.target.value)}
+                    onBlur={() => {
+                      if (parsedExchangeRate && parsedExchangeRate > 0) {
+                        updateQuotationCurrency(quotationData.quotationCurrency || "ARS", parsedExchangeRate);
+                        setExchangeRateInput(String(parsedExchangeRate));
+                      }
+                    }}
+                    className="h-9 text-center"
+                    placeholder="Ej. 1.250,50"
+                  />
+                  <p className="text-center text-[11px] text-muted-foreground">
+                    Snapshot obligatorio para personal y herramientas en USD.
+                  </p>
+                  {quotationData.requiresExchangeRateConfirmation && (
+                    <p role="alert" className="rounded-md border border-amber-200 bg-amber-50 p-2 text-center text-[11px] text-amber-800">
+                      Cotización legacy: confirmá este TC para migrarla al pricing v2. Hasta entonces se conservan sus totales guardados.
+                    </p>
+                  )}
                 </div>
               </div>
             </div>

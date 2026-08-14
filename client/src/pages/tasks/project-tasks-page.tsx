@@ -19,7 +19,6 @@ import { Loader2, Users, Trash2, Plus, ChevronLeft, ChevronRight, List, LayoutGr
 import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
 import { usePermissions } from "@/hooks/use-permissions";
-import { useAuth } from "@/hooks/use-auth";
 import ProjectTaskList from "@/components/tasks/ProjectTaskList";
 import { PROJECT_ROLE_OPTIONS, projectRoleLabel } from "@/constants/project-roles";
 
@@ -68,7 +67,6 @@ interface Props {
 export default function ProjectTasksPage({ params }: Props) {
   const projectId = parseInt(params.id);
   const { isOperations } = usePermissions();
-  const { user } = useAuth();
   const [membersOpen, setMembersOpen] = useState(false);
   const [addPersonnelId, setAddPersonnelId] = useState<string>("none");
   const [addRole, setAddRole] = useState("member");
@@ -99,20 +97,6 @@ export default function ProjectTasksPage({ params }: Props) {
     queryFn: () => authFetch("/api/tasks-personnel").then(r => r.json()),
   });
 
-  const { data: summaryTasks } = useQuery<{ tasks: any[] }>({
-    queryKey: ["/api/tasks/project", projectId, "summary"],
-    queryFn: () => authFetch(`/api/tasks/project/${projectId}`).then(r => r.json()),
-    enabled: view === "panel" && !!projectId,
-    staleTime: 60_000,
-  });
-  const allSummaryTasks = summaryTasks?.tasks || [];
-  const totalEstimatedHours = allSummaryTasks.reduce(
-    (sum: number, task: any) => sum + Number(task.estimatedHoursTotal ?? 0),
-    0,
-  );
-  const completedCount = allSummaryTasks.filter((t: any) => t.status === "done").length;
-  const pendingCount = allSummaryTasks.filter((t: any) => t.status !== "done" && t.status !== "cancelled").length;
-
   // Sync local members from server data (after refetch, reset override)
   useEffect(() => {
     if (project?.members) {
@@ -121,9 +105,7 @@ export default function ProjectTasksPage({ params }: Props) {
   }, [project?.members]);
 
   const members: ProjectMember[] = localMembers ?? (project?.members ?? []);
-  const canManageProject = isOperations || members.some(
-    (member) => member.personnelId === user?.personnelId && member.role === "owner",
-  );
+  const canManageProject = isOperations;
 
   const addMemberMutation = useMutation({
     mutationFn: ({ personnelId, role }: { personnelId: number; role: string }) =>
@@ -552,169 +534,9 @@ export default function ProjectTasksPage({ params }: Props) {
             projectId={projectId}
             members={members}
             projectColor={dotColor}
+            canManageMembers={canManageProject}
+            onManageMembers={() => setMembersOpen(true)}
           />
-
-          <div className="space-y-6">
-            {/* Stats cards */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <div className="rounded-xl border bg-card p-4">
-                <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1"><LayoutList className="h-3.5 w-3.5" />Total</div>
-                <div className="text-2xl font-bold">{allSummaryTasks.length}</div>
-                <div className="text-xs text-muted-foreground">tareas</div>
-              </div>
-              <div className="rounded-xl border bg-card p-4">
-                <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1"><CheckCircle2 className="h-3.5 w-3.5 text-green-600" />Completadas</div>
-                <div className="text-2xl font-bold text-green-700">{completedCount}</div>
-                <div className="text-xs text-muted-foreground">finalizadas</div>
-              </div>
-              <div className="rounded-xl border bg-card p-4">
-                <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1"><AlertCircle className="h-3.5 w-3.5 text-amber-500" />Pendientes</div>
-                <div className="text-2xl font-bold text-amber-700">{pendingCount}</div>
-                <div className="text-xs text-muted-foreground">en curso</div>
-              </div>
-              <div className="rounded-xl border bg-card p-4">
-                <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1"><Clock className="h-3.5 w-3.5 text-blue-600" />Horas est.</div>
-                <div className="text-2xl font-bold text-blue-700">{totalEstimatedHours.toFixed(0)}h</div>
-                <div className="text-xs text-muted-foreground">estimadas</div>
-              </div>
-            </div>
-
-            {/* Progress */}
-            {allSummaryTasks.length > 0 && (
-              <div className="rounded-xl border bg-card p-4">
-                <div className="flex items-center justify-between text-sm mb-2">
-                  <span className="font-medium">Progreso general</span>
-                  <span className="text-muted-foreground">{Math.round((completedCount / allSummaryTasks.length) * 100)}%</span>
-                </div>
-                <div className="h-2 rounded-full bg-muted overflow-hidden">
-                  <div
-                    className="h-full rounded-full bg-primary transition-all duration-700"
-                    style={{ width: `${Math.round((completedCount / allSummaryTasks.length) * 100)}%` }}
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* Hours comparison */}
-            {(totalEstimatedHours > 0 || project.totalHours > 0) && (
-              <div className="rounded-xl border bg-card p-4">
-                <h3 className="text-sm font-semibold mb-3">Horas: estimadas vs. reales</h3>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-xs mb-1">
-                    <span className="text-muted-foreground">Estimadas</span>
-                    <span className="font-medium">{totalEstimatedHours.toFixed(1)}h</span>
-                  </div>
-                  <div className="h-2 rounded-full bg-muted overflow-hidden">
-                    <div className="h-full rounded-full bg-blue-400" style={{ width: "100%" }} />
-                  </div>
-                  <div className="flex items-center justify-between text-xs mb-1 mt-2">
-                    <span className="text-muted-foreground">Reales registradas</span>
-                    <span className={`font-medium ${totalEstimatedHours > 0 && project.totalHours > totalEstimatedHours ? "text-red-600" : "text-green-700"}`}>
-                      {project.totalHours.toFixed(1)}h
-                      {totalEstimatedHours > 0 && (
-                        <span className="ml-1 text-muted-foreground font-normal">
-                          ({Math.round((project.totalHours / totalEstimatedHours) * 100)}%)
-                        </span>
-                      )}
-                    </span>
-                  </div>
-                  <div className="h-2 rounded-full bg-muted overflow-hidden">
-                    <div
-                      className={`h-full rounded-full ${project.totalHours > totalEstimatedHours && totalEstimatedHours > 0 ? "bg-red-400" : "bg-green-400"}`}
-                      style={{ width: totalEstimatedHours > 0 ? `${Math.min(100, Math.round((project.totalHours / totalEstimatedHours) * 100))}%` : "100%" }}
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Team */}
-            {members.length > 0 && (
-              <div className="rounded-xl border bg-card p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-semibold">Equipo del proyecto</h3>
-                  <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setMembersOpen(true)}>
-                    <Users className="h-3 w-3 mr-1" />Gestionar
-                  </Button>
-                </div>
-                <div className="space-y-2">
-                  {members.map(m => (
-                    <div key={m.personnelId} className="flex items-center gap-3">
-                      <div className={cn("h-7 w-7 rounded-full flex items-center justify-center text-white text-xs font-semibold", dotColor)}>
-                        {getInitials(m.name)}
-                      </div>
-                      <span className="text-sm">{m.name}</span>
-                      <Badge variant="outline" className={cn("text-[10px] h-4 px-1.5 ml-auto", m.role === "owner" ? "text-amber-700 border-amber-300" : "text-muted-foreground")}>
-                        {projectRoleLabel(m.role)}
-                      </Badge>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Project info */}
-            <div className="rounded-xl border bg-card p-4">
-              <h3 className="text-sm font-semibold mb-3">Info del proyecto</h3>
-              <div className="space-y-2 text-sm">
-                {project.clientName && (
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Cliente</span>
-                    <span className="font-medium">{project.clientName}</span>
-                  </div>
-                )}
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Estado</span>
-                  <span className="font-medium">{PROJECT_STATUS_CONFIG[project.status]?.label || project.status}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">ID</span>
-                  <span className="font-mono text-xs text-muted-foreground">#{project.id}</span>
-                </div>
-                {/* Brief interno */}
-                {project.source !== "own" && (
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-muted-foreground">Brief interno</span>
-                    {briefEditing && canManageProject ? (
-                      <div className="flex items-center gap-1">
-                        <Input
-                          autoFocus
-                          value={briefDraft}
-                          onChange={e => setBriefDraft(e.target.value)}
-                          placeholder="https://..."
-                          className="h-7 text-xs w-48"
-                          onKeyDown={e => {
-                            if (e.key === "Enter") { updateBriefUrlMutation.mutate(briefDraft.trim()); setBriefEditing(false); }
-                            if (e.key === "Escape") setBriefEditing(false);
-                          }}
-                        />
-                        <Button size="sm" className="h-7 text-xs" onClick={() => { updateBriefUrlMutation.mutate(briefDraft.trim()); setBriefEditing(false); }}>
-                          OK
-                        </Button>
-                      </div>
-                    ) : project.briefUrl ? (
-                      <div className="flex items-center gap-2">
-                        <a href={project.briefUrl} target="_blank" rel="noopener noreferrer" className="font-medium text-indigo-600 hover:underline truncate max-w-[160px]">
-                          Abrir brief
-                        </a>
-                        {canManageProject && (
-                          <button className="text-xs text-muted-foreground hover:text-foreground" onClick={() => { setBriefDraft(project.briefUrl || ""); setBriefEditing(true); }}>
-                            editar
-                          </button>
-                        )}
-                      </div>
-                    ) : canManageProject ? (
-                      <button className="text-xs text-indigo-600 hover:underline" onClick={() => { setBriefDraft(""); setBriefEditing(true); }}>
-                        + Agregar link
-                      </button>
-                    ) : (
-                      <span className="text-muted-foreground">—</span>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
         </div>}
 
         {/* Calendar view */}

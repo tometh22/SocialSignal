@@ -15,6 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useOptimizedQuote } from '@/context/optimized-quote-context';
 import { useLocation } from 'wouter';
 import { useCurrency } from '@/hooks/use-currency';
+import { calculateQuotationPricing } from '@shared/utils/quotation-pricing';
 
 interface QuotationVariant {
   id: number;
@@ -132,14 +133,12 @@ export function QuotationVariants({
     // hace al persistir (toStoredCurrency), para que estas variantes locales
     // queden en la misma unidad que las que vienen de la DB una vez guardadas
     // (así formatCurrency solo necesita poner el label, sin volver a convertir).
-    let adjustedBaseCost = toStoredCurrency(baseCost);
-    let adjustedComplexityAdjustment = toStoredCurrency(complexityAdjustment);
-    let adjustedMarkupAmount = toStoredCurrency(markupAmount);
-    let adjustedTotalAmount = toStoredCurrency(totalAmount);
-    
-    // IMPORTANTE: Intermedio es la BASE (cotización original sin cambios)
-    // Básico y Full usan MISMO markup factor pero ajustan solo costo base
-    const baseMarkupFactor = 2.0; // Fijo x2 como establece la cotización original
+    const resultForScale = (scale: number) => calculateVariantResult(
+      baseTeamMembers.map((member) => ({ ...member, hours: member.hours * scale, cost: member.hours * scale * member.rate })),
+    ).display;
+    const basic = resultForScale(0.75);
+    const intermediate = resultForScale(1);
+    const full = resultForScale(1.8);
     
     const localVariants = [
       { 
@@ -148,11 +147,10 @@ export function QuotationVariants({
         variantName: 'Básico', 
         variantDescription: 'Versión esencial con funcionalidades básicas',
         variantOrder: 1,
-        baseCost: adjustedBaseCost * 0.75,
-        complexityAdjustment: adjustedComplexityAdjustment * 0.75,
-        // Recalcular markup con el MISMO factor pero sobre los costos reducidos
-        markupAmount: (adjustedBaseCost * 0.75 + adjustedComplexityAdjustment * 0.75) * (baseMarkupFactor - 1),
-        totalAmount: (adjustedBaseCost * 0.75 + adjustedComplexityAdjustment * 0.75) * baseMarkupFactor,
+        baseCost: basic.baseCost,
+        complexityAdjustment: basic.complexityAdjustment,
+        markupAmount: basic.markupAmount,
+        totalAmount: basic.total,
         isSelected: false,
         createdAt: new Date().toISOString()
       },
@@ -162,10 +160,10 @@ export function QuotationVariants({
         variantName: 'Intermedio', 
         variantDescription: 'Versión estándar con funcionalidades completas',
         variantOrder: 2,
-        baseCost: adjustedBaseCost, // BASE SIN CAMBIOS
-        complexityAdjustment: adjustedComplexityAdjustment, // BASE SIN CAMBIOS
-        markupAmount: adjustedMarkupAmount, // BASE SIN CAMBIOS
-        totalAmount: adjustedTotalAmount, // BASE SIN CAMBIOS - Esta es la cotización original
+        baseCost: intermediate.baseCost,
+        complexityAdjustment: intermediate.complexityAdjustment,
+        markupAmount: intermediate.markupAmount,
+        totalAmount: intermediate.total,
         isSelected: true, // Esta debe estar seleccionada por defecto
         createdAt: new Date().toISOString()
       },
@@ -175,11 +173,10 @@ export function QuotationVariants({
         variantName: 'Full', 
         variantDescription: 'Versión premium con todas las funcionalidades',
         variantOrder: 3,
-        baseCost: adjustedBaseCost * 1.8,
-        complexityAdjustment: adjustedComplexityAdjustment * 1.8,
-        // Recalcular markup con el MISMO factor pero sobre los costos aumentados
-        markupAmount: (adjustedBaseCost * 1.8 + adjustedComplexityAdjustment * 1.8) * (baseMarkupFactor - 1),
-        totalAmount: (adjustedBaseCost * 1.8 + adjustedComplexityAdjustment * 1.8) * baseMarkupFactor,
+        baseCost: full.baseCost,
+        complexityAdjustment: full.complexityAdjustment,
+        markupAmount: full.markupAmount,
+        totalAmount: full.total,
         isSelected: false,
         createdAt: new Date().toISOString()
       }
@@ -201,6 +198,33 @@ export function QuotationVariants({
     quotationData.quotationCurrency === 'USD' && variantExchangeRate > 0
       ? amountARS / variantExchangeRate
       : amountARS;
+
+  const calculateVariantResult = (members: Array<{ hours: number; rate: number; cost?: number }>) => {
+    const common = {
+      quotationCurrency: quotationData.quotationCurrency === 'USD' ? 'USD' as const : 'ARS' as const,
+      exchangeRate: variantExchangeRate,
+      team: members.map((member) => ({
+        hours: member.hours,
+        rate: member.rate,
+        cost: member.cost ?? member.hours * member.rate,
+        currency: quotationData.quotationCurrency === 'USD' ? 'USD' as const : 'ARS' as const,
+      })),
+      complexityFactor: baseCost > 0 ? complexityAdjustment / baseCost : 0,
+      marginFactor: quotationData.financials.marginFactor || 2,
+      toolsCostUSD: quotationData.financials.toolsCost || 0,
+      platformCostARS: quotationData.financials.platformCost || 0,
+      deviationPercentage: quotationData.financials.deviationPercentage || 0,
+      discountPercentage: quotationData.financials.discountPercentage || 0,
+      priceMode: quotationData.financials.priceMode || 'auto',
+      manualPrice: quotationData.financials.manualPrice,
+      manualPriceCurrency: quotationData.financials.manualPriceCurrency || quotationData.quotationCurrency,
+    };
+    const withoutInflation = calculateQuotationPricing({ ...common, inflationFactor: 1 });
+    const inflationFactor = withoutInflation.canonicalARS.total > 0
+      ? Math.max(0, totalAmount / withoutInflation.canonicalARS.total)
+      : 1;
+    return calculateQuotationPricing({ ...common, inflationFactor });
+  };
 
   const createDefaultVariants = async () => {
     // IMPORTANTE: Aplicar MISMO markup pero ajustar solo costos base
@@ -229,25 +253,21 @@ export function QuotationVariants({
 
     try {
       for (const variant of defaultVariants) {
-        // IMPORTANTE: Para variantes, aplicar MISMO markup factor pero solo ajustar costos base
         const costAdjustmentFactor = (1 + variant.adjustmentPercentage / 100);
-        const adjustedBaseCost = baseCost * costAdjustmentFactor;
-        const adjustedComplexity = complexityAdjustment * costAdjustmentFactor;
-        
-        // CALCULAR markup basado en la cotización original (x2 exacto)
-        // La cotización original: costo base + complejidad, luego x2
-        const originalMarkupFactor = 2.0; // Fijo x2 como en la cotización base
-        const adjustedMarkup = (adjustedBaseCost + adjustedComplexity) * (originalMarkupFactor - 1);
-        const adjustedTotal = (adjustedBaseCost + adjustedComplexity) * originalMarkupFactor;
+        const result = calculateVariantResult(baseTeamMembers.map((member) => ({
+          ...member,
+          hours: member.hours * costAdjustmentFactor,
+          cost: member.hours * costAdjustmentFactor * member.rate,
+        }))).display;
 
         await apiRequest(`/api/quotations/${quotationId}/variants`, 'POST', {
           variantName: variant.name,
           variantDescription: variant.description,
           variantOrder: variant.order,
-          baseCost: toStoredCurrency(adjustedBaseCost),
-          complexityAdjustment: toStoredCurrency(adjustedComplexity),
-          markupAmount: toStoredCurrency(adjustedMarkup),
-          totalAmount: toStoredCurrency(adjustedTotal),
+          baseCost: result.baseCost,
+          complexityAdjustment: result.complexityAdjustment,
+          markupAmount: result.markupAmount,
+          totalAmount: result.total,
           isSelected: variant.name === 'Intermedio' // Select intermediate as default
         });
       }
@@ -284,16 +304,21 @@ export function QuotationVariants({
       // Convertido a la moneda de visualización acá mismo (no solo al persistir),
       // para que quede en la misma unidad que el resto de `variants` en el
       // estado local (createLocalVariants) cuando la cotización todavía no se guardó.
+      const result = calculateVariantResult(baseTeamMembers.map((member) => ({
+        ...member,
+        hours: member.hours * adjustmentFactor,
+        cost: member.hours * adjustmentFactor * member.rate,
+      }))).display;
       const variantData = {
         id: -(variants.length + 1), // Use negative ID for local variants
         quotationId: quotationId || 0,
         variantName: newVariant.name,
         variantDescription: newVariant.description,
         variantOrder: variants.length + 1,
-        baseCost: toStoredCurrency(baseCost * adjustmentFactor),
-        complexityAdjustment: toStoredCurrency(complexityAdjustment * adjustmentFactor),
-        markupAmount: toStoredCurrency(markupAmount * adjustmentFactor),
-        totalAmount: toStoredCurrency(totalAmount * adjustmentFactor),
+        baseCost: result.baseCost,
+        complexityAdjustment: result.complexityAdjustment,
+        markupAmount: result.markupAmount,
+        totalAmount: result.total,
         isSelected: false,
         createdAt: new Date().toISOString()
       };
@@ -456,12 +481,29 @@ export function QuotationVariants({
         console.log("⚠️ No hay variantes seleccionadas, creando cotización base");
       }
       
-      await saveQuotation('pending'); // Cambiar a pending en lugar de approved
-      console.log("✅ Cotización guardada exitosamente como pending");
+      const persistedVariants = variants.map((variant) => {
+        const result = calculateVariantResult(baseTeamMembers.map((member) => ({
+          ...member,
+          hours: getEffectiveMemberHours(variant, member),
+          cost: getEffectiveMemberHours(variant, member) * (member.rate || 0),
+        }))).display;
+        return {
+          variantName: variant.variantName,
+          variantDescription: variant.variantDescription || null,
+          variantOrder: variant.variantOrder,
+          baseCost: result.baseCost,
+          complexityAdjustment: result.complexityAdjustment,
+          markupAmount: result.markupAmount,
+          totalAmount: result.total,
+          isSelected: selectedVariantIds.includes(variant.id),
+        };
+      });
+      await saveQuotation('approved', persistedVariants);
+      console.log("✅ Cotización guardada exitosamente como approved");
       
       toast({
-        title: "Cotización creada",
-        description: "La cotización se ha creada exitosamente y está pendiente de aprobación.",
+        title: "Cotización aprobada",
+        description: "La cotización ya está disponible para crear el proyecto.",
       });
       setLocation('/manage-quotes');
     } catch (error: any) {
@@ -507,7 +549,11 @@ export function QuotationVariants({
 
   const computeVariantTotal = (variant: QuotationVariant): number => {
     if (!baseTeamMembers?.length) return variant.totalAmount;
-    return computeVariantCostFromTeam(variant) * (quotationData?.financials?.marginFactor || 2.0);
+    return calculateVariantResult(baseTeamMembers.map((member) => ({
+      ...member,
+      hours: getEffectiveMemberHours(variant, member),
+      cost: getEffectiveMemberHours(variant, member) * (member.rate || 0),
+    }))).display.total;
   };
 
   const getVariantTotalHours = (variant: QuotationVariant): number => {
@@ -919,7 +965,7 @@ export function QuotationVariants({
             ) : (
               <>
                 <CheckCircle className="h-4 w-4 mr-2" />
-                Finalizar Cotización
+                Aprobar y finalizar
               </>
             )}
           </Button>

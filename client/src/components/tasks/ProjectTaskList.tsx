@@ -406,6 +406,24 @@ function TaskRow({ task, allPersonnel, projectMembers = [], onOpen, onToggle, on
   const [assigneeOpen, setAssigneeOpen] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState("");
+  const [inlinePriority, setInlinePriority] = useState(task.priority);
+  useEffect(() => setInlinePriority(task.priority), [task.priority]);
+  const priorityMutation = useMutation({
+    mutationFn: (priority: string) => apiRequest(`/api/tasks/${task.id}`, "PUT", { priority }),
+    onMutate: (priority) => {
+      const previous = inlinePriority;
+      setInlinePriority(priority);
+      return { previous };
+    },
+    onError: (_error, _priority, context) => {
+      setInlinePriority(context?.previous ?? task.priority);
+      toast({ title: "No se pudo cambiar la prioridad", variant: "destructive" });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks/project", task.projectId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks/my-tasks"] });
+    },
+  });
   const assignee = allPersonnel.find(p => p.id === task.assigneeId);
   const collaborators = allPersonnel.filter(p => (task.collaboratorIds || []).includes(p.id));
   // La asignación es una propiedad del equipo del proyecto, nunca del directorio global.
@@ -457,7 +475,31 @@ function TaskRow({ task, allPersonnel, projectMembers = [], onOpen, onToggle, on
 
         {/* Title */}
         <div className="flex-1 min-w-0 px-2 py-3 flex items-center gap-1.5">
-          <div className={cn("w-2 h-2 rounded-full flex-shrink-0", PRIORITY_DOT[task.priority] || "bg-gray-200")} />
+          <Popover>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                aria-label={`Prioridad: ${PRIORITY_LABELS[inlinePriority] || inlinePriority}`}
+                className="grid h-6 w-6 flex-shrink-0 place-items-center rounded hover:bg-muted"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <span className={cn("h-2.5 w-2.5 rounded-full", PRIORITY_DOT[inlinePriority] || "bg-gray-200")} />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent className="w-36 p-1" align="start" onClick={(event) => event.stopPropagation()}>
+              {(["low", "medium", "high", "urgent"] as const).map((priority) => (
+                <button
+                  key={priority}
+                  type="button"
+                  className={cn("flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-xs hover:bg-accent", inlinePriority === priority && "bg-primary/10 font-medium")}
+                  onClick={() => priorityMutation.mutate(priority)}
+                >
+                  <span className={cn("h-2 w-2 rounded-full", PRIORITY_DOT[priority])} />
+                  {PRIORITY_LABELS[priority]}
+                </button>
+              ))}
+            </PopoverContent>
+          </Popover>
           {!isDone && (
             <Popover>
               <PopoverTrigger asChild>
@@ -471,7 +513,7 @@ function TaskRow({ task, allPersonnel, projectMembers = [], onOpen, onToggle, on
                 </button>
               </PopoverTrigger>
               <PopoverContent className="w-36 p-1 shadow-lg" align="start" onClick={e => e.stopPropagation()}>
-                {(["todo","in_progress","blocked","done"] as const).map(s => (
+                {(["todo","in_progress","blocked"] as const).map(s => (
                   <button
                     key={s}
                     className={cn(
@@ -1103,6 +1145,7 @@ function BoardCard({ task, allPersonnel, onOpen }: { task: Task; allPersonnel: P
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `board-card:${task.id}`,
     data: { taskId: task.id, fromStatus: task.status },
+    disabled: task.status === "done",
   });
   const assignee = allPersonnel.find(p => p.id === task.assigneeId);
   const overdue = isOverdue(task);
@@ -1165,7 +1208,7 @@ function BoardCard({ task, allPersonnel, onOpen }: { task: Task; allPersonnel: P
 
 function BoardColumn({ label, dot, ring, empty, status, tasks, allPersonnel, projectId, projectMembers, onOpen, onRefresh, onStatusChange }: BoardColumnProps) {
   const [showAdd, setShowAdd] = useState(false);
-  const { setNodeRef, isOver } = useDroppable({ id: `board-col:${status}` });
+  const { setNodeRef, isOver } = useDroppable({ id: `board-col:${status}`, disabled: status === "done" });
 
   return (
     <div className={cn("flex-1 min-w-0 flex flex-col rounded-xl border-t-2 border border-border bg-muted/5 transition-colors", ring, isOver && "bg-primary/5 ring-2 ring-primary/20")}>
@@ -1209,7 +1252,7 @@ function BoardColumn({ label, dot, ring, empty, status, tasks, allPersonnel, pro
           </div>
         ))}
 
-        {showAdd ? (
+        {status !== "done" && (showAdd ? (
           <div className="bg-card rounded-lg border border-primary/30 p-2">
             <NewTaskRow
               projectId={projectId}
@@ -1229,7 +1272,7 @@ function BoardColumn({ label, dot, ring, empty, status, tasks, allPersonnel, pro
             <Plus className="h-3 w-3 group-hover:scale-110 transition-transform" />
             Agregar tarea
           </button>
-        )}
+        ))}
       </div>
     </div>
   );
@@ -1307,8 +1350,8 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
   };
 
   const toggleMutation = useMutation({
-    mutationFn: (task: Task) => apiRequest(`/api/tasks/${task.id}`, "PUT", {
-      status: task.status === "done" ? "todo" : "done",
+    mutationFn: (task: Task) => apiRequest(`/api/tasks/${task.id}/completion`, "POST", {
+      completed: task.status !== "done",
     }),
     onSuccess: () => { refetch(); invalidateRelated(); },
   });
@@ -1354,7 +1397,7 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
     const taskId = active.data.current?.taskId as number;
     const fromStatus = active.data.current?.fromStatus as string;
     const toStatus = over.id.toString().replace("board-col:", "");
-    if (!taskId || fromStatus === toStatus) return;
+    if (!taskId || fromStatus === toStatus || fromStatus === "done" || toStatus === "done") return;
     handleBoardStatusChange(taskId, toStatus);
   };
 

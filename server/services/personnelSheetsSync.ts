@@ -26,6 +26,10 @@ const SPANISH_MONTHS: Record<string, string> = {
 export interface ParsedSheetRow {
   sheetName: string;
   monthlyRates: Record<string, number>; // { jan2026: 11562.5, feb2026: 12137.85, ... }
+  // Optional comparison-only values. When the Master exposes a monthly salary,
+  // synchronization never writes it directly: it is checked against
+  // hourly-rate × hours and a persistent warning is emitted on mismatch.
+  monthlySalaries?: Record<string, number>;
   currentRole?: string | null;
   sublevel?: string | null;
   legacyRole?: string | null;
@@ -160,16 +164,20 @@ export function parseValorHoraSection(rows: string[][], year: number): ParsedShe
 
   // Mapear índice de columna → campo {mmm}{yyyy}
   const monthByCol = new Map<number, string>();
+  const salaryMonthByCol = new Map<number, string>();
   for (let c = 0; c < subHeader.length; c++) {
     const label = String(subHeader[c] ?? "").trim().toLowerCase();
-    if (label !== "valor hora ajustada") continue;
     const date = String(dateRow[c] ?? "").trim().toLowerCase();
     const m = date.match(/(ene|feb|mar|abr|may|jun|jul|ago|sep|oct|nov|dic)\s*(\d{4})/);
     if (!m) continue;
     const monthKey = SPANISH_MONTHS[m[1]];
     const yr = parseInt(m[2], 10);
     if (yr !== year) continue;
-    monthByCol.set(c, `${monthKey}${yr}`);
+    if (label === "valor hora ajustada") {
+      monthByCol.set(c, `${monthKey}${yr}`);
+    } else if (label.includes("sueldo") && label.includes("mensual")) {
+      salaryMonthByCol.set(c, `${monthKey}${yr}`);
+    }
   }
 
   if (monthByCol.size === 0) {
@@ -198,10 +206,18 @@ export function parseValorHoraSection(rows: string[][], year: number): ParsedShe
 
     let hasAny = false;
     const monthlyRates: Record<string, number> = {};
+    const monthlySalaries: Record<string, number> = {};
     for (const [c, field] of monthByCol.entries()) {
       const num = parseMoney(rows[r]?.[c]);
       if (num !== null) {
         monthlyRates[field] = num;
+        hasAny = true;
+      }
+    }
+    for (const [c, field] of salaryMonthByCol.entries()) {
+      const num = parseMoney(rows[r]?.[c]);
+      if (num !== null) {
+        monthlySalaries[field] = num;
         hasAny = true;
       }
     }
@@ -219,6 +235,7 @@ export function parseValorHoraSection(rows: string[][], year: number): ParsedShe
     result.push({
       sheetName: name,
       monthlyRates,
+      monthlySalaries: Object.keys(monthlySalaries).length > 0 ? monthlySalaries : undefined,
       currentRole: cell(roleCol),
       sublevel: cell(sublevelCol),
       legacyRole: cell(legacyRoleCol),

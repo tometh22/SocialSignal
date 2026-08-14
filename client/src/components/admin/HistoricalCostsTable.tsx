@@ -10,7 +10,7 @@ interface HistoricalCostsTableProps {
   personnel: Personnel[];
 }
 
-type EditableField = "hourlyRateARS" | "monthlySalaryARS" | "hourlyRateUSD" | "monthlySalaryUSD";
+type EditableField = "hourlyRateARS" | "hourlyRateUSD" | "monthlyHoursSnapshot";
 
 const MONTHS = [
   "Ene", "Feb", "Mar", "Abr", "May", "Jun",
@@ -57,8 +57,16 @@ export function HistoricalCostsTable({ personnel }: HistoricalCostsTableProps) {
       );
       if (!existing && data.value == null) return null;
 
-      const monthlyHours = personnel.find((person) => person.id === data.personnelId)?.monthlyHours ?? null;
-      const payload = { [data.field]: data.value, monthlyHours };
+      const currentMonthlyHours = personnel.find((person) => person.id === data.personnelId)?.monthlyHours ?? null;
+      const payload = data.field === "monthlyHoursSnapshot"
+        ? { monthlyHours: data.value }
+        : {
+            [data.field]: data.value,
+            // A brand-new period takes one explicit initial snapshot. Editing
+            // an existing period never replaces its snapshot with today's
+            // contractual hours.
+            ...(!existing ? { monthlyHours: currentMonthlyHours } : {}),
+          };
       return existing
         ? apiRequest(`/api/personnel-historical-costs/${existing.id}`, { method: "PATCH", body: payload })
         : apiRequest("/api/personnel-historical-costs", {
@@ -107,10 +115,18 @@ export function HistoricalCostsTable({ personnel }: HistoricalCostsTableProps) {
     if (!(key in editingCells)) return;
     const rawValue = editingCells[key];
     const value = rawValue === "" ? null : Number(rawValue);
-    if (value != null && (!Number.isFinite(value) || value < 0)) {
+    const person = personnel.find((candidate) => candidate.id === personnelId);
+    const invalidHours = field === "monthlyHoursSnapshot" && value != null && (
+      !Number.isInteger(value)
+      || value < 0
+      || (person?.contractType !== "freelance" && (value < 40 || value > 300))
+    );
+    if (value != null && (!Number.isFinite(value) || value < 0 || invalidHours)) {
       toast({
         title: "Valor inválido",
-        description: "Ingresá un número mayor o igual a cero.",
+        description: field === "monthlyHoursSnapshot"
+          ? "Ingresá horas enteras; para contratos fijos deben estar entre 40 y 300."
+          : "Ingresá un número mayor o igual a cero.",
         variant: "destructive",
       });
       return;
@@ -150,11 +166,11 @@ export function HistoricalCostsTable({ personnel }: HistoricalCostsTableProps) {
         </div>
 
         <div className="max-h-[32rem] overflow-auto">
-          <table className="min-w-[1520px] text-xs">
+          <table className="min-w-[1640px] text-xs">
             <thead className="sticky top-0 z-20 bg-gray-100">
               <tr>
                 <th className="sticky left-0 z-30 min-w-52 border-r bg-gray-100 px-3 py-2 text-left font-medium text-gray-700">Personal</th>
-                <th className="w-20 border-r px-2 py-2 text-center font-medium text-gray-700">Tipo</th>
+                <th className="w-36 border-r px-2 py-2 text-left font-medium text-gray-700">Concepto</th>
                 {MONTHS.map((month, index) => (
                   <th key={month} className="min-w-24 border-r px-2 py-2 text-center font-medium text-gray-700">{month} {selectedYear}</th>
                 ))}
@@ -162,67 +178,77 @@ export function HistoricalCostsTable({ personnel }: HistoricalCostsTableProps) {
             </thead>
             <tbody className="divide-y divide-gray-200 bg-white">
               {personnel.map((person) => {
-                const usesUSD = (person as any).billingCurrency === "USD";
-                const hourlyField: EditableField = usesUSD ? "hourlyRateUSD" : "hourlyRateARS";
-                const salaryField: EditableField = usesUSD ? "monthlySalaryUSD" : "monthlySalaryARS";
-                const currency = usesUSD ? "USD" : "ARS";
+                const billingCurrency = String((person as any).billingCurrency ?? "ARS").toUpperCase();
+                const usesARS = billingCurrency !== "USD";
+                const usesUSD = billingCurrency === "USD" || billingCurrency === "MIXED";
+                const rows: Array<
+                  | { kind: "editable"; label: string; field: EditableField; step: string }
+                  | { kind: "salary"; label: string; field: "monthlySalaryARS" | "monthlySalaryUSD"; locale: string }
+                > = [
+                  ...(usesARS ? [{ kind: "editable" as const, label: "Valor hora ARS", field: "hourlyRateARS" as const, step: "0.01" }] : []),
+                  ...(usesUSD ? [{ kind: "editable" as const, label: "Valor hora USD", field: "hourlyRateUSD" as const, step: "0.01" }] : []),
+                  { kind: "editable", label: "Horas del período", field: "monthlyHoursSnapshot", step: "1" },
+                  ...(usesARS ? [{ kind: "salary" as const, label: "Sueldo ARS", field: "monthlySalaryARS" as const, locale: "es-AR" }] : []),
+                  ...(usesUSD ? [{ kind: "salary" as const, label: "Sueldo USD", field: "monthlySalaryUSD" as const, locale: "en-US" }] : []),
+                ];
                 return (
-                <Fragment key={person.id}>
-                  <tr className="hover:bg-gray-50">
-                    <td className="sticky left-0 z-10 border-r bg-white px-3 py-2">
-                      <p className="text-sm font-medium text-gray-900">{person.name}</p>
-                      <p className="text-[11px] text-gray-500">
-                        {((person as any).contractType === "freelance" ? (person as any).legacyRole : (person as any).currentRole)
-                          || (person as any).roleName
-                          || "Rol pendiente"}
-                        {(person as any).sublevel ? ` · ${(person as any).sublevel}` : ""}
-                      </p>
-                    </td>
-                    <td className="border-r px-2 py-1 text-center text-gray-600">{currency}/h</td>
-                    {MONTHS.map((_, index) => {
-                      const month = index + 1;
-                      const key = cellKey(person.id, month, hourlyField);
-                      return (
-                        <td key={key} className="border-r px-1 py-1.5">
-                          <Input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={getCellValue(person.id, month, hourlyField)}
-                            onChange={(event) => handleCellChange(person.id, month, hourlyField, event.target.value)}
-                            onBlur={() => handleCellBlur(person.id, month, hourlyField)}
-                            className="h-8 border-0 text-center text-xs hover:bg-gray-50 focus:border focus:border-primary"
-                            placeholder="-"
-                          />
+                  <Fragment key={person.id}>
+                    {rows.map((row, rowIndex) => (
+                      <tr key={`${person.id}-${row.label}`} className={rowIndex === rows.length - 1 ? "border-b-2 border-gray-300" : "hover:bg-gray-50"}>
+                        <td className="sticky left-0 z-10 border-r bg-white px-3 py-2">
+                          {rowIndex === 0 && (
+                            <>
+                              <p className="text-sm font-medium text-gray-900">{person.name}</p>
+                              <p className="text-[11px] text-gray-500">
+                                {((person as any).contractType === "freelance" ? (person as any).legacyRole : (person as any).currentRole)
+                                  || (person as any).roleName
+                                  || "Rol pendiente"}
+                                {(person as any).sublevel ? ` · ${(person as any).sublevel}` : ""}
+                                {billingCurrency === "MIXED" ? " · Mixto" : ` · ${billingCurrency}`}
+                              </p>
+                            </>
+                          )}
                         </td>
-                      );
-                    })}
-                  </tr>
-                  {person.contractType !== "freelance" && (
-                    <tr className="border-b-2 border-gray-200 hover:bg-gray-50">
-                      <td className="sticky left-0 z-10 border-r bg-white px-3 py-2 text-[11px] text-gray-500">Sueldo mensual</td>
-                      <td className="border-r px-2 py-1 text-center text-gray-600">{currency}/mes</td>
-                      {MONTHS.map((_, index) => {
-                        const month = index + 1;
-                        const key = cellKey(person.id, month, salaryField);
-                        return (
-                          <td key={key} className="border-r px-1 py-1.5">
-                            <Input
-                              type="number"
-                              min="0"
-                              step="0.01"
-                              value={getCellValue(person.id, month, salaryField)}
-                              onChange={(event) => handleCellChange(person.id, month, salaryField, event.target.value)}
-                              onBlur={() => handleCellBlur(person.id, month, salaryField)}
-                              className="h-8 border-0 text-center text-xs hover:bg-gray-50 focus:border focus:border-primary"
-                              placeholder="-"
-                            />
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  )}
-                </Fragment>
+                        <td className="border-r px-2 py-1 text-left text-gray-600">{row.label}</td>
+                        {MONTHS.map((_, index) => {
+                          const month = index + 1;
+                          const cost = costByPersonAndMonth.get(`${person.id}-${month}`);
+                          if (row.kind === "salary") {
+                            const value = cost?.[row.field];
+                            const missingHours = cost != null && cost.monthlyHoursSnapshot == null;
+                            return (
+                              <td
+                                key={`${person.id}-${month}-${row.field}`}
+                                className={`border-r px-2 py-1.5 text-center ${missingHours ? "bg-amber-50 text-amber-700" : "text-gray-600"}`}
+                                title={missingHours ? "Sin horas del período: sueldo no calculado" : "Calculado como valor hora × horas del período"}
+                              >
+                                {value == null ? "—" : Number(value).toLocaleString(row.locale, { maximumFractionDigits: 2 })}
+                              </td>
+                            );
+                          }
+                          const key = cellKey(person.id, month, row.field);
+                          const isHours = row.field === "monthlyHoursSnapshot";
+                          return (
+                            <td key={key} className="border-r px-1 py-1.5">
+                              <Input
+                                type="number"
+                                min="0"
+                                max={isHours && person.contractType !== "freelance" ? "300" : undefined}
+                                step={row.step}
+                                value={getCellValue(person.id, month, row.field)}
+                                onChange={(event) => handleCellChange(person.id, month, row.field, event.target.value)}
+                                onBlur={() => handleCellBlur(person.id, month, row.field)}
+                                disabled={updateCostMutation.isPending}
+                                className={`h-8 border-0 text-center text-xs hover:bg-gray-50 focus:border focus:border-primary ${isHours && cost && cost.monthlyHoursSnapshot == null ? "bg-amber-50" : ""}`}
+                                placeholder={isHours && person.monthlyHours == null ? "Sin horas" : "-"}
+                                aria-label={`${row.label} de ${person.name}, ${MONTHS[index]} ${selectedYear}`}
+                              />
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                  </Fragment>
                 );
               })}
             </tbody>
@@ -231,7 +257,7 @@ export function HistoricalCostsTable({ personnel }: HistoricalCostsTableProps) {
       </div>
 
       <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
-        La misma grilla permite consultar y editar años pasados, el año actual y períodos futuros. La tarifa vigente se resuelve desde este historial para cotizaciones, capacidad y cierre mensual.
+        El valor hora es la fuente canónica. ARS y USD se administran por separado en contratos mixtos. El sueldo mensual se calcula automáticamente como valor hora × horas del período; una celda ámbar indica que faltan horas y el sueldo queda vacío hasta que un Admin las corrija.
       </div>
     </div>
   );

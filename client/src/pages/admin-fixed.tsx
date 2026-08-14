@@ -82,7 +82,6 @@ import { RoleSummary } from "@/components/admin/role-summary";
 import { TemplateCost } from "@/components/admin/template-cost";
 import { CostMultipliersManager } from "@/components/cost-multipliers-manager";
 import { ExchangeRateManager } from "@/components/admin/ExchangeRateManager";
-import { PersonnelHistoricalCostsManager } from "@/components/admin/PersonnelHistoricalCostsManager";
 import { HistoricalCostsTable } from "@/components/admin/HistoricalCostsTable";
 
 
@@ -111,7 +110,15 @@ const personnelSchema = z.object({
   roleId: z.coerce.number().min(1, "Debe seleccionar un rol"),
   email: z.string().email().optional().or(z.literal("")),
   contractType: z.enum(["full-time", "part-time", "freelance"]).default("full-time"),
+  billingCurrency: z.enum(["ARS", "USD", "mixed"]).default("ARS"),
+  monthlyHours: z.coerce.number().int().min(40).max(300).nullable().optional(),
+  hourlyRateARS: z.coerce.number().min(0).nullable().optional(),
+  hourlyRateUSD: z.coerce.number().min(0).nullable().optional(),
   includeInRealCosts: z.boolean().default(true)
+}).superRefine((value, context) => {
+  if (value.contractType !== "freelance" && value.monthlyHours == null) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["monthlyHours"], message: "Las horas mensuales son requeridas" });
+  }
 });
 
 // Schema para el formulario de plantillas
@@ -312,9 +319,18 @@ export default function Admin() {
       name: "",
       email: "",
       contractType: "full-time",
+      billingCurrency: "ARS",
+      monthlyHours: 160,
+      hourlyRateARS: 0,
+      hourlyRateUSD: 0,
       includeInRealCosts: true
     }
   });
+  const personnelContractType = personnelForm.watch("contractType");
+  const personnelBillingCurrency = personnelForm.watch("billingCurrency");
+  const personnelMonthlyHours = personnelForm.watch("monthlyHours");
+  const personnelHourlyRateARS = personnelForm.watch("hourlyRateARS");
+  const personnelHourlyRateUSD = personnelForm.watch("hourlyRateUSD");
 
   const templateForm = useForm<TemplateFormValues>({
     resolver: zodResolver(templateSchema),
@@ -783,6 +799,10 @@ export default function Admin() {
       email: "",
       roleId: 0,
       contractType: "full-time",
+      billingCurrency: "ARS",
+      monthlyHours: 160,
+      hourlyRateARS: 0,
+      hourlyRateUSD: 0,
       includeInRealCosts: true
     });
     setCurrentPersonnel(null);
@@ -796,6 +816,10 @@ export default function Admin() {
       email: personnel.email || "",
       roleId: personnel.roleId,
       contractType: (personnel.contractType as "full-time" | "part-time" | "freelance") || "full-time",
+      billingCurrency: ((personnel as any).billingCurrency as "ARS" | "USD" | "mixed") || "ARS",
+      monthlyHours: personnel.monthlyHours ?? null,
+      hourlyRateARS: (personnel as any).currentHourlyRateARS ?? null,
+      hourlyRateUSD: (personnel as any).currentHourlyRateUSD ?? null,
       includeInRealCosts: personnel.includeInRealCosts ?? true
     });
     setCurrentPersonnel(personnel);
@@ -804,12 +828,18 @@ export default function Admin() {
   };
 
   const onPersonnelSubmit = (values: PersonnelFormValues) => {
+    const payload: any = {
+      ...values,
+      monthlyHours: values.contractType === "freelance" ? null : values.monthlyHours,
+    };
+    if (values.billingCurrency === "ARS") delete payload.hourlyRateUSD;
+    if (values.billingCurrency === "USD") delete payload.hourlyRateARS;
     if (isEditing && currentPersonnel) {
-      updatePersonnelMutation.mutate({ id: currentPersonnel.id, data: values });
+      updatePersonnelMutation.mutate({ id: currentPersonnel.id, data: payload });
     } else {
       // The legacy column is required for backwards-compatible rows but is not
       // a rate source. The canonical rate is added below in historical costs.
-      createPersonnelMutation.mutate({ ...values, hourlyRate: 0 });
+      createPersonnelMutation.mutate({ ...payload, hourlyRate: 0 });
     }
   };
 
@@ -1134,7 +1164,7 @@ export default function Admin() {
                                 </TooltipTrigger>
                                 <TooltipContent className="max-w-xs">
                                   <p className="text-sm">
-                                    Solo para empleados Full-time. Representa el costo de oportunidad mensual.
+                                    Valor calculado de sólo lectura: valor hora × horas del período, por moneda.
                                   </p>
                                 </TooltipContent>
                               </Tooltip>
@@ -1152,7 +1182,7 @@ export default function Admin() {
                                 <TooltipContent className="max-w-xs">
                                   <p className="text-sm">
                                     Capacidad contractual mensual para empleados fijos (por ejemplo 120 o 160 horas).
-                                    Junto con el sueldo mensual define el valor hora: cambiar cualquiera de los dos recalcula el valor hora histórico vigente.
+                                    Los cambios crean o actualizan el snapshot del mes vigente sin reescribir períodos anteriores.
                                   </p>
                                 </TooltipContent>
                               </Tooltip>
@@ -1275,11 +1305,6 @@ export default function Admin() {
           {sortedPersonnel && sortedPersonnel.length > 0 && (
             <div id="personal-cost-history-grid" className="mt-6 scroll-mt-6">
               <HistoricalCostsTable personnel={personnel ?? []} />
-            </div>
-          )}
-          {sortedPersonnel && sortedPersonnel.length > 0 && (
-            <div id="personal-cost-history" className="mt-6 scroll-mt-6">
-              <PersonnelHistoricalCostsManager />
             </div>
           )}
         </TabsContent>
@@ -1663,7 +1688,7 @@ export default function Admin() {
 
       {/* Diálogo para crear/editar personal */}
       <Dialog open={personnelDialogOpen} onOpenChange={setPersonnelDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[640px]">
           <DialogHeader>
             <DialogTitle>
               {isEditing ? "Editar Miembro del Equipo" : "Añadir Nuevo Miembro"}
@@ -1759,6 +1784,84 @@ export default function Admin() {
                   </FormItem>
                 )}
               />
+
+              <FormField
+                control={personnelForm.control}
+                name="billingCurrency"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Moneda contractual</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                      <SelectContent>
+                        <SelectItem value="ARS">ARS</SelectItem>
+                        <SelectItem value="USD">USD</SelectItem>
+                        <SelectItem value="mixed">Mixto (ARS y USD)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormDescription>En contratos mixtos ambas tarifas se guardan y calculan por separado.</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {personnelContractType !== "freelance" && (
+                <FormField
+                  control={personnelForm.control}
+                  name="monthlyHours"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Horas mensuales</FormLabel>
+                      <FormControl>
+                        <Input type="number" min={40} max={300} step={1} value={field.value ?? ""} onChange={field.onChange} />
+                      </FormControl>
+                      <FormDescription>Se guarda como snapshot del mes vigente; no modifica períodos anteriores.</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                {personnelBillingCurrency !== "USD" && (
+                  <FormField
+                    control={personnelForm.control}
+                    name="hourlyRateARS"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Valor hora ARS</FormLabel>
+                        <FormControl><Input type="number" min={0} step="0.01" value={field.value ?? ""} onChange={field.onChange} /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+                {personnelBillingCurrency !== "ARS" && (
+                  <FormField
+                    control={personnelForm.control}
+                    name="hourlyRateUSD"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Valor hora USD</FormLabel>
+                        <FormControl><Input type="number" min={0} step="0.01" value={field.value ?? ""} onChange={field.onChange} /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+              </div>
+
+              <div className="rounded-md border bg-slate-50 p-3 text-sm text-slate-700">
+                <p className="font-medium">Sueldo mensual calculado</p>
+                {personnelContractType === "freelance" || !personnelMonthlyHours ? (
+                  <p className="mt-1 text-amber-700">Sin horas contractuales: el sueldo queda vacío.</p>
+                ) : (
+                  <div className="mt-1 flex flex-wrap gap-x-5 gap-y-1 text-xs">
+                    {personnelBillingCurrency !== "USD" && <span>ARS {Number((personnelHourlyRateARS ?? 0) * personnelMonthlyHours).toLocaleString("es-AR", { maximumFractionDigits: 2 })}</span>}
+                    {personnelBillingCurrency !== "ARS" && <span>USD {Number((personnelHourlyRateUSD ?? 0) * personnelMonthlyHours).toLocaleString("en-US", { maximumFractionDigits: 2 })}</span>}
+                  </div>
+                )}
+              </div>
 
               <FormField
                 control={personnelForm.control}

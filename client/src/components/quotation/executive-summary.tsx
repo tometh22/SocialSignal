@@ -34,7 +34,7 @@ export function ExecutiveSummary() {
   // baseCost/totalAmount del contexto siempre están en ARS (ver
   // optimized-quote-context.tsx). Si la cotización se eligió en USD, hay que
   // convertir antes de formatear — de lo contrario se muestra el número ARS
-  // etiquetado como si fuera USD (mismo bug ya corregido en currency-selection.tsx).
+  // etiquetado como si fuera USD.
   const effectiveRate = quotationData.exchangeRateSnapshot && quotationData.exchangeRateSnapshot > 0
     ? quotationData.exchangeRateSnapshot
     : exchangeRate;

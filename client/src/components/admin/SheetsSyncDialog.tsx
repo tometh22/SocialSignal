@@ -54,6 +54,7 @@ interface ApplyResponse {
   updatedPersonnel: number;
   cellsUpdated: number;
   skipped: string[];
+  warnings: Array<{ message: string }>;
 }
 
 const MONTH_LABELS: Record<string, string> = {
@@ -183,8 +184,8 @@ export function SheetsSyncDialog() {
     },
     onSuccess: (data) => {
       toast({
-        title: "Sincronización aplicada",
-        description: `${data.updatedPersonnel} persona(s) actualizada(s), ${data.cellsUpdated} valores escritos.`,
+        title: data.warnings.length > 0 ? "Sincronización aplicada con advertencias" : "Sincronización aplicada",
+        description: `${data.updatedPersonnel} persona(s) actualizada(s), ${data.cellsUpdated} valores escritos.${data.warnings.length > 0 ? ` ${data.warnings.length} advertencia(s) quedaron auditadas.` : ""}`,
       });
       queryClient.invalidateQueries({ queryKey: ["/api/personnel"] });
       setOpen(false);

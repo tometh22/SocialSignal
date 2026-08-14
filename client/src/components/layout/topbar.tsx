@@ -11,11 +11,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
-  AlertCircle,
   Bell,
   ChevronDown,
   ChevronRight,
-  Clock3,
   Command,
   Loader2,
   LogOut,
@@ -29,7 +27,7 @@ import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/use-auth";
 import { usePermissions } from "@/hooks/use-permissions";
-import { authFetch } from "@/lib/queryClient";
+import { apiRequest, authFetch, queryClient } from "@/lib/queryClient";
 import { reviewApi, reviewKeys, type ReviewRoomSummary } from "@/lib/review-api";
 import { GlobalSearch } from "@/components/features/global-search";
 import { MessagesPopup } from "@/components/features/messages-popup";
@@ -45,6 +43,15 @@ type DueReminder = {
   isOverdue: boolean;
   type?: "manual" | "inactivity";
   daysSince?: number;
+};
+
+type ProductNotification = {
+  id: number;
+  title: string;
+  message: string;
+  actionUrl: string | null;
+  readAt: string | null;
+  createdAt: string;
 };
 
 interface TopbarProps {
@@ -136,6 +143,19 @@ export default function Topbar({ onMenuClick }: TopbarProps = {}) {
     enabled: hasPermission("crm"),
   });
 
+  const { data: notifications = [] } = useQuery<ProductNotification[]>({
+    queryKey: ["/api/notifications"],
+    queryFn: async () => {
+      const response = await authFetch("/api/notifications");
+      if (!response.ok) return [];
+      const data = await response.json();
+      return Array.isArray(data) ? data : [];
+    },
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+    enabled: Boolean(user),
+  });
+
   useEffect(() => {
     const handleShortcut = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
@@ -178,6 +198,16 @@ export default function Topbar({ onMenuClick }: TopbarProps = {}) {
     ? `${user.firstName.charAt(0)}${user.lastName.charAt(0)}`.toUpperCase()
     : "--";
   const overdueCount = reminders.filter((reminder) => reminder.isOverdue).length;
+  const unreadNotifications = notifications.filter((notification) => !notification.readAt);
+  const alertCount = unreadNotifications.length + reminders.length;
+  const markNotificationRead = async (id: number) => {
+    await apiRequest(`/api/notifications/${id}/read`, "PATCH");
+    await queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
+  };
+  const markAllNotificationsRead = async () => {
+    await apiRequest("/api/notifications/read-all", "PATCH");
+    await queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
+  };
   const isProvider = (user as any)?.role === "external_provider";
 
   return (
@@ -265,12 +295,12 @@ export default function Topbar({ onMenuClick }: TopbarProps = {}) {
                 variant="ghost"
                 size="icon"
                 className="relative h-9 w-9 text-slate-500"
-                aria-label={`Alertas${reminders.length ? `, ${reminders.length} pendientes` : ""}`}
+                aria-label={`Notificaciones${alertCount ? `, ${alertCount} pendientes` : ""}`}
               >
                 <Bell className="h-4 w-4" />
-                {reminders.length > 0 && (
+                {alertCount > 0 && (
                   <span className="absolute right-1.5 top-1.5 grid h-3.5 min-w-3.5 place-items-center rounded-full border-2 border-white bg-primary px-0.5 text-[8px] font-bold leading-none text-white">
-                    {reminders.length > 9 ? "9+" : reminders.length}
+                    {alertCount > 9 ? "9+" : alertCount}
                   </span>
                 )}
               </Button>
@@ -278,44 +308,51 @@ export default function Topbar({ onMenuClick }: TopbarProps = {}) {
             <DropdownMenuContent align="end" className="w-[min(22rem,calc(100vw-1.5rem))] overflow-hidden rounded-2xl p-0 shadow-xl">
               <div className="flex items-center justify-between border-b border-border/70 px-4 py-3.5">
                 <div>
-                  <p className="text-sm font-semibold text-foreground">Alertas CRM</p>
+                  <p className="text-sm font-semibold text-foreground">Notificaciones</p>
                   <p className="mt-0.5 text-[11px] text-muted-foreground">
-                    {reminders.length === 0
-                      ? "Todo está al día"
-                      : `${overdueCount} vencida${overdueCount === 1 ? "" : "s"} de ${reminders.length}`}
+                    {unreadNotifications.length === 0
+                      ? "No tenés novedades sin leer"
+                      : `${unreadNotifications.length} sin leer`}
                   </p>
                 </div>
-                <span className={cn(
-                  "grid h-8 w-8 place-items-center rounded-xl",
-                  reminders.length ? "bg-amber-50 text-amber-600" : "bg-emerald-50 text-emerald-600",
-                )}>
-                  {reminders.length ? <AlertCircle className="h-4 w-4" /> : <Sparkles className="h-4 w-4" />}
-                </span>
+                {unreadNotifications.length > 0 && (
+                  <button
+                    type="button"
+                    className="text-[11px] font-semibold text-primary hover:underline"
+                    onClick={() => void markAllNotificationsRead()}
+                  >
+                    Marcar todas
+                  </button>
+                )}
               </div>
 
-              {reminders.length === 0 ? (
+              {notifications.length === 0 ? (
                 <div className="mind-empty-state min-h-[9rem]">
                   <Sparkles className="h-6 w-6 text-emerald-500" />
-                  <p className="text-sm font-semibold text-foreground">Sin pendientes</p>
-                  <p className="mt-1 text-xs">No hay recordatorios que requieran atención.</p>
+                  <p className="text-sm font-semibold text-foreground">Sin novedades</p>
+                  <p className="mt-1 text-xs">Las decisiones sobre tus solicitudes aparecerán acá.</p>
                 </div>
               ) : (
                 <div className="max-h-80 overflow-y-auto p-1.5">
-                  {reminders.slice(0, 8).map((reminder) => (
-                    <DropdownMenuItem key={String(reminder.id)} asChild className="rounded-xl p-0">
-                      <Link href={`/crm/${reminder.leadId}`} className="flex w-full items-start gap-3 px-3 py-2.5">
+                  {notifications.slice(0, 8).map((notification) => (
+                    <DropdownMenuItem key={notification.id} asChild className="rounded-xl p-0">
+                      <Link
+                        href={notification.actionUrl || "/absences"}
+                        onClick={() => void markNotificationRead(notification.id)}
+                        className={cn("flex w-full items-start gap-3 px-3 py-2.5", !notification.readAt && "bg-primary/[0.04]")}
+                      >
                         <span className={cn(
                           "mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-lg",
-                          reminder.isOverdue ? "bg-red-50 text-red-600" : "bg-amber-50 text-amber-600",
+                          notification.readAt ? "bg-slate-50 text-slate-500" : "bg-primary/10 text-primary",
                         )}>
-                          {reminder.isOverdue ? <AlertCircle className="h-3.5 w-3.5" /> : <Clock3 className="h-3.5 w-3.5" />}
+                          <Bell className="h-3.5 w-3.5" />
                         </span>
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-xs font-semibold text-foreground">
-                            {reminder.leadName || `Lead #${reminder.leadId}`}
+                            {notification.title}
                           </span>
-                          <span className="mt-0.5 block truncate text-[11px] text-muted-foreground">
-                            {reminder.description}
+                          <span className="mt-0.5 block text-[11px] leading-4 text-muted-foreground">
+                            {notification.message}
                           </span>
                         </span>
                         <ChevronRight className="mt-1 h-3.5 w-3.5 shrink-0 text-muted-foreground/50" />
@@ -325,13 +362,18 @@ export default function Topbar({ onMenuClick }: TopbarProps = {}) {
                 </div>
               )}
 
-              <DropdownMenuSeparator className="m-0" />
-              <Link
-                href="/crm"
-                className="flex items-center justify-center gap-1 px-4 py-2.5 text-xs font-semibold text-primary transition-colors hover:bg-primary/[0.04]"
-              >
-                Abrir CRM <ChevronRight className="h-3.5 w-3.5" />
-              </Link>
+              {hasPermission("crm") && reminders.length > 0 && (
+                <>
+                  <DropdownMenuSeparator className="m-0" />
+                  <Link
+                    href="/crm"
+                    className="flex items-center justify-between gap-2 px-4 py-2.5 text-xs font-semibold text-amber-700 transition-colors hover:bg-amber-50"
+                  >
+                    <span>{reminders.length} alerta{reminders.length === 1 ? "" : "s"} CRM · {overdueCount} vencida{overdueCount === 1 ? "" : "s"}</span>
+                    <ChevronRight className="h-3.5 w-3.5" />
+                  </Link>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
 

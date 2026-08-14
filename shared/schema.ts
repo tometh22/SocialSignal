@@ -669,6 +669,8 @@ export const quotations = pgTable("quotations", {
   toolsCost: doublePrecision("tools_cost").default(0), // Costo de herramientas
   priceMode: text("price_mode").default("auto"), // 'auto' | 'manual'
   manualPrice: doublePrecision("manual_price"), // Precio manual cuando priceMode = 'manual'
+  manualPriceCurrency: text("manual_price_currency").default("ARS"), // Moneda nativa del precio manual
+  pricingVersion: integer("pricing_version").notNull().default(1), // 1=legacy, 2=motor canónico
   adjustmentReason: text("adjustment_reason"),
   additionalNotes: text("additional_notes"),
   status: text("status").notNull().default("draft"), // 'draft', 'pending', 'approved', 'rejected', 'in-negotiation'
@@ -714,6 +716,11 @@ export const insertQuotationSchema = baseInsertQuotationSchema.extend({
     .transform((value) => String(value))
     .nullable()
     .optional(),
+  quotationCurrency: z.enum(["ARS", "USD"]).optional(),
+  manualPriceCurrency: z.enum(["ARS", "USD"]).nullable().optional(),
+  priceMode: z.enum(["auto", "manual"]).optional(),
+  pricingVersion: z.number().int().min(1).optional(),
+  status: z.enum(["draft", "pending", "approved", "rejected", "in-negotiation"]).optional(),
   proposalLink: z.string().nullable().optional(),
 });
 
@@ -964,7 +971,19 @@ export const personnelAbsences = pgTable("personnel_absences", {
   type: text("type").notNull().default('vacation'), // 'vacation' | 'sick' | 'other' | 'epical_day'
   notes: text("notes"),
   createdBy: integer("created_by").references(() => users.id, { onDelete: 'set null' }),
+  requestedBy: integer("requested_by").references(() => users.id, { onDelete: 'set null' }),
+  status: text("status").notNull().default('pending'),
+  businessDays: integer("business_days").notNull().default(0),
+  reviewedBy: integer("reviewed_by").references(() => users.id, { onDelete: 'set null' }),
+  reviewedAt: timestamp("reviewed_at"),
+  reviewReason: text("review_reason"),
+  cancellationRequestedAt: timestamp("cancellation_requested_at"),
+  cancellationReason: text("cancellation_reason"),
+  cancelledBy: integer("cancelled_by").references(() => users.id, { onDelete: 'set null' }),
+  cancelledAt: timestamp("cancelled_at"),
+  legacyImported: boolean("legacy_imported").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
 export const insertPersonnelAbsenceSchema = createInsertSchema(personnelAbsences).omit({
@@ -974,6 +993,53 @@ export const insertPersonnelAbsenceSchema = createInsertSchema(personnelAbsences
 
 export type PersonnelAbsence = typeof personnelAbsences.$inferSelect;
 export type InsertPersonnelAbsence = z.infer<typeof insertPersonnelAbsenceSchema>;
+
+export const absenceAllowances = pgTable("absence_allowances", {
+  id: serial("id").primaryKey(),
+  personnelId: integer("personnel_id").notNull().references(() => personnel.id, { onDelete: 'cascade' }),
+  year: integer("year").notNull(),
+  vacationDays: integer("vacation_days").notNull().default(0),
+  epicalDays: integer("epical_days").notNull().default(0),
+  updatedBy: integer("updated_by").references(() => users.id, { onDelete: 'set null' }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  oneAllowancePerYear: unique("absence_allowances_person_year_unique").on(table.personnelId, table.year),
+}));
+
+export const absenceEvents = pgTable("absence_events", {
+  id: serial("id").primaryKey(),
+  absenceId: integer("absence_id").notNull().references(() => personnelAbsences.id, { onDelete: 'cascade' }),
+  eventKey: text("event_key").notNull().unique(),
+  action: text("action").notNull(),
+  fromStatus: text("from_status"),
+  toStatus: text("to_status"),
+  reason: text("reason"),
+  actorUserId: integer("actor_user_id").references(() => users.id, { onDelete: 'set null' }),
+  metadata: jsonb("metadata").$type<Record<string, unknown>>().default({}),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const userNotifications = pgTable("user_notifications", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  eventKey: text("event_key").notNull(),
+  type: text("type").notNull(),
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  entityType: text("entity_type"),
+  entityId: integer("entity_id"),
+  actionUrl: text("action_url"),
+  readAt: timestamp("read_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  oneNotificationPerEvent: unique("user_notifications_user_event_unique").on(table.userId, table.eventKey),
+  unreadByUser: index("user_notifications_unread_idx").on(table.userId, table.readAt, table.createdAt),
+}));
+
+export type AbsenceAllowance = typeof absenceAllowances.$inferSelect;
+export type AbsenceEvent = typeof absenceEvents.$inferSelect;
+export type UserNotification = typeof userNotifications.$inferSelect;
 
 // ==================== CIERRE MENSUAL ====================
 export const monthlyClosings = pgTable("monthly_closings", {
@@ -1710,7 +1776,7 @@ export const insertTaskSchema = createInsertSchema(tasks).omit({
   dueDate: z.union([z.date(), z.string().transform((str) => new Date(str))]).optional().nullable(),
   completedAt: z.union([z.date(), z.string().transform((str) => new Date(str))]).optional().nullable(),
   collaboratorIds: z.array(z.number()).optional().default([]),
-  status: z.enum(["todo", "in_progress", "blocked", "done"]).default("todo"),
+  status: z.enum(["todo", "in_progress", "blocked"]).default("todo"),
   priority: z.enum(["low", "medium", "high", "urgent"]).default("medium"),
 });
 
@@ -2571,6 +2637,7 @@ export const personnelHistoricalCosts = pgTable("personnel_historical_costs", {
   monthlySalaryARS: numeric("monthly_salary_ars", { precision: 12, scale: 2 }),
   hourlyRateUSD: numeric("hourly_rate_usd", { precision: 10, scale: 2 }),
   monthlySalaryUSD: numeric("monthly_salary_usd", { precision: 12, scale: 2 }),
+  monthlyHoursSnapshot: doublePrecision("monthly_hours_snapshot"),
   exchangeRateId: integer("exchange_rate_id").references(() => exchangeRates.id),
   adjustmentReason: text("adjustment_reason"), // Razón del ajuste (inflación, promoción, etc.)
   notes: text("notes"), // Notas adicionales
@@ -2608,6 +2675,47 @@ export const insertPersonnelHistoricalCostSchema = createInsertSchema(personnelH
 
 export type PersonnelHistoricalCost = typeof personnelHistoricalCosts.$inferSelect;
 export type InsertPersonnelHistoricalCost = z.infer<typeof insertPersonnelHistoricalCostSchema>;
+
+export const personnelCostMigrationAudit = pgTable("personnel_cost_migration_audit", {
+  id: serial("id").primaryKey(),
+  historicalCostId: integer("historical_cost_id").notNull().references(() => personnelHistoricalCosts.id, { onDelete: 'cascade' }),
+  migrationKey: text("migration_key").notNull(),
+  oldMonthlySalaryARS: numeric("old_monthly_salary_ars", { precision: 12, scale: 2 }),
+  newMonthlySalaryARS: numeric("new_monthly_salary_ars", { precision: 12, scale: 2 }),
+  oldMonthlySalaryUSD: numeric("old_monthly_salary_usd", { precision: 12, scale: 2 }),
+  newMonthlySalaryUSD: numeric("new_monthly_salary_usd", { precision: 12, scale: 2 }),
+  hourlyRateARS: numeric("hourly_rate_ars", { precision: 10, scale: 2 }),
+  hourlyRateUSD: numeric("hourly_rate_usd", { precision: 10, scale: 2 }),
+  monthlyHoursSnapshot: doublePrecision("monthly_hours_snapshot"),
+  currency: text("currency").notNull(),
+  outcome: text("outcome").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  oneAuditPerMigration: unique("personnel_cost_migration_audit_unique").on(table.historicalCostId, table.migrationKey),
+}));
+
+// Immutable warnings emitted by personnel cost synchronizations. The hourly
+// rate remains authoritative, but an incompatible salary supplied by an
+// external source must remain visible and auditable after the sync finishes.
+export const personnelCostSyncWarnings = pgTable("personnel_cost_sync_warnings", {
+  id: serial("id").primaryKey(),
+  warningKey: text("warning_key").notNull().unique(),
+  historicalCostId: integer("historical_cost_id").references(() => personnelHistoricalCosts.id, { onDelete: "set null" }),
+  personnelId: integer("personnel_id").notNull().references(() => personnel.id, { onDelete: "cascade" }),
+  year: integer("year").notNull(),
+  month: integer("month").notNull(),
+  source: text("source").notNull(),
+  currency: text("currency").notNull(),
+  warningCode: text("warning_code").notNull(),
+  hourlyRate: numeric("hourly_rate", { precision: 10, scale: 2 }),
+  suppliedMonthlySalary: numeric("supplied_monthly_salary", { precision: 12, scale: 2 }),
+  derivedMonthlySalary: numeric("derived_monthly_salary", { precision: 12, scale: 2 }),
+  monthlyHoursSnapshot: doublePrecision("monthly_hours_snapshot"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  byPersonnelPeriod: index("personnel_cost_sync_warnings_period_idx")
+    .on(table.personnelId, table.year, table.month, table.createdAt),
+}));
 
 // ==================== HISTORIAL DE TIPOS DE CAMBIO ====================
 // Tabla para versionado de tipos de cambio

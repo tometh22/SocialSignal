@@ -932,7 +932,7 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
                               checked={sub.status === "done"}
                               onClick={e => {
                                 e.stopPropagation();
-                                apiRequest(`/api/tasks/${sub.id}`, "PUT", { status: sub.status === "done" ? "todo" : "done" })
+                                apiRequest(`/api/tasks/${sub.id}/completion`, "POST", { completed: sub.status !== "done" })
                                   .then(() => refetchTask());
                               }}
                             />

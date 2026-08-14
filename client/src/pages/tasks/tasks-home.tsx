@@ -10,6 +10,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { FolderOpen, Clock, ChevronRight, ChevronDown, CalendarIcon, Check, ListTodo, List, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { isCompletedInCurrentBuenosAiresWeek } from "@shared/utils/buenos-aires-week";
 import { useAuth } from "@/hooks/use-auth";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -30,6 +31,7 @@ type Task = {
   clientName?: string | null;
   assigneeId?: number | null;
   createdBy?: number | null;
+  completedAt?: string | null;
 };
 
 type TaskProject = {
@@ -80,6 +82,11 @@ function capitalize(str: string) {
 function isOverdue(task: Task) {
   const dueDate = parseCivilTaskDate(task.dueDate);
   return dueDate && dueDate < new Date() && task.status !== "done";
+}
+
+function completedThisWeek(task: Task) {
+  if (task.status !== "done" || !task.completedAt) return false;
+  return isCompletedInCurrentBuenosAiresWeek(task.completedAt);
 }
 
 // ── Animated circle checkbox ──────────────────────────────────────────
@@ -335,8 +342,8 @@ export default function TasksHomePage() {
   };
 
   const toggleMutation = useMutation({
-    mutationFn: (task: Task) => apiRequest(`/api/tasks/${task.id}`, "PUT", {
-      status: task.status === "done" ? "todo" : "done",
+    mutationFn: (task: Task) => apiRequest(`/api/tasks/${task.id}/completion`, "POST", {
+      completed: task.status !== "done",
     }),
     onSuccess: () => {
       setTimeout(() => {
@@ -375,11 +382,11 @@ export default function TasksHomePage() {
     upcoming: myTasks.filter(t => t.status !== "done" && t.status !== "cancelled" && t.status !== "in_progress" && t.status !== "in_review" && t.status !== "blocked" && !isOverdue(t)).length,
     in_progress: myTasks.filter(t => t.status === "in_progress" || t.status === "in_review" || t.status === "blocked").length,
     overdue: myTasks.filter(t => !!isOverdue(t) && t.status !== "done").length,
-    done: myTasks.filter(t => t.status === "done").length,
+    done: myTasks.filter(completedThisWeek).length,
   };
 
   const filteredMyTasks = myTasks.filter(t => {
-    if (myTab === "done") return t.status === "done";
+    if (myTab === "done") return completedThisWeek(t);
     if (myTab === "overdue") return !!isOverdue(t) && t.status !== "done";
     if (myTab === "in_progress") return t.status === "in_progress" || t.status === "in_review" || t.status === "blocked";
     return t.status !== "done" && t.status !== "cancelled" && t.status !== "in_progress" && t.status !== "in_review" && t.status !== "blocked" && !isOverdue(t);
@@ -457,9 +464,9 @@ export default function TasksHomePage() {
           ) : (
             <div className="h-52 w-full" aria-label="Gráfico de horas del mes por proyecto">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={myHours.byProject} margin={{ top: 8, right: 8, left: -18, bottom: 20 }}>
+                <BarChart data={myHours.byProject} margin={{ top: 8, right: 12, left: 8, bottom: 8 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="projectName" tick={{ fontSize: 10 }} angle={-12} textAnchor="end" interval={0} height={46} />
+                  <XAxis dataKey="projectName" tick={{ fontSize: 10 }} interval={0} height={34} tickFormatter={(value) => String(value).length > 14 ? `${String(value).slice(0, 13)}…` : String(value)} />
                   <YAxis tick={{ fontSize: 10 }} allowDecimals={false} />
                   <ChartTooltip formatter={(value: number) => [`${Number(value).toFixed(2)}h`, "Horas"]} />
                   <Bar dataKey="hours" fill="#e11d48" radius={[5, 5, 0, 0]} />
