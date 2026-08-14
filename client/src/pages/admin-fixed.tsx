@@ -84,6 +84,7 @@ import { CostMultipliersManager } from "@/components/cost-multipliers-manager";
 import { ExchangeRateManager } from "@/components/admin/ExchangeRateManager";
 import { PersonnelHistoricalCostsManager } from "@/components/admin/PersonnelHistoricalCostsManager";
 import { HistoricalCostsTable } from "@/components/admin/HistoricalCostsTable";
+import { AdminDataCleanup } from "@/components/admin/AdminDataCleanup";
 
 
 import { 
@@ -1005,6 +1006,10 @@ export default function Admin() {
             <BadgeDollarSign className="h-4 w-4" />
             Inflación
           </TabsTrigger>
+          <TabsTrigger value="data-cleanup" className="flex items-center gap-2 text-red-700 data-[state=active]:text-red-800">
+            <Trash className="h-4 w-4" />
+            Borrado de datos
+          </TabsTrigger>
 
         </TabsList>
 
@@ -1542,6 +1547,9 @@ export default function Admin() {
           </Card>
         </TabsContent>
 
+        <TabsContent value="data-cleanup">
+          <AdminDataCleanup />
+        </TabsContent>
 
       </Tabs>
 

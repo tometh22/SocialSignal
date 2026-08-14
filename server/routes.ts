@@ -159,6 +159,7 @@ import {
 import * as income from './domain/income';
 import { INCOME_SOT_ENABLED, logIncomeSOT } from './domain/income/feature-flag';
 import { createXlsxBuffer } from './utils/xlsx-export';
+import { getAdminCleanupInventory, permanentlyDeleteAdminData } from './services/adminDataCleanup';
 
 // 🚀 COSTS SOT - Nueva fuente única de verdad para costos
 import * as costs from './domain/costs';
@@ -10535,6 +10536,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     next();
   };
+
+  // =========== BORRADO PERMANENTE DE DATOS (ADMIN-ONLY) ===========
+  // Deliberadamente separado de los endpoints de usuario: permite seleccionar
+  // varios recursos en una sola transacción, pero nunca acepta "borrar todo"
+  // implícito. El cliente debe enviar los IDs concretos y una confirmación.
+  app.get("/api/admin/data-cleanup", requireAuth, requireAdminMiddleware, async (_req, res) => {
+    try {
+      res.json(await getAdminCleanupInventory());
+    } catch (error) {
+      console.error("Error obteniendo inventario de borrado admin:", error);
+      res.status(500).json({ message: "No se pudo cargar el inventario de datos" });
+    }
+  });
+
+  app.delete("/api/admin/data-cleanup", requireAuth, requireAdminMiddleware, async (req, res) => {
+    if (req.body?.confirmation !== "ELIMINAR_DEFINITIVAMENTE") {
+      return res.status(400).json({ message: "Confirmación inválida" });
+    }
+
+    try {
+      const result = await permanentlyDeleteAdminData({
+        projects: req.body?.projects,
+        tasks: req.body?.tasks,
+        quotations: req.body?.quotations,
+        statuses: req.body?.statuses,
+      });
+      res.json({ success: true, deleted: result });
+    } catch (error: any) {
+      console.error("Error en borrado permanente admin:", error);
+      const message = error instanceof Error ? error.message : "No se pudieron eliminar los datos";
+      const status = message.includes("proyecto conservado") ? 409 : 400;
+      res.status(status).json({ message });
+    }
+  });
 
   app.get("/api/admin/users", requireAuth, requireAdminMiddleware, async (req: Request, res: Response) => {
     try {
