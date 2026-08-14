@@ -69,7 +69,7 @@ describe("Feedback Mind V2-9 product definitions contract", () => {
       "PRO-06": /estado.*Vista de proyectos.*Tareas/i,
       "PRO-07": /Cliente > Proyecto.*lista\/carpeta/i,
       "PRO-08": /Colaboradores.*activos asignados.*Operaciones/i,
-      "PRO-09": /Ops\/Admin.*active-projects.*colaboradores.*tasks\/projects/i,
+      "PRO-09": /Ops\/Admin.*active-projects.*tasks\/projects.*tipo Asana.*usuarios autorizados/i,
       "PRO-10": /costo.*horas.*altas.*ediciones.*bajas/i,
       "PRO-11": /actividad.*Tareas.*proyecto/i,
       "PRO-12": /Evaluar retirar.*actividad/i,
@@ -118,5 +118,13 @@ describe("Feedback Mind V2-9 product definitions contract", () => {
   it("leaves only the two authorized deferred decisions", () => {
     const deferredRows = Array.from(productDefinitionsMarkdown.matchAll(/^\| ([A-Z]+-\d{2}) \| Diferido \|/gm), match => match[1]);
     expect(deferredRows).toEqual(["PRO-12", "TAR-16"]);
+  });
+
+  it("maps every Feedback 14-8 follow-up without silently implementing new product proposals", () => {
+    const addendumIds = Array.from(productDefinitionsMarkdown.matchAll(/^\| (F14-\d{2}) \|/gm), match => match[1]);
+    expect(addendumIds).toEqual(Array.from({ length: 23 }, (_, index) => `F14-${String(index + 1).padStart(2, "0")}`));
+    expect(productDefinitionsMarkdown).toContain("F14-10 | Requiere definición");
+    expect(productDefinitionsMarkdown).toContain("F14-13 | Requiere definición");
+    expect(productDefinitionsMarkdown).toContain("F14-23 | Implementado");
   });
 });

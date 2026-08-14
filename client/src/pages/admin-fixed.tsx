@@ -1104,9 +1104,6 @@ export default function Admin() {
                   <CardDescription>Gestioná los datos contractuales; las tarifas se administran en la fuente histórica de abajo.</CardDescription>
                 </div>
                 <div className="flex items-center gap-2">
-                  <a href="#personal-cost-history" className="rounded-md border px-3 py-2 text-sm text-muted-foreground hover:bg-muted">
-                    Ver costos históricos
-                  </a>
                   <a href="#personal-cost-history-grid" className="rounded-md border px-3 py-2 text-sm text-muted-foreground hover:bg-muted">
                     Ver tabla mensual
                   </a>

@@ -249,7 +249,7 @@ function transformBackendResponse(backendData: any): ProjectsApi {
         costUSDNormalized,
         markup,
         margin,
-        totalHours: p.metrics?.totalHours,
+        totalHours: p.metrics?.totalHours ?? p.metrics?.workedHours,
       },
       anomaly: anomaly.length > 0 ? anomaly : undefined,
       projectType: p.projectType,

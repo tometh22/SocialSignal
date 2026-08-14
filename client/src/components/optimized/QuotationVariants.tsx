@@ -96,6 +96,7 @@ export function QuotationVariants({
       setLoading(true);
       const response = await apiRequest(`/api/quotations/${quotationId}/variants`, 'GET');
       setVariants(response);
+      setSelectedVariantIds(response.filter((variant: QuotationVariant) => variant.isSelected).map((variant: QuotationVariant) => variant.id));
       
       // If no variants exist, create default variants
       if (response.length === 0) {
@@ -561,6 +562,18 @@ export function QuotationVariants({
     return baseTeamMembers.reduce((sum, m) => sum + getEffectiveMemberHours(variant, m), 0);
   };
 
+  const getBaseReferenceTotal = (): number => {
+    const persistedBase = toStoredCurrency(totalAmount);
+    if (persistedBase > 0) return persistedBase;
+    const intermediate = variants.find((variant) => variant.variantName === 'Intermedio');
+    return intermediate ? computeVariantTotal(intermediate) : 0;
+  };
+
+  const getDifferenceVsBase = (variant: QuotationVariant): number => {
+    const reference = getBaseReferenceTotal();
+    return reference > 0 ? Math.round(((computeVariantTotal(variant) / reference) - 1) * 100) : 0;
+  };
+
   if (loading) {
     return (
       <div className="p-6">
@@ -614,7 +627,7 @@ export function QuotationVariants({
           
           <Dialog>
             <DialogTrigger asChild>
-              <Button variant="outline" className="flex items-center gap-2">
+              <Button variant="outline" size="sm" className="flex items-center gap-2">
                 <Plus className="h-4 w-4" />
                 Nueva Variante
               </Button>
@@ -775,11 +788,7 @@ export function QuotationVariants({
               {/* Indicador de Diferencia */}
               <div className="flex justify-center">
                 {(() => {
-                  const varTotal = computeVariantTotal(variant);
-                  // varTotal ya está en la moneda de visualización; totalAmount
-                  // (prop) sigue en ARS crudo — convertir antes del ratio.
-                  const baseTotalDisplay = toStoredCurrency(totalAmount);
-                  const diff = baseTotalDisplay > 0 ? Math.round(((varTotal / baseTotalDisplay) - 1) * 100) : 0;
+                  const diff = getDifferenceVsBase(variant);
                   if (diff > 0) return <Badge variant="secondary" className="bg-green-100 text-green-800"><TrendingUp className="h-3 w-3 mr-1" />+{diff}%</Badge>;
                   if (diff < 0) return <Badge variant="secondary" className="bg-red-100 text-red-800"><TrendingDown className="h-3 w-3 mr-1" />{diff}%</Badge>;
                   return <Badge variant="secondary" className="bg-gray-100 text-gray-800"><Minus className="h-3 w-3 mr-1" />Base</Badge>;
@@ -833,7 +842,7 @@ export function QuotationVariants({
                     <th className="text-right p-2">Costo Base</th>
                     <th className="text-right p-2">Markup</th>
                     <th className="text-right p-2">Total</th>
-                    <th className="text-center p-2">Margen vs Base</th>
+                    <th className="text-center p-2">Diferencia vs cotización base</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -845,16 +854,11 @@ export function QuotationVariants({
                       <td className="p-2 text-right font-medium">{formatCurrency(variant.totalAmount)}</td>
                       <td className="p-2 text-center">
                         {(() => {
-                          // Encontrar la variante base (Básico) como referencia
-                          const baseVariant = variants.find(v => v.variantName === 'Básico') || variants[0];
-                          if (!baseVariant) return <span>-</span>;
-                          
-                          // variant.totalAmount y baseVariant.totalAmount ya están en la
-                          // moneda de visualización (ver toStoredCurrency) — no hay que
-                          // volver a convertir para comparar.
+                          const baseReferenceTotal = getBaseReferenceTotal();
+                          if (baseReferenceTotal <= 0) return <span>-</span>;
                           const isARS = quotationData.quotationCurrency === 'ARS';
-                          const convertedVariantAmount = variant.totalAmount;
-                          const convertedBaseAmount = baseVariant.totalAmount;
+                          const convertedVariantAmount = computeVariantTotal(variant);
+                          const convertedBaseAmount = baseReferenceTotal;
                           
                           if (convertedVariantAmount > convertedBaseAmount) {
                             const percentDiff = Math.round(((convertedVariantAmount / convertedBaseAmount) - 1) * 100);

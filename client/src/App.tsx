@@ -89,11 +89,6 @@ function PortfolioHubByRole() {
   return isOperations ? <ActiveProjectsNext /> : <Redirect to="/tasks/projects" />;
 }
 
-function TaskProjectsHubByRole() {
-  const { isOperations } = usePermissions();
-  return isOperations ? <Redirect to="/active-projects" /> : <ProjectsHubPage />;
-}
-
 function OperationsOnlyProjectCreate() {
   const { isOperations } = usePermissions();
   return isOperations ? <NewProjectWithTooltips /> : <Redirect to="/tasks/projects" />;
@@ -119,9 +114,8 @@ function OperationsOnlyProjectTimeEntries() {
   return isOperations ? <TimeEntries /> : <Redirect to="/tasks/projects" />;
 }
 
-function ProjectRedirectByRole({ params }: { params: { id: string } }) {
-  const { isOperations } = usePermissions();
-  return <Redirect to={isOperations ? `/active-projects/${params.id}` : `/tasks/projects/${params.id}`} />;
+function ProjectTasksRedirect({ params }: { params: { id: string } }) {
+  return <Redirect to={`/tasks/projects/${params.id}`} />;
 }
 
 // Wrapper para procesar parámetros de consulta para OptimizedQuote
@@ -258,7 +252,7 @@ function AppRoutes() {
                   <ProtectedRoute path="/active-projects/:id/edit" component={OperationsOnlyProjectEdit} requiredPermission="projects" />
                   <ProtectedRoute path="/active-projects/:id" component={OperationsOnlyProjectDetail} requiredPermission="projects" />
                   <ProtectedRoute path="/active-projects/:id/time-entries" component={OperationsOnlyProjectTimeEntries} requiredPermission="projects" />
-                  <ProtectedRoute path="/projects/:id" component={ProjectRedirectByRole} requiredPermission="projects" />
+                  <ProtectedRoute path="/projects/:id" component={ProjectTasksRedirect} requiredPermission="projects" />
                   <ProtectedRoute path="/project-settings/:id" component={OperationsOnlyProjectSettings} requiredPermission="projects" />
                   <ProtectedRoute path="/time-entries/project/:projectId" component={OperationsOnlyProjectTimeEntries} requiredPermission="projects" />
 
@@ -284,7 +278,7 @@ function AppRoutes() {
                   <ProtectedRoute path="/tasks/team-calendar" component={TeamCalendarPage} requiredPermission="projects" />
                   <ProtectedRoute path="/tasks/hours-dashboard" component={HoursDashboardPage} requiredAnyPermission={HOURS_DASHBOARD_ACCESS_SECTIONS} />
                   <ProtectedRoute path="/absences" component={PersonnelAbsences} requiredAnyPermission={HOME_ACCESS_SECTIONS} />
-                  <ProtectedRoute path="/tasks/projects" component={TaskProjectsHubByRole} requiredPermission="projects" />
+                  <ProtectedRoute path="/tasks/projects" component={ProjectsHubPage} requiredPermission="projects" />
                   <ProtectedRoute path="/tasks/projects/:id" component={ProjectTasksPage} requiredPermission="projects" />
 
                   {/* CRM Ventas */}
@@ -326,8 +320,8 @@ function AppRoutes() {
 
                   
                   {/* Legacy Redirects */}
-                  <ProtectedRoute path="/project-details/:id" component={ProjectRedirectByRole} requiredPermission="projects" />
-                  <ProtectedRoute path="/project/:id" component={ProjectRedirectByRole} requiredPermission="projects" />
+                  <ProtectedRoute path="/project-details/:id" component={ProjectTasksRedirect} requiredPermission="projects" />
+                  <ProtectedRoute path="/project/:id" component={ProjectTasksRedirect} requiredPermission="projects" />
                   
                   <Route component={NotFound} />
                 </Switch>

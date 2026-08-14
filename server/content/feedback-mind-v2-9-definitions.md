@@ -1,6 +1,6 @@
 ---
-version: 2.9.1
-updatedAt: 2026-08-13
+version: 2.9.3
+updatedAt: 2026-08-14
 feedbackCount: 70
 ---
 
@@ -43,7 +43,7 @@ Este documento es la fuente canónica y versionada de las reglas funcionales cer
 | PRO-06 | Implementado | Gestionar el estado sólo en Vista de proyectos; Tareas lo muestra en lectura. |
 | PRO-07 | Implementado | Usar jerarquía Cliente > Proyecto, vista lista/carpeta y carpetas cerradas por defecto. |
 | PRO-08 | Implementado | Colaboradores ven sólo proyectos activos asignados; Operaciones ve todos con filtro. |
-| PRO-09 | Implementado | Unificar las superficies de Operaciones: Ops/Admin usan /active-projects y colaboradores /tasks/projects. |
+| PRO-09 | Implementado | Separar los destinos por intención: Ops/Admin conservan /active-projects para cartera financiera; /tasks/projects y su detalle son la superficie operativa tipo Asana para todos los usuarios autorizados. |
 | PRO-10 | Implementado | Reflejar costo y horas del proyecto después de altas, ediciones y bajas de tiempo. |
 | PRO-11 | Implementado | Reflejar la actividad del módulo Tareas dentro del proyecto. |
 | PRO-12 | Diferido | Evaluar retirar de Vista de proyectos la actividad propia de Gestión de tareas; no hubo decisión funcional autorizada. |
@@ -87,6 +87,38 @@ Este documento es la fuente canónica y versionada de las reglas funcionales cer
 
 Se consideran parte indivisible de esta versión: CFG-03, CFG-04, COT-05, COT-06, COT-07, COT-08, COT-11, COT-12, COT-13, COT-14, COT-15, COT-16, PRO-09, TAR-20, TAR-21, TAR-22, TAR-23, TAR-24, TAR-25, TAR-26 y OPS-08 (workflow transversal de Ausencias/Notificaciones). El cierre no modifica PRO-12 ni TAR-16.
 
+## Addendum — revisión visual Feedback 14-8
+
+Este addendum registra las diez capturas recibidas el 14 de agosto de 2026. No altera la identidad ni el conteo de las 70 entradas originales; documenta su verificación posterior y separa propuestas nuevas de defectos del alcance aprobado.
+
+| ID | Estado | Definición y resolución |
+|---|---|---|
+| F14-01 | Implementado | Configuración conserva una sola entrada a la tabla mensual; se retiró el enlace “Ver costos históricos” cuyo administrador legacy ya no existe. |
+| F14-02 | Implementado | Rol vigente, Subnivel y Rol viejo se descubren por encabezados desde la tabla independiente de Personal del Máster y se combinan por nombre normalizado con las tarifas. No dependen de que esas columnas estén en “Valor Hora Real y Estimada”. |
+| F14-03 | Implementado | Información básica usa un bloque de formulario centrado y el contexto del cliente queda debajo, dentro del mismo ancho canónico. |
+| F14-04 | Implementado | Mes salarial y Proyección de tarifas usan contenido, texto y selectores centrados en desktop, tablet y móvil. |
+| F14-05 | Implementado | Tarifas y montos USD muestran siempre dos decimales en Equipo, Revisión, Variantes y Gestión; ARS conserva presentación sin centavos. |
+| F14-06 | Implementado | Los cuatro KPIs de Revisión comparten alto, centrado y alineación interna. |
+| F14-07 | Implementado | Las variantes automáticas permiten ajustar horas por persona, recalculan con el motor canónico y comparan el resultado efectivo contra la cotización base. |
+| F14-08 | Implementado | “Seleccionar todo” y “Nueva variante” usan el mismo tamaño de control. |
+| F14-09 | Implementado | En Gestión, badges y datos de cotización permanecen en flujo responsivo y no se superponen ni desplazan. |
+| F14-10 | Requiere definición | La propuesta de un Kanban global de proyectos con cinco etapas es un producto nuevo: requiere definir si sustituye o complementa cartera, permisos, estados canónicos y reglas de transición. No se agrega dentro de este cierre. |
+| F14-11 | Implementado | La cartera financiera incluye proyectos que tengan sólo hechos de labor, usa nombre propio para proyectos sin cotización y publica costo y horas reales tras cada reconstrucción. |
+| F14-12 | Diferido existente | Retirar actividad de Tareas de la vista financiera sigue siendo PRO-12; no hay autorización funcional para cambiarlo. |
+| F14-13 | Requiere definición | Sustituir el gráfico mensual por un donut es una propuesta de visualización nueva. Se conserva el gráfico actual ya corregido hasta definir qué dimensión representa el porcentaje y cuál es su denominador. |
+| F14-14 | Implementado | La pestaña Finalizadas sólo incluye `completedAt` de la semana civil vigente en Buenos Aires. |
+| F14-15 | Implementado | Una carga realizada por Operaciones para un tercero guarda `personnelId` del tercero y `createdBy` del operador; panel, capacidad, cierre y cartera agregan por la persona atribuida. |
+| F14-16 | Implementado | `done` no está disponible en desplegables ni drag; el checklist y el endpoint de finalización son el único contrato. |
+| F14-17 | Implementado | Prioridad se edita inline con `low`, `medium`, `high`, `urgent`, actualización optimista y rollback. |
+| F14-18 | Implementado | La tarjeta duplicada “Por sección” fue retirada. |
+| F14-19 | Implementado | “Equipo del proyecto” reemplaza “Personas involucradas” y usa miembros reales con estadísticas por persona. |
+| F14-20 | Implementado | Un status custom puede eliminarse con confirmación mediante su endpoint dedicado. |
+| F14-21 | Implementado | El cierre mensual suma las cargas de Tareas por `personnelId`, incluidas las realizadas por Operaciones para otra persona. |
+| F14-22 | Implementado | Ausencias dispone de autoservicio, aprobación/rechazo, cancelación, cupos separados y notificaciones. |
+| F14-23 | Implementado | Todo enlace de proyecto originado en Home o Tareas abre `/tasks/projects/:id`; `/active-projects` queda reservado a la intención financiera de Ops/Admin. |
+
+La verificación de datos del Máster requiere credenciales Google válidas en el entorno desplegado. Un fallo de autenticación nunca se presenta como sincronización exitosa y no aplica cambios parciales.
+
 ## Costos de Personal
 
 Valor hora es la fuente canónica. Para cada moneda se calcula de forma independiente:
@@ -121,9 +153,9 @@ El resultado se redondea a dos decimales con una política única. El precio man
 
 ## Proyectos y tareas
 
-- Operaciones/Admin administra cartera en `/active-projects`. Colaboradores usan `/tasks/projects` y sólo ven proyectos activos donde son miembros o responsables.
+- Operaciones/Admin administra cartera y finanzas en `/active-projects`. La navegación operativa desde Home/Tareas usa `/tasks/projects` y `/tasks/projects/:id` para todos los roles autorizados; el backend limita colaboradores a proyectos activos donde son miembros o responsables y permite a Operaciones/Admin usar el alcance de equipo.
 - Creación, edición financiera y cambios de estado requieren Operaciones/Admin en servidor.
-- `/tasks/projects/:id` es la superficie operativa para miembros autorizados.
+- `/tasks/projects/:id` es la superficie operativa tipo Asana para miembros autorizados y para Operaciones/Admin.
 - `ProjectOverviewPanel` es el resumen único. Equipo del proyecto se deriva de miembros reales.
 - Una tarea se completa únicamente por `POST /api/tasks/:id/completion`. Marcar checklist establece `done` y `completedAt`; desmarcar establece `todo` y limpia `completedAt`.
 - La mutación genérica de estado rechaza `done`; el tablero no permite arrastrar hacia ni desde Finalizadas. El mismo contrato aplica a subtareas.

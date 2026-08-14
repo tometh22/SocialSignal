@@ -154,11 +154,15 @@ describe("Feedback Mind V2-9 integration contracts", () => {
     expect(routes).toContain('eventKey: `absence-cancellation-requested:${absenceId}:${new Date(updated.updatedAt).toISOString()}`');
   });
 
-  it("keeps the project surfaces canonical by role", () => {
+  it("keeps financial portfolio separate from the Asana-style operational surface", () => {
     const app = source("client/src/App.tsx");
+    const home = source("client/src/pages/home-dashboard.tsx");
     expect(app).toContain('return isOperations ? <ActiveProjectsNext /> : <Redirect to="/tasks/projects" />');
-    expect(app).toContain('return isOperations ? <Redirect to="/active-projects" /> : <ProjectsHubPage />');
-    expect(app).toContain('isOperations ? `/active-projects/${params.id}` : `/tasks/projects/${params.id}`');
+    expect(app).toContain('path="/tasks/projects" component={ProjectsHubPage}');
+    expect(app).toContain('return <Redirect to={`/tasks/projects/${params.id}`} />');
+    expect(app).not.toContain('isOperations ? <Redirect to="/active-projects" /> : <ProjectsHubPage />');
+    expect(home).toContain('href={`/tasks/projects/${alert.projectId}`}');
+    expect(home).not.toContain('href={`/active-projects/${alert.projectId}`}');
   });
 
   it("keeps one management overview and the real project team", () => {
@@ -169,6 +173,36 @@ describe("Feedback Mind V2-9 integration contracts", () => {
     expect(overview).not.toContain("Por sección");
     expect(overview).toContain("Equipo del proyecto");
     expect(overview).toContain("members.map");
+  });
+
+  it("includes labor-only projects and exposes their real portfolio hours", () => {
+    const aggregator = source("server/domain/view-aggregator.ts");
+    const routes = source("server/routes.ts");
+    const portfolio = source("client/src/pages/active-projects-next.tsx");
+    expect(aggregator).toContain("laborProjectsInPeriod");
+    expect(aggregator).toContain("...laborProjectsInPeriod.map((project) => project.projectId)");
+    expect(aggregator).toContain("project.quotationProjectName || project.activeProjectName || project.subprojectName");
+    expect(aggregator).toContain("totalHours: viewData.totalWorkedHours");
+    expect(routes).toContain("project.metrics.workedHours = finData.metrics.totalHours");
+    expect(portfolio).toContain("p.metrics?.totalHours ?? p.metrics?.workedHours");
+  });
+
+  it("discovers role metadata outside the hourly-rate tab", () => {
+    const sync = source("server/services/personnelSheetsSync.ts");
+    expect(sync).toContain("parsePersonnelMetadataGrid");
+    expect(sync).toContain('fields: "sheets.properties.title"');
+    expect(sync).toContain("mergePersonnelMetadata(rateRows, metadataRows)");
+  });
+
+  it("formats USD with cents and keeps quotation variants visibly comparable", () => {
+    const team = source("client/src/components/optimized/EnhancedTeamConfig.tsx");
+    const review = source("client/src/components/optimized/financial-review-final.tsx");
+    const variants = source("client/src/components/optimized/QuotationVariants.tsx");
+    expect(team).toContain("minimumFractionDigits: currency === 'USD' ? 2 : 0");
+    expect(review).toContain("minimumFractionDigits: currencyLabel === 'USD' ? 2 : 0");
+    expect(variants).toContain("getDifferenceVsBase");
+    expect(variants).toContain("Diferencia vs cotización base");
+    expect(variants).toContain('variant="outline" size="sm" className="flex items-center gap-2"');
   });
 
   it("keeps the hours chart responsive and priority editable inline", () => {

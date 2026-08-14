@@ -16,6 +16,7 @@ import * as fs from "fs";
 const SPREADSHEET_ID = "1FZLFmTQQOSYQns2cOYlM86UGEH7EHZsJOFegyDR7quc";
 const SHEET_TAB = "Valor Hora Real y Estimada";
 const READ_RANGE = `'${SHEET_TAB}'!A1:AZ200`;
+const PERSONNEL_METADATA_RANGE = "A1:Z500";
 
 const SPANISH_MONTHS: Record<string, string> = {
   ene: "jan", feb: "feb", mar: "mar", abr: "apr",
@@ -30,6 +31,14 @@ export interface ParsedSheetRow {
   // synchronization never writes it directly: it is checked against
   // hourly-rate × hours and a persistent warning is emitted on mismatch.
   monthlySalaries?: Record<string, number>;
+  currentRole?: string | null;
+  sublevel?: string | null;
+  legacyRole?: string | null;
+}
+
+export interface ParsedPersonnelMetadata {
+  sheetName: string;
+  email?: string | null;
   currentRole?: string | null;
   sublevel?: string | null;
   legacyRole?: string | null;
@@ -123,6 +132,91 @@ export function parseMoney(raw: unknown): number | null {
   }
   const n = parseFloat(s);
   return isFinite(n) && n > 0 ? n : null;
+}
+
+function normalizeHeader(raw: unknown): string {
+  return String(raw ?? "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+/**
+ * Parses the personnel catalogue independently from the hourly-rate tab.
+ * The Master keeps Nombre/Mail/Rol viejo/Estado/Rol/Subnivel in a separate
+ * table, whose tab name can change. Header-based discovery avoids coupling
+ * the synchronization contract to a particular tab or column position.
+ */
+export function parsePersonnelMetadataGrid(rows: string[][]): ParsedPersonnelMetadata[] {
+  const headerAliases = {
+    name: new Set(["nombre", "nombre completo", "persona", "personal"]),
+    email: new Set(["mail", "email", "correo", "correo electronico"]),
+    currentRole: new Set(["rol", "role", "rol actual"]),
+    sublevel: new Set(["subnivel", "sublevel", "sub nivel"]),
+    legacyRole: new Set(["rol viejo", "rol anterior", "legacy role"]),
+  };
+  const findColumn = (headers: string[], aliases: Set<string>) =>
+    headers.findIndex((header) => aliases.has(header));
+
+  for (let headerRow = 0; headerRow < Math.min(rows.length, 50); headerRow++) {
+    const headers = (rows[headerRow] ?? []).map(normalizeHeader);
+    const nameCol = findColumn(headers, headerAliases.name);
+    const roleCol = findColumn(headers, headerAliases.currentRole);
+    const sublevelCol = findColumn(headers, headerAliases.sublevel);
+    const legacyRoleCol = findColumn(headers, headerAliases.legacyRole);
+    if (nameCol < 0 || (roleCol < 0 && sublevelCol < 0 && legacyRoleCol < 0)) continue;
+
+    const emailCol = findColumn(headers, headerAliases.email);
+    const parsed: ParsedPersonnelMetadata[] = [];
+    for (let rowIndex = headerRow + 1; rowIndex < rows.length; rowIndex++) {
+      const row = rows[rowIndex] ?? [];
+      const sheetName = String(row[nameCol] ?? "").trim();
+      if (!sheetName) continue;
+      const cell = (column: number) => column >= 0 ? String(row[column] ?? "").trim() || null : null;
+      parsed.push({
+        sheetName,
+        email: cell(emailCol),
+        currentRole: cell(roleCol),
+        sublevel: cell(sublevelCol),
+        legacyRole: cell(legacyRoleCol),
+      });
+    }
+    return parsed;
+  }
+
+  return [];
+}
+
+export function mergePersonnelMetadata(
+  rateRows: ParsedSheetRow[],
+  metadataRows: ParsedPersonnelMetadata[],
+): ParsedSheetRow[] {
+  const metadataByName = new Map<string, ParsedPersonnelMetadata>();
+  for (const metadata of metadataRows) {
+    const key = normalizeName(metadata.sheetName);
+    const current = metadataByName.get(key);
+    metadataByName.set(key, {
+      sheetName: current?.sheetName ?? metadata.sheetName,
+      email: current?.email ?? metadata.email ?? null,
+      currentRole: current?.currentRole ?? metadata.currentRole ?? null,
+      sublevel: current?.sublevel ?? metadata.sublevel ?? null,
+      legacyRole: current?.legacyRole ?? metadata.legacyRole ?? null,
+    });
+  }
+
+  return rateRows.map((row) => {
+    const metadata = metadataByName.get(normalizeName(row.sheetName));
+    if (!metadata) return row;
+    return {
+      ...row,
+      currentRole: row.currentRole ?? metadata.currentRole ?? null,
+      sublevel: row.sublevel ?? metadata.sublevel ?? null,
+      legacyRole: row.legacyRole ?? metadata.legacyRole ?? null,
+    };
+  });
 }
 
 export function parseValorHoraSection(rows: string[][], year: number): ParsedSheetRow[] {
@@ -252,7 +346,38 @@ export async function fetchValorHoraForYear(year: number): Promise<ParsedSheetRo
     range: READ_RANGE,
   });
   const rows = (response.data.values || []) as string[][];
-  return parseValorHoraSection(rows, year);
+  const rateRows = parseValorHoraSection(rows, year);
+
+  try {
+    const workbook = await sheets.spreadsheets.get({
+      spreadsheetId: SPREADSHEET_ID,
+      fields: "sheets.properties.title",
+    });
+    const tabTitles = (workbook.data.sheets ?? [])
+      .map((sheet) => sheet.properties?.title)
+      .filter((title): title is string => Boolean(title) && title !== SHEET_TAB)
+      .sort((left, right) => {
+        const priority = (title: string) => /personal|equipo|team|staff|rrhh/i.test(title) ? 0 : 1;
+        return priority(left) - priority(right);
+      });
+    if (tabTitles.length === 0) return rateRows;
+
+    const metadataResponse = await sheets.spreadsheets.values.batchGet({
+      spreadsheetId: SPREADSHEET_ID,
+      ranges: tabTitles.map((title) => `'${title.replace(/'/g, "''")}'!${PERSONNEL_METADATA_RANGE}`),
+      majorDimension: "ROWS",
+      valueRenderOption: "FORMATTED_VALUE",
+    });
+    const metadataRows = (metadataResponse.data.valueRanges ?? []).flatMap((range) =>
+      parsePersonnelMetadataGrid((range.values ?? []) as string[][]),
+    );
+    return mergePersonnelMetadata(rateRows, metadataRows);
+  } catch (error) {
+    // Rates remain usable if an unrelated catalogue tab is temporarily
+    // unreadable; auth failures still surface from the primary reads above.
+    console.warn("[personnel-sheets-sync] No se pudo leer metadata de Personal; se sincronizarán sólo tarifas.", error);
+    return rateRows;
+  }
 }
 
 /** @deprecated Use fetchValorHoraForYear(2026) */
