@@ -26,6 +26,9 @@ interface ViewModelOutput {
   estimatedHours: number;
   teamBreakdown: any[];
   flags: string[];
+  revenueUSDNormalized?: number;
+  costUSDNormalized?: number;
+  fxRate?: number | null;
 }
 
 /**
@@ -318,7 +321,10 @@ async function getProjectPeriodViewFromSoT(
     totalBillingHours,
     estimatedHours,
     teamBreakdown,
-    flags: []
+    flags: [],
+    revenueUSDNormalized: revenueUSDVal,
+    costUSDNormalized: totalCostUSD,
+    fxRate: fxRate > 0 ? fxRate : null,
   };
 
   console.log(`✅ [SoT Reader] SUCCESS: team=${teamBreakdown.length}, totalBillingHours=${totalBillingHours.toFixed(2)}, costDisplay=${costDisplay.toFixed(2)} ${currencyNative}`);
@@ -593,6 +599,7 @@ export interface FinancialProjectMetrics {
     profitUSD: number;
     margin: number | null;
     markup: number | null;
+    totalHours: number;
   };
 }
 
@@ -604,10 +611,18 @@ export async function aggregateProjectsFromStarSchema(
   
   try {
     // 1) Obtener todos los projectIds únicos del Star Schema para este período
-    const projectsInPeriod = await db
-      .selectDistinct({ projectId: factRCMonth.projectId })
-      .from(factRCMonth)
-      .where(eq(factRCMonth.periodKey, periodKey));
+    const [rcProjectsInPeriod, laborProjectsInPeriod] = await Promise.all([
+      db.selectDistinct({ projectId: factRCMonth.projectId })
+        .from(factRCMonth)
+        .where(eq(factRCMonth.periodKey, periodKey)),
+      db.selectDistinct({ projectId: factLaborMonth.projectId })
+        .from(factLaborMonth)
+        .where(eq(factLaborMonth.periodKey, periodKey)),
+    ]);
+    const projectsInPeriod = Array.from(new Set([
+      ...rcProjectsInPeriod.map((project) => project.projectId),
+      ...laborProjectsInPeriod.map((project) => project.projectId),
+    ])).map((projectId) => ({ projectId }));
 
     console.log(`  📊 Found ${projectsInPeriod.length} projects in Star Schema for period ${periodKey}`);
 
@@ -622,7 +637,9 @@ export async function aggregateProjectsFromStarSchema(
       .select({
         projectId: activeProjects.id,
         clientName: clients.name,
-        projectName: quotations.projectName,
+        activeProjectName: activeProjects.name,
+        subprojectName: activeProjects.subprojectName,
+        quotationProjectName: quotations.projectName,
         projectType: sql<string>`NULL`,
         quotationType: quotations.quotationType
       })
@@ -642,7 +659,8 @@ export async function aggregateProjectsFromStarSchema(
     const results: FinancialProjectMetrics[] = [];
 
     for (const project of projectsData) {
-      if (!project.clientName || !project.projectName) {
+      const projectName = project.quotationProjectName || project.activeProjectName || project.subprojectName;
+      if (!project.clientName || !projectName) {
         console.warn(`  ⚠️ Skipping project ${project.projectId} - missing client/project name`);
         continue;
       }
@@ -660,22 +678,22 @@ export async function aggregateProjectsFromStarSchema(
 
       // 4) Convertir a formato FinancialProjectMetrics
       const { canonicalizeKey } = await import('./shared/strings');
-      const projectKey = canonicalizeKey(`${project.clientName}|${project.projectName}`);
+      const projectKey = canonicalizeKey(`${project.clientName}|${projectName}`);
 
-      // Calcular USD normalizado (para KPIs)
-      const revenueUSD = viewData.currencyNative === 'USD' 
-        ? viewData.revenueDisplay 
-        : viewData.revenueDisplay / (viewData.cotizacion || 1345);
-      
-      const costUSD = viewData.currencyNative === 'USD'
-        ? viewData.costDisplay
-        : viewData.costDisplay / (viewData.cotizacion || 1345);
+      // Los hechos ya contienen ambas monedas. Usarlos evita confundir el
+      // monto de cotización con un tipo de cambio y convertir dos veces.
+      const revenueUSD = viewData.revenueUSDNormalized ?? (
+        viewData.currencyNative === 'USD' ? viewData.revenueDisplay : 0
+      );
+      const costUSD = viewData.costUSDNormalized ?? (
+        viewData.currencyNative === 'USD' ? viewData.costDisplay : 0
+      );
 
       results.push({
         projectKey,
         projectId: project.projectId,
         clientName: project.clientName,
-        projectName: project.projectName,
+        projectName,
         projectType: project.projectType,
         currencyNative: viewData.currencyNative as 'USD' | 'ARS',
         isOneShot: project.quotationType === 'one-time',
@@ -686,7 +704,8 @@ export async function aggregateProjectsFromStarSchema(
           costUSDNormalized: costUSD,
           profitUSD: revenueUSD - costUSD,
           margin: viewData.margin,
-          markup: viewData.markup
+          markup: viewData.markup,
+          totalHours: viewData.totalWorkedHours,
         }
       });
 

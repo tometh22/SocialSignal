@@ -107,6 +107,10 @@ const EnhancedTeamConfig: React.FC = () => {
 
   const currency = quotationData.quotationCurrency || 'ARS';
   const currencyLabel = currency === 'USD' ? 'USD' : 'ARS';
+  const formatQuotedAmount = (amount: number) => amount.toLocaleString(currency === 'USD' ? 'en-US' : 'es-AR', {
+    minimumFractionDigits: currency === 'USD' ? 2 : 0,
+    maximumFractionDigits: currency === 'USD' ? 2 : 0,
+  });
 
   const getCorrectRate = (person: Personnel, role?: Role): number => {
     const rate = getPersonnelRate(person.id, currency);
@@ -340,14 +344,14 @@ const EnhancedTeamConfig: React.FC = () => {
               <Calculator className="h-4 w-4 text-green-500" />
               <span className="text-sm font-medium">Costo total:</span>
               <span className="font-bold text-green-600">
-                ${totalCost.toLocaleString('es-AR')} {currencyLabel}
+                ${formatQuotedAmount(totalCost)} {currencyLabel}
               </span>
             </div>
             <div className="flex items-center space-x-2">
               <DollarSign className="h-4 w-4 text-purple-500" />
               <span className="text-sm font-medium">Promedio/hora:</span>
               <span className="font-bold text-purple-600">
-                ${totalHours > 0 ? Math.round(totalCost / totalHours).toLocaleString('es-AR') : 0} {currencyLabel}
+                ${formatQuotedAmount(totalHours > 0 ? totalCost / totalHours : 0)} {currencyLabel}
               </span>
             </div>
           </div>
@@ -507,7 +511,7 @@ const EnhancedTeamConfig: React.FC = () => {
                       <div className="flex-grow">
                         <div className="font-medium">{role.name}</div>
                         <div className={`${isSelected ? 'text-blue-200' : 'text-gray-500'}`}>
-                          ${(currency === 'USD' ? ((role as any).defaultRateUsd || 0) : role.defaultRate).toLocaleString('es-AR')} {currencyLabel}/h
+                          ${formatQuotedAmount(currency === 'USD' ? ((role as any).defaultRateUsd || 0) : role.defaultRate)} {currencyLabel}/h
                         </div>
                       </div>
                       {isSelected && (
@@ -593,7 +597,7 @@ const EnhancedTeamConfig: React.FC = () => {
                         </div>
                         <div className={`${isSelected ? 'text-green-200' : 'text-gray-500'}`}>
                           {getPersonnelRate(person.id, currency) > 0
-                            ? `$${getPersonnelRate(person.id, currency).toLocaleString('es-AR')} ${currencyLabel}/h`
+                            ? `$${formatQuotedAmount(getPersonnelRate(person.id, currency))} ${currencyLabel}/h`
                             : "Sin tarifa histórica"}
                           {isReferenceConversion(person) && !isReferenceConversionMissingFx(person) && <span className="ml-1 text-[10px]">(ref. USD→ARS)</span>}
                           {isReferenceConversionMissingFx(person) && <span className="ml-1 text-[10px] text-amber-600">(falta tipo de cambio)</span>}
@@ -758,7 +762,7 @@ const EnhancedTeamConfig: React.FC = () => {
                                   </div>
                                   <div className="text-center">
                                     <div className="font-medium text-sm">
-                                      ${member.rate.toLocaleString('es-AR')}
+                                      ${formatQuotedAmount(member.rate)}
                                     </div>
                                     <div className="text-xs text-gray-500">{currencyLabel}/hora</div>
                                   </div>
@@ -770,18 +774,18 @@ const EnhancedTeamConfig: React.FC = () => {
                                 <div className="font-bold text-lg text-primary">
                                   ${(() => {
                                     if (!isEditing) {
-                                      return (member.hours * member.rate).toLocaleString('es-AR');
+                                      return formatQuotedAmount(member.hours * member.rate);
                                     }
 
                                     const tempValues = tempEditValues[member.id];
                                     if (!tempValues) {
-                                      return (member.hours * member.rate).toLocaleString();
+                                      return formatQuotedAmount(member.hours * member.rate);
                                     }
 
                                     const hours = tempValues.hours === '' ? member.hours : parseFloat(tempValues.hours) || 0;
                                     const rate = tempValues.rate === '' ? member.rate : parseFloat(tempValues.rate) || 0;
 
-                                    return (hours * rate).toLocaleString();
+                                    return formatQuotedAmount(hours * rate);
                                   })()}
                                 </div>
                                 <div className="text-xs text-gray-500">total</div>

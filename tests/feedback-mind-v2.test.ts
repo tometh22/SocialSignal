@@ -20,7 +20,12 @@ import {
   weeklyEstimateOverlapsRange,
 } from "../shared/utils/taskEstimates";
 import { ApiError, getApiErrorMessage, parseApiError } from "../client/src/lib/api-error";
-import { describeSheetsSyncError, parseValorHoraSection } from "../server/services/personnelSheetsSync";
+import {
+  describeSheetsSyncError,
+  mergePersonnelMetadata,
+  parsePersonnelMetadataGrid,
+  parseValorHoraSection,
+} from "../server/services/personnelSheetsSync";
 import { deriveMonthlySalariesFromHourlyRates } from "../shared/utils/personnel-cost";
 
 test("quotation contract accepts numeric exchangeRateAtQuote and normalizes it for numeric columns", () => {
@@ -267,6 +272,31 @@ test("Google personnel rows capture current role, sublevel and legacy freelance 
     monthlyRates: { jan2026: 10000 },
     monthlySalaries: { jan2026: 1600000 },
   });
+});
+
+test("Google personnel metadata is discovered from its independent catalogue table", () => {
+  const metadata = parsePersonnelMetadataGrid([
+    ["Listado actualizado"],
+    ["Nombre", "Mail", "Rol viejo", "Estado", "Rol", "Subnivel"],
+    ["Ana Pérez", "ana@example.com", "Analista", "ACTIVO", "Productora", "Senior"],
+  ]);
+  expect(metadata).toEqual([{
+    sheetName: "Ana Pérez",
+    email: "ana@example.com",
+    legacyRole: "Analista",
+    currentRole: "Productora",
+    sublevel: "Senior",
+  }]);
+  expect(mergePersonnelMetadata([{
+    sheetName: "ANA PEREZ",
+    monthlyRates: { aug2026: 10_000 },
+  }], metadata)).toEqual([{
+    sheetName: "ANA PEREZ",
+    monthlyRates: { aug2026: 10_000 },
+    legacyRole: "Analista",
+    currentRole: "Productora",
+    sublevel: "Senior",
+  }]);
 });
 
 test("salary remains informational and freelance capacity can be null", () => {

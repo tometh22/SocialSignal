@@ -51,9 +51,9 @@ const OptimizedBasicInfo: React.FC = () => {
       {/* Formulario principal y datos del cliente en un solo componente */}
       <Card className="bg-white border border-neutral-100 shadow-sm overflow-hidden">
         <CardContent className="p-6">
-          <div className="mx-auto grid max-w-5xl grid-cols-1 items-stretch gap-6 md:grid-cols-3">
+          <div className="mx-auto flex max-w-5xl flex-col items-center gap-6">
             {/* Panel izquierdo: Cliente y Nombre del Proyecto */}
-            <div className="space-y-4 md:col-span-2">
+            <div className="w-full max-w-4xl space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Cliente */}
                 <div className="space-y-2">
@@ -258,7 +258,7 @@ const OptimizedBasicInfo: React.FC = () => {
             </div>
 
             {/* Panel derecho: Información del cliente o ayuda contextual */}
-            <div className="flex md:border-l md:border-neutral-100 md:pl-6">
+            <div className="flex w-full max-w-4xl border-t border-neutral-100 pt-6">
               {quotationData.client ? (
                 <div className="w-full self-center rounded-md bg-slate-50 p-4">
                   <div className="flex items-center mb-3">

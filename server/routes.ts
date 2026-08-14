@@ -1043,6 +1043,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             project.metrics.profitUSD = finData.metrics.profitUSD;
             project.metrics.markupRatio = finData.metrics.markup;
             project.metrics.marginFrac = finData.metrics.margin;
+            project.metrics.workedHours = finData.metrics.totalHours;
+            (project.metrics as any).totalHours = finData.metrics.totalHours;
           }
         }
         

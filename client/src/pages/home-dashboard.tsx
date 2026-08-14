@@ -301,7 +301,7 @@ export default function HomeDashboard() {
                 </div>
                 {alert.projectId && (
                   <Link
-                    href={`/active-projects/${alert.projectId}`}
+                    href={`/tasks/projects/${alert.projectId}`}
                     aria-label={`Abrir proyecto ${alert.projectName}`}
                     className="grid h-8 w-8 flex-shrink-0 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-white/70 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
                   >

@@ -472,7 +472,11 @@ export default function ManageQuotes() {
   };
 
     const formatCurrency = (amount: number, curr: string = 'ARS') => {
-        return `$${amount.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} ${curr}`;
+        const isUSD = curr.toUpperCase() === 'USD';
+        return `$${amount.toLocaleString(isUSD ? 'en-US' : 'es-AR', {
+          minimumFractionDigits: isUSD ? 2 : 0,
+          maximumFractionDigits: isUSD ? 2 : 0,
+        })} ${curr}`;
     };
 
     const getStatusVariant = (status: string) => {

@@ -89,9 +89,9 @@ export default function FinancialReviewFinal() {
 
   const currencyLabel = quotationData.quotationCurrency || 'ARS';
   const formatFinalCurrency = (amount: number) => 
-    `${currencyLabel} ${amount.toLocaleString('es-AR', { 
-      minimumFractionDigits: 0, 
-      maximumFractionDigits: 0 
+    `${currencyLabel} ${amount.toLocaleString(currencyLabel === 'USD' ? 'en-US' : 'es-AR', {
+      minimumFractionDigits: currencyLabel === 'USD' ? 2 : 0,
+      maximumFractionDigits: currencyLabel === 'USD' ? 2 : 0,
     })}`;
 
   // Helper function to get role name
@@ -307,13 +307,13 @@ export default function FinancialReviewFinal() {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <Tooltip>
           <TooltipTrigger asChild>
-            <Card className="border-0 shadow-sm bg-gradient-to-br from-blue-50 to-blue-100 cursor-help">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
+            <Card className="h-full border-0 shadow-sm bg-gradient-to-br from-blue-50 to-blue-100 cursor-help">
+              <CardContent className="flex h-full items-center justify-center p-4 text-center">
+                <div className="flex items-center justify-center gap-3">
                   <div className="w-8 h-8 rounded-lg bg-blue-200 flex items-center justify-center">
                     <Users className="h-4 w-4 text-blue-700" />
                   </div>
-                  <div>
+                  <div className="text-center">
                     <p className="text-xs font-medium text-blue-800">Equipo</p>
                     <p className="text-lg font-bold text-blue-900">{quotationData.teamMembers.length} miembros</p>
                     <p className="text-xs text-blue-600">{formatFinalCurrency(teamBaseCostDisplay)} base</p>
@@ -329,13 +329,13 @@ export default function FinancialReviewFinal() {
 
         <Tooltip>
           <TooltipTrigger asChild>
-            <Card className="border-0 shadow-sm bg-gradient-to-br from-amber-50 to-amber-100 cursor-help">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
+            <Card className="h-full border-0 shadow-sm bg-gradient-to-br from-amber-50 to-amber-100 cursor-help">
+              <CardContent className="flex h-full items-center justify-center p-4 text-center">
+                <div className="flex items-center justify-center gap-3">
                   <div className="w-8 h-8 rounded-lg bg-amber-200 flex items-center justify-center">
                     <Target className="h-4 w-4 text-amber-700" />
                   </div>
-                  <div>
+                  <div className="text-center">
                     <p className="text-xs font-medium text-amber-800">Complejidad</p>
                     <p className="text-lg font-bold text-amber-900">+{getComplexityPercentage()}%</p>
                     <p className="text-xs text-amber-600">+{formatFinalCurrency(teamComplexityAdjustmentDisplay)}</p>
@@ -349,13 +349,13 @@ export default function FinancialReviewFinal() {
           </TooltipContent>
         </Tooltip>
 
-        <Card className={`border-0 shadow-sm ${
+        <Card className={`h-full border-0 shadow-sm ${
           quotationData.inflation.applyInflationAdjustment 
             ? 'bg-gradient-to-br from-orange-50 to-orange-100' 
             : 'bg-gradient-to-br from-gray-50 to-gray-100'
         }`}>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
+          <CardContent className="flex h-full items-center justify-center p-4 text-center">
+            <div className="flex items-center justify-center gap-3">
               <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
                 quotationData.inflation.applyInflationAdjustment 
                   ? 'bg-orange-200' 
@@ -367,7 +367,7 @@ export default function FinancialReviewFinal() {
                     : 'text-gray-700'
                 }`} />
               </div>
-              <div>
+              <div className="text-center">
                 <p className={`text-xs font-medium ${
                   quotationData.inflation.applyInflationAdjustment 
                     ? 'text-orange-800' 
@@ -394,13 +394,13 @@ export default function FinancialReviewFinal() {
 
         <Tooltip>
           <TooltipTrigger asChild>
-            <Card className="border-0 shadow-sm bg-gradient-to-br from-green-50 to-green-100 cursor-help">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
+            <Card className="h-full border-0 shadow-sm bg-gradient-to-br from-green-50 to-green-100 cursor-help">
+              <CardContent className="flex h-full items-center justify-center p-4 text-center">
+                <div className="flex items-center justify-center gap-3">
                   <div className="w-8 h-8 rounded-lg bg-green-200 flex items-center justify-center">
                     <TrendingUp className="h-4 w-4 text-green-700" />
                   </div>
-                  <div>
+                  <div className="text-center">
                     <p className="text-xs font-medium text-green-800">Markup</p>
                     <p className="text-lg font-bold text-green-900">
                       {quotationData.financials.priceMode === 'manual' && quotationData.financials.manualPrice 
