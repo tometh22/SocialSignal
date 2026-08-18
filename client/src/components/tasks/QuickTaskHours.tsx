@@ -10,6 +10,7 @@ import { apiRequest, authFetchJson, queryClient } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { getApiErrorMessage } from "@/lib/api-error";
+import { usePermissions } from "@/hooks/use-permissions";
 
 type TimeEntrySummary = {
   id: number;
@@ -24,18 +25,18 @@ type TaskHoursSummary = {
   timeEntries?: TimeEntrySummary[];
 };
 
+type PersonnelOption = { id: number; name: string };
+
 function formatHours(hours: number) {
-  const totalMinutes = Math.round(hours * 60);
-  const wholeHours = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
-  if (wholeHours === 0) return `${minutes}min`;
-  return minutes === 0 ? `${wholeHours}h` : `${wholeHours}h ${minutes}min`;
+  return `${(Math.round(hours * 100) / 100).toFixed(2)} h`;
 }
 
 export default function QuickTaskHours({ taskId, className }: { taskId: number; className?: string }) {
   const { toast } = useToast();
+  const { isOperations } = usePermissions();
   const [open, setOpen] = useState(false);
   const [manual, setManual] = useState("");
+  const [personnelId, setPersonnelId] = useState("");
   const [timerStartedAt, setTimerStartedAt] = useState<number | null>(null);
   const [timerSeconds, setTimerSeconds] = useState(0);
 
@@ -46,11 +47,17 @@ export default function QuickTaskHours({ taskId, className }: { taskId: number; 
     staleTime: 15_000,
   });
 
+  const { data: personnel = [] } = useQuery<PersonnelOption[]>({
+    queryKey: ["/api/personnel"],
+    enabled: open && isOperations,
+  });
+
   const logMutation = useMutation({
     mutationFn: (hours: number) => apiRequest(`/api/tasks/${taskId}/time`, "POST", {
       date: format(new Date(), "yyyy-MM-dd"),
       hours,
       description: "Carga rápida",
+      ...(isOperations && personnelId ? { personnelId: Number(personnelId) } : {}),
     }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
@@ -58,6 +65,8 @@ export default function QuickTaskHours({ taskId, className }: { taskId: number; 
       queryClient.invalidateQueries({ queryKey: ["/api/tasks/hours-summary"] });
       queryClient.invalidateQueries({ queryKey: ["/api/tasks/my-hours"] });
       queryClient.invalidateQueries({ queryKey: ["/api/monthly-closings/real-hours"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
       setManual("");
     },
     onError: (error) => toast({
@@ -118,6 +127,19 @@ export default function QuickTaskHours({ taskId, className }: { taskId: number; 
             </Button>
           ))}
         </div>
+        {isOperations && (
+          <label className="mb-2 block text-[10px] text-muted-foreground">
+            Cargar para
+            <select
+              value={personnelId}
+              onChange={(event) => setPersonnelId(event.target.value)}
+              className="mt-1 h-8 w-full rounded-md border border-input bg-background px-2 text-xs text-foreground"
+            >
+              <option value="">Yo / persona vinculada</option>
+              {personnel.map((person) => <option key={person.id} value={person.id}>{person.name}</option>)}
+            </select>
+          </label>
+        )}
         <div className="mb-2 flex gap-1">
           <Input value={manual} onChange={(event) => setManual(event.target.value)} placeholder="Horas" className="h-8 text-xs" onKeyDown={(event) => event.key === "Enter" && saveManual()} />
           <Button size="sm" className="h-8 text-xs" onClick={saveManual} disabled={logMutation.isPending || !manual.trim()}>

@@ -62,10 +62,7 @@ function getInitials(name: string) {
 
 function formatHours(h: number) {
   if (h === 0) return "—";
-  if (h < 1) return `${Math.round(h * 60)}m`;
-  const hrs = Math.floor(h);
-  const mins = Math.round((h - hrs) * 60);
-  return mins > 0 ? `${hrs}h ${mins}m` : `${hrs}h`;
+  return `${(Math.round(h * 100) / 100).toFixed(2)} h`;
 }
 
 function StatCard({ icon: Icon, label, value, sub, color }: {

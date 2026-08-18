@@ -111,11 +111,7 @@ function parseHoursInput(value: string): number | null {
 }
 
 function formatHours(hours: number) {
-  const h = Math.floor(hours);
-  const m = Math.round((hours - h) * 60);
-  if (h === 0) return `${m}min`;
-  if (m === 0) return `${h}h`;
-  return `${h}h ${m}min`;
+  return `${(Math.round(hours * 100) / 100).toFixed(2)} h`;
 }
 
 function getMondayOf(d: Date): string {
@@ -484,6 +480,7 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
       queryClient.invalidateQueries({ queryKey: ["/api/monthly-closings/real-hours"] });
       if (task?.projectId) {
         queryClient.invalidateQueries({ queryKey: ["/api/tasks/project", task.projectId] });
+        queryClient.invalidateQueries({ queryKey: ["projects", task.projectId, "complete-data"] });
       }
       setLogHours(""); setLogDesc(""); setShowTimeLog(false);
       toast({
@@ -510,6 +507,7 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
       onUpdate?.();
       if (task?.projectId) {
         queryClient.invalidateQueries({ queryKey: ["/api/tasks/project", task.projectId] });
+        queryClient.invalidateQueries({ queryKey: ["projects", task.projectId, "complete-data"] });
       }
       queryClient.invalidateQueries({ queryKey: ["/api/tasks/hours-summary"] });
       queryClient.invalidateQueries({ queryKey: ["/api/tasks/my-hours"] });
@@ -534,6 +532,7 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
       refetchTask();
       if (task?.projectId) {
         queryClient.invalidateQueries({ queryKey: ["/api/tasks/project", task.projectId] });
+        queryClient.invalidateQueries({ queryKey: ["projects", task.projectId, "complete-data"] });
       }
     },
   });
@@ -564,6 +563,7 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
       refetchTask();
       if (task?.projectId) {
         queryClient.invalidateQueries({ queryKey: ["/api/tasks/project", task.projectId] });
+        queryClient.invalidateQueries({ queryKey: ["projects", task.projectId, "complete-data"] });
       }
     },
   });
@@ -577,6 +577,7 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
       queryClient.invalidateQueries({ queryKey: ["/api/tasks/hours-summary"] });
       queryClient.invalidateQueries({ queryKey: ["/api/tasks/my-hours"] });
       queryClient.invalidateQueries({ queryKey: ["/api/monthly-closings/real-hours"] });
+      if (task?.projectId) queryClient.invalidateQueries({ queryKey: ["projects", task.projectId, "complete-data"] });
       setEditingTimeEntryId(null);
       toast({ title: "Carga de tiempo actualizada" });
     },

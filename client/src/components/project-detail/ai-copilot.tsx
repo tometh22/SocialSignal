@@ -89,13 +89,22 @@ function useProjectIntelligence(props: AICopilotProps) {
     const signals: Signal[] = [];
     const recommendations: Recommendation[] = [];
     let recRank = 1;
+    const avgCostPerHour = totalHours > 0 ? cost / totalHours : 0;
+    const projectedCost = estimatedHours > totalHours && avgCostPerHour > 0
+      ? Math.max(cost, estimatedHours * avgCostPerHour)
+      : cost;
+    const budgetAtRisk = budget > 0 && projectedCost > budget;
+    const hoursPlanReached = estimatedHours > 0 && totalHours >= estimatedHours;
+    const marginDataMature = budgetAtRisk || hoursPlanReached || estimatedHours <= 0;
 
     if (cost > 0) {
       const gapTo25x = cost * 2.5 - revenue;
       const costCutNeeded = cost > 0 ? ((cost - revenue / 2.5) / cost) * 100 : 0;
-      if (markup < 2.0) {
-        signals.push({ level: "critical", headline: `Markup CRITICO: ${markup.toFixed(2)}x`, detail: `Por debajo de 2.0x — el proyecto genera pérdida de eficiencia. Necesita ${usd(Math.abs(gapTo25x))} más de revenue o reducir costos un ${costCutNeeded.toFixed(0)}% para llegar al estándar Epical (2.5x).` });
-        recommendations.push({ rank: recRank++, impact: "high", text: `Renegociar precio o reducir scope para subir markup de ${markup.toFixed(1)}x → 2.5x (faltan ${usd(gapTo25x)}).` });
+      if (markup < 2.0 && marginDataMature) {
+        signals.push({ level: "critical", headline: `Markup CRITICO: ${markup.toFixed(2)}x`, detail: `Por debajo de 2.0x con datos suficientes para accionar. Necesita ${usd(Math.abs(gapTo25x))} más de revenue o reducir costos un ${costCutNeeded.toFixed(0)}% para llegar al estándar Epical (2.5x).` });
+        recommendations.push({ rank: recRank++, impact: "high", text: `Renegociar precio o reducir scope para subir markup de ${markup.toFixed(1)}x → 2.5x (faltan ${usd(Math.max(0, gapTo25x))}).` });
+      } else if (markup < 2.0) {
+        signals.push({ level: "info", headline: `Markup preliminar: ${markup.toFixed(2)}x`, detail: `El costo actual está por debajo del presupuesto y todavía no hay suficiente consumo para recomendar renegociación. Seguir monitoreando.` });
       } else if (markup < 2.5) {
         signals.push({ level: "warning", headline: `Markup bajo el estándar: ${markup.toFixed(2)}x`, detail: `Meta Epical: 2.5x. Faltan ${usd(gapTo25x)} de revenue o reducir costos un ${costCutNeeded.toFixed(0)}% para alcanzarla.` });
         recommendations.push({ rank: recRank++, impact: "high", text: `Para llegar a 2.5x: subir revenue en ${usd(gapTo25x)} o reducir costos de equipo en ${costCutNeeded.toFixed(0)}%.` });

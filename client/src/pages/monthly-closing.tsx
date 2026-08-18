@@ -90,6 +90,18 @@ export default function MonthlyClosing() {
       headers: { "Content-Type": "application/json" },
     }).then((r) => r.json()),
   });
+  const { data: invoiceReviews = [] } = useQuery<any[]>({
+    queryKey: ["/api/operations/invoices/review", year, month + 1],
+    queryFn: () => fetch(`/api/operations/invoices/review?period=${year}-${String(month + 1).padStart(2, "0")}`, {
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+    }).then((r) => r.ok ? r.json() : []),
+  });
+  const invoiceReviewMutation = useMutation({
+    mutationFn: ({ id, approvalStatus }: { id: number; approvalStatus: "approved" | "rejected" }) =>
+      apiRequest(`/api/operations/invoices/review/${id}`, "PATCH", { approvalStatus }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/operations/invoices/review"] }),
+  });
 
   // Number of holidays falling on weekdays in the selected month
   const monthHolidayCount = (holidaysData || []).filter((h: any) => {
@@ -557,6 +569,31 @@ export default function MonthlyClosing() {
           />
         </div>
       </div>
+
+      {invoiceReviews.length > 0 && (
+        <Card className="border-indigo-200 bg-indigo-50/30">
+          <CardHeader className="pb-3"><CardTitle className="text-base">Facturas post-cierre para revisar</CardTitle></CardHeader>
+          <CardContent className="space-y-2">
+            {invoiceReviews.map((invoice: any) => (
+              <div key={invoice.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-background px-3 py-2 text-sm">
+                <div>
+                  <div className="font-medium">{invoice.personnel_name || invoice.user_name || invoice.email || "Persona"}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {invoice.period} · sugerido USD {Number(invoice.suggested_invoice_usd || 0).toFixed(2)} · declarado USD {invoice.declared_invoice_usd == null ? "—" : Number(invoice.declared_invoice_usd).toFixed(2)} · diferencia {invoice.difference_usd == null ? "—" : Number(invoice.difference_usd).toFixed(2)}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline">{invoice.approval_status}</Badge>
+                  {invoice.approval_status === "pending" && <>
+                    <Button size="sm" onClick={() => invoiceReviewMutation.mutate({ id: invoice.id, approvalStatus: "approved" })}><Check className="mr-1 h-3 w-3" />Aprobar</Button>
+                    <Button size="sm" variant="outline" onClick={() => invoiceReviewMutation.mutate({ id: invoice.id, approvalStatus: "rejected" })}><X className="mr-1 h-3 w-3" />Rechazar</Button>
+                  </>}
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>

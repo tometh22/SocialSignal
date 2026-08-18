@@ -14,6 +14,12 @@ interface InlineEditRoleProps {
     description: string;
     defaultRate: number;
     defaultRateUsd: number | null;
+    rateAverages?: Array<{
+      sublevel: string;
+      averageRateARS: number | null;
+      averageRateUSD: number | null;
+      personnelCount: number;
+    }>;
   };
 }
 
@@ -247,6 +253,15 @@ function InlineEditRole({ role }: InlineEditRoleProps) {
     <tr className="border-b hover:bg-muted/50 transition-colors">
       <td className="px-6 py-4">
         <div className="font-medium text-gray-900">{displayRole.name}</div>
+        {displayRole.rateAverages?.length ? (
+          <div className="mt-1 space-y-0.5 text-[11px] text-muted-foreground">
+            {displayRole.rateAverages.map((average) => (
+              <div key={average.sublevel}>
+                {average.sublevel}: {average.personnelCount} persona{average.personnelCount === 1 ? "" : "s"}
+              </div>
+            ))}
+          </div>
+        ) : null}
       </td>
       <td className="px-6 py-4">
         <div className="text-sm text-muted-foreground max-w-xs truncate">
@@ -254,16 +269,30 @@ function InlineEditRole({ role }: InlineEditRoleProps) {
         </div>
       </td>
       <td className="px-6 py-4">
-        <div className="flex items-center gap-1">
-          <span className="text-sm font-semibold text-green-700">${displayRole.defaultRate.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
-          <span className="text-xs text-muted-foreground">ARS/hr</span>
-        </div>
+        {displayRole.rateAverages?.length ? displayRole.rateAverages.map((average) => (
+          <div key={average.sublevel} className="flex items-center gap-1 text-xs">
+            <span className="font-semibold text-green-700">{average.averageRateARS == null ? "—" : `$${average.averageRateARS.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</span>
+            <span className="text-muted-foreground">{average.sublevel}</span>
+          </div>
+        )) : (
+          <div className="flex items-center gap-1">
+            <span className="text-sm font-semibold text-green-700">${displayRole.defaultRate.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
+            <span className="text-xs text-muted-foreground">fallback</span>
+          </div>
+        )}
       </td>
       <td className="px-6 py-4">
-        <div className="flex items-center gap-1">
-          <span className="text-sm font-semibold text-blue-700">${(displayRole.defaultRateUsd || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
-          <span className="text-xs text-muted-foreground">USD/hr</span>
-        </div>
+        {displayRole.rateAverages?.length ? displayRole.rateAverages.map((average) => (
+          <div key={average.sublevel} className="flex items-center gap-1 text-xs">
+            <span className="font-semibold text-blue-700">{average.averageRateUSD == null ? "—" : `$${average.averageRateUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</span>
+            <span className="text-muted-foreground">{average.sublevel}</span>
+          </div>
+        )) : (
+          <div className="flex items-center gap-1">
+            <span className="text-sm font-semibold text-blue-700">${(displayRole.defaultRateUsd || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
+            <span className="text-xs text-muted-foreground">fallback</span>
+          </div>
+        )}
       </td>
       <td className="px-6 py-4">
         <div className="flex items-center gap-1">

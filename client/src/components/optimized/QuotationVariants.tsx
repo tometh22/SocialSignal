@@ -610,6 +610,7 @@ export function QuotationVariants({
           <Button 
             variant="outline" 
             size="sm"
+            className="h-9 min-w-[150px]"
             onClick={() => {
               const allSelected = selectedVariantIds.length === variants.length;
               if (allSelected) {
@@ -627,7 +628,7 @@ export function QuotationVariants({
           
           <Dialog>
             <DialogTrigger asChild>
-              <Button variant="outline" size="sm" className="flex items-center gap-2">
+              <Button variant="outline" size="sm" className="flex items-center gap-2" style={{ height: 36, minWidth: 150, justifyContent: "center" }}>
                 <Plus className="h-4 w-4" />
                 Nueva Variante
               </Button>
@@ -735,7 +736,7 @@ export function QuotationVariants({
                 </div>
                 <div className="space-y-1">
                   <div className="flex items-center justify-center text-green-600"><Clock className="h-4 w-4" /></div>
-                  <div className="text-sm font-medium">{getVariantTotalHours(variant).toFixed(0)}h</div>
+                  <div className="text-sm font-medium">{getVariantTotalHours(variant).toFixed(2)} h</div>
                   <div className="text-xs text-gray-500">Horas</div>
                 </div>
                 <div className="space-y-1">

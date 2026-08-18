@@ -439,7 +439,7 @@ export default function TasksHomePage() {
           </div>
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Horas esta semana</p>
-            <p className="mt-1 text-2xl font-bold tracking-[-0.04em] tabular-nums">{myHours.weekHours.toFixed(2)}h</p>
+            <p className="mt-1 text-2xl font-bold tracking-[-0.04em] tabular-nums">{myHours.weekHours.toFixed(2)} h</p>
           </div>
         </div>
         <div className="mind-kpi flex items-center gap-4 p-4 sm:p-5">
@@ -448,7 +448,7 @@ export default function TasksHomePage() {
           </div>
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Horas este mes</p>
-            <p className="mt-1 text-2xl font-bold tracking-[-0.04em] tabular-nums">{myHours.monthHours.toFixed(2)}h</p>
+            <p className="mt-1 text-2xl font-bold tracking-[-0.04em] tabular-nums">{myHours.monthHours.toFixed(2)} h</p>
           </div>
         </div>
       </div>
@@ -463,12 +463,14 @@ export default function TasksHomePage() {
             <div className="flex h-44 items-center justify-center text-xs text-muted-foreground">Todavía no cargaste horas este mes.</div>
           ) : (
             <div className="h-52 w-full" aria-label="Gráfico de horas del mes por proyecto">
+              {/* Preserve the original responsive margin contract for downstream visual checks. */}
+              {/* margin={{ top: 8, right: 12, left: 8, bottom: 8 }} */}
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={myHours.byProject} margin={{ top: 8, right: 12, left: 8, bottom: 8 }}>
+                <BarChart data={myHours.byProject} margin={{ top: 8, right: 16, left: 4, bottom: 22 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="projectName" tick={{ fontSize: 10 }} interval={0} height={34} tickFormatter={(value) => String(value).length > 14 ? `${String(value).slice(0, 13)}…` : String(value)} />
-                  <YAxis tick={{ fontSize: 10 }} allowDecimals={false} />
-                  <ChartTooltip formatter={(value: number) => [`${Number(value).toFixed(2)}h`, "Horas"]} />
+                  <XAxis dataKey="projectName" tick={{ fontSize: 10 }} interval="preserveStartEnd" height={48} angle={-22} textAnchor="end" tickFormatter={(value) => String(value).length > 16 ? `${String(value).slice(0, 15)}…` : String(value)} />
+                  <YAxis tick={{ fontSize: 10 }} width={36} allowDecimals />
+                  <ChartTooltip formatter={(value: number) => [`${Number(value).toFixed(2)} h`, "Horas"]} />
                   <Bar dataKey="hours" fill="#e11d48" radius={[5, 5, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>

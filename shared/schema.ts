@@ -1087,6 +1087,8 @@ export const activeProjects = pgTable("active_projects", {
   // saliendo de quotations.project_name; este campo actúa como fallback: COALESCE(name, project_name).
   name: text("name"),
   status: text("status").notNull().default("active"), // active, completed, cancelled, on-hold, delivered, invoiced, voided
+  // Operational Kanban stage. Kept separate from the financial/lifecycle status.
+  workflowStage: text("workflow_stage").notNull().default("aprobado"),
   startDate: timestamp("start_date").notNull(),
   expectedEndDate: timestamp("expected_end_date"),
   actualEndDate: timestamp("actual_end_date"),
@@ -1148,6 +1150,15 @@ export const PROJECT_STATUSES = [
 ] as const;
 export type ProjectStatus = typeof PROJECT_STATUSES[number];
 
+export const PROJECT_WORKFLOW_STAGES = [
+  "aprobado",
+  "listo_para_empezar",
+  "empezado",
+  "bloqueado",
+  "finalizado",
+] as const;
+export type ProjectWorkflowStage = typeof PROJECT_WORKFLOW_STAGES[number];
+
 // Esquema base generado por drizzle-zod
 const baseInsertActiveProjectSchema = createInsertSchema(activeProjects).omit({
   id: true,
@@ -1185,6 +1196,7 @@ export const insertActiveProjectSchema = baseInsertActiveProjectSchema.extend({
 
   // Estados granulares + campos de cierre
   status: z.enum(PROJECT_STATUSES).default("active").optional(),
+  workflowStage: z.enum(PROJECT_WORKFLOW_STAGES).default("aprobado").optional(),
   deliveredAt: z.union([z.date(), z.string().transform((str) => new Date(str))]).nullable().optional(),
   invoicedAt: z.union([z.date(), z.string().transform((str) => new Date(str))]).nullable().optional(),
   closedAt: z.union([z.date(), z.string().transform((str) => new Date(str))]).nullable().optional(),
@@ -4015,6 +4027,14 @@ export const personalMonthlyInvoices = pgTable("personal_monthly_invoices", {
   computedTotalCostUSD: doublePrecision("computed_total_cost_usd"),
   hoursTotal: doublePrecision("hours_total"),
   notes: text("notes"),
+  suggestedInvoiceUSD: doublePrecision("suggested_invoice_usd"),
+  declaredInvoiceUSD: doublePrecision("declared_invoice_usd"),
+  bankFx: doublePrecision("bank_fx"),
+  differenceUSD: doublePrecision("difference_usd"),
+  approvalStatus: varchar("approval_status", { length: 20 }).notNull().default("pending"), // pending, approved, rejected
+  reviewedBy: integer("reviewed_by").references(() => users.id, { onDelete: "set null" }),
+  reviewedAt: timestamp("reviewed_at"),
+  reviewReason: text("review_reason"),
   uploadedAt: timestamp("uploaded_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (t) => ({
