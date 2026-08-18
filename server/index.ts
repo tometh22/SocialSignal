@@ -12,6 +12,7 @@ import { taskHierarchySecurityMigrationSql } from "./migrations/task-hierarchy-s
 import { quotationHeaderCurrencyRepairMigrationSql } from "./migrations/quotation-header-currency-repair";
 import { feedbackMindV29MigrationSql } from "./migrations/feedback-mind-v2-9";
 import { personnelCostSyncWarningsMigrationSql } from "./migrations/personnel-cost-sync-warnings";
+import { feedbackMindV210MigrationSql } from "./migrations/feedback-mind-v2-10";
 import cors from 'cors';
 import { execSync } from 'child_process';
 
@@ -809,6 +810,7 @@ async function applyPendingMigrations() {
     await run('0039 quotation header currency repair', quotationHeaderCurrencyRepairMigrationSql);
     await run('0040 feedback_mind_v2_9 closure', feedbackMindV29MigrationSql);
     await run('0041 personnel cost sync warnings', personnelCostSyncWarningsMigrationSql);
+    await run('0042 feedback_mind_v2_10 closure', feedbackMindV210MigrationSql);
 
     // 0033: feriados duplicados (mismo date+name insertado más de una vez desde el
     // formulario) — borra duplicados conservando la fila más antigua y agrega la

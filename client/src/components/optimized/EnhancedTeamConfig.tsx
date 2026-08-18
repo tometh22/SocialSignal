@@ -338,7 +338,7 @@ const EnhancedTeamConfig: React.FC = () => {
             <div className="flex items-center space-x-2">
               <Clock className="h-4 w-4 text-blue-500" />
               <span className="text-sm font-medium">Total horas:</span>
-              <span className="font-bold text-blue-600">{totalHours}h</span>
+              <span className="font-bold text-blue-600">{totalHours.toFixed(2)} h</span>
             </div>
             <div className="flex items-center space-x-2">
               <Calculator className="h-4 w-4 text-green-500" />

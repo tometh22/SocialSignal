@@ -90,7 +90,7 @@ export const roundTo2Decimals = (value: number): number => {
  * @returns String formateado como "160.16h" en lugar de "160.16000000000003h"
  */
 export const formatHours = (hours: number): string => {
-  return `${roundTo2Decimals(hours)}h`;
+  return `${roundTo2Decimals(hours).toFixed(2)} h`;
 };
 
 /**

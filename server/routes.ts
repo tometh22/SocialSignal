@@ -130,6 +130,7 @@ import {
   insertHolidaySchema,
   monthlyClosings,
   insertMonthlyClosingSchema,
+  PROJECT_WORKFLOW_STAGES,
   personnelAbsences,
   insertPersonnelAbsenceSchema,
   absenceAllowances,
@@ -4102,8 +4103,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Roles routes
   app.get("/api/roles", requireAuth, async (_, res) => {
-    const roles = await storage.getRoles();
-    res.json(roles);
+    const roleRows = await storage.getRoles();
+    const averageRows = await db.execute(sql`
+      SELECT
+        p.role_id,
+        COALESCE(NULLIF(TRIM(p.current_role), ''), NULLIF(TRIM(r.name), ''), 'Sin rol') AS role_name,
+        COALESCE(NULLIF(TRIM(p.sublevel), ''), 'Sin subnivel') AS sublevel,
+        AVG(NULLIF(p.hourly_rate_ars, 0)) AS average_rate_ars,
+        AVG(NULLIF(p.hourly_rate, 0)) AS average_rate_usd,
+        COUNT(*)::int AS personnel_count
+      FROM personnel p
+      LEFT JOIN roles r ON r.id = p.role_id
+      WHERE p.include_in_real_costs = TRUE
+      GROUP BY 1, 2, 3
+      ORDER BY 2, 3
+    `);
+    res.json(roleRows.map((role: any) => ({
+      ...role,
+      rateAverages: (averageRows.rows as any[])
+        .filter((row) => Number(row.role_id) === Number(role.id) || String(row.role_name).trim().toLowerCase() === String(role.name).trim().toLowerCase())
+        .map((row) => ({
+          sublevel: row.sublevel,
+          averageRateARS: row.average_rate_ars == null ? null : Number(row.average_rate_ars),
+          averageRateUSD: row.average_rate_usd == null ? null : Number(row.average_rate_usd),
+          personnelCount: Number(row.personnel_count),
+        })),
+    })));
   });
 
   app.get("/api/roles/:id", requireAuth, async (req, res) => {
@@ -9973,6 +9998,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Safe cleanup for local/staging feedback-cycle data. It never runs in
+  // production and defaults to a dry-run preview.
+  app.post("/api/admin/test-data-reset", requireAuth, async (req, res) => {
+    if (!req.user?.isAdmin) return res.status(403).json({ message: "Admin access required" });
+    if (process.env.NODE_ENV === "production") {
+      return res.status(409).json({ message: "El reset de datos de prueba está bloqueado en producción" });
+    }
+    try {
+      const candidates = await db.execute(sql`
+        SELECT ap.id, COALESCE(ap.name, q.project_name) AS project_name,
+               c.name AS client_name, ap.status
+        FROM active_projects ap
+        LEFT JOIN quotations q ON q.id = ap.quotation_id
+        JOIN clients c ON c.id = ap.client_id
+        WHERE LOWER(COALESCE(ap.name, q.project_name, '')) ~ '(test|prueba|nuevo)'
+        ORDER BY ap.id
+      `);
+      const unusedQuotes = await db.execute(sql`
+        SELECT q.id, q.project_name, q.status
+        FROM quotations q
+        LEFT JOIN active_projects ap ON ap.quotation_id = q.id
+        WHERE ap.id IS NULL AND q.status IN ('draft', 'rejected', 'in-negotiation')
+        ORDER BY q.id
+      `);
+      const preview = {
+        projects: candidates.rows,
+        unusedQuotes: unusedQuotes.rows,
+        projectCount: candidates.rows.length,
+        quotationCount: unusedQuotes.rows.length,
+      };
+      if (req.body?.dryRun !== false || req.body?.confirm !== "RESET_TEST_DATA") {
+        return res.json({ dryRun: true, ...preview, message: "Preview generado. Enviá confirm=RESET_TEST_DATA y dryRun=false para ejecutar." });
+      }
+
+      let deletedProjects = 0;
+      for (const row of candidates.rows as any[]) {
+        if (await storage.deleteActiveProject(Number(row.id))) deletedProjects++;
+      }
+      let deletedQuotes = 0;
+      for (const row of unusedQuotes.rows as any[]) {
+        if (await storage.deleteQuotation(Number(row.id))) deletedQuotes++;
+      }
+      res.json({ dryRun: false, deletedProjects, deletedQuotes, preview });
+    } catch (error) {
+      console.error("Error ejecutando reset de datos de prueba:", error);
+      res.status(500).json({ message: "No se pudo ejecutar el reset de datos de prueba" });
+    }
+  });
+
   // =========== FACTURA MENSUAL PERSONAL ===========
   // Endpoints para que cada usuario gestione su factura del mes (una por mes).
 
@@ -10296,6 +10370,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const summary = await getMonthlyPersonalSummary(req.user!.id, period);
       const relPath = `/uploads/invoices/${req.user!.id}/${req.file.filename}`;
+      const suggestedInvoiceUSD = summary?.grandTotalUSD != null
+        ? Math.round(Number(summary.grandTotalUSD) * 0.9 * 100) / 100
+        : null;
+      const declaredInvoiceUSD = req.body?.declaredInvoiceUSD === undefined || req.body?.declaredInvoiceUSD === ""
+        ? null
+        : Number(req.body.declaredInvoiceUSD);
+      const bankFx = req.body?.bankFx === undefined || req.body?.bankFx === ""
+        ? null
+        : Number(req.body.bankFx);
+      if (declaredInvoiceUSD != null && (!Number.isFinite(declaredInvoiceUSD) || declaredInvoiceUSD < 0)) {
+        return res.status(400).json({ message: "Monto declarado inválido" });
+      }
+      if (bankFx != null && (!Number.isFinite(bankFx) || bankFx <= 0)) {
+        return res.status(400).json({ message: "Tipo de cambio bancario inválido" });
+      }
+      const differenceUSD = declaredInvoiceUSD != null && suggestedInvoiceUSD != null
+        ? Math.round((declaredInvoiceUSD - suggestedInvoiceUSD) * 100) / 100
+        : null;
 
       // Check if an invoice already exists for this user+period — delete the old file first
       const [existing] = await db
@@ -10321,6 +10413,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
             personnelId: summary?.personnelId ?? null,
             updatedAt: new Date(),
             notes: req.body?.notes ?? existing.notes,
+            suggestedInvoiceUSD,
+            declaredInvoiceUSD,
+            bankFx,
+            differenceUSD,
+            approvalStatus: "pending",
+            reviewedBy: null,
+            reviewedAt: null,
+            reviewReason: null,
           })
           .where(eq(personalMonthlyInvoices.id, existing.id))
           .returning();
@@ -10341,12 +10441,104 @@ export async function registerRoutes(app: Express): Promise<Server> {
           computedTotalCostUSD: summary?.totalCostUSD ?? null,
           hoursTotal: summary?.hours ?? null,
           notes: req.body?.notes ?? null,
+          suggestedInvoiceUSD,
+          declaredInvoiceUSD,
+          bankFx,
+          differenceUSD,
         })
         .returning();
       res.status(201).json(created);
     } catch (error: any) {
       console.error("Error subiendo factura personal:", error);
       res.status(500).json({ message: error?.message ?? "Error al subir factura" });
+    }
+  });
+
+  // Submit/update the post-closing review without requiring a new file upload.
+  app.patch("/api/me/invoices/:id/review", requireAuth, async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const [row] = await db.select().from(personalMonthlyInvoices)
+        .where(eq(personalMonthlyInvoices.id, id)).limit(1);
+      if (!row) return res.status(404).json({ message: "Factura no encontrada" });
+      if (row.userId !== req.user!.id && !req.user!.isAdmin) {
+        return res.status(403).json({ message: "No podés editar esta factura" });
+      }
+      const declaredInvoiceUSD = req.body?.declaredInvoiceUSD === undefined || req.body?.declaredInvoiceUSD === ""
+        ? null : Number(req.body.declaredInvoiceUSD);
+      const bankFx = req.body?.bankFx === undefined || req.body?.bankFx === ""
+        ? null : Number(req.body.bankFx);
+      if (declaredInvoiceUSD != null && (!Number.isFinite(declaredInvoiceUSD) || declaredInvoiceUSD < 0)) {
+        return res.status(400).json({ message: "Monto declarado inválido" });
+      }
+      if (bankFx != null && (!Number.isFinite(bankFx) || bankFx <= 0)) {
+        return res.status(400).json({ message: "Tipo de cambio bancario inválido" });
+      }
+      const suggestedInvoiceUSD = row.suggestedInvoiceUSD != null
+        ? Number(row.suggestedInvoiceUSD)
+        : row.computedTotalCostUSD != null ? Math.round(Number(row.computedTotalCostUSD) * 0.9 * 100) / 100 : null;
+      const differenceUSD = declaredInvoiceUSD != null && suggestedInvoiceUSD != null
+        ? Math.round((declaredInvoiceUSD - suggestedInvoiceUSD) * 100) / 100
+        : null;
+      const [updated] = await db.update(personalMonthlyInvoices).set({
+        suggestedInvoiceUSD,
+        declaredInvoiceUSD,
+        bankFx,
+        differenceUSD,
+        approvalStatus: "pending",
+        reviewedBy: null,
+        reviewedAt: null,
+        reviewReason: null,
+        updatedAt: new Date(),
+      }).where(eq(personalMonthlyInvoices.id, id)).returning();
+      res.json(updated);
+    } catch (error) {
+      console.error("Error actualizando revisión de factura:", error);
+      res.status(500).json({ message: "Error actualizando revisión" });
+    }
+  });
+
+  // Operations review queue for post-closing invoices.
+  app.get("/api/operations/invoices/review", requireAuth, async (req, res) => {
+    if (!isOperationsRequest(req)) return res.status(403).json({ message: "Acceso exclusivo de Operaciones" });
+    try {
+      const period = req.query.period ? String(req.query.period) : null;
+      const result = await db.execute(sql`
+        SELECT i.*, u.email, CONCAT_WS(' ', u.first_name, u.last_name) AS user_name,
+               p.name AS personnel_name
+        FROM personal_monthly_invoices i
+        LEFT JOIN users u ON u.id = i.user_id
+        LEFT JOIN personnel p ON p.id = i.personnel_id
+        WHERE ${period ? sql`i.period = ${period}` : sql`TRUE`}
+        ORDER BY i.period DESC, i.uploaded_at DESC
+      `);
+      res.json(result.rows);
+    } catch (error) {
+      console.error("Error obteniendo revisiones de facturas:", error);
+      res.status(500).json({ message: "Error obteniendo revisiones" });
+    }
+  });
+
+  app.patch("/api/operations/invoices/review/:id", requireAuth, async (req, res) => {
+    if (!isOperationsRequest(req)) return res.status(403).json({ message: "Acceso exclusivo de Operaciones" });
+    try {
+      const id = Number(req.params.id);
+      const approvalStatus = String(req.body?.approvalStatus ?? "");
+      if (!Number.isInteger(id) || !["approved", "rejected"].includes(approvalStatus)) {
+        return res.status(400).json({ message: "Revisión inválida" });
+      }
+      const [updated] = await db.update(personalMonthlyInvoices).set({
+        approvalStatus,
+        reviewedBy: req.user!.id,
+        reviewedAt: new Date(),
+        reviewReason: req.body?.reviewReason ? String(req.body.reviewReason) : null,
+        updatedAt: new Date(),
+      }).where(eq(personalMonthlyInvoices.id, id)).returning();
+      if (!updated) return res.status(404).json({ message: "Factura no encontrada" });
+      res.json(updated);
+    } catch (error) {
+      console.error("Error revisando factura:", error);
+      res.status(500).json({ message: "Error revisando factura" });
     }
   });
 
@@ -20226,6 +20418,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           COALESCE(ap.name, q.project_name) as name,
           c.name as client_name,
           ap.status,
+          ap.workflow_stage,
           COUNT(DISTINCT t.id) as task_count,
           COUNT(DISTINCT CASE WHEN t.status NOT IN ('done', 'cancelled') THEN t.id END) as pending_count,
           MAX(t.updated_at) as last_activity,
@@ -20235,7 +20428,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         JOIN clients c ON c.id = ap.client_id
         LEFT JOIN tasks t ON t.project_id = ap.id
         WHERE ${status} AND ${visibility}
-        GROUP BY ap.id, ap.name, q.project_name, c.name, ap.status
+        GROUP BY ap.id, ap.name, q.project_name, c.name, ap.status, ap.workflow_stage
         ORDER BY c.name, COALESCE(ap.name, q.project_name)
       `);
 
@@ -20261,6 +20454,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         name: p.name,
         clientName: p.client_name,
         status: p.status,
+        workflowStage: p.workflow_stage,
         taskCount: parseInt(p.task_count) || 0,
         pendingCount: parseInt(p.pending_count) || 0,
         lastActivity: p.last_activity,
@@ -20318,7 +20512,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "No tenés acceso a este proyecto" });
       }
       const projectResult = await db.execute(sql`
-        SELECT ap.id, COALESCE(ap.name, q.project_name) as name, c.name as client_name, ap.status, ap.brief_url
+        SELECT ap.id, COALESCE(ap.name, q.project_name) as name, c.name as client_name, ap.status, ap.workflow_stage, ap.brief_url
         FROM active_projects ap
         LEFT JOIN quotations q ON q.id = ap.quotation_id
         JOIN clients c ON c.id = ap.client_id
@@ -20331,6 +20525,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         name: p.name,
         clientName: p.client_name,
         status: p.status,
+        workflowStage: p.workflow_stage,
         briefUrl: p.brief_url ?? null,
         source: 'active_project',
       };
@@ -20393,6 +20588,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error en PUT /api/tasks/projects/:id:", error);
       res.status(500).json({ message: "Error al actualizar proyecto" });
+    }
+  });
+
+  // Operational Kanban stage; deliberately separate from the financial lifecycle status.
+  app.patch("/api/tasks/projects/:id/workflow-stage", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const projectId = Number(req.params.id);
+      const workflowStage = String(req.body?.workflowStage ?? "");
+      if (!Number.isInteger(projectId) || projectId <= 0) {
+        return res.status(400).json({ message: "Proyecto inválido" });
+      }
+      if (!(PROJECT_WORKFLOW_STAGES as readonly string[]).includes(workflowStage)) {
+        return res.status(400).json({ message: "Etapa de workflow inválida" });
+      }
+      // Any authorized project member can move the operational stage; financial
+      // status and project economics remain restricted to Operations/Admin.
+      if (!(await canAccessTaskProject(req, projectId))) {
+        return res.status(403).json({ message: "No tenés acceso a este proyecto" });
+      }
+      const [updated] = await db.update(activeProjects)
+        .set({ workflowStage, updatedAt: new Date() })
+        .where(eq(activeProjects.id, projectId))
+        .returning({ id: activeProjects.id, workflowStage: activeProjects.workflowStage });
+      if (!updated) return res.status(404).json({ message: "Proyecto no encontrado" });
+      res.json(updated);
+    } catch (error) {
+      console.error("Error actualizando etapa del proyecto:", error);
+      res.status(500).json({ message: "Error al actualizar la etapa" });
     }
   });
 

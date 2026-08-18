@@ -17,6 +17,11 @@ type InvoiceRow = {
   notes: string | null;
   uploadedAt: string;
   updatedAt: string;
+  suggestedInvoiceUSD?: number | null;
+  declaredInvoiceUSD?: number | null;
+  bankFx?: number | null;
+  differenceUSD?: number | null;
+  approvalStatus?: "pending" | "approved" | "rejected";
 };
 
 type MonthSummary = {
@@ -68,6 +73,8 @@ export default function MyInvoices() {
   const [period, setPeriod] = useState(currentPeriod());
   const [file, setFile] = useState<File | null>(null);
   const [notes, setNotes] = useState("");
+  const [declaredInvoiceUSD, setDeclaredInvoiceUSD] = useState("");
+  const [bankFx, setBankFx] = useState("");
 
   const invoicesQuery = useQuery<InvoiceRow[]>({
     queryKey: ["/api/me/invoices"],
@@ -127,6 +134,8 @@ export default function MyInvoices() {
       fd.append("file", file);
       fd.append("period", period);
       if (notes) fd.append("notes", notes);
+      if (declaredInvoiceUSD.trim()) fd.append("declaredInvoiceUSD", declaredInvoiceUSD);
+      if (bankFx.trim()) fd.append("bankFx", bankFx);
       const res = await authFetch("/api/me/invoices", { method: "POST", body: fd });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
@@ -164,6 +173,31 @@ export default function MyInvoices() {
     () => (invoicesQuery.data ?? []).find(i => i.period === period) ?? null,
     [invoicesQuery.data, period]
   );
+
+  React.useEffect(() => {
+    setDeclaredInvoiceUSD(existingForPeriod?.declaredInvoiceUSD == null ? "" : String(existingForPeriod.declaredInvoiceUSD));
+    setBankFx(existingForPeriod?.bankFx == null ? "" : String(existingForPeriod.bankFx));
+  }, [existingForPeriod?.id, existingForPeriod?.declaredInvoiceUSD, existingForPeriod?.bankFx]);
+
+  const reviewMutation = useMutation({
+    mutationFn: async () => {
+      if (!existingForPeriod) throw new Error("Primero subí la factura del período");
+      const response = await authFetch(`/api/me/invoices/${existingForPeriod.id}/review`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          declaredInvoiceUSD: declaredInvoiceUSD.trim() === "" ? null : Number(declaredInvoiceUSD),
+          bankFx: bankFx.trim() === "" ? null : Number(bankFx),
+        }),
+      });
+      if (!response.ok) throw new Error((await response.json().catch(() => ({}))).message ?? "No se pudo enviar la revisión");
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Revisión enviada", description: "Operaciones recibirá la factura para aprobarla." });
+      qc.invalidateQueries({ queryKey: ["/api/me/invoices"] });
+    },
+    onError: (error: Error) => toast({ title: "No se pudo enviar", description: error.message, variant: "destructive" }),
+  });
 
   return (
     <div className="mx-auto max-w-4xl p-5 sm:p-8">
@@ -358,6 +392,47 @@ export default function MyInvoices() {
           </button>
         </div>
       </div>
+
+      {summaryQuery.data?.isClosed && (
+        <div className="rounded-xl border border-indigo-200 bg-indigo-50/50 p-5 mb-8">
+          <h2 className="text-sm font-semibold text-indigo-900 mb-1">Revisión post-cierre</h2>
+          <p className="text-xs text-indigo-800/80 mb-4">
+            El monto sugerido para facturar es el 90% del total unificado del cierre. El cierre de Operaciones no se modifica.
+          </p>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-5">
+            <div>
+              <div className="text-[11px] text-indigo-700">Sugerido (90%)</div>
+              <div className="text-lg font-semibold text-indigo-900">{formatUSD((summaryQuery.data.grandTotalUSD ?? 0) * 0.9)}</div>
+            </div>
+            <label className="text-[11px] text-indigo-700">
+              Monto declarado USD
+              <input value={declaredInvoiceUSD} onChange={e => setDeclaredInvoiceUSD(e.target.value)} type="number" min="0" step="0.01" className="mt-1 w-full rounded-lg border border-indigo-200 bg-white px-3 py-1.5 text-sm text-slate-900" />
+            </label>
+            <label className="text-[11px] text-indigo-700">
+              TC bancario
+              <input value={bankFx} onChange={e => setBankFx(e.target.value)} type="number" min="0" step="0.01" className="mt-1 w-full rounded-lg border border-indigo-200 bg-white px-3 py-1.5 text-sm text-slate-900" />
+            </label>
+            <div>
+              <div className="text-[11px] text-indigo-700">Sugerido equivalente ARS</div>
+              <div className="mt-1 text-lg font-semibold text-indigo-900">
+                {bankFx.trim() === "" ? "—" : formatARS(Number(bankFx) * Number((summaryQuery.data.grandTotalUSD ?? 0) * 0.9))}
+              </div>
+            </div>
+            <div>
+              <div className="text-[11px] text-indigo-700">Diferencia USD</div>
+              <div className="mt-1 text-lg font-semibold text-indigo-900">
+                {declaredInvoiceUSD.trim() === "" ? "—" : formatUSD(Number(declaredInvoiceUSD) - Number((summaryQuery.data.grandTotalUSD ?? 0) * 0.9))}
+              </div>
+            </div>
+          </div>
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <button onClick={() => reviewMutation.mutate()} disabled={reviewMutation.isPending || !existingForPeriod} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50">
+              {reviewMutation.isPending ? "Enviando…" : "Enviar a aprobación de Operaciones"}
+            </button>
+            {existingForPeriod?.approvalStatus && <span className="text-xs text-indigo-700">Estado: {existingForPeriod.approvalStatus}</span>}
+          </div>
+        </div>
+      )}
 
       {/* Historial */}
       <h2 className="text-sm font-semibold text-slate-700 mb-2">Historial</h2>

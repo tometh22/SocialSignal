@@ -626,6 +626,12 @@ export default function ProjectsHubPage() {
               Ir a Vista de proyectos
             </Button>
           </Link>
+          <Link href="/tasks/projects/kanban">
+            <Button size="sm" variant="outline" className="h-8 text-sm gap-1.5">
+              <LayoutGrid className="h-3.5 w-3.5" />
+              Kanban
+            </Button>
+          </Link>
         </div>
       </div>
 

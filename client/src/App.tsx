@@ -52,6 +52,7 @@ const MyTasksPage = lazy(() => import("@/pages/my-tasks"));
 const TeamCalendarPage = lazy(() => import("@/pages/team-calendar"));
 const HoursDashboardPage = lazy(() => import("@/pages/hours-dashboard"));
 const ProjectsHubPage = lazy(() => import("@/pages/tasks/projects-hub"));
+const ProjectsKanbanPage = lazy(() => import("@/pages/tasks/projects-kanban"));
 const ProjectTasksPage = lazy(() => import("@/pages/tasks/project-tasks-page"));
 const TasksHomePage = lazy(() => import("@/pages/tasks/tasks-home"));
 
@@ -279,6 +280,7 @@ function AppRoutes() {
                   <ProtectedRoute path="/tasks/hours-dashboard" component={HoursDashboardPage} requiredAnyPermission={HOURS_DASHBOARD_ACCESS_SECTIONS} />
                   <ProtectedRoute path="/absences" component={PersonnelAbsences} requiredAnyPermission={HOME_ACCESS_SECTIONS} />
                   <ProtectedRoute path="/tasks/projects" component={ProjectsHubPage} requiredPermission="projects" />
+                  <ProtectedRoute path="/tasks/projects/kanban" component={ProjectsKanbanPage} requiredPermission="projects" />
                   <ProtectedRoute path="/tasks/projects/:id" component={ProjectTasksPage} requiredPermission="projects" />
 
                   {/* CRM Ventas */}

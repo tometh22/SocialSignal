@@ -29,7 +29,7 @@ const fmt = (n: number | null | undefined, prefix = "$") =>
   : `${prefix}${Math.abs(Math.round(n)).toLocaleString("es-AR")}`;
 
 const fmtHours = (n: number | null | undefined) =>
-  n == null || !Number.isFinite(n) ? "—" : `${n.toFixed(1)}h`;
+  n == null || !Number.isFinite(n) ? "—" : `${n.toFixed(2)} h`;
 
 // ─── Tab definitions ──────────────────────────────────────────────────────────
 
