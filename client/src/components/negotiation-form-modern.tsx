@@ -62,7 +62,9 @@ export function NegotiationFormModern({
 
   // Calculate price difference
   const priceDifference = newPrice - currentPrice;
-  const pricePercentageChange = ((priceDifference / currentPrice) * 100).toFixed(1);
+  const pricePercentageChange = currentPrice > 0
+    ? ((priceDifference / currentPrice) * 100).toFixed(1)
+    : "0.0";
   const isPriceReduction = priceDifference < 0;
   
   // Calculate team cost changes
@@ -118,6 +120,7 @@ export function NegotiationFormModern({
   };
 
   const handleSubmit = () => {
+    if (!Number.isFinite(newPrice) || newPrice <= 0) return;
     const changeType = determineChangeType();
     
     const data = {

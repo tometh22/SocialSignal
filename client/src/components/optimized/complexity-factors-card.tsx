@@ -64,7 +64,7 @@ const ComplexityFactorsCard: React.FC = () => {
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-lg font-semibold text-gray-900">Factores de Complejidad</h3>
-          <p className="text-sm text-gray-600">Define las características que ajustarán las horas del equipo configurado</p>
+          <p className="text-sm text-gray-600">Define las características que ajustarán el costo base del equipo</p>
         </div>
         <Badge className={complexityLevel.color}>
           Factor Total: {(totalFactor * 100).toFixed(1)}% - {complexityLevel.level}
@@ -88,7 +88,7 @@ const ComplexityFactorsCard: React.FC = () => {
               })}
             </div>
             <div className="mt-3 pt-3 border-t text-sm text-gray-600">
-              Los factores de complejidad se aplicarán a las horas según el tipo de rol
+              Los factores de complejidad se aplican de forma uniforme sobre el costo base
             </div>
           </CardContent>
         </Card>

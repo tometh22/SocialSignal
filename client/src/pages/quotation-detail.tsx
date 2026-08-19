@@ -21,7 +21,8 @@ import { QuotationVariantsDisplay } from '@/components/quotation/quotation-varia
 interface TeamMember {
   id: number;
   quotationId: number;
-  personnelId: number;
+  personnelId: number | null;
+  roleId: number | null;
   hours: number;
   rate: number;
   cost: number;
@@ -41,6 +42,14 @@ interface Quotation {
   baseCost: number;
   complexityAdjustment: number;
   markupAmount: number;
+  marginFactor?: number | null;
+  toolsCost?: number | null;
+  platformCost?: number | null;
+  additionalDeliverableCost?: number | null;
+  deviationPercentage?: number | null;
+  discountPercentage?: number | null;
+  applyInflationAdjustment?: boolean | null;
+  manualInflationRate?: number | null;
   totalAmount: number;
   status: string;
   adjustmentReason: string;
@@ -113,65 +122,30 @@ const QuotationDetail: React.FC = () => {
       setError(null);
       
       try {
-        // Obtener cotización
-        console.log('🔍 Fetching quotation with ID:', quotationId);
-        const quotationRes = await authFetch(`/api/quotations/${quotationId}`);
-        console.log('📊 Quotation response status:', quotationRes.status);
-        
-        if (!quotationRes.ok) {
-          const errorData = await quotationRes.json();
-          console.error('❌ Quotation API error:', errorData);
-          throw new Error(`Error al cargar la cotización: ${errorData.message || quotationRes.status}`);
-        }
-        
-        const quotationData = await quotationRes.json();
-        console.log('✅ Quotation data loaded:', quotationData);
-        setQuotation(quotationData);
-        
-        // Obtener equipo
-        console.log('👥 Fetching team for quotation ID:', quotationId);
-        const teamRes = await authFetch(`/api/quotation-team/${quotationId}`);
-        console.log('👥 Team response status:', teamRes.status);
-        
-        if (!teamRes.ok) {
-          const errorData = await teamRes.json();
-          console.error('❌ Team API error:', errorData);
-          throw new Error(`Error al cargar el equipo: ${errorData.message || teamRes.status}`);
-        }
-        
-        const teamData = await teamRes.json();
-        console.log('✅ Team data loaded:', teamData);
-        setTeamMembers(teamData);
-        
-        // Obtener datos del cliente
-        if (quotationData.clientId) {
-          const clientRes = await authFetch(`/api/clients/${quotationData.clientId}`);
-          if (!clientRes.ok) throw new Error('Error al cargar el cliente');
-          const clientData = await clientRes.json();
-          setClient(clientData);
-        }
-        
-        // Obtener datos de la plantilla
-        if (quotationData.templateId) {
-          const templateRes = await authFetch(`/api/templates/${quotationData.templateId}`);
-          if (templateRes.ok) {
-            const templateData = await templateRes.json();
-            setTemplate(templateData);
+        const fetchJson = async (path: string, label: string) => {
+          const response = await authFetch(path);
+          if (!response.ok) {
+            const payload = await response.json().catch(() => ({}));
+            throw new Error(`Error al cargar ${label}: ${payload.message || response.status}`);
           }
-        }
-        
-        // Obtener roles
-        const rolesRes = await authFetch('/api/roles');
-        if (!rolesRes.ok) throw new Error('Error al cargar roles');
-        const rolesData = await rolesRes.json();
+          return response.json();
+        };
+        const [quotationData, teamData, rolesData, personnelData] = await Promise.all([
+          fetchJson(`/api/quotations/${quotationId}`, 'la cotización'),
+          fetchJson(`/api/quotation-team/${quotationId}`, 'el equipo'),
+          fetchJson('/api/roles', 'los roles'),
+          fetchJson('/api/personnel', 'el personal'),
+        ]);
+        setQuotation(quotationData);
+        setTeamMembers(teamData);
         setRoles(rolesData);
-        
-        // Obtener personal
-        const personnelRes = await authFetch('/api/personnel');
-        if (!personnelRes.ok) throw new Error('Error al cargar personal');
-        const personnelData = await personnelRes.json();
         setPersonnel(personnelData);
-        
+        const [clientData, templateData] = await Promise.all([
+          quotationData.clientId ? fetchJson(`/api/clients/${quotationData.clientId}`, 'el cliente') : null,
+          quotationData.templateId ? fetchJson(`/api/templates/${quotationData.templateId}`, 'la plantilla').catch(() => null) : null,
+        ]);
+        setClient(clientData);
+        setTemplate(templateData);
       } catch (err) {
         console.error('Error:', err);
         setError(err instanceof Error ? err.message : 'Error desconocido');
@@ -210,7 +184,12 @@ const QuotationDetail: React.FC = () => {
   // Formatear moneda
   const formatCurrency = (amount: number) => {
     const curr = quotation?.quotationCurrency || 'ARS';
-    return `$${amount.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} ${curr}`;
+    return new Intl.NumberFormat(curr === 'USD' ? 'en-US' : 'es-AR', {
+      style: 'currency',
+      currency: curr,
+      minimumFractionDigits: curr === 'USD' ? 2 : 0,
+      maximumFractionDigits: curr === 'USD' ? 2 : 0,
+    }).format(amount);
   };
 
   // Formatear fecha
@@ -240,18 +219,18 @@ const QuotationDetail: React.FC = () => {
   };
 
   // Obtener nombre de personal por ID
-  const getPersonnelName = (id: number) => {
+  const getPersonnelName = (id: number | null) => {
+    if (!id) return 'Sin persona asignada';
     const person = personnel.find(p => p.id === id);
     return person ? person.name : `Personal ID: ${id}`;
   };
 
   // Obtener nombre de rol por ID
-  const getRoleName = (personnelId: number) => {
-    const person = personnel.find(p => p.id === personnelId);
-    if (!person) return 'Rol no encontrado';
-    
-    const role = roles.find(r => r.id === person.roleId);
-    return role ? role.name : `Rol ID: ${person.roleId}`;
+  const getRoleName = (roleId: number | null, personnelId: number | null) => {
+    const quotedRoleId = roleId || personnel.find(p => p.id === personnelId)?.roleId;
+    if (!quotedRoleId) return 'Rol no especificado';
+    const role = roles.find(r => r.id === quotedRoleId);
+    return role ? role.name : `Rol ID: ${quotedRoleId}`;
   };
 
   // Mapear tipos de proyecto a nombres
@@ -263,7 +242,10 @@ const QuotationDetail: React.FC = () => {
       'strategic': 'Análisis Estratégico',
       'crisis': 'Gestión de Crisis',
       'brand': 'Análisis de Marca',
-      'custom': 'Personalizado'
+      'custom': 'Personalizado',
+      'on-demand': 'Proyecto On-Demand',
+      'fee-mensual': 'Fee mensual',
+      'always-on': 'Always-On',
     };
     
     return projectTypes[type] || type;
@@ -275,7 +257,8 @@ const QuotationDetail: React.FC = () => {
       'draft': { label: 'Borrador', variant: 'outline' },
       'pending': { label: 'Pendiente', variant: 'secondary' },
       'approved': { label: 'Aprobada', variant: 'default' },
-      'rejected': { label: 'Rechazada', variant: 'destructive' }
+      'rejected': { label: 'Rechazada', variant: 'destructive' },
+      'in-negotiation': { label: 'En negociación', variant: 'secondary' },
     };
     
     const config = statusConfig[status] || { label: status, variant: 'outline' };
@@ -285,6 +268,25 @@ const QuotationDetail: React.FC = () => {
         {config.label}
       </Badge>
     );
+  };
+
+  const downloadQuotation = () => {
+    if (!quotation) return;
+    const exportData = {
+      quotation,
+      client,
+      team: teamMembers.map((member) => ({
+        ...member,
+        personnelName: getPersonnelName(member.personnelId),
+        roleName: getRoleName(member.roleId, member.personnelId),
+      })),
+    };
+    const url = URL.createObjectURL(new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' }));
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `cotizacion-${quotation.id}.json`;
+    anchor.click();
+    URL.revokeObjectURL(url);
   };
 
   // Obtener icono y texto para el análisis
@@ -365,9 +367,10 @@ const QuotationDetail: React.FC = () => {
   return (
     <div className="container py-5 max-w-7xl bg-[#f8f9ff]">
       {/* Encabezado y acciones - más compacto */}
-      <div className="flex justify-between items-center mb-5 bg-white z-10 shadow-sm rounded-lg px-4 py-3 border border-slate-200">
-        <div className="flex items-center gap-3">
+      <div className="mb-5 flex flex-col gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 items-center gap-3">
           <Button 
+            aria-label="Volver a gestión de cotizaciones"
             variant="ghost" 
             size="sm"
             className="rounded-full h-8 w-8 p-0 hover:bg-slate-50"
@@ -377,12 +380,12 @@ const QuotationDetail: React.FC = () => {
           </Button>
           
           <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-lg font-bold text-slate-800">{quotation.projectName}</h1>
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="break-words text-lg font-bold text-slate-800">{quotation.projectName}</h1>
               {getStatusBadge(quotation.status)}
             </div>
             
-            <div className="flex items-center gap-2 mt-0.5">
+            <div className="mt-0.5 flex flex-wrap items-center gap-2">
               <div className="text-slate-500 text-xs">
                 <span className="flex items-center">
                   <FileText className="h-3 w-3 mr-1 inline-block" />
@@ -416,17 +419,18 @@ const QuotationDetail: React.FC = () => {
           </div>
         </div>
 
-        <div className="flex gap-1">
-          <Button variant="outline" size="sm" className="h-8 px-2 border-slate-200 text-slate-600">
+        <div className="flex gap-1 self-end sm:self-auto">
+          <Button aria-label="Imprimir cotización" onClick={() => window.print()} variant="outline" size="sm" className="h-8 px-2 border-slate-200 text-slate-600">
             <Printer className="h-4 w-4" />
           </Button>
-          <Button variant="outline" size="sm" className="h-8 px-2 border-slate-200 text-slate-600">
+          <Button aria-label="Descargar cotización" onClick={downloadQuotation} variant="outline" size="sm" className="h-8 px-2 border-slate-200 text-slate-600">
             <Download className="h-4 w-4" />
           </Button>
           <Button 
             variant="default" 
             size="sm" 
             className="h-8 px-2 bg-indigo-500 hover:bg-indigo-600 text-white"
+            aria-label="Editar cotización"
             onClick={() => setLocation(`/optimized-quote/${quotation.id}`)}
           >
             <Edit className="h-4 w-4" />
@@ -565,7 +569,7 @@ const QuotationDetail: React.FC = () => {
                             index % 2 === 0 ? "bg-white" : "bg-slate-50/40"
                           )}
                         >
-                          <TableCell className="font-medium text-slate-700 py-2 text-sm">{getRoleName(member.personnelId)}</TableCell>
+                          <TableCell className="font-medium text-slate-700 py-2 text-sm">{getRoleName(member.roleId, member.personnelId)}</TableCell>
                           <TableCell className="text-slate-600 py-2 text-sm">
                             {getPersonnelName(member.personnelId)}
                             {(() => {
@@ -621,9 +625,9 @@ const QuotationDetail: React.FC = () => {
             quotationId={quotation.id} 
             currentPrice={quotation.totalAmount}
             quotationStatus={quotation.status}
-            currentTeam={teamMembers.map(member => ({
-              personnelId: member.personnelId,
-              roleId: personnel.find(p => p.id === member.personnelId)?.roleId || 0,
+            currentTeam={teamMembers.filter(member => member.personnelId).map(member => ({
+              personnelId: member.personnelId!,
+              roleId: member.roleId || 0,
               estimatedHours: member.hours,
               hourlyRate: member.rate
             }))}
@@ -676,6 +680,43 @@ const QuotationDetail: React.FC = () => {
                   <span className="font-medium text-slate-800 text-sm">{formatCurrency(quotation.markupAmount)}</span>
                 </div>
               </div>
+
+              {(quotation.toolsCost || 0) > 0 && (
+                <div className="px-4 py-3 flex justify-between text-sm">
+                  <span className="text-slate-600">Herramientas:</span>
+                  <span className="font-medium">{formatCurrency(quotation.toolsCost || 0)}</span>
+                </div>
+              )}
+              {(quotation.platformCost || 0) > 0 && (
+                <div className="px-4 py-3 flex justify-between text-sm">
+                  <span className="text-slate-600">Plataforma:</span>
+                  <span className="font-medium">{formatCurrency(quotation.platformCost || 0)}</span>
+                </div>
+              )}
+              {(quotation.additionalDeliverableCost || 0) > 0 && (
+                <div className="px-4 py-3 flex justify-between text-sm">
+                  <span className="text-slate-600">Entregables adicionales:</span>
+                  <span className="font-medium">{formatCurrency(quotation.additionalDeliverableCost || 0)}</span>
+                </div>
+              )}
+              {(quotation.deviationPercentage || 0) > 0 && (
+                <div className="px-4 py-3 flex justify-between text-sm">
+                  <span className="text-slate-600">Desvío:</span>
+                  <span className="font-medium">{quotation.deviationPercentage}%</span>
+                </div>
+              )}
+              {(quotation.discountPercentage || 0) > 0 && (
+                <div className="px-4 py-3 flex justify-between text-sm">
+                  <span className="text-slate-600">Descuento:</span>
+                  <span className="font-medium text-red-600">-{quotation.discountPercentage}%</span>
+                </div>
+              )}
+              {quotation.applyInflationAdjustment && (
+                <div className="px-4 py-3 flex justify-between text-sm">
+                  <span className="text-slate-600">Proyección inflacionaria:</span>
+                  <span className="font-medium">{quotation.manualInflationRate || 0}% anual</span>
+                </div>
+              )}
               
               <div className="px-4 py-4 bg-green-50 border-t border-green-100">
                 <div className="flex justify-between items-center">
@@ -694,6 +735,7 @@ const QuotationDetail: React.FC = () => {
                 variant="outline" 
                 size="sm"
                 className="flex-1 flex justify-center items-center gap-1.5 border-slate-200 text-slate-600 hover:bg-slate-50 h-8 text-xs"
+                onClick={downloadQuotation}
               >
                 <Download className="h-3.5 w-3.5" />
                 Exportar

@@ -7,6 +7,12 @@ import {
   calculateQuotationPricing,
   type QuotationPricingResult,
 } from "@shared/utils/quotation-pricing";
+import {
+  getAnalysisTypeFactor,
+  getClientEngagementFactor,
+  getCountriesFactor,
+  getMentionsVolumeFactor,
+} from "@shared/utils/quotation-complexity";
 
 export interface OptimizedTeamMember {
   id: string;
@@ -26,6 +32,13 @@ export type QuotationVariantPayload = {
   markupAmount: number;
   totalAmount: number;
   isSelected: boolean;
+  teamMembers: Array<{
+    roleId: number | null;
+    personnelId: number | null;
+    hours: number;
+    rate: number;
+    cost: number;
+  }>;
 };
 
 export interface ProjectData {
@@ -207,88 +220,6 @@ const initialQuotationData: QuotationData = {
   salaryMonth: null
 };
 
-// Helper functions for complexity calculation
-const getAnalysisTypeFactor = (type: string): number => {
-  console.log('📊 Analysis Type Factor for:', type);
-  const factors: Record<string, number> = {
-    'basic': -0.10,   // Básico: -10% (más simple que estándar)
-    'standard': 0.0,  // Estándar: +0% (base de referencia)
-    'advanced': 0.15, // Avanzado: +15%
-    'premium': 0.25,  // Premium: +25%
-    'Básico': -0.10,
-    'Estándar': 0.0,
-    'Avanzado': 0.15,
-    'Premium': 0.25
-  };
-  const factor = factors[type] || 0.0;
-  console.log(`📊 Analysis Type "${type}" -> ${factor} (${factor * 100}%)`);
-  return factor;
-};
-
-const getMentionsVolumeFactor = (volume: string): number => {
-  console.log('📊 Mentions Volume Factor for:', volume);
-  const factors: Record<string, number> = {
-    'low': -0.05,     // Bajo: -5% (menos trabajo de análisis)
-    'medium': 0.0,    // Medio: +0% (base estándar 1K-10K)
-    'high': 0.15,     // Alto: +15% (más trabajo significativo)
-    'very-high': 0.30, // Muy Alto: +30% (complejidad exponencial)
-    'Bajo': -0.05,
-    'Medio': 0.0,
-    'Alto': 0.15,
-    'Muy Alto': 0.30
-  };
-  const factor = factors[volume] || 0.0;
-  console.log(`📊 Mentions Volume "${volume}" -> ${factor} (${factor * 100}%)`);
-  return factor;
-};
-
-const getCountriesFactor = (countries: string): number => {
-  console.log('📊 Countries Factor for:', countries);
-  const factors: Record<string, number> = {
-    '1': 0.0,         // 1 país: +0% (base estándar)
-    '2-3': 0.08,      // 2-3 países: +8% (coordinación adicional)
-    '4-6': 0.18,      // 4-6 países: +18% (complejidad multicultural)
-    '7+': 0.30,       // 7+ países: +30% (gestión muy compleja)
-    '2-3 países': 0.08,
-    '4+ países': 0.18,
-    '4-6 países': 0.18,
-    '7+ países': 0.30
-  };
-  const factor = factors[countries] || 0.0;
-  console.log(`📊 Countries "${countries}" -> ${factor} (${factor * 100}%)`);
-  return factor;
-};
-
-const getClientEngagementFactor = (engagement: string): number => {
-  console.log('📊 Client Engagement Factor for:', engagement);
-  const factors: Record<string, number> = {
-    'low': -0.05,     // Bajo: -5% (cliente autónomo, menos reuniones)
-    'medium': 0.0,    // Medio: +0% (engagement estándar)
-    'high': 0.12,     // Alto: +12% (más reuniones y seguimiento)
-    'very-high': 0.20, // Muy Alto: +20% (cliente muy demandante)
-    'Bajo': -0.05,
-    'Medio': 0.0,
-    'Alto': 0.12,
-    'Muy Alto': 0.20
-  };
-  const factor = factors[engagement] || 0.0;
-  console.log(`📊 Client Engagement "${engagement}" -> ${factor} (${factor * 100}%)`);
-  return factor;
-};
-
-const getTemplateFactor = (complexity: string): number => {
-  console.log('📊 Template Factor for:', complexity);
-  const factors: Record<string, number> = {
-    'basic': 0.0,
-    'medium': 0.1,
-    'high': 0.15,
-    'low': 0.0
-  };
-  const factor = factors[complexity] || 0.0;
-  console.log(`📊 Template "${complexity}" -> ${factor} (${factor * 100}%)`);
-  return factor;
-};
-
 interface OptimizedQuoteProviderProps {
   children: React.ReactNode;
   quotationId?: number;
@@ -302,8 +233,8 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
   const [markupAmount, setMarkupAmount] = useState(0);
   const [totalAmount, setTotalAmount] = useState(0);
   const [pricingResult, setPricingResult] = useState<QuotationPricingResult>({
-    canonicalARS: { baseCost: 0, complexityAdjustment: 0, markupAmount: 0, toolsCost: 0, platformCost: 0, deviationAmount: 0, discountAmount: 0, total: 0 },
-    display: { baseCost: 0, complexityAdjustment: 0, markupAmount: 0, toolsCost: 0, platformCost: 0, deviationAmount: 0, discountAmount: 0, total: 0 },
+    canonicalARS: { baseCost: 0, complexityAdjustment: 0, markupAmount: 0, toolsCost: 0, additionalDeliverableCost: 0, platformCost: 0, deviationAmount: 0, discountAmount: 0, total: 0 },
+    display: { baseCost: 0, complexityAdjustment: 0, markupAmount: 0, toolsCost: 0, additionalDeliverableCost: 0, platformCost: 0, deviationAmount: 0, discountAmount: 0, total: 0 },
     displayCurrency: "ARS",
     effectiveMarginFactor: 2,
   });
@@ -531,10 +462,6 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
           localStorage.setItem('draft-quotation', JSON.stringify(draftData));
           localStorage.setItem('draft-quotation-backup', JSON.stringify(draftData));
           localStorage.setItem('last-autosave-time', Date.now().toString());
-          console.log('💾 Autoguardado completo:', new Date().toLocaleTimeString(), 
-                     `- Cliente: ${quotationData.client?.name || 'Sin cliente'}`,
-                     `- Proyecto: ${quotationData.project.name || 'Sin nombre'}`,
-                     `- Equipo: ${quotationData.teamMembers.length} miembros`);
         } catch (error) {
           console.error('❌ Error saving draft:', error);
           // Try to clear some space and save essential data only
@@ -570,13 +497,33 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
     return () => clearInterval(saveInterval);
   }, [quotationData]);
 
-  // Draft detection disabled - clean up any existing drafts on load
+  // Restore a recent local draft only when opening a new quotation. A saved
+  // quotation always wins over local state.
   useEffect(() => {
-    // Clear any existing draft data to prevent issues
-    localStorage.removeItem('draft-quotation');
-    localStorage.removeItem('draft-quotation-backup');
-    localStorage.removeItem('pending-draft-restore');
-    console.log('🧹 Draft data cleared on component mount');
+    if (!window.location.pathname.match(/^\/optimized-quote\/?$/)) return;
+    const rawDraft = localStorage.getItem('draft-quotation')
+      || localStorage.getItem('draft-quotation-backup');
+    if (!rawDraft) return;
+    try {
+      const draft = JSON.parse(rawDraft);
+      const isRecent = Number(draft.timestamp) > Date.now() - 7 * 24 * 60 * 60 * 1000;
+      const restored = draft.quotationData;
+      if (!isRecent || !restored || typeof restored !== 'object') return;
+      setQuotationData({
+        ...initialQuotationData,
+        ...restored,
+        id: undefined,
+        project: { ...initialQuotationData.project, ...(restored.project || {}) },
+        financials: { ...initialQuotationData.financials, ...(restored.financials || {}) },
+        inflation: { ...initialQuotationData.inflation, ...(restored.inflation || {}) },
+        teamMembers: Array.isArray(restored.teamMembers) ? restored.teamMembers : [],
+        deliverables: Array.isArray(restored.deliverables) ? restored.deliverables : [],
+      });
+      sessionStorage.setItem('quotation-draft-restored', String(Date.now()));
+    } catch {
+      localStorage.removeItem('draft-quotation');
+      localStorage.removeItem('draft-quotation-backup');
+    }
   }, []);
 
   // Calculate recommended roles based on template
@@ -597,15 +544,6 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
 
   // Calculate complexity factors with proper logging
   const complexityFactors = useMemo((): ComplexityFactors => {
-    console.log('🔧 === COMPLEXITY FACTORS CALCULATION ===');
-    console.log('🔍 Input data:', {
-      analysisType: quotationData.analysisType,
-      mentionsVolume: quotationData.mentionsVolume,
-      countriesCovered: quotationData.countriesCovered,
-      clientEngagement: quotationData.clientEngagement,
-      template: quotationData.template?.name || 'None',
-      complexity: quotationData.complexity
-    });
 
     const factors = {
       analysisTypeFactor: getAnalysisTypeFactor(quotationData.analysisType),
@@ -614,11 +552,6 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
       clientEngagementFactor: getClientEngagementFactor(quotationData.clientEngagement)
       // Removed templateFactor - it doesn't make logical sense
     };
-
-    console.log('📊 Calculated complexity factors:', factors);
-
-    const totalFactor = Object.values(factors).reduce((sum, factor) => sum + (factor || 0), 0);
-    console.log(`🎯 Total complexity factor: ${totalFactor} (${(totalFactor * 100).toFixed(1)}%)`);
 
     return factors;
   }, [
@@ -658,6 +591,7 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
       complexityFactor,
       marginFactor: quotationData.financials.marginFactor,
       toolsCostUSD: quotationData.financials.toolsCost,
+      additionalDeliverableCostUSD: quotationData.additionalDeliverableCost,
       platformCostARS: quotationData.financials.platformCost,
       deviationPercentage: quotationData.financials.deviationPercentage,
       discountPercentage: quotationData.financials.discountPercentage,
@@ -846,7 +780,6 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
   }, [forceRecalculate]);
 
   const updateTeamMembers = useCallback((teamMembers: OptimizedTeamMember[]) => {
-    console.log('👥 Updating team members:', teamMembers);
     setQuotationData(prev => ({ ...prev, teamMembers }));
     forceRecalculate();
   }, [forceRecalculate]);
@@ -885,7 +818,6 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
       cost: defaultHours * defaultRate
     };
 
-    console.log('➕ Adding new team member:', newMember);
 
     setQuotationData(prev => ({
       ...prev,
@@ -896,7 +828,6 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
   }, [roles, getPersonnelRate, quotationData.quotationCurrency, forceRecalculate]);
 
   const updateTeamMember = useCallback((id: string, updates: Partial<OptimizedTeamMember>) => {
-    console.log('📝 Updating team member:', id, updates);
 
     setQuotationData(prev => ({
       ...prev,
@@ -907,7 +838,6 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
           if ('hours' in updates || 'rate' in updates) {
             updatedMember.cost = (updatedMember.hours || 0) * (updatedMember.rate || 0);
           }
-          console.log('✅ Updated team member:', updatedMember);
           return updatedMember;
         }
         return member;
@@ -937,13 +867,9 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
 
   const loadQuotation = useCallback(async (quotationId: number) => {
     try {
-      console.log('🔍 Loading quotation ID:', quotationId);
-
       const quotation: any = await apiRequest(`/api/quotations/${quotationId}`, 'GET');
-      console.log('📄 Quotation data loaded:', quotation);
 
       const teamMembers = await apiRequest(`/api/quotation-team/${quotationId}`, 'GET');
-      console.log('👥 Team members loaded:', teamMembers);
 
       // Ensure team members are properly reconstructed
       const optimizedTeamMembers: OptimizedTeamMember[] = teamMembers.map((member: any, index: number) => {
@@ -957,27 +883,17 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
           cost: Number(member.cost) || (Number(member.hours || 0) * Number(member.rate || 0))
         };
 
-        console.log('👤 Processing team member:', {
-          id: member.id,
-          roleId: member.roleId,
-          personnelId: member.personnelId,
-          personnelName: member.personnelName,
-          processed: teamMember
-        });
-
         return teamMember;
       });
 
       // Get client data separately
       const clientData = quotation.clientId ? await apiRequest(`/api/clients/${quotation.clientId}`, 'GET') : null;
-      console.log('🏢 Client data loaded:', clientData);
 
       // Get template data if available
       let templateData = null;
       if (quotation.templateId) {
         try {
           templateData = await apiRequest(`/api/templates/${quotation.templateId}`, 'GET');
-          console.log('📋 Template data loaded:', templateData);
         } catch (templateError) {
           console.warn('⚠️ Could not load template:', templateError);
         }
@@ -998,10 +914,14 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
         template: templateData,
         complexity: (templateData?.complexity as 'basic' | 'medium' | 'high') || 'basic',
         teamMembers: optimizedTeamMembers,
-        deliverables: [],
-        additionalDeliverableCost: 0,
+        deliverables: Array.isArray(quotation.deliverables) ? quotation.deliverables : [],
+        additionalDeliverableCost: quotation.quotationCurrency === "USD"
+          ? Number(quotation.additionalDeliverableCost || 0)
+          : Number(quotation.additionalDeliverableCost || 0) / (Number(quotation.exchangeRateAtQuote) || 1),
         financials: {
-          platformCost: Number(quotation.platformCost || 0),
+          platformCost: quotation.quotationCurrency === "USD"
+            ? Number(quotation.platformCost || 0) * (Number(quotation.exchangeRateAtQuote) || 1)
+            : Number(quotation.platformCost || 0),
           deviationPercentage: Number(quotation.deviationPercentage || 0),
           discount: Number(quotation.discountPercentage || 0),
           // Use saved marginFactor or calculate from saved values
@@ -1013,7 +933,9 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
               ((quotation.markupAmount / (quotation.baseCost + (quotation.complexityAdjustment || 0))) * 100) : 100),
           discountPercentage: Number(quotation.discountPercentage || 0),
           // Nuevos campos cargados de la base de datos
-          toolsCost: Number(quotation.toolsCost || 0),
+          toolsCost: quotation.quotationCurrency === "USD"
+            ? Number(quotation.toolsCost || 0)
+            : Number(quotation.toolsCost || 0) / (Number(quotation.exchangeRateAtQuote) || 1),
           priceMode: (quotation.priceMode as 'auto' | 'manual') || 'auto',
           manualPrice: quotation.manualPrice ? Number(quotation.manualPrice) : undefined,
           manualPriceCurrency: (quotation.manualPriceCurrency === "USD" ? "USD" : "ARS") as "USD" | "ARS",
@@ -1036,12 +958,10 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
         salaryMonth: quotation.salaryMonth ?? null
       };
 
-      console.log('📊 Final quotation data to set:', loadedQuotationData);
       setQuotationData(loadedQuotationData);
 
       // Force recalculation after loading
       setTimeout(() => {
-        console.log('🔄 Triggering recalculation after load');
         forceRecalculate();
       }, 100);
 
@@ -1071,30 +991,11 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
 
       // Para borradores, permitir cotizaciones sin equipo
       // Logging para debug
-      console.log('📋 Validating quotation data:', {
-        status,
-        clientId: quotationData.client?.id,
-        projectName: quotationData.project.name,
-        teamMembersCount: quotationData.teamMembers?.length || 0,
-        teamMembers: quotationData.teamMembers
-      });
-
       if (status !== 'draft' && (!quotationData.teamMembers || quotationData.teamMembers.length === 0)) {
-        console.error("❌ Validation failed: No team members found for non-draft status");
-        console.error("❌ Team members data:", quotationData.teamMembers);
-        console.error("❌ Status:", status);
         throw new Error("Debe agregar al menos un miembro al equipo antes de finalizar la cotización");
       }
 
-      // baseCost/complexityAdjustment/markupAmount/totalAmount siempre están
-      // en ARS internamente; si la cotización se eligió en USD hay que
-      // convertir antes de persistir, para que quotation-detail.tsx no muestre
-      // el número ARS crudo etiquetado como USD.
       const saveExchangeRate = quotationData.exchangeRateSnapshot || exchangeRate || 1;
-      const toStoredCurrency = (amountARS: number) =>
-        quotationData.quotationCurrency === 'USD' && saveExchangeRate > 0
-          ? amountARS / saveExchangeRate
-          : amountARS;
 
       const quotationPayload = {
         clientId: quotationData.client.id,
@@ -1106,16 +1007,18 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
         countriesCovered: quotationData.countriesCovered || '1',
         clientEngagement: quotationData.clientEngagement || 'medium',
         templateId: quotationData.template?.id || null,
-        baseCost: toStoredCurrency(baseCost || 0),
-        complexityAdjustment: toStoredCurrency(complexityAdjustment || 0),
-        markupAmount: toStoredCurrency(markupAmount || 0),
+        baseCost: pricingResult.display.baseCost,
+        complexityAdjustment: pricingResult.display.complexityAdjustment,
+        markupAmount: pricingResult.display.markupAmount,
         marginFactor: quotationData.financials.marginFactor || 2.0,
-        totalAmount: toStoredCurrency(totalAmount || 0),
-        platformCost: quotationData.financials.platformCost || 0,
+        totalAmount: pricingResult.display.total,
+        platformCost: pricingResult.display.platformCost,
         deviationPercentage: quotationData.financials.deviationPercentage || 0,
         discountPercentage: quotationData.financials.discountPercentage || 0,
         // Nuevos campos para herramientas y pricing manual
-        toolsCost: quotationData.financials.toolsCost || 0,
+        toolsCost: pricingResult.display.toolsCost,
+        deliverables: quotationData.deliverables || [],
+        additionalDeliverableCost: pricingResult.display.additionalDeliverableCost,
         priceMode: quotationData.financials.priceMode || 'auto',
         manualPrice: quotationData.financials.manualPrice || null,
         manualPriceCurrency: quotationData.financials.manualPriceCurrency ?? quotationData.quotationCurrency,
@@ -1153,9 +1056,6 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
         ...(variants ? { variants } : {}),
       };
 
-      console.log('📤 Saving quotation with payload:', quotationPayload);
-      console.log('🔍 QuotationData.id value:', quotationData.id);
-      console.log('🔍 QuotationData.id type:', typeof quotationData.id);
 
       // SOLUCIÓN CRÍTICA: Verificar primero si la cotización existe
       let isEditing = false;
@@ -1218,7 +1118,7 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
       console.error("❌ Error saving quotation:", error);
       throw error;
     }
-  }, [quotationData, baseCost, complexityAdjustment, markupAmount, totalAmount]);
+  }, [quotationData, pricingResult, exchangeRate, queryClient]);
 
   const calculateTotalCost = useCallback(() => {
     console.log('🔄 Manual recalculation triggered');
@@ -1226,6 +1126,9 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
   }, [forceRecalculate]);
 
   const resetQuotation = useCallback(() => {
+    localStorage.removeItem('draft-quotation');
+    localStorage.removeItem('draft-quotation-backup');
+    localStorage.removeItem('last-autosave-time');
     setQuotationData(initialQuotationData);
     setBaseCost(0);
     setComplexityAdjustment(0);
