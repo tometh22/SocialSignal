@@ -652,6 +652,7 @@ export const quotations = pgTable("quotations", {
   projectName: text("project_name").notNull(),
   analysisType: text("analysis_type").notNull(), // 'basic', 'standard', 'deep'
   projectType: text("project_type").notNull(), // 'demo', 'executive', 'comprehensive', 'always-on', 'monitoring'
+  projectDuration: text("project_duration"),
   mentionsVolume: text("mentions_volume").notNull(), // 'small', 'medium', 'large', 'xlarge'
   countriesCovered: text("countries_covered").notNull(), // '1', '2-5', '6-10', '10+'
   clientEngagement: text("client_engagement").notNull(), // 'low', 'medium', 'high'
@@ -665,6 +666,8 @@ export const quotations = pgTable("quotations", {
   deviationPercentage: doublePrecision("deviation_percentage").default(0), // Porcentaje de desviación
   discountPercentage: doublePrecision("discount_percentage").default(0), // Porcentaje de descuento
   totalAmount: doublePrecision("total_amount").notNull(),
+  deliverables: jsonb("deliverables").$type<Array<Record<string, unknown>>>().notNull().default([]),
+  additionalDeliverableCost: doublePrecision("additional_deliverable_cost").notNull().default(0),
   // Nuevos campos para costos de herramientas y pricing manual
   toolsCost: doublePrecision("tools_cost").default(0), // Costo de herramientas
   priceMode: text("price_mode").default("auto"), // 'auto' | 'manual'
@@ -706,6 +709,26 @@ const baseInsertQuotationSchema = createInsertSchema(quotations).omit({
 
 // Esquema personalizado que permite Date, string o undefined para las fechas
 export const insertQuotationSchema = baseInsertQuotationSchema.extend({
+  projectName: z.string().trim().min(1).max(200),
+  projectType: z.string().trim().min(1).max(60),
+  projectDuration: z.string().trim().max(100).nullable().optional(),
+  analysisType: z.string().trim().min(1).max(60),
+  mentionsVolume: z.string().trim().min(1).max(60),
+  countriesCovered: z.string().trim().min(1).max(60),
+  clientEngagement: z.string().trim().min(1).max(60),
+  baseCost: z.number().finite().nonnegative(),
+  complexityAdjustment: z.number().finite(),
+  markupAmount: z.number().finite(),
+  marginFactor: z.number().finite().min(0).max(100).nullable().optional(),
+  platformCost: z.number().finite().nonnegative().nullable().optional(),
+  deviationPercentage: z.number().finite().min(0).max(500).nullable().optional(),
+  discountPercentage: z.number().finite().min(0).max(99.99).nullable().optional(),
+  totalAmount: z.number().finite().nonnegative(),
+  toolsCost: z.number().finite().nonnegative().nullable().optional(),
+  manualPrice: z.number().finite().positive().nullable().optional(),
+  manualInflationRate: z.number().finite().min(0).max(1000).nullable().optional(),
+  additionalDeliverableCost: z.number().finite().nonnegative().optional(),
+  deliverables: z.array(z.record(z.unknown())).max(100).optional(),
   projectStartDate: z.union([
     z.date(), 
     z.string().transform((str) => new Date(str)),
@@ -721,7 +744,7 @@ export const insertQuotationSchema = baseInsertQuotationSchema.extend({
   priceMode: z.enum(["auto", "manual"]).optional(),
   pricingVersion: z.number().int().min(1).optional(),
   status: z.enum(["draft", "pending", "approved", "rejected", "in-negotiation"]).optional(),
-  proposalLink: z.string().nullable().optional(),
+  proposalLink: z.string().url().max(2048).nullable().optional(),
 });
 
 // ==================== HISTORIAL DE NEGOCIACIONES ====================
@@ -748,6 +771,20 @@ export const negotiationHistory = pgTable("negotiation_history", {
 export const insertNegotiationHistorySchema = createInsertSchema(negotiationHistory).omit({
   id: true,
   createdAt: true,
+}).extend({
+  quotationId: z.number().int().positive(),
+  previousPrice: z.number().finite().nonnegative(),
+  newPrice: z.number().finite().positive(),
+  changeType: z.enum([
+    "price_reduction",
+    "price_increase",
+    "scope_reduction",
+    "scope_expansion",
+    "team_adjustment",
+    "mixed",
+  ]),
+  adjustmentPercentage: z.number().finite().nullable().optional(),
+  proposalLink: z.string().url().max(2048).nullable().optional(),
 });
 
 export type NegotiationHistory = typeof negotiationHistory.$inferSelect;
@@ -772,6 +809,14 @@ export const quotationVariants = pgTable("quotation_variants", {
 export const insertQuotationVariantSchema = createInsertSchema(quotationVariants).omit({
   id: true,
   createdAt: true,
+}).extend({
+  variantName: z.string().trim().min(1).max(120),
+  variantDescription: z.string().trim().max(1000).nullable().optional(),
+  variantOrder: z.number().int().min(1).max(100),
+  baseCost: z.number().finite().nonnegative(),
+  complexityAdjustment: z.number().finite(),
+  markupAmount: z.number().finite(),
+  totalAmount: z.number().finite().positive(),
 });
 
 export type QuotationVariant = typeof quotationVariants.$inferSelect;
@@ -1999,13 +2044,15 @@ export const costMultipliersRelations = relations(costMultipliers, ({ one }) => 
 export const analysisTypes = [
   { value: "basic", label: "Metodología Básica" },
   { value: "standard", label: "Metodología Estándar" },
-  { value: "deep", label: "Metodología Avanzada" },
+  { value: "advanced", label: "Metodología Avanzada" },
+  { value: "premium", label: "Metodología Premium" },
 ];
 
 // Opciones de tipo de proyecto (modalidad de negocio)
 export const projectTypes = [
   { value: "on-demand", label: "On Demand (Proyecto Único)" },
   { value: "fee-mensual", label: "Fee Mensual (Contrato Recurrente)" },
+  { value: "always-on", label: "Always-On (Servicio continuo con entregables)" },
 ];
 
 // Opciones de duración según tipo de proyecto
@@ -2025,22 +2072,28 @@ export const projectDurationOptions = {
     { value: "2-years", label: "2 años" },
     { value: "custom", label: "Personalizada" },
   ],
+  "always-on": [
+    { value: "6-months", label: "6 meses" },
+    { value: "1-year", label: "1 año" },
+    { value: "open-ended", label: "Continuo" },
+    { value: "custom", label: "Personalizada" },
+  ],
 };
 
 // Opciones de volumen de menciones
 export const mentionsVolumeOptions = [
-  { value: "small", label: "1k - 10k menciones" },
-  { value: "medium", label: "10k - 50k menciones" },
-  { value: "large", label: "50k - 200k menciones" },
-  { value: "xlarge", label: "200k+ menciones" },
+  { value: "low", label: "Menos de 1k menciones" },
+  { value: "medium", label: "1k - 10k menciones" },
+  { value: "high", label: "10k - 100k menciones" },
+  { value: "very-high", label: "Más de 100k menciones" },
 ];
 
 // Opciones de países cubiertos
 export const countriesCoveredOptions = [
   { value: "1", label: "Un solo país" },
-  { value: "2-5", label: "2-5 países" },
-  { value: "6-10", label: "6-10 países" },
-  { value: "10+", label: "10+ países" },
+  { value: "2-3", label: "2-3 países" },
+  { value: "4-6", label: "4-6 países" },
+  { value: "7+", label: "7+ países" },
 ];
 
 // Opciones de nivel de participación del cliente
@@ -2048,6 +2101,7 @@ export const clientEngagementOptions = [
   { value: "low", label: "Bajo (Revisiones mínimas)" },
   { value: "medium", label: "Medio (2-3 ciclos de revisión)" },
   { value: "high", label: "Alto (Múltiples interacciones)" },
+  { value: "very-high", label: "Muy alto (Seguimiento continuo)" },
 ];
 
 // Opciones de estado de cotización

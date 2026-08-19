@@ -15,6 +15,7 @@ export type QuotationPricingInput = {
   complexityFactor?: number;
   marginFactor?: number;
   toolsCostUSD?: number;
+  additionalDeliverableCostUSD?: number;
   platformCostARS?: number;
   deviationPercentage?: number;
   discountPercentage?: number;
@@ -29,6 +30,7 @@ export type PricingBreakdown = {
   complexityAdjustment: number;
   markupAmount: number;
   toolsCost: number;
+  additionalDeliverableCost: number;
   platformCost: number;
   deviationAmount: number;
   discountAmount: number;
@@ -71,7 +73,11 @@ export function calculateQuotationPricing(input: QuotationPricingInput): Quotati
   const complexityAdjustment = baseCost * finite(input.complexityFactor);
   const subtotalWithComplexity = baseCost + complexityAdjustment;
   const toolsCost = finite(input.toolsCostUSD) * exchangeRate;
+  const additionalDeliverableCost = finite(input.additionalDeliverableCostUSD) * exchangeRate;
   const platformCost = finite(input.platformCostARS);
+  const deviationRate = finite(input.deviationPercentage) / 100;
+  const discountRate = finite(input.discountPercentage) / 100;
+  const inflationFactor = Math.max(0, finite(input.inflationFactor, 1));
 
   let markupAmount: number;
   let subtotalWithMarkup: number;
@@ -82,7 +88,14 @@ export function calculateQuotationPricing(input: QuotationPricingInput): Quotati
       input.manualPriceCurrency ?? input.quotationCurrency,
       exchangeRate,
     );
-    subtotalWithMarkup = Math.max(0, manualPriceARS - toolsCost);
+    // Manual price is the final amount charged to the client. Back-solve the
+    // markup so platform, deviation, discount and inflation do not make the
+    // displayed total drift away from that target.
+    const postDiscountInflation = Math.max(Number.EPSILON, (1 - discountRate) * inflationFactor);
+    const subtotalWithPlatformTarget = manualPriceARS
+      / postDiscountInflation
+      / Math.max(Number.EPSILON, 1 + deviationRate);
+    subtotalWithMarkup = subtotalWithPlatformTarget - toolsCost - additionalDeliverableCost - platformCost;
     markupAmount = subtotalWithMarkup - subtotalWithComplexity;
     effectiveMarginFactor = subtotalWithComplexity > 0 ? subtotalWithMarkup / subtotalWithComplexity : 1;
   } else {
@@ -91,17 +104,18 @@ export function calculateQuotationPricing(input: QuotationPricingInput): Quotati
     subtotalWithMarkup = subtotalWithComplexity + markupAmount;
   }
 
-  const subtotalWithPlatform = subtotalWithMarkup + toolsCost + platformCost;
-  const deviationAmount = subtotalWithPlatform * (finite(input.deviationPercentage) / 100);
+  const subtotalWithPlatform = subtotalWithMarkup + toolsCost + additionalDeliverableCost + platformCost;
+  const deviationAmount = subtotalWithPlatform * deviationRate;
   const subtotalWithDeviation = subtotalWithPlatform + deviationAmount;
-  const discountAmount = subtotalWithDeviation * (finite(input.discountPercentage) / 100);
-  const total = (subtotalWithDeviation - discountAmount) * Math.max(0, finite(input.inflationFactor, 1));
+  const discountAmount = subtotalWithDeviation * discountRate;
+  const total = (subtotalWithDeviation - discountAmount) * inflationFactor;
 
   const canonicalARS: PricingBreakdown = {
     baseCost: round(baseCost),
     complexityAdjustment: round(complexityAdjustment),
     markupAmount: round(markupAmount),
     toolsCost: round(toolsCost),
+    additionalDeliverableCost: round(additionalDeliverableCost),
     platformCost: round(platformCost),
     deviationAmount: round(deviationAmount),
     discountAmount: round(discountAmount),

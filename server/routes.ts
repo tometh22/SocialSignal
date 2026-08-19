@@ -33,6 +33,7 @@ import {
   insertQuotationSchema,
   insertQuotationTeamMemberSchema,
   insertQuotationVariantSchema,
+  insertNegotiationHistorySchema,
   insertTemplateRoleAssignmentSchema,
   insertActiveProjectSchema,
   insertTimeEntrySchema,
@@ -178,6 +179,11 @@ import { createXlsxBuffer } from './utils/xlsx-export';
 import { createHash } from "node:crypto";
 import { productDefinitionsMarkdown } from "./content/product-definitions.generated";
 import { PRODUCT_DEFINITIONS_MANIFEST } from "./content/product-definitions-manifest";
+import { calculateQuotationPricing } from "@shared/utils/quotation-pricing";
+import { calculateQuotationComplexityFactor } from "@shared/utils/quotation-complexity";
+import {
+  assertQuotationTransition,
+} from "@shared/utils/quotation-workflow";
 
 // 🚀 COSTS SOT - Nueva fuente única de verdad para costos
 import * as costs from './domain/costs';
@@ -5198,6 +5204,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Quotations are commercially sensitive. This prefix guard protects every
+  // current and future route in the module, including nested negotiation and
+  // display endpoints, even if a handler forgets to repeat the middleware.
+  app.use([
+    "/api/quotations",
+    "/api/quotation-team",
+    "/api/quotation-team-member",
+    "/api/quotation-variants",
+    "/api/quotation-templates",
+    "/api/template-roles",
+  ], requireAuth, requirePermission("quotations"));
+
   // Quotations routes
   app.get("/api/quotations", requireAuth, async (req, res) => {
     try {
@@ -5224,10 +5242,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         count: sql<number>`count(*)::int`,
       })
       .from(quotationTeamMembers)
+      .where(isNull(quotationTeamMembers.variantId))
       .groupBy(quotationTeamMembers.quotationId);
     const result: Record<number, number> = {};
     for (const row of rows) result[row.quotationId] = row.count;
     res.json(result);
+  });
+
+  app.get("/api/quotations/management-metadata", requireAuth, async (_req, res) => {
+    const rows = await db.select({
+      id: quotations.id,
+      hasNegotiation: sql<boolean>`EXISTS (
+        SELECT 1 FROM negotiation_history nh WHERE nh.quotation_id = ${quotations.id}
+      )`,
+      hasProject: sql<boolean>`EXISTS (
+        SELECT 1 FROM active_projects ap WHERE ap.quotation_id = ${quotations.id}
+      )`,
+    }).from(quotations);
+    res.json({
+      negotiations: Object.fromEntries(rows.map((row) => [row.id, row.hasNegotiation])),
+      projects: Object.fromEntries(rows.map((row) => [row.id, row.hasProject])),
+    });
   });
 
   app.get("/api/quotations/client/:clientId", requireAuth, async (req, res) => {
@@ -5277,9 +5312,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const quotationTeamRequestSchema = z.object({
     teamMembers: z.array(quotationTeamPayloadSchema),
   });
-  const quotationVariantsPayloadSchema = z.array(
-    insertQuotationVariantSchema.omit({ quotationId: true }),
-  ).max(20);
+  const quotationVariantPayloadSchema = insertQuotationVariantSchema
+    .omit({ quotationId: true })
+    .extend({
+      teamMembers: z.array(quotationTeamPayloadSchema).max(100).optional(),
+    });
+  const quotationVariantsPayloadSchema = z.array(quotationVariantPayloadSchema).max(20);
+  const negotiatedTeamPayloadSchema = z.array(z.object({
+    personnelId: z.number().int().positive(),
+    roleId: z.number().int().positive(),
+    estimatedHours: z.number().finite().positive(),
+    hourlyRate: z.number().finite().nonnegative(),
+  })).max(100);
   const validatePricingSnapshot = (quotation: z.infer<typeof insertQuotationSchema>) => {
     if ((quotation.pricingVersion ?? 1) >= 2 && !(Number(quotation.exchangeRateAtQuote) > 0)) {
       throw new z.ZodError([{
@@ -5296,6 +5340,102 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }]);
     }
   };
+
+  const quotationInflationFactor = (quotation: z.infer<typeof insertQuotationSchema>) => {
+    if (!quotation.applyInflationAdjustment) return 1;
+    const annualRate = Number(quotation.manualInflationRate) || 25;
+    let months = 0;
+    if (quotation.rateProjectionMode === "annual_avg") {
+      months = 6;
+    } else if (quotation.projectStartDate) {
+      const start = new Date(quotation.projectStartDate);
+      const now = new Date();
+      months = Math.max(0, (start.getFullYear() - now.getFullYear()) * 12 + start.getMonth() - now.getMonth());
+    }
+    return months > 0 ? Math.pow(1 + annualRate / 100, months / 12) : 1;
+  };
+
+  const moneyMatches = (actual: number, expected: number) =>
+    Math.abs(actual - expected) <= Math.max(0.02, Math.abs(expected) * 0.00001);
+
+  function validateAndNormalizeQuotationPricing(
+    quotation: z.infer<typeof insertQuotationSchema>,
+    teamMembers: z.infer<typeof quotationTeamPayloadSchema>[],
+  ) {
+    const issues: z.ZodIssue[] = [];
+    const normalizedTeam = teamMembers.map((member, index) => {
+      const calculatedCost = member.hours * member.rate;
+      if (!moneyMatches(member.cost, calculatedCost)) {
+        issues.push({
+          code: z.ZodIssueCode.custom,
+          path: ["teamMembers", index, "cost"],
+          message: "El costo debe coincidir con horas × tarifa",
+        });
+      }
+      if (quotation.status !== "draft" && (member.hours <= 0 || member.rate <= 0)) {
+        issues.push({
+          code: z.ZodIssueCode.custom,
+          path: ["teamMembers", index],
+          message: "Las cotizaciones no borrador requieren horas y tarifa positivas",
+        });
+      }
+      return { ...member, cost: calculatedCost };
+    });
+
+    if (quotation.status !== "draft" && normalizedTeam.length === 0) {
+      issues.push({
+        code: z.ZodIssueCode.custom,
+        path: ["teamMembers"],
+        message: "La cotización requiere al menos un integrante",
+      });
+    }
+
+    const currency = quotation.quotationCurrency === "USD" ? "USD" : "ARS";
+    const exchangeRate = Number(quotation.exchangeRateAtQuote);
+    if (exchangeRate > 0) {
+      const complexityFactor = calculateQuotationComplexityFactor(quotation);
+      const toolsCost = Number(quotation.toolsCost) || 0;
+      const platformCost = Number(quotation.platformCost) || 0;
+      const additionalDeliverableCost = Number(quotation.additionalDeliverableCost) || 0;
+      const pricing = calculateQuotationPricing({
+        quotationCurrency: currency,
+        exchangeRate,
+        team: normalizedTeam.map((member) => ({ ...member, currency })),
+        complexityFactor,
+        marginFactor: Number(quotation.marginFactor) || 0,
+        toolsCostUSD: currency === "USD" ? toolsCost : toolsCost / exchangeRate,
+        additionalDeliverableCostUSD: currency === "USD"
+          ? additionalDeliverableCost
+          : additionalDeliverableCost / exchangeRate,
+        platformCostARS: currency === "USD" ? platformCost * exchangeRate : platformCost,
+        deviationPercentage: Number(quotation.deviationPercentage) || 0,
+        discountPercentage: Number(quotation.discountPercentage) || 0,
+        inflationFactor: quotationInflationFactor(quotation),
+        priceMode: quotation.priceMode === "manual" ? "manual" : "auto",
+        manualPrice: quotation.manualPrice,
+        manualPriceCurrency: quotation.manualPriceCurrency === "USD" ? "USD" : "ARS",
+      }).display;
+      for (const [field, expected] of [
+        ["baseCost", pricing.baseCost],
+        ["complexityAdjustment", pricing.complexityAdjustment],
+        ["markupAmount", pricing.markupAmount],
+        ["totalAmount", pricing.total],
+      ] as const) {
+        if (!moneyMatches(Number(quotation[field]), expected)) {
+          issues.push({
+            code: z.ZodIssueCode.custom,
+            path: [field],
+            message: `El importe no coincide con el cálculo canónico (${expected})`,
+          });
+        }
+      }
+    }
+    if (quotation.status !== "draft" && quotation.totalAmount <= 0) {
+      issues.push({ code: z.ZodIssueCode.custom, path: ["totalAmount"], message: "El total debe ser positivo" });
+    }
+    if (issues.length > 0) throw new z.ZodError(issues);
+    return normalizedTeam;
+  }
 
   async function validateQuotationTeamReferences(teamMembers: z.infer<typeof quotationTeamPayloadSchema>[]) {
     const personnelIds = [...new Set(teamMembers.flatMap((member) => member.personnelId ? [member.personnelId] : []))];
@@ -5332,25 +5472,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/quotations", requireAuth, async (req, res) => {
     try {
-      console.log('📥 POST /api/quotations - Request body:', JSON.stringify(req.body, null, 2));
-
       try {
-        // Validar datos con Zod
-        console.log('🔍 Validating quotation data...');
         const { teamMembers: rawTeamMembers, variants: rawVariants, ...rawQuotation } = req.body ?? {};
         const validatedData = insertQuotationSchema.parse(rawQuotation);
         validatePricingSnapshot(validatedData);
-        const validatedTeam = quotationTeamRequestSchema
+        const parsedTeam = quotationTeamRequestSchema
           .parse({ teamMembers: rawTeamMembers })
           .teamMembers;
+        const validatedTeam = validateAndNormalizeQuotationPricing(validatedData, parsedTeam);
         const validatedVariants = rawVariants === undefined
           ? []
           : quotationVariantsPayloadSchema.parse(rawVariants);
         if (validatedData.status === "approved" && validatedVariants.length === 0) {
           return res.status(400).json({ message: "Una cotización aprobada debe incluir al menos una variante" });
         }
-        await validateQuotationTeamReferences(validatedTeam);
-        console.log('✅ Validation successful:', JSON.stringify(validatedData, null, 2));
+        const normalizedVariants = validatedVariants.map((variant) => {
+          const variantTeam = validateAndNormalizeQuotationPricing(
+            { ...validatedData, ...variant },
+            variant.teamMembers ?? validatedTeam,
+          );
+          return { ...variant, teamMembers: variantTeam };
+        });
+        await validateQuotationTeamReferences([
+          ...validatedTeam,
+          ...normalizedVariants.flatMap((variant) => variant.teamMembers),
+        ]);
 
         // Crear cotización — expiresAt default = ahora + 30 días si no viene en payload
         if (!validatedData.expiresAt) {
@@ -5359,16 +5505,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
           (validatedData as any).expiresAt = exp;
         }
         const quotation = await db.transaction(async (tx) => {
-          const [created] = await tx.insert(quotations).values(validatedData).returning();
+          const [created] = await tx.insert(quotations).values({
+            ...validatedData,
+            createdBy: req.user?.id ?? null,
+          }).returning();
           if (validatedTeam.length > 0) {
             await tx.insert(quotationTeamMembers).values(
-              validatedTeam.map((member) => ({ ...member, quotationId: created.id })),
+              validatedTeam.map((member) => ({ ...member, quotationId: created.id, variantId: null })),
             );
           }
-          if (validatedVariants.length > 0) {
-            await tx.insert(quotationVariants).values(
-              validatedVariants.map((variant) => ({ ...variant, quotationId: created.id })),
-            );
+          for (const variant of normalizedVariants) {
+            const { teamMembers, ...variantData } = variant;
+            const [createdVariant] = await tx.insert(quotationVariants)
+              .values({ ...variantData, quotationId: created.id })
+              .returning();
+            if (teamMembers.length > 0) {
+              await tx.insert(quotationTeamMembers).values(teamMembers.map((member) => ({
+                ...member,
+                quotationId: created.id,
+                variantId: createdVariant.id,
+              })));
+            }
           }
           return created;
         });
@@ -5376,12 +5533,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Si viene de un lead CRM, registrar actividad automáticamente
         if (validatedData.leadId) {
           try {
-            const userId = (req.session as any)?.userId;
+            const userId = req.user?.id;
             await db.insert(crmActivities).values({
               leadId: validatedData.leadId,
               type: 'proposal',
               title: `Cotización creada: ${validatedData.projectName}`,
-              content: `Se generó una nueva cotización para el proyecto "${validatedData.projectName}". Estado: Borrador. ID: #${quotation.id}`,
+              content: `Se generó una nueva cotización para el proyecto "${validatedData.projectName}". Estado: ${validatedData.status ?? "draft"}. ID: #${quotation.id}`,
               activityDate: new Date(),
               createdBy: userId,
             });
@@ -5408,7 +5565,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     } catch (error) {
       console.error("Error al crear cotización:", error);
-      res.status(500).json({ message: "Failed to create quotation", error: String(error) });
+      res.status(500).json({ message: "Failed to create quotation" });
     }
   });
 
@@ -5416,8 +5573,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/quotations/:id", requireAuth, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      console.log('📥 PUT /api/quotations/:id - ID:', id);
-      console.log('📥 PUT /api/quotations/:id - Request body:', JSON.stringify(req.body, null, 2));
       
       if (isNaN(id)) return res.status(400).json({ message: "Invalid quotation ID" });
 
@@ -5431,42 +5586,68 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       try {
         // Validar datos con Zod
-        console.log('🔍 Validating quotation data for update...');
         const { teamMembers: rawTeamMembers, variants: rawVariants, ...rawQuotation } = req.body ?? {};
         const validatedData = insertQuotationSchema.parse(rawQuotation);
         validatePricingSnapshot(validatedData);
-        const validatedTeam = quotationTeamRequestSchema
+        if (validatedData.status && validatedData.status !== existingQuotation.status) {
+          assertQuotationTransition(existingQuotation.status, validatedData.status);
+        }
+        const parsedTeam = quotationTeamRequestSchema
           .parse({ teamMembers: rawTeamMembers })
           .teamMembers;
+        const validatedTeam = validateAndNormalizeQuotationPricing(validatedData, parsedTeam);
         const validatedVariants = rawVariants === undefined
           ? undefined
           : quotationVariantsPayloadSchema.parse(rawVariants);
         if (validatedData.status === "approved" && (!validatedVariants || validatedVariants.length === 0)) {
           return res.status(400).json({ message: "Una cotización aprobada debe incluir al menos una variante" });
         }
-        await validateQuotationTeamReferences(validatedTeam);
+        const normalizedVariants = validatedVariants?.map((variant) => {
+          const variantTeam = validateAndNormalizeQuotationPricing(
+            { ...validatedData, ...variant },
+            variant.teamMembers ?? validatedTeam,
+          );
+          return { ...variant, teamMembers: variantTeam };
+        });
+        await validateQuotationTeamReferences([
+          ...validatedTeam,
+          ...(normalizedVariants?.flatMap((variant) => variant.teamMembers) ?? []),
+        ]);
 
         // Cotización y equipo forman una única unidad: nunca dejamos un guardado
         // exitoso con integrantes faltantes.
         const updatedQuotation = await db.transaction(async (tx) => {
           const [updated] = await tx.update(quotations)
-            .set(validatedData)
+            .set({ ...validatedData, updatedAt: new Date() })
             .where(eq(quotations.id, id))
             .returning();
           if (!updated) throw new Error("Quotation not found");
           await tx.delete(quotationTeamMembers)
-            .where(eq(quotationTeamMembers.quotationId, id));
+            .where(normalizedVariants
+              ? eq(quotationTeamMembers.quotationId, id)
+              : and(
+                  eq(quotationTeamMembers.quotationId, id),
+                  isNull(quotationTeamMembers.variantId),
+                ));
           if (validatedTeam.length > 0) {
             await tx.insert(quotationTeamMembers).values(
-              validatedTeam.map((member) => ({ ...member, quotationId: id })),
+              validatedTeam.map((member) => ({ ...member, quotationId: id, variantId: null })),
             );
           }
-          if (validatedVariants) {
+          if (normalizedVariants) {
             await tx.delete(quotationVariants).where(eq(quotationVariants.quotationId, id));
-            if (validatedVariants.length > 0) {
-              await tx.insert(quotationVariants).values(
-                validatedVariants.map((variant) => ({ ...variant, quotationId: id })),
-              );
+            for (const variant of normalizedVariants) {
+              const { teamMembers, ...variantData } = variant;
+              const [createdVariant] = await tx.insert(quotationVariants)
+                .values({ ...variantData, quotationId: id })
+                .returning();
+              if (teamMembers.length > 0) {
+                await tx.insert(quotationTeamMembers).values(teamMembers.map((member) => ({
+                  ...member,
+                  quotationId: id,
+                  variantId: createdVariant.id,
+                })));
+              }
             }
           }
           return updated;
@@ -5484,23 +5665,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
         throw validationError;
       }
     } catch (error) {
+      if (error instanceof Error && error.message.startsWith("No se puede cambiar")) {
+        return res.status(400).json({ message: error.message });
+      }
       console.error("Error al actualizar cotización:", error);
-      res.status(500).json({ message: "Failed to update quotation", error: String(error) });
+      res.status(500).json({ message: "Failed to update quotation" });
     }
   });
+
+  const quotationMetadataPatchSchema = insertQuotationSchema.pick({
+    projectName: true,
+    proposalLink: true,
+    additionalNotes: true,
+    adjustmentReason: true,
+    templateCustomization: true,
+    expiresAt: true,
+  }).partial().strict();
 
   app.patch("/api/quotations/:id", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "Invalid quotation ID" });
 
     try {
-      const validatedData = insertQuotationSchema.partial().parse(req.body);
-      if (validatedData.status === "approved") {
-        return res.status(409).json({
-          message: "La aprobación requiere el flujo transaccional de finalización",
-        });
-      }
-      const updatedQuotation = await storage.updateQuotation(id, validatedData);
+      const validatedData = quotationMetadataPatchSchema.parse(req.body);
+      const updatedQuotation = await storage.updateQuotation(id, { ...validatedData, updatedAt: new Date() } as any);
 
       if (!updatedQuotation) {
         return res.status(404).json({ message: "Quotation not found" });
@@ -5520,77 +5708,134 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (isNaN(id)) return res.status(400).json({ message: "Invalid quotation ID" });
 
     try {
-      const { status, lossReason } = req.body;
+      const { status, lossReason } = z.object({
+        status: z.enum(["draft", "pending", "approved", "rejected", "in-negotiation"]),
+        lossReason: z.string().trim().min(1).max(1000).optional(),
+      }).parse(req.body);
 
-      if (!status) return res.status(400).json({ message: "Status is required" });
-
-      if (status === "approved") {
-        return res.status(409).json({
-          message: "La aprobación requiere guardar cotización, equipo, variantes y pricing mediante el flujo de finalización",
-        });
-      }
-
-      const validStatuses = ['draft', 'pending', 'approved', 'rejected', 'in-negotiation'];
-      if (!validStatuses.includes(status)) {
-        return res.status(400).json({ message: `Invalid status. Must be one of: ${validStatuses.join(', ')}` });
-      }
-
-      // Get the current quotation to check its status
       const currentQuotation = await storage.getQuotation(id);
       if (!currentQuotation) {
         return res.status(404).json({ message: "Quotation not found" });
       }
+      assertQuotationTransition(currentQuotation.status, status);
 
-      // Validate status transitions
-      const validTransitions: Record<string, string[]> = {
-        'draft': ['pending', 'rejected'],
-        'pending': ['approved', 'rejected', 'in-negotiation'],
-        'approved': ['in-negotiation'],
-        'in-negotiation': ['approved', 'rejected', 'pending'],
-        'rejected': ['draft', 'pending']
-      };
-
-      const allowed = validTransitions[currentQuotation.status];
-      if (allowed && !allowed.includes(status)) {
-        return res.status(400).json({
-          message: `No se puede cambiar de "${currentQuotation.status}" a "${status}". Transiciones válidas: ${allowed.join(', ')}`
-        });
-      }
-
-      let updateData: any = { status };
+      let updateData: any = { status, updatedAt: new Date() };
+      let negotiatedTeamToApply: z.infer<typeof quotationTeamPayloadSchema>[] | null = null;
+      let selectedVariantIds: number[] = [];
 
       // Guardar motivo de pérdida al rechazar
       if (status === 'rejected' && lossReason) {
         updateData.lossReason = lossReason;
       }
 
-      if (currentQuotation.status === 'in-negotiation' && status === 'approved') {
-        // Get the last negotiation entry
-        const negotiationHistory = await storage.getNegotiationHistory(id);
-        
-        if (negotiationHistory && negotiationHistory.length > 0) {
-          // Get the most recent negotiation (first in the array since it's ordered by createdAt DESC)
+      if (status === "approved") {
+        const [team, variants] = await Promise.all([
+          storage.getQuotationTeamMembers(id),
+          storage.getQuotationVariants(id),
+        ]);
+        if (variants.length === 0) {
+          return res.status(400).json({ message: "Una cotización aprobada debe incluir al menos una variante" });
+        }
+        if (team.length === 0) {
+          return res.status(400).json({ message: "Una cotización aprobada debe incluir equipo" });
+        }
+        validatePricingSnapshot(insertQuotationSchema.parse(currentQuotation));
+        const selectedVariant = variants.find((variant) =>
+          variant.isSelected && moneyMatches(variant.totalAmount, currentQuotation.totalAmount)
+        ) ?? variants.find((variant) => variant.isSelected);
+        const selectedVariantTeam = selectedVariant
+          ? await storage.getQuotationTeamMembersByVariant(selectedVariant.id)
+          : [];
+        const approvalTeam = selectedVariantTeam.length > 0 ? selectedVariantTeam : team;
+
+        if (currentQuotation.status === "in-negotiation") {
+          const negotiationHistory = await storage.getNegotiationHistory(id);
+          if (negotiationHistory.length === 0) {
+            return res.status(400).json({ message: "No hay una negociación registrada para aprobar" });
+          }
           const lastNegotiation = negotiationHistory[0];
-          
-          // Update the quotation with the last negotiated price
-          updateData.totalAmount = lastNegotiation.newPrice;
-          
-          // Also update the markup amount to maintain the correct calculation
-          const operationalSubtotal = currentQuotation.baseCost + currentQuotation.complexityAdjustment;
-          updateData.markupAmount = lastNegotiation.newPrice - operationalSubtotal;
-          
-          console.log(`[API] Updating quotation ${id} from negotiated price: ${currentQuotation.totalAmount} → ${lastNegotiation.newPrice}`);
+          if (lastNegotiation.newTeam) {
+            const negotiatedTeam = negotiatedTeamPayloadSchema.parse(JSON.parse(lastNegotiation.newTeam));
+            negotiatedTeamToApply = negotiatedTeam.map((member) => ({
+              personnelId: member.personnelId,
+              roleId: member.roleId,
+              hours: member.estimatedHours,
+              rate: member.hourlyRate,
+              cost: Math.round(member.estimatedHours * member.hourlyRate * 100) / 100,
+            }));
+            await validateQuotationTeamReferences(negotiatedTeamToApply);
+          }
+          selectedVariantIds = variants.filter((variant) => variant.isSelected).map((variant) => variant.id);
+          const acceptedBaseCost = negotiatedTeamToApply
+            ? negotiatedTeamToApply.reduce((sum, member) => sum + member.cost, 0)
+            : currentQuotation.baseCost;
+          const complexityFactor = calculateQuotationComplexityFactor(currentQuotation);
+          const acceptedComplexity = Math.round(acceptedBaseCost * complexityFactor * 100) / 100;
+          const nonMarginCosts = (currentQuotation.toolsCost || 0)
+            + (currentQuotation.platformCost || 0)
+            + (currentQuotation.additionalDeliverableCost || 0);
+          const operationalSubtotal = acceptedBaseCost + acceptedComplexity;
+          updateData = {
+            ...updateData,
+            baseCost: acceptedBaseCost,
+            complexityAdjustment: acceptedComplexity,
+            totalAmount: lastNegotiation.newPrice,
+            markupAmount: lastNegotiation.newPrice - operationalSubtotal - nonMarginCosts,
+            marginFactor: operationalSubtotal > 0
+              ? (lastNegotiation.newPrice - nonMarginCosts) / operationalSubtotal
+              : 0,
+            priceMode: "manual",
+            manualPrice: lastNegotiation.newPrice,
+            manualPriceCurrency: currentQuotation.quotationCurrency || "ARS",
+            deviationPercentage: 0,
+            discountPercentage: 0,
+            applyInflationAdjustment: false,
+          };
+        } else {
+          validateAndNormalizeQuotationPricing(insertQuotationSchema.parse(currentQuotation), approvalTeam);
         }
       }
 
-      const updatedQuotation = await storage.updateQuotation(id, updateData);
+      const updatedQuotation = await db.transaction(async (tx) => {
+        const [updated] = await tx.update(quotations)
+          .set(updateData)
+          .where(eq(quotations.id, id))
+          .returning();
+        if (!updated || !negotiatedTeamToApply) return updated;
+
+        await tx.delete(quotationTeamMembers).where(and(
+          eq(quotationTeamMembers.quotationId, id),
+          isNull(quotationTeamMembers.variantId),
+        ));
+        await tx.insert(quotationTeamMembers).values(negotiatedTeamToApply.map((member) => ({
+          ...member,
+          quotationId: id,
+          variantId: null,
+        })));
+
+        for (const variantId of selectedVariantIds) {
+          await tx.delete(quotationTeamMembers).where(eq(quotationTeamMembers.variantId, variantId));
+          await tx.insert(quotationTeamMembers).values(negotiatedTeamToApply.map((member) => ({
+            ...member,
+            quotationId: id,
+            variantId,
+          })));
+          await tx.update(quotationVariants).set({
+            baseCost: updateData.baseCost,
+            complexityAdjustment: updateData.complexityAdjustment,
+            markupAmount: updateData.markupAmount,
+            totalAmount: updateData.totalAmount,
+          }).where(eq(quotationVariants.id, variantId));
+        }
+        return updated;
+      });
 
       if (!updatedQuotation) {
         return res.status(404).json({ message: "Quotation not found" });
       }
 
       // Sync budget to active project when quotation price changes on approval
-      if (status === 'approved' && updateData.totalAmount) {
+      if (status === 'approved' && updateData.totalAmount !== undefined) {
         try {
           const projects = await db.select().from(activeProjects)
             .where(eq(activeProjects.quotationId, id));
@@ -5605,8 +5850,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json(updatedQuotation);
     } catch (error) {
+      if (error instanceof z.ZodError || error instanceof SyntaxError) {
+        return res.status(400).json({
+          message: "La cotización no cumple las reglas para ese estado",
+          errors: error instanceof z.ZodError ? error.errors : undefined,
+        });
+      }
+      if (error instanceof Error && error.message.startsWith("No se puede cambiar")) {
+        return res.status(400).json({ message: error.message });
+      }
       console.error(`[API] Error actualizando estado de cotización ID ${id}:`, error);
-      res.status(500).json({ message: "Failed to update quotation status", error: error instanceof Error ? (error as Error).message : 'Unknown error' });
+      res.status(500).json({ message: "Failed to update quotation status" });
     }
   });
 
@@ -5661,7 +5915,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // POST /api/quotation-templates
   app.post("/api/quotation-templates", requireAuth, async (req, res) => {
     try {
-      const userId = (req.session as any)?.userId;
+      const userId = req.user?.id;
       const { name, description, projectType, analysisType, mentionsVolume, countriesCovered, clientEngagement, teamConfig, complexityConfig } = req.body;
       if (!name || !projectType || !analysisType || !teamConfig) {
         return res.status(400).json({ message: "name, projectType, analysisType y teamConfig son requeridos" });
@@ -5804,44 +6058,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!quotation) {
         return res.status(404).json({ message: "Quotation not found" });
       }
+      if (quotation.status !== "in-negotiation") {
+        return res.status(409).json({ message: "La cotización debe estar en negociación para registrar cambios" });
+      }
 
-      const {
-        newPrice,
-        previousScope,
-        newScope,
-        previousTeam,
-        newTeam,
-        changeType,
-        clientFeedback,
-        internalNotes,
-        negotiationReason,
-        proposalLink
-      } = req.body;
+      const rawNewTeam = req.body?.newTeam
+        ? negotiatedTeamPayloadSchema.parse(JSON.parse(req.body.newTeam))
+        : null;
+      const payload = insertNegotiationHistorySchema
+        .omit({ quotationId: true, previousPrice: true, createdBy: true, adjustmentPercentage: true })
+        .parse({
+          ...req.body,
+          proposalLink: req.body?.proposalLink || null,
+          newTeam: rawNewTeam ? JSON.stringify(rawNewTeam) : null,
+        });
 
       // Calculate adjustment percentage (guard against division by zero)
       const adjustmentPercentage = quotation.totalAmount > 0
-        ? ((newPrice - quotation.totalAmount) / quotation.totalAmount) * 100
+        ? ((payload.newPrice - quotation.totalAmount) / quotation.totalAmount) * 100
         : 0;
 
       const negotiationEntry = await storage.createNegotiationHistory({
+        ...payload,
         quotationId,
         previousPrice: quotation.totalAmount,
-        newPrice,
-        previousScope,
-        newScope,
-        previousTeam,
-        newTeam,
-        changeType,
-        clientFeedback,
-        internalNotes,
-        negotiationReason,
-        proposalLink,
         adjustmentPercentage,
-        createdBy: req.user?.id
+        createdBy: req.user?.id ?? null,
       });
 
       res.status(201).json(negotiationEntry);
     } catch (error) {
+      if (error instanceof z.ZodError || error instanceof SyntaxError) {
+        return res.status(400).json({ message: "Los datos de negociación son inválidos", errors: error instanceof z.ZodError ? error.errors : undefined });
+      }
       console.error("Error creating negotiation history:", error);
       res.status(500).json({ message: "Failed to create negotiation history" });
     }
@@ -5941,9 +6190,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (isNaN(quotationId)) return res.status(400).json({ message: "Invalid quotation ID" });
 
     try {
-      console.log(`🔍 Fetching team members for quotation ID: ${quotationId}`);
       const members = await storage.getQuotationTeamMembers(quotationId);
-      console.log(`👥 Found ${members.length} team members:`, members);
       res.json(members);
     } catch (error) {
       console.error(`❌ Error fetching team members for quotation ${quotationId}:`, error);
@@ -5957,13 +6204,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (isNaN(quotationId)) return res.status(400).json({ message: "Invalid quotation ID" });
 
     try {
-      const { roleId, personnelId, hours, rate } = req.body;
-      
-      if (!roleId || !personnelId || !hours || !rate) {
-        return res.status(400).json({ message: "roleId, personnelId, hours, and rate are required" });
-      }
-
-      console.log(`🔧 Assigning personnel ${personnelId} to role ${roleId} in quotation ${quotationId}`);
+      const assignment = z.object({
+        roleId: z.number().int().positive(),
+        personnelId: z.number().int().positive(),
+        hours: z.number().finite().positive(),
+        rate: z.number().finite().nonnegative(),
+      }).parse(req.body);
+      const { roleId, personnelId, hours, rate } = assignment;
       
       // Find the team member with this role in the quotation
       const teamMembers = await storage.getQuotationTeamMembers(quotationId);
@@ -5981,9 +6228,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         cost: hours * rate
       });
 
-      console.log(`✅ Personnel assigned successfully:`, updatedMember);
       res.json(updatedMember);
     } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid assignment data", errors: error.errors });
+      }
       console.error("Error assigning personnel to quotation team:", error);
       res.status(500).json({ message: "Failed to assign personnel" });
     }
@@ -5991,34 +6240,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/quotation-team", requireAuth, async (req, res) => {
     try {
-      console.log('📥 Creating team member with data:', JSON.stringify(req.body, null, 2));
-
-      // CRITICAL FIX: No auto-asignar personal cuando se cotiza solo con roles
-      // Si el usuario eligió cotizar con roles, respetar esa decisión
-      let personnelId = req.body.personnelId || null;
-
-      // Preparar datos asegurando que cost esté presente y personnelId sea válido
       const teamMemberData = {
         ...req.body,
-        personnelId: personnelId,
-        roleId: req.body.roleId, // CRITICAL: Explicitly preserve the roleId from request
-        cost: req.body.cost || (req.body.hours * req.body.rate) || 0
+        personnelId: req.body.personnelId || null,
+        cost: Number(req.body.hours) * Number(req.body.rate),
       };
-
-      console.log('🔍 CRITICAL DEBUG - Request roleId:', req.body.roleId);
-      console.log('🔍 CRITICAL DEBUG - TeamMemberData roleId:', teamMemberData.roleId);
-      console.log('📝 Final team member data:', teamMemberData);
 
       try {
         // Validar datos con Zod
         const validatedData = insertQuotationTeamMemberSchema.parse(teamMemberData);
+        await validateQuotationTeamReferences([validatedData]);
+        const quotation = await storage.getQuotation(validatedData.quotationId);
+        if (!quotation) return res.status(404).json({ message: "Quotation not found" });
+        if (validatedData.variantId) {
+          const variant = await storage.getQuotationVariant(validatedData.variantId);
+          if (!variant || variant.quotationId !== validatedData.quotationId) {
+            return res.status(400).json({ message: "Variant does not belong to quotation" });
+          }
+        }
 
         // VALIDACIÓN OPCIONAL DE TARIFAS - Solo advertir si hay diferencias grandes
         if (validatedData.personnelId) {
           const personnel = await storage.getPersonnelById(validatedData.personnelId);
           if (personnel && personnel.hourlyRate !== validatedData.rate) {
-            // Permitir la asignación con tarifa personalizada
-            console.log(`⚠️ Using custom rate ${validatedData.rate} instead of personnel rate ${personnel.hourlyRate}`);
+            // Custom negotiated rates are valid and intentionally preserved.
           }
         }
 
@@ -6041,14 +6286,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             existing.hours === validatedData.hours && 
             existing.rate === validatedData.rate
           );
-          console.log('📋 Returning existing duplicate member');
           return res.status(200).json(duplicateMember);
         }
 
         // Si no es duplicado, crear el nuevo miembro
         const member = await storage.createQuotationTeamMember(validatedData);
-        console.log('✅ Team member created successfully');
-
         res.status(201).json(member);
       } catch (validationError) {
         if (validationError instanceof z.ZodError) {
@@ -6236,9 +6478,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (isNaN(quotationId)) return res.status(400).json({ message: "Invalid quotation ID" });
 
     try {
-      console.log(`🔍 Fetching variants for quotation ID: ${quotationId}`);
       const variants = await storage.getQuotationVariants(quotationId);
-      console.log(`📊 Found ${variants.length} variants:`, variants);
       res.json(variants);
     } catch (error) {
       console.error(`❌ Error fetching variants for quotation ${quotationId}:`, error);
@@ -6274,9 +6514,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         quotationId
       });
 
-      console.log('📝 Creating quotation variant:', validatedData);
       const variant = await storage.createQuotationVariant(validatedData);
-      console.log('✅ Quotation variant created:', variant);
       res.status(201).json(variant);
     } catch (error) {
       console.error("❌ Error creating quotation variant:", error);
@@ -6294,6 +6532,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     try {
       const validatedData = insertQuotationVariantSchema.partial().parse(req.body);
+      if (validatedData.isSelected !== undefined) {
+        return res.status(409).json({ message: "Use el endpoint de selección de variante" });
+      }
       const updatedVariant = await storage.updateQuotationVariant(variantId, validatedData);
 
       if (!updatedVariant) {
@@ -6333,9 +6574,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (isNaN(variantId)) return res.status(400).json({ message: "Invalid variant ID" });
 
     try {
-      console.log(`🔍 Fetching team members for variant ID: ${variantId}`);
       const members = await storage.getQuotationTeamMembersByVariant(variantId);
-      console.log(`👥 Found ${members.length} team members for variant:`, members);
       res.json(members);
     } catch (error) {
       console.error(`❌ Error fetching team members for variant ${variantId}:`, error);
@@ -6352,8 +6591,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (isNaN(variantId)) return res.status(400).json({ message: "Invalid variant ID" });
 
     try {
-      console.log(`🎯 Selecting variant ${variantId} for quotation ${quotationId}`);
-
       // Use transaction to prevent race condition with concurrent variant selection
       const selectedVariant = await db.transaction(async (tx) => {
         // First, unselect all variants for this quotation
@@ -6370,20 +6607,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ))
           .returning();
 
-        // Sync quotation.totalAmount to the selected variant's totalAmount
-        if (variant?.totalAmount != null) {
+        if (!variant) throw new Error("VARIANT_NOT_FOUND");
+
+        // The selected commercial scenario becomes the quotation header.
+        if (variant.totalAmount != null) {
           await tx.update(quotations)
-            .set({ totalAmount: Number(variant.totalAmount) })
+            .set({
+              baseCost: Number(variant.baseCost),
+              complexityAdjustment: Number(variant.complexityAdjustment),
+              markupAmount: Number(variant.markupAmount),
+              totalAmount: Number(variant.totalAmount),
+              updatedAt: new Date(),
+            })
             .where(eq(quotations.id, quotationId));
         }
 
         return variant;
       });
 
-      console.log(`✅ Variant ${variantId} selected for quotation ${quotationId}`);
       res.json({ success: true, message: "Variant selected successfully", variant: selectedVariant });
       
     } catch (error) {
+      if (error instanceof Error && error.message === "VARIANT_NOT_FOUND") {
+        return res.status(404).json({ message: "Variant not found for quotation" });
+      }
       console.error(`❌ Error selecting variant ${variantId} for quotation ${quotationId}:`, error);
       res.status(500).json({ message: "Failed to select variant", error: String(error) });
     }
@@ -8481,6 +8728,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         (validatedData as any).budget = quotation.totalAmount;
       }
       // Find and preserve the selected variant
+      let selectedVariantId = validatedData.selectedVariantId ?? null;
       if (validatedData.quotationId) {
         const selectedVariant = await db.select().from(quotationVariants)
           .where(and(
@@ -8490,6 +8738,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .limit(1);
         if (selectedVariant.length > 0 && !validatedData.selectedVariantId) {
           (validatedData as any).selectedVariantId = selectedVariant[0].id;
+          selectedVariantId = selectedVariant[0].id;
         }
       }
 
@@ -8500,7 +8749,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (validatedData.quotationId) {
         try {
           console.log(`📋 Copiando equipo automáticamente desde cotización ${validatedData.quotationId} al proyecto ${project.id}`);
-          const baseTeam = await storage.copyQuotationTeamToProject(Number(validatedData.quotationId), project.id);
+          const baseTeam = await storage.copyQuotationTeamToProject(
+            Number(validatedData.quotationId),
+            project.id,
+            selectedVariantId,
+          );
           console.log(`✅ Equipo copiado automáticamente: ${baseTeam.length} miembros`);
         } catch (teamError) {
           console.warn('⚠️ Error al copiar equipo automáticamente, pero proyecto creado exitosamente:', teamError);
@@ -12749,9 +13002,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   };
 
-  const convertFromUSD = (amountUSD: number, toCurrency: string, exchangeRate: number): number => {
-    if (toCurrency === 'USD') return amountUSD;
-    return Math.round(amountUSD * exchangeRate * 100) / 100;
+  const convertQuotationAmount = (
+    amount: number,
+    fromCurrency: "ARS" | "USD",
+    toCurrency: "ARS" | "USD",
+    exchangeRate: number,
+  ): number => {
+    if (fromCurrency === toCurrency) return amount;
+    const converted = fromCurrency === "USD" ? amount * exchangeRate : amount / exchangeRate;
+    return Math.round(converted * 100) / 100;
   };
 
   const formatCurrency = (amount: number, currency: string): string => {
@@ -12777,24 +13036,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (isNaN(id)) {
         return res.status(400).json({ message: "Invalid quotation ID" });
       }
+      if (currency !== "ARS" && currency !== "USD") {
+        return res.status(400).json({ message: "Currency must be ARS or USD" });
+      }
 
       const quotation = await storage.getQuotation(id);
       if (!quotation) {
         return res.status(404).json({ message: "Quotation not found" });
       }
 
-      const currentRate = await getCurrentExchangeRate();
+      const snapshotRate = Number(quotation.exchangeRateAtQuote) || await getCurrentExchangeRate();
+      const sourceCurrency = quotation.quotationCurrency === "USD" ? "USD" : "ARS";
+      const convert = (amount: number) => convertQuotationAmount(amount, sourceCurrency, currency, snapshotRate);
 
       // Convertir valores USD a la moneda solicitada
       const convertedQuotation = {
         ...quotation,
         displayCurrency: currency,
-        exchangeRateUsed: currentRate,
-        baseCostDisplay: convertFromUSD(quotation.baseCost, currency, currentRate),
-        complexityAdjustmentDisplay: convertFromUSD(quotation.complexityAdjustment || 0, currency, currentRate),
-        totalAmountDisplay: convertFromUSD(quotation.totalAmount, currency, currentRate),
+        exchangeRateUsed: snapshotRate,
+        baseCostDisplay: convert(quotation.baseCost),
+        complexityAdjustmentDisplay: convert(quotation.complexityAdjustment || 0),
+        totalAmountDisplay: convert(quotation.totalAmount),
         formattedTotal: formatCurrency(
-          convertFromUSD(quotation.totalAmount, currency, currentRate), 
+          convert(quotation.totalAmount),
           currency
         )
       };

@@ -73,22 +73,13 @@ export function QuotationVariantsDisplay({
     try {
       setApprovingVariant(variant.id);
       
-      // Actualizar el estado de la cotización a aprobada
-      await apiRequest(`/api/quotations/${quotationId}`, {
-        method: 'PATCH',
-        body: {
-          status: 'approved',
-          selectedVariantId: variant.id,
-          totalAmount: variant.totalAmount,
-          baseCost: variant.baseCost,
-          complexityAdjustment: variant.complexityAdjustment,
-          markupAmount: variant.markupAmount
-        }
-      });
-
-      // Marcar la variante como seleccionada
+      // La selección sincroniza el encabezado financiero; la aprobación pasa
+      // después por la máquina de estados del servidor.
       await apiRequest(`/api/quotations/${quotationId}/variants/${variant.id}/select`, {
         method: 'PATCH'
+      });
+      await apiRequest(`/api/quotations/${quotationId}/status`, 'PATCH', {
+        status: 'approved',
       });
 
       toast({

@@ -36,6 +36,7 @@ describe("Feedback Mind V2-9 shared domains", () => {
       complexityAdjustment: 1_010,
       markupAmount: 11_110,
       toolsCost: 5_000,
+      additionalDeliverableCost: 0,
       platformCost: 100,
       deviationAmount: 2_732,
       discountAmount: 1_502.6,
@@ -136,7 +137,9 @@ describe("Feedback Mind V2-9 integration contracts", () => {
     expect(create).toContain("tx.insert(quotationTeamMembers)");
     expect(create).toContain("tx.insert(quotationVariants)");
     expect(create).toContain('validatedData.status === "approved"');
-    expect(routes).toContain('message: "La aprobación requiere el flujo transaccional de finalización"');
+    expect(routes).toContain('app.patch("/api/quotations/:id/status"');
+    expect(routes).toContain("assertQuotationTransition(currentQuotation.status, status)");
+    expect(routes).toContain('status === "approved"');
   });
 
   it("makes completion endpoint the only generic path to done", () => {

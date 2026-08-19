@@ -48,7 +48,7 @@ interface Client {
 
 export default function ManageQuotes() {
   const [, navigate] = useLocation();
-  const { formatCurrency: formatCurrencyWithConversion, convertFromUSD, exchangeRate } = useCurrency();
+  const { formatCurrency: formatCurrencyWithConversion, exchangeRate } = useCurrency();
 
   const { data: quotations, isLoading, refetch, error: quotationsError } = useQuery<Quotation[]>({
     queryKey: ["/api/quotations"],
@@ -66,68 +66,12 @@ export default function ManageQuotes() {
     staleTime: 30000,
   });
 
-  // Query to check which quotations have negotiation history
-  const { data: negotiationData = {} } = useQuery<Record<number, boolean>>({
-    queryKey: ["/api/quotations/negotiation-status"],
-    enabled: !!quotations && quotations.length > 0,
-    queryFn: async () => {
-      if (!quotations) return {};
-      
-      // For each quotation that was approved, check if it has negotiation history
-      const negotiationStatus: Record<number, boolean> = {};
-      
-      const approvedQuotations = quotations.filter(q => q.status === 'approved');
-      
-      await Promise.all(
-        approvedQuotations.map(async (quotation) => {
-          try {
-            const response = await authFetch(`/api/quotations/${quotation.id}/negotiation-history`, {
-              credentials: 'include'
-            });
-            if (response.ok) {
-              const history = await response.json();
-              negotiationStatus[quotation.id] = history && history.length > 0;
-            }
-          } catch (error) {
-            console.error(`Error fetching negotiation history for quotation ${quotation.id}:`, error);
-          }
-        })
-      );
-      
-      return negotiationStatus;
-    }
-  });
-
-  // Query to check which approved quotations already have projects
-  const { data: quotationProjects = {} } = useQuery<Record<number, boolean>>({
-    queryKey: ["/api/quotations/project-status"],
-    enabled: !!quotations && quotations.length > 0,
-    queryFn: async () => {
-      if (!quotations) return {};
-      
-      const projectStatus: Record<number, boolean> = {};
-      
-      const approvedQuotations = quotations.filter(q => q.status === 'approved');
-      
-      await Promise.all(
-        approvedQuotations.map(async (quotation) => {
-          try {
-            const response = await authFetch(`/api/active-projects/quotation/${quotation.id}`, {
-              credentials: 'include'
-            });
-            if (response.ok) {
-              const projects = await response.json();
-              projectStatus[quotation.id] = projects && projects.length > 0;
-            }
-          } catch (error) {
-            console.error(`Error checking projects for quotation ${quotation.id}:`, error);
-          }
-        })
-      );
-      
-      return projectStatus;
-    }
-  });
+  const { data: managementMetadata } = useQuery<{
+    negotiations: Record<number, boolean>;
+    projects: Record<number, boolean>;
+  }>({ queryKey: ["/api/quotations/management-metadata"] });
+  const negotiationData = managementMetadata?.negotiations ?? {};
+  const quotationProjects = managementMetadata?.projects ?? {};
 
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -429,21 +373,27 @@ export default function ManageQuotes() {
   // Calculate statistics
   // Helpers para expiración
   const isExpired = (quote: Quotation) =>
-    !!quote.expiresAt && new Date(quote.expiresAt) < new Date() && quote.status === 'pending';
+    !!quote.expiresAt
+    && new Date(quote.expiresAt) < new Date()
+    && (quote.status === 'pending' || quote.status === 'in-negotiation');
 
+  const statsSource = quotations || [];
   const stats = {
-    total: filteredQuotations.length,
-    approved: filteredQuotations.filter(q => q.status === 'approved').length,
-    pending: filteredQuotations.filter(q => q.status === 'pending').length,
-    rejected: filteredQuotations.filter(q => q.status === 'rejected').length,
-    expired: filteredQuotations.filter(isExpired).length,
-    inNegotiation: filteredQuotations.filter(q => q.status === 'in-negotiation').length,
-    totalValue: filteredQuotations.reduce((sum, q) => sum + q.totalAmount, 0),
-    conversionRate: filteredQuotations.length > 0
-      ? (filteredQuotations.filter(q => q.status === 'approved').length / filteredQuotations.length) * 100
+    total: statsSource.length,
+    approved: statsSource.filter(q => q.status === 'approved').length,
+    pending: statsSource.filter(q => q.status === 'pending').length,
+    rejected: statsSource.filter(q => q.status === 'rejected').length,
+    expired: statsSource.filter(isExpired).length,
+    inNegotiation: statsSource.filter(q => q.status === 'in-negotiation').length,
+    totalValueARS: statsSource.reduce((sum, q) => {
+      const fx = Number(q.exchangeRateAtQuote) || Number(q.usdExchangeRate) || exchangeRate;
+      return sum + (q.quotationCurrency === 'USD' ? q.totalAmount * fx : q.totalAmount);
+    }, 0),
+    conversionRate: statsSource.length > 0
+      ? (statsSource.filter(q => q.status === 'approved').length / statsSource.length) * 100
       : 0,
-    rejectionRate: filteredQuotations.length > 0
-      ? (filteredQuotations.filter(q => q.status === 'rejected').length / filteredQuotations.length) * 100
+    rejectionRate: statsSource.length > 0
+      ? (statsSource.filter(q => q.status === 'rejected').length / statsSource.length) * 100
       : 0,
   };
 
@@ -552,11 +502,11 @@ export default function ManageQuotes() {
             />
             <MetricCard
               label="Valor total"
-              value={`$${stats.totalValue.toLocaleString("es-AR", { maximumFractionDigits: 0 })}`}
+              value={`ARS ${stats.totalValueARS.toLocaleString("es-AR", { maximumFractionDigits: 0 })}`}
               icon={<DollarSign className="h-5 w-5" />}
               tone="info"
               valueSize="compact"
-              valueLabel={`Valor total: ${stats.totalValue.toLocaleString("es-AR", { maximumFractionDigits: 0 })}`}
+              valueLabel={`Valor total en pesos: ${stats.totalValueARS.toLocaleString("es-AR", { maximumFractionDigits: 0 })}`}
             />
             <MetricCard
               label="Conversión"
@@ -822,13 +772,7 @@ export default function ManageQuotes() {
                                       {(() => {
                                         // Mostrar cotización en su moneda original
                                         const currency = quote.quotationCurrency || 'ARS';
-                                        // If currency is USD but totalAmount looks like ARS (saved before conversion),
-                                        // divide by the exchange rate at quote time
-                                        const fxAtQuote = Number(quote.exchangeRateAtQuote) || quote.usdExchangeRate || exchangeRate || 1;
-                                        const displayAmount = currency === 'USD'
-                                          ? quote.totalAmount / fxAtQuote
-                                          : quote.totalAmount;
-                                        return formatCurrencyWithConversion(displayAmount, currency);
+                                        return formatCurrencyWithConversion(quote.totalAmount, currency);
                                       })()}
                                     </p>
                                   </div>
@@ -840,11 +784,7 @@ export default function ManageQuotes() {
                                       <span className="font-medium text-gray-700">
                                         {(() => {
                                           const currency = quote.quotationCurrency || 'ARS';
-                                          const fxAtQuote = Number(quote.exchangeRateAtQuote) || quote.usdExchangeRate || exchangeRate || 1;
-                                          const displayAmount = currency === 'USD'
-                                            ? quote.baseCost / fxAtQuote
-                                            : quote.baseCost;
-                                          return formatCurrencyWithConversion(displayAmount, currency);
+                                          return formatCurrencyWithConversion(quote.baseCost, currency);
                                         })()}
                                       </span>
                                     </div>
@@ -852,8 +792,7 @@ export default function ManageQuotes() {
                                       <span className="text-gray-500">Markup:</span>
                                       <span className={`font-bold ${
                                         (() => {
-                                          const totalBaseCost = quote.baseCost + (quote.complexityAdjustment || 0);
-                                          const realFactor = totalBaseCost > 0 ? (quote.totalAmount / totalBaseCost) : 1;
+                                          const realFactor = Number(quote.marginFactor) || 1;
                                           return realFactor >= 2.5 ? 'text-emerald-600' :
                                                  realFactor >= 2.0 ? 'text-blue-600' :
                                                  realFactor >= 1.5 ? 'text-amber-600' :
@@ -861,8 +800,7 @@ export default function ManageQuotes() {
                                         })()
                                       }`}>
                                         {(() => {
-                                          const totalBaseCost = quote.baseCost + (quote.complexityAdjustment || 0);
-                                          const realFactor = totalBaseCost > 0 ? (quote.totalAmount / totalBaseCost) : 1;
+                                          const realFactor = Number(quote.marginFactor) || 1;
                                           const markupPercentage = ((realFactor - 1) * 100).toFixed(0);
                                           return `${markupPercentage}% (${realFactor.toFixed(1)}x)`;
                                         })()}
@@ -1022,7 +960,11 @@ export default function ManageQuotes() {
 
             {(() => {
               const VALID_TRANSITIONS: Record<string, Array<{ status: string; label: string; className: string }>> = {
-                "draft":          [{ status: "pending",        label: "Enviar (Pendiente)",    className: "bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100" }],
+                "draft":          [
+                  { status: "pending",        label: "Enviar (Pendiente)", className: "bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100" },
+                  { status: "approved",       label: "Aprobar", className: "bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100" },
+                  { status: "rejected",       label: "Rechazar", className: "bg-red-50 border-red-200 text-red-600 hover:bg-red-100" },
+                ],
                 "pending":        [
                   { status: "approved",       label: "Aprobar",             className: "bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100" },
                   { status: "in-negotiation", label: "En Negociación",      className: "bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100" },
@@ -1033,8 +975,11 @@ export default function ManageQuotes() {
                   { status: "rejected",       label: "Rechazar",            className: "bg-red-50 border-red-200 text-red-600 hover:bg-red-100" },
                   { status: "pending",        label: "Volver a Pendiente",  className: "bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100" },
                 ],
-                "rejected":       [{ status: "pending",        label: "Reactivar (Pendiente)", className: "bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100" }],
-                "approved":       [],
+                "rejected":       [
+                  { status: "draft", label: "Volver a borrador", className: "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100" },
+                  { status: "pending", label: "Reactivar (Pendiente)", className: "bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100" },
+                ],
+                "approved":       [{ status: "in-negotiation", label: "Reabrir negociación", className: "bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100" }],
               };
               const currentStatus = selectedQuote?.status || "draft";
               const transitions = VALID_TRANSITIONS[currentStatus] || Object.keys(VALID_TRANSITIONS)

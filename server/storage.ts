@@ -55,7 +55,7 @@ import {
   crmLeads
 } from "@shared/schema";
 import { db, pool } from "./db";
-import { eq, ne, and, sql, inArray, desc, asc } from "drizzle-orm";
+import { eq, ne, and, sql, inArray, desc, asc, isNull } from "drizzle-orm";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import { getDateRangeForFilter } from "./utils/dateRange";
@@ -289,7 +289,7 @@ export interface IStorage {
   createProjectBaseTeamMember(team: InsertProjectBaseTeam): Promise<ProjectBaseTeam>;
   updateProjectBaseTeam(id: number, team: Partial<InsertProjectBaseTeam>): Promise<ProjectBaseTeam | undefined>;
   deleteProjectBaseTeam(id: number): Promise<boolean>;
-  copyQuotationTeamToProject(quotationId: number, projectId: number): Promise<ProjectBaseTeam[]>;
+  copyQuotationTeamToProject(quotationId: number, projectId: number, variantId?: number | null): Promise<ProjectBaseTeam[]>;
 
   // Quick time entry operations
   getQuickTimeEntries(projectId: number): Promise<QuickTimeEntry[]>;
@@ -1018,7 +1018,7 @@ export class DatabaseStorage implements IStorage {
   async updateQuotation(id: number, quotation: Partial<InsertQuotation>): Promise<Quotation | undefined> {
     const [updatedQuotation] = await db
       .update(quotations)
-      .set(quotation)
+      .set({ ...quotation, updatedAt: new Date() })
       .where(eq(quotations.id, id))
       .returning();
     return updatedQuotation;
@@ -1069,97 +1069,59 @@ export class DatabaseStorage implements IStorage {
 
   // Quotation team member operations
   async getQuotationTeamMembers(quotationId: number): Promise<QuotationTeamMember[]> {
-    console.log(`📊 Storage: Getting team members for quotation ${quotationId}`);
-
-    try {
-      // Primero obtener los miembros básicos
-      const basicMembers = await db.select().from(quotationTeamMembers).where(eq(quotationTeamMembers.quotationId, quotationId));
-      
-      // Luego enriquecer con datos de personal y roles
-      const enrichedMembers = await Promise.all(
-        basicMembers.map(async (member) => {
-          // Solo buscar datos de personal si hay un personnelId
-          let personnelData = null;
-          if (member.personnelId) {
-            const personnelResult = await db.select().from(personnel).where(eq(personnel.id, member.personnelId));
-            personnelData = personnelResult[0];
-          }
-          
-          const roleData = await db.select().from(roles).where(eq(roles.id, member.roleId!));
-          
-          return {
-            ...member,
-            // Si no hay personnelId, devolver valores vacíos para mantener la estructura
-            personnelName: personnelData?.name || '',
-            personnelEmail: personnelData?.email || '',
-            personnelHourlyRate: personnelData?.hourlyRate || 0,
-            roleName: roleData[0]?.name || 'Unknown Role',
-            roleDescription: roleData[0]?.description || ''
-          };
-        })
-      );
-      
-      console.log(`📊 Storage: Found ${enrichedMembers.length} team members for quotation ${quotationId} with complete data:`, enrichedMembers.slice(0, 2));
-      return enrichedMembers;
-    } catch (error) {
-      console.error(`❌ Storage: Error getting team members for quotation ${quotationId}:`, error);
-      throw error;
-    }
+    const rows = await db.select({
+      member: quotationTeamMembers,
+      personnelName: personnel.name,
+      personnelEmail: personnel.email,
+      personnelHourlyRate: personnel.hourlyRate,
+      roleName: roles.name,
+      roleDescription: roles.description,
+    }).from(quotationTeamMembers)
+      .leftJoin(personnel, eq(personnel.id, quotationTeamMembers.personnelId))
+      .leftJoin(roles, eq(roles.id, quotationTeamMembers.roleId))
+      .where(and(
+        eq(quotationTeamMembers.quotationId, quotationId),
+        isNull(quotationTeamMembers.variantId),
+      ));
+    return rows.map((row) => ({
+      ...row.member,
+      personnelName: row.personnelName || "",
+      personnelEmail: row.personnelEmail || "",
+      personnelHourlyRate: row.personnelHourlyRate || 0,
+      roleName: row.roleName || "Unknown Role",
+      roleDescription: row.roleDescription || "",
+    })) as QuotationTeamMember[];
   }
 
   async getQuotationTeamMembersByVariant(variantId: number): Promise<QuotationTeamMember[]> {
-    console.log(`📊 Storage: Getting team members for variant ${variantId}`);
-    
-    try {
-      const basicMembers = await db.select().from(quotationTeamMembers).where(eq(quotationTeamMembers.variantId, variantId));
-      
-      const enrichedMembers = await Promise.all(
-        basicMembers.map(async (member) => {
-          let personnelData = null;
-          if (member.personnelId) {
-            const personnelResult = await db.select().from(personnel).where(eq(personnel.id, member.personnelId));
-            personnelData = personnelResult[0];
-          }
-          
-          const roleData = await db.select().from(roles).where(eq(roles.id, member.roleId!));
-          
-          return {
-            ...member,
-            personnelName: personnelData?.name || '',
-            personnelEmail: personnelData?.email || '',
-            personnelHourlyRate: personnelData?.hourlyRate || 0,
-            roleName: roleData[0]?.name || 'Unknown Role',
-            roleDescription: roleData[0]?.description || ''
-          };
-        })
-      );
-      
-      console.log(`📊 Storage: Found ${enrichedMembers.length} team members for variant ${variantId}`);
-      return enrichedMembers;
-    } catch (error) {
-      console.error(`❌ Storage: Error getting team members for variant ${variantId}:`, error);
-      throw error;
-    }
+    const rows = await db.select({
+      member: quotationTeamMembers,
+      personnelName: personnel.name,
+      personnelEmail: personnel.email,
+      personnelHourlyRate: personnel.hourlyRate,
+      roleName: roles.name,
+      roleDescription: roles.description,
+    }).from(quotationTeamMembers)
+      .leftJoin(personnel, eq(personnel.id, quotationTeamMembers.personnelId))
+      .leftJoin(roles, eq(roles.id, quotationTeamMembers.roleId))
+      .where(eq(quotationTeamMembers.variantId, variantId));
+    return rows.map((row) => ({
+      ...row.member,
+      personnelName: row.personnelName || "",
+      personnelEmail: row.personnelEmail || "",
+      personnelHourlyRate: row.personnelHourlyRate || 0,
+      roleName: row.roleName || "Unknown Role",
+      roleDescription: row.roleDescription || "",
+    })) as QuotationTeamMember[];
   }
 
   async createQuotationTeamMember(member: InsertQuotationTeamMember): Promise<QuotationTeamMember> {
-    console.log('📝 Creando miembro del equipo con datos:', {
-      quotationId: member.quotationId,
-      variantId: member.variantId,
-      personnelId: member.personnelId,
-      roleId: member.roleId,
-      hours: member.hours,
-      rate: member.rate,
-      cost: member.cost
-    });
-
     // Validar que los datos mínimos estén presentes
     if (!member.quotationId) {
       throw new Error('quotation_id es requerido para crear un miembro del equipo');
     }
     
     const [newMember] = await db.insert(quotationTeamMembers).values(member).returning();
-    console.log('✅ Miembro del equipo creado exitosamente:', newMember);
     return newMember;
   }
 
@@ -1228,7 +1190,6 @@ export class DatabaseStorage implements IStorage {
 
   // Quotation variant operations
   async getQuotationVariants(quotationId: number): Promise<QuotationVariant[]> {
-    console.log(`📊 Storage: Getting variants for quotation ${quotationId}`);
     return await db.select()
       .from(quotationVariants)
       .where(eq(quotationVariants.quotationId, quotationId))
@@ -1241,9 +1202,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createQuotationVariant(variant: InsertQuotationVariant): Promise<QuotationVariant> {
-    console.log('📝 Creating quotation variant:', variant);
     const [newVariant] = await db.insert(quotationVariants).values(variant).returning();
-    console.log('✅ Quotation variant created successfully:', newVariant);
     return newVariant;
   }
 
@@ -1280,6 +1239,8 @@ export class DatabaseStorage implements IStorage {
       return projectDurationOptions["on-demand"];
     } else if (projectType === 'fee-mensual') {
       return projectDurationOptions["fee-mensual"];
+    } else if (projectType === 'always-on') {
+      return projectDurationOptions["always-on"];
     }
     return [];
   }
@@ -3143,7 +3104,7 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async copyQuotationTeamToProject(quotationId: number, projectId: number): Promise<ProjectBaseTeam[]> {
+  async copyQuotationTeamToProject(quotationId: number, projectId: number, variantId?: number | null): Promise<ProjectBaseTeam[]> {
     try {
       // Verificar si el proyecto ya tiene equipo base
       const existingTeam = await db.select().from(projectBaseTeam).where(eq(projectBaseTeam.projectId, projectId));
@@ -3154,12 +3115,34 @@ export class DatabaseStorage implements IStorage {
       }
 
       // Obtener el equipo de la cotización
-      const quotationTeam = await db.select({
+      let quotationTeam = await db.select({
         personnelId: quotationTeamMembers.personnelId,
         roleId: quotationTeamMembers.roleId,
         hours: quotationTeamMembers.hours,
         rate: quotationTeamMembers.rate
-      }).from(quotationTeamMembers).where(eq(quotationTeamMembers.quotationId, quotationId));
+      }).from(quotationTeamMembers).where(variantId
+        ? and(
+            eq(quotationTeamMembers.quotationId, quotationId),
+            eq(quotationTeamMembers.variantId, variantId),
+          )
+        : and(
+            eq(quotationTeamMembers.quotationId, quotationId),
+            isNull(quotationTeamMembers.variantId),
+          ));
+
+      // Backward compatibility for quotations created before variant teams
+      // were persisted: selected scenario falls back to the canonical base.
+      if (variantId && quotationTeam.length === 0) {
+        quotationTeam = await db.select({
+          personnelId: quotationTeamMembers.personnelId,
+          roleId: quotationTeamMembers.roleId,
+          hours: quotationTeamMembers.hours,
+          rate: quotationTeamMembers.rate,
+        }).from(quotationTeamMembers).where(and(
+          eq(quotationTeamMembers.quotationId, quotationId),
+          isNull(quotationTeamMembers.variantId),
+        ));
+      }
 
       // Crear el equipo base del proyecto - filtrar solo miembros con personnelId válido
       const baseTeam: InsertProjectBaseTeam[] = quotationTeam

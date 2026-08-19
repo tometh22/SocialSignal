@@ -96,7 +96,7 @@ export function QuotationVariants({
       setLoading(true);
       const response = await apiRequest(`/api/quotations/${quotationId}/variants`, 'GET');
       setVariants(response);
-      setSelectedVariantIds(response.filter((variant: QuotationVariant) => variant.isSelected).map((variant: QuotationVariant) => variant.id));
+      setSelectedVariantIds(response.map((variant: QuotationVariant) => variant.id));
       
       // If no variants exist, create default variants
       if (response.length === 0) {
@@ -112,14 +112,6 @@ export function QuotationVariants({
   };
 
   const createLocalVariants = () => {
-    console.log('🎨 Creating local variants with:', { 
-      baseCost, 
-      complexityAdjustment, 
-      markupAmount, 
-      totalAmount,
-      currency: quotationData.quotationCurrency,
-      exchangeRate
-    });
     setLoading(true);
     
     // Check if we have valid data
@@ -183,7 +175,6 @@ export function QuotationVariants({
       }
     ];
     
-    console.log('🎨 Created variants:', localVariants);
     setVariants(localVariants);
     setSelectedVariantIds([-1, -2, -3]); // Select all variants by default for client presentation
     setLoading(false);
@@ -213,6 +204,7 @@ export function QuotationVariants({
       complexityFactor: baseCost > 0 ? complexityAdjustment / baseCost : 0,
       marginFactor: quotationData.financials.marginFactor || 2,
       toolsCostUSD: quotationData.financials.toolsCost || 0,
+      additionalDeliverableCostUSD: quotationData.additionalDeliverableCost || 0,
       platformCostARS: quotationData.financials.platformCost || 0,
       deviationPercentage: quotationData.financials.deviationPercentage || 0,
       discountPercentage: quotationData.financials.discountPercentage || 0,
@@ -357,20 +349,6 @@ export function QuotationVariants({
         ? selectedVariantIds.filter(id => id !== variantId)
         : [...selectedVariantIds, variantId];
 
-      if (quotationId && quotationId > 0) {
-        // Update in database for existing quotations
-        await apiRequest(`/api/quotation-variants/${variantId}`, 'PATCH', { 
-          isSelected: !isCurrentlySelected 
-        });
-        await fetchVariants();
-      } else {
-        // Update local variants for new quotations
-        setVariants(prev => prev.map(v => ({
-          ...v,
-          isSelected: v.id === variantId ? !isCurrentlySelected : v.isSelected
-        })));
-      }
-      
       setSelectedVariantIds(newSelectedIds);
       
       // Notify about all selected variants
@@ -457,13 +435,6 @@ export function QuotationVariants({
   const handleFinalize = async () => {
     try {
       setIsFinalizing(true);
-      console.log("🚀 Iniciando finalización de cotización...");
-      console.log("🔍 Estado actual del contexto:", {
-        quotationData: quotationData,
-        teamMembersLength: quotationData.teamMembers?.length || 0,
-        selectedVariantIds: selectedVariantIds
-      });
-      
       // Verificar datos críticos antes de continuar
       if (!quotationData.project.name?.trim()) {
         throw new Error("Debe completar el nombre del proyecto en el primer paso antes de finalizar");
@@ -479,15 +450,16 @@ export function QuotationVariants({
 
       // Verificar que tenemos variantes seleccionadas o al menos crear una cotización válida
       if (selectedVariantIds.length === 0) {
-        console.log("⚠️ No hay variantes seleccionadas, creando cotización base");
+        throw new Error("Debe seleccionar al menos una variante para incluir en la cotización");
       }
       
-      const persistedVariants = variants.map((variant) => {
-        const result = calculateVariantResult(baseTeamMembers.map((member) => ({
+      const persistedVariants = variants.filter((variant) => selectedVariantIds.includes(variant.id)).map((variant) => {
+        const effectiveTeam = baseTeamMembers.map((member) => ({
           ...member,
           hours: getEffectiveMemberHours(variant, member),
           cost: getEffectiveMemberHours(variant, member) * (member.rate || 0),
-        }))).display;
+        }));
+        const result = calculateVariantResult(effectiveTeam).display;
         return {
           variantName: variant.variantName,
           variantDescription: variant.variantDescription || null,
@@ -496,11 +468,17 @@ export function QuotationVariants({
           complexityAdjustment: result.complexityAdjustment,
           markupAmount: result.markupAmount,
           totalAmount: result.total,
-          isSelected: selectedVariantIds.includes(variant.id),
+          isSelected: variant.isSelected,
+          teamMembers: effectiveTeam.map((member) => ({
+            roleId: Number(member.roleId) > 0 ? Number(member.roleId) : null,
+            personnelId: Number(member.personnelId) > 0 ? Number(member.personnelId) : null,
+            hours: member.hours,
+            rate: member.rate,
+            cost: member.hours * member.rate,
+          })),
         };
       });
       await saveQuotation('approved', persistedVariants);
-      console.log("✅ Cotización guardada exitosamente como approved");
       
       toast({
         title: "Cotización aprobada",
@@ -509,9 +487,6 @@ export function QuotationVariants({
       setLocation('/manage-quotes');
     } catch (error: any) {
       console.error("❌ Error al finalizar:", error);
-      console.error("❌ Error details:", error.message);
-      console.error("❌ Error stack:", error.stack);
-      console.error("❌ quotationData at error:", quotationData);
       
       const errorMessage = getApiErrorMessage(error, "Error desconocido");
       toast({
@@ -615,11 +590,9 @@ export function QuotationVariants({
               const allSelected = selectedVariantIds.length === variants.length;
               if (allSelected) {
                 setSelectedVariantIds([]);
-                setVariants(prev => prev.map(v => ({ ...v, isSelected: false })));
               } else {
                 const allIds = variants.map(v => v.id);
                 setSelectedVariantIds(allIds);
-                setVariants(prev => prev.map(v => ({ ...v, isSelected: true })));
               }
             }}
           >
@@ -684,7 +657,7 @@ export function QuotationVariants({
           <Card 
             key={variant.id} 
             className={`relative cursor-pointer transition-all duration-200 hover:shadow-lg ${
-              variant.isSelected 
+              selectedVariantIds.includes(variant.id)
                 ? 'ring-2 ring-blue-500 shadow-lg' 
                 : 'hover:shadow-md'
             }`}
@@ -696,6 +669,7 @@ export function QuotationVariants({
                   <Checkbox 
                     checked={selectedVariantIds.includes(variant.id)}
                     onCheckedChange={() => toggleVariantSelection(variant.id)}
+                    onClick={(event) => event.stopPropagation()}
                     className="mt-1"
                   />
                   <div>

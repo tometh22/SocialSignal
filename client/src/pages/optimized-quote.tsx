@@ -66,6 +66,15 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
   const [bannerVisible, setBannerVisible] = useState(true);
   const isOnline = useOnlineStatus();
 
+  useEffect(() => {
+    if (!sessionStorage.getItem('quotation-draft-restored')) return;
+    sessionStorage.removeItem('quotation-draft-restored');
+    toast({
+      title: "Borrador recuperado",
+      description: "Restauramos automáticamente tu cotización guardada localmente.",
+    });
+  }, [toast]);
+
   // Prevent accidental page refresh/close when there's unsaved data
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
@@ -325,7 +334,10 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
             <div className="mx-auto flex w-max min-w-fit items-center gap-1 px-2">
               {steps.map((step, index) => (
                 <div key={step.num} className="flex items-center">
-                  <div
+                  <button
+                    type="button"
+                    aria-label={`Ir al paso ${step.num}: ${step.title}`}
+                    disabled={step.num >= currentStep}
                     onClick={() => step.num < currentStep && goToStep(step.num)}
                     className={`w-8 h-8 rounded-full flex items-center justify-center text-sm transition-all
                     ${step.num < currentStep ? 'cursor-pointer hover:scale-110' : ''}
@@ -338,7 +350,7 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
                     ) : (
                       step.num
                     )}
-                  </div>
+                  </button>
                   <span className={`ml-2 text-sm font-medium transition-colors
                     ${currentStep === step.num ? 'text-primary' : 'text-gray-500'}`}>
                     {step.title}
