@@ -14,6 +14,10 @@ import { feedbackMindV29MigrationSql } from "./migrations/feedback-mind-v2-9";
 import { personnelCostSyncWarningsMigrationSql } from "./migrations/personnel-cost-sync-warnings";
 import { feedbackMindV210MigrationSql } from "./migrations/feedback-mind-v2-10";
 import { quotationProfessionalWorkflowMigrationSql } from "./migrations/quotation-professional-workflow";
+import {
+  quotationWorkflowFoundationMigrationSql,
+  serviceBlueprintFoundationMigrationSql,
+} from "./migrations/quotation-workflow-foundation";
 import { exchangeRateForecast2026MigrationSql } from "./migrations/exchange-rate-forecast-2026";
 import { professionalQuotationStudioMigrationSql } from "./migrations/professional-quotation-studio";
 import { ensureServiceBlueprintSeeds } from "./services/service-blueprints";
@@ -815,6 +819,11 @@ async function applyPendingMigrations() {
     await run('0040 feedback_mind_v2_9 closure', feedbackMindV29MigrationSql);
     await run('0041 personnel cost sync warnings', personnelCostSyncWarningsMigrationSql);
     await run('0042 feedback_mind_v2_10 closure', feedbackMindV210MigrationSql);
+    // Keep foundational DDL independent from legacy data repair. The repair is
+    // intentionally best-effort, while these tables are required for startup
+    // (and for the service blueprint seed below).
+    await run('0043-0046 service blueprint foundation', serviceBlueprintFoundationMigrationSql);
+    await run('0043-0046 quotation workflow foundation', quotationWorkflowFoundationMigrationSql);
     await run('0043-0044 professional quotation workflow', quotationProfessionalWorkflowMigrationSql);
     await run('0045 exchange-rate forecast 2026', exchangeRateForecast2026MigrationSql);
     await run('0046 professional quotation studio', professionalQuotationStudioMigrationSql);
