@@ -22,6 +22,7 @@ type Proposal = {
   billingEntity?: { razonSocial: string; country?: string; taxId?: string } | null;
   team: Array<{ roleName?: string; hours: number }>;
   variants: Array<{ id: number; variantName: string; variantDescription?: string; totalAmount: number; netAmount: number; taxAmount: number; grandTotal: number }>;
+  proposalDocument?: { locale: 'es' | 'en'; content: { theme: { primaryColor: string; accentColor: string; clientLogoUrl?: string | null }; assets: Array<{ id: string; type: string; url: string; altText: string }>; blocks: Array<{ id: string; type: string; title: string; body?: string; bullets: string[]; visible: boolean; internalOnly: boolean }> } } | null;
   documentHash?: string;
 };
 
@@ -77,12 +78,23 @@ export default function PublicProposal() {
     <main className="min-h-screen bg-slate-50 px-4 py-8 sm:px-6 lg:py-12">
       <div className="mx-auto max-w-5xl space-y-6">
         <header className="flex flex-col justify-between gap-4 rounded-2xl bg-slate-950 p-6 text-white sm:flex-row sm:items-center">
-          <div><div className="mb-2 flex items-center gap-2 text-xs text-slate-300"><ShieldCheck className="h-4 w-4" /> Propuesta segura y verificable</div><h1 className="text-2xl font-semibold">{data.quotation.projectName}</h1><p className="mt-1 text-sm text-slate-300">{data.quotation.quotationNumber} · Revisión {data.quotation.revisionNumber}</p></div>
+          <div>{data.proposalDocument?.content.theme.clientLogoUrl && <img src={data.proposalDocument.content.theme.clientLogoUrl} alt="Logo del cliente" className="mb-4 h-9 max-w-40 object-contain object-left brightness-0 invert" />}<div className="mb-2 flex items-center gap-2 text-xs text-slate-300"><ShieldCheck className="h-4 w-4" /> Propuesta segura y verificable</div><h1 className="text-2xl font-semibold">{data.quotation.projectName}</h1><p className="mt-1 text-sm text-slate-300">{data.quotation.quotationNumber} · Revisión {data.quotation.revisionNumber}</p></div>
           <div className="text-left sm:text-right"><Badge className="bg-white/10 text-white">Válida hasta {new Date(data.quotation.expiresAt).toLocaleDateString('es-AR')}</Badge><p className="mt-3 text-3xl font-bold">{format(displayedPrice?.grandTotal || 0)}</p>{selectedVariant && <p className="mt-1 text-xs text-slate-300">Alternativa {selectedVariant.variantName}</p>}</div>
         </header>
 
         <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
           <div className="space-y-6">
+            {data.proposalDocument?.content.blocks
+              .filter((block) => block.visible && !block.internalOnly && block.type !== 'cover' && block.type !== 'closing')
+              .map((block) => (
+                <Card key={block.id}>
+                  <CardHeader><CardTitle className="text-lg">{block.title}</CardTitle></CardHeader>
+                  <CardContent className="space-y-3 text-sm text-slate-600">
+                    {block.body && <p className="whitespace-pre-wrap leading-6">{block.body}</p>}
+                    {block.bullets.length > 0 && <ul className="space-y-2">{block.bullets.map((bullet, index) => <li key={`${block.id}-${index}`} className="flex gap-3"><span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-indigo-500" /><span>{bullet}</span></li>)}</ul>}
+                  </CardContent>
+                </Card>
+              ))}
             <Card><CardHeader><CardTitle className="flex items-center gap-2 text-base"><Building2 className="h-4 w-4 text-indigo-600" /> Cliente y alcance</CardTitle></CardHeader><CardContent className="space-y-4 text-sm"><div><p className="font-medium">{data.billingEntity?.razonSocial || data.client?.name}</p>{data.billingEntity?.taxId && <p className="text-slate-500">{data.billingEntity.taxId} · {data.billingEntity.country}</p>}</div>{data.quotation.inclusions && <section><h2 className="mb-1 font-medium">Incluye</h2><p className="whitespace-pre-wrap text-slate-600">{data.quotation.inclusions}</p></section>}{data.quotation.exclusions && <section><h2 className="mb-1 font-medium">No incluye</h2><p className="whitespace-pre-wrap text-slate-600">{data.quotation.exclusions}</p></section>}</CardContent></Card>
             {data.variants.length > 0 && <Card><CardHeader><CardTitle className="text-base">Alternativas disponibles</CardTitle></CardHeader><CardContent><RadioGroup value={variantId ? String(variantId) : ''} onValueChange={(value) => setVariantId(Number(value))} className="space-y-3">{data.variants.map((variant) => <label key={variant.id} className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 ${variantId === variant.id ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200'}`}><RadioGroupItem value={String(variant.id)} className="mt-1" /><span className="flex-1"><span className="flex justify-between gap-3"><strong>{variant.variantName}</strong><strong>{format(variant.grandTotal)}</strong></span>{variant.variantDescription && <span className="mt-1 block text-xs text-slate-500">{variant.variantDescription}</span>}</span></label>)}</RadioGroup></CardContent></Card>}
             <Card><CardHeader><CardTitle className="flex items-center gap-2 text-base"><CalendarDays className="h-4 w-4 text-indigo-600" /> Condiciones económicas</CardTitle></CardHeader><CardContent className="space-y-2 text-sm"><div className="flex justify-between"><span>Neto</span><span>{format(displayedPrice?.netAmount || 0)}</span></div><div className="flex justify-between"><span>{data.quotation.taxLabel} ({data.quotation.taxRate}%)</span><span>{format(displayedPrice?.taxAmount || 0)}</span></div><div className="flex justify-between border-t pt-2 text-base font-semibold"><span>Total</span><span>{format(displayedPrice?.grandTotal || 0)}</span></div><p className="pt-2 text-xs text-slate-500">Pago a {data.quotation.paymentTermsDays ?? 0} días. Términos versión {data.quotation.termsVersion}.</p>{data.quotation.commercialTerms && <p className="whitespace-pre-wrap pt-3 text-slate-600">{data.quotation.commercialTerms}</p>}<Button variant="outline" className="mt-3" onClick={() => window.open(`/api/public/quotations/${encodeURIComponent(token)}/document.pdf`, '_blank')}><Download className="mr-2 h-4 w-4" /> Descargar PDF</Button></CardContent></Card>

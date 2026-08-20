@@ -80,6 +80,14 @@ export default function ManageQuotes() {
   }>({
     queryKey: ['/api/quotation-analytics/funnel'],
   });
+  const { data: professionalAnalytics } = useQuery<{
+    byMotion: Array<{ key: string; count: number; won: number; value: number }>;
+    byBlueprint: Array<{ key: number | null; count: number; won: number; value: number }>;
+    byDuration: Array<{ key: string | null; count: number; won: number; value: number }>;
+    byMarket: Array<{ key: string; count: number; won: number; value: number }>;
+    byPriceBand: Array<{ key: string; count: number; won: number; value: number }>;
+    byLossReason: Array<{ key: string | null; count: number }>;
+  }>({ queryKey: ['/api/quotation-analytics/professional'] });
 
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -534,6 +542,8 @@ export default function ManageQuotes() {
               valueLabel={`Tasa de rechazo: ${stats.rejectionRate.toFixed(1)} por ciento`}
             />
           </MetricGrid>
+
+          {professionalAnalytics?.byMotion?.length ? <div className="mb-4 rounded-xl border border-indigo-100 bg-indigo-50/50 px-4 py-3"><div className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-indigo-600"><GitBranch className="h-3.5 w-3.5" /> Conversión por modalidad comercial <span className="font-normal normal-case text-slate-500">· demos excluidas</span></div><div className="flex flex-wrap gap-2">{professionalAnalytics.byMotion.map((item) => <Badge key={item.key} variant="outline" className="bg-white px-3 py-1.5">{motionLabel(item.key)} · {item.count ? ((item.won / item.count) * 100).toFixed(0) : 0}% <span className="ml-1 text-slate-400">({item.won}/{item.count})</span></Badge>)}</div></div> : null}
 
           {/* Win/Loss insights bar */}
           {Object.keys(lossReasonBreakdown).length > 0 && (
@@ -1084,4 +1094,8 @@ export default function ManageQuotes() {
       />
     </>
   );
+}
+
+function motionLabel(value: string) {
+  return ({ new_business: "Nuevo negocio", renewal: "Renovación", expansion: "Expansión", demo: "Demo" } as Record<string, string>)[value] || value;
 }

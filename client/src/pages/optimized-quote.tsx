@@ -59,6 +59,7 @@ const DeliverableConfiguration = React.lazy(() => import('@/components/quotation
 const OptimizedFinancialReview = React.lazy(() => import('@/components/optimized/financial-review-final'));
 const ExecutiveSummary = React.lazy(() => import('@/components/quotation/executive-summary').then((module) => ({ default: module.ExecutiveSummary })));
 const QuotationVariants = React.lazy(() => import('@/components/optimized/QuotationVariants').then((module) => ({ default: module.QuotationVariants })));
+const ProfessionalScopeBuilder = React.lazy(() => import('@/components/quotation/professional-scope-builder').then((module) => ({ default: module.ProfessionalScopeBuilder })));
 
 const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isRequote = false }) => {
   const [, setLocation] = useLocation();
@@ -372,8 +373,13 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
                   </div>
                   <Separator />
                   <div>
+                    <SectionHeading title="Receta y alcance profesional" description="Partí de un producto probado y ajustá cobertura, módulos, entregables y esfuerzo para este cliente." />
+                    <ProfessionalScopeBuilder />
+                  </div>
+                  <Separator />
+                  <div>
                     <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                      <SectionHeading title="Punto de partida" description="Elegí una plantilla o configurá el alcance desde cero." />
+                      <SectionHeading title="Plantillas legacy" description="Compatibilidad para cotizaciones históricas que todavía no usan recetas profesionales." />
                       {!isEditing && <QuotationTemplatesPicker />}
                     </div>
                     <OptimizedTemplateSelection />

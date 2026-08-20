@@ -144,6 +144,7 @@ import {
   quotationApprovals,
   quotationApprovalRules,
   quotationDeliveries,
+  proposalDocuments,
   sheetPersonnelAliases,
 } from "@shared/schema";
 import { fetchValorHora2026, fetchValorHoraForYear, getHistoricalRateFields, HISTORICAL_RATE_FIELDS_2026, findPersonnelIdFuzzy, describeSheetsSyncError } from "./services/personnelSheetsSync";
@@ -161,6 +162,10 @@ import { requireRole, requireProvider, requireProviderCanAccessProject } from ".
 import { requirePermission } from "./middleware/requirePermission";
 import { createReviewRoomsRouter } from "./routes-review-rooms";
 import { createLedgerRouter } from "./routes-ledger";
+import { registerProposalStudioRoutes } from "./routes-proposal-studio";
+import { runDocumentQa } from "./routes-proposal-studio";
+import { blueprintDefinitionSchema, estimateBlueprintWorkload, proposalDocumentSchema } from "@shared/quotation-professional";
+import { renderProposalPdf } from "./services/proposal-studio";
 import { reviewRooms, reviewRoomMembers, capacityOverrides } from "@shared/schema";
 import path from 'path';
 import PDFDocument from "pdfkit";
@@ -876,6 +881,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Setup authentication with storage
   const { requireAuth, resolveUserFromSessionCookie } = setupAuth(app, storage);
+  registerProposalStudioRoutes(app, requireAuth);
 
   // ═══ Review Rooms (multi-sala) ═══════════════════════════════════════════
   app.use('/api/reviews', createReviewRoomsRouter(requireAuth));
@@ -5490,7 +5496,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         variantOrder: variant.variantOrder,
         totalAmount: variant.totalAmount,
         ...calculateTaxBreakdown(variant.totalAmount, quotation.taxRate, quotation.pricesIncludeTax),
+        scopeSnapshot: variant.scopeSnapshot,
+        deliverables: variant.deliverables,
+        assumptions: variant.assumptions,
+        isRecommended: variant.isRecommended,
+        unitMetrics: variant.unitMetrics,
       })),
+      proposalDocument: snapshot.proposalDocument
+        ? { locale: snapshot.proposalDocument.locale, content: snapshot.proposalDocument.content }
+        : null,
       documentHash: snapshot.documentHash || quotation.documentHash,
     };
   }
@@ -5603,8 +5617,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(eq(quotationRevisions.quotationId, quotation.id))
         .orderBy(desc(quotationRevisions.revisionNumber)).limit(1))[0];
       const snapshot: any = latest?.snapshot ?? await buildQuotationSnapshot(db, quotation.id);
+      const [proposalDocument] = await db.select().from(proposalDocuments).where(and(
+        eq(proposalDocuments.quotationId, quotation.id),
+        eq(proposalDocuments.locale, "es"),
+        eq(proposalDocuments.isStale, false),
+      )).limit(1);
       const currentSnapshot = {
         ...snapshot,
+        proposalDocument: proposalDocument?.status === "published" ? proposalDocument : null,
         documentHash: latest?.documentHash ?? quotation.documentHash,
         quotation: { ...snapshot.quotation, ...quotation, status: quotation.status === "sent" ? "viewed" : quotation.status },
       };
@@ -5629,10 +5649,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(and(eq(quotationRevisions.quotationId, quotation.id), eq(quotationRevisions.revisionNumber, quotation.revisionNumber)))
         .limit(1))[0];
       if (!revision) return res.status(404).json({ message: "Documento no encontrado" });
-      const pdf = await renderQuotationPdf(publicQuotationProjection({
-        ...(revision.snapshot as any),
-        documentHash: revision.documentHash,
-      }));
+      const [proposalDocument] = await db.select().from(proposalDocuments).where(and(
+        eq(proposalDocuments.quotationId, quotation.id),
+        eq(proposalDocuments.locale, "es"),
+        eq(proposalDocuments.status, "published"),
+        eq(proposalDocuments.isStale, false),
+      )).limit(1);
+      const pdf = proposalDocument
+        ? await renderProposalPdf(proposalDocumentSchema.parse(proposalDocument.content), { title: quotation.projectName, quotationNumber: quotation.quotationNumber })
+        : await renderQuotationPdf(publicQuotationProjection({
+            ...(revision.snapshot as any),
+            documentHash: revision.documentHash,
+          }));
       res.setHeader("Content-Type", "application/pdf");
       res.setHeader("Content-Disposition", `inline; filename="${quotation.quotationNumber}-R${quotation.revisionNumber}.pdf"`);
       res.send(pdf);
@@ -6225,6 +6253,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
             .where(and(eq(quotations.id, id), eq(quotations.lockVersion, existingQuotation.lockVersion)))
             .returning();
           if (!updated) throw new Error("QUOTATION_VERSION_CONFLICT");
+          await tx.update(proposalDocuments).set({
+            isStale: true,
+            qaStatus: "pending",
+            status: "draft",
+            updatedAt: new Date(),
+            updatedBy: req.user?.id ?? null,
+          }).where(eq(proposalDocuments.quotationId, id));
           await tx.delete(quotationTeamMembers)
             .where(normalizedVariants
               ? eq(quotationTeamMembers.quotationId, id)
@@ -6498,6 +6533,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (!row) {
           throw Object.assign(new Error("Otra persona ya creó una revisión"), { statusCode: 409 });
         }
+        await tx.update(proposalDocuments).set({
+          isStale: true,
+          qaStatus: "pending",
+          status: "draft",
+          updatedAt: new Date(),
+          updatedBy: req.user?.id ?? null,
+        }).where(eq(proposalDocuments.quotationId, id));
         await tx.update(quotationVariants).set({ isSelected: false }).where(eq(quotationVariants.quotationId, id));
         const revisionResult = await persistQuotationRevision(tx, id, req.user?.id ?? null, reason);
         await recordQuotationEvent(tx, {
@@ -6604,10 +6646,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(eq(quotationRevisions.quotationId, id))
         .orderBy(desc(quotationRevisions.revisionNumber)).limit(1))[0];
       const snapshot: any = latest?.snapshot ?? await buildQuotationSnapshot(db, id);
-      const pdf = await renderQuotationPdf(publicQuotationProjection({
-        ...snapshot,
-        documentHash: latest?.documentHash ?? snapshot.documentHash,
-      }));
+      const [proposalDocument] = await db.select().from(proposalDocuments).where(and(
+        eq(proposalDocuments.quotationId, id),
+        eq(proposalDocuments.locale, "es"),
+        eq(proposalDocuments.isStale, false),
+      )).limit(1);
+      const pdf = proposalDocument && ["ready", "published"].includes(proposalDocument.status)
+        ? await renderProposalPdf(proposalDocumentSchema.parse(proposalDocument.content), { title: snapshot.quotation.projectName, quotationNumber: snapshot.quotation.quotationNumber })
+        : await renderQuotationPdf(publicQuotationProjection({
+            ...snapshot,
+            documentHash: latest?.documentHash ?? snapshot.documentHash,
+          }));
       const filename = `${snapshot.quotation.quotationNumber || `cotizacion-${id}`}-R${snapshot.quotation.revisionNumber}.pdf`;
       res.setHeader("Content-Type", "application/pdf");
       res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
@@ -6647,6 +6696,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .where(and(eq(quotationRevisions.quotationId, id), eq(quotationRevisions.revisionNumber, quotation.revisionNumber)))
           .limit(1))[0];
         if (!revision) return res.status(409).json({ message: "La revisión comercial no tiene snapshot" });
+        const [proposalDocument] = await db.select().from(proposalDocuments).where(and(
+          eq(proposalDocuments.quotationId, id),
+          eq(proposalDocuments.locale, "es"),
+        )).limit(1);
+        if (quotation.scopeSnapshot) {
+          if (!proposalDocument || proposalDocument.isStale || proposalDocument.sourceDocumentHash !== revision.documentHash) {
+            return res.status(409).json({ message: "La propuesta visual está desactualizada. Reconciliála en el Estudio antes de enviar.", code: "PROPOSAL_DOCUMENT_STALE" });
+          }
+          const qa = await runDocumentQa(id, proposalDocument.id);
+          if (qa.blockers.length) return res.status(409).json({ message: "La propuesta tiene errores comerciales bloqueantes", blockers: qa.blockers });
+          if (qa.warnings.length && !proposalDocument.warningOverrideReason) {
+            return res.status(409).json({ message: "La propuesta tiene advertencias editoriales pendientes", warnings: qa.warnings });
+          }
+          if (!["ready", "published"].includes(proposalDocument.status)) {
+            return res.status(409).json({ message: "Ejecutá y aprobá el QA de la propuesta antes de enviarla" });
+          }
+        }
         const publicToken = randomBytes(32).toString("base64url");
         const appUrl = process.env.PUBLIC_APP_URL || process.env.APP_URL || `${req.protocol}://${req.get("host")}`;
         const publicUrl = `${appUrl}/proposal/${publicToken}`;
@@ -6654,7 +6720,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ...(revision.snapshot as any),
           documentHash: revision.documentHash,
         });
-        const pdf = await renderQuotationPdf(projection);
+        const pdf = proposalDocument
+          ? await renderProposalPdf(proposalDocumentSchema.parse(proposalDocument.content), { title: quotation.projectName, quotationNumber: quotation.quotationNumber })
+          : await renderQuotationPdf(projection);
         const subject = input.subject || `Propuesta ${quotation.quotationNumber}: ${quotation.projectName}`;
         const sender = process.env.SENDGRID_FROM_EMAIL;
         const apiKey = process.env.SENDGRID_API_KEY;
@@ -6732,6 +6800,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
               metadata: { recipientEmail: input.recipientEmail, deliveryId: delivery.id },
             });
             await syncQuotationToCrm(tx, updated, "sent", req.user?.id ?? null, `Propuesta enviada a ${input.recipientEmail}`);
+            if (proposalDocument) {
+              await tx.update(proposalDocuments).set({ status: "published", updatedAt: now, updatedBy: req.user?.id ?? null })
+                .where(eq(proposalDocuments.id, proposalDocument.id));
+            }
             if (quotation.leadId) {
               const reminderDate = new Date(Math.min(
                 now.getTime() + 3 * 24 * 60 * 60 * 1000,
@@ -6777,12 +6849,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
       status: quotations.status,
       count: sql<number>`count(*)::int`,
       value: sql<number>`coalesce(sum(${quotations.totalAmount}), 0)::double precision`,
-    }).from(quotations).where(isNull(quotations.archivedAt)).groupBy(quotations.status);
+    }).from(quotations).where(and(
+      isNull(quotations.archivedAt),
+      sql`${quotations.commercialMotion} <> 'demo'`,
+    )).groupBy(quotations.status);
     const byStatus = Object.fromEntries(rows.map((row) => [row.status, { count: row.count, value: row.value }]));
     const sent = ["sent", "viewed", "in-negotiation", "approved", "rejected", "expired"]
       .reduce((sum, status) => sum + (byStatus[status]?.count || 0), 0);
     const won = byStatus.approved?.count || 0;
     res.json({ byStatus, sent, won, winRate: sent > 0 ? (won / sent) * 100 : 0 });
+  });
+
+  app.get("/api/quotation-analytics/professional", requireAuth, requirePermission("quotations"), async (_req, res) => {
+    const base = and(isNull(quotations.archivedAt), sql`${quotations.commercialMotion} <> 'demo'`);
+    const group = async (dimension: any) => db.select({
+      key: dimension,
+      count: sql<number>`count(*)::int`,
+      won: sql<number>`count(*) filter (where ${quotations.status} = 'approved')::int`,
+      value: sql<number>`coalesce(sum(${quotations.totalAmount}), 0)::double precision`,
+    }).from(quotations).where(base).groupBy(dimension);
+    const marketDimension = sql<string>`coalesce(${quotations.scopeSnapshot}->'coverage'->'markets'->>0, 'Sin mercado')`;
+    const priceBandDimension = sql<string>`case
+      when ${quotations.totalAmount} < 5000 then '<5k'
+      when ${quotations.totalAmount} < 15000 then '5k-15k'
+      when ${quotations.totalAmount} < 50000 then '15k-50k'
+      else '50k+'
+    end`;
+    const [byMotion, byBlueprint, byDuration, byMarket, byPriceBand, byLossReason] = await Promise.all([
+      group(quotations.commercialMotion),
+      group(quotations.serviceBlueprintId),
+      group(quotations.projectDuration),
+      group(marketDimension),
+      group(priceBandDimension),
+      db.select({ key: quotations.lossReason, count: sql<number>`count(*)::int` }).from(quotations)
+        .where(and(base, sql`${quotations.status} in ('rejected','expired','cancelled')`))
+        .groupBy(quotations.lossReason),
+    ]);
+    res.json({ byMotion, byBlueprint, byDuration, byMarket, byPriceBand, byLossReason });
   });
 
   // GET /api/quotations/:id/profitability — cotización vs horas reales del proyecto
@@ -9700,30 +9803,140 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      const project = await storage.createActiveProject(validatedData);
-
-      // Copiar automáticamente el equipo de la cotización al proyecto recién creado
-      // (solo si el proyecto está vinculado a una cotización).
-      if (validatedData.quotationId) {
-        try {
-          console.log(`📋 Copiando equipo automáticamente desde cotización ${validatedData.quotationId} al proyecto ${project.id}`);
-          const baseTeam = await storage.copyQuotationTeamToProject(
-            Number(validatedData.quotationId),
-            project.id,
-            selectedVariantId,
-          );
-          console.log(`✅ Equipo copiado automáticamente: ${baseTeam.length} miembros`);
-        } catch (teamError) {
-          console.warn('⚠️ Error al copiar equipo automáticamente, pero proyecto creado exitosamente:', teamError);
-          // No fallar la creación del proyecto si hay error copiando el equipo
+      const project = await db.transaction(async (tx) => {
+        if (validatedData.quotationId) {
+          await tx.execute(sql`SELECT id FROM quotations WHERE id = ${Number(validatedData.quotationId)} FOR UPDATE`);
+          const [existingProject] = await tx.select({ id: activeProjects.id }).from(activeProjects)
+            .where(eq(activeProjects.quotationId, Number(validatedData.quotationId))).limit(1);
+          if (existingProject) throw Object.assign(new Error("La cotización ya fue materializada en un proyecto"), { statusCode: 409, projectId: existingProject.id });
         }
-      }
+
+        const [created] = await tx.insert(activeProjects).values(validatedData).returning();
+        if (!quotation) return created;
+
+        const selectedVariant = selectedVariantId
+          ? (await tx.select().from(quotationVariants).where(and(eq(quotationVariants.id, selectedVariantId), eq(quotationVariants.quotationId, quotation.id))).limit(1))[0]
+          : null;
+        const scope = blueprintDefinitionSchema.safeParse(selectedVariant?.scopeSnapshot ?? quotation.scopeSnapshot);
+        const variantTeam = await tx.select({
+          personnelId: quotationTeamMembers.personnelId,
+          roleId: quotationTeamMembers.roleId,
+          hours: quotationTeamMembers.hours,
+          rate: quotationTeamMembers.rate,
+        }).from(quotationTeamMembers).where(selectedVariantId
+          ? and(eq(quotationTeamMembers.quotationId, quotation.id), eq(quotationTeamMembers.variantId, selectedVariantId))
+          : and(eq(quotationTeamMembers.quotationId, quotation.id), isNull(quotationTeamMembers.variantId)));
+        const canonicalTeam = variantTeam.length > 0 ? variantTeam : await tx.select({
+          personnelId: quotationTeamMembers.personnelId,
+          roleId: quotationTeamMembers.roleId,
+          hours: quotationTeamMembers.hours,
+          rate: quotationTeamMembers.rate,
+        }).from(quotationTeamMembers).where(and(eq(quotationTeamMembers.quotationId, quotation.id), isNull(quotationTeamMembers.variantId)));
+        const assignableTeam = canonicalTeam.filter((member): member is typeof member & { personnelId: number; roleId: number } => member.personnelId != null && member.roleId != null);
+        if (assignableTeam.length > 0) {
+          await tx.insert(projectBaseTeam).values(assignableTeam.map((member) => ({
+            projectId: created.id,
+            personnelId: member.personnelId,
+            roleId: member.roleId,
+            estimatedHours: member.hours,
+            hourlyRate: member.rate,
+            isActive: true,
+          })));
+        }
+
+        if (!scope.success) return created; // Legacy quotations keep the compatible team-only handoff.
+        const definition = scope.data;
+        const workload = estimateBlueprintWorkload(definition);
+        const projectStart = validatedData.startDate;
+        const includedDeliverables = definition.deliverables.filter((item) => item.included);
+        const slaDefinition = {
+          level: definition.coverage.slaLevel,
+          channels: definition.alertChannels,
+          monitoringWindow: definition.monitoringWindow,
+        };
+        for (const soldItem of includedDeliverables) {
+          for (let cycle = 0; cycle < soldItem.quantity; cycle += 1) {
+            const dueDate = new Date(projectStart);
+            const spacing = Math.max(1, Math.round((definition.durationMonths * 30) / Math.max(1, soldItem.quantity)));
+            dueDate.setDate(dueDate.getDate() + Math.min(Math.round(definition.durationMonths * 30), spacing * (cycle + 1)));
+            const estimatedHours = workload.lines.filter((line) => line.sourceId === soldItem.id)
+              .reduce((sum, line) => sum + line.estimatedHours, 0) / Math.max(1, soldItem.quantity);
+            await tx.insert(deliverables).values({
+              clientId: quotation.clientId,
+              project_id: created.id,
+              name: soldItem.quantity > 1 ? `${soldItem.name} · ${cycle + 1}/${soldItem.quantity}` : soldItem.name,
+              deliveryMonth: `${dueDate.getFullYear()}-${String(dueDate.getMonth() + 1).padStart(2, "0")}`,
+              due_date: dueDate,
+              frequency: soldItem.cadence,
+              deliverable_type: soldItem.type,
+              hoursEstimated: String(Math.round(estimatedHours * 100) / 100),
+              sourceScopeItemId: `${soldItem.id}:${cycle + 1}`,
+              acceptanceCriteria: soldItem.acceptanceCriteria,
+              slaDefinition,
+              createdBy: req.user?.id ?? null,
+            });
+          }
+        }
+
+        const sectionTasks = [
+          { title: "Setup y calibración", sectionName: "Setup", estimatedHours: workload.lines.filter((line) => line.sourceId === "setup").reduce((sum, line) => sum + line.estimatedHours, 0) },
+          { title: "Producción de entregables vendidos", sectionName: "Producción", estimatedHours: workload.totalHours * 0.7 },
+          { title: "Revisión y QA de alcance", sectionName: "Revisión", estimatedHours: workload.totalHours * 0.15 },
+          { title: "Presentación y cierre con cliente", sectionName: "Presentación", estimatedHours: workload.totalHours * 0.15 },
+        ];
+        const operationalTasks = sectionTasks.map((task, index) => ({
+          ...task,
+          estimatedHours: Math.round(task.estimatedHours * 2) / 2,
+          description: index === 0
+            ? `Brief operativo: ${JSON.stringify(quotation.decisionContext || {})}`
+            : index === 2
+              ? `Criterios de aceptación materializados desde ${includedDeliverables.length} entregables vendidos.`
+              : index === 3
+                ? `Fuera de contrato: ${definition.exclusions.join("; ") || "Sin exclusiones declaradas"}`
+                : `Ejecutar el alcance aceptado con SLA ${definition.coverage.slaLevel}.`,
+          projectId: created.id,
+          position: index,
+          createdBy: req.user?.id ?? null,
+        }));
+        const milestoneTasks = definition.milestones.flatMap((milestone, milestoneIndex) => {
+          const dueDate = new Date(projectStart);
+          dueDate.setDate(dueDate.getDate() + milestone.offsetDays);
+          return (milestone.taskNames.length ? milestone.taskNames : [milestone.name]).map((title, taskIndex) => ({
+            title,
+            description: milestone.description || `Hito vendido: ${milestone.name}`,
+            projectId: created.id,
+            sectionName: "Hitos",
+            startDate: projectStart,
+            dueDate,
+            estimatedHours: null,
+            position: operationalTasks.length + milestoneIndex * 10 + taskIndex,
+            createdBy: req.user?.id ?? null,
+          }));
+        });
+        await tx.insert(tasks).values([...operationalTasks, ...milestoneTasks]);
+
+        if (["monthly_fee", "annual_program", "renewal"].includes(definition.modality)) {
+          const cycles = Math.max(1, Math.ceil(definition.durationMonths));
+          await tx.insert(projectCycles).values(Array.from({ length: cycles }, (_, index) => {
+            const cycleStart = new Date(projectStart);
+            cycleStart.setMonth(cycleStart.getMonth() + index);
+            const cycleEnd = new Date(cycleStart);
+            cycleEnd.setMonth(cycleEnd.getMonth() + 1);
+            cycleEnd.setDate(cycleEnd.getDate() - 1);
+            return { parentProjectId: created.id, cycleName: `Ciclo ${index + 1}`, cycleType: "monthly", startDate: cycleStart, endDate: cycleEnd, status: index === 0 ? "active" : "upcoming" };
+          }));
+        }
+        return created;
+      });
       
       res.status(201).json(project);
     } catch (error) {
       if (error instanceof z.ZodError) {
         console.error("Error de validación:", error.errors);
         return res.status(400).json({ message: "Datos de proyecto inválidos", errors: error.errors });
+      }
+      if ((error as any)?.statusCode === 409) {
+        return res.status(409).json({ message: (error as Error).message, projectId: (error as any).projectId });
       }
       console.error("Error creating active project:", error);
       res.status(500).json({ message: "Error al crear el proyecto activo" });

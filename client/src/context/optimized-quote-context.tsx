@@ -14,6 +14,7 @@ import {
   getCountriesFactor,
   getMentionsVolumeFactor,
 } from "@shared/utils/quotation-complexity";
+import type { BlueprintDefinition, CommercialMotion } from "@shared/quotation-professional";
 
 export interface OptimizedTeamMember {
   id: string;
@@ -33,6 +34,12 @@ export type QuotationVariantPayload = {
   markupAmount: number;
   totalAmount: number;
   isSelected: boolean;
+  scopeSnapshot?: BlueprintDefinition | null;
+  deliverables?: Array<Record<string, unknown>>;
+  assumptions?: string[];
+  isRecommended?: boolean;
+  unitMetrics?: Record<string, number>;
+  isLegacy?: boolean;
   teamMembers: Array<{
     roleId: number | null;
     personnelId: number | null;
@@ -119,6 +126,13 @@ export interface QuotationData {
   // Mes histórico (formato 'mmmYYYY', ej. 'aug2025') a usar como tarifa
   // por defecto al agregar personal y al recalcular tarifas. null = "más reciente disponible".
   salaryMonth?: string | null;
+  serviceBlueprintId?: number | null;
+  serviceBlueprintVersion?: number | null;
+  commercialMotion?: CommercialMotion;
+  scopeSnapshot?: BlueprintDefinition | null;
+  decisionContext?: Record<string, unknown>;
+  operationalPlan?: Record<string, unknown>;
+  effortOverrideReason?: string | null;
 }
 
 interface OptimizedQuoteContextType {
@@ -260,7 +274,14 @@ const initialQuotationData: QuotationData = {
   exclusions: '',
   termsVersion: '1',
   lockVersion: 1,
-  salaryMonth: null
+  salaryMonth: null,
+  serviceBlueprintId: null,
+  serviceBlueprintVersion: null,
+  commercialMotion: 'new_business',
+  scopeSnapshot: null,
+  decisionContext: {},
+  operationalPlan: {},
+  effortOverrideReason: null,
 };
 
 interface OptimizedQuoteProviderProps {
@@ -1001,7 +1022,14 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
         inclusions: quotation.inclusions || '',
         exclusions: quotation.exclusions || '',
         termsVersion: quotation.termsVersion || '1',
-        salaryMonth: quotation.salaryMonth ?? null
+        salaryMonth: quotation.salaryMonth ?? null,
+        serviceBlueprintId: quotation.serviceBlueprintId ?? null,
+        serviceBlueprintVersion: quotation.serviceBlueprintVersion ?? null,
+        commercialMotion: quotation.commercialMotion || 'new_business',
+        scopeSnapshot: quotation.scopeSnapshot || null,
+        decisionContext: quotation.decisionContext || {},
+        operationalPlan: quotation.operationalPlan || {},
+        effortOverrideReason: quotation.effortOverrideReason || null,
       };
 
       setQuotationData(loadedQuotationData);
@@ -1056,6 +1084,13 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
         countriesCovered: quotationData.countriesCovered || '1',
         clientEngagement: quotationData.clientEngagement || 'medium',
         templateId: quotationData.template?.id || null,
+        serviceBlueprintId: quotationData.serviceBlueprintId ?? null,
+        serviceBlueprintVersion: quotationData.serviceBlueprintVersion ?? null,
+        commercialMotion: quotationData.commercialMotion || 'new_business',
+        scopeSnapshot: quotationData.scopeSnapshot ?? null,
+        decisionContext: quotationData.decisionContext || {},
+        operationalPlan: quotationData.operationalPlan || {},
+        effortOverrideReason: quotationData.effortOverrideReason || null,
         baseCost: pricingResult.display.baseCost,
         complexityAdjustment: pricingResult.display.complexityAdjustment,
         markupAmount: pricingResult.display.markupAmount,

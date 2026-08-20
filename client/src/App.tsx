@@ -10,6 +10,8 @@ const OptimizedQuote = lazy(() => import("@/pages/optimized-quote"));
 import { OptimizedQuoteProvider } from "@/context/optimized-quote-context";
 const ManageQuotes = lazy(() => import("@/pages/manage-quotes"));
 const QuotationDetail = lazy(() => import("@/pages/quotation-detail"));
+const ProposalStudio = lazy(() => import("@/pages/proposal-studio"));
+const ServiceBlueprintsAdmin = lazy(() => import("@/pages/service-blueprints-admin"));
 const QuoteRedirect = lazy(() => import("@/pages/quote-redirect"));
 const PublicProposal = lazy(() => import("@/pages/public-proposal"));
 const Clients = lazy(() => import("@/pages/clients"));
@@ -244,6 +246,8 @@ function AppRoutes() {
                   <ProtectedRoute path="/new-quote" component={() => <Redirect to="/optimized-quote" />} />
                   <ProtectedRoute path="/quotations" component={ManageQuotes} requiredPermission="quotations" />
                   <ProtectedRoute path="/quotations/:id" component={QuotationDetail} requiredPermission="quotations" />
+                  <ProtectedRoute path="/quotations/:id/studio" component={ProposalStudio} requiredPermission="quotations" />
+                  <ProtectedRoute path="/operations/service-blueprints" component={ServiceBlueprintsAdmin} requiredPermission="operations" />
                   <ProtectedRoute path="/quote-redirect" component={QuoteRedirect} />
                   
                   {/* Legacy Redirects for Quotations */}

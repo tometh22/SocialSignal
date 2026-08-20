@@ -26,6 +26,7 @@ import { useOptimizedQuote } from '@/context/optimized-quote-context';
 import { useLocation } from 'wouter';
 import { useCurrency } from '@/hooks/use-currency';
 import { calculateQuotationPricing } from '@shared/utils/quotation-pricing';
+import { blueprintDefinitionSchema, estimateBlueprintWorkload, type BlueprintDefinition } from '@shared/quotation-professional';
 
 interface QuotationVariant {
   id: number;
@@ -37,6 +38,12 @@ interface QuotationVariant {
   complexityAdjustment: number;
   markupAmount: number;
   totalAmount: number;
+  scopeSnapshot?: BlueprintDefinition | null;
+  deliverables?: Array<Record<string, unknown>>;
+  assumptions?: string[];
+  isRecommended?: boolean;
+  unitMetrics?: Record<string, number>;
+  isLegacy?: boolean;
   isSelected: boolean;
   createdAt: string;
 }
@@ -90,7 +97,7 @@ export function QuotationVariants({
   const [approvalDialogOpen, setApprovalDialogOpen] = useState(false);
   const [variantPendingDeletion, setVariantPendingDeletion] = useState<number | null>(null);
   const { toast } = useToast();
-  const { saveQuotation } = useOptimizedQuote();
+  const { saveQuotation, availableRoles } = useOptimizedQuote();
   const [, setLocation] = useLocation();
   const { exchangeRate } = useCurrency();
 
@@ -109,7 +116,8 @@ export function QuotationVariants({
       const response = await apiRequest(`/api/quotations/${quotationId}/variants`, 'GET');
       setVariants(response);
       const selectedFromServer = response.filter((variant: QuotationVariant) => variant.isSelected).map((variant: QuotationVariant) => variant.id);
-      const recommended = response.find((variant: QuotationVariant) => variant.variantName === 'Intermedio');
+      const recommended = response.find((variant: QuotationVariant) => variant.isRecommended)
+        || response.find((variant: QuotationVariant) => variant.variantName === 'Intermedio');
       setSelectedVariantIds(selectedFromServer.length > 0 ? selectedFromServer : recommended ? [recommended.id] : []);
       
       // If no variants exist, create default variants
@@ -140,9 +148,30 @@ export function QuotationVariants({
     // hace al persistir (toStoredCurrency), para que estas variantes locales
     // queden en la misma unidad que las que vienen de la DB una vez guardadas
     // (así formatCurrency solo necesita poner el label, sin volver a convertir).
-    const resultForScale = (scale: number) => calculateVariantResult(
-      baseTeamMembers.map((member) => ({ ...member, hours: member.hours * scale, cost: member.hours * scale * member.rate })),
-    ).display;
+    if (quotationData.scopeSnapshot) {
+      const definitions = professionalVariantDefinitions(blueprintDefinitionSchema.parse(quotationData.scopeSnapshot));
+      const localVariants = definitions.map((definition, index) => {
+        const effectiveTeam = teamForScope(definition.scope, baseTeamMembers, availableRoles);
+        const result = calculateVariantResult(effectiveTeam).display;
+        return {
+          id: -(index + 1), quotationId: quotationId || 0,
+          variantName: definition.name, variantDescription: definition.description,
+          variantOrder: index + 1, baseCost: result.baseCost,
+          complexityAdjustment: result.complexityAdjustment, markupAmount: result.markupAmount,
+          totalAmount: result.total, scopeSnapshot: definition.scope,
+          deliverables: definition.scope.deliverables as unknown as Array<Record<string, unknown>>,
+          assumptions: definition.assumptions, isRecommended: definition.recommended,
+          unitMetrics: unitMetricsFor(definition.scope, result.total), isLegacy: false,
+          isSelected: false, createdAt: new Date().toISOString(),
+        };
+      });
+      setVariants(localVariants);
+      setSelectedVariantIds([localVariants.find((variant) => variant.isRecommended)?.id ?? localVariants[0].id]);
+      setLoading(false);
+      return;
+    }
+
+    const resultForScale = (scale: number) => calculateVariantResult(baseTeamMembers.map((member) => ({ ...member, hours: member.hours * scale, cost: member.hours * scale * member.rate }))).display;
     const basic = resultForScale(0.75);
     const intermediate = resultForScale(1);
     const full = resultForScale(1.8);
@@ -158,6 +187,7 @@ export function QuotationVariants({
         complexityAdjustment: basic.complexityAdjustment,
         markupAmount: basic.markupAmount,
         totalAmount: basic.total,
+        isLegacy: true,
         isSelected: false,
         createdAt: new Date().toISOString()
       },
@@ -171,6 +201,7 @@ export function QuotationVariants({
         complexityAdjustment: intermediate.complexityAdjustment,
         markupAmount: intermediate.markupAmount,
         totalAmount: intermediate.total,
+        isLegacy: true,
         isSelected: false,
         createdAt: new Date().toISOString()
       },
@@ -184,6 +215,7 @@ export function QuotationVariants({
         complexityAdjustment: full.complexityAdjustment,
         markupAmount: full.markupAmount,
         totalAmount: full.total,
+        isLegacy: true,
         isSelected: false,
         createdAt: new Date().toISOString()
       }
@@ -234,6 +266,38 @@ export function QuotationVariants({
   };
 
   const createDefaultVariants = async () => {
+    if (quotationData.scopeSnapshot) {
+      try {
+        const definitions = professionalVariantDefinitions(blueprintDefinitionSchema.parse(quotationData.scopeSnapshot));
+        for (const [index, definition] of definitions.entries()) {
+          const teamMembers = teamForScope(definition.scope, baseTeamMembers, availableRoles);
+          const result = calculateVariantResult(teamMembers).display;
+          await apiRequest(`/api/quotations/${quotationId}/variants`, 'POST', {
+            variantName: definition.name,
+            variantDescription: definition.description,
+            variantOrder: index + 1,
+            baseCost: result.baseCost,
+            complexityAdjustment: result.complexityAdjustment,
+            markupAmount: result.markupAmount,
+            totalAmount: result.total,
+            scopeSnapshot: definition.scope,
+            deliverables: definition.scope.deliverables,
+            assumptions: definition.assumptions,
+            isRecommended: definition.recommended,
+            unitMetrics: unitMetricsFor(definition.scope, result.total),
+            isLegacy: false,
+            isSelected: false,
+            teamMembers,
+          });
+        }
+        await fetchVariants();
+        toast({ title: "Escenarios creados", description: "Cada alternativa tiene alcance, equipo y precio propios" });
+      } catch (error) {
+        console.error('Error creating professional variants:', error);
+        toast({ title: "Error", description: "No se pudieron crear los escenarios de alcance", variant: "destructive" });
+      }
+      return;
+    }
     // IMPORTANTE: Aplicar MISMO markup pero ajustar solo costos base
     const baseMarkupFactor = quotationData.financials.marginFactor || 2.0;
     
@@ -275,6 +339,7 @@ export function QuotationVariants({
           complexityAdjustment: result.complexityAdjustment,
           markupAmount: result.markupAmount,
           totalAmount: result.total,
+          isLegacy: true,
           isSelected: false // La aceptación pertenece exclusivamente al portal del cliente
         });
       }
@@ -306,16 +371,16 @@ export function QuotationVariants({
 
     try {
       setIsCreating(true);
-      const adjustmentFactor = 1 + (newVariant.adjustmentPercentage / 100);
+      const professionalScope = quotationData.scopeSnapshot ? blueprintDefinitionSchema.parse(quotationData.scopeSnapshot) : null;
+      const adjustmentFactor = professionalScope ? 1 : 1 + (newVariant.adjustmentPercentage / 100);
       
       // Convertido a la moneda de visualización acá mismo (no solo al persistir),
       // para que quede en la misma unidad que el resto de `variants` en el
       // estado local (createLocalVariants) cuando la cotización todavía no se guardó.
-      const result = calculateVariantResult(baseTeamMembers.map((member) => ({
-        ...member,
-        hours: member.hours * adjustmentFactor,
-        cost: member.hours * adjustmentFactor * member.rate,
-      }))).display;
+      const effectiveTeam = professionalScope
+        ? teamForScope(professionalScope, baseTeamMembers, availableRoles)
+        : baseTeamMembers.map((member) => ({ ...member, hours: member.hours * adjustmentFactor, cost: member.hours * adjustmentFactor * member.rate }));
+      const result = calculateVariantResult(effectiveTeam).display;
       const variantData = {
         id: -(variants.length + 1), // Use negative ID for local variants
         quotationId: quotationId || 0,
@@ -326,6 +391,12 @@ export function QuotationVariants({
         complexityAdjustment: result.complexityAdjustment,
         markupAmount: result.markupAmount,
         totalAmount: result.total,
+        scopeSnapshot: professionalScope,
+        deliverables: professionalScope?.deliverables || [],
+        assumptions: professionalScope ? ['Parte del alcance configurado; editá sus horas antes de finalizar si corresponde.'] : [],
+        isRecommended: false,
+        unitMetrics: professionalScope ? unitMetricsFor(professionalScope, result.total) : {},
+        isLegacy: !professionalScope,
         isSelected: false,
         createdAt: new Date().toISOString()
       };
@@ -478,6 +549,12 @@ export function QuotationVariants({
           complexityAdjustment: result.complexityAdjustment,
           markupAmount: result.markupAmount,
           totalAmount: result.total,
+          scopeSnapshot: variant.scopeSnapshot || null,
+          deliverables: variant.deliverables || [],
+          assumptions: variant.assumptions || [],
+          isRecommended: Boolean(variant.isRecommended),
+          unitMetrics: variant.unitMetrics || {},
+          isLegacy: Boolean(variant.isLegacy),
           isSelected: false,
           teamMembers: effectiveTeam.map((member) => ({
             roleId: Number(member.roleId) > 0 ? Number(member.roleId) : null,
@@ -510,6 +587,10 @@ export function QuotationVariants({
   };
 
   const getDefaultMemberHours = (variant: QuotationVariant, member: TeamMember): number => {
+    if (variant.scopeSnapshot) {
+      const effective = teamForScope(blueprintDefinitionSchema.parse(variant.scopeSnapshot), baseTeamMembers, availableRoles).find((item) => item.id === member.id);
+      if (effective) return effective.hours;
+    }
     if (!baseCost || baseCost === 0 || !member.hours) return member.hours || 0;
     // variant.baseCost está en la moneda de visualización; baseCost (prop) está
     // en ARS crudo — convertirlo antes del ratio para no mezclar unidades.
@@ -638,7 +719,7 @@ export function QuotationVariants({
                   placeholder="Describí las características de esta variante..."
                 />
               </div>
-              <div>
+              {!quotationData.scopeSnapshot && <div>
                 <label className="text-sm font-medium">Ajuste de Precio (%)</label>
                 <Input
                   type="number"
@@ -649,7 +730,8 @@ export function QuotationVariants({
                 <p className="text-xs text-gray-500 mt-1">
                   Porcentaje de ajuste sobre el precio base (puede ser negativo)
                 </p>
-              </div>
+              </div>}
+              {quotationData.scopeSnapshot && <p className="rounded-lg bg-indigo-50 p-3 text-xs text-indigo-700">La nueva alternativa parte del alcance configurado. El precio se recalcula desde el equipo; no se aplica un porcentaje arbitrario.</p>}
               <Button 
                 onClick={createCustomVariant} 
                 disabled={isCreating}
@@ -699,10 +781,19 @@ export function QuotationVariants({
                     Para envío
                   </Badge>
                 )}
-                {variant.variantName === 'Intermedio' && !selectedVariantIds.includes(variant.id) && (
+                {(variant.isRecommended || variant.variantName === 'Intermedio') && !selectedVariantIds.includes(variant.id) && (
                   <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-700">Recomendada</Badge>
                 )}
               </div>
+
+              {variant.scopeSnapshot && (
+                <div className="flex flex-wrap gap-1.5 rounded-lg border border-slate-200 bg-white p-3 text-xs text-slate-600">
+                  <Badge variant="outline">{variant.scopeSnapshot.coverage.markets.length} mercados</Badge>
+                  <Badge variant="outline">{variant.scopeSnapshot.coverage.brands.length} marcas</Badge>
+                  <Badge variant="outline">{variant.scopeSnapshot.deliverables.filter((item) => item.included).length} entregables</Badge>
+                  <Badge variant="outline">SLA {variant.scopeSnapshot.coverage.slaLevel}</Badge>
+                </div>
+              )}
             </CardHeader>
             
             <CardContent className="space-y-4">
@@ -816,8 +907,8 @@ export function QuotationVariants({
                 <thead>
                   <tr className="border-b">
                     <th className="text-left p-2">Variante</th>
-                    <th className="text-right p-2">Costo Base</th>
-                    <th className="text-right p-2">Multiplicador</th>
+                    <th className="text-center p-2">Alcance</th>
+                    <th className="text-right p-2">Horas</th>
                     <th className="text-right p-2">Total</th>
                     <th className="text-center p-2">Diferencia vs cotización base</th>
                   </tr>
@@ -826,8 +917,8 @@ export function QuotationVariants({
                   {variants.map((variant) => (
                     <tr key={variant.id} className="border-b hover:bg-gray-50">
                       <td className="p-2 font-medium">{variant.variantName}</td>
-                      <td className="p-2 text-right">{formatCurrency(variant.baseCost)}</td>
-                      <td className="p-2 text-right">x{(variant.totalAmount / (variant.baseCost + variant.complexityAdjustment)).toFixed(1)}</td>
+                      <td className="p-2 text-center">{variant.scopeSnapshot ? `${variant.scopeSnapshot.deliverables.filter((item) => item.included).length} entregables · ${variant.scopeSnapshot.coverage.markets.length} mercados` : 'Legacy'}</td>
+                      <td className="p-2 text-right">{getVariantTotalHours(variant).toFixed(1)} h</td>
                       <td className="p-2 text-right font-medium">{formatCurrency(variant.totalAmount)}</td>
                       <td className="p-2 text-center">
                         {(() => {
@@ -992,4 +1083,66 @@ export function QuotationVariants({
       </AlertDialog>
     </div>
   );
+}
+
+function professionalVariantDefinitions(base: BlueprintDefinition) {
+  const essential = structuredClone(base);
+  essential.coverage.designLevel = "standard";
+  essential.coverage.slaLevel = "standard";
+  essential.deliverables = essential.deliverables.map((item) => ({
+    ...item,
+    included: item.type !== "workshop" && item.type !== "dashboard" && item.cadence !== "quarterly",
+  }));
+
+  const recommended = structuredClone(base);
+  const expanded = structuredClone(base);
+  expanded.coverage.designLevel = "executive";
+  if (expanded.coverage.slaLevel === "standard") expanded.coverage.slaLevel = "priority";
+  expanded.deliverables = expanded.deliverables.map((item) => ({ ...item, included: true }));
+
+  return [
+    { name: "Esencial", description: "Foco en los entregables imprescindibles y SLA estándar.", scope: essential, assumptions: ["Sin workshops ni dashboard", "Diseño estándar"], recommended: false },
+    { name: "Recomendada", description: "Alcance equilibrado para convertir evidencia en decisiones.", scope: recommended, assumptions: ["Alcance y cadencia de la receta seleccionada"], recommended: true },
+    { name: "Expandida", description: "Máxima profundidad, diseño ejecutivo y todos los módulos previstos.", scope: expanded, assumptions: ["Todos los entregables incluidos", "Diseño ejecutivo", "SLA prioritario"], recommended: false },
+  ];
+}
+
+function teamForScope(scope: BlueprintDefinition, team: TeamMember[], roles: Array<{ id: number; name: string }>) {
+  const workload = estimateBlueprintWorkload(scope);
+  const grouped = new Map<string, TeamMember[]>();
+  for (const member of team) {
+    const key = roleKeyForName(member.roleName || roles.find((role) => role.id === member.roleId)?.name || "");
+    grouped.set(key, [...(grouped.get(key) || []), member]);
+  }
+  return team.map((member) => {
+    const key = roleKeyForName(member.roleName || roles.find((role) => role.id === member.roleId)?.name || "");
+    const peers = grouped.get(key) || [member];
+    const target = workload.byRole[key];
+    if (target == null) return { ...member, hours: 0, cost: 0 };
+    const peerBase = peers.reduce((sum, item) => sum + Number(item.hours || 0), 0);
+    const share = peerBase > 0 ? Number(member.hours || 0) / peerBase : 1 / peers.length;
+    const hours = Math.round(target * share * 2) / 2;
+    return { ...member, hours, cost: hours * Number(member.rate || 0) };
+  });
+}
+
+function roleKeyForName(name: string) {
+  const normalized = name.toLocaleLowerCase("es");
+  if (normalized.includes("director") || normalized.includes("cuentas")) return "director";
+  if (normalized.includes("project") || normalized.includes(" pm") || normalized === "pm" || normalized.includes("proyecto")) return "pm";
+  if (normalized.includes("data") || normalized.includes("datos")) return "data";
+  if (normalized.includes("tech") || normalized.includes("tecnolog")) return "tech";
+  if (normalized.includes("diseñ") || normalized.includes("design")) return "design";
+  return "analyst";
+}
+
+function unitMetricsFor(scope: BlueprintDefinition, total: number) {
+  const months = Math.max(1, scope.durationMonths);
+  const deliveries = Math.max(1, scope.deliverables.filter((item) => item.included).reduce((sum, item) => sum + item.quantity, 0));
+  return {
+    perMonth: Number((total / months).toFixed(2)),
+    perMarket: Number((total / Math.max(1, scope.coverage.markets.length)).toFixed(2)),
+    perBrand: Number((total / Math.max(1, scope.coverage.brands.length)).toFixed(2)),
+    perDeliverable: Number((total / deliveries).toFixed(2)),
+  };
 }

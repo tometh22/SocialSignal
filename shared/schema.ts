@@ -2,6 +2,7 @@ import { pgTable, text, serial, integer, boolean, timestamp, date, doublePrecisi
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations, sql } from "drizzle-orm";
+import { blueprintDefinitionSchema, type BlueprintDefinition, type ProposalDocumentContent, type ProposalQaIssue } from "./quotation-professional";
 
 // ==================== USUARIOS ====================
 // Tabla de usuarios
@@ -644,6 +645,40 @@ export const insertReportTemplateSchema = createInsertSchema(reportTemplates).pi
   baseCost: true,
 });
 
+// ==================== RECETAS PROFESIONALES DE SERVICIO ====================
+export const serviceBlueprints = pgTable("service_blueprints", {
+  id: serial("id").primaryKey(),
+  slug: varchar("slug", { length: 120 }).notNull(),
+  name: varchar("name", { length: 180 }).notNull(),
+  description: text("description"),
+  version: integer("version").notNull().default(1),
+  status: varchar("status", { length: 20 }).notNull().default("draft"),
+  definition: jsonb("definition").$type<BlueprintDefinition>().notNull(),
+  sourceLabel: varchar("source_label", { length: 180 }),
+  createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
+  publishedBy: integer("published_by").references(() => users.id, { onDelete: "set null" }),
+  publishedAt: timestamp("published_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  slugVersionUnique: unique("service_blueprints_slug_version_unique").on(table.slug, table.version),
+  statusIdx: index("service_blueprints_status_idx").on(table.status),
+}));
+
+export const insertServiceBlueprintSchema = createInsertSchema(serviceBlueprints).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  slug: z.string().trim().min(2).max(120).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
+  name: z.string().trim().min(2).max(180),
+  version: z.number().int().positive(),
+  status: z.enum(["draft", "published", "archived"]),
+});
+
+export type ServiceBlueprint = typeof serviceBlueprints.$inferSelect;
+export type InsertServiceBlueprint = z.infer<typeof insertServiceBlueprintSchema>;
+
 // ==================== COTIZACIONES ====================
 // Quotations table
 export const quotations = pgTable("quotations", {
@@ -662,6 +697,13 @@ export const quotations = pgTable("quotations", {
   clientEngagement: text("client_engagement").notNull(), // 'low', 'medium', 'high'
   templateId: integer("template_id"),
   templateCustomization: text("template_customization"),
+  serviceBlueprintId: integer("service_blueprint_id").references(() => serviceBlueprints.id, { onDelete: "set null" }),
+  serviceBlueprintVersion: integer("service_blueprint_version"),
+  commercialMotion: varchar("commercial_motion", { length: 30 }).notNull().default("new_business"),
+  scopeSnapshot: jsonb("scope_snapshot").$type<BlueprintDefinition | null>(),
+  decisionContext: jsonb("decision_context").$type<Record<string, unknown>>().notNull().default({}),
+  operationalPlan: jsonb("operational_plan").$type<Record<string, unknown>>().notNull().default({}),
+  effortOverrideReason: text("effort_override_reason"),
   baseCost: doublePrecision("base_cost").notNull(),
   complexityAdjustment: doublePrecision("complexity_adjustment").notNull(),
   markupAmount: doublePrecision("markup_amount").notNull(),
@@ -742,6 +784,13 @@ export const insertQuotationSchema = baseInsertQuotationSchema.extend({
   projectType: z.string().trim().min(1).max(60),
   projectDuration: z.string().trim().max(100).nullable().optional(),
   analysisType: z.string().trim().min(1).max(60),
+  serviceBlueprintId: z.number().int().positive().nullable().optional(),
+  serviceBlueprintVersion: z.number().int().positive().nullable().optional(),
+  commercialMotion: z.enum(["new_business", "renewal", "expansion", "demo"]).optional(),
+  scopeSnapshot: blueprintDefinitionSchema.nullable().optional(),
+  decisionContext: z.record(z.unknown()).optional(),
+  operationalPlan: z.record(z.unknown()).optional(),
+  effortOverrideReason: z.string().trim().min(3).max(2_000).nullable().optional(),
   mentionsVolume: z.string().trim().min(1).max(60),
   countriesCovered: z.string().trim().min(1).max(60),
   clientEngagement: z.string().trim().min(1).max(60),
@@ -847,6 +896,12 @@ export const quotationVariants = pgTable("quotation_variants", {
   complexityAdjustment: doublePrecision("complexity_adjustment").notNull(),
   markupAmount: doublePrecision("markup_amount").notNull(),
   totalAmount: doublePrecision("total_amount").notNull(),
+  scopeSnapshot: jsonb("scope_snapshot").$type<BlueprintDefinition | null>(),
+  deliverables: jsonb("deliverables").$type<Array<Record<string, unknown>>>().notNull().default([]),
+  assumptions: jsonb("assumptions").$type<string[]>().notNull().default([]),
+  isRecommended: boolean("is_recommended").notNull().default(false),
+  unitMetrics: jsonb("unit_metrics").$type<Record<string, number>>().notNull().default({}),
+  isLegacy: boolean("is_legacy").notNull().default(false),
   isSelected: boolean("is_selected").default(false), // Variante seleccionada por el cliente
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
@@ -862,6 +917,10 @@ export const insertQuotationVariantSchema = createInsertSchema(quotationVariants
   complexityAdjustment: z.number().finite(),
   markupAmount: z.number().finite(),
   totalAmount: z.number().finite().positive(),
+  scopeSnapshot: blueprintDefinitionSchema.nullable().optional(),
+  deliverables: z.array(z.record(z.unknown())).max(100).optional(),
+  assumptions: z.array(z.string().trim().min(1).max(500)).max(50).optional(),
+  unitMetrics: z.record(z.number().finite().nonnegative()).optional(),
 });
 
 export type QuotationVariant = typeof quotationVariants.$inferSelect;
@@ -970,11 +1029,64 @@ export const quotationDeliveries = pgTable("quotation_deliveries", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+export const proposalDocuments = pgTable("proposal_documents", {
+  id: serial("id").primaryKey(),
+  quotationId: integer("quotation_id").notNull().references(() => quotations.id, { onDelete: "cascade" }),
+  revisionId: integer("revision_id").references(() => quotationRevisions.id, { onDelete: "cascade" }),
+  locale: varchar("locale", { length: 5 }).notNull().default("es"),
+  content: jsonb("content").$type<ProposalDocumentContent>().notNull(),
+  status: varchar("status", { length: 20 }).notNull().default("draft"), // draft | ready | published
+  sourceDocumentHash: varchar("source_document_hash", { length: 64 }),
+  qaStatus: varchar("qa_status", { length: 20 }).notNull().default("pending"),
+  qaIssues: jsonb("qa_issues").$type<ProposalQaIssue[]>().notNull().default([]),
+  warningOverrideReason: text("warning_override_reason"),
+  isStale: boolean("is_stale").notNull().default(false),
+  createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
+  updatedBy: integer("updated_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  quotationLocaleUnique: unique("proposal_documents_quotation_locale_unique").on(table.quotationId, table.locale),
+}));
+
+export const proposalAssets = pgTable("proposal_assets", {
+  id: serial("id").primaryKey(),
+  quotationId: integer("quotation_id").notNull().references(() => quotations.id, { onDelete: "cascade" }),
+  documentId: integer("document_id").references(() => proposalDocuments.id, { onDelete: "cascade" }),
+  assetType: varchar("asset_type", { length: 30 }).notNull(), // client_logo | brand_image | chart | attachment
+  storageUrl: text("storage_url").notNull(),
+  altText: varchar("alt_text", { length: 500 }),
+  metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
+  createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const proposalAgentRuns = pgTable("proposal_agent_runs", {
+  id: serial("id").primaryKey(),
+  quotationId: integer("quotation_id").notNull().references(() => quotations.id, { onDelete: "cascade" }),
+  documentId: integer("document_id").notNull().references(() => proposalDocuments.id, { onDelete: "cascade" }),
+  model: varchar("model", { length: 120 }).notNull(),
+  promptHash: varchar("prompt_hash", { length: 64 }).notNull(),
+  requestedOperation: varchar("requested_operation", { length: 80 }).notNull(),
+  proposedPatch: jsonb("proposed_patch").$type<Record<string, unknown>>().notNull().default({}),
+  acceptedPatch: jsonb("accepted_patch").$type<Record<string, unknown> | null>(),
+  inputTokens: integer("input_tokens"),
+  outputTokens: integer("output_tokens"),
+  status: varchar("status", { length: 30 }).notNull(), // proposed | accepted | rejected | failed
+  errorMessage: text("error_message"),
+  createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  decidedAt: timestamp("decided_at"),
+});
+
 export type QuotationRevision = typeof quotationRevisions.$inferSelect;
 export type QuotationEvent = typeof quotationEvents.$inferSelect;
 export type QuotationApproval = typeof quotationApprovals.$inferSelect;
 export type QuotationApprovalRule = typeof quotationApprovalRules.$inferSelect;
 export type QuotationDelivery = typeof quotationDeliveries.$inferSelect;
+export type ProposalDocument = typeof proposalDocuments.$inferSelect;
+export type ProposalAsset = typeof proposalAssets.$inferSelect;
+export type ProposalAgentRun = typeof proposalAgentRuns.$inferSelect;
 
 // ==================== TEMPLATES DE COTIZACIÓN ====================
 // Quotation templates — configuraciones reutilizables de equipo + scope
@@ -2333,6 +2445,9 @@ export const deliverables = pgTable("deliverables", {
   deliverable_type: text("deliverable_type"), // Tipo de entregable: informe, análisis, monitoreo, dashboard
   specific_budget: numeric("specific_budget", { precision: 8, scale: 2 }), // Presupuesto específico para este entregable
   parent_project_id: integer("parent_project_id").references(() => activeProjects.id), // Para relacionar con proyectos macro
+  sourceScopeItemId: varchar("source_scope_item_id", { length: 80 }),
+  acceptanceCriteria: jsonb("acceptance_criteria").$type<string[]>().notNull().default([]),
+  slaDefinition: jsonb("sla_definition").$type<Record<string, unknown>>().notNull().default({}),
 });
 
 // Relaciones de entregables

@@ -15,6 +15,8 @@ import { personnelCostSyncWarningsMigrationSql } from "./migrations/personnel-co
 import { feedbackMindV210MigrationSql } from "./migrations/feedback-mind-v2-10";
 import { quotationProfessionalWorkflowMigrationSql } from "./migrations/quotation-professional-workflow";
 import { exchangeRateForecast2026MigrationSql } from "./migrations/exchange-rate-forecast-2026";
+import { professionalQuotationStudioMigrationSql } from "./migrations/professional-quotation-studio";
+import { ensureServiceBlueprintSeeds } from "./services/service-blueprints";
 import cors from 'cors';
 import { execSync } from 'child_process';
 
@@ -815,6 +817,7 @@ async function applyPendingMigrations() {
     await run('0042 feedback_mind_v2_10 closure', feedbackMindV210MigrationSql);
     await run('0043-0044 professional quotation workflow', quotationProfessionalWorkflowMigrationSql);
     await run('0045 exchange-rate forecast 2026', exchangeRateForecast2026MigrationSql);
+    await run('0046 professional quotation studio', professionalQuotationStudioMigrationSql);
 
     // 0033: feriados duplicados (mismo date+name insertado más de una vez desde el
     // formulario) — borra duplicados conservando la fila más antigua y agrega la
@@ -1028,6 +1031,7 @@ const port = Number(process.env.PORT || 5000);
 
     // Initialize database connection and data
     await initializeDatabase();
+    await ensureServiceBlueprintSeeds();
     console.log("💾 Database initialized successfully");
 
     await backfillNativeLaborOnce();

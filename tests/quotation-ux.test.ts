@@ -59,6 +59,7 @@ describe('quotation UX workflow', () => {
       'client',
       'project-name',
       'quotation-exchange-rate',
+      'professional-scope',
     ]);
     expect(getFirstIncompleteQuotationPhase(quotation)).toBe(1);
   });

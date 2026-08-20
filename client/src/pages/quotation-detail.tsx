@@ -31,6 +31,7 @@ interface TeamMember {
 
 interface Quotation {
   id: number;
+  scopeSnapshot?: Record<string, unknown> | null;
   clientId: number;
   projectName: string;
   projectType: string;
@@ -423,6 +424,11 @@ const QuotationDetail: React.FC = () => {
         </div>
 
         <div className="flex gap-1 self-end sm:self-auto">
+          {quotation.scopeSnapshot && (
+            <Button aria-label="Abrir Estudio de Propuesta" onClick={() => setLocation(`/quotations/${quotation.id}/studio`)} variant="outline" size="sm" className="h-8 gap-1.5 border-indigo-200 text-indigo-700">
+              <FileText className="h-4 w-4" /> Studio
+            </Button>
+          )}
           <Button aria-label="Imprimir cotización" onClick={() => window.print()} variant="outline" size="sm" className="h-8 px-2 border-slate-200 text-slate-600">
             <Printer className="h-4 w-4" />
           </Button>

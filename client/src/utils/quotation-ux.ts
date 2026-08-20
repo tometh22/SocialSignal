@@ -1,4 +1,5 @@
 import type { QuotationData } from '@/context/optimized-quote-context';
+import { blueprintDefinitionSchema, estimateBlueprintWorkload } from '@shared/quotation-professional';
 
 export const QUOTATION_PHASES = [
   { num: 1, title: 'Proyecto', shortTitle: 'Proyecto', description: 'Cliente, modalidad, moneda y plantilla' },
@@ -32,6 +33,9 @@ export function validateQuotationPhase(
     if (!hasPositiveExchangeRate(quotation)) {
       issues.push({ field: 'quotation-exchange-rate', message: 'Confirmá un tipo de cambio positivo.' });
     }
+    if (!quotation.id && !quotation.scopeSnapshot) {
+      issues.push({ field: 'professional-scope', message: 'Elegí una receta profesional para definir el alcance.' });
+    }
     return issues;
   }
 
@@ -49,6 +53,14 @@ export function validateQuotationPhase(
     }
     if (!quotation.analysisType || !quotation.mentionsVolume || !quotation.countriesCovered || !quotation.clientEngagement) {
       issues.push({ field: 'complexity-config', message: 'Completá todos los factores de complejidad.' });
+    }
+    if (quotation.scopeSnapshot) {
+      const standardHours = estimateBlueprintWorkload(blueprintDefinitionSchema.parse(quotation.scopeSnapshot)).totalHours;
+      const configuredHours = quotation.teamMembers.reduce((sum, member) => sum + Number(member.hours || 0), 0);
+      const deviation = standardHours > 0 ? Math.abs(configuredHours - standardHours) / standardHours : 0;
+      if (deviation > 0.1 && !quotation.effortOverrideReason?.trim()) {
+        issues.push({ field: 'professional-scope', message: 'Justificá el desvío de horas frente a la receta profesional.' });
+      }
     }
     if (quotation.project.type === 'always-on') {
       if (!quotation.deliverables.length) {
