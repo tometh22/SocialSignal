@@ -25,13 +25,36 @@ DO $$ BEGIN
     SET tools_cost = tools_cost * exchange_rate_at_quote::double precision
     WHERE quotation_currency = 'ARS'
       AND COALESCE(tools_cost, 0) <> 0
-      AND COALESCE(exchange_rate_at_quote::double precision, 0) > 0;
+      AND COALESCE(exchange_rate_at_quote::double precision, 0) > 0
+      -- Only touch rows that already satisfy the legacy money constraint. A
+      -- failing row must remain untouched so one bad historical quote cannot
+      -- abort all subsequent schema DDL during production startup.
+      AND base_cost >= 0
+      AND total_amount >= 0
+      AND (status = 'draft' OR total_amount > 0)
+      AND quotation_currency IN ('ARS', 'USD')
+      AND COALESCE(platform_cost, 0) >= 0
+      AND COALESCE(tools_cost, 0) >= 0
+      AND COALESCE(additional_deliverable_cost, 0) >= 0
+      AND COALESCE(discount_percentage, 0) >= 0
+      AND COALESCE(discount_percentage, 0) < 100
+      AND tools_cost * exchange_rate_at_quote::double precision >= 0;
 
     UPDATE quotations
     SET platform_cost = platform_cost / exchange_rate_at_quote::double precision
     WHERE quotation_currency = 'USD'
       AND COALESCE(platform_cost, 0) <> 0
-      AND COALESCE(exchange_rate_at_quote::double precision, 0) > 0;
+      AND COALESCE(exchange_rate_at_quote::double precision, 0) > 0
+      AND base_cost >= 0
+      AND total_amount >= 0
+      AND (status = 'draft' OR total_amount > 0)
+      AND quotation_currency IN ('ARS', 'USD')
+      AND COALESCE(platform_cost, 0) >= 0
+      AND COALESCE(tools_cost, 0) >= 0
+      AND COALESCE(additional_deliverable_cost, 0) >= 0
+      AND COALESCE(discount_percentage, 0) >= 0
+      AND COALESCE(discount_percentage, 0) < 100
+      AND platform_cost / exchange_rate_at_quote::double precision >= 0;
   END IF;
 END $$;
 
