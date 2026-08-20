@@ -19,6 +19,7 @@ import {
 
 type BlueprintWithWorkload = ServiceBlueprint & { workload: ReturnType<typeof estimateBlueprintWorkload> };
 type WeeklyCapacity = { personnel: Array<{ personnelId: number; name: string; maxCapacity: number; actualHours: number; estimatedTaskHours: number; isOverloaded: boolean }> };
+type ScopeBuilderMode = "all" | "recipe" | "scope";
 
 const MODULES = [
   ["brand", "Marca"], ["campaign", "Campaña"], ["influencers", "Influencers"],
@@ -26,7 +27,7 @@ const MODULES = [
   ["culture", "Cultura"], ["trends", "Tendencias"], ["category", "Categoría"], ["multisource", "Multifuente"],
 ] as const;
 
-export function ProfessionalScopeBuilder() {
+export function ProfessionalScopeBuilder({ mode = "all" }: { mode?: ScopeBuilderMode }) {
   const { quotationData, updateQuotationData, updateTeamMembers, availableRoles } = useOptimizedQuote();
   const { data: blueprints = [], isLoading } = useQuery<BlueprintWithWorkload[]>({ queryKey: ["/api/service-blueprints?status=published"] });
   const { data: capacity } = useQuery<WeeklyCapacity>({ queryKey: ["/api/capacity/weekly"] });
@@ -81,7 +82,9 @@ export function ProfessionalScopeBuilder() {
     updateQuotationData({
       serviceBlueprintId: blueprint?.id ?? quotationData.serviceBlueprintId ?? null,
       serviceBlueprintVersion: blueprint?.version ?? quotationData.serviceBlueprintVersion ?? null,
-      commercialMotion: definition.commercialMotion,
+      commercialMotion: quotationData.commercialMotion && quotationData.commercialMotion !== "new_business"
+        ? quotationData.commercialMotion
+        : definition.commercialMotion,
       scopeSnapshot: definition,
       project: {
         ...quotationData.project,
@@ -141,23 +144,34 @@ export function ProfessionalScopeBuilder() {
 
   return (
     <div className="space-y-5" id="professional-scope">
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-        {blueprints.map((blueprint) => {
-          const active = quotationData.serviceBlueprintId === blueprint.id;
-          return (
-            <button key={blueprint.id} type="button" onClick={() => applyBlueprint(blueprint)} className={`rounded-xl border p-4 text-left transition ${active ? "border-indigo-500 bg-indigo-50 ring-2 ring-indigo-100" : "border-slate-200 bg-white hover:border-indigo-300"}`}>
-              <span className="flex items-start justify-between gap-2"><strong className="text-sm text-slate-950">{blueprint.name}</strong>{active && <CheckCircle2 className="h-4 w-4 text-indigo-600" />}</span>
-              <span className="mt-2 block text-xs leading-5 text-slate-500">{blueprint.description}</span>
-              <span className="mt-3 flex flex-wrap gap-1.5"><Badge variant="outline">v{blueprint.version}</Badge><Badge variant="outline">{blueprint.workload.totalHours} h</Badge><Badge variant="outline">{blueprint.definition.deliverables.length} entregables</Badge></span>
-            </button>
-          );
-        })}
-      </div>
+      {mode !== "scope" && (
+        <div>
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-slate-900">Elegí el servicio que mejor encaja</p>
+              <p className="mt-1 text-xs text-slate-500">Partimos de una receta probada; después podés personalizarla sin alterar el catálogo.</p>
+            </div>
+            <Badge variant="outline" className="hidden sm:inline-flex">{blueprints.length} opciones</Badge>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {blueprints.map((blueprint) => {
+              const active = quotationData.serviceBlueprintId === blueprint.id;
+              return (
+                <button key={blueprint.id} type="button" onClick={() => applyBlueprint(blueprint)} aria-pressed={active} className={`rounded-xl border p-4 text-left transition ${active ? "border-indigo-500 bg-indigo-50 ring-2 ring-indigo-100" : "border-slate-200 bg-white hover:border-indigo-300"}`}>
+                  <span className="flex items-start justify-between gap-2"><strong className="text-sm text-slate-950">{blueprint.name}</strong>{active && <CheckCircle2 className="h-4 w-4 text-indigo-600" />}</span>
+                  <span className="mt-2 block text-xs leading-5 text-slate-500">{blueprint.description}</span>
+                  <span className="mt-3 flex flex-wrap gap-1.5"><Badge variant="outline">{blueprint.workload.totalHours} h estimadas</Badge><Badge variant="outline">{blueprint.definition.deliverables.length} entregables</Badge></span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
-      {scope && (
+      {scope && mode !== "recipe" && (
         <>
           <Card>
-            <CardHeader><CardTitle className="text-base">Contexto de decisión</CardTitle></CardHeader>
+            <CardHeader><CardTitle className="text-base">Contexto y decisión</CardTitle><p className="text-sm text-slate-500">Contale al equipo qué necesita resolver el cliente y qué cambio debería habilitar el servicio.</p></CardHeader>
             <CardContent className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2 md:col-span-2"><Label>Contexto y desafío del cliente</Label><Textarea rows={3} value={String(quotationData.decisionContext?.context || "")} onChange={(event) => updateQuotationData({ decisionContext: { ...(quotationData.decisionContext || {}), context: event.target.value } })} placeholder="¿Qué cambió, qué tensión existe y por qué importa ahora?" /></div>
               <div className="space-y-2"><Label>Decisión que debe habilitar</Label><Textarea rows={3} value={String(quotationData.decisionContext?.decision || "")} onChange={(event) => updateQuotationData({ decisionContext: { ...(quotationData.decisionContext || {}), decision: event.target.value } })} placeholder="¿Qué podrá decidir el cliente con este servicio?" /></div>
@@ -166,7 +180,7 @@ export function ProfessionalScopeBuilder() {
             </CardContent>
           </Card>
           <Card>
-            <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Layers3 className="h-4 w-4 text-indigo-600" /> Cobertura y módulos</CardTitle></CardHeader>
+            <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Layers3 className="h-4 w-4 text-indigo-600" /> Cobertura y preguntas</CardTitle><p className="text-sm text-slate-500">Definí dónde vamos a mirar y qué dimensiones del negocio necesitamos responder.</p></CardHeader>
             <CardContent className="space-y-5">
               <div className="grid gap-4 md:grid-cols-2">
                 <ListField label="Mercados" value={scope.coverage.markets.join(", ")} onChange={(value) => updateCoverageList("markets", value)} />
@@ -175,14 +189,14 @@ export function ProfessionalScopeBuilder() {
                 <ListField label="Fuentes" value={scope.coverage.sources.join(", ")} onChange={(value) => updateCoverageList("sources", value)} />
               </div>
               <div>
-                <Label className="mb-2 block">Módulos analíticos</Label>
+                <Label className="mb-2 block">Preguntas que responderemos</Label>
                 <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                   {MODULES.map(([value, label]) => <label key={value} className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm"><Checkbox checked={scope.coverage.analysisModules.includes(value)} onCheckedChange={(checked) => updateScope({ ...scope, coverage: { ...scope.coverage, analysisModules: checked ? [...scope.coverage.analysisModules, value] : scope.coverage.analysisModules.filter((item) => item !== value) } })} />{label}</label>)}
                 </div>
               </div>
               <div className="grid gap-4 sm:grid-cols-3">
-                <div className="space-y-2"><Label>SLA</Label><Select value={scope.coverage.slaLevel} onValueChange={(value: any) => updateScope({ ...scope, coverage: { ...scope.coverage, slaLevel: value } })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="standard">Estándar</SelectItem><SelectItem value="priority">Prioritario</SelectItem><SelectItem value="real_time">Tiempo real</SelectItem></SelectContent></Select></div>
-                <div className="space-y-2"><Label>Diseño</Label><Select value={scope.coverage.designLevel} onValueChange={(value: any) => updateScope({ ...scope, coverage: { ...scope.coverage, designLevel: value } })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="standard">Estándar</SelectItem><SelectItem value="branded">Branded</SelectItem><SelectItem value="executive">Ejecutivo</SelectItem></SelectContent></Select></div>
+                <div className="space-y-2"><Label>Tiempo de respuesta</Label><Select value={scope.coverage.slaLevel} onValueChange={(value: any) => updateScope({ ...scope, coverage: { ...scope.coverage, slaLevel: value } })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="standard">Estándar</SelectItem><SelectItem value="priority">Prioritario</SelectItem><SelectItem value="real_time">Tiempo real</SelectItem></SelectContent></Select></div>
+                <div className="space-y-2"><Label>Nivel de presentación</Label><Select value={scope.coverage.designLevel} onValueChange={(value: any) => updateScope({ ...scope, coverage: { ...scope.coverage, designLevel: value } })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="standard">Estándar</SelectItem><SelectItem value="branded">Con identidad de marca</SelectItem><SelectItem value="executive">Ejecutivo</SelectItem></SelectContent></Select></div>
                 <div className="space-y-2"><Label>Idiomas</Label><Select value={scope.coverage.languages.join("+")} onValueChange={(value) => updateScope({ ...scope, coverage: { ...scope.coverage, languages: value === "es+en" ? ["es", "en"] : [value as "es" | "en"] } })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="es">Español</SelectItem><SelectItem value="en">Inglés</SelectItem><SelectItem value="es+en">Español + inglés</SelectItem></SelectContent></Select></div>
               </div>
             </CardContent>
@@ -202,12 +216,12 @@ export function ProfessionalScopeBuilder() {
           </Card>
 
           <Card>
-            <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Calculator className="h-4 w-4 text-indigo-600" /> Explicación del esfuerzo</CardTitle></CardHeader>
+            <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Calculator className="h-4 w-4 text-indigo-600" /> Cómo se calcula el esfuerzo</CardTitle><p className="text-sm text-slate-500">Una referencia para validar que el equipo propuesto puede cumplir el alcance.</p></CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid gap-3 sm:grid-cols-3"><Metric label="Horas estándar" value={`${estimate?.totalHours || 0} h`} /><Metric label="Horas configuradas" value={`${currentHours.toFixed(1)} h`} /><Metric label="Desviación" value={`${deviation >= 0 ? "+" : ""}${deviation.toFixed(1)}%`} /></div>
+              <div className="grid gap-3 sm:grid-cols-3"><Metric label="Referencia" value={`${estimate?.totalHours || 0} h`} /><Metric label="Configuradas" value={`${currentHours.toFixed(1)} h`} /><Metric label="Ajuste operativo" value={`${deviation >= 0 ? "+" : ""}${deviation.toFixed(1)}%`} /></div>
               <div className="overflow-x-auto rounded-lg border border-slate-200"><table className="w-full text-sm"><thead className="bg-slate-50 text-left text-xs text-slate-500"><tr><th className="px-3 py-2">Trabajo</th><th className="px-3 py-2">Rol</th><th className="px-3 py-2 text-right">Horas</th></tr></thead><tbody>{estimate?.lines.map((line, index) => <tr key={`${line.sourceId}-${line.roleKey}-${index}`} className="border-t"><td className="px-3 py-2">{line.sourceName}</td><td className="px-3 py-2 capitalize">{line.roleKey}</td><td className="px-3 py-2 text-right tabular-nums">{line.estimatedHours}</td></tr>)}</tbody></table></div>
-              <Button type="button" variant="outline" onClick={() => applyDefinition(scope)}><RefreshCw className="mr-2 h-4 w-4" /> Recalcular equipo desde el alcance</Button>
-              {Math.abs(deviation) > 10 && <div className="space-y-2"><Label htmlFor="effort-override-reason">Motivo del desvío de horas</Label><Textarea id="effort-override-reason" value={quotationData.effortOverrideReason || ""} onChange={(event) => updateQuotationData({ effortOverrideReason: event.target.value })} placeholder="Explicá por qué el equipo se aparta del estándar…" /></div>}
+              <Button type="button" variant="outline" onClick={() => applyDefinition(scope)}><RefreshCw className="mr-2 h-4 w-4" /> Actualizar equipo sugerido</Button>
+              {Math.abs(deviation) > 10 && <div className="space-y-2"><Label htmlFor="effort-override-reason">Motivo del ajuste operativo</Label><Textarea id="effort-override-reason" value={quotationData.effortOverrideReason || ""} onChange={(event) => updateQuotationData({ effortOverrideReason: event.target.value })} placeholder="Explicá por qué el equipo necesita apartarse de la referencia…" /></div>}
               {unmappedRoles.length > 0 && <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />No encontramos roles equivalentes para: {unmappedRoles.join(", ")}. Crealos o asigná el equipo manualmente.</div>}
               {capacityWarnings.length > 0 && <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800"><div className="flex items-center gap-2 font-medium"><AlertCircle className="h-4 w-4" /> Advertencia de capacidad</div><ul className="mt-2 list-disc space-y-1 pl-5">{capacityWarnings.map((warning) => <li key={warning}>{warning}</li>)}</ul></div>}
             </CardContent>

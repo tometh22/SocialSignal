@@ -8,7 +8,22 @@ export const QUOTATION_PHASES = [
   { num: 4, title: 'Propuesta', shortTitle: 'Propuesta', description: 'Vista cliente, variantes y aprobación' },
 ] as const;
 
+/**
+ * Business-oriented navigation for the professional wizard. The legacy
+ * phases above remain exported because older consumers and saved drafts still
+ * use their three validation buckets.
+ */
+export const QUOTATION_STEPS = [
+  { num: 1, title: 'Brief', shortTitle: 'Brief', description: 'Cliente, oportunidad y objetivo' },
+  { num: 2, title: 'Servicio', shortTitle: 'Servicio', description: 'Elegí una receta probada' },
+  { num: 3, title: 'Alcance', shortTitle: 'Alcance', description: 'Definí cobertura y entregables' },
+  { num: 4, title: 'Equipo', shortTitle: 'Equipo', description: 'Confirmá capacidad y esfuerzo' },
+  { num: 5, title: 'Inversión', shortTitle: 'Inversión', description: 'Precio, moneda y condiciones' },
+  { num: 6, title: 'Envío', shortTitle: 'Envío', description: 'Compará, revisá y prepará la propuesta' },
+] as const;
+
 export type QuotationPhase = 1 | 2 | 3 | 4;
+export type QuotationStep = 1 | 2 | 3 | 4 | 5 | 6;
 
 export type QuotationValidationIssue = {
   field: string;
@@ -116,6 +131,48 @@ export function validateQuotationPhase(
   }
 
   return [];
+}
+
+/** Validation buckets used by the new progressive wizard. */
+export function validateQuotationStep(
+  step: QuotationStep,
+  quotation: QuotationData,
+): QuotationValidationIssue[] {
+  if (step === 1) {
+    const issues: QuotationValidationIssue[] = [];
+    if (!quotation.client?.id) issues.push({ field: 'client', message: 'Seleccioná un cliente.' });
+    if (!quotation.project.name?.trim()) issues.push({ field: 'project-name', message: 'Ingresá el nombre del proyecto.' });
+    if (!quotation.project.type) issues.push({ field: 'project-type', message: 'Seleccioná una modalidad de proyecto.' });
+    if (!quotation.commercialMotion) issues.push({ field: 'commercial-motion', message: 'Seleccioná el tipo de oportunidad.' });
+    if (quotation.project.type && quotation.project.type !== 'always-on' && !quotation.project.duration) {
+      issues.push({ field: 'project-duration', message: 'Seleccioná la duración estimada.' });
+    }
+    return issues;
+  }
+
+  if (step === 2 || step === 3) {
+    return quotation.scopeSnapshot || (quotation.id && Number(quotation.pricingVersion || 2) < 2)
+      ? []
+      : [{ field: 'professional-scope', message: 'Elegí una receta profesional para definir el servicio.' }];
+  }
+
+  if (step === 4) return validateQuotationPhase(2, quotation);
+  if (step === 5) {
+    const issues = validateQuotationPhase(3, quotation);
+    if (!hasPositiveExchangeRate(quotation)) {
+      issues.unshift({ field: 'quotation-exchange-rate', message: 'Confirmá un tipo de cambio positivo antes de revisar la inversión.' });
+    }
+    return issues;
+  }
+
+  return [];
+}
+
+export function getFirstIncompleteQuotationStep(quotation: QuotationData): QuotationStep | null {
+  for (const step of [1, 2, 3, 4, 5] as const) {
+    if (validateQuotationStep(step, quotation).length > 0) return step;
+  }
+  return null;
 }
 
 export function getFirstIncompleteQuotationPhase(quotation: QuotationData): QuotationPhase | null {

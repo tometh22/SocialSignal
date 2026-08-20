@@ -249,7 +249,7 @@ const OptimizedBasicInfo: React.FC<OptimizedBasicInfoProps> = ({ errors = {} }) 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 {/* Tipo de Proyecto */}
                 <div className="space-y-2">
-                  <Label htmlFor="project-type" className="text-sm font-medium text-gray-700">Tipo de Proyecto</Label>
+                    <Label htmlFor="project-type" className="text-sm font-medium text-gray-700">Modalidad de servicio</Label>
                   <Select
                     value={quotationData.project.type}
                     onValueChange={updateProjectType}
@@ -376,7 +376,9 @@ const OptimizedBasicInfo: React.FC<OptimizedBasicInfoProps> = ({ errors = {} }) 
                   <p className="text-center text-[11px] text-muted-foreground">
                     Snapshot obligatorio: todas las conversiones de esta propuesta usan exactamente este valor.
                   </p>
-                  <div className="space-y-2 rounded-md border border-slate-200 bg-slate-50 p-2.5 text-[11px]">
+                  <details className="rounded-md border border-slate-200 bg-slate-50 p-2.5 text-[11px]">
+                    <summary className="cursor-pointer text-center font-medium text-slate-600">Verificar tipo de cambio y fuentes</summary>
+                    <div className="mt-2 space-y-2">
                     <div className="text-center text-slate-600">
                       {exchangeRateLoading ? 'Consultando TC vigente…' : exchangeRateError || !exchangeRateReady ? (
                         <span className="text-red-700">No hay un TC vigente disponible; ingresalo manualmente o verificá las fuentes.</span>
@@ -461,13 +463,15 @@ const OptimizedBasicInfo: React.FC<OptimizedBasicInfoProps> = ({ errors = {} }) 
                       </div>
                     )}
                   </div>
-                  {quotationData.requiresExchangeRateConfirmation && (
+                    {quotationData.requiresExchangeRateConfirmation && (
                     <p role="alert" className="rounded-md border border-amber-200 bg-amber-50 p-2 text-center text-[11px] text-amber-800">
-                      Cotización legacy: confirmá este TC para migrarla al pricing v2. Hasta entonces se conservan sus totales guardados.
+                      Cotización histórica: confirmá este TC para migrarla al pricing actual. Hasta entonces se conservan sus totales guardados.
                     </p>
                   )}
-                </div>
+                  </details>
               </div>
+            </div>
+
             </div>
 
             {/* Panel derecho: Información del cliente o ayuda contextual */}

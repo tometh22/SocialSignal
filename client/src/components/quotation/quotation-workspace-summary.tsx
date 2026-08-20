@@ -6,10 +6,11 @@ import { BriefcaseBusiness, CircleDollarSign, Clock3, ShieldCheck, Users } from 
 
 type QuotationWorkspaceSummaryProps = {
   currentPhase: number;
+  totalSteps?: number;
   compact?: boolean;
 };
 
-export function QuotationWorkspaceSummary({ currentPhase, compact = false }: QuotationWorkspaceSummaryProps) {
+export function QuotationWorkspaceSummary({ currentPhase, totalSteps = 4, compact = false }: QuotationWorkspaceSummaryProps) {
   const { quotationData, pricingResult } = useOptimizedQuote();
   const currency = quotationData.quotationCurrency === 'USD' ? 'USD' : 'ARS';
   const locale = currency === 'USD' ? 'en-US' : 'es-AR';
@@ -28,21 +29,24 @@ export function QuotationWorkspaceSummary({ currentPhase, compact = false }: Quo
     'fee-mensual': 'Fee mensual',
     'always-on': 'Servicio recurrente',
   }[quotationData.project.type] || quotationData.project.type || 'Sin definir';
+  const motionLabel = {
+    new_business: 'Nuevo negocio', renewal: 'Renovación', expansion: 'Expansión', demo: 'Demo',
+  }[quotationData.commercialMotion || 'new_business'] || 'Nuevo negocio';
 
   const content = (
     <div className="space-y-4">
       <div className="space-y-2">
         <div className="flex items-center justify-between text-xs text-slate-500">
           <span>Avance</span>
-          <span className="font-medium text-slate-700">Fase {currentPhase} de 4</span>
+          <span className="font-medium text-slate-700">Paso {currentPhase} de {totalSteps}</span>
         </div>
-        <Progress value={(currentPhase / 4) * 100} className="h-1.5" />
+        <Progress value={(currentPhase / totalSteps) * 100} className="h-1.5" />
       </div>
 
       <div className="space-y-3">
         <SummaryRow icon={BriefcaseBusiness} label="Cliente" value={quotationData.client?.name || 'Sin seleccionar'} />
         <SummaryRow icon={Users} label="Equipo" value={`${quotationData.teamMembers.length} integrantes · ${totalHours.toFixed(1)} h`} />
-        <SummaryRow icon={Clock3} label="Modalidad" value={projectTypeLabel} />
+        <SummaryRow icon={Clock3} label="Oportunidad" value={`${motionLabel} · ${projectTypeLabel}`} />
       </div>
 
       <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-4">
@@ -50,10 +54,13 @@ export function QuotationWorkspaceSummary({ currentPhase, compact = false }: Quo
           <CircleDollarSign className="h-4 w-4" /> Precio estimado
         </div>
         <p aria-live="polite" className="text-2xl font-bold tabular-nums text-emerald-950">{formatAmount(total)}</p>
-        <div className="mt-2 flex items-center justify-between text-xs text-emerald-800">
-          <span>Costo {formatAmount(pricingResult.display.baseCost)}</span>
-          <span>Margen {marginPercent.toFixed(0)}%</span>
-        </div>
+        <details className="mt-2 text-xs text-emerald-800">
+          <summary className="cursor-pointer">Ver desglose interno</summary>
+          <div className="mt-2 flex items-center justify-between">
+            <span>Costo interno {formatAmount(pricingResult.display.baseCost)}</span>
+            <span>Rentabilidad {marginPercent.toFixed(0)}%</span>
+          </div>
+        </details>
       </div>
 
       <div className="flex items-start gap-2 rounded-lg bg-slate-50 p-3 text-xs text-slate-600">
