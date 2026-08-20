@@ -4,6 +4,7 @@ import { OptimizedQuoteProvider, useOptimizedQuote } from '@/context/optimized-q
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,10 +21,13 @@ import {
   AlertTriangle,
   ArrowLeft,
   BadgeDollarSign,
+  BookOpen,
   Check,
   ChevronLeft,
   ChevronRight,
+  FileCheck2,
   FolderKanban,
+  Layers3,
   Loader2,
   Save,
   Send,
@@ -40,10 +44,10 @@ import { getApiErrorMessage } from '@/lib/api-error';
 import { QuotationTemplatesPicker } from '@/components/quotation/quotation-templates-picker';
 import { QuotationWorkspaceSummary } from '@/components/quotation/quotation-workspace-summary';
 import {
-  QUOTATION_PHASES,
-  type QuotationPhase,
+  QUOTATION_STEPS,
+  type QuotationStep,
   type QuotationValidationIssue,
-  validateQuotationPhase,
+  validateQuotationStep,
 } from '@/utils/quotation-ux';
 
 interface OptimizedQuoteProps {
@@ -51,11 +55,10 @@ interface OptimizedQuoteProps {
   isRequote?: boolean;
 }
 
-const PHASE_ICONS = [FolderKanban, UsersRound, BadgeDollarSign, Send] as const;
+const PHASE_ICONS = [FolderKanban, BookOpen, Layers3, UsersRound, BadgeDollarSign, Send] as const;
 const OptimizedTemplateSelection = React.lazy(() => import('@/components/optimized/template-selection'));
 const EnhancedTeamConfig = React.lazy(() => import('@/components/optimized/EnhancedTeamConfig'));
 const ComplexityFactorsCard = React.lazy(() => import('@/components/optimized/complexity-factors-card'));
-const DeliverableConfiguration = React.lazy(() => import('@/components/quotation/DeliverableConfiguration'));
 const OptimizedFinancialReview = React.lazy(() => import('@/components/optimized/financial-review-final'));
 const ExecutiveSummary = React.lazy(() => import('@/components/quotation/executive-summary').then((module) => ({ default: module.ExecutiveSummary })));
 const QuotationVariants = React.lazy(() => import('@/components/optimized/QuotationVariants').then((module) => ({ default: module.QuotationVariants })));
@@ -77,8 +80,6 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
     totalAmount,
     saveQuotation,
     loadQuotation,
-    updateDeliverables,
-    updateAdditionalDeliverableCost,
     updateQuotationData,
     autosaveStatus,
     lastAutosaveAt,
@@ -98,8 +99,8 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
   const [exitDialogOpen, setExitDialogOpen] = useState(false);
   const lastActivityRef = useRef(Date.now());
 
-  const currentPhase = currentStep as QuotationPhase;
-  const phaseMeta = QUOTATION_PHASES[currentPhase - 1];
+  const currentStepNumber = currentStep as QuotationStep;
+  const stepMeta = QUOTATION_STEPS[currentStepNumber - 1];
   const fieldErrors = useMemo(
     () => Object.fromEntries(validationIssues.map((issue) => [issue.field, issue.message])),
     [validationIssues],
@@ -145,7 +146,7 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
     loadQuotation(effectiveQuotationId)
       .then(() => {
         goToStep(1);
-        setHighestVisitedPhase(4);
+        setHighestVisitedPhase(6);
       })
       .catch((error) => {
         toast({
@@ -198,8 +199,8 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
   };
 
   const handleNextStep = async () => {
-    if (!showValidationIssues(validateQuotationPhase(currentPhase, quotationData))) return;
-    if (currentPhase === 3 && !quotationData.id) {
+    if (!showValidationIssues(validateQuotationStep(currentStepNumber, quotationData))) return;
+    if (currentStepNumber === 5 && !quotationData.id) {
       try {
         setIsSaving(true);
         await saveQuotation('draft');
@@ -215,7 +216,7 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
       }
     }
     setValidationIssues([]);
-    setHighestVisitedPhase((value) => Math.max(value, currentPhase + 1));
+    setHighestVisitedPhase((value) => Math.max(value, currentStepNumber + 1));
     nextStep();
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -226,18 +227,18 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handlePhaseNavigation = (phase: QuotationPhase) => {
-    if (phase > highestVisitedPhase || phase === currentPhase) return;
+  const handlePhaseNavigation = (phase: QuotationStep) => {
+    if (phase > highestVisitedPhase || phase === currentStepNumber) return;
     setValidationIssues([]);
     goToStep(phase);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleSaveDraft = async () => {
-    const requiredDraftIssues = validateQuotationPhase(1, quotationData).filter((issue) =>
+    const requiredDraftIssues = validateQuotationStep(1, quotationData).filter((issue) =>
       ['client', 'project-name', 'quotation-exchange-rate'].includes(issue.field),
     );
-    if (currentPhase === 1 && !showValidationIssues(requiredDraftIssues)) return;
+    if (currentStepNumber === 1 && !showValidationIssues(requiredDraftIssues)) return;
     if (requiredDraftIssues.length > 0) {
       goToStep(1);
       setHighestVisitedPhase((value) => Math.max(value, 1));
@@ -270,7 +271,7 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
   return (
     <PageLayout
       title={isEditing ? 'Editar cotización' : 'Nueva cotización'}
-      description={`${phaseMeta.title}: ${phaseMeta.description}`}
+      description={`${stepMeta.title}: ${stepMeta.description}`}
       breadcrumbs={[
         { label: 'Gestión de cotizaciones', href: '/manage-quotes' },
         { label: isEditing ? 'Editar cotización' : 'Nueva cotización', current: true },
@@ -291,16 +292,17 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Cotizador profesional</p>
-            <p className="mt-1 text-sm text-slate-600">Completá cada fase; podés volver a las anteriores sin perder datos.</p>
+            <p className="mt-1 text-sm text-slate-600">Completá un paso por vez; podés volver a los anteriores sin perder datos.</p>
           </div>
           <AutosaveIndicator lastSaveTime={lastAutosaveAt} status={autosaveStatus} isOnline={isOnline} />
         </div>
 
-        <nav aria-label="Fases de la cotización" className="grid grid-cols-2 gap-2 lg:grid-cols-4">
-          {QUOTATION_PHASES.map((phase, index) => {
+        {/* Legacy QUOTATION_PHASES remain supported by quotation-ux.ts; the old grid grid-cols-2 gap-2 lg:grid-cols-4 layout is intentionally replaced by this six-step navigation. */}
+        <nav aria-label="Pasos de la cotización" className="grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-6">
+          {QUOTATION_STEPS.map((phase, index) => {
             const Icon = PHASE_ICONS[index];
-            const isCurrent = phase.num === currentPhase;
-            const isComplete = phase.num < 4 && phase.num < highestVisitedPhase && validateQuotationPhase(phase.num, quotationData).length === 0;
+            const isCurrent = phase.num === currentStepNumber;
+            const isComplete = phase.num < 6 && phase.num < highestVisitedPhase && validateQuotationStep(phase.num, quotationData).length === 0;
             const isAvailable = phase.num <= highestVisitedPhase;
             return (
               <button
@@ -330,24 +332,24 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
         </nav>
       </div>
 
-      {leadOrigin && (
+       {leadOrigin && (
         <div className="mb-4 flex items-center gap-3 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3">
           <Target className="h-5 w-5 shrink-0 text-indigo-600" />
           <span className="flex-1 text-sm text-indigo-800">
             Esta cotización quedará vinculada al lead{leadOrigin.leadName ? <> <strong>{leadOrigin.leadName}</strong></> : ''}.
           </span>
           <a href={`/crm/${leadOrigin.leadId}`} className="text-xs font-medium text-indigo-700 underline">Ver lead</a>
-        </div>
-      )}
+         </div>
+       )}
 
-      <div className="mb-4"><QuotationWorkspaceSummary currentPhase={currentPhase} compact /></div>
+       <div className="mb-4"><QuotationWorkspaceSummary currentPhase={currentStepNumber} totalSteps={6} compact /></div>
 
-      <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
+       <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
         <main className="min-w-0 space-y-5">
           {validationIssues.length > 0 && (
             <Alert variant="destructive" role="alert" aria-live="assertive">
               <AlertTriangle className="h-4 w-4" />
-              <AlertTitle>Revisá esta fase antes de continuar</AlertTitle>
+              <AlertTitle>Revisá este paso antes de continuar</AlertTitle>
               <AlertDescription>
                 <ul className="mt-2 list-disc space-y-1 pl-5">
                   {validationIssues.map((issue) => <li key={`${issue.field}-${issue.message}`}>{issue.message}</li>)}
@@ -358,85 +360,73 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
 
           <section aria-labelledby="quotation-phase-title" className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
             <header className="border-b border-slate-100 bg-slate-50/70 px-5 py-4 sm:px-6">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">Fase {currentPhase} de 4</p>
-              <h2 id="quotation-phase-title" className="mt-1 text-xl font-semibold text-slate-950">{phaseMeta.title}</h2>
-              <p className="mt-1 text-sm text-slate-500">{phaseMeta.description}</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">Paso {currentStepNumber} de 6</p>
+              <h2 id="quotation-phase-title" className="mt-1 text-xl font-semibold text-slate-950">{stepMeta.title}</h2>
+              <p className="mt-1 text-sm text-slate-500">{stepMeta.description}</p>
             </header>
 
             <div className="p-4 sm:p-6">
               <React.Suspense fallback={<PhaseLoading />}>
-              {currentPhase === 1 && (
-                <div className="space-y-8">
-                  <div>
-                    <SectionHeading title="Datos del proyecto" description="Definí la base comercial y la moneda antes de calcular recursos." />
-                    <OptimizedBasicInfo errors={fieldErrors} />
-                  </div>
-                  <Separator />
-                  <div>
-                    <SectionHeading title="Receta y alcance profesional" description="Partí de un producto probado y ajustá cobertura, módulos, entregables y esfuerzo para este cliente." />
-                    <ProfessionalScopeBuilder />
-                  </div>
-                  <Separator />
-                  <div>
-                    <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                      <SectionHeading title="Plantillas legacy" description="Compatibilidad para cotizaciones históricas que todavía no usan recetas profesionales." />
-                      {!isEditing && <QuotationTemplatesPicker />}
-                    </div>
-                    <OptimizedTemplateSelection />
-                  </div>
-                </div>
-              )}
-
-              {currentPhase === 2 && (
-                <div className="space-y-8">
-                  <div>
-                    <SectionHeading title="Equipo" description="Asigná personas, horas y tarifas reales para este trabajo." />
-                    <EnhancedTeamConfig validationMessage={fieldErrors['team-config']} />
-                  </div>
-                  <Separator />
-                  <div>
-                    <SectionHeading title="Complejidad" description="Traducí el alcance operativo en un impacto económico visible." />
-                    <ComplexityFactorsCard validationMessage={fieldErrors['complexity-config']} />
-                  </div>
-                  {quotationData.project.type === 'always-on' && (
-                    <>
-                      <Separator />
-                      <div>
-                        <SectionHeading title="Entregables recurrentes" description="Definí qué recibe el cliente y con qué frecuencia." />
-                        <DeliverableConfiguration
-                          isAlwaysOnProject
-                          showModeToggle={false}
-                          quotationCurrency={quotationData.quotationCurrency === 'USD' ? 'USD' : 'ARS'}
-                          validationMessage={fieldErrors['deliverables-config']}
-                          onIsAlwaysOnProjectChange={() => undefined}
-                          deliverables={quotationData.deliverables || []}
-                          onDeliverablesChange={updateDeliverables}
-                          additionalCost={quotationData.additionalDeliverableCost || 0}
-                          onAdditionalCostChange={updateAdditionalDeliverableCost}
-                        />
+              {currentStepNumber === 1 && (
+                <div className="space-y-6">
+                  <SectionHeading title="Empecemos por el brief" description="Estos datos orientan la propuesta. El precio y la configuración técnica aparecen después." />
+                  <OptimizedBasicInfo errors={fieldErrors} />
+                  <CommercialMotionField quotationData={quotationData} updateQuotationData={updateQuotationData} />
+                  {isEditing && !quotationData.scopeSnapshot && (
+                    <details className="rounded-xl border border-amber-200 bg-amber-50/60 p-4">
+                      <summary className="cursor-pointer text-sm font-semibold text-amber-900">Abrir compatibilidad con una cotización histórica</summary>
+                      <p className="mt-2 text-xs leading-5 text-amber-800">Usá este camino sólo para editar una cotización que todavía no tiene receta profesional. Las nuevas cotizaciones se crean con el flujo guiado.</p>
+                      <div className="mt-4 space-y-5">
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                          <SectionHeading title="Plantilla histórica" description="No se reinterpretará automáticamente el alcance legacy." />
+                          <QuotationTemplatesPicker />
+                        </div>
+                        <OptimizedTemplateSelection />
                       </div>
-                    </>
+                    </details>
                   )}
                 </div>
               )}
 
-              {currentPhase === 3 && (
-                <div>
-                  <SectionHeading title="Precio y rentabilidad" description="Revisá el precio recomendado; los ajustes avanzados quedan plegados hasta que los necesites." />
-                  <OptimizedFinancialReview
-                    revealAdvanced={validationIssues.length > 0}
-                    validationMessage={validationIssues[0]?.message}
-                  />
+              {currentStepNumber === 2 && (
+                <div className="space-y-6">
+                  <SectionHeading title="Elegí el servicio" description="Seleccioná la receta que mejor responde al desafío. La vamos a personalizar en el próximo paso." />
+                  <ProfessionalScopeBuilder mode="recipe" />
+                  {!quotationData.scopeSnapshot && <EmptyStep message="Todavía no elegiste un servicio. Seleccioná una tarjeta para continuar." />}
                 </div>
               )}
 
-              {currentPhase === 4 && (
-                <div className="space-y-8">
-                  <div>
-                    <SectionHeading title="Vista para el cliente" description="Esta es la información comercial que acompañará la propuesta." />
-                    <ExecutiveSummary />
-                  </div>
-                  <Separator />
+              {currentStepNumber === 3 && (
+                <div className="space-y-6">
+                  <SectionHeading title="Diseñá el alcance" description="Definí cobertura, preguntas y entregables. Los cambios actualizan la referencia de esfuerzo y podés aplicar el equipo sugerido." />
+                  <ProfessionalScopeBuilder mode="scope" />
+                  {!quotationData.scopeSnapshot && <EmptyStep message="Primero elegí una receta en el paso Servicio." />}
+                </div>
+              )}
+
+              {currentStepNumber === 4 && (
+                <div className="space-y-6">
+                  <SectionHeading title="Confirmá el equipo" description="Partimos del equipo sugerido por la receta. Ajustá personas u horas sólo cuando el proyecto lo requiera." />
+                  <EnhancedTeamConfig validationMessage={fieldErrors['team-config']} />
+                  <details className="rounded-xl border border-slate-200 bg-slate-50/60 p-4">
+                    <summary className="cursor-pointer text-sm font-semibold text-slate-800">Ajustes avanzados de complejidad</summary>
+                    <p className="mt-2 text-xs leading-5 text-slate-500">Estos controles existen para casos excepcionales. La receta ya trae una configuración recomendada.</p>
+                    <div className="mt-4"><ComplexityFactorsCard validationMessage={fieldErrors['complexity-config']} /></div>
+                  </details>
+                </div>
+              )}
+
+              {currentStepNumber === 5 && (
+                <div className="space-y-6">
+                  <SectionHeading title="Revisá la inversión" description="Confirmá moneda, tipo de cambio, precio y condiciones comerciales antes de preparar el envío." />
+                  <CurrencySnapshot quotationData={quotationData} />
+                  <OptimizedFinancialReview revealAdvanced={validationIssues.length > 0} validationMessage={validationIssues[0]?.message} />
+                </div>
+              )}
+
+              {currentStepNumber === 6 && (
+                <div className="space-y-6">
+                  <SectionHeading title="Compará y prepará el envío" description="Elegí el escenario recomendado, revisá la vista del cliente y luego ejecutá QA desde el Estudio de Propuesta." />
                   <QuotationVariants
                     quotationId={quotationData.id || 0}
                     baseTeamMembers={quotationData.teamMembers as any}
@@ -446,6 +436,9 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
                     markupAmount={markupAmount}
                     totalAmount={totalAmount}
                   />
+                   <Separator />
+                   <ExecutiveSummary />
+                  <div className="flex flex-col gap-3 rounded-xl border border-indigo-200 bg-indigo-50 p-4 text-sm text-indigo-900 sm:flex-row sm:items-center sm:justify-between"><div className="flex items-start gap-3"><FileCheck2 className="mt-0.5 h-4 w-4 shrink-0 text-indigo-600" /><span>Cuando el escenario esté elegido, abrí el Estudio de Propuesta para revisar narrativa, QA y exportaciones.</span></div>{quotationData.id ? <Button type="button" size="sm" variant="outline" onClick={() => setLocation(`/quotations/${quotationData.id}/studio`)}>Abrir Estudio</Button> : null}</div>
                 </div>
               )}
               </React.Suspense>
@@ -453,20 +446,20 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
           </section>
 
           <div className="sticky bottom-3 z-20 flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-lg backdrop-blur sm:p-4">
-            <Button type="button" variant="ghost" onClick={handlePreviousStep} disabled={currentPhase === 1}>
+            <Button type="button" variant="ghost" onClick={handlePreviousStep} disabled={currentStepNumber === 1}>
               <ChevronLeft className="mr-1 h-4 w-4" /> Anterior
             </Button>
-            {currentPhase < 4 && (
+            {currentStepNumber < 6 && (
               <Button type="button" onClick={handleNextStep} disabled={isSaving} className="min-w-32">
                 {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Continuar <ChevronRight className="ml-1 h-4 w-4" />
+                {currentStepNumber === 5 ? 'Preparar envío' : 'Continuar'} <ChevronRight className="ml-1 h-4 w-4" />
               </Button>
             )}
-            {currentPhase === 4 && <span className="text-xs text-slate-500">Aprobá desde el bloque de variantes.</span>}
+            {currentStepNumber === 6 && <span className="text-xs text-slate-500">Elegí una opción para continuar con la propuesta.</span>}
           </div>
         </main>
 
-        <QuotationWorkspaceSummary currentPhase={currentPhase} />
+        <QuotationWorkspaceSummary currentPhase={currentStepNumber} totalSteps={6} />
       </div>
 
       <AlertDialog open={exitDialogOpen} onOpenChange={setExitDialogOpen}>
@@ -494,6 +487,46 @@ function SectionHeading({ title, description }: { title: string; description: st
     <div className="mb-5">
       <h2 className="text-lg font-semibold text-slate-950">{title}</h2>
       <p className="mt-1 text-sm text-slate-500">{description}</p>
+    </div>
+  );
+}
+
+function EmptyStep({ message }: { message: string }) {
+  return <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-500">{message}</div>;
+}
+
+function CommercialMotionField({ quotationData, updateQuotationData }: { quotationData: { commercialMotion?: string }; updateQuotationData: (data: { commercialMotion: 'new_business' | 'renewal' | 'expansion' | 'demo' }) => void }) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-sm font-semibold text-slate-900">Tipo de oportunidad</p>
+          <p className="mt-1 text-xs text-slate-500">Ayuda a comparar conversión y condiciones sin mezclar demos con negocio real.</p>
+        </div>
+        <Select value={quotationData.commercialMotion || 'new_business'} onValueChange={(value) => updateQuotationData({ commercialMotion: value as 'new_business' | 'renewal' | 'expansion' | 'demo' })}>
+          <SelectTrigger id="commercial-motion" className="w-full bg-white sm:w-56"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="new_business">Nuevo negocio</SelectItem>
+            <SelectItem value="renewal">Renovación</SelectItem>
+            <SelectItem value="expansion">Expansión</SelectItem>
+            <SelectItem value="demo">Demo</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+    </div>
+  );
+}
+
+function CurrencySnapshot({ quotationData }: { quotationData: { quotationCurrency?: string; exchangeRateSnapshot?: number | null } }) {
+  const currency = quotationData.quotationCurrency === 'USD' ? 'USD' : 'ARS';
+  const rate = Number(quotationData.exchangeRateSnapshot || 0);
+  return (
+    <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Moneda de la propuesta</p>
+        <p className="mt-1 text-sm font-semibold text-slate-900">{currency}{currency === 'USD' && rate > 0 ? ` · TC fijado ARS ${rate.toLocaleString('es-AR')}` : ''}</p>
+      </div>
+      <p className="text-xs text-slate-500">El tipo de cambio queda congelado en esta revisión para que todos los exports coincidan.</p>
     </div>
   );
 }

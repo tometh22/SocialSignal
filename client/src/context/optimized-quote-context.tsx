@@ -646,7 +646,7 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
 
   // Navigation functions
   const nextStep = useCallback(() => {
-    const maxStep = 4;
+    const maxStep = 6;
     if (currentStep < maxStep) {
       setCurrentStep(currentStep + 1);
     }
@@ -659,7 +659,7 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
   }, [currentStep]);
 
   const goToStep = useCallback((step: number) => {
-    const maxStep = 4;
+    const maxStep = 6;
     if (step >= 1 && step <= maxStep) {
       setCurrentStep(step);
     }

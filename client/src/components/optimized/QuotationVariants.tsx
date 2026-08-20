@@ -666,31 +666,14 @@ export function QuotationVariants({
     <div className="space-y-6 p-4 sm:p-6">
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Variantes de Cotización</h2>
+          <h2 className="text-2xl font-bold text-gray-900">Escenarios de alcance</h2>
           <p className="text-gray-600 mt-1">
-            Seleccioná las opciones que querés incluir en la propuesta para el cliente
+            Compará alternativas reales de cobertura, entregables y precio antes de elegir qué mostrarle al cliente.
           </p>
           <Badge variant="outline" className="mt-2 bg-slate-50 text-slate-600">Los costos internos no se muestran al cliente</Badge>
         </div>
         
         <div className="flex flex-col gap-2 sm:flex-row">
-          <Button 
-            variant="outline" 
-            size="sm"
-            className="h-9 sm:min-w-[150px]"
-            onClick={() => {
-              const allSelected = selectedVariantIds.length === variants.length;
-              if (allSelected) {
-                setSelectedVariantIds([]);
-              } else {
-                const allIds = variants.map(v => v.id);
-                setSelectedVariantIds(allIds);
-              }
-            }}
-          >
-            {selectedVariantIds.length === variants.length ? 'Deseleccionar todas' : 'Seleccionar todas'}
-          </Button>
-          
           <Dialog>
             <DialogTrigger asChild>
               <Button variant="outline" size="sm" className="flex items-center gap-2" style={{ height: 36, minWidth: 150, justifyContent: "center" }}>
@@ -784,6 +767,7 @@ export function QuotationVariants({
                 {(variant.isRecommended || variant.variantName === 'Intermedio') && !selectedVariantIds.includes(variant.id) && (
                   <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-700">Recomendada</Badge>
                 )}
+                {variant.isLegacy && <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-700">Histórico</Badge>}
               </div>
 
               {variant.scopeSnapshot && (
@@ -791,7 +775,7 @@ export function QuotationVariants({
                   <Badge variant="outline">{variant.scopeSnapshot.coverage.markets.length} mercados</Badge>
                   <Badge variant="outline">{variant.scopeSnapshot.coverage.brands.length} marcas</Badge>
                   <Badge variant="outline">{variant.scopeSnapshot.deliverables.filter((item) => item.included).length} entregables</Badge>
-                  <Badge variant="outline">SLA {variant.scopeSnapshot.coverage.slaLevel}</Badge>
+                  <Badge variant="outline">Respuesta {variant.scopeSnapshot.coverage.slaLevel === 'real_time' ? 'tiempo real' : variant.scopeSnapshot.coverage.slaLevel === 'priority' ? 'prioritaria' : 'estándar'}</Badge>
                 </div>
               )}
             </CardHeader>
@@ -819,8 +803,8 @@ export function QuotationVariants({
                 </div>
                 <div className="space-y-1">
                   <div className="flex items-center justify-center text-purple-600"><DollarSign className="h-4 w-4" /></div>
-                  <div className="text-sm font-medium">{formatCurrency(computeVariantCostFromTeam(variant))}</div>
-                  <div className="text-xs text-gray-500">Costo interno</div>
+                  <div className="text-sm font-medium">{variant.scopeSnapshot?.coverage.languages?.join(' + ').toUpperCase() || 'ES'}</div>
+                  <div className="text-xs text-gray-500">Idiomas</div>
                 </div>
               </div>
 
@@ -865,13 +849,13 @@ export function QuotationVariants({
                 </>
               )}
 
-              {/* Indicador de Diferencia */}
+              {/* Indicador de diferencia, expresado como inversión y no como multiplicador técnico. */}
               <div className="flex justify-center">
                 {(() => {
                   const diff = getDifferenceVsBase(variant);
-                  if (diff > 0) return <Badge variant="secondary" className="bg-green-100 text-green-800"><TrendingUp className="h-3 w-3 mr-1" />+{diff}%</Badge>;
-                  if (diff < 0) return <Badge variant="secondary" className="bg-red-100 text-red-800"><TrendingDown className="h-3 w-3 mr-1" />{diff}%</Badge>;
-                  return <Badge variant="secondary" className="bg-gray-100 text-gray-800"><Minus className="h-3 w-3 mr-1" />Base</Badge>;
+                  if (diff > 0) return <Badge variant="secondary" className="bg-green-100 text-green-800"><TrendingUp className="h-3 w-3 mr-1" />{diff}% más que la recomendada</Badge>;
+                  if (diff < 0) return <Badge variant="secondary" className="bg-red-100 text-red-800"><TrendingDown className="h-3 w-3 mr-1" />{Math.abs(diff)}% menos que la recomendada</Badge>;
+                  return <Badge variant="secondary" className="bg-gray-100 text-gray-800"><Minus className="h-3 w-3 mr-1" />Referencia</Badge>;
                 })()}
               </div>
 
@@ -899,7 +883,8 @@ export function QuotationVariants({
       {variants.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>Comparativa de Variantes</CardTitle>
+            {/* Legacy label "Diferencia vs cotización base" remains in historical exports; the UI uses business language. */}
+            <CardTitle>Comparación rápida</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
@@ -908,16 +893,16 @@ export function QuotationVariants({
                   <tr className="border-b">
                     <th className="text-left p-2">Variante</th>
                     <th className="text-center p-2">Alcance</th>
-                    <th className="text-right p-2">Horas</th>
+                    <th className="text-right p-2">Esfuerzo</th>
                     <th className="text-right p-2">Total</th>
-                    <th className="text-center p-2">Diferencia vs cotización base</th>
+                    <th className="text-center p-2">Diferencia de inversión</th>
                   </tr>
                 </thead>
                 <tbody>
                   {variants.map((variant) => (
                     <tr key={variant.id} className="border-b hover:bg-gray-50">
                       <td className="p-2 font-medium">{variant.variantName}</td>
-                      <td className="p-2 text-center">{variant.scopeSnapshot ? `${variant.scopeSnapshot.deliverables.filter((item) => item.included).length} entregables · ${variant.scopeSnapshot.coverage.markets.length} mercados` : 'Legacy'}</td>
+                      <td className="p-2 text-center">{variant.scopeSnapshot ? `${variant.scopeSnapshot.deliverables.filter((item) => item.included).length} entregables · ${variant.scopeSnapshot.coverage.markets.length} mercados` : 'Histórico'}</td>
                       <td className="p-2 text-right">{getVariantTotalHours(variant).toFixed(1)} h</td>
                       <td className="p-2 text-right font-medium">{formatCurrency(variant.totalAmount)}</td>
                       <td className="p-2 text-center">
@@ -991,7 +976,7 @@ export function QuotationVariants({
         <div className="flex justify-center">
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
             <p className="text-sm text-blue-800">
-              <strong>{selectedVariantIds.length}</strong> variante{selectedVariantIds.length > 1 ? 's' : ''} seleccionada{selectedVariantIds.length > 1 ? 's' : ''} para enviar al cliente
+              <strong>{selectedVariantIds.length}</strong> escenario{selectedVariantIds.length > 1 ? 's' : ''} seleccionado{selectedVariantIds.length > 1 ? 's' : ''} para enviar al cliente
             </p>
             <p className="text-xs text-blue-600 mt-1">
               El cliente podrá elegir entre {selectedVariantIds.length > 1 ? 'estas opciones' : 'esta opción'}
