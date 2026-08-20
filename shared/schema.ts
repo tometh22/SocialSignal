@@ -648,7 +648,11 @@ export const insertReportTemplateSchema = createInsertSchema(reportTemplates).pi
 // Quotations table
 export const quotations = pgTable("quotations", {
   id: serial("id").primaryKey(),
+  quotationNumber: varchar("quotation_number", { length: 40 }).unique(),
+  revisionNumber: integer("revision_number").notNull().default(1),
+  parentQuotationId: integer("parent_quotation_id").references((): AnyPgColumn => quotations.id, { onDelete: "set null" }),
   clientId: integer("client_id").notNull().references(() => clients.id),
+  billingEntityId: integer("billing_entity_id").references(() => clientBillingEntities.id, { onDelete: "set null" }),
   projectName: text("project_name").notNull(),
   analysisType: text("analysis_type").notNull(), // 'basic', 'standard', 'deep'
   projectType: text("project_type").notNull(), // 'demo', 'executive', 'comprehensive', 'always-on', 'monitoring'
@@ -682,6 +686,7 @@ export const quotations = pgTable("quotations", {
   applyInflationAdjustment: boolean("apply_inflation_adjustment").default(false), // Si aplicar ajuste inflacionario
   inflationMethod: text("inflation_method").default("automatic"), // 'automatic' o 'manual'
   manualInflationRate: doublePrecision("manual_inflation_rate"), // Tasa manual si method = 'manual'
+  automaticInflationRate: doublePrecision("automatic_inflation_rate"), // Snapshot anual efectivo calculado con los últimos 12 meses
   rateProjectionMode: text("rate_projection_mode").default("current"), // 'current' | 'projected' | 'annual_avg' — modo de proyección del valor hora
   projectedCostARS: doublePrecision("projected_cost_ars"), // Costo proyectado en pesos argentinos
   usdExchangeRate: doublePrecision("usd_exchange_rate"), // Tipo de cambio USD/ARS al momento de cotización
@@ -695,9 +700,33 @@ export const quotations = pgTable("quotations", {
   leadId: integer("lead_id").references(() => crmLeads.id),
   expiresAt: timestamp("expires_at"), // Fecha de expiración (default: 30 días desde creación)
   lossReason: text("loss_reason"), // Motivo de pérdida cuando status='rejected'
+  subtotalAmount: doublePrecision("subtotal_amount"),
+  taxRate: doublePrecision("tax_rate").notNull().default(0),
+  taxLabel: varchar("tax_label", { length: 40 }).notNull().default("IVA"),
+  taxAmount: doublePrecision("tax_amount").notNull().default(0),
+  pricesIncludeTax: boolean("prices_include_tax").notNull().default(false),
+  paymentTermsDays: integer("payment_terms_days"),
+  paymentSchedule: jsonb("payment_schedule").$type<Array<{ label: string; percentage: number; dueDays?: number }>>().notNull().default([]),
+  commercialTerms: text("commercial_terms"),
+  inclusions: text("inclusions"),
+  exclusions: text("exclusions"),
+  termsVersion: varchar("terms_version", { length: 40 }).notNull().default("1"),
+  acceptedVariantId: integer("accepted_variant_id").references((): AnyPgColumn => quotationVariants.id, { onDelete: "set null" }),
+  internalApprovedAt: timestamp("internal_approved_at"),
+  internalApprovedBy: integer("internal_approved_by").references(() => users.id, { onDelete: "set null" }),
+  sentAt: timestamp("sent_at"),
+  viewedAt: timestamp("viewed_at"),
+  acceptedAt: timestamp("accepted_at"),
+  rejectedAt: timestamp("rejected_at"),
+  publicTokenHash: varchar("public_token_hash", { length: 64 }),
+  publicTokenExpiresAt: timestamp("public_token_expires_at"),
+  documentHash: varchar("document_hash", { length: 64 }),
+  lockVersion: integer("lock_version").notNull().default(1),
+  archivedAt: timestamp("archived_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
   createdBy: integer("created_by").references(() => users.id, { onDelete: 'set null' }),
+  updatedBy: integer("updated_by").references(() => users.id, { onDelete: 'set null' }),
 });
 
 // Esquema base generado por drizzle-zod
@@ -727,6 +756,7 @@ export const insertQuotationSchema = baseInsertQuotationSchema.extend({
   toolsCost: z.number().finite().nonnegative().nullable().optional(),
   manualPrice: z.number().finite().positive().nullable().optional(),
   manualInflationRate: z.number().finite().min(0).max(1000).nullable().optional(),
+  automaticInflationRate: z.number().finite().min(0).max(1000).nullable().optional(),
   additionalDeliverableCost: z.number().finite().nonnegative().optional(),
   deliverables: z.array(z.record(z.unknown())).max(100).optional(),
   projectStartDate: z.union([
@@ -743,8 +773,23 @@ export const insertQuotationSchema = baseInsertQuotationSchema.extend({
   manualPriceCurrency: z.enum(["ARS", "USD"]).nullable().optional(),
   priceMode: z.enum(["auto", "manual"]).optional(),
   pricingVersion: z.number().int().min(1).optional(),
-  status: z.enum(["draft", "pending", "approved", "rejected", "in-negotiation"]).optional(),
+  status: z.enum(["draft", "pending", "internally-approved", "sent", "viewed", "approved", "rejected", "in-negotiation", "expired", "cancelled", "superseded"]).optional(),
   proposalLink: z.string().url().max(2048).nullable().optional(),
+  quotationType: z.enum(["one-time", "recurring", "fee"]).optional(),
+  taxRate: z.number().finite().min(0).max(100).optional(),
+  taxAmount: z.number().finite().nonnegative().optional(),
+  subtotalAmount: z.number().finite().nonnegative().nullable().optional(),
+  paymentTermsDays: z.number().int().min(0).max(730).nullable().optional(),
+  paymentSchedule: z.array(z.object({
+    label: z.string().trim().min(1).max(120),
+    percentage: z.number().finite().positive().max(100),
+    dueDays: z.number().int().min(0).max(730).optional(),
+  })).max(24).optional(),
+  commercialTerms: z.string().trim().max(20_000).nullable().optional(),
+  inclusions: z.string().trim().max(10_000).nullable().optional(),
+  exclusions: z.string().trim().max(10_000).nullable().optional(),
+  termsVersion: z.string().trim().min(1).max(40).optional(),
+  lockVersion: z.number().int().positive().optional(),
 });
 
 // ==================== HISTORIAL DE NEGOCIACIONES ====================
@@ -854,6 +899,83 @@ export const insertQuotationTeamMemberSchema = createInsertSchema(quotationTeamM
 export type QuotationTeamMember = typeof quotationTeamMembers.$inferSelect;
 export type InsertQuotationTeamMember = z.infer<typeof insertQuotationTeamMemberSchema>;
 
+// ==================== GOBIERNO COMERCIAL DE COTIZACIONES ====================
+export const quotationRevisions = pgTable("quotation_revisions", {
+  id: serial("id").primaryKey(),
+  quotationId: integer("quotation_id").notNull().references(() => quotations.id, { onDelete: "cascade" }),
+  revisionNumber: integer("revision_number").notNull(),
+  status: text("status").notNull(),
+  snapshot: jsonb("snapshot").$type<Record<string, unknown>>().notNull(),
+  documentHash: varchar("document_hash", { length: 64 }).notNull(),
+  reason: text("reason"),
+  createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  quotationRevisionUnique: unique("quotation_revisions_quote_revision_unique").on(table.quotationId, table.revisionNumber),
+}));
+
+export const quotationEvents = pgTable("quotation_events", {
+  id: serial("id").primaryKey(),
+  quotationId: integer("quotation_id").notNull().references(() => quotations.id, { onDelete: "cascade" }),
+  revisionId: integer("revision_id").references(() => quotationRevisions.id, { onDelete: "set null" }),
+  eventType: varchar("event_type", { length: 80 }).notNull(),
+  eventKey: varchar("event_key", { length: 180 }).unique(),
+  actorUserId: integer("actor_user_id").references(() => users.id, { onDelete: "set null" }),
+  actorType: varchar("actor_type", { length: 30 }).notNull().default("internal"),
+  metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const quotationApprovals = pgTable("quotation_approvals", {
+  id: serial("id").primaryKey(),
+  quotationId: integer("quotation_id").notNull().references(() => quotations.id, { onDelete: "cascade" }),
+  revisionId: integer("revision_id").notNull().references(() => quotationRevisions.id, { onDelete: "cascade" }),
+  ruleCode: varchar("rule_code", { length: 80 }).notNull(),
+  ruleLabel: varchar("rule_label", { length: 255 }).notNull(),
+  status: varchar("status", { length: 20 }).notNull().default("pending"),
+  requestedBy: integer("requested_by").references(() => users.id, { onDelete: "set null" }),
+  requestedAt: timestamp("requested_at").notNull().defaultNow(),
+  decidedBy: integer("decided_by").references(() => users.id, { onDelete: "set null" }),
+  decidedAt: timestamp("decided_at"),
+  decisionReason: text("decision_reason"),
+}, (table) => ({
+  approvalRuleUnique: unique("quotation_approvals_revision_rule_unique").on(table.revisionId, table.ruleCode),
+}));
+
+export const quotationApprovalRules = pgTable("quotation_approval_rules", {
+  id: serial("id").primaryKey(),
+  code: varchar("code", { length: 80 }).notNull().unique(),
+  name: varchar("name", { length: 255 }).notNull(),
+  minDiscountPercentage: doublePrecision("min_discount_percentage"),
+  maxGrossMarginPercentage: doublePrecision("max_gross_margin_percentage"),
+  minTotalAmount: doublePrecision("min_total_amount"),
+  currency: varchar("currency", { length: 3 }),
+  requiresManualPrice: boolean("requires_manual_price").notNull().default(false),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const quotationDeliveries = pgTable("quotation_deliveries", {
+  id: serial("id").primaryKey(),
+  quotationId: integer("quotation_id").notNull().references(() => quotations.id, { onDelete: "cascade" }),
+  revisionId: integer("revision_id").notNull().references(() => quotationRevisions.id, { onDelete: "cascade" }),
+  recipientEmail: varchar("recipient_email", { length: 255 }).notNull(),
+  subject: varchar("subject", { length: 255 }).notNull(),
+  status: varchar("status", { length: 30 }).notNull().default("queued"),
+  providerMessageId: varchar("provider_message_id", { length: 255 }),
+  errorMessage: text("error_message"),
+  sentAt: timestamp("sent_at"),
+  createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export type QuotationRevision = typeof quotationRevisions.$inferSelect;
+export type QuotationEvent = typeof quotationEvents.$inferSelect;
+export type QuotationApproval = typeof quotationApprovals.$inferSelect;
+export type QuotationApprovalRule = typeof quotationApprovalRules.$inferSelect;
+export type QuotationDelivery = typeof quotationDeliveries.$inferSelect;
+
 // ==================== TEMPLATES DE COTIZACIÓN ====================
 // Quotation templates — configuraciones reutilizables de equipo + scope
 export const quotationTemplates = pgTable("quotation_templates", {
@@ -930,6 +1052,11 @@ export const insertMonthlyInflationSchema = createInsertSchema(monthlyInflation)
   id: true,
   createdAt: true,
   updatedAt: true,
+}).extend({
+  year: z.number().int().min(2000).max(2100),
+  month: z.number().int().min(1).max(12),
+  inflationRate: z.number().finite().positive().max(1),
+  source: z.string().trim().max(120).nullable().optional(),
 });
 
 export type MonthlyInflation = typeof monthlyInflation.$inferSelect;

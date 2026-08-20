@@ -1,19 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { Check, Clock, AlertCircle, Wifi, WifiOff } from 'lucide-react';
+import type { AutosaveStatus } from '@/context/optimized-quote-context';
 
 interface AutosaveIndicatorProps {
   lastSaveTime?: number;
   isOnline?: boolean;
-  hasUnsavedChanges?: boolean;
+  status?: AutosaveStatus;
 }
 
 export const AutosaveIndicator: React.FC<AutosaveIndicatorProps> = ({
   lastSaveTime,
   isOnline = true,
-  hasUnsavedChanges = false
+  status = 'idle',
 }) => {
   const [currentTime, setCurrentTime] = useState(Date.now());
-  const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'pending' | 'error'>('saved');
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -21,14 +21,6 @@ export const AutosaveIndicator: React.FC<AutosaveIndicatorProps> = ({
     }, 1000);
     return () => clearInterval(timer);
   }, []);
-
-  useEffect(() => {
-    if (lastSaveTime && Date.now() - lastSaveTime < 2000) {
-      setSaveStatus('saved');
-    } else if (hasUnsavedChanges) {
-      setSaveStatus('pending');
-    }
-  }, [lastSaveTime, hasUnsavedChanges]);
 
   const getTimeSinceLastSave = () => {
     if (!lastSaveTime) return '';
@@ -43,7 +35,7 @@ export const AutosaveIndicator: React.FC<AutosaveIndicatorProps> = ({
   const getStatusIcon = () => {
     if (!isOnline) return <WifiOff className="h-3 w-3 text-red-500" />;
     
-    switch (saveStatus) {
+    switch (status) {
       case 'saved':
         return <Check className="h-3 w-3 text-green-500" />;
       case 'saving':
@@ -60,7 +52,7 @@ export const AutosaveIndicator: React.FC<AutosaveIndicatorProps> = ({
   const getStatusText = () => {
     if (!isOnline) return 'Sin conexión';
     
-    switch (saveStatus) {
+    switch (status) {
       case 'saved':
         return `Guardado ${getTimeSinceLastSave()}`;
       case 'saving':
@@ -69,6 +61,8 @@ export const AutosaveIndicator: React.FC<AutosaveIndicatorProps> = ({
         return 'Cambios pendientes';
       case 'error':
         return 'Error al guardar';
+      case 'idle':
+        return 'Autoguardado listo';
       default:
         return 'Autoguardado activo';
     }
@@ -77,7 +71,7 @@ export const AutosaveIndicator: React.FC<AutosaveIndicatorProps> = ({
   const getStatusColor = () => {
     if (!isOnline) return 'text-red-600 bg-red-50 border-red-200';
     
-    switch (saveStatus) {
+    switch (status) {
       case 'saved':
         return 'text-green-600 bg-green-50 border-green-200';
       case 'saving':
@@ -92,7 +86,11 @@ export const AutosaveIndicator: React.FC<AutosaveIndicatorProps> = ({
   };
 
   return (
-    <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full border text-xs font-medium ${getStatusColor()}`}>
+    <div
+      role="status"
+      aria-live="polite"
+      className={`inline-flex items-center gap-2 px-3 py-1 rounded-full border text-xs font-medium ${getStatusColor()}`}
+    >
       {getStatusIcon()}
       <span>{getStatusText()}</span>
     </div>

@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { InflationAdjustmentCard } from "@/components/optimized/inflation-adjustment-card";
+import { CommercialTermsCard } from "@/components/quotation/commercial-terms-card";
 import ToolsAndPricing from "@/components/optimized/tools-and-pricing";
 import { Separator } from "@/components/ui/separator";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -47,7 +48,12 @@ import {
   Edit
 } from "lucide-react";
 
-export default function FinancialReviewFinal() {
+type FinancialReviewFinalProps = {
+  revealAdvanced?: boolean;
+  validationMessage?: string;
+};
+
+export default function FinancialReviewFinal({ revealAdvanced = false, validationMessage }: FinancialReviewFinalProps) {
   const {
     quotationData,
     baseCost,
@@ -61,16 +67,36 @@ export default function FinancialReviewFinal() {
     forceRecalculate,
     updateInflation,
     updateFinancials,
-    updateQuotationCurrency,
     saveQuotation,
     getPersonnelRate
   } = useOptimizedQuote();
+  const { data: inflationHistory = [] } = useQuery<Array<{ year: number; month: number; inflationRate: number }>>({
+    queryKey: ['/api/inflation/data'],
+  });
+  const automaticAnnualInflationRate = React.useMemo(() => {
+    const latest = [...inflationHistory]
+      .sort((left, right) => right.year - left.year || right.month - left.month)
+      .slice(0, 12);
+    if (latest.length === 0) return null;
+    return (latest.reduce((factor, item) => factor * (1 + Number(item.inflationRate || 0)), 1) - 1) * 100;
+  }, [inflationHistory]);
+
+  useEffect(() => {
+    if (quotationData.inflation.inflationMethod !== 'automatic' || automaticAnnualInflationRate == null) return;
+    if (Math.abs((quotationData.inflation.automaticInflationRate ?? -1) - automaticAnnualInflationRate) < 0.0001) return;
+    updateInflation({ automaticInflationRate: automaticAnnualInflationRate });
+  }, [automaticAnnualInflationRate, quotationData.inflation.automaticInflationRate, quotationData.inflation.inflationMethod, updateInflation]);
 
   const [, navigate] = useLocation();
   const { toast } = useToast();
 
   const [isSaving, setIsSaving] = useState(false);
   const [isSavingDraft, setIsSavingDraft] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  useEffect(() => {
+    if (revealAdvanced) setShowAdvanced(true);
+  }, [revealAdvanced]);
+  const advancedVisible = showAdvanced || revealAdvanced;
   const markupMultiplier = quotationData.financials?.marginFactor || 2.0;
   const discountPercentage = quotationData.financials?.discountPercentage || 0;
 
@@ -129,8 +155,11 @@ export default function FinancialReviewFinal() {
   let inflationFactor = 1;
   if (quotationData.inflation.applyInflationAdjustment) {
     const annualInflationRate = quotationData.inflation.inflationMethod === 'manual'
-      ? (quotationData.inflation.manualInflationRate || 25)
-      : 25;
+      ? quotationData.inflation.manualInflationRate
+      : quotationData.inflation.automaticInflationRate;
+    if (annualInflationRate == null || !Number.isFinite(annualInflationRate) || annualInflationRate < 0) {
+      inflationFactor = 1;
+    } else {
     const monthlyRateDecimal = Math.pow(1 + (annualInflationRate / 100), 1/12) - 1;
     monthlyInflationRate = monthlyRateDecimal * 100;
     if (rateMode === "annual_avg") {
@@ -142,12 +171,12 @@ export default function FinancialReviewFinal() {
     }
     inflationFactor = Math.pow(1 + monthlyRateDecimal, monthsToProject);
     totalInflationPercentage = (inflationFactor - 1) * 100;
+    }
   }
   const preInflationTotalARS = inflationFactor > 0 ? canonical.total / inflationFactor : canonical.total;
   const inflationAdjustmentARS = canonical.total - preInflationTotalARS;
   const finalBaseAfterInflationARS = subtotalWithComplexityARS;
   const platformCostARS = canonical.platformCost;
-  const toolsCostUSD_stored = quotationData.financials?.toolsCost ?? 0;
   const toolsCostARS = canonical.toolsCost;
   const subtotalWithPlatformARS = finalBaseAfterInflationARS + platformCostARS;
   const marginAmountARS = canonical.markupAmount;
@@ -160,9 +189,7 @@ export default function FinancialReviewFinal() {
   // useCurrency() and safeRate are declared near the top of this component
   const subtotalWithPlatformUSD = safeRate > 1 ? convertToUSD(subtotalWithPlatformARS, 'ARS') : 0;
   const subtotalWithMarginUSD = safeRate > 1 ? convertToUSD(subtotalWithMarginARS, 'ARS') : 0;
-  const finalTotalUSD = safeRate > 1 ? convertToUSD(finalTotalARS, 'ARS') : 0;
   const inflationAdjustmentUSD = safeRate > 1 ? convertToUSD(inflationAdjustmentARS, 'ARS') : 0;
-  const toolsCostUSD = toolsCostUSD_stored; // already in USD — no second conversion needed
   
   // All values are already in ARS - no conversion needed for display
   const teamBaseCostDisplay = displayed.baseCost;
@@ -259,7 +286,7 @@ export default function FinancialReviewFinal() {
 
       toast({
         title: "Borrador guardado",
-        description: "El borrador se ha guardado correctamente. Puedes continuar editándolo más tarde.",
+        description: "El borrador se guardó correctamente. Podés continuar editándolo más tarde.",
       });
 
     } catch (error) {
@@ -299,12 +326,17 @@ export default function FinancialReviewFinal() {
 
   return (
     <TooltipProvider>
-      <div className="min-h-screen bg-gradient-to-b from-slate-50 via-white to-slate-50">
+      <div className="bg-white">
       {/* Header removido - los botones de finalización ahora están solo en el último paso */}
 
-      <div className="max-w-7xl mx-auto px-4 lg:px-6 py-8">
+      <div className="mx-auto max-w-7xl py-6">
+        {validationMessage && (
+          <div role="alert" className="mb-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+            {validationMessage}
+          </div>
+        )}
         {/* Executive Summary Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <div className="mb-8 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Tooltip>
           <TooltipTrigger asChild>
             <Card className="h-full border-0 shadow-sm bg-gradient-to-br from-blue-50 to-blue-100 cursor-help">
@@ -401,7 +433,7 @@ export default function FinancialReviewFinal() {
                     <TrendingUp className="h-4 w-4 text-green-700" />
                   </div>
                   <div className="text-center">
-                    <p className="text-xs font-medium text-green-800">Markup</p>
+                    <p className="text-xs font-medium text-green-800">Multiplicador</p>
                     <p className="text-lg font-bold text-green-900">
                       {quotationData.financials.priceMode === 'manual' && quotationData.financials.manualPrice 
                         ? `${((subtotalWithMarginARS / subtotalWithPlatformARS) || 1).toFixed(1)}x`
@@ -414,13 +446,31 @@ export default function FinancialReviewFinal() {
             </Card>
           </TooltipTrigger>
           <TooltipContent>
-            <p className="max-w-xs">Multiplicador de ganancia aplicado al costo base. El markup {markupMultiplier}x significa que el precio es {markupMultiplier} veces el costo.</p>
+            <p className="max-w-xs">Multiplicador comercial aplicado al costo. Un valor de {markupMultiplier}x significa que el precio equivale a {markupMultiplier} veces la base calculada.</p>
           </TooltipContent>
         </Tooltip>
         </div>
 
+        <div className="mb-6 flex flex-col items-start justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 sm:flex-row sm:items-center">
+          <div>
+            <p className="font-medium text-slate-900">Precio comercial</p>
+            <p className="text-sm text-slate-500">El resumen está listo. Abrí los ajustes solo si necesitás cambiar margen, descuento, herramientas o inflación.</p>
+          </div>
+          <Button
+            type="button"
+            variant={advancedVisible ? 'secondary' : 'outline'}
+            onClick={() => setShowAdvanced((current) => !current)}
+            aria-expanded={advancedVisible}
+            aria-controls="advanced-pricing-controls"
+            className="shrink-0"
+          >
+            <Settings className="mr-2 h-4 w-4" />
+            {advancedVisible ? 'Ocultar ajustes' : 'Ajustar precio'}
+          </Button>
+        </div>
+
         {/* Main Content - Responsive Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 lg:gap-6">
+        <div className={`grid grid-cols-1 gap-4 lg:gap-6 ${advancedVisible ? 'lg:grid-cols-2 xl:grid-cols-3' : 'lg:grid-cols-2'}`}>
 
         {/* Left: Team Breakdown */}
         <div className="space-y-4 lg:space-y-6">
@@ -554,9 +604,9 @@ export default function FinancialReviewFinal() {
         </div>
 
         {/* Center: Controls and Inflation */}
-        <div className="space-y-4 lg:space-y-6">
+        {advancedVisible && <div id="advanced-pricing-controls" className="space-y-4 lg:space-y-6">
           {/* Margin and Discount Controls */}
-          <Card className="shadow-sm border-0 bg-white">
+          <Card id="pricing-config" className="shadow-sm border-0 bg-white" tabIndex={-1}>
             <CardHeader className="pb-4 border-b border-gray-100">
               <CardTitle className="text-lg flex items-center gap-2">
                 <Percent className="h-5 w-5 text-indigo-600" />
@@ -569,8 +619,8 @@ export default function FinancialReviewFinal() {
                 <div className="flex items-center justify-between">
                   <Label className="text-sm font-medium text-gray-900">
                     {quotationData.financials.priceMode === 'manual' && quotationData.financials.manualPrice 
-                      ? "Markup Calculado (Automático)"
-                      : "Multiplicador de Markup"}
+                      ? "Multiplicador calculado"
+                      : "Multiplicador comercial"}
                   </Label>
                   <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
                     {quotationData.financials.priceMode === 'manual' && quotationData.financials.manualPrice 
@@ -590,6 +640,7 @@ export default function FinancialReviewFinal() {
                         <>
                           <div className="flex-1">
                             <Slider
+                              aria-label="Multiplicador comercial"
                               value={[currentMarkup]}
                               onValueChange={(value) => {
                                 updateFinancials({ marginFactor: value[0] });
@@ -636,7 +687,7 @@ export default function FinancialReviewFinal() {
                     </div>
                     <p className="text-xs text-green-700 mt-1">
                       {quotationData.financials.priceMode === 'manual' && quotationData.financials.manualPrice ? (
-                        `Markup calculado: ${((subtotalWithMarginUSD / subtotalWithPlatformUSD) || 1).toFixed(2)}x (${formatFinalCurrency(subtotalWithPlatformDisplay)} → ${formatFinalCurrency(subtotalWithMarginDisplay)})`
+                        `Multiplicador calculado: ${((subtotalWithMarginUSD / subtotalWithPlatformUSD) || 1).toFixed(2)}x (${formatFinalCurrency(subtotalWithPlatformDisplay)} → ${formatFinalCurrency(subtotalWithMarginDisplay)})`
                       ) : (
                         `Base: ${formatFinalCurrency(subtotalWithPlatformDisplay)} × ${markupMultiplier} = ${formatFinalCurrency(subtotalWithMarginDisplay)}`
                       )}
@@ -662,6 +713,7 @@ export default function FinancialReviewFinal() {
                 </div>
                 <div className="space-y-3">
                   <Slider
+                    aria-label="Descuento al cliente"
                     value={[discountPercentage]}
                     onValueChange={(value) => {
                       updateFinancials({ discountPercentage: value[0] });
@@ -686,6 +738,14 @@ export default function FinancialReviewFinal() {
                         Se aplica sobre: {formatFinalCurrency(subtotalWithMarginDisplay)} (subtotal + margen)
                       </p>
                     </div>
+                  )}
+                  {discountPercentage >= 20 && (
+                    <Alert className="border-amber-200 bg-amber-50 text-amber-900">
+                      <AlertTriangle className="h-4 w-4" />
+                      <AlertDescription>
+                        Descuento elevado: documentá la justificación y obtené aprobación comercial antes de finalizar.
+                      </AlertDescription>
+                    </Alert>
                   )}
                 </div>
 
@@ -734,9 +794,12 @@ export default function FinancialReviewFinal() {
                       size="sm"
                       onClick={() => {
                         updateFinancials({ priceMode: 'manual' });
-                        // Si no hay precio manual, usar el precio actual convertido a ARS como punto de partida
+                        // Use the current displayed total in the selected quotation currency.
                         if (!quotationData.financials.manualPrice) {
-                          updateFinancials({ manualPrice: finalTotalUSD * exchangeRate });
+                          updateFinancials({
+                            manualPrice: finalTotalDisplay,
+                            manualPriceCurrency: currencyLabel === 'USD' ? 'USD' : 'ARS',
+                          });
                         }
                       }}
                       className="flex-1"
@@ -752,20 +815,21 @@ export default function FinancialReviewFinal() {
                         <div className="space-y-2">
                           <div className="flex items-center justify-between mb-1">
                             <Label className="text-sm font-medium text-blue-900">
-                              Precio objetivo (ARS)
+                              Precio objetivo ({currencyLabel})
                             </Label>
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <Info className="h-4 w-4 text-blue-400 cursor-help" />
                               </TooltipTrigger>
                               <TooltipContent side="left" className="max-w-xs">
-                                <p>Ingrese el precio que desea cobrar al cliente. El sistema calculará automáticamente el markup necesario.</p>
+                                <p>Ingresá el precio que querés cobrar. El sistema calculará automáticamente el multiplicador necesario.</p>
                               </TooltipContent>
                             </Tooltip>
                           </div>
                           <div className="relative">
                             <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-blue-500 font-semibold">$</span>
                             <Input
+                              id="manual-price"
                               type="number"
                               placeholder="0.00"
                               value={quotationData.financials.manualPrice || ''}
@@ -781,26 +845,26 @@ export default function FinancialReviewFinal() {
                         </div>
                         
                         {/* Métricas calculadas */}
-                        <div className="grid grid-cols-3 gap-2">
+                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                           <div className="bg-gray-50 rounded-lg p-2 text-center">
                             <p className="text-xs text-gray-600">Costo Base</p>
                             <p className="font-mono text-sm font-semibold text-gray-900">
-                              ${safeRate > 1 ? ((subtotalWithPlatformUSD + toolsCostUSD) * safeRate).toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) : '—'}
+                              {formatFinalCurrency(subtotalWithPlatformDisplay + toolsCostDisplay)}
                             </p>
                           </div>
                           <div className="bg-blue-50 rounded-lg p-2 text-center">
-                            <p className="text-xs text-blue-600">Markup</p>
+                            <p className="text-xs text-blue-600">Multiplicador</p>
                             <p className="font-mono text-sm font-semibold text-blue-900">
-                              {quotationData.financials.manualPrice && subtotalWithPlatformUSD > 0 && safeRate > 1
-                                ? `${(((quotationData.financials.manualPrice / safeRate - toolsCostUSD) / (1 - (discountPercentage / 100))) / subtotalWithPlatformUSD).toFixed(2)}x`
+                              {quotationData.financials.manualPrice && subtotalWithPlatformDisplay > 0
+                                ? `${(((quotationData.financials.manualPrice - toolsCostDisplay) / (1 - (discountPercentage / 100))) / subtotalWithPlatformDisplay).toFixed(2)}x`
                                 : '—'}
                             </p>
                           </div>
                           <div className="bg-green-50 rounded-lg p-2 text-center">
                             <p className="text-xs text-green-600">Ganancia</p>
                             <p className="font-mono text-sm font-semibold text-green-900">
-                              {quotationData.financials.manualPrice && safeRate > 1
-                                ? `$${Math.max(0, quotationData.financials.manualPrice - ((subtotalWithPlatformUSD + toolsCostUSD) * safeRate)).toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+                              {quotationData.financials.manualPrice
+                                ? formatFinalCurrency(Math.max(0, quotationData.financials.manualPrice - subtotalWithPlatformDisplay - toolsCostDisplay))
                                 : '—'}
                             </p>
                           </div>
@@ -913,6 +977,7 @@ export default function FinancialReviewFinal() {
                     <div className="space-y-2">
                       <Label className="font-medium">Fecha de inicio del proyecto</Label>
                       <Input
+                        id="inflation-start-date"
                         type="date"
                         value={quotationData.inflation.projectStartDate}
                         onChange={(e) => updateInflation({ projectStartDate: e.target.value })}
@@ -926,25 +991,11 @@ export default function FinancialReviewFinal() {
                     </div>
 
                     <div className="space-y-2">
-                      <Label className="font-medium">Moneda de cotización</Label>
-                      <Select 
-                        value={quotationData.quotationCurrency} 
-                        onValueChange={(value) => {
-                          console.log('💱 Currency selector changed to:', value);
-                          updateQuotationCurrency(value);
-                        }}
-                      >
-                        <SelectTrigger className="border-orange-200 focus:border-orange-400">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="ARS">Pesos Argentinos (ARS)</SelectItem>
-                          <SelectItem value="USD">Dólares Estadounidenses (USD)</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <div className="text-xs text-orange-600 mt-1">
-                        Tipo de cambio: 1 USD = ${exchangeRate.toLocaleString()} ARS
+                      <Label className="font-medium">Moneda confirmada</Label>
+                      <div className="rounded-md border border-orange-200 bg-orange-50 px-3 py-2 text-sm font-medium text-orange-900">
+                        {currencyLabel} · TC guardado: 1 USD = {safeRate.toLocaleString('es-AR')} ARS
                       </div>
+                      <p className="text-[11px] text-orange-700/80">La moneda se define en la fase Proyecto para evitar recálculos accidentales.</p>
                     </div>
 
                     <div className="space-y-2">
@@ -974,6 +1025,13 @@ export default function FinancialReviewFinal() {
                           placeholder="Ej: 25.5"
                           className="border-orange-200 focus:border-orange-400"
                         />
+                      </div>
+                    )}
+                    {quotationData.inflation.inflationMethod === 'automatic' && (
+                      <div className="rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-xs text-orange-800">
+                        {automaticAnnualInflationRate == null
+                          ? 'No hay 12 meses de inflación configurados. Completá la serie antes de aprobar.'
+                          : `Tasa anual compuesta guardada: ${automaticAnnualInflationRate.toFixed(2)}% (${Math.min(inflationHistory.length, 12)} meses).`}
                       </div>
                     )}
                   </div>
@@ -1021,7 +1079,9 @@ export default function FinancialReviewFinal() {
               )}
             </CardContent>
           </Card>
-        </div>
+        </div>}
+
+        {advancedVisible && <CommercialTermsCard />}
 
         {/* Right: Financial Waterfall */}
         <div className="space-y-4 lg:space-y-6">
@@ -1104,7 +1164,7 @@ export default function FinancialReviewFinal() {
                     <div className="flex flex-col gap-0.5">
                       <span className="text-sm text-green-800">Margen de Ganancia</span>
                       <span className="text-xs text-green-600">
-                        Markup {quotationData.financials.priceMode === 'manual' && quotationData.financials.manualPrice
+                        Multiplicador {quotationData.financials.priceMode === 'manual' && quotationData.financials.manualPrice
                           ? (subtotalWithPlatformUSD > 0 ? `${(subtotalWithMarginUSD / subtotalWithPlatformUSD).toFixed(2)}x calc.` : '—')
                           : `${markupMultiplier}x`}
                       </span>

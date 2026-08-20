@@ -27,6 +27,7 @@ interface DeliverableConfigProps {
   onChange: (deliverables: Deliverable[]) => void;
   additionalCost?: number;
   onAdditionalCostChange?: (cost: number) => void;
+  currency?: 'ARS' | 'USD';
 }
 
 const FREQUENCY_OPTIONS = [
@@ -49,8 +50,15 @@ export const DeliverableConfig: React.FC<DeliverableConfigProps> = ({
   deliverables,
   onChange,
   additionalCost = 0,
-  onAdditionalCostChange
+  onAdditionalCostChange,
+  currency = 'ARS',
 }) => {
+  const formatBudget = (amount: number) => new Intl.NumberFormat(currency === 'USD' ? 'en-US' : 'es-AR', {
+    style: 'currency',
+    currency,
+    maximumFractionDigits: currency === 'USD' ? 2 : 0,
+  }).format(amount || 0);
+  const configuredBudget = deliverables.reduce((sum, deliverable) => sum + Number(deliverable.budget || 0), 0);
   const handleAddDeliverable = () => {
     const newDeliverable: Deliverable = {
       id: crypto.randomUUID(),
@@ -87,7 +95,7 @@ export const DeliverableConfig: React.FC<DeliverableConfigProps> = ({
         <CardHeader>
           <CardTitle>Configuración de Entregables</CardTitle>
           <CardDescription>
-            Define los tipos de entregables, frecuencias y presupuestos específicos
+            Definí tipos de entregables, frecuencias y presupuestos específicos
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -100,6 +108,7 @@ export const DeliverableConfig: React.FC<DeliverableConfigProps> = ({
                     variant="ghost" 
                     size="icon"
                     onClick={() => handleRemoveDeliverable(deliverable.id)}
+                    aria-label={`Eliminar entregable ${index + 1}`}
                   >
                     <Trash2 className="h-4 w-4 text-destructive" />
                   </Button>
@@ -151,13 +160,13 @@ export const DeliverableConfig: React.FC<DeliverableConfigProps> = ({
                     id={`description-${deliverable.id}`}
                     value={deliverable.description}
                     onChange={(e) => handleDeliverableChange(deliverable.id, 'description', e.target.value)}
-                    placeholder="Describe el entregable y sus características principales..."
+                    placeholder="Describí el entregable y sus características principales..."
                     rows={2}
                   />
                 </div>
                 
                 <div className="space-y-2">
-                  <Label htmlFor={`budget-${deliverable.id}`}>Presupuesto para este entregable (USD)</Label>
+                  <Label htmlFor={`budget-${deliverable.id}`}>Presupuesto para este entregable ({currency})</Label>
                   <div className="relative">
                     <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-muted-foreground">
                       $
@@ -184,11 +193,15 @@ export const DeliverableConfig: React.FC<DeliverableConfigProps> = ({
               <PlusCircle className="mr-2 h-4 w-4" />
               Añadir entregable
             </Button>
+            <div className="flex items-center justify-between rounded-lg bg-slate-50 px-4 py-3 text-sm">
+              <span className="text-slate-600">Presupuesto configurado</span>
+              <strong className="tabular-nums text-slate-900">{formatBudget(configuredBudget)}</strong>
+            </div>
           </div>
         </CardContent>
         <CardFooter className="flex-col items-start border-t p-4">
           <div className="w-full space-y-2">
-            <Label htmlFor="additional-cost">Costo por entregables adicionales (opcional)</Label>
+            <Label htmlFor="additional-cost">Costo por entregables adicionales ({currency}, opcional)</Label>
             <div className="relative">
               <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-muted-foreground">
                 $

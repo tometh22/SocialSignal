@@ -17,7 +17,10 @@ const source = (path: string) => readFileSync(new URL(`../${path}`, import.meta.
 
 describe("quotation integrity domain", () => {
   it("enforces the shared status machine", () => {
-    expect(canTransitionQuotation("draft", "approved")).toBe(true);
+    expect(canTransitionQuotation("draft", "approved")).toBe(false);
+    expect(canTransitionQuotation("draft", "pending")).toBe(true);
+    expect(canTransitionQuotation("pending", "internally-approved")).toBe(true);
+    expect(canTransitionQuotation("internally-approved", "sent")).toBe(true);
     expect(canTransitionQuotation("approved", "draft")).toBe(false);
     expect(canTransitionQuotation("in-negotiation", "approved")).toBe(true);
     expect(() => assertQuotationTransition("approved", "rejected")).toThrow("No se puede cambiar");

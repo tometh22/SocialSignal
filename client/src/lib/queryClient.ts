@@ -171,7 +171,7 @@ export function getQueryFn({ on401 = "throw" }: FetcherOptions = {}) {
 // Generic function for API requests (overloaded)
 export async function apiRequest(
   endpoint: string,
-  options: { method: string; body?: any }
+  options: { method: string; body?: any; headers?: Record<string, string> }
 ): Promise<any>;
 export async function apiRequest(
   endpoint: string,
@@ -180,11 +180,12 @@ export async function apiRequest(
 ): Promise<any>;
 export async function apiRequest(
   endpoint: string,
-  methodOrOptions: string | { method: string; body?: any },
+  methodOrOptions: string | { method: string; body?: any; headers?: Record<string, string> },
   data?: any
 ) {
   let method: string;
   let requestData: any;
+  let additionalHeaders: Record<string, string> = {};
   
   if (typeof methodOrOptions === 'string') {
     method = methodOrOptions;
@@ -192,6 +193,7 @@ export async function apiRequest(
   } else {
     method = methodOrOptions.method;
     requestData = methodOrOptions.body;
+    additionalHeaders = methodOrOptions.headers ?? {};
   }
   const url = rewriteReviewUrl(endpoint);
 
@@ -199,6 +201,7 @@ export async function apiRequest(
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
       ...getAuthHeader(),
+      ...additionalHeaders,
     };
     
     const options: RequestInit = {

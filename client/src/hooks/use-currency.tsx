@@ -6,26 +6,34 @@ import { useQuery } from '@tanstack/react-query';
  */
 export const useCurrency = () => {
   // Obtener tipo de cambio actual desde la base de datos
-  const { data: rateData, isLoading: exchangeRateLoading } = useQuery({
-    queryKey: ['/api/admin/system-config'],
-    select: (data: any[]) => {
-      const cfg = data?.find(config => config.configKey === 'usd_exchange_rate');
-      return cfg ? { value: cfg.configValue || 1200, description: cfg.description || null, updatedAt: cfg.updatedAt || null } : null;
-    }
+  const { data: rateData, isLoading: exchangeRateLoading, isError: exchangeRateError } = useQuery<{
+    rate: number;
+    source: string | null;
+    updatedAt: string | null;
+  }>({
+    queryKey: ['/api/exchange-rate'],
+    staleTime: 0,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
   });
-  const exchangeRate: number = rateData?.value ?? 1200;
-  const exchangeRateSource: string | null = rateData?.description ?? null;
+  const parsedRate = Number(rateData?.rate);
+  const exchangeRateReady = Number.isFinite(parsedRate) && parsedRate > 0;
+  // Zero is intentional while loading/error: never snapshot a made-up fallback.
+  const exchangeRate: number = exchangeRateReady ? parsedRate : 0;
+  const exchangeRateSource: string | null = rateData?.source ?? null;
   const exchangeRateUpdatedAt: string | null = rateData?.updatedAt ?? null;
 
   // Función para convertir de USD a la moneda especificada
   const convertFromUSD = (amountUSD: number, toCurrency: string): number => {
     if (toCurrency === 'USD') return amountUSD;
+    if (!exchangeRateReady) return 0;
     return Math.round(amountUSD * exchangeRate * 100) / 100;
   };
 
   // Función para convertir de cualquier moneda a USD
   const convertToUSD = (amount: number, fromCurrency: string): number => {
     if (fromCurrency === 'USD') return amount;
+    if (!exchangeRateReady) return 0;
     return Math.round((amount / exchangeRate) * 10000) / 10000;
   };
 
@@ -56,6 +64,8 @@ export const useCurrency = () => {
   return {
     exchangeRate,
     exchangeRateLoading,
+    exchangeRateError,
+    exchangeRateReady,
     exchangeRateSource,
     exchangeRateUpdatedAt,
     convertFromUSD,

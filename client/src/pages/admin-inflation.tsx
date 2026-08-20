@@ -52,7 +52,12 @@ export default function AdminInflationPage() {
   // Mutación para crear/actualizar inflación
   const inflationMutation = useMutation({
     mutationFn: (data: typeof newInflation) => 
-      apiRequest('/api/admin/monthly-inflation', 'POST', data),
+      apiRequest('/api/admin/monthly-inflation', 'POST', {
+        ...data,
+        // El formulario usa porcentaje humano (8,5); el dominio persiste la
+        // tasa decimal (0,085) para poder componerla sin ambigüedad.
+        inflationRate: data.inflationRate / 100,
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/monthly-inflation'] });
       toast({ title: 'Dato de inflación guardado exitosamente' });

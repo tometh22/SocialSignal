@@ -4,8 +4,9 @@ import { useQuery } from "@tanstack/react-query";
 import { ReportTemplate } from "@shared/schema";
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
-import { Search, FileText, Check } from "lucide-react";
+import { Search, FileText, Check, RefreshCw, AlertCircle } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 
 /**
  * Componente simplificado para selección de plantillas únicamente
@@ -16,7 +17,7 @@ export const OptimizedTemplateSelection = () => {
   const [searchQuery, setSearchQuery] = useState("");
 
   // Consultar plantillas disponibles
-  const { data: templates, isLoading } = useQuery<ReportTemplate[]>({
+  const { data: templates, isLoading, isError, refetch } = useQuery<ReportTemplate[]>({
     queryKey: ['/api/report-templates']
   });
 
@@ -58,8 +59,18 @@ export const OptimizedTemplateSelection = () => {
     return (
       <Card 
         key={template.id}
+        role="button"
+        tabIndex={0}
+        aria-pressed={isSelected}
+        aria-label={`${isSelected ? 'Plantilla seleccionada' : 'Seleccionar plantilla'}: ${template.name}`}
         className={`cursor-pointer transition-all ${isSelected ? 'border-primary ring-2 ring-primary/20 bg-blue-50/30' : 'hover:border-gray-300'}`}
         onClick={() => handleTemplateSelect(template)}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            handleTemplateSelect(template);
+          }
+        }}
       >
         <CardHeader className="pb-2">
           <div className="flex justify-between items-start">
@@ -102,7 +113,7 @@ export const OptimizedTemplateSelection = () => {
             </div>
           ) : (
             <div className="w-full flex items-center justify-center py-1 border border-dashed border-neutral-300 rounded-md text-neutral-500 text-sm">
-              Click para seleccionar
+              Elegir plantilla
             </div>
           )}
         </CardFooter>
@@ -114,8 +125,10 @@ export const OptimizedTemplateSelection = () => {
     <div className="space-y-6">
       {/* Búsqueda de plantillas */}
       <div className="relative">
+        <label htmlFor="template-search" className="sr-only">Buscar plantillas</label>
         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-neutral-400 h-4 w-4" />
         <Input
+          id="template-search"
           placeholder="Buscar plantillas..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
@@ -125,8 +138,18 @@ export const OptimizedTemplateSelection = () => {
 
       {/* Opción personalizada */}
       <Card 
+        role="button"
+        tabIndex={0}
+        aria-pressed={quotationData.template === null}
+        aria-label="Usar configuración personalizada sin plantilla"
         className={`cursor-pointer transition-all ${quotationData.template === null ? 'border-primary ring-2 ring-primary/20 bg-blue-50/30' : 'hover:border-gray-300'}`}
         onClick={() => handleTemplateSelect(null)}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            handleTemplateSelect(null);
+          }
+        }}
       >
         <CardHeader className="pb-2">
           <div className="flex justify-between items-start">
@@ -164,14 +187,23 @@ export const OptimizedTemplateSelection = () => {
             </div>
           ) : (
             <div className="w-full flex items-center justify-center py-1 border border-dashed border-neutral-300 rounded-md text-neutral-500 text-sm">
-              Click para seleccionar
+              Usar configuración personalizada
             </div>
           )}
         </CardFooter>
       </Card>
 
       {/* Lista de plantillas */}
-      {isLoading ? (
+      {isError ? (
+        <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-6 text-center">
+          <AlertCircle className="mx-auto mb-3 h-8 w-8 text-red-500" />
+          <p className="font-medium text-red-900">No pudimos cargar las plantillas</p>
+          <p className="mt-1 text-sm text-red-700">Podés reintentar o continuar con una configuración personalizada.</p>
+          <Button type="button" variant="outline" className="mt-4" onClick={() => refetch()}>
+            <RefreshCw className="mr-2 h-4 w-4" /> Reintentar
+          </Button>
+        </div>
+      ) : isLoading ? (
         <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
           {[1, 2, 3, 4].map((i) => (
             <Card key={i} className="animate-pulse">

@@ -5,8 +5,11 @@ import { Badge } from "@/components/ui/badge";
 import { Copy, Check, Building2, Users, DollarSign, Calendar, FileText, Briefcase } from "lucide-react";
 import { useCurrency } from "@/hooks/use-currency";
 import { cn } from "@/lib/utils";
+import { calculateTaxBreakdown } from "@shared/utils/quotation-commercial";
 
 const PROJECT_TYPE_LABELS: Record<string, string> = {
+  'on-demand': 'Proyecto puntual',
+  'fee-mensual': 'Fee mensual',
   'always-on': 'Monitoreo Continuo',
   'one-shot': 'Proyecto Puntual',
   'monitoring': 'Monitoreo',
@@ -22,7 +25,7 @@ const ANALYSIS_LABELS: Record<string, string> = {
 };
 
 export function ExecutiveSummary() {
-  const { quotationData, baseCost, totalAmount, markupAmount } = useOptimizedQuote();
+  const { quotationData, totalAmount } = useOptimizedQuote();
   const { formatCurrency, exchangeRate } = useCurrency();
   const [copied, setCopied] = useState(false);
 
@@ -41,16 +44,22 @@ export function ExecutiveSummary() {
   const toDisplayCurrency = (amountARS: number) =>
     currency === 'USD' && effectiveRate > 0 ? amountARS / effectiveRate : amountARS;
 
-  const expiryDate = new Date();
-  expiryDate.setDate(expiryDate.getDate() + 30);
+  const expiryDate = quotationData.expiresAt
+    ? new Date(`${quotationData.expiresAt}T12:00:00`)
+    : new Date();
+  if (!quotationData.expiresAt) expiryDate.setDate(expiryDate.getDate() + 30);
   const expiryStr = expiryDate.toLocaleDateString('es-AR', { day: '2-digit', month: 'long', year: 'numeric' });
 
   const totalHours = team.reduce((s: number, m: any) => s + (m.hours || 0), 0);
-  const marginPercent = baseCost > 0 ? (((totalAmount - baseCost) / totalAmount) * 100).toFixed(0) : '0';
   const projectTypeLabel = PROJECT_TYPE_LABELS[project?.type] || project?.type || '';
   const analysisLabel = ANALYSIS_LABELS[quotationData.analysisType] || quotationData.analysisType || '';
 
   const fmt = (n: number) => formatCurrency(toDisplayCurrency(n), currency);
+  const tax = calculateTaxBreakdown(
+    toDisplayCurrency(totalAmount),
+    quotationData.taxRate || 0,
+    quotationData.pricesIncludeTax || false,
+  );
 
   // Email template
   const emailTemplate = `Estimado/a ${client?.contactName || 'cliente'},
@@ -66,22 +75,29 @@ RESUMEN DE LA PROPUESTA
 
 PRECIO${project?.type === 'always-on' ? ' MENSUAL' : ' TOTAL'}
 ━━━━━━━━━━━━━━━━━━━━━
-${currency} ${fmt(totalAmount)}
+Neto: ${formatCurrency(tax.netAmount, currency)}
+${quotationData.taxLabel || 'Impuestos'} (${quotationData.taxRate || 0}%): ${formatCurrency(tax.taxAmount, currency)}
+TOTAL: ${formatCurrency(tax.grandTotal, currency)}
 
 CONDICIONES
 ━━━━━━━━━━━━━━━━━━━━━
 • Esta propuesta tiene validez hasta el ${expiryStr}.
 • Los precios están expresados en ${currency}.
+• Condición de pago: ${quotationData.paymentTermsDays ?? 0} días.
 ${quotationData.proposalLink ? `• Propuesta completa: ${quotationData.proposalLink}` : ''}
 
 Quedamos a disposición para cualquier consulta.
 
 Saludos cordiales`;
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(emailTemplate);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(emailTemplate);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setCopied(false);
+    }
   };
 
   return (
@@ -91,10 +107,12 @@ Saludos cordiales`;
           <h2 className="text-lg font-semibold text-slate-900">Resumen ejecutivo</h2>
           <p className="text-sm text-slate-500 mt-0.5">Revisá todo antes de enviar al cliente</p>
         </div>
-        <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 text-xs">
-          <Calendar className="h-3 w-3 mr-1" />
-          Vence {expiryStr}
-        </Badge>
+        <div className="flex flex-col items-end gap-1.5">
+          <Badge variant="outline" className="border-indigo-200 bg-indigo-50 text-xs text-indigo-700">Vista para el cliente</Badge>
+          <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 text-xs">
+            <Calendar className="h-3 w-3 mr-1" /> Vence {expiryStr}
+          </Badge>
+        </div>
       </div>
 
       {/* Key info cards */}
@@ -118,15 +136,15 @@ Saludos cordiales`;
             <DollarSign className="h-3.5 w-3.5" /> Precio{project?.type === 'always-on' ? ' mensual' : ' total'}
           </div>
           <div>
-            <p className="text-2xl font-bold text-slate-900">{fmt(totalAmount)}</p>
+            <p className="text-2xl font-bold text-slate-900">{formatCurrency(tax.grandTotal, currency)}</p>
             <p className="text-xs text-slate-400 mt-0.5">{currency}</p>
           </div>
           <div className="space-y-1 pt-1 border-t border-slate-100">
             <div className="flex justify-between text-xs text-slate-500">
-              <span>Costo base</span><span>{fmt(baseCost)}</span>
+              <span>Moneda</span><span>{currency}</span>
             </div>
             <div className="flex justify-between text-xs text-slate-500">
-              <span>Margen</span><span>{marginPercent}%</span>
+              <span>Validez</span><span>hasta {expiryDate.toLocaleDateString('es-AR')}</span>
             </div>
           </div>
         </div>
@@ -155,7 +173,7 @@ Saludos cordiales`;
           <div className="flex items-center gap-2 text-xs font-semibold text-slate-500 uppercase tracking-wide">
             <FileText className="h-3.5 w-3.5" /> Email listo para enviar
           </div>
-          <Button size="sm" variant="outline" onClick={handleCopy} className="h-7 text-xs gap-1.5">
+          <Button size="sm" variant="outline" onClick={handleCopy} className="h-7 text-xs gap-1.5" aria-live="polite">
             {copied ? <><Check className="h-3 w-3 text-emerald-500" /> Copiado</> : <><Copy className="h-3 w-3" /> Copiar</>}
           </Button>
         </div>

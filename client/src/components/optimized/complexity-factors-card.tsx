@@ -6,7 +6,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { TrendingUp, Users, Globe, MessageSquare } from 'lucide-react';
 
-const ComplexityFactorsCard: React.FC = () => {
+type ComplexityFactorsCardProps = {
+  validationMessage?: string;
+};
+
+const ComplexityFactorsCard: React.FC<ComplexityFactorsCardProps> = ({ validationMessage }) => {
   const {
     quotationData,
     updateAnalysisType,
@@ -14,7 +18,8 @@ const ComplexityFactorsCard: React.FC = () => {
     updateCountriesCovered,
     updateClientEngagement,
     complexityFactors,
-    availableRoles
+    availableRoles,
+    pricingResult,
   } = useOptimizedQuote();
 
   const analysisTypes = [
@@ -58,17 +63,31 @@ const ComplexityFactorsCard: React.FC = () => {
 
   const totalFactor = getTotalComplexityFactor();
   const complexityLevel = getComplexityLevel(totalFactor);
+  const currency = quotationData.quotationCurrency === 'USD' ? 'USD' : 'ARS';
+  const formattedImpact = new Intl.NumberFormat(currency === 'USD' ? 'en-US' : 'es-AR', {
+    style: 'currency',
+    currency,
+    maximumFractionDigits: currency === 'USD' ? 2 : 0,
+  }).format(pricingResult.display.complexityAdjustment || 0);
 
   return (
-    <div className="space-y-6">
+    <div id="complexity-config" className="space-y-6" tabIndex={-1}>
+      {validationMessage && (
+        <div role="alert" className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+          {validationMessage}
+        </div>
+      )}
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-lg font-semibold text-gray-900">Factores de Complejidad</h3>
-          <p className="text-sm text-gray-600">Define las características que ajustarán el costo base del equipo</p>
+          <p className="text-sm text-gray-600">Definí las características que ajustarán el costo base del equipo</p>
         </div>
-        <Badge className={complexityLevel.color}>
-          Factor Total: {(totalFactor * 100).toFixed(1)}% - {complexityLevel.level}
-        </Badge>
+        <div className="flex flex-col items-end gap-1">
+          <Badge className={complexityLevel.color}>
+            +{(totalFactor * 100).toFixed(1)}% · {complexityLevel.level}
+          </Badge>
+          <span className="text-xs font-medium text-slate-600">Impacto estimado: +{formattedImpact}</span>
+        </div>
       </div>
 
       {/* Resumen del equipo configurado */}
@@ -105,7 +124,7 @@ const ComplexityFactorsCard: React.FC = () => {
           </CardHeader>
           <CardContent className="space-y-3">
             <Select value={quotationData.analysisType} onValueChange={updateAnalysisType}>
-              <SelectTrigger>
+              <SelectTrigger aria-label="Tipo de análisis">
                 <SelectValue placeholder="Seleccionar tipo de análisis" />
               </SelectTrigger>
               <SelectContent>
@@ -132,7 +151,7 @@ const ComplexityFactorsCard: React.FC = () => {
           </CardHeader>
           <CardContent className="space-y-3">
             <Select value={quotationData.mentionsVolume} onValueChange={updateMentionsVolume}>
-              <SelectTrigger>
+              <SelectTrigger aria-label="Volumen de menciones">
                 <SelectValue placeholder="Seleccionar volumen" />
               </SelectTrigger>
               <SelectContent>
@@ -159,7 +178,7 @@ const ComplexityFactorsCard: React.FC = () => {
           </CardHeader>
           <CardContent className="space-y-3">
             <Select value={quotationData.countriesCovered} onValueChange={updateCountriesCovered}>
-              <SelectTrigger>
+              <SelectTrigger aria-label="Países cubiertos">
                 <SelectValue placeholder="Seleccionar países" />
               </SelectTrigger>
               <SelectContent>
@@ -186,7 +205,7 @@ const ComplexityFactorsCard: React.FC = () => {
           </CardHeader>
           <CardContent className="space-y-3">
             <Select value={quotationData.clientEngagement} onValueChange={updateClientEngagement}>
-              <SelectTrigger>
+              <SelectTrigger aria-label="Nivel de participación del cliente">
                 <SelectValue placeholder="Seleccionar nivel" />
               </SelectTrigger>
               <SelectContent>

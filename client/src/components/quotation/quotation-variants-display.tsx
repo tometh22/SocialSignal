@@ -1,11 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Separator } from '@/components/ui/separator';
 import { CheckCircle, TrendingUp, TrendingDown, Minus, Eye, Edit } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
 
 interface QuotationVariant {
@@ -27,7 +25,6 @@ interface QuotationVariantsDisplayProps {
   quotationStatus: string;
   quotationCurrency?: string;
   baseTotal: number;
-  onVariantApproved?: (variant: QuotationVariant) => void;
 }
 
 export function QuotationVariantsDisplay({ 
@@ -35,12 +32,9 @@ export function QuotationVariantsDisplay({
   quotationStatus, 
   quotationCurrency = 'ARS',
   baseTotal,
-  onVariantApproved 
 }: QuotationVariantsDisplayProps) {
   const [variants, setVariants] = useState<QuotationVariant[]>([]);
   const [loading, setLoading] = useState(true);
-  const [approvingVariant, setApprovingVariant] = useState<number | null>(null);
-  const { toast } = useToast();
 
   useEffect(() => {
     fetchVariants();
@@ -67,45 +61,6 @@ export function QuotationVariantsDisplay({
       minimumFractionDigits: isARS ? 0 : 2,
       maximumFractionDigits: isARS ? 0 : 2,
     }).format(amount);
-  };
-
-  const handleApproveVariant = async (variant: QuotationVariant) => {
-    try {
-      setApprovingVariant(variant.id);
-      
-      // La selección sincroniza el encabezado financiero; la aprobación pasa
-      // después por la máquina de estados del servidor.
-      await apiRequest(`/api/quotations/${quotationId}/variants/${variant.id}/select`, {
-        method: 'PATCH'
-      });
-      await apiRequest(`/api/quotations/${quotationId}/status`, 'PATCH', {
-        status: 'approved',
-      });
-
-      toast({
-        title: "Variante aprobada",
-        description: `Se ha aprobado la variante "${variant.variantName}" y actualizado la cotización.`,
-        variant: "default",
-      });
-
-      // Refrescar variantes para mostrar la seleccionada
-      await fetchVariants();
-      
-      // Llamar al callback si existe
-      if (onVariantApproved) {
-        onVariantApproved(variant);
-      }
-
-    } catch (error: any) {
-      console.error('Error approving variant:', error);
-      toast({
-        title: "Error al aprobar variante",
-        description: error.message || 'No se pudo aprobar la variante',
-        variant: "destructive",
-      });
-    } finally {
-      setApprovingVariant(null);
-    }
   };
 
   const getPercentageDifference = (variantTotal: number, baseTotal: number) => {
@@ -180,9 +135,6 @@ export function QuotationVariantsDisplay({
                 <TableHead className="font-medium text-slate-600 text-xs py-2 text-right">Total</TableHead>
                 <TableHead className="font-medium text-slate-600 text-xs py-2 text-center">Diferencia</TableHead>
                 <TableHead className="font-medium text-slate-600 text-xs py-2 text-center">Estado</TableHead>
-                {quotationStatus === 'pending' && (
-                  <TableHead className="font-medium text-slate-600 text-xs py-2 text-center">Acciones</TableHead>
-                )}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -245,47 +197,23 @@ export function QuotationVariantsDisplay({
                       </Badge>
                     )}
                   </TableCell>
-                  {quotationStatus === 'pending' && (
-                    <TableCell className="py-3 text-center">
-                      {!variant.isSelected && (
-                        <Button
-                          size="sm"
-                          className="h-7 px-2 text-xs"
-                          onClick={() => handleApproveVariant(variant)}
-                          disabled={approvingVariant === variant.id}
-                        >
-                          {approvingVariant === variant.id ? (
-                            <>
-                              <div className="animate-spin rounded-full h-3 w-3 border-b border-white mr-1"></div>
-                              Aprobando...
-                            </>
-                          ) : (
-                            <>
-                              <CheckCircle className="h-3 w-3 mr-1" />
-                              Aprobar
-                            </>
-                          )}
-                        </Button>
-                      )}
-                    </TableCell>
-                  )}
                 </TableRow>
               ))}
             </TableBody>
           </Table>
         </div>
         
-        {quotationStatus === 'pending' && (
+        {['internally-approved', 'sent', 'viewed', 'in-negotiation'].includes(quotationStatus) && (
           <>
             <Separator />
             <div className="p-4 bg-blue-50">
               <p className="text-xs text-blue-700 mb-2 font-medium">
-                💡 Instrucciones para aprobar variantes:
+                Selección de alternativa
               </p>
               <ul className="text-xs text-blue-600 space-y-1">
-                <li>• Selecciona "Aprobar" en la variante que deseas confirmar</li>
-                <li>• Al aprobar una variante, la cotización cambiará a estado "Aprobada"</li>
-                <li>• Podrás crear el proyecto basado en la variante seleccionada</li>
+                <li>• Las alternativas incluidas permanecen disponibles para el cliente.</li>
+                <li>• Sólo el portal seguro puede registrar cuál fue aceptada.</li>
+                <li>• La aceptación guarda identidad, fecha, términos y evidencia técnica.</li>
               </ul>
             </div>
           </>

@@ -24,7 +24,10 @@ import {
   Star,
   User,
   DollarSign,
-  Info
+  Info,
+  Search,
+  ArrowUp,
+  ArrowDown
 } from 'lucide-react';
 import { motion, AnimatePresence, Reorder } from 'framer-motion';
 
@@ -68,7 +71,11 @@ const RATE_PROJECTION_OPTIONS: { value: 'current' | 'annual_avg'; label: string;
   },
 ];
 
-const EnhancedTeamConfig: React.FC = () => {
+type EnhancedTeamConfigProps = {
+  validationMessage?: string;
+};
+
+const EnhancedTeamConfig: React.FC<EnhancedTeamConfigProps> = ({ validationMessage }) => {
   const { exchangeRate } = useCurrency();
   const {
     quotationData,
@@ -97,6 +104,8 @@ const EnhancedTeamConfig: React.FC = () => {
   const [showRoleDetails, setShowRoleDetails] = useState(false);
   const [selectedQuickRoles, setSelectedQuickRoles] = useState<Set<number>>(new Set());
   const [selectedQuickPersonnel, setSelectedQuickPersonnel] = useState<Set<number>>(new Set());
+  const [roleSearch, setRoleSearch] = useState('');
+  const [personnelSearch, setPersonnelSearch] = useState('');
 
 
 
@@ -252,7 +261,7 @@ const EnhancedTeamConfig: React.FC = () => {
       if (person) {
         // If personnel has specific roles, try to find an appropriate one
         // For now, we'll use a default role or let user select
-        const defaultRole = availableRoles.find(role => role.id === 1) || availableRoles[0]; // Default to first role
+        const defaultRole = availableRoles.find(role => role.id === person.roleId);
         if (defaultRole) {
           const hours = 40;
           const rate = getCorrectRate(person, defaultRole);
@@ -311,9 +320,38 @@ const EnhancedTeamConfig: React.FC = () => {
   // Calcular totales
   const totalCost = draggedMembers.reduce((sum, member) => sum + member.cost, 0);
   const totalHours = draggedMembers.reduce((sum, member) => sum + member.hours, 0);
+  const normalizedRoleSearch = roleSearch.trim().toLocaleLowerCase('es');
+  const normalizedPersonnelSearch = personnelSearch.trim().toLocaleLowerCase('es');
+  const filteredRoles = availableRoles.filter((role) => role.name.toLocaleLowerCase('es').includes(normalizedRoleSearch));
+  const filteredPersonnel = availablePersonnel.filter((person) =>
+    person.name.toLocaleLowerCase('es').includes(normalizedPersonnelSearch) ||
+    (person.currentRole || '').toLocaleLowerCase('es').includes(normalizedPersonnelSearch),
+  );
+
+  const moveMember = (memberId: string, direction: -1 | 1) => {
+    const index = draggedMembers.findIndex((member) => member.id === memberId);
+    const target = index + direction;
+    if (index < 0 || target < 0 || target >= draggedMembers.length) return;
+    const reordered = [...draggedMembers];
+    [reordered[index], reordered[target]] = [reordered[target], reordered[index]];
+    handleReorder(reordered);
+  };
 
   return (
-    <div className="space-y-6">
+    <div id="team-config" className="space-y-6" tabIndex={-1}>
+      {validationMessage && (
+        <div role="alert" className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+          {validationMessage}
+        </div>
+      )}
+      {(availableRoles.length === 0 || availablePersonnel.length === 0) && (
+        <div role="status" className="flex flex-col gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 sm:flex-row sm:items-center sm:justify-between">
+          <span>No hay {availableRoles.length === 0 && availablePersonnel.length === 0 ? 'roles ni personas' : availableRoles.length === 0 ? 'roles' : 'personas'} disponibles en el catálogo.</span>
+          <Button type="button" size="sm" variant="outline" onClick={() => { loadRoles(); loadPersonnel(); }}>
+            Volver a cargar
+          </Button>
+        </div>
+      )}
       {/* Header con estadísticas */}
       <Card className="border-primary/20 bg-gradient-to-r from-primary/5 to-primary/10">
         <CardHeader className="pb-4">
@@ -324,7 +362,7 @@ const EnhancedTeamConfig: React.FC = () => {
                 Configuración del Equipo
               </CardTitle>
               <p className="text-sm text-muted-foreground mt-1">
-                Define los roles y personal que trabajarán en este proyecto
+                Definí los roles y las personas que trabajarán en este proyecto
               </p>
             </div>
             <div className="text-right">
@@ -435,32 +473,36 @@ const EnhancedTeamConfig: React.FC = () => {
       <div className="flex flex-wrap gap-3">
         <Button
           onClick={() => setQuickAddMode(!quickAddMode)}
+          aria-expanded={quickAddMode}
+          aria-controls="quick-role-picker"
           variant="outline"
           className="flex items-center gap-2"
         >
           <Plus className="h-4 w-4" />
-          Agregar por Rol
+          Agregar por rol
         </Button>
         <Button
           onClick={() => setQuickPersonnelMode(!quickPersonnelMode)}
+          aria-expanded={quickPersonnelMode}
+          aria-controls="quick-personnel-picker"
           variant="outline"
           className="flex items-center gap-2"
         >
           <User className="h-4 w-4" />
-          Agregar Personas
+          Agregar personas
         </Button>
       </div>
 
       {/* Modo de agregado rápido */}
         {quickAddMode && (
-          <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <div id="quick-role-picker" className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
             <div className="flex items-center justify-between mb-3">
               <div>
-                <h4 className="text-sm font-medium text-blue-900">Selecciona roles para agregar rápidamente:</h4>
+                <h4 className="text-sm font-medium text-blue-900">Seleccioná los roles que querés agregar:</h4>
                 <p className="text-xs text-blue-600 mt-1">
                   {selectedQuickRoles.size > 0 
                     ? `${selectedQuickRoles.size} rol${selectedQuickRoles.size > 1 ? 'es' : ''} seleccionado${selectedQuickRoles.size > 1 ? 's' : ''}`
-                    : 'Haz clic en los roles que deseas agregar'
+                    : 'Elegí uno o más roles de la lista'
                   }
                 </p>
               </div>
@@ -487,8 +529,12 @@ const EnhancedTeamConfig: React.FC = () => {
                 </Button>
               </div>
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-              {availableRoles.map(role => {
+            <div className="relative mb-3">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-blue-500" />
+              <Input value={roleSearch} onChange={(event) => setRoleSearch(event.target.value)} placeholder="Buscar rol..." className="bg-white pl-9" />
+            </div>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {filteredRoles.map(role => {
                 const isSelected = selectedQuickRoles.has(role.id);
                 const isAlreadyInTeam = quotationData.teamMembers.some(member => member.roleId === role.id);
 
@@ -530,14 +576,14 @@ const EnhancedTeamConfig: React.FC = () => {
 
       {/* Modo de agregado rápido de personal */}
         {quickPersonnelMode && (
-          <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+          <div id="quick-personnel-picker" className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
             <div className="flex items-center justify-between mb-3">
               <div>
-                <h4 className="text-sm font-medium text-green-900">Selecciona personas para agregar rápidamente:</h4>
+                <h4 className="text-sm font-medium text-green-900">Seleccioná las personas que querés agregar:</h4>
                 <p className="text-xs text-green-600 mt-1">
                   {selectedQuickPersonnel.size > 0 
                     ? `${selectedQuickPersonnel.size} persona${selectedQuickPersonnel.size > 1 ? 's' : ''} seleccionada${selectedQuickPersonnel.size > 1 ? 's' : ''}`
-                    : 'Haz clic en las personas que deseas agregar'
+                    : 'Elegí una o más personas de la lista'
                   }
                 </p>
               </div>
@@ -564,8 +610,12 @@ const EnhancedTeamConfig: React.FC = () => {
                 </Button>
               </div>
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-              {availablePersonnel.map(person => {
+            <div className="relative mb-3">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-green-600" />
+              <Input value={personnelSearch} onChange={(event) => setPersonnelSearch(event.target.value)} placeholder="Buscar persona o rol..." className="bg-white pl-9" />
+            </div>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {filteredPersonnel.map(person => {
                 const isSelected = selectedQuickPersonnel.has(person.id);
                 const isAlreadyInTeam = quotationData.teamMembers.some(member => member.personnelId === person.id);
 
@@ -625,7 +675,7 @@ const EnhancedTeamConfig: React.FC = () => {
           <h3 className="text-lg font-semibold">Equipo del Proyecto</h3>
           {draggedMembers.length > 1 && (
             <Badge variant="secondary" className="text-xs">
-              Arrastra para reordenar
+              Arrastrá o usá las flechas para reordenar
             </Badge>
           )}
         </div>
@@ -643,7 +693,7 @@ const EnhancedTeamConfig: React.FC = () => {
                 No hay miembros en el equipo
               </p>
               <p className="text-xs text-gray-400 mt-1">
-                Utiliza el formulario anterior para añadir miembros al equipo del proyecto
+                Usá los botones de arriba para agregar integrantes al proyecto
               </p>
             </motion.div>
           ) : (
@@ -675,7 +725,7 @@ const EnhancedTeamConfig: React.FC = () => {
                           <div className="grid grid-cols-1 items-center gap-4 md:grid-cols-[auto_minmax(12rem,1fr)_minmax(18rem,auto)_auto]">
                             {/* Drag handle */}
                             <div className="flex-shrink-0">
-                              <GripVertical className="h-5 w-5 text-gray-400" />
+                              <GripVertical aria-hidden="true" className="h-5 w-5 text-gray-400" />
                             </div>
 
                             {/* Role info */}
@@ -725,6 +775,7 @@ const EnhancedTeamConfig: React.FC = () => {
                                   <div className="flex items-center space-x-2">
                                     <Input
                                       type="number"
+                                      aria-label={`Horas de ${personnel?.name || role?.name || 'integrante'}`}
                                       value={tempEditValues[member.id]?.hours !== undefined ? tempEditValues[member.id].hours : member.hours}
                                       onChange={(e) => setTempEditValues(prev => ({
                                         ...prev,
@@ -741,6 +792,7 @@ const EnhancedTeamConfig: React.FC = () => {
                                     <span className="text-xs">$</span>
                                     <Input
                                       type="number"
+                                      aria-label={`Tarifa por hora de ${personnel?.name || role?.name || 'integrante'}`}
                                       step="0.01"
                                       value={tempEditValues[member.id]?.rate !== undefined ? tempEditValues[member.id].rate : member.rate}
                                       onChange={(e) => setTempEditValues(prev => ({
@@ -794,6 +846,28 @@ const EnhancedTeamConfig: React.FC = () => {
 
                             {/* Actions */}
                             <div className="flex items-center space-x-1">
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => moveMember(member.id, -1)}
+                                disabled={draggedMembers[0]?.id === member.id}
+                                className="h-8 w-8 p-0"
+                                aria-label={`Subir ${personnel?.name || role?.name || 'integrante'}`}
+                              >
+                                <ArrowUp className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => moveMember(member.id, 1)}
+                                disabled={draggedMembers[draggedMembers.length - 1]?.id === member.id}
+                                className="h-8 w-8 p-0"
+                                aria-label={`Bajar ${personnel?.name || role?.name || 'integrante'}`}
+                              >
+                                <ArrowDown className="h-4 w-4" />
+                              </Button>
                               {isEditing ? (
                                 <>
                                   <Button 
@@ -801,6 +875,7 @@ const EnhancedTeamConfig: React.FC = () => {
                                     variant="ghost"
                                     onClick={() => saveEdit(member.id)}
                                     className="h-8 w-8 p-0 group"
+                                    aria-label="Guardar cambios del integrante"
                                   >
                                     <Check className="h-4 w-4 text-green-600 group-hover:text-white" />
                                   </Button>
@@ -809,6 +884,7 @@ const EnhancedTeamConfig: React.FC = () => {
                                     variant="ghost"
                                     onClick={cancelEdit}
                                     className="h-8 w-8 p-0 group"
+                                    aria-label="Cancelar edición del integrante"
                                   >
                                     <X className="h-4 w-4 text-red-600 group-hover:text-white" />
                                   </Button>
@@ -820,6 +896,7 @@ const EnhancedTeamConfig: React.FC = () => {
                                     variant="ghost"
                                     onClick={() => startEditing(member.id, member.hours, member.rate)}
                                     className="h-8 w-8 p-0"
+                                    aria-label={`Editar ${personnel?.name || role?.name || 'integrante'}`}
                                   >
                                     <Edit className="h-4 w-4" />
                                   </Button>
@@ -828,6 +905,7 @@ const EnhancedTeamConfig: React.FC = () => {
                                     variant="ghost"
                                     onClick={() => removeTeamMember(member.id)}
                                     className="h-8 w-8 p-0 hover:bg-red-50"
+                                    aria-label={`Eliminar ${personnel?.name || role?.name || 'integrante'}`}
                                   >
                                     <Trash2 className="h-4 w-4 text-red-600" />
                                   </Button>

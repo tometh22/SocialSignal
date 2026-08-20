@@ -8,6 +8,16 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Plus, Copy, Trash2, Check, X, TrendingUp, TrendingDown, Minus, Users, Clock, DollarSign, Save, CheckCircle, Loader2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { apiRequest } from '@/lib/queryClient';
 import { getApiErrorMessage } from '@/lib/api-error';
@@ -77,6 +87,8 @@ export function QuotationVariants({
   const [variantTeamHours, setVariantTeamHours] = useState<Record<string, number>>({});
   const [variantInputText, setVariantInputText] = useState<Record<string, string>>({});
   const [expandedTeamVariant, setExpandedTeamVariant] = useState<number | null>(null);
+  const [approvalDialogOpen, setApprovalDialogOpen] = useState(false);
+  const [variantPendingDeletion, setVariantPendingDeletion] = useState<number | null>(null);
   const { toast } = useToast();
   const { saveQuotation } = useOptimizedQuote();
   const [, setLocation] = useLocation();
@@ -96,7 +108,9 @@ export function QuotationVariants({
       setLoading(true);
       const response = await apiRequest(`/api/quotations/${quotationId}/variants`, 'GET');
       setVariants(response);
-      setSelectedVariantIds(response.map((variant: QuotationVariant) => variant.id));
+      const selectedFromServer = response.filter((variant: QuotationVariant) => variant.isSelected).map((variant: QuotationVariant) => variant.id);
+      const recommended = response.find((variant: QuotationVariant) => variant.variantName === 'Intermedio');
+      setSelectedVariantIds(selectedFromServer.length > 0 ? selectedFromServer : recommended ? [recommended.id] : []);
       
       // If no variants exist, create default variants
       if (response.length === 0) {
@@ -157,7 +171,7 @@ export function QuotationVariants({
         complexityAdjustment: intermediate.complexityAdjustment,
         markupAmount: intermediate.markupAmount,
         totalAmount: intermediate.total,
-        isSelected: true, // Esta debe estar seleccionada por defecto
+        isSelected: false,
         createdAt: new Date().toISOString()
       },
       { 
@@ -176,7 +190,7 @@ export function QuotationVariants({
     ];
     
     setVariants(localVariants);
-    setSelectedVariantIds([-1, -2, -3]); // Select all variants by default for client presentation
+    setSelectedVariantIds([-2]);
     setLoading(false);
   };
 
@@ -261,7 +275,7 @@ export function QuotationVariants({
           complexityAdjustment: result.complexityAdjustment,
           markupAmount: result.markupAmount,
           totalAmount: result.total,
-          isSelected: variant.name === 'Intermedio' // Select intermediate as default
+          isSelected: false // La aceptación pertenece exclusivamente al portal del cliente
         });
       }
       
@@ -358,10 +372,6 @@ export function QuotationVariants({
         onVariantSelected(selectedVariants[0]);
       }
 
-      toast({
-        title: isCurrentlySelected ? "Variante deseleccionada" : "Variante seleccionada",
-        description: `${newSelectedIds.length} variante(s) seleccionada(s) para enviar al cliente`
-      });
     } catch (error) {
       console.error('Error toggling variant:', error);
       toast({
@@ -468,7 +478,7 @@ export function QuotationVariants({
           complexityAdjustment: result.complexityAdjustment,
           markupAmount: result.markupAmount,
           totalAmount: result.total,
-          isSelected: variant.isSelected,
+          isSelected: false,
           teamMembers: effectiveTeam.map((member) => ({
             roleId: Number(member.roleId) > 0 ? Number(member.roleId) : null,
             personnelId: Number(member.personnelId) > 0 ? Number(member.personnelId) : null,
@@ -478,11 +488,11 @@ export function QuotationVariants({
           })),
         };
       });
-      await saveQuotation('approved', persistedVariants);
+      await saveQuotation('pending', persistedVariants);
       
       toast({
-        title: "Cotización aprobada",
-        description: "La cotización ya está disponible para crear el proyecto.",
+        title: "Enviada a aprobación interna",
+        description: "La versión quedó bloqueada y espera la revisión de otra persona antes de enviarse al cliente.",
       });
       setLocation('/manage-quotes');
     } catch (error: any) {
@@ -563,7 +573,7 @@ export function QuotationVariants({
         {!baseCost && (
           <div className="text-center mt-4">
             <p className="text-gray-500">
-              Configura el equipo en el paso anterior para ver las variantes disponibles
+              Configurá el equipo en la fase Alcance para ver las variantes disponibles
             </p>
           </div>
         )}
@@ -572,20 +582,21 @@ export function QuotationVariants({
   }
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex justify-between items-center">
+    <div className="space-y-6 p-4 sm:p-6">
+      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Variantes de Cotización</h2>
           <p className="text-gray-600 mt-1">
-            Selecciona las variantes que quieres enviar al cliente para su elección
+            Seleccioná las opciones que querés incluir en la propuesta para el cliente
           </p>
+          <Badge variant="outline" className="mt-2 bg-slate-50 text-slate-600">Los costos internos no se muestran al cliente</Badge>
         </div>
         
-        <div className="flex gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row">
           <Button 
             variant="outline" 
             size="sm"
-            className="h-9 min-w-[150px]"
+            className="h-9 sm:min-w-[150px]"
             onClick={() => {
               const allSelected = selectedVariantIds.length === variants.length;
               if (allSelected) {
@@ -596,19 +607,19 @@ export function QuotationVariants({
               }
             }}
           >
-            {selectedVariantIds.length === variants.length ? 'Deseleccionar Todo' : 'Seleccionar Todo'}
+            {selectedVariantIds.length === variants.length ? 'Deseleccionar todas' : 'Seleccionar todas'}
           </Button>
           
           <Dialog>
             <DialogTrigger asChild>
               <Button variant="outline" size="sm" className="flex items-center gap-2" style={{ height: 36, minWidth: 150, justifyContent: "center" }}>
                 <Plus className="h-4 w-4" />
-                Nueva Variante
+                Nueva variante
               </Button>
             </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Crear Nueva Variante</DialogTitle>
+              <DialogTitle>Crear nueva variante</DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
               <div>
@@ -624,7 +635,7 @@ export function QuotationVariants({
                 <Textarea
                   value={newVariant.description}
                   onChange={(e) => setNewVariant({ ...newVariant, description: e.target.value })}
-                  placeholder="Describe las características de esta variante..."
+                  placeholder="Describí las características de esta variante..."
                 />
               </div>
               <div>
@@ -654,14 +665,13 @@ export function QuotationVariants({
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {variants.map((variant) => (
-          <Card 
+          <Card
             key={variant.id} 
-            className={`relative cursor-pointer transition-all duration-200 hover:shadow-lg ${
+            className={`relative transition-all duration-200 ${
               selectedVariantIds.includes(variant.id)
                 ? 'ring-2 ring-blue-500 shadow-lg' 
-                : 'hover:shadow-md'
+                : 'border-slate-200'
             }`}
-            onClick={() => toggleVariantSelection(variant.id)}
           >
             <CardHeader className="pb-3">
               <div className="flex justify-between items-start">
@@ -669,7 +679,7 @@ export function QuotationVariants({
                   <Checkbox 
                     checked={selectedVariantIds.includes(variant.id)}
                     onCheckedChange={() => toggleVariantSelection(variant.id)}
-                    onClick={(event) => event.stopPropagation()}
+                    aria-label={`Incluir variante ${variant.variantName} en la propuesta`}
                     className="mt-1"
                   />
                   <div>
@@ -688,6 +698,9 @@ export function QuotationVariants({
                     <Check className="h-3 w-3 mr-1" />
                     Para envío
                   </Badge>
+                )}
+                {variant.variantName === 'Intermedio' && !selectedVariantIds.includes(variant.id) && (
+                  <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-700">Recomendada</Badge>
                 )}
               </div>
             </CardHeader>
@@ -716,7 +729,7 @@ export function QuotationVariants({
                 <div className="space-y-1">
                   <div className="flex items-center justify-center text-purple-600"><DollarSign className="h-4 w-4" /></div>
                   <div className="text-sm font-medium">{formatCurrency(computeVariantCostFromTeam(variant))}</div>
-                  <div className="text-xs text-gray-500">Costo</div>
+                  <div className="text-xs text-gray-500">Costo interno</div>
                 </div>
               </div>
 
@@ -740,6 +753,7 @@ export function QuotationVariants({
                             <span className="flex-1 truncate text-gray-700">{m.personnelName || m.roleName}</span>
                             <input
                               type="number" min={0} step={1}
+                              aria-label={`Horas de ${m.personnelName || m.roleName} en ${variant.variantName}`}
                               value={variantInputText[inputKey] ?? String(getEffectiveMemberHours(variant, m))}
                               onChange={e => { e.stopPropagation(); setVariantInputText(prev => ({ ...prev, [inputKey]: e.target.value })); }}
                               onBlur={e => {
@@ -770,18 +784,6 @@ export function QuotationVariants({
                 })()}
               </div>
 
-              {/* Botón de Acción */}
-              <Button 
-                variant={selectedVariantIds.includes(variant.id) ? "secondary" : "default"}
-                className="w-full"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  toggleVariantSelection(variant.id);
-                }}
-              >
-                {selectedVariantIds.includes(variant.id) ? 'Para Envío' : 'Incluir'}
-              </Button>
-
               {/* Botón de Eliminar (solo para variantes custom) */}
               {!['Básico', 'Intermedio', 'Full'].includes(variant.variantName) && (
                 <Button
@@ -790,7 +792,7 @@ export function QuotationVariants({
                   className="w-full text-red-600 hover:text-red-800 hover:bg-red-50"
                   onClick={(e) => {
                     e.stopPropagation();
-                    deleteVariant(variant.id);
+                    setVariantPendingDeletion(variant.id);
                   }}
                 >
                   <Trash2 className="h-4 w-4 mr-2" />
@@ -815,7 +817,7 @@ export function QuotationVariants({
                   <tr className="border-b">
                     <th className="text-left p-2">Variante</th>
                     <th className="text-right p-2">Costo Base</th>
-                    <th className="text-right p-2">Markup</th>
+                    <th className="text-right p-2">Multiplicador</th>
                     <th className="text-right p-2">Total</th>
                     <th className="text-center p-2">Diferencia vs cotización base</th>
                   </tr>
@@ -908,11 +910,11 @@ export function QuotationVariants({
       )}
 
       {/* Botones de Finalización */}
-      <div className="flex justify-between items-center pt-8 border-t border-gray-200 mt-8">
+      <div className="mt-8 flex flex-col gap-4 border-t border-gray-200 pt-8 sm:flex-row sm:items-center sm:justify-between">
         <div className="text-sm text-gray-600">
-          Este es el último paso del proceso de cotización
+          Revisá la vista para el cliente y aprobá solo cuando la propuesta esté lista.
         </div>
-        <div className="flex gap-3">
+        <div className="flex flex-col gap-3 sm:flex-row">
           <Button
             variant="outline"
             onClick={handleSave}
@@ -927,29 +929,67 @@ export function QuotationVariants({
             ) : (
               <>
                 <Save className="h-4 w-4 mr-2" />
-                Guardar Borrador
+                Guardar borrador
               </>
             )}
           </Button>
           <Button
-            onClick={handleFinalize}
-            disabled={isSaving || isFinalizing}
+            onClick={() => setApprovalDialogOpen(true)}
+            disabled={isSaving || isFinalizing || selectedVariantIds.length === 0}
             className="bg-emerald-600 hover:bg-emerald-700 text-white"
           >
             {isFinalizing ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Finalizando...
+                Enviando a revisión...
               </>
             ) : (
               <>
                 <CheckCircle className="h-4 w-4 mr-2" />
-                Aprobar y finalizar
+                Solicitar aprobación
               </>
             )}
           </Button>
         </div>
       </div>
+
+      <AlertDialog open={approvalDialogOpen} onOpenChange={setApprovalDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Enviar esta versión a aprobación interna?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se congelarán {selectedVariantIds.length} alternativa{selectedVariantIds.length === 1 ? '' : 's'} en una revisión auditable. Otra persona deberá aprobarla antes del envío al cliente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Revisar nuevamente</AlertDialogCancel>
+            <AlertDialogAction onClick={handleFinalize} className="bg-emerald-600 hover:bg-emerald-700">
+              Confirmar envío a revisión
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={variantPendingDeletion !== null} onOpenChange={(open) => !open && setVariantPendingDeletion(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar esta variante?</AlertDialogTitle>
+            <AlertDialogDescription>Esta acción no se puede deshacer.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700"
+              onClick={() => {
+                if (variantPendingDeletion !== null) deleteVariant(variantPendingDeletion);
+                setVariantPendingDeletion(null);
+              }}
+            >
+              Eliminar variante
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
