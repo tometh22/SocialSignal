@@ -1,40 +1,121 @@
 import React from 'react';
 import { useOptimizedQuote } from '@/context/optimized-quote-context';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useQuery } from '@tanstack/react-query';
-import { Client, projectDurationOptions } from '@shared/schema';
+import { Client, ClientBillingEntity, projectDurationOptions } from '@shared/schema';
 import { Card, CardContent } from '@/components/ui/card';
-import { User, Calendar, FolderOpen, DollarSign } from 'lucide-react';
+import { User, Calendar, FolderOpen, DollarSign, AlertCircle, RefreshCw } from 'lucide-react';
 import { parseLocalizedDecimal } from '@shared/utils/quotation-pricing';
+import { useCurrency } from '@/hooks/use-currency';
 
-const OptimizedBasicInfo: React.FC = () => {
+type LiveBlueVerification = {
+  status: 'matched' | 'stale-source' | 'discrepancy' | 'partial';
+  differencePercentage: number | null;
+  recommended: { source: string; buy: number; sell: number; updatedAt: string | null };
+  sources: {
+    dolarApi: { sell: number; updatedAt: string | null; ageHours: number } | null;
+    dolarHoy: { sell: number; updatedAt: string | null; ageHours: number } | null;
+  };
+};
+
+type ExchangeRateForecast = {
+  rate: number;
+  year: number;
+  month: number;
+  source: string | null;
+  notes: string | null;
+  updatedAt: string | null;
+};
+
+type OptimizedBasicInfoProps = {
+  errors?: Record<string, string>;
+};
+
+const OptimizedBasicInfo: React.FC<OptimizedBasicInfoProps> = ({ errors = {} }) => {
   const {
     quotationData,
     updateClient,
     updateProjectName,
     updateProjectType,
     updateProjectDuration,
-    updateQuotationCurrency
+    updateQuotationCurrency,
+    updateQuotationData,
   } = useOptimizedQuote();
   const [exchangeRateInput, setExchangeRateInput] = React.useState(
     quotationData.exchangeRateSnapshot ? String(quotationData.exchangeRateSnapshot) : "",
   );
+  const [pendingCurrency, setPendingCurrency] = React.useState<string | null>(null);
   React.useEffect(() => {
     if (quotationData.exchangeRateSnapshot && document.activeElement?.id !== "quotation-exchange-rate") {
       setExchangeRateInput(String(quotationData.exchangeRateSnapshot));
     }
   }, [quotationData.exchangeRateSnapshot]);
   const parsedExchangeRate = parseLocalizedDecimal(exchangeRateInput);
-
-  // Consultar lista de clientes
-  const { data: clients, isLoading: isLoadingClients } = useQuery<Client[]>({
-    queryKey: ['/api/clients'],
+  const {
+    exchangeRate: configuredExchangeRate,
+    exchangeRateLoading,
+    exchangeRateError,
+    exchangeRateReady,
+    exchangeRateSource,
+    exchangeRateUpdatedAt,
+  } = useCurrency();
+  const {
+    data: liveBlue,
+    isFetching: isCheckingLiveBlue,
+    refetch: checkLiveBlue,
+    isError: liveBlueError,
+  } = useQuery<LiveBlueVerification>({
+    queryKey: ['/api/exchange-rate/live'],
+    enabled: false,
+    staleTime: 0,
+  });
+  const formatRate = (value: number) => new Intl.NumberFormat('es-AR', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  }).format(value);
+  const formatRateDate = (value: string | null) => value
+    ? new Intl.DateTimeFormat('es-AR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value))
+    : 'sin fecha informada';
+  const projectStartParts = quotationData.inflation.projectStartDate
+    ? quotationData.inflation.projectStartDate.split('-').map(Number)
+    : null;
+  const forecastYear = projectStartParts?.[0] || 0;
+  const forecastMonth = projectStartParts?.[1] || 0;
+  const { data: projectFxForecast } = useQuery<ExchangeRateForecast>({
+    queryKey: [`/api/exchange-rate/forecast?year=${forecastYear}&month=${forecastMonth}`],
+    enabled: forecastYear > 0 && forecastMonth >= 1 && forecastMonth <= 12,
+    retry: false,
   });
 
+  // Consultar lista de clientes
+  const { data: clients, isLoading: isLoadingClients, isError: clientsError, refetch: refetchClients } = useQuery<Client[]>({
+    queryKey: ['/api/clients'],
+  });
+  const { data: billingEntities = [] } = useQuery<ClientBillingEntity[]>({
+    queryKey: [`/api/clients/${quotationData.client?.id || 0}/billing-entities`],
+    enabled: Boolean(quotationData.client?.id),
+  });
+  React.useEffect(() => {
+    if (!quotationData.client || quotationData.billingEntityId || billingEntities.length === 0) return;
+    const preferred = billingEntities.find((entity) => entity.isDefault) || billingEntities[0];
+    updateQuotationData({ billingEntityId: preferred.id });
+  }, [billingEntities, quotationData.billingEntityId, quotationData.client, updateQuotationData]);
+
   // Consultar tipos de proyecto
-  const { data: projectTypes, isLoading: isLoadingProjectTypes } = useQuery<{value: string, label: string}[]>({
+  const { data: projectTypes, isLoading: isLoadingProjectTypes, isError: projectTypesError, refetch: refetchProjectTypes } = useQuery<{value: string, label: string}[]>({
     queryKey: ['/api/options/project-types'],
   });
 
@@ -48,6 +129,17 @@ const OptimizedBasicInfo: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {(clientsError || projectTypesError) && (
+        <div role="alert" className="flex flex-col gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-2">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>No pudimos cargar {clientsError && projectTypesError ? 'clientes ni modalidades' : clientsError ? 'los clientes' : 'las modalidades de proyecto'}.</span>
+          </div>
+          <Button type="button" size="sm" variant="outline" onClick={() => { refetchClients(); refetchProjectTypes(); }}>
+            <RefreshCw className="mr-2 h-4 w-4" /> Reintentar
+          </Button>
+        </div>
+      )}
       {/* Formulario principal y datos del cliente en un solo componente */}
       <Card className="bg-white border border-neutral-100 shadow-sm overflow-hidden">
         <CardContent className="p-6">
@@ -66,10 +158,11 @@ const OptimizedBasicInfo: React.FC = () => {
                     onValueChange={(value) => {
                       const selectedClient = clients?.find(client => client.id === parseInt(value));
                       updateClient(selectedClient || null);
+                      updateQuotationData({ billingEntityId: null });
                     }}
                     disabled={isLoadingClients}
                   >
-                    <SelectTrigger id="client" className="w-full bg-white border-neutral-200 h-9 focus:ring-1 focus:ring-primary/20 focus:border-primary/60 text-gray-800">
+                    <SelectTrigger id="client" aria-invalid={Boolean(errors.client)} aria-describedby={errors.client ? 'client-error' : undefined} className="w-full bg-white border-neutral-200 h-9 focus:ring-1 focus:ring-primary/20 focus:border-primary/60 text-gray-800">
                       <SelectValue placeholder="Seleccionar cliente" />
                     </SelectTrigger>
                     <SelectContent className="border border-neutral-200 bg-white">
@@ -111,6 +204,7 @@ const OptimizedBasicInfo: React.FC = () => {
                       )}
                     </SelectContent>
                   </Select>
+                  <FieldError id="client-error" message={errors.client} />
                 </div>
 
                 {/* Nombre del Proyecto */}
@@ -124,10 +218,33 @@ const OptimizedBasicInfo: React.FC = () => {
                     placeholder="Ej. Análisis de Mercado Q2 2023"
                     value={quotationData.project.name}
                     onChange={(e) => updateProjectName(e.target.value)}
+                    aria-invalid={Boolean(errors['project-name'])}
+                    aria-describedby={errors['project-name'] ? 'project-name-error' : undefined}
                     className="bg-white border-neutral-200 h-9 focus:ring-1 focus:ring-primary/20 focus:border-primary/60 text-gray-800"
                   />
+                  <FieldError id="project-name-error" message={errors['project-name']} />
                 </div>
               </div>
+
+              {quotationData.client && (
+                <div className="space-y-2">
+                  <Label htmlFor="billing-entity" className="text-sm font-medium text-gray-700">Entidad legal que recibirá la propuesta</Label>
+                  <Select
+                    value={quotationData.billingEntityId ? String(quotationData.billingEntityId) : ''}
+                    onValueChange={(value) => updateQuotationData({ billingEntityId: Number(value) })}
+                    disabled={billingEntities.length === 0}
+                  >
+                    <SelectTrigger id="billing-entity" className="h-9 w-full border-neutral-200 bg-white"><SelectValue placeholder={billingEntities.length === 0 ? 'El cliente no tiene entidades configuradas' : 'Seleccionar razón social'} /></SelectTrigger>
+                    <SelectContent>
+                      {billingEntities.map((entity) => (
+                        <SelectItem key={entity.id} value={String(entity.id)}>
+                          {entity.razonSocial}{entity.taxId ? ` · ${entity.taxId}` : ''}{entity.country ? ` · ${entity.country}` : ''}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 {/* Tipo de Proyecto */}
@@ -138,7 +255,7 @@ const OptimizedBasicInfo: React.FC = () => {
                     onValueChange={updateProjectType}
                     disabled={isLoadingProjectTypes}
                   >
-                    <SelectTrigger id="project-type" className="w-full bg-white border-neutral-200 h-9 focus:ring-1 focus:ring-primary/20 focus:border-primary/60 text-gray-800">
+                    <SelectTrigger id="project-type" aria-invalid={Boolean(errors['project-type'])} aria-describedby={errors['project-type'] ? 'project-type-error' : undefined} className="w-full bg-white border-neutral-200 h-9 focus:ring-1 focus:ring-primary/20 focus:border-primary/60 text-gray-800">
                       <SelectValue placeholder="Seleccionar tipo" />
                     </SelectTrigger>
                     <SelectContent className="border border-neutral-200 bg-white">
@@ -160,6 +277,7 @@ const OptimizedBasicInfo: React.FC = () => {
                       )}
                     </SelectContent>
                   </Select>
+                  <FieldError id="project-type-error" message={errors['project-type']} />
                 </div>
 
                 {/* Duración del Proyecto */}
@@ -173,7 +291,7 @@ const OptimizedBasicInfo: React.FC = () => {
                       value={quotationData.project.duration}
                       onValueChange={updateProjectDuration}
                     >
-                      <SelectTrigger id="project-duration" className="w-full bg-white border-neutral-200 h-9 focus:ring-1 focus:ring-primary/20 focus:border-primary/60 text-gray-800">
+                      <SelectTrigger id="project-duration" aria-invalid={Boolean(errors['project-duration'])} aria-describedby={errors['project-duration'] ? 'project-duration-error' : undefined} className="w-full bg-white border-neutral-200 h-9 focus:ring-1 focus:ring-primary/20 focus:border-primary/60 text-gray-800">
                         <SelectValue placeholder="Seleccionar duración" />
                       </SelectTrigger>
                       <SelectContent className="border border-neutral-200 bg-white">
@@ -201,6 +319,7 @@ const OptimizedBasicInfo: React.FC = () => {
                         }
                       </SelectContent>
                     </Select>
+                    <FieldError id="project-duration-error" message={errors['project-duration']} />
                   </div>
                 )}
 
@@ -211,7 +330,14 @@ const OptimizedBasicInfo: React.FC = () => {
                   </Label>
                   <Select
                     value={quotationData.quotationCurrency || "ARS"}
-                    onValueChange={updateQuotationCurrency}
+                    onValueChange={(currency) => {
+                      if (currency === quotationData.quotationCurrency) return;
+                      if (quotationData.teamMembers.length > 0) {
+                        setPendingCurrency(currency);
+                      } else {
+                        updateQuotationCurrency(currency);
+                      }
+                    }}
                   >
                     <SelectTrigger id="quotation-currency" className="h-9 w-full border-neutral-200 bg-white text-gray-800 [&>span]:text-center">
                       <SelectValue />
@@ -222,7 +348,7 @@ const OptimizedBasicInfo: React.FC = () => {
                     </SelectContent>
                   </Select>
                   <p className="text-center text-[11px] text-muted-foreground">
-                    Define desde el inicio cómo se convierten y muestran las tarifas del equipo.
+                    Definí desde el inicio cómo se convierten y muestran las tarifas del equipo.
                   </p>
                 </div>
 
@@ -235,6 +361,7 @@ const OptimizedBasicInfo: React.FC = () => {
                     inputMode="decimal"
                     value={exchangeRateInput}
                     aria-invalid={parsedExchangeRate == null || parsedExchangeRate <= 0}
+                    aria-describedby={errors['quotation-exchange-rate'] ? 'quotation-exchange-rate-error' : undefined}
                     onChange={(event) => setExchangeRateInput(event.target.value)}
                     onBlur={() => {
                       if (parsedExchangeRate && parsedExchangeRate > 0) {
@@ -245,9 +372,95 @@ const OptimizedBasicInfo: React.FC = () => {
                     className="h-9 text-center"
                     placeholder="Ej. 1.250,50"
                   />
+                  <FieldError id="quotation-exchange-rate-error" message={errors['quotation-exchange-rate']} />
                   <p className="text-center text-[11px] text-muted-foreground">
-                    Snapshot obligatorio para personal y herramientas en USD.
+                    Snapshot obligatorio: todas las conversiones de esta propuesta usan exactamente este valor.
                   </p>
+                  <div className="space-y-2 rounded-md border border-slate-200 bg-slate-50 p-2.5 text-[11px]">
+                    <div className="text-center text-slate-600">
+                      {exchangeRateLoading ? 'Consultando TC vigente…' : exchangeRateError || !exchangeRateReady ? (
+                        <span className="text-red-700">No hay un TC vigente disponible; ingresalo manualmente o verificá las fuentes.</span>
+                      ) : (
+                        <>
+                          Vigente: <strong>ARS {formatRate(configuredExchangeRate)}</strong>
+                          {' · '}{exchangeRateSource || 'Configuración manual'}
+                          {' · '}{formatRateDate(exchangeRateUpdatedAt)}
+                        </>
+                      )}
+                    </div>
+                    <div className="flex flex-col justify-center gap-2 sm:flex-row">
+                      {exchangeRateReady && configuredExchangeRate !== quotationData.exchangeRateSnapshot && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-[11px]"
+                          onClick={() => updateQuotationCurrency(quotationData.quotationCurrency || 'ARS', configuredExchangeRate)}
+                        >
+                          Usar TC vigente
+                        </Button>
+                      )}
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-[11px]"
+                        disabled={isCheckingLiveBlue}
+                        onClick={() => checkLiveBlue()}
+                      >
+                        <RefreshCw className={`mr-1.5 h-3 w-3 ${isCheckingLiveBlue ? 'animate-spin' : ''}`} />
+                        Corroborar en vivo
+                      </Button>
+                    </div>
+                    {projectFxForecast && (
+                      <div className="rounded border border-violet-200 bg-violet-50 p-2 text-center text-violet-900">
+                        Proyección para {String(projectFxForecast.month).padStart(2, '0')}/{projectFxForecast.year}:{' '}
+                        <strong>ARS {formatRate(projectFxForecast.rate)}</strong>
+                        {' · '}{projectFxForecast.source || 'estimación interna'}
+                        <div className="mt-1">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="h-7 border-violet-300 text-[11px]"
+                            onClick={() => updateQuotationCurrency(quotationData.quotationCurrency || 'ARS', projectFxForecast.rate)}
+                          >
+                            Usar proyección del mes
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                    {liveBlueError && (
+                      <p role="alert" className="text-center text-red-700">No pudimos consultar las fuentes en vivo.</p>
+                    )}
+                    {liveBlue && (
+                      <div className={`rounded border p-2 ${liveBlue.status === 'matched' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-amber-200 bg-amber-50 text-amber-900'}`}>
+                        <div className="grid grid-cols-1 gap-1 text-center sm:grid-cols-2">
+                          <span>DolarAPI: {liveBlue.sources.dolarApi ? `ARS ${formatRate(liveBlue.sources.dolarApi.sell)} · ${formatRateDate(liveBlue.sources.dolarApi.updatedAt)}` : 'no disponible'}</span>
+                          <span>Dólar Hoy: {liveBlue.sources.dolarHoy ? `ARS ${formatRate(liveBlue.sources.dolarHoy.sell)} · ${formatRateDate(liveBlue.sources.dolarHoy.updatedAt)}` : 'no disponible'}</span>
+                        </div>
+                        <p className="mt-1 text-center">
+                          {liveBlue.status === 'matched'
+                            ? 'Las fuentes coinciden dentro del 2%.'
+                            : liveBlue.status === 'stale-source'
+                              ? 'Una fuente está desactualizada; recomendamos la publicación más reciente.'
+                              : liveBlue.status === 'discrepancy'
+                                ? `Las fuentes difieren ${liveBlue.differencePercentage?.toFixed(2)}%. Revisá antes de aplicar.`
+                                : 'Sólo una fuente respondió; verificá antes de aplicar.'}
+                        </p>
+                        <div className="mt-2 text-center">
+                          <Button
+                            type="button"
+                            size="sm"
+                            className="h-7 text-[11px]"
+                            onClick={() => updateQuotationCurrency(quotationData.quotationCurrency || 'ARS', liveBlue.recommended.sell)}
+                          >
+                            Usar ARS {formatRate(liveBlue.recommended.sell)} ({liveBlue.recommended.source})
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                   {quotationData.requiresExchangeRateConfirmation && (
                     <p role="alert" className="rounded-md border border-amber-200 bg-amber-50 p-2 text-center text-[11px] text-amber-800">
                       Cotización legacy: confirmá este TC para migrarla al pricing v2. Hasta entonces se conservan sus totales guardados.
@@ -315,7 +528,7 @@ const OptimizedBasicInfo: React.FC = () => {
               ) : (
                 <div className="flex h-full w-full flex-col justify-center rounded-md bg-blue-50 p-4 text-center">
                   <h3 className="text-sm font-medium text-blue-700 mb-2">Información Inicial</h3>
-                  <p className="text-xs text-blue-600">Selecciona un cliente y proporciona un nombre de proyecto para comenzar.</p>
+                  <p className="text-xs text-blue-600">Seleccioná un cliente e ingresá un nombre de proyecto para comenzar.</p>
                   <p className="text-xs text-blue-500 mt-2">Los campos marcados con <span className="text-red-500">*</span> son obligatorios.</p>
                 </div>
               )}
@@ -323,8 +536,33 @@ const OptimizedBasicInfo: React.FC = () => {
           </div>
         </CardContent>
       </Card>
+
+      <AlertDialog open={pendingCurrency !== null} onOpenChange={(open) => !open && setPendingCurrency(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Cambiar la moneda de la cotización?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Las tarifas del equipo y el precio objetivo se recalcularán usando el tipo de cambio confirmado. Revisá los totales antes de aprobar.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Conservar moneda actual</AlertDialogCancel>
+            <AlertDialogAction onClick={() => {
+              if (pendingCurrency) updateQuotationCurrency(pendingCurrency);
+              setPendingCurrency(null);
+            }}>
+              Recalcular en {pendingCurrency}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
 
 export default OptimizedBasicInfo;
+
+function FieldError({ id, message }: { id: string; message?: string }) {
+  if (!message) return null;
+  return <p id={id} role="alert" className="text-xs font-medium text-red-600">{message}</p>;
+}

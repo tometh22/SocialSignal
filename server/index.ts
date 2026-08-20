@@ -13,6 +13,8 @@ import { quotationHeaderCurrencyRepairMigrationSql } from "./migrations/quotatio
 import { feedbackMindV29MigrationSql } from "./migrations/feedback-mind-v2-9";
 import { personnelCostSyncWarningsMigrationSql } from "./migrations/personnel-cost-sync-warnings";
 import { feedbackMindV210MigrationSql } from "./migrations/feedback-mind-v2-10";
+import { quotationProfessionalWorkflowMigrationSql } from "./migrations/quotation-professional-workflow";
+import { exchangeRateForecast2026MigrationSql } from "./migrations/exchange-rate-forecast-2026";
 import cors from 'cors';
 import { execSync } from 'child_process';
 
@@ -811,6 +813,8 @@ async function applyPendingMigrations() {
     await run('0040 feedback_mind_v2_9 closure', feedbackMindV29MigrationSql);
     await run('0041 personnel cost sync warnings', personnelCostSyncWarningsMigrationSql);
     await run('0042 feedback_mind_v2_10 closure', feedbackMindV210MigrationSql);
+    await run('0043-0044 professional quotation workflow', quotationProfessionalWorkflowMigrationSql);
+    await run('0045 exchange-rate forecast 2026', exchangeRateForecast2026MigrationSql);
 
     // 0033: feriados duplicados (mismo date+name insertado más de una vez desde el
     // formulario) — borra duplicados conservando la fila más antigua y agrega la
@@ -1057,6 +1061,10 @@ const port = Number(process.env.PORT || 5000);
       startReminderNotifications();
       console.log("🔔 Job de notificaciones de recordatorios CRM iniciado");
     }
+
+    const { startQuotationExpirationJob } = await import("./jobs/quotation-expiration");
+    startQuotationExpirationJob();
+    console.log("📨 Job de vencimiento de cotizaciones iniciado");
 
     // Register the routes and bind the exact same HTTP server they use for
     // WebSocket upgrades. Calling app.listen() here would create a second

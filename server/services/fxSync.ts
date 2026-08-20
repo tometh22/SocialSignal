@@ -1,6 +1,7 @@
 import { db } from "../db";
-import { exchangeRates } from "../../shared/schema";
+import { exchangeRates, systemConfig } from "../../shared/schema";
 import { and, eq } from "drizzle-orm";
+import { fetchLiveBlueRates } from "./liveFx";
 
 type UpsertInput = {
   year: number;
@@ -65,22 +66,11 @@ async function upsertRate(input: UpsertInput) {
  * como rate daily + source Blue para el mes y año en curso.
  */
 export async function syncBlueToday(createdBy: number) {
-  const res = await fetch("https://dolarapi.com/v1/dolares/blue", {
-    headers: { accept: "application/json" },
-  });
-  if (!res.ok) {
-    throw new Error(`dolarapi.com respondió ${res.status}`);
-  }
-  const payload = (await res.json()) as {
-    venta?: number;
-    compra?: number;
-    fechaActualizacion?: string;
-  };
-  const rate = Number(payload?.venta);
-  if (!Number.isFinite(rate) || rate <= 0) {
-    throw new Error("Respuesta inválida de dolarapi.com");
-  }
-  const fetchedAt = payload.fechaActualizacion ? new Date(payload.fechaActualizacion) : new Date();
+  const verification = await fetchLiveBlueRates();
+  const rate = verification.recommended.sell;
+  const fetchedAt = verification.recommended.updatedAt
+    ? new Date(verification.recommended.updatedAt)
+    : new Date();
   const year = fetchedAt.getFullYear();
   const month = fetchedAt.getMonth() + 1;
 
@@ -91,10 +81,26 @@ export async function syncBlueToday(createdBy: number) {
     rateType: "daily",
     source: "Blue",
     specificDate: fetchedAt,
-    notes: `Auto-sync dolarapi.com · compra ${payload.compra ?? "?"} / venta ${rate}`,
+    notes: `Auto-sync ${verification.recommended.source} · compra ${verification.recommended.buy} / venta ${rate} · verificación ${verification.status}`,
     createdBy,
   });
-  return { rate, fetchedAt, saved };
+  await db.insert(systemConfig)
+    .values({
+      configKey: "usd_exchange_rate",
+      configValue: rate,
+      description: `${verification.recommended.source} Blue venta · verificación ${verification.status}`,
+      updatedBy: createdBy,
+    })
+    .onConflictDoUpdate({
+      target: systemConfig.configKey,
+      set: {
+        configValue: rate,
+        description: `${verification.recommended.source} Blue venta · verificación ${verification.status}`,
+        updatedAt: new Date(),
+        updatedBy: createdBy,
+      },
+    });
+  return { rate, fetchedAt, saved, verification };
 }
 
 type RemEstimate = { year: number; month: number; rate: number };

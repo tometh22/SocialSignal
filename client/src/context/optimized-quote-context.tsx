@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Client, ReportTemplate, Role, Personnel, Quotation } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 import { useCurrency } from "@/hooks/use-currency";
+import { resolveQuotationPersonnelRate } from "@shared/utils/quotation-personnel-rate";
 import {
   calculateQuotationPricing,
   type QuotationPricingResult,
@@ -54,6 +55,8 @@ export interface ComplexityFactors {
   clientEngagementFactor: number;
 }
 
+export type AutosaveStatus = 'idle' | 'pending' | 'saving' | 'saved' | 'error';
+
 interface QuotationFinancials {
   platformCost: number;
   deviationPercentage: number;
@@ -87,12 +90,29 @@ export interface QuotationData {
     applyInflationAdjustment: boolean;
     inflationMethod: string;
     manualInflationRate: number;
+    automaticInflationRate?: number;
     projectStartDate: string;
   rateProjectionMode?: "current" | "annual_avg";
   };
   customization?: string;
   proposalLink?: string; // Link a la propuesta original
+  adjustmentReason?: string;
   leadId?: number; // Lead CRM de origen (para integración CRM-Cotizaciones)
+  billingEntityId?: number | null;
+  expiresAt?: string;
+  quotationType?: 'one-time' | 'recurring' | 'fee';
+  taxRate?: number;
+  taxLabel?: string;
+  pricesIncludeTax?: boolean;
+  paymentTermsDays?: number | null;
+  paymentSchedule?: Array<{ label: string; percentage: number; dueDays?: number }>;
+  commercialTerms?: string;
+  inclusions?: string;
+  exclusions?: string;
+  termsVersion?: string;
+  quotationNumber?: string | null;
+  revisionNumber?: number;
+  lockVersion?: number;
   exchangeRateSnapshot?: number; // Tipo de cambio al momento de cotizar (snapshot)
   pricingVersion?: number;
   requiresExchangeRateConfirmation?: boolean;
@@ -113,6 +133,9 @@ interface OptimizedQuoteContextType {
   availableRoles: Role[];
   availablePersonnel: Personnel[];
   recommendedRoleIds: number[];
+  autosaveStatus: AutosaveStatus;
+  lastAutosaveAt?: number;
+  hasUnsavedChanges: boolean;
 
   // Navigation
   currentStep: number;
@@ -178,6 +201,12 @@ interface OptimizedQuoteContextType {
 
 const OptimizedQuoteContext = createContext<OptimizedQuoteContextType | undefined>(undefined);
 
+const defaultExpiryDate = () => {
+  const date = new Date();
+  date.setDate(date.getDate() + 30);
+  return date.toISOString().split('T')[0];
+};
+
 const initialQuotationData: QuotationData = {
   client: null,
   project: {
@@ -213,10 +242,24 @@ const initialQuotationData: QuotationData = {
   inflation: {
     applyInflationAdjustment: false,
     inflationMethod: "manual",
-    manualInflationRate: 25,
+    manualInflationRate: 0,
+    automaticInflationRate: undefined,
     projectStartDate: "",
     rateProjectionMode: "current"
   },
+  quotationType: 'one-time',
+  expiresAt: defaultExpiryDate(),
+  taxRate: 0,
+  taxLabel: 'IVA',
+  pricesIncludeTax: false,
+  paymentTermsDays: 30,
+  paymentSchedule: [],
+  commercialTerms: 'Los importes y fechas quedan sujetos a la vigencia indicada en esta propuesta.',
+  adjustmentReason: '',
+  inclusions: '',
+  exclusions: '',
+  termsVersion: '1',
+  lockVersion: 1,
   salaryMonth: null
 };
 
@@ -240,18 +283,24 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
   });
   const [currentStep, setCurrentStep] = useState(1);
   const [recalculationTrigger, setRecalculationTrigger] = useState(0);
+  const [autosaveStatus, setAutosaveStatus] = useState<AutosaveStatus>('idle');
+  const [lastAutosaveAt, setLastAutosaveAt] = useState<number | undefined>(() => {
+    const stored = localStorage.getItem('last-autosave-time');
+    return stored ? Number(stored) : undefined;
+  });
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   const queryClient = useQueryClient();
-  const { convertToUSD, exchangeRate } = useCurrency();
+  const { convertToUSD, exchangeRate, exchangeRateReady } = useCurrency();
   const effectiveExchangeRate = quotationData.exchangeRateSnapshot && quotationData.exchangeRateSnapshot > 0
     ? quotationData.exchangeRateSnapshot
     : exchangeRate;
 
   useEffect(() => {
-    if (!quotationData.exchangeRateSnapshot && !quotationData.requiresExchangeRateConfirmation && exchangeRate > 0) {
+    if (!quotationData.exchangeRateSnapshot && !quotationData.requiresExchangeRateConfirmation && exchangeRateReady && exchangeRate > 0) {
       setQuotationData((current) => ({ ...current, exchangeRateSnapshot: exchangeRate }));
     }
-  }, [exchangeRate, quotationData.exchangeRateSnapshot, quotationData.requiresExchangeRateConfirmation]);
+  }, [exchangeRate, exchangeRateReady, quotationData.exchangeRateSnapshot, quotationData.requiresExchangeRateConfirmation]);
 
   // Get data from queries first
   const { data: roles = [] } = useQuery<Role[]>({
@@ -321,56 +370,21 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
     const rateExchangeRate = exchangeRateOverride && exchangeRateOverride > 0
       ? exchangeRateOverride
       : effectiveExchangeRate;
-    const personBillingCurrency = (person as any).billingCurrency ?? 'ARS';
-    const useUsd = currency === 'USD';
-    const field = useUsd ? "hourlyRateUSD" : "hourlyRateARS";
-    const historicalRates = [...((person as any).historicalRates ?? [])]
-      .sort((left: any, right: any) =>
-        (right.year * 100 + right.month) - (left.year * 100 + left.month)
-      );
-
-    if (rateMode === 'annual_avg') {
-      const averageYear = projectStartDate?.getFullYear() ?? currentYear;
-      const personRates = historicalRates.filter((r: any) =>
-        r.year === averageYear && Number(r[field]) > 0
-      );
-      if (personRates.length > 0) {
-        return personRates.reduce((sum: number, rate: any) => sum + Number(rate[field]), 0)
-          / personRates.length;
-      }
-      const fallbackField = useUsd ? "hourlyRateARS" : "hourlyRateUSD";
-      const fallbackRates = historicalRates.filter((r: any) =>
-        r.year === averageYear &&
-        Number(r[fallbackField]) > 0 &&
-        (Number(r.exchangeRate) > 0 || rateExchangeRate > 0)
-      );
-      if (fallbackRates.length === 0) return 0;
-      return fallbackRates.reduce((sum: number, rate: any) => {
-        const value = Number(rate[fallbackField]);
-        const fx = Number(rate.exchangeRate) || rateExchangeRate;
-        return sum + (useUsd ? value / fx : value * fx);
-      }, 0) / fallbackRates.length;
-    }
-
     const parsedMonth = parseSalaryMonth(targetMonth);
     const referenceDate = parsedMonth
         ? new Date(parsedMonth.year, parsedMonth.month - 1, 1)
         : new Date();
-    const referencePeriod = referenceDate.getFullYear() * 100 + referenceDate.getMonth() + 1;
-    const applicable = historicalRates.find((rate: any) =>
-      rate.year * 100 + rate.month <= referencePeriod && Number(rate[field]) > 0
-    );
-    if (applicable) return Number(applicable[field]);
-    if (!useUsd) {
-      const usdRate = historicalRates.find((rate: any) => rate.year * 100 + rate.month <= referencePeriod && Number(rate.hourlyRateUSD) > 0);
-      const fx = Number(usdRate?.exchangeRate) || rateExchangeRate;
-      if (usdRate && fx > 0) return Number(usdRate.hourlyRateUSD) * fx;
-    } else {
-      const arsRate = historicalRates.find((rate: any) => rate.year * 100 + rate.month <= referencePeriod && Number(rate.hourlyRateARS) > 0);
-      const fx = Number(arsRate?.exchangeRate) || rateExchangeRate;
-      if (arsRate && fx > 0) return Number(arsRate.hourlyRateARS) / fx;
-    }
-    return 0;
+    return resolveQuotationPersonnelRate({
+      billingCurrency: (person as any).billingCurrency,
+      usdBillingFraction: (person as any).usdBillingFraction,
+      quotationCurrency: currency,
+      quotationExchangeRate: rateExchangeRate,
+      historicalRates: (person as any).historicalRates,
+      referenceYear: referenceDate.getFullYear(),
+      referenceMonth: referenceDate.getMonth() + 1,
+      rateMode,
+      averageYear: projectStartDate?.getFullYear() ?? currentYear,
+    });
   }, [currentYear, effectiveExchangeRate]);
 
   const getPersonnelRate = useCallback((personnelId: number, targetCurrency?: string, targetMonth?: string | null) => {
@@ -446,55 +460,40 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
     setRecalculationTrigger(prev => prev + 1);
   }, [queryClient]);
 
-  // Enhanced auto-save draft to localStorage with error handling
+  // Persist local drafts shortly after each meaningful edit and expose the
+  // real write lifecycle to the UI. This avoids time-based status guesses.
   useEffect(() => {
-    const saveInterval = setInterval(() => {
-      if (quotationData.project.name || quotationData.teamMembers.length > 0 || quotationData.client) {
-        try {
-          const draftData = {
-            quotationData,
-            timestamp: Date.now(),
-            version: '2.0',
-            userAgent: navigator.userAgent,
-            url: window.location.href
-          };
+    const hasMeaningfulData = Boolean(
+      quotationData.project.name || quotationData.teamMembers.length > 0 || quotationData.client,
+    );
+    if (!hasMeaningfulData) return;
 
-          localStorage.setItem('draft-quotation', JSON.stringify(draftData));
-          localStorage.setItem('draft-quotation-backup', JSON.stringify(draftData));
-          localStorage.setItem('last-autosave-time', Date.now().toString());
-        } catch (error) {
-          console.error('❌ Error saving draft:', error);
-          // Try to clear some space and save essential data only
-          try {
-            localStorage.removeItem('draft-quotation-backup');
-            const essentialData = {
-              quotationData: {
-                client: quotationData.client,
-                project: quotationData.project,
-                teamMembers: quotationData.teamMembers,
-                template: quotationData.template
-              },
-              timestamp: Date.now()
-            };
-            localStorage.setItem('draft-quotation', JSON.stringify(essentialData));
-            console.log('💾 Guardado de emergencia realizado');
-          } catch (secondError) {
-            console.error('❌ CRÍTICO: No se puede guardar datos del formulario');
-            // Last resort: try to save to sessionStorage
-            try {
-              sessionStorage.setItem('emergency-draft', JSON.stringify({
-                client: quotationData.client?.name,
-                project: quotationData.project.name,
-                teamCount: quotationData.teamMembers.length,
-                timestamp: Date.now()
-              }));
-            } catch {}
-          }
-        }
+    setAutosaveStatus('pending');
+    setHasUnsavedChanges(true);
+    const saveTimeout = window.setTimeout(() => {
+      setAutosaveStatus('saving');
+      try {
+        const timestamp = Date.now();
+        const draftData = {
+          quotationData,
+          timestamp,
+          version: '2.1',
+          url: window.location.href,
+        };
+        localStorage.setItem('draft-quotation', JSON.stringify(draftData));
+        localStorage.setItem('draft-quotation-backup', JSON.stringify(draftData));
+        localStorage.setItem('last-autosave-time', String(timestamp));
+        setLastAutosaveAt(timestamp);
+        setAutosaveStatus('saved');
+        setHasUnsavedChanges(false);
+      } catch (error) {
+        console.error('❌ Error saving quotation draft:', error);
+        setAutosaveStatus('error');
+        setHasUnsavedChanges(true);
       }
-    }, 10000); // Save every 10 seconds (más frecuente)
+    }, 900);
 
-    return () => clearInterval(saveInterval);
+    return () => window.clearTimeout(saveTimeout);
   }, [quotationData]);
 
   // Restore a recent local draft only when opening a new quotation. A saved
@@ -565,7 +564,23 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
   ]);
 
   useEffect(() => {
-    const annualRate = quotationData.inflation.manualInflationRate || 25;
+    if (!(effectiveExchangeRate > 0)) {
+      const emptyResult: QuotationPricingResult = {
+        canonicalARS: { baseCost: 0, complexityAdjustment: 0, markupAmount: 0, toolsCost: 0, additionalDeliverableCost: 0, platformCost: 0, deviationAmount: 0, discountAmount: 0, total: 0 },
+        display: { baseCost: 0, complexityAdjustment: 0, markupAmount: 0, toolsCost: 0, additionalDeliverableCost: 0, platformCost: 0, deviationAmount: 0, discountAmount: 0, total: 0 },
+        displayCurrency: quotationData.quotationCurrency === "USD" ? "USD" : "ARS",
+        effectiveMarginFactor: quotationData.financials.marginFactor || 2,
+      };
+      setPricingResult(emptyResult);
+      setBaseCost(0);
+      setComplexityAdjustment(0);
+      setMarkupAmount(0);
+      setTotalAmount(0);
+      return;
+    }
+    const annualRate = quotationData.inflation.inflationMethod === "automatic"
+      ? quotationData.inflation.automaticInflationRate
+      : quotationData.inflation.manualInflationRate;
     let months = 0;
     if (quotationData.inflation.applyInflationAdjustment) {
       if (quotationData.inflation.rateProjectionMode === "annual_avg") {
@@ -576,12 +591,13 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
         months = Math.max(0, (start.getFullYear() - now.getFullYear()) * 12 + start.getMonth() - now.getMonth());
       }
     }
-    const monthlyInflation = Math.pow(1 + annualRate / 100, 1 / 12) - 1;
+    const safeAnnualRate = Number.isFinite(annualRate) && Number(annualRate) >= 0 ? Number(annualRate) : 0;
+    const monthlyInflation = Math.pow(1 + safeAnnualRate / 100, 1 / 12) - 1;
     const inflationFactor = months > 0 ? Math.pow(1 + monthlyInflation, months) : 1;
     const complexityFactor = Object.values(complexityFactors).reduce((sum, factor) => sum + (factor || 0), 0);
     const result = calculateQuotationPricing({
       quotationCurrency: quotationData.quotationCurrency === "USD" ? "USD" : "ARS",
-      exchangeRate: effectiveExchangeRate || 1,
+      exchangeRate: effectiveExchangeRate,
       team: quotationData.teamMembers.map((member) => ({
         hours: member.hours,
         rate: member.rate,
@@ -609,11 +625,11 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
 
   // Navigation functions
   const nextStep = useCallback(() => {
-    const maxStep = quotationData.project.type === 'always-on' ? 8 : 7;
+    const maxStep = 4;
     if (currentStep < maxStep) {
       setCurrentStep(currentStep + 1);
     }
-  }, [currentStep, quotationData.project.type]);
+  }, [currentStep]);
 
   const previousStep = useCallback(() => {
     if (currentStep > 1) {
@@ -622,11 +638,11 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
   }, [currentStep]);
 
   const goToStep = useCallback((step: number) => {
-    const maxStep = quotationData.project.type === 'always-on' ? 8 : 7;
+    const maxStep = 4;
     if (step >= 1 && step <= maxStep) {
       setCurrentStep(step);
     }
-  }, [quotationData.project.type]);
+  }, []);
 
   // Context methods with proper recalculation triggers
   const updateClient = useCallback((client: Client | null) => {
@@ -687,6 +703,14 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
         }
         return { ...member, rate: newRate, cost: member.hours * newRate };
       });
+      const oldCurrency = prev.quotationCurrency || 'ARS';
+      const currentManualPrice = prev.financials.manualPrice;
+      let convertedManualPrice = currentManualPrice;
+      if (currentManualPrice && oldCurrency !== newCurrency && rateSnapshot > 0) {
+        convertedManualPrice = oldCurrency === 'ARS'
+          ? currentManualPrice / rateSnapshot
+          : currentManualPrice * rateSnapshot;
+      }
       return {
         ...prev,
         quotationCurrency: newCurrency,
@@ -697,6 +721,11 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
           ? false
           : prev.requiresExchangeRateConfirmation,
         teamMembers: updatedMembers,
+        financials: {
+          ...prev.financials,
+          manualPrice: convertedManualPrice,
+          manualPriceCurrency: newCurrency === 'USD' ? 'USD' : 'ARS',
+        },
       };
     });
     forceRecalculate();
@@ -901,6 +930,9 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
 
       const loadedQuotationData = {
         id: quotation.id, // Importante: establecer el ID para indicar que estamos editando
+        quotationNumber: quotation.quotationNumber,
+        revisionNumber: quotation.revisionNumber,
+        lockVersion: quotation.lockVersion,
         client: clientData,
         project: {
           name: quotation.projectName || "",
@@ -951,10 +983,24 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
           applyInflationAdjustment: Boolean(quotation.applyInflationAdjustment),
           inflationMethod: quotation.inflationMethod || "manual",
           manualInflationRate: Number(quotation.manualInflationRate || 0),
+          automaticInflationRate: quotation.automaticInflationRate == null ? undefined : Number(quotation.automaticInflationRate),
           projectStartDate: quotation.projectStartDate ? new Date(quotation.projectStartDate).toISOString().split('T')[0] : "",
           rateProjectionMode: ((quotation as any).rateProjectionMode === "annual_avg" ? "annual_avg" : "current") as "current" | "annual_avg",
         },
         proposalLink: quotation.proposalLink || undefined,
+        adjustmentReason: quotation.adjustmentReason || '',
+        billingEntityId: quotation.billingEntityId,
+        expiresAt: quotation.expiresAt ? new Date(quotation.expiresAt).toISOString().split('T')[0] : undefined,
+        quotationType: (quotation.quotationType || 'one-time') as 'one-time' | 'recurring' | 'fee',
+        taxRate: Number(quotation.taxRate || 0),
+        taxLabel: quotation.taxLabel || 'IVA',
+        pricesIncludeTax: Boolean(quotation.pricesIncludeTax),
+        paymentTermsDays: quotation.paymentTermsDays == null ? null : Number(quotation.paymentTermsDays),
+        paymentSchedule: Array.isArray(quotation.paymentSchedule) ? quotation.paymentSchedule : [],
+        commercialTerms: quotation.commercialTerms || '',
+        inclusions: quotation.inclusions || '',
+        exclusions: quotation.exclusions || '',
+        termsVersion: quotation.termsVersion || '1',
         salaryMonth: quotation.salaryMonth ?? null
       };
 
@@ -995,7 +1041,10 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
         throw new Error("Debe agregar al menos un miembro al equipo antes de finalizar la cotización");
       }
 
-      const saveExchangeRate = quotationData.exchangeRateSnapshot || exchangeRate || 1;
+      const saveExchangeRate = Number(quotationData.exchangeRateSnapshot || exchangeRate);
+      if (!Number.isFinite(saveExchangeRate) || saveExchangeRate <= 0) {
+        throw new Error("Confirmá un tipo de cambio USD/ARS positivo antes de guardar la cotización");
+      }
 
       const quotationPayload = {
         clientId: quotationData.client.id,
@@ -1026,12 +1075,27 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
         applyInflationAdjustment: quotationData.inflation.applyInflationAdjustment || false,
         inflationMethod: quotationData.inflation.inflationMethod || 'manual',
         manualInflationRate: quotationData.inflation.manualInflationRate || 0,
+        automaticInflationRate: quotationData.inflation.automaticInflationRate ?? null,
         projectStartDate: quotationData.inflation.projectStartDate ? new Date(quotationData.inflation.projectStartDate) : undefined,
         rateProjectionMode: quotationData.inflation.rateProjectionMode || 'current',
         quotationCurrency: quotationData.quotationCurrency || 'ARS',
         exchangeRateAtQuote: saveExchangeRate,
         proposalLink: quotationData.proposalLink || null,
+        adjustmentReason: quotationData.adjustmentReason || null,
         leadId: quotationData.leadId || null,
+        billingEntityId: quotationData.billingEntityId ?? null,
+        expiresAt: quotationData.expiresAt ? new Date(`${quotationData.expiresAt}T12:00:00`) : undefined,
+        quotationType: quotationData.quotationType || 'one-time',
+        taxRate: quotationData.taxRate || 0,
+        taxLabel: quotationData.taxLabel || 'IVA',
+        pricesIncludeTax: quotationData.pricesIncludeTax || false,
+        paymentTermsDays: quotationData.paymentTermsDays ?? null,
+        paymentSchedule: quotationData.paymentSchedule || [],
+        commercialTerms: quotationData.commercialTerms || null,
+        inclusions: quotationData.inclusions || null,
+        exclusions: quotationData.exclusions || null,
+        termsVersion: quotationData.termsVersion || '1',
+        lockVersion: quotationData.lockVersion || 1,
         salaryMonth: quotationData.salaryMonth ?? null,
         status: status,
         // The UI uses 0 as the empty role sentinel when a member is selected
@@ -1098,6 +1162,16 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
         // Actualizar el ID en el contexto después de crear
         setQuotationData(prev => ({ ...prev, id: savedQuotation.id }));
       }
+      setQuotationData((previous) => ({
+        ...previous,
+        id: savedQuotation.id,
+        quotationNumber: savedQuotation.quotationNumber ?? previous.quotationNumber,
+        revisionNumber: savedQuotation.revisionNumber ?? previous.revisionNumber,
+        lockVersion: savedQuotation.lockVersion ?? previous.lockVersion,
+        expiresAt: savedQuotation.expiresAt
+          ? new Date(savedQuotation.expiresAt).toISOString().split('T')[0]
+          : previous.expiresAt,
+      }));
 
       // Track successful quotation completion for draft management
       if (status !== 'draft') {
@@ -1111,6 +1185,12 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
 
       await queryClient.invalidateQueries({ queryKey: ['/api/quotations'] });
       await queryClient.invalidateQueries({ queryKey: ['/api/quotations/approved'] });
+
+      const savedAt = Date.now();
+      localStorage.setItem('last-autosave-time', String(savedAt));
+      setLastAutosaveAt(savedAt);
+      setAutosaveStatus('saved');
+      setHasUnsavedChanges(false);
 
       console.log('🎉 Quotation and team saved successfully');
       return savedQuotation;
@@ -1275,6 +1355,9 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
     availableRoles: roles,
     availablePersonnel: filteredPersonnel,
     recommendedRoleIds,
+    autosaveStatus,
+    lastAutosaveAt,
+    hasUnsavedChanges,
     currentStep,
     nextStep,
     previousStep,

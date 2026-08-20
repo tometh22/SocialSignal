@@ -11,6 +11,7 @@ import { OptimizedQuoteProvider } from "@/context/optimized-quote-context";
 const ManageQuotes = lazy(() => import("@/pages/manage-quotes"));
 const QuotationDetail = lazy(() => import("@/pages/quotation-detail"));
 const QuoteRedirect = lazy(() => import("@/pages/quote-redirect"));
+const PublicProposal = lazy(() => import("@/pages/public-proposal"));
 const Clients = lazy(() => import("@/pages/clients"));
 const Admin = lazy(() => import("@/pages/admin-fixed"));
 const AdminInflation = lazy(() => import("@/pages/admin-inflation"));
@@ -193,6 +194,9 @@ function AppRoutes() {
   return (
     <Switch>
       <Route path="/auth" component={AuthPage} />
+      <Route path="/proposal/:token">
+        <Suspense fallback={<AppRouteFallback />}><PublicProposal /></Suspense>
+      </Route>
 
       <Route path="*">
         <div className="app-shell flex h-[100dvh] overflow-hidden bg-background">

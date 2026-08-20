@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Search, FileText, CheckCircle, AlertCircle, Clock, Edit, Eye, Trash2, PenLine, Plus, X, MessageCircle, Filter, Loader2, Calendar, DollarSign, TrendingUp, Zap, Users, Handshake, Briefcase, Target, ThumbsDown, TrendingDown, AlertOctagon, ChevronDown, FolderOpen, List } from "lucide-react";
+import { Search, FileText, CheckCircle, AlertCircle, Clock, Edit, Eye, Archive, PenLine, Plus, X, MessageCircle, Filter, Loader2, Calendar, DollarSign, TrendingUp, Zap, Users, Handshake, Briefcase, Target, ThumbsDown, TrendingDown, AlertOctagon, ChevronDown, FolderOpen, List, Send, GitBranch } from "lucide-react";
 import { LossReasonDialog } from "@/components/quotation/loss-reason-dialog";
 import { PageLayout } from "@/components/ui/page-layout";
 import { Loader } from "@/components/ui/loader";
@@ -72,6 +72,14 @@ export default function ManageQuotes() {
   }>({ queryKey: ["/api/quotations/management-metadata"] });
   const negotiationData = managementMetadata?.negotiations ?? {};
   const quotationProjects = managementMetadata?.projects ?? {};
+  const { data: funnel } = useQuery<{
+    sent: number;
+    won: number;
+    winRate: number;
+    byStatus: Record<string, { count: number; value: number }>;
+  }>({
+    queryKey: ['/api/quotation-analytics/funnel'],
+  });
 
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -80,8 +88,6 @@ export default function ManageQuotes() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [newStatus, setNewStatus] = useState<string | null>(null);
-  const [associatedProjects, setAssociatedProjects] = useState<any[]>([]);
-  const [checkingProjects, setCheckingProjects] = useState(false);
   const [deletingQuoteId, setDeletingQuoteId] = useState<number | null>(null);
   const [lossReasonQuote, setLossReasonQuote] = useState<Quotation | null>(null);
   const [markingLost, setMarkingLost] = useState(false);
@@ -174,21 +180,9 @@ export default function ManageQuotes() {
     }, 10);
   };
 
-  const openDeleteDialog = async (quote: Quotation) => {
+  const openDeleteDialog = (quote: Quotation) => {
     setSelectedQuote(quote);
-    setCheckingProjects(true);
-
-    try {
-      const response = await authFetch(`/api/active-projects/quotation/${quote.id}`);
-      const projects = await response.json();
-      setAssociatedProjects(projects || []);
-    } catch (error) {
-      console.error("Error checking associated projects:", error);
-      setAssociatedProjects([]);
-    } finally {
-      setCheckingProjects(false);
-      setDeleteDialogOpen(true);
-    }
+    setDeleteDialogOpen(true);
   };
 
   const handleDeleteQuotation = async () => {
@@ -212,22 +206,12 @@ export default function ManageQuotes() {
         data = { success: response.ok, message: response.statusText };
       }
 
-      if (response.status === 409) {
-        setDeletingQuoteId(null);
-        toast({
-          title: "No se puede eliminar",
-          description: "Esta cotización está siendo utilizada por proyectos activos y no puede ser eliminada.",
-          variant: "destructive",
-        });
-        return;
-      }
-
       if (response.ok && data.success) {
 
         setTimeout(() => {
           toast({
-            title: "Cotización eliminada",
-            description: `La cotización "${selectedQuote.projectName}" ha sido eliminada correctamente.`,
+            title: "Cotización archivada",
+            description: `La cotización "${selectedQuote.projectName}" se archivó sin borrar su historial comercial.`,
           });
 
           refetch();
@@ -235,7 +219,7 @@ export default function ManageQuotes() {
           setDeletingQuoteId(null);
         }, 800);
       } else {
-        console.error(`[QUOTES] ❌ Error en eliminación:`, {
+        console.error(`[QUOTES] ❌ Error al archivar:`, {
           status: response.status,
           statusText: response.statusText,
           data: data,
@@ -244,14 +228,14 @@ export default function ManageQuotes() {
 
         setDeletingQuoteId(null);
         toast({
-          title: "Error al eliminar",
-          description: data.message || `No se pudo eliminar la cotización "${selectedQuote.projectName}".`,
+          title: "Error al archivar",
+          description: data.message || `No se pudo archivar la cotización "${selectedQuote.projectName}".`,
           variant: "destructive",
         });
       }
     } catch (error) {
       setDeletingQuoteId(null);
-      console.error(`[QUOTES] ❌ Error crítico al eliminar cotización:`, {
+      console.error(`[QUOTES] ❌ Error crítico al archivar cotización:`, {
         quotationId: selectedQuote.id,
         quotationName: selectedQuote.projectName,
         error: error instanceof Error ? {
@@ -264,14 +248,14 @@ export default function ManageQuotes() {
 
       toast({
         title: "Error crítico",
-        description: `Ocurrió un error inesperado al intentar eliminar la cotización "${selectedQuote.projectName}". ${error instanceof Error ? error.message : 'Error desconocido'}`,
+        description: `Ocurrió un error inesperado al intentar archivar la cotización "${selectedQuote.projectName}". ${error instanceof Error ? error.message : 'Error desconocido'}`,
         variant: "destructive",
       });
     }
   };
 
   const getExpiryBadge = (quote: Quotation) => {
-    if (!quote.expiresAt || (quote.status !== 'pending' && quote.status !== 'in-negotiation')) return null;
+    if (!quote.expiresAt || !['sent', 'viewed', 'in-negotiation'].includes(quote.status)) return null;
     const exp = new Date(quote.expiresAt);
     const now = new Date();
     const daysLeft = Math.ceil((exp.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
@@ -294,7 +278,7 @@ export default function ManageQuotes() {
 
   const isQuoteExpired = (quote: { status: string; expiresAt?: string | Date | null }) => {
     return quote.expiresAt
-      && (quote.status === "pending" || quote.status === "in-negotiation")
+      && ["sent", "viewed", "in-negotiation"].includes(quote.status)
       && new Date(quote.expiresAt) < new Date();
   };
 
@@ -313,13 +297,31 @@ export default function ManageQuotes() {
         variant: 'default' as const,
         className: 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100',
         icon: CheckCircle,
-        label: 'Aprobada'
+        label: 'Aceptada por cliente'
       },
       'pending': {
         variant: 'secondary' as const,
         className: 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100',
         icon: Clock,
-        label: 'Pendiente'
+        label: 'Aprobación interna'
+      },
+      'internally-approved': {
+        variant: 'outline' as const,
+        className: 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100',
+        icon: CheckCircle,
+        label: 'Aprobada internamente'
+      },
+      'sent': {
+        variant: 'outline' as const,
+        className: 'bg-cyan-50 text-cyan-700 border-cyan-200',
+        icon: Send,
+        label: 'Enviada'
+      },
+      'viewed': {
+        variant: 'outline' as const,
+        className: 'bg-violet-50 text-violet-700 border-violet-200',
+        icon: Eye,
+        label: 'Vista por cliente'
       },
       'rejected': {
         variant: 'destructive' as const,
@@ -338,7 +340,10 @@ export default function ManageQuotes() {
         className: 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100',
         icon: Edit,
         label: 'Borrador'
-      }
+      },
+      'expired': { variant: 'outline' as const, className: 'bg-orange-50 text-orange-700 border-orange-200', icon: AlertOctagon, label: 'Vencida' },
+      'cancelled': { variant: 'outline' as const, className: 'bg-slate-50 text-slate-600 border-slate-200', icon: X, label: 'Cancelada' },
+      'superseded': { variant: 'outline' as const, className: 'bg-slate-50 text-slate-500 border-slate-200', icon: GitBranch, label: 'Reemplazada' },
     };
 
     const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.draft;
@@ -358,10 +363,16 @@ export default function ManageQuotes() {
   const translateStatus = (status: string) => {
     const statusMap: Record<string, string> = {
       'pending': 'Pendiente',
-      'approved': 'Aprobada',
+      'internally-approved': 'Aprobada internamente',
+      'sent': 'Enviada',
+      'viewed': 'Vista por cliente',
+      'approved': 'Aceptada por cliente',
       'rejected': 'Rechazada',
       'in-negotiation': 'En Negociación',
-      'draft': 'Borrador'
+      'draft': 'Borrador',
+      'expired': 'Vencida',
+      'cancelled': 'Cancelada',
+      'superseded': 'Reemplazada',
     };
     return statusMap[status] || status;
   };
@@ -375,7 +386,7 @@ export default function ManageQuotes() {
   const isExpired = (quote: Quotation) =>
     !!quote.expiresAt
     && new Date(quote.expiresAt) < new Date()
-    && (quote.status === 'pending' || quote.status === 'in-negotiation');
+    && ['sent', 'viewed', 'in-negotiation'].includes(quote.status);
 
   const statsSource = quotations || [];
   const stats = {
@@ -389,11 +400,9 @@ export default function ManageQuotes() {
       const fx = Number(q.exchangeRateAtQuote) || Number(q.usdExchangeRate) || exchangeRate;
       return sum + (q.quotationCurrency === 'USD' ? q.totalAmount * fx : q.totalAmount);
     }, 0),
-    conversionRate: statsSource.length > 0
-      ? (statsSource.filter(q => q.status === 'approved').length / statsSource.length) * 100
-      : 0,
-    rejectionRate: statsSource.length > 0
-      ? (statsSource.filter(q => q.status === 'rejected').length / statsSource.length) * 100
+    conversionRate: funnel?.winRate ?? 0,
+    rejectionRate: (funnel?.sent || 0) > 0
+      ? ((funnel?.byStatus?.rejected?.count || 0) / (funnel?.sent || 1)) * 100
       : 0,
   };
 
@@ -512,7 +521,7 @@ export default function ManageQuotes() {
               label="Conversión"
               value={`${stats.conversionRate.toFixed(1)}%`}
               icon={<TrendingUp className="h-5 w-5" />}
-              detail={`${stats.approved} aprobadas de ${stats.total}`}
+              detail={`${funnel?.won ?? stats.approved} aceptadas de ${funnel?.sent ?? 0} enviadas`}
               tone="success"
               valueLabel={`Tasa de conversión: ${stats.conversionRate.toFixed(1)} por ciento`}
             />
@@ -573,9 +582,14 @@ export default function ManageQuotes() {
                       <SelectItem value="all">Todos los Estados</SelectItem>
                       <SelectItem value="draft">Borrador</SelectItem>
                       <SelectItem value="pending">Pendiente</SelectItem>
+                      <SelectItem value="internally-approved">Aprobada internamente</SelectItem>
+                      <SelectItem value="sent">Enviada</SelectItem>
+                      <SelectItem value="viewed">Vista por cliente</SelectItem>
                       <SelectItem value="approved">Aprobada</SelectItem>
                       <SelectItem value="rejected">Rechazada</SelectItem>
                       <SelectItem value="in-negotiation">En Negociación</SelectItem>
+                      <SelectItem value="expired">Vencida</SelectItem>
+                      <SelectItem value="cancelled">Cancelada</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -846,7 +860,7 @@ export default function ManageQuotes() {
                                   )}
                                   
                                   <div className="ml-2 border-l border-gray-200 pl-2 flex items-center">
-                                    {['pending', 'in-negotiation'].includes(quote.status) && (
+                                    {['sent', 'viewed', 'in-negotiation'].includes(quote.status) && (
                                       <Button
                                         variant="ghost"
                                         size="sm"
@@ -875,7 +889,7 @@ export default function ManageQuotes() {
                                       {deletingQuoteId === quote.id ? (
                                         <Loader2 className="h-3.5 w-3.5 animate-spin" />
                                       ) : (
-                                        <Trash2 className="h-3.5 w-3.5" />
+                                        <Archive className="h-3.5 w-3.5" />
                                       )}
                                     </Button>
                                   </div>
@@ -961,30 +975,26 @@ export default function ManageQuotes() {
             {(() => {
               const VALID_TRANSITIONS: Record<string, Array<{ status: string; label: string; className: string }>> = {
                 "draft":          [
-                  { status: "pending",        label: "Enviar (Pendiente)", className: "bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100" },
-                  { status: "approved",       label: "Aprobar", className: "bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100" },
-                  { status: "rejected",       label: "Rechazar", className: "bg-red-50 border-red-200 text-red-600 hover:bg-red-100" },
+                  { status: "pending", label: "Solicitar aprobación interna", className: "bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100" },
+                  { status: "cancelled", label: "Cancelar", className: "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100" },
                 ],
                 "pending":        [
-                  { status: "approved",       label: "Aprobar",             className: "bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100" },
-                  { status: "in-negotiation", label: "En Negociación",      className: "bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100" },
-                  { status: "rejected",       label: "Rechazar",            className: "bg-red-50 border-red-200 text-red-600 hover:bg-red-100" },
+                  { status: "cancelled", label: "Cancelar solicitud", className: "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100" },
                 ],
+                "internally-approved": [{ status: "cancelled", label: "Cancelar antes del envío", className: "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100" }],
+                "sent": [{ status: "in-negotiation", label: "Registrar negociación", className: "bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100" }, { status: "cancelled", label: "Cancelar", className: "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100" }],
+                "viewed": [{ status: "in-negotiation", label: "Registrar negociación", className: "bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100" }, { status: "cancelled", label: "Cancelar", className: "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100" }],
                 "in-negotiation": [
-                  { status: "approved",       label: "Aprobar",             className: "bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100" },
-                  { status: "rejected",       label: "Rechazar",            className: "bg-red-50 border-red-200 text-red-600 hover:bg-red-100" },
-                  { status: "pending",        label: "Volver a Pendiente",  className: "bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100" },
+                  { status: "cancelled", label: "Cancelar", className: "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100" },
                 ],
-                "rejected":       [
-                  { status: "draft", label: "Volver a borrador", className: "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100" },
-                  { status: "pending", label: "Reactivar (Pendiente)", className: "bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100" },
-                ],
-                "approved":       [{ status: "in-negotiation", label: "Reabrir negociación", className: "bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100" }],
+                "rejected": [],
+                "expired": [],
+                "cancelled": [],
+                "approved": [],
+                "superseded": [],
               };
               const currentStatus = selectedQuote?.status || "draft";
-              const transitions = VALID_TRANSITIONS[currentStatus] || Object.keys(VALID_TRANSITIONS)
-                .filter(s => s !== currentStatus)
-                .map(s => ({ status: s, label: s, className: "" }));
+              const transitions = VALID_TRANSITIONS[currentStatus] || [];
               return (
                 <div>
                   <h4 className="text-sm font-semibold text-gray-700 mb-3">Cambiar a:</h4>
@@ -1027,77 +1037,39 @@ export default function ManageQuotes() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Dialog with improved styling */}
+      {/* Recoverable archive dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent className="rounded-2xl border-0 shadow-2xl max-w-md">
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center text-lg font-semibold">
-              {associatedProjects.length > 0 ? (
-                <>
-                  <AlertCircle className="h-5 w-5 mr-2 text-amber-600" />
-                  No se puede eliminar
-                </>
-              ) : (
-                <>
-                  <Trash2 className="h-5 w-5 mr-2 text-red-600" />
-                  ¿Confirmar eliminación?
-                </>
-              )}
+              <Archive className="h-5 w-5 mr-2 text-slate-600" />
+              ¿Archivar cotización?
             </AlertDialogTitle>
             <AlertDialogDescription className="text-gray-600">
-              {checkingProjects ? (
-                <div className="flex items-center gap-3 py-4">
-                  <Loader2 className="h-5 w-5 animate-spin text-indigo-600" />
-                  <span>Verificando proyectos asociados...</span>
-                </div>
-              ) : associatedProjects.length > 0 ? (
-                <div className="space-y-4">
-                  <p>
-                    Esta cotización no puede ser eliminada porque tiene {associatedProjects.length} proyecto(s) activo(s) asociado(s):
-                  </p>
-                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-                    {associatedProjects.map((project) => (
-                      <div key={project.id} className="flex items-center gap-2 text-sm">
-                        <div className="w-2 h-2 bg-amber-500 rounded-full"></div>
-                        <span className="font-medium">Proyecto ID {project.id}</span>
-                        <span className="text-gray-600">({project.status})</span>
-                      </div>
-                    ))}
-                  </div>
-                  <p className="text-xs text-gray-500">
-                    Para eliminar esta cotización, primero debe completar o eliminar los proyectos asociados.
-                  </p>
-                </div>
-              ) : (
-                <div>
-                  <p className="mb-4">Esta acción no se puede deshacer. La cotización será eliminada permanentemente.</p>
-                  {selectedQuote && (
-                    <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
-                      <p className="font-medium text-sm mb-2">Detalles de la cotización:</p>
-                      <div className="space-y-1 text-sm text-gray-600">
-                        <p>Proyecto: <span className="font-semibold text-gray-900">{selectedQuote.projectName}</span></p>
-                        <p>ID: <span className="font-semibold text-gray-900">{selectedQuote.id}</span></p>
-                        <p>Estado: {getStatusBadge(selectedQuote.status)}</p>
-                      </div>
+              <div>
+                <p className="mb-4">Se ocultará del listado activo, pero conservará revisiones, aprobaciones, decisiones y proyectos vinculados.</p>
+                {selectedQuote && (
+                  <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+                    <p className="font-medium text-sm mb-2">Detalles de la cotización:</p>
+                    <div className="space-y-1 text-sm text-gray-600">
+                      <p>Proyecto: <span className="font-semibold text-gray-900">{selectedQuote.projectName}</span></p>
+                      <p>Número: <span className="font-semibold text-gray-900">{selectedQuote.quotationNumber || `#${selectedQuote.id}`}</span></p>
+                      <p>Estado: {getStatusBadge(selectedQuote.status)}</p>
                     </div>
-                  )}
-                </div>
-              )}
+                  </div>
+                )}
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="gap-3">
-            <AlertDialogCancel className="rounded-xl">
-              {associatedProjects.length > 0 ? "Entendido" : "Cancelar"}
-            </AlertDialogCancel>
-            {associatedProjects.length === 0 && !checkingProjects && (
-              <AlertDialogAction
-                onClick={handleDeleteQuotation}
-                className="rounded-xl bg-red-600 hover:bg-red-700 text-white"
-              >
-                <Trash2 className="h-4 w-4 mr-2" />
-                Eliminar
-              </AlertDialogAction>
-            )}
+            <AlertDialogCancel className="rounded-xl">Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteQuotation}
+              className="rounded-xl bg-slate-800 hover:bg-slate-900 text-white"
+            >
+              <Archive className="h-4 w-4 mr-2" />
+              Archivar
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

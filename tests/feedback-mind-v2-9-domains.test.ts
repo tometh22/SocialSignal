@@ -130,16 +130,17 @@ describe("Feedback Mind V2-9 integration contracts", () => {
     expect(history).toContain("...(!existing ? { monthlyHours: currentMonthlyHours } : {})");
   });
 
-  it("persists approved quotation, team and variants in one transaction", () => {
+  it("persists submitted quotation, team, variants and approvals in one transaction", () => {
     const routes = source("server/routes.ts");
     const create = routes.slice(routes.indexOf('app.post("/api/quotations"'), routes.indexOf('// Ruta PUT para actualizar cotización completa'));
     expect(create).toContain("db.transaction");
     expect(create).toContain("tx.insert(quotationTeamMembers)");
     expect(create).toContain("tx.insert(quotationVariants)");
-    expect(create).toContain('validatedData.status === "approved"');
+    expect(create).toContain('validatedData.status === "pending"');
+    expect(create).toContain("createQuotationApprovalRequests");
     expect(routes).toContain('app.patch("/api/quotations/:id/status"');
     expect(routes).toContain("assertQuotationTransition(currentQuotation.status, status)");
-    expect(routes).toContain('status === "approved"');
+    expect(routes).toContain('input.decision === "accept" ? "approved"');
   });
 
   it("makes completion endpoint the only generic path to done", () => {

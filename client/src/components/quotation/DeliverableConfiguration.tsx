@@ -14,6 +14,9 @@ interface DeliverableConfigurationProps {
   onDeliverablesChange: (deliverables: Deliverable[]) => void;
   additionalCost: number;
   onAdditionalCostChange: (cost: number) => void;
+  quotationCurrency?: 'ARS' | 'USD';
+  showModeToggle?: boolean;
+  validationMessage?: string;
 }
 
 const DeliverableConfiguration: React.FC<DeliverableConfigurationProps> = ({
@@ -22,7 +25,10 @@ const DeliverableConfiguration: React.FC<DeliverableConfigurationProps> = ({
   deliverables,
   onDeliverablesChange,
   additionalCost,
-  onAdditionalCostChange
+  onAdditionalCostChange,
+  quotationCurrency = 'ARS',
+  showModeToggle = true,
+  validationMessage,
 }) => {
   const { toast } = useToast();
   
@@ -68,17 +74,24 @@ const DeliverableConfiguration: React.FC<DeliverableConfigurationProps> = ({
   };
 
   return (
-    <div className="space-y-6">
+    <div id="deliverables-config" className="space-y-6" tabIndex={-1}>
+      {validationMessage && (
+        <div role="alert" className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+          {validationMessage}
+        </div>
+      )}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle>Configuración de Proyecto Always-On</CardTitle>
+              <CardTitle>{showModeToggle ? 'Configuración de proyecto recurrente' : 'Servicio recurrente confirmado'}</CardTitle>
               <CardDescription>
-                Activa esta opción para proyectos con entregables múltiples a diferentes frecuencias
+                {showModeToggle
+                  ? 'Activá esta opción para trabajar con múltiples entregables y frecuencias.'
+                  : 'La modalidad se definió en la fase Proyecto. Configurá ahora sus entregables.'}
               </CardDescription>
             </div>
-            <div className="flex items-center space-x-2">
+            {showModeToggle && <div className="flex items-center space-x-2">
               <Switch 
                 id="always-on-mode"
                 checked={isAlwaysOnProject}
@@ -87,14 +100,14 @@ const DeliverableConfiguration: React.FC<DeliverableConfigurationProps> = ({
               <Label htmlFor="always-on-mode">
                 {isAlwaysOnProject ? 'Activado' : 'Desactivado'}
               </Label>
-            </div>
+            </div>}
           </div>
         </CardHeader>
         <CardContent>
           {isAlwaysOnProject ? (
             <Alert className="mb-6 bg-blue-50 text-blue-800 border border-blue-200">
               <InfoIcon className="h-4 w-4" />
-              <AlertTitle>Modo Always-On</AlertTitle>
+              <AlertTitle>Alcance recurrente</AlertTitle>
               <AlertDescription>
                 Los proyectos Always-On te permiten configurar múltiples entregables a diferentes
                 frecuencias (semanal, quincenal, mensual, trimestral) con presupuestos específicos
@@ -117,6 +130,7 @@ const DeliverableConfiguration: React.FC<DeliverableConfigurationProps> = ({
           onChange={onDeliverablesChange}
           additionalCost={additionalCost}
           onAdditionalCostChange={onAdditionalCostChange}
+          currency={quotationCurrency}
         />
       )}
     </div>

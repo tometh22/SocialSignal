@@ -998,11 +998,11 @@ export class DatabaseStorage implements IStorage {
 
   // Quotation operations
   async getQuotations(): Promise<Quotation[]> {
-    return await db.select().from(quotations);
+    return await db.select().from(quotations).where(isNull(quotations.archivedAt));
   }
 
   async getQuotationsByClient(clientId: number): Promise<Quotation[]> {
-    return await db.select().from(quotations).where(eq(quotations.clientId, clientId));
+    return await db.select().from(quotations).where(and(eq(quotations.clientId, clientId), isNull(quotations.archivedAt)));
   }
 
   async getQuotation(id: number): Promise<Quotation | undefined> {

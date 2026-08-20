@@ -31,7 +31,7 @@ describe("Feedback Mind V2.7 — personal y cotizaciones", () => {
     expect(inline).toContain('aria-label="Subnivel"');
   });
 
-  test("la moneda se elige en información básica y la configuración queda centrada", () => {
+  test("la moneda se elige con confirmación y el flujo usa cuatro fases responsive", () => {
     const basic = source("client/src/components/optimized/basic-info.tsx");
     const team = source("client/src/components/optimized/EnhancedTeamConfig.tsx");
     const stepper = source("client/src/pages/optimized-quote.tsx");
@@ -40,7 +40,9 @@ describe("Feedback Mind V2.7 — personal y cotizaciones", () => {
     expect(basic).toContain("Moneda de cotización");
     expect(basic).toContain("max-w-5xl");
     expect(team).toContain("md:justify-center");
-    expect(stepper).toContain("mx-auto flex w-max min-w-fit");
+    expect(basic).toContain("setPendingCurrency(currency)");
+    expect(stepper).toContain("grid grid-cols-2 gap-2 lg:grid-cols-4");
+    expect(stepper).toContain("QUOTATION_PHASES");
   });
 
   test("las carpetas de cotizaciones empiezan cerradas", () => {
@@ -123,14 +125,17 @@ describe("Feedback Mind V2.7 — atribución, costos y capacidad", () => {
     expect(server).toContain("0035_native_task_labor_backfill");
   });
 
-  test("tarifas USD usan el FX mensual o la configuración global sin doble conversión", () => {
+  test("tarifas USD respetan la moneda contractual y el snapshot de la cotización", () => {
     const rateResolver = source("server/domain/personnel-rate.ts");
     const quoteContext = source("client/src/context/optimized-quote-context.tsx");
+    const quotePersonnelRate = source("shared/utils/quotation-personnel-rate.ts");
     const variants = source("client/src/components/optimized/QuotationVariants.tsx");
 
     expect(rateResolver).toContain('eq(systemConfig.configKey, "usd_exchange_rate")');
     expect(rateResolver).toContain("exchangeRateId: fx?.id ?? null");
-    expect(quoteContext).toContain("Number(rate.exchangeRate) || rateExchangeRate");
+    expect(quoteContext).toContain("resolveQuotationPersonnelRate");
+    expect(quotePersonnelRate).toContain("quotationExchangeRate");
+    expect(quotePersonnelRate).toContain('billingCurrency === "mixed"');
     expect(quoteContext).toContain("calculateQuotationPricing");
     expect(variants).toContain("calculateQuotationPricing");
     expect(variants).not.toContain("totalARS +=");
@@ -148,7 +153,8 @@ describe("Feedback Mind V2.7 — atribución, costos y capacidad", () => {
     const basic = source("client/src/components/optimized/basic-info.tsx");
     const wizard = source("client/src/pages/optimized-quote.tsx");
 
-    expect(basic).toContain('onValueChange={updateQuotationCurrency}');
+    expect(basic).toContain('if (quotationData.teamMembers.length > 0)');
+    expect(basic).toContain('updateQuotationCurrency(currency)');
     expect(basic).toContain("updateQuotationCurrency(quotationData.quotationCurrency || \"ARS\", parsedExchangeRate)");
     expect(basic).toContain("parseLocalizedDecimal");
     expect(wizard).not.toContain("CurrencySelection");

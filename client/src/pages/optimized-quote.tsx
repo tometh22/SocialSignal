@@ -1,31 +1,64 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useRoute } from 'wouter';
 import { OptimizedQuoteProvider, useOptimizedQuote } from '@/context/optimized-quote-context';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Separator } from '@/components/ui/separator';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
-import { ChevronLeft, ChevronRight, Check, Save, ArrowLeft, Building2, FileText, Calendar, Loader2, AlertTriangle, X, Clock, RefreshCw, Plus, Target } from 'lucide-react';
-import { PageLayout } from "@/components/ui/page-layout";
+import {
+  AlertTriangle,
+  ArrowLeft,
+  BadgeDollarSign,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  FolderKanban,
+  Loader2,
+  Save,
+  Send,
+  Target,
+  UsersRound,
+} from 'lucide-react';
+import { PageLayout } from '@/components/ui/page-layout';
 import AutosaveIndicator from '@/components/ui/autosave-indicator';
 import { useOnlineStatus } from '@/hooks/use-online-status';
 
 import OptimizedBasicInfo from '@/components/optimized/basic-info';
-import { default as ComplexityFactorsCard } from '@/components/optimized/complexity-factors-card';
-import OptimizedTemplateSelection from '@/components/optimized/template-selection';
-import EnhancedTeamConfig from '@/components/optimized/EnhancedTeamConfig';
-import OptimizedFinancialReview from '@/components/optimized/financial-review-final';
-import DeliverableConfiguration from '@/components/quotation/DeliverableConfiguration';
 import QuotationErrorBoundary from '@/components/quotation-error-boundary';
 import { getApiErrorMessage } from '@/lib/api-error';
-import { QuotationVariants } from '@/components/optimized/QuotationVariants';
-import { ExecutiveSummary } from '@/components/quotation/executive-summary';
 import { QuotationTemplatesPicker } from '@/components/quotation/quotation-templates-picker';
+import { QuotationWorkspaceSummary } from '@/components/quotation/quotation-workspace-summary';
+import {
+  QUOTATION_PHASES,
+  type QuotationPhase,
+  type QuotationValidationIssue,
+  validateQuotationPhase,
+} from '@/utils/quotation-ux';
 
 interface OptimizedQuoteProps {
   quotationId?: number;
   isRequote?: boolean;
 }
+
+const PHASE_ICONS = [FolderKanban, UsersRound, BadgeDollarSign, Send] as const;
+const OptimizedTemplateSelection = React.lazy(() => import('@/components/optimized/template-selection'));
+const EnhancedTeamConfig = React.lazy(() => import('@/components/optimized/EnhancedTeamConfig'));
+const ComplexityFactorsCard = React.lazy(() => import('@/components/optimized/complexity-factors-card'));
+const DeliverableConfiguration = React.lazy(() => import('@/components/quotation/DeliverableConfiguration'));
+const OptimizedFinancialReview = React.lazy(() => import('@/components/optimized/financial-review-final'));
+const ExecutiveSummary = React.lazy(() => import('@/components/quotation/executive-summary').then((module) => ({ default: module.ExecutiveSummary })));
+const QuotationVariants = React.lazy(() => import('@/components/optimized/QuotationVariants').then((module) => ({ default: module.QuotationVariants })));
 
 const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isRequote = false }) => {
   const [, setLocation] = useLocation();
@@ -45,515 +78,436 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
     loadQuotation,
     updateDeliverables,
     updateAdditionalDeliverableCost,
-    updateClient,
-    updateProjectName,
-    resetQuotation,
-    setQuotationData: setQuotationDataDirect,
     updateQuotationData,
+    autosaveStatus,
+    lastAutosaveAt,
+    hasUnsavedChanges,
   } = useOptimizedQuote();
 
-  // Get quotation ID from URL if not passed as prop
   const [match, params] = useRoute('/optimized-quote/:id');
   const urlQuotationId = match ? params?.id : null;
-  const effectiveQuotationId = quotationId || (urlQuotationId && !isNaN(parseInt(urlQuotationId)) ? parseInt(urlQuotationId) : null);
-
+  const effectiveQuotationId = quotationId || (urlQuotationId && !Number.isNaN(Number(urlQuotationId)) ? Number(urlQuotationId) : null);
   const isEditing = Boolean(effectiveQuotationId);
+  const isOnline = useOnlineStatus();
 
-  // Read leadId from URL query params (e.g., /optimized-quote?leadId=5&clientId=3)
   const [leadOrigin, setLeadOrigin] = useState<{ leadId: number; leadName?: string } | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  const [lastActivity, setLastActivity] = useState(Date.now());
-  const [bannerVisible, setBannerVisible] = useState(true);
-  const isOnline = useOnlineStatus();
+  const [highestVisitedPhase, setHighestVisitedPhase] = useState(1);
+  const [validationIssues, setValidationIssues] = useState<QuotationValidationIssue[]>([]);
+  const [exitDialogOpen, setExitDialogOpen] = useState(false);
+  const lastActivityRef = useRef(Date.now());
+
+  const currentPhase = currentStep as QuotationPhase;
+  const phaseMeta = QUOTATION_PHASES[currentPhase - 1];
+  const fieldErrors = useMemo(
+    () => Object.fromEntries(validationIssues.map((issue) => [issue.field, issue.message])),
+    [validationIssues],
+  );
 
   useEffect(() => {
     if (!sessionStorage.getItem('quotation-draft-restored')) return;
     sessionStorage.removeItem('quotation-draft-restored');
     toast({
-      title: "Borrador recuperado",
-      description: "Restauramos automáticamente tu cotización guardada localmente.",
+      title: 'Borrador recuperado',
+      description: 'Restauramos automáticamente la cotización guardada en este dispositivo.',
     });
   }, [toast]);
 
-  // Prevent accidental page refresh/close when there's unsaved data
   useEffect(() => {
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      const lastSave = localStorage.getItem('last-autosave-time');
-      const hasData = quotationData.project.name || quotationData.teamMembers.length > 0 || quotationData.client;
-      const timeSinceLastSave = lastSave ? Date.now() - parseInt(lastSave) : Infinity;
-
-      if (hasData && timeSinceLastSave > 5000) { // If more than 5 seconds since last save
-        e.preventDefault();
-        e.returnValue = 'Tienes cambios sin guardar en tu cotización. ¿Estás seguro de que quieres salir?';
-        return e.returnValue;
-      }
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+    if (validationIssues.length > 0) setValidationIssues([]);
   }, [quotationData]);
 
-  // Read leadId from URL query params and pre-link the quotation to a CRM lead
   useEffect(() => {
-    if (isEditing) return; // Don't override when editing existing quotation
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (!hasUnsavedChanges) return;
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedChanges]);
+
+  useEffect(() => {
+    if (isEditing) return;
     const searchParams = new URLSearchParams(window.location.search);
-    const leadIdParam = searchParams.get('leadId');
-    const leadNameParam = searchParams.get('leadName');
-    const clientIdParam = searchParams.get('clientId');
-    if (leadIdParam && !isNaN(parseInt(leadIdParam))) {
-      const lid = parseInt(leadIdParam);
-      updateQuotationData({ leadId: lid });
-      setLeadOrigin({ leadId: lid, leadName: leadNameParam || undefined });
+    const leadId = Number(searchParams.get('leadId'));
+    const leadName = searchParams.get('leadName');
+    if (Number.isInteger(leadId) && leadId > 0) {
+      updateQuotationData({ leadId });
+      setLeadOrigin({ leadId, leadName: leadName || undefined });
     }
-  }, [isEditing]);
+  }, [isEditing, updateQuotationData]);
 
-  // Load quotation if editing
   useEffect(() => {
-    console.log('🔍 OptimizedQuote useEffect:', {
-      effectiveQuotationId,
-      isRequote,
-      urlQuotationId,
-      quotationId,
-      currentQuotationData: quotationData
-    });
-
-    if (effectiveQuotationId && !isRequote) {
-      console.log('📥 Starting to load quotation:', effectiveQuotationId);
-
-      // Clear any existing data first
-      setIsSaving(true);
-
-      loadQuotation(effectiveQuotationId)
-        .then(() => {
-          console.log('✅ Quotation loaded successfully');
-          goToStep(1); // Start from first step when editing
-          setIsSaving(false);
-        })
-        .catch(error => {
-          console.error('❌ Error loading quotation:', error);
-          setIsSaving(false);
-          toast({
-            title: "Error al cargar cotización",
-            description: `No se pudo cargar la cotización ID ${effectiveQuotationId}: ${error.message || 'Error desconocido'}`,
-            variant: "destructive",
-          });
+    if (!effectiveQuotationId || isRequote) return;
+    setIsSaving(true);
+    loadQuotation(effectiveQuotationId)
+      .then(() => {
+        goToStep(1);
+        setHighestVisitedPhase(4);
+      })
+      .catch((error) => {
+        toast({
+          title: 'No pudimos cargar la cotización',
+          description: getApiErrorMessage(error, `No se encontró la cotización ${effectiveQuotationId}.`),
+          variant: 'destructive',
         });
-    }
-  }, [effectiveQuotationId, isRequote, loadQuotation, goToStep, toast]);
+      })
+      .finally(() => setIsSaving(false));
+  }, [effectiveQuotationId, goToStep, isRequote, loadQuotation, toast]);
 
-  // Monitor user session and show warnings
   useEffect(() => {
     if (!user) {
       toast({
-        title: "⚠️ Sesión perdida",
-        description: "Tu sesión ha expirado. Redirigiendo al login...",
-        variant: "destructive",
+        title: 'Sesión finalizada',
+        description: 'Volvé a iniciar sesión para continuar.',
+        variant: 'destructive',
       });
-      setTimeout(() => setLocation('/auth'), 2000);
-      return;
+      const redirect = window.setTimeout(() => setLocation('/auth'), 1500);
+      return () => window.clearTimeout(redirect);
     }
 
-    // Track user activity
-    const handleActivity = () => {
-      setLastActivity(Date.now());
-    };
-
-    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
-    events.forEach(event => {
-      document.addEventListener(event, handleActivity, true);
-    });
-
-    // Warning for session expiry
-    const checkSession = setInterval(() => {
-      const timeSinceActivity = Date.now() - lastActivity;
-      const thirtyMinutes = 30 * 60 * 1000;
-
-      if (timeSinceActivity > thirtyMinutes) {
+    const handleActivity = () => { lastActivityRef.current = Date.now(); };
+    const events = ['mousedown', 'keypress', 'scroll', 'touchstart', 'click'];
+    events.forEach((event) => document.addEventListener(event, handleActivity, true));
+    const interval = window.setInterval(() => {
+      if (Date.now() - lastActivityRef.current > 30 * 60 * 1000) {
         toast({
-          title: "⏰ Sesión inactiva",
-          description: "Has estado inactivo por mucho tiempo. Tu sesión podría expirar pronto.",
-          variant: "destructive",
+          title: 'Sesión inactiva',
+          description: 'Guardamos un borrador local. Verificá tu sesión antes de aprobar.',
+          variant: 'destructive',
         });
       }
-    }, 5 * 60 * 1000); // Check every 5 minutes
+    }, 5 * 60 * 1000);
 
     return () => {
-      events.forEach(event => {
-        document.removeEventListener(event, handleActivity, true);
-      });
-      clearInterval(checkSession);
+      events.forEach((event) => document.removeEventListener(event, handleActivity, true));
+      window.clearInterval(interval);
     };
-  }, [user, lastActivity, setLocation, toast]);
+  }, [setLocation, toast, user]);
 
-  const variantsStep = quotationData.project?.type === 'always-on' ? 7 : 6;
+  const showValidationIssues = (issues: QuotationValidationIssue[]) => {
+    setValidationIssues(issues);
+    if (issues.length === 0) return true;
+    window.requestAnimationFrame(() => {
+      document.getElementById(issues[0].field)?.focus({ preventScroll: false });
+      document.getElementById(issues[0].field)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+    return false;
+  };
 
   const handleNextStep = async () => {
-    // Auto-save before entering the variants step if quote not yet saved
-    if (currentStep === variantsStep - 1 && !quotationData.id) {
+    if (!showValidationIssues(validateQuotationPhase(currentPhase, quotationData))) return;
+    if (currentPhase === 3 && !quotationData.id) {
       try {
         setIsSaving(true);
         await saveQuotation('draft');
-      } catch {
-        // Non-fatal: proceed even if save fails
+      } catch (error) {
+        toast({
+          title: 'No pudimos preparar las variantes',
+          description: getApiErrorMessage(error, 'Guardá el borrador antes de continuar.'),
+          variant: 'destructive',
+        });
+        return;
       } finally {
         setIsSaving(false);
       }
     }
+    setValidationIssues([]);
+    setHighestVisitedPhase((value) => Math.max(value, currentPhase + 1));
     nextStep();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleSave = async () => {
+  const handlePreviousStep = () => {
+    setValidationIssues([]);
+    previousStep();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handlePhaseNavigation = (phase: QuotationPhase) => {
+    if (phase > highestVisitedPhase || phase === currentPhase) return;
+    setValidationIssues([]);
+    goToStep(phase);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleSaveDraft = async () => {
+    const requiredDraftIssues = validateQuotationPhase(1, quotationData).filter((issue) =>
+      ['client', 'project-name', 'quotation-exchange-rate'].includes(issue.field),
+    );
+    if (currentPhase === 1 && !showValidationIssues(requiredDraftIssues)) return;
+    if (requiredDraftIssues.length > 0) {
+      goToStep(1);
+      setHighestVisitedPhase((value) => Math.max(value, 1));
+      showValidationIssues(requiredDraftIssues);
+      return;
+    }
     try {
       setIsSaving(true);
-
-      // Validaciones previas
-      if (!quotationData.client) {
-        toast({
-          title: "Cliente requerido",
-          description: "Debe seleccionar un cliente antes de guardar.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      if (!quotationData.project.name?.trim()) {
-        toast({
-          title: "Nombre de proyecto requerido",
-          description: "Debe ingresar el nombre del proyecto antes de guardar.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      if (quotationData.teamMembers.length === 0) {
-        toast({
-          title: "Equipo requerido",
-          description: "Debe agregar al menos un miembro al equipo antes de guardar.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      console.log('💾 Iniciando guardado de cotización...');
-      const savedQuotation = await saveQuotation();
-
-      toast({
-        title: "Cotización guardada",
-        description: `La cotización "${quotationData.project.name}" se ha guardado correctamente.`,
-      });
-
-      console.log('🎉 Cotización guardada exitosamente, redirigiendo...');
-      setLocation('/manage-quotes');
+      await saveQuotation('draft');
+      toast({ title: 'Borrador guardado', description: 'Podés continuar editando sin salir del cotizador.' });
     } catch (error) {
-      console.error("❌ Error al guardar:", error);
-      const errorMessage = getApiErrorMessage(error, "Error desconocido");
       toast({
-        title: "Error al guardar",
-        description: `No se pudo guardar la cotización: ${errorMessage}`,
-        variant: "destructive",
+        title: 'No pudimos guardar el borrador',
+        description: getApiErrorMessage(error, 'Intentá nuevamente.'),
+        variant: 'destructive',
       });
     } finally {
       setIsSaving(false);
     }
   };
 
-  const getSteps = () => {
-    const baseSteps = [
-      { num: 1, title: "Info Básica" },
-      { num: 2, title: "Plantilla" },
-      { num: 3, title: "Equipo" },
-      { num: 4, title: "Complejidad" },
-    ];
-
-    if (quotationData.project?.type === 'always-on') {
-      baseSteps.push({ num: 5, title: "Entregables" });
-      baseSteps.push({ num: 6, title: "Revisión" });
-      baseSteps.push({ num: 7, title: "Variantes" });
-      baseSteps.push({ num: 8, title: "Resumen" });
-    } else {
-      baseSteps.push({ num: 5, title: "Revisión" });
-      baseSteps.push({ num: 6, title: "Variantes" });
-      baseSteps.push({ num: 7, title: "Resumen" });
+  const handleExit = () => {
+    if (hasUnsavedChanges || autosaveStatus === 'error') {
+      setExitDialogOpen(true);
+      return;
     }
-
-    return baseSteps;
+    setLocation('/manage-quotes');
   };
-
-  const steps = getSteps();
-  const isLastStep = currentStep === steps[steps.length - 1].num;
 
   return (
     <PageLayout
-      title={isEditing ? 'Editar Cotización' : 'Nueva Cotización'}
-      description="Crea y gestiona cotizaciones de manera optimizada"
+      title={isEditing ? 'Editar cotización' : 'Nueva cotización'}
+      description={`${phaseMeta.title}: ${phaseMeta.description}`}
       breadcrumbs={[
-        { label: "Gestión de Cotizaciones", href: "/manage-quotes" },
-        { label: isEditing ? 'Editar Cotización' : 'Nueva Cotización', current: true }
+        { label: 'Gestión de cotizaciones', href: '/manage-quotes' },
+        { label: isEditing ? 'Editar cotización' : 'Nueva cotización', current: true },
       ]}
-      actions={
-        <div className="flex gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setLocation("/manage-quotes")}
-            className="text-gray-600 hover:text-gray-800 hover:bg-gray-100"
-          >
-            <ArrowLeft className="h-4 w-4 mr-1" />
-            Volver
+      actions={(
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" variant="ghost" size="sm" onClick={handleExit}>
+            <ArrowLeft className="mr-1 h-4 w-4" /> Volver
           </Button>
-
-
-
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleSave}
-            disabled={isSaving}
-            className="text-primary hover:text-primary-dark hover:bg-primary/5"
-          >
-            {isSaving ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                Guardando...
-              </>
-            ) : (
-              <>
-                <Save className="h-4 w-4 mr-1" />
-                Guardar
-              </>
-            )}
+          <Button type="button" variant="outline" size="sm" onClick={handleSaveDraft} disabled={isSaving}>
+            {isSaving ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Save className="mr-1 h-4 w-4" />}
+            Guardar borrador
           </Button>
         </div>
-      }
+      )}
     >
-
-      {/* Progress indicator */}
-      <div className="standard-card mb-6">
-        <div className="card-content py-4">
-          <div className="overflow-x-auto">
-            <div className="mx-auto flex w-max min-w-fit items-center gap-1 px-2">
-              {steps.map((step, index) => (
-                <div key={step.num} className="flex items-center">
-                  <button
-                    type="button"
-                    aria-label={`Ir al paso ${step.num}: ${step.title}`}
-                    disabled={step.num >= currentStep}
-                    onClick={() => step.num < currentStep && goToStep(step.num)}
-                    className={`w-8 h-8 rounded-full flex items-center justify-center text-sm transition-all
-                    ${step.num < currentStep ? 'cursor-pointer hover:scale-110' : ''}
-                    ${currentStep >= step.num
-                      ? 'bg-primary text-white shadow-sm'
-                      : 'bg-gray-100 text-gray-400 border border-gray-200'}`}
-                  >
-                    {step.num < currentStep ? (
-                      <Check className="h-4 w-4" />
-                    ) : (
-                      step.num
-                    )}
-                  </button>
-                  <span className={`ml-2 text-sm font-medium transition-colors
-                    ${currentStep === step.num ? 'text-primary' : 'text-gray-500'}`}>
-                    {step.title}
-                  </span>
-                  {index < steps.length - 1 && (
-                    <div className={`mx-4 h-px w-12 transition-colors
-                      ${step.num < currentStep ? 'bg-primary' : 'bg-gray-200'}`}></div>
-                  )}
-                </div>
-              ))}
-            </div>
+      <div className="mb-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Cotizador profesional</p>
+            <p className="mt-1 text-sm text-slate-600">Completá cada fase; podés volver a las anteriores sin perder datos.</p>
           </div>
-
-          {/* Autosave indicator */}
-          <div className="flex justify-center mt-4">
-            <AutosaveIndicator
-              lastSaveTime={localStorage.getItem('last-autosave-time') ? parseInt(localStorage.getItem('last-autosave-time')!) : undefined}
-              hasUnsavedChanges={Date.now() - (parseInt(localStorage.getItem('last-autosave-time') || '0')) > 10000}
-              isOnline={isOnline}
-            />
-          </div>
+          <AutosaveIndicator lastSaveTime={lastAutosaveAt} status={autosaveStatus} isOnline={isOnline} />
         </div>
+
+        <nav aria-label="Fases de la cotización" className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+          {QUOTATION_PHASES.map((phase, index) => {
+            const Icon = PHASE_ICONS[index];
+            const isCurrent = phase.num === currentPhase;
+            const isComplete = phase.num < 4 && phase.num < highestVisitedPhase && validateQuotationPhase(phase.num, quotationData).length === 0;
+            const isAvailable = phase.num <= highestVisitedPhase;
+            return (
+              <button
+                key={phase.num}
+                type="button"
+                onClick={() => handlePhaseNavigation(phase.num)}
+                disabled={!isAvailable || isCurrent}
+                aria-current={isCurrent ? 'step' : undefined}
+                className={`rounded-xl border p-3 text-left transition-colors ${
+                  isCurrent
+                    ? 'border-primary bg-primary/5 text-primary'
+                    : isAvailable
+                      ? 'border-slate-200 bg-white text-slate-700 hover:border-primary/40 hover:bg-primary/[0.03]'
+                      : 'cursor-not-allowed border-slate-100 bg-slate-50 text-slate-400'
+                }`}
+              >
+                <span className="flex items-center gap-2">
+                  <span className={`flex h-7 w-7 items-center justify-center rounded-full ${isCurrent || isComplete ? 'bg-primary text-white' : 'bg-slate-200 text-slate-500'}`}>
+                    {isComplete && !isCurrent ? <Check className="h-4 w-4" /> : <Icon className="h-4 w-4" />}
+                  </span>
+                  <span className="text-sm font-semibold">{phase.num}. {phase.title}</span>
+                </span>
+                <span className="mt-2 hidden text-xs text-slate-500 sm:block">{phase.description}</span>
+              </button>
+            );
+          })}
+        </nav>
       </div>
 
-      {/* CRM Lead banner */}
       {leadOrigin && (
-        <div className="mb-4 flex items-center gap-3 px-4 py-3 bg-indigo-50 border border-indigo-200 rounded-xl">
-          <Target className="h-5 w-5 text-indigo-600 flex-shrink-0" />
-          <span className="text-sm text-indigo-800 flex-1">
-            Esta cotización se vinculará al lead{leadOrigin.leadName ? <> <strong>{leadOrigin.leadName}</strong></> : ''} del CRM.
+        <div className="mb-4 flex items-center gap-3 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3">
+          <Target className="h-5 w-5 shrink-0 text-indigo-600" />
+          <span className="flex-1 text-sm text-indigo-800">
+            Esta cotización quedará vinculada al lead{leadOrigin.leadName ? <> <strong>{leadOrigin.leadName}</strong></> : ''}.
           </span>
-          <a
-            href={`/crm/${leadOrigin.leadId}`}
-            className="text-xs text-indigo-600 underline hover:text-indigo-800"
-          >
-            Ver lead
-          </a>
+          <a href={`/crm/${leadOrigin.leadId}`} className="text-xs font-medium text-indigo-700 underline">Ver lead</a>
         </div>
       )}
 
-      {/* Main content */}
-      <div className="space-y-6">
-        {/* Template picker — solo visible en step 1 y 3 */}
-        {(currentStep === 1 || currentStep === 3) && !isEditing && (
-          <div className="flex justify-end px-1">
-            <QuotationTemplatesPicker />
-          </div>
-        )}
-        <div className="standard-card">
-          <div className="card-content">
-            {currentStep === 1 && <OptimizedBasicInfo />}
-            {currentStep === 2 && <OptimizedTemplateSelection />}
-            {currentStep === 3 && <EnhancedTeamConfig />}
-            {currentStep === 4 && <ComplexityFactorsCard />}
+      <div className="mb-4"><QuotationWorkspaceSummary currentPhase={currentPhase} compact /></div>
 
-            {currentStep === 5 && quotationData.project?.type === 'always-on' && (
-              <div className="p-6">
-                <DeliverableConfiguration
-                  isAlwaysOnProject={true}
-                  onIsAlwaysOnProjectChange={() => {}}
-                  deliverables={quotationData.deliverables || []}
-                  onDeliverablesChange={updateDeliverables}
-                  additionalCost={quotationData.additionalDeliverableCost || 0}
-                  onAdditionalCostChange={updateAdditionalDeliverableCost}
-                />
-              </div>
-            )}
+      <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
+        <main className="min-w-0 space-y-5">
+          {validationIssues.length > 0 && (
+            <Alert variant="destructive" role="alert" aria-live="assertive">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertTitle>Revisá esta fase antes de continuar</AlertTitle>
+              <AlertDescription>
+                <ul className="mt-2 list-disc space-y-1 pl-5">
+                  {validationIssues.map((issue) => <li key={`${issue.field}-${issue.message}`}>{issue.message}</li>)}
+                </ul>
+              </AlertDescription>
+            </Alert>
+          )}
 
-            {((currentStep === 5 && quotationData.project?.type !== 'always-on') ||
-              (currentStep === 6 && quotationData.project?.type === 'always-on')) && (
-              <OptimizedFinancialReview />
-            )}
+          <section aria-labelledby="quotation-phase-title" className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <header className="border-b border-slate-100 bg-slate-50/70 px-5 py-4 sm:px-6">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">Fase {currentPhase} de 4</p>
+              <h2 id="quotation-phase-title" className="mt-1 text-xl font-semibold text-slate-950">{phaseMeta.title}</h2>
+              <p className="mt-1 text-sm text-slate-500">{phaseMeta.description}</p>
+            </header>
 
-            {((currentStep === 7 && quotationData.project?.type !== 'always-on') ||
-              (currentStep === 8 && quotationData.project?.type === 'always-on')) && (
-              <ExecutiveSummary />
-            )}
+            <div className="p-4 sm:p-6">
+              <React.Suspense fallback={<PhaseLoading />}>
+              {currentPhase === 1 && (
+                <div className="space-y-8">
+                  <div>
+                    <SectionHeading title="Datos del proyecto" description="Definí la base comercial y la moneda antes de calcular recursos." />
+                    <OptimizedBasicInfo errors={fieldErrors} />
+                  </div>
+                  <Separator />
+                  <div>
+                    <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <SectionHeading title="Punto de partida" description="Elegí una plantilla o configurá el alcance desde cero." />
+                      {!isEditing && <QuotationTemplatesPicker />}
+                    </div>
+                    <OptimizedTemplateSelection />
+                  </div>
+                </div>
+              )}
 
-            {((currentStep === 6 && quotationData.project?.type !== 'always-on') ||
-              (currentStep === 7 && quotationData.project?.type === 'always-on')) && (
-              <QuotationVariants
-                quotationId={quotationData.id || 0}
-                baseTeamMembers={quotationData.teamMembers as any}
-                quotationData={quotationData}
-                baseCost={baseCost}
-                complexityAdjustment={complexityAdjustment}
-                markupAmount={markupAmount}
-                totalAmount={totalAmount}
-                onVariantSelected={(variant) => {
-                  console.log('Variant selected:', variant);
-                }}
-              />
-            )}
-          </div>
-        </div>
+              {currentPhase === 2 && (
+                <div className="space-y-8">
+                  <div>
+                    <SectionHeading title="Equipo" description="Asigná personas, horas y tarifas reales para este trabajo." />
+                    <EnhancedTeamConfig validationMessage={fieldErrors['team-config']} />
+                  </div>
+                  <Separator />
+                  <div>
+                    <SectionHeading title="Complejidad" description="Traducí el alcance operativo en un impacto económico visible." />
+                    <ComplexityFactorsCard validationMessage={fieldErrors['complexity-config']} />
+                  </div>
+                  {quotationData.project.type === 'always-on' && (
+                    <>
+                      <Separator />
+                      <div>
+                        <SectionHeading title="Entregables recurrentes" description="Definí qué recibe el cliente y con qué frecuencia." />
+                        <DeliverableConfiguration
+                          isAlwaysOnProject
+                          showModeToggle={false}
+                          quotationCurrency={quotationData.quotationCurrency === 'USD' ? 'USD' : 'ARS'}
+                          validationMessage={fieldErrors['deliverables-config']}
+                          onIsAlwaysOnProjectChange={() => undefined}
+                          deliverables={quotationData.deliverables || []}
+                          onDeliverablesChange={updateDeliverables}
+                          additionalCost={quotationData.additionalDeliverableCost || 0}
+                          onAdditionalCostChange={updateAdditionalDeliverableCost}
+                        />
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
 
-        {/* Tips section only on first step */}
-        {currentStep === 1 && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            <Card className="bg-white border border-neutral-100 shadow-sm">
-              <CardHeader className="pb-2">
-                <CardTitle className="flex items-center text-base">
-                  <span className="bg-primary/5 p-2 rounded-sm mr-3">
-                    <Building2 className="h-4 w-4 text-primary" />
-                  </span>
-                  Tipos de Proyecto
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-xs text-neutral-600">
-                  <strong>On Demand:</strong> Proyecto único con duración específica (3 semanas a 4+ meses).<br/>
-                  <strong>Fee Mensual:</strong> Contrato recurrente mínimo 6 meses o 1 año.
-                </p>
-              </CardContent>
-            </Card>
+              {currentPhase === 3 && (
+                <div>
+                  <SectionHeading title="Precio y rentabilidad" description="Revisá el precio recomendado; los ajustes avanzados quedan plegados hasta que los necesites." />
+                  <OptimizedFinancialReview
+                    revealAdvanced={validationIssues.length > 0}
+                    validationMessage={validationIssues[0]?.message}
+                  />
+                </div>
+              )}
 
-            <Card className="bg-white border border-neutral-100 shadow-sm">
-              <CardHeader className="pb-2">
-                <CardTitle className="flex items-center text-base">
-                  <span className="bg-primary/5 p-2 rounded-sm mr-3">
-                    <FileText className="h-4 w-4 text-primary" />
-                  </span>
-                  Entregables
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-xs text-neutral-600">
-                  En proyectos Always-On puedes definir múltiples entregables con frecuencias específicas.
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-white border border-neutral-100 shadow-sm">
-              <CardHeader className="pb-2">
-                <CardTitle className="flex items-center text-base">
-                  <span className="bg-primary/5 p-2 rounded-sm mr-3">
-                    <Calendar className="h-4 w-4 text-primary" />
-                  </span>
-                  Presupuesto
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-xs text-neutral-600">
-                  El presupuesto base se calculará automáticamente según el equipo y complejidad seleccionados.
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
-        {/* Navigation buttons - Hide the blue button in last step since it has its own action buttons */}
-        {!isLastStep && (
-          <div className="flex justify-between items-center pt-6 border-t">
-            <Button
-              variant="ghost"
-              onClick={previousStep}
-              disabled={currentStep === 1}
-              className="flex items-center text-neutral-600 hover:text-white"
-            >
-              <ChevronLeft className="h-4 w-4 mr-1" />
-              Anterior
-            </Button>
-
-            <div className="flex gap-3">
-              <Button
-                onClick={handleNextStep}
-                disabled={isSaving}
-                className="bg-primary hover:bg-primary/90 text-white flex items-center px-6"
-              >
-                {isSaving ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
-                Siguiente
-                <ChevronRight className="h-4 w-4 ml-1" />
-              </Button>
+              {currentPhase === 4 && (
+                <div className="space-y-8">
+                  <div>
+                    <SectionHeading title="Vista para el cliente" description="Esta es la información comercial que acompañará la propuesta." />
+                    <ExecutiveSummary />
+                  </div>
+                  <Separator />
+                  <QuotationVariants
+                    quotationId={quotationData.id || 0}
+                    baseTeamMembers={quotationData.teamMembers as any}
+                    quotationData={quotationData}
+                    baseCost={baseCost}
+                    complexityAdjustment={complexityAdjustment}
+                    markupAmount={markupAmount}
+                    totalAmount={totalAmount}
+                  />
+                </div>
+              )}
+              </React.Suspense>
             </div>
-          </div>
-        )}
+          </section>
 
-        {/* Show only back button in last step */}
-        {isLastStep && (
-          <div className="flex justify-start items-center pt-6 border-t">
-            <Button
-              variant="ghost"
-              onClick={previousStep}
-              className="flex items-center text-neutral-600 hover:text-white"
-            >
-              <ChevronLeft className="h-4 w-4 mr-1" />
-              Anterior
+          <div className="sticky bottom-3 z-20 flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-lg backdrop-blur sm:p-4">
+            <Button type="button" variant="ghost" onClick={handlePreviousStep} disabled={currentPhase === 1}>
+              <ChevronLeft className="mr-1 h-4 w-4" /> Anterior
             </Button>
+            {currentPhase < 4 && (
+              <Button type="button" onClick={handleNextStep} disabled={isSaving} className="min-w-32">
+                {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Continuar <ChevronRight className="ml-1 h-4 w-4" />
+              </Button>
+            )}
+            {currentPhase === 4 && <span className="text-xs text-slate-500">Aprobá desde el bloque de variantes.</span>}
           </div>
-        )}
+        </main>
+
+        <QuotationWorkspaceSummary currentPhase={currentPhase} />
       </div>
+
+      <AlertDialog open={exitDialogOpen} onOpenChange={setExitDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Salir del cotizador?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Hay cambios que todavía no pudieron guardarse localmente. Si salís ahora, podrías perderlos.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Seguir editando</AlertDialogCancel>
+            <AlertDialogAction onClick={() => setLocation('/manage-quotes')} className="bg-red-600 hover:bg-red-700">
+              Salir de todos modos
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </PageLayout>
   );
 };
 
-const OptimizedQuote: React.FC<OptimizedQuoteProps> = (props) => {
+function SectionHeading({ title, description }: { title: string; description: string }) {
   return (
-    <QuotationErrorBoundary>
-      <OptimizedQuoteProvider>
-        <OptimizedQuoteContent {...props} />
-      </OptimizedQuoteProvider>
-    </QuotationErrorBoundary>
+    <div className="mb-5">
+      <h2 className="text-lg font-semibold text-slate-950">{title}</h2>
+      <p className="mt-1 text-sm text-slate-500">{description}</p>
+    </div>
   );
-};
+}
+
+function PhaseLoading() {
+  return (
+    <div role="status" aria-label="Cargando fase" className="space-y-4 py-4">
+      <div className="h-5 w-48 animate-pulse rounded bg-slate-200" />
+      <div className="h-28 animate-pulse rounded-xl bg-slate-100" />
+      <div className="h-28 animate-pulse rounded-xl bg-slate-100" />
+    </div>
+  );
+}
+
+const OptimizedQuote: React.FC<OptimizedQuoteProps> = (props) => (
+  <QuotationErrorBoundary>
+    <OptimizedQuoteProvider>
+      <OptimizedQuoteContent {...props} />
+    </OptimizedQuoteProvider>
+  </QuotationErrorBoundary>
+);
 
 export default OptimizedQuote;

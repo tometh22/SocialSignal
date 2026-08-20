@@ -139,13 +139,18 @@ import {
   userNotifications,
   quotationTeamMembers,
   quotationTemplates,
+  quotationRevisions,
+  quotationEvents,
+  quotationApprovals,
+  quotationApprovalRules,
+  quotationDeliveries,
   sheetPersonnelAliases,
 } from "@shared/schema";
 import { fetchValorHora2026, fetchValorHoraForYear, getHistoricalRateFields, HISTORICAL_RATE_FIELDS_2026, findPersonnelIdFuzzy, describeSheetsSyncError } from "./services/personnelSheetsSync";
 import { applyCanonicalPersonnelRateRows } from "./services/personnel-cost-sync";
 import { ActiveProjectsAggregator } from "./domain/projectsActive";import { resolveTimeFilter } from "./services/time";
 import { CoverageCalculator } from "./domain/coverage";
-import { eq, and, or, isNull, isNotNull, desc, sql, asc, gte, lte, inArray } from "drizzle-orm";
+import { eq, and, or, isNull, isNotNull, desc, sql, asc, gte, lte, lt, inArray } from "drizzle-orm";
 import { reinitializeDatabase } from "./reinit-data";
 import { upload, uploadDocument, uploadInvoice, deleteOldFile } from "./upload";
 import { personalMonthlyInvoices, personalFxOverrides, externalProviders as externalProvidersTable, providerProjectAccess as providerProjectAccessTable, exchangeRates } from "@shared/schema";
@@ -158,6 +163,7 @@ import { createReviewRoomsRouter } from "./routes-review-rooms";
 import { createLedgerRouter } from "./routes-ledger";
 import { reviewRooms, reviewRoomMembers, capacityOverrides } from "@shared/schema";
 import path from 'path';
+import PDFDocument from "pdfkit";
 import { setupChat } from "./chat";
 // import { googleSheetsService } from "./services/googleSheetsService"; // Temporalmente deshabilitado
 import { googleSheetsServiceAlternative } from "./services/googleSheetsServiceAlternative";
@@ -176,14 +182,22 @@ import {
 import * as income from './domain/income';
 import { INCOME_SOT_ENABLED, logIncomeSOT } from './domain/income/feature-flag';
 import { createXlsxBuffer } from './utils/xlsx-export';
-import { createHash } from "node:crypto";
+import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { productDefinitionsMarkdown } from "./content/product-definitions.generated";
 import { PRODUCT_DEFINITIONS_MANIFEST } from "./content/product-definitions-manifest";
 import { calculateQuotationPricing } from "@shared/utils/quotation-pricing";
 import { calculateQuotationComplexityFactor } from "@shared/utils/quotation-complexity";
 import {
   assertQuotationTransition,
+  isQuotationStatus,
+  quotationNeedsImmutableRevision,
 } from "@shared/utils/quotation-workflow";
+import {
+  calculateGrossMarginPercentage,
+  calculateTaxBreakdown,
+  stableQuotationSnapshot,
+  validatePaymentSchedule,
+} from "@shared/utils/quotation-commercial";
 
 // 🚀 COSTS SOT - Nueva fuente única de verdad para costos
 import * as costs from './domain/costs';
@@ -5204,6 +5218,515 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  const quotationDecisionSchema = z.object({
+    decision: z.enum(["accept", "reject", "negotiate"]),
+    variantId: z.number().int().positive().optional(),
+    name: z.string().trim().min(2).max(160),
+    email: z.string().trim().email().max(255),
+    reason: z.string().trim().max(2000).optional(),
+    consent: z.literal(true),
+  }).superRefine((value, context) => {
+    if (value.decision !== "accept" && (!value.reason || value.reason.length < 3)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["reason"],
+        message: "Incluí un comentario para rechazar o negociar",
+      });
+    }
+  });
+
+  const quoteTokenHash = (token: string) => createHash("sha256").update(token).digest("hex");
+
+  const escapeHtml = (value: string) => value.replace(/[&<>"']/g, (character) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;",
+  })[character] || character);
+
+  const safeTokenEquals = (candidate: string, storedHash: string) => {
+    const candidateHash = Buffer.from(quoteTokenHash(candidate), "hex");
+    const expectedHash = Buffer.from(storedHash, "hex");
+    return candidateHash.length === expectedHash.length && timingSafeEqual(candidateHash, expectedHash);
+  };
+
+  async function buildQuotationSnapshot(executor: any, quotationId: number) {
+    const [quotation] = await executor.select().from(quotations).where(eq(quotations.id, quotationId));
+    if (!quotation) throw new Error("Quotation not found");
+    const [clientRows, billingRows, baseTeam, variants, allVariantMembers] = await Promise.all([
+      executor.select().from(clients).where(eq(clients.id, quotation.clientId)),
+      quotation.billingEntityId
+        ? executor.select().from(clientBillingEntities).where(eq(clientBillingEntities.id, quotation.billingEntityId))
+        : Promise.resolve([]),
+      executor.select({
+        id: quotationTeamMembers.id,
+        roleId: quotationTeamMembers.roleId,
+        roleName: roles.name,
+        hours: quotationTeamMembers.hours,
+        rate: quotationTeamMembers.rate,
+        cost: quotationTeamMembers.cost,
+        personnelId: quotationTeamMembers.personnelId,
+      }).from(quotationTeamMembers)
+        .leftJoin(roles, eq(roles.id, quotationTeamMembers.roleId))
+        .where(and(eq(quotationTeamMembers.quotationId, quotationId), isNull(quotationTeamMembers.variantId))),
+      executor.select().from(quotationVariants)
+        .where(eq(quotationVariants.quotationId, quotationId))
+        .orderBy(asc(quotationVariants.variantOrder)),
+      executor.select({
+        id: quotationTeamMembers.id,
+        variantId: quotationTeamMembers.variantId,
+        roleId: quotationTeamMembers.roleId,
+        roleName: roles.name,
+        hours: quotationTeamMembers.hours,
+        rate: quotationTeamMembers.rate,
+        cost: quotationTeamMembers.cost,
+        personnelId: quotationTeamMembers.personnelId,
+      }).from(quotationTeamMembers)
+        .leftJoin(roles, eq(roles.id, quotationTeamMembers.roleId))
+        .where(and(eq(quotationTeamMembers.quotationId, quotationId), isNotNull(quotationTeamMembers.variantId))),
+    ]);
+    return {
+      quotation,
+      client: clientRows[0] ?? null,
+      billingEntity: billingRows[0] ?? null,
+      team: baseTeam,
+      variants: variants.map((variant: any) => ({
+        ...variant,
+        team: allVariantMembers.filter((member: any) => member.variantId === variant.id),
+      })),
+    };
+  }
+
+  async function persistQuotationRevision(
+    executor: any,
+    quotationId: number,
+    actorUserId: number | null,
+    reason: string,
+  ) {
+    const snapshot = await buildQuotationSnapshot(executor, quotationId);
+    const serialized = stableQuotationSnapshot(snapshot);
+    const documentHash = createHash("sha256").update(serialized).digest("hex");
+    const revisionNumber = Number(snapshot.quotation.revisionNumber) || 1;
+    const [revision] = await executor.insert(quotationRevisions).values({
+      quotationId,
+      revisionNumber,
+      status: snapshot.quotation.status,
+      snapshot,
+      documentHash,
+      reason,
+      createdBy: actorUserId,
+    }).onConflictDoNothing().returning();
+    const effectiveRevision = revision ?? (await executor.select().from(quotationRevisions).where(and(
+      eq(quotationRevisions.quotationId, quotationId),
+      eq(quotationRevisions.revisionNumber, revisionNumber),
+    )))[0];
+    const effectiveDocumentHash = revision ? documentHash : effectiveRevision.documentHash;
+    await executor.update(quotations).set({ documentHash: effectiveDocumentHash }).where(eq(quotations.id, quotationId));
+    return {
+      revision: effectiveRevision,
+      snapshot: revision ? snapshot : effectiveRevision.snapshot,
+      documentHash: effectiveDocumentHash,
+    };
+  }
+
+  async function recordQuotationEvent(
+    executor: any,
+    input: {
+      quotationId: number;
+      revisionId?: number | null;
+      eventType: string;
+      eventKey?: string;
+      actorUserId?: number | null;
+      actorType?: string;
+      metadata?: Record<string, unknown>;
+    },
+  ) {
+    await executor.insert(quotationEvents).values({
+      quotationId: input.quotationId,
+      revisionId: input.revisionId ?? null,
+      eventType: input.eventType,
+      eventKey: input.eventKey,
+      actorUserId: input.actorUserId ?? null,
+      actorType: input.actorType ?? "internal",
+      metadata: input.metadata ?? {},
+    }).onConflictDoNothing();
+  }
+
+  async function createQuotationApprovalRequests(
+    executor: any,
+    quotation: any,
+    revisionId: number,
+    requestedBy: number | null,
+  ) {
+    const activeRules = await executor.select().from(quotationApprovalRules)
+      .where(eq(quotationApprovalRules.isActive, true));
+    const netRevenue = calculateTaxBreakdown(
+      quotation.totalAmount,
+      quotation.taxRate,
+      quotation.pricesIncludeTax,
+    ).netAmount;
+    const grossMargin = calculateGrossMarginPercentage(
+      netRevenue,
+      Number(quotation.baseCost || 0)
+        + Number(quotation.toolsCost || 0)
+        + Number(quotation.platformCost || 0)
+        + Number(quotation.additionalDeliverableCost || 0),
+    );
+    const matched = activeRules.filter((rule: any) => {
+      if (rule.currency && rule.currency !== quotation.quotationCurrency) return false;
+      if (rule.requiresManualPrice && quotation.priceMode !== "manual") return false;
+      const checks = [
+        rule.minDiscountPercentage != null && Number(quotation.discountPercentage || 0) > Number(rule.minDiscountPercentage),
+        rule.maxGrossMarginPercentage != null && grossMargin < Number(rule.maxGrossMarginPercentage),
+        rule.minTotalAmount != null && Number(quotation.totalAmount) >= Number(rule.minTotalAmount),
+        rule.requiresManualPrice && quotation.priceMode === "manual",
+      ];
+      return checks.some(Boolean);
+    });
+    const requests = [
+      { code: "standard-review", name: "Revisión comercial obligatoria" },
+      ...matched.map((rule: any) => ({ code: rule.code, name: rule.name })),
+    ];
+    if (requests.length > 0) {
+      await executor.insert(quotationApprovals).values(requests.map((request) => ({
+        quotationId: quotation.id,
+        revisionId,
+        ruleCode: request.code,
+        ruleLabel: request.name,
+        requestedBy,
+      }))).onConflictDoNothing();
+    }
+    return requests;
+  }
+
+  async function syncQuotationToCrm(
+    executor: any,
+    quotation: any,
+    status: string,
+    actorUserId: number | null,
+    note?: string,
+  ) {
+    if (!quotation.leadId) return;
+    const stage = status === "approved" ? "won"
+      : ["rejected", "expired", "cancelled"].includes(status) ? "lost"
+      : status === "in-negotiation" ? "negotiation"
+      : ["pending", "internally-approved", "sent", "viewed"].includes(status) ? "proposal"
+      : null;
+    if (!stage) return;
+    const now = new Date();
+    await executor.update(crmLeads).set({
+      stage,
+      updatedAt: now,
+      ...(stage === "won" ? { wonAt: now, lostAt: null, lostReason: null } : {}),
+      ...(stage === "lost" ? { lostAt: now, lostReason: note || quotation.lossReason || null } : {}),
+    }).where(eq(crmLeads.id, quotation.leadId));
+    await executor.insert(crmActivities).values({
+      leadId: quotation.leadId,
+      quotationId: quotation.id,
+      type: status === "sent" ? "email" : "proposal",
+      title: `Cotización ${quotation.quotationNumber || `#${quotation.id}`}: ${status}`,
+      content: note || `La cotización cambió al estado ${status}.`,
+      activityDate: now,
+      createdBy: actorUserId,
+    });
+  }
+
+  async function requireDraftQuotation(quotationId: number, res: Response) {
+    const quotation = await storage.getQuotation(quotationId);
+    if (!quotation) {
+      res.status(404).json({ message: "Quotation not found" });
+      return null;
+    }
+    if (quotation.status !== "draft") {
+      res.status(409).json({
+        message: "El alcance sólo puede modificarse en borrador. Creá una revisión antes de cambiarlo.",
+        code: "QUOTATION_REVISION_REQUIRED",
+      });
+      return null;
+    }
+    return quotation;
+  }
+
+  function publicQuotationProjection(snapshot: any) {
+    const quotation = snapshot.quotation;
+    const tax = calculateTaxBreakdown(quotation.totalAmount, quotation.taxRate, quotation.pricesIncludeTax);
+    return {
+      quotation: {
+        id: quotation.id,
+        quotationNumber: quotation.quotationNumber,
+        revisionNumber: quotation.revisionNumber,
+        projectName: quotation.projectName,
+        projectType: quotation.projectType,
+        projectDuration: quotation.projectDuration,
+        analysisType: quotation.analysisType,
+        quotationCurrency: quotation.quotationCurrency,
+        quotationType: quotation.quotationType,
+        deliverables: quotation.deliverables,
+        expiresAt: quotation.expiresAt,
+        status: quotation.status,
+        taxLabel: quotation.taxLabel,
+        taxRate: quotation.taxRate,
+        pricesIncludeTax: quotation.pricesIncludeTax,
+        paymentTermsDays: quotation.paymentTermsDays,
+        paymentSchedule: quotation.paymentSchedule,
+        commercialTerms: quotation.commercialTerms,
+        inclusions: quotation.inclusions,
+        exclusions: quotation.exclusions,
+        termsVersion: quotation.termsVersion,
+        ...tax,
+      },
+      client: snapshot.client ? { name: snapshot.client.name, contactName: snapshot.client.contactName } : null,
+      billingEntity: snapshot.billingEntity ? {
+        razonSocial: snapshot.billingEntity.razonSocial,
+        country: snapshot.billingEntity.country,
+        taxId: snapshot.billingEntity.taxId,
+      } : null,
+      team: snapshot.team.map((member: any) => ({ roleName: member.roleName, hours: member.hours })),
+      variants: snapshot.variants.map((variant: any) => ({
+        id: variant.id,
+        variantName: variant.variantName,
+        variantDescription: variant.variantDescription,
+        variantOrder: variant.variantOrder,
+        totalAmount: variant.totalAmount,
+        ...calculateTaxBreakdown(variant.totalAmount, quotation.taxRate, quotation.pricesIncludeTax),
+      })),
+      documentHash: snapshot.documentHash || quotation.documentHash,
+    };
+  }
+
+  async function renderQuotationPdf(projection: ReturnType<typeof publicQuotationProjection>): Promise<Buffer> {
+    return await new Promise((resolve, reject) => {
+      const document = new PDFDocument({ size: "A4", margin: 48, info: {
+        Title: `Cotización ${projection.quotation.quotationNumber}`,
+        Subject: projection.quotation.projectName,
+        Author: "SocialSignal",
+      } });
+      const chunks: Buffer[] = [];
+      document.on("data", (chunk) => chunks.push(Buffer.from(chunk)));
+      document.on("end", () => resolve(Buffer.concat(chunks)));
+      document.on("error", reject);
+      const quote = projection.quotation;
+      const currency = quote.quotationCurrency || "ARS";
+      const format = (amount: number) => new Intl.NumberFormat("es-AR", {
+        style: "currency",
+        currency,
+        minimumFractionDigits: currency === "USD" ? 2 : 0,
+      }).format(amount);
+      document.fillColor("#0f172a").fontSize(22).text("Propuesta comercial", { align: "left" });
+      document.moveDown(0.3).fontSize(10).fillColor("#64748b")
+        .text(`${quote.quotationNumber} · Revisión ${quote.revisionNumber}`);
+      document.moveDown(1.2).fillColor("#0f172a").fontSize(15).text(quote.projectName);
+      document.fontSize(10).fillColor("#475569")
+        .text(`Cliente: ${projection.billingEntity?.razonSocial || projection.client?.name || "—"}`)
+        .text(`Vigencia: ${quote.expiresAt ? new Date(quote.expiresAt).toLocaleDateString("es-AR") : "—"}`)
+        .text(`Moneda: ${currency}`);
+      document.moveDown(1.2).fontSize(12).fillColor("#0f172a").text("Alcance y alternativas");
+      if (projection.variants.length > 0) {
+        for (const variant of projection.variants) {
+          document.moveDown(0.35).fontSize(10).fillColor("#334155")
+            .text(`${variant.variantName}: ${format(variant.grandTotal)}`);
+          if (variant.variantDescription) document.fontSize(9).fillColor("#64748b").text(variant.variantDescription);
+        }
+      } else {
+        document.moveDown(0.35).fontSize(10).text(`Propuesta: ${format(quote.netAmount)}`);
+      }
+      document.moveDown(1.2).fontSize(12).fillColor("#0f172a").text("Condiciones económicas");
+      document.fontSize(10).fillColor("#334155")
+        .text(`Neto: ${format(quote.netAmount)}`)
+        .text(`${quote.taxLabel || "Impuestos"} (${quote.taxRate || 0}%): ${format(quote.taxAmount)}`)
+        .fontSize(13).fillColor("#0f172a").text(`Total: ${format(quote.grandTotal)}`);
+      if (quote.paymentTermsDays != null) {
+        document.moveDown(0.5).fontSize(10).fillColor("#475569").text(`Condición de pago: ${quote.paymentTermsDays} días`);
+      }
+      if (quote.paymentSchedule?.length) {
+        document.moveDown(0.4).fontSize(10).fillColor("#475569").text("Cronograma:");
+        quote.paymentSchedule.forEach((milestone: any) => document.text(`• ${milestone.label}: ${milestone.percentage}%${milestone.dueDays != null ? ` · ${milestone.dueDays} días` : ""}`));
+      }
+      for (const [title, content] of [
+        ["Incluye", quote.inclusions],
+        ["No incluye", quote.exclusions],
+        ["Términos comerciales", quote.commercialTerms],
+      ] as const) {
+        if (!content) continue;
+        document.moveDown(1).fontSize(11).fillColor("#0f172a").text(title);
+        document.moveDown(0.25).fontSize(9).fillColor("#475569").text(content);
+      }
+      document.moveDown(1.5).fontSize(8).fillColor("#94a3b8")
+        .text(`Versión de términos: ${quote.termsVersion} · Hash documental: ${projection.documentHash || "pendiente"}`);
+      document.end();
+    });
+  }
+
+  // Public client portal. Tokens are random, only their SHA-256 hashes are stored.
+  app.get("/api/public/quotations/:token", async (req, res) => {
+    try {
+      const token = req.params.token;
+      if (!token || token.length < 32) return res.status(404).json({ message: "Cotización no encontrada" });
+      const hash = quoteTokenHash(token);
+      const [quotation] = await db.select().from(quotations).where(eq(quotations.publicTokenHash, hash));
+      if (!quotation || !quotation.publicTokenHash || !safeTokenEquals(token, quotation.publicTokenHash)) {
+        return res.status(404).json({ message: "Cotización no encontrada" });
+      }
+      const now = new Date();
+      if ((quotation.publicTokenExpiresAt && quotation.publicTokenExpiresAt < now)
+        || (quotation.expiresAt && quotation.expiresAt < now)) {
+        if (["sent", "viewed", "in-negotiation"].includes(quotation.status)) {
+          await db.transaction(async (tx) => {
+            await tx.update(quotations).set({ status: "expired", updatedAt: now, lockVersion: sql`${quotations.lockVersion} + 1` })
+              .where(eq(quotations.id, quotation.id));
+            await recordQuotationEvent(tx, {
+              quotationId: quotation.id,
+              eventType: "expired",
+              eventKey: `expired:${quotation.id}:${quotation.revisionNumber}`,
+              actorType: "system",
+            });
+            await syncQuotationToCrm(tx, quotation, "expired", null, "La propuesta venció sin decisión del cliente.");
+          });
+        }
+        return res.status(410).json({ message: "La cotización está vencida" });
+      }
+      if (quotation.status === "sent") {
+        await db.transaction(async (tx) => {
+          await tx.update(quotations).set({ status: "viewed", viewedAt: now, updatedAt: now, lockVersion: sql`${quotations.lockVersion} + 1` })
+            .where(and(eq(quotations.id, quotation.id), eq(quotations.status, "sent")));
+          await recordQuotationEvent(tx, {
+            quotationId: quotation.id,
+            eventType: "viewed",
+            eventKey: `viewed:${quotation.id}:${quotation.revisionNumber}`,
+            actorType: "client",
+            metadata: { ip: req.ip, userAgent: req.get("user-agent") || null },
+          });
+        });
+      }
+      const latest = (await db.select().from(quotationRevisions)
+        .where(eq(quotationRevisions.quotationId, quotation.id))
+        .orderBy(desc(quotationRevisions.revisionNumber)).limit(1))[0];
+      const snapshot: any = latest?.snapshot ?? await buildQuotationSnapshot(db, quotation.id);
+      const currentSnapshot = {
+        ...snapshot,
+        documentHash: latest?.documentHash ?? quotation.documentHash,
+        quotation: { ...snapshot.quotation, ...quotation, status: quotation.status === "sent" ? "viewed" : quotation.status },
+      };
+      res.json(publicQuotationProjection(currentSnapshot));
+    } catch (error) {
+      console.error("Error opening public quotation:", error);
+      res.status(500).json({ message: "No se pudo abrir la cotización" });
+    }
+  });
+
+  app.get("/api/public/quotations/:token/document.pdf", async (req, res) => {
+    try {
+      const hash = quoteTokenHash(req.params.token);
+      const [quotation] = await db.select().from(quotations).where(eq(quotations.publicTokenHash, hash));
+      if (!quotation || !quotation.publicTokenHash || !safeTokenEquals(req.params.token, quotation.publicTokenHash)) {
+        return res.status(404).json({ message: "Cotización no encontrada" });
+      }
+      if ((quotation.expiresAt && quotation.expiresAt < new Date()) || quotation.status === "expired") {
+        return res.status(410).json({ message: "La cotización está vencida" });
+      }
+      const revision = (await db.select().from(quotationRevisions)
+        .where(and(eq(quotationRevisions.quotationId, quotation.id), eq(quotationRevisions.revisionNumber, quotation.revisionNumber)))
+        .limit(1))[0];
+      if (!revision) return res.status(404).json({ message: "Documento no encontrado" });
+      const pdf = await renderQuotationPdf(publicQuotationProjection({
+        ...(revision.snapshot as any),
+        documentHash: revision.documentHash,
+      }));
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `inline; filename="${quotation.quotationNumber}-R${quotation.revisionNumber}.pdf"`);
+      res.send(pdf);
+    } catch (error) {
+      res.status(500).json({ message: "No se pudo generar el documento" });
+    }
+  });
+
+  app.post("/api/public/quotations/:token/decision", async (req, res) => {
+    try {
+      const input = quotationDecisionSchema.parse(req.body);
+      const hash = quoteTokenHash(req.params.token);
+      const [quotation] = await db.select().from(quotations).where(eq(quotations.publicTokenHash, hash));
+      if (!quotation || !quotation.publicTokenHash || !safeTokenEquals(req.params.token, quotation.publicTokenHash)) {
+        return res.status(404).json({ message: "Cotización no encontrada" });
+      }
+      if (!["sent", "viewed", "in-negotiation"].includes(quotation.status)) {
+        return res.status(409).json({ message: "La cotización ya no admite decisiones" });
+      }
+      if ((quotation.expiresAt && quotation.expiresAt < new Date())
+        || (quotation.publicTokenExpiresAt && quotation.publicTokenExpiresAt < new Date())) {
+        return res.status(410).json({ message: "La cotización está vencida" });
+      }
+      const variants = await db.select().from(quotationVariants).where(eq(quotationVariants.quotationId, quotation.id));
+      if (input.decision === "accept" && variants.length > 0 && !input.variantId) {
+        return res.status(400).json({ message: "Elegí la variante que aceptás" });
+      }
+      const selected = input.variantId ? variants.find((variant) => variant.id === input.variantId) : undefined;
+      if (input.variantId && !selected) return res.status(400).json({ message: "La variante no pertenece a la cotización" });
+      const status = input.decision === "accept" ? "approved"
+        : input.decision === "reject" ? "rejected"
+        : "in-negotiation";
+      const now = new Date();
+      const selectedTax = selected
+        ? calculateTaxBreakdown(selected.totalAmount, quotation.taxRate, quotation.pricesIncludeTax)
+        : null;
+      const updated = await db.transaction(async (tx) => {
+        const [row] = await tx.update(quotations).set({
+          status,
+          acceptedVariantId: input.decision === "accept" ? selected?.id ?? null : null,
+          ...(selected ? {
+            totalAmount: selected.totalAmount,
+            subtotalAmount: selectedTax?.netAmount,
+            taxAmount: selectedTax?.taxAmount,
+          } : {}),
+          acceptedAt: input.decision === "accept" ? now : null,
+          rejectedAt: input.decision === "reject" ? now : null,
+          lossReason: input.decision === "reject" ? input.reason || "Rechazada por el cliente" : quotation.lossReason,
+          updatedAt: now,
+          lockVersion: sql`${quotations.lockVersion} + 1`,
+        }).where(and(
+          eq(quotations.id, quotation.id),
+          eq(quotations.lockVersion, quotation.lockVersion),
+          inArray(quotations.status, ["sent", "viewed", "in-negotiation"]),
+        )).returning();
+        if (!row) {
+          throw Object.assign(new Error("La cotización recibió otra decisión simultánea"), { statusCode: 409 });
+        }
+        if (selected) {
+          await tx.update(quotationVariants).set({ isSelected: false }).where(eq(quotationVariants.quotationId, quotation.id));
+          await tx.update(quotationVariants).set({ isSelected: true }).where(eq(quotationVariants.id, selected.id));
+        }
+        const latest = (await tx.select().from(quotationRevisions)
+          .where(eq(quotationRevisions.quotationId, quotation.id))
+          .orderBy(desc(quotationRevisions.revisionNumber)).limit(1))[0];
+        await recordQuotationEvent(tx, {
+          quotationId: quotation.id,
+          revisionId: latest?.id,
+          eventType: status,
+          eventKey: `${status}:${quotation.id}:${quotation.revisionNumber}`,
+          actorType: "client",
+          metadata: {
+            name: input.name,
+            email: input.email,
+            reason: input.reason || null,
+            variantId: selected?.id || null,
+            termsVersion: quotation.termsVersion,
+            consent: input.consent,
+            ip: req.ip,
+            userAgent: req.get("user-agent") || null,
+          },
+        });
+        await syncQuotationToCrm(tx, row, status, null, input.reason);
+        return row;
+      });
+      res.json({ success: true, status: updated.status });
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: "La decisión es inválida", errors: error.errors });
+      if ((error as any)?.statusCode === 409) return res.status(409).json({ message: (error as Error).message });
+      console.error("Error recording quotation decision:", error);
+      res.status(500).json({ message: "No se pudo registrar la decisión" });
+    }
+  });
+
   // Quotations are commercially sensitive. This prefix guard protects every
   // current and future route in the module, including nested negotiation and
   // display endpoints, even if a handler forgets to repeat the middleware.
@@ -5343,7 +5866,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   const quotationInflationFactor = (quotation: z.infer<typeof insertQuotationSchema>) => {
     if (!quotation.applyInflationAdjustment) return 1;
-    const annualRate = Number(quotation.manualInflationRate) || 25;
+    const annualRate = quotation.inflationMethod === "automatic"
+      ? Number(quotation.automaticInflationRate)
+      : Number(quotation.manualInflationRate);
+    if (!Number.isFinite(annualRate) || annualRate < 0
+      || (quotation.inflationMethod === "manual" && annualRate <= 0)) {
+      throw new z.ZodError([{
+        code: z.ZodIssueCode.custom,
+        path: [quotation.inflationMethod === "automatic" ? "automaticInflationRate" : "manualInflationRate"],
+        message: "La tasa anual efectiva debe estar confirmada",
+      }]);
+    }
     let months = 0;
     if (quotation.rateProjectionMode === "annual_avg") {
       months = 6;
@@ -5353,6 +5886,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       months = Math.max(0, (start.getFullYear() - now.getFullYear()) * 12 + start.getMonth() - now.getMonth());
     }
     return months > 0 ? Math.pow(1 + annualRate / 100, months / 12) : 1;
+  };
+
+  const normalizeQuotationCommercialFields = (quotation: z.infer<typeof insertQuotationSchema>) => {
+    validatePaymentSchedule(quotation.paymentSchedule ?? []);
+    const tax = calculateTaxBreakdown(
+      quotation.totalAmount,
+      quotation.taxRate ?? 0,
+      quotation.pricesIncludeTax ?? false,
+    );
+    return {
+      ...quotation,
+      subtotalAmount: tax.netAmount,
+      taxAmount: tax.taxAmount,
+    };
   };
 
   const moneyMatches = (actual: number, expected: number) =>
@@ -5470,11 +6017,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (issues.length > 0) throw new z.ZodError(issues);
   }
 
+  async function validateQuotationCommercialReferences(quotation: z.infer<typeof insertQuotationSchema>) {
+    const issues: z.ZodIssue[] = [];
+    if (quotation.billingEntityId) {
+      const [entity] = await db.select().from(clientBillingEntities).where(eq(clientBillingEntities.id, quotation.billingEntityId));
+      if (!entity || entity.clientId !== quotation.clientId) {
+        issues.push({ code: z.ZodIssueCode.custom, path: ["billingEntityId"], message: "La entidad de facturación no pertenece al cliente" });
+      }
+    }
+    if (quotation.status === "pending") {
+      if (!quotation.expiresAt || quotation.expiresAt <= new Date()) {
+        issues.push({ code: z.ZodIssueCode.custom, path: ["expiresAt"], message: "La vigencia debe finalizar en una fecha futura" });
+      }
+      if (!quotation.commercialTerms?.trim()) {
+        issues.push({ code: z.ZodIssueCode.custom, path: ["commercialTerms"], message: "Los términos comerciales son obligatorios" });
+      }
+      if ((quotation.priceMode === "manual" || Number(quotation.discountPercentage || 0) > 0)
+        && !quotation.adjustmentReason?.trim()) {
+        issues.push({ code: z.ZodIssueCode.custom, path: ["adjustmentReason"], message: "Justificá el precio manual o descuento" });
+      }
+    }
+    if (issues.length > 0) throw new z.ZodError(issues);
+  }
+
   app.post("/api/quotations", requireAuth, async (req, res) => {
     try {
       try {
         const { teamMembers: rawTeamMembers, variants: rawVariants, ...rawQuotation } = req.body ?? {};
-        const validatedData = insertQuotationSchema.parse(rawQuotation);
+        let validatedData = normalizeQuotationCommercialFields(insertQuotationSchema.parse(rawQuotation));
+        if (!["draft", "pending"].includes(validatedData.status ?? "draft")) {
+          return res.status(409).json({ message: "Una cotización nueva debe guardarse como borrador o enviarse a revisión interna" });
+        }
         validatePricingSnapshot(validatedData);
         const parsedTeam = quotationTeamRequestSchema
           .parse({ teamMembers: rawTeamMembers })
@@ -5483,20 +6056,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const validatedVariants = rawVariants === undefined
           ? []
           : quotationVariantsPayloadSchema.parse(rawVariants);
-        if (validatedData.status === "approved" && validatedVariants.length === 0) {
-          return res.status(400).json({ message: "Una cotización aprobada debe incluir al menos una variante" });
-        }
         const normalizedVariants = validatedVariants.map((variant) => {
           const variantTeam = validateAndNormalizeQuotationPricing(
             { ...validatedData, ...variant },
             variant.teamMembers ?? validatedTeam,
           );
-          return { ...variant, teamMembers: variantTeam };
+          return { ...variant, isSelected: false, teamMembers: variantTeam };
         });
         await validateQuotationTeamReferences([
           ...validatedTeam,
           ...normalizedVariants.flatMap((variant) => variant.teamMembers),
         ]);
+        await validateQuotationCommercialReferences(validatedData);
 
         // Crear cotización — expiresAt default = ahora + 30 días si no viene en payload
         if (!validatedData.expiresAt) {
@@ -5505,10 +6076,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           (validatedData as any).expiresAt = exp;
         }
         const quotation = await db.transaction(async (tx) => {
-          const [created] = await tx.insert(quotations).values({
+          const [inserted] = await tx.insert(quotations).values({
             ...validatedData,
             createdBy: req.user?.id ?? null,
+            updatedBy: req.user?.id ?? null,
           }).returning();
+          const quotationNumber = `COT-${new Date(inserted.createdAt).getFullYear()}-${String(inserted.id).padStart(6, "0")}`;
+          const [created] = await tx.update(quotations).set({ quotationNumber })
+            .where(eq(quotations.id, inserted.id)).returning();
           if (validatedTeam.length > 0) {
             await tx.insert(quotationTeamMembers).values(
               validatedTeam.map((member) => ({ ...member, quotationId: created.id, variantId: null })),
@@ -5527,30 +6102,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
               })));
             }
           }
+          const revisionResult = await persistQuotationRevision(
+            tx,
+            created.id,
+            req.user?.id ?? null,
+            validatedData.status === "pending" ? "Enviada a revisión interna" : "Borrador inicial",
+          );
+          if (validatedData.status === "pending") {
+            await createQuotationApprovalRequests(tx, created, revisionResult.revision.id, req.user?.id ?? null);
+          }
+          await recordQuotationEvent(tx, {
+            quotationId: created.id,
+            revisionId: revisionResult.revision.id,
+            eventType: validatedData.status === "pending" ? "submitted" : "created",
+            eventKey: `${validatedData.status === "pending" ? "submitted" : "created"}:${created.id}:1`,
+            actorUserId: req.user?.id ?? null,
+            metadata: { quotationNumber },
+          });
+          await syncQuotationToCrm(tx, created, validatedData.status ?? "draft", req.user?.id ?? null);
           return created;
         });
-
-        // Si viene de un lead CRM, registrar actividad automáticamente
-        if (validatedData.leadId) {
-          try {
-            const userId = req.user?.id;
-            await db.insert(crmActivities).values({
-              leadId: validatedData.leadId,
-              type: 'proposal',
-              title: `Cotización creada: ${validatedData.projectName}`,
-              content: `Se generó una nueva cotización para el proyecto "${validatedData.projectName}". Estado: ${validatedData.status ?? "draft"}. ID: #${quotation.id}`,
-              activityDate: new Date(),
-              createdBy: userId,
-            });
-            // Avanzar el lead a etapa "proposal" si está en etapas anteriores
-            const [lead] = await db.select().from(crmLeads).where(eq(crmLeads.id, validatedData.leadId));
-            if (lead && ['new', 'contacted', 'qualified'].includes(lead.stage)) {
-              await db.update(crmLeads).set({ stage: 'proposal', updatedAt: new Date() }).where(eq(crmLeads.id, validatedData.leadId));
-            }
-          } catch (crmError) {
-            console.warn('⚠️ Could not register CRM activity for quotation:', crmError);
-          }
-        }
 
         res.status(201).json(quotation);
       } catch (validationError) {
@@ -5582,12 +6153,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log('❌ Quotation not found for ID:', id);
         return res.status(404).json({ message: "Quotation not found" });
       }
+      if (quotationNeedsImmutableRevision(existingQuotation.status)) {
+        return res.status(409).json({
+          message: "La cotización ya tiene una versión comercial inmutable. Creá una nueva revisión para modificarla.",
+          code: "QUOTATION_REVISION_REQUIRED",
+        });
+      }
       console.log('✅ Existing quotation found:', existingQuotation.id);
 
       try {
         // Validar datos con Zod
         const { teamMembers: rawTeamMembers, variants: rawVariants, ...rawQuotation } = req.body ?? {};
-        const validatedData = insertQuotationSchema.parse(rawQuotation);
+        const parsedData = normalizeQuotationCommercialFields(insertQuotationSchema.parse(rawQuotation));
+        if (existingQuotation.status !== "draft") {
+          return res.status(409).json({
+            message: "La versión en revisión ya es inmutable. Creá una nueva revisión para modificarla.",
+            code: "QUOTATION_REVISION_REQUIRED",
+          });
+        }
+        if (parsedData.lockVersion !== existingQuotation.lockVersion) {
+          return res.status(409).json({
+            message: "La cotización fue modificada por otra persona. Recargá la última versión antes de guardar.",
+            code: "QUOTATION_VERSION_CONFLICT",
+            currentLockVersion: existingQuotation.lockVersion,
+          });
+        }
+        if (!["draft", "pending"].includes(parsedData.status ?? existingQuotation.status)) {
+          return res.status(409).json({ message: "Los estados comerciales se modifican mediante su acción específica" });
+        }
+        const nextRevisionNumber = parsedData.status === "pending"
+          ? existingQuotation.revisionNumber + 1
+          : existingQuotation.revisionNumber;
+        const validatedData = {
+          ...parsedData,
+          revisionNumber: nextRevisionNumber,
+        };
         validatePricingSnapshot(validatedData);
         if (validatedData.status && validatedData.status !== existingQuotation.status) {
           assertQuotationTransition(existingQuotation.status, validatedData.status);
@@ -5599,29 +6199,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const validatedVariants = rawVariants === undefined
           ? undefined
           : quotationVariantsPayloadSchema.parse(rawVariants);
-        if (validatedData.status === "approved" && (!validatedVariants || validatedVariants.length === 0)) {
-          return res.status(400).json({ message: "Una cotización aprobada debe incluir al menos una variante" });
-        }
         const normalizedVariants = validatedVariants?.map((variant) => {
           const variantTeam = validateAndNormalizeQuotationPricing(
             { ...validatedData, ...variant },
             variant.teamMembers ?? validatedTeam,
           );
-          return { ...variant, teamMembers: variantTeam };
+          return { ...variant, isSelected: false, teamMembers: variantTeam };
         });
         await validateQuotationTeamReferences([
           ...validatedTeam,
           ...(normalizedVariants?.flatMap((variant) => variant.teamMembers) ?? []),
         ]);
+        await validateQuotationCommercialReferences(validatedData);
 
         // Cotización y equipo forman una única unidad: nunca dejamos un guardado
         // exitoso con integrantes faltantes.
         const updatedQuotation = await db.transaction(async (tx) => {
           const [updated] = await tx.update(quotations)
-            .set({ ...validatedData, updatedAt: new Date() })
-            .where(eq(quotations.id, id))
+            .set({
+              ...validatedData,
+              updatedAt: new Date(),
+              updatedBy: req.user?.id ?? null,
+              lockVersion: sql`${quotations.lockVersion} + 1`,
+            })
+            .where(and(eq(quotations.id, id), eq(quotations.lockVersion, existingQuotation.lockVersion)))
             .returning();
-          if (!updated) throw new Error("Quotation not found");
+          if (!updated) throw new Error("QUOTATION_VERSION_CONFLICT");
           await tx.delete(quotationTeamMembers)
             .where(normalizedVariants
               ? eq(quotationTeamMembers.quotationId, id)
@@ -5650,6 +6253,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
               }
             }
           }
+          const revisionResult = await persistQuotationRevision(
+            tx,
+            id,
+            req.user?.id ?? null,
+            validatedData.status === "pending" ? "Revisión enviada a aprobación" : "Borrador actualizado",
+          );
+          if (validatedData.status === "pending") {
+            await createQuotationApprovalRequests(tx, updated, revisionResult.revision.id, req.user?.id ?? null);
+          }
+          await recordQuotationEvent(tx, {
+            quotationId: id,
+            revisionId: revisionResult.revision.id,
+            eventType: validatedData.status === "pending" ? "submitted" : "updated",
+            eventKey: `${validatedData.status === "pending" ? "submitted" : "updated"}:${id}:${nextRevisionNumber}`,
+            actorUserId: req.user?.id ?? null,
+            metadata: { previousLockVersion: existingQuotation.lockVersion },
+          });
+          await syncQuotationToCrm(tx, updated, updated.status, req.user?.id ?? null);
           return updated;
         });
 
@@ -5665,6 +6286,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         throw validationError;
       }
     } catch (error) {
+      if (error instanceof Error && error.message === "QUOTATION_VERSION_CONFLICT") {
+        return res.status(409).json({ message: "La cotización fue modificada por otra persona. Recargá e intentá nuevamente.", code: error.message });
+      }
       if (error instanceof Error && error.message.startsWith("No se puede cambiar")) {
         return res.status(400).json({ message: error.message });
       }
@@ -5687,8 +6311,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (isNaN(id)) return res.status(400).json({ message: "Invalid quotation ID" });
 
     try {
+      const current = await requireDraftQuotation(id, res);
+      if (!current) return;
       const validatedData = quotationMetadataPatchSchema.parse(req.body);
-      const updatedQuotation = await storage.updateQuotation(id, { ...validatedData, updatedAt: new Date() } as any);
+      const updatedQuotation = await db.transaction(async (tx) => {
+        const [updated] = await tx.update(quotations).set({
+          ...validatedData,
+          updatedAt: new Date(),
+          updatedBy: req.user?.id ?? null,
+          lockVersion: sql`${quotations.lockVersion} + 1`,
+        }).where(and(
+          eq(quotations.id, id),
+          eq(quotations.lockVersion, current.lockVersion),
+        )).returning();
+        if (updated) await recordQuotationEvent(tx, {
+          quotationId: id,
+          eventType: "metadata-updated",
+          eventKey: `metadata-updated:${id}:${updated.lockVersion}`,
+          actorUserId: req.user?.id ?? null,
+          metadata: { fields: Object.keys(validatedData) },
+        });
+        return updated;
+      });
 
       if (!updatedQuotation) {
         return res.status(404).json({ message: "Quotation not found" });
@@ -5709,7 +6353,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     try {
       const { status, lossReason } = z.object({
-        status: z.enum(["draft", "pending", "approved", "rejected", "in-negotiation"]),
+        status: z.enum(["draft", "pending", "internally-approved", "sent", "viewed", "approved", "rejected", "in-negotiation", "expired", "cancelled", "superseded"]),
         lossReason: z.string().trim().min(1).max(1000).optional(),
       }).parse(req.body);
 
@@ -5717,135 +6361,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!currentQuotation) {
         return res.status(404).json({ message: "Quotation not found" });
       }
+      if (["internally-approved", "sent", "viewed", "approved", "expired", "superseded"].includes(status)) {
+        return res.status(409).json({
+          message: "Ese estado sólo puede alcanzarse mediante su acción comercial específica",
+          code: "QUOTATION_ACTION_REQUIRED",
+        });
+      }
+      if (status === "rejected" && !lossReason) {
+        return res.status(400).json({ message: "El motivo de pérdida es obligatorio" });
+      }
       assertQuotationTransition(currentQuotation.status, status);
 
       let updateData: any = { status, updatedAt: new Date() };
-      let negotiatedTeamToApply: z.infer<typeof quotationTeamPayloadSchema>[] | null = null;
-      let selectedVariantIds: number[] = [];
 
       // Guardar motivo de pérdida al rechazar
       if (status === 'rejected' && lossReason) {
         updateData.lossReason = lossReason;
       }
+      if (status === "cancelled") {
+        updateData.publicTokenHash = null;
+        updateData.publicTokenExpiresAt = null;
+      }
 
-      if (status === "approved") {
-        const [team, variants] = await Promise.all([
-          storage.getQuotationTeamMembers(id),
-          storage.getQuotationVariants(id),
-        ]);
-        if (variants.length === 0) {
-          return res.status(400).json({ message: "Una cotización aprobada debe incluir al menos una variante" });
-        }
-        if (team.length === 0) {
-          return res.status(400).json({ message: "Una cotización aprobada debe incluir equipo" });
-        }
-        validatePricingSnapshot(insertQuotationSchema.parse(currentQuotation));
-        const selectedVariant = variants.find((variant) =>
-          variant.isSelected && moneyMatches(variant.totalAmount, currentQuotation.totalAmount)
-        ) ?? variants.find((variant) => variant.isSelected);
-        const selectedVariantTeam = selectedVariant
-          ? await storage.getQuotationTeamMembersByVariant(selectedVariant.id)
-          : [];
-        const approvalTeam = selectedVariantTeam.length > 0 ? selectedVariantTeam : team;
-
-        if (currentQuotation.status === "in-negotiation") {
-          const negotiationHistory = await storage.getNegotiationHistory(id);
-          if (negotiationHistory.length === 0) {
-            return res.status(400).json({ message: "No hay una negociación registrada para aprobar" });
-          }
-          const lastNegotiation = negotiationHistory[0];
-          if (lastNegotiation.newTeam) {
-            const negotiatedTeam = negotiatedTeamPayloadSchema.parse(JSON.parse(lastNegotiation.newTeam));
-            negotiatedTeamToApply = negotiatedTeam.map((member) => ({
-              personnelId: member.personnelId,
-              roleId: member.roleId,
-              hours: member.estimatedHours,
-              rate: member.hourlyRate,
-              cost: Math.round(member.estimatedHours * member.hourlyRate * 100) / 100,
-            }));
-            await validateQuotationTeamReferences(negotiatedTeamToApply);
-          }
-          selectedVariantIds = variants.filter((variant) => variant.isSelected).map((variant) => variant.id);
-          const acceptedBaseCost = negotiatedTeamToApply
-            ? negotiatedTeamToApply.reduce((sum, member) => sum + member.cost, 0)
-            : currentQuotation.baseCost;
-          const complexityFactor = calculateQuotationComplexityFactor(currentQuotation);
-          const acceptedComplexity = Math.round(acceptedBaseCost * complexityFactor * 100) / 100;
-          const nonMarginCosts = (currentQuotation.toolsCost || 0)
-            + (currentQuotation.platformCost || 0)
-            + (currentQuotation.additionalDeliverableCost || 0);
-          const operationalSubtotal = acceptedBaseCost + acceptedComplexity;
-          updateData = {
-            ...updateData,
-            baseCost: acceptedBaseCost,
-            complexityAdjustment: acceptedComplexity,
-            totalAmount: lastNegotiation.newPrice,
-            markupAmount: lastNegotiation.newPrice - operationalSubtotal - nonMarginCosts,
-            marginFactor: operationalSubtotal > 0
-              ? (lastNegotiation.newPrice - nonMarginCosts) / operationalSubtotal
-              : 0,
-            priceMode: "manual",
-            manualPrice: lastNegotiation.newPrice,
-            manualPriceCurrency: currentQuotation.quotationCurrency || "ARS",
-            deviationPercentage: 0,
-            discountPercentage: 0,
-            applyInflationAdjustment: false,
-          };
-        } else {
-          validateAndNormalizeQuotationPricing(insertQuotationSchema.parse(currentQuotation), approvalTeam);
-        }
+      if (status === "pending") {
+        const parsedQuotation = insertQuotationSchema.parse(currentQuotation);
+        validatePricingSnapshot(parsedQuotation);
+        await validateQuotationCommercialReferences(parsedQuotation);
+        const team = await storage.getQuotationTeamMembers(id);
+        validateAndNormalizeQuotationPricing(parsedQuotation, team);
       }
 
       const updatedQuotation = await db.transaction(async (tx) => {
         const [updated] = await tx.update(quotations)
-          .set(updateData)
-          .where(eq(quotations.id, id))
+          .set({
+            ...updateData,
+            updatedBy: req.user?.id ?? null,
+            lockVersion: sql`${quotations.lockVersion} + 1`,
+          })
+          .where(and(
+            eq(quotations.id, id),
+            eq(quotations.lockVersion, currentQuotation.lockVersion),
+          ))
           .returning();
-        if (!updated || !negotiatedTeamToApply) return updated;
-
-        await tx.delete(quotationTeamMembers).where(and(
-          eq(quotationTeamMembers.quotationId, id),
-          isNull(quotationTeamMembers.variantId),
-        ));
-        await tx.insert(quotationTeamMembers).values(negotiatedTeamToApply.map((member) => ({
-          ...member,
-          quotationId: id,
-          variantId: null,
-        })));
-
-        for (const variantId of selectedVariantIds) {
-          await tx.delete(quotationTeamMembers).where(eq(quotationTeamMembers.variantId, variantId));
-          await tx.insert(quotationTeamMembers).values(negotiatedTeamToApply.map((member) => ({
-            ...member,
-            quotationId: id,
-            variantId,
-          })));
-          await tx.update(quotationVariants).set({
-            baseCost: updateData.baseCost,
-            complexityAdjustment: updateData.complexityAdjustment,
-            markupAmount: updateData.markupAmount,
-            totalAmount: updateData.totalAmount,
-          }).where(eq(quotationVariants.id, variantId));
+        if (!updated) {
+          throw Object.assign(new Error("La cotización fue modificada por otra persona"), { statusCode: 409 });
         }
+
+        let revision = (await tx.select().from(quotationRevisions)
+          .where(eq(quotationRevisions.quotationId, id))
+          .orderBy(desc(quotationRevisions.revisionNumber)).limit(1))[0];
+        if (status === "pending") {
+          const nextRevisionNumber = currentQuotation.revisionNumber + 1;
+          const [revisionHeader] = await tx.update(quotations).set({ revisionNumber: nextRevisionNumber })
+            .where(eq(quotations.id, id)).returning();
+          const result = await persistQuotationRevision(tx, id, req.user?.id ?? null, "Enviada a revisión interna");
+          revision = result.revision;
+          await createQuotationApprovalRequests(tx, revisionHeader, revision.id, req.user?.id ?? null);
+        }
+        await recordQuotationEvent(tx, {
+          quotationId: id,
+          revisionId: revision?.id,
+          eventType: status,
+          eventKey: `${status}:${id}:${currentQuotation.revisionNumber}:${Date.now()}`,
+          actorUserId: req.user?.id ?? null,
+          metadata: { from: currentQuotation.status, lossReason: lossReason || null },
+        });
+        await syncQuotationToCrm(tx, updated, status, req.user?.id ?? null, lossReason);
         return updated;
       });
 
       if (!updatedQuotation) {
         return res.status(404).json({ message: "Quotation not found" });
-      }
-
-      // Sync budget to active project when quotation price changes on approval
-      if (status === 'approved' && updateData.totalAmount !== undefined) {
-        try {
-          const projects = await db.select().from(activeProjects)
-            .where(eq(activeProjects.quotationId, id));
-          for (const project of projects) {
-            await storage.updateActiveProject(project.id, { budget: updateData.totalAmount });
-            console.log(`[API] Synced budget for project ${project.id}: ${updateData.totalAmount}`);
-          }
-        } catch (budgetErr) {
-          console.warn('[API] Failed to sync project budget, quotation updated successfully:', budgetErr);
-        }
       }
 
       res.json(updatedQuotation);
@@ -5859,9 +6445,344 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (error instanceof Error && error.message.startsWith("No se puede cambiar")) {
         return res.status(400).json({ message: error.message });
       }
+      if ((error as any)?.statusCode === 409) return res.status(409).json({ message: (error as Error).message });
       console.error(`[API] Error actualizando estado de cotización ID ${id}:`, error);
       res.status(500).json({ message: "Failed to update quotation status" });
     }
+  });
+
+  app.get("/api/quotations/:id/commercial-history", requireAuth, async (req, res) => {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) return res.status(400).json({ message: "Invalid quotation ID" });
+    const [revisions, events, approvals, deliveries] = await Promise.all([
+      db.select().from(quotationRevisions).where(eq(quotationRevisions.quotationId, id)).orderBy(desc(quotationRevisions.revisionNumber)),
+      db.select().from(quotationEvents).where(eq(quotationEvents.quotationId, id)).orderBy(desc(quotationEvents.createdAt)),
+      db.select().from(quotationApprovals).where(eq(quotationApprovals.quotationId, id)).orderBy(desc(quotationApprovals.requestedAt)),
+      db.select().from(quotationDeliveries).where(eq(quotationDeliveries.quotationId, id)).orderBy(desc(quotationDeliveries.createdAt)),
+    ]);
+    res.json({ revisions, events, approvals, deliveries });
+  });
+
+  app.post("/api/quotations/:id/revisions", requireAuth, async (req, res) => {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) return res.status(400).json({ message: "Invalid quotation ID" });
+    try {
+      const { reason } = z.object({ reason: z.string().trim().min(3).max(1000) }).parse(req.body);
+      const current = await storage.getQuotation(id);
+      if (!current) return res.status(404).json({ message: "Quotation not found" });
+      if (!quotationNeedsImmutableRevision(current.status) && !["rejected", "expired", "cancelled"].includes(current.status)) {
+        return res.status(409).json({ message: "La cotización todavía puede editarse sin abrir una nueva revisión" });
+      }
+      const [revised] = await db.transaction(async (tx) => {
+        const [row] = await tx.update(quotations).set({
+          status: "draft",
+          revisionNumber: current.revisionNumber + 1,
+          parentQuotationId: current.parentQuotationId || current.id,
+          internalApprovedAt: null,
+          internalApprovedBy: null,
+          sentAt: null,
+          viewedAt: null,
+          acceptedAt: null,
+          rejectedAt: null,
+          acceptedVariantId: null,
+          publicTokenHash: null,
+          publicTokenExpiresAt: null,
+          lossReason: null,
+          updatedAt: new Date(),
+          updatedBy: req.user?.id ?? null,
+          lockVersion: sql`${quotations.lockVersion} + 1`,
+        }).where(and(
+          eq(quotations.id, id),
+          eq(quotations.lockVersion, current.lockVersion),
+        )).returning();
+        if (!row) {
+          throw Object.assign(new Error("Otra persona ya creó una revisión"), { statusCode: 409 });
+        }
+        await tx.update(quotationVariants).set({ isSelected: false }).where(eq(quotationVariants.quotationId, id));
+        const revisionResult = await persistQuotationRevision(tx, id, req.user?.id ?? null, reason);
+        await recordQuotationEvent(tx, {
+          quotationId: id,
+          revisionId: revisionResult.revision.id,
+          eventType: "revision-created",
+          eventKey: `revision-created:${id}:${row.revisionNumber}`,
+          actorUserId: req.user?.id ?? null,
+          metadata: { reason, fromRevision: current.revisionNumber },
+        });
+        return [row];
+      });
+      res.status(201).json(revised);
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: "Indicá el motivo de la revisión", errors: error.errors });
+      if ((error as any)?.statusCode === 409) return res.status(409).json({ message: (error as Error).message });
+      res.status(500).json({ message: "No se pudo crear la revisión" });
+    }
+  });
+
+  app.post(
+    "/api/quotations/:quotationId/approvals/:approvalId/decision",
+    requireAuth,
+    requirePermission("quotations_approve", "operations"),
+    async (req, res) => {
+      const quotationId = Number(req.params.quotationId);
+      const approvalId = Number(req.params.approvalId);
+      if (!Number.isInteger(quotationId) || !Number.isInteger(approvalId)) return res.status(400).json({ message: "Invalid ID" });
+      try {
+        const input = z.object({
+          decision: z.enum(["approved", "rejected"]),
+          reason: z.string().trim().min(3).max(2000),
+        }).parse(req.body);
+        const [approval] = await db.select().from(quotationApprovals).where(and(
+          eq(quotationApprovals.id, approvalId),
+          eq(quotationApprovals.quotationId, quotationId),
+        ));
+        if (!approval) return res.status(404).json({ message: "Approval not found" });
+        if (approval.status !== "pending") return res.status(409).json({ message: "La aprobación ya fue decidida" });
+        if (approval.requestedBy && approval.requestedBy === req.user?.id) {
+          return res.status(409).json({ message: "Quien solicita no puede aprobar su propia cotización" });
+        }
+        const quotation = await storage.getQuotation(quotationId);
+        if (!quotation || quotation.status !== "pending") return res.status(409).json({ message: "La cotización no está pendiente de aprobación" });
+        const now = new Date();
+        const result = await db.transaction(async (tx) => {
+          await tx.execute(sql`SELECT id FROM quotations WHERE id = ${quotationId} FOR UPDATE`);
+          const [lockedQuotation] = await tx.select({ status: quotations.status }).from(quotations)
+            .where(eq(quotations.id, quotationId));
+          if (lockedQuotation?.status !== "pending") {
+            throw Object.assign(new Error("La cotización ya recibió otra decisión"), { statusCode: 409 });
+          }
+          const [decidedApproval] = await tx.update(quotationApprovals).set({
+            status: input.decision,
+            decidedBy: req.user?.id ?? null,
+            decidedAt: now,
+            decisionReason: input.reason,
+          }).where(and(
+            eq(quotationApprovals.id, approvalId),
+            eq(quotationApprovals.status, "pending"),
+          )).returning();
+          if (!decidedApproval) {
+            throw Object.assign(new Error("La aprobación ya fue decidida"), { statusCode: 409 });
+          }
+          const remaining = await tx.select().from(quotationApprovals).where(and(
+            eq(quotationApprovals.revisionId, approval.revisionId),
+            eq(quotationApprovals.status, "pending"),
+          ));
+          const rejected = input.decision === "rejected";
+          const nextStatus = rejected ? "draft" : remaining.length === 0 ? "internally-approved" : "pending";
+          const [updated] = await tx.update(quotations).set({
+            status: nextStatus,
+            internalApprovedAt: nextStatus === "internally-approved" ? now : null,
+            internalApprovedBy: nextStatus === "internally-approved" ? req.user?.id ?? null : null,
+            updatedAt: now,
+            updatedBy: req.user?.id ?? null,
+            lockVersion: sql`${quotations.lockVersion} + 1`,
+          }).where(eq(quotations.id, quotationId)).returning();
+          await recordQuotationEvent(tx, {
+            quotationId,
+            revisionId: approval.revisionId,
+            eventType: rejected ? "approval-rejected" : "approval-approved",
+            eventKey: `approval:${approvalId}:${input.decision}`,
+            actorUserId: req.user?.id ?? null,
+            metadata: { ruleCode: approval.ruleCode, reason: input.reason, nextStatus },
+          });
+          if (nextStatus === "internally-approved") await syncQuotationToCrm(tx, updated, nextStatus, req.user?.id ?? null);
+          return { quotation: updated, remainingApprovals: remaining.length };
+        });
+        res.json(result);
+      } catch (error) {
+        if (error instanceof z.ZodError) return res.status(400).json({ message: "La decisión es inválida", errors: error.errors });
+        if ((error as any)?.statusCode === 409) return res.status(409).json({ message: (error as Error).message });
+        res.status(500).json({ message: "No se pudo decidir la aprobación" });
+      }
+    },
+  );
+
+  app.get("/api/quotations/:id/document.pdf", requireAuth, async (req, res) => {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) return res.status(400).json({ message: "Invalid quotation ID" });
+    try {
+      const latest = (await db.select().from(quotationRevisions)
+        .where(eq(quotationRevisions.quotationId, id))
+        .orderBy(desc(quotationRevisions.revisionNumber)).limit(1))[0];
+      const snapshot: any = latest?.snapshot ?? await buildQuotationSnapshot(db, id);
+      const pdf = await renderQuotationPdf(publicQuotationProjection({
+        ...snapshot,
+        documentHash: latest?.documentHash ?? snapshot.documentHash,
+      }));
+      const filename = `${snapshot.quotation.quotationNumber || `cotizacion-${id}`}-R${snapshot.quotation.revisionNumber}.pdf`;
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
+      res.setHeader("Content-Length", pdf.length);
+      res.send(pdf);
+    } catch (error) {
+      res.status(500).json({ message: "No se pudo generar el documento" });
+    }
+  });
+
+  app.post(
+    "/api/quotations/:id/send",
+    requireAuth,
+    requirePermission("quotations_send", "quotations", "operations"),
+    async (req, res) => {
+      const id = Number(req.params.id);
+      if (!Number.isInteger(id)) return res.status(400).json({ message: "Invalid quotation ID" });
+      const idempotencyKey = req.get("Idempotency-Key")?.trim();
+      if (!idempotencyKey || idempotencyKey.length < 12 || idempotencyKey.length > 120) {
+        return res.status(400).json({ message: "Idempotency-Key es obligatorio para enviar" });
+      }
+      try {
+        const input = z.object({
+          recipientEmail: z.string().trim().email().max(255),
+          subject: z.string().trim().min(3).max(255).optional(),
+          message: z.string().trim().max(5000).optional(),
+        }).parse(req.body);
+        const duplicate = (await db.select().from(quotationEvents)
+          .where(eq(quotationEvents.eventKey, `send:${id}:${idempotencyKey}`)).limit(1))[0];
+        if (duplicate) return res.json({ success: true, idempotentReplay: true });
+        const quotation = await storage.getQuotation(id);
+        if (!quotation) return res.status(404).json({ message: "Quotation not found" });
+        if (quotation.status !== "internally-approved") {
+          return res.status(409).json({ message: "La cotización debe estar aprobada internamente antes de enviarse" });
+        }
+        const revision = (await db.select().from(quotationRevisions)
+          .where(and(eq(quotationRevisions.quotationId, id), eq(quotationRevisions.revisionNumber, quotation.revisionNumber)))
+          .limit(1))[0];
+        if (!revision) return res.status(409).json({ message: "La revisión comercial no tiene snapshot" });
+        const publicToken = randomBytes(32).toString("base64url");
+        const appUrl = process.env.PUBLIC_APP_URL || process.env.APP_URL || `${req.protocol}://${req.get("host")}`;
+        const publicUrl = `${appUrl}/proposal/${publicToken}`;
+        const projection = publicQuotationProjection({
+          ...(revision.snapshot as any),
+          documentHash: revision.documentHash,
+        });
+        const pdf = await renderQuotationPdf(projection);
+        const subject = input.subject || `Propuesta ${quotation.quotationNumber}: ${quotation.projectName}`;
+        const sender = process.env.SENDGRID_FROM_EMAIL;
+        const apiKey = process.env.SENDGRID_API_KEY;
+        if (!sender || !apiKey) {
+          return res.status(503).json({ message: "El proveedor de email no está configurado; no se marcó la cotización como enviada" });
+        }
+        const delivery = await db.transaction(async (tx) => {
+          const [queued] = await tx.insert(quotationDeliveries).values({
+            quotationId: id,
+            revisionId: revision.id,
+            recipientEmail: input.recipientEmail,
+            subject,
+            status: "queued",
+            createdBy: req.user?.id ?? null,
+          }).onConflictDoNothing().returning();
+          if (!queued) return null;
+          const [reserved] = await tx.update(quotations).set({
+            publicTokenHash: quoteTokenHash(publicToken),
+            publicTokenExpiresAt: quotation.expiresAt,
+            updatedAt: new Date(),
+            updatedBy: req.user?.id ?? null,
+            lockVersion: sql`${quotations.lockVersion} + 1`,
+          }).where(and(
+            eq(quotations.id, id),
+            eq(quotations.status, "internally-approved"),
+            eq(quotations.lockVersion, quotation.lockVersion),
+          )).returning();
+          if (!reserved) {
+            throw Object.assign(new Error("La cotización cambió antes de reservar el envío"), { statusCode: 409 });
+          }
+          return queued;
+        });
+        if (!delivery) return res.json({ success: true, idempotentReplay: true });
+        const sgMail = await import("@sendgrid/mail");
+        sgMail.default.setApiKey(apiKey);
+        try {
+          const [providerResponse] = await sgMail.default.send({
+            to: input.recipientEmail,
+            from: sender,
+            subject,
+            text: `${input.message || "Adjuntamos nuestra propuesta comercial."}\n\nRevisar y responder: ${publicUrl}`,
+            html: `<p>${escapeHtml(input.message || "Adjuntamos nuestra propuesta comercial.").replace(/\n/g, "<br>")}</p><p><a href="${publicUrl}">Revisar y responder la propuesta</a></p>`,
+            attachments: [{
+              content: pdf.toString("base64"),
+              filename: `${quotation.quotationNumber}-R${quotation.revisionNumber}.pdf`,
+              type: "application/pdf",
+              disposition: "attachment",
+            }],
+          });
+          const now = new Date();
+          const result = await db.transaction(async (tx) => {
+            await tx.update(quotationDeliveries).set({
+              status: "sent",
+              providerMessageId: providerResponse.headers?.["x-message-id"] || null,
+              sentAt: now,
+            }).where(eq(quotationDeliveries.id, delivery.id));
+            const [updated] = await tx.update(quotations).set({
+              status: "sent",
+              sentAt: now,
+              updatedAt: now,
+              updatedBy: req.user?.id ?? null,
+              lockVersion: sql`${quotations.lockVersion} + 1`,
+            }).where(and(
+              eq(quotations.id, id),
+              eq(quotations.status, "internally-approved"),
+              eq(quotations.publicTokenHash, quoteTokenHash(publicToken)),
+            )).returning();
+            if (!updated) throw new Error("No se pudo confirmar la reserva de envío");
+            await recordQuotationEvent(tx, {
+              quotationId: id,
+              revisionId: revision.id,
+              eventType: "sent",
+              eventKey: `send:${id}:${idempotencyKey}`,
+              actorUserId: req.user?.id ?? null,
+              metadata: { recipientEmail: input.recipientEmail, deliveryId: delivery.id },
+            });
+            await syncQuotationToCrm(tx, updated, "sent", req.user?.id ?? null, `Propuesta enviada a ${input.recipientEmail}`);
+            if (quotation.leadId) {
+              const reminderDate = new Date(Math.min(
+                now.getTime() + 3 * 24 * 60 * 60 * 1000,
+                quotation.expiresAt?.getTime() ?? Number.MAX_SAFE_INTEGER,
+              ));
+              await tx.insert(crmReminders).values({
+                leadId: quotation.leadId,
+                description: `Seguimiento de ${quotation.quotationNumber}`,
+                dueDate: reminderDate,
+                createdBy: req.user?.id ?? null,
+              });
+            }
+            return updated;
+          });
+          res.json({ success: true, quotation: result, deliveryId: delivery.id });
+        } catch (sendError) {
+          await db.transaction(async (tx) => {
+            await tx.update(quotationDeliveries).set({ status: "failed", errorMessage: String(sendError) })
+              .where(eq(quotationDeliveries.id, delivery.id));
+            await tx.update(quotations).set({
+              publicTokenHash: null,
+              publicTokenExpiresAt: null,
+              lockVersion: sql`${quotations.lockVersion} + 1`,
+            }).where(and(
+              eq(quotations.id, id),
+              eq(quotations.status, "internally-approved"),
+              eq(quotations.publicTokenHash, quoteTokenHash(publicToken)),
+            ));
+          });
+          throw sendError;
+        }
+      } catch (error) {
+        if (error instanceof z.ZodError) return res.status(400).json({ message: "Los datos de envío son inválidos", errors: error.errors });
+        if ((error as any)?.statusCode === 409) return res.status(409).json({ message: (error as Error).message });
+        console.error("Error sending quotation:", error);
+        res.status(502).json({ message: "No se pudo enviar la cotización; el estado comercial no cambió" });
+      }
+    },
+  );
+
+  app.get("/api/quotation-analytics/funnel", requireAuth, requirePermission("quotations"), async (_req, res) => {
+    const rows = await db.select({
+      status: quotations.status,
+      count: sql<number>`count(*)::int`,
+      value: sql<number>`coalesce(sum(${quotations.totalAmount}), 0)::double precision`,
+    }).from(quotations).where(isNull(quotations.archivedAt)).groupBy(quotations.status);
+    const byStatus = Object.fromEntries(rows.map((row) => [row.status, { count: row.count, value: row.value }]));
+    const sent = ["sent", "viewed", "in-negotiation", "approved", "rejected", "expired"]
+      .reduce((sum, status) => sum + (byStatus[status]?.count || 0), 0);
+    const won = byStatus.approved?.count || 0;
+    res.json({ byStatus, sent, won, winRate: sent > 0 ? (won / sent) * 100 : 0 });
   });
 
   // GET /api/quotations/:id/profitability — cotización vs horas reales del proyecto
@@ -5883,19 +6804,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }).from(timeEntries).where(eq(timeEntries.projectId, project.id));
 
       const realHours = entries.reduce((s, e) => s + (e.hours || 0), 0);
-      const realCost = entries.reduce((s, e) => s + (e.totalCost || 0), 0);
+      const realCostARS = entries.reduce((s, e) => s + (e.totalCost || 0), 0);
 
       // Horas cotizadas
       const quotedTeam = await storage.getQuotationTeamMembers(id);
       const quotedHours = quotedTeam.reduce((s, m) => s + (m.hours || 0), 0);
-      const quotedCost = quotation.baseCost || 0;
-
-      const margin = quotedCost > 0 ? ((quotedCost - realCost) / quotedCost) * 100 : 0;
+      const quotedCost = Number(quotation.baseCost || 0)
+        + Number(quotation.toolsCost || 0)
+        + Number(quotation.platformCost || 0)
+        + Number(quotation.additionalDeliverableCost || 0);
+      const exchangeRate = Number(quotation.exchangeRateAtQuote) || Number(quotation.usdExchangeRate) || 1;
+      const realCost = quotation.quotationCurrency === "USD" && exchangeRate > 0
+        ? realCostARS / exchangeRate
+        : realCostARS;
+      const revenue = quotation.pricesIncludeTax
+        ? calculateTaxBreakdown(quotation.totalAmount, quotation.taxRate, true).netAmount
+        : quotation.totalAmount;
+      const plannedMargin = calculateGrossMarginPercentage(revenue, quotedCost);
+      const actualMargin = calculateGrossMarginPercentage(revenue, realCost);
+      const marginDelta = Math.round((actualMargin - plannedMargin) * 10) / 10;
 
       res.json({
         quotation: { totalAmount: quotation.totalAmount, baseCost: quotedCost, quotedHours },
         project: { id: project.id, name: project.subprojectName || project.id },
-        profitability: { realHours, realCost, quotedHours, quotedCost, marginDelta: parseFloat(margin.toFixed(1)) },
+        profitability: {
+          realHours,
+          realCost,
+          quotedHours,
+          quotedCost,
+          revenue,
+          plannedGrossMargin: plannedMargin,
+          actualGrossMargin: actualMargin,
+          marginDelta,
+          currency: quotation.quotationCurrency,
+        },
       });
     } catch (e) {
       res.status(500).json({ message: "Error fetching profitability", error: String(e) });
@@ -5942,7 +6884,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (e) { res.status(500).json({ message: String(e) }); }
   });
 
-  // Eliminar una cotización
+  // Archivar una cotización. La evidencia comercial nunca se elimina físicamente.
   app.delete("/api/quotations/:id", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "Invalid quotation ID" });
@@ -5957,48 +6899,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
           message: "La cotización no existe" 
         });
       }
+      if (quotation.archivedAt) {
+        return res.json({ success: true, id, archivedAt: quotation.archivedAt, recoverable: true, idempotentReplay: true });
+      }
 
-      // 2. Verificar si la cotización está asociada a proyectos activos
-      const activeProjects = await storage.getActiveProjectsByQuotationId(id);
-
-      if (activeProjects.length > 0) {
-
-        const projectInfo = activeProjects.map(p => ({ id: p.id, name: `Proyecto ID ${p.id}` }));
-
-        return res.status(409).json({ 
-          success: false, 
-          message: "No se puede eliminar esta cotización porque está siendo utilizada por proyectos activos", 
-          projects: projectInfo
+      const archivedAt = new Date();
+      await db.transaction(async (tx) => {
+        await tx.update(quotations).set({
+          archivedAt,
+          updatedAt: archivedAt,
+          updatedBy: req.user?.id ?? null,
+          lockVersion: sql`${quotations.lockVersion} + 1`,
+        }).where(eq(quotations.id, id));
+        await recordQuotationEvent(tx, {
+          quotationId: id,
+          eventType: "archived",
+          eventKey: `archived:${id}:${archivedAt.toISOString()}`,
+          actorUserId: req.user?.id ?? null,
         });
-      }
-
-      // 3. Proceder con la eliminación
-      // First delete team members associated with the quotation
-      const teamMembers = await storage.getQuotationTeamMembers(id);
-      for (const member of teamMembers) {
-        await storage.deleteQuotationTeamMember(member.id);
-      }
-      const success = await storage.deleteQuotation(id);
-
-      if (!success) {
-        return res.status(500).json({ 
-          success: false, 
-          message: "Ocurrió un error al intentar eliminar la cotización" 
-        });
-      }
+      });
 
       res.json({ 
         success: true, 
-        message: "Cotización eliminada exitosamente",
-        id
+        message: "Cotización archivada exitosamente",
+        id,
+        archivedAt,
+        recoverable: true,
       });
     } catch (error) {
-      console.error("[API] Error eliminando cotización:", error);
+      console.error("[API] Error archivando cotización:", error);
       res.status(500).json({ 
         success: false, 
-        message: "Error al eliminar la cotización" 
+        message: "Error al archivar la cotización"
       });
     }
+  });
+
+  app.post("/api/quotations/:id/restore", requireAuth, async (req, res) => {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) return res.status(400).json({ message: "Invalid quotation ID" });
+    const [restored] = await db.transaction(async (tx) => {
+      const [row] = await tx.update(quotations).set({
+        archivedAt: null,
+        updatedAt: new Date(),
+        updatedBy: req.user?.id ?? null,
+        lockVersion: sql`${quotations.lockVersion} + 1`,
+      }).where(eq(quotations.id, id)).returning();
+      if (row) await recordQuotationEvent(tx, {
+        quotationId: id,
+        eventType: "restored",
+        eventKey: `restored:${id}:${row.lockVersion}`,
+        actorUserId: req.user?.id ?? null,
+      });
+      return [row];
+    });
+    if (!restored) return res.status(404).json({ message: "Quotation not found" });
+    res.json(restored);
   });
 
   // Actualizar el cliente asociado a una cotización
@@ -6007,6 +6963,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (isNaN(id)) return res.status(400).json({ message: "Invalid quotation ID" });
 
     try {
+      const current = await requireDraftQuotation(id, res);
+      if (!current) return;
       const { clientId } = req.body;
       if (!clientId || isNaN(clientId)) {
         return res.status(400).json({ message: "Valid client ID is required" });
@@ -6019,7 +6977,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Actualizar la cotización con el nuevo cliente
-      const updatedQuotation = await storage.updateQuotation(id, { clientId });
+      const updatedQuotation = await db.transaction(async (tx) => {
+        const [updated] = await tx.update(quotations).set({
+          clientId,
+          billingEntityId: null,
+          updatedAt: new Date(),
+          updatedBy: req.user?.id ?? null,
+          lockVersion: sql`${quotations.lockVersion} + 1`,
+        }).where(and(
+          eq(quotations.id, id),
+          eq(quotations.lockVersion, current.lockVersion),
+        )).returning();
+        if (updated) await recordQuotationEvent(tx, {
+          quotationId: id,
+          eventType: "client-updated",
+          eventKey: `client-updated:${id}:${updated.lockVersion}`,
+          actorUserId: req.user?.id ?? null,
+          metadata: { previousClientId: current.clientId, clientId },
+        });
+        return updated;
+      });
 
       if (!updatedQuotation) {
         return res.status(404).json({ message: "Quotation not found" });
@@ -6204,6 +7181,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (isNaN(quotationId)) return res.status(400).json({ message: "Invalid quotation ID" });
 
     try {
+      if (!await requireDraftQuotation(quotationId, res)) return;
       const assignment = z.object({
         roleId: z.number().int().positive(),
         personnelId: z.number().int().positive(),
@@ -6252,6 +7230,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await validateQuotationTeamReferences([validatedData]);
         const quotation = await storage.getQuotation(validatedData.quotationId);
         if (!quotation) return res.status(404).json({ message: "Quotation not found" });
+        if (quotation.status !== "draft") {
+          return res.status(409).json({ message: "El equipo sólo puede modificarse en borrador", code: "QUOTATION_REVISION_REQUIRED" });
+        }
         if (validatedData.variantId) {
           const variant = await storage.getQuotationVariant(validatedData.variantId);
           if (!variant || variant.quotationId !== validatedData.quotationId) {
@@ -6313,6 +7294,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const quotationId = parseInt(req.params.quotationId);
     if (isNaN(quotationId)) return res.status(400).json({ message: "Invalid quotation ID" });
 
+    if (!await requireDraftQuotation(quotationId, res)) return;
     // Delete team members associated with the quotation
     const teamMembers = await storage.getQuotationTeamMembers(quotationId);
     for (const member of teamMembers) {
@@ -6327,6 +7309,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (isNaN(id)) return res.status(400).json({ message: "Invalid team member ID" });
 
     try {
+      const [member] = await db.select().from(quotationTeamMembers).where(eq(quotationTeamMembers.id, id));
+      if (!member) return res.status(404).json({ message: "Team member not found" });
+      if (!await requireDraftQuotation(member.quotationId, res)) return;
       // Usamos el método de storage para manejar la eliminación en lugar de acceder directamente a la base de datos
       await storage.deleteQuotationTeamMemberById(id);
       res.status(204).send();
@@ -6509,8 +7494,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (isNaN(quotationId)) return res.status(400).json({ message: "Invalid quotation ID" });
 
     try {
+      if (!await requireDraftQuotation(quotationId, res)) return;
       const validatedData = insertQuotationVariantSchema.parse({
         ...req.body,
+        isSelected: false,
         quotationId
       });
 
@@ -6531,8 +7518,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (isNaN(variantId)) return res.status(400).json({ message: "Invalid variant ID" });
 
     try {
-      const validatedData = insertQuotationVariantSchema.partial().parse(req.body);
-      if (validatedData.isSelected !== undefined) {
+      const currentVariant = await storage.getQuotationVariant(variantId);
+      if (!currentVariant) return res.status(404).json({ message: "Variant not found" });
+      if (!await requireDraftQuotation(currentVariant.quotationId, res)) return;
+      const validatedData = insertQuotationVariantSchema.pick({
+        variantName: true,
+        variantDescription: true,
+        variantOrder: true,
+      }).partial().strict().parse(req.body);
+      if (Object.prototype.hasOwnProperty.call(req.body ?? {}, "isSelected")) {
         return res.status(409).json({ message: "Use el endpoint de selección de variante" });
       }
       const updatedVariant = await storage.updateQuotationVariant(variantId, validatedData);
@@ -6557,6 +7551,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (isNaN(variantId)) return res.status(400).json({ message: "Invalid variant ID" });
 
     try {
+      const currentVariant = await storage.getQuotationVariant(variantId);
+      if (!currentVariant) return res.status(404).json({ message: "Variant not found" });
+      if (!await requireDraftQuotation(currentVariant.quotationId, res)) return;
       const success = await storage.deleteQuotationVariant(variantId);
       if (!success) {
         return res.status(404).json({ message: "Variant not found" });
@@ -6582,58 +7579,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Select a quotation variant (mark as selected and update quotation)
-  app.patch("/api/quotations/:quotationId/variants/:variantId/select", requireAuth, async (req, res) => {
+  // Kept as an explicit compatibility response for older clients. A commercial
+  // alternative is accepted exclusively through the auditable public decision.
+  app.patch("/api/quotations/:quotationId/variants/:variantId/select", requireAuth, (req, res) => {
     const quotationId = parseInt(req.params.quotationId);
     const variantId = parseInt(req.params.variantId);
     
     if (isNaN(quotationId)) return res.status(400).json({ message: "Invalid quotation ID" });
     if (isNaN(variantId)) return res.status(400).json({ message: "Invalid variant ID" });
 
-    try {
-      // Use transaction to prevent race condition with concurrent variant selection
-      const selectedVariant = await db.transaction(async (tx) => {
-        // First, unselect all variants for this quotation
-        await tx.update(quotationVariants)
-          .set({ isSelected: false })
-          .where(eq(quotationVariants.quotationId, quotationId));
-
-        // Then select the chosen variant and return it
-        const [variant] = await tx.update(quotationVariants)
-          .set({ isSelected: true })
-          .where(and(
-            eq(quotationVariants.id, variantId),
-            eq(quotationVariants.quotationId, quotationId)
-          ))
-          .returning();
-
-        if (!variant) throw new Error("VARIANT_NOT_FOUND");
-
-        // The selected commercial scenario becomes the quotation header.
-        if (variant.totalAmount != null) {
-          await tx.update(quotations)
-            .set({
-              baseCost: Number(variant.baseCost),
-              complexityAdjustment: Number(variant.complexityAdjustment),
-              markupAmount: Number(variant.markupAmount),
-              totalAmount: Number(variant.totalAmount),
-              updatedAt: new Date(),
-            })
-            .where(eq(quotations.id, quotationId));
-        }
-
-        return variant;
-      });
-
-      res.json({ success: true, message: "Variant selected successfully", variant: selectedVariant });
-      
-    } catch (error) {
-      if (error instanceof Error && error.message === "VARIANT_NOT_FOUND") {
-        return res.status(404).json({ message: "Variant not found for quotation" });
-      }
-      console.error(`❌ Error selecting variant ${variantId} for quotation ${quotationId}:`, error);
-      res.status(500).json({ message: "Failed to select variant", error: String(error) });
-    }
+    return res.status(409).json({
+      message: "La variante aceptada sólo puede seleccionarse mediante el portal del cliente",
+      code: "CLIENT_DECISION_REQUIRED",
+    });
   });
 
   // ---------- RUTAS PARA PROYECTOS ACTIVOS ----------
@@ -11208,15 +12166,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Ruta para obtener tipo de cambio
   app.get("/api/exchange-rate", requireAuth, async (req, res) => {
     try {
-      const exchangeRateConfig = await db.select()
+      const [exchangeRateConfig] = await db.select()
         .from(systemConfig)
-        .where(eq(systemConfig.configKey, 'usd_exchange_rate'));
-      
-      const rate = exchangeRateConfig.length > 0 ? exchangeRateConfig[0].configValue : 1100;
-      res.json({ rate });
+        .where(eq(systemConfig.configKey, 'usd_exchange_rate'))
+        .limit(1);
+      const rate = Number(exchangeRateConfig?.configValue);
+      if (!Number.isFinite(rate) || rate <= 0) {
+        return res.status(503).json({ message: "No hay un tipo de cambio USD/ARS vigente configurado" });
+      }
+      res.setHeader("Cache-Control", "no-store");
+      return res.json({
+        rate,
+        source: exchangeRateConfig.description ?? "Configuración manual",
+        updatedAt: exchangeRateConfig.updatedAt?.toISOString() ?? null,
+      });
     } catch (error) {
       console.error("Error fetching exchange rate:", error);
-      res.status(500).json({ message: "Failed to fetch exchange rate" });
+      return res.status(500).json({ message: "Failed to fetch exchange rate" });
+    }
+  });
+
+  app.get("/api/exchange-rate/forecast", requireAuth, async (req, res) => {
+    const year = Number(req.query.year);
+    const month = Number(req.query.month);
+    if (!Number.isInteger(year) || !Number.isInteger(month) || month < 1 || month > 12) {
+      return res.status(400).json({ message: "Año o mes inválido" });
+    }
+    try {
+      const [forecast] = await db.select()
+        .from(exchangeRates)
+        .where(and(
+          eq(exchangeRates.year, year),
+          eq(exchangeRates.month, month),
+          eq(exchangeRates.rateType, "estimated"),
+          eq(exchangeRates.isActive, true),
+        ))
+        .orderBy(desc(exchangeRates.updatedAt))
+        .limit(1);
+      if (!forecast) return res.status(404).json({ message: "No hay proyección para ese período" });
+      res.setHeader("Cache-Control", "no-store");
+      return res.json({
+        rate: Number(forecast.rate),
+        year: forecast.year,
+        month: forecast.month,
+        source: forecast.source,
+        notes: forecast.notes,
+        updatedAt: forecast.updatedAt?.toISOString() ?? null,
+      });
+    } catch (error) {
+      console.error("Error fetching exchange-rate forecast:", error);
+      return res.status(500).json({ message: "No se pudo obtener la proyección" });
     }
   });
 
@@ -11237,7 +12236,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Actualizar existente
         const updated = await db.update(monthlyInflation)
           .set({
-            inflationRate: validatedData.inflationRate, // Guardar como porcentaje
+            inflationRate: validatedData.inflationRate, // Tasa decimal: 0.085 = 8.5%
             source: validatedData.source,
             updatedAt: new Date(),
             updatedBy: validatedData.updatedBy
@@ -11250,7 +12249,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const created = await db.insert(monthlyInflation)
           .values({
             ...validatedData,
-            inflationRate: validatedData.inflationRate, // Guardar como porcentaje
+            inflationRate: validatedData.inflationRate, // Tasa decimal: 0.085 = 8.5%
           })
           .returning();
         res.status(201).json(created[0]);
@@ -12995,10 +13994,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(eq(systemConfig.configKey, 'usd_exchange_rate'))
         .limit(1);
       
-      return exchangeRateConfig.length > 0 ? exchangeRateConfig[0].configValue : 1200;
+      const rate = Number(exchangeRateConfig[0]?.configValue);
+      if (!Number.isFinite(rate) || rate <= 0) {
+        throw new Error("No hay un tipo de cambio USD/ARS vigente configurado");
+      }
+      return rate;
     } catch (error) {
       console.error("Error fetching current exchange rate:", error);
-      return 1200;
+      throw error;
     }
   };
 
@@ -18239,6 +19242,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /api/exchange-rates/sync-blue - Sincroniza dólar blue del día desde dolarapi.com
+  app.get("/api/exchange-rate/live", requireAuth, async (_req, res) => {
+    try {
+      const { fetchLiveBlueRates } = await import('./services/liveFx');
+      const result = await fetchLiveBlueRates();
+      res.setHeader("Cache-Control", "no-store");
+      return res.json(result);
+    } catch (error) {
+      console.error("Error verifying live blue rate:", error);
+      return res.status(502).json({
+        message: error instanceof Error ? error.message : "No se pudo verificar el dólar en vivo",
+      });
+    }
+  });
+
+  // Persiste la fuente más fresca después de contrastar DolarAPI y DolarHoy.
   app.post("/api/exchange-rates/sync-blue", requireAuth, requirePermission("operations"), async (req, res) => {
     try {
       const userId = req.user?.id;

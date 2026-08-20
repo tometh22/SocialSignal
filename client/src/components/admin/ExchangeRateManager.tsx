@@ -20,7 +20,7 @@ const exchangeRateSchema = z.object({
   year: z.number().min(2020).max(2030),
   month: z.number().min(1).max(12),
   rate: z.number().min(0.01, "La tasa debe ser mayor a 0"),
-  rateType: z.enum(["end_of_month", "daily", "average"]),
+  rateType: z.enum(["end_of_month", "daily", "average", "estimated"]),
   source: z.enum(["Blue", "REM", "MEP", "CCL", "BCRA", "Manual"]).default("Blue"),
   specificDate: z.string().optional(),
   isActive: z.boolean().default(true),
@@ -34,7 +34,7 @@ interface ExchangeRate {
   year: number;
   month: number;
   rate: number;
-  rateType: "end_of_month" | "daily" | "average";
+  rateType: "end_of_month" | "daily" | "average" | "estimated";
   source?: string;
   specificDate?: string;
   isActive: boolean;
@@ -75,6 +75,7 @@ const RATE_TYPES = [
   { value: "end_of_month", label: "Fin de mes" },
   { value: "daily", label: "Diario" },
   { value: "average", label: "Promedio mensual" },
+  { value: "estimated", label: "Proyectado" },
 ];
 
 export function ExchangeRateManager() {
@@ -171,10 +172,12 @@ export function ExchangeRateManager() {
       toast({
         title: "Blue sincronizado",
         description: result?.rate
-          ? `Dólar blue de hoy: ${formatCurrency(Number(result.rate))}`
+          ? `Dólar blue de hoy: ${formatCurrency(Number(result.rate))} · ${result?.verification?.status === "matched" ? "fuentes coincidentes" : "revisá la verificación de fuentes"}`
           : "Tipo de cambio blue actualizado.",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/exchange-rates"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/exchange-rate"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/system-config"] });
     },
     onError: (error: any) => {
       toast({

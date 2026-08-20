@@ -16,6 +16,7 @@ import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import { NegotiationHistory } from '@/components/negotiation-history';
 import { QuotationVariantsDisplay } from '@/components/quotation/quotation-variants-display';
+import { CommercialWorkflowCard } from '@/components/quotation/commercial-workflow-card';
 
 // Interfaces
 interface TeamMember {
@@ -58,6 +59,8 @@ interface Quotation {
   createdAt: string;
   expiresAt?: string | null;
   lossReason?: string | null;
+  quotationNumber?: string | null;
+  revisionNumber?: number;
 }
 
 interface ClientInfo {
@@ -369,7 +372,7 @@ const QuotationDetail: React.FC = () => {
       {/* Encabezado y acciones - más compacto */}
       <div className="mb-5 flex flex-col gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm sm:flex-row sm:items-center sm:justify-between">
         <div className="flex min-w-0 items-center gap-3">
-          <Button 
+          {quotation.status === 'draft' && <Button
             aria-label="Volver a gestión de cotizaciones"
             variant="ghost" 
             size="sm"
@@ -377,7 +380,7 @@ const QuotationDetail: React.FC = () => {
             onClick={() => setLocation('/manage-quotes')}
           >
             <ArrowLeft className="h-4 w-4 text-slate-600" />
-          </Button>
+          </Button>}
           
           <div>
             <div className="flex flex-wrap items-center gap-2">
@@ -439,6 +442,15 @@ const QuotationDetail: React.FC = () => {
       </div>
 
       {/* Contenido principal */}
+      <div className="mb-5">
+        <CommercialWorkflowCard
+          quotationId={quotation.id}
+          status={quotation.status}
+          recipientEmail={client?.contactEmail}
+          quotationNumber={quotation.quotationNumber}
+          onChanged={() => setRefreshKey((value) => value + 1)}
+        />
+      </div>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         {/* Columna izquierda */}
         <div className="lg:col-span-2 space-y-6">
@@ -803,7 +815,7 @@ const QuotationDetail: React.FC = () => {
                 <TrendingUp className="h-4 w-4 text-slate-500" />
                 <span className="text-sm font-semibold text-slate-700">Rentabilidad real vs cotizada</span>
               </div>
-              <div className="grid grid-cols-3 divide-x divide-slate-100 px-2 py-4">
+              <div className="grid grid-cols-2 md:grid-cols-5 divide-x divide-slate-100 px-2 py-4">
                 <div className="px-4 text-center">
                   <p className="text-xs text-slate-400 mb-1">Horas cotizadas</p>
                   <p className="text-xl font-bold text-slate-900">{profitability.profitability.quotedHours}h</p>
@@ -812,6 +824,16 @@ const QuotationDetail: React.FC = () => {
                   <p className="text-xs text-slate-400 mb-1">Horas reales</p>
                   <p className={`text-xl font-bold ${profitability.profitability.realHours > profitability.profitability.quotedHours ? 'text-red-600' : 'text-emerald-600'}`}>
                     {Math.round(profitability.profitability.realHours)}h
+                  </p>
+                </div>
+                <div className="px-4 text-center">
+                  <p className="text-xs text-slate-400 mb-1">Margen cotizado</p>
+                  <p className="text-xl font-bold text-slate-900">{profitability.profitability.plannedGrossMargin}%</p>
+                </div>
+                <div className="px-4 text-center">
+                  <p className="text-xs text-slate-400 mb-1">Margen real</p>
+                  <p className={`text-xl font-bold ${profitability.profitability.actualGrossMargin >= 30 ? 'text-emerald-600' : 'text-red-600'}`}>
+                    {profitability.profitability.actualGrossMargin}%
                   </p>
                 </div>
                 <div className="px-4 text-center">
@@ -830,9 +852,6 @@ const QuotationDetail: React.FC = () => {
             quotationStatus={quotation.status}
             quotationCurrency={quotation.quotationCurrency || 'ARS'}
             baseTotal={quotation.totalAmount}
-            onVariantApproved={() => {
-              setRefreshKey(k => k + 1);
-            }}
           />
         </div>
       </div>
