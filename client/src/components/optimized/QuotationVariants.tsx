@@ -97,7 +97,7 @@ export function QuotationVariants({
   const [approvalDialogOpen, setApprovalDialogOpen] = useState(false);
   const [variantPendingDeletion, setVariantPendingDeletion] = useState<number | null>(null);
   const { toast } = useToast();
-  const { saveQuotation, availableRoles } = useOptimizedQuote();
+  const { saveQuotation, availableRoles, availablePersonnel } = useOptimizedQuote();
   const [, setLocation] = useLocation();
   const { exchangeRate } = useCurrency();
 
@@ -823,12 +823,17 @@ export function QuotationVariants({
                       <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">Horas por persona</div>
                       {baseTeamMembers.map(m => {
                         const inputKey = `${variant.id}-${m.id}`;
+                        const memberLabel = m.personnelName
+                          || (m.personnelId ? availablePersonnel.find(person => person.id === m.personnelId)?.name : null)
+                          || m.roleName
+                          || availableRoles.find(role => role.id === m.roleId)?.name
+                          || `Rol ${m.roleId}`;
                         return (
                           <div key={m.id} className="flex items-center gap-2 text-xs">
-                            <span className="flex-1 truncate text-slate-700">{m.personnelName || m.roleName}</span>
+                            <span className="flex-1 truncate text-slate-700">{memberLabel}</span>
                             <input
                               type="number" min={0} step={1}
-                              aria-label={`Horas de ${m.personnelName || m.roleName} en ${variant.variantName}`}
+                              aria-label={`Horas de ${memberLabel} en ${variant.variantName}`}
                               value={variantInputText[inputKey] ?? String(getEffectiveMemberHours(variant, m))}
                               onChange={e => { e.stopPropagation(); setVariantInputText(prev => ({ ...prev, [inputKey]: e.target.value })); }}
                               onBlur={e => {

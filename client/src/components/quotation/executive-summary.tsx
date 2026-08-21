@@ -25,7 +25,7 @@ const ANALYSIS_LABELS: Record<string, string> = {
 };
 
 export function ExecutiveSummary() {
-  const { quotationData, totalAmount } = useOptimizedQuote();
+  const { quotationData, totalAmount, availableRoles, availablePersonnel } = useOptimizedQuote();
   const { formatCurrency, exchangeRate } = useCurrency();
   const [copied, setCopied] = useState(false);
 
@@ -157,12 +157,16 @@ Saludos cordiales`;
             <Users className="h-3.5 w-3.5" /> Equipo ({totalHours} hs{project?.type === 'always-on' ? '/mes' : ''})
           </div>
           <div className="space-y-2">
-            {team.map((m: any, i: number) => (
-              <div key={i} className="flex items-center justify-between text-sm">
-                <span className="text-slate-700">{m.roleName || `Rol ${m.roleId}`}{m.personnelName ? ` · ${m.personnelName}` : ''}</span>
-                <span className="text-slate-500 tabular-nums">{m.hours} hs</span>
-              </div>
-            ))}
+            {team.map((m, i) => {
+              const roleName = availableRoles.find((role) => role.id === m.roleId)?.name || `Rol ${m.roleId}`;
+              const personnelName = m.personnelId ? availablePersonnel.find((person) => person.id === m.personnelId)?.name : null;
+              return (
+                <div key={i} className="flex items-center justify-between text-sm">
+                  <span className="text-slate-700">{roleName}{personnelName ? ` · ${personnelName}` : ''}</span>
+                  <span className="text-slate-500 tabular-nums">{m.hours} hs</span>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
