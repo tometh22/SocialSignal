@@ -1,6 +1,6 @@
 import { db } from "../db";
 import { exchangeRates, systemConfig } from "../../shared/schema";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { fetchLiveBlueRates } from "./liveFx";
 
 type UpsertInput = {
@@ -15,6 +15,18 @@ type UpsertInput = {
 };
 
 async function upsertRate(input: UpsertInput) {
+  if (input.rateType !== "estimated") {
+    await db.update(exchangeRates).set({
+      isActive: false,
+      updatedAt: new Date(),
+      updatedBy: input.createdBy,
+    }).where(and(
+      eq(exchangeRates.year, input.year),
+      eq(exchangeRates.month, input.month),
+      eq(exchangeRates.rateType, "estimated"),
+      eq(exchangeRates.isActive, true),
+    ));
+  }
   const existing = await db
     .select()
     .from(exchangeRates)
@@ -123,6 +135,13 @@ export async function importRemEstimates(estimates: RemEstimate[], createdBy: nu
     ) {
       continue;
     }
+    const [observed] = await db.select({ id: exchangeRates.id }).from(exchangeRates).where(and(
+      eq(exchangeRates.year, est.year),
+      eq(exchangeRates.month, est.month),
+      eq(exchangeRates.isActive, true),
+      sql`${exchangeRates.rateType} <> 'estimated'`,
+    )).limit(1);
+    if (observed) continue;
     const row = await upsertRate({
       year: est.year,
       month: est.month,

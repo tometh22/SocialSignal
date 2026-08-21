@@ -337,6 +337,19 @@ const EnhancedTeamConfig: React.FC<EnhancedTeamConfigProps> = ({ validationMessa
     handleReorder(reordered);
   };
 
+  const assignPersonnel = (member: DragDropTeamMember, value: string) => {
+    const personnelId = Number(value);
+    const person = availablePersonnel.find((candidate) => candidate.id === personnelId);
+    if (!person) return;
+    const role = getRoleInfo(member.roleId);
+    const rate = getCorrectRate(person, role);
+    updateTeamMember(member.id, {
+      personnelId,
+      rate,
+      cost: Number(member.hours || 0) * rate,
+    });
+  };
+
   return (
     <div id="team-config" className="space-y-6" tabIndex={-1}>
       {validationMessage && (
@@ -748,12 +761,30 @@ const EnhancedTeamConfig: React.FC<EnhancedTeamConfigProps> = ({ validationMessa
                                 )}
                               </div>
                               <div className="flex items-center justify-center space-x-1 text-sm text-gray-600">
-                                <User className="h-3 w-3" />
-                                <span>{(() => {
-                                  if (!member.personnelId) return 'Sin asignar';
-                                  const foundPerson = availablePersonnel.find(p => p.id === member.personnelId);
-                                  return foundPerson?.name || `Personal ${member.personnelId}`;
-                                })()}</span>
+                                <User className="h-3 w-3 flex-shrink-0" />
+                                {!member.personnelId ? (
+                                  <Select onValueChange={(value) => assignPersonnel(member, value)}>
+                                    <SelectTrigger
+                                      className="h-8 w-[190px] border-amber-300 bg-amber-50 text-xs text-amber-900"
+                                      aria-label={`Asignar persona al rol ${role?.name || member.roleId}`}
+                                    >
+                                      <SelectValue placeholder="Asignar persona" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {availablePersonnel
+                                        .filter((candidate) => !quotationData.teamMembers.some(
+                                          (teamMember) => teamMember.personnelId === candidate.id,
+                                        ))
+                                        .map((candidate) => (
+                                          <SelectItem key={candidate.id} value={String(candidate.id)}>
+                                            {candidate.name}
+                                          </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                  </Select>
+                                ) : (
+                                  <span>{availablePersonnel.find(p => p.id === member.personnelId)?.name || `Personal ${member.personnelId}`}</span>
+                                )}
                                 {(() => {
                                   const p = availablePersonnel.find(p => p.id === member.personnelId);
                                   const bc = (p as any)?.billingCurrency;

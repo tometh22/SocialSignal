@@ -7,6 +7,12 @@ import {
   type Personnel,
 } from "@shared/schema";
 import { deriveMonthlySalariesFromHourlyRates } from "@shared/utils/personnel-cost";
+import {
+  allowedSublevelsForRole,
+  normalizePersonnelArea,
+  normalizePersonnelRole,
+  normalizePersonnelSublevel,
+} from "@shared/utils/personnel-classification";
 import { findPersonnelIdFuzzy, type ParsedSheetRow } from "./personnelSheetsSync";
 
 const MONTH_NUMBER: Record<string, number> = {
@@ -115,18 +121,21 @@ export async function applyCanonicalPersonnelRateRows(
       continue;
     }
 
-    const metadata = person.contractType === "freelance"
-      ? {
-          currentRole: null,
-          sublevel: row.sublevel ?? person.sublevel,
-          legacyRole: row.legacyRole ?? person.legacyRole,
-        }
-      : {
-          currentRole: row.currentRole ?? person.currentRole,
-          sublevel: row.sublevel ?? person.sublevel,
-          legacyRole: row.legacyRole ?? person.legacyRole,
-        };
-    const hasMetadata = Boolean(row.currentRole || row.sublevel || row.legacyRole);
+    const currentRole = normalizePersonnelRole(row.currentRole)
+      ?? (person.contractType === "freelance" ? normalizePersonnelRole(row.legacyRole) : null)
+      ?? normalizePersonnelRole(person.currentRole)
+      ?? person.currentRole;
+    const candidateSublevel = normalizePersonnelSublevel(row.sublevel) ?? normalizePersonnelSublevel(person.sublevel);
+    const sublevel = currentRole && candidateSublevel && allowedSublevelsForRole(currentRole).includes(candidateSublevel)
+      ? candidateSublevel
+      : person.sublevel;
+    const metadata = {
+      currentRole,
+      sublevel,
+      legacyRole: row.legacyRole ?? person.legacyRole,
+      area: normalizePersonnelArea(row.area) ?? normalizePersonnelArea(person.area) ?? person.area,
+    };
+    const hasMetadata = Boolean(row.currentRole || row.sublevel || row.legacyRole || row.area);
     if (hasMetadata) {
       await db.update(personnel).set(metadata).where(eq(personnel.id, person.id));
     }

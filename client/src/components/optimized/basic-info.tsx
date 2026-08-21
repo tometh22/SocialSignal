@@ -104,7 +104,7 @@ const OptimizedBasicInfo: React.FC<OptimizedBasicInfoProps> = ({ errors = {} }) 
   const { data: clients, isLoading: isLoadingClients, isError: clientsError, refetch: refetchClients } = useQuery<Client[]>({
     queryKey: ['/api/clients'],
   });
-  const { data: billingEntities = [] } = useQuery<ClientBillingEntity[]>({
+  const { data: billingEntities = [], isLoading: billingEntitiesLoading, isError: billingEntitiesError, refetch: refetchBillingEntities } = useQuery<ClientBillingEntity[]>({
     queryKey: [`/api/clients/${quotationData.client?.id || 0}/billing-entities`],
     enabled: Boolean(quotationData.client?.id),
   });
@@ -232,9 +232,9 @@ const OptimizedBasicInfo: React.FC<OptimizedBasicInfoProps> = ({ errors = {} }) 
                   <Select
                     value={quotationData.billingEntityId ? String(quotationData.billingEntityId) : ''}
                     onValueChange={(value) => updateQuotationData({ billingEntityId: Number(value) })}
-                    disabled={billingEntities.length === 0}
+                    disabled={billingEntitiesLoading || billingEntities.length === 0}
                   >
-                    <SelectTrigger id="billing-entity" className="h-9 w-full border-neutral-200 bg-white"><SelectValue placeholder={billingEntities.length === 0 ? 'El cliente no tiene entidades configuradas' : 'Seleccionar razón social'} /></SelectTrigger>
+                    <SelectTrigger id="billing-entity" className="h-9 w-full border-neutral-200 bg-white"><SelectValue placeholder={billingEntitiesLoading ? 'Cargando entidades…' : billingEntities.length === 0 ? 'El cliente no tiene entidades configuradas' : 'Seleccionar razón social'} /></SelectTrigger>
                     <SelectContent>
                       {billingEntities.map((entity) => (
                         <SelectItem key={entity.id} value={String(entity.id)}>
@@ -243,6 +243,15 @@ const OptimizedBasicInfo: React.FC<OptimizedBasicInfoProps> = ({ errors = {} }) 
                       ))}
                     </SelectContent>
                   </Select>
+                  {billingEntitiesError && (
+                    <div role="alert" className="flex items-center justify-between gap-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                      <span>No pudimos cargar las entidades legales.</span>
+                      <Button type="button" size="sm" variant="ghost" onClick={() => refetchBillingEntities()}>Reintentar</Button>
+                    </div>
+                  )}
+                  {!billingEntitiesLoading && !billingEntitiesError && billingEntities.length === 0 && (
+                    <p className="text-xs text-amber-700">Configurá la razón social desde <a className="font-medium underline" href="/clients">Clientes</a> y volvé a esta cotización.</p>
+                  )}
                 </div>
               )}
 

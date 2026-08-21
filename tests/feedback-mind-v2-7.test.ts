@@ -112,8 +112,10 @@ describe("Feedback Mind V2.7 — atribución, costos y capacidad", () => {
     const server = source("server/index.ts");
 
     expect(migration).toContain('ADD COLUMN IF NOT EXISTS "current_role" TEXT');
-    expect(migration).toContain('SET "current_role" = NULL');
-    expect(migration).not.toContain('SET "current_role" = NULL,\n    "sublevel" = NULL');
+    // V2-11 supersedes the old rule that cleared the canonical level for
+    // freelancers; startup migrations must no longer erase a manual mapping.
+    expect(migration).not.toContain('SET "current_role" = NULL');
+    expect(closure).not.toContain('SET "current_role" = NULL');
     expect(closure).toContain("hourly_rate_usd = cost.hourly_rate_ars");
     expect(closure).toContain("system_config_config_key_unique");
     expect(closure).toContain("role.name ILIKE '%semi senior%'");

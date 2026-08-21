@@ -26,8 +26,7 @@ WHERE role.id = person.role_id
   AND (person."current_role" IS NULL OR BTRIM(person."current_role") = '' OR LOWER(BTRIM(person."current_role")) = 'postgres');
 
 UPDATE personnel person
-SET "current_role" = NULL,
-    "legacy_role" = role.name
+SET "legacy_role" = role.name
 FROM roles role
 WHERE role.id = person.role_id
   AND person.contract_type = 'freelance'

@@ -6,6 +6,12 @@ import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  PERSONNEL_AREAS,
+  PERSONNEL_ROLE_LEVELS,
+  allowedSublevelsForRole,
+  normalizePersonnelRole,
+} from "@shared/utils/personnel-classification";
 
 interface PersonnelRow {
   [key: string]: unknown;
@@ -17,6 +23,7 @@ interface PersonnelRow {
   currentRole?: string | null;
   sublevel?: string | null;
   legacyRole?: string | null;
+  area?: string | null;
   contractType?: string;
   monthlyHours?: number;
   includeInRealCosts?: boolean;
@@ -52,6 +59,7 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
     roleId: String(person.roleId),
     currentRole: person.currentRole ?? "",
     legacyRole: person.legacyRole ?? "",
+    area: person.area ?? "",
     sublevel: person.sublevel ?? "",
     contractType: person.contractType ?? "full-time",
     hourlyRateARS: person.currentHourlyRateARS == null ? "" : String(person.currentHourlyRateARS),
@@ -70,6 +78,7 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
       roleId: String(person.roleId),
       currentRole: person.currentRole ?? "",
       legacyRole: person.legacyRole ?? "",
+      area: person.area ?? "",
       sublevel: person.sublevel ?? "",
       contractType: person.contractType ?? "full-time",
       hourlyRateARS: person.currentHourlyRateARS == null ? "" : String(person.currentHourlyRateARS),
@@ -97,9 +106,10 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
         name: form.name.trim(),
         email: form.email.trim(),
         roleId: Number(form.roleId),
-        currentRole: form.contractType === "freelance" ? null : (form.currentRole.trim() || null),
-        legacyRole: form.contractType === "freelance" ? (form.legacyRole.trim() || null) : (person.legacyRole ?? null),
+        currentRole: form.currentRole.trim() || null,
+        legacyRole: form.legacyRole.trim() || person.legacyRole || null,
         sublevel: form.sublevel.trim() || null,
+        area: form.area || null,
         contractType: form.contractType,
         monthlyHours: form.contractType === "freelance" ? undefined : monthlyHours,
         includeInRealCosts: form.includeInRealCosts,
@@ -156,14 +166,28 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>{roles.map((role) => <SelectItem key={role.id} value={String(role.id)}>{role.name}</SelectItem>)}</SelectContent>
             </Select>
-            {form.contractType === "freelance" ? (
-              <Input aria-label="Rol histórico" placeholder="Rol histórico" value={form.legacyRole} onChange={(event) => setForm({ ...form, legacyRole: event.target.value })} />
-            ) : (
-              <Input aria-label="Rol actual" placeholder="Rol actual" value={form.currentRole} onChange={(event) => setForm({ ...form, currentRole: event.target.value })} />
-            )}
+            <Select value={normalizePersonnelRole(form.currentRole) ?? undefined} onValueChange={(currentRole) => {
+              const permitted = allowedSublevelsForRole(currentRole);
+              setForm({ ...form, currentRole, sublevel: permitted.includes(form.sublevel) ? form.sublevel : "A" });
+            }}>
+              <SelectTrigger aria-label="Rol actual"><SelectValue placeholder="Seleccionar nivel" /></SelectTrigger>
+              <SelectContent>{PERSONNEL_ROLE_LEVELS.map((role) => <SelectItem key={role} value={role}>{role}</SelectItem>)}</SelectContent>
+            </Select>
+            {form.contractType === "freelance" && <Input aria-label="Rol histórico" placeholder="Rol histórico del Máster" value={form.legacyRole} onChange={(event) => setForm({ ...form, legacyRole: event.target.value })} />}
           </div>
         </td>
-        <td className="px-6 py-4"><Input aria-label="Subnivel" placeholder="Subnivel" value={form.sublevel} onChange={(event) => setForm({ ...form, sublevel: event.target.value })} /></td>
+        <td className="px-6 py-4">
+          <Select value={form.sublevel || undefined} onValueChange={(sublevel) => setForm({ ...form, sublevel })}>
+            <SelectTrigger aria-label="Subnivel"><SelectValue placeholder="Subnivel" /></SelectTrigger>
+            <SelectContent>{allowedSublevelsForRole(form.currentRole).map((sublevel) => <SelectItem key={sublevel} value={sublevel}>{sublevel}</SelectItem>)}</SelectContent>
+          </Select>
+        </td>
+        <td className="px-6 py-4">
+          <Select value={form.area || undefined} onValueChange={(area) => setForm({ ...form, area })}>
+            <SelectTrigger aria-label="Área"><SelectValue placeholder="Área" /></SelectTrigger>
+            <SelectContent>{PERSONNEL_AREAS.map((area) => <SelectItem key={area} value={area}>{area}</SelectItem>)}</SelectContent>
+          </Select>
+        </td>
         <td className="px-6 py-4">
           <Select value={form.contractType} onValueChange={(contractType) => setForm({ ...form, contractType })}>
             <SelectTrigger><SelectValue /></SelectTrigger>
@@ -224,9 +248,10 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
       <td className="px-6 py-4 font-medium">{person.name}</td>
       <td className="px-6 py-4 text-sm text-muted-foreground">{person.email || "—"}</td>
       <td className="px-6 py-4 text-sm">
-        {(person.contractType === "freelance" ? person.legacyRole : person.currentRole) || "Pendiente de sincronizar"}
+        {person.currentRole || person.legacyRole || "Pendiente de asignar"}
       </td>
       <td className="px-6 py-4 text-sm">{person.sublevel || "—"}</td>
+      <td className="px-6 py-4 text-sm">{person.area || "—"}</td>
       <td className="px-6 py-4 text-sm">{contractLabel[person.contractType ?? "full-time"]}</td>
       <td className="px-6 py-4 text-sm">
         <div>{money(person.currentHourlyRateARS)} ARS/h</div>

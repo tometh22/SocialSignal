@@ -34,6 +34,7 @@ export interface ParsedSheetRow {
   currentRole?: string | null;
   sublevel?: string | null;
   legacyRole?: string | null;
+  area?: string | null;
 }
 
 export interface ParsedPersonnelMetadata {
@@ -42,6 +43,7 @@ export interface ParsedPersonnelMetadata {
   currentRole?: string | null;
   sublevel?: string | null;
   legacyRole?: string | null;
+  area?: string | null;
 }
 
 /**
@@ -157,6 +159,7 @@ export function parsePersonnelMetadataGrid(rows: string[][]): ParsedPersonnelMet
     currentRole: new Set(["rol", "role", "rol actual"]),
     sublevel: new Set(["subnivel", "sublevel", "sub nivel"]),
     legacyRole: new Set(["rol viejo", "rol anterior", "legacy role"]),
+    area: new Set(["area", "equipo", "departamento"]),
   };
   const findColumn = (headers: string[], aliases: Set<string>) =>
     headers.findIndex((header) => aliases.has(header));
@@ -167,7 +170,8 @@ export function parsePersonnelMetadataGrid(rows: string[][]): ParsedPersonnelMet
     const roleCol = findColumn(headers, headerAliases.currentRole);
     const sublevelCol = findColumn(headers, headerAliases.sublevel);
     const legacyRoleCol = findColumn(headers, headerAliases.legacyRole);
-    if (nameCol < 0 || (roleCol < 0 && sublevelCol < 0 && legacyRoleCol < 0)) continue;
+    const areaCol = findColumn(headers, headerAliases.area);
+    if (nameCol < 0 || (roleCol < 0 && sublevelCol < 0 && legacyRoleCol < 0 && areaCol < 0)) continue;
 
     const emailCol = findColumn(headers, headerAliases.email);
     const parsed: ParsedPersonnelMetadata[] = [];
@@ -182,6 +186,7 @@ export function parsePersonnelMetadataGrid(rows: string[][]): ParsedPersonnelMet
         currentRole: cell(roleCol),
         sublevel: cell(sublevelCol),
         legacyRole: cell(legacyRoleCol),
+        ...(areaCol >= 0 ? { area: cell(areaCol) } : {}),
       });
     }
     return parsed;
@@ -198,13 +203,15 @@ export function mergePersonnelMetadata(
   for (const metadata of metadataRows) {
     const key = normalizeName(metadata.sheetName);
     const current = metadataByName.get(key);
-    metadataByName.set(key, {
+    const merged: ParsedPersonnelMetadata = {
       sheetName: current?.sheetName ?? metadata.sheetName,
       email: current?.email ?? metadata.email ?? null,
       currentRole: current?.currentRole ?? metadata.currentRole ?? null,
       sublevel: current?.sublevel ?? metadata.sublevel ?? null,
       legacyRole: current?.legacyRole ?? metadata.legacyRole ?? null,
-    });
+    };
+    if (current?.area != null || metadata.area != null) merged.area = current?.area ?? metadata.area ?? null;
+    metadataByName.set(key, merged);
   }
 
   return rateRows.map((row) => {
@@ -215,6 +222,7 @@ export function mergePersonnelMetadata(
       currentRole: row.currentRole ?? metadata.currentRole ?? null,
       sublevel: row.sublevel ?? metadata.sublevel ?? null,
       legacyRole: row.legacyRole ?? metadata.legacyRole ?? null,
+      ...(row.area != null || metadata.area != null ? { area: row.area ?? metadata.area ?? null } : {}),
     };
   });
 }
@@ -255,6 +263,7 @@ export function parseValorHoraSection(rows: string[][], year: number): ParsedShe
   const roleCol = metadataColumn(["rol", "role"]);
   const sublevelCol = metadataColumn(["subnivel", "sublevel"]);
   const legacyRoleCol = metadataColumn(["rol viejo", "rol viejo/a", "legacy role"]);
+  const areaCol = metadataColumn(["area", "área", "equipo", "departamento"]);
 
   // Mapear índice de columna → campo {mmm}{yyyy}
   const monthByCol = new Map<number, string>();
@@ -333,6 +342,7 @@ export function parseValorHoraSection(rows: string[][], year: number): ParsedShe
       currentRole: cell(roleCol),
       sublevel: cell(sublevelCol),
       legacyRole: cell(legacyRoleCol),
+      ...(areaCol >= 0 ? { area: cell(areaCol) } : {}),
     });
   }
 

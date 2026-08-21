@@ -13,6 +13,7 @@ import { quotationHeaderCurrencyRepairMigrationSql } from "./migrations/quotatio
 import { feedbackMindV29MigrationSql } from "./migrations/feedback-mind-v2-9";
 import { personnelCostSyncWarningsMigrationSql } from "./migrations/personnel-cost-sync-warnings";
 import { feedbackMindV210MigrationSql } from "./migrations/feedback-mind-v2-10";
+import { feedbackMindV211MigrationSql } from "./migrations/feedback-mind-v2-11";
 import { quotationProfessionalWorkflowMigrationSql } from "./migrations/quotation-professional-workflow";
 import {
   quotationWorkflowFoundationMigrationSql,
@@ -66,8 +67,6 @@ async function applyPendingMigrations() {
       ALTER TABLE "personnel" ALTER COLUMN "monthly_hours" DROP NOT NULL;
       UPDATE "personnel" SET "monthly_hours" = NULL
       WHERE "contract_type" = 'freelance' AND ("monthly_hours" IS NULL OR "monthly_hours" = 160);
-      UPDATE "personnel" SET "current_role" = NULL
-      WHERE "contract_type" = 'freelance';
     `);
     await run('0002 personnel_include_in_real_costs', `
       ALTER TABLE "personnel" ADD COLUMN IF NOT EXISTS "include_in_real_costs" boolean NOT NULL DEFAULT true;
@@ -831,6 +830,7 @@ async function applyPendingMigrations() {
     await run('0046 professional quotation studio', professionalQuotationStudioMigrationSql);
     await run('0047 financial intelligence', financialIntelligenceMigrationSql);
     await run('0048 monthly summary period unique', monthlySummaryPeriodUniqueMigrationSql);
+    await run('0049 feedback_mind_v2_11 corrections', feedbackMindV211MigrationSql);
 
     // 0033: feriados duplicados (mismo date+name insertado más de una vez desde el
     // formulario) — borra duplicados conservando la fila más antigua y agrega la

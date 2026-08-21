@@ -1,12 +1,13 @@
 import { useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
-import { Users, Clock, AlertCircle, Lock, MessageSquare } from "lucide-react";
+import { Users, Clock, AlertCircle, Lock, MessageSquare, Trash2 } from "lucide-react";
 import { roomColor, type ReviewRoomSummary } from "@/lib/review-api";
 import { setLastReviewRoomId } from "@/hooks/use-review-room";
 
 interface Props {
   room: ReviewRoomSummary;
+  onArchive?: (room: ReviewRoomSummary) => void;
 }
 
 function relTime(s: string | null): string {
@@ -19,7 +20,7 @@ function relTime(s: string | null): string {
   return new Date(s).toLocaleDateString('es-AR', { day: 'numeric', month: 'short' });
 }
 
-export default function RoomCard({ room }: Props) {
+export default function RoomCard({ room, onArchive }: Props) {
   const [, navigate] = useLocation();
   const color = roomColor(room.colorIndex);
 
@@ -29,10 +30,19 @@ export default function RoomCard({ room }: Props) {
   };
 
   return (
-    <button
+    <div
+      role="button"
+      tabIndex={0}
       onClick={open}
+      onKeyDown={(event) => {
+        if (event.target !== event.currentTarget) return;
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          open();
+        }
+      }}
       className={cn(
-        "group relative bg-white border rounded-xl p-5 text-left transition-all hover:shadow-md",
+        "group relative cursor-pointer bg-white border rounded-xl p-5 text-left transition-all hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500",
         color.border,
       )}
     >
@@ -50,6 +60,19 @@ export default function RoomCard({ room }: Props) {
             <p className="text-xs text-slate-500 line-clamp-2 mt-0.5">{room.description}</p>
           )}
         </div>
+        {room.myRole === 'owner' && onArchive && (
+          <button
+            type="button"
+            className="rounded-md p-1.5 text-slate-400 opacity-0 transition hover:bg-rose-50 hover:text-rose-600 focus:opacity-100 group-hover:opacity-100"
+            aria-label={`Eliminar sala ${room.name}`}
+            onClick={(event) => {
+              event.stopPropagation();
+              onArchive(room);
+            }}
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        )}
         {room.privacy === 'private' ? (
           <Badge variant="outline" className="text-[10px] gap-1 border-slate-300 text-slate-600">
             <Lock className="h-2.5 w-2.5" />
@@ -94,6 +117,6 @@ export default function RoomCard({ room }: Props) {
           )}
         </span>
       </div>
-    </button>
+    </div>
   );
 }

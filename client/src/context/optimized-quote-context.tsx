@@ -9,8 +9,6 @@ import {
   type QuotationPricingResult,
 } from "@shared/utils/quotation-pricing";
 import {
-  getAnalysisTypeFactor,
-  getClientEngagementFactor,
   getCountriesFactor,
   getMentionsVolumeFactor,
 } from "@shared/utils/quotation-complexity";
@@ -566,10 +564,10 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
   const complexityFactors = useMemo((): ComplexityFactors => {
 
     const factors = {
-      analysisTypeFactor: getAnalysisTypeFactor(quotationData.analysisType),
+      analysisTypeFactor: 0,
       mentionsVolumeFactor: getMentionsVolumeFactor(quotationData.mentionsVolume),
       countriesFactor: getCountriesFactor(quotationData.countriesCovered),
-      clientEngagementFactor: getClientEngagementFactor(quotationData.clientEngagement)
+      clientEngagementFactor: 0,
       // Removed templateFactor - it doesn't make logical sense
     };
 
@@ -599,22 +597,7 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
       setTotalAmount(0);
       return;
     }
-    const annualRate = quotationData.inflation.inflationMethod === "automatic"
-      ? quotationData.inflation.automaticInflationRate
-      : quotationData.inflation.manualInflationRate;
-    let months = 0;
-    if (quotationData.inflation.applyInflationAdjustment) {
-      if (quotationData.inflation.rateProjectionMode === "annual_avg") {
-        months = 6;
-      } else if (quotationData.inflation.projectStartDate) {
-        const start = new Date(quotationData.inflation.projectStartDate);
-        const now = new Date();
-        months = Math.max(0, (start.getFullYear() - now.getFullYear()) * 12 + start.getMonth() - now.getMonth());
-      }
-    }
-    const safeAnnualRate = Number.isFinite(annualRate) && Number(annualRate) >= 0 ? Number(annualRate) : 0;
-    const monthlyInflation = Math.pow(1 + safeAnnualRate / 100, 1 / 12) - 1;
-    const inflationFactor = months > 0 ? Math.pow(1 + monthlyInflation, months) : 1;
+    const inflationFactor = 1;
     const complexityFactor = Object.values(complexityFactors).reduce((sum, factor) => sum + (factor || 0), 0);
     const result = calculateQuotationPricing({
       quotationCurrency: quotationData.quotationCurrency === "USD" ? "USD" : "ARS",
@@ -1001,10 +984,10 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
         requiresExchangeRateConfirmation: Number(quotation.pricingVersion || 1) < 2
           || !(Number(quotation.exchangeRateAtQuote) > 0),
         inflation: {
-          applyInflationAdjustment: Boolean(quotation.applyInflationAdjustment),
-          inflationMethod: quotation.inflationMethod || "manual",
-          manualInflationRate: Number(quotation.manualInflationRate || 0),
-          automaticInflationRate: quotation.automaticInflationRate == null ? undefined : Number(quotation.automaticInflationRate),
+          applyInflationAdjustment: false,
+          inflationMethod: "manual",
+          manualInflationRate: 0,
+          automaticInflationRate: undefined,
           projectStartDate: quotation.projectStartDate ? new Date(quotation.projectStartDate).toISOString().split('T')[0] : "",
           rateProjectionMode: ((quotation as any).rateProjectionMode === "annual_avg" ? "annual_avg" : "current") as "current" | "annual_avg",
         },
@@ -1107,10 +1090,10 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
         manualPrice: quotationData.financials.manualPrice || null,
         manualPriceCurrency: quotationData.financials.manualPriceCurrency ?? quotationData.quotationCurrency,
         pricingVersion: 2,
-        applyInflationAdjustment: quotationData.inflation.applyInflationAdjustment || false,
-        inflationMethod: quotationData.inflation.inflationMethod || 'manual',
-        manualInflationRate: quotationData.inflation.manualInflationRate || 0,
-        automaticInflationRate: quotationData.inflation.automaticInflationRate ?? null,
+        applyInflationAdjustment: false,
+        inflationMethod: 'manual',
+        manualInflationRate: 0,
+        automaticInflationRate: null,
         projectStartDate: quotationData.inflation.projectStartDate ? new Date(quotationData.inflation.projectStartDate) : undefined,
         rateProjectionMode: quotationData.inflation.rateProjectionMode || 'current',
         quotationCurrency: quotationData.quotationCurrency || 'ARS',

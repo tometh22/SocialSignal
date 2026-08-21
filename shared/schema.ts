@@ -260,6 +260,7 @@ export const personnel = pgTable("personnel", {
   currentRole: text("current_role"),
   sublevel: text("sublevel"),
   legacyRole: text("legacy_role"),
+  area: text("area"),
   hourlyRate: doublePrecision("hourly_rate").notNull(), // USD per hour
   hourlyRateARS: doublePrecision("hourly_rate_ars"), // ARS per hour for local projects
   contractType: text("contract_type").notNull().default("full-time"), // 'full-time', 'part-time', 'freelance'
@@ -461,6 +462,7 @@ export const insertPersonnelSchema = createInsertSchema(personnel).pick({
   currentRole: true,
   sublevel: true,
   legacyRole: true,
+  area: true,
   hourlyRate: true,
   hourlyRateARS: true,
   contractType: true,
