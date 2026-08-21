@@ -14,6 +14,8 @@ const ProposalStudio = lazy(() => import("@/pages/proposal-studio"));
 const ServiceBlueprintsAdmin = lazy(() => import("@/pages/service-blueprints-admin"));
 const QuoteRedirect = lazy(() => import("@/pages/quote-redirect"));
 const PublicProposal = lazy(() => import("@/pages/public-proposal"));
+const PublicProposalGroup = lazy(() => import("@/pages/public-proposal-group"));
+const QuotationGroupWorkspace = lazy(() => import("@/pages/quotation-group-workspace"));
 const Clients = lazy(() => import("@/pages/clients"));
 const Admin = lazy(() => import("@/pages/admin-fixed"));
 const AdminDataSources = lazy(() => import("@/pages/admin-data-sources"));
@@ -198,6 +200,9 @@ function AppRoutes() {
       <Route path="/proposal/:token">
         <Suspense fallback={<AppRouteFallback />}><PublicProposal /></Suspense>
       </Route>
+      <Route path="/proposal-group/:token">
+        <Suspense fallback={<AppRouteFallback />}><PublicProposalGroup /></Suspense>
+      </Route>
 
       <Route path="*">
         <div className="app-shell flex h-[100dvh] overflow-hidden bg-background">
@@ -246,6 +251,7 @@ function AppRoutes() {
                   <ProtectedRoute path="/quotations" component={ManageQuotes} requiredPermission="quotations" />
                   <ProtectedRoute path="/quotations/:id" component={QuotationDetail} requiredPermission="quotations" />
                   <ProtectedRoute path="/quotations/:id/studio" component={ProposalStudio} requiredPermission="quotations" />
+                  <ProtectedRoute path="/quotation-groups/:id" component={QuotationGroupWorkspace} requiredPermission="quotations" />
                   <ProtectedRoute path="/operations/service-blueprints" component={ServiceBlueprintsAdmin} requiredPermission="operations" />
                   <ProtectedRoute path="/quote-redirect" component={QuoteRedirect} />
                   

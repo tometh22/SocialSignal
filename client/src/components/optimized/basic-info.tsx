@@ -42,7 +42,7 @@ type ExchangeRateForecast = {
 
 type OptimizedBasicInfoProps = {
   errors?: Record<string, string>;
-  mode?: 'project' | 'financial';
+  mode?: 'project' | 'financial' | 'group';
 };
 
 const OptimizedBasicInfo: React.FC<OptimizedBasicInfoProps> = ({ errors = {}, mode = 'project' }) => {
@@ -55,7 +55,8 @@ const OptimizedBasicInfo: React.FC<OptimizedBasicInfoProps> = ({ errors = {}, mo
     updateQuotationCurrency,
     updateQuotationData,
   } = useOptimizedQuote();
-  const isProjectMode = mode === 'project';
+  const isProjectMode = mode !== 'financial';
+  const isGroupMode = mode === 'group';
   const [exchangeRateInput, setExchangeRateInput] = React.useState(
     quotationData.exchangeRateSnapshot ? String(quotationData.exchangeRateSnapshot) : '',
   );
@@ -137,8 +138,8 @@ const OptimizedBasicInfo: React.FC<OptimizedBasicInfoProps> = ({ errors = {}, mo
         <Card className="border-slate-200 shadow-none">
           <CardContent className="p-5 sm:p-6">
             <div className="mb-5">
-              <h3 className="text-base font-semibold text-slate-950">Datos esenciales</h3>
-              <p className="mt-1 text-sm text-slate-500">Sólo lo necesario para identificar la oportunidad. Moneda y precio se definen en Finanzas.</p>
+              <h3 className="text-base font-semibold text-slate-950">{isGroupMode ? 'Datos compartidos del grupo' : 'Datos esenciales'}</h3>
+              <p className="mt-1 text-sm text-slate-500">{isGroupMode ? 'Cliente y entidad se solicitan una sola vez para todas las propuestas.' : 'Sólo lo necesario para identificar la oportunidad. Moneda y precio se definen en Finanzas.'}</p>
             </div>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <Field label="Cliente" icon={User} required error={errors.client} errorId="client-error">
@@ -147,21 +148,21 @@ const OptimizedBasicInfo: React.FC<OptimizedBasicInfoProps> = ({ errors = {}, mo
                   <SelectContent>{clients?.map((client) => <SelectItem key={client.id} value={String(client.id)}>{client.name}</SelectItem>)}</SelectContent>
                 </Select>
               </Field>
-              <Field label="Nombre del proyecto" icon={FolderOpen} required error={errors['project-name']} errorId="project-name-error">
+              {!isGroupMode && <Field label="Nombre del proyecto" icon={FolderOpen} required error={errors['project-name']} errorId="project-name-error">
                 <Input id="project-name" placeholder="Ej. Playbook regional de TikTok Shop" value={quotationData.project.name} onChange={(event) => updateProjectName(event.target.value)} aria-invalid={Boolean(errors['project-name'])} className="h-10 border-slate-200" />
-              </Field>
-              <Field label="Modalidad de servicio" error={errors['project-type']} errorId="project-type-error">
+              </Field>}
+              {!isGroupMode && <Field label="Modalidad de servicio" error={errors['project-type']} errorId="project-type-error">
                 <Select value={quotationData.project.type} onValueChange={updateProjectType} disabled={isLoadingProjectTypes}>
                   <SelectTrigger id="project-type" aria-invalid={Boolean(errors['project-type'])} className="h-10 border-slate-200"><SelectValue placeholder="Seleccionar modalidad" /></SelectTrigger>
                   <SelectContent>{projectTypes?.map((type) => <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>)}</SelectContent>
                 </Select>
-              </Field>
-              <Field label="Duración" icon={Calendar} error={errors['project-duration']} errorId="project-duration-error">
+              </Field>}
+              {!isGroupMode && <Field label="Duración" icon={Calendar} error={errors['project-duration']} errorId="project-duration-error">
                 <Select value={quotationData.project.duration} onValueChange={updateProjectDuration} disabled={!quotationData.project.type}>
                   <SelectTrigger id="project-duration" aria-invalid={Boolean(errors['project-duration'])} className="h-10 border-slate-200"><SelectValue placeholder="Seleccionar duración" /></SelectTrigger>
                   <SelectContent>{visibleDurationOptions.map((duration) => <SelectItem key={duration.value} value={duration.value}>{duration.label}</SelectItem>)}</SelectContent>
                 </Select>
-              </Field>
+              </Field>}
             </div>
             {quotationData.client && (
               <div className="mt-4 border-t border-slate-100 pt-4">

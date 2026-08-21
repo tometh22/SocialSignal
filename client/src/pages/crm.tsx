@@ -101,6 +101,8 @@ function fmtUsd(val: number | null | undefined) {
 interface Lead {
   id: number;
   companyName: string;
+  opportunityName?: string | null;
+  quotationGroupId?: number | null;
   stage: Stage;
   source: string | null;
   estimatedValueUsd: number | null;
@@ -547,8 +549,9 @@ function LeadCard({ lead, onClick, onDelete }: LeadCardProps) {
       <div className="flex items-start justify-between gap-2 mb-2">
         <div className="flex-1 min-w-0">
           <p className="font-semibold text-slate-800 text-sm truncate group-hover:text-indigo-700 transition-colors">
-            {lead.companyName}
+            {lead.opportunityName || lead.companyName}
           </p>
+          {lead.opportunityName && <p className="mt-0.5 truncate text-[11px] font-medium text-slate-400">{lead.companyName}{lead.quotationGroupId ? ' · grupo de propuestas' : ''}</p>}
           {lead.primaryContact && (
             <p className="text-xs text-slate-500 truncate mt-0.5">{lead.primaryContact.name}</p>
           )}

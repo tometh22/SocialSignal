@@ -82,6 +82,9 @@ import {
   clients,
   clientBillingEntities,
   quotations,
+  quotationGroups,
+  quotationGroupItems,
+  quotationGroupDeliveries,
   quotationVariants,
   timeEntries,
   personnel,
@@ -253,6 +256,7 @@ import {
   stableQuotationSnapshot,
   validatePaymentSchedule,
 } from "@shared/utils/quotation-commercial";
+import { deriveQuotationGroupStatus, isQuotationConfigured } from "@shared/utils/quotation-groups";
 
 // 🚀 COSTS SOT - Nueva fuente única de verdad para costos
 import * as costs from './domain/costs';
@@ -5523,15 +5527,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     note?: string,
   ) {
     if (!quotation.leadId) return;
+    const exchangeRate = Number(quotation.exchangeRateAtQuote) || Number(quotation.usdExchangeRate) || 0;
+    const estimatedValueUsd = quotation.quotationCurrency === "USD"
+      ? Number(quotation.totalAmount || 0)
+      : exchangeRate > 0 ? Number(quotation.totalAmount || 0) / exchangeRate : 0;
     const stage = status === "approved" ? "won"
       : ["rejected", "expired", "cancelled"].includes(status) ? "lost"
       : status === "in-negotiation" ? "negotiation"
       : ["pending", "internally-approved", "sent", "viewed"].includes(status) ? "proposal"
       : null;
-    if (!stage) return;
+    if (!stage) {
+      if (estimatedValueUsd > 0) await executor.update(crmLeads).set({ estimatedValueUsd, updatedAt: new Date() })
+        .where(eq(crmLeads.id, quotation.leadId));
+      return;
+    }
     const now = new Date();
     await executor.update(crmLeads).set({
       stage,
+      ...(estimatedValueUsd > 0 ? { estimatedValueUsd } : {}),
       updatedAt: now,
       ...(stage === "won" ? { wonAt: now, lostAt: null, lostReason: null } : {}),
       ...(stage === "lost" ? { lostAt: now, lostReason: note || quotation.lossReason || null } : {}),
@@ -5618,6 +5631,91 @@ export async function registerRoutes(app: Express): Promise<Server> {
     };
   }
 
+  async function loadQuotationGroupWorkspace(groupId: number, publicProjection = false, allowedQuotationIds?: number[]) {
+    const [group] = await db.select().from(quotationGroups).where(eq(quotationGroups.id, groupId));
+    if (!group || group.archivedAt) return null;
+    const [client] = await db.select().from(clients).where(eq(clients.id, group.clientId));
+    const allItems = await db.select({
+      item: quotationGroupItems,
+      quotation: quotations,
+      opportunityName: crmLeads.opportunityName,
+      crmStage: crmLeads.stage,
+    }).from(quotationGroupItems)
+      .innerJoin(quotations, eq(quotationGroupItems.quotationId, quotations.id))
+      .leftJoin(crmLeads, eq(quotations.leadId, crmLeads.id))
+      .where(eq(quotationGroupItems.groupId, groupId))
+      .orderBy(asc(quotationGroupItems.position));
+    const allowedSet = allowedQuotationIds ? new Set(allowedQuotationIds) : null;
+    const items = allowedSet ? allItems.filter(({ quotation }) => allowedSet.has(quotation.id)) : allItems;
+    const documentRows = items.length ? await db.select().from(proposalDocuments)
+      .where(inArray(proposalDocuments.quotationId, items.map(({ quotation }) => quotation.id))) : [];
+    const variantRows = publicProjection && items.length ? await db.select().from(quotationVariants)
+      .where(inArray(quotationVariants.quotationId, items.map(({ quotation }) => quotation.id)))
+      .orderBy(asc(quotationVariants.variantOrder)) : [];
+    const approvalRows = items.length ? await db.select().from(quotationApprovals)
+      .where(inArray(quotationApprovals.quotationId, items.map(({ quotation }) => quotation.id))) : [];
+    const payloadItems = items.map(({ item, quotation, opportunityName, crmStage }) => {
+      const document = documentRows.find((row) => row.quotationId === quotation.id && row.locale === "es");
+      const approvals = approvalRows.filter((row) => row.quotationId === quotation.id);
+      const base = {
+        id: item.id,
+        position: item.position,
+        quotationId: quotation.id,
+        quotationNumber: quotation.quotationNumber,
+        projectName: quotation.projectName,
+        status: quotation.status,
+        currency: quotation.quotationCurrency,
+        totalAmount: quotation.totalAmount,
+        lockVersion: quotation.lockVersion,
+        lastCompletedStep: item.lastCompletedStep,
+        configuredAt: item.configuredAt,
+        candidate: item.candidateSnapshot,
+        crm: { opportunityName, stage: crmStage },
+        approval: {
+          pending: approvals.filter((row) => row.status === "pending").length,
+          rejected: approvals.filter((row) => row.status === "rejected").length,
+        },
+        qa: document ? {
+          status: document.qaStatus,
+          stale: document.isStale,
+          blockers: (document.qaIssues || []).filter((issue: any) => issue.severity === "blocker").length,
+          warnings: (document.qaIssues || []).filter((issue: any) => issue.severity === "warning").length,
+        } : { status: quotation.scopeSnapshot ? "missing" : "not_required", stale: false, blockers: 0, warnings: 0 },
+      };
+      const publicTax = calculateTaxBreakdown(quotation.totalAmount, quotation.taxRate, quotation.pricesIncludeTax);
+      return publicProjection ? {
+        quotationId: base.quotationId,
+        quotationNumber: base.quotationNumber,
+        projectName: base.projectName,
+        status: base.status,
+        currency: base.currency,
+        totalAmount: publicTax.grandTotal,
+        netAmount: publicTax.netAmount,
+        taxAmount: publicTax.taxAmount,
+        taxLabel: quotation.taxLabel,
+        taxRate: quotation.taxRate,
+        termsVersion: quotation.termsVersion,
+        variants: variantRows.filter((variant) => variant.quotationId === quotation.id).map((variant) => ({
+          id: variant.id,
+          name: variant.variantName,
+          description: variant.variantDescription,
+          totalAmount: calculateTaxBreakdown(variant.totalAmount, quotation.taxRate, quotation.pricesIncludeTax).grandTotal,
+        })),
+      } : base;
+    });
+    return {
+      group: publicProjection ? {
+        id: group.id,
+        groupNumber: group.groupNumber,
+        name: group.name,
+        expiresAt: group.publicTokenExpiresAt,
+      } : group,
+      client: client ? { id: client.id, name: client.name, contactName: client.contactName } : null,
+      status: deriveQuotationGroupStatus(items.map(({ quotation }) => quotation.status)),
+      items: payloadItems,
+    };
+  }
+
   async function renderQuotationPdf(projection: ReturnType<typeof publicQuotationProjection>): Promise<Buffer> {
     return await new Promise((resolve, reject) => {
       const document = new PDFDocument({ size: "A4", margin: 48, info: {
@@ -5680,6 +5778,180 @@ export async function registerRoutes(app: Express): Promise<Server> {
       document.end();
     });
   }
+
+  async function resolvePublicGroup(token: string) {
+    if (!token || token.length < 32) return null;
+    const hash = quoteTokenHash(token);
+    const [group] = await db.select().from(quotationGroups).where(eq(quotationGroups.publicTokenHash, hash));
+    if (!group || !group.publicTokenHash || !safeTokenEquals(token, group.publicTokenHash) || group.archivedAt) return null;
+    const [delivery] = await db.select().from(quotationGroupDeliveries).where(and(
+      eq(quotationGroupDeliveries.groupId, group.id), eq(quotationGroupDeliveries.status, "sent"),
+    )).orderBy(desc(quotationGroupDeliveries.sentAt)).limit(1);
+    if (!delivery) return null;
+    const allowedQuotationIds = Array.isArray(delivery.includedQuotationIds) ? delivery.includedQuotationIds.map(Number) : [];
+    if (group.publicTokenExpiresAt && group.publicTokenExpiresAt < new Date()) return { expired: true as const, group, allowedQuotationIds };
+    return { expired: false as const, group, allowedQuotationIds };
+  }
+
+  app.get("/api/public/quotation-groups/:token", async (req, res) => {
+    try {
+      const resolved = await resolvePublicGroup(req.params.token);
+      if (!resolved) return res.status(404).json({ message: "Grupo de propuestas no encontrado" });
+      if (resolved.expired) return res.status(410).json({ message: "El grupo de propuestas está vencido" });
+      const sentRows = resolved.allowedQuotationIds.length ? await db.select().from(quotations).where(and(
+        inArray(quotations.id, resolved.allowedQuotationIds), eq(quotations.status, "sent"),
+      )) : [];
+      if (sentRows.length) {
+        const now = new Date();
+        await db.transaction(async (tx) => {
+          for (const quotation of sentRows) {
+            const [viewed] = await tx.update(quotations).set({ status: "viewed", viewedAt: now, updatedAt: now,
+              lockVersion: sql`${quotations.lockVersion} + 1` }).where(and(eq(quotations.id, quotation.id), eq(quotations.status, "sent"))).returning();
+            if (!viewed) continue;
+            await recordQuotationEvent(tx, { quotationId: quotation.id, eventType: "viewed",
+              eventKey: `group-viewed:${quotation.id}:${quotation.revisionNumber}`, actorType: "client",
+              metadata: { groupId: resolved.group.id, ip: req.ip, userAgent: req.get("user-agent") || null } });
+            await syncQuotationToCrm(tx, viewed, "viewed", null, "El cliente abrió el portal grupal.");
+          }
+        });
+      }
+      const workspace = await loadQuotationGroupWorkspace(resolved.group.id, true, resolved.allowedQuotationIds);
+      res.json(workspace);
+    } catch (error) {
+      console.error("Error opening public quotation group:", error);
+      res.status(500).json({ message: "No se pudo abrir el grupo de propuestas" });
+    }
+  });
+
+  app.get("/api/public/quotation-groups/:token/quotations/:quotationId/document.pdf", async (req, res) => {
+    try {
+      const resolved = await resolvePublicGroup(req.params.token);
+      if (!resolved) return res.status(404).json({ message: "Grupo de propuestas no encontrado" });
+      if (resolved.expired) return res.status(410).json({ message: "El grupo de propuestas está vencido" });
+      const quotationId = Number(req.params.quotationId);
+      if (!resolved.allowedQuotationIds.includes(quotationId)) return res.status(404).json({ message: "Propuesta no encontrada" });
+      const [item] = await db.select().from(quotationGroupItems).where(and(
+        eq(quotationGroupItems.groupId, resolved.group.id), eq(quotationGroupItems.quotationId, quotationId),
+      ));
+      if (!item) return res.status(404).json({ message: "Propuesta no encontrada" });
+      const [quotation] = await db.select().from(quotations).where(eq(quotations.id, quotationId));
+      const revision = (await db.select().from(quotationRevisions)
+        .where(eq(quotationRevisions.quotationId, quotationId)).orderBy(desc(quotationRevisions.revisionNumber)).limit(1))[0];
+      if (!quotation || !revision) return res.status(404).json({ message: "Documento no encontrado" });
+      const [proposalDocument] = await db.select().from(proposalDocuments).where(and(
+        eq(proposalDocuments.quotationId, quotationId), eq(proposalDocuments.locale, "es"),
+        eq(proposalDocuments.status, "published"), eq(proposalDocuments.isStale, false),
+      )).limit(1);
+      const pdf = proposalDocument
+        ? await renderProposalPdf(proposalDocumentSchema.parse(proposalDocument.content), { title: quotation.projectName, quotationNumber: quotation.quotationNumber })
+        : await renderQuotationPdf(publicQuotationProjection({ ...(revision.snapshot as any), documentHash: revision.documentHash }));
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `inline; filename="${quotation.quotationNumber}-R${quotation.revisionNumber}.pdf"`);
+      res.send(pdf);
+    } catch (error) {
+      res.status(500).json({ message: "No se pudo generar el documento" });
+    }
+  });
+
+  app.get("/api/public/quotation-groups/:token/documents.zip", async (req, res) => {
+    try {
+      const resolved = await resolvePublicGroup(req.params.token);
+      if (!resolved) return res.status(404).json({ message: "Grupo de propuestas no encontrado" });
+      if (resolved.expired) return res.status(410).json({ message: "El grupo de propuestas está vencido" });
+      if (resolved.allowedQuotationIds.length === 0) return res.status(404).json({ message: "No hay documentos disponibles" });
+      const rows = await db.select({ item: quotationGroupItems, quotation: quotations })
+        .from(quotationGroupItems).innerJoin(quotations, eq(quotationGroupItems.quotationId, quotations.id))
+        .where(and(eq(quotationGroupItems.groupId, resolved.group.id), inArray(quotationGroupItems.quotationId, resolved.allowedQuotationIds)))
+        .orderBy(asc(quotationGroupItems.position));
+      const JSZip = (await import("jszip")).default;
+      const zip = new JSZip();
+      for (const { quotation } of rows) {
+        const revision = (await db.select().from(quotationRevisions).where(eq(quotationRevisions.quotationId, quotation.id))
+          .orderBy(desc(quotationRevisions.revisionNumber)).limit(1))[0];
+        if (!revision) continue;
+        const [document] = await db.select().from(proposalDocuments).where(and(
+          eq(proposalDocuments.quotationId, quotation.id), eq(proposalDocuments.locale, "es"),
+          eq(proposalDocuments.status, "published"), eq(proposalDocuments.isStale, false),
+        )).limit(1);
+        const pdf = document
+          ? await renderProposalPdf(proposalDocumentSchema.parse(document.content), { title: quotation.projectName, quotationNumber: quotation.quotationNumber })
+          : await renderQuotationPdf(publicQuotationProjection({ ...(revision.snapshot as any), documentHash: revision.documentHash }));
+        zip.file(`${quotation.quotationNumber}-R${quotation.revisionNumber}.pdf`, pdf);
+      }
+      const archive = await zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE" });
+      res.setHeader("Content-Type", "application/zip");
+      res.setHeader("Content-Disposition", `attachment; filename="${resolved.group.groupNumber}-propuestas.zip"`);
+      res.send(archive);
+    } catch (error) {
+      res.status(500).json({ message: "No se pudieron preparar los documentos" });
+    }
+  });
+
+  app.post("/api/public/quotation-groups/:token/quotations/:quotationId/decision", async (req, res) => {
+    try {
+      const input = quotationDecisionSchema.parse(req.body);
+      const resolved = await resolvePublicGroup(req.params.token);
+      if (!resolved) return res.status(404).json({ message: "Grupo de propuestas no encontrado" });
+      if (resolved.expired) return res.status(410).json({ message: "El grupo de propuestas está vencido" });
+      const quotationId = Number(req.params.quotationId);
+      if (!resolved.allowedQuotationIds.includes(quotationId)) return res.status(404).json({ message: "Propuesta no encontrada" });
+      const [item] = await db.select().from(quotationGroupItems).where(and(
+        eq(quotationGroupItems.groupId, resolved.group.id), eq(quotationGroupItems.quotationId, quotationId),
+      ));
+      if (!item) return res.status(404).json({ message: "Propuesta no encontrada" });
+      const [quotation] = await db.select().from(quotations).where(eq(quotations.id, quotationId));
+      if (!quotation || !["sent", "viewed", "in-negotiation"].includes(quotation.status)) {
+        return res.status(409).json({ message: "La propuesta ya no admite decisiones" });
+      }
+      const variants = await db.select().from(quotationVariants).where(eq(quotationVariants.quotationId, quotation.id));
+      if (input.decision === "accept" && variants.length > 0 && !input.variantId) {
+        return res.status(400).json({ message: "Elegí la variante que aceptás" });
+      }
+      const selected = input.variantId ? variants.find((variant) => variant.id === input.variantId) : undefined;
+      if (input.variantId && !selected) return res.status(400).json({ message: "La variante no pertenece a la propuesta" });
+      const status = input.decision === "accept" ? "approved" : input.decision === "reject" ? "rejected" : "in-negotiation";
+      const now = new Date();
+      const selectedTax = selected ? calculateTaxBreakdown(selected.totalAmount, quotation.taxRate, quotation.pricesIncludeTax) : null;
+      const [updated] = await db.transaction(async (tx) => {
+        const rows = await tx.update(quotations).set({
+          status,
+          acceptedVariantId: input.decision === "accept" ? selected?.id ?? null : null,
+          ...(selected ? { totalAmount: selected.totalAmount, subtotalAmount: selectedTax?.netAmount, taxAmount: selectedTax?.taxAmount } : {}),
+          acceptedAt: input.decision === "accept" ? now : null,
+          rejectedAt: input.decision === "reject" ? now : null,
+          lossReason: input.decision === "reject" ? input.reason || "Rechazada por el cliente" : quotation.lossReason,
+          updatedAt: now,
+          lockVersion: sql`${quotations.lockVersion} + 1`,
+        }).where(and(eq(quotations.id, quotation.id), eq(quotations.lockVersion, quotation.lockVersion),
+          inArray(quotations.status, ["sent", "viewed", "in-negotiation"]))).returning();
+        if (!rows[0]) throw Object.assign(new Error("La propuesta recibió otra decisión simultánea"), { statusCode: 409 });
+        if (selected) {
+          await tx.update(quotationVariants).set({ isSelected: false }).where(eq(quotationVariants.quotationId, quotation.id));
+          await tx.update(quotationVariants).set({ isSelected: true }).where(eq(quotationVariants.id, selected.id));
+        }
+        const latest = (await tx.select().from(quotationRevisions).where(eq(quotationRevisions.quotationId, quotation.id))
+          .orderBy(desc(quotationRevisions.revisionNumber)).limit(1))[0];
+        await recordQuotationEvent(tx, {
+          quotationId: quotation.id,
+          revisionId: latest?.id,
+          eventType: status,
+          eventKey: `${status}:${quotation.id}:${quotation.revisionNumber}`,
+          actorType: "client",
+          metadata: { name: input.name, email: input.email, reason: input.reason || null, variantId: selected?.id || null,
+            termsVersion: quotation.termsVersion, consent: input.consent, groupId: resolved.group.id, ip: req.ip,
+            userAgent: req.get("user-agent") || null },
+        });
+        await syncQuotationToCrm(tx, rows[0], status, null, input.reason);
+        return rows;
+      });
+      res.json({ success: true, status: updated.status, groupStatus: (await loadQuotationGroupWorkspace(resolved.group.id, true))?.status });
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: "La decisión es inválida", errors: error.errors });
+      if ((error as any)?.statusCode === 409) return res.status(409).json({ message: (error as Error).message });
+      console.error("Error recording group quotation decision:", error);
+      res.status(500).json({ message: "No se pudo registrar la decisión" });
+    }
+  });
 
   // Public client portal. Tokens are random, only their SHA-256 hashes are stored.
   app.get("/api/public/quotations/:token", async (req, res) => {
@@ -5869,6 +6141,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // display endpoints, even if a handler forgets to repeat the middleware.
   app.use([
     "/api/quotations",
+    "/api/quotation-groups",
     "/api/quotation-team",
     "/api/quotation-team-member",
     "/api/quotation-variants",
@@ -6176,6 +6449,585 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     if (issues.length > 0) throw new z.ZodError(issues);
   }
+
+  const quotationGroupCandidateSchema = z.object({
+    id: z.string().trim().min(1).max(120),
+    projectName: z.string().trim().min(2).max(200),
+    summary: z.string().trim().max(5_000).default(""),
+    objective: z.string().trim().max(5_000).default(""),
+    decision: z.string().trim().max(5_000).default(""),
+    modality: z.enum(["demo", "one_shot", "event_pack", "monthly_fee", "annual_program", "renewal"]).nullable().optional(),
+    durationMonths: z.number().int().positive().max(120).nullable().optional(),
+    markets: z.array(z.string().trim().max(100)).max(50).default([]),
+    languages: z.array(z.enum(["es", "en"])).max(2).default(["es"]),
+    modules: z.array(z.string().trim().max(120)).max(50).default([]),
+    recommendedBlueprint: z.object({ id: z.number().int().positive(), slug: z.string(), name: z.string() }).passthrough().nullable().optional(),
+  }).passthrough();
+
+  const createQuotationGroupSchema = z.object({
+    name: z.string().trim().min(2).max(240),
+    clientId: z.number().int().positive(),
+    billingEntityId: z.number().int().positive().nullable().optional(),
+    sourceLeadId: z.number().int().positive().nullable().optional(),
+    sourceType: z.enum(["meeting_minute", "brief", "manual", "crm"]).default("meeting_minute"),
+    sourceFileName: z.string().trim().max(255).nullable().optional(),
+    internalMinute: z.string().max(100_000).nullable().optional(),
+    analysisSnapshot: z.record(z.unknown()).default({}),
+    proposals: z.array(quotationGroupCandidateSchema).min(2).max(8),
+    shared: z.object({
+      commercialMotion: z.enum(["new_business", "renewal", "expansion", "demo"]).default("new_business"),
+      quotationCurrency: z.enum(["ARS", "USD"]).default("ARS"),
+      exchangeRateAtQuote: z.union([z.number().positive(), z.string().regex(/^\d+(?:\.\d+)?$/)]),
+      paymentTermsDays: z.number().int().min(0).max(730).nullable().optional(),
+      commercialTerms: z.string().trim().max(20_000).nullable().optional(),
+      taxRate: z.number().min(0).max(100).default(0),
+      taxLabel: z.string().trim().min(1).max(40).default("IVA"),
+      pricesIncludeTax: z.boolean().default(false),
+    }),
+  });
+
+  app.post("/api/quotation-groups", requireAuth, async (req, res) => {
+    const idempotencyKey = req.get("Idempotency-Key")?.trim();
+    if (!idempotencyKey || idempotencyKey.length < 12 || idempotencyKey.length > 120) {
+      return res.status(400).json({ message: "Idempotency-Key es obligatorio para crear un grupo" });
+    }
+    try {
+      const input = createQuotationGroupSchema.parse(req.body);
+      const keyHash = quoteTokenHash(idempotencyKey);
+      const [existing] = await db.select().from(quotationGroups).where(eq(quotationGroups.idempotencyKeyHash, keyHash));
+      if (existing) return res.json({ ...(await loadQuotationGroupWorkspace(existing.id)), idempotentReplay: true });
+      const [client] = await db.select().from(clients).where(eq(clients.id, input.clientId));
+      if (!client) return res.status(400).json({ message: "El cliente no existe" });
+      if (input.billingEntityId) {
+        const [entity] = await db.select().from(clientBillingEntities).where(eq(clientBillingEntities.id, input.billingEntityId));
+        if (!entity || entity.clientId !== input.clientId) return res.status(400).json({ message: "La entidad no pertenece al cliente" });
+      }
+      const workspace = await db.transaction(async (tx) => {
+        const [groupSeed] = await tx.insert(quotationGroups).values({
+          name: input.name,
+          clientId: input.clientId,
+          billingEntityId: input.billingEntityId ?? null,
+          sourceLeadId: input.sourceLeadId ?? null,
+          sourceType: input.sourceType,
+          sourceFileName: input.sourceFileName ?? null,
+          internalMinute: input.internalMinute ?? null,
+          analysisSnapshot: input.analysisSnapshot,
+          sharedDefaults: input.shared,
+          idempotencyKeyHash: keyHash,
+          createdBy: req.user?.id ?? null,
+          updatedBy: req.user?.id ?? null,
+        }).returning();
+        const groupNumber = `GRP-${new Date(groupSeed.createdAt).getFullYear()}-${String(groupSeed.id).padStart(6, "0")}`;
+        const [group] = await tx.update(quotationGroups).set({ groupNumber }).where(eq(quotationGroups.id, groupSeed.id)).returning();
+        let reuseSourceLead = false;
+        let sourceContacts: Array<typeof crmContacts.$inferSelect> = [];
+        if (input.sourceLeadId) {
+          const [sourceLead] = await tx.select().from(crmLeads).where(eq(crmLeads.id, input.sourceLeadId));
+          if (!sourceLead) throw Object.assign(new Error("La oportunidad de origen no existe"), { statusCode: 400 });
+          const history = await tx.select({ id: quotations.id }).from(quotations).where(eq(quotations.leadId, input.sourceLeadId)).limit(1);
+          reuseSourceLead = history.length === 0;
+          sourceContacts = await tx.select().from(crmContacts).where(eq(crmContacts.leadId, input.sourceLeadId));
+        }
+        const expiresAt = new Date();
+        expiresAt.setDate(expiresAt.getDate() + 30);
+        for (let index = 0; index < input.proposals.length; index += 1) {
+          const candidate = input.proposals[index];
+          let leadId: number;
+          if (index === 0 && input.sourceLeadId && reuseSourceLead) {
+            const [lead] = await tx.update(crmLeads).set({
+              companyName: client.name,
+              clientId: input.clientId,
+              quotationGroupId: group.id,
+              opportunityName: candidate.projectName,
+              stage: "qualified",
+              updatedAt: new Date(),
+            }).where(eq(crmLeads.id, input.sourceLeadId)).returning();
+            leadId = lead.id;
+          } else {
+            const [lead] = await tx.insert(crmLeads).values({
+              companyName: client.name,
+              clientId: input.clientId,
+              quotationGroupId: group.id,
+              opportunityName: candidate.projectName,
+              stage: "qualified",
+              source: input.sourceType,
+              notes: `Oportunidad ${index + 1} de ${input.proposals.length} · ${groupNumber}`,
+              assignedTo: req.user?.id ?? null,
+              createdBy: req.user?.id ?? null,
+            }).returning();
+            leadId = lead.id;
+            if (sourceContacts.length) {
+              await tx.insert(crmContacts).values(sourceContacts.map((contact) => ({
+                leadId,
+                name: contact.name,
+                email: contact.email,
+                phone: contact.phone,
+                position: contact.position,
+                isPrimary: contact.isPrimary,
+              })));
+            }
+          }
+          const modality = candidate.modality;
+          const [seed] = await tx.insert(quotations).values({
+            clientId: input.clientId,
+            billingEntityId: input.billingEntityId ?? null,
+            projectName: candidate.projectName,
+            analysisType: "standard",
+            projectType: modality === "demo" ? "demo" : modality === "monthly_fee" ? "always-on" : "comprehensive",
+            projectDuration: candidate.durationMonths ? `${candidate.durationMonths} meses` : null,
+            mentionsVolume: "medium",
+            countriesCovered: candidate.markets.length > 1 ? "2-5" : "1",
+            clientEngagement: "medium",
+            serviceBlueprintId: candidate.recommendedBlueprint?.id ?? null,
+            commercialMotion: input.shared.commercialMotion,
+            decisionContext: { summary: candidate.summary, objective: candidate.objective, decision: candidate.decision },
+            operationalPlan: { sourceCandidateId: candidate.id, markets: candidate.markets, languages: candidate.languages, modules: candidate.modules },
+            baseCost: 0,
+            complexityAdjustment: 0,
+            markupAmount: 0,
+            totalAmount: 0,
+            subtotalAmount: 0,
+            taxRate: input.shared.taxRate,
+            taxLabel: input.shared.taxLabel,
+            taxAmount: 0,
+            pricesIncludeTax: input.shared.pricesIncludeTax,
+            paymentTermsDays: input.shared.paymentTermsDays ?? null,
+            commercialTerms: input.shared.commercialTerms ?? null,
+            quotationCurrency: input.shared.quotationCurrency,
+            exchangeRateAtQuote: String(input.shared.exchangeRateAtQuote),
+            pricingVersion: 2,
+            quotationType: modality === "monthly_fee" || modality === "annual_program" ? "recurring" : "one-time",
+            status: "draft",
+            leadId,
+            expiresAt,
+            createdBy: req.user?.id ?? null,
+            updatedBy: req.user?.id ?? null,
+          }).returning();
+          const quotationNumber = `COT-${new Date(seed.createdAt).getFullYear()}-${String(seed.id).padStart(6, "0")}`;
+          const [quotation] = await tx.update(quotations).set({ quotationNumber }).where(eq(quotations.id, seed.id)).returning();
+          const revision = await persistQuotationRevision(tx, quotation.id, req.user?.id ?? null, `Borrador inicial · ${groupNumber}`);
+          await recordQuotationEvent(tx, {
+            quotationId: quotation.id,
+            revisionId: revision.revision.id,
+            eventType: "created",
+            eventKey: `created:${quotation.id}:1`,
+            actorUserId: req.user?.id ?? null,
+            metadata: { quotationNumber, groupId: group.id, groupNumber, position: index + 1 },
+          });
+          await tx.insert(quotationGroupItems).values({
+            groupId: group.id,
+            quotationId: quotation.id,
+            position: index + 1,
+            candidateSnapshot: candidate,
+          });
+        }
+        return group.id;
+      });
+      res.status(201).json(await loadQuotationGroupWorkspace(workspace));
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: "El grupo tiene campos inválidos", errors: error.errors });
+      if ((error as any)?.statusCode === 400) return res.status(400).json({ message: (error as Error).message });
+      if ((error as any)?.code === "23505") {
+        const [existing] = await db.select().from(quotationGroups).where(eq(quotationGroups.idempotencyKeyHash, quoteTokenHash(idempotencyKey)));
+        if (existing) return res.json({ ...(await loadQuotationGroupWorkspace(existing.id)), idempotentReplay: true });
+      }
+      console.error("Error creating quotation group:", error);
+      res.status(500).json({ message: "No se pudo crear el grupo; no se guardó ningún registro parcial" });
+    }
+  });
+
+  app.get("/api/quotation-groups", requireAuth, async (req, res) => {
+    const clientId = req.query.clientId ? Number(req.query.clientId) : null;
+    const rows = await db.select().from(quotationGroups).where(and(
+      isNull(quotationGroups.archivedAt),
+      clientId && Number.isInteger(clientId) ? eq(quotationGroups.clientId, clientId) : undefined,
+    )).orderBy(desc(quotationGroups.createdAt));
+    res.json(await Promise.all(rows.map((row) => loadQuotationGroupWorkspace(row.id))));
+  });
+
+  app.get("/api/quotation-groups/:id", requireAuth, async (req, res) => {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) return res.status(400).json({ message: "Invalid group ID" });
+    const workspace = await loadQuotationGroupWorkspace(id);
+    if (!workspace) return res.status(404).json({ message: "Grupo no encontrado" });
+    res.json(workspace);
+  });
+
+  app.patch("/api/quotation-groups/:id/items/:quotationId/progress", requireAuth, async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const quotationId = Number(req.params.quotationId);
+      const input = z.object({ lastCompletedStep: z.number().int().min(0).max(6), configured: z.boolean().optional() }).parse(req.body);
+      const now = new Date();
+      if (input.configured) {
+        const [quotation] = await db.select().from(quotations).where(eq(quotations.id, quotationId));
+        const team = await db.select({ id: quotationTeamMembers.id }).from(quotationTeamMembers).where(and(
+          eq(quotationTeamMembers.quotationId, quotationId), isNull(quotationTeamMembers.variantId),
+        ));
+        if (!quotation || !isQuotationConfigured({
+          completedStep: input.lastCompletedStep,
+          hasScope: Boolean(quotation.scopeSnapshot),
+          teamSize: team.length,
+          exchangeRate: Number(quotation.exchangeRateAtQuote),
+          totalAmount: Number(quotation.totalAmount),
+        })) return res.status(409).json({ message: "La propuesta necesita alcance, equipo, FX y precio válidos para quedar configurada" });
+      }
+      const [item] = await db.update(quotationGroupItems).set({
+        lastCompletedStep: input.lastCompletedStep,
+        startedAt: sql`coalesce(${quotationGroupItems.startedAt}, ${now})`,
+        configuredAt: input.configured ? now : undefined,
+        updatedAt: now,
+      }).where(and(eq(quotationGroupItems.groupId, id), eq(quotationGroupItems.quotationId, quotationId))).returning();
+      if (!item) return res.status(404).json({ message: "Propuesta no encontrada en el grupo" });
+      res.json(item);
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: "Progreso inválido", errors: error.errors });
+      res.status(500).json({ message: "No se pudo guardar el progreso" });
+    }
+  });
+
+  app.patch("/api/quotation-groups/:id/shared", requireAuth, async (req, res) => {
+    try {
+      const groupId = Number(req.params.id);
+      const input = z.object({
+        lockVersions: z.array(z.object({ quotationId: z.number().int().positive(), lockVersion: z.number().int().positive() })).min(1).max(8),
+        fields: z.object({
+          billingEntityId: z.number().int().positive().nullable().optional(),
+          commercialMotion: z.enum(["new_business", "renewal", "expansion", "demo"]).optional(),
+          quotationCurrency: z.enum(["ARS", "USD"]).optional(),
+          exchangeRateAtQuote: z.union([z.number().positive(), z.string().regex(/^\d+(?:\.\d+)?$/)]).optional(),
+          paymentTermsDays: z.number().int().min(0).max(730).nullable().optional(),
+          commercialTerms: z.string().trim().max(20_000).nullable().optional(),
+          taxRate: z.number().min(0).max(100).optional(),
+          taxLabel: z.string().trim().min(1).max(40).optional(),
+          pricesIncludeTax: z.boolean().optional(),
+        }).refine((fields) => Object.keys(fields).length > 0, "Incluí al menos un campo"),
+      }).parse(req.body);
+      const [group] = await db.select().from(quotationGroups).where(eq(quotationGroups.id, groupId));
+      if (!group) return res.status(404).json({ message: "Grupo no encontrado" });
+      const requestedIds = input.lockVersions.map((entry) => entry.quotationId);
+      const groupItems = await db.select().from(quotationGroupItems).where(and(
+        eq(quotationGroupItems.groupId, groupId), inArray(quotationGroupItems.quotationId, requestedIds),
+      ));
+      if (groupItems.length !== requestedIds.length) return res.status(400).json({ message: "Hay cotizaciones que no pertenecen al grupo" });
+      if (input.fields.billingEntityId) {
+        const [entity] = await db.select().from(clientBillingEntities).where(eq(clientBillingEntities.id, input.fields.billingEntityId));
+        if (!entity || entity.clientId !== group.clientId) return res.status(400).json({ message: "La entidad no pertenece al cliente" });
+      }
+      const result = await db.transaction(async (tx) => {
+        const changed: number[] = [];
+        for (const version of input.lockVersions) {
+          const [quotation] = await tx.select().from(quotations).where(eq(quotations.id, version.quotationId));
+          if (!quotation || quotation.status !== "draft" || quotation.lockVersion !== version.lockVersion) {
+            throw Object.assign(new Error(`La cotización ${version.quotationId} cambió o dejó de ser borrador`), { statusCode: 409 });
+          }
+          const oldCurrency = quotation.quotationCurrency === "USD" ? "USD" : "ARS";
+          const newCurrency = input.fields.quotationCurrency ?? oldCurrency;
+          const oldFx = Number(quotation.exchangeRateAtQuote) || 1;
+          const newFx = Number(input.fields.exchangeRateAtQuote ?? quotation.exchangeRateAtQuote);
+          if (!Number.isFinite(newFx) || newFx <= 0) throw Object.assign(new Error("El tipo de cambio debe ser positivo"), { statusCode: 400 });
+          const needsReprice = newCurrency !== oldCurrency || newFx !== oldFx;
+          let financialPatch: Record<string, unknown> = {};
+          if (needsReprice) {
+            const factor = oldCurrency === newCurrency
+              ? (newCurrency === "USD" ? oldFx / newFx : 1)
+              : oldCurrency === "USD" ? oldFx : 1 / newFx;
+            const team = await tx.select().from(quotationTeamMembers).where(and(
+              eq(quotationTeamMembers.quotationId, quotation.id), isNull(quotationTeamMembers.variantId),
+            ));
+            for (const member of team) {
+              await tx.update(quotationTeamMembers).set({ rate: member.rate * factor, cost: member.cost * factor })
+                .where(eq(quotationTeamMembers.id, member.id));
+            }
+            const convertedTeam = team.map((member) => ({ ...member, rate: member.rate * factor, cost: member.cost * factor, currency: newCurrency }));
+            const toolsCost = Number(quotation.toolsCost || 0) * factor;
+            const platformCost = Number(quotation.platformCost || 0) * factor;
+            const additionalDeliverableCost = Number(quotation.additionalDeliverableCost || 0) * factor;
+            const nextQuote: any = { ...quotation, ...input.fields, quotationCurrency: newCurrency, exchangeRateAtQuote: String(newFx),
+              toolsCost, platformCost, additionalDeliverableCost,
+              manualPrice: quotation.manualPrice == null ? null : Number(quotation.manualPrice) * factor,
+              manualPriceCurrency: newCurrency };
+            const pricing = calculateQuotationPricing({
+              quotationCurrency: newCurrency,
+              exchangeRate: newFx,
+              team: convertedTeam,
+              complexityFactor: calculateQuotationComplexityFactor(nextQuote),
+              marginFactor: Number(quotation.marginFactor) || 0,
+              toolsCostUSD: newCurrency === "USD" ? toolsCost : toolsCost / newFx,
+              additionalDeliverableCostUSD: newCurrency === "USD" ? additionalDeliverableCost : additionalDeliverableCost / newFx,
+              platformCostARS: newCurrency === "USD" ? platformCost * newFx : platformCost,
+              deviationPercentage: Number(quotation.deviationPercentage) || 0,
+              discountPercentage: Number(quotation.discountPercentage) || 0,
+              inflationFactor: quotationInflationFactor(nextQuote),
+              priceMode: quotation.priceMode === "manual" ? "manual" : "auto",
+              manualPrice: nextQuote.manualPrice,
+              manualPriceCurrency: newCurrency,
+            }).display;
+            const tax = calculateTaxBreakdown(pricing.total, input.fields.taxRate ?? quotation.taxRate,
+              input.fields.pricesIncludeTax ?? quotation.pricesIncludeTax);
+            financialPatch = { toolsCost, platformCost, additionalDeliverableCost, manualPrice: nextQuote.manualPrice,
+              manualPriceCurrency: newCurrency, baseCost: pricing.baseCost, complexityAdjustment: pricing.complexityAdjustment,
+              markupAmount: pricing.markupAmount, totalAmount: pricing.total, subtotalAmount: tax.netAmount, taxAmount: tax.taxAmount };
+            const variants = await tx.select().from(quotationVariants).where(eq(quotationVariants.quotationId, quotation.id));
+            for (const variant of variants) {
+              const variantTax = calculateTaxBreakdown(variant.totalAmount * factor, input.fields.taxRate ?? quotation.taxRate,
+                input.fields.pricesIncludeTax ?? quotation.pricesIncludeTax);
+              await tx.update(quotationVariants).set({
+                baseCost: variant.baseCost * factor,
+                complexityAdjustment: variant.complexityAdjustment * factor,
+                markupAmount: variant.markupAmount * factor,
+                totalAmount: variantTax.grandTotal,
+              }).where(eq(quotationVariants.id, variant.id));
+            }
+            await tx.update(quotationTeamMembers).set({
+              rate: sql`${quotationTeamMembers.rate} * ${factor}`,
+              cost: sql`${quotationTeamMembers.cost} * ${factor}`,
+            }).where(and(eq(quotationTeamMembers.quotationId, quotation.id), isNotNull(quotationTeamMembers.variantId)));
+          }
+          const { exchangeRateAtQuote: _exchangeRateAtQuote, ...persistedFields } = input.fields;
+          const [updated] = await tx.update(quotations).set({
+            ...persistedFields,
+            ...(input.fields.exchangeRateAtQuote !== undefined ? { exchangeRateAtQuote: String(input.fields.exchangeRateAtQuote) } : {}),
+            ...financialPatch,
+            updatedAt: new Date(),
+            updatedBy: req.user?.id ?? null,
+            lockVersion: sql`${quotations.lockVersion} + 1`,
+          }).where(and(eq(quotations.id, quotation.id), eq(quotations.lockVersion, version.lockVersion), eq(quotations.status, "draft"))).returning();
+          if (!updated) throw Object.assign(new Error("Conflicto de versión al propagar"), { statusCode: 409 });
+          await tx.update(proposalDocuments).set({ isStale: true, qaStatus: "pending", status: "draft", updatedAt: new Date(), updatedBy: req.user?.id ?? null })
+            .where(eq(proposalDocuments.quotationId, quotation.id));
+          changed.push(quotation.id);
+        }
+        await tx.update(quotationGroups).set({
+          billingEntityId: input.fields.billingEntityId !== undefined ? input.fields.billingEntityId : group.billingEntityId,
+          sharedDefaults: { ...(group.sharedDefaults as any), ...input.fields },
+          updatedAt: new Date(),
+          updatedBy: req.user?.id ?? null,
+        }).where(eq(quotationGroups.id, groupId));
+        return changed;
+      });
+      res.json({ success: true, changed: result, workspace: await loadQuotationGroupWorkspace(groupId) });
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: "Los campos compartidos son inválidos", errors: error.errors });
+      if ((error as any)?.statusCode) return res.status((error as any).statusCode).json({ message: (error as Error).message });
+      console.error("Error propagating quotation group fields:", error);
+      res.status(500).json({ message: "No se aplicó ningún cambio" });
+    }
+  });
+
+  app.post("/api/quotation-groups/:id/submit-approval", requireAuth, async (req, res) => {
+    try {
+      const groupId = Number(req.params.id);
+      const input = z.object({ quotationIds: z.array(z.number().int().positive()).min(1).max(8) }).parse(req.body);
+      await db.transaction(async (tx) => {
+        const items = await tx.select().from(quotationGroupItems).where(and(
+          eq(quotationGroupItems.groupId, groupId), inArray(quotationGroupItems.quotationId, input.quotationIds),
+        ));
+        if (items.length !== input.quotationIds.length) throw Object.assign(new Error("Hay propuestas que no pertenecen al grupo"), { statusCode: 400 });
+        for (const item of items) {
+          const [quotation] = await tx.select().from(quotations).where(eq(quotations.id, item.quotationId));
+          const team = await tx.select().from(quotationTeamMembers).where(and(eq(quotationTeamMembers.quotationId, item.quotationId), isNull(quotationTeamMembers.variantId)));
+          if (!quotation || quotation.status !== "draft" || !item.configuredAt || quotation.totalAmount <= 0 || team.length === 0 || Number(quotation.exchangeRateAtQuote) <= 0) {
+            throw Object.assign(new Error(`${quotation?.projectName || `Propuesta ${item.position}`} todavía no está configurada`), { statusCode: 409 });
+          }
+          const [updated] = await tx.update(quotations).set({
+            status: "pending", revisionNumber: quotation.revisionNumber + 1, updatedAt: new Date(), updatedBy: req.user?.id ?? null,
+            lockVersion: sql`${quotations.lockVersion} + 1`,
+          }).where(and(eq(quotations.id, quotation.id), eq(quotations.lockVersion, quotation.lockVersion), eq(quotations.status, "draft"))).returning();
+          if (!updated) throw Object.assign(new Error("Una propuesta cambió mientras se enviaba"), { statusCode: 409 });
+          const revision = await persistQuotationRevision(tx, quotation.id, req.user?.id ?? null, "Envío agrupado a revisión interna");
+          await createQuotationApprovalRequests(tx, updated, revision.revision.id, req.user?.id ?? null);
+          await recordQuotationEvent(tx, { quotationId: quotation.id, revisionId: revision.revision.id, eventType: "submitted",
+            eventKey: `submitted:${quotation.id}:${updated.revisionNumber}`, actorUserId: req.user?.id ?? null, metadata: { groupId } });
+          await syncQuotationToCrm(tx, updated, "pending", req.user?.id ?? null);
+        }
+      });
+      res.json({ success: true, workspace: await loadQuotationGroupWorkspace(groupId) });
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: "Selección inválida", errors: error.errors });
+      if ((error as any)?.statusCode) return res.status((error as any).statusCode).json({ message: (error as Error).message });
+      res.status(500).json({ message: "No se envió ninguna propuesta a aprobación" });
+    }
+  });
+
+  app.post("/api/quotation-groups/:id/qa", requireAuth, async (req, res) => {
+    try {
+      const groupId = Number(req.params.id);
+      const input = z.object({ quotationIds: z.array(z.number().int().positive()).min(1).max(8) }).parse(req.body);
+      const items = await db.select().from(quotationGroupItems).where(and(
+        eq(quotationGroupItems.groupId, groupId), inArray(quotationGroupItems.quotationId, input.quotationIds),
+      ));
+      if (items.length !== input.quotationIds.length) return res.status(400).json({ message: "Hay propuestas que no pertenecen al grupo" });
+      const results = [];
+      for (const item of items) {
+        const [quotation] = await db.select().from(quotations).where(eq(quotations.id, item.quotationId));
+        const [document] = await db.select().from(proposalDocuments).where(and(
+          eq(proposalDocuments.quotationId, item.quotationId), eq(proposalDocuments.locale, "es"),
+        )).limit(1);
+        if (!quotation?.scopeSnapshot) {
+          results.push({ quotationId: item.quotationId, status: "not_required", blockers: [], warnings: [] });
+        } else if (!document) {
+          results.push({ quotationId: item.quotationId, status: "missing", blockers: [{ message: "Falta preparar el documento comercial" }], warnings: [] });
+        } else if (document.isStale) {
+          results.push({ quotationId: item.quotationId, status: "stale", blockers: [{ message: "El documento está desactualizado" }], warnings: [] });
+        } else {
+          const qa = await runDocumentQa(item.quotationId, document.id);
+          results.push({ quotationId: item.quotationId, status: qa.blockers.length ? "blocked" : qa.warnings.length ? "warning" : "passed", ...qa });
+        }
+      }
+      res.json({ results, workspace: await loadQuotationGroupWorkspace(groupId) });
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: "Selección inválida", errors: error.errors });
+      res.status(500).json({ message: "No se pudo ejecutar el QA agrupado" });
+    }
+  });
+
+  app.post(
+    "/api/quotation-groups/:id/send",
+    requireAuth,
+    requirePermission("quotations_send", "quotations", "operations"),
+    async (req, res) => {
+      const groupId = Number(req.params.id);
+      const idempotencyKey = req.get("Idempotency-Key")?.trim();
+      if (!Number.isInteger(groupId)) return res.status(400).json({ message: "Invalid group ID" });
+      if (!idempotencyKey || idempotencyKey.length < 12 || idempotencyKey.length > 120) {
+        return res.status(400).json({ message: "Idempotency-Key es obligatorio para enviar" });
+      }
+      try {
+        const input = z.object({
+          quotationIds: z.array(z.number().int().positive()).min(1).max(8),
+          recipientEmail: z.string().trim().email().max(255),
+          subject: z.string().trim().min(3).max(255).optional(),
+          message: z.string().trim().max(5_000).optional(),
+        }).parse(req.body);
+        const keyHash = quoteTokenHash(`${groupId}:${idempotencyKey}`);
+        const [duplicate] = await db.select().from(quotationGroupDeliveries).where(eq(quotationGroupDeliveries.idempotencyKeyHash, keyHash));
+        if (duplicate?.status === "sent") return res.json({ success: true, idempotentReplay: true, deliveryId: duplicate.id });
+        if (duplicate) return res.status(409).json({ message: "Este intento de envío ya fue procesado y no terminó correctamente; generá un nuevo envío" });
+        const [group] = await db.select().from(quotationGroups).where(eq(quotationGroups.id, groupId));
+        if (!group) return res.status(404).json({ message: "Grupo no encontrado" });
+        const rows = await db.select({ item: quotationGroupItems, quotation: quotations })
+          .from(quotationGroupItems).innerJoin(quotations, eq(quotationGroupItems.quotationId, quotations.id))
+          .where(and(eq(quotationGroupItems.groupId, groupId), inArray(quotationGroupItems.quotationId, input.quotationIds)))
+          .orderBy(asc(quotationGroupItems.position));
+        if (rows.length !== input.quotationIds.length) return res.status(400).json({ message: "Hay propuestas que no pertenecen al grupo" });
+        const blockers: Array<{ quotationId: number; projectName: string; message: string }> = [];
+        const prepared: Array<{ quotation: typeof quotations.$inferSelect; revision: typeof quotationRevisions.$inferSelect; document: typeof proposalDocuments.$inferSelect | null }> = [];
+        for (const { quotation } of rows) {
+          if (quotation.status !== "internally-approved") {
+            blockers.push({ quotationId: quotation.id, projectName: quotation.projectName, message: "Requiere aprobación interna" });
+            continue;
+          }
+          const revision = (await db.select().from(quotationRevisions).where(and(
+            eq(quotationRevisions.quotationId, quotation.id), eq(quotationRevisions.revisionNumber, quotation.revisionNumber),
+          )).limit(1))[0];
+          if (!revision) {
+            blockers.push({ quotationId: quotation.id, projectName: quotation.projectName, message: "Falta el snapshot de la revisión" });
+            continue;
+          }
+          const [document] = await db.select().from(proposalDocuments).where(and(
+            eq(proposalDocuments.quotationId, quotation.id), eq(proposalDocuments.locale, "es"),
+          )).limit(1);
+          if (quotation.scopeSnapshot) {
+            if (!document || document.isStale || document.sourceDocumentHash !== revision.documentHash) {
+              blockers.push({ quotationId: quotation.id, projectName: quotation.projectName, message: "El documento está ausente o desactualizado" });
+              continue;
+            }
+            const qa = await runDocumentQa(quotation.id, document.id);
+            if (qa.blockers.length || (qa.warnings.length && !document.warningOverrideReason) || !["ready", "published"].includes(document.status)) {
+              blockers.push({ quotationId: quotation.id, projectName: quotation.projectName, message: qa.blockers.length ? "Tiene errores comerciales bloqueantes" : "El QA no está aprobado" });
+              continue;
+            }
+          }
+          prepared.push({ quotation, revision, document: document ?? null });
+        }
+        if (blockers.length) return res.status(409).json({ message: "Hay propuestas que todavía no están listas", blockers });
+        const sender = process.env.SENDGRID_FROM_EMAIL;
+        const apiKey = process.env.SENDGRID_API_KEY;
+        if (!sender || !apiKey) return res.status(503).json({ message: "El proveedor de email no está configurado; no se marcó ninguna propuesta como enviada" });
+        const publicToken = randomBytes(32).toString("base64url");
+        const tokenExpiresAt = prepared.reduce<Date | null>((earliest, row) => {
+          if (!row.quotation.expiresAt) return earliest;
+          return !earliest || row.quotation.expiresAt < earliest ? row.quotation.expiresAt : earliest;
+        }, null);
+        const subject = input.subject || `${group.name} · ${prepared.length} propuestas de Epical`;
+        const delivery = await db.transaction(async (tx) => {
+          const [queued] = await tx.insert(quotationGroupDeliveries).values({
+            groupId,
+            recipientEmail: input.recipientEmail,
+            subject,
+            includedQuotationIds: input.quotationIds,
+            idempotencyKeyHash: keyHash,
+            createdBy: req.user?.id ?? null,
+          }).returning();
+          await tx.update(quotationGroups).set({
+            publicTokenHash: quoteTokenHash(publicToken),
+            publicTokenExpiresAt: tokenExpiresAt,
+            updatedAt: new Date(),
+            updatedBy: req.user?.id ?? null,
+          }).where(eq(quotationGroups.id, groupId));
+          return queued;
+        });
+        const appUrl = process.env.PUBLIC_APP_URL || process.env.APP_URL || `${req.protocol}://${req.get("host")}`;
+        const publicUrl = `${appUrl}/proposal-group/${publicToken}`;
+        const cards = prepared.map(({ quotation }) => `<li><strong>${escapeHtml(quotation.projectName)}</strong> · ${escapeHtml(quotation.quotationNumber || "")}</li>`).join("");
+        const sgMail = await import("@sendgrid/mail");
+        sgMail.default.setApiKey(apiKey);
+        try {
+          const [providerResponse] = await sgMail.default.send({
+            to: input.recipientEmail,
+            from: sender,
+            subject,
+            text: `${input.message || "Preparamos propuestas independientes para que puedan evaluar cada alcance por separado."}\n\nRevisar propuestas: ${publicUrl}`,
+            html: `<p>${escapeHtml(input.message || "Preparamos propuestas independientes para que puedan evaluar cada alcance por separado.").replace(/\n/g, "<br>")}</p><ul>${cards}</ul><p><a href="${publicUrl}">Revisar y responder las propuestas</a></p>`,
+          });
+          const now = new Date();
+          await db.transaction(async (tx) => {
+            await tx.update(quotationGroupDeliveries).set({
+              status: "sent", providerMessageId: providerResponse.headers?.["x-message-id"] || null, sentAt: now,
+            }).where(eq(quotationGroupDeliveries.id, delivery.id));
+            for (const { quotation, revision, document } of prepared) {
+              const [updated] = await tx.update(quotations).set({
+                status: "sent", sentAt: now, updatedAt: now, updatedBy: req.user?.id ?? null,
+                lockVersion: sql`${quotations.lockVersion} + 1`,
+              }).where(and(eq(quotations.id, quotation.id), eq(quotations.status, "internally-approved"), eq(quotations.lockVersion, quotation.lockVersion))).returning();
+              if (!updated) throw new Error(`${quotation.projectName} cambió antes de confirmar el envío`);
+              await tx.insert(quotationDeliveries).values({
+                quotationId: quotation.id,
+                revisionId: revision.id,
+                groupDeliveryId: delivery.id,
+                recipientEmail: input.recipientEmail,
+                subject,
+                status: "sent",
+                providerMessageId: providerResponse.headers?.["x-message-id"] || null,
+                sentAt: now,
+                createdBy: req.user?.id ?? null,
+              });
+              await recordQuotationEvent(tx, { quotationId: quotation.id, revisionId: revision.id, eventType: "sent",
+                eventKey: `group-send:${quotation.id}:${idempotencyKey}`, actorUserId: req.user?.id ?? null,
+                metadata: { groupId, groupDeliveryId: delivery.id, recipientEmail: input.recipientEmail } });
+              await syncQuotationToCrm(tx, updated, "sent", req.user?.id ?? null, `Grupo de propuestas enviado a ${input.recipientEmail}`);
+              if (document) await tx.update(proposalDocuments).set({ status: "published", updatedAt: now, updatedBy: req.user?.id ?? null })
+                .where(eq(proposalDocuments.id, document.id));
+            }
+          });
+          res.json({ success: true, publicUrl, deliveryId: delivery.id, workspace: await loadQuotationGroupWorkspace(groupId) });
+        } catch (sendError) {
+          await db.transaction(async (tx) => {
+            await tx.update(quotationGroupDeliveries).set({ status: "failed", errorMessage: String(sendError) })
+              .where(eq(quotationGroupDeliveries.id, delivery.id));
+            await tx.update(quotationGroups).set({ publicTokenHash: null, publicTokenExpiresAt: null, updatedAt: new Date() })
+              .where(and(eq(quotationGroups.id, groupId), eq(quotationGroups.publicTokenHash, quoteTokenHash(publicToken))));
+          });
+          throw sendError;
+        }
+      } catch (error) {
+        if (error instanceof z.ZodError) return res.status(400).json({ message: "Los datos de envío son inválidos", errors: error.errors });
+        console.error("Error sending quotation group:", error);
+        res.status(502).json({ message: "No se pudo enviar el grupo; ninguna propuesta cambió de estado" });
+      }
+    },
+  );
 
   app.post("/api/quotations", requireAuth, async (req, res) => {
     try {
@@ -20135,7 +20987,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       if (search && typeof search === 'string') {
         const q = search.toLowerCase();
-        allLeads = allLeads.filter(l => l.companyName.toLowerCase().includes(q));
+        allLeads = allLeads.filter(l => l.companyName.toLowerCase().includes(q) || l.opportunityName?.toLowerCase().includes(q));
       }
 
       // Enrich with primary contact and last activity
