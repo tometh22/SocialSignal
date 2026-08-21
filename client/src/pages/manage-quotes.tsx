@@ -136,8 +136,10 @@ export default function ManageQuotes() {
           return dateB - dateA;
         })
     : [];
+  const groupedQuotationIds = new Set(commercialGroups.flatMap((entry) => entry.items.map((item) => item.quotationId)));
+  const standaloneQuotations = filteredQuotations.filter((quote) => !groupedQuotationIds.has(quote.id));
   const quotationGroups = Object.entries(
-    filteredQuotations.reduce<Record<string, Quotation[]>>((groups, quote) => {
+    standaloneQuotations.reduce<Record<string, Quotation[]>>((groups, quote) => {
       const clientName = getClient(quote.clientId)?.name || "Cliente sin identificar";
       (groups[clientName] ??= []).push(quote);
       return groups;
@@ -650,7 +652,7 @@ export default function ManageQuotes() {
               ) : filteredQuotations.length > 0 ? (
 
                 <div className="space-y-7 p-3 sm:p-6">
-                  {(quoteView === "folders" ? quotationGroups : [["__all__", filteredQuotations] as [string, Quotation[]]]).map(([clientName, clientQuotes]) => (
+                  {(quoteView === "folders" ? quotationGroups : [["__all__", standaloneQuotations] as [string, Quotation[]]]).map(([clientName, clientQuotes]) => (
                     <section key={clientName}>
                       {quoteView === "folders" && <button className="mb-3 flex w-full items-center gap-3 border-b border-slate-200 pb-2 text-left" onClick={() => setExpandedQuoteClients((previous) => {
                         const next = new Set(previous);

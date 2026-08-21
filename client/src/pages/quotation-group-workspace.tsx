@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useRoute } from 'wouter';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertCircle, ArrowRight, CheckCircle2, ClipboardCheck, FileCheck2, Layers3, Loader2, Mail, RefreshCw, Send, Settings2 } from 'lucide-react';
@@ -33,7 +33,7 @@ type GroupItem = {
 };
 
 type GroupWorkspace = {
-  group: { id: number; groupNumber: string; name: string; sharedDefaults: Record<string, any> };
+  group: { id: number; groupNumber: string; name: string; billingEntityId: number | null; sharedDefaults: Record<string, any> };
   client: { id: number; name: string } | null;
   status: string;
   items: GroupItem[];
@@ -64,11 +64,26 @@ export default function QuotationGroupWorkspacePage() {
   const [currency, setCurrency] = useState<'ARS' | 'USD'>('ARS');
   const [fx, setFx] = useState('');
   const [paymentTermsDays, setPaymentTermsDays] = useState('');
+  const [commercialTerms, setCommercialTerms] = useState('');
+  const [billingEntityId, setBillingEntityId] = useState<string>('none');
   const [actionError, setActionError] = useState<string | null>(null);
 
   const { data: workspace, isLoading, isError, refetch } = useQuery<GroupWorkspace>({
     queryKey: [`/api/quotation-groups/${groupId}`], enabled: Number.isInteger(groupId), staleTime: 15_000,
   });
+  const { data: billingEntities = [] } = useQuery<Array<{ id: number; razonSocial: string; taxId?: string | null }>>({
+    queryKey: [`/api/clients/${workspace?.client?.id || 0}/billing-entities`],
+    enabled: Boolean(workspace?.client?.id),
+  });
+  useEffect(() => {
+    if (!workspace) return;
+    const defaults = workspace.group.sharedDefaults || {};
+    setCurrency((defaults.quotationCurrency || workspace.items[0]?.currency || 'ARS') as 'ARS' | 'USD');
+    setFx(defaults.exchangeRateAtQuote ? String(defaults.exchangeRateAtQuote) : '');
+    setPaymentTermsDays(defaults.paymentTermsDays == null ? '' : String(defaults.paymentTermsDays));
+    setCommercialTerms(defaults.commercialTerms || '');
+    setBillingEntityId(workspace.group.billingEntityId ? String(workspace.group.billingEntityId) : 'none');
+  }, [workspace]);
   const refresh = () => queryClient.invalidateQueries({ queryKey: [`/api/quotation-groups/${groupId}`] });
   const runAction = useMutation({
     mutationFn: async ({ endpoint, body, headers }: { endpoint: string; body: any; headers?: Record<string, string> }) => apiRequest(endpoint, { method: 'POST', body, headers }),
@@ -125,7 +140,7 @@ export default function QuotationGroupWorkspacePage() {
         ))}
       </div>
 
-      <Dialog open={sharedOpen} onOpenChange={setSharedOpen}><DialogContent><DialogHeader><DialogTitle>Aplicar datos a los borradores</DialogTitle><DialogDescription>Se actualizarán {mutableDrafts.length} propuestas en una sola transacción. Las aprobadas o enviadas nunca se modificarán.</DialogDescription></DialogHeader><div className="grid gap-4 py-2 sm:grid-cols-2"><div><Label>Moneda</Label><Select value={currency} onValueChange={(value) => setCurrency(value as 'ARS' | 'USD')}><SelectTrigger className="mt-2"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ARS">ARS</SelectItem><SelectItem value="USD">USD</SelectItem></SelectContent></Select></div><div><Label>Tipo de cambio USD/ARS</Label><Input className="mt-2" inputMode="decimal" value={fx} onChange={(event) => setFx(event.target.value)} placeholder="Ej. 1.450" /></div><div className="sm:col-span-2"><Label>Plazo de pago (días)</Label><Input className="mt-2" inputMode="numeric" value={paymentTermsDays} onChange={(event) => setPaymentTermsDays(event.target.value)} placeholder="Ej. 30" /></div></div><DialogFooter><Button variant="outline" onClick={() => setSharedOpen(false)}>Cancelar</Button><Button disabled={!fx || mutableDrafts.length === 0 || runAction.isPending} onClick={async () => { try { await apiRequest(`/api/quotation-groups/${groupId}/shared`, 'PATCH', { lockVersions: mutableDrafts.map((item) => ({ quotationId: item.quotationId, lockVersion: item.lockVersion })), fields: { quotationCurrency: currency, exchangeRateAtQuote: Number(fx), ...(paymentTermsDays ? { paymentTermsDays: Number(paymentTermsDays) } : {}) } }); setSharedOpen(false); setActionError(null); void refresh(); toast({ title: 'Datos comunes actualizados', description: 'Los precios se recalcularon con el motor canónico y los documentos quedaron marcados para reconciliar.' }); } catch (error) { setActionError(getApiErrorMessage(error, 'No se aplicó ningún cambio.')); setSharedOpen(false); } }}>Confirmar y recalcular</Button></DialogFooter></DialogContent></Dialog>
+      <Dialog open={sharedOpen} onOpenChange={setSharedOpen}><DialogContent><DialogHeader><DialogTitle>Aplicar datos a los borradores</DialogTitle><DialogDescription>Se actualizarán {mutableDrafts.length} propuestas en una sola transacción. Las aprobadas o enviadas nunca se modificarán.</DialogDescription></DialogHeader><div className="grid gap-4 py-2 sm:grid-cols-2"><div><Label>Entidad legal</Label><Select value={billingEntityId} onValueChange={setBillingEntityId}><SelectTrigger className="mt-2"><SelectValue placeholder="Conservar entidad actual" /></SelectTrigger><SelectContent><SelectItem value="none">Conservar entidad actual</SelectItem>{billingEntities.map((entity) => <SelectItem key={entity.id} value={String(entity.id)}>{entity.razonSocial}{entity.taxId ? ` · ${entity.taxId}` : ''}</SelectItem>)}</SelectContent></Select></div><div><Label>Moneda</Label><Select value={currency} onValueChange={(value) => setCurrency(value as 'ARS' | 'USD')}><SelectTrigger className="mt-2"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ARS">ARS</SelectItem><SelectItem value="USD">USD</SelectItem></SelectContent></Select></div><div><Label>Tipo de cambio USD/ARS</Label><Input className="mt-2" inputMode="decimal" value={fx} onChange={(event) => setFx(event.target.value)} placeholder="Ej. 1.450" /></div><div><Label>Plazo de pago (días)</Label><Input className="mt-2" inputMode="numeric" value={paymentTermsDays} onChange={(event) => setPaymentTermsDays(event.target.value)} placeholder="Ej. 30" /></div><div className="sm:col-span-2"><Label>Condiciones comerciales</Label><Textarea className="mt-2" rows={3} value={commercialTerms} onChange={(event) => setCommercialTerms(event.target.value)} placeholder="Vigencia, facturación y condiciones comunes" /></div></div><DialogFooter><Button variant="outline" onClick={() => setSharedOpen(false)}>Cancelar</Button><Button disabled={!fx || mutableDrafts.length === 0 || runAction.isPending} onClick={async () => { try { await apiRequest(`/api/quotation-groups/${groupId}/shared`, 'PATCH', { lockVersions: mutableDrafts.map((item) => ({ quotationId: item.quotationId, lockVersion: item.lockVersion })), fields: { ...(billingEntityId !== 'none' ? { billingEntityId: Number(billingEntityId) } : {}), quotationCurrency: currency, exchangeRateAtQuote: Number(fx), ...(paymentTermsDays ? { paymentTermsDays: Number(paymentTermsDays) } : {}), commercialTerms: commercialTerms || null } }); setSharedOpen(false); setActionError(null); void refresh(); toast({ title: 'Datos comunes actualizados', description: 'Los precios se recalcularon con el motor canónico y los documentos quedaron marcados para reconciliar.' }); } catch (error) { setActionError(getApiErrorMessage(error, 'No se aplicó ningún cambio.')); setSharedOpen(false); } }}>Confirmar y recalcular</Button></DialogFooter></DialogContent></Dialog>
 
       <Dialog open={sendOpen} onOpenChange={setSendOpen}><DialogContent><DialogHeader><DialogTitle>Enviar un único portal</DialogTitle><DialogDescription>El email no adjunta PDFs. El cliente recibirá un enlace seguro y podrá decidir cada propuesta por separado.</DialogDescription></DialogHeader><div className="space-y-4 py-2"><div><Label>Email del cliente</Label><Input className="mt-2" type="email" value={recipientEmail} onChange={(event) => setRecipientEmail(event.target.value)} placeholder="cliente@empresa.com" /></div><div><Label>Mensaje</Label><Textarea className="mt-2" value={message} onChange={(event) => setMessage(event.target.value)} rows={4} /></div><div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600"><Mail className="mr-2 inline h-4 w-4" />Incluye {approvedToSend.length} propuestas aprobadas y listas.</div></div><DialogFooter><Button variant="outline" onClick={() => setSendOpen(false)}>Cancelar</Button><Button disabled={!recipientEmail || runAction.isPending} onClick={() => runAction.mutate({ endpoint: `/api/quotation-groups/${groupId}/send`, headers: { 'Idempotency-Key': `group-send-${Date.now()}-${crypto.randomUUID()}` }, body: { quotationIds: approvedToSend.map((item) => item.quotationId), recipientEmail, message } }, { onSuccess: () => { setSendOpen(false); toast({ title: 'Portal enviado', description: 'El cliente recibió un único enlace seguro.' }); } })}>{runAction.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}Enviar portal</Button></DialogFooter></DialogContent></Dialog>
     </PageLayout>
