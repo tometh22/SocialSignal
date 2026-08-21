@@ -55,6 +55,16 @@ export const THRESHOLDS = {
   materialityUsd: 1000,
 };
 
+/**
+ * Algunas tablas que shared/schema.ts declara no existen en todos los entornos
+ * (fact_estimated_cost_month, por ejemplo, no está en producción). Un detector
+ * que consulta una tabla ausente no debe tumbar toda la corrida: se saltea.
+ */
+async function tableExists(name: string): Promise<boolean> {
+  const { rows } = await pool.query(`SELECT to_regclass($1) IS NOT NULL AS existe`, [`public.${name}`]);
+  return rows[0]?.existe === true;
+}
+
 function pct(n: number): string {
   return `${(n * 100).toFixed(1)}%`;
 }
@@ -360,6 +370,8 @@ export async function runAllDetectors(opts: RunDetectorsOptions = {}): Promise<F
   }
 
   // 4. Líneas en cero en la proyección de costos.
+  const hasEstimatedCosts = await tableExists('fact_estimated_cost_month');
+  if (hasEstimatedCosts) {
   const { rows: conceptRows } = await pool.query(
     `WITH reales AS (
         SELECT detalle AS concept, AVG(monto_total_usd)::float AS avg_usd
@@ -384,6 +396,7 @@ export async function runAllDetectors(opts: RunDetectorsOptions = {}): Promise<F
     projectedTotalUsd: Number(r.total_usd) || 0,
     projectedMonths: Number(r.months) || 0,
   }))));
+  }
 
   // 5. Reversiones de provisión del ejercicio.
   const { rows: provRows } = await pool.query(
@@ -435,14 +448,14 @@ export async function runAllDetectors(opts: RunDetectorsOptions = {}): Promise<F
   ));
 
   // 8. Concentración de costos sobre la facturación del ejercicio.
-  const { rows: costRows } = await pool.query(
-    `SELECT detalle AS concept, SUM(monto_total_usd)::float AS amount
-       FROM fact_estimated_cost_month
-      WHERE month_key = ANY($1::text[]) AND detalle IS NOT NULL
-      GROUP BY detalle`,
-    [yearPeriods],
-  );
-  if (hasRevenueData) {
+  if (hasEstimatedCosts && hasRevenueData) {
+    const { rows: costRows } = await pool.query(
+      `SELECT detalle AS concept, SUM(monto_total_usd)::float AS amount
+         FROM fact_estimated_cost_month
+        WHERE month_key = ANY($1::text[]) AND detalle IS NOT NULL
+        GROUP BY detalle`,
+      [yearPeriods],
+    );
     findings.push(...detectCostConcentration(
       costRows.map((r: any) => ({ concept: r.concept, amountUsd: Number(r.amount) || 0 })),
       totals.facturacion,
