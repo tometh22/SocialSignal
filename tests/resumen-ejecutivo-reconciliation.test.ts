@@ -168,32 +168,44 @@ const CERRADOS_2026 = [
   { mes: '06 jun', ventas: 75181.93, markup: 3.59 },
   { mes: '07 jul', ventas: 44576.72, markup: 4.26 },
 ];
-const PROYECTADOS_2026 = [
-  { mes: '08 ago', ventas: 44027.89, markup: 0.76 },
-  { mes: '09 sep', ventas: 130568.85, markup: 2.74 },
-  { mes: '10 oct', ventas: 39639.81, markup: 0.85 },
-  { mes: '11 nov', ventas: 39351.25, markup: 0.84 },
-  { mes: '12 dic', ventas: 39228.58, markup: 0.87 },
-];
+// Los meses proyectados NO tienen markup cargado en la planilla. El Looker de la
+// misma fuente los muestra vacíos. MIND los derivaba como ventas / (ventas−EBIT),
+// que es ventas sobre costos TOTALES en vez de sobre costos DIRECTOS: otra
+// métrica. Producía 0,76 / 2,74 / 0,85 / 0,84 / 0,87 contra un real de 3–4.
+const PROYECTADOS_2026_SIN_MARKUP = ['08 ago', '09 sep', '10 oct', '11 nov', '12 dic'];
 
 describe('markup ejecutado vs proyectado', () => {
   it('el markup de los 7 meses cerrados de 2026 es 3,62', () => {
     expect(markupDe(CERRADOS_2026)).toBeCloseTo(3.62, 2);
   });
 
-  it('el markup de los 5 meses proyectados es 1,20', () => {
-    // La planilla asume vender por debajo del costo directo en cuatro de los
-    // cinco meses (markup < 1). Es un supuesto de la proyección, no ejecución.
-    expect(markupDe(PROYECTADOS_2026)).toBeCloseTo(1.20, 2);
+  it('los 5 meses proyectados no tienen markup en la planilla', () => {
+    // Verificado contra la celda cruda (columna 18 del Resumen Ejecutivo) y
+    // contra el Looker de la misma fuente: los cinco vienen vacíos.
+    expect(PROYECTADOS_2026_SIN_MARKUP).toHaveLength(5);
   });
 
-  it('mezclarlos daba el 1,88 que se mostraba antes', () => {
-    // Un markup por debajo del estándar de 2,5 que hacía ver el negocio
-    // desplomado, cuando lo ejecutado va en 3,62.
-    expect(markupDe([...CERRADOS_2026, ...PROYECTADOS_2026])).toBeCloseTo(1.88, 2);
+  it('derivar el markup de los costos totales da un número sin sentido', () => {
+    // ventas / (ventas − EBIT) usa costos TOTALES, no directos.
+    const derivado = (ventas: number, ebit: number) =>
+      Math.round((ventas / (ventas - ebit)) * 100) / 100;
+    expect(derivado(44027.89, -13629.11)).toBeCloseTo(0.76, 2);
+    expect(derivado(39639.81, -6813.76)).toBeCloseTo(0.85, 2);
+    // Un markup < 1 significaría vender por debajo del costo directo, cuando
+    // los meses cerrados del mismo año van en 3,62.
+    expect(derivado(44027.89, -13629.11)).toBeLessThan(1);
   });
 
-  it('2025 no cambia: los doce meses están cerrados', () => {
+  it('mezclar los derivados con los reales daba el 1,88 que se mostraba', () => {
+    const derivados = [
+      { ventas: 44027.89, markup: 0.76 }, { ventas: 130568.85, markup: 2.74 },
+      { ventas: 39639.81, markup: 0.85 }, { ventas: 39351.25, markup: 0.84 },
+      { ventas: 39228.58, markup: 0.87 },
+    ];
+    expect(markupDe([...CERRADOS_2026, ...derivados])).toBeCloseTo(1.88, 2);
+  });
+
+  it('2025 no cambia: los doce meses tienen markup real en la planilla', () => {
     const cerrados2025 = [
       { ventas: 28311.39, markup: 2.06 }, { ventas: 22453.38, markup: 1.87 },
       { ventas: 25655.51, markup: 2.11 }, { ventas: 28128.17, markup: 2.40 },
@@ -206,10 +218,8 @@ describe('markup ejecutado vs proyectado', () => {
   });
 
   it('la media armónica no es el promedio simple', () => {
-    // Un mes chico con markup altísimo no debe arrastrar el total.
     const ms = [{ ventas: 100000, markup: 2 }, { ventas: 1000, markup: 20 }];
-    const promedioSimple = (2 + 20) / 2;
-    expect(markupDe(ms)).toBeLessThan(promedioSimple);
+    expect(markupDe(ms)).toBeLessThan((2 + 20) / 2);
     expect(markupDe(ms)).toBeCloseTo(2.02, 2);
   });
 });

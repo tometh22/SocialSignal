@@ -239,10 +239,12 @@ function aggregateMonths(
    * Se calcula por separado sobre meses CERRADOS y meses PROYECTADOS.
    *
    * Motivo: el markup mide eficiencia de ejecución, y no tiene sentido medir la
-   * de meses que todavía no se ejecutaron. Además la planilla usa otra base de
-   * costo en los meses abiertos — al 2026-08-21 traía markup 0,76 / 0,85 / 0,84
-   * / 0,87 (vender por debajo del costo directo), y mezclarlos hundía el anual
-   * de 3,62 a 1,88 contra un estándar de 2,5.
+   * de meses que todavía no se ejecutaron.
+   *
+   * Al 2026-08-21 la planilla no carga markup en los meses abiertos, así que
+   * markupProyectado queda en null y la vista no muestra esa tarjeta. La
+   * separación igual corresponde: en cuanto Operaciones cargue markup estimado,
+   * mezclarlo con lo ejecutado distorsionaría la métrica.
    */
   const markupDe = (ms: MonthData[]): number | null => {
     const validos = ms.filter(m => m.ventasDelMes != null && m.markup != null && m.markup > 0);
@@ -344,11 +346,17 @@ async function fetchDashboardRows(): Promise<MonthData[]> {
     const cierre = parseCierre(row[COL.CIERRE], new Date());
     const ventasDelMes = parseMoney(row[COL.VENTAS]);
     const ebitOperativo = parseMoney(row[COL.EBIT]);
-    const sheetMarkup = parseMoney(row[COL.MARKUP]);
-    const impliedCosts = ventasDelMes != null && ebitOperativo != null ? ventasDelMes - ebitOperativo : null;
-    const markup = sheetMarkup ?? (ventasDelMes != null && impliedCosts != null && impliedCosts > 0
-      ? Math.round((ventasDelMes / impliedCosts) * 100) / 100
-      : null);
+    // MarkUp = Ventas sin IVA / Costos DIRECTOS (equipo con bonos, 50% de las
+    // Vickys, Youscan). Es la definición del Excel MAESTRO.
+    //
+    // Antes, si la celda venía vacía se derivaba como ventas / (ventas − EBIT).
+    // Ese denominador son los costos TOTALES, no los directos: otra métrica.
+    // Para ago–dic 2026 producía 0,76 / 2,74 / 0,85 / 0,84 / 0,87 contra un
+    // markup real de 3–4, y hundía el anual. El Looker de la misma planilla
+    // muestra esos meses vacíos, que es lo correcto.
+    //
+    // Sin dato en la planilla, no hay markup. No se inventa con otra base.
+    const markup = parseMoney(row[COL.MARKUP]);
 
     const activoLiquido = parseMoney(row[COL.ACTIVO_LIQUIDO]);
     const activoMedPlazo = parseMoney(row[COL.ACTIVO_MP_CRYPTO]);
