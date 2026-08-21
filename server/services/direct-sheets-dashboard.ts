@@ -524,3 +524,85 @@ export async function fetchResumenEjecutivoDirectly(
 
   return { data: allData, filtered, available };
 }
+
+// ─── Proyección: ejecutado vs proyectado ────────────────────────────────────
+
+export interface ProyeccionMes {
+  periodKey: string;
+  monthLabel: string;
+  month: number;
+  /** false = el mes todavía no cerró, así que su cifra es proyección. */
+  cierre: boolean;
+  facturacion: number | null;
+  /** Base de costo consistente con el EBIT: ventas − EBIT. */
+  costos: number | null;
+  resultado: number | null;
+}
+
+export interface ProyeccionSerie {
+  ejecutado: number;
+  proyectado: number;
+  total: number;
+}
+
+export interface ProyeccionResumen {
+  year: number;
+  facturacion: ProyeccionSerie;
+  costos: ProyeccionSerie;
+  resultado: ProyeccionSerie;
+  meses: ProyeccionMes[];
+  mesesCerrados: number;
+  mesesProyectados: number;
+}
+
+/**
+ * Ejecutado contra proyectado, mes a mes.
+ *
+ * Responde la pregunta que el board hace siempre — "cómo venimos contra lo que
+ * proyectamos" — separando los meses cerrados de los que todavía no.
+ *
+ * Los costos NO salen de la solapa de costos sino de `ventas − EBIT`, que es la
+ * base consistente con el EBIT del Resumen Ejecutivo (excluye impuestos ARG y
+ * USA e intereses). Verificado contra el Looker de la misma planilla: coincide
+ * al centavo en los doce meses de 2026.
+ *
+ * Las series "con IVA" y "totales" del Looker viven en otra solapa y no se
+ * derivan de acá; hoy no se exponen para no mezclar bases de costo.
+ */
+export async function getProyeccionResumen(year: number): Promise<ProyeccionResumen> {
+  const cached = await dashboardDataCache.get();
+  dashboardCacheStatus = { stale: cached.stale, fetchedAt: cached.fetchedAt };
+
+  const meses: ProyeccionMes[] = cached.data
+    .filter((m) => m.year === year && m.ventasDelMes != null)
+    .sort((a, b) => a.month - b.month)
+    .map((m) => ({
+      periodKey: m.periodKey,
+      monthLabel: m.monthLabel,
+      month: m.month,
+      cierre: m.cierre,
+      facturacion: m.ventasDelMes,
+      costos: m.ventasDelMes != null && m.ebitOperativo != null
+        ? Math.round((m.ventasDelMes - m.ebitOperativo) * 100) / 100
+        : null,
+      resultado: m.ebitOperativo,
+    }));
+
+  const serie = (pick: (m: ProyeccionMes) => number | null): ProyeccionSerie => {
+    const sum = (ms: ProyeccionMes[]) =>
+      Math.round(ms.reduce((a, m) => a + (pick(m) ?? 0), 0) * 100) / 100;
+    const ejecutado = sum(meses.filter((m) => m.cierre));
+    const proyectado = sum(meses.filter((m) => !m.cierre));
+    return { ejecutado, proyectado, total: Math.round((ejecutado + proyectado) * 100) / 100 };
+  };
+
+  return {
+    year,
+    facturacion: serie((m) => m.facturacion),
+    costos: serie((m) => m.costos),
+    resultado: serie((m) => m.resultado),
+    meses,
+    mesesCerrados: meses.filter((m) => m.cierre).length,
+    mesesProyectados: meses.filter((m) => !m.cierre).length,
+  };
+}

@@ -8808,6 +8808,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // 📊 DIRECT SHEETS DASHBOARD - reads from Google Sheets in real-time (like Looker Studio)
+  // Ejecutado vs proyectado del ejercicio. Reemplaza la página "Proyección
+  // (resumen)" del Looker Studio, leyendo la misma solapa del Excel MAESTRO.
+  app.get("/api/v2/executive/proyeccion", requireAuth, async (req, res) => {
+    const year = Number(req.query.year ?? new Date().getFullYear());
+    if (!Number.isInteger(year) || year < 2020 || year > 2100) {
+      return res.status(400).json({ message: "year inválido" });
+    }
+    try {
+      const { getProyeccionResumen } = await import('./services/direct-sheets-dashboard');
+      res.setHeader('Cache-Control', 'private, max-age=60, stale-while-revalidate=300');
+      res.json(await getProyeccionResumen(year));
+    } catch (error: any) {
+      console.error('❌ Proyección error:', error?.message || error);
+      res.status(500).json({ message: 'Error obteniendo la proyección', error: error?.message });
+    }
+  });
+
   app.get("/api/v2/executive/dashboard", requireAuth, async (req, res) => {
     try {
       const p = (k: string) => { const v = parseInt(req.query[k] as string); return isNaN(v) ? undefined : v; };

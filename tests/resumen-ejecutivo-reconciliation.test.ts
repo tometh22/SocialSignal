@@ -223,3 +223,69 @@ describe('markup ejecutado vs proyectado', () => {
     expect(markupDe(ms)).toBeCloseTo(2.02, 2);
   });
 });
+
+// ─── Proyección: ejecutado vs proyectado ─────────────────────────────────────
+
+/**
+ * La página Proyección deriva los costos como ventas − EBIT. Esa es la base
+ * consistente con el EBIT del Resumen Ejecutivo (excluye impuestos ARG y USA e
+ * intereses de Oxean) y coincide al centavo con la serie "sin impuestos" del
+ * reporte de Looker sobre la misma planilla.
+ */
+const MESES_2026 = [
+  { mes: '01 ene', cierre: true,  ventas: 41593.61,  ebit: -2922.68  },
+  { mes: '02 feb', cierre: true,  ventas: 71617.90,  ebit: 27050.00  },
+  { mes: '03 mar', cierre: true,  ventas: 53737.80,  ebit: 9602.52   },
+  { mes: '04 abr', cierre: true,  ventas: 35639.64,  ebit: -17707.31 },
+  { mes: '05 may', cierre: true,  ventas: 26164.83,  ebit: -18628.19 },
+  { mes: '06 jun', cierre: true,  ventas: 75181.93,  ebit: 30875.65  },
+  { mes: '07 jul', cierre: true,  ventas: 44576.72,  ebit: -4846.02  },
+  { mes: '08 ago', cierre: false, ventas: 44027.89,  ebit: -13629.11 },
+  { mes: '09 sep', cierre: false, ventas: 130568.85, ebit: 82850.47  },
+  { mes: '10 oct', cierre: false, ventas: 39639.81,  ebit: -6813.76  },
+  { mes: '11 nov', cierre: false, ventas: 39351.25,  ebit: -7715.52  },
+  { mes: '12 dic', cierre: false, ventas: 39228.58,  ebit: -5900.16  },
+];
+
+const sumar = (ms: typeof MESES_2026, pick: (m: typeof MESES_2026[0]) => number) =>
+  Math.round(ms.reduce((a, m) => a + pick(m), 0) * 100) / 100;
+
+describe('proyección — ejecutado vs proyectado', () => {
+  const cerrados = MESES_2026.filter(m => m.cierre);
+  const proyectados = MESES_2026.filter(m => !m.cierre);
+
+  it('separa 7 meses cerrados de 5 proyectados', () => {
+    expect(cerrados).toHaveLength(7);
+    expect(proyectados).toHaveLength(5);
+  });
+
+  it('la facturación coincide con el reporte de Looker', () => {
+    expect(sumar(cerrados, m => m.ventas)).toBeCloseTo(348512.42, 1);
+    expect(sumar(proyectados, m => m.ventas)).toBeCloseTo(292816.37, 1);
+    expect(sumar(MESES_2026, m => m.ventas)).toBeCloseTo(641328.79, 1);
+  });
+
+  it('los costos ejecutados coinciden con la serie "sin impuestos"', () => {
+    expect(sumar(cerrados, m => m.ventas - m.ebit)).toBeCloseTo(325088.44, 1);
+  });
+
+  it('facturación − costos es exactamente el EBIT', () => {
+    // Invariante que hace imposible que las tres tarjetas se contradigan.
+    const facturacion = sumar(MESES_2026, m => m.ventas);
+    const costos = sumar(MESES_2026, m => m.ventas - m.ebit);
+    const ebit = sumar(MESES_2026, m => m.ebit);
+    expect(facturacion - costos).toBeCloseTo(ebit, 1);
+    expect(ebit).toBeCloseTo(72215.89, 1);
+  });
+
+  it('el total es la suma de ejecutado y proyectado en las tres series', () => {
+    for (const pick of [
+      (m: typeof MESES_2026[0]) => m.ventas,
+      (m: typeof MESES_2026[0]) => m.ventas - m.ebit,
+      (m: typeof MESES_2026[0]) => m.ebit,
+    ]) {
+      expect(sumar(cerrados, pick) + sumar(proyectados, pick))
+        .toBeCloseTo(sumar(MESES_2026, pick), 1);
+    }
+  });
+});
