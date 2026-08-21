@@ -43,6 +43,7 @@ import QuotationErrorBoundary from '@/components/quotation-error-boundary';
 import { getApiErrorMessage } from '@/lib/api-error';
 import { QuotationTemplatesPicker } from '@/components/quotation/quotation-templates-picker';
 import { QuotationWorkspaceSummary } from '@/components/quotation/quotation-workspace-summary';
+import { QuotationBriefIntake, type BriefIntakeAnalysis } from '@/components/quotation/quotation-brief-intake';
 import {
   QUOTATION_STEPS,
   type QuotationStep,
@@ -370,6 +371,16 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
               {currentStepNumber === 1 && (
                 <div className="space-y-6">
                   <SectionHeading title="Empecemos por el brief" description="Estos datos orientan la propuesta. El precio y la configuración técnica aparecen después." />
+                  <QuotationBriefIntake onApply={(analysis: BriefIntakeAnalysis) => {
+                    const motion = analysis.modality === 'renewal' ? 'renewal' : analysis.modality === 'annual_program' ? 'new_business' : quotationData.commercialMotion || 'new_business';
+                    const projectType = analysis.modality === 'monthly_fee' || analysis.modality === 'renewal' ? 'fee-mensual' : analysis.modality === 'annual_program' ? 'always-on' : analysis.modality === 'event_pack' ? 'monitoring' : analysis.modality === 'demo' ? 'demo' : 'on-demand';
+                    updateQuotationData({
+                      project: { ...quotationData.project, name: analysis.projectName || quotationData.project.name, type: projectType, duration: analysis.durationMonths ? `${analysis.durationMonths} meses` : quotationData.project.duration },
+                      commercialMotion: motion,
+                      decisionContext: { ...(quotationData.decisionContext || {}), source: 'brief_or_meeting_minute', summary: analysis.summary, context: analysis.summary, objective: analysis.objective, decision: analysis.decision, markets: analysis.markets, brands: analysis.brands, competitors: analysis.competitors, sources: analysis.sources, modules: analysis.modules, languages: analysis.languages, mentionVolume: analysis.mentionVolume, slaLevel: analysis.slaLevel, designLevel: analysis.designLevel, missingQuestions: analysis.missingQuestions, recommendationReason: analysis.recommendationReason, recommendedBlueprintId: analysis.recommendedBlueprint?.id || null, recommendedBlueprintSlug: analysis.recommendationSlug, recommendationConfidence: analysis.confidence },
+                    });
+                    toast({ title: 'Diagnóstico incorporado', description: analysis.recommendedBlueprint ? `La receta ${analysis.recommendedBlueprint.name} quedará destacada en Servicio.` : 'Completá o ajustá el brief para elegir una receta.' });
+                  }} />
                   <OptimizedBasicInfo errors={fieldErrors} />
                   <CommercialMotionField quotationData={quotationData} updateQuotationData={updateQuotationData} />
                   {isEditing && !quotationData.scopeSnapshot && (

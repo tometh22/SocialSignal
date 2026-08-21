@@ -32,10 +32,24 @@ import {
   renderProposalPdf,
   renderProposalPptx,
 } from "./services/proposal-studio";
+import { analyzeQuotationBrief } from "./services/quotation-brief";
 
 type AuthMiddleware = RequestHandler;
 
 export function registerProposalStudioRoutes(app: Express, requireAuth: AuthMiddleware) {
+  app.post("/api/quotation-intake/analyze", requireAuth, requirePermission("quotations"), async (req, res) => {
+    try {
+      const { brief } = z.object({ brief: z.string().trim().min(20).max(50_000) }).parse(req.body);
+      const rows = await db.select({ id: serviceBlueprints.id, slug: serviceBlueprints.slug, name: serviceBlueprints.name, description: serviceBlueprints.description, definition: serviceBlueprints.definition })
+        .from(serviceBlueprints).where(eq(serviceBlueprints.status, "published"));
+      const result = await analyzeQuotationBrief(brief, rows.map((row) => ({ ...row, definition: blueprintDefinitionSchema.parse(row.definition) })));
+      res.json(result);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: "El brief o minuta no es válido", errors: error.errors });
+      res.status(error?.statusCode || 500).json({ message: error?.message || "No se pudo analizar el brief" });
+    }
+  });
+
   app.get("/api/service-blueprints", requireAuth, requirePermission("quotations"), async (req, res) => {
     const requestedStatus = typeof req.query.status === "string" ? req.query.status : "published";
     const status = z.enum(["draft", "published", "archived", "all"]).parse(requestedStatus);

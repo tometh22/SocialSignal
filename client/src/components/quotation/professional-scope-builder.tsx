@@ -41,6 +41,8 @@ export function ProfessionalScopeBuilder({ mode = "all" }: { mode?: ScopeBuilder
     return isBlueprintCompatibleWithProjectType(quotationData.project.type, modality);
   }), [blueprints, quotationData.project.type]);
   const selected = useMemo(() => blueprints.find((item) => item.id === quotationData.serviceBlueprintId), [blueprints, quotationData.serviceBlueprintId]);
+  const recommendedBlueprintId = Number(quotationData.decisionContext?.recommendedBlueprintId || 0);
+  const orderedBlueprints = useMemo(() => [...compatibleBlueprints].sort((a, b) => Number(b.id === recommendedBlueprintId) - Number(a.id === recommendedBlueprintId)), [compatibleBlueprints, recommendedBlueprintId]);
   const scope = quotationData.scopeSnapshot ? blueprintDefinitionSchema.parse(quotationData.scopeSnapshot) : null;
   const estimate = useMemo(() => scope ? estimateBlueprintWorkload(scope) : null, [scope]);
   const benchmarkFor = (serviceBlueprintId: number | null | undefined, projectType: string) => {
@@ -72,7 +74,30 @@ export function ProfessionalScopeBuilder({ mode = "all" }: { mode?: ScopeBuilder
   }, [capacity, quotationData.teamMembers, scope]);
 
   const applyBlueprint = (blueprint: BlueprintWithWorkload) => {
-    const definition = blueprintDefinitionSchema.parse(structuredClone(blueprint.definition));
+    const baseDefinition = blueprintDefinitionSchema.parse(structuredClone(blueprint.definition));
+    const briefContext = quotationData.decisionContext || {};
+    const listFromBrief = (key: string) => Array.isArray(briefContext[key]) ? (briefContext[key] as unknown[]).filter((item): item is string => typeof item === "string" && item.trim().length > 0) : [];
+    const languagesFromBrief = listFromBrief("languages").filter((item): item is "es" | "en" => item === "es" || item === "en");
+    const mentionVolumeFromBrief = ["small", "medium", "large", "xlarge"].includes(String(briefContext.mentionVolume)) ? String(briefContext.mentionVolume) as BlueprintDefinition["coverage"]["mentionVolume"] : baseDefinition.coverage.mentionVolume;
+    const slaFromBrief = ["standard", "priority", "real_time"].includes(String(briefContext.slaLevel)) ? String(briefContext.slaLevel) as BlueprintDefinition["coverage"]["slaLevel"] : baseDefinition.coverage.slaLevel;
+    const designFromBrief = ["standard", "branded", "executive"].includes(String(briefContext.designLevel)) ? String(briefContext.designLevel) as BlueprintDefinition["coverage"]["designLevel"] : baseDefinition.coverage.designLevel;
+    const definition = blueprintDefinitionSchema.parse({
+      ...baseDefinition,
+      coverage: {
+        ...baseDefinition.coverage,
+        markets: listFromBrief("markets").length ? listFromBrief("markets") : baseDefinition.coverage.markets,
+        brands: listFromBrief("brands").length ? listFromBrief("brands") : baseDefinition.coverage.brands,
+        competitors: listFromBrief("competitors").length ? listFromBrief("competitors") : baseDefinition.coverage.competitors,
+        sources: listFromBrief("sources").length ? listFromBrief("sources") : baseDefinition.coverage.sources,
+        languages: languagesFromBrief.length ? languagesFromBrief : baseDefinition.coverage.languages,
+        mentionVolume: mentionVolumeFromBrief,
+        slaLevel: slaFromBrief,
+        designLevel: designFromBrief,
+        analysisModules: listFromBrief("modules").filter((item): item is BlueprintDefinition["coverage"]["analysisModules"][number] => MODULES.some(([value]) => value === item)).length
+          ? listFromBrief("modules") as BlueprintDefinition["coverage"]["analysisModules"]
+          : baseDefinition.coverage.analysisModules,
+      },
+    });
     applyDefinition(definition, blueprint);
   };
 
@@ -197,19 +222,20 @@ export function ProfessionalScopeBuilder({ mode = "all" }: { mode?: ScopeBuilder
               <p className="text-sm font-semibold text-slate-900">Elegí el servicio que mejor encaja</p>
               <p className="mt-1 text-xs text-slate-500">Partimos de una receta probada; después podés personalizarla sin alterar el catálogo.</p>
             </div>
-            <Badge variant="outline" className="hidden sm:inline-flex">{compatibleBlueprints.length} opciones</Badge>
+            <Badge variant="outline" className="hidden sm:inline-flex">{compatibleBlueprints.length} opciones · recomendación primero</Badge>
           </div>
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {compatibleBlueprints.map((blueprint) => {
+            {orderedBlueprints.map((blueprint) => {
               const active = quotationData.serviceBlueprintId === blueprint.id;
               const blueprintProjectType = isBlueprintCompatibleWithProjectType(quotationData.project.type, blueprintDefinitionSchema.parse(blueprint.definition).modality)
                 ? quotationData.project.type
                 : projectTypeFor(blueprintDefinitionSchema.parse(blueprint.definition).modality);
               const benchmark = benchmarkFor(blueprint.id, blueprintProjectType);
               const historicalWorkload = applyHistoricalEffortBenchmark(blueprint.workload, benchmark);
+              const recommended = blueprint.id === recommendedBlueprintId;
               return (
                 <button key={blueprint.id} type="button" onClick={() => applyBlueprint(blueprint)} aria-pressed={active} className={`rounded-xl border p-4 text-left transition ${active ? "border-indigo-500 bg-indigo-50 ring-2 ring-indigo-100" : "border-slate-200 bg-white hover:border-indigo-300"}`}>
-                  <span className="flex items-start justify-between gap-2"><strong className="text-sm text-slate-950">{blueprint.name}</strong>{active && <CheckCircle2 className="h-4 w-4 text-indigo-600" />}</span>
+                  <span className="flex items-start justify-between gap-2"><span><strong className="text-sm text-slate-950">{blueprint.name}</strong>{recommended && <Badge className="ml-2 bg-emerald-600 text-[10px]">Para este brief</Badge>}</span>{active && <CheckCircle2 className="h-4 w-4 text-indigo-600" />}</span>
                   <span className="mt-2 block text-xs leading-5 text-slate-500">{blueprint.description}</span>
                   <span className="mt-3 flex flex-wrap gap-1.5"><Badge variant="outline">{historicalWorkload.totalHours} h estimadas</Badge><Badge variant="outline">{blueprint.definition.deliverables.length} entregables</Badge>{benchmark && <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">{benchmark.sampleSize} proyectos reales</Badge>}</span>
                 </button>
