@@ -642,18 +642,18 @@ export function QuotationVariants({
 
   if (loading) {
     return (
-      <div className="p-6">
+      <div className="p-4 sm:p-6">
         <div className="animate-pulse space-y-4">
-          <div className="h-6 bg-gray-200 rounded w-1/4"></div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="h-6 w-1/4 rounded bg-slate-100"></div>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
             {[1, 2, 3].map(i => (
-              <div key={i} className="h-48 bg-gray-200 rounded"></div>
+              <div key={i} className="h-48 rounded-2xl border border-slate-200 bg-slate-50"></div>
             ))}
           </div>
         </div>
         {!baseCost && (
-          <div className="text-center mt-4">
-            <p className="text-gray-500">
+          <div className="mt-4 text-center">
+            <p className="text-sm text-slate-500">
               Configurá el equipo en la fase Alcance para ver las variantes disponibles
             </p>
           </div>
@@ -666,11 +666,11 @@ export function QuotationVariants({
     <div className="space-y-6 p-4 sm:p-6">
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Escenarios de alcance</h2>
-          <p className="text-gray-600 mt-1">
+          <h2 className="text-lg font-semibold text-slate-950 sm:text-2xl">Escenarios de alcance</h2>
+          <p className="mt-1 text-sm text-slate-500">
             Compará alternativas reales de cobertura, entregables y precio antes de elegir qué mostrarle al cliente.
           </p>
-          <Badge variant="outline" className="mt-2 bg-slate-50 text-slate-600">Los costos internos no se muestran al cliente</Badge>
+          <Badge variant="outline" className="mt-2 border-slate-200 bg-slate-50 text-slate-600">Los costos internos no se muestran al cliente</Badge>
         </div>
         
         <div className="flex flex-col gap-2 sm:flex-row">
@@ -687,7 +687,7 @@ export function QuotationVariants({
             </DialogHeader>
             <div className="space-y-4">
               <div>
-                <label className="text-sm font-medium">Nombre</label>
+                <label className="text-sm font-medium text-slate-700">Nombre</label>
                 <Input
                   value={newVariant.name}
                   onChange={(e) => setNewVariant({ ...newVariant, name: e.target.value })}
@@ -695,7 +695,7 @@ export function QuotationVariants({
                 />
               </div>
               <div>
-                <label className="text-sm font-medium">Descripción</label>
+                <label className="text-sm font-medium text-slate-700">Descripción</label>
                 <Textarea
                   value={newVariant.description}
                   onChange={(e) => setNewVariant({ ...newVariant, description: e.target.value })}
@@ -703,14 +703,14 @@ export function QuotationVariants({
                 />
               </div>
               {!quotationData.scopeSnapshot && <div>
-                <label className="text-sm font-medium">Ajuste de Precio (%)</label>
+                <label className="text-sm font-medium text-slate-700">Ajuste de Precio (%)</label>
                 <Input
                   type="number"
                   value={newVariant.adjustmentPercentage}
                   onChange={(e) => setNewVariant({ ...newVariant, adjustmentPercentage: parseFloat(e.target.value) || 0 })}
                   placeholder="0"
                 />
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="mt-1 text-xs text-slate-500">
                   Porcentaje de ajuste sobre el precio base (puede ser negativo)
                 </p>
               </div>}
@@ -731,35 +731,35 @@ export function QuotationVariants({
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {variants.map((variant) => (
           <Card
-            key={variant.id} 
+            key={variant.id}
             className={`relative transition-all duration-200 ${
               selectedVariantIds.includes(variant.id)
-                ? 'ring-2 ring-blue-500 shadow-lg' 
-                : 'border-slate-200'
+                ? 'border-indigo-500 bg-indigo-50/40 ring-2 ring-indigo-100'
+                : 'border-slate-200 bg-white hover:border-indigo-300'
             }`}
           >
             <CardHeader className="pb-3">
               <div className="flex justify-between items-start">
                 <div className="flex items-start gap-3">
-                  <Checkbox 
+                  <Checkbox
                     checked={selectedVariantIds.includes(variant.id)}
                     onCheckedChange={() => toggleVariantSelection(variant.id)}
                     aria-label={`Incluir variante ${variant.variantName} en la propuesta`}
                     className="mt-1"
                   />
                   <div>
-                    <CardTitle className="text-lg font-semibold text-gray-900">
+                    <CardTitle className="text-lg font-semibold text-slate-950">
                       {variant.variantName}
                     </CardTitle>
                     {variant.variantDescription && (
-                      <p className="text-sm text-gray-600 mt-1">
+                      <p className="mt-1 text-sm text-slate-500">
                         {variant.variantDescription}
                       </p>
                     )}
                   </div>
                 </div>
                 {selectedVariantIds.includes(variant.id) && (
-                  <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+                  <Badge variant="secondary" className="bg-indigo-100 text-indigo-700">
                     <Check className="h-3 w-3 mr-1" />
                     Para envío
                   </Badge>
@@ -782,29 +782,29 @@ export function QuotationVariants({
             
             <CardContent className="space-y-4">
               {/* Precio Principal */}
-              <div className="text-center py-4 bg-gray-50 rounded-lg">
-                <div className="text-2xl font-bold text-gray-900">
+              <div className="rounded-lg bg-slate-50 py-4 text-center">
+                <div className="text-2xl font-bold tabular-nums text-slate-950">
                   {formatCurrency(computeVariantTotal(variant))}
                 </div>
-                <div className="text-sm text-gray-500">Precio Total</div>
+                <div className="text-sm text-slate-500">Precio Total</div>
               </div>
 
               {/* Métricas reales del equipo */}
               <div className="grid grid-cols-3 gap-3 text-center">
                 <div className="space-y-1">
-                  <div className="flex items-center justify-center text-blue-600"><Users className="h-4 w-4" /></div>
-                  <div className="text-sm font-medium">{baseTeamMembers?.length || 0}</div>
-                  <div className="text-xs text-gray-500">Personas</div>
+                  <div className="flex items-center justify-center text-slate-400"><Users className="h-4 w-4" /></div>
+                  <div className="text-sm font-medium text-slate-900">{baseTeamMembers?.length || 0}</div>
+                  <div className="text-xs text-slate-500">Personas</div>
                 </div>
                 <div className="space-y-1">
-                  <div className="flex items-center justify-center text-green-600"><Clock className="h-4 w-4" /></div>
-                  <div className="text-sm font-medium">{getVariantTotalHours(variant).toFixed(2)} h</div>
-                  <div className="text-xs text-gray-500">Horas</div>
+                  <div className="flex items-center justify-center text-slate-400"><Clock className="h-4 w-4" /></div>
+                  <div className="text-sm font-medium text-slate-900">{getVariantTotalHours(variant).toFixed(2)} h</div>
+                  <div className="text-xs text-slate-500">Horas</div>
                 </div>
                 <div className="space-y-1">
-                  <div className="flex items-center justify-center text-purple-600"><DollarSign className="h-4 w-4" /></div>
-                  <div className="text-sm font-medium">{variant.scopeSnapshot?.coverage.languages?.join(' + ').toUpperCase() || 'ES'}</div>
-                  <div className="text-xs text-gray-500">Idiomas</div>
+                  <div className="flex items-center justify-center text-slate-400"><DollarSign className="h-4 w-4" /></div>
+                  <div className="text-sm font-medium text-slate-900">{variant.scopeSnapshot?.coverage.languages?.join(' + ').toUpperCase() || 'ES'}</div>
+                  <div className="text-xs text-slate-500">Idiomas</div>
                 </div>
               </div>
 
@@ -813,19 +813,19 @@ export function QuotationVariants({
                 <>
                   <button
                     onClick={e => { e.stopPropagation(); setExpandedTeamVariant(v => v === variant.id ? null : variant.id); }}
-                    className="w-full text-xs text-indigo-600 hover:text-indigo-800 flex items-center justify-center gap-1 py-1"
+                    className="flex w-full items-center justify-center gap-1 py-1 text-xs text-indigo-600 hover:text-indigo-800"
                   >
                     <Users className="h-3 w-3" />
                     {expandedTeamVariant === variant.id ? 'Ocultar equipo' : 'Ver / ajustar equipo'}
                   </button>
                   {expandedTeamVariant === variant.id && (
-                    <div className="border rounded-lg p-2 space-y-1.5 bg-gray-50" onClick={e => e.stopPropagation()}>
-                      <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Horas por persona</div>
+                    <div className="space-y-1.5 rounded-lg border border-slate-200 bg-slate-50 p-2" onClick={e => e.stopPropagation()}>
+                      <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">Horas por persona</div>
                       {baseTeamMembers.map(m => {
                         const inputKey = `${variant.id}-${m.id}`;
                         return (
                           <div key={m.id} className="flex items-center gap-2 text-xs">
-                            <span className="flex-1 truncate text-gray-700">{m.personnelName || m.roleName}</span>
+                            <span className="flex-1 truncate text-slate-700">{m.personnelName || m.roleName}</span>
                             <input
                               type="number" min={0} step={1}
                               aria-label={`Horas de ${m.personnelName || m.roleName} en ${variant.variantName}`}
@@ -838,9 +838,9 @@ export function QuotationVariants({
                                 setVariantInputText(prev => { const n = { ...prev }; delete n[inputKey]; return n; });
                               }}
                               onClick={e => e.stopPropagation()}
-                              className="w-14 border rounded text-center py-0.5 px-1 text-xs bg-white"
+                              className="w-14 rounded border border-slate-200 bg-white px-1 py-0.5 text-center text-xs"
                             />
-                            <span className="text-gray-400">h</span>
+                            <span className="text-slate-400">h</span>
                           </div>
                         );
                       })}
@@ -853,9 +853,9 @@ export function QuotationVariants({
               <div className="flex justify-center">
                 {(() => {
                   const diff = getDifferenceVsBase(variant);
-                  if (diff > 0) return <Badge variant="secondary" className="bg-green-100 text-green-800"><TrendingUp className="h-3 w-3 mr-1" />{diff}% más que la recomendada</Badge>;
-                  if (diff < 0) return <Badge variant="secondary" className="bg-red-100 text-red-800"><TrendingDown className="h-3 w-3 mr-1" />{Math.abs(diff)}% menos que la recomendada</Badge>;
-                  return <Badge variant="secondary" className="bg-gray-100 text-gray-800"><Minus className="h-3 w-3 mr-1" />Referencia</Badge>;
+                  if (diff > 0) return <Badge variant="outline" className="border-slate-200 bg-slate-100 text-slate-700"><TrendingUp className="h-3 w-3 mr-1" />{diff}% más que la recomendada</Badge>;
+                  if (diff < 0) return <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-700"><TrendingDown className="h-3 w-3 mr-1" />{Math.abs(diff)}% menos que la recomendada</Badge>;
+                  return <Badge variant="outline" className="border-slate-200 bg-slate-100 text-slate-600"><Minus className="h-3 w-3 mr-1" />Referencia</Badge>;
                 })()}
               </div>
 
@@ -864,7 +864,7 @@ export function QuotationVariants({
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="w-full text-red-600 hover:text-red-800 hover:bg-red-50"
+                  className="w-full text-red-600 hover:bg-red-50 hover:text-red-700"
                   onClick={(e) => {
                     e.stopPropagation();
                     setVariantPendingDeletion(variant.id);
@@ -884,42 +884,42 @@ export function QuotationVariants({
         <Card>
           <CardHeader>
             {/* Legacy label "Diferencia vs cotización base" remains in historical exports; the UI uses business language. */}
-            <CardTitle>Comparación rápida</CardTitle>
+            <CardTitle className="text-lg font-semibold text-slate-950">Comparación rápida</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto rounded-lg border border-slate-200">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b">
-                    <th className="text-left p-2">Variante</th>
-                    <th className="text-center p-2">Alcance</th>
-                    <th className="text-right p-2">Esfuerzo</th>
-                    <th className="text-right p-2">Total</th>
-                    <th className="text-center p-2">Diferencia de inversión</th>
+                  <tr className="border-b border-slate-200 bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    <th className="p-2 text-left">Variante</th>
+                    <th className="p-2 text-center">Alcance</th>
+                    <th className="p-2 text-right">Esfuerzo</th>
+                    <th className="p-2 text-right">Total</th>
+                    <th className="p-2 text-center">Diferencia de inversión</th>
                   </tr>
                 </thead>
                 <tbody>
                   {variants.map((variant) => (
-                    <tr key={variant.id} className="border-b hover:bg-gray-50">
-                      <td className="p-2 font-medium">{variant.variantName}</td>
-                      <td className="p-2 text-center">{variant.scopeSnapshot ? `${variant.scopeSnapshot.deliverables.filter((item) => item.included).length} entregables · ${variant.scopeSnapshot.coverage.markets.length} mercados` : 'Histórico'}</td>
-                      <td className="p-2 text-right">{getVariantTotalHours(variant).toFixed(1)} h</td>
-                      <td className="p-2 text-right font-medium">{formatCurrency(computeVariantTotal(variant))}</td>
+                    <tr key={variant.id} className="border-b border-slate-200 last:border-b-0 hover:bg-slate-50">
+                      <td className="p-2 font-medium text-slate-900">{variant.variantName}</td>
+                      <td className="p-2 text-center text-slate-600">{variant.scopeSnapshot ? `${variant.scopeSnapshot.deliverables.filter((item) => item.included).length} entregables · ${variant.scopeSnapshot.coverage.markets.length} mercados` : 'Histórico'}</td>
+                      <td className="p-2 text-right text-slate-600">{getVariantTotalHours(variant).toFixed(1)} h</td>
+                      <td className="p-2 text-right font-medium tabular-nums text-slate-900">{formatCurrency(computeVariantTotal(variant))}</td>
                       <td className="p-2 text-center">
                         {(() => {
                           const baseReferenceTotal = getBaseReferenceTotal();
-                          if (baseReferenceTotal <= 0) return <span>-</span>;
+                          if (baseReferenceTotal <= 0) return <span className="text-slate-400">-</span>;
                           const isARS = quotationData.quotationCurrency === 'ARS';
                           const convertedVariantAmount = computeVariantTotal(variant);
                           const convertedBaseAmount = baseReferenceTotal;
-                          
+
                           if (convertedVariantAmount > convertedBaseAmount) {
                             const percentDiff = Math.round(((convertedVariantAmount / convertedBaseAmount) - 1) * 100);
                             const amountDiff = convertedVariantAmount - convertedBaseAmount;
                             return (
                               <div className="text-right">
-                                <span className="text-green-600 font-medium">+{percentDiff}%</span>
-                                <div className="text-xs text-gray-500">
+                                <span className="font-medium text-slate-700">+{percentDiff}%</span>
+                                <div className="text-xs text-slate-500">
                                   +{new Intl.NumberFormat(isARS ? 'es-AR' : 'en-US', {
                                     style: 'currency',
                                     currency: isARS ? 'ARS' : 'USD',
@@ -934,8 +934,8 @@ export function QuotationVariants({
                             const amountDiff = convertedVariantAmount - convertedBaseAmount;
                             return (
                               <div className="text-right">
-                                <span className="text-red-600 font-medium">{percentDiff}%</span>
-                                <div className="text-xs text-gray-500">
+                                <span className="font-medium text-emerald-700">{percentDiff}% ahorro</span>
+                                <div className="text-xs text-emerald-600">
                                   {new Intl.NumberFormat(isARS ? 'es-AR' : 'en-US', {
                                     style: 'currency',
                                     currency: isARS ? 'ARS' : 'USD',
@@ -948,8 +948,8 @@ export function QuotationVariants({
                           } else {
                             return (
                               <div className="text-right">
-                                <span className="text-gray-500 font-medium">Base</span>
-                                <div className="text-xs text-gray-500">
+                                <span className="font-medium text-slate-500">Base</span>
+                                <div className="text-xs text-slate-500">
                                   {new Intl.NumberFormat(isARS ? 'es-AR' : 'en-US', {
                                     style: 'currency',
                                     currency: isARS ? 'ARS' : 'USD',
@@ -974,11 +974,11 @@ export function QuotationVariants({
       {/* Resumen de Selección */}
       {selectedVariantIds.length > 0 && (
         <div className="flex justify-center">
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
-            <p className="text-sm text-blue-800">
+          <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-4 text-center">
+            <p className="text-sm text-indigo-700">
               <strong>{selectedVariantIds.length}</strong> escenario{selectedVariantIds.length > 1 ? 's' : ''} seleccionado{selectedVariantIds.length > 1 ? 's' : ''} para enviar al cliente
             </p>
-            <p className="text-xs text-blue-600 mt-1">
+            <p className="mt-1 text-xs text-indigo-500">
               El cliente podrá elegir entre {selectedVariantIds.length > 1 ? 'estas opciones' : 'esta opción'}
             </p>
           </div>
@@ -986,8 +986,8 @@ export function QuotationVariants({
       )}
 
       {/* Botones de Finalización */}
-      <div className="mt-8 flex flex-col gap-4 border-t border-gray-200 pt-8 sm:flex-row sm:items-center sm:justify-between">
-        <div className="text-sm text-gray-600">
+      <div className="mt-8 flex flex-col gap-4 border-t border-slate-200 pt-8 sm:flex-row sm:items-center sm:justify-between">
+        <div className="text-sm text-slate-500">
           Revisá la vista para el cliente y aprobá solo cuando la propuesta esté lista.
         </div>
         <div className="flex flex-col gap-3 sm:flex-row">
@@ -995,7 +995,7 @@ export function QuotationVariants({
             variant="outline"
             onClick={handleSave}
             disabled={isSaving || isFinalizing}
-            className="border-gray-200 hover:bg-gray-50"
+            className="border-slate-200 hover:bg-slate-50"
           >
             {isSaving ? (
               <>

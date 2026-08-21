@@ -283,17 +283,15 @@ export default function FinancialReviewFinal({ revealAdvanced = false, validatio
         <div className="mb-8 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <Tooltip>
           <TooltipTrigger asChild>
-            <Card className="h-full border-0 shadow-sm bg-gradient-to-br from-blue-50 to-blue-100 cursor-help">
-              <CardContent className="flex h-full items-center justify-center p-4 text-center">
-                <div className="flex items-center justify-center gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-blue-200 flex items-center justify-center">
-                    <Users className="h-4 w-4 text-blue-700" />
-                  </div>
-                  <div className="text-center">
-                    <p className="text-xs font-medium text-blue-800">Equipo</p>
-                    <p className="text-lg font-bold text-blue-900">{quotationData.teamMembers.length} miembros</p>
-                    <p className="text-xs text-blue-600">{formatFinalCurrency(teamBaseCostDisplay)} base</p>
-                  </div>
+            <Card className="h-full border-slate-200 cursor-help">
+              <CardContent className="flex h-full items-center justify-center gap-3 p-4">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100">
+                  <Users className="h-4 w-4 text-slate-600" />
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500">Equipo</p>
+                  <p className="text-lg font-semibold tabular-nums text-slate-950">{quotationData.teamMembers.length} miembros</p>
+                  <p className="text-xs text-slate-500">{formatFinalCurrency(teamBaseCostDisplay)} base</p>
                 </div>
               </CardContent>
             </Card>
@@ -305,17 +303,15 @@ export default function FinancialReviewFinal({ revealAdvanced = false, validatio
 
         <Tooltip>
           <TooltipTrigger asChild>
-            <Card className="h-full border-0 shadow-sm bg-gradient-to-br from-amber-50 to-amber-100 cursor-help">
-              <CardContent className="flex h-full items-center justify-center p-4 text-center">
-                <div className="flex items-center justify-center gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-amber-200 flex items-center justify-center">
-                    <Target className="h-4 w-4 text-amber-700" />
-                  </div>
-                  <div className="text-center">
-                    <p className="text-xs font-medium text-amber-800">Complejidad</p>
-                    <p className="text-lg font-bold text-amber-900">+{getComplexityPercentage()}%</p>
-                    <p className="text-xs text-amber-600">+{formatFinalCurrency(teamComplexityAdjustmentDisplay)}</p>
-                  </div>
+            <Card className="h-full border-slate-200 cursor-help">
+              <CardContent className="flex h-full items-center justify-center gap-3 p-4">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-100">
+                  <Target className="h-4 w-4 text-amber-700" />
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500">Complejidad</p>
+                  <p className="text-lg font-semibold tabular-nums text-slate-950">+{getComplexityPercentage()}%</p>
+                  <p className="text-xs text-slate-500">+{formatFinalCurrency(teamComplexityAdjustmentDisplay)}</p>
                 </div>
               </CardContent>
             </Card>
@@ -327,21 +323,19 @@ export default function FinancialReviewFinal({ revealAdvanced = false, validatio
 
         <Tooltip>
           <TooltipTrigger asChild>
-            <Card className="h-full border-0 shadow-sm bg-gradient-to-br from-green-50 to-green-100 cursor-help">
-              <CardContent className="flex h-full items-center justify-center p-4 text-center">
-                <div className="flex items-center justify-center gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-green-200 flex items-center justify-center">
-                    <TrendingUp className="h-4 w-4 text-green-700" />
-                  </div>
-                  <div className="text-center">
-                    <p className="text-xs font-medium text-green-800">Multiplicador</p>
-                    <p className="text-lg font-bold text-green-900">
-                      {quotationData.financials.priceMode === 'manual' && quotationData.financials.manualPrice 
-                        ? `${((subtotalWithMarginARS / subtotalWithPlatformARS) || 1).toFixed(1)}x`
-                        : `${markupMultiplier.toFixed(1)}x`}
-                    </p>
-                    <p className="text-xs text-green-600">+{formatFinalCurrency(marginAmountDisplay)}</p>
-                  </div>
+            <Card className="h-full border-slate-200 cursor-help">
+              <CardContent className="flex h-full items-center justify-center gap-3 p-4">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-100">
+                  <TrendingUp className="h-4 w-4 text-emerald-700" />
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500">Multiplicador</p>
+                  <p className="text-lg font-semibold tabular-nums text-slate-950">
+                    {quotationData.financials.priceMode === 'manual' && quotationData.financials.manualPrice
+                      ? `${((subtotalWithMarginARS / subtotalWithPlatformARS) || 1).toFixed(1)}x`
+                      : `${markupMultiplier.toFixed(1)}x`}
+                  </p>
+                  <p className="text-xs text-slate-500">+{formatFinalCurrency(marginAmountDisplay)}</p>
                 </div>
               </CardContent>
             </Card>
@@ -377,54 +371,54 @@ export default function FinancialReviewFinal({ revealAdvanced = false, validatio
         <div className="space-y-4 lg:space-y-6">
           {/* Team Composition - Collapsible */}
           <Collapsible defaultOpen={true}>
-            <Card className="shadow-sm border-0 bg-white overflow-hidden">
+            <Card className="border-slate-200 bg-white overflow-hidden">
               <CollapsibleTrigger className="w-full">
-                <CardHeader className="pb-4 border-b border-gray-100 hover:bg-gray-50 transition-colors cursor-pointer">
+                <CardHeader className="pb-4 border-b border-slate-100 hover:bg-slate-50 transition-colors cursor-pointer">
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-lg flex items-center gap-2">
-                      <Users className="h-5 w-5 text-blue-600" />
+                      <Users className="h-5 w-5 text-indigo-600" />
                       Composición del Equipo
                       <Badge variant="secondary" className="ml-2">
                         {quotationData.teamMembers.length} miembros
                       </Badge>
                     </CardTitle>
-                    <ChevronDown className="h-4 w-4 text-gray-500" />
+                    <ChevronDown className="h-4 w-4 text-slate-500" />
                   </div>
                 </CardHeader>
               </CollapsibleTrigger>
               <CollapsibleContent>
                 <CardContent className="p-0">
-              <div className="divide-y divide-gray-50">
+              <div className="divide-y divide-slate-100">
                 {quotationData.teamMembers.map((member, index) => (
-                  <div key={member.id || index} className="p-4 hover:bg-gray-25 transition-colors">
+                  <div key={member.id || index} className="p-4 hover:bg-slate-50 transition-colors">
                     <div className="flex justify-between items-start">
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-100 to-indigo-100 flex items-center justify-center">
-                          <span className="text-xs font-semibold text-blue-700">
-                            {(member.personnelId 
-                              ? getPersonnelName(member.personnelId) 
+                        <div className="w-8 h-8 rounded-full bg-indigo-50 flex items-center justify-center">
+                          <span className="text-xs font-semibold text-indigo-700">
+                            {(member.personnelId
+                              ? getPersonnelName(member.personnelId)
                               : getRoleName(member.roleId)
                             ).charAt(0)}
                           </span>
                         </div>
                         <div>
-                          <p className="text-sm font-semibold text-gray-900">
-                            {member.personnelId 
-                              ? getPersonnelName(member.personnelId) 
+                          <p className="text-sm font-semibold text-slate-900">
+                            {member.personnelId
+                              ? getPersonnelName(member.personnelId)
                               : getRoleName(member.roleId)
                             }
                           </p>
-                          <p className="text-xs text-gray-500">
-                            {member.hours}h × ${(member.personnelId 
+                          <p className="text-xs text-slate-500">
+                            {member.hours}h × ${(member.personnelId
                               ? getPersonnelRate(member.personnelId)
                               : member.rate
                             ).toFixed(1)}/h
                           </p>
                         </div>
                       </div>
-                      <span className="text-sm font-bold text-gray-900">
+                      <span className="text-sm font-semibold tabular-nums text-slate-900">
                         {formatFinalCurrency(
-                          member.hours * (member.personnelId 
+                          member.hours * (member.personnelId
                             ? getPersonnelRate(member.personnelId)
                             : member.rate
                           )
@@ -435,10 +429,10 @@ export default function FinancialReviewFinal({ revealAdvanced = false, validatio
                 ))}
               </div>
 
-              <div className="p-4 bg-blue-50 border-t border-blue-100">
+              <div className="p-4 bg-slate-50 border-t border-slate-200">
                 <div className="flex justify-between items-center">
-                  <span className="font-semibold text-blue-900">Subtotal Base</span>
-                  <span className="text-lg font-bold text-blue-900">{formatFinalCurrency(teamBaseCostDisplay)}</span>
+                  <span className="font-semibold text-slate-900">Subtotal Base</span>
+                  <span className="text-lg font-semibold tabular-nums text-slate-950">{formatFinalCurrency(teamBaseCostDisplay)}</span>
                 </div>
               </div>
                 </CardContent>
@@ -448,9 +442,9 @@ export default function FinancialReviewFinal({ revealAdvanced = false, validatio
 
           {/* Complexity Factors - Collapsible */}
           <Collapsible defaultOpen={false}>
-            <Card className="shadow-sm border-0 bg-white overflow-hidden">
+            <Card className="border-slate-200 bg-white overflow-hidden">
               <CollapsibleTrigger className="w-full">
-                <CardHeader className="pb-4 border-b border-gray-100 hover:bg-gray-50 transition-colors cursor-pointer">
+                <CardHeader className="pb-4 border-b border-slate-100 hover:bg-slate-50 transition-colors cursor-pointer">
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-lg flex items-center gap-2">
                       <Calculator className="h-5 w-5 text-amber-600" />
@@ -459,22 +453,22 @@ export default function FinancialReviewFinal({ revealAdvanced = false, validatio
                         +{getComplexityPercentage()}%
                       </Badge>
                     </CardTitle>
-                    <ChevronDown className="h-4 w-4 text-gray-500" />
+                    <ChevronDown className="h-4 w-4 text-slate-500" />
                   </div>
                 </CardHeader>
               </CollapsibleTrigger>
               <CollapsibleContent>
                 <CardContent className="p-4">
               <div className="space-y-3">
-                <div className="flex justify-between items-center p-3 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border border-green-100">
-                  <span className="text-sm font-medium text-green-900">Volumen de Menciones</span>
-                  <Badge variant="outline" className="text-xs text-green-700 border-green-300">
+                <div className="flex justify-between items-center p-3 bg-slate-50 rounded-lg border border-slate-200">
+                  <span className="text-sm font-medium text-slate-700">Volumen de Menciones</span>
+                  <Badge variant="outline" className="text-xs text-slate-600 border-slate-300">
                     +{(complexityFactors.mentionsVolumeFactor * 100).toFixed(1)}%
                   </Badge>
                 </div>
-                <div className="flex justify-between items-center p-3 bg-gradient-to-r from-purple-50 to-violet-50 rounded-lg border border-purple-100">
-                  <span className="text-sm font-medium text-purple-900">Países Cubiertos</span>
-                  <Badge variant="outline" className="text-xs text-purple-700 border-purple-300">
+                <div className="flex justify-between items-center p-3 bg-slate-50 rounded-lg border border-slate-200">
+                  <span className="text-sm font-medium text-slate-700">Países Cubiertos</span>
+                  <Badge variant="outline" className="text-xs text-slate-600 border-slate-300">
                     +{(complexityFactors.countriesFactor * 100).toFixed(1)}%
                   </Badge>
                 </div>
@@ -484,7 +478,7 @@ export default function FinancialReviewFinal({ revealAdvanced = false, validatio
 
               <div className="flex justify-between items-center p-3 bg-amber-50 rounded-lg border border-amber-200">
                 <span className="font-semibold text-amber-900">Total Ajuste Complejidad</span>
-                <span className="text-lg font-bold text-amber-900">+{formatFinalCurrency(teamComplexityAdjustmentDisplay)}</span>
+                <span className="text-lg font-semibold tabular-nums text-amber-900">+{formatFinalCurrency(teamComplexityAdjustmentDisplay)}</span>
               </div>
                 </CardContent>
               </CollapsibleContent>
@@ -495,8 +489,8 @@ export default function FinancialReviewFinal({ revealAdvanced = false, validatio
         {/* Center: financial controls */}
         {advancedVisible && <div id="advanced-pricing-controls" className="space-y-4 lg:space-y-6">
           {/* Margin and Discount Controls */}
-          <Card id="pricing-config" className="shadow-sm border-0 bg-white" tabIndex={-1}>
-            <CardHeader className="pb-4 border-b border-gray-100">
+          <Card id="pricing-config" className="border-slate-200 bg-white" tabIndex={-1}>
+            <CardHeader className="pb-4 border-b border-slate-100">
               <CardTitle className="text-lg flex items-center gap-2">
                 <Percent className="h-5 w-5 text-indigo-600" />
                 Ajustes Financieros
@@ -506,13 +500,13 @@ export default function FinancialReviewFinal({ revealAdvanced = false, validatio
               {/* Markup Control */}
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <Label className="text-sm font-medium text-gray-900">
-                    {quotationData.financials.priceMode === 'manual' && quotationData.financials.manualPrice 
+                  <Label className="text-sm font-medium text-slate-900">
+                    {quotationData.financials.priceMode === 'manual' && quotationData.financials.manualPrice
                       ? "Multiplicador calculado"
                       : "Multiplicador comercial"}
                   </Label>
-                  <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                    {quotationData.financials.priceMode === 'manual' && quotationData.financials.manualPrice 
+                  <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200">
+                    {quotationData.financials.priceMode === 'manual' && quotationData.financials.manualPrice
                       ? `${((subtotalWithMarginUSD / subtotalWithPlatformUSD) || 1).toFixed(2)}x calc.`
                       : `${markupMultiplier}x`}
                   </Badge>
@@ -559,22 +553,22 @@ export default function FinancialReviewFinal({ revealAdvanced = false, validatio
                               placeholder="2.0"
                             />
                           </div>
-                          <span className="text-sm font-medium text-gray-600">x</span>
+                          <span className="text-sm font-medium text-slate-600">x</span>
                         </>
                       );
                     })()}
                   </div>
-                  <div className="flex justify-between text-xs text-gray-500">
+                  <div className="flex justify-between text-xs text-slate-500">
                     <span>1.0x (Sin ganancia)</span>
                     <span>3.5x</span>
                     <span>6.0x</span>
                   </div>
-                  <div className="p-3 bg-green-50 rounded-lg border border-green-200">
+                  <div className="p-3 bg-emerald-50 rounded-lg border border-emerald-200">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-green-900">Ganancia Generada:</span>
-                      <span className="text-lg font-bold text-green-900">+{formatFinalCurrency(marginAmountDisplay)}</span>
+                      <span className="text-sm font-medium text-emerald-900">Ganancia Generada:</span>
+                      <span className="text-lg font-semibold tabular-nums text-emerald-900">+{formatFinalCurrency(marginAmountDisplay)}</span>
                     </div>
-                    <p className="text-xs text-green-700 mt-1">
+                    <p className="text-xs text-emerald-700 mt-1">
                       {quotationData.financials.priceMode === 'manual' && quotationData.financials.manualPrice ? (
                         `Multiplicador calculado: ${((subtotalWithMarginUSD / subtotalWithPlatformUSD) || 1).toFixed(2)}x (${formatFinalCurrency(subtotalWithPlatformDisplay)} → ${formatFinalCurrency(subtotalWithMarginDisplay)})`
                       ) : (
@@ -590,12 +584,12 @@ export default function FinancialReviewFinal({ revealAdvanced = false, validatio
               {/* Discount Control */}
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <Label className="text-sm font-medium text-gray-900">
+                  <Label className="text-sm font-medium text-slate-900">
                     Descuento al Cliente
                   </Label>
-                  <Badge variant="outline" className={discountPercentage > 0 
-                    ? "bg-red-50 text-red-700 border-red-200" 
-                    : "bg-gray-50 text-gray-700 border-gray-200"
+                  <Badge variant="outline" className={discountPercentage > 0
+                    ? "bg-red-50 text-red-700 border-red-200"
+                    : "bg-slate-50 text-slate-700 border-slate-200"
                   }>
                     {discountPercentage}%
                   </Badge>
@@ -612,7 +606,7 @@ export default function FinancialReviewFinal({ revealAdvanced = false, validatio
                     step={1}
                     className="w-full"
                   />
-                  <div className="flex justify-between text-xs text-gray-500">
+                  <div className="flex justify-between text-xs text-slate-500">
                     <span>0%</span>
                     <span>25%</span>
                     <span>50%</span>
@@ -621,7 +615,7 @@ export default function FinancialReviewFinal({ revealAdvanced = false, validatio
                     <div className="p-3 bg-red-50 rounded-lg border border-red-200">
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-medium text-red-900">Descuento Aplicado:</span>
-                        <span className="text-lg font-bold text-red-900">-{formatFinalCurrency(discountAmountDisplay)}</span>
+                        <span className="text-lg font-semibold tabular-nums text-red-900">-{formatFinalCurrency(discountAmountDisplay)}</span>
                       </div>
                       <p className="text-xs text-red-700 mt-1">
                         Se aplica sobre: {formatFinalCurrency(subtotalWithMarginDisplay)} (subtotal + margen)
@@ -641,7 +635,7 @@ export default function FinancialReviewFinal({ revealAdvanced = false, validatio
                 {/* Tools Cost Section */}
                 <Separator className="my-4" />
                 <div className="space-y-3">
-                  <Label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                  <Label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
                     <Settings className="h-4 w-4" />
                     Costos de Herramientas (USD)
                   </Label>
@@ -652,7 +646,7 @@ export default function FinancialReviewFinal({ revealAdvanced = false, validatio
                     onChange={(e) => updateFinancials({ toolsCost: Number(e.target.value) || 0 })}
                     className="text-right font-mono"
                   />
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs text-slate-500">
                     Costos adicionales de software, licencias o herramientas específicas
                   </p>
                 </div>
@@ -660,7 +654,7 @@ export default function FinancialReviewFinal({ revealAdvanced = false, validatio
                 {/* Price Mode Section */}
                 <Separator className="my-4" />
                 <div className="space-y-3">
-                  <Label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                  <Label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
                     <Calculator className="h-4 w-4" />
                     Modo de Cálculo de Precio
                   </Label>
@@ -699,16 +693,16 @@ export default function FinancialReviewFinal({ revealAdvanced = false, validatio
                   </div>
                   
                   {quotationData.financials.priceMode === 'manual' && (
-                    <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                    <div className="mt-4 p-4 bg-indigo-50 rounded-lg border border-indigo-200">
                       <div className="space-y-4">
                         <div className="space-y-2">
                           <div className="flex items-center justify-between mb-1">
-                            <Label className="text-sm font-medium text-blue-900">
+                            <Label className="text-sm font-medium text-indigo-900">
                               Precio objetivo ({currencyLabel})
                             </Label>
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <Info className="h-4 w-4 text-blue-400 cursor-help" />
+                                <Info className="h-4 w-4 text-indigo-400 cursor-help" />
                               </TooltipTrigger>
                               <TooltipContent side="left" className="max-w-xs">
                                 <p>Ingresá el precio que querés cobrar. El sistema calculará automáticamente el multiplicador necesario.</p>
@@ -716,7 +710,7 @@ export default function FinancialReviewFinal({ revealAdvanced = false, validatio
                             </Tooltip>
                           </div>
                           <div className="relative">
-                            <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-blue-500 font-semibold">$</span>
+                            <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-indigo-500 font-semibold">$</span>
                             <Input
                               id="manual-price"
                               type="number"
@@ -726,32 +720,32 @@ export default function FinancialReviewFinal({ revealAdvanced = false, validatio
                                 const value = parseFloat(e.target.value);
                                 updateFinancials({ manualPrice: isNaN(value) ? 0 : value });
                               }}
-                              className="text-right font-mono text-xl pl-10 pr-3 h-12 border-blue-200 focus:border-blue-400 bg-blue-50/50"
+                              className="text-right font-mono text-xl pl-10 pr-3 h-12 border-indigo-200 focus:border-indigo-400 bg-white"
                               min="0"
                               step="0.01"
                             />
                           </div>
                         </div>
-                        
+
                         {/* Métricas calculadas */}
                         <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                          <div className="bg-gray-50 rounded-lg p-2 text-center">
-                            <p className="text-xs text-gray-600">Costo Base</p>
-                            <p className="font-mono text-sm font-semibold text-gray-900">
+                          <div className="rounded-lg bg-slate-50 p-2 text-center">
+                            <p className="text-xs text-slate-500">Costo Base</p>
+                            <p className="font-mono text-sm font-semibold tabular-nums text-slate-900">
                               {formatFinalCurrency(subtotalWithPlatformDisplay + toolsCostDisplay)}
                             </p>
                           </div>
-                          <div className="bg-blue-50 rounded-lg p-2 text-center">
-                            <p className="text-xs text-blue-600">Multiplicador</p>
-                            <p className="font-mono text-sm font-semibold text-blue-900">
+                          <div className="rounded-lg bg-indigo-50 p-2 text-center">
+                            <p className="text-xs text-indigo-600">Multiplicador</p>
+                            <p className="font-mono text-sm font-semibold tabular-nums text-indigo-900">
                               {quotationData.financials.manualPrice && subtotalWithPlatformDisplay > 0
                                 ? `${(((quotationData.financials.manualPrice - toolsCostDisplay) / (1 - (discountPercentage / 100))) / subtotalWithPlatformDisplay).toFixed(2)}x`
                                 : '—'}
                             </p>
                           </div>
-                          <div className="bg-green-50 rounded-lg p-2 text-center">
-                            <p className="text-xs text-green-600">Ganancia</p>
-                            <p className="font-mono text-sm font-semibold text-green-900">
+                          <div className="rounded-lg bg-emerald-50 p-2 text-center">
+                            <p className="text-xs text-emerald-600">Ganancia</p>
+                            <p className="font-mono text-sm font-semibold tabular-nums text-emerald-900">
                               {quotationData.financials.manualPrice
                                 ? formatFinalCurrency(Math.max(0, quotationData.financials.manualPrice - subtotalWithPlatformDisplay - toolsCostDisplay))
                                 : '—'}
@@ -774,8 +768,8 @@ export default function FinancialReviewFinal({ revealAdvanced = false, validatio
 
         {/* Right: Financial Waterfall */}
         <div className="space-y-4 lg:space-y-6">
-          <Card className="shadow-lg border-0 bg-gradient-to-br from-white to-emerald-50/30 h-fit">
-            <CardHeader className="pb-4 border-b border-emerald-100">
+          <Card className="border-slate-200 h-fit">
+            <CardHeader className="pb-4 border-b border-slate-100">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-lg flex items-center gap-2">
                   <BarChart3 className="h-5 w-5 text-emerald-600" />
@@ -783,7 +777,7 @@ export default function FinancialReviewFinal({ revealAdvanced = false, validatio
                 </CardTitle>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Info className="h-4 w-4 text-gray-400 cursor-help" />
+                    <Info className="h-4 w-4 text-slate-400 cursor-help" />
                   </TooltipTrigger>
                   <TooltipContent side="left" className="max-w-xs">
                     <p>Este desglose muestra cómo se calcula el precio final paso a paso, desde el costo base hasta el precio final al cliente.</p>
@@ -795,19 +789,19 @@ export default function FinancialReviewFinal({ revealAdvanced = false, validatio
 
               {/* Sección 1: Costo Base */}
               <div className="space-y-2">
-                <div className="flex items-center gap-2 text-xs font-semibold text-gray-600 uppercase tracking-wide">
-                  <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 text-xs">1</div>
+                <div className="flex items-center gap-2 text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                  <div className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 text-xs">1</div>
                   Costo Base
                 </div>
-                <div className="bg-blue-50 rounded-lg p-3 border border-blue-100">
+                <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-blue-800">Equipo</span>
-                    <span className="font-semibold text-blue-900">{formatFinalCurrency(teamBaseCostDisplay)}</span>
+                    <span className="text-sm text-slate-600">Equipo</span>
+                    <span className="font-semibold tabular-nums text-slate-900">{formatFinalCurrency(teamBaseCostDisplay)}</span>
                   </div>
                   {teamComplexityAdjustmentDisplay > 0 && (
-                    <div className="flex justify-between items-center mt-2 pt-2 border-t border-blue-100">
-                      <span className="text-sm text-blue-800">+ Complejidad ({getComplexityPercentage()}%)</span>
-                      <span className="font-semibold text-blue-900">+{formatFinalCurrency(teamComplexityAdjustmentDisplay)}</span>
+                    <div className="flex justify-between items-center mt-2 pt-2 border-t border-slate-200">
+                      <span className="text-sm text-slate-600">+ Complejidad ({getComplexityPercentage()}%)</span>
+                      <span className="font-semibold tabular-nums text-slate-900">+{formatFinalCurrency(teamComplexityAdjustmentDisplay)}</span>
                     </div>
                   )}
                 </div>
@@ -816,15 +810,15 @@ export default function FinancialReviewFinal({ revealAdvanced = false, validatio
               {/* Sección 2: Ajustes */}
               {platformCostDisplay > 0 ? (
                 <div className="space-y-2">
-                  <div className="flex items-center gap-2 text-xs font-semibold text-gray-600 uppercase tracking-wide">
-                    <div className="w-6 h-6 rounded-full bg-orange-100 flex items-center justify-center text-orange-700 text-xs">2</div>
+                  <div className="flex items-center gap-2 text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                    <div className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 text-xs">2</div>
                     Ajustes
                   </div>
-                  <div className="bg-orange-50 rounded-lg p-3 border border-orange-100">
+                  <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
                     {platformCostDisplay > 0 && (
                       <div className="flex justify-between items-center">
-                        <span className="text-sm text-orange-800">Costos de Plataforma</span>
-                        <span className="font-semibold text-orange-900">+{formatFinalCurrency(platformCostDisplay)}</span>
+                        <span className="text-sm text-slate-600">Costos de Plataforma</span>
+                        <span className="font-semibold tabular-nums text-slate-900">+{formatFinalCurrency(platformCostDisplay)}</span>
                       </div>
                     )}
                   </div>
@@ -833,26 +827,26 @@ export default function FinancialReviewFinal({ revealAdvanced = false, validatio
 
               {/* Sección 3: Margen y Herramientas */}
               <div className="space-y-2">
-                <div className="flex items-center gap-2 text-xs font-semibold text-gray-600 uppercase tracking-wide">
-                  <div className="w-6 h-6 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-xs">3</div>
+                <div className="flex items-center gap-2 text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                  <div className="w-6 h-6 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 text-xs">3</div>
                   Precio de Venta
                 </div>
-                <div className="bg-green-50 rounded-lg p-3 border border-green-100">
+                <div className="bg-emerald-50 rounded-lg p-3 border border-emerald-100">
                   <div className="flex justify-between items-center">
                     <div className="flex flex-col gap-0.5">
-                      <span className="text-sm text-green-800">Margen de Ganancia</span>
-                      <span className="text-xs text-green-600">
+                      <span className="text-sm text-emerald-800">Margen de Ganancia</span>
+                      <span className="text-xs text-emerald-600">
                         Multiplicador {quotationData.financials.priceMode === 'manual' && quotationData.financials.manualPrice
                           ? (subtotalWithPlatformUSD > 0 ? `${(subtotalWithMarginUSD / subtotalWithPlatformUSD).toFixed(2)}x calc.` : '—')
                           : `${markupMultiplier}x`}
                       </span>
                     </div>
-                    <span className="font-semibold text-green-900">+{formatFinalCurrency(marginAmountDisplay)}</span>
+                    <span className="font-semibold tabular-nums text-emerald-900">+{formatFinalCurrency(marginAmountDisplay)}</span>
                   </div>
                   {toolsCostDisplay > 0 && (
-                    <div className="flex justify-between items-center mt-2 pt-2 border-t border-green-100">
-                      <span className="text-sm text-green-800">Costos de Herramientas</span>
-                      <span className="font-semibold text-green-900">+{formatFinalCurrency(toolsCostDisplay)}</span>
+                    <div className="flex justify-between items-center mt-2 pt-2 border-t border-emerald-100">
+                      <span className="text-sm text-emerald-800">Costos de Herramientas</span>
+                      <span className="font-semibold tabular-nums text-emerald-900">+{formatFinalCurrency(toolsCostDisplay)}</span>
                     </div>
                   )}
                 </div>
@@ -861,14 +855,14 @@ export default function FinancialReviewFinal({ revealAdvanced = false, validatio
               {/* Sección 4: Descuento (si aplica) */}
               {discountPercentage > 0 && (
                 <div className="space-y-2">
-                  <div className="flex items-center gap-2 text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                  <div className="flex items-center gap-2 text-xs font-semibold text-slate-500 uppercase tracking-wide">
                     <div className="w-6 h-6 rounded-full bg-red-100 flex items-center justify-center text-red-700 text-xs">4</div>
                     Descuento
                   </div>
                   <div className="bg-red-50 rounded-lg p-3 border border-red-100">
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-red-800">Descuento ({discountPercentage}%)</span>
-                      <span className="font-semibold text-red-900">-{formatFinalCurrency(discountAmountDisplay)}</span>
+                      <span className="font-semibold tabular-nums text-red-900">-{formatFinalCurrency(discountAmountDisplay)}</span>
                     </div>
                   </div>
                 </div>
@@ -877,22 +871,22 @@ export default function FinancialReviewFinal({ revealAdvanced = false, validatio
               {/* Separador visual */}
               <div className="relative py-2">
                 <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-gray-200"></div>
+                  <div className="w-full border-t border-slate-200"></div>
                 </div>
               </div>
 
               {/* Total Final */}
-              <div className="p-4 bg-gradient-to-br from-emerald-50 to-green-50 rounded-xl border-2 border-emerald-200 shadow-sm">
+              <div className="rounded-xl bg-slate-950 p-4 text-white">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <CheckCircle className="h-5 w-5 text-emerald-700" />
-                    <span className="text-lg font-bold text-emerald-900">Resumen Final</span>
+                    <CheckCircle className="h-5 w-5 text-emerald-400" />
+                    <span className="text-sm font-medium text-slate-300">Resumen Final</span>
                   </div>
-                  <span className="text-2xl font-bold text-emerald-900">
+                  <span className="text-2xl font-semibold tabular-nums">
                     {formatFinalCurrency(finalTotalDisplay)}
                   </span>
                 </div>
-                <p className="text-sm text-emerald-700 mt-1">
+                <p className="text-sm text-slate-400 mt-1">
                   {quotationData.quotationCurrency} • {quotationData.teamMembers.length} miembros • {quotationData.client?.name}
                 </p>
               </div>
@@ -902,7 +896,7 @@ export default function FinancialReviewFinal({ revealAdvanced = false, validatio
 
           <div className="flex flex-col gap-3">
             {/* Botones de finalización removidos - ahora están solo en el último paso */}
-            <div className="text-center text-sm text-gray-500 py-4">
+            <div className="text-center text-sm text-slate-500 py-4">
               Continúa al siguiente paso para finalizar la cotización
             </div>
           </div>

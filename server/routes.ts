@@ -6457,7 +6457,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     objective: z.string().trim().max(5_000).default(""),
     decision: z.string().trim().max(5_000).default(""),
     modality: z.enum(["demo", "one_shot", "event_pack", "monthly_fee", "annual_program", "renewal"]).nullable().optional(),
-    durationMonths: z.number().int().positive().max(120).nullable().optional(),
+    durationMonths: z.number().positive().max(120).nullable().optional(),
     markets: z.array(z.string().trim().max(100)).max(50).default([]),
     languages: z.array(z.enum(["es", "en"])).max(2).default(["es"]),
     modules: z.array(z.string().trim().max(120)).max(50).default([]),

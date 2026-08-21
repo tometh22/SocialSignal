@@ -58,13 +58,13 @@ const ToolsAndPricing: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Sección de Costos de Herramientas */}
-      <Card className="border-amber-200 bg-amber-50/30">
+      <Card className="border-slate-200">
         <CardHeader className="pb-4">
           <div className="flex items-center gap-2">
             <Wrench className="h-5 w-5 text-amber-600" />
-            <CardTitle className="text-lg text-amber-900">Costos de Herramientas</CardTitle>
+            <CardTitle className="text-lg text-slate-950">Costos de Herramientas</CardTitle>
           </div>
-          <p className="text-sm text-amber-700">
+          <p className="text-sm text-slate-500">
             Agrega costos de software, licencias o herramientas específicas para este proyecto
           </p>
         </CardHeader>
@@ -84,19 +84,19 @@ const ToolsAndPricing: React.FC = () => {
             </div>
             <div className="space-y-2">
               <Label>Cálculo</Label>
-              <div className="p-3 bg-white rounded-md border text-sm space-y-1">
+              <div className="rounded-lg bg-slate-50 p-3 text-sm space-y-1">
                 <div className="flex justify-between">
-                  <span>Base + Complejidad:</span>
-                  <span className="font-mono">ARS {subtotalBeforeToolsARS.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
+                  <span className="text-slate-600">Base + Complejidad:</span>
+                  <span className="font-mono tabular-nums text-slate-900">ARS {subtotalBeforeToolsARS.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>+ Herramientas (USD {toolsCostUSD.toFixed(2)}):</span>
-                  <span className="font-mono">ARS {toolsCostARS.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
+                  <span className="text-slate-600">+ Herramientas (USD {toolsCostUSD.toFixed(2)}):</span>
+                  <span className="font-mono tabular-nums text-slate-900">ARS {toolsCostARS.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
                 </div>
                 <Separator className="my-1" />
                 <div className="flex justify-between font-medium">
-                  <span>Subtotal:</span>
-                  <span className="font-mono">ARS {subtotalWithToolsARS.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
+                  <span className="text-slate-700">Subtotal:</span>
+                  <span className="font-mono tabular-nums text-slate-950">ARS {subtotalWithToolsARS.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
                 </div>
               </div>
             </div>
@@ -105,12 +105,12 @@ const ToolsAndPricing: React.FC = () => {
       </Card>
 
       {/* Sección de Pricing Manual */}
-      <Card className="border-green-200 bg-green-50/30">
+      <Card className="border-slate-200">
         <CardHeader className="pb-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Calculator className="h-5 w-5 text-green-600" />
-              <CardTitle className="text-lg text-green-900">Modo de Pricing</CardTitle>
+              <Calculator className="h-5 w-5 text-indigo-600" />
+              <CardTitle className="text-lg text-slate-950">Modo de Pricing</CardTitle>
             </div>
             <div className="flex items-center gap-3">
               <Label htmlFor="price-mode" className="text-sm font-medium">
@@ -123,8 +123,8 @@ const ToolsAndPricing: React.FC = () => {
               />
             </div>
           </div>
-          <p className="text-sm text-green-700">
-            {isManualMode 
+          <p className="text-sm text-slate-500">
+            {isManualMode
               ? "Establece un precio final y el margen se calculará automáticamente"
               : "El precio se calcula automáticamente basado en costos + margen"
             }
@@ -148,21 +148,21 @@ const ToolsAndPricing: React.FC = () => {
               </div>
               <div className="space-y-2">
                 <Label>Margen Calculado</Label>
-                <div className="p-3 bg-white rounded-md border text-sm space-y-1">
+                <div className="rounded-lg bg-slate-50 p-3 text-sm space-y-1">
                   <div className="flex justify-between">
-                    <span>Costos base (USD):</span>
-                    <span className="font-mono">USD {subtotalWithToolsUSD.toFixed(2)}</span>
+                    <span className="text-slate-600">Costos base (USD):</span>
+                    <span className="font-mono tabular-nums text-slate-900">USD {subtotalWithToolsUSD.toFixed(2)}</span>
                   </div>
-                  <div className="flex justify-between text-xs text-muted-foreground">
+                  <div className="flex justify-between text-xs text-slate-500">
                     <span>= ARS {subtotalWithToolsARS.toLocaleString('es-AR', { maximumFractionDigits: 0 })} ÷ TC {exchangeRate?.toLocaleString('es-AR')}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span>Precio manual:</span>
-                    <span className="font-mono">USD {(quotationData.financials.manualPrice || 0).toFixed(2)}</span>
+                    <span className="text-slate-600">Precio manual:</span>
+                    <span className="font-mono tabular-nums text-slate-900">USD {(quotationData.financials.manualPrice || 0).toFixed(2)}</span>
                   </div>
                   <Separator className="my-1" />
                   <div className="flex justify-between items-center">
-                    <span>Margen efectivo:</span>
+                    <span className="text-slate-700">Margen efectivo:</span>
                     <Badge variant={effectiveMarginPercentage > 0 ? "default" : "destructive"}>
                       {effectiveMarginPercentage.toFixed(1)}%
                     </Badge>
@@ -172,18 +172,18 @@ const ToolsAndPricing: React.FC = () => {
             </div>
           ) : (
             // Modo Automático
-            <div className="p-4 bg-white rounded-md border">
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
               <div className="flex items-center gap-2 mb-3">
-                <DollarSign className="h-4 w-4 text-green-600" />
-                <span className="font-medium text-sm">Cálculo Automático</span>
+                <DollarSign className="h-4 w-4 text-emerald-600" />
+                <span className="font-medium text-sm text-slate-700">Cálculo Automático</span>
               </div>
-              <div className="flex items-center justify-between text-sm">
+              <div className="flex items-center justify-between text-sm text-slate-600">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span>Costos: ARS {subtotalWithToolsARS.toLocaleString('es-AR', { maximumFractionDigits: 0 })}</span>
                   <ArrowRight className="h-3 w-3" />
                   <span>Margen: {effectiveMarginPercentage.toFixed(1)}%</span>
                   <ArrowRight className="h-3 w-3" />
-                  <span className="font-bold">Total: ${totalAmount.toFixed(2)}</span>
+                  <span className="font-semibold text-slate-950">Total: ${totalAmount.toFixed(2)}</span>
                 </div>
               </div>
             </div>
@@ -192,36 +192,36 @@ const ToolsAndPricing: React.FC = () => {
       </Card>
 
       {/* Resumen del Impacto */}
-      <Card className="border-blue-200 bg-blue-50/30">
+      <Card className="border-slate-200">
         <CardHeader className="pb-3">
-          <CardTitle className="text-sm text-blue-900">Resumen del Impacto</CardTitle>
+          <CardTitle className="text-sm text-slate-950">Resumen del Impacto</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
-            <div>
-              <div className="text-xs text-blue-600 mb-1">Herramientas</div>
-              <div className="font-mono text-sm font-medium">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-center">
+            <div className="rounded-lg bg-slate-50 p-3">
+              <div className="text-xs text-slate-500 mb-1">Herramientas</div>
+              <div className="font-mono text-sm font-medium tabular-nums text-slate-900">
                 USD {toolsCostUSD.toFixed(2)}
               </div>
-              <div className="text-xs text-blue-500">
+              <div className="text-xs text-slate-500">
                 ARS {toolsCostARS.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
               </div>
             </div>
-            <div>
-              <div className="text-xs text-blue-600 mb-1">Modo</div>
+            <div className="rounded-lg bg-slate-50 p-3">
+              <div className="text-xs text-slate-500 mb-1">Modo</div>
               <Badge variant={isManualMode ? "default" : "secondary"} className="text-xs">
                 {isManualMode ? "Manual" : "Auto"}
               </Badge>
             </div>
-            <div>
-              <div className="text-xs text-blue-600 mb-1">Margen</div>
-              <div className="font-mono text-sm font-medium">
+            <div className="rounded-lg bg-slate-50 p-3">
+              <div className="text-xs text-slate-500 mb-1">Margen</div>
+              <div className="font-mono text-sm font-medium tabular-nums text-slate-900">
                 {effectiveMarginPercentage.toFixed(1)}%
               </div>
             </div>
-            <div>
-              <div className="text-xs text-blue-600 mb-1">Total Final</div>
-              <div className="font-mono text-lg font-bold text-blue-900">
+            <div className="rounded-lg bg-slate-50 p-3">
+              <div className="text-xs text-slate-500 mb-1">Total Final</div>
+              <div className="font-mono text-lg font-semibold tabular-nums text-slate-950">
                 ${totalAmount.toFixed(2)}
               </div>
             </div>

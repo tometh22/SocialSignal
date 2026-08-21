@@ -104,12 +104,12 @@ Saludos cordiales`;
     <div className="p-6 space-y-6 max-w-3xl mx-auto">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-slate-900">Resumen ejecutivo</h2>
+          <h2 className="text-lg font-semibold text-slate-950">Resumen ejecutivo</h2>
           <p className="text-sm text-slate-500 mt-0.5">Revisá todo antes de enviar al cliente</p>
         </div>
         <div className="flex flex-col items-end gap-1.5">
           <Badge variant="outline" className="border-indigo-200 bg-indigo-50 text-xs text-indigo-700">Vista para el cliente</Badge>
-          <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 text-xs">
+          <Badge variant="outline" className="border-amber-200 bg-amber-50 text-xs text-amber-700">
             <Calendar className="h-3 w-3 mr-1" /> Vence {expiryStr}
           </Badge>
         </div>
@@ -122,12 +122,12 @@ Saludos cordiales`;
             <Building2 className="h-3.5 w-3.5" /> Cliente & Proyecto
           </div>
           <div>
-            <p className="font-semibold text-slate-900">{client?.name || '—'}</p>
+            <p className="font-semibold text-slate-950">{client?.name || '—'}</p>
             <p className="text-sm text-slate-600">{project?.name || '—'}</p>
           </div>
           <div className="flex flex-wrap gap-1.5">
-            <Badge variant="outline" className="text-xs bg-slate-50">{projectTypeLabel}</Badge>
-            <Badge variant="outline" className="text-xs bg-slate-50">Análisis {analysisLabel}</Badge>
+            <Badge variant="outline" className="border-slate-200 bg-slate-50 text-xs text-slate-600">{projectTypeLabel}</Badge>
+            <Badge variant="outline" className="border-slate-200 bg-slate-50 text-xs text-slate-600">Análisis {analysisLabel}</Badge>
           </div>
         </div>
 
@@ -136,7 +136,7 @@ Saludos cordiales`;
             <DollarSign className="h-3.5 w-3.5" /> Precio{project?.type === 'always-on' ? ' mensual' : ' total'}
           </div>
           <div>
-            <p className="text-2xl font-bold text-slate-900">{formatCurrency(tax.grandTotal, currency)}</p>
+            <p className="text-2xl font-bold tabular-nums text-slate-950">{formatCurrency(tax.grandTotal, currency)}</p>
             <p className="text-xs text-slate-400 mt-0.5">{currency}</p>
           </div>
           <div className="space-y-1 pt-1 border-t border-slate-100">
@@ -173,8 +173,17 @@ Saludos cordiales`;
           <div className="flex items-center gap-2 text-xs font-semibold text-slate-500 uppercase tracking-wide">
             <FileText className="h-3.5 w-3.5" /> Email listo para enviar
           </div>
-          <Button size="sm" variant="outline" onClick={handleCopy} className="h-7 text-xs gap-1.5" aria-live="polite">
-            {copied ? <><Check className="h-3 w-3 text-emerald-500" /> Copiado</> : <><Copy className="h-3 w-3" /> Copiar</>}
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleCopy}
+            className={cn(
+              "h-7 gap-1.5 text-xs transition-colors",
+              copied && "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-700"
+            )}
+            aria-live="polite"
+          >
+            {copied ? <><Check className="h-3 w-3" /> Copiado</> : <><Copy className="h-3 w-3" /> Copiar</>}
           </Button>
         </div>
         <pre className="p-4 text-xs text-slate-600 whitespace-pre-wrap font-mono leading-relaxed bg-slate-50/30 max-h-72 overflow-y-auto">

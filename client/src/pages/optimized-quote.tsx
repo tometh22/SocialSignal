@@ -415,7 +415,7 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
                       : 'cursor-not-allowed text-slate-400'
                 }`}
               >
-                  <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${isCurrent ? 'bg-white/15 text-white' : isComplete ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+                  <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition-colors ${isCurrent ? 'bg-white/15 text-white' : isComplete ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
                     {isComplete && !isCurrent ? <Check className="h-4 w-4" /> : <Icon className="h-4 w-4" />}
                   </span>
                   <span className="min-w-0"><span className={`block text-[10px] uppercase tracking-wide ${isCurrent ? 'text-slate-300' : 'text-slate-400'}`}>Paso {phase.num}</span><span className="block truncate text-xs font-semibold">{phase.title}</span></span>
@@ -423,6 +423,9 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
             );
           })}
         </nav>
+        <div className="mt-3 h-1 w-full overflow-hidden rounded-full bg-slate-100" role="progressbar" aria-valuenow={currentStepNumber} aria-valuemin={1} aria-valuemax={6} aria-label="Progreso de la cotización">
+          <div className="h-full rounded-full bg-slate-950 transition-[width] duration-500 ease-out" style={{ width: `${(currentStepNumber / 6) * 100}%` }} />
+        </div>
       </div>
 
        {leadOrigin && (
@@ -465,7 +468,7 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
               <p className="mt-1 text-sm text-slate-500">{stepMeta.description}</p>
             </header>
 
-            <div className="p-4 sm:p-6">
+            <div key={currentStepNumber} className="animate-fadeIn p-4 sm:p-6">
               <React.Suspense fallback={<PhaseLoading />}>
               {currentStepNumber === 1 && (
                 <div className="space-y-6">
@@ -617,7 +620,12 @@ function SectionHeading({ title, description }: { title: string; description: st
 }
 
 function EmptyStep({ message }: { message: string }) {
-  return <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-500">{message}</div>;
+  return (
+    <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center">
+      <span className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-slate-400"><Layers3 className="h-4 w-4" /></span>
+      <p className="max-w-sm text-sm text-slate-500">{message}</p>
+    </div>
+  );
 }
 
 function CommercialMotionField({ quotationData, updateQuotationData }: { quotationData: { commercialMotion?: string }; updateQuotationData: (data: { commercialMotion: 'new_business' | 'renewal' | 'expansion' | 'demo' }) => void }) {
