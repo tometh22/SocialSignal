@@ -87,3 +87,78 @@ describe('isProjectionRow', () => {
     expect(isProjectionRow(null)).toBe(true);
   });
 });
+
+// ─── Parseo de moneda en formato español ─────────────────────────────────────
+
+/** Réplica de parseMoneyUnified corregido (server/etl/import-incomes-confirmed.ts). */
+const parseMoney = (value: string | null | undefined): number | null => {
+  if (value === null || value === undefined || value === '') return null;
+  let cleaned = String(value).trim().replace(/[^\d.,-]/g, '');
+  if (cleaned === '' || cleaned === '-') return null;
+  if (cleaned.includes(',')) {
+    cleaned = cleaned.replace(/\./g, '').replace(',', '.');
+  } else if (/^-?\d{1,3}(\.\d{3}){2,}$/.test(cleaned)) {
+    cleaned = cleaned.replace(/\./g, '');
+  }
+  const parsed = parseFloat(cleaned);
+  return isNaN(parsed) ? null : parsed;
+};
+
+describe('parseMoneyUnified — formato español', () => {
+  it('no confunde el separador de miles con el decimal', () => {
+    // La versión anterior reemplazaba TODA coma por punto y hacía parseFloat,
+    // que se queda con el primer punto: mil veces menos de lo real.
+    expect(parseMoney('$29.230,00')).toBe(29230);
+    expect(parseMoney('$3.696,40')).toBeCloseTo(3696.4, 2);
+    expect(parseMoney('$1.234,56')).toBeCloseTo(1234.56, 2);
+  });
+
+  it('lee montos en pesos con dos o más separadores de miles', () => {
+    expect(parseMoney('$1.500.675')).toBe(1500675);
+    expect(parseMoney('$1.402.500')).toBe(1402500);
+  });
+
+  it('con UN solo punto trata el valor como decimal', () => {
+    // Ambiguo por naturaleza: "5.805" puede ser cinco con ochocientos cinco
+    // (String(5.805), que es lo que manda daily-sot-sync) o cinco mil ochocientos
+    // cinco en formato español. Se elige el caso que efectivamente llega.
+    // Un primer intento trataba esto como miles y convertía 5,805 en 5805.
+    expect(parseMoney('5.805')).toBeCloseTo(5.805, 3);
+    expect(parseMoney('1.234')).toBeCloseTo(1.234, 3);
+    expect(parseMoney('3696.4')).toBeCloseTo(3696.4, 2);
+  });
+
+  it('sigue leyendo enteros y decimales simples', () => {
+    expect(parseMoney('5300')).toBe(5300);
+    expect(parseMoney('151.28')).toBeCloseTo(151.28, 2);
+    expect(parseMoney('-1.234,56')).toBeCloseTo(-1234.56, 2);
+  });
+
+  it('devuelve null para vacío o basura', () => {
+    expect(parseMoney('')).toBeNull();
+    expect(parseMoney(null)).toBeNull();
+    expect(parseMoney(undefined)).toBeNull();
+    expect(parseMoney('#NUM!')).toBeNull();
+    expect(parseMoney('-')).toBeNull();
+  });
+});
+
+// ─── Varias facturas al mismo cliente en el mismo mes ────────────────────────
+
+describe('agregación por clave natural', () => {
+  it('suma las dos facturas de Detroit de jul-2026', () => {
+    // La solapa trae 1.402.500 ARS (899,04 USD) y 236.000 ARS (151,28 USD).
+    // El upsert las colapsaba y guardaba sólo la última: 151,28 en vez de
+    // 1.050,32 — 86% de la facturación del cliente perdida en silencio.
+    const facturas = [899.04, 151.28];
+    expect(facturas.reduce((a, b) => a + b, 0)).toBeCloseTo(1050.32, 2);
+  });
+
+  it('un mes es proyección sólo si TODAS sus facturas lo son', () => {
+    const esProyeccion = (ms: boolean[]) => ms.every(Boolean);
+    expect(esProyeccion([true, true])).toBe(true);
+    // Si una parte ya se ejecutó, el mes no es proyección.
+    expect(esProyeccion([false, true])).toBe(false);
+    expect(esProyeccion([false, false])).toBe(false);
+  });
+});

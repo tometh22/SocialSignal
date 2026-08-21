@@ -34,12 +34,28 @@ type ConfirmedProjectRowType = z.infer<typeof ConfirmedProjectRow>;
  * Parsear dinero en formato flexible
  */
 function parseMoneyUnified(value: string | undefined | null): number | null {
-  if (!value) return null;
-  
-  const cleaned = String(value)
-    .replace(/[^\d.,-]/g, '') // quitar símbolos
-    .replace(/,/g, '.'); // normalizar decimal
-  
+  if (value === null || value === undefined || value === '') return null;
+
+  let cleaned = String(value).trim().replace(/[^\d.,-]/g, '');
+  if (cleaned === '' || cleaned === '-') return null;
+
+  // Formato español: el punto es separador de miles y la coma decimal.
+  // Reemplazar las comas por puntos a secas rompía todo valor con miles:
+  // "$29.230,00" daba 29,23 y "$3.696,40" daba 3.696 — mil veces menos.
+  if (cleaned.includes(',')) {
+    cleaned = cleaned.replace(/\./g, '').replace(',', '.');
+  } else if (/^-?\d{1,3}(\.\d{3}){2,}$/.test(cleaned)) {
+    // Dos o más puntos sin coma sólo pueden ser separadores de miles:
+    // "1.500.675". Un número no tiene dos comas decimales.
+    //
+    // Con UN solo punto no se puede decidir: esta función recibe tanto strings
+    // crudos de la planilla ("$236.000" = doscientos treinta y seis mil) como
+    // números ya parseados que el llamador convirtió con String() ("5.805" =
+    // cinco con ochocientos cinco). Se trata como decimal, que es lo correcto
+    // para el segundo caso — el único que llega hoy desde daily-sot-sync.
+    cleaned = cleaned.replace(/\./g, '');
+  }
+
   const parsed = parseFloat(cleaned);
   return isNaN(parsed) ? null : parsed;
 }
@@ -126,17 +142,53 @@ export async function importIncomesFromConfirmed(rows: any[]): Promise<ImportInc
       `(${filtered.length - proyecciones} reales, ${proyecciones} proyecciones)`,
     );
 
-    // Procesar cada fila
+    // Agregar por la clave natural (cliente, proyecto, mes) ANTES de escribir.
+    //
+    // La solapa puede traer varias facturas al mismo cliente/proyecto/mes: Detroit
+    // tiene dos filas en jul-2026 (1.402.500 y 236.000 ARS). El upsert las
+    // colapsaba y se quedaba con la última procesada, dejando Detroit en 151,28
+    // cuando el real es 1.050,32 — 86% de la facturación del cliente perdida en
+    // silencio. Diez filas de 147 caían en este caso.
+    //
+    // Sumar en el ON CONFLICT no sirve: el ETL corre de nuevo cada seis horas y
+    // duplicaría. Agregando en origen, el upsert escribe el total y es idempotente.
+    const agrupadas = new Map<string, typeof filtered>();
     for (const row of filtered) {
+      const clave = [
+        row["Cliente"].trim(),
+        row["Detalle"].trim(),
+        monthKeyFromEs(row["Mes Facturación"], row["Año Facturación"]),
+      ].join('|');
+      const grupo = agrupadas.get(clave);
+      if (grupo) grupo.push(row); else agrupadas.set(clave, [row]);
+    }
+
+    const conVariasFacturas = [...agrupadas.values()].filter((g) => g.length > 1);
+    if (conVariasFacturas.length > 0) {
+      console.log(
+        `🧮 ${conVariasFacturas.length} clave(s) con más de una factura en el mes, se suman: ` +
+        conVariasFacturas.map((g) => `${g[0]["Cliente"]}/${g[0]["Detalle"]} ×${g.length}`).join(', '),
+      );
+    }
+
+    for (const grupo of agrupadas.values()) {
+      const row = grupo[0];
       try {
         const monthKey = monthKeyFromEs(row["Mes Facturación"], row["Año Facturación"]);
+        const sumar = (campo: string) => {
+          const vals = grupo
+            .map((r) => parseMoneyUnified((r as any)[campo] ?? ""))
+            .filter((v): v is number => v != null);
+          return vals.length > 0 ? vals.reduce((a, b) => a + b, 0) : null;
+        };
         
-        // Parsear valores
-        let amountLocalArs = parseMoneyUnified(row["Moneda Original ARS"] ?? "");
-        const amountLocalUsd = parseMoneyUnified(row["Moneda Original USD"] ?? "");
-        const revenueUsd = parseMoneyUnified(row["Monto Total USD"]) ?? 0;
-        const revenueUsdVat = parseMoneyUnified(row["Monto Total USD CON IVA"] ?? "");
-        let revenueArsVat = parseMoneyUnified(row["Monto Total ARS CON IVA"] ?? "");
+        // Importes: suma del grupo. La cotización no se suma — es un ratio, se
+        // toma la de la primera fila.
+        let amountLocalArs = sumar("Moneda Original ARS");
+        const amountLocalUsd = sumar("Moneda Original USD");
+        const revenueUsd = sumar("Monto Total USD") ?? 0;
+        const revenueUsdVat = sumar("Monto Total USD CON IVA");
+        let revenueArsVat = sumar("Monto Total ARS CON IVA");
         const fxRef = parseMoneyUnified(row["Cotización"] ?? "");
         
         // Aplicar corrección anti-×100/×1000/×10000 a valores ARS
@@ -163,7 +215,8 @@ export async function importIncomesFromConfirmed(rows: any[]): Promise<ImportInc
           projectName: row["Detalle"].trim(),
           projectType: row["Tipo de proyecto"].trim(),
           confirmed: true,
-          isProjection: isProjectionRow(row["Pasado/Futuro"]),
+          // Si alguna factura del mes ya se ejecutó, el mes no es proyección.
+          isProjection: grupo.every((r) => isProjectionRow(r["Pasado/Futuro"])),
           statusHint: (row["Facturado/No Facturado"] ?? "").trim() || null,
           fxRef: fxRef ? String(fxRef) : null,
           amountLocalArs: amountLocalArs ? String(amountLocalArs) : null,
