@@ -1,14 +1,15 @@
 import { useRef, useState } from "react";
-import { FileText, Lightbulb, Loader2, Sparkles, Upload, X } from "lucide-react";
+import { ArrowRight, FileText, Layers3, Loader2, Sparkles, Upload, X } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { apiRequest } from "@/lib/queryClient";
 import { getApiErrorMessage } from "@/lib/api-error";
 
-export type BriefIntakeAnalysis = {
+export type BriefProposalCandidate = {
+  id: string;
   summary: string;
   projectName: string;
   objective: string;
@@ -28,12 +29,26 @@ export type BriefIntakeAnalysis = {
   recommendationReason: string;
   confidence: number;
   missingQuestions: string[];
-  source: "ai" | "heuristic";
-  model: string | null;
   recommendedBlueprint: { id: number; slug: string; name: string; workloadHours: number } | null;
 };
 
-type Props = { onApply: (analysis: BriefIntakeAnalysis) => void };
+export type BriefIntakeAnalysis = Omit<BriefProposalCandidate, "id"> & {
+  source: "ai" | "heuristic";
+  model: string | null;
+  proposals: BriefProposalCandidate[];
+  requiresProposalSelection: boolean;
+};
+
+type Props = { onApply: (proposal: BriefProposalCandidate, analysis: BriefIntakeAnalysis) => void };
+
+const modalityLabel: Record<string, string> = {
+  demo: "Demo",
+  one_shot: "Proyecto puntual",
+  event_pack: "Pack de evento",
+  monthly_fee: "Fee mensual",
+  annual_program: "Programa anual",
+  renewal: "Renovación",
+};
 
 export function QuotationBriefIntake({ onApply }: Props) {
   const [brief, setBrief] = useState("");
@@ -50,7 +65,7 @@ export function QuotationBriefIntake({ onApply }: Props) {
       return;
     }
     if (!/text\/(plain|markdown|csv)|application\/json/.test(file.type) && !/\.(txt|md|csv|json)$/i.test(file.name)) {
-      setError("Por ahora podés cargar minutas .txt, .md, .csv o .json. También podés pegar el texto directamente.");
+      setError("Podés cargar minutas .txt, .md, .csv o .json, o pegar el texto directamente.");
       return;
     }
     setFileName(file.name);
@@ -60,7 +75,7 @@ export function QuotationBriefIntake({ onApply }: Props) {
 
   const analyze = async () => {
     if (brief.trim().length < 20) {
-      setError("Contanos al menos el desafío, el cliente o la decisión que hay que habilitar (20 caracteres mínimo).");
+      setError("Incluí al menos el desafío, el cliente o la decisión que hay que habilitar.");
       return;
     }
     setError(null);
@@ -69,40 +84,103 @@ export function QuotationBriefIntake({ onApply }: Props) {
       const result = await apiRequest("/api/quotation-intake/analyze", "POST", { brief: brief.trim() });
       setAnalysis(result);
     } catch (requestError) {
-      setError(getApiErrorMessage(requestError, "No pudimos analizar la minuta. Podés continuar con el brief manual."));
+      setError(getApiErrorMessage(requestError, "No pudimos analizar la minuta. Podés continuar completando los datos manualmente."));
     } finally {
       setIsAnalyzing(false);
     }
   };
 
+  const reset = () => {
+    setAnalysis(null);
+    setError(null);
+  };
+
+  if (analysis) {
+    const proposals = analysis.proposals?.length ? analysis.proposals : [{ id: "proposal-1", ...analysis }];
+    const multiple = proposals.length > 1;
+    return (
+      <Card className="overflow-hidden border-slate-200 shadow-none">
+        <CardContent className="p-0">
+          <div className="border-b border-slate-200 bg-slate-950 px-5 py-5 text-white sm:px-6">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="flex items-start gap-3">
+                <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/10"><Layers3 className="h-4 w-4" /></span>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-300">Análisis completado</p>
+                  <h3 className="mt-1 text-lg font-semibold">{multiple ? `Detectamos ${proposals.length} propuestas diferentes` : "Detectamos una propuesta cotizable"}</h3>
+                  <p className="mt-1 max-w-2xl text-sm leading-5 text-slate-300">{multiple ? "Cada alcance tiene un objetivo y una decisión propios. Elegí cuál querés cotizar primero; no mezclaremos sus horas ni entregables." : analysis.summary}</p>
+                </div>
+              </div>
+              <Button type="button" variant="outline" size="sm" onClick={reset} className="w-fit border-white/20 bg-transparent text-white hover:bg-white/10 hover:text-white">Editar minuta</Button>
+            </div>
+          </div>
+
+          <div className="space-y-3 bg-slate-50/60 p-4 sm:p-6">
+            {proposals.map((proposal, index) => (
+              <article key={proposal.id || `${proposal.projectName}-${index}`} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="flex min-w-0 gap-3">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-semibold text-white">{index + 1}</span>
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h4 className="text-base font-semibold text-slate-950">{proposal.projectName}</h4>
+                        <Badge variant="outline" className="border-slate-200 bg-slate-50 text-slate-600">{proposal.modality ? modalityLabel[proposal.modality] : "Por definir"}{proposal.durationMonths ? ` · ${proposal.durationMonths} meses` : ""}</Badge>
+                      </div>
+                      <p className="mt-2 text-sm leading-6 text-slate-600">{proposal.summary}</p>
+                      {proposal.decision && <p className="mt-2 text-xs leading-5 text-slate-500"><span className="font-semibold text-slate-700">Decisión que habilita:</span> {proposal.decision}</p>}
+                      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
+                        {proposal.recommendedBlueprint && <span><strong className="text-slate-700">Receta:</strong> {proposal.recommendedBlueprint.name}</span>}
+                        {proposal.markets.length > 0 && <span><strong className="text-slate-700">Mercados:</strong> {proposal.markets.join(", ")}</span>}
+                        <span><strong className="text-slate-700">Confianza:</strong> {Math.round(proposal.confidence * 100)}%</span>
+                      </div>
+                      {proposal.missingQuestions.length > 0 && (
+                        <details className="mt-3 text-xs text-slate-600">
+                          <summary className="cursor-pointer font-medium text-slate-700">{proposal.missingQuestions.length} {proposal.missingQuestions.length === 1 ? "dato pendiente" : "datos pendientes"}</summary>
+                          <ul className="mt-2 list-disc space-y-1 pl-5">{proposal.missingQuestions.map((question) => <li key={question}>{question}</li>)}</ul>
+                        </details>
+                      )}
+                    </div>
+                  </div>
+                  <Button type="button" className="shrink-0 lg:min-w-44" onClick={() => onApply(proposal, analysis)}>Cotizar esta propuesta <ArrowRight className="ml-2 h-4 w-4" /></Button>
+                </div>
+              </article>
+            ))}
+            <details className="rounded-lg px-1 text-xs text-slate-500">
+              <summary className="cursor-pointer font-medium text-slate-600">Ver minuta analizada</summary>
+              <p className="mt-2 whitespace-pre-wrap rounded-lg border border-slate-200 bg-white p-3 leading-5">{brief}</p>
+            </details>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
-    <Card className="overflow-hidden border-indigo-200 bg-gradient-to-br from-indigo-50 via-white to-white shadow-sm">
-      <CardHeader className="pb-3">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+    <Card className="border-slate-200 shadow-none">
+      <CardContent className="p-5 sm:p-6">
+        <div className="flex items-start gap-3">
+          <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-950 text-white"><Sparkles className="h-4 w-4" /></span>
           <div>
-            <CardTitle className="flex items-center gap-2 text-base text-slate-950"><Sparkles className="h-4 w-4 text-indigo-600" /> Empezá con un brief o una minuta</CardTitle>
-            <p className="mt-1 max-w-2xl text-sm leading-5 text-slate-600">Pegá las notas de una reunión o cargá un archivo de texto. El asistente detecta el desafío, las preguntas y la receta más adecuada. Nada comercial se aplica sin tu confirmación.</p>
+            <h3 className="text-base font-semibold text-slate-950">Partí de un brief o una minuta</h3>
+            <p className="mt-1 max-w-2xl text-sm leading-5 text-slate-500">El asistente separa oportunidades, identifica el alcance y recomienda una receta. Vos confirmás qué propuesta querés cotizar.</p>
           </div>
-          <Badge variant="outline" className="w-fit border-indigo-200 bg-white text-indigo-700"><Lightbulb className="mr-1 h-3.5 w-3.5" /> Recomendación explicada</Badge>
         </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <Textarea value={brief} onChange={(event) => { setBrief(event.target.value); setAnalysis(null); }} rows={5} placeholder="Ej.: En la reunión con Uber definimos monitorear la conversación del Mundial en Argentina, Brasil y México, con alertas y un reporte ejecutivo semanal para marketing y asuntos públicos…" aria-label="Brief o minuta de reunión" />
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-2">
-            <input ref={fileRef} type="file" accept=".txt,.md,.csv,.json,text/plain,text/markdown,text/csv,application/json" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; if (file) void readFile(file); event.currentTarget.value = ""; }} />
-            <Button type="button" variant="outline" size="sm" onClick={() => fileRef.current?.click()}><Upload className="mr-2 h-4 w-4" /> Cargar minuta</Button>
-            {fileName && <span className="flex max-w-[220px] items-center gap-1 truncate text-xs text-slate-500"><FileText className="h-3.5 w-3.5 shrink-0" /> {fileName}<button type="button" className="ml-1 rounded p-0.5 hover:bg-slate-200" aria-label="Quitar archivo" onClick={() => { setFileName(null); setBrief(""); setAnalysis(null); }}><X className="h-3 w-3" /></button></span>}
+
+        <div className="mt-5 space-y-3">
+          <Textarea value={brief} onChange={(event) => { setBrief(event.target.value); setAnalysis(null); }} rows={6} placeholder="Pegá acá el brief, la minuta o las notas de la reunión…" aria-label="Brief o minuta de reunión" className="resize-y border-slate-200 bg-slate-50/50 text-sm leading-6" />
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex min-w-0 items-center gap-2">
+              <input ref={fileRef} type="file" accept=".txt,.md,.csv,.json,text/plain,text/markdown,text/csv,application/json" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; if (file) void readFile(file); event.currentTarget.value = ""; }} />
+              <Button type="button" variant="outline" size="sm" onClick={() => fileRef.current?.click()}><Upload className="mr-2 h-4 w-4" /> Cargar archivo</Button>
+              {fileName && <span className="flex min-w-0 items-center gap-1 truncate text-xs text-slate-500"><FileText className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{fileName}</span><button type="button" className="ml-1 rounded p-0.5 hover:bg-slate-200" aria-label="Quitar archivo" onClick={() => { setFileName(null); setBrief(""); }}><X className="h-3 w-3" /></button></span>}
+            </div>
+            <Button type="button" onClick={() => void analyze()} disabled={isAnalyzing || brief.trim().length < 20} className="sm:min-w-48">
+              {isAnalyzing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+              {isAnalyzing ? "Analizando…" : "Analizar oportunidades"}
+            </Button>
           </div>
-          <Button type="button" onClick={() => void analyze()} disabled={isAnalyzing || brief.trim().length < 20} className="sm:min-w-44"><>{isAnalyzing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}</> {isAnalyzing ? "Analizando…" : "Analizar y recomendar"}</Button>
         </div>
-        {error && <Alert variant="destructive"><AlertTitle>No pudimos procesarlo</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>}
-        {analysis && <div className="rounded-xl border border-indigo-200 bg-white p-4 shadow-sm">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><p className="text-xs font-semibold uppercase tracking-wide text-indigo-600">Lectura inicial {analysis.source === "ai" ? "asistida por IA" : "rápida"}</p><p className="mt-1 text-sm leading-5 text-slate-700">{analysis.summary}</p></div><Badge variant="outline">Confianza {Math.round(analysis.confidence * 100)}%</Badge></div>
-          {analysis.recommendedBlueprint && <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3"><p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Receta sugerida</p><p className="mt-1 font-semibold text-emerald-950">{analysis.recommendedBlueprint.name}</p><p className="mt-1 text-sm leading-5 text-emerald-900">{analysis.recommendationReason}</p><p className="mt-1 text-xs text-emerald-700">Referencia inicial: {analysis.recommendedBlueprint.workloadHours} h · Podés modificar cobertura y entregables después.</p></div>}
-          {analysis.missingQuestions.length > 0 && <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3"><p className="text-xs font-semibold uppercase tracking-wide text-amber-700">Para afinar la propuesta</p><ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-amber-900">{analysis.missingQuestions.map((question) => <li key={question}>{question}</li>)}</ul></div>}
-          <Button type="button" className="mt-4 w-full sm:w-auto" onClick={() => onApply(analysis)}>Usar este diagnóstico en el cotizador</Button>
-        </div>}
+        {error && <Alert variant="destructive" className="mt-4"><AlertTitle>No pudimos procesarlo</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>}
       </CardContent>
     </Card>
   );

@@ -50,7 +50,8 @@ describe('professional quotation workflow', () => {
     expect(routes).toContain('/api/quotation-analytics/funnel');
     expect(routes).toContain('syncQuotationToCrm');
     expect(source('server/routes-proposal-studio.ts')).toContain('/api/quotation-intake/analyze');
-    expect(source('client/src/components/quotation/quotation-brief-intake.tsx')).toContain('Cargar minuta');
+    expect(source('client/src/components/quotation/quotation-brief-intake.tsx')).toContain('Cargar archivo');
+    expect(source('client/src/components/quotation/quotation-brief-intake.tsx')).toContain('propuestas diferentes');
     expect(source('client/src/components/quotation/quotation-brief-intake.tsx')).toContain('recommendationReason');
   });
 });
