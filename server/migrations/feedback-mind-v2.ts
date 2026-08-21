@@ -78,10 +78,6 @@ SET monthly_hours = NULL
 WHERE contract_type = 'freelance'
   AND (monthly_hours IS NULL OR monthly_hours = 160);
 
-UPDATE personnel
-SET "current_role" = NULL
-WHERE contract_type = 'freelance';
-
 ALTER TABLE personnel_absences
   DROP CONSTRAINT IF EXISTS personnel_absences_type_check;
 

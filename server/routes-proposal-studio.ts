@@ -1,5 +1,5 @@
 import type { Express, RequestHandler } from "express";
-import { and, asc, desc, eq, isNull } from "drizzle-orm";
+import { and, asc, desc, eq, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "./db";
 import { requirePermission } from "./middleware/requirePermission";
@@ -43,6 +43,61 @@ export function registerProposalStudioRoutes(app: Express, requireAuth: AuthMidd
       ? await db.select().from(serviceBlueprints).orderBy(asc(serviceBlueprints.name), desc(serviceBlueprints.version))
       : await db.select().from(serviceBlueprints).where(eq(serviceBlueprints.status, status)).orderBy(asc(serviceBlueprints.name), desc(serviceBlueprints.version));
     res.json(rows.map((row) => ({ ...row, workload: estimateBlueprintWorkload(blueprintDefinitionSchema.parse(row.definition)) })));
+  });
+
+  app.get("/api/quotation-effort-benchmarks", requireAuth, requirePermission("quotations"), async (_req, res) => {
+    try {
+      const result = await db.execute(sql`
+        WITH logged_hours AS (
+          SELECT project_id, SUM(hours)::double precision AS actual_hours
+          FROM (
+            SELECT task.project_id, entry.hours
+            FROM task_time_entries entry
+            INNER JOIN tasks task ON task.id = entry.task_id
+            UNION ALL
+            SELECT legacy.project_id, legacy.hours
+            FROM time_entries legacy
+          ) combined_entries
+          GROUP BY project_id
+        ), completed_projects AS (
+          SELECT
+            project.id AS project_id,
+            quote.service_blueprint_id,
+            quote.project_type,
+            hours.actual_hours
+          FROM active_projects project
+          INNER JOIN quotations quote ON quote.id = project.quotation_id
+          INNER JOIN logged_hours hours ON hours.project_id = project.id
+          WHERE hours.actual_hours > 0
+            AND (
+              project.closed_at IS NOT NULL
+              OR project.is_finished = true
+              OR project.status IN ('completed', 'delivered', 'invoiced')
+              OR project.workflow_stage = 'finalizado'
+            )
+        )
+        SELECT
+          service_blueprint_id,
+          project_type,
+          COUNT(*)::integer AS sample_size,
+          AVG(actual_hours)::double precision AS average_actual_hours,
+          percentile_cont(0.5) WITHIN GROUP (ORDER BY actual_hours)::double precision AS median_actual_hours
+        FROM completed_projects
+        GROUP BY GROUPING SETS ((service_blueprint_id, project_type), (project_type))
+        HAVING GROUPING(service_blueprint_id) = 1 OR service_blueprint_id IS NOT NULL
+        ORDER BY project_type, service_blueprint_id NULLS LAST
+      `);
+      res.json(result.rows.map((row) => ({
+        serviceBlueprintId: row.service_blueprint_id == null ? null : Number(row.service_blueprint_id),
+        projectType: String(row.project_type),
+        sampleSize: Number(row.sample_size),
+        averageActualHours: Number(row.average_actual_hours),
+        medianActualHours: Number(row.median_actual_hours),
+      })));
+    } catch (error) {
+      console.error("[quotation-effort-benchmarks] Error:", error);
+      res.status(500).json({ message: "No se pudo calcular el histórico de esfuerzo" });
+    }
   });
 
   app.post("/api/service-blueprints", requireAuth, requirePermission("quotations"), async (req, res) => {

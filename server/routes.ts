@@ -14,6 +14,12 @@ import {
 import { aggregateWeeklyEstimatesByTask } from "@shared/utils/taskEstimates";
 import { deriveMonthlySalariesFromHourlyRates } from "@shared/utils/personnel-cost";
 import {
+  allowedSublevelsForRole,
+  normalizePersonnelArea,
+  normalizePersonnelRole,
+  normalizePersonnelSublevel,
+} from "@shared/utils/personnel-classification";
+import {
   ABSENCE_ACTIONS,
   ABSENCE_TYPES,
   absenceConsumesAllowance,
@@ -183,6 +189,49 @@ import {
   convertDirectCostsToCostRecord,
   type CurrencyCode 
 } from "./services/currency";
+
+function canonicalizePersonnelClassification(
+  input: Record<string, any>,
+  existing?: { currentRole?: string | null; sublevel?: string | null; area?: string | null },
+) {
+  const badRequest = (message: string, field: string) => {
+    throw Object.assign(new Error(message), { status: 400, field });
+  };
+
+  if (Object.prototype.hasOwnProperty.call(input, "currentRole")) {
+    if (input.currentRole == null || String(input.currentRole).trim() === "") input.currentRole = null;
+    else input.currentRole = normalizePersonnelRole(input.currentRole)
+      ?? badRequest("El rol debe ser Junior, Semi Senior, Senior, Lead o Lead de Leads", "currentRole");
+  }
+  if (Object.prototype.hasOwnProperty.call(input, "sublevel")) {
+    if (input.sublevel == null || String(input.sublevel).trim() === "") input.sublevel = null;
+    else input.sublevel = normalizePersonnelSublevel(input.sublevel)
+      ?? badRequest("El subnivel debe ser A, B o C", "sublevel");
+  }
+  if (Object.prototype.hasOwnProperty.call(input, "area")) {
+    if (input.area == null || String(input.area).trim() === "") input.area = null;
+    else input.area = normalizePersonnelArea(input.area)
+      ?? badRequest("El área debe ser Operaciones, Marketing, DataTech o Cuenta", "area");
+  }
+
+  // Freelancers use the same canonical seniority catalogue. When the Master
+  // only provides the historical role, classify it to the closest level.
+  if ((input.contractType ?? null) === "freelance" && !input.currentRole) {
+    input.currentRole = normalizePersonnelRole(input.legacyRole) ?? existing?.currentRole ?? null;
+  }
+
+  const role = input.currentRole ?? existing?.currentRole ?? null;
+  const sublevel = input.sublevel ?? existing?.sublevel ?? null;
+  if (role && sublevel && !allowedSublevelsForRole(role).includes(sublevel)) {
+    badRequest(
+      normalizePersonnelRole(role) === "4 Lead"
+        ? "Lead admite subniveles A, B o C"
+        : "Este rol admite únicamente subniveles A o B",
+      "sublevel",
+    );
+  }
+  return input;
+}
 
 // 🚀 INCOME SOT - Nueva fuente única de verdad para ingresos
 import * as income from './domain/income';
@@ -4133,24 +4182,76 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/roles", requireAuth, async (_, res) => {
     const roleRows = await storage.getRoles();
     const averageRows = await db.execute(sql`
+      WITH latest_rates AS (
+        SELECT DISTINCT ON (cost.personnel_id)
+          cost.personnel_id,
+          cost.hourly_rate_ars,
+          cost.hourly_rate_usd,
+          COALESCE(rate_by_id.rate, rate_by_period.rate) AS exchange_rate
+        FROM personnel_historical_costs cost
+        LEFT JOIN exchange_rates rate_by_id
+          ON rate_by_id.id = cost.exchange_rate_id
+        LEFT JOIN LATERAL (
+          SELECT candidate.rate
+          FROM exchange_rates candidate
+          WHERE candidate.year = cost.year
+            AND candidate.month = cost.month
+            AND candidate.is_active = TRUE
+          ORDER BY
+            CASE WHEN candidate.rate_type = 'estimated' THEN 1 ELSE 0 END,
+            candidate.specific_date DESC NULLS LAST,
+            candidate.updated_at DESC
+          LIMIT 1
+        ) rate_by_period ON TRUE
+        WHERE cost.is_active = TRUE
+          AND (cost.year * 100 + cost.month) <= (
+            EXTRACT(YEAR FROM CURRENT_DATE)::int * 100 + EXTRACT(MONTH FROM CURRENT_DATE)::int
+          )
+        ORDER BY cost.personnel_id, cost.year DESC, cost.month DESC, cost.updated_at DESC
+      )
+      , classification_averages AS (
+        SELECT
+          COALESCE(NULLIF(TRIM(p.current_role), ''), NULLIF(TRIM(r.name), ''), 'Sin rol') AS role_name,
+          COALESCE(NULLIF(TRIM(p.sublevel), ''), 'Sin subnivel') AS sublevel,
+          AVG(NULLIF(latest.hourly_rate_ars, 0)) AS average_rate_ars,
+          AVG(NULLIF(COALESCE(
+            latest.hourly_rate_usd,
+            latest.hourly_rate_ars / NULLIF(latest.exchange_rate, 0)
+          ), 0)) AS average_rate_usd,
+          COUNT(*)::int AS personnel_count
+        FROM personnel p
+        LEFT JOIN roles r ON r.id = p.role_id
+        LEFT JOIN latest_rates latest ON latest.personnel_id = p.id
+        WHERE p.include_in_real_costs = TRUE
+        GROUP BY 1, 2
+      ), role_classifications AS (
+        SELECT DISTINCT
+          p.role_id,
+          COALESCE(NULLIF(TRIM(p.current_role), ''), NULLIF(TRIM(r.name), ''), 'Sin rol') AS role_name,
+          COALESCE(NULLIF(TRIM(p.sublevel), ''), 'Sin subnivel') AS sublevel
+        FROM personnel p
+        LEFT JOIN roles r ON r.id = p.role_id
+        WHERE p.include_in_real_costs = TRUE
+      )
       SELECT
-        p.role_id,
-        COALESCE(NULLIF(TRIM(p.current_role), ''), NULLIF(TRIM(r.name), ''), 'Sin rol') AS role_name,
-        COALESCE(NULLIF(TRIM(p.sublevel), ''), 'Sin subnivel') AS sublevel,
-        AVG(NULLIF(p.hourly_rate_ars, 0)) AS average_rate_ars,
-        AVG(NULLIF(p.hourly_rate, 0)) AS average_rate_usd,
-        COUNT(*)::int AS personnel_count
-      FROM personnel p
-      LEFT JOIN roles r ON r.id = p.role_id
-      WHERE p.include_in_real_costs = TRUE
-      GROUP BY 1, 2, 3
-      ORDER BY 2, 3
+        classification.role_id,
+        average.role_name,
+        average.sublevel,
+        average.average_rate_ars,
+        average.average_rate_usd,
+        average.personnel_count
+      FROM role_classifications classification
+      INNER JOIN classification_averages average
+        ON average.role_name = classification.role_name
+        AND average.sublevel = classification.sublevel
+      ORDER BY average.role_name, average.sublevel
     `);
     res.json(roleRows.map((role: any) => ({
       ...role,
       rateAverages: (averageRows.rows as any[])
         .filter((row) => Number(row.role_id) === Number(role.id) || String(row.role_name).trim().toLowerCase() === String(role.name).trim().toLowerCase())
         .map((row) => ({
+          roleName: row.role_name,
           sublevel: row.sublevel,
           averageRateARS: row.average_rate_ars == null ? null : Number(row.average_rate_ars),
           averageRateUSD: row.average_rate_usd == null ? null : Number(row.average_rate_usd),
@@ -4235,6 +4336,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         currentRole: personnel.currentRole,
         sublevel: personnel.sublevel,
         legacyRole: personnel.legacyRole,
+        area: personnel.area,
         hourlyRate: personnel.hourlyRate,
         hourlyRateARS: personnel.hourlyRateARS,
         roleName: roles.name,
@@ -4522,6 +4624,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/personnel", requireAuth, async (req, res) => {
     try {
       const incoming = { ...req.body, hourlyRate: 0 };
+      canonicalizePersonnelClassification(incoming);
       const parseCanonicalRate = (value: unknown) => {
         if (value == null || value === "") return null;
         const parsed = Number(String(value).replace(",", "."));
@@ -4586,6 +4689,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Si hourlyRate viene como string, asegurarnos de convertirlo a número
       let data = { ...req.body };
+      canonicalizePersonnelClassification(data, currentPerson ?? undefined);
       const hasHourlyRateARS = Object.prototype.hasOwnProperty.call(data, "hourlyRateARS");
       const hasHourlyRateUSD = Object.prototype.hasOwnProperty.call(data, "hourlyRateUSD");
       const parseCanonicalRate = (value: unknown) => {
@@ -4795,6 +4899,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         currentRole?: string | null;
         sublevel?: string | null;
         legacyRole?: string | null;
+        area?: string | null;
       };
 
       const matched: PreviewRow[] = [];
@@ -4831,9 +4936,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
               }
             }
             const metadata = [
-              ["currentRole", person?.contractType === "freelance" ? null : row.currentRole ?? null, person?.currentRole ?? null],
+              ["currentRole", normalizePersonnelRole(row.currentRole) ?? (person?.contractType === "freelance" ? normalizePersonnelRole(row.legacyRole) : null), person?.currentRole ?? null],
               ["sublevel", row.sublevel ?? null, person?.sublevel ?? null],
               ["legacyRole", row.legacyRole ?? null, person?.legacyRole ?? null],
+              ["area", normalizePersonnelArea(row.area), person?.area ?? null],
             ] as const;
             for (const [field, next, current] of metadata) {
               if (next !== null && next !== current) proposedChanges.push({ field, current, next });
@@ -4849,6 +4955,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           currentRole: row.currentRole ?? null,
           sublevel: row.sublevel ?? null,
           legacyRole: row.legacyRole ?? null,
+          area: row.area ?? null,
         };
         if (match && "personnelId" in match) {
           matched.push(entry);
@@ -19340,7 +19447,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { exchangeRates } = await import('../shared/schema');
       const rates = await db.select()
         .from(exchangeRates)
-        .where(eq(exchangeRates.year, year))
+        .where(and(eq(exchangeRates.year, year), eq(exchangeRates.isActive, true)))
         .orderBy(asc(exchangeRates.month));
       
       return res.json(rates);
@@ -19360,6 +19467,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         createdBy: req.user?.id,
         createdAt: new Date(),
       });
+      if (validatedData.rateType !== "estimated") {
+        await db.update(exchangeRates).set({ isActive: false, updatedAt: new Date(), updatedBy: req.user?.id })
+          .where(and(
+            eq(exchangeRates.year, validatedData.year),
+            eq(exchangeRates.month, validatedData.month),
+            eq(exchangeRates.rateType, "estimated"),
+            eq(exchangeRates.isActive, true),
+          ));
+      }
       
       const [newRate] = await db.insert(exchangeRates)
         .values(validatedData)
@@ -19385,6 +19501,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { exchangeRates, insertExchangeRateSchema } = await import('../shared/schema');
 
       const validatedData = insertExchangeRateSchema.partial().parse(req.body);
+      const [existingRate] = await db.select().from(exchangeRates).where(eq(exchangeRates.id, id));
+      if (!existingRate) return res.status(404).json({ message: "Exchange rate not found" });
+      const effectiveYear = validatedData.year ?? existingRate.year;
+      const effectiveMonth = validatedData.month ?? existingRate.month;
+      const effectiveType = validatedData.rateType ?? existingRate.rateType;
+      if (effectiveType !== "estimated") {
+        await db.update(exchangeRates).set({ isActive: false, updatedAt: new Date(), updatedBy: req.user?.id })
+          .where(and(
+            eq(exchangeRates.year, effectiveYear),
+            eq(exchangeRates.month, effectiveMonth),
+            eq(exchangeRates.rateType, "estimated"),
+            eq(exchangeRates.isActive, true),
+            sql`${exchangeRates.id} <> ${id}`,
+          ));
+      }
 
       const [updatedRate] = await db.update(exchangeRates)
         .set({
@@ -19484,6 +19615,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         rate: result.rate,
         fetchedAt: result.fetchedAt,
         record: result.saved,
+        verification: result.verification,
       });
     } catch (error) {
       console.error("Error syncing blue rate:", error);

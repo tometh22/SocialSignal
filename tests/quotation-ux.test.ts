@@ -75,7 +75,7 @@ describe('quotation UX workflow', () => {
     ]);
   });
 
-  it('requires a valid target price and inflation date in advanced pricing', () => {
+  it('requires a valid target price without legacy inflation fields', () => {
     const quotation = validQuotation();
     quotation.financials.priceMode = 'manual';
     quotation.financials.manualPrice = 0;
@@ -83,7 +83,6 @@ describe('quotation UX workflow', () => {
     quotation.inflation.applyInflationAdjustment = true;
     expect(validateQuotationPhase(3, quotation).map((issue) => issue.field)).toEqual([
       'manual-price',
-      'inflation-start-date',
     ]);
   });
 });

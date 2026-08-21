@@ -81,6 +81,14 @@ export type WorkloadLine = {
   estimatedHours: number;
 };
 
+export type EffortBenchmark = {
+  serviceBlueprintId: number | null;
+  projectType: string;
+  sampleSize: number;
+  averageActualHours: number;
+  medianActualHours: number;
+};
+
 const volumeFactor: Record<ScopeCoverage["mentionVolume"], number> = {
   small: 0.9,
   medium: 1,
@@ -138,6 +146,35 @@ export function estimateBlueprintWorkload(definition: BlueprintDefinition) {
     totalHours: roundHalfHour(Object.values(byRole).reduce((sum, hours) => sum + hours, 0)),
     byRole,
     lines,
+  };
+}
+
+/**
+ * Applies a conservative correction learned from completed comparable projects.
+ * Two samples are required and the correction is capped so sparse history cannot
+ * overwhelm the deterministic recipe.
+ */
+export function applyHistoricalEffortBenchmark(
+  workload: ReturnType<typeof estimateBlueprintWorkload>,
+  benchmark?: EffortBenchmark | null,
+) {
+  const historicalFactor = benchmark && benchmark.sampleSize >= 2 && workload.totalHours > 0 && benchmark.medianActualHours > 0
+    ? Math.min(1.5, Math.max(0.65, benchmark.medianActualHours / workload.totalHours))
+    : 1;
+  const byRole = Object.fromEntries(
+    Object.entries(workload.byRole).map(([roleKey, hours]) => [roleKey, roundHalfHour(hours * historicalFactor)]),
+  );
+  const lines = workload.lines.map((line) => ({
+    ...line,
+    estimatedHours: roundHalfHour(line.estimatedHours * historicalFactor),
+  }));
+
+  return {
+    ...workload,
+    totalHours: roundHalfHour(Object.values(byRole).reduce((sum, hours) => sum + hours, 0)),
+    byRole,
+    lines,
+    historicalFactor: Number(historicalFactor.toFixed(4)),
   };
 }
 

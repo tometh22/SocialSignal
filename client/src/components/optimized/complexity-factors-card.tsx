@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { TrendingUp, Users, Globe, MessageSquare } from 'lucide-react';
+import { Globe, MessageSquare } from 'lucide-react';
 
 type ComplexityFactorsCardProps = {
   validationMessage?: string;
@@ -13,21 +13,12 @@ type ComplexityFactorsCardProps = {
 const ComplexityFactorsCard: React.FC<ComplexityFactorsCardProps> = ({ validationMessage }) => {
   const {
     quotationData,
-    updateAnalysisType,
     updateMentionsVolume,
     updateCountriesCovered,
-    updateClientEngagement,
     complexityFactors,
     availableRoles,
     pricingResult,
   } = useOptimizedQuote();
-
-  const analysisTypes = [
-    { value: 'basic', label: 'Análisis Básico' },
-    { value: 'standard', label: 'Análisis Estándar' },
-    { value: 'advanced', label: 'Análisis Avanzado' },
-    { value: 'premium', label: 'Análisis Premium' }
-  ];
 
   const mentionsVolumeOptions = [
     { value: 'low', label: 'Bajo (< 1K menciones)' },
@@ -41,13 +32,6 @@ const ComplexityFactorsCard: React.FC<ComplexityFactorsCardProps> = ({ validatio
     { value: '2-3', label: '2-3 países' },
     { value: '4-6', label: '4-6 países' },
     { value: '7+', label: '7+ países' }
-  ];
-
-  const engagementOptions = [
-    { value: 'low', label: 'Bajo' },
-    { value: 'medium', label: 'Medio' },
-    { value: 'high', label: 'Alto' },
-    { value: 'very-high', label: 'Muy Alto' }
   ];
 
   const getTotalComplexityFactor = () => {
@@ -79,8 +63,8 @@ const ComplexityFactorsCard: React.FC<ComplexityFactorsCardProps> = ({ validatio
       )}
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-semibold text-gray-900">Factores de Complejidad</h3>
-          <p className="text-sm text-gray-600">Definí las características que ajustarán el costo base del equipo</p>
+          <h3 className="text-lg font-semibold text-gray-900">Escala del alcance</h3>
+          <p className="text-sm text-gray-600">El costo se ajusta únicamente por volumen y cobertura; la profundidad analítica ya está incluida en la receta.</p>
         </div>
         <div className="flex flex-col items-end gap-1">
           <Badge className={complexityLevel.color}>
@@ -114,33 +98,6 @@ const ComplexityFactorsCard: React.FC<ComplexityFactorsCardProps> = ({ validatio
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Tipo de Análisis */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium flex items-center">
-              <TrendingUp className="h-4 w-4 mr-2 text-blue-600" />
-              Tipo de Análisis
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <Select value={quotationData.analysisType} onValueChange={updateAnalysisType}>
-              <SelectTrigger aria-label="Tipo de análisis">
-                <SelectValue placeholder="Seleccionar tipo de análisis" />
-              </SelectTrigger>
-              <SelectContent>
-                {analysisTypes.map(type => (
-                  <SelectItem key={type.value} value={type.value}>
-                    {type.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <div className="text-xs text-gray-500">
-              Factor: +{(complexityFactors.analysisTypeFactor * 100).toFixed(1)}%
-            </div>
-          </CardContent>
-        </Card>
-
         {/* Volumen de Menciones */}
         <Card>
           <CardHeader className="pb-3">
@@ -195,78 +152,7 @@ const ComplexityFactorsCard: React.FC<ComplexityFactorsCardProps> = ({ validatio
           </CardContent>
         </Card>
 
-        {/* Compromiso del Cliente */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium flex items-center">
-              <Users className="h-4 w-4 mr-2 text-orange-600" />
-              Compromiso del Cliente
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <Select value={quotationData.clientEngagement} onValueChange={updateClientEngagement}>
-              <SelectTrigger aria-label="Nivel de participación del cliente">
-                <SelectValue placeholder="Seleccionar nivel" />
-              </SelectTrigger>
-              <SelectContent>
-                {engagementOptions.map(option => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <div className="text-xs text-gray-500">
-              Factor: +{(complexityFactors.clientEngagementFactor * 100).toFixed(1)}%
-            </div>
-          </CardContent>
-        </Card>
       </div>
-
-      {/* Impacto por Tipo de Rol */}
-      <Card className="bg-gray-50">
-        <CardContent className="p-4">
-          <h4 className="font-medium text-gray-900 mb-3">Impacto por Tipo de Rol</h4>
-          <div className="space-y-3 text-sm">
-            <div className="flex items-center justify-between p-2 bg-blue-50 rounded">
-              <div>
-                <span className="font-medium text-blue-900">Roles de Análisis</span>
-                <div className="text-xs text-blue-700">Analistas, Especialistas, Tech Leads</div>
-              </div>
-              <div className="text-blue-900 font-mono">
-                +{((complexityFactors.analysisTypeFactor + complexityFactors.mentionsVolumeFactor + complexityFactors.countriesFactor) * 100).toFixed(1)}%
-              </div>
-            </div>
-            
-            <div className="flex items-center justify-between p-2 bg-green-50 rounded">
-              <div>
-                <span className="font-medium text-green-900">Roles de Gestión</span>
-                <div className="text-xs text-green-700">Managers, Directores, Account</div>
-              </div>
-              <div className="text-green-900 font-mono">
-                +{((complexityFactors.clientEngagementFactor + complexityFactors.analysisTypeFactor * 0.5) * 100).toFixed(1)}%
-              </div>
-            </div>
-            
-            <div className="flex items-center justify-between p-2 bg-purple-50 rounded">
-              <div>
-                <span className="font-medium text-purple-900">Otros Roles</span>
-                <div className="text-xs text-purple-700">Diseñadores, etc.</div>
-              </div>
-              <div className="text-purple-900 font-mono">
-                +{(complexityFactors.analysisTypeFactor * 0.3 * 100).toFixed(1)}%
-              </div>
-            </div>
-          </div>
-          
-          <div className="mt-4 pt-4 border-t">
-            <div className="flex items-center justify-between">
-              <span className="font-medium text-gray-900">Factor Promedio Ponderado</span>
-              <span className="text-xl font-bold text-primary">+{(totalFactor * 100).toFixed(1)}%</span>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 };

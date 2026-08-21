@@ -1,7 +1,7 @@
 /**
  * Project Detail — V4: Hero + Tabs.
  * Optimized for "5-second diagnosis" by Management/CEO and Ops/PMs.
- * Hero is always visible; tabs (Resumen / Equipo / Finanzas / Tareas)
+ * Hero is always visible; tabs (Resumen / Equipo / Finanzas)
  * keep the page focused without an infinite scroll.
  * Active tab persists in the URL via ?tab=<name>.
  */
@@ -16,7 +16,6 @@ import { cn } from "@/lib/utils";
 import { useCompleteProjectData } from "@/hooks/useCompleteProjectData";
 import { toProjectVM } from "@/selectors/projectVM";
 import { usePermissions } from "@/hooks/use-permissions";
-import ProjectTaskList from "@/components/tasks/ProjectTaskList";
 
 import ProjectHero   from "@/components/project-detail/project-hero";
 import AICopilot     from "@/components/project-detail/ai-copilot";
@@ -33,16 +32,15 @@ const fmtHours = (n: number | null | undefined) =>
 
 // ─── Tab definitions ──────────────────────────────────────────────────────────
 
-type TabValue = "resumen" | "equipo" | "finanzas" | "tareas";
+type TabValue = "resumen" | "equipo" | "finanzas";
 const TABS: { value: TabValue; label: string; icon: React.ReactNode }[] = [
   { value: "resumen",  label: "Resumen",  icon: <LayoutDashboard className="h-3.5 w-3.5" /> },
   { value: "equipo",   label: "Equipo",   icon: <Users className="h-3.5 w-3.5" /> },
   { value: "finanzas", label: "Finanzas", icon: <BarChart3 className="h-3.5 w-3.5" /> },
-  { value: "tareas",   label: "Tareas",   icon: <ListTodo className="h-3.5 w-3.5" /> },
 ];
 
 function isTabValue(v: string | null): v is TabValue {
-  return v === "resumen" || v === "equipo" || v === "finanzas" || v === "tareas";
+  return v === "resumen" || v === "equipo" || v === "finanzas";
 }
 
 // ─── P&L Breakdown ───────────────────────────────────────────────────────────
@@ -399,9 +397,6 @@ export default function ProjectDetail() {
   const effectiveMargin = effectiveMarkup > 0 ? ((revenue - effectiveCost) / revenue) * 100 : margin;
   const effectiveBudgetUtil = budget > 0 && effectiveCost > 0 ? (effectiveCost / budget) * 100 : budgetUtil;
 
-  // Compute task summary stats
-  const taskSummaryActive = 0; // Will be shown from ProjectTaskList data
-  const taskSummaryCompleted = 0;
   const teamAvgDeviation = enrichedTeam.length > 0
     ? enrichedTeam.reduce((sum: number, m: any) => {
         const target = m.targetHours ?? m.estimatedHours ?? 0;
@@ -461,6 +456,16 @@ export default function ProjectDetail() {
           </div>
         </Link>
       )}
+
+      <Link href={`/tasks/projects/${pid}`}>
+        <div className="mb-4 flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 transition-colors hover:bg-slate-50">
+          <div className="flex items-center gap-2 text-sm text-slate-700">
+            <ListTodo className="h-4 w-4 text-indigo-600" />
+            <span>La planificación, actividad y carga de horas se gestionan en Tareas.</span>
+          </div>
+          <span className="flex items-center gap-1 text-sm font-medium text-indigo-700">Abrir gestión de tareas <ArrowRight className="h-4 w-4" /></span>
+        </div>
+      </Link>
 
       {/* ── Tabs ─────────────────────────────────────────────────── */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -605,14 +610,6 @@ export default function ProjectDetail() {
           )}
         </TabsContent>
 
-        {/* ── Tareas — full task list ───────────────────────────── */}
-        <TabsContent value="tareas" className="animate-fadeIn">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="p-1">
-              <ProjectTaskList projectId={pid} />
-            </div>
-          </div>
-        </TabsContent>
       </Tabs>
      </div>
     </div>

@@ -16,7 +16,6 @@ const QuoteRedirect = lazy(() => import("@/pages/quote-redirect"));
 const PublicProposal = lazy(() => import("@/pages/public-proposal"));
 const Clients = lazy(() => import("@/pages/clients"));
 const Admin = lazy(() => import("@/pages/admin-fixed"));
-const AdminInflation = lazy(() => import("@/pages/admin-inflation"));
 const AdminDataSources = lazy(() => import("@/pages/admin-data-sources"));
 const AdminDefinitions = lazy(() => import("@/pages/admin-definitions"));
 
@@ -301,7 +300,6 @@ function AppRoutes() {
                   {/* Client & Resource Management */}
                   <ProtectedRoute path="/clients" component={Clients} requiredPermission="crm" />
                   <ProtectedRoute path="/admin/users" component={AdminUsersPage} requiredPermission="admin" />
-                  <ProtectedRoute path="/admin/inflation" component={AdminInflation} requiredPermission="admin" />
                   <ProtectedRoute path="/admin/data-sources" component={AdminDataSources} requiredPermission="admin" />
                   <ProtectedRoute path="/admin/definitions" component={AdminDefinitions} requiredPermission="admin" />
                   <ProtectedRoute path="/admin" component={Admin} requiredPermission="admin" />

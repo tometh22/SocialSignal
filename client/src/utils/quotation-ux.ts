@@ -30,6 +30,16 @@ export type QuotationValidationIssue = {
   message: string;
 };
 
+export function isBlueprintCompatibleWithProjectType(projectType: string | undefined, modality: string) {
+  // Renewal/expansion is a commercial motion applied to an existing quote,
+  // not a standalone service recipe.
+  if (modality === 'renewal') return false;
+  if (!projectType) return true;
+  if (projectType === 'on-demand') return ['one_shot', 'event_pack', 'demo'].includes(modality);
+  if (projectType === 'fee-mensual' || projectType === 'always-on') return ['monthly_fee', 'annual_program'].includes(modality);
+  return true;
+}
+
 const hasPositiveExchangeRate = (quotation: QuotationData) =>
   Number(quotation.exchangeRateSnapshot) > 0 && !quotation.requiresExchangeRateConfirmation;
 
@@ -66,8 +76,8 @@ export function validateQuotationPhase(
         issues.push({ field: 'team-config', message: 'Resolvé las tarifas faltantes antes de continuar.' });
       }
     }
-    if (!quotation.analysisType || !quotation.mentionsVolume || !quotation.countriesCovered || !quotation.clientEngagement) {
-      issues.push({ field: 'complexity-config', message: 'Completá todos los factores de complejidad.' });
+    if (!quotation.mentionsVolume || !quotation.countriesCovered) {
+      issues.push({ field: 'complexity-config', message: 'Completá volumen y cobertura para calcular la complejidad.' });
     }
     if (quotation.scopeSnapshot) {
       const standardHours = estimateBlueprintWorkload(blueprintDefinitionSchema.parse(quotation.scopeSnapshot)).totalHours;
@@ -98,19 +108,6 @@ export function validateQuotationPhase(
     }
     if (Number(financials.discountPercentage || 0) < 0 || Number(financials.discountPercentage || 0) > 50) {
       issues.push({ field: 'pricing-config', message: 'El descuento debe estar entre 0% y 50%.' });
-    }
-    if (quotation.inflation.applyInflationAdjustment && quotation.inflation.rateProjectionMode !== 'annual_avg' && !quotation.inflation.projectStartDate) {
-      issues.push({ field: 'inflation-start-date', message: 'Definí la fecha de inicio para proyectar la inflación.' });
-    }
-    if (quotation.inflation.applyInflationAdjustment
-      && quotation.inflation.inflationMethod === 'automatic'
-      && quotation.inflation.automaticInflationRate == null) {
-      issues.push({ field: 'pricing-config', message: 'No hay una tasa automática disponible; cargá la serie de inflación o elegí una tasa manual.' });
-    }
-    if (quotation.inflation.applyInflationAdjustment
-      && quotation.inflation.inflationMethod === 'manual'
-      && Number(quotation.inflation.manualInflationRate) <= 0) {
-      issues.push({ field: 'pricing-config', message: 'Ingresá una tasa manual positiva o desactivá el ajuste por inflación.' });
     }
     if ((financials.priceMode === 'manual' || Number(financials.discountPercentage || 0) > 0)
       && !quotation.adjustmentReason?.trim()) {

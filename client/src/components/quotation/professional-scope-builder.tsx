@@ -12,10 +12,13 @@ import { AlertCircle, Calculator, CheckCircle2, Layers3, RefreshCw } from "lucid
 import { useOptimizedQuote } from "@/context/optimized-quote-context";
 import type { ServiceBlueprint } from "@shared/schema";
 import {
+  applyHistoricalEffortBenchmark,
   blueprintDefinitionSchema,
   estimateBlueprintWorkload,
   type BlueprintDefinition,
+  type EffortBenchmark,
 } from "@shared/quotation-professional";
+import { isBlueprintCompatibleWithProjectType } from "@/utils/quotation-ux";
 
 type BlueprintWithWorkload = ServiceBlueprint & { workload: ReturnType<typeof estimateBlueprintWorkload> };
 type WeeklyCapacity = { personnel: Array<{ personnelId: number; name: string; maxCapacity: number; actualHours: number; estimatedTaskHours: number; isOverloaded: boolean }> };
@@ -30,13 +33,29 @@ const MODULES = [
 export function ProfessionalScopeBuilder({ mode = "all" }: { mode?: ScopeBuilderMode }) {
   const { quotationData, updateQuotationData, updateTeamMembers, availableRoles } = useOptimizedQuote();
   const { data: blueprints = [], isLoading } = useQuery<BlueprintWithWorkload[]>({ queryKey: ["/api/service-blueprints?status=published"] });
+  const { data: effortBenchmarks = [] } = useQuery<EffortBenchmark[]>({ queryKey: ["/api/quotation-effort-benchmarks"] });
   const { data: capacity } = useQuery<WeeklyCapacity>({ queryKey: ["/api/capacity/weekly"] });
   const [unmappedRoles, setUnmappedRoles] = useState<string[]>([]);
+  const compatibleBlueprints = useMemo(() => blueprints.filter((blueprint) => {
+    const modality = blueprintDefinitionSchema.parse(blueprint.definition).modality;
+    return isBlueprintCompatibleWithProjectType(quotationData.project.type, modality);
+  }), [blueprints, quotationData.project.type]);
   const selected = useMemo(() => blueprints.find((item) => item.id === quotationData.serviceBlueprintId), [blueprints, quotationData.serviceBlueprintId]);
   const scope = quotationData.scopeSnapshot ? blueprintDefinitionSchema.parse(quotationData.scopeSnapshot) : null;
   const estimate = useMemo(() => scope ? estimateBlueprintWorkload(scope) : null, [scope]);
+  const benchmarkFor = (serviceBlueprintId: number | null | undefined, projectType: string) => {
+    const exact = effortBenchmarks
+      .filter((item) => item.serviceBlueprintId === serviceBlueprintId && item.projectType === projectType && item.sampleSize >= 2)
+      .sort((left, right) => right.sampleSize - left.sampleSize)[0];
+    return exact || effortBenchmarks.find((item) => item.serviceBlueprintId == null && item.projectType === projectType && item.sampleSize >= 2) || null;
+  };
+  const activeBenchmark = benchmarkFor(quotationData.serviceBlueprintId, quotationData.project.type);
+  const referenceEstimate = useMemo(
+    () => estimate ? applyHistoricalEffortBenchmark(estimate, activeBenchmark) : null,
+    [activeBenchmark, estimate],
+  );
   const currentHours = quotationData.teamMembers.reduce((sum, member) => sum + Number(member.hours || 0), 0);
-  const deviation = estimate?.totalHours ? ((currentHours - estimate.totalHours) / estimate.totalHours) * 100 : 0;
+  const deviation = referenceEstimate?.totalHours ? ((currentHours - referenceEstimate.totalHours) / referenceEstimate.totalHours) * 100 : 0;
   const capacityWarnings = useMemo(() => {
     if (!scope || !capacity) return [];
     const projectWeeks = Math.max(1, scope.durationMonths * 4.33);
@@ -58,7 +77,12 @@ export function ProfessionalScopeBuilder({ mode = "all" }: { mode?: ScopeBuilder
   };
 
   const applyDefinition = (definition: BlueprintDefinition, blueprint = selected) => {
-    const workload = estimateBlueprintWorkload(definition);
+    const recipeWorkload = estimateBlueprintWorkload(definition);
+    const nextProjectType = isBlueprintCompatibleWithProjectType(quotationData.project.type, definition.modality)
+      ? quotationData.project.type
+      : projectTypeFor(definition.modality);
+    const benchmark = benchmarkFor(blueprint?.id ?? quotationData.serviceBlueprintId, nextProjectType);
+    const workload = applyHistoricalEffortBenchmark(recipeWorkload, benchmark);
     const missing: string[] = [];
     const nextMembers = Object.entries(workload.byRole).flatMap(([roleKey, hours]) => {
       const role = resolveRole(roleKey, availableRoles);
@@ -88,7 +112,7 @@ export function ProfessionalScopeBuilder({ mode = "all" }: { mode?: ScopeBuilder
       scopeSnapshot: definition,
       project: {
         ...quotationData.project,
-        type: projectTypeFor(definition.modality),
+        type: nextProjectType,
         duration: `${definition.durationMonths} meses`,
       },
       quotationType: definition.modality === "one_shot" || definition.modality === "event_pack" || definition.modality === "demo" ? "one-time" : "fee",
@@ -116,8 +140,14 @@ export function ProfessionalScopeBuilder({ mode = "all" }: { mode?: ScopeBuilder
         monitoringWindow: definition.monitoringWindow,
         alertChannels: definition.alertChannels,
         workload,
+        effortBenchmark: benchmark ? {
+          sampleSize: benchmark.sampleSize,
+          averageActualHours: benchmark.averageActualHours,
+          medianActualHours: benchmark.medianActualHours,
+          historicalFactor: workload.historicalFactor,
+        } : null,
       },
-      effortOverrideReason: null,
+      effortOverrideReason: historicalReason(recipeWorkload.totalHours, workload.historicalFactor, benchmark),
     });
   };
 
@@ -128,6 +158,9 @@ export function ProfessionalScopeBuilder({ mode = "all" }: { mode?: ScopeBuilder
   };
 
   const updateScope = (definition: BlueprintDefinition) => {
+    const recipeWorkload = estimateBlueprintWorkload(definition);
+    const benchmark = benchmarkFor(quotationData.serviceBlueprintId, quotationData.project.type);
+    const workload = applyHistoricalEffortBenchmark(recipeWorkload, benchmark);
     updateQuotationData({
       scopeSnapshot: definition,
       deliverables: definition.deliverables.map((deliverable) => ({
@@ -136,7 +169,20 @@ export function ProfessionalScopeBuilder({ mode = "all" }: { mode?: ScopeBuilder
         quantity: deliverable.quantity, format: deliverable.format,
         acceptanceCriteria: deliverable.acceptanceCriteria, dueRule: deliverable.dueRule, included: deliverable.included,
       })),
-      operationalPlan: { ...(quotationData.operationalPlan || {}), milestones: definition.milestones, monitoringWindow: definition.monitoringWindow, alertChannels: definition.alertChannels, workload: estimateBlueprintWorkload(definition) },
+      operationalPlan: {
+        ...(quotationData.operationalPlan || {}),
+        milestones: definition.milestones,
+        monitoringWindow: definition.monitoringWindow,
+        alertChannels: definition.alertChannels,
+        workload,
+        effortBenchmark: benchmark ? {
+          sampleSize: benchmark.sampleSize,
+          averageActualHours: benchmark.averageActualHours,
+          medianActualHours: benchmark.medianActualHours,
+          historicalFactor: workload.historicalFactor,
+        } : null,
+      },
+      effortOverrideReason: historicalReason(recipeWorkload.totalHours, workload.historicalFactor, benchmark),
     });
   };
 
@@ -151,20 +197,35 @@ export function ProfessionalScopeBuilder({ mode = "all" }: { mode?: ScopeBuilder
               <p className="text-sm font-semibold text-slate-900">Elegí el servicio que mejor encaja</p>
               <p className="mt-1 text-xs text-slate-500">Partimos de una receta probada; después podés personalizarla sin alterar el catálogo.</p>
             </div>
-            <Badge variant="outline" className="hidden sm:inline-flex">{blueprints.length} opciones</Badge>
+            <Badge variant="outline" className="hidden sm:inline-flex">{compatibleBlueprints.length} opciones</Badge>
           </div>
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {blueprints.map((blueprint) => {
+            {compatibleBlueprints.map((blueprint) => {
               const active = quotationData.serviceBlueprintId === blueprint.id;
+              const blueprintProjectType = isBlueprintCompatibleWithProjectType(quotationData.project.type, blueprintDefinitionSchema.parse(blueprint.definition).modality)
+                ? quotationData.project.type
+                : projectTypeFor(blueprintDefinitionSchema.parse(blueprint.definition).modality);
+              const benchmark = benchmarkFor(blueprint.id, blueprintProjectType);
+              const historicalWorkload = applyHistoricalEffortBenchmark(blueprint.workload, benchmark);
               return (
                 <button key={blueprint.id} type="button" onClick={() => applyBlueprint(blueprint)} aria-pressed={active} className={`rounded-xl border p-4 text-left transition ${active ? "border-indigo-500 bg-indigo-50 ring-2 ring-indigo-100" : "border-slate-200 bg-white hover:border-indigo-300"}`}>
                   <span className="flex items-start justify-between gap-2"><strong className="text-sm text-slate-950">{blueprint.name}</strong>{active && <CheckCircle2 className="h-4 w-4 text-indigo-600" />}</span>
                   <span className="mt-2 block text-xs leading-5 text-slate-500">{blueprint.description}</span>
-                  <span className="mt-3 flex flex-wrap gap-1.5"><Badge variant="outline">{blueprint.workload.totalHours} h estimadas</Badge><Badge variant="outline">{blueprint.definition.deliverables.length} entregables</Badge></span>
+                  <span className="mt-3 flex flex-wrap gap-1.5"><Badge variant="outline">{historicalWorkload.totalHours} h estimadas</Badge><Badge variant="outline">{blueprint.definition.deliverables.length} entregables</Badge>{benchmark && <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">{benchmark.sampleSize} proyectos reales</Badge>}</span>
                 </button>
               );
             })}
           </div>
+          {compatibleBlueprints.length === 0 && (
+            <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5 text-center text-sm text-slate-600">
+              No hay recetas publicadas para esta modalidad. Volvé al Brief y elegí otra modalidad o pedí que publiquen una receta compatible.
+            </div>
+          )}
+          {["renewal", "expansion"].includes(quotationData.commercialMotion || "") && (
+            <div className="mt-3 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
+              Renovación y expansión se registran como tipo de oportunidad. Para conservar alcance, equipo y condiciones, abrí la cotización vigente desde Gestión y editá esa base.
+            </div>
+          )}
         </div>
       )}
 
@@ -216,10 +277,12 @@ export function ProfessionalScopeBuilder({ mode = "all" }: { mode?: ScopeBuilder
           </Card>
 
           <Card>
-            <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Calculator className="h-4 w-4 text-indigo-600" /> Cómo se calcula el esfuerzo</CardTitle><p className="text-sm text-slate-500">Una referencia para validar que el equipo propuesto puede cumplir el alcance.</p></CardHeader>
+            <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Calculator className="h-4 w-4 text-indigo-600" /> Cómo se calcula el esfuerzo</CardTitle><p className="text-sm text-slate-500">La receta se contrasta con la mediana de proyectos cerrados comparables cuando hay datos suficientes.</p></CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid gap-3 sm:grid-cols-3"><Metric label="Referencia" value={`${estimate?.totalHours || 0} h`} /><Metric label="Configuradas" value={`${currentHours.toFixed(1)} h`} /><Metric label="Ajuste operativo" value={`${deviation >= 0 ? "+" : ""}${deviation.toFixed(1)}%`} /></div>
-              <div className="overflow-x-auto rounded-lg border border-slate-200"><table className="w-full text-sm"><thead className="bg-slate-50 text-left text-xs text-slate-500"><tr><th className="px-3 py-2">Trabajo</th><th className="px-3 py-2">Rol</th><th className="px-3 py-2 text-right">Horas</th></tr></thead><tbody>{estimate?.lines.map((line, index) => <tr key={`${line.sourceId}-${line.roleKey}-${index}`} className="border-t"><td className="px-3 py-2">{line.sourceName}</td><td className="px-3 py-2 capitalize">{line.roleKey}</td><td className="px-3 py-2 text-right tabular-nums">{line.estimatedHours}</td></tr>)}</tbody></table></div>
+              <div className="grid gap-3 sm:grid-cols-3"><Metric label="Referencia" value={`${referenceEstimate?.totalHours || 0} h`} /><Metric label="Configuradas" value={`${currentHours.toFixed(1)} h`} /><Metric label="Ajuste operativo" value={`${deviation >= 0 ? "+" : ""}${deviation.toFixed(1)}%`} /></div>
+              {activeBenchmark && <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">Referencia ajustada con {activeBenchmark.sampleSize} proyectos cerrados: mediana de {activeBenchmark.medianActualHours.toFixed(1)} h reales.</div>}
+              {!activeBenchmark && <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">Todavía no hay dos proyectos comparables cerrados. Se usa la receta profesional sin ajuste histórico.</div>}
+              <div className="overflow-x-auto rounded-lg border border-slate-200"><table className="w-full text-sm"><thead className="bg-slate-50 text-left text-xs text-slate-500"><tr><th className="px-3 py-2">Trabajo</th><th className="px-3 py-2">Rol</th><th className="px-3 py-2 text-right">Horas</th></tr></thead><tbody>{referenceEstimate?.lines.map((line, index) => <tr key={`${line.sourceId}-${line.roleKey}-${index}`} className="border-t"><td className="px-3 py-2">{line.sourceName}</td><td className="px-3 py-2 capitalize">{line.roleKey}</td><td className="px-3 py-2 text-right tabular-nums">{line.estimatedHours}</td></tr>)}</tbody></table></div>
               <Button type="button" variant="outline" onClick={() => applyDefinition(scope)}><RefreshCw className="mr-2 h-4 w-4" /> Actualizar equipo sugerido</Button>
               {Math.abs(deviation) > 10 && <div className="space-y-2"><Label htmlFor="effort-override-reason">Motivo del ajuste operativo</Label><Textarea id="effort-override-reason" value={quotationData.effortOverrideReason || ""} onChange={(event) => updateQuotationData({ effortOverrideReason: event.target.value })} placeholder="Explicá por qué el equipo necesita apartarse de la referencia…" /></div>}
               {unmappedRoles.length > 0 && <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />No encontramos roles equivalentes para: {unmappedRoles.join(", ")}. Crealos o asigná el equipo manualmente.</div>}
@@ -257,4 +320,9 @@ function countryBucket(count: number) {
   if (count <= 5) return "2-5";
   if (count <= 10) return "6-10";
   return "10+";
+}
+
+function historicalReason(recipeHours: number, historicalFactor: number, benchmark?: EffortBenchmark | null) {
+  if (!benchmark || Math.abs(historicalFactor - 1) < 0.001) return null;
+  return `Ajuste histórico automático: mediana de ${benchmark.medianActualHours.toFixed(1)} h en ${benchmark.sampleSize} proyectos comparables (receta: ${recipeHours.toFixed(1)} h).`;
 }

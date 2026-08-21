@@ -21,7 +21,7 @@ describe("Feedback Mind V2-10 contracts", () => {
     const routes = source("server/routes.ts");
     const rolesUi = source("client/src/components/admin/inline-edit-role.tsx");
     expect(routes).toContain("rateAverages");
-    expect(routes).toContain("GROUP BY 1, 2, 3");
+    expect(routes).toContain("classification_averages AS");
     expect(rolesUi).toContain("averageRateARS");
     expect(rolesUi).toContain("fallback");
   });

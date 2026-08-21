@@ -83,6 +83,11 @@ import { TemplateCost } from "@/components/admin/template-cost";
 import { CostMultipliersManager } from "@/components/cost-multipliers-manager";
 import { ExchangeRateManager } from "@/components/admin/ExchangeRateManager";
 import { HistoricalCostsTable } from "@/components/admin/HistoricalCostsTable";
+import {
+  PERSONNEL_AREAS,
+  PERSONNEL_ROLE_LEVELS,
+  allowedSublevelsForRole,
+} from "@shared/utils/personnel-classification";
 
 
 import { 
@@ -108,6 +113,9 @@ const roleSchema = z.object({
 const personnelSchema = z.object({
   name: z.string().min(1, "El nombre es requerido"),
   roleId: z.coerce.number().min(1, "Debe seleccionar un rol"),
+  currentRole: z.enum(PERSONNEL_ROLE_LEVELS, { required_error: "Debe seleccionar un nivel" }),
+  sublevel: z.enum(["A", "B", "C"]),
+  area: z.enum(PERSONNEL_AREAS, { required_error: "Debe seleccionar un área" }),
   email: z.string().email().optional().or(z.literal("")),
   contractType: z.enum(["full-time", "part-time", "freelance"]).default("full-time"),
   billingCurrency: z.enum(["ARS", "USD", "mixed"]).default("ARS"),
@@ -118,6 +126,9 @@ const personnelSchema = z.object({
 }).superRefine((value, context) => {
   if (value.contractType !== "freelance" && value.monthlyHours == null) {
     context.addIssue({ code: z.ZodIssueCode.custom, path: ["monthlyHours"], message: "Las horas mensuales son requeridas" });
+  }
+  if (!allowedSublevelsForRole(value.currentRole).includes(value.sublevel)) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["sublevel"], message: "Este rol admite únicamente subniveles A o B" });
   }
 });
 
@@ -289,6 +300,7 @@ export default function Admin() {
   // Query para cargar datos inicialmente
   const { data: queryInflationData, isLoading: inflationLoading } = useQuery<MonthlyInflation[]>({
     queryKey: ['/api/admin/monthly-inflation'],
+    enabled: false,
   });
 
   // Effect para sincronizar con la query inicial
@@ -318,6 +330,9 @@ export default function Admin() {
     defaultValues: {
       name: "",
       email: "",
+      currentRole: "1 Junior",
+      sublevel: "A",
+      area: "Operaciones",
       contractType: "full-time",
       billingCurrency: "ARS",
       monthlyHours: 160,
@@ -331,6 +346,7 @@ export default function Admin() {
   const personnelMonthlyHours = personnelForm.watch("monthlyHours");
   const personnelHourlyRateARS = personnelForm.watch("hourlyRateARS");
   const personnelHourlyRateUSD = personnelForm.watch("hourlyRateUSD");
+  const personnelCurrentRole = personnelForm.watch("currentRole");
 
   const templateForm = useForm<TemplateFormValues>({
     resolver: zodResolver(templateSchema),
@@ -798,6 +814,9 @@ export default function Admin() {
       name: "",
       email: "",
       roleId: 0,
+      currentRole: "1 Junior",
+      sublevel: "A",
+      area: "Operaciones",
       contractType: "full-time",
       billingCurrency: "ARS",
       monthlyHours: 160,
@@ -815,6 +834,9 @@ export default function Admin() {
       name: personnel.name,
       email: personnel.email || "",
       roleId: personnel.roleId,
+      currentRole: ((personnel as any).currentRole || "1 Junior") as any,
+      sublevel: ((personnel as any).sublevel || "A") as any,
+      area: ((personnel as any).area || "Operaciones") as any,
       contractType: (personnel.contractType as "full-time" | "part-time" | "freelance") || "full-time",
       billingCurrency: ((personnel as any).billingCurrency as "ARS" | "USD" | "mixed") || "ARS",
       monthlyHours: personnel.monthlyHours ?? null,
@@ -981,8 +1003,34 @@ export default function Admin() {
 
   const getCurrentHourlyRate = (person: any) => Number(person.currentHourlyRateARS) || 0;
 
-  // Ordenar datos por tarifa de mayor a menor (usando tarifa actual calculada)
-  const sortedRoles = roles ? [...roles].sort((a, b) => (b.defaultRate || 0) - (a.defaultRate || 0)) : [];
+  const roleObservedAverage = (role: any, currency: "ARS" | "USD") => {
+    const rows = Array.isArray(role.rateAverages) ? role.rateAverages : [];
+    const populated = rows.filter((row: any) => Number(row.personnelCount) > 0 && Number(row[currency === "ARS" ? "averageRateARS" : "averageRateUSD"]) > 0);
+    const people = populated.reduce((sum: number, row: any) => sum + Number(row.personnelCount), 0);
+    if (!people) return currency === "ARS" ? Number(role.defaultRate || 0) : Number(role.defaultRateUsd || 0);
+    return populated.reduce((sum: number, row: any) => sum + Number(row[currency === "ARS" ? "averageRateARS" : "averageRateUSD"]) * Number(row.personnelCount), 0) / people;
+  };
+  // Ordenar por la tarifa canónica observada; el default queda sólo como fallback.
+  const sortedRoles = roles ? [...roles].sort((a, b) => roleObservedAverage(b, "ARS") - roleObservedAverage(a, "ARS")) : [];
+  const observedSummary = (field: "averageRateARS" | "averageRateUSD") => {
+    const classifications = new Map<string, any>();
+    for (const role of sortedRoles as any[]) {
+      for (const row of role.rateAverages || []) classifications.set(`${row.roleName}-${row.sublevel}`, row);
+    }
+    return [...classifications.values()].reduce((summary, row: any) => {
+      const value = Number(row[field]);
+      const people = Number(row.personnelCount || 0);
+      if (value > 0 && people > 0) {
+        summary.total += value * people;
+        summary.people += people;
+      }
+      return summary;
+    }, { total: 0, people: 0 });
+  };
+  const observedARS = observedSummary("averageRateARS");
+  const observedUSD = observedSummary("averageRateUSD");
+  const observedRoleAverageARS = observedARS.people ? observedARS.total / observedARS.people : 0;
+  const observedRoleAverageUSD = observedUSD.people ? observedUSD.total / observedUSD.people : 0;
   const sortedPersonnel = personnel ? [...personnel].sort((a, b) => getCurrentHourlyRate(b) - getCurrentHourlyRate(a)) : [];
 
   return (
@@ -1010,7 +1058,7 @@ export default function Admin() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-7">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="roles" className="flex items-center gap-2">
             <Users className="h-4 w-4" />
             Roles
@@ -1031,11 +1079,6 @@ export default function Admin() {
             <DollarSign className="h-4 w-4" />
             Tipos de Cambio
           </TabsTrigger>
-          <TabsTrigger value="inflation" className="flex items-center gap-2">
-            <BadgeDollarSign className="h-4 w-4" />
-            Inflación
-          </TabsTrigger>
-
         </TabsList>
 
         <TabsContent value="roles">
@@ -1087,7 +1130,7 @@ export default function Admin() {
                 <div className="flex justify-between items-center text-sm">
                   <span className="text-slate-500">Total: {sortedRoles.length} roles configurados</span>
                   <span className="text-blue-600 font-medium">
-                    Tarifa promedio: ${(sortedRoles.reduce((sum, role) => sum + role.defaultRate, 0) / sortedRoles.length).toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} ARS/hr | ${(sortedRoles.reduce((sum, role) => sum + (role.defaultRateUsd || 0), 0) / sortedRoles.length).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} USD/hr
+                    Promedio observado: ${observedRoleAverageARS.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ARS/hr | ${observedRoleAverageUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD/hr
                   </span>
                 </div>
               </div>
@@ -1133,6 +1176,7 @@ export default function Admin() {
                         <TableHead>Email</TableHead>
                         <TableHead>Rol actual</TableHead>
                         <TableHead>Subnivel</TableHead>
+                        <TableHead>Área</TableHead>
                         <TableHead>
                           <div className="flex items-center gap-1">
                             Tipo Contrato
@@ -1255,6 +1299,7 @@ export default function Admin() {
                             currentRole: person.currentRole,
                             sublevel: person.sublevel,
                             legacyRole: person.legacyRole,
+                            area: person.area,
                             contractType: person.contractType,
                             currentHourlyRateARS: person.currentHourlyRateARS,
                             currentHourlyRateUSD: person.currentHourlyRateUSD,
@@ -1755,6 +1800,55 @@ export default function Admin() {
                   </FormItem>
                 )}
               />
+
+              <div className="grid gap-4 sm:grid-cols-3">
+                <FormField
+                  control={personnelForm.control}
+                  name="currentRole"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Nivel</FormLabel>
+                      <Select value={field.value} onValueChange={(value) => {
+                        field.onChange(value);
+                        const currentSublevel = personnelForm.getValues("sublevel");
+                        if (!allowedSublevelsForRole(value).includes(currentSublevel)) personnelForm.setValue("sublevel", "A");
+                      }}>
+                        <FormControl><SelectTrigger><SelectValue placeholder="Seleccionar nivel" /></SelectTrigger></FormControl>
+                        <SelectContent>{PERSONNEL_ROLE_LEVELS.map((role) => <SelectItem key={role} value={role}>{role}</SelectItem>)}</SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={personnelForm.control}
+                  name="sublevel"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Subnivel</FormLabel>
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                        <SelectContent>{allowedSublevelsForRole(personnelCurrentRole).map((sublevel) => <SelectItem key={sublevel} value={sublevel}>{sublevel}</SelectItem>)}</SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={personnelForm.control}
+                  name="area"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Área</FormLabel>
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <FormControl><SelectTrigger><SelectValue placeholder="Seleccionar área" /></SelectTrigger></FormControl>
+                        <SelectContent>{PERSONNEL_AREAS.map((area) => <SelectItem key={area} value={area}>{area}</SelectItem>)}</SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
 
               <FormField
                 control={personnelForm.control}

@@ -1,7 +1,6 @@
 
 import React, { useEffect, useState } from "react";
 import { useLocation } from "wouter";
-import { useQuery } from "@tanstack/react-query";
 import { useOptimizedQuote } from "@/context/optimized-quote-context";
 import { formatCurrency } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -13,7 +12,6 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
-import { InflationAdjustmentCard } from "@/components/optimized/inflation-adjustment-card";
 import { CommercialTermsCard } from "@/components/quotation/commercial-terms-card";
 import ToolsAndPricing from "@/components/optimized/tools-and-pricing";
 import { Separator } from "@/components/ui/separator";
@@ -40,7 +38,6 @@ import {
   Clock,
   Save,
   Zap,
-  Shield,
   Loader2,
   Percent,
   HelpCircle,
@@ -65,28 +62,10 @@ export default function FinancialReviewFinal({ revealAdvanced = false, validatio
     availableRoles,
     availablePersonnel,
     forceRecalculate,
-    updateInflation,
     updateFinancials,
     saveQuotation,
     getPersonnelRate
   } = useOptimizedQuote();
-  const { data: inflationHistory = [] } = useQuery<Array<{ year: number; month: number; inflationRate: number }>>({
-    queryKey: ['/api/inflation/data'],
-  });
-  const automaticAnnualInflationRate = React.useMemo(() => {
-    const latest = [...inflationHistory]
-      .sort((left, right) => right.year - left.year || right.month - left.month)
-      .slice(0, 12);
-    if (latest.length === 0) return null;
-    return (latest.reduce((factor, item) => factor * (1 + Number(item.inflationRate || 0)), 1) - 1) * 100;
-  }, [inflationHistory]);
-
-  useEffect(() => {
-    if (quotationData.inflation.inflationMethod !== 'automatic' || automaticAnnualInflationRate == null) return;
-    if (Math.abs((quotationData.inflation.automaticInflationRate ?? -1) - automaticAnnualInflationRate) < 0.0001) return;
-    updateInflation({ automaticInflationRate: automaticAnnualInflationRate });
-  }, [automaticAnnualInflationRate, quotationData.inflation.automaticInflationRate, quotationData.inflation.inflationMethod, updateInflation]);
-
   const [, navigate] = useLocation();
   const { toast } = useToast();
 
@@ -144,41 +123,9 @@ export default function FinancialReviewFinal({ revealAdvanced = false, validatio
   const teamComplexityAdjustmentARS = canonical.complexityAdjustment;
   const subtotalWithComplexityARS = teamBaseCostARS + teamComplexityAdjustmentARS;
 
-  // Calculate inflation if applicable - in ARS
-  const baseForInflation = subtotalWithComplexityARS;
-  let monthlyInflationRate = 0;
-  let totalInflationPercentage = 0;
-  let monthsToProject = 0;
-
-  const rateMode = quotationData.inflation.rateProjectionMode === "annual_avg" ? "annual_avg" : "current";
-
-  let inflationFactor = 1;
-  if (quotationData.inflation.applyInflationAdjustment) {
-    const annualInflationRate = quotationData.inflation.inflationMethod === 'manual'
-      ? quotationData.inflation.manualInflationRate
-      : quotationData.inflation.automaticInflationRate;
-    if (annualInflationRate == null || !Number.isFinite(annualInflationRate) || annualInflationRate < 0) {
-      inflationFactor = 1;
-    } else {
-    const monthlyRateDecimal = Math.pow(1 + (annualInflationRate / 100), 1/12) - 1;
-    monthlyInflationRate = monthlyRateDecimal * 100;
-    if (rateMode === "annual_avg") {
-      monthsToProject = 6;
-    } else if (quotationData.inflation.projectStartDate) {
-      const start = new Date(quotationData.inflation.projectStartDate);
-      const now = new Date();
-      monthsToProject = Math.max(0, (start.getFullYear() - now.getFullYear()) * 12 + start.getMonth() - now.getMonth());
-    }
-    inflationFactor = Math.pow(1 + monthlyRateDecimal, monthsToProject);
-    totalInflationPercentage = (inflationFactor - 1) * 100;
-    }
-  }
-  const preInflationTotalARS = inflationFactor > 0 ? canonical.total / inflationFactor : canonical.total;
-  const inflationAdjustmentARS = canonical.total - preInflationTotalARS;
-  const finalBaseAfterInflationARS = subtotalWithComplexityARS;
   const platformCostARS = canonical.platformCost;
   const toolsCostARS = canonical.toolsCost;
-  const subtotalWithPlatformARS = finalBaseAfterInflationARS + platformCostARS;
+  const subtotalWithPlatformARS = subtotalWithComplexityARS + platformCostARS;
   const marginAmountARS = canonical.markupAmount;
   const discountAmountARS = canonical.discountAmount;
   const subtotalWithMarginARS = subtotalWithComplexityARS + marginAmountARS;
@@ -189,7 +136,6 @@ export default function FinancialReviewFinal({ revealAdvanced = false, validatio
   // useCurrency() and safeRate are declared near the top of this component
   const subtotalWithPlatformUSD = safeRate > 1 ? convertToUSD(subtotalWithPlatformARS, 'ARS') : 0;
   const subtotalWithMarginUSD = safeRate > 1 ? convertToUSD(subtotalWithMarginARS, 'ARS') : 0;
-  const inflationAdjustmentUSD = safeRate > 1 ? convertToUSD(inflationAdjustmentARS, 'ARS') : 0;
   
   // All values are already in ARS - no conversion needed for display
   const teamBaseCostDisplay = displayed.baseCost;
@@ -197,14 +143,12 @@ export default function FinancialReviewFinal({ revealAdvanced = false, validatio
   const subtotalWithComplexityDisplay = teamBaseCostDisplay + teamComplexityAdjustmentDisplay;
   const platformCostDisplay = displayed.platformCost;
   const toolsCostDisplay = displayed.toolsCost;
-  const finalBaseAfterInflationDisplay = teamBaseCostDisplay + teamComplexityAdjustmentDisplay;
-  const subtotalWithPlatformDisplay = finalBaseAfterInflationDisplay + platformCostDisplay;
+  const subtotalWithPlatformDisplay = subtotalWithComplexityDisplay + platformCostDisplay;
   const subtotalWithMarginDisplay = subtotalWithComplexityDisplay + displayed.markupAmount;
   const subtotalWithPlatformAndToolsDisplay = subtotalWithMarginDisplay + toolsCostDisplay + platformCostDisplay + displayed.deviationAmount;
   const marginAmountDisplay = displayed.markupAmount;
   const discountAmountDisplay = displayed.discountAmount;
   const finalTotalDisplay = displayed.total;
-  const inflationAdjustmentDisplay = quotationData.quotationCurrency === "USD" ? inflationAdjustmentARS / safeRate : inflationAdjustmentARS;
 
   const handleSaveQuotation = async () => {
     try {
@@ -336,7 +280,7 @@ export default function FinancialReviewFinal({ revealAdvanced = false, validatio
           </div>
         )}
         {/* Executive Summary Cards */}
-        <div className="mb-8 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mb-8 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <Tooltip>
           <TooltipTrigger asChild>
             <Card className="h-full border-0 shadow-sm bg-gradient-to-br from-blue-50 to-blue-100 cursor-help">
@@ -377,52 +321,9 @@ export default function FinancialReviewFinal({ revealAdvanced = false, validatio
             </Card>
           </TooltipTrigger>
           <TooltipContent>
-            <p className="max-w-xs">Ajuste por complejidad del proyecto basado en tipo de análisis, volumen de menciones, países cubiertos y compromiso del cliente.</p>
+            <p className="max-w-xs">Ajuste por complejidad basado en el volumen de menciones y la cobertura geográfica.</p>
           </TooltipContent>
         </Tooltip>
-
-        <Card className={`h-full border-0 shadow-sm ${
-          quotationData.inflation.applyInflationAdjustment 
-            ? 'bg-gradient-to-br from-orange-50 to-orange-100' 
-            : 'bg-gradient-to-br from-gray-50 to-gray-100'
-        }`}>
-          <CardContent className="flex h-full items-center justify-center p-4 text-center">
-            <div className="flex items-center justify-center gap-3">
-              <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-                quotationData.inflation.applyInflationAdjustment 
-                  ? 'bg-orange-200' 
-                  : 'bg-gray-200'
-              }`}>
-                <Clock className={`h-4 w-4 ${
-                  quotationData.inflation.applyInflationAdjustment 
-                    ? 'text-orange-700' 
-                    : 'text-gray-700'
-                }`} />
-              </div>
-              <div className="text-center">
-                <p className={`text-xs font-medium ${
-                  quotationData.inflation.applyInflationAdjustment 
-                    ? 'text-orange-800' 
-                    : 'text-gray-800'
-                }`}>Inflación</p>
-                <p className={`text-lg font-bold ${
-                  quotationData.inflation.applyInflationAdjustment 
-                    ? 'text-orange-900' 
-                    : 'text-gray-900'
-                }`}>
-                  {quotationData.inflation.applyInflationAdjustment ? 'Aplicada' : 'Sin ajuste'}
-                </p>
-                <p className={`text-xs ${
-                  quotationData.inflation.applyInflationAdjustment 
-                    ? 'text-orange-600' 
-                    : 'text-gray-600'
-                }`}>
-                  {inflationAdjustmentARS > 0 ? `+${formatFinalCurrency(inflationAdjustmentDisplay)}` : 'N/A'}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
 
         <Tooltip>
           <TooltipTrigger asChild>
@@ -565,12 +466,6 @@ export default function FinancialReviewFinal({ revealAdvanced = false, validatio
               <CollapsibleContent>
                 <CardContent className="p-4">
               <div className="space-y-3">
-                <div className="flex justify-between items-center p-3 bg-gradient-to-r from-amber-50 to-orange-50 rounded-lg border border-amber-100">
-                  <span className="text-sm font-medium text-amber-900">Tipo de Análisis</span>
-                  <Badge variant="outline" className="text-xs text-amber-700 border-amber-300">
-                    +{(complexityFactors.analysisTypeFactor * 100).toFixed(1)}%
-                  </Badge>
-                </div>
                 <div className="flex justify-between items-center p-3 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border border-green-100">
                   <span className="text-sm font-medium text-green-900">Volumen de Menciones</span>
                   <Badge variant="outline" className="text-xs text-green-700 border-green-300">
@@ -581,12 +476,6 @@ export default function FinancialReviewFinal({ revealAdvanced = false, validatio
                   <span className="text-sm font-medium text-purple-900">Países Cubiertos</span>
                   <Badge variant="outline" className="text-xs text-purple-700 border-purple-300">
                     +{(complexityFactors.countriesFactor * 100).toFixed(1)}%
-                  </Badge>
-                </div>
-                <div className="flex justify-between items-center p-3 bg-gradient-to-r from-blue-50 to-cyan-50 rounded-lg border border-blue-100">
-                  <span className="text-sm font-medium text-blue-900">Compromiso Cliente</span>
-                  <Badge variant="outline" className="text-xs text-blue-700 border-blue-300">
-                    +{(complexityFactors.clientEngagementFactor * 100).toFixed(1)}%
                   </Badge>
                 </div>
               </div>
@@ -603,7 +492,7 @@ export default function FinancialReviewFinal({ revealAdvanced = false, validatio
           </Collapsible>
         </div>
 
-        {/* Center: Controls and Inflation */}
+        {/* Center: financial controls */}
         {advancedVisible && <div id="advanced-pricing-controls" className="space-y-4 lg:space-y-6">
           {/* Margin and Discount Controls */}
           <Card id="pricing-config" className="shadow-sm border-0 bg-white" tabIndex={-1}>
@@ -879,206 +768,6 @@ export default function FinancialReviewFinal({ revealAdvanced = false, validatio
 
 
 
-          {/* Inflation Card */}
-          <Card className="shadow-sm border-0 bg-white">
-            <CardHeader className="pb-4 border-b border-gray-100">
-              <CardTitle className="text-lg flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Shield className="h-5 w-5 text-orange-600" />
-                  Protección Inflacionaria
-                </div>
-                <Button
-                  variant={quotationData.inflation.applyInflationAdjustment ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => updateInflation({ 
-                    applyInflationAdjustment: !quotationData.inflation.applyInflationAdjustment 
-                  })}
-                  className={quotationData.inflation.applyInflationAdjustment 
-                    ? "bg-orange-600 hover:bg-orange-700" 
-                    : "border-orange-200 text-orange-600 hover:bg-orange-50"
-                  }
-                >
-                  {quotationData.inflation.applyInflationAdjustment ? (
-                    <>
-                      <Zap className="h-4 w-4 mr-2" />
-                      Activada
-                    </>
-                  ) : (
-                    <>
-                      <Shield className="h-4 w-4 mr-2" />
-                      Activar
-                    </>
-                  )}
-                </Button>
-              </CardTitle>
-            </CardHeader>
-
-            <CardContent className="p-4">
-              {!quotationData.inflation.applyInflationAdjustment ? (
-                <div className="text-center py-8">
-                  <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
-                    <Shield className="h-8 w-8 text-gray-400" />
-                  </div>
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">
-                    Sin Protección Inflacionaria
-                  </h3>
-                  <p className="text-sm text-gray-600 mb-4">
-                    La cotización se mantiene en valores actuales sin proyección inflacionaria
-                  </p>
-                  <Button
-                    onClick={() => updateInflation({ applyInflationAdjustment: true })}
-                    className="bg-orange-600 hover:bg-orange-700"
-                  >
-                    <Zap className="h-4 w-4 mr-2" />
-                    Activar Protección
-                  </Button>
-                </div>
-              ) : (
-                <div className="space-y-6">
-                  <div className="flex items-center justify-between p-4 bg-orange-50 rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center">
-                        <Zap className="h-5 w-5 text-orange-600" />
-                      </div>
-                      <div>
-                        <h3 className="font-semibold text-orange-900">Protección Activada</h3>
-                        <p className="text-sm text-orange-700">
-                          Cotización protegida contra inflación argentina
-                        </p>
-                      </div>
-                    </div>
-                    <Badge className="bg-orange-100 text-orange-700 border-orange-200">
-                      {inflationAdjustmentUSD > 0 ? `+${formatFinalCurrency(inflationAdjustmentDisplay)}` : 'Configurando...'}
-                    </Badge>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label className="font-medium">Fuente del valor hora</Label>
-                    <Select
-                      value={quotationData.inflation.rateProjectionMode === "annual_avg" ? "annual_avg" : "current"}
-                      onValueChange={(value) =>
-                        updateInflation({ rateProjectionMode: value as "current" | "annual_avg" })
-                      }
-                    >
-                      <SelectTrigger className="border-orange-200 focus:border-orange-400">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="current">Valor actual (foto del mes)</SelectItem>
-                        <SelectItem value="annual_avg">Promedio anual</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <p className="text-[11px] text-orange-700/80">
-                      Seleccioná si el valor hora debe ser la foto del mes o el promedio anual estimado del equipo.
-                    </p>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label className="font-medium">Fecha de inicio del proyecto</Label>
-                      <Input
-                        id="inflation-start-date"
-                        type="date"
-                        value={quotationData.inflation.projectStartDate}
-                        onChange={(e) => updateInflation({ projectStartDate: e.target.value })}
-                        min={new Date().toISOString().split('T')[0]}
-                        className="border-orange-200 focus:border-orange-400"
-                        disabled={quotationData.inflation.rateProjectionMode === "annual_avg"}
-                      />
-                      {quotationData.inflation.rateProjectionMode === "annual_avg" && (
-                        <p className="text-[11px] text-orange-600/80">No aplica en modo promedio anual.</p>
-                      )}
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label className="font-medium">Moneda confirmada</Label>
-                      <div className="rounded-md border border-orange-200 bg-orange-50 px-3 py-2 text-sm font-medium text-orange-900">
-                        {currencyLabel} · TC guardado: 1 USD = {safeRate.toLocaleString('es-AR')} ARS
-                      </div>
-                      <p className="text-[11px] text-orange-700/80">La moneda se define en la fase Proyecto para evitar recálculos accidentales.</p>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label className="font-medium">Método de cálculo</Label>
-                      <Select 
-                        value={quotationData.inflation.inflationMethod} 
-                        onValueChange={(value) => updateInflation({ inflationMethod: value })}
-                      >
-                        <SelectTrigger className="border-orange-200 focus:border-orange-400">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="automatic">Automático (Promedio 12 meses)</SelectItem>
-                          <SelectItem value="manual">Manual (Tasa personalizada)</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    {quotationData.inflation.inflationMethod === 'manual' && (
-                      <div className="space-y-2">
-                        <Label className="font-medium">Tasa inflación anual (%)</Label>
-                        <Input
-                          type="number"
-                          step="0.1"
-                          value={quotationData.inflation.manualInflationRate || 0}
-                          onChange={(e) => updateInflation({ manualInflationRate: Number(e.target.value) })}
-                          placeholder="Ej: 25.5"
-                          className="border-orange-200 focus:border-orange-400"
-                        />
-                      </div>
-                    )}
-                    {quotationData.inflation.inflationMethod === 'automatic' && (
-                      <div className="rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-xs text-orange-800">
-                        {automaticAnnualInflationRate == null
-                          ? 'No hay 12 meses de inflación configurados. Completá la serie antes de aprobar.'
-                          : `Tasa anual compuesta guardada: ${automaticAnnualInflationRate.toFixed(2)}% (${Math.min(inflationHistory.length, 12)} meses).`}
-                      </div>
-                    )}
-                  </div>
-
-                  {quotationData.inflation.projectStartDate && inflationAdjustmentUSD > 0 && (
-                    <div className="p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border border-green-200">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="font-medium text-green-900">Impacto Proyectado:</span>
-                        <span className="text-lg font-bold text-green-900">
-                          +{formatFinalCurrency(inflationAdjustmentDisplay)}
-                        </span>
-                      </div>
-                      <div className="grid grid-cols-2 gap-4 mt-3 text-sm">
-                        <div className="space-y-1">
-                          <p className="text-green-700">
-                            <strong>Período:</strong> {monthsToProject} meses
-                          </p>
-                          <p className="text-green-700">
-                            <strong>Tasa mensual:</strong> {monthlyInflationRate.toFixed(4)}%
-                          </p>
-                        </div>
-                        <div className="space-y-1">
-                          <p className="text-green-700">
-                            <strong>Inflación total:</strong> {totalInflationPercentage.toFixed(2)}%
-                          </p>
-                          <p className="text-green-700">
-                            <strong>Moneda:</strong> {quotationData.quotationCurrency}
-                          </p>
-                        </div>
-                      </div>
-                      <p className="text-sm text-green-700 mt-2 pt-2 border-t border-green-200">
-                        Proyección desde {new Date().toLocaleDateString('es-AR')} hasta{' '}
-                        {new Date(quotationData.inflation.projectStartDate).toLocaleDateString('es-AR')}
-                      </p>
-                    </div>
-                  )}
-
-                  <div className="flex items-start gap-2 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
-                    <AlertTriangle className="h-4 w-4 text-yellow-600 mt-0.5 flex-shrink-0" />
-                    <p className="text-sm text-yellow-800">
-                      Las proyecciones son estimativas basadas en datos históricos
-                    </p>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
         </div>}
 
         {advancedVisible && <CommercialTermsCard />}
@@ -1125,26 +814,15 @@ export default function FinancialReviewFinal({ revealAdvanced = false, validatio
               </div>
 
               {/* Sección 2: Ajustes */}
-              {(quotationData.inflation.applyInflationAdjustment && inflationAdjustmentUSD > 0) || platformCostDisplay > 0 ? (
+              {platformCostDisplay > 0 ? (
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 text-xs font-semibold text-gray-600 uppercase tracking-wide">
                     <div className="w-6 h-6 rounded-full bg-orange-100 flex items-center justify-center text-orange-700 text-xs">2</div>
                     Ajustes
                   </div>
                   <div className="bg-orange-50 rounded-lg p-3 border border-orange-100">
-                    {quotationData.inflation.applyInflationAdjustment && inflationAdjustmentUSD > 0 && (
-                      <div className="flex justify-between items-center">
-                        <div className="flex flex-col gap-0.5">
-                          <span className="text-sm text-orange-800">Protección Inflacionaria</span>
-                          <span className="text-xs text-orange-600">
-                            {totalInflationPercentage.toFixed(2)}% en {monthsToProject} meses
-                          </span>
-                        </div>
-                        <span className="font-semibold text-orange-900">+{formatFinalCurrency(inflationAdjustmentDisplay)}</span>
-                      </div>
-                    )}
                     {platformCostDisplay > 0 && (
-                      <div className={`flex justify-between items-center ${quotationData.inflation.applyInflationAdjustment && inflationAdjustmentUSD > 0 ? 'mt-2 pt-2 border-t border-orange-100' : ''}`}>
+                      <div className="flex justify-between items-center">
                         <span className="text-sm text-orange-800">Costos de Plataforma</span>
                         <span className="font-semibold text-orange-900">+{formatFinalCurrency(platformCostDisplay)}</span>
                       </div>
