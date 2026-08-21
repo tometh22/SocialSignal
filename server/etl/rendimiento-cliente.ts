@@ -77,6 +77,16 @@ async function readRendimientoCliente(): Promise<any[]> {
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId,
       range,
+      // Sin esto la API devuelve los importes ya formateados en español y
+      // parseNumberRobust no puede desambiguarlos: "29.230" es tanto veintinueve
+      // mil doscientos treinta (planilla) como 29,230 (decimal US), y elegía el
+      // segundo. financial_sot quedaba con todos los montos con miles divididos
+      // por 1000 — Warner Fee Marketing en 29,23 en vez de 29.230.
+      //
+      // Con UNFORMATTED_VALUE llegan como number y parseNumberRobust los
+      // devuelve tal cual, sin heurística de formato. El problema desaparece en
+      // vez de parchearse.
+      valueRenderOption: 'UNFORMATTED_VALUE',
     });
 
     const rows = response.data.values;
