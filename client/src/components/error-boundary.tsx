@@ -2,6 +2,7 @@ import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { isChunkLoadError, reloadOnceForChunkError } from '@/lib/chunk-error';
 
 interface Props {
   children: ReactNode;
@@ -40,6 +41,10 @@ export class ErrorBoundary extends Component<Props, State> {
     if (this.props.onError) {
       this.props.onError(error, errorInfo);
     }
+
+    // Un chunk viejo (post-deploy) nunca se resuelve reintentando en memoria:
+    // hace falta traer el index.html y los hashes de assets vigentes.
+    reloadOnceForChunkError(error);
   }
 
   handleReset = () => {
@@ -53,6 +58,8 @@ export class ErrorBoundary extends Component<Props, State> {
         return this.props.fallback;
       }
 
+      const chunkError = isChunkLoadError(this.state.error);
+
       // Default error UI
       return (
         <div className="min-h-screen bg-background flex items-center justify-center p-4">
@@ -61,11 +68,11 @@ export class ErrorBoundary extends Component<Props, State> {
               <div className="mx-auto mb-4 w-12 h-12 rounded-full bg-red-100 flex items-center justify-center">
                 <AlertTriangle className="w-6 h-6 text-red-600" />
               </div>
-              <CardTitle className="text-red-600">Error en la Aplicación</CardTitle>
+              <CardTitle className="text-red-600">{chunkError ? 'Hay una versión nueva disponible' : 'Error en la Aplicación'}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="text-center text-muted-foreground">
-                <p>Ha ocurrido un error inesperado. Por favor, intenta recargar la página.</p>
+                <p>{chunkError ? 'Actualizamos Mind mientras tenías esta pestaña abierta. Recargá para traer la versión vigente.' : 'Ha ocurrido un error inesperado. Por favor, intenta recargar la página.'}</p>
                 {process.env.NODE_ENV === 'development' && this.state.error && (
                   <details className="mt-4 text-left">
                     <summary className="cursor-pointer text-sm font-medium">

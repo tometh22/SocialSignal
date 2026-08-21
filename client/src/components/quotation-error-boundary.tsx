@@ -3,6 +3,7 @@ import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { AlertTriangle, RefreshCw, Home } from 'lucide-react';
+import { isChunkLoadError, reloadOnceForChunkError } from '@/lib/chunk-error';
 
 interface Props {
   children: ReactNode;
@@ -28,7 +29,7 @@ class QuotationErrorBoundary extends Component<Props, State> {
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error('🚨 Quotation Error Boundary caught an error:', error);
     console.error('📍 Error Info:', errorInfo);
-    
+
     // Try to save current state before crash
     try {
       const currentData = localStorage.getItem('draft-quotation');
@@ -41,9 +42,17 @@ class QuotationErrorBoundary extends Component<Props, State> {
     }
 
     this.props.onError?.(error, errorInfo);
+
+    // Un chunk viejo (post-deploy) nunca se resuelve reintentando en memoria:
+    // hace falta traer el index.html y los hashes de assets vigentes.
+    reloadOnceForChunkError(error);
   }
 
   handleRetry = () => {
+    if (this.state.error && isChunkLoadError(this.state.error)) {
+      window.location.reload();
+      return;
+    }
     if (this.state.retryCount < 3) {
       this.setState(prevState => ({
         hasError: false,
@@ -62,33 +71,41 @@ class QuotationErrorBoundary extends Component<Props, State> {
 
   render() {
     if (this.state.hasError) {
+      const chunkError = isChunkLoadError(this.state.error);
       return (
         <div className="page-container">
           <Card className="max-w-lg mx-auto">
             <CardHeader>
               <CardTitle className="flex items-center text-destructive">
                 <AlertTriangle className="h-5 w-5 mr-2" />
-                Error en la Cotización
+                {chunkError ? 'Hay una versión nueva disponible' : 'Error en la Cotización'}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-muted-foreground">
-                Ha ocurrido un error inesperado en la aplicación de cotización. 
+                {chunkError
+                  ? 'Actualizamos Mind mientras tenías esta pestaña abierta. Recargá para traer la versión vigente.'
+                  : 'Ha ocurrido un error inesperado en la aplicación de cotización.'}
                 {this.state.retryCount > 0 && ` (Intento ${this.state.retryCount}/3)`}
               </p>
-              
-              {this.state.error && (
+
+              {this.state.error && !chunkError && (
                 <div className="bg-muted p-3 rounded text-sm">
                   <strong>Error:</strong> {this.state.error.message}
                 </div>
               )}
-              
+
               <div className="text-sm text-muted-foreground">
                 💾 Tus datos han sido guardados automáticamente y pueden ser recuperados.
               </div>
-              
+
               <div className="flex gap-2">
-                {this.state.retryCount < 3 ? (
+                {chunkError ? (
+                  <Button onClick={() => window.location.reload()} className="flex-1">
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Recargar
+                  </Button>
+                ) : this.state.retryCount < 3 ? (
                   <Button onClick={this.handleRetry} className="flex-1">
                     <RefreshCw className="h-4 w-4 mr-2" />
                     Reintentar

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -175,6 +175,22 @@ export function ProfessionalScopeBuilder({ mode = "all" }: { mode?: ScopeBuilder
       effortOverrideReason: historicalReason(recipeWorkload.totalHours, workload.historicalFactor, benchmark),
     });
   };
+
+  // Los grupos de propuestas creados desde el brief guardan serviceBlueprintId
+  // en el servidor (para que la receta recomendada aparezca preseleccionada)
+  // pero no el scopeSnapshot: recién se materializa cuando el usuario abre
+  // esta pantalla. Sin este efecto la tarjeta se ve elegida (ring indigo +
+  // check) pero "Continuar" bloquea con "Elegí una receta profesional",
+  // porque la validación exige scopeSnapshot, no sólo el id. Lo aplicamos
+  // una sola vez apenas detectamos el desfasaje.
+  const autoAppliedBlueprintId = useRef<number | null>(null);
+  useEffect(() => {
+    if (quotationData.scopeSnapshot || !quotationData.serviceBlueprintId || !selected) return;
+    if (autoAppliedBlueprintId.current === selected.id) return;
+    autoAppliedBlueprintId.current = selected.id;
+    applyBlueprint(selected);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quotationData.scopeSnapshot, quotationData.serviceBlueprintId, selected]);
 
   const updateCoverageList = (field: "markets" | "brands" | "competitors" | "sources", value: string) => {
     if (!scope) return;
