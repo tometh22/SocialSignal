@@ -2,11 +2,17 @@ import { Request, Response, NextFunction } from "express";
 
 // Input sanitization middleware to prevent XSS and injection attacks
 export const sanitizeInput = (req: Request, res: Response, next: NextFunction) => {
+  // SQL is always parameterized at the data-access layer. Treating ordinary prose
+  // as SQL based on a single keyword (for example "seleccionar", "or", or a
+  // semicolon in a meeting note) made the brief/minute flow unusable. Keep this
+  // middleware focused on the small set of unambiguous payload-level attack
+  // signatures and leave query safety to Drizzle's parameter binding.
   const dangerousPatterns = [
-    /(\bUNION\b|\bSELECT\b|\bINSERT\b|\bUPDATE\b|\bDELETE\b|\bDROP\b)/i,
-    /(\-\-|\;|\|)/g,
-    /(\bexec\s+|execute\s+|sp_|xp_)/gi, // More specific: only match when followed by space or underscore
-    /(\bOR\b|\bAND\b).*(\=|\<|\>)/i
+    /\bUNION(?:\s+ALL)?\s+SELECT\b/i,
+    /\b(?:INSERT\s+INTO|UPDATE\s+\w+\s+SET|DELETE\s+FROM|DROP\s+(?:TABLE|DATABASE)|ALTER\s+TABLE)\b/i,
+    /(?:--|;|\|)\s*(?:SELECT|INSERT|UPDATE|DELETE|DROP|ALTER)\b/i,
+    /\b(?:OR|AND)\s+['"`]?\d+['"`]?\s*=\s*['"`]?\d+['"`]?/i,
+    /\b(?:EXEC(?:UTE)?\s+|SP_|XP_)\w*/i,
   ];
 
   const containsSQLInjection = (input: string): boolean => {
@@ -15,12 +21,6 @@ export const sanitizeInput = (req: Request, res: Response, next: NextFunction) =
 
   const sanitizeValue = (value: any): any => {
     if (typeof value === 'string') {
-      // Whitelist for legitimate query parameters
-      const legitimateParams = ['august_2025', 'EXEC', 'ECON', 'basis', 'timeFilter'];
-      if (legitimateParams.includes(value)) {
-        return value; // Allow whitelisted values
-      }
-      
       // Check for SQL injection patterns
       if (containsSQLInjection(value)) {
         console.log(`🚨 Input sanitization blocked value: "${value}"`);
@@ -40,7 +40,7 @@ export const sanitizeInput = (req: Request, res: Response, next: NextFunction) =
         .replace(/<embed\b[^<]*(?:(?!<\/embed>)<[^<]*)*<\/embed>/gi, '')
         .replace(/javascript:/gi, '')
         .replace(/on\w+\s*=/gi, '')
-        .replace(/[\x00-\x1f\x7f]/g, '') // Remove control characters
+        .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g, '') // Keep line breaks in briefs/minutes
         .trim();
     }
     
