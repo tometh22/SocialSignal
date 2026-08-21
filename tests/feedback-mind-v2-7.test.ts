@@ -31,18 +31,18 @@ describe("Feedback Mind V2.7 — personal y cotizaciones", () => {
     expect(inline).toContain('aria-label="Subnivel"');
   });
 
-  test("la moneda se elige con confirmación y el flujo usa cuatro fases responsive", () => {
+  test("la moneda se elige con confirmación y el flujo usa seis pasos responsive", () => {
     const basic = source("client/src/components/optimized/basic-info.tsx");
     const team = source("client/src/components/optimized/EnhancedTeamConfig.tsx");
     const stepper = source("client/src/pages/optimized-quote.tsx");
 
     expect(basic).toContain("updateQuotationCurrency");
     expect(basic).toContain("Moneda de cotización");
-    expect(basic).toContain("max-w-5xl");
+    expect(basic).toContain("mode?: 'project' | 'financial'");
     expect(team).toContain("md:justify-center");
     expect(basic).toContain("setPendingCurrency(currency)");
-    expect(stepper).toContain("grid grid-cols-2 gap-2 lg:grid-cols-4");
-    expect(stepper).toContain("QUOTATION_PHASES");
+    expect(stepper).toContain('overflow-x-auto');
+    expect(stepper).toContain("QUOTATION_STEPS");
   });
 
   test("las carpetas de cotizaciones empiezan cerradas", () => {
@@ -157,7 +157,7 @@ describe("Feedback Mind V2.7 — atribución, costos y capacidad", () => {
 
     expect(basic).toContain('if (quotationData.teamMembers.length > 0)');
     expect(basic).toContain('updateQuotationCurrency(currency)');
-    expect(basic).toContain("updateQuotationCurrency(quotationData.quotationCurrency || \"ARS\", parsedExchangeRate)");
+    expect(basic).toContain("updateQuotationCurrency(quotationData.quotationCurrency || 'ARS', parsedExchangeRate)");
     expect(basic).toContain("parseLocalizedDecimal");
     expect(wizard).not.toContain("CurrencySelection");
     expect(context).toContain("exchangeRateSnapshot: Number(quotation.exchangeRateAtQuote)");

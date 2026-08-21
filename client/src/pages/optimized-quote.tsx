@@ -43,7 +43,7 @@ import QuotationErrorBoundary from '@/components/quotation-error-boundary';
 import { getApiErrorMessage } from '@/lib/api-error';
 import { QuotationTemplatesPicker } from '@/components/quotation/quotation-templates-picker';
 import { QuotationWorkspaceSummary } from '@/components/quotation/quotation-workspace-summary';
-import { QuotationBriefIntake, type BriefIntakeAnalysis } from '@/components/quotation/quotation-brief-intake';
+import { QuotationBriefIntake, type BriefIntakeAnalysis, type BriefProposalCandidate } from '@/components/quotation/quotation-brief-intake';
 import {
   QUOTATION_STEPS,
   type QuotationStep,
@@ -289,17 +289,16 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
         </div>
       )}
     >
-      <div className="mb-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mb-5 rounded-2xl border border-slate-200 bg-white px-4 py-4 sm:px-5">
+        <div className="mb-4 flex items-center justify-between gap-3">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Cotizador profesional</p>
-            <p className="mt-1 text-sm text-slate-600">Completá un paso por vez; podés volver a los anteriores sin perder datos.</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Progreso</p>
+            <p className="mt-1 text-sm font-medium text-slate-700">{stepMeta.title}</p>
           </div>
           <AutosaveIndicator lastSaveTime={lastAutosaveAt} status={autosaveStatus} isOnline={isOnline} />
         </div>
 
-        {/* Legacy QUOTATION_PHASES remain supported by quotation-ux.ts; the old grid grid-cols-2 gap-2 lg:grid-cols-4 layout is intentionally replaced by this six-step navigation. */}
-        <nav aria-label="Pasos de la cotización" className="grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-6">
+        <nav aria-label="Pasos de la cotización" className="flex min-w-0 gap-1 overflow-x-auto pb-1">
           {QUOTATION_STEPS.map((phase, index) => {
             const Icon = PHASE_ICONS[index];
             const isCurrent = phase.num === currentStepNumber;
@@ -312,21 +311,18 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
                 onClick={() => handlePhaseNavigation(phase.num)}
                 disabled={!isAvailable || isCurrent}
                 aria-current={isCurrent ? 'step' : undefined}
-                className={`rounded-xl border p-3 text-left transition-colors ${
+                className={`group flex min-w-[8.5rem] flex-1 items-center gap-2 rounded-lg px-2.5 py-2 text-left transition-colors ${
                   isCurrent
-                    ? 'border-primary bg-primary/5 text-primary'
+                    ? 'bg-slate-950 text-white'
                     : isAvailable
-                      ? 'border-slate-200 bg-white text-slate-700 hover:border-primary/40 hover:bg-primary/[0.03]'
-                      : 'cursor-not-allowed border-slate-100 bg-slate-50 text-slate-400'
+                      ? 'text-slate-700 hover:bg-slate-100'
+                      : 'cursor-not-allowed text-slate-400'
                 }`}
               >
-                <span className="flex items-center gap-2">
-                  <span className={`flex h-7 w-7 items-center justify-center rounded-full ${isCurrent || isComplete ? 'bg-primary text-white' : 'bg-slate-200 text-slate-500'}`}>
+                  <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${isCurrent ? 'bg-white/15 text-white' : isComplete ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
                     {isComplete && !isCurrent ? <Check className="h-4 w-4" /> : <Icon className="h-4 w-4" />}
                   </span>
-                  <span className="text-sm font-semibold">{phase.num}. {phase.title}</span>
-                </span>
-                <span className="mt-2 hidden text-xs text-slate-500 sm:block">{phase.description}</span>
+                  <span className="min-w-0"><span className={`block text-[10px] uppercase tracking-wide ${isCurrent ? 'text-slate-300' : 'text-slate-400'}`}>Paso {phase.num}</span><span className="block truncate text-xs font-semibold">{phase.title}</span></span>
               </button>
             );
           })}
@@ -334,18 +330,18 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
       </div>
 
        {leadOrigin && (
-        <div className="mb-4 flex items-center gap-3 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3">
-          <Target className="h-5 w-5 shrink-0 text-indigo-600" />
-          <span className="flex-1 text-sm text-indigo-800">
+        <div className="mb-4 flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+          <Target className="h-5 w-5 shrink-0 text-slate-500" />
+          <span className="flex-1 text-sm text-slate-700">
             Esta cotización quedará vinculada al lead{leadOrigin.leadName ? <> <strong>{leadOrigin.leadName}</strong></> : ''}.
           </span>
-          <a href={`/crm/${leadOrigin.leadId}`} className="text-xs font-medium text-indigo-700 underline">Ver lead</a>
+          <a href={`/crm/${leadOrigin.leadId}`} className="text-xs font-medium text-slate-700 underline">Ver lead</a>
          </div>
        )}
 
-       <div className="mb-4"><QuotationWorkspaceSummary currentPhase={currentStepNumber} totalSteps={6} compact /></div>
+       {currentStepNumber > 1 && <div className="mb-4"><QuotationWorkspaceSummary currentPhase={currentStepNumber} totalSteps={6} compact /></div>}
 
-       <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
+       <div className={currentStepNumber === 1 ? 'mx-auto max-w-5xl' : 'grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_18rem]'}>
         <main className="min-w-0 space-y-5">
           {validationIssues.length > 0 && (
             <Alert variant="destructive" role="alert" aria-live="assertive">
@@ -370,18 +366,17 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
               <React.Suspense fallback={<PhaseLoading />}>
               {currentStepNumber === 1 && (
                 <div className="space-y-6">
-                  <SectionHeading title="Empecemos por el brief" description="Estos datos orientan la propuesta. El precio y la configuración técnica aparecen después." />
-                  <QuotationBriefIntake onApply={(analysis: BriefIntakeAnalysis) => {
-                    const motion = analysis.modality === 'renewal' ? 'renewal' : analysis.modality === 'annual_program' ? 'new_business' : quotationData.commercialMotion || 'new_business';
-                    const projectType = analysis.modality === 'monthly_fee' || analysis.modality === 'renewal' ? 'fee-mensual' : analysis.modality === 'annual_program' ? 'always-on' : analysis.modality === 'event_pack' ? 'monitoring' : analysis.modality === 'demo' ? 'demo' : 'on-demand';
+                  <QuotationBriefIntake onApply={(proposal: BriefProposalCandidate, analysis: BriefIntakeAnalysis) => {
+                    const motion = proposal.modality === 'renewal' ? 'renewal' : proposal.modality === 'demo' ? 'demo' : quotationData.commercialMotion || 'new_business';
+                    const projectType = proposal.modality === 'monthly_fee' || proposal.modality === 'renewal' ? 'fee-mensual' : proposal.modality === 'annual_program' ? 'always-on' : 'on-demand';
                     updateQuotationData({
-                      project: { ...quotationData.project, name: analysis.projectName || quotationData.project.name, type: projectType, duration: analysis.durationMonths ? `${analysis.durationMonths} meses` : quotationData.project.duration },
+                      project: { ...quotationData.project, name: proposal.projectName || quotationData.project.name, type: projectType, duration: durationValueFromMonths(proposal.durationMonths, projectType, quotationData.project.duration) },
                       commercialMotion: motion,
-                      decisionContext: { ...(quotationData.decisionContext || {}), source: 'brief_or_meeting_minute', summary: analysis.summary, context: analysis.summary, objective: analysis.objective, decision: analysis.decision, markets: analysis.markets, brands: analysis.brands, competitors: analysis.competitors, sources: analysis.sources, modules: analysis.modules, languages: analysis.languages, mentionVolume: analysis.mentionVolume, slaLevel: analysis.slaLevel, designLevel: analysis.designLevel, missingQuestions: analysis.missingQuestions, recommendationReason: analysis.recommendationReason, recommendedBlueprintId: analysis.recommendedBlueprint?.id || null, recommendedBlueprintSlug: analysis.recommendationSlug, recommendationConfidence: analysis.confidence },
+                      decisionContext: { ...(quotationData.decisionContext || {}), source: 'brief_or_meeting_minute', summary: proposal.summary, context: proposal.summary, objective: proposal.objective, decision: proposal.decision, markets: proposal.markets, brands: proposal.brands, competitors: proposal.competitors, sources: proposal.sources, modules: proposal.modules, languages: proposal.languages, mentionVolume: proposal.mentionVolume, slaLevel: proposal.slaLevel, designLevel: proposal.designLevel, missingQuestions: proposal.missingQuestions, recommendationReason: proposal.recommendationReason, recommendedBlueprintId: proposal.recommendedBlueprint?.id || null, recommendedBlueprintSlug: proposal.recommendationSlug, recommendationConfidence: proposal.confidence, detectedProposalCount: analysis.proposals.length, selectedProposalId: proposal.id },
                     });
-                    toast({ title: 'Diagnóstico incorporado', description: analysis.recommendedBlueprint ? `La receta ${analysis.recommendedBlueprint.name} quedará destacada en Servicio.` : 'Completá o ajustá el brief para elegir una receta.' });
+                    toast({ title: 'Propuesta seleccionada', description: proposal.recommendedBlueprint ? `${proposal.projectName}. La receta ${proposal.recommendedBlueprint.name} quedará destacada en Servicio.` : `${proposal.projectName}. Completá los datos esenciales para continuar.` });
                   }} />
-                  <OptimizedBasicInfo errors={fieldErrors} />
+                  <OptimizedBasicInfo mode="project" errors={fieldErrors} />
                   <CommercialMotionField quotationData={quotationData} updateQuotationData={updateQuotationData} />
                   {isEditing && !quotationData.scopeSnapshot && (
                     <details className="rounded-xl border border-amber-200 bg-amber-50/60 p-4">
@@ -430,7 +425,7 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
               {currentStepNumber === 5 && (
                 <div className="space-y-6">
                   <SectionHeading title="Revisá la inversión" description="Confirmá moneda, tipo de cambio, precio y condiciones comerciales antes de preparar el envío." />
-                  <CurrencySnapshot quotationData={quotationData} />
+                  <OptimizedBasicInfo mode="financial" errors={fieldErrors} />
                   <OptimizedFinancialReview revealAdvanced={validationIssues.length > 0} validationMessage={validationIssues[0]?.message} />
                 </div>
               )}
@@ -456,10 +451,10 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
             </div>
           </section>
 
-          <div className="sticky bottom-3 z-20 flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-lg backdrop-blur sm:p-4">
-            <Button type="button" variant="ghost" onClick={handlePreviousStep} disabled={currentStepNumber === 1}>
+          <div className={`sticky bottom-2 z-20 mt-4 flex items-center gap-3 rounded-xl border border-slate-200 bg-white/95 p-2 shadow-md backdrop-blur ${currentStepNumber === 1 ? 'justify-end' : 'justify-between'}`}>
+            {currentStepNumber > 1 && <Button type="button" variant="ghost" onClick={handlePreviousStep}>
               <ChevronLeft className="mr-1 h-4 w-4" /> Anterior
-            </Button>
+            </Button>}
             {currentStepNumber < 6 && (
               <Button type="button" onClick={handleNextStep} disabled={isSaving} className="min-w-32">
                 {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -470,7 +465,7 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
           </div>
         </main>
 
-        <QuotationWorkspaceSummary currentPhase={currentStepNumber} totalSteps={6} />
+        {currentStepNumber > 1 && <QuotationWorkspaceSummary currentPhase={currentStepNumber} totalSteps={6} />}
       </div>
 
       <AlertDialog open={exitDialogOpen} onOpenChange={setExitDialogOpen}>
@@ -508,8 +503,9 @@ function EmptyStep({ message }: { message: string }) {
 
 function CommercialMotionField({ quotationData, updateQuotationData }: { quotationData: { commercialMotion?: string }; updateQuotationData: (data: { commercialMotion: 'new_business' | 'renewal' | 'expansion' | 'demo' }) => void }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <details className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+      <summary className="cursor-pointer text-sm font-medium text-slate-700">Clasificación comercial <span className="ml-2 font-normal text-slate-400">· opcional</span></summary>
+      <div className="mt-4 flex flex-col gap-3 border-t border-slate-100 pt-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-sm font-semibold text-slate-900">Tipo de oportunidad</p>
           <p className="mt-1 text-xs text-slate-500">Ayuda a comparar conversión y condiciones sin mezclar demos con negocio real.</p>
@@ -524,22 +520,24 @@ function CommercialMotionField({ quotationData, updateQuotationData }: { quotati
           </SelectContent>
         </Select>
       </div>
-    </div>
+    </details>
   );
 }
 
-function CurrencySnapshot({ quotationData }: { quotationData: { quotationCurrency?: string; exchangeRateSnapshot?: number | null } }) {
-  const currency = quotationData.quotationCurrency === 'USD' ? 'USD' : 'ARS';
-  const rate = Number(quotationData.exchangeRateSnapshot || 0);
-  return (
-    <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 sm:flex-row sm:items-center sm:justify-between">
-      <div>
-        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Moneda de la propuesta</p>
-        <p className="mt-1 text-sm font-semibold text-slate-900">{currency}{currency === 'USD' && rate > 0 ? ` · TC fijado ARS ${rate.toLocaleString('es-AR')}` : ''}</p>
-      </div>
-      <p className="text-xs text-slate-500">El tipo de cambio queda congelado en esta revisión para que todos los exports coincidan.</p>
-    </div>
-  );
+function durationValueFromMonths(months: number | null, projectType: string, fallback: string) {
+  if (!months) return fallback;
+  if (projectType === 'on-demand') {
+    if (months <= 0.75) return '3-weeks';
+    if (months <= 1) return '1-month';
+    if (months <= 2) return '2-months';
+    if (months <= 3) return '3-months';
+    if (months <= 4) return '4-months';
+  }
+  if (months === 6) return '6-months';
+  if (months === 12) return '1-year';
+  if (months === 18) return '18-months';
+  if (months === 24) return '2-years';
+  return fallback || 'custom';
 }
 
 function PhaseLoading() {
