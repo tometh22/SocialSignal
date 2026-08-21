@@ -245,6 +245,7 @@ import { productDefinitionsMarkdown } from "./content/product-definitions.genera
 import { PRODUCT_DEFINITIONS_MANIFEST } from "./content/product-definitions-manifest";
 import { calculateQuotationPricing } from "@shared/utils/quotation-pricing";
 import { calculateQuotationComplexityFactor } from "@shared/utils/quotation-complexity";
+import { calculateMarginDrift } from "@shared/utils/quotation-margin-drift";
 import {
   assertQuotationTransition,
   isQuotationStatus,
@@ -6228,6 +6229,86 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (err) {
       console.error('GET /api/quotations/:id error:', err);
       res.status(500).json({ message: 'Error fetching quotation' });
+    }
+  });
+
+  // Alerta de margen para contratos activos (fee mensual / programa anual):
+  // el precio quedó fijo en dólares al cotizar, pero el costo se sigue
+  // pagando en pesos y cambia mes a mes. Compara el costo del mismo equipo
+  // con las tarifas vigentes hoy contra el costo congelado al cotizar. No
+  // cambia ningún precio — es sólo diagnóstico (ver shared/utils/quotation-margin-drift.ts).
+  app.get("/api/quotations/:id/margin-drift", requireAuth, requirePermission("quotations"), async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid quotation ID" });
+
+      const [quotation] = await db.select().from(quotations).where(eq(quotations.id, id));
+      if (!quotation) return res.status(404).json({ message: "Quotation not found" });
+
+      if (quotation.quotationType === "one-time") {
+        return res.json({ applicable: false, reason: "one-time" });
+      }
+      if (quotation.status !== "approved") {
+        return res.json({ applicable: false, reason: "not-active" });
+      }
+
+      const exchangeRateAtQuote = Number(quotation.exchangeRateAtQuote);
+      if (!(exchangeRateAtQuote > 0)) {
+        return res.json({ applicable: false, reason: "missing-quote-fx" });
+      }
+
+      const [currentFxConfig] = await db.select()
+        .from(systemConfig)
+        .where(eq(systemConfig.configKey, "usd_exchange_rate"));
+      const currentExchangeRate = Number(currentFxConfig?.configValue);
+      if (!(currentExchangeRate > 0)) {
+        return res.json({ applicable: false, reason: "missing-current-fx" });
+      }
+
+      // Si el cliente aceptó una variante puntual, su equipo (y por lo tanto
+      // su costo) vive en filas con ese variantId — no en las de la base —
+      // y totalAmount ya se actualizó al precio de esa variante al aceptar.
+      // Usar el equipo equivocado compararía manzanas con naranjas.
+      const teamFilter = quotation.acceptedVariantId
+        ? eq(quotationTeamMembers.variantId, quotation.acceptedVariantId)
+        : isNull(quotationTeamMembers.variantId);
+      const members = await db.select().from(quotationTeamMembers).where(and(
+        eq(quotationTeamMembers.quotationId, id),
+        teamFilter,
+      ));
+      if (members.length === 0) {
+        return res.json({ applicable: false, reason: "no-team" });
+      }
+
+      const quotationCurrency = quotation.quotationCurrency === "USD" ? "USD" : "ARS";
+      const now = new Date();
+      const team = await Promise.all(members.map(async (member) => {
+        const originalRate = Number(member.rate) || 0;
+        if (!member.personnelId) {
+          return { personnelId: null, hours: Number(member.hours) || 0, originalRate, currentRate: null };
+        }
+        const resolved = await resolveCanonicalPersonnelRate(member.personnelId, now);
+        if (resolved.error || resolved.hourlyRateARS == null) {
+          return { personnelId: member.personnelId, hours: Number(member.hours) || 0, originalRate, currentRate: null };
+        }
+        const currentRate = quotationCurrency === "USD"
+          ? resolved.hourlyRateARS / currentExchangeRate
+          : resolved.hourlyRateARS;
+        return { personnelId: member.personnelId, hours: Number(member.hours) || 0, originalRate, currentRate };
+      }));
+
+      const drift = calculateMarginDrift({ lockedTotal: Number(quotation.totalAmount) || 0, team });
+      return res.json({
+        applicable: true,
+        quotationCurrency,
+        exchangeRateAtQuote,
+        currentExchangeRate,
+        exchangeRateDriftPercentage: Number((((currentExchangeRate - exchangeRateAtQuote) / exchangeRateAtQuote) * 100).toFixed(2)),
+        ...drift,
+      });
+    } catch (error) {
+      console.error("GET /api/quotations/:id/margin-drift error:", error);
+      res.status(500).json({ message: "No se pudo calcular la deriva de margen" });
     }
   });
 
