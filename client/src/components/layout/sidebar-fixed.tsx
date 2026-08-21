@@ -42,6 +42,7 @@ import {
   ShieldAlert,
   Database,
   BookOpen,
+  Repeat,
 } from "lucide-react";
 
 type NavItem = {
@@ -173,6 +174,8 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
       items: [
         { href: "/dashboard", title: "Resumen financiero", icon: LayoutDashboard, description: "KPIs económicos y operativos", anyPermissions: FINANCE_SUMMARY_ACCESS_SECTIONS },
         { href: "/finance/proyeccion", title: "Proyección", icon: Target, description: "Ejecutado vs proyectado del ejercicio", anyPermissions: FINANCE_SUMMARY_ACCESS_SECTIONS },
+        { href: "/finance/arr", title: "ARR", icon: Repeat, description: "Ingreso recurrente anualizado", anyPermissions: FINANCE_SUMMARY_ACCESS_SECTIONS },
+        { href: "/finance/rendimiento", title: "Rendimiento", icon: Gauge, description: "Markup y margen por cliente y proyecto", anyPermissions: FINANCE_SUMMARY_ACCESS_SECTIONS },
         { href: "/finance/cashflow", title: "Cashflow", icon: Wallet, description: "Movimientos y saldos bancarios", permission: 'finance' as AppSection },
         { href: "/finance/activo", title: "Activo", icon: CircleArrowUp, description: "Cuentas a cobrar y activos líquidos", permission: 'finance' as AppSection },
         { href: "/finance/pasivo", title: "Pasivo", icon: CircleArrowDown, description: "Cuentas a pagar y deudas", permission: 'finance' as AppSection },

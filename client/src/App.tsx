@@ -46,6 +46,8 @@ const CRMLeadPage = lazy(() => import("@/pages/crm-lead"));
 const ReviewHubPage = lazy(() => import("@/pages/review/hub"));
 const ReviewRoomPage = lazy(() => import("@/pages/review/room"));
 import ProyeccionPage from "@/pages/proyeccion";
+import ArrPage from "@/pages/arr";
+import RendimientoPage from "@/pages/rendimiento";
 const ActivoPage = lazy(() => import("@/pages/activo"));
 const PasivoPage = lazy(() => import("@/pages/pasivo"));
 const ProvisionsPage = lazy(() => import("@/pages/provisions"));
@@ -313,6 +315,8 @@ function AppRoutes() {
 
                   {/* Finance Ledger */}
                   <ProtectedRoute path="/finance/proyeccion" component={ProyeccionPage} requiredAnyPermission={FINANCE_SUMMARY_ACCESS_SECTIONS} />
+                  <ProtectedRoute path="/finance/arr" component={ArrPage} requiredAnyPermission={FINANCE_SUMMARY_ACCESS_SECTIONS} />
+                  <ProtectedRoute path="/finance/rendimiento" component={RendimientoPage} requiredAnyPermission={FINANCE_SUMMARY_ACCESS_SECTIONS} />
                   <ProtectedRoute path="/finance/activo" component={ActivoPage} requiredPermission="finance" />
                   <ProtectedRoute path="/finance/pasivo" component={PasivoPage} requiredPermission="finance" />
                   <ProtectedRoute path="/finance/provisions" component={ProvisionsPage} requiredPermission="finance" />

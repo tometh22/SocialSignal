@@ -8808,6 +8808,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // 📊 DIRECT SHEETS DASHBOARD - reads from Google Sheets in real-time (like Looker Studio)
+  // Ingreso recurrente (ARR/MRR) y rendimiento por proyecto. Reemplazan las
+  // páginas "ARR", "Rendimiento de Cliente" y "Rendimiento de Proyectos" del
+  // Looker Studio, sobre financial_sot (solapa "Rendimiento Cliente").
+  const parsePeriodo = (raw: unknown) =>
+    typeof raw === 'string' && /^\d{4}-(0[1-9]|1[0-2])$/.test(raw) ? raw : null;
+
+  app.get("/api/v2/executive/recurring", requireAuth, async (req, res) => {
+    try {
+      const svc = await import('./services/recurring-revenue');
+      const disponibles = await svc.getPeriodosDisponibles();
+      const periodo = parsePeriodo(req.query.period) ?? disponibles[0];
+      if (!periodo) return res.json({ periodos: [], data: null });
+      res.setHeader('Cache-Control', 'private, max-age=60, stale-while-revalidate=300');
+      res.json({ periodos: disponibles, data: await svc.getRecurringRevenue(periodo) });
+    } catch (error: any) {
+      console.error('❌ Recurring revenue error:', error?.message || error);
+      res.status(500).json({ message: 'Error obteniendo el ingreso recurrente', error: error?.message });
+    }
+  });
+
+  app.get("/api/v2/executive/rendimiento", requireAuth, async (req, res) => {
+    try {
+      const svc = await import('./services/recurring-revenue');
+      const disponibles = await svc.getPeriodosDisponibles();
+      const periodo = parsePeriodo(req.query.period) ?? disponibles[0];
+      if (!periodo) return res.json({ periodos: [], periodo: null, filas: [] });
+      res.setHeader('Cache-Control', 'private, max-age=60, stale-while-revalidate=300');
+      res.json({ periodos: disponibles, periodo, filas: await svc.getRendimiento(periodo) });
+    } catch (error: any) {
+      console.error('❌ Rendimiento error:', error?.message || error);
+      res.status(500).json({ message: 'Error obteniendo el rendimiento', error: error?.message });
+    }
+  });
+
   // Ejecutado vs proyectado del ejercicio. Reemplaza la página "Proyección
   // (resumen)" del Looker Studio, leyendo la misma solapa del Excel MAESTRO.
   app.get("/api/v2/executive/proyeccion", requireAuth, async (req, res) => {
