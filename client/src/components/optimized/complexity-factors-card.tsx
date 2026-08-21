@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Globe, MessageSquare } from 'lucide-react';
+import { CheckCircle2, Globe, MessageSquare } from 'lucide-react';
 
 type ComplexityFactorsCardProps = {
   validationMessage?: string;
@@ -53,6 +53,7 @@ const ComplexityFactorsCard: React.FC<ComplexityFactorsCardProps> = ({ validatio
     currency,
     maximumFractionDigits: currency === 'USD' ? 2 : 0,
   }).format(pricingResult.display.complexityAdjustment || 0);
+  const hasBlueprintScope = Boolean(quotationData.scopeSnapshot);
 
   return (
     <div id="complexity-config" className="space-y-6" tabIndex={-1}>
@@ -64,15 +65,28 @@ const ComplexityFactorsCard: React.FC<ComplexityFactorsCardProps> = ({ validatio
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-lg font-semibold text-slate-950">Escala del alcance</h3>
-          <p className="text-sm text-slate-500">El costo se ajusta únicamente por volumen y cobertura; la profundidad analítica ya está incluida en la receta.</p>
+          <p className="text-sm text-slate-500">
+            {hasBlueprintScope
+              ? 'El volumen y la cobertura ya están reflejados en las horas sugeridas por la receta. Este panel es sólo de referencia.'
+              : 'El costo se ajusta únicamente por volumen y cobertura; la profundidad analítica ya está incluida en la receta.'}
+          </p>
         </div>
-        <div className="flex flex-col items-end gap-1">
-          <Badge className={complexityLevel.color}>
-            +{(totalFactor * 100).toFixed(1)}% · {complexityLevel.level}
-          </Badge>
-          <span className="text-xs font-medium text-slate-600">Impacto estimado: +{formattedImpact}</span>
-        </div>
+        {!hasBlueprintScope && (
+          <div className="flex flex-col items-end gap-1">
+            <Badge className={complexityLevel.color}>
+              +{(totalFactor * 100).toFixed(1)}% · {complexityLevel.level}
+            </Badge>
+            <span className="text-xs font-medium text-slate-600">Impacto estimado: +{formattedImpact}</span>
+          </div>
+        )}
       </div>
+
+      {hasBlueprintScope && (
+        <div className="flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
+          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>Esta cotización usa una receta profesional: el volumen de menciones y la cobertura de países ya ajustaron las horas del equipo en el paso Alcance. No se aplica ningún cargo adicional por complejidad sobre el precio.</span>
+        </div>
+      )}
 
       {/* Resumen del equipo configurado */}
       {quotationData.teamMembers.length > 0 && (
@@ -91,68 +105,71 @@ const ComplexityFactorsCard: React.FC<ComplexityFactorsCardProps> = ({ validatio
               })}
             </div>
             <div className="mt-3 border-t border-slate-200 pt-3 text-sm text-slate-500">
-              Los factores de complejidad se aplican de forma uniforme sobre el costo base
+              {hasBlueprintScope
+                ? 'El volumen y la cobertura ya están incluidos en las horas de cada rol.'
+                : 'Los factores de complejidad se aplican de forma uniforme sobre el costo base'}
             </div>
           </CardContent>
         </Card>
       )}
 
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-        {/* Volumen de Menciones */}
-        <Card className="border-slate-200 shadow-none">
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center text-sm font-medium text-slate-950">
-              <MessageSquare className="mr-2 h-4 w-4 text-indigo-600" />
-              Volumen de menciones
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <Select value={quotationData.mentionsVolume} onValueChange={updateMentionsVolume}>
-              <SelectTrigger aria-label="Volumen de menciones">
-                <SelectValue placeholder="Seleccionar volumen" />
-              </SelectTrigger>
-              <SelectContent>
-                {mentionsVolumeOptions.map(option => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <div className="text-xs text-slate-500">
-              Factor: +{(complexityFactors.mentionsVolumeFactor * 100).toFixed(1)}%
-            </div>
-          </CardContent>
-        </Card>
+      {!hasBlueprintScope && (
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+          {/* Volumen de Menciones */}
+          <Card className="border-slate-200 shadow-none">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center text-sm font-medium text-slate-950">
+                <MessageSquare className="mr-2 h-4 w-4 text-indigo-600" />
+                Volumen de menciones
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Select value={quotationData.mentionsVolume} onValueChange={updateMentionsVolume}>
+                <SelectTrigger aria-label="Volumen de menciones">
+                  <SelectValue placeholder="Seleccionar volumen" />
+                </SelectTrigger>
+                <SelectContent>
+                  {mentionsVolumeOptions.map(option => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <div className="text-xs text-slate-500">
+                Factor: +{(complexityFactors.mentionsVolumeFactor * 100).toFixed(1)}%
+              </div>
+            </CardContent>
+          </Card>
 
-        {/* Países Cubiertos */}
-        <Card className="border-slate-200 shadow-none">
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center text-sm font-medium text-slate-950">
-              <Globe className="mr-2 h-4 w-4 text-indigo-600" />
-              Países cubiertos
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <Select value={quotationData.countriesCovered} onValueChange={updateCountriesCovered}>
-              <SelectTrigger aria-label="Países cubiertos">
-                <SelectValue placeholder="Seleccionar países" />
-              </SelectTrigger>
-              <SelectContent>
-                {countriesOptions.map(option => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <div className="text-xs text-slate-500">
-              Factor: +{(complexityFactors.countriesFactor * 100).toFixed(1)}%
-            </div>
-          </CardContent>
-        </Card>
-
-      </div>
+          {/* Países Cubiertos */}
+          <Card className="border-slate-200 shadow-none">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center text-sm font-medium text-slate-950">
+                <Globe className="mr-2 h-4 w-4 text-indigo-600" />
+                Países cubiertos
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Select value={quotationData.countriesCovered} onValueChange={updateCountriesCovered}>
+                <SelectTrigger aria-label="Países cubiertos">
+                  <SelectValue placeholder="Seleccionar países" />
+                </SelectTrigger>
+                <SelectContent>
+                  {countriesOptions.map(option => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <div className="text-xs text-slate-500">
+                Factor: +{(complexityFactors.countriesFactor * 100).toFixed(1)}%
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 };
