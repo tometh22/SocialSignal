@@ -64,12 +64,43 @@ function parseMonthLabel(label: string): number | null {
   return null;
 }
 
+/**
+ * Detecta la fórmula rota de Beneficio Neto del Resumen Ejecutivo.
+ *
+ * En los meses sin cerrar (ago–dic 2026 al 2026-08-21) la celda de Beneficio
+ * Neto devuelve exactamente las Ventas del mes y el Margen Neto queda en 100%:
+ * la fórmula no está restando ningún costo. El dashboard sumaba esas cinco
+ * celdas y mostraba 332.145 de beneficio neto anual cuando el real ronda −21k.
+ *
+ * No es un dato conservador ni optimista: es la venta disfrazada de resultado.
+ * Sumarla es peor que no tener el dato.
+ */
+export function isBrokenNetProfit(
+  beneficioNeto: number | null,
+  ventasDelMes: number | null,
+  margenNeto: number | null,
+): boolean {
+  if (beneficioNeto == null || ventasDelMes == null) return false;
+  if (ventasDelMes === 0) return false;
+  const igualAVentas = Math.abs(beneficioNeto - ventasDelMes) < 0.01;
+  const margenCien = margenNeto != null && Math.abs(margenNeto - 100) < 0.01;
+  return igualAVentas && margenCien;
+}
+
 interface MonthData {
   periodKey: string;
   year: number;
   month: number;
   monthLabel: string;
   cierre: boolean;
+  /** true si la celda de Beneficio Neto del Excel está rota (ver isBrokenNetProfit). */
+  beneficioNetoRoto?: boolean;
+  /** Sólo en agregados: el beneficio neto no cubre todos los meses del período. */
+  beneficioNetoParcial?: boolean;
+  /** Sólo en agregados: meses excluidos del beneficio neto por celda rota. */
+  mesesSinBeneficioNeto?: string[];
+  /** Sólo en agregados: cuántos meses entraron al total. */
+  mesesAgregados?: number;
   // P&L
   ventasDelMes: number | null;
   ebitOperativo: number | null;
@@ -154,6 +185,13 @@ function aggregateMonths(
     ? Math.round((ventasDelMes / totalDirectCosts) * 100) / 100
     : null;
 
+  // Un total parcial no puede presentarse como total. Si algún mes quedó fuera
+  // porque su celda estaba rota, el agregado lo declara para que la vista lo
+  // etiquete en vez de mostrar un número que no cubre el período completo.
+  const mesesSinBeneficioNeto = sorted
+    .filter(m => m.beneficioNetoRoto)
+    .map(m => m.monthLabel);
+
   return {
     periodKey,
     year,
@@ -163,6 +201,9 @@ function aggregateMonths(
     ventasDelMes,
     ebitOperativo,
     beneficioNeto,
+    beneficioNetoParcial: mesesSinBeneficioNeto.length > 0,
+    mesesSinBeneficioNeto,
+    mesesAgregados: sorted.length,
     margenOperativo,
     margenNeto,
     markup,
@@ -235,17 +276,28 @@ async function fetchDashboardRows(): Promise<MonthData[]> {
     const pasivoFacturacionAdelantada = parseMoney(row[COL.PASIVO_FACT_ADEL]);
     const pasivoProveedores = parseMoney(row[COL.PASIVO_PROVEEDORES]);
 
+    const beneficioNetoRaw = parseMoney(row[COL.BENEFICIO_NETO]);
+    const margenNetoRaw = parsePercent(row[COL.MARGEN_NETO]);
+    const beneficioNetoRoto = isBrokenNetProfit(beneficioNetoRaw, ventasDelMes, margenNetoRaw);
+    if (beneficioNetoRoto) {
+      console.warn(
+        `⚠️ [Resumen Ejecutivo] ${periodKey}: Beneficio Neto == Ventas y margen 100% — fórmula rota en la planilla, se excluye del agregado`,
+      );
+    }
+
     allData.push({
       periodKey,
       year,
       month,
       monthLabel: mesLabel,
       cierre,
+      beneficioNetoRoto,
       ventasDelMes,
       ebitOperativo,
-      beneficioNeto: parseMoney(row[COL.BENEFICIO_NETO]),
+      // La celda rota no se propaga: null significa "sin dato", que es la verdad.
+      beneficioNeto: beneficioNetoRoto ? null : beneficioNetoRaw,
       margenOperativo: parsePercent(row[COL.MARGEN_OP]),
-      margenNeto: parsePercent(row[COL.MARGEN_NETO]),
+      margenNeto: beneficioNetoRoto ? null : margenNetoRaw,
       markup,
       proyeccionResultado: parseMoney(row[COL.PROYECCION]),
       activoLiquido,

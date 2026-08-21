@@ -261,10 +261,19 @@ export default function ExecutiveDashboardV2() {
                 tooltip: "Ventas / Costos Directos del equipo. Indica cuántas veces los ingresos superan el costo directo. Estándar Epical: ≥2.5x. Excelente: ≥3.0x.",
               },
               {
-                label: "Beneficio Neto",
+                // El Excel deja la fórmula de Beneficio Neto rota en los meses sin
+                // cerrar (devuelve las Ventas con margen 100%). El backend excluye
+                // esos meses en vez de sumarlos; acá se avisa que el total es parcial
+                // para que nadie lo lea como el resultado del período completo.
+                label: d.beneficioNetoParcial ? "Beneficio Neto (parcial)" : "Beneficio Neto",
                 value: fmt(d.beneficioNeto), pct: null, color: kpiColor(d.beneficioNeto, 0), icon: Wallet,
                 tone: d.beneficioNeto == null ? "neutral" as const : d.beneficioNeto >= 0 ? "success" as const : "danger" as const,
-                tooltip: "EBIT − Impuestos. Ganancia final del período después de todos los costos e impuestos. Equivale al Margen Neto aplicado sobre las ventas.",
+                tooltip: d.beneficioNetoParcial
+                  ? `Cubre sólo ${(d.mesesAgregados ?? 0) - (d.mesesSinBeneficioNeto?.length ?? 0)} de ${d.mesesAgregados ?? 0} meses. `
+                    + `En el Excel MAESTRO, ${(d.mesesSinBeneficioNeto ?? []).join(", ")} tienen la fórmula de Beneficio Neto rota `
+                    + `(devuelve las Ventas del mes con margen 100%), así que se excluyen en lugar de inflar el total. `
+                    + `Para cerrar el período hay que corregir esas celdas en la planilla.`
+                  : "EBIT − Impuestos. Ganancia final del período después de todos los costos e impuestos. Equivale al Margen Neto aplicado sobre las ventas.",
               },
             ].map((kpi, i) => (
               <MetricCard
