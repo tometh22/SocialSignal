@@ -34,6 +34,12 @@ const BLOCK_LABELS: Record<string, string> = {
   scenarios: "Escenarios", terms: "Condiciones", closing: "Cierre",
 };
 type StudioMode = "narrative" | "design" | "qa" | "export";
+const STUDIO_STEPS: Array<{ id: StudioMode; label: string; hint: string }> = [
+  { id: "narrative", label: "Narrativa", hint: "Historia y tono" },
+  { id: "design", label: "Diseño", hint: "Identidad visual" },
+  { id: "qa", label: "QA", hint: "Control comercial" },
+  { id: "export", label: "Exportar", hint: "PDF y PPTX" },
+];
 
 export default function ProposalStudio() {
   const [, params] = useRoute<{ id: string }>("/quotations/:id/studio");
@@ -151,6 +157,8 @@ export default function ProposalStudio() {
       </header>
 
       {document.isStale && <div className="mx-auto max-w-[1680px] px-5 pt-5"><Alert variant="destructive"><RefreshCw className="h-4 w-4" /><AlertTitle>La revisión comercial cambió</AlertTitle><AlertDescription>Reconciliá el documento antes de ejecutar QA, exportar o enviar. La reconciliación conserva el tema visual y actualiza precio, alcance, escenarios y términos.</AlertDescription></Alert></div>}
+
+      <div className="mx-auto max-w-[1680px] px-5 pt-4"><div className="grid grid-cols-2 gap-2 rounded-xl border border-slate-200 bg-white p-2 sm:grid-cols-4">{STUDIO_STEPS.map((step, index) => { const active = step.id === studioMode; const complete = STUDIO_STEPS.findIndex((item) => item.id === studioMode) > index; return <button key={step.id} type="button" onClick={() => setStudioMode(step.id)} className={`rounded-lg px-3 py-2 text-left transition ${active ? "bg-indigo-600 text-white shadow-sm" : complete ? "bg-indigo-50 text-indigo-800 hover:bg-indigo-100" : "text-slate-600 hover:bg-slate-50"}`}><span className="flex items-center gap-2 text-xs font-semibold"><span className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] ${active ? "bg-white/20" : "bg-slate-100"}`}>{index + 1}</span>{step.label}</span><span className={`mt-1 block text-[10px] ${active ? "text-indigo-100" : "text-slate-400"}`}>{step.hint}</span></button>; })}</div></div>
 
       <div className="mx-auto grid max-w-[1440px] gap-5 p-5 xl:grid-cols-[240px_minmax(0,1fr)_300px]">
         <aside className="space-y-4">

@@ -19,7 +19,7 @@ export const QUOTATION_STEPS = [
   { num: 3, title: 'Alcance', shortTitle: 'Alcance', description: 'Definí cobertura y entregables' },
   { num: 4, title: 'Equipo', shortTitle: 'Equipo', description: 'Confirmá capacidad y esfuerzo' },
   { num: 5, title: 'Inversión', shortTitle: 'Inversión', description: 'Precio, moneda y condiciones' },
-  { num: 6, title: 'Envío', shortTitle: 'Envío', description: 'Compará, revisá y prepará la propuesta' },
+  { num: 6, title: 'Propuesta', shortTitle: 'Propuesta', description: 'Compará, validá y prepará el envío' },
 ] as const;
 
 export type QuotationPhase = 1 | 2 | 3 | 4;

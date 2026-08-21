@@ -2,7 +2,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { useOptimizedQuote } from '@/context/optimized-quote-context';
 import { cn } from '@/lib/utils';
-import { BriefcaseBusiness, CircleDollarSign, Clock3, ShieldCheck, Users } from 'lucide-react';
+import { BriefcaseBusiness, CircleDollarSign, Clock3, ShieldCheck, Users, Sparkles, AlertCircle } from 'lucide-react';
 
 type QuotationWorkspaceSummaryProps = {
   currentPhase: number;
@@ -32,6 +32,12 @@ export function QuotationWorkspaceSummary({ currentPhase, totalSteps = 4, compac
   const motionLabel = {
     new_business: 'Nuevo negocio', renewal: 'Renovación', expansion: 'Expansión', demo: 'Demo',
   }[quotationData.commercialMotion || 'new_business'] || 'Nuevo negocio';
+  const decisionContext = quotationData.decisionContext || {};
+  const briefReady = Boolean(decisionContext.summary || decisionContext.context || quotationData.project.name);
+  const recommendationConfidence = Number(decisionContext.recommendationConfidence || 0);
+  const hasScope = Boolean(quotationData.scopeSnapshot);
+  const workloadReference = Number((quotationData.operationalPlan as any)?.workload?.totalHours || 0);
+  const effortDelta = workloadReference > 0 ? ((totalHours - workloadReference) / workloadReference) * 100 : 0;
 
   const content = (
     <div className="space-y-4">
@@ -47,6 +53,18 @@ export function QuotationWorkspaceSummary({ currentPhase, totalSteps = 4, compac
         <SummaryRow icon={BriefcaseBusiness} label="Cliente" value={quotationData.client?.name || 'Sin seleccionar'} />
         <SummaryRow icon={Users} label="Equipo" value={`${quotationData.teamMembers.length} integrantes · ${totalHours.toFixed(1)} h`} />
         <SummaryRow icon={Clock3} label="Oportunidad" value={`${motionLabel} · ${projectTypeLabel}`} />
+      </div>
+
+      <div className="rounded-xl border border-indigo-100 bg-indigo-50/60 p-3">
+        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-indigo-700"><Sparkles className="h-3.5 w-3.5" /> Calidad de la decisión</div>
+        <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
+          <StatusDot label="Brief" ready={briefReady} />
+          <StatusDot label="Receta" ready={hasScope} />
+          <StatusDot label="Equipo" ready={totalHours > 0} />
+          <StatusDot label="Referencia" ready={workloadReference === 0 || Math.abs(effortDelta) <= 10} />
+        </div>
+        {recommendationConfidence > 0 && <p className="mt-2 text-[11px] leading-4 text-indigo-800">Recomendación inicial: {Math.round(recommendationConfidence * 100)}% de confianza. Confirmá la receta en Servicio.</p>}
+        {workloadReference > 0 && Math.abs(effortDelta) > 10 && <p className="mt-2 flex items-start gap-1 text-[11px] leading-4 text-amber-800"><AlertCircle className="mt-0.5 h-3 w-3 shrink-0" />El equipo está {Math.abs(effortDelta).toFixed(0)}% {effortDelta > 0 ? 'por encima' : 'por debajo'} de la referencia.</p>}
       </div>
 
       <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-4">
@@ -91,6 +109,10 @@ export function QuotationWorkspaceSummary({ currentPhase, totalSteps = 4, compac
       {content}
     </aside>
   );
+}
+
+function StatusDot({ label, ready }: { label: string; ready: boolean }) {
+  return <div className="flex items-center gap-1.5 text-slate-700"><span className={cn('h-2 w-2 rounded-full', ready ? 'bg-emerald-500' : 'bg-slate-300')} />{label}</div>;
 }
 
 function SummaryRow({ icon: Icon, label, value }: { icon: typeof Users; label: string; value: string }) {

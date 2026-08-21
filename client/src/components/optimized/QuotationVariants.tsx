@@ -904,7 +904,7 @@ export function QuotationVariants({
                       <td className="p-2 font-medium">{variant.variantName}</td>
                       <td className="p-2 text-center">{variant.scopeSnapshot ? `${variant.scopeSnapshot.deliverables.filter((item) => item.included).length} entregables · ${variant.scopeSnapshot.coverage.markets.length} mercados` : 'Histórico'}</td>
                       <td className="p-2 text-right">{getVariantTotalHours(variant).toFixed(1)} h</td>
-                      <td className="p-2 text-right font-medium">{formatCurrency(variant.totalAmount)}</td>
+                      <td className="p-2 text-right font-medium">{formatCurrency(computeVariantTotal(variant))}</td>
                       <td className="p-2 text-center">
                         {(() => {
                           const baseReferenceTotal = getBaseReferenceTotal();
