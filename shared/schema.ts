@@ -4646,6 +4646,13 @@ export const cashflowTransactions = pgTable("cashflow_transactions", {
   saldoBOA: numeric("saldo_boa", { precision: 14, scale: 2 }),
   saldoCaja: numeric("saldo_caja", { precision: 14, scale: 2 }),
   saldoTotalUSD: numeric("saldo_total_usd", { precision: 14, scale: 2 }),
+  /**
+   * Hash de la clave natural (fecha, period_key, tipo_movimiento, banco,
+   * detalle_operacion, monto_ars, monto_usd). Columna GENERADA en la base
+   * (migración 0052) para que no pueda divergir entre los caminos de escritura.
+   * Sólo lectura: es el target del ON CONFLICT del ETL.
+   */
+  rowHash: text("row_hash"),
   importedAt: timestamp("imported_at").defaultNow(),
   importBatch: varchar("import_batch", { length: 100 }),
   createdAt: timestamp("created_at").notNull().defaultNow(),

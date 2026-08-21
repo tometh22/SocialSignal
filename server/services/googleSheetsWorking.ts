@@ -4496,6 +4496,7 @@ class GoogleSheetsWorkingService {
   async importCashflowTransactions(storage: any, periodKey: string): Promise<{ inserted: number; errors: string[] }> {
     const errors: string[] = [];
     let inserted = 0;
+    let skipped = 0;
     try {
       const { db } = await import('../db');
       const { cashflowTransactions } = await import('@shared/schema');
@@ -4543,7 +4544,10 @@ class GoogleSheetsWorkingService {
         if (!detalleOperacion && !montoARSRaw && !montoUSDRaw) continue;
 
         try {
-          await db.insert(cashflowTransactions).values({
+          // Upsert contra el hash de la clave natural (migración 0052). Antes
+          // era un INSERT plano con import_batch nuevo en cada corrida: la tabla
+          // llegó a 299.866 filas para 389 movimientos reales, creciendo sola.
+          const [row] = await db.insert(cashflowTransactions).values({
             fecha,
             periodKey,
             tipoMovimiento,
@@ -4552,8 +4556,12 @@ class GoogleSheetsWorkingService {
             montoARS: montoARSRaw ? String(montoARSRaw) : null,
             montoUSD: montoUSDRaw ? String(montoUSDRaw) : null,
             importBatch,
-          });
-          inserted++;
+          })
+            .onConflictDoNothing({ target: cashflowTransactions.rowHash })
+            .returning({ id: cashflowTransactions.id });
+
+          if (row) inserted++;
+          else skipped++;
         } catch (rowErr: any) {
           errors.push(`Row ${i}: ${rowErr.message}`);
         }
@@ -4561,7 +4569,7 @@ class GoogleSheetsWorkingService {
     } catch (err: any) {
       errors.push(err.message);
     }
-    console.log(`✅ Cashflow ${periodKey}: ${inserted} inserted`);
+    console.log(`✅ Cashflow ${periodKey}: ${inserted} nuevos, ${skipped} ya existían`);
     return { inserted, errors };
   }
 }
