@@ -24,6 +24,7 @@ import { professionalQuotationStudioMigrationSql } from "./migrations/profession
 import { financialIntelligenceMigrationSql } from "./migrations/financial-intelligence";
 import { monthlySummaryPeriodUniqueMigrationSql } from "./migrations/monthly-summary-period-unique";
 import { schemaDriftUniqueConstraintsMigrationSql } from "./migrations/schema-drift-unique-constraints";
+import { incomeSotProjectionFlagMigrationSql } from "./migrations/income-sot-projection-flag";
 import { ensureServiceBlueprintSeeds } from "./services/service-blueprints";
 import cors from 'cors';
 import { execSync } from 'child_process';
@@ -833,6 +834,7 @@ async function applyPendingMigrations() {
     await run('0048 monthly summary period unique', monthlySummaryPeriodUniqueMigrationSql);
     await run('0049 feedback_mind_v2_11 corrections', feedbackMindV211MigrationSql);
     await run('0050 schema drift unique constraints', schemaDriftUniqueConstraintsMigrationSql);
+    await run('0051 income_sot projection flag', incomeSotProjectionFlagMigrationSql);
 
     // 0033: feriados duplicados (mismo date+name insertado más de una vez desde el
     // formulario) — borra duplicados conservando la fila más antigua y agrega la

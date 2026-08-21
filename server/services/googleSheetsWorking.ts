@@ -1,4 +1,5 @@
 import { google } from 'googleapis';
+import { resolveIncomeAmountColumns, isProjectionRow } from '../etl/proyectos-confirmados-spec';
 import fs from 'fs';
 import path from 'path';
 import { parseDec } from '../../shared/parse-utils';
@@ -41,6 +42,15 @@ interface ProyectoConfirmado {
   valorBase: number;
   monedaARS: number;
   monedaUSD: number;
+  /**
+   * "Monto Total USD" de la solapa: el total ya convertido, presente en TODAS las
+   * filas. `monedaUSD` es "Moneda Original USD" y viene vacío en las filas
+   * facturadas en pesos — usar ese campo como importe deja 66 de 109 filas en
+   * cero (bug detectado el 2026-08-21).
+   */
+  montoTotalUSD: number;
+  /** Cotización de la fila, para auditar la conversión ARS -> USD. */
+  cotizacion: number;
   estado: 'confirmado' | 'estimado' | 'cancelado';
 }
 
@@ -614,10 +624,15 @@ class GoogleSheetsWorkingService {
 
       console.log(`📊 Procesando ${rows.length} filas de proyectos confirmados`);
       return this.processProyectosData(rows);
-      
+
     } catch (error) {
+      // Antes devolvía [] ante cualquier error. Eso hacía indistinguible
+      // "la solapa está vacía" de "la credencial expiró", y el ETL de ingresos
+      // cerraba con un tilde verde y cero filas durante meses. Propagar.
       console.error('❌ Error obteniendo proyectos confirmados:', error);
-      return [];
+      throw error instanceof Error
+        ? error
+        : new Error(`getProyectosConfirmados falló: ${String(error)}`);
     }
   }
 
@@ -649,7 +664,9 @@ class GoogleSheetsWorkingService {
       ajuste: headers.findIndex(h => h && h.toLowerCase().includes('ajuste')),
       valorBase: headers.findIndex(h => h && h.toLowerCase().includes('valor') && h.toLowerCase().includes('base')),
       monedaARS: headers.findIndex(h => h && h.toLowerCase().includes('ars')),
-      monedaUSD: headers.findIndex(h => h && h.toLowerCase().includes('usd'))
+      // Ver resolveIncomeAmountColumns: la solapa tiene tres headers con "usd"
+      // y elegir el equivocado deja las filas en pesos en cero.
+      ...resolveIncomeAmountColumns(headers),
     };
 
     console.log('🗺️ Mapeo de columnas proyectos:', columnMap);
@@ -704,6 +721,8 @@ class GoogleSheetsWorkingService {
           valorBase: this.parseMoneyValue(this.getCellValue(row, columnMap.valorBase)),
           monedaARS: this.parseMoneyValue(this.getCellValue(row, columnMap.monedaARS)),
           monedaUSD: this.parseMoneyValue(this.getCellValue(row, columnMap.monedaUSD)),
+          montoTotalUSD: this.parseMoneyValue(this.getCellValue(row, columnMap.montoTotalUSD)),
+          cotizacion: this.parseMoneyValue(this.getCellValue(row, columnMap.cotizacion)),
           estado: esConfirmado ? 'confirmado' : 'estimado'
         };
 

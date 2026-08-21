@@ -3280,6 +3280,8 @@ export const incomeSot = pgTable("income_sot", {
   projectName: text("project_name").notNull(), // Detalle
   projectType: text("project_type"), // Tipo de proyecto: 'Fee' | 'One Shot'
   confirmed: boolean("confirmed").notNull().default(true), // Confirmado = Sí
+  /** Pasado/Futuro de la solapa: false = facturación real, true = proyección. */
+  isProjection: boolean("is_projection").notNull().default(false),
   statusHint: text("status_hint"), // Facturado/No requiere factura/etc (opcional)
   fxRef: numeric("fx_ref", { precision: 12, scale: 6 }), // Cotización (guardado para auditoría)
   amountLocalArs: numeric("amount_local_ars", { precision: 16, scale: 2 }), // Moneda Original ARS

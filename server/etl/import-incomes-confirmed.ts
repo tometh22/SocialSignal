@@ -4,6 +4,7 @@
  */
 
 import { z } from "zod";
+import { isProjectionRow } from "./proyectos-confirmados-spec";
 import { db } from "../db";
 import { incomeSot } from "../../shared/schema";
 import { sql } from "drizzle-orm";
@@ -100,29 +101,30 @@ export async function importIncomesFromConfirmed(rows: any[]): Promise<ImportInc
 
     console.log(`✅ Filas válidas: ${parsed.length}`);
 
-    // Filtrar: Confirmado = "Sí" y Pasado/Futuro = "Real"
-    const filtered = parsed
-      .filter(r => {
-        const confirmadoNormalized = (r["Confirmado"] || "")
-          .toLowerCase()
-          .normalize("NFD") // Descomponer caracteres acentuados
-          .replace(/[\u0300-\u036f]/g, ""); // Eliminar marcas de acento
-        const confirmado = confirmadoNormalized.startsWith("si");
-        
-        const pasadoFuturoRaw = r["Pasado/Futuro"] || "";
-        const pasadoFuturoNormalized = pasadoFuturoRaw
-          .toLowerCase()
-          .trim()
-          .normalize("NFD")
-          .replace(/[\u0300-\u036f]/g, "");
-        
-        // Solo aceptar si explícitamente dice "Real"
-        const pasadoFuturo = pasadoFuturoNormalized === "real";
-        
-        return confirmado && pasadoFuturo;
-      });
+    const normalize = (value: string | undefined) => (value || "")
+      .toLowerCase()
+      .trim()
+      .normalize("NFD")                 // descomponer acentos
+      .replace(/[\u0300-\u036f]/g, ""); // eliminar marcas
 
-    console.log(`🔍 Filtradas (Confirmado=Sí, Pasado/Futuro=Real): ${filtered.length}`);
+    // Filtrar SOLO por Confirmado. Pasado/Futuro ya no descarta: se conserva
+    // como is_projection.
+    //
+    // Antes se exigía ademas Pasado/Futuro = "Real", lo que tiraba las filas
+    // proyectadas — entre ellas la venta a Warner de USD 90.960 de sep-2026.
+    // Son dos dimensiones distintas: si la venta esta cerrada comercialmente
+    // (Confirmado) y si ya ocurrio o esta proyectada (Pasado/Futuro).
+    // Mezclarlas dejaba a income_sot sin ninguna facturacion futura.
+    //
+    // Las filas con Pasado/Futuro ilegible (#NUM! y similares en la planilla)
+    // se tratan como proyeccion: es el supuesto conservador.
+    const filtered = parsed.filter(r => normalize(r["Confirmado"]).startsWith("si"));
+
+    const proyecciones = filtered.filter(r => isProjectionRow(r["Pasado/Futuro"])).length;
+    console.log(
+      `🔍 Filtradas (Confirmado=Sí): ${filtered.length} ` +
+      `(${filtered.length - proyecciones} reales, ${proyecciones} proyecciones)`,
+    );
 
     // Procesar cada fila
     for (const row of filtered) {
@@ -161,6 +163,7 @@ export async function importIncomesFromConfirmed(rows: any[]): Promise<ImportInc
           projectName: row["Detalle"].trim(),
           projectType: row["Tipo de proyecto"].trim(),
           confirmed: true,
+          isProjection: isProjectionRow(row["Pasado/Futuro"]),
           statusHint: (row["Facturado/No Facturado"] ?? "").trim() || null,
           fxRef: fxRef ? String(fxRef) : null,
           amountLocalArs: amountLocalArs ? String(amountLocalArs) : null,
@@ -178,6 +181,7 @@ export async function importIncomesFromConfirmed(rows: any[]): Promise<ImportInc
             target: [incomeSot.clientName, incomeSot.projectName, incomeSot.monthKey],
             set: {
               projectType: sql`EXCLUDED.project_type`,
+              isProjection: sql`EXCLUDED.is_projection`,
               fxRef: sql`COALESCE(EXCLUDED.fx_ref, income_sot.fx_ref)`,
               amountLocalArs: sql`COALESCE(EXCLUDED.amount_local_ars, income_sot.amount_local_ars)`,
               amountLocalUsd: sql`COALESCE(EXCLUDED.amount_local_usd, income_sot.amount_local_usd)`,

@@ -50,6 +50,11 @@ async function runFullPipeline() {
   const start = Date.now();
   console.log('🌟 [SoT Sync] Iniciando pipeline completo...');
 
+  // Cada paso captura su propio error para no cortar el pipeline, pero los
+  // acumula acá. Antes cada catch hacía console.warn y el job cerraba con
+  // "Pipeline completo" aunque no hubiera persistido una sola fila.
+  const syncFailures: string[] = [];
+
   try {
     const { googleSheetsWorkingService } = await import('../services/googleSheetsWorking');
     const { executeSoTETL } = await import('../etl/sot-etl');
@@ -171,15 +176,34 @@ async function runFullPipeline() {
         'Tipo de proyecto': (p.proyecto || '').toLowerCase().includes('fee') ? 'Fee' : 'Puntual',
         'Confirmado': p.confirmado ? 'Sí' : 'No',
         'Pasado/Futuro': p.pasadoFuturo || '',
-        'Cotización': '',
+        'Cotización': p.cotizacion ? String(p.cotizacion) : '',
         'Moneda Original ARS': p.monedaARS ? String(p.monedaARS) : '',
         'Moneda Original USD': p.monedaUSD ? String(p.monedaUSD) : '',
-        'Monto Total USD': String(p.monedaUSD || ''),
+        // "Monto Total USD" de la solapa, que viene completo en TODAS las filas.
+        // Antes se mandaba p.monedaUSD ("Moneda Original USD"), vacío en las
+        // filas facturadas en pesos: 66 de 109 entraban con revenue_usd = 0.
+        'Monto Total USD': String(p.montoTotalUSD || p.monedaUSD || ''),
       }));
       const ir = await importIncomesFromConfirmed(incomeRows);
       console.log(`✅ [SoT Sync] Ingresos: ${ir.inserted} insertados, ${ir.updated} actualizados`);
+
+      // Un ETL que procesa filas y no persiste ninguna está roto, no vacío.
+      // Sin esto, el ON CONFLICT contra una constraint inexistente falló en
+      // cada fila durante meses y el job cerró siempre con un tilde verde.
+      if (incomeRows.length > 0 && ir.inserted === 0) {
+        throw new Error(
+          `Income sync procesó ${incomeRows.length} filas y no persistió ninguna. ` +
+          `Errores: ${ir.errors.length}. Primero: ${ir.errors[0] ?? 'sin detalle'}`,
+        );
+      }
+      if (ir.errors.length > 0) {
+        console.error(
+          `❌ [SoT Sync] Ingresos con ${ir.errors.length} errores. Primero: ${ir.errors[0]}`,
+        );
+      }
     } catch (e: any) {
-      console.warn('⚠️ [SoT Sync] Income sync falló:', e?.message);
+      console.error('❌ [SoT Sync] Income sync falló:', e?.message);
+      syncFailures.push(`incomes: ${e?.message ?? String(e)}`);
     }
 
     // 6. Costos estimados
@@ -193,11 +217,19 @@ async function runFullPipeline() {
       const ce = await runEstimatedCostsETL(parsed);
       console.log(`✅ [SoT Sync] Costos estimados: ${ce.inserted}/${ce.parsed} filas insertadas`);
     } catch (e: any) {
-      console.warn('⚠️ [SoT Sync] Costos estimados falló:', e?.message);
+      console.error('❌ [SoT Sync] Costos estimados falló:', e?.message);
+      syncFailures.push(`costos-estimados: ${e?.message ?? String(e)}`);
     }
 
     const elapsed = Math.round((Date.now() - start) / 1000);
-    console.log(`🏁 [SoT Sync] Pipeline completo en ${elapsed}s`);
+    if (syncFailures.length > 0) {
+      console.error(
+        `🔴 [SoT Sync] Pipeline terminó en ${elapsed}s con ${syncFailures.length} paso(s) FALLIDO(S):`,
+      );
+      syncFailures.forEach((f) => console.error(`   · ${f}`));
+    } else {
+      console.log(`🏁 [SoT Sync] Pipeline completo en ${elapsed}s, sin fallas`);
+    }
 
   } catch (error: any) {
     console.error('❌ [SoT Sync] Error fatal:', error?.message || error);
