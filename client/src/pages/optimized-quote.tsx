@@ -448,7 +448,7 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
        {currentStepNumber > 1 && <div className="mb-4"><QuotationWorkspaceSummary currentPhase={currentStepNumber} totalSteps={6} compact /></div>}
 
        <div className={currentStepNumber === 1 ? 'mx-auto max-w-5xl' : 'grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_18rem]'}>
-        <main className="min-w-0 space-y-5">
+        <main className="min-w-0 space-y-5 pb-20">
           {validationIssues.length > 0 && (
             <Alert variant="destructive" role="alert" aria-live="assertive">
               <AlertTriangle className="h-4 w-4" />

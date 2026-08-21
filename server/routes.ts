@@ -6450,6 +6450,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (issues.length > 0) throw new z.ZodError(issues);
   }
 
+  // Misma correspondencia que professional-scope-builder.tsx#projectTypeFor,
+  // para que las cotizaciones creadas desde un grupo de propuestas queden
+  // con una modalidad real y seleccionable en el paso Brief (ver
+  // shared/schema.ts#projectTypes) en vez del valor genérico "comprehensive".
+  const PROJECT_TYPE_BY_MODALITY: Record<string, string> = {
+    demo: "demo",
+    one_shot: "on-demand",
+    event_pack: "monitoring",
+    monthly_fee: "fee-mensual",
+    annual_program: "always-on",
+    renewal: "fee-mensual",
+  };
+
   const quotationGroupCandidateSchema = z.object({
     id: z.string().trim().min(1).max(120),
     projectName: z.string().trim().min(2).max(200),
@@ -6573,7 +6586,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             billingEntityId: input.billingEntityId ?? null,
             projectName: candidate.projectName,
             analysisType: "standard",
-            projectType: modality === "demo" ? "demo" : modality === "monthly_fee" ? "always-on" : "comprehensive",
+            projectType: (modality && PROJECT_TYPE_BY_MODALITY[modality]) || "on-demand",
             projectDuration: candidate.durationMonths ? `${candidate.durationMonths} meses` : null,
             mentionsVolume: "medium",
             countriesCovered: candidate.markets.length > 1 ? "2-5" : "1",

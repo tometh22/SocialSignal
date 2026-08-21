@@ -2382,10 +2382,19 @@ export const analysisTypes = [
 ];
 
 // Opciones de tipo de proyecto (modalidad de negocio)
+// Incluye tanto las modalidades de venta activa (on-demand/fee-mensual/
+// always-on) como los valores que otras partes del flujo ya asignan a
+// quotation.project.type (demo, monitoring, comprehensive) al aplicar una
+// receta de Demo o Intelligence Event Pack, o al crear un grupo de
+// propuestas. Si faltan acá, el Select de "Modalidad de servicio" queda en
+// blanco porque el valor no matchea ningún SelectItem.
 export const projectTypes = [
   { value: "on-demand", label: "On Demand (Proyecto Único)" },
   { value: "fee-mensual", label: "Fee Mensual (Contrato Recurrente)" },
   { value: "always-on", label: "Always-On (Servicio continuo con entregables)" },
+  { value: "demo", label: "Demo (sin contratación)" },
+  { value: "monitoring", label: "Intelligence Event Pack (monitoreo puntual)" },
+  { value: "comprehensive", label: "Cobertura integral" },
 ];
 
 // Opciones de duración según tipo de proyecto
