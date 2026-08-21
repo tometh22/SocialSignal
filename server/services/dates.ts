@@ -80,3 +80,32 @@ export function isValidMonthKey(monthKey: string): boolean {
   
   return y >= 2020 && y <= 2030 && m >= 1 && m <= 12;
 }
+/**
+ * Suma (o resta, con delta negativo) meses a un monthKey YYYY-MM.
+ */
+export function addMonths(monthKey: string, delta: number): string {
+  const [yearRaw, monthRaw] = monthKey.split('-');
+  const total = parseInt(yearRaw, 10) * 12 + (parseInt(monthRaw, 10) - 1) + delta;
+  const year = Math.floor(total / 12);
+  const month = total % 12;
+  return `${String(year).padStart(4, '0')}-${String(month + 1).padStart(2, '0')}`;
+}
+
+/**
+ * Cantidad de meses entre dos monthKeys, inclusive de ambos extremos.
+ * monthSpan('2026-09', '2027-08') === 12
+ */
+export function monthSpan(from: string, to: string): number {
+  const [fy, fm] = from.split('-').map((n) => parseInt(n, 10));
+  const [ty, tm] = to.split('-').map((n) => parseInt(n, 10));
+  return (ty * 12 + tm) - (fy * 12 + fm) + 1;
+}
+
+/**
+ * Lista de monthKeys entre from y to, inclusive. Devuelve [] si el rango es inválido.
+ */
+export function monthRange(from: string, to: string): string[] {
+  const span = monthSpan(from, to);
+  if (span <= 0) return [];
+  return Array.from({ length: span }, (_, i) => addMonths(from, i));
+}

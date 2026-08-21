@@ -4600,3 +4600,111 @@ export const factEstimatedCostMonth = pgTable("fact_estimated_cost_month", {
   monthKeyIdx: index("fact_estimated_cost_month_month_key_idx").on(t.monthKey),
 }));
 export type FactEstimatedCostMonth = typeof factEstimatedCostMonth.$inferSelect;
+
+// ==================== FINANCIAL INTELLIGENCE (0047) ====================
+// El Excel MAESTRO guarda un único número de ingreso por proyecto/mes que
+// significa "facturación" pero se lee como "resultado". revenue_events guarda
+// el hecho con sus tres fechas para que facturación / devengado / cobranza se
+// deriven en vez de elegirse. Ver server/services/revenue-basis.ts.
+
+export const revenueEvents = pgTable("revenue_events", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").references(() => activeProjects.id, { onDelete: 'set null' }),
+  clientName: varchar("client_name", { length: 180 }).notNull(),
+  projectName: varchar("project_name", { length: 255 }),
+
+  amountUsd: numeric("amount_usd", { precision: 14, scale: 2 }).notNull(),
+  amountNative: numeric("amount_native", { precision: 16, scale: 2 }),
+  currency: varchar("currency", { length: 3 }).notNull().default('USD'),
+  fxRate: numeric("fx_rate", { precision: 12, scale: 4 }),
+
+  // Las tres fechas. invoice_period es la única obligatoria.
+  invoicePeriod: varchar("invoice_period", { length: 7 }).notNull(),
+  deliveryStart: varchar("delivery_start", { length: 7 }),
+  deliveryEnd: varchar("delivery_end", { length: 7 }),
+  deliveryCurve: varchar("delivery_curve", { length: 20 }).notNull().default('invoice'),
+  collectionPeriodExpected: varchar("collection_period_expected", { length: 7 }),
+  collectionPeriodActual: varchar("collection_period_actual", { length: 7 }),
+  paymentTermsDays: integer("payment_terms_days"),
+
+  confirmed: boolean("confirmed").notNull().default(true),
+  probability: numeric("probability", { precision: 5, scale: 2 }),
+  status: varchar("status", { length: 20 }).notNull().default('confirmed'),
+
+  sourceTab: varchar("source_tab", { length: 80 }),
+  sourceRowId: text("source_row_id"),
+  isEstimate: boolean("is_estimate").notNull().default(false),
+  periodClosed: boolean("period_closed").notNull().default(false),
+
+  note: text("note"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (t) => ({
+  invoicePeriodIdx: index("revenue_events_invoice_period_idx").on(t.invoicePeriod),
+  deliveryIdx: index("revenue_events_delivery_idx").on(t.deliveryStart, t.deliveryEnd),
+  collectionIdx: index("revenue_events_collection_idx").on(t.collectionPeriodExpected),
+  clientIdx: index("revenue_events_client_idx").on(t.clientName),
+  statusIdx: index("revenue_events_status_idx").on(t.status),
+}));
+
+export const insertRevenueEventSchema = createInsertSchema(revenueEvents).omit({
+  id: true, createdAt: true, updatedAt: true,
+});
+export type RevenueEvent = typeof revenueEvents.$inferSelect;
+export type InsertRevenueEvent = z.infer<typeof insertRevenueEventSchema>;
+
+// Partidas no recurrentes, para poder mostrar el YTD limpio junto al reportado.
+export const oneOffItems = pgTable("one_off_items", {
+  id: serial("id").primaryKey(),
+  periodKey: varchar("period_key", { length: 7 }).notNull(),
+  concept: varchar("concept", { length: 180 }).notNull(),
+  amountUsd: numeric("amount_usd", { precision: 14, scale: 2 }).notNull(),
+  kind: varchar("kind", { length: 40 }).notNull(),
+  affects: varchar("affects", { length: 20 }).notNull(),
+  counterpartPeriod: varchar("counterpart_period", { length: 7 }),
+  note: text("note"),
+  detectedBy: varchar("detected_by", { length: 60 }),
+  confirmedBy: integer("confirmed_by").references(() => users.id, { onDelete: 'set null' }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => ({
+  periodIdx: index("one_off_items_period_idx").on(t.periodKey),
+}));
+
+export const insertOneOffItemSchema = createInsertSchema(oneOffItems).omit({ id: true, createdAt: true });
+export type OneOffItem = typeof oneOffItems.$inferSelect;
+export type InsertOneOffItem = z.infer<typeof insertOneOffItemSchema>;
+
+// Salida de los detectores de calidad de dato (server/services/data-quality.ts).
+export const dataQualityFindings = pgTable("data_quality_findings", {
+  id: serial("id").primaryKey(),
+  detector: varchar("detector", { length: 60 }).notNull(),
+  severity: varchar("severity", { length: 20 }).notNull(),
+  periodKey: varchar("period_key", { length: 7 }),
+  entity: varchar("entity", { length: 180 }),
+  title: varchar("title", { length: 255 }).notNull(),
+  detail: text("detail"),
+  expectedValue: numeric("expected_value", { precision: 16, scale: 2 }),
+  actualValue: numeric("actual_value", { precision: 16, scale: 2 }),
+  delta: numeric("delta", { precision: 16, scale: 2 }),
+  sourceRef: text("source_ref"),
+  status: varchar("status", { length: 20 }).notNull().default('open'),
+  firstSeenAt: timestamp("first_seen_at").notNull().defaultNow(),
+  lastSeenAt: timestamp("last_seen_at").notNull().defaultNow(),
+  resolvedAt: timestamp("resolved_at"),
+  mutedUntil: timestamp("muted_until"),
+}, (t) => ({
+  statusIdx: index("data_quality_findings_status_idx").on(t.status, t.severity),
+}));
+
+export type DataQualityFinding = typeof dataQualityFindings.$inferSelect;
+
+// Términos contractuales por cliente, para contrastar contra la cobranza real.
+export const clientPaymentTerms = pgTable("client_payment_terms", {
+  id: serial("id").primaryKey(),
+  clientName: varchar("client_name", { length: 180 }).notNull().unique(),
+  contractualDays: integer("contractual_days").notNull(),
+  note: text("note"),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export type ClientPaymentTerms = typeof clientPaymentTerms.$inferSelect;
