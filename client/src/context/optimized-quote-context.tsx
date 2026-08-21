@@ -562,23 +562,31 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
 
   // Calculate complexity factors with proper logging
   const complexityFactors = useMemo((): ComplexityFactors => {
-
+    // Las cotizaciones con receta profesional (scopeSnapshot) ya inflan las
+    // horas sugeridas del equipo según volumen de menciones y cobertura
+    // (ver estimateBlueprintWorkload en shared/quotation-professional.ts).
+    // Sumar estos dos factores legado de nuevo acá duplicaba el mismo ajuste
+    // como un cargo aparte en pesos, con un porcentaje distinto e
+    // inconsistente al de las horas. Sólo siguen activos para cotizaciones
+    // legado sin receta, donde son la única señal de complejidad disponible.
+    const hasBlueprintScope = Boolean(quotationData.scopeSnapshot);
     const factors = {
       analysisTypeFactor: 0,
-      mentionsVolumeFactor: getMentionsVolumeFactor(quotationData.mentionsVolume),
-      countriesFactor: getCountriesFactor(quotationData.countriesCovered),
+      mentionsVolumeFactor: hasBlueprintScope ? 0 : getMentionsVolumeFactor(quotationData.mentionsVolume),
+      countriesFactor: hasBlueprintScope ? 0 : getCountriesFactor(quotationData.countriesCovered),
       clientEngagementFactor: 0,
       // Removed templateFactor - it doesn't make logical sense
     };
 
     return factors;
   }, [
-    quotationData.analysisType, 
-    quotationData.mentionsVolume, 
-    quotationData.countriesCovered, 
-    quotationData.clientEngagement, 
-    quotationData.template, 
+    quotationData.analysisType,
+    quotationData.mentionsVolume,
+    quotationData.countriesCovered,
+    quotationData.clientEngagement,
+    quotationData.template,
     quotationData.complexity,
+    quotationData.scopeSnapshot,
     recalculationTrigger
   ]);
 
