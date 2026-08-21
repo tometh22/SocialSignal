@@ -10,7 +10,8 @@ import {
   ArrowLeft, Download, Printer, Edit, FileCheck,
   FileClock, Loader2, Building, Calendar, Clock,
   Mail, Phone, Briefcase, Users, Globe, DollarSign,
-  MessageSquare, FileText, Layers, PieChart, TrendingUp
+  MessageSquare, FileText, Layers, PieChart, TrendingUp,
+  AlertTriangle, ShieldCheck, TrendingDown
 } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
@@ -62,6 +63,23 @@ interface Quotation {
   lossReason?: string | null;
   quotationNumber?: string | null;
   revisionNumber?: number;
+}
+
+interface MarginDrift {
+  applicable: true;
+  quotationCurrency: string;
+  exchangeRateAtQuote: number;
+  currentExchangeRate: number;
+  exchangeRateDriftPercentage: number;
+  originalCost: number;
+  currentCost: number;
+  costDeltaPercentage: number;
+  originalMarginPercentage: number;
+  currentMarginPercentage: number;
+  marginErosionPoints: number;
+  unresolvedMembers: number;
+  totalMembers: number;
+  severity: 'ok' | 'watch' | 'critical';
 }
 
 interface ClientInfo {
@@ -116,6 +134,7 @@ const QuotationDetail: React.FC = () => {
   const [roles, setRoles] = useState<Role[]>([]);
   const [refreshKey, setRefreshKey] = useState(0);
   const [profitability, setProfitability] = useState<any>(null);
+  const [marginDrift, setMarginDrift] = useState<MarginDrift | null>(null);
 
   // Cargar los datos de la cotización
   useEffect(() => {
@@ -172,6 +191,19 @@ const QuotationDetail: React.FC = () => {
     authFetch(`/api/quotations/${quotationId}/profitability`)
       .then(r => r.ok ? r.json() : null)
       .then(data => { if (data?.profitability) setProfitability(data); })
+      .catch(() => {});
+  }, [quotationId, refreshKey]);
+
+  // Deriva de margen: sólo aplica a contratos aceptados y recurrentes (fee
+  // mensual / programa anual). El endpoint devuelve applicable:false para
+  // todo lo demás — no hace falta pre-filtrar acá.
+  useEffect(() => {
+    if (!quotationId) return;
+    authFetch(`/api/quotations/${quotationId}/margin-drift`)
+      .then(r => r.ok ? r.json() : null)
+      .then((data: MarginDrift | { applicable: false } | null) => {
+        setMarginDrift(data && data.applicable ? data : null);
+      })
       .catch(() => {});
   }, [quotationId, refreshKey]);
 
@@ -654,6 +686,8 @@ const QuotationDetail: React.FC = () => {
 
         {/* Columna derecha - Resumen financiero */}
         <div className="space-y-5">
+          {marginDrift && <MarginDriftCard drift={marginDrift} formatCurrency={formatCurrency} />}
+
           {/* Resumen financiero */}
           <div className="bg-white rounded-md border border-slate-200 overflow-hidden">
             <div className="px-4 py-3 flex items-center gap-1.5 border-b border-slate-200">
@@ -864,5 +898,56 @@ const QuotationDetail: React.FC = () => {
     </div>
   );
 };
+
+// Diagnóstico: el precio de un fee mensual/programa anual queda fijo en
+// dólares al aceptarse, pero el costo se paga en pesos y cambia mes a mes.
+// Esta tarjeta no cambia ningún precio — sólo avisa cuándo el margen real
+// (con las tarifas vigentes hoy) se alejó del margen que se cotizó.
+function MarginDriftCard({ drift, formatCurrency }: { drift: MarginDrift; formatCurrency: (amount: number) => string }) {
+  const styles = {
+    ok: { border: 'border-emerald-200', bg: 'bg-emerald-50', icon: 'text-emerald-600', title: 'text-emerald-900', Icon: ShieldCheck, label: 'Margen en línea con lo cotizado' },
+    watch: { border: 'border-amber-200', bg: 'bg-amber-50', icon: 'text-amber-600', title: 'text-amber-900', Icon: TrendingDown, label: 'El margen se está erosionando' },
+    critical: { border: 'border-red-200', bg: 'bg-red-50', icon: 'text-red-600', title: 'text-red-900', Icon: AlertTriangle, label: 'Margen crítico: revisar con el cliente' },
+  }[drift.severity];
+
+  return (
+    <div className={cn('rounded-md border overflow-hidden', styles.border)}>
+      <div className={cn('px-4 py-3 flex items-center gap-1.5 border-b', styles.border, styles.bg)}>
+        <styles.Icon className={cn('h-3.5 w-3.5', styles.icon)} />
+        <h3 className={cn('font-medium text-sm', styles.title)}>{styles.label}</h3>
+      </div>
+      <div className={cn('px-4 py-3 space-y-2.5', styles.bg)}>
+        <div className="flex justify-between items-center">
+          <span className="text-slate-600 text-sm">Costo del equipo al cotizar:</span>
+          <span className="font-medium text-slate-800 text-sm">{formatCurrency(drift.originalCost)}</span>
+        </div>
+        <div className="flex justify-between items-center">
+          <span className="text-slate-600 text-sm">Costo del equipo hoy:</span>
+          <span className="font-medium text-slate-800 text-sm">
+            {formatCurrency(drift.currentCost)}
+            <span className={cn('ml-1.5 text-xs', drift.costDeltaPercentage > 0 ? 'text-red-600' : 'text-emerald-600')}>
+              ({drift.costDeltaPercentage > 0 ? '+' : ''}{drift.costDeltaPercentage.toFixed(1)}%)
+            </span>
+          </span>
+        </div>
+        <div className="flex justify-between items-center pt-2 border-t border-slate-200">
+          <span className="text-slate-600 text-sm">Margen cotizado:</span>
+          <span className="font-medium text-slate-800 text-sm">{drift.originalMarginPercentage.toFixed(1)}%</span>
+        </div>
+        <div className="flex justify-between items-center">
+          <span className="text-slate-600 text-sm">Margen real hoy:</span>
+          <span className={cn('font-bold text-sm', drift.severity === 'critical' ? 'text-red-700' : drift.severity === 'watch' ? 'text-amber-700' : 'text-emerald-700')}>
+            {drift.currentMarginPercentage.toFixed(1)}%
+          </span>
+        </div>
+        <p className="text-xs text-slate-500 pt-1">
+          Tipo de cambio al cotizar: {drift.exchangeRateAtQuote.toFixed(2)} · vigente: {drift.currentExchangeRate.toFixed(2)}
+          {' '}({drift.exchangeRateDriftPercentage > 0 ? '+' : ''}{drift.exchangeRateDriftPercentage.toFixed(1)}%).
+          {drift.unresolvedMembers > 0 && ` ${drift.unresolvedMembers} de ${drift.totalMembers} integrantes sin tarifa vigente para actualizar.`}
+        </p>
+      </div>
+    </div>
+  );
+}
 
 export default QuotationDetail;
