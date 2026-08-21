@@ -8814,6 +8814,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const parsePeriodo = (raw: unknown) =>
     typeof raw === 'string' && /^\d{4}-(0[1-9]|1[0-2])$/.test(raw) ? raw : null;
 
+  app.get("/api/v2/executive/costs", requireAuth, async (req, res) => {
+    const year = Number(req.query.year ?? new Date().getFullYear());
+    if (!Number.isInteger(year) || year < 2020 || year > 2100) {
+      return res.status(400).json({ message: "year inválido" });
+    }
+    try {
+      const { getCostBreakdown } = await import('./services/cost-breakdown');
+      res.setHeader('Cache-Control', 'private, max-age=60, stale-while-revalidate=300');
+      res.json(await getCostBreakdown(year));
+    } catch (error: any) {
+      console.error('❌ Cost breakdown error:', error?.message || error);
+      res.status(500).json({ message: 'Error obteniendo el desglose de costos', error: error?.message });
+    }
+  });
+
   app.get("/api/v2/executive/recurring", requireAuth, async (req, res) => {
     try {
       const svc = await import('./services/recurring-revenue');

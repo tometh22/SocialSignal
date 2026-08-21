@@ -26,6 +26,7 @@ import { monthlySummaryPeriodUniqueMigrationSql } from "./migrations/monthly-sum
 import { schemaDriftUniqueConstraintsMigrationSql } from "./migrations/schema-drift-unique-constraints";
 import { incomeSotProjectionFlagMigrationSql } from "./migrations/income-sot-projection-flag";
 import { cashflowDedupeMigrationSql } from "./migrations/cashflow-dedupe";
+import { factEstimatedCostMonthMigrationSql } from "./migrations/fact-estimated-cost-month";
 import { quotationGroupsMigrationSql } from "./migrations/quotation-groups";
 import { ensureServiceBlueprintSeeds } from "./services/service-blueprints";
 import cors from 'cors';
@@ -838,6 +839,7 @@ async function applyPendingMigrations() {
     await run('0050 schema drift unique constraints', schemaDriftUniqueConstraintsMigrationSql);
     await run('0051 income_sot projection flag', incomeSotProjectionFlagMigrationSql);
     await run('0052 cashflow dedupe', cashflowDedupeMigrationSql);
+    await run('0053 fact_estimated_cost_month', factEstimatedCostMonthMigrationSql);
     await run('0052 quotation groups', quotationGroupsMigrationSql);
 
     // 0033: feriados duplicados (mismo date+name insertado más de una vez desde el
