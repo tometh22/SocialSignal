@@ -162,6 +162,7 @@ import { requireRole, requireProvider, requireProviderCanAccessProject } from ".
 import { requirePermission } from "./middleware/requirePermission";
 import { createReviewRoomsRouter } from "./routes-review-rooms";
 import { createLedgerRouter } from "./routes-ledger";
+import { createFinancialIntelligenceRouter } from "./routes-financial-intelligence";
 import { registerProposalStudioRoutes } from "./routes-proposal-studio";
 import { runDocumentQa } from "./routes-proposal-studio";
 import { blueprintDefinitionSchema, estimateBlueprintWorkload, proposalDocumentSchema } from "@shared/quotation-professional";
@@ -886,6 +887,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ═══ Review Rooms (multi-sala) ═══════════════════════════════════════════
   app.use('/api/reviews', createReviewRoomsRouter(requireAuth));
   app.use('/api', createLedgerRouter(requireAuth));
+  app.use('/api/financial-intelligence', createFinancialIntelligenceRouter(requireAuth));
 
   // Legacy aliases: resuelven /api/status-semanal/* → /api/reviews/:miReviewId/*
   // para no romper bookmarks/clientes stale mientras migran. Borrar en v1.1.
