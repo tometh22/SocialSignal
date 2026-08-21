@@ -134,6 +134,13 @@ interface MonthData {
   /** Sólo en agregados anuales: cuántos meses ya cerraron y cuántos son proyección. */
   mesesCerrados?: number;
   mesesProyectados?: number;
+  /**
+   * Markup de los meses proyectados, separado del de ejecución. El markup mide
+   * eficiencia de ejecución; mezclarlo con meses no ejecutados lo distorsiona.
+   */
+  markupProyectado?: number | null;
+  markupMesesCerrados?: number;
+  markupMesesProyectados?: number;
   // P&L
   ventasDelMes: number | null;
   ebitOperativo: number | null;
@@ -224,18 +231,34 @@ function aggregateMonths(
   const margenOperativo = ventasDelMes ? (ebitOperativo ?? 0) / ventasDelMes * 100 : null;
   const margenNeto = ventasDelMes ? (beneficioNeto ?? 0) / ventasDelMes * 100 : null;
 
-  // Markup correcto para períodos multi-mes: media armónica ponderada por ventas.
-  // markup_i = ventas_i / costos_directos_i  →  CD_i = ventas_i / markup_i
-  // Markup total = sum(ventas_i) / sum(CD_i) = sum(ventas_i) / sum(ventas_i / markup_i)
-  const totalDirectCosts = sorted.reduce((acc, m) => {
-    if (m.ventasDelMes != null && m.markup != null && m.markup > 0) {
-      return acc + m.ventasDelMes / m.markup;
-    }
-    return acc;
-  }, 0);
-  const markup = ventasDelMes != null && totalDirectCosts > 0
-    ? Math.round((ventasDelMes / totalDirectCosts) * 100) / 100
-    : null;
+  /**
+   * Markup de un período multi-mes: media armónica ponderada por ventas.
+   *   markup_i = ventas_i / costos_directos_i  →  CD_i = ventas_i / markup_i
+   *   markup   = sum(ventas_i) / sum(CD_i)
+   *
+   * Se calcula por separado sobre meses CERRADOS y meses PROYECTADOS.
+   *
+   * Motivo: el markup mide eficiencia de ejecución, y no tiene sentido medir la
+   * de meses que todavía no se ejecutaron. Además la planilla usa otra base de
+   * costo en los meses abiertos — al 2026-08-21 traía markup 0,76 / 0,85 / 0,84
+   * / 0,87 (vender por debajo del costo directo), y mezclarlos hundía el anual
+   * de 3,62 a 1,88 contra un estándar de 2,5.
+   */
+  const markupDe = (ms: MonthData[]): number | null => {
+    const validos = ms.filter(m => m.ventasDelMes != null && m.markup != null && m.markup > 0);
+    if (validos.length === 0) return null;
+    const ventas = validos.reduce((a, m) => a + (m.ventasDelMes as number), 0);
+    const costosDirectos = validos.reduce((a, m) => a + (m.ventasDelMes as number) / (m.markup as number), 0);
+    return costosDirectos > 0 ? Math.round((ventas / costosDirectos) * 100) / 100 : null;
+  };
+
+  const mesesCerradosArr = sorted.filter(m => m.cierre);
+  const mesesProyectadosArr = sorted.filter(m => !m.cierre);
+
+  // Si ningún mes está marcado como cerrado, no hay nada que separar: el markup
+  // se calcula sobre todo el período, como antes.
+  const markup = mesesCerradosArr.length > 0 ? markupDe(mesesCerradosArr) : markupDe(sorted);
+  const markupProyectado = mesesCerradosArr.length > 0 ? markupDe(mesesProyectadosArr) : null;
 
   // Un total parcial no puede presentarse como total. Si algún mes quedó fuera
   // porque su celda estaba rota, el agregado lo declara para que la vista lo
@@ -259,6 +282,9 @@ function aggregateMonths(
     margenOperativo,
     margenNeto,
     markup,
+    markupProyectado,
+    markupMesesCerrados: mesesCerradosArr.length,
+    markupMesesProyectados: mesesProyectadosArr.length,
     proyeccionResultado: last.proyeccionResultado,
     // Balance: foto del último mes CON datos, no del último del calendario.
     activoLiquido: snapshot.activoLiquido,

@@ -144,3 +144,72 @@ describe('parseCierre', () => {
     expect(parseCierre('#REF!', hoy)).toBe(false);
   });
 });
+
+// ─── Markup: ejecutado vs proyectado ─────────────────────────────────────────
+
+/**
+ * Media armónica ponderada por ventas, que es como se agrega el markup:
+ *   markup_i = ventas_i / CD_i  →  CD_i = ventas_i / markup_i
+ *   markup   = Σ ventas_i / Σ CD_i
+ */
+const markupDe = (ms: Array<{ ventas: number; markup: number }>) => {
+  const ventas = ms.reduce((a, m) => a + m.ventas, 0);
+  const cd = ms.reduce((a, m) => a + m.ventas / m.markup, 0);
+  return Math.round((ventas / cd) * 100) / 100;
+};
+
+// Datos reales del Resumen Ejecutivo para 2026.
+const CERRADOS_2026 = [
+  { mes: '01 ene', ventas: 41593.61, markup: 3.61 },
+  { mes: '02 feb', ventas: 71617.90, markup: 4.08 },
+  { mes: '03 mar', ventas: 53737.80, markup: 3.12 },
+  { mes: '04 abr', ventas: 35639.64, markup: 3.42 },
+  { mes: '05 may', ventas: 26164.83, markup: 3.18 },
+  { mes: '06 jun', ventas: 75181.93, markup: 3.59 },
+  { mes: '07 jul', ventas: 44576.72, markup: 4.26 },
+];
+const PROYECTADOS_2026 = [
+  { mes: '08 ago', ventas: 44027.89, markup: 0.76 },
+  { mes: '09 sep', ventas: 130568.85, markup: 2.74 },
+  { mes: '10 oct', ventas: 39639.81, markup: 0.85 },
+  { mes: '11 nov', ventas: 39351.25, markup: 0.84 },
+  { mes: '12 dic', ventas: 39228.58, markup: 0.87 },
+];
+
+describe('markup ejecutado vs proyectado', () => {
+  it('el markup de los 7 meses cerrados de 2026 es 3,62', () => {
+    expect(markupDe(CERRADOS_2026)).toBeCloseTo(3.62, 2);
+  });
+
+  it('el markup de los 5 meses proyectados es 1,20', () => {
+    // La planilla asume vender por debajo del costo directo en cuatro de los
+    // cinco meses (markup < 1). Es un supuesto de la proyección, no ejecución.
+    expect(markupDe(PROYECTADOS_2026)).toBeCloseTo(1.20, 2);
+  });
+
+  it('mezclarlos daba el 1,88 que se mostraba antes', () => {
+    // Un markup por debajo del estándar de 2,5 que hacía ver el negocio
+    // desplomado, cuando lo ejecutado va en 3,62.
+    expect(markupDe([...CERRADOS_2026, ...PROYECTADOS_2026])).toBeCloseTo(1.88, 2);
+  });
+
+  it('2025 no cambia: los doce meses están cerrados', () => {
+    const cerrados2025 = [
+      { ventas: 28311.39, markup: 2.06 }, { ventas: 22453.38, markup: 1.87 },
+      { ventas: 25655.51, markup: 2.11 }, { ventas: 28128.17, markup: 2.40 },
+      { ventas: 38475.81, markup: 3.38 }, { ventas: 46583.86, markup: 3.07 },
+      { ventas: 46034.88, markup: 3.72 }, { ventas: 53975.16, markup: 3.46 },
+      { ventas: 108980.95, markup: 2.87 }, { ventas: 81838.86, markup: 3.16 },
+      { ventas: 44708.22, markup: 3.74 }, { ventas: 46052.09, markup: 3.64 },
+    ];
+    expect(markupDe(cerrados2025)).toBeCloseTo(2.97, 2);
+  });
+
+  it('la media armónica no es el promedio simple', () => {
+    // Un mes chico con markup altísimo no debe arrastrar el total.
+    const ms = [{ ventas: 100000, markup: 2 }, { ventas: 1000, markup: 20 }];
+    const promedioSimple = (2 + 20) / 2;
+    expect(markupDe(ms)).toBeLessThan(promedioSimple);
+    expect(markupDe(ms)).toBeCloseTo(2.02, 2);
+  });
+});

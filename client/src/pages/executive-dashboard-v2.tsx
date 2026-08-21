@@ -255,11 +255,22 @@ export default function ExecutiveDashboardV2() {
                 tooltip: "Beneficio Neto / Ventas × 100. Porcentaje de cada dólar de venta que queda como ganancia final después de todos los costos e impuestos.",
               },
               {
-                label: "Markup",
+                // El markup mide eficiencia de EJECUCIÓN, así que sólo cuenta
+                // meses cerrados. Los proyectados van en su propia tarjeta.
+                label: d.markupMesesProyectados ? "Markup (ejecutado)" : "Markup",
                 value: d.markup != null ? `${d.markup.toFixed(2)}×` : "—", pct: null, color: kpiColor(d.markup, 2.5), icon: TrendingUp,
                 tone: d.markup == null ? "neutral" as const : d.markup >= 2.5 ? "success" as const : d.markup >= 0 ? "warning" as const : "danger" as const,
-                tooltip: "Ventas / Costos Directos del equipo. Indica cuántas veces los ingresos superan el costo directo. Estándar Epical: ≥2.5x. Excelente: ≥3.0x.",
+                tooltip: "Ventas / Costos Directos del equipo. Indica cuántas veces los ingresos superan el costo directo. Estándar Epical: ≥2.5x. Excelente: ≥3.0x."
+                  + (d.markupMesesCerrados ? ` Calculado sobre los ${d.markupMesesCerrados} meses cerrados del período.` : ""),
               },
+              ...(d.markupProyectado != null ? [{
+                label: "Markup proyectado",
+                value: `${d.markupProyectado.toFixed(2)}×`, pct: null, color: kpiColor(d.markupProyectado, 2.5), icon: TrendingUp,
+                tone: d.markupProyectado >= 2.5 ? "success" as const : d.markupProyectado >= 0 ? "warning" as const : "danger" as const,
+                tooltip: `Markup implícito en los ${d.markupMesesProyectados} meses aún no cerrados del período. `
+                  + `No mide ejecución: es lo que la proyección del Excel MAESTRO asume. `
+                  + `Si difiere mucho del ejecutado, revisar la base de costo de esos meses en la planilla.`,
+              }] : []),
               {
                 // El Excel deja la fórmula de Beneficio Neto rota en los meses sin
                 // cerrar (devuelve las Ventas con margen 100%). El backend excluye
