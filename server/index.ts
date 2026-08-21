@@ -23,6 +23,7 @@ import { exchangeRateForecast2026MigrationSql } from "./migrations/exchange-rate
 import { professionalQuotationStudioMigrationSql } from "./migrations/professional-quotation-studio";
 import { financialIntelligenceMigrationSql } from "./migrations/financial-intelligence";
 import { monthlySummaryPeriodUniqueMigrationSql } from "./migrations/monthly-summary-period-unique";
+import { schemaDriftUniqueConstraintsMigrationSql } from "./migrations/schema-drift-unique-constraints";
 import { ensureServiceBlueprintSeeds } from "./services/service-blueprints";
 import cors from 'cors';
 import { execSync } from 'child_process';
@@ -831,6 +832,7 @@ async function applyPendingMigrations() {
     await run('0047 financial intelligence', financialIntelligenceMigrationSql);
     await run('0048 monthly summary period unique', monthlySummaryPeriodUniqueMigrationSql);
     await run('0049 feedback_mind_v2_11 corrections', feedbackMindV211MigrationSql);
+    await run('0050 schema drift unique constraints', schemaDriftUniqueConstraintsMigrationSql);
 
     // 0033: feriados duplicados (mismo date+name insertado más de una vez desde el
     // formulario) — borra duplicados conservando la fila más antigua y agrega la
