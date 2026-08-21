@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Search, FileText, CheckCircle, AlertCircle, Clock, Edit, Eye, Archive, PenLine, Plus, X, MessageCircle, Filter, Loader2, Calendar, DollarSign, TrendingUp, Zap, Users, Handshake, Briefcase, Target, ThumbsDown, TrendingDown, AlertOctagon, ChevronDown, FolderOpen, List, Send, GitBranch } from "lucide-react";
+import { Search, FileText, CheckCircle, AlertCircle, Clock, Edit, Eye, Archive, PenLine, Plus, X, MessageCircle, Filter, Loader2, Calendar, DollarSign, TrendingUp, Zap, Users, Handshake, Briefcase, Target, ThumbsDown, TrendingDown, AlertOctagon, ChevronDown, FolderOpen, List, Send, GitBranch, Layers3 } from "lucide-react";
 import { LossReasonDialog } from "@/components/quotation/loss-reason-dialog";
 import { PageLayout } from "@/components/ui/page-layout";
 import { Loader } from "@/components/ui/loader";
@@ -72,6 +72,12 @@ export default function ManageQuotes() {
   }>({ queryKey: ["/api/quotations/management-metadata"] });
   const negotiationData = managementMetadata?.negotiations ?? {};
   const quotationProjects = managementMetadata?.projects ?? {};
+  const { data: commercialGroups = [] } = useQuery<Array<{
+    group: { id: number; groupNumber: string; name: string; clientId: number };
+    client: { name: string } | null;
+    status: string;
+    items: Array<{ quotationId: number; projectName: string; status: string; currency: string; totalAmount: number }>;
+  }>>({ queryKey: ['/api/quotation-groups'] });
   const { data: funnel } = useQuery<{
     sent: number;
     won: number;
@@ -608,6 +614,20 @@ export default function ManageQuotes() {
           </Card>
 
           {/* Main Content Card */}
+          {commercialGroups.length > 0 && (
+            <Card className="mind-panel mb-6 overflow-hidden">
+              <CardHeader className="border-b border-slate-200 bg-slate-950 py-4 text-white"><CardTitle className="flex items-center gap-2 text-base"><Layers3 className="h-5 w-5 text-indigo-300" />Cliente → grupos de propuestas → cotizaciones</CardTitle></CardHeader>
+              <CardContent className="grid gap-3 p-4 sm:p-5 lg:grid-cols-2">
+                {commercialGroups.filter((entry) => entry.items.some((item) => item.projectName.toLowerCase().includes(searchTerm.toLowerCase()) && (statusFilter === 'all' || item.status === statusFilter))).map((entry) => (
+                  <button key={entry.group.id} type="button" onClick={() => navigate(`/quotation-groups/${entry.group.id}`)} className="rounded-xl border border-slate-200 bg-white p-4 text-left transition hover:border-indigo-300 hover:shadow-sm">
+                    <div className="flex items-start justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{entry.client?.name || 'Cliente'}</p><h3 className="mt-1 font-semibold text-slate-950">{entry.group.name}</h3><p className="mt-1 text-xs text-slate-500">{entry.group.groupNumber} · {entry.items.length} propuestas</p></div><Badge variant="outline">{entry.status.replaceAll('_', ' ')}</Badge></div>
+                    <div className="mt-4 space-y-2 border-t border-slate-100 pt-3">{entry.items.map((item) => <div key={item.quotationId} className="flex items-center justify-between gap-3 text-xs"><span className="truncate text-slate-700">{item.projectName}</span><span className="shrink-0 font-medium text-slate-900">{formatCurrency(item.totalAmount, item.currency)}</span></div>)}</div>
+                  </button>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+
           <Card className="mind-panel mb-8 overflow-hidden">
             <CardHeader className="border-b border-slate-200 bg-slate-50/70 py-4">
               <CardTitle className="text-lg font-semibold text-slate-800 flex items-center justify-between gap-3">

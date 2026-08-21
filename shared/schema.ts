@@ -681,6 +681,61 @@ export const insertServiceBlueprintSchema = createInsertSchema(serviceBlueprints
 export type ServiceBlueprint = typeof serviceBlueprints.$inferSelect;
 export type InsertServiceBlueprint = z.infer<typeof insertServiceBlueprintSchema>;
 
+// ==================== GRUPOS COMERCIALES DE COTIZACIONES ====================
+// Un grupo comparte el origen comercial y el contexto del cliente, pero nunca
+// reemplaza la independencia de precios, aprobaciones y resultados de cada
+// cotización.
+export const quotationGroups = pgTable("quotation_groups", {
+  id: serial("id").primaryKey(),
+  groupNumber: varchar("group_number", { length: 40 }).unique(),
+  name: varchar("name", { length: 240 }).notNull(),
+  clientId: integer("client_id").notNull().references(() => clients.id),
+  billingEntityId: integer("billing_entity_id").references(() => clientBillingEntities.id, { onDelete: "set null" }),
+  sourceLeadId: integer("source_lead_id").references((): AnyPgColumn => crmLeads.id, { onDelete: "set null" }),
+  sourceType: varchar("source_type", { length: 40 }).notNull().default("meeting_minute"),
+  sourceFileName: varchar("source_file_name", { length: 255 }),
+  internalMinute: text("internal_minute"),
+  analysisSnapshot: jsonb("analysis_snapshot").$type<Record<string, unknown>>().notNull().default({}),
+  sharedDefaults: jsonb("shared_defaults").$type<Record<string, unknown>>().notNull().default({}),
+  publicTokenHash: varchar("public_token_hash", { length: 64 }),
+  publicTokenExpiresAt: timestamp("public_token_expires_at"),
+  idempotencyKeyHash: varchar("idempotency_key_hash", { length: 64 }).unique(),
+  archivedAt: timestamp("archived_at"),
+  createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
+  updatedBy: integer("updated_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  clientIdx: index("quotation_groups_client_idx").on(table.clientId),
+  sourceLeadIdx: index("quotation_groups_source_lead_idx").on(table.sourceLeadId),
+}));
+
+export const insertQuotationGroupSchema = createInsertSchema(quotationGroups).omit({
+  id: true,
+  groupNumber: true,
+  publicTokenHash: true,
+  publicTokenExpiresAt: true,
+  idempotencyKeyHash: true,
+  archivedAt: true,
+  createdBy: true,
+  updatedBy: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  name: z.string().trim().min(2).max(240),
+  clientId: z.number().int().positive(),
+  billingEntityId: z.number().int().positive().nullable().optional(),
+  sourceLeadId: z.number().int().positive().nullable().optional(),
+  sourceType: z.enum(["meeting_minute", "brief", "manual", "crm"]).optional(),
+  sourceFileName: z.string().trim().max(255).nullable().optional(),
+  internalMinute: z.string().max(100_000).nullable().optional(),
+  analysisSnapshot: z.record(z.unknown()).optional(),
+  sharedDefaults: z.record(z.unknown()).optional(),
+});
+
+export type QuotationGroup = typeof quotationGroups.$inferSelect;
+export type InsertQuotationGroup = z.infer<typeof insertQuotationGroupSchema>;
+
 // ==================== COTIZACIONES ====================
 // Quotations table
 export const quotations = pgTable("quotations", {
@@ -842,6 +897,24 @@ export const insertQuotationSchema = baseInsertQuotationSchema.extend({
   termsVersion: z.string().trim().min(1).max(40).optional(),
   lockVersion: z.number().int().positive().optional(),
 });
+
+export const quotationGroupItems = pgTable("quotation_group_items", {
+  id: serial("id").primaryKey(),
+  groupId: integer("group_id").notNull().references(() => quotationGroups.id, { onDelete: "cascade" }),
+  quotationId: integer("quotation_id").notNull().references(() => quotations.id, { onDelete: "cascade" }).unique(),
+  position: integer("position").notNull(),
+  candidateSnapshot: jsonb("candidate_snapshot").$type<Record<string, unknown>>().notNull().default({}),
+  lastCompletedStep: integer("last_completed_step").notNull().default(0),
+  startedAt: timestamp("started_at"),
+  configuredAt: timestamp("configured_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  groupPositionUnique: unique("quotation_group_items_group_position_unique").on(table.groupId, table.position),
+  groupIdx: index("quotation_group_items_group_idx").on(table.groupId),
+}));
+
+export type QuotationGroupItem = typeof quotationGroupItems.$inferSelect;
 
 // ==================== HISTORIAL DE NEGOCIACIONES ====================
 // Negotiation history table to track all price changes and scope adjustments
@@ -1021,6 +1094,7 @@ export const quotationDeliveries = pgTable("quotation_deliveries", {
   id: serial("id").primaryKey(),
   quotationId: integer("quotation_id").notNull().references(() => quotations.id, { onDelete: "cascade" }),
   revisionId: integer("revision_id").notNull().references(() => quotationRevisions.id, { onDelete: "cascade" }),
+  groupDeliveryId: integer("group_delivery_id").references((): AnyPgColumn => quotationGroupDeliveries.id, { onDelete: "set null" }),
   recipientEmail: varchar("recipient_email", { length: 255 }).notNull(),
   subject: varchar("subject", { length: 255 }).notNull(),
   status: varchar("status", { length: 30 }).notNull().default("queued"),
@@ -1030,6 +1104,23 @@ export const quotationDeliveries = pgTable("quotation_deliveries", {
   createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
+
+export const quotationGroupDeliveries = pgTable("quotation_group_deliveries", {
+  id: serial("id").primaryKey(),
+  groupId: integer("group_id").notNull().references(() => quotationGroups.id, { onDelete: "cascade" }),
+  recipientEmail: varchar("recipient_email", { length: 255 }).notNull(),
+  subject: varchar("subject", { length: 255 }).notNull(),
+  status: varchar("status", { length: 30 }).notNull().default("queued"),
+  providerMessageId: varchar("provider_message_id", { length: 255 }),
+  errorMessage: text("error_message"),
+  includedQuotationIds: jsonb("included_quotation_ids").$type<number[]>().notNull().default([]),
+  idempotencyKeyHash: varchar("idempotency_key_hash", { length: 64 }).unique(),
+  sentAt: timestamp("sent_at"),
+  createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  groupIdx: index("quotation_group_deliveries_group_idx").on(table.groupId),
+}));
 
 export const proposalDocuments = pgTable("proposal_documents", {
   id: serial("id").primaryKey(),
@@ -1086,6 +1177,7 @@ export type QuotationEvent = typeof quotationEvents.$inferSelect;
 export type QuotationApproval = typeof quotationApprovals.$inferSelect;
 export type QuotationApprovalRule = typeof quotationApprovalRules.$inferSelect;
 export type QuotationDelivery = typeof quotationDeliveries.$inferSelect;
+export type QuotationGroupDelivery = typeof quotationGroupDeliveries.$inferSelect;
 export type ProposalDocument = typeof proposalDocuments.$inferSelect;
 export type ProposalAsset = typeof proposalAssets.$inferSelect;
 export type ProposalAgentRun = typeof proposalAgentRuns.$inferSelect;
@@ -3973,6 +4065,8 @@ export const crmLeads = pgTable("crm_leads", {
   estimatedValueUsd: doublePrecision("estimated_value_usd"),
   notes: text("notes"),
   clientId: integer("client_id").references(() => clients.id), // vínculo a cliente existente
+  quotationGroupId: integer("quotation_group_id").references(() => quotationGroups.id, { onDelete: "set null" }),
+  opportunityName: varchar("opportunity_name", { length: 255 }),
   assignedTo: integer("assigned_to").references(() => users.id),
   lostReason: text("lost_reason"),
   wonAt: timestamp("won_at"),

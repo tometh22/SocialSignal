@@ -1,10 +1,12 @@
 import { useRef, useState } from "react";
-import { ArrowRight, FileText, Layers3, Loader2, Sparkles, Upload, X } from "lucide-react";
+import { ArrowDown, ArrowRight, ArrowUp, FileText, Layers3, Loader2, Sparkles, Upload, X } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 import { apiRequest } from "@/lib/queryClient";
 import { getApiErrorMessage } from "@/lib/api-error";
 
@@ -39,7 +41,14 @@ export type BriefIntakeAnalysis = Omit<BriefProposalCandidate, "id"> & {
   requiresProposalSelection: boolean;
 };
 
-type Props = { onApply: (proposal: BriefProposalCandidate, analysis: BriefIntakeAnalysis) => void };
+type Props = {
+  onApply: (proposal: BriefProposalCandidate, analysis: BriefIntakeAnalysis) => void;
+  onCreateGroup?: (proposals: BriefProposalCandidate[], analysis: BriefIntakeAnalysis, source: { brief: string; fileName: string | null }) => void | Promise<void>;
+  onAnalysisChange?: (analysis: BriefIntakeAnalysis | null) => void;
+  canCreateGroup?: boolean;
+  clientName?: string | null;
+  isCreatingGroup?: boolean;
+};
 
 const modalityLabel: Record<string, string> = {
   demo: "Demo",
@@ -50,12 +59,14 @@ const modalityLabel: Record<string, string> = {
   renewal: "Renovación",
 };
 
-export function QuotationBriefIntake({ onApply }: Props) {
+export function QuotationBriefIntake({ onApply, onCreateGroup, onAnalysisChange, canCreateGroup = false, clientName, isCreatingGroup = false }: Props) {
   const [brief, setBrief] = useState("");
   const [fileName, setFileName] = useState<string | null>(null);
   const [analysis, setAnalysis] = useState<BriefIntakeAnalysis | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [reviewProposals, setReviewProposals] = useState<BriefProposalCandidate[]>([]);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const fileRef = useRef<HTMLInputElement>(null);
 
   const readFile = async (file: File) => {
@@ -83,6 +94,10 @@ export function QuotationBriefIntake({ onApply }: Props) {
     try {
       const result = await apiRequest("/api/quotation-intake/analyze", "POST", { brief: brief.trim() });
       setAnalysis(result);
+      const proposals = result.proposals?.length ? result.proposals : [{ id: "proposal-1", ...result }];
+      setReviewProposals(proposals);
+      setSelectedIds(new Set(proposals.map((proposal: BriefProposalCandidate) => proposal.id)));
+      onAnalysisChange?.(result);
     } catch (requestError) {
       setError(getApiErrorMessage(requestError, "No pudimos analizar la minuta. Podés continuar completando los datos manualmente."));
     } finally {
@@ -92,12 +107,24 @@ export function QuotationBriefIntake({ onApply }: Props) {
 
   const reset = () => {
     setAnalysis(null);
+    setReviewProposals([]);
+    setSelectedIds(new Set());
+    onAnalysisChange?.(null);
     setError(null);
   };
 
   if (analysis) {
-    const proposals = analysis.proposals?.length ? analysis.proposals : [{ id: "proposal-1", ...analysis }];
+    const proposals = reviewProposals.length ? reviewProposals : (analysis.proposals?.length ? analysis.proposals : [{ id: "proposal-1", ...analysis }]);
     const multiple = proposals.length > 1;
+    const selected = proposals.filter((proposal) => selectedIds.has(proposal.id));
+    const updateName = (id: string, projectName: string) => setReviewProposals((current) => current.map((proposal) => proposal.id === id ? { ...proposal, projectName } : proposal));
+    const move = (index: number, direction: -1 | 1) => setReviewProposals((current) => {
+      const target = index + direction;
+      if (target < 0 || target >= current.length) return current;
+      const copy = [...current];
+      [copy[index], copy[target]] = [copy[target], copy[index]];
+      return copy;
+    });
     return (
       <Card className="overflow-hidden border-slate-200 shadow-none">
         <CardContent className="p-0">
@@ -108,7 +135,7 @@ export function QuotationBriefIntake({ onApply }: Props) {
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-300">Análisis completado</p>
                   <h3 className="mt-1 text-lg font-semibold">{multiple ? `Detectamos ${proposals.length} propuestas diferentes` : "Detectamos una propuesta cotizable"}</h3>
-                  <p className="mt-1 max-w-2xl text-sm leading-5 text-slate-300">{multiple ? "Cada alcance tiene un objetivo y una decisión propios. Elegí cuál querés cotizar primero; no mezclaremos sus horas ni entregables." : analysis.summary}</p>
+                  <p className="mt-1 max-w-2xl text-sm leading-5 text-slate-300">{multiple ? "Revisá los alcances antes de crear el grupo. Cada uno tendrá precio, aprobación, resultado CRM y proyecto propios." : analysis.summary}</p>
                 </div>
               </div>
               <Button type="button" variant="outline" size="sm" onClick={reset} className="w-fit border-white/20 bg-transparent text-white hover:bg-white/10 hover:text-white">Editar minuta</Button>
@@ -117,13 +144,13 @@ export function QuotationBriefIntake({ onApply }: Props) {
 
           <div className="space-y-3 bg-slate-50/60 p-4 sm:p-6">
             {proposals.map((proposal, index) => (
-              <article key={proposal.id || `${proposal.projectName}-${index}`} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+              <article key={proposal.id || `${proposal.projectName}-${index}`} className={`rounded-xl border bg-white p-4 shadow-sm sm:p-5 ${multiple && !selectedIds.has(proposal.id) ? "border-slate-200 opacity-55" : "border-slate-200"}`}>
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                   <div className="flex min-w-0 gap-3">
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-semibold text-white">{index + 1}</span>
+                    {multiple ? <Checkbox className="mt-1" checked={selectedIds.has(proposal.id)} onCheckedChange={(checked) => setSelectedIds((current) => { const next = new Set(current); checked ? next.add(proposal.id) : next.delete(proposal.id); return next; })} aria-label={`Incluir ${proposal.projectName}`} /> : <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-semibold text-white">{index + 1}</span>}
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
-                        <h4 className="text-base font-semibold text-slate-950">{proposal.projectName}</h4>
+                        {multiple ? <Input value={proposal.projectName} onChange={(event) => updateName(proposal.id, event.target.value)} className="h-9 min-w-[16rem] flex-1 border-slate-200 text-base font-semibold" aria-label={`Nombre de propuesta ${index + 1}`} /> : <h4 className="text-base font-semibold text-slate-950">{proposal.projectName}</h4>}
                         <Badge variant="outline" className="border-slate-200 bg-slate-50 text-slate-600">{proposal.modality ? modalityLabel[proposal.modality] : "Por definir"}{proposal.durationMonths ? ` · ${proposal.durationMonths} meses` : ""}</Badge>
                       </div>
                       <p className="mt-2 text-sm leading-6 text-slate-600">{proposal.summary}</p>
@@ -141,10 +168,18 @@ export function QuotationBriefIntake({ onApply }: Props) {
                       )}
                     </div>
                   </div>
-                  <Button type="button" className="shrink-0 lg:min-w-44" onClick={() => onApply(proposal, analysis)}>Cotizar esta propuesta <ArrowRight className="ml-2 h-4 w-4" /></Button>
+                  {multiple ? <div className="flex shrink-0 gap-1"><Button type="button" size="icon" variant="ghost" disabled={index === 0} onClick={() => move(index, -1)} aria-label="Mover propuesta hacia arriba"><ArrowUp className="h-4 w-4" /></Button><Button type="button" size="icon" variant="ghost" disabled={index === proposals.length - 1} onClick={() => move(index, 1)} aria-label="Mover propuesta hacia abajo"><ArrowDown className="h-4 w-4" /></Button></div> : <Button type="button" className="shrink-0 lg:min-w-44" onClick={() => onApply(proposal, analysis)}>Usar este brief <ArrowRight className="ml-2 h-4 w-4" /></Button>}
                 </div>
               </article>
             ))}
+            {multiple && (
+              <div className="sticky bottom-2 z-10 flex flex-col gap-3 rounded-xl border border-slate-200 bg-white/95 p-4 shadow-lg backdrop-blur sm:flex-row sm:items-center sm:justify-between">
+                <div><p className="text-sm font-semibold text-slate-900">{selected.length} de {proposals.length} propuestas seleccionadas</p><p className="mt-0.5 text-xs text-slate-500">{canCreateGroup ? `Se crearán juntas para ${clientName}.` : "Completá el cliente y la entidad legal debajo antes de crear el grupo."}</p></div>
+                <Button type="button" disabled={!canCreateGroup || selected.length < 2 || selected.some((proposal) => proposal.projectName.trim().length < 2) || isCreatingGroup} onClick={() => void onCreateGroup?.(selected, analysis, { brief: brief.trim(), fileName })}>
+                  {isCreatingGroup ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Layers3 className="mr-2 h-4 w-4" />} Crear {selected.length} cotizaciones
+                </Button>
+              </div>
+            )}
             <details className="rounded-lg px-1 text-xs text-slate-500">
               <summary className="cursor-pointer font-medium text-slate-600">Ver minuta analizada</summary>
               <p className="mt-2 whitespace-pre-wrap rounded-lg border border-slate-200 bg-white p-3 leading-5">{brief}</p>

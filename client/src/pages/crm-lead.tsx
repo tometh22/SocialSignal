@@ -102,6 +102,7 @@ interface LinkedQuotation {
 }
 interface Lead {
   id: number; companyName: string; stage: Stage; source: string | null;
+  opportunityName?: string | null; quotationGroupId?: number | null;
   estimatedValueUsd: number | null; notes: string | null; clientId: number | null;
   createdAt: string; updatedAt: string; lostReason: string | null;
   contacts: Contact[]; activities: Activity[]; reminders: Reminder[];
@@ -289,7 +290,7 @@ export default function CRMLeadPage({ params }: { params: { id: string } }) {
             <div className="flex items-center gap-3">
               {!editingName ? (
                 <div className="flex items-center gap-2 group/name">
-                  <h1 className="text-xl font-semibold text-slate-900">{lead.companyName}</h1>
+                  <h1 className="text-xl font-semibold text-slate-900">{lead.opportunityName || lead.companyName}</h1>
                   <button onClick={() => { setTempName(lead.companyName); setEditingName(true); }}
                     className="opacity-0 group-hover/name:opacity-100 text-slate-400 hover:text-indigo-600 transition-all">
                     <Edit3 className="w-3.5 h-3.5" />
@@ -323,6 +324,7 @@ export default function CRMLeadPage({ params }: { params: { id: string } }) {
               )}
             </div>
             <p className="text-xs text-slate-400 mt-0.5">
+              {lead.opportunityName && <><span className="font-medium text-slate-500">{lead.companyName}</span>{lead.quotationGroupId && <> · <a className="text-indigo-600 hover:underline" href={`/quotation-groups/${lead.quotationGroupId}`}>Grupo de propuestas</a></>} · </>}
               Creado el {fmtDate(lead.createdAt)} · Actualizado hace {daysSinceUpdate ?? 0} día{daysSinceUpdate !== 1 ? 's' : ''}
             </p>
           </div>

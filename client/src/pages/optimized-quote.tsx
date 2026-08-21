@@ -5,6 +5,9 @@ import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -41,6 +44,7 @@ import { useOnlineStatus } from '@/hooks/use-online-status';
 import OptimizedBasicInfo from '@/components/optimized/basic-info';
 import QuotationErrorBoundary from '@/components/quotation-error-boundary';
 import { getApiErrorMessage } from '@/lib/api-error';
+import { apiRequest } from '@/lib/queryClient';
 import { QuotationTemplatesPicker } from '@/components/quotation/quotation-templates-picker';
 import { QuotationWorkspaceSummary } from '@/components/quotation/quotation-workspace-summary';
 import { QuotationBriefIntake, type BriefIntakeAnalysis, type BriefProposalCandidate } from '@/components/quotation/quotation-brief-intake';
@@ -98,9 +102,16 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
   const [highestVisitedPhase, setHighestVisitedPhase] = useState(1);
   const [validationIssues, setValidationIssues] = useState<QuotationValidationIssue[]>([]);
   const [exitDialogOpen, setExitDialogOpen] = useState(false);
+  const [intakeAnalysis, setIntakeAnalysis] = useState<BriefIntakeAnalysis | null>(null);
+  const [isCreatingGroup, setIsCreatingGroup] = useState(false);
+  const [groupWorkspace, setGroupWorkspace] = useState<any>(null);
   const lastActivityRef = useRef(Date.now());
 
   const currentStepNumber = currentStep as QuotationStep;
+  const groupId = Number(new URLSearchParams(window.location.search).get('groupId')) || null;
+  const currentGroupIndex = groupWorkspace?.items?.findIndex((item: any) => item.quotationId === effectiveQuotationId) ?? -1;
+  const currentGroupItem = currentGroupIndex >= 0 ? groupWorkspace.items[currentGroupIndex] : null;
+  const nextGroupItem = currentGroupIndex >= 0 ? groupWorkspace.items[currentGroupIndex + 1] : null;
   const stepMeta = QUOTATION_STEPS[currentStepNumber - 1];
   const fieldErrors = useMemo(
     () => Object.fromEntries(validationIssues.map((issue) => [issue.field, issue.message])),
@@ -158,6 +169,22 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
       })
       .finally(() => setIsSaving(false));
   }, [effectiveQuotationId, goToStep, isRequote, loadQuotation, toast]);
+
+  useEffect(() => {
+    if (!groupId) return;
+    apiRequest(`/api/quotation-groups/${groupId}`, 'GET')
+      .then(setGroupWorkspace)
+      .catch(() => setGroupWorkspace(null));
+  }, [groupId, effectiveQuotationId]);
+
+  useEffect(() => {
+    if (!groupId || !effectiveQuotationId || !currentGroupItem) return;
+    const completed = Math.max(Number(currentGroupItem.lastCompletedStep || 0), currentStepNumber - 1);
+    if (completed === currentGroupItem.lastCompletedStep) return;
+    apiRequest(`/api/quotation-groups/${groupId}/items/${effectiveQuotationId}/progress`, 'PATCH', { lastCompletedStep: completed })
+      .then(() => setGroupWorkspace((current: any) => current ? { ...current, items: current.items.map((item: any) => item.quotationId === effectiveQuotationId ? { ...item, lastCompletedStep: completed } : item) } : current))
+      .catch(() => undefined);
+  }, [currentGroupItem, currentStepNumber, effectiveQuotationId, groupId]);
 
   useEffect(() => {
     if (!user) {
@@ -269,6 +296,70 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
     setLocation('/manage-quotes');
   };
 
+  const handleCreateGroup = async (proposals: BriefProposalCandidate[], analysis: BriefIntakeAnalysis, source: { brief: string; fileName: string | null }) => {
+    if (!quotationData.client?.id) {
+      toast({ title: 'Elegí el cliente', description: 'El grupo necesita un cliente y una entidad legal compartidos.', variant: 'destructive' });
+      document.getElementById('client')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+    const exchangeRateAtQuote = Number(quotationData.exchangeRateSnapshot);
+    if (!Number.isFinite(exchangeRateAtQuote) || exchangeRateAtQuote <= 0) {
+      toast({ title: 'Confirmá el tipo de cambio', description: 'Se copiará como snapshot común de las cotizaciones.', variant: 'destructive' });
+      return;
+    }
+    try {
+      setIsCreatingGroup(true);
+      const workspace = await apiRequest('/api/quotation-groups', {
+        method: 'POST',
+        headers: { 'Idempotency-Key': `brief-${Date.now()}-${crypto.randomUUID()}` },
+        body: {
+          name: `${quotationData.client.name} · ${proposals.length} propuestas`,
+          clientId: quotationData.client.id,
+          billingEntityId: quotationData.billingEntityId ?? null,
+          sourceLeadId: quotationData.leadId ?? null,
+          sourceType: source.fileName ? 'meeting_minute' : 'brief',
+          sourceFileName: source.fileName,
+          internalMinute: source.brief,
+          analysisSnapshot: analysis,
+          proposals,
+          shared: {
+            commercialMotion: quotationData.commercialMotion || 'new_business',
+            quotationCurrency: quotationData.quotationCurrency || 'ARS',
+            exchangeRateAtQuote,
+            paymentTermsDays: quotationData.paymentTermsDays ?? null,
+            commercialTerms: quotationData.commercialTerms || null,
+            taxRate: quotationData.taxRate || 0,
+            taxLabel: quotationData.taxLabel || 'IVA',
+            pricesIncludeTax: Boolean(quotationData.pricesIncludeTax),
+          },
+        },
+      });
+      const first = workspace.items?.[0];
+      if (!first) throw new Error('El grupo se creó sin propuestas');
+      toast({ title: `${proposals.length} cotizaciones creadas`, description: 'Cada propuesta ya tiene su oportunidad CRM y borrador independiente.' });
+      setLocation(`/optimized-quote/${first.quotationId}?groupId=${workspace.group.id}`);
+    } catch (error) {
+      toast({ title: 'No pudimos crear el grupo', description: getApiErrorMessage(error, 'No se guardó ningún registro parcial.'), variant: 'destructive' });
+    } finally {
+      setIsCreatingGroup(false);
+    }
+  };
+
+  const handleSaveAndContinueGroup = async () => {
+    if (!groupId || !effectiveQuotationId) return;
+    try {
+      setIsSaving(true);
+      await saveQuotation('draft');
+      await apiRequest(`/api/quotation-groups/${groupId}/items/${effectiveQuotationId}/progress`, 'PATCH', { lastCompletedStep: 6, configured: true });
+      if (nextGroupItem) setLocation(`/optimized-quote/${nextGroupItem.quotationId}?groupId=${groupId}`);
+      else setLocation(`/quotation-groups/${groupId}`);
+    } catch (error) {
+      toast({ title: 'No pudimos completar esta propuesta', description: getApiErrorMessage(error, 'Revisá alcance, equipo, moneda y precio.'), variant: 'destructive' });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   return (
     <PageLayout
       title={isEditing ? 'Editar cotización' : 'Nueva cotización'}
@@ -339,6 +430,13 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
          </div>
        )}
 
+       {groupWorkspace && currentGroupItem && (
+        <div className="mb-4 flex flex-col gap-3 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 sm:flex-row sm:items-center">
+          <div className="flex min-w-0 flex-1 items-center gap-3"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-indigo-700 text-xs font-bold text-white">{currentGroupIndex + 1}/{groupWorkspace.items.length}</span><div className="min-w-0"><p className="truncate text-sm font-semibold text-indigo-950">{groupWorkspace.client?.name} · Propuesta {currentGroupIndex + 1} de {groupWorkspace.items.length}</p><p className="truncate text-xs text-indigo-700">{currentGroupItem.projectName}</p></div></div>
+          <Button type="button" size="sm" variant="outline" onClick={() => setLocation(`/quotation-groups/${groupId}`)}>Ver panel del grupo</Button>
+        </div>
+       )}
+
        {currentStepNumber > 1 && <div className="mb-4"><QuotationWorkspaceSummary currentPhase={currentStepNumber} totalSteps={6} compact /></div>}
 
        <div className={currentStepNumber === 1 ? 'mx-auto max-w-5xl' : 'grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_18rem]'}>
@@ -366,7 +464,13 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
               <React.Suspense fallback={<PhaseLoading />}>
               {currentStepNumber === 1 && (
                 <div className="space-y-6">
-                  <QuotationBriefIntake onApply={(proposal: BriefProposalCandidate, analysis: BriefIntakeAnalysis) => {
+                  <QuotationBriefIntake
+                    onAnalysisChange={setIntakeAnalysis}
+                    canCreateGroup={Boolean(quotationData.client?.id && Number(quotationData.exchangeRateSnapshot) > 0)}
+                    clientName={quotationData.client?.name}
+                    isCreatingGroup={isCreatingGroup}
+                    onCreateGroup={handleCreateGroup}
+                    onApply={(proposal: BriefProposalCandidate, analysis: BriefIntakeAnalysis) => {
                     const motion = proposal.modality === 'renewal' ? 'renewal' : proposal.modality === 'demo' ? 'demo' : quotationData.commercialMotion || 'new_business';
                     const projectType = proposal.modality === 'monthly_fee' || proposal.modality === 'renewal' ? 'fee-mensual' : proposal.modality === 'annual_program' ? 'always-on' : 'on-demand';
                     updateQuotationData({
@@ -376,8 +480,15 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
                     });
                     toast({ title: 'Propuesta seleccionada', description: proposal.recommendedBlueprint ? `${proposal.projectName}. La receta ${proposal.recommendedBlueprint.name} quedará destacada en Servicio.` : `${proposal.projectName}. Completá los datos esenciales para continuar.` });
                   }} />
-                  <OptimizedBasicInfo mode="project" errors={fieldErrors} />
+                  <OptimizedBasicInfo mode={intakeAnalysis?.requiresProposalSelection ? 'group' : 'project'} errors={fieldErrors} />
                   <CommercialMotionField quotationData={quotationData} updateQuotationData={updateQuotationData} />
+                  {intakeAnalysis?.requiresProposalSelection && (
+                    <details className="rounded-xl border border-slate-200 bg-slate-50/60 p-4">
+                      <summary className="cursor-pointer text-sm font-semibold text-slate-800">Moneda, tipo de cambio y condiciones comunes</summary>
+                      <p className="mt-2 text-xs text-slate-500">Se copiarán inicialmente a todas las propuestas. Después sólo se propagarán con confirmación explícita.</p>
+                      <div className="mt-4 space-y-4"><OptimizedBasicInfo mode="financial" errors={fieldErrors} /><div className="grid gap-4 rounded-xl border border-slate-200 bg-white p-4 sm:grid-cols-2"><div><Label htmlFor="group-payment-terms">Plazo de pago (días)</Label><Input id="group-payment-terms" className="mt-2" inputMode="numeric" value={quotationData.paymentTermsDays ?? ''} onChange={(event) => updateQuotationData({ paymentTermsDays: event.target.value ? Number(event.target.value) : null })} placeholder="Ej. 30" /></div><div className="sm:col-span-2"><Label htmlFor="group-commercial-terms">Condiciones comerciales comunes</Label><Textarea id="group-commercial-terms" className="mt-2" rows={3} value={quotationData.commercialTerms || ''} onChange={(event) => updateQuotationData({ commercialTerms: event.target.value })} placeholder="Facturación, vigencia o condiciones aplicables a las tres propuestas" /></div></div></div>
+                    </details>
+                  )}
                   {isEditing && !quotationData.scopeSnapshot && (
                     <details className="rounded-xl border border-amber-200 bg-amber-50/60 p-4">
                       <summary className="cursor-pointer text-sm font-semibold text-amber-900">Abrir compatibilidad con una cotización histórica</summary>
@@ -461,7 +572,7 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
                 {currentStepNumber === 5 ? 'Preparar envío' : 'Continuar'} <ChevronRight className="ml-1 h-4 w-4" />
               </Button>
             )}
-            {currentStepNumber === 6 && <span className="text-xs text-slate-500">Elegí una opción para continuar con la propuesta.</span>}
+            {currentStepNumber === 6 && (groupWorkspace && currentGroupItem ? <Button type="button" onClick={handleSaveAndContinueGroup} disabled={isSaving}>{isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{nextGroupItem ? `Guardar y continuar con propuesta ${currentGroupIndex + 2}` : 'Guardar y volver al panel'}<ChevronRight className="ml-1 h-4 w-4" /></Button> : <span className="text-xs text-slate-500">Elegí una opción para continuar con la propuesta.</span>)}
           </div>
         </main>
 
