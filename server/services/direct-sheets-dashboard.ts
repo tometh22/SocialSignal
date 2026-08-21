@@ -75,6 +75,31 @@ function parseMonthLabel(label: string): number | null {
  * No es un dato conservador ni optimista: es la venta disfrazada de resultado.
  * Sumarla es peor que no tener el dato.
  */
+/**
+ * La columna "Cierre" del Resumen Ejecutivo NO es un flag: contiene la fecha de
+ * cierre del mes ("31-3-2025"). El parser la comparaba contra ['sí','true','x',…]
+ * y nunca matcheaba, así que `cierre` era false en los 24 meses — incluidos los
+ * de 2025, que están cerrados hace rato.
+ *
+ * Un mes está cerrado cuando su fecha de cierre ya pasó.
+ */
+export function parseCierre(raw: string | undefined | null, hoy: Date): boolean {
+  const value = String(raw ?? '').trim();
+  if (!value) return false;
+
+  const m = value.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
+  if (!m) {
+    // Formatos viejos que sí eran booleanos, por si quedan filas legacy.
+    return ['sí', 'si', 'true', 'verdadero', '1', 'yes', 'x', '✓', 'ok', 'cerrado']
+      .includes(value.toLowerCase());
+  }
+
+  const [, d, mo, y] = m;
+  const fecha = new Date(Number(y), Number(mo) - 1, Number(d));
+  if (isNaN(fecha.getTime())) return false;
+  return fecha.getTime() <= hoy.getTime();
+}
+
 export function isBrokenNetProfit(
   beneficioNeto: number | null,
   ventasDelMes: number | null,
@@ -101,6 +126,14 @@ interface MonthData {
   mesesSinBeneficioNeto?: string[];
   /** Sólo en agregados: cuántos meses entraron al total. */
   mesesAgregados?: number;
+  /** Sólo en agregados: período del que sale la foto de balance. */
+  balancePeriodKey?: string | null;
+  balanceMonthLabel?: string | null;
+  /** true si la foto de balance NO es del último mes del período. */
+  balanceDesactualizado?: boolean;
+  /** Sólo en agregados anuales: cuántos meses ya cerraron y cuántos son proyección. */
+  mesesCerrados?: number;
+  mesesProyectados?: number;
   // P&L
   ventasDelMes: number | null;
   ebitOperativo: number | null;
@@ -159,6 +192,25 @@ function aggregateMonths(
   const sorted = [...months].sort((a, b) => a.periodKey.localeCompare(b.periodKey));
   const last = sorted[sorted.length - 1];
 
+  /**
+   * Activo y Pasivo son SNAPSHOTS, no flujos: no se suman, se toma una foto.
+   *
+   * Antes se usaba el último mes del período sin más. Para un año en curso ese
+   * mes está vacío — al 2026-08-21, dic-2026 no tiene balance — y toda la
+   * sección Balance quedaba en blanco. Con 2025 funcionaba de casualidad,
+   * porque dic-2025 sí estaba cargado.
+   *
+   * Además hay meses abiertos que traen 0,00 en vez de vacío (ago-2026): un
+   * cero tampoco es un balance, es un placeholder. Por eso se exige que al
+   * menos una de las tres patas sea distinta de cero.
+   */
+  const tieneBalance = (m: MonthData) =>
+    m.activoTotal != null &&
+    (m.activoTotal !== 0 || (m.pasivoTotal ?? 0) !== 0 || (m.clientesACobrar ?? 0) !== 0);
+
+  const conBalance = sorted.filter(tieneBalance);
+  const snapshot = conBalance.length > 0 ? conBalance[conBalance.length - 1] : last;
+
   const sumField = (key: 'ventasDelMes' | 'ebitOperativo' | 'beneficioNeto' | 'cashflow'): number | null => {
     const vals = sorted.map(m => m[key]).filter((v): v is number => v != null);
     return vals.length > 0 ? vals.reduce((a, b) => a + b, 0) : null;
@@ -208,18 +260,22 @@ function aggregateMonths(
     margenNeto,
     markup,
     proyeccionResultado: last.proyeccionResultado,
-    // Balance fields are snapshots — use last available month
-    activoLiquido: last.activoLiquido,
-    activoMedPlazo: last.activoMedPlazo,
-    clientesACobrar: last.clientesACobrar,
-    activoTotal: last.activoTotal,
-    pasivoImpuestosUSA: last.pasivoImpuestosUSA,
-    pasivoFacturacionAdelantada: last.pasivoFacturacionAdelantada,
-    pasivoProveedores: last.pasivoProveedores,
-    pasivoTotal: last.pasivoTotal,
-    balanceNeto: last.balanceNeto,
+    // Balance: foto del último mes CON datos, no del último del calendario.
+    activoLiquido: snapshot.activoLiquido,
+    activoMedPlazo: snapshot.activoMedPlazo,
+    clientesACobrar: snapshot.clientesACobrar,
+    activoTotal: snapshot.activoTotal,
+    pasivoImpuestosUSA: snapshot.pasivoImpuestosUSA,
+    pasivoFacturacionAdelantada: snapshot.pasivoFacturacionAdelantada,
+    pasivoProveedores: snapshot.pasivoProveedores,
+    pasivoTotal: snapshot.pasivoTotal,
+    balanceNeto: snapshot.balanceNeto,
+    // Un balance sin su fecha induce a error: puede ser de hace cinco meses.
+    balancePeriodKey: conBalance.length > 0 ? snapshot.periodKey : null,
+    balanceMonthLabel: conBalance.length > 0 ? snapshot.monthLabel : null,
+    balanceDesactualizado: conBalance.length > 0 && snapshot.periodKey !== last.periodKey,
     cashflow,
-    cashflow60Dias: last.cashflow60Dias,
+    cashflow60Dias: snapshot.cashflow60Dias,
   };
 }
 
@@ -259,8 +315,7 @@ async function fetchDashboardRows(): Promise<MonthData[]> {
     const year = parseInt(yearStr);
     if (!month || isNaN(year)) continue;
     const periodKey = `${year}-${String(month).padStart(2, '0')}`;
-    const cierreRaw = String(row[COL.CIERRE] || '').trim().toLowerCase();
-    const cierre = ['sí', 'si', 'true', 'verdadero', '1', 'yes', 'x', '✓', 'ok', 'cerrado'].includes(cierreRaw);
+    const cierre = parseCierre(row[COL.CIERRE], new Date());
     const ventasDelMes = parseMoney(row[COL.VENTAS]);
     const ebitOperativo = parseMoney(row[COL.EBIT]);
     const sheetMarkup = parseMoney(row[COL.MARKUP]);
@@ -361,13 +416,13 @@ export async function fetchResumenEjecutivoDirectly(
 
   if (filterYear && filterYearTotal) {
     // Year-to-date: only months marked as closed (Cierre = true)
-    const yearMonths = allData
-      .filter(d => d.year === filterYear && d.cierre)
+    // El total anual incluye TODOS los meses con facturación cargada, cerrados y
+    // proyectados. Filtrar por `cierre` daría un "año" que se corta en agosto.
+    // La distinción se expone en mesesCerrados/mesesProyectados para que la
+    // vista pueda etiquetarla en vez de esconderla.
+    const monthsToAggregate = allData
+      .filter(d => d.year === filterYear && d.ventasDelMes != null)
       .sort((a, b) => a.month - b.month);
-    // Fallback: if no months have cierre flag, use all available months with revenue data
-    const monthsToAggregate = yearMonths.length > 0
-      ? yearMonths
-      : allData.filter(d => d.year === filterYear && d.ventasDelMes != null).sort((a, b) => a.month - b.month);
     const lastMonth = monthsToAggregate.length > 0 ? monthsToAggregate[monthsToAggregate.length - 1].month : 12;
     const lastMonthLabel = monthsToAggregate.length > 0 ? monthsToAggregate[monthsToAggregate.length - 1].monthLabel : `Dic ${filterYear}`;
     filtered = aggregateMonths(
@@ -381,6 +436,8 @@ export async function fetchResumenEjecutivoDirectly(
     if (filtered) {
       (filtered as any)._ytdLastMonthLabel = lastMonthLabel;
       (filtered as any)._ytdMonthCount = monthsToAggregate.length;
+      (filtered as any).mesesCerrados = monthsToAggregate.filter(d => d.cierre).length;
+      (filtered as any).mesesProyectados = monthsToAggregate.filter(d => !d.cierre).length;
     }
   } else if (filterYear && filterQuarter && filterQuarter >= 1 && filterQuarter <= 4) {
     const q0 = (filterQuarter - 1) * 3 + 1;

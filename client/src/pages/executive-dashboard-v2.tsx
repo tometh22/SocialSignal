@@ -337,6 +337,14 @@ export default function ExecutiveDashboardV2() {
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base flex items-center gap-2">
                     <Wallet className="h-4 w-4" /> Balance
+                    {/* Activo y Pasivo son fotos, no acumulados: sin la fecha del
+                        corte el número induce a error. Para un año en curso la
+                        última foto disponible puede ser de varios meses atrás. */}
+                    {d.balanceMonthLabel && (
+                      <span className={`text-xs font-normal ${d.balanceDesactualizado ? "text-amber-600" : "text-muted-foreground"}`}>
+                        al cierre de {d.balanceMonthLabel}
+                      </span>
+                    )}
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2">

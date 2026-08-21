@@ -12,7 +12,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { isBrokenNetProfit } from '../server/services/direct-sheets-dashboard';
+import { isBrokenNetProfit, parseCierre } from '../server/services/direct-sheets-dashboard';
 
 describe('isBrokenNetProfit', () => {
   it('detecta los cinco meses rotos de 2026 con sus valores reales', () => {
@@ -101,5 +101,46 @@ describe('agregado anual — invariantes', () => {
       44027.89, 130568.85, 39639.81, 39351.25, 39228.58,
     ];
     expect(ventas.reduce((a, b) => a + b, 0)).toBeCloseTo(641328.81, 2);
+  });
+});
+
+// ─── Columna "Cierre" ────────────────────────────────────────────────────────
+
+describe('parseCierre', () => {
+  const hoy = new Date(2026, 7, 21); // 21-8-2026
+
+  it('lee la fecha de cierre, que es lo que la columna realmente contiene', () => {
+    // El parser anterior comparaba contra ['sí','true','x',…] y devolvía false
+    // en los 24 meses, incluidos los de 2025 cerrados hace más de un año.
+    expect(parseCierre('31-3-2025', hoy)).toBe(true);
+    expect(parseCierre('31-12-2025', hoy)).toBe(true);
+    expect(parseCierre('31-7-2026', hoy)).toBe(true);
+  });
+
+  it('un mes cuya fecha de cierre no llegó todavía no está cerrado', () => {
+    expect(parseCierre('30-9-2026', hoy)).toBe(false);
+    expect(parseCierre('31-12-2026', hoy)).toBe(false);
+  });
+
+  it('el propio día de cierre cuenta como cerrado', () => {
+    expect(parseCierre('21-8-2026', hoy)).toBe(true);
+  });
+
+  it('acepta barras además de guiones', () => {
+    expect(parseCierre('31/3/2025', hoy)).toBe(true);
+    expect(parseCierre('30/9/2026', hoy)).toBe(false);
+  });
+
+  it('sigue aceptando los booleanos legacy', () => {
+    expect(parseCierre('Sí', hoy)).toBe(true);
+    expect(parseCierre('cerrado', hoy)).toBe(true);
+    expect(parseCierre('no', hoy)).toBe(false);
+  });
+
+  it('vacío o basura no es cierre', () => {
+    expect(parseCierre('', hoy)).toBe(false);
+    expect(parseCierre(null, hoy)).toBe(false);
+    expect(parseCierre(undefined, hoy)).toBe(false);
+    expect(parseCierre('#REF!', hoy)).toBe(false);
   });
 });
