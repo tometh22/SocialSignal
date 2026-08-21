@@ -112,6 +112,11 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
   const currentGroupIndex = groupWorkspace?.items?.findIndex((item: any) => item.quotationId === effectiveQuotationId) ?? -1;
   const currentGroupItem = currentGroupIndex >= 0 ? groupWorkspace.items[currentGroupIndex] : null;
   const nextGroupItem = currentGroupIndex >= 0 ? groupWorkspace.items[currentGroupIndex + 1] : null;
+  const isMultiProposalIntake = Boolean(
+    currentStepNumber === 1
+    && intakeAnalysis?.requiresProposalSelection
+    && (intakeAnalysis.proposals?.length || 0) > 1,
+  );
   const stepMeta = QUOTATION_STEPS[currentStepNumber - 1];
   const fieldErrors = useMemo(
     () => Object.fromEntries(validationIssues.map((issue) => [issue.field, issue.message])),
@@ -480,7 +485,9 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
                     });
                     toast({ title: 'Propuesta seleccionada', description: proposal.recommendedBlueprint ? `${proposal.projectName}. La receta ${proposal.recommendedBlueprint.name} quedará destacada en Servicio.` : `${proposal.projectName}. Completá los datos esenciales para continuar.` });
                   }} />
-                  <OptimizedBasicInfo mode={intakeAnalysis?.requiresProposalSelection ? 'group' : 'project'} errors={fieldErrors} />
+                  <div id={intakeAnalysis?.requiresProposalSelection ? 'group-shared-data' : undefined}>
+                    <OptimizedBasicInfo mode={intakeAnalysis?.requiresProposalSelection ? 'group' : 'project'} errors={fieldErrors} />
+                  </div>
                   <CommercialMotionField quotationData={quotationData} updateQuotationData={updateQuotationData} />
                   {intakeAnalysis?.requiresProposalSelection && (
                     <details className="rounded-xl border border-slate-200 bg-slate-50/60 p-4">
@@ -566,12 +573,13 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
             {currentStepNumber > 1 && <Button type="button" variant="ghost" onClick={handlePreviousStep}>
               <ChevronLeft className="mr-1 h-4 w-4" /> Anterior
             </Button>}
-            {currentStepNumber < 6 && (
+            {currentStepNumber < 6 && !isMultiProposalIntake && (
               <Button type="button" onClick={handleNextStep} disabled={isSaving} className="min-w-32">
                 {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 {currentStepNumber === 5 ? 'Preparar envío' : 'Continuar'} <ChevronRight className="ml-1 h-4 w-4" />
               </Button>
             )}
+            {isMultiProposalIntake && <p className="px-3 py-2 text-xs text-slate-500">Elegí una propuesta para seguir individualmente o creá el grupo desde el bloque anterior.</p>}
             {currentStepNumber === 6 && (groupWorkspace && currentGroupItem ? <Button type="button" onClick={handleSaveAndContinueGroup} disabled={isSaving}>{isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{nextGroupItem ? `Guardar y continuar con propuesta ${currentGroupIndex + 2}` : 'Guardar y volver al panel'}<ChevronRight className="ml-1 h-4 w-4" /></Button> : <span className="text-xs text-slate-500">Elegí una opción para continuar con la propuesta.</span>)}
           </div>
         </main>

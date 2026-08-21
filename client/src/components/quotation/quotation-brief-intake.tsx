@@ -67,6 +67,7 @@ export function QuotationBriefIntake({ onApply, onCreateGroup, onAnalysisChange,
   const [error, setError] = useState<string | null>(null);
   const [reviewProposals, setReviewProposals] = useState<BriefProposalCandidate[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [appliedProposalId, setAppliedProposalId] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const readFile = async (file: File) => {
@@ -109,6 +110,7 @@ export function QuotationBriefIntake({ onApply, onCreateGroup, onAnalysisChange,
     setAnalysis(null);
     setReviewProposals([]);
     setSelectedIds(new Set());
+    setAppliedProposalId(null);
     onAnalysisChange?.(null);
     setError(null);
   };
@@ -117,6 +119,7 @@ export function QuotationBriefIntake({ onApply, onCreateGroup, onAnalysisChange,
     const proposals = reviewProposals.length ? reviewProposals : (analysis.proposals?.length ? analysis.proposals : [{ id: "proposal-1", ...analysis }]);
     const multiple = proposals.length > 1;
     const selected = proposals.filter((proposal) => selectedIds.has(proposal.id));
+    const selectedSingle = selected.length === 1 ? selected[0] : null;
     const updateName = (id: string, projectName: string) => setReviewProposals((current) => current.map((proposal) => proposal.id === id ? { ...proposal, projectName } : proposal));
     const move = (index: number, direction: -1 | 1) => setReviewProposals((current) => {
       const target = index + direction;
@@ -126,14 +129,14 @@ export function QuotationBriefIntake({ onApply, onCreateGroup, onAnalysisChange,
       return copy;
     });
     return (
-      <Card className="overflow-hidden border-slate-200 shadow-none">
+      <Card className="overflow-hidden border-slate-200 shadow-sm">
         <CardContent className="p-0">
           <div className="border-b border-slate-200 bg-slate-950 px-5 py-5 text-white sm:px-6">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div className="flex items-start gap-3">
                 <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/10"><Layers3 className="h-4 w-4" /></span>
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-300">Análisis completado</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-300">Paso 1 · Oportunidad detectada</p>
                   <h3 className="mt-1 text-lg font-semibold">{multiple ? `Detectamos ${proposals.length} propuestas diferentes` : "Detectamos una propuesta cotizable"}</h3>
                   <p className="mt-1 max-w-2xl text-sm leading-5 text-slate-300">{multiple ? "Revisá los alcances antes de crear el grupo. Cada uno tendrá precio, aprobación, resultado CRM y proyecto propios." : analysis.summary}</p>
                 </div>
@@ -142,20 +145,26 @@ export function QuotationBriefIntake({ onApply, onCreateGroup, onAnalysisChange,
             </div>
           </div>
 
-          <div className="space-y-3 bg-slate-50/60 p-4 sm:p-6">
+          <div className="space-y-4 bg-slate-50/60 p-4 sm:p-6">
+            {multiple && (
+              <div className="flex flex-col gap-1 rounded-lg border border-indigo-100 bg-indigo-50 px-3.5 py-3 text-sm text-indigo-950 sm:flex-row sm:items-center sm:justify-between">
+                <span><strong>Revisá, renombrá o excluí</strong> lo que no quieras cotizar.</span>
+                <span className="text-xs font-medium text-indigo-700">{selected.length} de {proposals.length} seleccionadas</span>
+              </div>
+            )}
             {proposals.map((proposal, index) => (
-              <article key={proposal.id || `${proposal.projectName}-${index}`} className={`rounded-xl border bg-white p-4 shadow-sm sm:p-5 ${multiple && !selectedIds.has(proposal.id) ? "border-slate-200 opacity-55" : "border-slate-200"}`}>
+              <article key={proposal.id || `${proposal.projectName}-${index}`} className={`rounded-xl border bg-white p-4 shadow-sm transition-opacity sm:p-5 ${multiple && !selectedIds.has(proposal.id) ? "border-slate-200 opacity-55" : "border-slate-200"}`}>
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                   <div className="flex min-w-0 gap-3">
-                    {multiple ? <Checkbox className="mt-1" checked={selectedIds.has(proposal.id)} onCheckedChange={(checked) => setSelectedIds((current) => { const next = new Set(current); checked ? next.add(proposal.id) : next.delete(proposal.id); return next; })} aria-label={`Incluir ${proposal.projectName}`} /> : <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-semibold text-white">{index + 1}</span>}
+                    {multiple ? <Checkbox className="mt-1" checked={selectedIds.has(proposal.id)} onCheckedChange={(checked) => { setAppliedProposalId(null); setSelectedIds((current) => { const next = new Set(current); checked ? next.add(proposal.id) : next.delete(proposal.id); return next; }); }} aria-label={`Incluir ${proposal.projectName}`} /> : <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-semibold text-white">{index + 1}</span>}
                     <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        {multiple ? <Input value={proposal.projectName} onChange={(event) => updateName(proposal.id, event.target.value)} className="h-9 min-w-[16rem] flex-1 border-slate-200 text-base font-semibold" aria-label={`Nombre de propuesta ${index + 1}`} /> : <h4 className="text-base font-semibold text-slate-950">{proposal.projectName}</h4>}
+                      <div className="flex min-w-0 flex-wrap items-center gap-2">
+                        {multiple ? <Input value={proposal.projectName} onChange={(event) => updateName(proposal.id, event.target.value)} className="h-9 min-w-0 w-full flex-1 border-slate-200 text-base font-semibold sm:min-w-[16rem]" aria-label={`Nombre de propuesta ${index + 1}`} /> : <h4 className="text-base font-semibold text-slate-950">{proposal.projectName}</h4>}
                         <Badge variant="outline" className="border-slate-200 bg-slate-50 text-slate-600">{proposal.modality ? modalityLabel[proposal.modality] : "Por definir"}{proposal.durationMonths ? ` · ${proposal.durationMonths} meses` : ""}</Badge>
                       </div>
                       <p className="mt-2 text-sm leading-6 text-slate-600">{proposal.summary}</p>
-                      {proposal.decision && <p className="mt-2 text-xs leading-5 text-slate-500"><span className="font-semibold text-slate-700">Decisión que habilita:</span> {proposal.decision}</p>}
-                      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
+                      {proposal.decision && <p className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-600"><span className="font-semibold text-slate-800">Decisión que habilita:</span> {proposal.decision}</p>}
+                      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-slate-500">
                         {proposal.recommendedBlueprint && <span><strong className="text-slate-700">Receta:</strong> {proposal.recommendedBlueprint.name}</span>}
                         {proposal.markets.length > 0 && <span><strong className="text-slate-700">Mercados:</strong> {proposal.markets.join(", ")}</span>}
                         <span><strong className="text-slate-700">Confianza:</strong> {Math.round(proposal.confidence * 100)}%</span>
@@ -173,11 +182,27 @@ export function QuotationBriefIntake({ onApply, onCreateGroup, onAnalysisChange,
               </article>
             ))}
             {multiple && (
-              <div className="sticky bottom-2 z-10 flex flex-col gap-3 rounded-xl border border-slate-200 bg-white/95 p-4 shadow-lg backdrop-blur sm:flex-row sm:items-center sm:justify-between">
-                <div><p className="text-sm font-semibold text-slate-900">{selected.length} de {proposals.length} propuestas seleccionadas</p><p className="mt-0.5 text-xs text-slate-500">{canCreateGroup ? `Se crearán juntas para ${clientName}.` : "Completá el cliente y la entidad legal debajo antes de crear el grupo."}</p></div>
-                <Button type="button" disabled={!canCreateGroup || selected.length < 2 || selected.some((proposal) => proposal.projectName.trim().length < 2) || isCreatingGroup} onClick={() => void onCreateGroup?.(selected, analysis, { brief: brief.trim(), fileName })}>
-                  {isCreatingGroup ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Layers3 className="mr-2 h-4 w-4" />} Crear {selected.length} cotizaciones
-                </Button>
+              <div className="sticky bottom-2 z-10 flex flex-col gap-3 rounded-xl border border-slate-300 bg-white p-4 shadow-lg sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-slate-900">{selected.length === 1 ? "Cotización individual" : `Grupo de ${selected.length} propuestas`}</p>
+                  <p className="mt-0.5 text-xs leading-5 text-slate-500">
+                    {selected.length === 1
+                      ? "Vas a continuar con esta propuesta en el cotizador individual."
+                      : canCreateGroup
+                        ? `Se crearán juntas para ${clientName || "el cliente seleccionado"}.`
+                        : "Completá cliente y datos financieros compartidos debajo para habilitar el grupo."}
+                  </p>
+                  {!canCreateGroup && selected.length >= 2 && <button type="button" className="mt-1 text-left text-xs font-medium text-indigo-700 underline underline-offset-2" onClick={() => document.getElementById('group-shared-data')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}>Ir a datos compartidos</button>}
+                </div>
+                {selectedSingle ? (
+                  appliedProposalId === selectedSingle.id ? <span className="shrink-0 rounded-lg bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700">Propuesta cargada · continuá abajo</span> : <Button type="button" className="shrink-0" onClick={() => { onApply(selectedSingle, analysis); onAnalysisChange?.({ ...analysis, requiresProposalSelection: false, proposals: [selectedSingle] }); setAppliedProposalId(selectedSingle.id); }}>
+                    Usar esta propuesta <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                ) : (
+                  <Button type="button" disabled={!canCreateGroup || selected.length < 2 || selected.some((proposal) => proposal.projectName.trim().length < 2) || isCreatingGroup} onClick={() => void onCreateGroup?.(selected, analysis, { brief: brief.trim(), fileName })}>
+                    {isCreatingGroup ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Layers3 className="mr-2 h-4 w-4" />} Crear grupo de {selected.length} propuestas
+                  </Button>
+                )}
               </div>
             )}
             <details className="rounded-lg px-1 text-xs text-slate-500">
