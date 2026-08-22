@@ -6232,6 +6232,82 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Panel de "cuentas en riesgo": la misma alerta de margen de abajo, pero
+  // calculada para todas las cotizaciones activas recurrentes de una sola
+  // vez, para no tener que abrir cotización por cotización. Resuelve la
+  // tarifa vigente de cada persona UNA sola vez (no una vez por cotización)
+  // para no multiplicar consultas cuando hay muchas cuentas activas.
+  app.get("/api/quotations/margin-drift-summary", requireAuth, requirePermission("quotations"), async (_req, res) => {
+    try {
+      const activeQuotations = await db.select().from(quotations).where(eq(quotations.status, "approved"));
+      const eligible = activeQuotations.filter((quotation) =>
+        quotation.quotationType !== "one-time" && Number(quotation.exchangeRateAtQuote) > 0);
+      if (eligible.length === 0) {
+        return res.json({ evaluated: 0, applicable: 0, atRisk: [] });
+      }
+
+      const [currentFxConfig] = await db.select().from(systemConfig).where(eq(systemConfig.configKey, "usd_exchange_rate"));
+      const currentExchangeRate = Number(currentFxConfig?.configValue);
+      if (!(currentExchangeRate > 0)) {
+        return res.json({ evaluated: eligible.length, applicable: 0, atRisk: [] });
+      }
+
+      const quotationIds = eligible.map((quotation) => quotation.id);
+      const allMembers = await db.select().from(quotationTeamMembers).where(inArray(quotationTeamMembers.quotationId, quotationIds));
+
+      const distinctPersonnelIds = Array.from(new Set(
+        allMembers.map((member) => member.personnelId).filter((personnelId): personnelId is number => personnelId != null),
+      ));
+      const now = new Date();
+      const rateEntries = await Promise.all(distinctPersonnelIds.map(async (personnelId) => {
+        const resolved = await resolveCanonicalPersonnelRate(personnelId, now);
+        return [personnelId, resolved.error || resolved.hourlyRateARS == null ? null : resolved.hourlyRateARS] as const;
+      }));
+      const currentArsRateByPersonnel = new Map(rateEntries);
+
+      const clientIds = Array.from(new Set(eligible.map((quotation) => quotation.clientId)));
+      const clientRows = clientIds.length
+        ? await db.select({ id: clients.id, name: clients.name }).from(clients).where(inArray(clients.id, clientIds))
+        : [];
+      const clientNameById = new Map(clientRows.map((client) => [client.id, client.name]));
+
+      const results = eligible.map((quotation) => {
+        const members = allMembers.filter((member) => member.quotationId === quotation.id
+          && (quotation.acceptedVariantId ? member.variantId === quotation.acceptedVariantId : member.variantId == null));
+        if (members.length === 0) return null;
+
+        const quotationCurrency = quotation.quotationCurrency === "USD" ? "USD" : "ARS";
+        const team = members.map((member) => {
+          const originalRate = Number(member.rate) || 0;
+          const hours = Number(member.hours) || 0;
+          if (!member.personnelId) return { personnelId: null, hours, originalRate, currentRate: null };
+          const arsRate = currentArsRateByPersonnel.get(member.personnelId);
+          if (arsRate == null) return { personnelId: member.personnelId, hours, originalRate, currentRate: null };
+          const currentRate = quotationCurrency === "USD" ? arsRate / currentExchangeRate : arsRate;
+          return { personnelId: member.personnelId, hours, originalRate, currentRate };
+        });
+        const drift = calculateMarginDrift({ lockedTotal: Number(quotation.totalAmount) || 0, team });
+        return {
+          quotationId: quotation.id,
+          quotationNumber: quotation.quotationNumber,
+          projectName: quotation.projectName,
+          clientName: clientNameById.get(quotation.clientId) || null,
+          quotationCurrency,
+          ...drift,
+        };
+      }).filter((item): item is NonNullable<typeof item> => item != null);
+
+      const atRisk = results
+        .filter((item) => item.severity !== "ok")
+        .sort((a, b) => b.marginErosionPoints - a.marginErosionPoints);
+
+      res.json({ evaluated: eligible.length, applicable: results.length, atRisk });
+    } catch (error) {
+      console.error("GET /api/quotations/margin-drift-summary error:", error);
+      res.status(500).json({ message: "No se pudo calcular el resumen de deriva de margen" });
+    }
+  });
+
   // Alerta de margen para contratos activos (fee mensual / programa anual):
   // el precio quedó fijo en dólares al cotizar, pero el costo se sigue
   // pagando en pesos y cambia mes a mes. Compara el costo del mismo equipo

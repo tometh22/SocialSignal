@@ -94,6 +94,21 @@ export default function ManageQuotes() {
     byPriceBand: Array<{ key: string; count: number; won: number; value: number }>;
     byLossReason: Array<{ key: string | null; count: number }>;
   }>({ queryKey: ['/api/quotation-analytics/professional'] });
+  const { data: marginRisk } = useQuery<{
+    evaluated: number;
+    applicable: number;
+    atRisk: Array<{
+      quotationId: number;
+      quotationNumber: string | null;
+      projectName: string;
+      clientName: string | null;
+      quotationCurrency: string;
+      currentMarginPercentage: number;
+      originalMarginPercentage: number;
+      marginErosionPoints: number;
+      severity: 'watch' | 'critical';
+    }>;
+  }>({ queryKey: ['/api/quotations/margin-drift-summary'] });
 
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -552,6 +567,38 @@ export default function ManageQuotes() {
           </MetricGrid>
 
           {professionalAnalytics?.byMotion?.length ? <div className="mb-4 rounded-xl border border-indigo-100 bg-indigo-50/50 px-4 py-3"><div className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-indigo-600"><GitBranch className="h-3.5 w-3.5" /> Conversión por modalidad comercial <span className="font-normal normal-case text-slate-500">· demos excluidas</span></div><div className="flex flex-wrap gap-2">{professionalAnalytics.byMotion.map((item) => <Badge key={item.key} variant="outline" className="bg-white px-3 py-1.5">{motionLabel(item.key)} · {item.count ? ((item.won / item.count) * 100).toFixed(0) : 0}% <span className="ml-1 text-slate-400">({item.won}/{item.count})</span></Badge>)}</div></div> : null}
+
+          {/* Cuentas en riesgo: fee mensual/programa anual cuyo margen real
+              (con tarifas vigentes hoy) se alejó del margen cotizado. El
+              costo se paga en pesos y el precio quedó fijo en dólares — ver
+              shared/utils/quotation-margin-drift.ts. Sólo diagnóstico. */}
+          {marginRisk && marginRisk.atRisk.length > 0 && (
+            <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50/60 px-4 py-3">
+              <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-amber-700">
+                <TrendingDown className="h-3.5 w-3.5" /> Cuentas en riesgo
+                <span className="font-normal normal-case text-slate-500">· margen erosionado vs. lo cotizado, {marginRisk.applicable} cuentas recurrentes evaluadas</span>
+              </div>
+              <div className="space-y-1.5">
+                {marginRisk.atRisk.map((item) => (
+                  <button
+                    key={item.quotationId}
+                    type="button"
+                    onClick={() => navigate(`/quotations/${item.quotationId}`)}
+                    className="flex w-full items-center justify-between gap-3 rounded-lg border border-amber-100 bg-white px-3 py-2 text-left transition hover:border-amber-300"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-slate-900">{item.clientName || 'Sin cliente'} · {item.projectName}</p>
+                      <p className="text-xs text-slate-500">Margen cotizado {item.originalMarginPercentage.toFixed(1)}% → hoy {item.currentMarginPercentage.toFixed(1)}%</p>
+                    </div>
+                    <Badge className={cn('shrink-0', item.severity === 'critical' ? 'bg-red-100 text-red-800 hover:bg-red-100' : 'bg-amber-100 text-amber-800 hover:bg-amber-100')}>
+                      <AlertOctagon className="mr-1 h-3 w-3" />
+                      -{item.marginErosionPoints.toFixed(1)}pts
+                    </Badge>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Win/Loss insights bar */}
           {Object.keys(lossReasonBreakdown).length > 0 && (
