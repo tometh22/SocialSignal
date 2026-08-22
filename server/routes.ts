@@ -6211,27 +6211,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/quotations/:id", requireAuth, async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      console.log('🔍 Getting quotation with ID:', req.params.id, 'parsed:', id);
-      if (isNaN(id)) {
-        console.error('❌ Invalid quotation ID:', req.params.id);
-        return res.status(400).json({ message: "Invalid quotation ID" });
-      }
-      const quotation = await storage.getQuotation(id);
-      if (!quotation) {
-        console.error('❌ Quotation not found for ID:', id);
-        return res.status(404).json({ message: "Quotation not found" });
-      }
-      console.log('✅ Quotation found:', quotation.id, quotation.projectName);
-      res.json(quotation);
-    } catch (err) {
-      console.error('GET /api/quotations/:id error:', err);
-      res.status(500).json({ message: 'Error fetching quotation' });
-    }
-  });
-
   // Panel de "cuentas en riesgo": la misma alerta de margen de abajo, pero
   // calculada para todas las cotizaciones activas recurrentes de una sola
   // vez, para no tener que abrir cotización por cotización. Resuelve la
@@ -6307,6 +6286,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "No se pudo calcular el resumen de deriva de margen" });
     }
   });
+
+  app.get("/api/quotations/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      console.log('🔍 Getting quotation with ID:', req.params.id, 'parsed:', id);
+      if (isNaN(id)) {
+        console.error('❌ Invalid quotation ID:', req.params.id);
+        return res.status(400).json({ message: "Invalid quotation ID" });
+      }
+      const quotation = await storage.getQuotation(id);
+      if (!quotation) {
+        console.error('❌ Quotation not found for ID:', id);
+        return res.status(404).json({ message: "Quotation not found" });
+      }
+      console.log('✅ Quotation found:', quotation.id, quotation.projectName);
+      res.json(quotation);
+    } catch (err) {
+      console.error('GET /api/quotations/:id error:', err);
+      res.status(500).json({ message: 'Error fetching quotation' });
+    }
+  });
+
 
   // Alerta de margen para contratos activos (fee mensual / programa anual):
   // el precio quedó fijo en dólares al cotizar, pero el costo se sigue
