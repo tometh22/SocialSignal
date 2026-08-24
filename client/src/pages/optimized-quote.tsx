@@ -368,11 +368,19 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
   return (
     <PageLayout
       title={isEditing ? 'Editar cotización' : 'Nueva cotización'}
-      description={`${stepMeta.title}: ${stepMeta.description}`}
+      // Antes: description={`${stepMeta.title}: ${stepMeta.description}`} — repetía
+      // textualmente el encabezado del paso que ya se muestra dentro de la tarjeta
+      // ("Paso N de 6 · título · descripción"), un eco redundante en el header.
       breadcrumbs={[
         { label: 'Gestión de cotizaciones', href: '/manage-quotes' },
         { label: isEditing ? 'Editar cotización' : 'Nueva cotización', current: true },
       ]}
+      // Todo el cotizador comparte un mismo ancho de columna (header, progreso,
+      // banner de grupo y contenido) para que los bordes queden alineados. Antes
+      // el chrome ocupaba 1440px y el formulario quedaba encajonado a 1024px
+      // centrado, lo que hacía que el contenido "flotara" con aire a los costados.
+      headerClassName="max-w-6xl"
+      contentClassName="max-w-6xl"
       actions={(
         <div className="flex flex-wrap gap-2">
           <Button type="button" variant="ghost" size="sm" onClick={handleExit}>
@@ -387,10 +395,10 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
     >
       <div className="mb-5 rounded-2xl border border-slate-200 bg-white px-4 py-4 sm:px-5">
         <div className="mb-4 flex items-center justify-between gap-3">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Progreso</p>
-            <p className="mt-1 text-sm font-medium text-slate-700">{stepMeta.title}</p>
-          </div>
+          {/* Sólo el eyebrow + autosave: el nombre del paso ya lo dan el stepper de abajo
+              y el encabezado "Paso N de 6" de la tarjeta de contenido — repetirlo acá
+              (antes "Progreso / Brief") era un eco redundante. */}
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Progreso · Paso {currentStepNumber} de 6</p>
           <AutosaveIndicator lastSaveTime={lastAutosaveAt} status={autosaveStatus} isOnline={isOnline} />
         </div>
 
@@ -449,7 +457,7 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
 
        {currentStepNumber > 1 && <div className="mb-4"><QuotationWorkspaceSummary currentPhase={currentStepNumber} totalSteps={6} compact /></div>}
 
-       <div className={currentStepNumber === 1 ? 'mx-auto max-w-5xl' : 'grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_18rem]'}>
+       <div className={currentStepNumber === 1 ? '' : 'grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_18rem]'}>
         <main className="min-w-0 space-y-5 pb-20">
           {validationIssues.length > 0 && (
             <Alert variant="destructive" role="alert" aria-live="assertive">
