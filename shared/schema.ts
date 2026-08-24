@@ -1318,6 +1318,55 @@ export const insertExchangeRateSchema = createInsertSchema(exchangeRates).omit({
 export type ExchangeRate = typeof exchangeRates.$inferSelect;
 export type InsertExchangeRate = z.infer<typeof insertExchangeRateSchema>;
 
+// ==================== AJUSTE PROGRAMADO DE PRECIO POR IPC ====================
+// Sólo para cotizaciones en ARS con la cláusula ipc_quarterly/annual_review
+// ya presente en el scopeSnapshot desde que se cotizaron (nunca se agrega
+// retroactivamente). Ver shared/utils/quotation-ipc-adjustment.ts.
+
+// Variación mensual del IPC, sincronizada desde una API pública
+// (ver server/services/ipcSync.ts). Mismo patrón que exchangeRates.
+export const ipcIndexValues = pgTable("ipc_index_values", {
+  id: serial("id").primaryKey(),
+  year: integer("year").notNull(),
+  month: integer("month").notNull(), // 1-12
+  monthlyPercentage: numeric("monthly_percentage", { precision: 6, scale: 3 }).notNull(), // ej. 2.100 = +2.1% ese mes
+  source: varchar("source", { length: 60 }).notNull().default("ArgentinaDatos"),
+  fetchedAt: timestamp("fetched_at").notNull().defaultNow(),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  uniquePeriodSource: unique().on(table.year, table.month, table.source),
+}));
+
+export type IpcIndexValue = typeof ipcIndexValues.$inferSelect;
+
+// Un ajuste propuesto por ciclo de una cotización. Nace en pending_approval;
+// nunca cambia el precio ni manda el email hasta que alguien lo aprueba.
+export const quotationPriceAdjustments = pgTable("quotation_price_adjustments", {
+  id: serial("id").primaryKey(),
+  quotationId: integer("quotation_id").notNull().references(() => quotations.id, { onDelete: "cascade" }),
+  cadence: varchar("cadence", { length: 20 }).notNull(), // 'ipc_quarterly' | 'annual_review'
+  periodStart: date("period_start").notNull(),
+  periodEnd: date("period_end").notNull(),
+  ipcAccumulatedPercentage: doublePrecision("ipc_accumulated_percentage").notNull(),
+  previousTotalAmount: doublePrecision("previous_total_amount").notNull(),
+  proposedTotalAmount: doublePrecision("proposed_total_amount").notNull(),
+  status: varchar("status", { length: 30 }).notNull().default("pending_approval"),
+  // 'pending_approval' | 'approved_applied' | 'rejected'. El email al
+  // cliente es best-effort al aprobar (emailSentAt queda null si falla o si
+  // no hay contacto cargado) — nunca bloquea que el precio se aplique.
+  reviewedBy: integer("reviewed_by").references(() => users.id, { onDelete: "set null" }),
+  reviewedAt: timestamp("reviewed_at"),
+  reviewNotes: text("review_notes"),
+  emailSentAt: timestamp("email_sent_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  uniqueQuotationPeriod: unique().on(table.quotationId, table.periodStart),
+}));
+
+export type QuotationPriceAdjustment = typeof quotationPriceAdjustments.$inferSelect;
+
 // ==================== FERIADOS Y DISPONIBILIDAD ====================
 export const holidays = pgTable("holidays", {
   id: serial("id").primaryKey(),

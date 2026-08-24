@@ -1,8 +1,10 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { apiRequest, authFetch } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/use-auth";
+import { usePermissions } from "@/hooks/use-permissions";
 import { useLocation } from "wouter";
 import { Quotation } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -109,6 +111,8 @@ export default function ManageQuotes() {
       severity: 'watch' | 'critical';
     }>;
   }>({ queryKey: ['/api/quotations/margin-drift-summary'] });
+  const queryClient = useQueryClient();
+  const { data: pendingIpcAdjustments = [] } = useQuery<PendingIpcAdjustment[]>({ queryKey: ['/api/quotation-price-adjustments/pending'] });
 
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -123,6 +127,14 @@ export default function ManageQuotes() {
   const [expandedQuoteClients, setExpandedQuoteClients] = useState<Set<string>>(new Set());
   const [quoteView, setQuoteView] = useState<"folders" | "list">("folders");
   const { toast } = useToast();
+  const { user } = useAuth();
+  const { isOperations } = usePermissions();
+  // El servidor exige requirePermission("quotations_approve", "operations")
+  // para aprobar/rechazar un ajuste de IPC — "quotations_approve" no es una
+  // AppSection (esas son secciones amplias de navegación), así que se lee
+  // directo del array crudo de permisos del usuario, igual que hace el
+  // propio hook por dentro.
+  const canApproveIpcAdjustments = isOperations || Boolean((user as any)?.permissions?.includes('quotations_approve'));
 
   // Función auxiliar para obtener el nombre del cliente por ID
   const getClientName = (clientId: number) => {
@@ -595,6 +607,25 @@ export default function ManageQuotes() {
                       -{item.marginErosionPoints.toFixed(1)}pts
                     </Badge>
                   </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Ajustes de precio por IPC pendientes de aprobación (fee mensual/
+              programa anual en ARS con la cláusula desde que se cotizaron).
+              Ver server/jobs/ipc-price-adjustments.ts. Aprobar aplica el
+              precio nuevo y avisa al cliente por email; rechazar no cambia
+              nada — el próximo ciclo se vuelve a evaluar solo. */}
+          {pendingIpcAdjustments.length > 0 && (
+            <div className="mb-4 rounded-xl border border-indigo-200 bg-indigo-50/60 px-4 py-3">
+              <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-indigo-700">
+                <TrendingUp className="h-3.5 w-3.5" /> Ajustes de precio por IPC pendientes
+                <span className="font-normal normal-case text-slate-500">· sólo contratos en ARS con cláusula desde el origen</span>
+              </div>
+              <div className="space-y-1.5">
+                {pendingIpcAdjustments.map((item) => (
+                  <IpcAdjustmentRow key={item.id} item={item} canApprove={canApproveIpcAdjustments} />
                 ))}
               </div>
             </div>
@@ -1167,4 +1198,78 @@ export default function ManageQuotes() {
 
 function motionLabel(value: string) {
   return ({ new_business: "Nuevo negocio", renewal: "Renovación", expansion: "Expansión", demo: "Demo" } as Record<string, string>)[value] || value;
+}
+
+const ipcMoneyFormatter = new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 });
+
+type PendingIpcAdjustment = {
+  id: number;
+  quotationId: number;
+  quotationNumber: string | null;
+  projectName: string;
+  clientName: string | null;
+  clientContactEmail: string | null;
+  cadence: 'ipc_quarterly' | 'annual_review';
+  periodStart: string;
+  periodEnd: string;
+  ipcAccumulatedPercentage: number;
+  previousTotalAmount: number;
+  proposedTotalAmount: number;
+};
+
+// Fila propia (no un .map() plano) a propósito: cada fila necesita su propio
+// estado de mutación. Con una única mutation compartida para toda la lista,
+// aprobar la fila A y después la B hacía que el spinner/disabled de A se
+// apagara apenas arrancaba B (mutation.variables sólo recuerda el último
+// llamado), permitiendo un doble click sobre A mientras seguía en vuelo.
+function IpcAdjustmentRow({ item, canApprove }: { item: PendingIpcAdjustment; canApprove: boolean }) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const approve = useMutation({
+    mutationFn: () => apiRequest(`/api/quotation-price-adjustments/${item.id}/approve`, 'POST'),
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/quotation-price-adjustments/pending'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/quotations'] });
+      toast({
+        title: result?.emailError ? 'Precio actualizado, pero hay que avisar a mano' : 'Ajuste aplicado',
+        description: result?.emailError ? `Precio actualizado. ${result.emailError}` : 'Precio actualizado y cliente notificado por email.',
+        variant: result?.emailError ? 'destructive' : 'default',
+      });
+    },
+    onError: (error: any) => toast({ title: 'No se pudo aplicar el ajuste', description: error?.message || 'Intentá de nuevo.', variant: 'destructive' }),
+  });
+  const reject = useMutation({
+    mutationFn: () => apiRequest(`/api/quotation-price-adjustments/${item.id}/reject`, 'POST'),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/quotation-price-adjustments/pending'] });
+      toast({ title: 'Ajuste rechazado', description: 'No se modificó el precio de la cotización.' });
+    },
+    onError: (error: any) => toast({ title: 'No se pudo rechazar el ajuste', description: error?.message || 'Intentá de nuevo.', variant: 'destructive' }),
+  });
+  const busy = approve.isPending || reject.isPending;
+
+  return (
+    <div className="flex flex-col gap-2 rounded-lg border border-indigo-100 bg-white px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
+      <div className="min-w-0">
+        <p className="truncate text-sm font-medium text-slate-900">{item.clientName || 'Sin cliente'} · {item.projectName}</p>
+        <p className="text-xs text-slate-500">
+          {ipcMoneyFormatter.format(item.previousTotalAmount)} → {ipcMoneyFormatter.format(item.proposedTotalAmount)} (+{item.ipcAccumulatedPercentage.toFixed(2)}% IPC · {item.periodStart} a {item.periodEnd})
+          {!item.clientContactEmail && <span className="ml-1 text-amber-700">· sin email de contacto cargado</span>}
+        </p>
+      </div>
+      {canApprove ? (
+        <div className="flex shrink-0 gap-2">
+          <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => reject.mutate()}>
+            {reject.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Rechazar'}
+          </Button>
+          <Button type="button" size="sm" disabled={busy} onClick={() => approve.mutate()}>
+            {approve.isPending ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <CheckCircle className="mr-1.5 h-3.5 w-3.5" />}
+            Aprobar y aplicar
+          </Button>
+        </div>
+      ) : (
+        <p className="shrink-0 text-xs text-slate-400">Necesitás permiso de aprobación</p>
+      )}
+    </div>
+  );
 }
