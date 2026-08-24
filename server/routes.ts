@@ -47,7 +47,6 @@ import {
   insertProjectComponentSchema,
   insertDeliverableSchema,
   insertClientModoCommentSchema,
-  insertRecurringProjectTemplateSchema,
   insertRecurringTemplatePersonnelSchema,
   insertProjectCycleSchema,
   insertProjectBaseTeamSchema,
@@ -14173,24 +14172,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Obtener un comentario MODO por ID
-  app.get("/api/modo-comments/:id", requireAuth, async (req, res) => {
-    const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ message: "Invalid comment ID" });
-
-    try {
-      const comment = await storage.getClientModoComment(id, 1, 2024);
-      if (!comment) {
-        return res.status(404).json({ message: "MODO comment not found" });
-      }
-      res.json(comment);
-    } catch (error) {
-      console.error("Error fetching MODO comment:", error);
-      res.status(500).json({ message: "Failed to fetch MODO comment" });
-    }
-  });
-
-  // Buscar comentario MODO por trimestre/año
+  // Buscar comentario MODO por trimestre/año. Va antes de "/:id" a
+  // propósito: con la misma cantidad de segmentos, "/:id" registrada primero
+  // interceptaría "/quarter" (parseInt("quarter") = NaN) y este endpoint
+  // nunca se alcanzaría (ver tests/express-route-order.test.ts).
   app.get("/api/modo-comments/quarter", requireAuth, async (req, res) => {
     const clientId = req.query.clientId ? parseInt(req.query.clientId as string) : null;
     const quarter = req.query.quarter ? parseInt(req.query.quarter as string) : null;
@@ -14208,6 +14193,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(comment);
     } catch (error) {
       console.error("Error fetching MODO comment by quarter:", error);
+      res.status(500).json({ message: "Failed to fetch MODO comment" });
+    }
+  });
+
+  // Obtener un comentario MODO por ID
+  app.get("/api/modo-comments/:id", requireAuth, async (req, res) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ message: "Invalid comment ID" });
+
+    try {
+      const comment = await storage.getClientModoComment(id, 1, 2024);
+      if (!comment) {
+        return res.status(404).json({ message: "MODO comment not found" });
+      }
+      res.json(comment);
+    } catch (error) {
+      console.error("Error fetching MODO comment:", error);
       res.status(500).json({ message: "Failed to fetch MODO comment" });
     }
   });
@@ -14604,78 +14606,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   /* MODO Routes END */
 
-  // =========== RUTAS PARA PLANTILLAS RECURRENTES ===========
-
-  // Crear plantilla recurrente
-  app.post("/api/recurring-templates", requireAuth, async (req, res) => {
-    try {
-      const validatedData = insertRecurringProjectTemplateSchema.parse(req.body);
-      const template = await storage.createRecurringTemplate(validatedData);
-      res.status(201).json(template);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid template data", errors: error.errors });
-      }
-      console.error("Error creating recurring template:", error);
-      res.status(500).json({ message: "Failed to create recurring template" });
-    }
-  });
-
-  // Obtener plantillas recurrentes por proyecto padre
-  app.get("/api/projects/:parentProjectId/recurring-templates", requireAuth, async (req, res) => {
-    try {
-      const parentProjectId = parseInt(req.params.parentProjectId);
-      if (isNaN(parentProjectId)) {
-        return res.status(400).json({ message: "Invalid parent project ID" });
-      }
-
-      const templates = await storage.getRecurringTemplatesByProject(parentProjectId);
-      res.json(templates);
-    } catch (error) {
-      console.error("Error fetching recurring templates:", error);
-      res.status(500).json({ message: "Failed to fetch recurring templates" });
-    }
-  });
-
-  // Actualizar plantilla recurrente
-  app.put("/api/recurring-templates/:id", requireAuth, async (req, res) => {
-    try {
-      const templateId = parseInt(req.params.id);
-      if (isNaN(templateId)) {
-        return res.status(400).json({ message: "Invalid template ID" });
-      }
-
-      const updatedTemplate = await storage.updateRecurringTemplate(templateId, req.body);
-      if (!updatedTemplate) {
-        return res.status(404).json({ message: "Template not found" });
-      }
-
-      res.json(updatedTemplate);
-    } catch (error) {
-      console.error("Error updating recurring template:", error);
-      res.status(500).json({ message: "Failed to update recurring template" });
-    }
-  });
-
-  // Eliminar plantilla recurrente
-  app.delete("/api/recurring-templates/:id", requireAuth, async (req, res) => {
-    try {
-      const templateId = parseInt(req.params.id);
-      if (isNaN(templateId)) {
-        return res.status(400).json({ message: "Invalid template ID" });
-      }
-
-      const deleted = await storage.deleteRecurringTemplate(templateId);
-      if (!deleted) {
-        return res.status(404).json({ message: "Template not found" });
-      }
-
-      res.json({ message: "Template deleted successfully" });
-    } catch (error) {
-      console.error("Error deleting recurring template:", error);
-      res.status(500).json({ message: "Failed to delete recurring template" });
-    }
-  });
+  // Nota: existió acá un segundo bloque de rutas "/api/recurring-templates"
+  // (POST/GET-por-proyecto-padre/PUT/DELETE) registrado después del bloque
+  // real (ver más arriba, sección "RUTAS PARA RECURRING TEMPLATES"). Con la
+  // misma ruta o la misma forma con parámetro, las de arriba siempre ganaban
+  // y este segundo bloque —y los métodos de storage que sólo él usaba
+  // (createRecurringTemplate, getRecurringTemplatesByProject,
+  // updateRecurringTemplate, deleteRecurringTemplate, sin sufijo "WithTeam")—
+  // eran código inalcanzable. Se eliminó sin cambiar comportamiento; el
+  // frontend (recurring-templates.tsx, always-on-project-view.tsx) siempre
+  // usó las rutas "WithTeam" que ya ganaban la carrera.
 
   // =========== RUTAS PARA CICLOS DE PROYECTO ===========
 
