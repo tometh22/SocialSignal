@@ -16,7 +16,7 @@ import {
   type ClientModoComment, type InsertClientModoComment,
   type QuarterlyNpsSurvey, type InsertQuarterlyNpsSurvey,
   type CostMultiplier, type InsertCostMultiplier,
-  type RecurringProjectTemplate, type InsertRecurringProjectTemplate,
+  type RecurringProjectTemplate,
   type RecurringTemplatePersonnel, type InsertRecurringTemplatePersonnel,
   type ProjectCycle, type InsertProjectCycle,
   type ProjectBaseTeam, type InsertProjectBaseTeam,
@@ -260,11 +260,7 @@ export interface IStorage {
   deleteCostMultiplier(id: number): Promise<boolean>;
 
   // Recurring Template operations
-  getRecurringTemplatesByProject(parentProjectId: number): Promise<RecurringProjectTemplate[]>;
   getRecurringTemplate(id: number): Promise<RecurringProjectTemplate | undefined>;
-  createRecurringTemplate(template: InsertRecurringProjectTemplate): Promise<RecurringProjectTemplate>;
-  updateRecurringTemplate(id: number, template: Partial<InsertRecurringProjectTemplate>): Promise<RecurringProjectTemplate | undefined>;
-  deleteRecurringTemplate(id: number): Promise<boolean>;
 
   // Enhanced Recurring Template operations with team assignment
   getRecurringTemplatesWithTeam(projectId: number): Promise<any[]>;
@@ -2717,46 +2713,16 @@ export class DatabaseStorage implements IStorage {
   }
 
   // =============== PLANTILLAS RECURRENTES (LEGACY INTERFACE COMPLIANCE) ===============
-
-  async getRecurringTemplatesByProject(parentProjectId: number): Promise<RecurringProjectTemplate[]> {
-    return await db.select()
-      .from(recurringProjectTemplates)
-      .where(eq(recurringProjectTemplates.parentProjectId, parentProjectId))
-      .orderBy(recurringProjectTemplates.templateName);
-  }
+  // getRecurringTemplatesByProject/createRecurringTemplate/updateRecurringTemplate/
+  // deleteRecurringTemplate se eliminaron: sólo las usaba un bloque de rutas
+  // en server/routes.ts que quedó inalcanzable por un bug de orden de rutas
+  // (ver tests/express-route-order.test.ts). getRecurringTemplate (singular)
+  // se mantiene: la usan otros métodos de esta clase.
 
   async getRecurringTemplate(id: number): Promise<RecurringProjectTemplate | undefined> {
     const [template] = await db.select().from(recurringProjectTemplates)
       .where(eq(recurringProjectTemplates.id, id));
     return template || undefined;
-  }
-
-  async createRecurringTemplate(template: InsertRecurringProjectTemplate): Promise<RecurringProjectTemplate> {
-    const [created] = await db.insert(recurringProjectTemplates).values(template).returning();
-    return created;
-  }
-
-  async updateRecurringTemplate(id: number, template: Partial<InsertRecurringProjectTemplate>): Promise<RecurringProjectTemplate | undefined> {
-    try {
-      const [updated] = await db.update(recurringProjectTemplates)
-        .set(template)
-        .where(eq(recurringProjectTemplates.id, id))
-        .returning();
-      return updated || undefined;
-    } catch (error) {
-      console.error("Error updating recurring template:", error);
-      return undefined;
-    }
-  }
-
-  async deleteRecurringTemplate(id: number): Promise<boolean> {
-    try {
-      await db.delete(recurringProjectTemplates).where(eq(recurringProjectTemplates.id, id));
-      return true;
-    } catch (error) {
-      console.error("Error deleting recurring template:", error);
-      return false;
-    }
   }
 
   // =============== CICLOS DE PROYECTO ===============
