@@ -394,7 +394,7 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
           <AutosaveIndicator lastSaveTime={lastAutosaveAt} status={autosaveStatus} isOnline={isOnline} />
         </div>
 
-        <nav aria-label="Pasos de la cotización" className="flex min-w-0 gap-1 overflow-x-auto pb-1">
+        <nav aria-label="Pasos de la cotización" className="flex min-w-0 items-center gap-1 overflow-x-auto pb-1">
           {QUOTATION_STEPS.map((phase, index) => {
             const Icon = PHASE_ICONS[index];
             const isCurrent = phase.num === currentStepNumber;
@@ -407,9 +407,10 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
                 onClick={() => handlePhaseNavigation(phase.num)}
                 disabled={!isAvailable || isCurrent}
                 aria-current={isCurrent ? 'step' : undefined}
-                className={`group flex min-w-[8.5rem] flex-1 items-center gap-2 rounded-lg px-2.5 py-2 text-left transition-colors ${
+                title={`Paso ${phase.num}: ${phase.title}`}
+                className={`group flex shrink-0 items-center gap-2 rounded-lg px-2.5 py-2 text-left transition-colors lg:flex-1 lg:min-w-[8.5rem] ${
                   isCurrent
-                    ? 'bg-slate-950 text-white'
+                    ? 'min-w-[8.5rem] flex-1 bg-slate-950 text-white'
                     : isAvailable
                       ? 'text-slate-700 hover:bg-slate-100'
                       : 'cursor-not-allowed text-slate-400'
@@ -418,7 +419,8 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
                   <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition-colors ${isCurrent ? 'bg-white/15 text-white' : isComplete ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
                     {isComplete && !isCurrent ? <Check className="h-4 w-4" /> : <Icon className="h-4 w-4" />}
                   </span>
-                  <span className="min-w-0"><span className={`block text-[10px] uppercase tracking-wide ${isCurrent ? 'text-slate-300' : 'text-slate-400'}`}>Paso {phase.num}</span><span className="block truncate text-xs font-semibold">{phase.title}</span></span>
+                  {/* En viewports angostos sólo el paso activo muestra su etiqueta (el resto queda en ícono + tooltip) para que los 6 pasos entren sin scroll horizontal ni recorte. Desde lg todos muestran su etiqueta como antes. */}
+                  <span className={`min-w-0 ${isCurrent ? '' : 'sr-only lg:not-sr-only'}`}><span className={`block text-[10px] uppercase tracking-wide ${isCurrent ? 'text-slate-300' : 'text-slate-400'}`}>Paso {phase.num}</span><span className="block truncate text-xs font-semibold">{phase.title}</span></span>
               </button>
             );
           })}
