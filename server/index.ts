@@ -28,6 +28,7 @@ import { incomeSotProjectionFlagMigrationSql } from "./migrations/income-sot-pro
 import { cashflowDedupeMigrationSql } from "./migrations/cashflow-dedupe";
 import { factEstimatedCostMonthMigrationSql } from "./migrations/fact-estimated-cost-month";
 import { quotationGroupsMigrationSql } from "./migrations/quotation-groups";
+import { ipcPriceAdjustmentsMigrationSql } from "./migrations/ipc-price-adjustments";
 import { ensureServiceBlueprintSeeds } from "./services/service-blueprints";
 import cors from 'cors';
 import { execSync } from 'child_process';
@@ -841,6 +842,7 @@ async function applyPendingMigrations() {
     await run('0052 cashflow dedupe', cashflowDedupeMigrationSql);
     await run('0053 fact_estimated_cost_month', factEstimatedCostMonthMigrationSql);
     await run('0052 quotation groups', quotationGroupsMigrationSql);
+    await run('0054 ipc price adjustments', ipcPriceAdjustmentsMigrationSql);
 
     // 0033: feriados duplicados (mismo date+name insertado más de una vez desde el
     // formulario) — borra duplicados conservando la fila más antigua y agrega la
@@ -1087,6 +1089,14 @@ const port = Number(process.env.PORT || 5000);
       const { startReminderNotifications } = await import("./jobs/reminder-notifications");
       startReminderNotifications();
       console.log("🔔 Job de notificaciones de recordatorios CRM iniciado");
+
+      // IPC sync (API pública ArgentinaDatos) + detección de ajustes de
+      // precio vencidos para contratos recurrentes en ARS. Sólo deja
+      // propuestas "pending_approval" — nunca cambia un precio ni manda un
+      // email sin aprobación explícita.
+      const { startIpcPriceAdjustmentsJob } = await import("./jobs/ipc-price-adjustments");
+      startIpcPriceAdjustmentsJob();
+      console.log("📈 Job de ajuste de precio por IPC iniciado (diario)");
     }
 
     const { startQuotationExpirationJob } = await import("./jobs/quotation-expiration");

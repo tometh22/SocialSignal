@@ -146,6 +146,7 @@ import {
   absenceEvents,
   userNotifications,
   quotationTeamMembers,
+  quotationPriceAdjustments,
   quotationTemplates,
   quotationRevisions,
   quotationEvents,
@@ -6385,6 +6386,226 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("GET /api/quotations/:id/margin-drift error:", error);
       res.status(500).json({ message: "No se pudo calcular la deriva de margen" });
+    }
+  });
+
+  // Ajustes de precio por IPC pendientes de aprobación (ver
+  // server/jobs/ipc-price-adjustments.ts, que los genera). Nunca se aplica
+  // ni se manda un email sin que alguien apruete explícitamente acá.
+  app.get("/api/quotation-price-adjustments/pending", requireAuth, requirePermission("quotations"), async (_req, res) => {
+    try {
+      const rows = await db.select({ adjustment: quotationPriceAdjustments, quotation: quotations })
+        .from(quotationPriceAdjustments)
+        .innerJoin(quotations, eq(quotationPriceAdjustments.quotationId, quotations.id))
+        .where(and(
+          eq(quotationPriceAdjustments.status, "pending_approval"),
+          // Si la cotización se movió a una revisión (vuelve a "draft") o se
+          // rechazó/archivó después de proponerse el ajuste, no mostrarlo
+          // como si siguiera vigente — aprobar sobre un precio viejo
+          // aplicaría un número que ya no corresponde.
+          eq(quotations.status, "approved"),
+        ))
+        .orderBy(desc(quotationPriceAdjustments.createdAt))
+        .limit(200);
+
+      const clientIds = Array.from(new Set(rows.map((row) => row.quotation.clientId)));
+      const clientRows = clientIds.length
+        ? await db.select({ id: clients.id, name: clients.name, contactEmail: clients.contactEmail }).from(clients).where(inArray(clients.id, clientIds))
+        : [];
+      const clientById = new Map(clientRows.map((client) => [client.id, client]));
+
+      res.json(rows.map(({ adjustment, quotation }) => ({
+        id: adjustment.id,
+        quotationId: quotation.id,
+        quotationNumber: quotation.quotationNumber,
+        projectName: quotation.projectName,
+        clientName: clientById.get(quotation.clientId)?.name ?? null,
+        clientContactEmail: clientById.get(quotation.clientId)?.contactEmail ?? null,
+        cadence: adjustment.cadence,
+        periodStart: adjustment.periodStart,
+        periodEnd: adjustment.periodEnd,
+        ipcAccumulatedPercentage: adjustment.ipcAccumulatedPercentage,
+        previousTotalAmount: adjustment.previousTotalAmount,
+        proposedTotalAmount: adjustment.proposedTotalAmount,
+        createdAt: adjustment.createdAt,
+      })));
+    } catch (error) {
+      console.error("GET /api/quotation-price-adjustments/pending error:", error);
+      res.status(500).json({ message: "No se pudieron cargar los ajustes pendientes" });
+    }
+  });
+
+  // Aprobar: aplica el nuevo precio a la cotización y, si el cliente tiene
+  // email de contacto cargado y SendGrid está configurado, le avisa. Si el
+  // email falla, el precio igual queda aplicado — se informa en la
+  // respuesta para que alguien lo mande a mano.
+  app.post("/api/quotation-price-adjustments/:id/approve", requireAuth, requirePermission("quotations_approve", "operations"), async (req, res) => {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) return res.status(400).json({ message: "Invalid ID" });
+    let result: { updatedQuotation: typeof quotations.$inferSelect; updatedAdjustment: typeof quotationPriceAdjustments.$inferSelect };
+    try {
+      result = await db.transaction(async (tx) => {
+        await tx.execute(sql`SELECT id FROM quotation_price_adjustments WHERE id = ${id} FOR UPDATE`);
+        const [adjustment] = await tx.select().from(quotationPriceAdjustments).where(eq(quotationPriceAdjustments.id, id));
+        if (!adjustment) throw Object.assign(new Error("Ajuste no encontrado"), { statusCode: 404 });
+        if (adjustment.status !== "pending_approval") throw Object.assign(new Error("El ajuste ya fue decidido"), { statusCode: 409 });
+
+        // Lockeamos y releemos la cotización para no pisar una edición
+        // concurrente (mismo patrón de lockVersion que el resto de las
+        // rutas que mutan quotations en este archivo).
+        await tx.execute(sql`SELECT id FROM quotations WHERE id = ${adjustment.quotationId} FOR UPDATE`);
+        const [currentQuotation] = await tx.select().from(quotations).where(eq(quotations.id, adjustment.quotationId));
+        if (!currentQuotation) throw Object.assign(new Error("La cotización del ajuste ya no existe"), { statusCode: 404 });
+        if (currentQuotation.status !== "approved") {
+          // La cotización se movió (nueva revisión, rechazo, etc.) después
+          // de proponerse este ajuste — aplicar ahora pisaría un precio que
+          // ya no corresponde al estado real de la cotización.
+          throw Object.assign(new Error("La cotización ya no está en estado aprobado; no se puede aplicar el ajuste"), { statusCode: 409 });
+        }
+
+        const now = new Date();
+        const [updatedQuotation] = await tx.update(quotations).set({
+          totalAmount: adjustment.proposedTotalAmount,
+          updatedAt: now,
+          lockVersion: sql`${quotations.lockVersion} + 1`,
+        }).where(and(
+          eq(quotations.id, adjustment.quotationId),
+          eq(quotations.lockVersion, currentQuotation.lockVersion),
+        )).returning();
+        if (!updatedQuotation) {
+          throw Object.assign(new Error("La cotización cambió mientras se aprobaba el ajuste; reintentá"), { statusCode: 409 });
+        }
+
+        const [updatedAdjustment] = await tx.update(quotationPriceAdjustments).set({
+          status: "approved_applied",
+          reviewedBy: req.user?.id ?? null,
+          reviewedAt: now,
+          updatedAt: now,
+        }).where(eq(quotationPriceAdjustments.id, id)).returning();
+
+        await recordQuotationEvent(tx, {
+          quotationId: adjustment.quotationId,
+          eventType: "ipc-adjustment-approved",
+          eventKey: `ipc-adjustment:${adjustment.id}:approved`,
+          actorUserId: req.user?.id ?? null,
+          metadata: {
+            adjustmentId: adjustment.id,
+            cadence: adjustment.cadence,
+            periodStart: adjustment.periodStart,
+            periodEnd: adjustment.periodEnd,
+            ipcAccumulatedPercentage: adjustment.ipcAccumulatedPercentage,
+            previousTotalAmount: adjustment.previousTotalAmount,
+            newTotalAmount: adjustment.proposedTotalAmount,
+          },
+        });
+
+        // Mantener el valor estimado del lead de CRM al día. A propósito NO
+        // se usa syncQuotationToCrm: ese helper re-marca wonAt con la fecha
+        // de hoy para status "approved", y acá la cotización ya estaba
+        // ganada — sólo cambió el monto, no la etapa.
+        if (updatedQuotation.leadId) {
+          const exchangeRate = Number(updatedQuotation.exchangeRateAtQuote) || Number(updatedQuotation.usdExchangeRate) || 0;
+          const estimatedValueUsd = exchangeRate > 0 ? updatedQuotation.totalAmount / exchangeRate : 0;
+          if (estimatedValueUsd > 0) {
+            await tx.update(crmLeads).set({ estimatedValueUsd, updatedAt: now }).where(eq(crmLeads.id, updatedQuotation.leadId));
+          }
+        }
+
+        return { updatedQuotation, updatedAdjustment };
+      });
+    } catch (error: any) {
+      if (error?.statusCode) return res.status(error.statusCode).json({ message: error.message });
+      console.error("POST /api/quotation-price-adjustments/:id/approve error:", error);
+      return res.status(500).json({ message: "No se pudo aplicar el ajuste" });
+    }
+
+    // El precio ya está aplicado y confirmado en la base — de acá para
+    // abajo nada puede volver a convertirse en un 500. Un fallo al buscar
+    // el contacto o al mandar el email sólo se refleja en emailError; la
+    // respuesta siempre confirma que el ajuste se aplicó.
+    let emailSent = false;
+    let emailError: string | null = null;
+    try {
+      const [client] = await db.select({ contactEmail: clients.contactEmail }).from(clients)
+        .where(eq(clients.id, result.updatedQuotation.clientId));
+      const sgApiKey = process.env.SENDGRID_API_KEY;
+      const sender = process.env.SENDGRID_FROM_EMAIL;
+      if (!client?.contactEmail) {
+        emailError = "El cliente no tiene un email de contacto cargado; avisale a mano.";
+      } else if (!sgApiKey || !sender) {
+        emailError = "SendGrid no está configurado; avisale a mano.";
+      } else {
+        const sgMail = await import("@sendgrid/mail");
+        sgMail.default.setApiKey(sgApiKey);
+        const percentage = result.updatedAdjustment.ipcAccumulatedPercentage.toFixed(2);
+        const newAmount = result.updatedAdjustment.proposedTotalAmount.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        const body = [
+          "Hola,",
+          "",
+          `Según lo acordado en el contrato de "${result.updatedQuotation.projectName}", corresponde actualizar el precio por variación acumulada del IPC (${percentage}%) durante el período ${result.updatedAdjustment.periodStart} a ${result.updatedAdjustment.periodEnd}.`,
+          "",
+          `Nuevo monto: ARS ${newAmount}`,
+          "",
+          "Cualquier consulta, quedamos a disposición.",
+          "",
+          "Saludos,",
+          "Epical",
+        ].join("\n");
+        await sgMail.default.send({
+          to: client.contactEmail,
+          from: sender,
+          subject: `Actualización de precio por IPC · ${result.updatedQuotation.projectName}`,
+          text: body,
+          html: escapeHtml(body).replace(/\n/g, "<br>"),
+        });
+        emailSent = true;
+        await db.update(quotationPriceAdjustments).set({ emailSentAt: new Date() }).where(eq(quotationPriceAdjustments.id, id));
+      }
+    } catch (error: any) {
+      console.error("Error sending IPC adjustment email:", error?.response?.body || error);
+      emailError = "No se pudo enviar el email; avisale a mano.";
+    }
+
+    res.json({ ...result.updatedAdjustment, emailSent, emailError });
+  });
+
+  // Rechazar: no cambia el precio. El próximo ciclo se vuelve a evaluar
+  // desde el fin de este período (no se re-propone el mismo).
+  app.post("/api/quotation-price-adjustments/:id/reject", requireAuth, requirePermission("quotations_approve", "operations"), async (req, res) => {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) return res.status(400).json({ message: "Invalid ID" });
+    try {
+      const input = z.object({ reason: z.string().trim().max(2000).optional() }).parse(req.body ?? {});
+      const now = new Date();
+      const [updated] = await db.update(quotationPriceAdjustments).set({
+        status: "rejected",
+        reviewedBy: req.user?.id ?? null,
+        reviewedAt: now,
+        reviewNotes: input.reason ?? null,
+        updatedAt: now,
+      }).where(and(
+        eq(quotationPriceAdjustments.id, id),
+        eq(quotationPriceAdjustments.status, "pending_approval"),
+      )).returning();
+      if (!updated) return res.status(409).json({ message: "El ajuste ya fue decidido o no existe" });
+      await recordQuotationEvent(db, {
+        quotationId: updated.quotationId,
+        eventType: "ipc-adjustment-rejected",
+        eventKey: `ipc-adjustment:${updated.id}:rejected`,
+        actorUserId: req.user?.id ?? null,
+        metadata: {
+          adjustmentId: updated.id,
+          cadence: updated.cadence,
+          periodStart: updated.periodStart,
+          periodEnd: updated.periodEnd,
+          proposedTotalAmount: updated.proposedTotalAmount,
+          reason: updated.reviewNotes,
+        },
+      });
+      res.json(updated);
+    } catch (error) {
+      console.error("POST /api/quotation-price-adjustments/:id/reject error:", error);
+      res.status(500).json({ message: "No se pudo rechazar el ajuste" });
     }
   });
 
