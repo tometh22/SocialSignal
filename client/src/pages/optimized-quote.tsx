@@ -369,8 +369,13 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
       {/* Hidratador headless: al editar una cotización con receta, deriva
           scopeSnapshot/equipo/precio desde el blueprint en la carga (no renderiza
           nada). Antes esto sólo pasaba al montar el paso 2, así que el resumen del
-          paso 1 mostraba estado falso sobre una cotización ya armada. */}
-      {isEditing && (
+          paso 1 mostraba estado falso sobre una cotización ya armada.
+          Se monta SÓLO cuando hay receta pero falta el snapshot (la precondición
+          exacta del efecto de hidratación): así no dispara sus queries en
+          cotizaciones legacy sin receta, no toca cotizaciones ya materializadas, y
+          se desmonta apenas hidrata (evita convivir con el builder visible del paso
+          2/3 y correr applyBlueprint dos veces). */}
+      {isEditing && quotationData.serviceBlueprintId && !quotationData.scopeSnapshot && (
         <React.Suspense fallback={null}>
           <ProfessionalScopeBuilder headless />
         </React.Suspense>
