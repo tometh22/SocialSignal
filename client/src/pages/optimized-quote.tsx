@@ -380,7 +380,10 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
           <ProfessionalScopeBuilder headless />
         </React.Suspense>
       )}
-      <div className="mx-auto w-full max-w-6xl pt-1">
+      <div className="mx-auto w-full max-w-6xl pt-1 2xl:max-w-[92rem]">
+        {/* En pantallas muy anchas (2xl) el área de trabajo se ensancha para
+            aprovechar el espacio vacío de los costados y reducir el scroll vertical
+            (el contenido cabe en menos alto). Debajo de 2xl se mantiene 6xl. */}
         {/* Cabecera aplanada: contexto + autosave + acción. Reemplaza al "hero" con
             blobs decorativos y a la tarjeta de progreso separada — antes eran dos
             superficies apiladas antes de llegar al contenido; ahora es una sola
@@ -495,6 +498,9 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
               <React.Suspense fallback={<PhaseLoading />}>
               {currentStepNumber === 1 && (
                 <div className="space-y-6">
+                  {/* En 2xl, "Partí de un brief" y "Datos esenciales" quedan lado a lado
+                      para usar el ancho y reducir el alto del paso (menos scroll). */}
+                  <div className="grid gap-6 2xl:grid-cols-2 2xl:items-start">
                   <QuotationBriefIntake
                     onAnalysisChange={setIntakeAnalysis}
                     canCreateGroup={Boolean(quotationData.client?.id && Number(quotationData.exchangeRateSnapshot) > 0)}
@@ -511,10 +517,13 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
                     });
                     toast({ title: 'Propuesta seleccionada', description: proposal.recommendedBlueprint ? `${proposal.projectName}. La receta ${proposal.recommendedBlueprint.name} quedará destacada en Servicio.` : `${proposal.projectName}. Completá los datos esenciales para continuar.` });
                   }} />
-                  <div id={intakeAnalysis?.requiresProposalSelection ? 'group-shared-data' : undefined}>
-                    <OptimizedBasicInfo mode={intakeAnalysis?.requiresProposalSelection ? 'group' : 'project'} errors={fieldErrors} />
+                  <div className="space-y-6">
+                    <div id={intakeAnalysis?.requiresProposalSelection ? 'group-shared-data' : undefined}>
+                      <OptimizedBasicInfo mode={intakeAnalysis?.requiresProposalSelection ? 'group' : 'project'} errors={fieldErrors} />
+                    </div>
+                    <CommercialMotionField quotationData={quotationData} updateQuotationData={updateQuotationData} />
                   </div>
-                  <CommercialMotionField quotationData={quotationData} updateQuotationData={updateQuotationData} />
+                  </div>
                   {intakeAnalysis?.requiresProposalSelection && (
                     <details className="rounded-xl border border-slate-200 bg-slate-50/60 p-4">
                       <summary className="cursor-pointer text-sm font-semibold text-slate-800">Moneda, tipo de cambio y condiciones comunes</summary>
