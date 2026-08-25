@@ -30,7 +30,7 @@ const MODULES = [
   ["culture", "Cultura"], ["trends", "Tendencias"], ["category", "Categoría"], ["multisource", "Multifuente"],
 ] as const;
 
-export function ProfessionalScopeBuilder({ mode = "all" }: { mode?: ScopeBuilderMode }) {
+export function ProfessionalScopeBuilder({ mode = "all", headless = false }: { mode?: ScopeBuilderMode; headless?: boolean }) {
   const { quotationData, updateQuotationData, updateTeamMembers, availableRoles } = useOptimizedQuote();
   const { data: blueprints = [], isLoading } = useQuery<BlueprintWithWorkload[]>({ queryKey: ["/api/service-blueprints?status=published"] });
   const { data: effortBenchmarks = [] } = useQuery<EffortBenchmark[]>({ queryKey: ["/api/quotation-effort-benchmarks"] });
@@ -226,6 +226,14 @@ export function ProfessionalScopeBuilder({ mode = "all" }: { mode?: ScopeBuilder
       effortOverrideReason: historicalReason(recipeWorkload.totalHours, workload.historicalFactor, benchmark),
     });
   };
+
+  // Modo headless: no renderiza UI, pero corre todos los hooks de arriba —
+  // incluido el useEffect que hidrata el scopeSnapshot desde el blueprint cuando
+  // hay serviceBlueprintId pero falta el snapshot. Se monta a nivel de página
+  // para que esa hidratación ocurra en la carga (y no recién al abrir el paso 2),
+  // así el resumen/equipo/precio son reales apenas se edita la cotización.
+  // Los efectos corren después del commit aunque el componente devuelva null.
+  if (headless) return null;
 
   if (isLoading) return <div className="rounded-xl border border-slate-200 p-6 text-sm text-slate-500">Cargando recetas profesionales…</div>;
 
