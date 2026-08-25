@@ -866,7 +866,17 @@ export const insertQuotationSchema = baseInsertQuotationSchema.extend({
   additionalDeliverableCost: z.number().finite().nonnegative().optional(),
   deliverables: z.array(z.record(z.unknown())).max(100).optional(),
   projectStartDate: z.union([
-    z.date(), 
+    z.date(),
+    z.string().transform((str) => new Date(str)),
+    z.undefined(),
+    z.null().transform(() => undefined)
+  ]).optional(),
+  // Igual que projectStartDate: el cliente manda la fecha como string ISO (un
+  // Date serializado a JSON), así que hay que aceptar string y transformarlo a
+  // Date. Sin esto, guardar/editar cualquier cotización con vigencia (todas la
+  // tienen por default +30 días) fallaba con 400 "Expected date, received string".
+  expiresAt: z.union([
+    z.date(),
     z.string().transform((str) => new Date(str)),
     z.undefined(),
     z.null().transform(() => undefined)
