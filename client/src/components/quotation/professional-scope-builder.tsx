@@ -280,7 +280,11 @@ export function ProfessionalScopeBuilder({ mode = "all", headless = false }: { m
       )}
 
       {scope && mode !== "recipe" && (
-        <>
+        // En 2xl las 4 tarjetas de alcance se reparten en 2 columnas (izq: Contexto +
+        // Cobertura, der: Entregables + Cómo se calcula) para bajar el alto del paso.
+        // Debajo de 2xl se apilan en el orden original.
+        <div className="grid gap-5 2xl:grid-cols-2 2xl:items-start">
+          <div className="space-y-5">
           <Card>
             <CardHeader><CardTitle className="text-base">Contexto y decisión</CardTitle><p className="text-sm text-slate-500">Contale al equipo qué necesita resolver el cliente y qué cambio debería habilitar el servicio.</p></CardHeader>
             <CardContent className="grid gap-4 md:grid-cols-2">
@@ -312,7 +316,8 @@ export function ProfessionalScopeBuilder({ mode = "all", headless = false }: { m
               </div>
             </CardContent>
           </Card>
-
+          </div>
+          <div className="space-y-5">
           <Card>
             <CardHeader><CardTitle className="text-base">Entregables y frecuencia</CardTitle></CardHeader>
             <CardContent className="space-y-3">
@@ -339,7 +344,8 @@ export function ProfessionalScopeBuilder({ mode = "all", headless = false }: { m
               {capacityWarnings.length > 0 && <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800"><div className="flex items-center gap-2 font-medium"><AlertCircle className="h-4 w-4" /> Advertencia de capacidad</div><ul className="mt-2 list-disc space-y-1 pl-5">{capacityWarnings.map((warning) => <li key={warning}>{warning}</li>)}</ul></div>}
             </CardContent>
           </Card>
-        </>
+          </div>
+        </div>
       )}
     </div>
   );
