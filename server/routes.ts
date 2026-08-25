@@ -244,7 +244,7 @@ import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { productDefinitionsMarkdown } from "./content/product-definitions.generated";
 import { PRODUCT_DEFINITIONS_MANIFEST } from "./content/product-definitions-manifest";
 import { calculateQuotationPricing } from "@shared/utils/quotation-pricing";
-import { calculateQuotationComplexityFactor } from "@shared/utils/quotation-complexity";
+import { calculateCanonicalComplexityFactor } from "@shared/utils/quotation-complexity";
 import { calculateMarginDrift } from "@shared/utils/quotation-margin-drift";
 import {
   assertQuotationTransition,
@@ -6728,7 +6728,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const currency = quotation.quotationCurrency === "USD" ? "USD" : "ARS";
     const exchangeRate = Number(quotation.exchangeRateAtQuote);
     if (exchangeRate > 0) {
-      const complexityFactor = calculateQuotationComplexityFactor(quotation);
+      const complexityFactor = calculateCanonicalComplexityFactor({
+        mentionsVolume: quotation.mentionsVolume,
+        countriesCovered: quotation.countriesCovered,
+        hasBlueprintScope: Boolean(quotation.scopeSnapshot),
+      });
       const toolsCost = Number(quotation.toolsCost) || 0;
       const platformCost = Number(quotation.platformCost) || 0;
       const additionalDeliverableCost = Number(quotation.additionalDeliverableCost) || 0;
@@ -7142,7 +7146,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
               quotationCurrency: newCurrency,
               exchangeRate: newFx,
               team: convertedTeam,
-              complexityFactor: calculateQuotationComplexityFactor(nextQuote),
+              complexityFactor: calculateCanonicalComplexityFactor({
+                mentionsVolume: nextQuote.mentionsVolume,
+                countriesCovered: nextQuote.countriesCovered,
+                hasBlueprintScope: Boolean(nextQuote.scopeSnapshot),
+              }),
               marginFactor: Number(quotation.marginFactor) || 0,
               toolsCostUSD: newCurrency === "USD" ? toolsCost : toolsCost / newFx,
               additionalDeliverableCostUSD: newCurrency === "USD" ? additionalDeliverableCost : additionalDeliverableCost / newFx,
