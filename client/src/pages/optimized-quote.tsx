@@ -449,12 +449,14 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
         </div>
        )}
 
-       {/* Resumen (mobile, colapsable) — siempre visible, también en el paso 1, para
-           que el layout no salte de 1 a 2 columnas entre pasos. */}
-       <div className="mt-6 xl:hidden"><QuotationWorkspaceSummary currentPhase={currentStepNumber} totalSteps={6} compact /></div>
+       {/* Resumen (mobile, colapsable). Sólo desde el paso 2: en el paso 1 de una
+           cotización con receta el equipo/scope/precio todavía no están hidratados
+           (se derivan del blueprint recién al montar el paso 2), así que mostrarlo
+           acá diría "Falta configurar el equipo" sobre una cotización ya armada.
+           El resumen fijo también en el paso 1 vuelve cuando se arregle esa carga. */}
+       {currentStepNumber > 1 && <div className="mt-6 xl:hidden"><QuotationWorkspaceSummary currentPhase={currentStepNumber} totalSteps={6} compact /></div>}
 
-       {/* Contenido: siempre 2 columnas (contenido + resumen fijo) desde xl. */}
-       <div className="mt-4 grid items-start gap-6 xl:mt-6 xl:grid-cols-[minmax(0,1fr)_18rem]">
+       <div className={currentStepNumber === 1 ? 'mt-6' : 'mt-4 grid items-start gap-6 xl:mt-6 xl:grid-cols-[minmax(0,1fr)_18rem]'}>
         <main className="min-w-0 space-y-5 pb-20">
           {validationIssues.length > 0 && (
             <Alert variant="destructive" role="alert" aria-live="assertive">
@@ -595,8 +597,8 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
           </div>
         </main>
 
-        {/* Resumen fijo (desktop) — siempre, también en el paso 1, para estabilizar el layout. */}
-        <QuotationWorkspaceSummary currentPhase={currentStepNumber} totalSteps={6} />
+        {/* Resumen fijo (desktop) desde el paso 2 (ver nota sobre hidratación arriba). */}
+        {currentStepNumber > 1 && <QuotationWorkspaceSummary currentPhase={currentStepNumber} totalSteps={6} />}
       </div>
 
       <AlertDialog open={exitDialogOpen} onOpenChange={setExitDialogOpen}>
