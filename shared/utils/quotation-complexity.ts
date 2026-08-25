@@ -33,3 +33,26 @@ export function calculateQuotationComplexityFactor(input: {
     + getCountriesFactor(input.countriesCovered)
     + getClientEngagementFactor(input.clientEngagement);
 }
+
+/**
+ * Factor de complejidad CANÓNICO para el pricing. Debe coincidir exactamente con
+ * el que calcula el cliente (client/src/context/optimized-quote-context.tsx,
+ * useMemo `complexityFactors` + su suma), o la validación de snapshot del
+ * servidor (validateAndNormalizeQuotationPricing) rechaza el precio que el
+ * cliente calculó y envió, con "El importe no coincide con el cálculo canónico".
+ *
+ * Reglas (heredadas del fix de doble-conteo hecho en el cliente):
+ * - Con receta (scopeSnapshot presente): 0. La receta ya infla las horas del
+ *   equipo según volumen/cobertura (estimateBlueprintWorkload); volver a sumar
+ *   complejidad como cargo aparte en pesos duplicaba el ajuste.
+ * - Sin receta (legacy): sólo volumen de menciones + cantidad de países.
+ *   analysisType y clientEngagement NO se aplican (el cliente los tiene en 0).
+ */
+export function calculateCanonicalComplexityFactor(input: {
+  mentionsVolume: string;
+  countriesCovered: string;
+  hasBlueprintScope: boolean;
+}): number {
+  if (input.hasBlueprintScope) return 0;
+  return getMentionsVolumeFactor(input.mentionsVolume) + getCountriesFactor(input.countriesCovered);
+}
