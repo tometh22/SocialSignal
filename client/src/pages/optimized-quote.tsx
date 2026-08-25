@@ -3,7 +3,6 @@ import { useLocation, useRoute } from 'wouter';
 import { OptimizedQuoteProvider, useOptimizedQuote } from '@/context/optimized-quote-context';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -595,8 +594,18 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
                     markupAmount={markupAmount}
                     totalAmount={totalAmount}
                   />
-                   <Separator />
-                   <ExecutiveSummary />
+                   {/* La vista previa del cliente (ExecutiveSummary) es enorme y apilarla
+                       debajo de la comparación de variantes hacía que este paso fuera el
+                       que más scrolleaba. La acción principal acá es elegir el escenario;
+                       la previa es de revisión (y está también "Abrir Estudio"), así que
+                       se colapsa por defecto. */}
+                   <details className="group rounded-2xl border border-slate-200 bg-white">
+                     <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-4 text-sm font-semibold text-slate-900">
+                       <span className="flex items-center gap-2"><FileCheck2 className="h-4 w-4 text-slate-500" /> Vista previa de la propuesta (cliente)</span>
+                       <ChevronRight className="h-4 w-4 shrink-0 text-slate-400 transition-transform group-open:rotate-90" />
+                     </summary>
+                     <div className="border-t border-slate-100 p-4 sm:p-6"><ExecutiveSummary /></div>
+                   </details>
                   <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700 sm:flex-row sm:items-center sm:justify-between"><div className="flex items-start gap-3"><FileCheck2 className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" /><span>Cuando el escenario esté elegido, abrí el Estudio de Propuesta para revisar narrativa, QA y exportaciones.</span></div>{quotationData.id ? <Button type="button" size="sm" variant="outline" onClick={() => setLocation(`/quotations/${quotationData.id}/studio`)}>Abrir Estudio</Button> : null}</div>
                 </div>
               )}
