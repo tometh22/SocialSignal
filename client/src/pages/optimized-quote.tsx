@@ -37,7 +37,6 @@ import {
   Target,
   UsersRound,
 } from 'lucide-react';
-import { PageLayout } from '@/components/ui/page-layout';
 import AutosaveIndicator from '@/components/ui/autosave-indicator';
 import { useOnlineStatus } from '@/hooks/use-online-status';
 
@@ -366,80 +365,75 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
   };
 
   return (
-    <PageLayout
-      title={isEditing ? 'Editar cotización' : 'Nueva cotización'}
-      // Antes: description={`${stepMeta.title}: ${stepMeta.description}`} — repetía
-      // textualmente el encabezado del paso que ya se muestra dentro de la tarjeta
-      // ("Paso N de 6 · título · descripción"), un eco redundante en el header.
-      breadcrumbs={[
-        { label: 'Gestión de cotizaciones', href: '/manage-quotes' },
-        { label: isEditing ? 'Editar cotización' : 'Nueva cotización', current: true },
-      ]}
-      // Todo el cotizador comparte un mismo ancho de columna (header, progreso,
-      // banner de grupo y contenido) para que los bordes queden alineados. Antes
-      // el chrome ocupaba 1440px y el formulario quedaba encajonado a 1024px
-      // centrado, lo que hacía que el contenido "flotara" con aire a los costados.
-      headerClassName="max-w-6xl"
-      contentClassName="max-w-6xl"
-      actions={(
-        <div className="flex flex-wrap gap-2">
-          <Button type="button" variant="ghost" size="sm" onClick={handleExit}>
-            <ArrowLeft className="mr-1 h-4 w-4" /> Volver
-          </Button>
-          <Button type="button" variant="outline" size="sm" onClick={handleSaveDraft} disabled={isSaving}>
-            {isSaving ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Save className="mr-1 h-4 w-4" />}
-            Guardar borrador
-          </Button>
-        </div>
-      )}
-    >
-      <div className="mb-5 rounded-2xl border border-slate-200 bg-white px-4 py-4 sm:px-5">
-        <div className="mb-4 flex items-center justify-between gap-3">
-          {/* Sólo el eyebrow + autosave: el nombre del paso ya lo dan el stepper de abajo
-              y el encabezado "Paso N de 6" de la tarjeta de contenido — repetirlo acá
-              (antes "Progreso / Brief") era un eco redundante. */}
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Progreso · Paso {currentStepNumber} de 6</p>
-          <AutosaveIndicator lastSaveTime={lastAutosaveAt} status={autosaveStatus} isOnline={isOnline} />
+    <div className="min-h-full">
+      <div className="mx-auto w-full max-w-6xl pt-1">
+        {/* Cabecera aplanada: contexto + autosave + acción. Reemplaza al "hero" con
+            blobs decorativos y a la tarjeta de progreso separada — antes eran dos
+            superficies apiladas antes de llegar al contenido; ahora es una sola
+            cabecera plana, con menos "sopa de tarjetas". */}
+        <div className="flex flex-wrap items-start justify-between gap-3 pb-4">
+          <div className="min-w-0">
+            <button
+              type="button"
+              onClick={handleExit}
+              className="mb-1 inline-flex items-center gap-1 text-xs font-medium text-slate-500 transition-colors hover:text-slate-900"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" /> Cotizaciones
+            </button>
+            <h1 className="truncate text-xl font-semibold text-slate-950">
+              {isEditing ? 'Editar cotización' : 'Nueva cotización'}
+              {quotationData.id ? <span className="ml-2 font-normal text-slate-400">#{quotationData.id}</span> : null}
+            </h1>
+          </div>
+          <div className="flex items-center gap-2">
+            <AutosaveIndicator lastSaveTime={lastAutosaveAt} status={autosaveStatus} isOnline={isOnline} />
+            <Button type="button" variant="outline" size="sm" onClick={handleSaveDraft} disabled={isSaving}>
+              {isSaving ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Save className="mr-1 h-4 w-4" />}
+              Guardar borrador
+            </Button>
+          </div>
         </div>
 
-        <nav aria-label="Pasos de la cotización" className="flex min-w-0 items-center gap-1 overflow-x-auto pb-1">
-          {QUOTATION_STEPS.map((phase, index) => {
-            const Icon = PHASE_ICONS[index];
-            const isCurrent = phase.num === currentStepNumber;
-            const isComplete = phase.num < 6 && phase.num < highestVisitedPhase && validateQuotationStep(phase.num, quotationData).length === 0;
-            const isAvailable = phase.num <= highestVisitedPhase;
-            return (
-              <button
-                key={phase.num}
-                type="button"
-                onClick={() => handlePhaseNavigation(phase.num)}
-                disabled={!isAvailable || isCurrent}
-                aria-current={isCurrent ? 'step' : undefined}
-                title={`Paso ${phase.num}: ${phase.title}`}
-                className={`group flex shrink-0 items-center gap-2 rounded-lg px-2.5 py-2 text-left transition-colors lg:flex-1 lg:min-w-[8.5rem] ${
-                  isCurrent
-                    ? 'min-w-[8.5rem] flex-1 bg-slate-950 text-white'
-                    : isAvailable
-                      ? 'text-slate-700 hover:bg-slate-100'
-                      : 'cursor-not-allowed text-slate-400'
-                }`}
-              >
-                  <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition-colors ${isCurrent ? 'bg-white/15 text-white' : isComplete ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
-                    {isComplete && !isCurrent ? <Check className="h-4 w-4" /> : <Icon className="h-4 w-4" />}
-                  </span>
-                  {/* En viewports angostos sólo el paso activo muestra su etiqueta (el resto queda en ícono + tooltip) para que los 6 pasos entren sin scroll horizontal ni recorte. Desde lg todos muestran su etiqueta como antes. */}
-                  <span className={`min-w-0 ${isCurrent ? '' : 'sr-only lg:not-sr-only'}`}><span className={`block text-[10px] uppercase tracking-wide ${isCurrent ? 'text-slate-300' : 'text-slate-400'}`}>Paso {phase.num}</span><span className="block truncate text-xs font-semibold">{phase.title}</span></span>
-              </button>
-            );
-          })}
-        </nav>
-        <div className="mt-3 h-1 w-full overflow-hidden rounded-full bg-slate-100" role="progressbar" aria-valuenow={currentStepNumber} aria-valuemin={1} aria-valuemax={6} aria-label="Progreso de la cotización">
-          <div className="h-full rounded-full bg-slate-950 transition-[width] duration-500 ease-out" style={{ width: `${(currentStepNumber / 6) * 100}%` }} />
+        {/* Stepper plano (sin tarjeta), separado del contenido sólo por un borde inferior. */}
+        <div className="border-b border-slate-200 pb-4">
+          <nav aria-label="Pasos de la cotización" className="flex min-w-0 items-center gap-1 overflow-x-auto pb-1">
+            {QUOTATION_STEPS.map((phase, index) => {
+              const Icon = PHASE_ICONS[index];
+              const isCurrent = phase.num === currentStepNumber;
+              const isComplete = phase.num < 6 && phase.num < highestVisitedPhase && validateQuotationStep(phase.num, quotationData).length === 0;
+              const isAvailable = phase.num <= highestVisitedPhase;
+              return (
+                <button
+                  key={phase.num}
+                  type="button"
+                  onClick={() => handlePhaseNavigation(phase.num)}
+                  disabled={!isAvailable || isCurrent}
+                  aria-current={isCurrent ? 'step' : undefined}
+                  title={`Paso ${phase.num}: ${phase.title}`}
+                  className={`group flex shrink-0 items-center gap-2 rounded-lg px-2.5 py-2 text-left transition-colors lg:flex-1 lg:min-w-[8.5rem] ${
+                    isCurrent
+                      ? 'min-w-[8.5rem] flex-1 bg-slate-950 text-white'
+                      : isAvailable
+                        ? 'text-slate-700 hover:bg-slate-100'
+                        : 'cursor-not-allowed text-slate-400'
+                  }`}
+                >
+                    <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition-colors ${isCurrent ? 'bg-white/15 text-white' : isComplete ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+                      {isComplete && !isCurrent ? <Check className="h-4 w-4" /> : <Icon className="h-4 w-4" />}
+                    </span>
+                    {/* En viewports angostos sólo el paso activo muestra su etiqueta (el resto queda en ícono + tooltip) para que los 6 pasos entren sin scroll horizontal ni recorte. Desde lg todos muestran su etiqueta como antes. */}
+                    <span className={`min-w-0 ${isCurrent ? '' : 'sr-only lg:not-sr-only'}`}><span className={`block text-[10px] uppercase tracking-wide ${isCurrent ? 'text-slate-300' : 'text-slate-400'}`}>Paso {phase.num}</span><span className="block truncate text-xs font-semibold">{phase.title}</span></span>
+                </button>
+              );
+            })}
+          </nav>
+          <div className="mt-3 h-1 w-full overflow-hidden rounded-full bg-slate-100" role="progressbar" aria-valuenow={currentStepNumber} aria-valuemin={1} aria-valuemax={6} aria-label="Progreso de la cotización">
+            <div className="h-full rounded-full bg-slate-950 transition-[width] duration-500 ease-out" style={{ width: `${(currentStepNumber / 6) * 100}%` }} />
+          </div>
         </div>
-      </div>
 
        {leadOrigin && (
-        <div className="mb-4 flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+        <div className="mt-6 flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
           <Target className="h-5 w-5 shrink-0 text-slate-500" />
           <span className="flex-1 text-sm text-slate-700">
             Esta cotización quedará vinculada al lead{leadOrigin.leadName ? <> <strong>{leadOrigin.leadName}</strong></> : ''}.
@@ -449,15 +443,18 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
        )}
 
        {groupWorkspace && currentGroupItem && (
-        <div className="mb-4 flex flex-col gap-3 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 sm:flex-row sm:items-center">
-          <div className="flex min-w-0 flex-1 items-center gap-3"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-indigo-700 text-xs font-bold text-white">{currentGroupIndex + 1}/{groupWorkspace.items.length}</span><div className="min-w-0"><p className="truncate text-sm font-semibold text-indigo-950">{groupWorkspace.client?.name} · Propuesta {currentGroupIndex + 1} de {groupWorkspace.items.length}</p><p className="truncate text-xs text-indigo-700">{currentGroupItem.projectName}</p></div></div>
+        <div className="mt-6 flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 sm:flex-row sm:items-center">
+          <div className="flex min-w-0 flex-1 items-center gap-3"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-900 text-xs font-bold text-white">{currentGroupIndex + 1}/{groupWorkspace.items.length}</span><div className="min-w-0"><p className="truncate text-sm font-semibold text-slate-900">{groupWorkspace.client?.name} · Propuesta {currentGroupIndex + 1} de {groupWorkspace.items.length}</p><p className="truncate text-xs text-slate-500">{currentGroupItem.projectName}</p></div></div>
           <Button type="button" size="sm" variant="outline" onClick={() => setLocation(`/quotation-groups/${groupId}`)}>Ver panel del grupo</Button>
         </div>
        )}
 
-       {currentStepNumber > 1 && <div className="mb-4"><QuotationWorkspaceSummary currentPhase={currentStepNumber} totalSteps={6} compact /></div>}
+       {/* Resumen (mobile, colapsable) — siempre visible, también en el paso 1, para
+           que el layout no salte de 1 a 2 columnas entre pasos. */}
+       <div className="mt-6 xl:hidden"><QuotationWorkspaceSummary currentPhase={currentStepNumber} totalSteps={6} compact /></div>
 
-       <div className={currentStepNumber === 1 ? '' : 'grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_18rem]'}>
+       {/* Contenido: siempre 2 columnas (contenido + resumen fijo) desde xl. */}
+       <div className="mt-4 grid items-start gap-6 xl:mt-6 xl:grid-cols-[minmax(0,1fr)_18rem]">
         <main className="min-w-0 space-y-5 pb-20">
           {validationIssues.length > 0 && (
             <Alert variant="destructive" role="alert" aria-live="assertive">
@@ -473,8 +470,9 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
 
           <section aria-labelledby="quotation-phase-title" className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
             <header className="border-b border-slate-100 bg-slate-50/70 px-5 py-4 sm:px-6">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">Paso {currentStepNumber} de 6</p>
-              <h2 id="quotation-phase-title" className="mt-1 text-xl font-semibold text-slate-950">{stepMeta.title}</h2>
+              {/* El "Paso N de 6" en mayúscula que estaba acá ya lo comunica el stepper
+                  de arriba; se quita para no repetir la etiqueta ni sumar ruido. */}
+              <h2 id="quotation-phase-title" className="text-lg font-semibold text-slate-950">{stepMeta.title}</h2>
               <p className="mt-1 text-sm text-slate-500">{stepMeta.description}</p>
             </header>
 
@@ -575,7 +573,7 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
                   />
                    <Separator />
                    <ExecutiveSummary />
-                  <div className="flex flex-col gap-3 rounded-xl border border-indigo-200 bg-indigo-50 p-4 text-sm text-indigo-900 sm:flex-row sm:items-center sm:justify-between"><div className="flex items-start gap-3"><FileCheck2 className="mt-0.5 h-4 w-4 shrink-0 text-indigo-600" /><span>Cuando el escenario esté elegido, abrí el Estudio de Propuesta para revisar narrativa, QA y exportaciones.</span></div>{quotationData.id ? <Button type="button" size="sm" variant="outline" onClick={() => setLocation(`/quotations/${quotationData.id}/studio`)}>Abrir Estudio</Button> : null}</div>
+                  <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700 sm:flex-row sm:items-center sm:justify-between"><div className="flex items-start gap-3"><FileCheck2 className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" /><span>Cuando el escenario esté elegido, abrí el Estudio de Propuesta para revisar narrativa, QA y exportaciones.</span></div>{quotationData.id ? <Button type="button" size="sm" variant="outline" onClick={() => setLocation(`/quotations/${quotationData.id}/studio`)}>Abrir Estudio</Button> : null}</div>
                 </div>
               )}
               </React.Suspense>
@@ -597,7 +595,8 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
           </div>
         </main>
 
-        {currentStepNumber > 1 && <QuotationWorkspaceSummary currentPhase={currentStepNumber} totalSteps={6} />}
+        {/* Resumen fijo (desktop) — siempre, también en el paso 1, para estabilizar el layout. */}
+        <QuotationWorkspaceSummary currentPhase={currentStepNumber} totalSteps={6} />
       </div>
 
       <AlertDialog open={exitDialogOpen} onOpenChange={setExitDialogOpen}>
@@ -616,7 +615,8 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </PageLayout>
+      </div>
+    </div>
   );
 };
 
