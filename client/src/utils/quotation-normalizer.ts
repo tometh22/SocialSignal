@@ -18,7 +18,7 @@ function toNative(amountUSD: number, native: Currency, fx: FxRates): number {
  * 
  * This prevents currency mismatches that break budget utilization, markup, and margin calculations.
  */
-export function normalizeQuotation(q: any, native: Currency, fxRate: number = 1345) {
+export function normalizeQuotation(q: any, native: Currency, fxRate: number = 1200) {
   if (!q) return null;
   
   const fx = { usd_ars: fxRate };

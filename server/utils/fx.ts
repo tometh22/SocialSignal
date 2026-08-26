@@ -5,33 +5,16 @@
  */
 
 import { parseMoneyUnified, detectAntiX100Generic } from "./money";
+import { fxForMonth } from "../services/fx";
 
 // Tabla de cotizaciones mensuales ARS/USD
-const FX_RATES: Record<string, number> = {
-  '2024-12': 1020,
-  '2025-01': 1050,
-  '2025-02': 1080,
-  '2025-03': 1110,
-  '2025-04': 1140,
-  '2025-05': 1170,
-  '2025-06': 1200,
-  '2025-07': 1230,
-  '2025-08': 1260,
-  '2025-09': 1290,
-  '2025-10': 1320,
-  '2025-11': 1350,
-  '2025-12': 1380,
-};
-
-const FALLBACK_RATE = 1300; // Cotización fallback si no existe el período
-
 /**
  * Obtiene la cotización ARS/USD para un período específico
  * @param period YYYY-MM format
  * @returns ARS/USD exchange rate
  */
 export function getFxRate(period: string): number {
-  return FX_RATES[period] || FALLBACK_RATE;
+  return fxForMonth(period);
 }
 
 /**

@@ -2,8 +2,6 @@
 // MOTOR ÚNICO: Todas las rutas usan computeProjectPeriodMetrics()
 
 import { Express } from 'express';
-import { projectsRouter } from './projects';
-import { projectRouter } from './project';
 import { deviationRouter } from './deviation';
 import { rankingsRouter } from './rankings';
 import { completeDataHandler } from './complete-data';
@@ -18,7 +16,7 @@ export function setupUniversalRoutes(app: Express, requireAuth: any) {
   
   // Integrar todas las rutas universales
   // app.use('/api/projects', projectsRouter);          // COMENTADO: Conflicto con handleProjectsRequest en línea 692 de routes.ts
-  app.get('/api/projects/:id/complete-data', completeDataHandler);  // ÚNICA RUTA COMPLETE-DATA (fix quirúrgico)
+  app.get('/api/projects/:id/complete-data', completeDataHandler);  // ÚNICA RUTA COMPLETE-DATA
   app.use('/api/projects', deviationRouter);         // GET /api/projects/:id/deviation-analysis  
   app.use('/api/projects', rankingsRouter);          // GET /api/projects/:id/performance-rankings
 

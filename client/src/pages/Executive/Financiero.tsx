@@ -36,13 +36,20 @@ interface FinancieroData {
     margen: string;
     burnRate: string;
     beneficioNeto: string;
+    cashflowNeto: string;
   };
   source: {
     facturado: string;
     directos: string;
     overhead: string;
     provisiones: string;
+    cash: string;
+    cajaTotal: string;
   };
+  cashInUsd: number;
+  cashOutUsd: number;
+  cashFlowNetoUsd: number;
+  cajaTotalUsd: number;
 }
 
 interface CashflowData {
@@ -116,28 +123,30 @@ interface ExecutiveFinancieroProps {
 
 export default function ExecutiveFinanciero({ period }: ExecutiveFinancieroProps) {
   const { data, isLoading, error } = useQuery<FinancieroData>({
-    queryKey: ['/api/v1/executive/financiero', period],
+    queryKey: ['/api/v1/executive/finanzas', period],
     queryFn: async () => {
       const url = period 
-        ? `/api/v1/executive/financiero?period=${period}` 
-        : '/api/v1/executive/financiero';
+        ? `/api/v1/executive/finanzas?period=${period}`
+        : '/api/v1/executive/finanzas';
       const res = await authFetch(url);
       if (!res.ok) throw new Error('Failed to fetch financiero data');
       return res.json();
     }
   });
   
-  const { data: cashflow } = useQuery<CashflowData>({
-    queryKey: ['/api/v1/executive/cashflow', period],
-    queryFn: async () => {
-      const url = period 
-        ? `/api/v1/executive/cashflow?period=${period}` 
-        : '/api/v1/executive/cashflow';
-      const res = await authFetch(url);
-      if (!res.ok) throw new Error('Failed to fetch cashflow data');
-      return res.json();
-    }
-  });
+  // Cash flow is part of the canonical /finanzas response. Keeping a single
+  // request avoids calling the removed legacy /cashflow endpoint.
+  const cashflow: CashflowData | null = data ? {
+    periodKey: data.periodKey,
+    label: data.label,
+    cashInUsd: data.cashInUsd,
+    cashOutUsd: data.cashOutUsd,
+    cashFlowNetoUsd: data.cashFlowNetoUsd,
+    cajaTotalUsd: data.cajaTotalUsd,
+    movementCount: 0,
+    formula: { neto: data.formula.cashflowNeto },
+    source: { movements: data.source.cash, cajaTotal: data.source.cajaTotal },
+  } : null;
   
   if (error) {
     return (

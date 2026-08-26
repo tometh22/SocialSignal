@@ -6,6 +6,11 @@
 // Imports para compatibilidad con código existente
 import { parseDec } from './number';
 import { TimeFilter } from './time';
+import { db } from '../db';
+import { exchangeRates } from '@shared/schema';
+import { and, desc, eq } from 'drizzle-orm';
+
+export const DEFAULT_FX_RATE = 1200;
 
 /**
  * Tabla de FX por mes (agregar según se necesite)
@@ -71,8 +76,35 @@ export function fxForMonth(monthKey: string): number {
   }
   
   // 3. Fallback conservador
-  console.warn(`⚠️ FX: No rate found for ${monthKey}, using fallback 1200`);
-  return 1200;
+  console.warn(`⚠️ FX: No rate found for ${monthKey}, using canonical fallback ${DEFAULT_FX_RATE}`);
+  return DEFAULT_FX_RATE;
+}
+
+/**
+ * Canonical asynchronous resolver used by ETL/import paths. Database values
+ * win over compatibility tables; the single fallback is explicit and logged.
+ */
+export async function getCanonicalFxForMonth(monthKey: string): Promise<number> {
+  const match = /^(\d{4})-(\d{2})$/.exec(monthKey);
+  if (!match) throw new Error(`Período FX inválido: ${monthKey}`);
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  try {
+    const [row] = await db.select({ rate: exchangeRates.rate })
+      .from(exchangeRates)
+      .where(and(
+        eq(exchangeRates.year, year),
+        eq(exchangeRates.month, month),
+        eq(exchangeRates.isActive, true),
+      ))
+      .orderBy(desc(exchangeRates.updatedAt))
+      .limit(1);
+    const databaseRate = Number(row?.rate);
+    if (Number.isFinite(databaseRate) && databaseRate > 0) return databaseRate;
+  } catch (error) {
+    console.warn(`⚠️ FX: no se pudo leer exchange_rates para ${monthKey}; se usa la tabla compatible`, error);
+  }
+  return fxForMonth(monthKey);
 }
 
 /**
@@ -101,7 +133,7 @@ export function fxForRow(period: TimeFilter, row: any): number {
   if (periodFX > 0) return periodFX;
   
   // 3. Fallback conservador
-  return 1200; // Aumentado para coincidir con nueva tabla
+  return DEFAULT_FX_RATE;
 }
 
 /**
@@ -119,7 +151,7 @@ export async function getFX(period: TimeFilter): Promise<number> {
   
   // Fallback a lógica original mejorada
   const year = parseInt(period.start.split('-')[0]);
-  if (year >= 2025) return 1200; // Actualizado para coincidir con tabla
+  if (year >= 2025) return DEFAULT_FX_RATE;
   if (year >= 2024) return 1190; // Actualizado para coincidir con tabla
   return 1150; // Fallback histórico actualizado
 }
@@ -139,7 +171,7 @@ export function getFXSync(period: TimeFilter): number {
   
   // Fallback a lógica original mejorada
   const year = parseInt(period.start.split('-')[0]);
-  if (year >= 2025) return 1200; // Actualizado para coincidir con tabla
+  if (year >= 2025) return DEFAULT_FX_RATE;
   if (year >= 2024) return 1190; // Actualizado para coincidir con tabla  
   return 1150; // Fallback histórico actualizado
 }

@@ -7,6 +7,7 @@ import { db } from '../db';
 import { financialSot } from '../../shared/schema';
 import { eq, and, inArray, sql } from 'drizzle-orm';
 import { canonicalizeKey } from './shared/strings';
+import { DEFAULT_FX_RATE, getCanonicalFxForMonth } from '../services/fx';
 
 export interface FinancialProjectMetrics {
   projectKey: string;
@@ -76,10 +77,12 @@ export async function aggregateFinancialProjects(
     console.log(`📊 FINANCIAL AGGREGATOR: Retrieved ${rows.length} rows from financial_sot`);
 
     // Procesar cada fila
-    const projects: FinancialProjectMetrics[] = rows.map(row => {
+    const projects: FinancialProjectMetrics[] = await Promise.all(rows.map(async row => {
       const revenueUSD = Number(row.revenueUsd) || 0;
       const costUSD = Number(row.costUsd) || 0;
-      const fx = Number(row.fx) || 1345;
+      const fx = Number(row.fx) || (row.monthKey
+        ? await getCanonicalFxForMonth(row.monthKey)
+        : DEFAULT_FX_RATE);
       
       // Determinar moneda nativa
       const currencyNative = isUSDNative(row.clientName) ? 'USD' : 'ARS';
@@ -112,7 +115,7 @@ export async function aggregateFinancialProjects(
           markup,
         },
       };
-    });
+    }));
 
     console.log(`✅ FINANCIAL AGGREGATOR: Processed ${projects.length} projects`);
     return projects;

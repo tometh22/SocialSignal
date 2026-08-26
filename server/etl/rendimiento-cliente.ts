@@ -8,6 +8,7 @@ import { financialSot } from '../../shared/schema';
 import { sql } from 'drizzle-orm';
 import { googleSheetsWorkingService } from '../services/googleSheetsWorking';
 import { parseNumberRobust } from '../utils/number';
+import { getCanonicalFxForMonth } from '../services/fx';
 
 interface RendimientoClienteRow {
   Cliente?: string;
@@ -133,9 +134,10 @@ async function getFXForMonth(year: number, monthNum: number): Promise<number> {
     return Number(result.rows[0].rate);
   }
   
-  // Fallback: usar 1345 (promedio histórico)
-  console.warn(`⚠️ No se encontró FX para ${year}-${String(monthNum).padStart(2, '0')}, usando 1345`);
-  return 1345;
+  const monthKey = `${year}-${String(monthNum).padStart(2, '0')}`;
+  const fallback = await getCanonicalFxForMonth(monthKey);
+  console.warn(`⚠️ No se encontró FX directo para ${monthKey}; usando resolver canónico ${fallback}`);
+  return fallback;
 }
 
 /**

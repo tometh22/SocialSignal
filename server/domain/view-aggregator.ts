@@ -11,6 +11,7 @@
 import { db } from '../db';
 import { projectAggregates, projectPeriods, factLaborMonth, factRCMonth, personnel, type ViewType } from '@shared/schema';
 import { eq, and, sql, inArray } from 'drizzle-orm';
+import { DEFAULT_FX_RATE, getCanonicalFxForMonth } from '../services/fx';
 
 interface ViewModelOutput {
   currencyNative: string;
@@ -406,7 +407,7 @@ export async function getProjectPeriodView(
   
   const fxMes = viewData.currency === 'ARS' && viewData.revenue && (viewData.revenueUsd || viewData.revenueUSD)
     ? viewData.revenue / (viewData.revenueUsd || viewData.revenueUSD)
-    : 1345;
+    : await getCanonicalFxForMonth(periodKey).catch(() => DEFAULT_FX_RATE);
   
   const hydrateMember = (m: any) => {
     // Helper: parsea a número válido o retorna null si inválido

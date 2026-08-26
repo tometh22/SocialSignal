@@ -352,7 +352,7 @@ export const CostDashboard: React.FC<CostDashboardProps> = ({ projectId, timeFil
                       
                       {/* COSTO ARS: USD convertido a pesos argentinos */}
                       <td className="px-4 py-2 text-sm text-right font-mono font-medium text-blue-600">
-                        {formatCurrency((record.montoTotalUSD || 0) * (record.tipoCambio || 1345), 'ARS')}
+                        {formatCurrency((record.montoTotalUSD || 0) * (record.tipoCambio || 0), 'ARS')}
                       </td>
                       {/* COSTO USD: Valor original en dólares */}
                       <td className="px-4 py-2 text-sm text-right font-mono font-medium text-green-600">
