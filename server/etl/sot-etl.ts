@@ -10,6 +10,7 @@ import { toPeriodKey, normKey, parseNum, prefer, normHours, needsAntiX100, gener
 import { resolveRCRow } from './sot-project-resolver';
 import { updateProvisionsinFactCostMonth, getProvisionSummaryByPeriod } from './provisions';
 import { normalizeContractualRateToARS } from '../domain/currency-normalization';
+import { DEFAULT_FX_RATE } from '../services/fx';
 
 // Dynamic import (evita ciclo estático: time-entries-to-fact-labor.ts importa
 // `ensurePeriod` de este archivo). Cutover de Excel→App: períodos >= cutover
@@ -1192,7 +1193,7 @@ export async function processRendimientoClienteToFactRC(rows: RendimientoCliente
       
       // quoteNative: precio/cotización del proyecto (denominador presupuesto)
       // Usa revenue en moneda nativa como precio del proyecto
-      const isUSDProject = revenueUSD > 0 && (revenueARS === 0 || revenueUSD > (revenueARS / (fxRate || 1300)));
+      const isUSDProject = revenueUSD > 0 && (revenueARS === 0 || revenueUSD > (revenueARS / (fxRate || DEFAULT_FX_RATE)));
       const quoteNative = isUSDProject ? revenueUSD : revenueARS;
       
       // DEPRECATED: mantener fx para compatibilidad

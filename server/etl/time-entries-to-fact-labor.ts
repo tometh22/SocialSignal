@@ -112,6 +112,8 @@ export async function buildFactLaborFromTimeEntries(
       projectId: timeEntries.projectId,
       personnelId: timeEntries.personnelId,
       hours: timeEntries.hours,
+      entryDate: timeEntries.date,
+      description: timeEntries.description,
       totalCost: timeEntries.totalCost,
       hourlyRateAtTime: timeEntries.hourlyRateAtTime,
       billable: timeEntries.billable,
@@ -140,8 +142,20 @@ export async function buildFactLaborFromTimeEntries(
 
   // Group by (projectId, personnelId)
   const aggregates = new Map<string, Aggregate>();
+  const seenEntryKeys = new Set<string>();
+  const entryFingerprint = (row: {
+    projectId: number;
+    personnelId: number;
+    entryDate: Date;
+    hours: number;
+    description: string | null;
+  }) => {
+    const day = new Date(row.entryDate).toISOString().slice(0, 10);
+    return [row.projectId, row.personnelId, day, Number(row.hours).toFixed(4), (row.description ?? '').trim().toLowerCase()].join('|');
+  };
 
   for (const row of rows) {
+    seenEntryKeys.add(entryFingerprint(row));
     const key = `${row.projectId}::${row.personnelId}`;
     const projectName =
       row.quotationProjectName ||
@@ -187,6 +201,8 @@ export async function buildFactLaborFromTimeEntries(
       projectId: tasks.projectId,
       personnelId: taskTimeEntries.personnelId,
       hours: taskTimeEntries.hours,
+      entryDate: taskTimeEntries.date,
+      description: taskTimeEntries.description,
       totalCost: taskTimeEntries.totalCost,
       hourlyRateAtTime: taskTimeEntries.hourlyRateAtTime,
       billable: taskTimeEntries.billable,
@@ -212,6 +228,15 @@ export async function buildFactLaborFromTimeEntries(
 
   for (const row of taskRows) {
     if (row.projectId == null) continue;
+    // A user can enter the same work from the legacy hours screen and the
+    // Tasks module. Keep the legacy row as the canonical one when the two
+    // entries have the same project/person/day/hours/description fingerprint.
+    const fingerprint = entryFingerprint({ ...row, projectId: row.projectId });
+    if (seenEntryKeys.has(fingerprint)) {
+      console.warn(`[time-entries-to-fact-labor] duplicate legacy/task entry skipped for project=${row.projectId}, personnel=${row.personnelId}, date=${new Date(row.entryDate).toISOString().slice(0, 10)}`);
+      continue;
+    }
+    seenEntryKeys.add(fingerprint);
     const key = `${row.projectId}::${row.personnelId}`;
     const projectName =
       row.quotationProjectName ||

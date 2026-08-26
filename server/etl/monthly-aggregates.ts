@@ -22,6 +22,7 @@ import {
   type ViewType
 } from '@shared/schema';
 import { eq, and } from 'drizzle-orm';
+import { getCanonicalFxForMonth } from '../services/fx';
 
 interface RawPeriodData {
   projectKey: string;
@@ -192,6 +193,7 @@ export async function processProjectPeriod(periodKey: string) {
   console.log(`📊 Procesando período ${periodKey}...`);
   
   const [year, month] = periodKey.split('-').map(Number);
+  const canonicalFx = await getCanonicalFxForMonth(periodKey);
   
   // 1. Obtener datos de financialSot
   const financialRows = await db.select()
@@ -231,7 +233,7 @@ export async function processProjectPeriod(periodKey: string) {
       costUSD: parseFloat(row.costUsd || '0'), // Costos (USD) - columna H
       costARS: parseFloat(row.costArs || '0'), // Costos [ARS] - columna K
       quotation: parseFloat(row.quotation || '0') || null, // Cotización - columna F
-      fxMonth: parseFloat(row.fx || '1345'),
+      fxMonth: parseFloat(row.fx || '') || canonicalFx,
       laborRows: []
     });
   }
@@ -244,7 +246,7 @@ export async function processProjectPeriod(periodKey: string) {
     
     if (!projectMap.has(key)) {
       // Proyecto solo en costos, sin revenue en financialSot
-      const fx = parseFloat(row.tipoCambio || row.fxCost || '1345');
+      const fx = parseFloat(row.tipoCambio || row.fxCost || '') || canonicalFx;
       projectMap.set(key, {
         projectKey: key,
         clientName: row.cliente || 'Sin cliente',
@@ -281,7 +283,7 @@ export async function processProjectPeriod(periodKey: string) {
         hourlyRateARS: parseFloat(row.valorHoraLocalCurrency || '0'),
         costTotal: 0,
         costUSD: 0,
-        fx: parseFloat(row.tipoCambio || row.fxCost || '1345'),
+        fx: parseFloat(row.tipoCambio || row.fxCost || '') || canonicalFx,
         flags: []
       });
     }

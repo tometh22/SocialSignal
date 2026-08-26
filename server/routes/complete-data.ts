@@ -10,6 +10,7 @@ import { activeProjects, quotations, clients } from '../../shared/schema';
 import { eq, and } from 'drizzle-orm';
 import { ActiveProjectsAggregator } from '../domain/projectsActive';
 import { storage } from '../storage';
+import { DEFAULT_FX_RATE, getCanonicalFxForMonth } from '../services/fx';
 
 
 /**
@@ -65,7 +66,8 @@ async function resolveProjectKey(projectKey: string): Promise<number | null> {
 /**
  * Project detail is also consumed by team members.  Hiding the Finanzas tab in
  * the client is not enough: the complete-data endpoint must not serialize
- * prices, costs, rates, revenue or margin data to a non-Operations user.
+ * prices, costs, rates, revenue or margin data to a user without a financial
+ * audience (Operations, Finance or Dashboard).
  */
 function redactFinancialProjectData(payload: any, canSeeFinancials: boolean) {
   if (canSeeFinancials) return payload;
@@ -178,7 +180,9 @@ export async function completeDataHandler(req: Request, res: Response) {
     const canSeeFinancials = Boolean(
       currentUser?.isAdmin ||
       currentUser?.role === "admin" ||
-      (Array.isArray(currentUser?.permissions) && currentUser.permissions.includes("operations")),
+      (Array.isArray(currentUser?.permissions) && currentUser.permissions.some((permission: string) =>
+        ["operations", "finance", "dashboard"].includes(permission),
+      )),
     );
     const projectId = String(req.params.id ?? req.query.projectId ?? '');
     const timeFilterQuery = String(req.query.timeFilter ?? '');
@@ -627,9 +631,12 @@ export async function completeDataHandler(req: Request, res: Response) {
       return val;
     };
 
+    const fallbackFx = period !== 'all'
+      ? await getCanonicalFxForMonth(period).catch(() => DEFAULT_FX_RATE)
+      : DEFAULT_FX_RATE;
     const fxMes = sotSummary?.currencyNative === 'ARS' && sotSummary?.revenueUSD && sotSummary?.revenueDisplay
       ? sotSummary.revenueDisplay / sotSummary.revenueUSD
-      : 1345;
+      : fallbackFx;
 
     const hydrateMember = (m: any) => {
       const safeNum = (val: any): number | null => {
@@ -689,7 +696,7 @@ export async function completeDataHandler(req: Request, res: Response) {
     const correctMarginRatio = sotSummary?.margin ?? (summary.revenueUSD > 0 ? ((summary.revenueUSD - summary.teamCostUSD) / summary.revenueUSD) : 0);
 
     const currencyNative = summary.currencyNative || 'ARS';
-    const fxRate = 1345;
+    const fxRate = fallbackFx;
 
     let totalAmountNative = quotationData?.totalAmount || 0;
     let cotizacion = totalAmountNative;

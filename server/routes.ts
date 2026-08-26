@@ -184,6 +184,7 @@ import { setupChat } from "./chat";
 import { googleSheetsServiceAlternative } from "./services/googleSheetsServiceAlternative";
 import { googleSheetsWorkingService } from "./services/googleSheetsWorking";
 import { autoSyncService } from "./services/autoSyncService";
+import { DEFAULT_FX_RATE, getCanonicalFxForMonth } from "./services/fx";
 import { 
   pickAnalysisCurrency, 
   createAnalysisStructure, 
@@ -2054,10 +2055,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   };
 
 
-  // RUTA RESTAURADA TEMPORALMENTE PARA DEBUG
-  const { completeDataHandler } = await import('./routes/complete-data');
-  app.get('/api/projects/:id/complete-data', requireAuth, completeDataHandler);
-
   // 📊 ENDPOINT: Project Lifetime Metrics (for one-shot projects)
   const { lifetimeMetricsHandler } = await import('./routes/lifetime-metrics');
   app.get('/api/projects/:id/lifetime-metrics', requireAuth, lifetimeMetricsHandler);
@@ -3411,6 +3408,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         };
         return monthMap[monthLower] || monthLower.slice(0, 3);
       };
+      const monthNumberByShort: Record<string, number> = {
+        ene: 1, feb: 2, mar: 3, abr: 4, may: 5, jun: 6,
+        jul: 7, ago: 8, sep: 9, oct: 10, nov: 11, dic: 12,
+      };
 
       for (const sale of salesData) {
         const usdAmount = Number(sale.amountUsd ?? 0) || 0;
@@ -3435,7 +3436,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
               const fallbackRate = tiposCambio
                 .filter(tc => normalizeMonth(tc.mes) === normalizedSaleMonth)
                 .sort((a, b) => b.año - a.año)[0];
-              realExchangeRate = fallbackRate?.tipoCambio || 1300;
+              const monthNumber = monthNumberByShort[normalizedSaleMonth];
+              realExchangeRate = fallbackRate?.tipoCambio || await getCanonicalFxForMonth(
+                `${sale.year}-${String(monthNumber || 1).padStart(2, '0')}`,
+              );
               console.log(`⚠️ Using fallback exchange rate for ${sale.month}/${sale.year}: ${realExchangeRate} (from ${fallbackRate?.año || 'default'})`);
             }
 
@@ -3443,8 +3447,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             console.log(`💱 ARS Sale: ARS $${localAmount} → USD $${convertedUsd.toFixed(2)} (rate: ${realExchangeRate}) for ${sale.clientName}-${sale.projectName} (${sale.month}/${sale.year})`);
             totalRealRevenue += convertedUsd;
           } catch (error) {
-            console.warn(`⚠️ Error getting exchange rate for ${sale.month}/${sale.year}, using fallback 1300:`, error);
-            const fallbackUsd = localAmount / 1300;
+            console.warn(`⚠️ Error getting exchange rate for ${sale.month}/${sale.year}, using canonical fallback:`, error);
+            const fallbackUsd = localAmount / DEFAULT_FX_RATE;
             console.log(`💱 ARS Sale (fallback): ARS $${localAmount} → USD $${fallbackUsd.toFixed(2)} for ${sale.clientName}-${sale.projectName}`);
             totalRealRevenue += fallbackUsd;
           }
@@ -9213,7 +9217,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const parsePeriodo = (raw: unknown) =>
     typeof raw === 'string' && /^\d{4}-(0[1-9]|1[0-2])$/.test(raw) ? raw : null;
 
-  app.get("/api/v2/executive/costs", requireAuth, async (req, res) => {
+  app.get("/api/v2/executive/costs", requireAuth, requirePermission("dashboard", "finance"), async (req, res) => {
     const year = Number(req.query.year ?? new Date().getFullYear());
     if (!Number.isInteger(year) || year < 2020 || year > 2100) {
       return res.status(400).json({ message: "year inválido" });
@@ -9228,7 +9232,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/v2/executive/recurring", requireAuth, async (req, res) => {
+  app.get("/api/v2/executive/recurring", requireAuth, requirePermission("dashboard", "finance"), async (req, res) => {
     try {
       const svc = await import('./services/recurring-revenue');
       const disponibles = await svc.getPeriodosDisponibles();
@@ -9242,7 +9246,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/v2/executive/rendimiento", requireAuth, async (req, res) => {
+  app.get("/api/v2/executive/rendimiento", requireAuth, requirePermission("dashboard", "finance"), async (req, res) => {
     try {
       const svc = await import('./services/recurring-revenue');
       const disponibles = await svc.getPeriodosDisponibles();
@@ -9258,7 +9262,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Ejecutado vs proyectado del ejercicio. Reemplaza la página "Proyección
   // (resumen)" del Looker Studio, leyendo la misma solapa del Excel MAESTRO.
-  app.get("/api/v2/executive/proyeccion", requireAuth, async (req, res) => {
+  app.get("/api/v2/executive/proyeccion", requireAuth, requirePermission("dashboard", "finance"), async (req, res) => {
     const year = Number(req.query.year ?? new Date().getFullYear());
     if (!Number.isInteger(year) || year < 2020 || year > 2100) {
       return res.status(400).json({ message: "year inválido" });
@@ -9273,7 +9277,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/v2/executive/dashboard", requireAuth, async (req, res) => {
+  app.get("/api/v2/executive/dashboard", requireAuth, requirePermission("dashboard", "finance"), async (req, res) => {
     try {
       const p = (k: string) => { const v = parseInt(req.query[k] as string); return isNaN(v) ? undefined : v; };
       const year = p('year');
@@ -9304,7 +9308,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // 📊 MANUAL TRIGGER: ETL Resumen Ejecutivo → monthly_financial_summary
   let resumenSyncInProgress = false;
-  app.post("/api/trigger-resumen-ejecutivo-sync", requireAuth, async (req, res) => {
+  app.post("/api/trigger-resumen-ejecutivo-sync", requireAuth, requirePermission("admin"), async (req, res) => {
     if (resumenSyncInProgress) {
       return res.json({ success: true, skipped: true, message: 'Sync already in progress' });
     }
@@ -14281,7 +14285,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Crear un nuevo entregable
   app.post("/api/deliverables", requireAuth, async (req, res) => {
     try {
-      const validatedData = insertDeliverableSchema.parse(req.body);
+      const validatedData = insertDeliverableSchema.parse({
+        ...req.body,
+        createdBy: (req.user as any)?.id ?? null,
+      });
       const deliverable = await storage.createDeliverable(validatedData);
       res.status(201).json(deliverable);
     } catch (error) {
@@ -14778,30 +14785,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/deliverables", requireAuth, async (req, res) => {
-    try {
-      const currentUser = req.user as any;
-      if (!currentUser) {
-        return res.status(401).json({ message: "Acceso no autorizado" });
-      }
-
-      // Validar datos
-      const schema = insertDeliverableSchema.parse({
-        ...req.body,
-        createdBy: currentUser.id
-      });
-
-      const deliverable = await storage.createDeliverable(schema);
-      res.status(201).json(deliverable);
-    } catch (error) {
-      console.error("Error al crear entregable:", error);
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ errors: error.errors });
-      }
-      res.status(500).json({ message: "Error al crear entregable" });
-    }
-  });
-
   app.put("/api/deliverables/:id", requireAuth, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
@@ -15158,11 +15141,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Crear nuevo registro rápido de tiempo
-  app.post("/api/projects/:id/quick-time-entries", requireAuth, async (req, res) => {
+  app.post("/api/projects/:id/quick-time-entries", requireAuth, requirePermission("operations"), async (req, res) => {
     try {
       const projectId = parseInt(req.params.id);
       if (isNaN(projectId)) {
         return res.status(400).json({ message: "Invalid project ID" });
+      }
+      if (!(await canAccessTaskProject(req, projectId))) {
+        return res.status(403).json({ message: "No tenés acceso a este proyecto" });
       }
 
       const entryData = insertQuickTimeEntrySchema.parse({
@@ -15211,16 +15197,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Agregar detalle a registro rápido
-  app.post("/api/quick-time-entries/:id/details", requireAuth, async (req, res) => {
+  app.post("/api/quick-time-entries/:id/details", requireAuth, requirePermission("operations"), async (req, res) => {
     try {
       const quickTimeEntryId = parseInt(req.params.id);
       if (isNaN(quickTimeEntryId)) {
         return res.status(400).json({ message: "Invalid entry ID" });
       }
 
+      const [quickEntry] = await db.select().from(quickTimeEntries)
+        .where(eq(quickTimeEntries.id, quickTimeEntryId)).limit(1);
+      if (!quickEntry) return res.status(404).json({ message: "Quick time entry not found" });
+      if (quickEntry.status !== "draft") {
+        return res.status(409).json({ message: "El período ya fue enviado y no admite cambios" });
+      }
+      if (!(await canAccessTaskProject(req, quickEntry.projectId))) {
+        return res.status(403).json({ message: "No tenés acceso a este proyecto" });
+      }
+
+      const requestedPersonnelId = Number(req.body?.personnelId);
+      if (!Number.isInteger(requestedPersonnelId) || requestedPersonnelId <= 0) {
+        return res.status(400).json({ message: "La persona seleccionada no es válida" });
+      }
+      const [targetPerson] = await db.select({ id: personnel.id, roleId: personnel.roleId })
+        .from(personnel).where(eq(personnel.id, requestedPersonnelId)).limit(1);
+      if (!targetPerson) return res.status(400).json({ message: "La persona seleccionada no existe" });
+
+      const canonicalRate = await resolveCanonicalPersonnelRate(targetPerson.id, quickEntry.startDate);
+      const rateError = canonicalRateErrorMessage(canonicalRate, quickEntry.startDate);
+      if (rateError || canonicalRate.hourlyRateARS == null) {
+        return res.status(422).json({
+          message: rateError ?? "No se pudo resolver la tarifa histórica de la persona",
+        });
+      }
+      const hours = Number(req.body?.hours);
+      if (!Number.isFinite(hours) || hours < 0.25) {
+        return res.status(400).json({ message: "Las horas deben ser al menos 0.25" });
+      }
+
       const detailData = insertQuickTimeEntryDetailSchema.parse({
-        ...req.body,
-        quickTimeEntryId
+        quickTimeEntryId,
+        personnelId: targetPerson.id,
+        roleId: targetPerson.roleId,
+        hours,
+        hourlyRate: canonicalRate.hourlyRateARS,
+        totalCost: hours * canonicalRate.hourlyRateARS,
+        description: typeof req.body?.description === "string" ? req.body.description.trim() || null : null,
       });
 
       const detail = await storage.createQuickTimeEntryDetail(detailData);
@@ -15232,7 +15253,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Actualizar detalle de registro rápido
-  app.patch("/api/quick-time-entry-details/:id", requireAuth, async (req, res) => {
+  app.patch("/api/quick-time-entry-details/:id", requireAuth, requirePermission("operations"), async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
@@ -15254,7 +15275,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Eliminar detalle de registro rápido
-  app.delete("/api/quick-time-entry-details/:id", requireAuth, async (req, res) => {
+  app.delete("/api/quick-time-entry-details/:id", requireAuth, requirePermission("operations"), async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
@@ -15270,7 +15291,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Enviar registro rápido para aprobación
-  app.post("/api/quick-time-entries/:id/submit", requireAuth, async (req, res) => {
+  app.post("/api/quick-time-entries/:id/submit", requireAuth, requirePermission("operations"), async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
@@ -15286,7 +15307,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Aprobar registro rápido — aprueba y materializa en time_entries
-  app.post("/api/quick-time-entries/:id/approve", requireAuth, async (req, res) => {
+  app.post("/api/quick-time-entries/:id/approve", requireAuth, requirePermission("operations"), async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
@@ -15317,6 +15338,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           approved: true,
           approvedBy: req.user?.id || null,
           approvedDate: new Date(),
+          createdBy: req.user?.id || null,
         } as any);
       }
 
@@ -17289,7 +17311,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ==================== DIRECT COSTS SYNC ====================
 
   // Sincronizar datos desde Excel MAESTRO manualmente
-  app.post("/api/direct-costs/sync", requireAuth, async (req, res) => {
+  app.post("/api/direct-costs/sync", requireAuth, requirePermission("admin"), async (req, res) => {
     try {
       console.log('🔄 Iniciando sincronización manual de Excel MAESTRO...');
       
@@ -18916,7 +18938,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // 🌟 SOT ETL ENDPOINT - Star Schema Data Pipeline
-  app.post("/api/etl/sot/run", requireAuth, async (req, res) => {
+  app.post("/api/etl/sot/run", requireAuth, requirePermission("admin"), async (req, res) => {
     try {
       console.log('🌟 SoT ETL API: Starting Star Schema ETL process...');
       
@@ -20571,7 +20593,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ==================== SYNC INCOMES FROM GOOGLE SHEETS ====================
   // Sincronizar ingresos automáticamente desde "Proyectos confirmados y estimados"
-  app.get('/internal/sync/income', requireAuth, async (req: Request, res: Response) => {
+  app.get('/internal/sync/income', requireAuth, requirePermission("admin"), async (req: Request, res: Response) => {
     try {
       console.log('🔄 SYNC INCOME: Starting automatic sync from Google Sheets');
       
@@ -20580,7 +20602,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`📊 SYNC INCOME: Retrieved ${proyectos.length} projects from Google Sheets`);
       
       // Convert to ETL format
-      const rows = proyectos.map(p => ({
+      const monthNumbers: Record<string, number> = {
+        enero: 1, ene: 1, febrero: 2, feb: 2, marzo: 3, mar: 3,
+        abril: 4, abr: 4, mayo: 5, may: 5, junio: 6, jun: 6,
+        julio: 7, jul: 7, agosto: 8, ago: 8, septiembre: 9, sep: 9,
+        octubre: 10, oct: 10, noviembre: 11, nov: 11, diciembre: 12, dic: 12,
+      };
+      const rows = await Promise.all(proyectos.map(async p => {
+        const rawMonth = String(p.mesFacturacion || '').trim().toLowerCase();
+        const month = Number(rawMonth) || monthNumbers[rawMonth] || monthNumbers[rawMonth.slice(0, 3)] || 1;
+        const periodKey = `${p.añoFacturacion}-${String(month).padStart(2, '0')}`;
+        const fx = await getCanonicalFxForMonth(periodKey);
+        const amountUsd = p.monedaUSD || (p.monedaARS ? p.monedaARS / fx : 0);
+        return {
         "Mes Facturación": p.mesFacturacion,
         "Año Facturación": p.añoFacturacion,
         "Cliente": p.cliente,
@@ -20591,7 +20625,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         "Cotización": "", // Se calculará si es necesario
         "Moneda Original ARS": p.monedaARS ? String(p.monedaARS) : "",
         "Moneda Original USD": p.monedaUSD ? String(p.monedaUSD) : "",
-        "Monto Total USD": String(p.monedaUSD || (p.monedaARS / 1345)) // Fallback FX
+        "Monto Total USD": String(amountUsd),
+        };
       }));
       
       console.log(`🔄 SYNC INCOME: Converted ${rows.length} rows to ETL format`);
@@ -20619,7 +20654,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ==================== SYNC FINANCIAL SOT FROM RENDIMIENTO CLIENTE ====================
   // Sincronizar financial_sot desde "Rendimiento Cliente"
-  app.get('/internal/sync/financial', requireAuth, async (req: Request, res: Response) => {
+  app.get('/internal/sync/financial', requireAuth, requirePermission("admin"), async (req: Request, res: Response) => {
     try {
       console.log('🔄 SYNC FINANCIAL: Starting sync from "Rendimiento Cliente"');
       
@@ -20646,7 +20681,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ==================== SYNC MONTHLY AGGREGATES (ETL 3 VISTAS) ====================
   // Sincroniza un período específico y genera las 3 vistas (Original, Operativa, USD)
-  app.post('/internal/sync/monthly-aggregates', requireAuth, async (req: Request, res: Response) => {
+  app.post('/internal/sync/monthly-aggregates', requireAuth, requirePermission("admin"), async (req: Request, res: Response) => {
     try {
       const { periodKey } = req.body; // YYYY-MM format
       
@@ -21051,7 +21086,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // - /api/v1/executive/economico: P&L gerencial (devengado - directos - overhead, sin provisiones)
   // - /api/v1/executive/finanzas: Contable + Caja (facturado - directos - overhead - provisiones + cash)
   
-  app.get("/api/v1/executive/operativo", requireAuth, async (req, res) => {
+  app.get("/api/v1/executive/operativo", requireAuth, requirePermission("dashboard"), async (req, res) => {
     try {
       const { getOperativoData } = await import('./services/executive-endpoints.js');
       const { getOperativoTrendsAndDiffs } = await import('./services/executive-analytics.js');
@@ -21092,7 +21127,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.get("/api/v1/executive/economico", requireAuth, async (req, res) => {
+  app.get("/api/v1/executive/economico", requireAuth, requirePermission("dashboard"), async (req, res) => {
     try {
       const { getEconomicoData } = await import('./services/executive-endpoints.js');
       const { getEconomicoTrendsAndDiffs } = await import('./services/executive-analytics.js');
@@ -21133,7 +21168,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.get("/api/v1/executive/finanzas", requireAuth, async (req, res) => {
+  app.get("/api/v1/executive/finanzas", requireAuth, requirePermission("finance"), async (req, res) => {
     try {
       const { getFinanzasData } = await import('./services/executive-endpoints.js');
       const { getFinanzasTrendsAndDiffs } = await import('./services/executive-analytics.js');
@@ -21176,7 +21211,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ===== UNIFIED EXECUTIVE DASHBOARD (matches Looker Studio exactly) =====
   // Reads exclusively from monthly_financial_summary (same source as Looker)
-  app.get("/api/v1/executive/dashboard", requireAuth, async (req, res) => {
+  app.get("/api/v1/executive/dashboard", requireAuth, requirePermission("dashboard", "finance"), async (req, res) => {
     try {
       const { getUnifiedDashboard } = await import('./services/executive-unified.js');
       const { validatePeriodKey } = await import('./services/kpi-formulas.js');
@@ -24729,7 +24764,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ==================== MONTHLY CLOSINGS CRUD ====================
-  app.get("/api/monthly-closings", requireAuth, async (req, res) => {
+  app.get("/api/monthly-closings", requireAuth, requirePermission("operations"), async (req, res) => {
     try {
       const year = req.query.year ? parseInt(req.query.year as string) : new Date().getFullYear();
       const month = req.query.month ? parseInt(req.query.month as string) : undefined;
@@ -24745,22 +24780,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Real hours per person for a month (time_entries + task_time_entries), to auto-fill the closing
-  app.get("/api/monthly-closings/real-hours", requireAuth, async (req, res) => {
+  app.get("/api/monthly-closings/real-hours", requireAuth, requirePermission("operations"), async (req, res) => {
     try {
       const year = req.query.year ? parseInt(req.query.year as string) : new Date().getFullYear();
       const month = req.query.month ? parseInt(req.query.month as string) : (new Date().getMonth() + 1);
       const start = new Date(year, month - 1, 1);
       const end = new Date(year, month, 0, 23, 59, 59, 999);
       const rows = await db.execute(sql`
-        SELECT personnel_id, COALESCE(SUM(hours), 0) AS hours FROM (
-          SELECT personnel_id, hours FROM time_entries WHERE date >= ${start} AND date <= ${end}
+        SELECT personnel_id, hours, entry_date, project_id, description, source FROM (
+          SELECT personnel_id, hours, date AS entry_date, project_id, description, 'legacy' AS source
+          FROM time_entries WHERE date >= ${start} AND date <= ${end}
           UNION ALL
-          SELECT personnel_id, hours FROM task_time_entries WHERE date >= ${start} AND date <= ${end}
+          SELECT tte.personnel_id, tte.hours, tte.date AS entry_date, t.project_id, tte.description, 'task' AS source
+          FROM task_time_entries tte
+          INNER JOIN tasks t ON t.id = tte.task_id
+          WHERE tte.date >= ${start} AND tte.date <= ${end}
         ) combined
-        GROUP BY personnel_id
       `);
       const map: Record<number, number> = {};
-      for (const r of rows.rows as any[]) map[Number(r.personnel_id)] = parseFloat(r.hours) || 0;
+      const seen = new Set<string>();
+      let deduped = 0;
+      for (const r of rows.rows as any[]) {
+        const day = new Date(r.entry_date).toISOString().slice(0, 10);
+        const fingerprint = [r.personnel_id, r.project_id ?? "none", day, Number(r.hours).toFixed(4), String(r.description ?? '').trim().toLowerCase()].join('|');
+        if (r.source === 'task' && seen.has(fingerprint)) {
+          deduped += 1;
+          continue;
+        }
+        seen.add(fingerprint);
+        const personnelId = Number(r.personnel_id);
+        map[personnelId] = (map[personnelId] || 0) + (parseFloat(r.hours) || 0);
+      }
+      if (deduped > 0) {
+        console.warn(`[monthly-closing] ${deduped} duplicate legacy/task hour entries ignored for ${year}-${String(month).padStart(2, '0')}`);
+      }
       res.json(map);
     } catch (error) {
       console.error("Error fetching real hours:", error);
@@ -24768,7 +24821,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/monthly-closings", requireAuth, async (req, res) => {
+  app.post("/api/monthly-closings", requireAuth, requirePermission("operations"), async (req, res) => {
     try {
       const parsed = insertMonthlyClosingSchema.parse({ ...req.body, closedBy: req.user?.id });
       const [person] = await db
@@ -24887,7 +24940,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ==================== ESTIMATED RATES CRUD ====================
-  app.get("/api/estimated-rates", requireAuth, async (req, res) => {
+  app.get("/api/estimated-rates", requireAuth, requirePermission("operations"), async (req, res) => {
     try {
       const year = req.query.year ? parseInt(req.query.year as string) : new Date().getFullYear();
       const result = await db.select().from(personnelHistoricalCosts).where(and(

@@ -264,7 +264,7 @@ export class ActiveProjectsAggregator {
     } catch (error) {
       console.error(`❌ FINANCIAL SOT ERROR in getSalesInPeriod:`, error);
       console.error(`❌ FINANCIAL SOT ERROR stack:`, error instanceof Error ? error.stack : 'No stack trace');
-      return []; // Return empty array on error
+      throw new Error(`No se pudo leer financial_sot para ventas del período ${period.start.substring(0, 7)}`, { cause: error });
     }
   }
 
@@ -319,7 +319,7 @@ export class ActiveProjectsAggregator {
     } catch (error) {
       console.error(`❌ FINANCIAL SOT COSTS ERROR in getCostsInPeriod:`, error);
       console.error(`❌ FINANCIAL SOT COSTS ERROR stack:`, error instanceof Error ? error.stack : 'No stack trace');
-      return []; // Return empty array on error
+      throw new Error(`No se pudo leer financial_sot para costos del período ${period.start.substring(0, 7)}`, { cause: error });
     }
   }
 

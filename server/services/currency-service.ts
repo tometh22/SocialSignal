@@ -1,6 +1,7 @@
 import { db } from "../db";
 import { systemConfig, exchangeRateHistory } from "@shared/schema";
 import { eq, desc } from "drizzle-orm";
+import { DEFAULT_FX_RATE } from './fx';
 
 /**
  * Servicio mejorado para manejo de tipos de cambio y conversiones
@@ -18,10 +19,10 @@ export class CurrencyService {
         .where(eq(systemConfig.configKey, 'usd_exchange_rate'))
         .limit(1);
       
-      return exchangeRateConfig.length > 0 ? exchangeRateConfig[0].configValue : 1200;
+      return exchangeRateConfig.length > 0 ? exchangeRateConfig[0].configValue : DEFAULT_FX_RATE;
     } catch (error) {
       console.error("Error fetching current exchange rate:", error);
-      return 1200; // Fallback seguro
+      return DEFAULT_FX_RATE;
     }
   }
 

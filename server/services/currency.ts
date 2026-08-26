@@ -2,6 +2,7 @@
 import { db } from '../db';
 import { exchangeRates } from '@shared/schema';
 import { eq, and, desc } from 'drizzle-orm';
+import { DEFAULT_FX_RATE } from './fx';
 
 export type CurrencyCode = 'ARS' | 'USD';
 
@@ -117,7 +118,7 @@ export async function getPeriodRate(period: string): Promise<ExchangeRate> {
     // Último fallback: tasa por defecto
     return {
       period,
-      rate: 1300, // ARS por USD - fallback histórico
+      rate: DEFAULT_FX_RATE,
       source: 'hardcoded_fallback'
     };
     
@@ -126,7 +127,7 @@ export async function getPeriodRate(period: string): Promise<ExchangeRate> {
     // En caso de error, usar tasa por defecto
     return {
       period,
-      rate: 1300, // ARS por USD
+      rate: DEFAULT_FX_RATE,
       source: 'error_fallback'
     };
   }

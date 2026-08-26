@@ -5,6 +5,7 @@ import path from 'path';
 import { parseDec } from '../../shared/parse-utils';
 import { buildPeriod, normalizeMonth } from '../../shared/utils/dateNormalization';
 import { parseMoneySmart } from '../utils/money';
+import { DEFAULT_FX_RATE, getCanonicalFxForMonth } from '../services/fx';
 import {
   activoBusinessKey,
   parseActivoSnapshot,
@@ -1261,7 +1262,7 @@ class GoogleSheetsWorkingService {
       }
 
       console.log(`📊 Procesando ${rows.length} filas de ventas con normalizacion y alias map`);
-      return this.processVentasTomiWithNormalization(rows);
+      return await this.processVentasTomiWithNormalization(rows);
       
     } catch (error) {
       console.error('❌ Error obteniendo ventas de Tomi:', error);
@@ -1326,7 +1327,7 @@ class GoogleSheetsWorkingService {
    * Procesar datos de "Ventas Tomi" con normalización y alias map 
    * según especificaciones exactas del usuario
    */
-  private processVentasTomiWithNormalization(rows: any[][]): VentaTomi[] {
+  private async processVentasTomiWithNormalization(rows: any[][]): Promise<VentaTomi[]> {
     const result: VentaTomi[] = [];
     const seenHashes = new Set<string>(); // Para deduplicación
     
@@ -1403,17 +1404,10 @@ class GoogleSheetsWorkingService {
         if (parsedUSD > 0) {
           amountUSD = parsedUSD;
         } else if (parsedARS > 0) {
-          // Use period-specific FX rate from aligned fallback table
+          // Use the canonical period-specific FX resolver.
           const parsedMonth = this.parseMonthLabel(mes, parseInt(año) || undefined);
           const fxMonthKey = parsedMonth ? `${parsedMonth.year}-${String(parsedMonth.month).padStart(2, '0')}` : `${año}-01`;
-          // Inline FX lookup aligned with fx.ts FX_TABLE
-          const FX_RATES: Record<string, number> = {
-            "2024-01": 1150, "2024-06": 1180, "2024-12": 1190,
-            "2025-01": 1200, "2025-02": 1180, "2025-03": 1190, "2025-04": 1205,
-            "2025-05": 1220, "2025-06": 1210, "2025-07": 1215, "2025-08": 1200,
-            "2025-09": 1195, "2025-10": 1205, "2025-11": 1210, "2025-12": 1200,
-          };
-          const fxRate = FX_RATES[fxMonthKey] || 1200;
+          const fxRate = await getCanonicalFxForMonth(fxMonthKey);
           amountUSD = parsedARS / fxRate;
           console.log(`💱 Conversión ARS→USD: ${parsedARS} / ${fxRate} = ${amountUSD}`);
         }
@@ -2627,7 +2621,7 @@ class GoogleSheetsWorkingService {
           // PROTECCIÓN: Valores mayores a $100,000 USD por concepto son probablemente ARS
           // Usar tipo de cambio aproximado para convertir
           const MAX_REASONABLE_USD = 100000;
-          const APPROX_FX = 1300; // Tipo de cambio aproximado ARS/USD
+          const APPROX_FX = DEFAULT_FX_RATE; // Fallback canónico ARS/USD
           
           if (Math.abs(amount) > MAX_REASONABLE_USD) {
             console.log(`⚠️ [${source}] Valor alto detectado: ${concept} = ${amount.toFixed(2)}, asumiendo ARS → USD ${(amount / APPROX_FX).toFixed(2)}`);

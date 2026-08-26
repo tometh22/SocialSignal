@@ -59,6 +59,7 @@ import { eq, ne, and, sql, inArray, desc, asc, isNull } from "drizzle-orm";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import { getDateRangeForFilter } from "./utils/dateRange";
+import { DEFAULT_FX_RATE, getCanonicalFxForMonth } from "./services/fx";
 
 // Función auxiliar para obtener el campo correcto de costo histórico
 function getHistoricalMonthField(year: number, month: number, type: 'hourly' | 'salary'): string {
@@ -1684,6 +1685,7 @@ export class DatabaseStorage implements IStorage {
         operationsFeedback: deliverable.operationsFeedback || deliverable.operations_feedback || "0",
         clientFeedback: deliverable.clientFeedback || deliverable.client_feedback || "0",
         briefCompliance: deliverable.briefCompliance || deliverable.brief_compliance || "0",
+        createdBy: deliverable.createdBy || deliverable.created_by || null,
         project_id: deliverable.projectId || deliverable.project_id,
         delivery_date: deliverable.deliveryDate || new Date(),
         due_date: deliverable.dueDate || deliverable.due_date || new Date(),
@@ -4907,7 +4909,9 @@ export class DatabaseStorage implements IStorage {
           
           try {
             const exchangeRate = await this.getExchangeRateByMonth(year, month);
-            const rate = exchangeRate ? parseFloat(exchangeRate.rate as any) : 1300; // fallback to 1300 if no rate found
+            const rate = exchangeRate
+              ? parseFloat(exchangeRate.rate as any)
+              : await getCanonicalFxForMonth(`${year}-${String(month).padStart(2, '0')}`);
             
             // CALCULAR USD para cálculos internos pero MOSTRAR ARS original
             amountUsd = parseFloat(sale.amountLocal || '0') / rate;
@@ -4916,8 +4920,8 @@ export class DatabaseStorage implements IStorage {
             
             console.log(`💱 Original ARS shown: ${originalAmount.toLocaleString()} ARS (USD equivalent: ${amountUsd.toFixed(2)} for calculations)`);
           } catch (error) {
-            console.warn(`⚠️ Could not get exchange rate for ${year}-${month}, using fallback rate 1300`);
-            amountUsd = parseFloat(sale.amountLocal || '0') / 1300;
+            console.warn(`⚠️ Could not get exchange rate for ${year}-${month}, using canonical fallback rate ${DEFAULT_FX_RATE}`);
+            amountUsd = parseFloat(sale.amountLocal || '0') / DEFAULT_FX_RATE;
             originalAmount = parseFloat(sale.amountLocal || '0');  // ✅ MOSTRAR MILLONES ARS
             currency = 'ARS';  // ✅ MOSTRAR COMO ARS ORIGINAL
           }
