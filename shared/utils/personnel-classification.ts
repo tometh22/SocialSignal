@@ -29,9 +29,9 @@ const normalized = (value: unknown) => String(value ?? "")
 export function normalizePersonnelRole(value: unknown): PersonnelRoleLevel | null {
   const role = normalized(value);
   if (!role) return null;
-  if (/\b(5|05)\b/.test(role) || role.includes("lead de leads") || role.includes("head") || role.includes("director")) return "5 Lead de Leads";
+  if (/\b(5|05)\b/.test(role) || role.includes("lead de leads") || role.includes("head") || role.includes("director") || role.includes("ceo") || role.includes("coo")) return "5 Lead de Leads";
   if (/\b(4|04)\b/.test(role) || role.includes("lead")) return "4 Lead";
-  if (/\b(2|02)\b/.test(role) || role.includes("semi senior") || role.includes("semisenior") || /\bssr\b/.test(role)) return "2 Semi Senior";
+  if (/\b(2|02)\b/.test(role) || role.includes("semi senior") || role.includes("semisenior") || role.includes("semi sr") || /\bssr\b/.test(role)) return "2 Semi Senior";
   if (/\b(1|01)\b/.test(role) || role.includes("junior") || /\bjr\b/.test(role)) return "1 Junior";
   if (/\b(3|03)\b/.test(role) || role.includes("senior") || /\bsr\b/.test(role)) return "3 Senior";
   return null;

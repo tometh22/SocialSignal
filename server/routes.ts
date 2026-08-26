@@ -237,6 +237,17 @@ function canonicalizePersonnelClassification(
   return input;
 }
 
+function canonicalizePersonnelDisplay(person: any) {
+  return {
+    ...person,
+    currentRole: normalizePersonnelRole(person.currentRole)
+      ?? normalizePersonnelRole(person.legacyRole)
+      ?? person.currentRole,
+    sublevel: normalizePersonnelSublevel(person.sublevel) ?? null,
+    area: normalizePersonnelArea(person.area) ?? person.area,
+  };
+}
+
 // 🚀 INCOME SOT - Nueva fuente única de verdad para ingresos
 import * as income from './domain/income';
 import { INCOME_SOT_ENABLED, logIncomeSOT } from './domain/income/feature-flag';
@@ -4540,7 +4551,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         normalized.hourlyRateARS = normalized.currentHourlyRateARS;
         normalized.hourlyRate = normalized.currentHourlyRateUSD;
-        return normalized;
+        return canonicalizePersonnelDisplay(normalized);
       });
 
       res.json(normalizedPersonnel);
@@ -4627,7 +4638,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         delete normalizedPerson[key];
       }
     }
-    res.json(normalizedPerson);
+    res.json(canonicalizePersonnelDisplay(normalizedPerson));
   });
 
   app.post("/api/personnel", requireAuth, async (req, res) => {
