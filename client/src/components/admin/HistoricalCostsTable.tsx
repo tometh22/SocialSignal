@@ -200,7 +200,7 @@ export function HistoricalCostsTable({ personnel }: HistoricalCostsTableProps) {
                             <>
                               <p className="text-sm font-medium text-gray-900">{person.name}</p>
                               <p className="text-[11px] text-gray-500">
-                                {((person as any).contractType === "freelance" ? (person as any).legacyRole : (person as any).currentRole)
+                                {((person as any).currentRole || (person as any).legacyRole)
                                   || (person as any).roleName
                                   || "Rol pendiente"}
                                 {(person as any).sublevel ? ` · ${(person as any).sublevel}` : ""}
