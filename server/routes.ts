@@ -12969,6 +12969,124 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // =========== LIMPIEZA DE DATOS DE PRUEBA ===========
+  // El reset de arriba borra físicamente y está bloqueado en producción, que es
+  // justamente donde se prueba el ciclo. Esto lo reemplaza con una limpieza
+  // reversible: las cotizaciones se archivan (`archivedAt`, con restore ya
+  // existente) y los proyectos pasan a `voided`, que la cartera ya trata como
+  // inactivo. Nada se elimina, así que puede correrse en producción.
+  //
+  // El patrón de nombres sólo SUGIERE. Archivar exige los ids que una persona
+  // eligió de la vista previa: nunca se actúa por coincidencia de texto sola.
+  const CLEANUP_NAME_PATTERN = '(test|prueba|fake|dummy|borrar)';
+
+  app.get("/api/admin/cleanup/candidates", requireAuth, async (req, res) => {
+    if (!req.user?.isAdmin) return res.status(403).json({ message: "Se requiere acceso de administrador" });
+    try {
+      const projects = await db.execute(sql`
+        SELECT ap.id,
+               COALESCE(NULLIF(TRIM(ap.name), ''), q.project_name, 'Sin nombre') AS name,
+               c.name AS client_name,
+               ap.status,
+               ap.created_at,
+               COALESCE(labor.hours, 0)::float AS logged_hours
+        FROM active_projects ap
+        LEFT JOIN quotations q ON q.id = ap.quotation_id
+        LEFT JOIN clients c ON c.id = ap.client_id
+        LEFT JOIN LATERAL (
+          SELECT SUM(te.hours) AS hours FROM time_entries te WHERE te.project_id = ap.id
+        ) labor ON TRUE
+        WHERE ap.status NOT IN ('voided', 'cancelled', 'completed')
+          AND LOWER(COALESCE(NULLIF(TRIM(ap.name), ''), q.project_name, '')) ~ ${CLEANUP_NAME_PATTERN}
+        ORDER BY ap.created_at DESC NULLS LAST, ap.id DESC
+      `);
+
+      // Una cotización se sugiere si nunca originó un proyecto y además es de
+      // prueba, quedó sin cerrar o ya venció. Las aprobadas vigentes nunca entran.
+      const quotes = await db.execute(sql`
+        SELECT q.id, q.project_name AS name, c.name AS client_name, q.status,
+               q.total_amount::float AS total_amount, q.created_at, q.expires_at,
+               CASE
+                 WHEN LOWER(q.project_name) ~ ${CLEANUP_NAME_PATTERN} THEN 'prueba'
+                 WHEN q.expires_at IS NOT NULL AND q.expires_at < NOW() THEN 'vencida'
+                 ELSE 'sin cerrar'
+               END AS reason
+        FROM quotations q
+        LEFT JOIN clients c ON c.id = q.client_id
+        LEFT JOIN active_projects ap ON ap.quotation_id = q.id
+        WHERE q.archived_at IS NULL
+          AND ap.id IS NULL
+          AND (
+            LOWER(q.project_name) ~ ${CLEANUP_NAME_PATTERN}
+            OR q.status IN ('draft', 'rejected', 'in-negotiation')
+            OR (q.expires_at IS NOT NULL AND q.expires_at < NOW())
+          )
+        ORDER BY q.created_at DESC NULLS LAST, q.id DESC
+      `);
+
+      res.json({ projects: projects.rows, quotations: quotes.rows });
+    } catch (error) {
+      console.error("Error listando candidatos de limpieza:", error);
+      res.status(500).json({ message: "No se pudieron listar los candidatos" });
+    }
+  });
+
+  app.post("/api/admin/cleanup/archive", requireAuth, async (req, res) => {
+    if (!req.user?.isAdmin) return res.status(403).json({ message: "Se requiere acceso de administrador" });
+    const asIds = (value: unknown) => Array.isArray(value)
+      ? [...new Set(value.map(Number).filter((id) => Number.isInteger(id) && id > 0))]
+      : [];
+    const quotationIds = asIds(req.body?.quotationIds);
+    const projectIds = asIds(req.body?.projectIds);
+    if (quotationIds.length === 0 && projectIds.length === 0) {
+      return res.status(400).json({ message: "Elegí al menos una cotización o proyecto para archivar" });
+    }
+    try {
+      const now = new Date();
+      const actor = req.user?.id ?? null;
+      const result = await db.transaction(async (tx) => {
+        const archivedQuotations = quotationIds.length === 0 ? [] : await tx.update(quotations).set({
+          archivedAt: now,
+          updatedAt: now,
+          updatedBy: actor,
+          lockVersion: sql`${quotations.lockVersion} + 1`,
+        }).where(and(
+          inArray(quotations.id, quotationIds),
+          isNull(quotations.archivedAt),
+        )).returning({ id: quotations.id, name: quotations.projectName });
+
+        for (const row of archivedQuotations) {
+          await recordQuotationEvent(tx, {
+            quotationId: row.id,
+            eventType: "archived",
+            eventKey: `cleanup-archived:${row.id}:${now.getTime()}`,
+            actorUserId: actor,
+          });
+        }
+
+        const voidedProjects = projectIds.length === 0 ? [] : await tx.update(activeProjects).set({
+          status: "voided",
+          updatedAt: now,
+        }).where(and(
+          inArray(activeProjects.id, projectIds),
+          sql`${activeProjects.status} NOT IN ('voided', 'cancelled', 'completed')`,
+        )).returning({ id: activeProjects.id, name: activeProjects.name });
+
+        return { archivedQuotations, voidedProjects };
+      });
+
+      console.log(`🧹 [Limpieza] ${result.archivedQuotations.length} cotizaciones archivadas y ${result.voidedProjects.length} proyectos anulados por el usuario ${actor}`);
+      res.json({
+        archivedQuotations: result.archivedQuotations,
+        voidedProjects: result.voidedProjects,
+        reversible: true,
+      });
+    } catch (error) {
+      console.error("Error archivando datos de prueba:", error);
+      res.status(500).json({ message: "No se pudo completar la limpieza" });
+    }
+  });
+
   // =========== FACTURA MENSUAL PERSONAL ===========
   // Endpoints para que cada usuario gestione su factura del mes (una por mes).
 

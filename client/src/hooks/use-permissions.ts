@@ -53,5 +53,9 @@ export function usePermissions() {
   // Team members see their own hours only (no capacity/idle metrics)
   const isTeamMember = !!user && !isOperations;
 
-  return { hasPermission, hasAnyPermission, getFirstAllowedRoute, allowedSections, isOperations, isTeamMember };
+  // Admin es un escalón por encima de Operaciones: acciones destructivas o de
+  // configuración global se gatean con esto, no con isOperations.
+  const isAdmin = Boolean((user as any)?.isAdmin);
+
+  return { hasPermission, hasAnyPermission, getFirstAllowedRoute, allowedSections, isOperations, isTeamMember, isAdmin };
 }
