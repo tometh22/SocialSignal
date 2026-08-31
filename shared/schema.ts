@@ -2259,7 +2259,9 @@ export const insertTaskTimeEntrySchema = createInsertSchema(taskTimeEntries).omi
   exchangeRateId: true,
 }).extend({
   date: z.union([z.date(), z.string().transform((str) => new Date(str))]),
-  hours: z.number().min(0.25, "El mínimo son 15 minutos (0.25 horas)"),
+  // Un minuto es la unidad mínima: el equipo carga duraciones reales (2:15),
+  // no múltiplos de cuarto de hora.
+  hours: z.number().min(1 / 60, "El mínimo es un minuto"),
 });
 
 export type TaskTimeEntry = typeof taskTimeEntries.$inferSelect;

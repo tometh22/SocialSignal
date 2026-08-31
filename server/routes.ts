@@ -237,6 +237,50 @@ function canonicalizePersonnelClassification(
   return input;
 }
 
+/**
+ * Personal ya no pide el rol del catálogo legacy: Nivel + Subnivel son la única
+ * clasificación que elige un usuario. `personnel.role_id` sigue siendo NOT NULL
+ * porque cotizaciones y plantillas todavía lo referencian, así que se deriva del
+ * nivel canónico en vez de pedirlo por segunda vez.
+ *
+ * El orden de resolución preserva la asignación existente (no genera churn al
+ * editar) y sólo crea una fila nueva si ningún rol del catálogo mapea al nivel.
+ */
+async function resolveCanonicalRoleId(
+  currentRole: unknown,
+  fallbackRoleId?: number | null,
+): Promise<number> {
+  const canonical = normalizePersonnelRole(currentRole);
+  if (!canonical) {
+    if (fallbackRoleId && fallbackRoleId > 0) return fallbackRoleId;
+    throw Object.assign(
+      new Error("El rol debe ser Junior, Semi Senior, Senior, Lead o Lead de Leads"),
+      { status: 400, field: "currentRole" },
+    );
+  }
+
+  const catalogue = await db.select().from(roles).orderBy(roles.id);
+  const matchesCanonical = (role: { name: string }) => normalizePersonnelRole(role.name) === canonical;
+
+  // 1. La fila ya asignada, si sigue representando el mismo nivel.
+  const current = fallbackRoleId ? catalogue.find((role) => role.id === fallbackRoleId) : undefined;
+  if (current && matchesCanonical(current)) return current.id;
+  // 2. Un rol nombrado exactamente como el nivel canónico.
+  const exact = catalogue.find((role) => role.name.trim() === canonical);
+  if (exact) return exact.id;
+  // 3. Cualquier rol legacy que mapee al nivel (CEO/COO → 5 Lead de Leads, etc.).
+  const equivalent = catalogue.find(matchesCanonical);
+  if (equivalent) return equivalent.id;
+  // 4. Sin equivalencia: se materializa el nivel canónico una única vez.
+  const [created] = await db.insert(roles).values({
+    name: canonical,
+    description: "Nivel canónico de la clasificación de Personal",
+    defaultRate: 0,
+    defaultRateUsd: 0,
+  }).returning();
+  return created.id;
+}
+
 function canonicalizePersonnelDisplay(person: any) {
   return {
     ...person,
@@ -4242,7 +4286,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         FROM personnel p
         LEFT JOIN roles r ON r.id = p.role_id
         LEFT JOIN latest_rates latest ON latest.personnel_id = p.id
+        -- Los freelance cobran por encima de la escala fija: incluirlos corre el
+        -- promedio del nivel hacia arriba y deja de representar al equipo.
         WHERE p.include_in_real_costs = TRUE
+          AND COALESCE(p.contract_type, '') <> 'freelance'
         GROUP BY 1, 2
       ), role_classifications AS (
         SELECT DISTINCT
@@ -4252,6 +4299,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         FROM personnel p
         LEFT JOIN roles r ON r.id = p.role_id
         WHERE p.include_in_real_costs = TRUE
+          AND COALESCE(p.contract_type, '') <> 'freelance'
       )
       SELECT
         classification.role_id,
@@ -4645,6 +4693,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const incoming = { ...req.body, hourlyRate: 0 };
       canonicalizePersonnelClassification(incoming);
+      incoming.roleId = await resolveCanonicalRoleId(incoming.currentRole, incoming.roleId);
       const parseCanonicalRate = (value: unknown) => {
         if (value == null || value === "") return null;
         const parsed = Number(String(value).replace(",", "."));
@@ -4710,6 +4759,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Si hourlyRate viene como string, asegurarnos de convertirlo a número
       let data = { ...req.body };
       canonicalizePersonnelClassification(data, currentPerson ?? undefined);
+      // Sólo se re-deriva cuando el nivel viaja en el body: un PATCH parcial de
+      // horas o tarifa no debe tocar la asignación de rol existente.
+      if (Object.prototype.hasOwnProperty.call(data, "currentRole")) {
+        data.roleId = await resolveCanonicalRoleId(
+          data.currentRole ?? currentPerson?.currentRole,
+          data.roleId ?? currentPerson?.roleId,
+        );
+      }
       const hasHourlyRateARS = Object.prototype.hasOwnProperty.call(data, "hourlyRateARS");
       const hasHourlyRateUSD = Object.prototype.hasOwnProperty.call(data, "hourlyRateUSD");
       const parseCanonicalRate = (value: unknown) => {
@@ -15241,8 +15298,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       const hours = Number(req.body?.hours);
-      if (!Number.isFinite(hours) || hours < 0.25) {
-        return res.status(400).json({ message: "Las horas deben ser al menos 0.25" });
+      if (!Number.isFinite(hours) || hours < 1 / 60) {
+        return res.status(400).json({ message: "Las horas deben ser al menos un minuto" });
       }
 
       const detailData = insertQuickTimeEntryDetailSchema.parse({
@@ -23066,8 +23123,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const hours = req.body?.hours === undefined ? entry.hours : Number(req.body.hours);
-      if (!Number.isFinite(hours) || hours < 0.25) {
-        return res.status(400).json({ message: "Las horas deben ser al menos 0.25" });
+      if (!Number.isFinite(hours) || hours < 1 / 60) {
+        return res.status(400).json({ message: "Las horas deben ser al menos un minuto" });
       }
       const rawDate = req.body?.date;
       const date = rawDate === undefined

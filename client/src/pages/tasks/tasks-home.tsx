@@ -201,6 +201,22 @@ function DateButton({
   );
 }
 
+/** Envuelve el título en un enlace al proyecto cuando la tarea tiene uno.
+ *  Sin proyecto asociado degrada a texto plano en vez de a un enlace muerto. */
+function TaskRowTarget({ projectId, title, children }: { projectId?: number | null; title: string; children: React.ReactNode }) {
+  const className = "flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden";
+  if (!projectId) return <div className={className}>{children}</div>;
+  return (
+    <Link
+      href={`/tasks/projects/${projectId}`}
+      className={cn(className, "rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring")}
+      title={`Abrir el proyecto de "${title}"`}
+    >
+      {children}
+    </Link>
+  );
+}
+
 // ── Task row in home widget ───────────────────────────────────────────
 function HomeTaskRow({
   task,
@@ -232,7 +248,10 @@ function HomeTaskRow({
         onClick={e => { e.stopPropagation(); onToggle(task); }}
       />
 
-      <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden">
+      {/* La fila abre el proyecto asociado: es el destino que se espera al
+          clickear una tarea desde la home. Las acciones de la derecha
+          (fecha, reloj) cortan la propagación y siguen funcionando. */}
+      <TaskRowTarget projectId={task.projectId} title={task.title}>
         <span className={cn(
           "text-sm truncate transition-all duration-200 leading-5",
           isDone ? "line-through text-muted-foreground" : "text-foreground"
@@ -244,7 +263,7 @@ function HomeTaskRow({
             {task.projectName}
           </span>
         )}
-      </div>
+      </TaskRowTarget>
 
       <DateButton
         startDate={task.startDate}

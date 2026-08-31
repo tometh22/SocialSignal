@@ -418,6 +418,10 @@ function TaskRow({ task, allPersonnel, projectMembers = [], onOpen, onToggle, on
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/tasks/project", task.projectId] });
       queryClient.invalidateQueries({ queryKey: ["/api/tasks/my-tasks"] });
+      // El panel de detalle lee ["/api/tasks", id] con staleTime infinito y
+      // "/api/tasks/project" no es prefijo suyo: sin esta línea la prioridad
+      // quedaba distinta en la fila y adentro de la tarea.
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks", task.id] });
     },
   });
   const assignee = allPersonnel.find(p => p.id === task.assigneeId);

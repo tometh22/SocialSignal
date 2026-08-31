@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { Clock, Loader2, Play, Square } from "lucide-react";
+import { Check, Clock, Loader2, Pencil, Play, Square, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -11,25 +11,25 @@ import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { getApiErrorMessage } from "@/lib/api-error";
 import { usePermissions } from "@/hooks/use-permissions";
+import { formatHours, parseHoursInput, roundToMinute } from "@/lib/task-hours";
 
 type TimeEntrySummary = {
   id: number;
   hours: number;
   date: string;
+  personnelId?: number | null;
   personnelName?: string | null;
   description?: string | null;
 };
 
 type TaskHoursSummary = {
+  projectId?: number | null;
+  assigneeId?: number | null;
   loggedHours?: number;
   timeEntries?: TimeEntrySummary[];
 };
 
 type PersonnelOption = { id: number; name: string };
-
-function formatHours(hours: number) {
-  return `${(Math.round(hours * 100) / 100).toFixed(2)} h`;
-}
 
 export default function QuickTaskHours({ taskId, className }: { taskId: number; className?: string }) {
   const { toast } = useToast();
@@ -39,6 +39,8 @@ export default function QuickTaskHours({ taskId, className }: { taskId: number; 
   const [personnelId, setPersonnelId] = useState("");
   const [timerStartedAt, setTimerStartedAt] = useState<number | null>(null);
   const [timerSeconds, setTimerSeconds] = useState(0);
+  const [editingEntryId, setEditingEntryId] = useState<number | null>(null);
+  const [editingHours, setEditingHours] = useState("");
 
   const { data: taskSummary } = useQuery<TaskHoursSummary>({
     queryKey: ["/api/tasks", taskId],
@@ -52,6 +54,46 @@ export default function QuickTaskHours({ taskId, className }: { taskId: number; 
     enabled: open && isOperations,
   });
 
+  // Lo que rige es el dueño de la tarea, no quien la carga: si Operaciones abre
+  // el reloj de una tarea ajena, la atribución arranca apuntando al responsable
+  // en vez de obligar a elegirlo en un paso extra.
+  useEffect(() => {
+    if (!open || !isOperations || personnelId) return;
+    if (taskSummary?.assigneeId) setPersonnelId(String(taskSummary.assigneeId));
+  }, [open, isOperations, personnelId, taskSummary?.assigneeId]);
+
+  useEffect(() => {
+    if (!open) {
+      setPersonnelId("");
+      setEditingEntryId(null);
+    }
+  }, [open]);
+
+  const projectId = taskSummary?.projectId ?? null;
+
+  /** La fila de la tarea lee `/api/tasks/project`: sin invalidarla, las horas
+   *  recién cargadas no aparecían hasta refrescar la página a mano. */
+  const invalidateHoursConsumers = () => {
+    queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/tasks", taskId] });
+    queryClient.invalidateQueries({ queryKey: ["/api/tasks/my-tasks"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/tasks/hours-summary"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/tasks/my-hours"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/monthly-closings/real-hours"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
+    queryClient.invalidateQueries({ queryKey: ["projects"] });
+    if (projectId) {
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks/project", projectId] });
+      queryClient.invalidateQueries({ queryKey: ["projects", projectId, "complete-data"] });
+    }
+  };
+
+  const describeError = (fallback: string) => (error: unknown) => toast({
+    title: fallback,
+    description: getApiErrorMessage(error, "Revisá tu vínculo con Personal y volvé a intentar."),
+    variant: "destructive",
+  });
+
   const logMutation = useMutation({
     mutationFn: (hours: number) => apiRequest(`/api/tasks/${taskId}/time`, "POST", {
       date: format(new Date(), "yyyy-MM-dd"),
@@ -60,20 +102,31 @@ export default function QuickTaskHours({ taskId, className }: { taskId: number; 
       ...(isOperations && personnelId ? { personnelId: Number(personnelId) } : {}),
     }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/tasks", taskId] });
-      queryClient.invalidateQueries({ queryKey: ["/api/tasks/hours-summary"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/tasks/my-hours"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/monthly-closings/real-hours"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
-      queryClient.invalidateQueries({ queryKey: ["projects"] });
+      invalidateHoursConsumers();
       setManual("");
     },
-    onError: (error) => toast({
-      title: "No se pudieron registrar las horas",
-      description: getApiErrorMessage(error, "Revisá tu vínculo con Personal y volvé a intentar."),
-      variant: "destructive",
-    }),
+    onError: describeError("No se pudieron registrar las horas"),
+  });
+
+  const editMutation = useMutation({
+    mutationFn: ({ entryId, hours }: { entryId: number; hours: number }) =>
+      apiRequest(`/api/tasks/${taskId}/time/${entryId}`, "PATCH", { hours }),
+    onSuccess: () => {
+      invalidateHoursConsumers();
+      setEditingEntryId(null);
+      toast({ title: "Carga corregida" });
+    },
+    onError: describeError("No se pudo corregir la carga"),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (entryId: number) => apiRequest(`/api/tasks/${taskId}/time/${entryId}`, "DELETE"),
+    onSuccess: () => {
+      invalidateHoursConsumers();
+      setEditingEntryId(null);
+      toast({ title: "Carga eliminada" });
+    },
+    onError: describeError("No se pudo eliminar la carga"),
   });
 
   useEffect(() => {
@@ -86,12 +139,33 @@ export default function QuickTaskHours({ taskId, className }: { taskId: number; 
   }, [timerStartedAt]);
 
   const saveManual = () => {
-    const hours = Number(manual.replace(",", "."));
-    if (Number.isFinite(hours) && hours > 0) logMutation.mutate(Math.max(0.25, Math.round(hours * 4) / 4));
+    const hours = parseHoursInput(manual);
+    if (hours == null || hours <= 0) {
+      toast({
+        title: "No entendimos esa duración",
+        description: "Podés escribir 45m, 1h30, 1:30 o 2,5.",
+        variant: "destructive",
+      });
+      return;
+    }
+    logMutation.mutate(roundToMinute(hours));
+  };
+
+  const commitEdit = (entryId: number) => {
+    const hours = parseHoursInput(editingHours);
+    if (hours == null || hours <= 0) {
+      toast({
+        title: "No entendimos esa duración",
+        description: "Podés escribir 45m, 1h30, 1:30 o 2,5.",
+        variant: "destructive",
+      });
+      return;
+    }
+    editMutation.mutate({ entryId, hours: roundToMinute(hours) });
   };
 
   const stopTimer = () => {
-    const hours = Math.max(0.25, Math.round((timerSeconds / 3600) * 4) / 4);
+    const hours = roundToMinute(Math.max(1 / 60, timerSeconds / 3600));
     setTimerStartedAt(null);
     setTimerSeconds(0);
     logMutation.mutate(hours);
@@ -99,6 +173,7 @@ export default function QuickTaskHours({ taskId, className }: { taskId: number; 
 
   const entries = taskSummary?.timeEntries ?? [];
   const total = taskSummary?.loggedHours ?? entries.reduce((sum, entry) => sum + Number(entry.hours || 0), 0);
+  const busy = editMutation.isPending || deleteMutation.isPending;
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -112,7 +187,7 @@ export default function QuickTaskHours({ taskId, className }: { taskId: number; 
           <Clock className="h-3.5 w-3.5" />
         </button>
       </PopoverTrigger>
-      <PopoverContent className="w-72 p-3" onClick={(event) => event.stopPropagation()}>
+      <PopoverContent className="w-80 p-3" onClick={(event) => event.stopPropagation()}>
         <div className="mb-3 flex items-center justify-between">
           <div>
             <p className="text-xs font-semibold">Cargar horas</p>
@@ -136,12 +211,23 @@ export default function QuickTaskHours({ taskId, className }: { taskId: number; 
               className="mt-1 h-8 w-full rounded-md border border-input bg-background px-2 text-xs text-foreground"
             >
               <option value="">Yo / persona vinculada</option>
-              {personnel.map((person) => <option key={person.id} value={person.id}>{person.name}</option>)}
+              {personnel.map((person) => (
+                <option key={person.id} value={person.id}>
+                  {person.name}{person.id === taskSummary?.assigneeId ? " · responsable" : ""}
+                </option>
+              ))}
             </select>
           </label>
         )}
         <div className="mb-2 flex gap-1">
-          <Input value={manual} onChange={(event) => setManual(event.target.value)} placeholder="Horas" className="h-8 text-xs" onKeyDown={(event) => event.key === "Enter" && saveManual()} />
+          <Input
+            value={manual}
+            onChange={(event) => setManual(event.target.value)}
+            placeholder="45m · 1h30 · 2,5"
+            aria-label="Duración a registrar"
+            className="h-8 text-xs"
+            onKeyDown={(event) => event.key === "Enter" && saveManual()}
+          />
           <Button size="sm" className="h-8 text-xs" onClick={saveManual} disabled={logMutation.isPending || !manual.trim()}>
             {logMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "Guardar"}
           </Button>
@@ -160,11 +246,55 @@ export default function QuickTaskHours({ taskId, className }: { taskId: number; 
           <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Últimas cargas</p>
           {entries.length === 0 ? (
             <p className="py-1 text-xs text-muted-foreground">Todavía no hay horas registradas.</p>
-          ) : entries.slice(0, 3).map((entry) => (
-            <div key={entry.id} className="flex items-center gap-2 border-b border-border/50 py-1.5 text-xs last:border-0">
-              <span className="w-14 font-medium">{formatHours(Number(entry.hours))}</span>
-              <span className="text-muted-foreground">{format(new Date(`${entry.date.slice(0, 10)}T00:00:00`), "d MMM", { locale: es })}</span>
-              <span className="min-w-0 flex-1 truncate text-right text-muted-foreground">{entry.personnelName || entry.description || "Carga"}</span>
+          ) : entries.slice(0, 4).map((entry) => (
+            <div key={entry.id} className="flex items-center gap-1.5 border-b border-border/50 py-1.5 text-xs last:border-0">
+              {editingEntryId === entry.id ? (
+                <>
+                  <Input
+                    autoFocus
+                    value={editingHours}
+                    onChange={(event) => setEditingHours(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") commitEdit(entry.id);
+                      if (event.key === "Escape") setEditingEntryId(null);
+                    }}
+                    aria-label="Corregir duración"
+                    className="h-7 flex-1 text-xs"
+                  />
+                  <Button size="sm" variant="ghost" className="h-7 w-7 p-0" disabled={busy} onClick={() => commitEdit(entry.id)} aria-label="Guardar corrección">
+                    <Check className="h-3.5 w-3.5 text-emerald-600" />
+                  </Button>
+                  <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => setEditingEntryId(null)} aria-label="Cancelar">
+                    <X className="h-3.5 w-3.5" />
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <span className="w-14 font-medium">{formatHours(Number(entry.hours))}</span>
+                  <span className="text-muted-foreground">{format(new Date(`${entry.date.slice(0, 10)}T00:00:00`), "d MMM", { locale: es })}</span>
+                  <span className="min-w-0 flex-1 truncate text-right text-muted-foreground">{entry.personnelName || entry.description || "Carga"}</span>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 w-7 shrink-0 p-0"
+                    disabled={busy}
+                    aria-label={`Corregir la carga de ${formatHours(Number(entry.hours))}`}
+                    onClick={() => { setEditingEntryId(entry.id); setEditingHours(String(Math.round(Number(entry.hours) * 100) / 100)); }}
+                  >
+                    <Pencil className="h-3 w-3" />
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 w-7 shrink-0 p-0 text-destructive hover:text-destructive"
+                    disabled={busy}
+                    aria-label={`Eliminar la carga de ${formatHours(Number(entry.hours))}`}
+                    onClick={() => deleteMutation.mutate(entry.id)}
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </>
+              )}
             </div>
           ))}
         </div>

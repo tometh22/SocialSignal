@@ -112,7 +112,6 @@ const roleSchema = z.object({
 // Schema para el formulario de personal
 const personnelSchema = z.object({
   name: z.string().min(1, "El nombre es requerido"),
-  roleId: z.coerce.number().min(1, "Debe seleccionar un rol"),
   currentRole: z.enum(PERSONNEL_ROLE_LEVELS, { required_error: "Debe seleccionar un nivel" }),
   sublevel: z.enum(["A", "B", "C"]),
   area: z.enum(PERSONNEL_AREAS, { required_error: "Debe seleccionar un área" }),
@@ -813,7 +812,6 @@ export default function Admin() {
     personnelForm.reset({
       name: "",
       email: "",
-      roleId: 0,
       currentRole: "1 Junior",
       sublevel: "A",
       area: "Operaciones",
@@ -833,7 +831,6 @@ export default function Admin() {
     personnelForm.reset({
       name: personnel.name,
       email: personnel.email || "",
-      roleId: personnel.roleId,
       currentRole: ((personnel as any).currentRole || "1 Junior") as any,
       sublevel: ((personnel as any).sublevel || "A") as any,
       area: ((personnel as any).area || "Operaciones") as any,
@@ -1773,34 +1770,10 @@ export default function Admin() {
                 )}
               />
 
-              <FormField
-                control={personnelForm.control}
-                name="roleId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Rol</FormLabel>
-                    <Select 
-                      onValueChange={(value) => field.onChange(parseInt(value))} 
-                      value={field.value ? field.value.toString() : undefined}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecciona un rol" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {roles?.map((role) => (
-                          <SelectItem key={role.id} value={role.id.toString()}>
-                            {role.name} (${role.defaultRate.toLocaleString('es-AR')} ARS/hr)
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
+              {/* La clasificación canónica es Nivel + Subnivel + Área. El rol del
+                  catálogo legacy se deriva en el servidor a partir del nivel, así
+                  que no se pide acá: mostrar las dos taxonomías juntas era
+                  exactamente lo que confundía al editar. */}
               <div className="grid gap-4 sm:grid-cols-3">
                 <FormField
                   control={personnelForm.control}

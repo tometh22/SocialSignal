@@ -5,7 +5,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { normalizePersonnelRole } from '@shared/utils/personnel-classification';
 import { Separator } from '@/components/ui/separator';
 import { Personnel, Role } from '@shared/schema';
 import { parseDecimalInput } from '@/lib/number-utils';
@@ -335,6 +336,28 @@ const EnhancedTeamConfig: React.FC<EnhancedTeamConfigProps> = ({ validationMessa
     const reordered = [...draggedMembers];
     [reordered[index], reordered[target]] = [reordered[target], reordered[index]];
     handleReorder(reordered);
+  };
+
+  /**
+   * Candidatos para un puesto, ordenados por afinidad con el rol cotizado.
+   * "Lead PM" mapea al nivel 4 Lead, así que quienes tienen ese nivel aparecen
+   * primero. No se filtra en duro: un puesto sin nadie del nivel dejaría el
+   * selector vacío y bloquearía el armado del equipo.
+   */
+  const candidatesForMember = (member: DragDropTeamMember) => {
+    const taken = new Set(
+      quotationData.teamMembers
+        .filter((teamMember) => teamMember.personnelId && teamMember.id !== member.id)
+        .map((teamMember) => teamMember.personnelId),
+    );
+    const available = availablePersonnel.filter((person) => !taken.has(person.id));
+    const targetLevel = normalizePersonnelRole(getRoleInfo(member.roleId)?.name);
+    if (!targetLevel) return { matching: [], others: available };
+    return {
+      matching: available.filter((person) => normalizePersonnelRole((person as any).currentRole) === targetLevel),
+      others: available.filter((person) => normalizePersonnelRole((person as any).currentRole) !== targetLevel),
+      targetLevel,
+    };
   };
 
   const assignPersonnel = (member: DragDropTeamMember, value: string) => {
@@ -752,15 +775,32 @@ const EnhancedTeamConfig: React.FC<EnhancedTeamConfigProps> = ({ validationMessa
                                       <SelectValue placeholder="Asignar persona" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                      {availablePersonnel
-                                        .filter((candidate) => !quotationData.teamMembers.some(
-                                          (teamMember) => teamMember.personnelId === candidate.id,
-                                        ))
-                                        .map((candidate) => (
-                                          <SelectItem key={candidate.id} value={String(candidate.id)}>
-                                            {candidate.name}
-                                          </SelectItem>
-                                        ))}
+                                      {(() => {
+                                        const { matching, others, targetLevel } = candidatesForMember(member);
+                                        return (
+                                          <>
+                                            {matching.length > 0 && (
+                                              <SelectGroup>
+                                                <SelectLabel className="text-[11px] text-emerald-700">{targetLevel} · perfil del rol</SelectLabel>
+                                                {matching.map((candidate) => (
+                                                  <SelectItem key={candidate.id} value={String(candidate.id)}>{candidate.name}</SelectItem>
+                                                ))}
+                                              </SelectGroup>
+                                            )}
+                                            {others.length > 0 && (
+                                              <SelectGroup>
+                                                {matching.length > 0 && <SelectLabel className="text-[11px] text-slate-500">Otros perfiles</SelectLabel>}
+                                                {others.map((candidate) => (
+                                                  <SelectItem key={candidate.id} value={String(candidate.id)}>
+                                                    {candidate.name}
+                                                    {(candidate as any).currentRole ? ` · ${(candidate as any).currentRole}` : ''}
+                                                  </SelectItem>
+                                                ))}
+                                              </SelectGroup>
+                                            )}
+                                          </>
+                                        );
+                                      })()}
                                     </SelectContent>
                                   </Select>
                                 ) : (
