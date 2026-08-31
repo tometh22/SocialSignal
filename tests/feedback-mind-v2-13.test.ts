@@ -9,9 +9,9 @@ import {
   serviceDeliverableSchema,
 } from "../shared/quotation-professional";
 import {
-  describeRoleAffinity,
-  inferAreaFromRoleName,
-  scoreCandidateForRole,
+  formatCanonicalRoleName,
+  personMatchesRole,
+  resolveCanonicalRoleForBlueprintKey,
 } from "../shared/utils/personnel-classification";
 import { insertTaskTimeEntrySchema } from "../shared/schema";
 import { parseHoursInput, roundToMinute } from "../client/src/lib/task-hours";
@@ -25,7 +25,7 @@ describe("Feedback Mind V2-13 · ronda 27-8", () => {
     const routes = source("server/routes.ts");
     expect(routes).toContain("async function resolveCanonicalRoleId(");
     // Alta y edición pasan por el resolver.
-    expect(routes).toContain("incoming.roleId = await resolveCanonicalRoleId(incoming.currentRole, incoming.roleId);");
+    expect(routes).toContain("incoming.roleId = await resolveCanonicalRoleId(incoming.currentRole, incoming.sublevel, incoming.area, incoming.roleId);");
     expect(routes).toContain('if (Object.prototype.hasOwnProperty.call(data, "currentRole")) {');
 
     const admin = source("client/src/pages/admin-fixed.tsx");
@@ -145,46 +145,68 @@ describe("Feedback Mind V2-13 · ronda 27-8", () => {
   });
 
   // ── F27-06 · Candidatos cruzados con el rol ──────────────────────────────
-  it("infiere el área de los roles que nombran una función, no un nivel", () => {
-    // Estos son los nombres reales del catálogo. Cruzar sólo por seniority
-    // dejaba a la mitad sin ordenar, que era el agujero de la primera pasada.
-    expect(inferAreaFromRoleName("Data Scientist")).toBe("DataTech");
-    expect(inferAreaFromRoleName("Project Manager")).toBe("Operaciones");
-    expect(inferAreaFromRoleName("Content Specialist")).toBe("Marketing");
-    expect(inferAreaFromRoleName("Account Director")).toBe("Cuenta");
-    // "Analista" es ambiguo entre áreas: no se adivina.
-    expect(inferAreaFromRoleName("Analista Senior")).toBeNull();
-    expect(inferAreaFromRoleName("")).toBeNull();
+  it("nombra los roles con la numeración de la escala y el área", () => {
+    expect(formatCanonicalRoleName("4 Lead", "A", "Operaciones")).toBe("04 Lead A · Operaciones");
+    expect(formatCanonicalRoleName("3 Senior", "B", "DataTech")).toBe("03 Senior B · DataTech");
+    expect(formatCanonicalRoleName("5 Lead de Leads", "A", "Cuenta")).toBe("05 Lead de Leads A · Cuenta");
+    // Sin nivel no hay rol canónico posible.
+    expect(formatCanonicalRoleName("Account Director", "A", "Cuenta")).toBe("05 Lead de Leads A · Cuenta");
+    expect(formatCanonicalRoleName("", "A", "Cuenta")).toBeNull();
   });
 
-  it("puntúa candidatos por nivel y por área, con el nivel pesando más", () => {
-    const leadOps = { currentRole: "4 Lead", area: "Operaciones" };
-    const juniorOps = { currentRole: "1 Junior", area: "Operaciones" };
-    const leadData = { currentRole: "4 Lead", area: "DataTech" };
+  it("ofrece un puesto sólo a quien coincide en nivel, subnivel y área", () => {
+    const role = { roleLevel: "4 Lead", sublevel: "A", area: "Operaciones" };
+    expect(personMatchesRole(role, { currentRole: "4 Lead", sublevel: "A", area: "Operaciones" })).toBe(true);
+    // Cada dimensión restringe por separado.
+    expect(personMatchesRole(role, { currentRole: "3 Senior", sublevel: "A", area: "Operaciones" })).toBe(false);
+    expect(personMatchesRole(role, { currentRole: "4 Lead", sublevel: "B", area: "Operaciones" })).toBe(false);
+    expect(personMatchesRole(role, { currentRole: "4 Lead", sublevel: "A", area: "DataTech" })).toBe(false);
 
-    // "Lead PM" codifica ambas dimensiones: nivel 4 Lead + área Operaciones.
-    expect(scoreCandidateForRole("Lead PM", leadOps)).toBe(3);
-    expect(scoreCandidateForRole("Lead PM", leadData)).toBe(2);
-    expect(scoreCandidateForRole("Lead PM", juniorOps)).toBe(1);
-    expect(scoreCandidateForRole("Lead PM", { currentRole: "1 Junior", area: "Marketing" })).toBe(0);
-
-    // El nivel pesa más que el área.
-    expect(scoreCandidateForRole("Lead PM", leadData))
-      .toBeGreaterThan(scoreCandidateForRole("Lead PM", juniorOps));
-
-    // Un rol que sólo nombra función ordena igual, que era lo que no pasaba.
-    expect(scoreCandidateForRole("Data Scientist", leadData)).toBe(1);
-    expect(scoreCandidateForRole("Data Scientist", leadOps)).toBe(0);
-
-    // Un rol del que no se infiere nada no ordena a nadie.
-    expect(describeRoleAffinity("Colaborador")).toBeNull();
-    expect(scoreCandidateForRole("Colaborador", leadOps)).toBe(0);
+    // Un rol que no fija subnivel ni área no restringe por esas dimensiones.
+    const anyLead = { roleLevel: "4 Lead", sublevel: null, area: null };
+    expect(personMatchesRole(anyLead, { currentRole: "4 Lead", sublevel: "C", area: "Marketing" })).toBe(true);
+    // Un rol del catálogo viejo no ofrece a nadie.
+    expect(personMatchesRole({ roleLevel: null }, { currentRole: "4 Lead" })).toBe(false);
   });
 
-  it("no filtra en duro: un puesto sin perfiles afines conserva candidatos", () => {
+  it("traduce cada función de receta al rol canónico de su área", () => {
+    const catalogue = [
+      { id: 1, roleLevel: "4 Lead", area: "Operaciones", isActive: true },
+      { id: 2, roleLevel: "3 Senior", area: "Operaciones", isActive: true },
+      { id: 3, roleLevel: "3 Senior", area: "DataTech", isActive: true },
+      { id: 4, roleLevel: "2 Semi Senior", area: "Marketing", isActive: true },
+      { id: 5, roleLevel: "5 Lead de Leads", area: "Cuenta", isActive: true },
+      { id: 6, roleLevel: null, area: null, isActive: false },
+    ];
+    // Área y nivel exactos cuando existen.
+    expect(resolveCanonicalRoleForBlueprintKey("pm", catalogue)?.id).toBe(1);
+    expect(resolveCanonicalRoleForBlueprintKey("analyst", catalogue)?.id).toBe(2);
+    expect(resolveCanonicalRoleForBlueprintKey("data", catalogue)?.id).toBe(3);
+    expect(resolveCanonicalRoleForBlueprintKey("design", catalogue)?.id).toBe(4);
+    expect(resolveCanonicalRoleForBlueprintKey("director", catalogue)?.id).toBe(5);
+
+    // Sin el nivel típico se cae a cualquiera del área, no a otra área.
+    const sinLead = catalogue.filter((role) => role.id !== 1);
+    expect(resolveCanonicalRoleForBlueprintKey("pm", sinLead)?.id).toBe(2);
+    // Sin nadie del área no inventa un rol de otra.
+    expect(resolveCanonicalRoleForBlueprintKey("design", [catalogue[0]])).toBeUndefined();
+    // Los roles retirados nunca se proponen.
+    expect(resolveCanonicalRoleForBlueprintKey("pm", [catalogue[5]])).toBeUndefined();
+  });
+
+  it("filtra en duro por clasificación y deja una salida para no bloquear", () => {
     const team = source("client/src/components/optimized/EnhancedTeamConfig.tsx");
-    expect(team).toContain("if (!affinity) return { matching: [], others: available, affinity: null };");
-    expect(team).toContain("others: scored.filter((item) => item.score === 0)");
+    expect(team).toContain("personMatchesRole(role, person as any)");
+    // Un puesto sin perfiles lo dice, en vez de mostrar un selector vacío.
+    expect(team).toContain("Nadie con la clasificación");
+    expect(team).toContain("perfiles de otra clasificación");
+  });
+
+  it("una cotización nueva no ofrece roles del catálogo viejo", () => {
+    const context = source("client/src/context/optimized-quote-context.tsx");
+    expect(context).toContain('(role as any).isActive !== false && (role as any).roleLevel');
+    // Nunca deja el selector vacío si la base todavía no migró.
+    expect(context).toContain("canonical.length > 0 ? canonical : allRoles");
   });
 
   // ── F27-08 · La tarea de la Home abre su proyecto ────────────────────────

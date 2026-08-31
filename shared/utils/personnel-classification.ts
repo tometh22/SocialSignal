@@ -64,45 +64,87 @@ export function isValidPersonnelClassification(role: unknown, sublevel: unknown)
 }
 
 /**
- * Deduce el área a partir del nombre de un rol cotizado. Los roles del catálogo
- * mezclan dos dimensiones: algunos codifican seniority ("Lead PM", "Analista
- * Senior") y otros la función ("Data Scientist", "Project Manager"). Sin esto,
- * cruzar candidatos sólo por nivel no hacía nada para la mitad del catálogo.
- *
- * El mapeo es deliberadamente conservador: términos ambiguos como "analista"
- * no se asignan, porque una corazonada errónea es peor que no ordenar.
+ * Nombre canónico de un rol del cotizador. Vicky lo pidió con la numeración de
+ * la escala ("04 Lead A"), y el área lo desambigua: sin ella, un "04 Lead A" de
+ * Operaciones y uno de DataTech serían el mismo rol y las recetas no podrían
+ * repartir horas por función.
  */
-export function inferAreaFromRoleName(value: unknown): PersonnelArea | null {
-  const role = normalized(value);
-  if (!role) return null;
-  if (/\b(data|datos|scientist|tech|tecnologia|developer|dev|ingenier|analytics)\b/.test(role)) return "DataTech";
-  if (/\b(pm|project|proyecto|producer|operacion|operaciones|ops|delivery)\b/.test(role)) return "Operaciones";
-  if (/\b(content|contenido|marketing|design|diseno|creative|creativo|redactor|copy)\b/.test(role)) return "Marketing";
-  if (/\b(account|cuenta|cuentas|comercial|sales|ventas)\b/.test(role)) return "Cuenta";
-  return null;
+export function formatCanonicalRoleName(
+  role: unknown,
+  sublevel: unknown,
+  area: unknown,
+): string | null {
+  const level = normalizePersonnelRole(role);
+  if (!level) return null;
+  // "3 Senior" -> "03 Senior", que es como lo escribe el equipo.
+  const padded = level.replace(/^(\d)\s/, (_, digit) => `0${digit} `);
+  const canonicalSublevel = normalizePersonnelSublevel(sublevel);
+  const canonicalArea = normalizePersonnelArea(area);
+  return [padded, canonicalSublevel, canonicalArea ? `· ${canonicalArea}` : null]
+    .filter(Boolean)
+    .join(" ");
+}
+
+/** Un rol es canónico cuando tiene nivel; sin él es del catálogo viejo. */
+export function isCanonicalRoleClassification(role: {
+  roleLevel?: string | null;
+  sublevel?: string | null;
+  area?: string | null;
+}) {
+  return Boolean(normalizePersonnelRole(role.roleLevel));
 }
 
 /**
- * Afinidad de una persona con el rol cotizado, de 0 a 3. El nivel pesa más que
- * el área porque es la dimensión que define la tarifa. Devuelve 0 cuando el rol
- * no permite inferir nada: en ese caso quien llama no debe ordenar ni filtrar.
+ * Una persona encaja en un rol canónico cuando coincide en las dimensiones que
+ * el rol define. El rol puede no fijar subnivel o área; en ese caso esa
+ * dimensión no restringe.
  */
-export function scoreCandidateForRole(
-  roleName: unknown,
-  person: { currentRole?: string | null; area?: string | null },
-): number {
-  const level = normalizePersonnelRole(roleName);
-  const area = inferAreaFromRoleName(roleName);
-  let score = 0;
-  if (level && normalizePersonnelRole(person.currentRole) === level) score += 2;
-  if (area && normalizePersonnelArea(person.area) === area) score += 1;
-  return score;
+export function personMatchesRole(
+  role: { roleLevel?: string | null; sublevel?: string | null; area?: string | null },
+  person: { currentRole?: string | null; sublevel?: string | null; area?: string | null },
+) {
+  const level = normalizePersonnelRole(role.roleLevel);
+  if (!level) return false;
+  if (normalizePersonnelRole(person.currentRole) !== level) return false;
+
+  const roleSublevel = normalizePersonnelSublevel(role.sublevel);
+  if (roleSublevel && normalizePersonnelSublevel(person.sublevel) !== roleSublevel) return false;
+
+  const roleArea = normalizePersonnelArea(role.area);
+  if (roleArea && normalizePersonnelArea(person.area) !== roleArea) return false;
+
+  return true;
 }
 
-/** Etiqueta de lo que se pudo inferir del rol, para explicar el agrupamiento. */
-export function describeRoleAffinity(roleName: unknown): string | null {
-  const level = normalizePersonnelRole(roleName);
-  const area = inferAreaFromRoleName(roleName);
-  if (level && area) return `${level} · ${area}`;
-  return level ?? area ?? null;
+/**
+ * Las recetas reparten horas por función ("8h de PM, 24h de analista"), pero el
+ * catálogo de roles pasó a ser la escala de Personal. Este mapa es el puente:
+ * traduce cada función de receta al área y al nivel típico que la ejecuta.
+ *
+ * Los niveles son un punto de partida editable, no una regla de negocio
+ * cerrada: al aplicar una receta el equipo queda propuesto y se ajusta a mano.
+ */
+export const BLUEPRINT_ROLE_PROFILES: Record<string, { area: PersonnelArea; level: PersonnelRoleLevel }> = {
+  director: { area: "Cuenta", level: "5 Lead de Leads" },
+  pm: { area: "Operaciones", level: "4 Lead" },
+  analyst: { area: "Operaciones", level: "3 Senior" },
+  data: { area: "DataTech", level: "3 Senior" },
+  tech: { area: "DataTech", level: "3 Senior" },
+  design: { area: "Marketing", level: "2 Semi Senior" },
+};
+
+/**
+ * Rol canónico para una función de receta. Prefiere la coincidencia exacta de
+ * área y nivel; si no existe, cualquiera del área; y como último recurso deja
+ * que quien llama use su propio criterio.
+ */
+export function resolveCanonicalRoleForBlueprintKey<T extends { roleLevel?: string | null; area?: string | null; isActive?: boolean }>(
+  roleKey: string,
+  roles: T[],
+): T | undefined {
+  const profile = BLUEPRINT_ROLE_PROFILES[roleKey];
+  if (!profile) return undefined;
+  const usable = roles.filter((role) => role.isActive !== false && normalizePersonnelRole(role.roleLevel));
+  const sameArea = usable.filter((role) => normalizePersonnelArea(role.area) === profile.area);
+  return sameArea.find((role) => normalizePersonnelRole(role.roleLevel) === profile.level) ?? sameArea[0];
 }

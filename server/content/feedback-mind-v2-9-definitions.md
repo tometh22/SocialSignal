@@ -1,5 +1,5 @@
 ---
-version: 2.14.0
+version: 2.15.0
 updatedAt: 2026-08-31
 feedbackCount: 70
 ---
@@ -269,3 +269,21 @@ producto que quedaron sin devolver.
 | GEN-02 | Requiere definición | Unificar Modalidad de servicio con las recetas y reducir el catálogo a One Shot, Fee, Intelligence Event Track y Demo (con Regional como parte de un Fee). El filtrado de recetas por modalidad ya está; la simplificación del catálogo es una decisión de producto. |
 | GEN-03 | Requiere definición | Si el tipo de análisis y el compromiso del cliente deben seguir siendo puntos de ajuste de costo, y en qué paso del cotizador corresponden. |
 | GEN-04 | Requiere definición | Si conviene mantener el módulo de Inflación. La serie ya se sincroniza sola por IPC, así que dejó de desactualizarse; la pregunta de fondo sigue abierta. |
+
+### Revisión 2.15.0 — roles del cotizador alineados con la escala de Personal
+
+Decisión tomada con Vicky Achabal: *"Tiene que quedar 04 Lead A o 04 Lead B o 03
+Senior A, etc. — reflejar la lógica de Roles, para que todo sea consistente. Y
+account director no debería aparecer porque no tenemos ese rol. Si ponemos 04
+Lead, deberían aparecerme opciones que en Roles tengan esa categorización."*
+
+| ID | Estado | Definición y resolución |
+|---|---|---|
+| GEN-05 | Implementado | El catálogo de roles del cotizador es la escala de Personal. Un rol canónico guarda nivel, subnivel y área en columnas propias (no se deduce del nombre) y se muestra como "04 Lead A · Operaciones". El área forma parte del rol porque, sin ella, un 04 Lead A de Operaciones y uno de DataTech serían indistinguibles y las recetas no podrían repartir horas por función. La migración materializa sólo las clasificaciones que existen en Personal, no las ~44 combinaciones teóricas. |
+| GEN-06 | Implementado | Los roles sin clasificación canónica —"Account Director" entre ellos— se retiran con `is_active = FALSE` en vez de borrarse: dejan de ofrecerse en cotizaciones nuevas y las históricas los siguen resolviendo por id. |
+| GEN-07 | Implementado | Al asignar una persona a un puesto sólo se ofrecen quienes coinciden en las dimensiones que el rol define. Un rol que no fija subnivel o área no restringe por esa dimensión. Cuando nadie coincide, la UI lo dice y ofrece ver el resto: filtrar en duro no puede dejar un puesto sin poder completarse. |
+| GEN-08 | Requiere validación | `BLUEPRINT_ROLE_PROFILES` traduce cada función de receta (director, pm, analyst, data, tech, design) a un área y un nivel típico. Las áreas se derivan de la función; los niveles son un punto de partida editable y no una regla de negocio aprobada. Al aplicar una receta el equipo queda propuesto y se ajusta a mano. |
+
+El catálogo de productos de seis modalidades (GEN-02) sigue pendiente: "Créditos"
+y "Fee + créditos" son modelos comerciales nuevos y necesitan definición antes de
+poder cotizarse.
