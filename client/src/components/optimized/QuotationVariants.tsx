@@ -26,7 +26,7 @@ import { useOptimizedQuote } from '@/context/optimized-quote-context';
 import { useLocation } from 'wouter';
 import { useCurrency } from '@/hooks/use-currency';
 import { calculateQuotationPricing } from '@shared/utils/quotation-pricing';
-import { blueprintDefinitionSchema, estimateBlueprintWorkload, type BlueprintDefinition } from '@shared/quotation-professional';
+import { blueprintDefinitionSchema, estimateBlueprintWorkload, isDeliverableSold, type BlueprintDefinition } from '@shared/quotation-professional';
 
 interface QuotationVariant {
   id: number;
@@ -774,7 +774,7 @@ export function QuotationVariants({
                 <div className="flex flex-wrap gap-1.5 rounded-lg border border-slate-200 bg-white p-3 text-xs text-slate-600">
                   <Badge variant="outline">{variant.scopeSnapshot.coverage.markets.length} mercados</Badge>
                   <Badge variant="outline">{variant.scopeSnapshot.coverage.brands.length} marcas</Badge>
-                  <Badge variant="outline">{variant.scopeSnapshot.deliverables.filter((item) => item.included).length} entregables</Badge>
+                  <Badge variant="outline">{variant.scopeSnapshot.deliverables.filter(isDeliverableSold).length} entregables</Badge>
                   <Badge variant="outline">Respuesta {variant.scopeSnapshot.coverage.slaLevel === 'real_time' ? 'tiempo real' : variant.scopeSnapshot.coverage.slaLevel === 'priority' ? 'prioritaria' : 'estándar'}</Badge>
                 </div>
               )}
@@ -907,7 +907,7 @@ export function QuotationVariants({
                   {variants.map((variant) => (
                     <tr key={variant.id} className="border-b border-slate-200 last:border-b-0 hover:bg-slate-50">
                       <td className="p-2 font-medium text-slate-900">{variant.variantName}</td>
-                      <td className="p-2 text-center text-slate-600">{variant.scopeSnapshot ? `${variant.scopeSnapshot.deliverables.filter((item) => item.included).length} entregables · ${variant.scopeSnapshot.coverage.markets.length} mercados` : 'Histórico'}</td>
+                      <td className="p-2 text-center text-slate-600">{variant.scopeSnapshot ? `${variant.scopeSnapshot.deliverables.filter(isDeliverableSold).length} entregables · ${variant.scopeSnapshot.coverage.markets.length} mercados` : 'Histórico'}</td>
                       <td className="p-2 text-right text-slate-600">{getVariantTotalHours(variant).toFixed(1)} h</td>
                       <td className="p-2 text-right font-medium tabular-nums text-slate-900">{formatCurrency(computeVariantTotal(variant))}</td>
                       <td className="p-2 text-center">
@@ -1128,7 +1128,7 @@ function roleKeyForName(name: string) {
 
 function unitMetricsFor(scope: BlueprintDefinition, total: number) {
   const months = Math.max(1, scope.durationMonths);
-  const deliveries = Math.max(1, scope.deliverables.filter((item) => item.included).reduce((sum, item) => sum + item.quantity, 0));
+  const deliveries = Math.max(1, scope.deliverables.filter(isDeliverableSold).reduce((sum, item) => sum + item.quantity, 0));
   return {
     perMonth: Number((total / months).toFixed(2)),
     perMarket: Number((total / Math.max(1, scope.coverage.markets.length)).toFixed(2)),

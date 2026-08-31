@@ -62,3 +62,47 @@ export function isValidPersonnelClassification(role: unknown, sublevel: unknown)
   const canonicalSublevel = normalizePersonnelSublevel(sublevel);
   return Boolean(canonicalRole && canonicalSublevel && allowedSublevelsForRole(canonicalRole).includes(canonicalSublevel));
 }
+
+/**
+ * Deduce el área a partir del nombre de un rol cotizado. Los roles del catálogo
+ * mezclan dos dimensiones: algunos codifican seniority ("Lead PM", "Analista
+ * Senior") y otros la función ("Data Scientist", "Project Manager"). Sin esto,
+ * cruzar candidatos sólo por nivel no hacía nada para la mitad del catálogo.
+ *
+ * El mapeo es deliberadamente conservador: términos ambiguos como "analista"
+ * no se asignan, porque una corazonada errónea es peor que no ordenar.
+ */
+export function inferAreaFromRoleName(value: unknown): PersonnelArea | null {
+  const role = normalized(value);
+  if (!role) return null;
+  if (/\b(data|datos|scientist|tech|tecnologia|developer|dev|ingenier|analytics)\b/.test(role)) return "DataTech";
+  if (/\b(pm|project|proyecto|producer|operacion|operaciones|ops|delivery)\b/.test(role)) return "Operaciones";
+  if (/\b(content|contenido|marketing|design|diseno|creative|creativo|redactor|copy)\b/.test(role)) return "Marketing";
+  if (/\b(account|cuenta|cuentas|comercial|sales|ventas)\b/.test(role)) return "Cuenta";
+  return null;
+}
+
+/**
+ * Afinidad de una persona con el rol cotizado, de 0 a 3. El nivel pesa más que
+ * el área porque es la dimensión que define la tarifa. Devuelve 0 cuando el rol
+ * no permite inferir nada: en ese caso quien llama no debe ordenar ni filtrar.
+ */
+export function scoreCandidateForRole(
+  roleName: unknown,
+  person: { currentRole?: string | null; area?: string | null },
+): number {
+  const level = normalizePersonnelRole(roleName);
+  const area = inferAreaFromRoleName(roleName);
+  let score = 0;
+  if (level && normalizePersonnelRole(person.currentRole) === level) score += 2;
+  if (area && normalizePersonnelArea(person.area) === area) score += 1;
+  return score;
+}
+
+/** Etiqueta de lo que se pudo inferir del rol, para explicar el agrupamiento. */
+export function describeRoleAffinity(roleName: unknown): string | null {
+  const level = normalizePersonnelRole(roleName);
+  const area = inferAreaFromRoleName(roleName);
+  if (level && area) return `${level} · ${area}`;
+  return level ?? area ?? null;
+}

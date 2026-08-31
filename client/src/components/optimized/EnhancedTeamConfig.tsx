@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { normalizePersonnelRole } from '@shared/utils/personnel-classification';
+import { describeRoleAffinity, scoreCandidateForRole } from '@shared/utils/personnel-classification';
 import { Separator } from '@/components/ui/separator';
 import { Personnel, Role } from '@shared/schema';
 import { parseDecimalInput } from '@/lib/number-utils';
@@ -340,9 +340,12 @@ const EnhancedTeamConfig: React.FC<EnhancedTeamConfigProps> = ({ validationMessa
 
   /**
    * Candidatos para un puesto, ordenados por afinidad con el rol cotizado.
-   * "Lead PM" mapea al nivel 4 Lead, así que quienes tienen ese nivel aparecen
-   * primero. No se filtra en duro: un puesto sin nadie del nivel dejaría el
-   * selector vacío y bloquearía el armado del equipo.
+   * Los roles del catálogo mezclan seniority ("Lead PM") y función ("Data
+   * Scientist"), así que se puntúan las dos dimensiones: cruzar sólo por nivel
+   * no ordenaba nada para roles como Project Manager o Content Specialist.
+   *
+   * No se filtra en duro: un puesto sin nadie afín dejaría el selector vacío y
+   * bloquearía el armado del equipo.
    */
   const candidatesForMember = (member: DragDropTeamMember) => {
     const taken = new Set(
@@ -351,12 +354,17 @@ const EnhancedTeamConfig: React.FC<EnhancedTeamConfigProps> = ({ validationMessa
         .map((teamMember) => teamMember.personnelId),
     );
     const available = availablePersonnel.filter((person) => !taken.has(person.id));
-    const targetLevel = normalizePersonnelRole(getRoleInfo(member.roleId)?.name);
-    if (!targetLevel) return { matching: [], others: available };
+    const roleName = getRoleInfo(member.roleId)?.name;
+    const affinity = describeRoleAffinity(roleName);
+    if (!affinity) return { matching: [], others: available, affinity: null };
+    const scored = available
+      .map((person) => ({ person, score: scoreCandidateForRole(roleName, person as any) }));
     return {
-      matching: available.filter((person) => normalizePersonnelRole((person as any).currentRole) === targetLevel),
-      others: available.filter((person) => normalizePersonnelRole((person as any).currentRole) !== targetLevel),
-      targetLevel,
+      matching: scored.filter((item) => item.score > 0)
+        .sort((left, right) => right.score - left.score)
+        .map((item) => item.person),
+      others: scored.filter((item) => item.score === 0).map((item) => item.person),
+      affinity,
     };
   };
 
@@ -776,12 +784,12 @@ const EnhancedTeamConfig: React.FC<EnhancedTeamConfigProps> = ({ validationMessa
                                     </SelectTrigger>
                                     <SelectContent>
                                       {(() => {
-                                        const { matching, others, targetLevel } = candidatesForMember(member);
+                                        const { matching, others, affinity } = candidatesForMember(member);
                                         return (
                                           <>
                                             {matching.length > 0 && (
                                               <SelectGroup>
-                                                <SelectLabel className="text-[11px] text-emerald-700">{targetLevel} · perfil del rol</SelectLabel>
+                                                <SelectLabel className="text-[11px] text-emerald-700">{affinity} · perfil del rol</SelectLabel>
                                                 {matching.map((candidate) => (
                                                   <SelectItem key={candidate.id} value={String(candidate.id)}>{candidate.name}</SelectItem>
                                                 ))}
