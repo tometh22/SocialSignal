@@ -1,5 +1,5 @@
 ---
-version: 2.13.1
+version: 2.14.0
 updatedAt: 2026-08-31
 feedbackCount: 70
 ---
@@ -256,3 +256,16 @@ de la propia versión 2.13.0. Se corrigen acá.
 | F27-05a | Implementado | `isDeliverableSold` es el predicado único de alcance vendido: incluido **y** con unidades. Antes la cantidad en cero quitaba horas y tareas pero el entregable seguía apareciendo en la propuesta que ve el cliente y en los conteos de "N entregables". |
 | F27-06a | Implementado | El cruce de candidatos puntúa nivel **y** área. Los roles del catálogo mezclan seniority ("Lead PM") con función ("Data Scientist", "Project Manager", "Content Specialist"): cruzar sólo por seniority no ordenaba nada para la mitad de ellos. El nivel pesa el doble que el área porque es lo que define la tarifa. |
 | F27-09a | Implementado | El reloj de la fila sólo ofrece corregir o eliminar cargas que el usuario puede modificar. El servidor ya rechazaba la carga ajena con 403; la UI ofrecía la acción igual. |
+
+### Revisión 2.14.0 — pedidos de la ronda que no se habían mapeado
+
+Un repaso completo del documento original encontró un pedido operativo que se
+repitió el 18-8, el 20-8 y el 27-8 y nunca se atendió, más tres preguntas de
+producto que quedaron sin devolver.
+
+| ID | Estado | Definición y resolución |
+|---|---|---|
+| GEN-01 | Implementado | Limpieza de datos de prueba reversible, disponible en producción. Las cotizaciones se archivan (`archivedAt`, con `POST /api/quotations/:id/restore` ya existente) y los proyectos pasan a `voided`, que la cartera ya trata como inactivo. Nada se elimina físicamente. El patrón de nombres sólo sugiere candidatos: archivar exige los ids que una persona eligió de la vista previa. Sólo Admin. Reemplaza a `test-data-reset`, que borraba físicamente y estaba bloqueado justamente en producción, que es donde se prueba el ciclo. |
+| GEN-02 | Requiere definición | Unificar Modalidad de servicio con las recetas y reducir el catálogo a One Shot, Fee, Intelligence Event Track y Demo (con Regional como parte de un Fee). El filtrado de recetas por modalidad ya está; la simplificación del catálogo es una decisión de producto. |
+| GEN-03 | Requiere definición | Si el tipo de análisis y el compromiso del cliente deben seguir siendo puntos de ajuste de costo, y en qué paso del cotizador corresponden. |
+| GEN-04 | Requiere definición | Si conviene mantener el módulo de Inflación. La serie ya se sincroniza sola por IPC, así que dejó de desactualizarse; la pregunta de fondo sigue abierta. |

@@ -253,4 +253,51 @@ describe("Feedback Mind V2-13 · ronda 27-8", () => {
     // La entidad creada queda seleccionada en el acto.
     expect(basicInfo).toContain("updateQuotationData({ billingEntityId: entity.id })");
   });
+  // ── GEN-01 · Limpieza de datos de prueba (pedida el 18-8, 20-8 y 27-8) ───
+  it("ofrece una limpieza reversible que sí puede correr en producción", () => {
+    const routes = source("server/routes.ts");
+    expect(routes).toContain('app.get("/api/admin/cleanup/candidates"');
+    expect(routes).toContain('app.post("/api/admin/cleanup/archive"');
+
+    const cleanup = routes.slice(
+      routes.indexOf("// =========== LIMPIEZA DE DATOS DE PRUEBA ==========="),
+      routes.indexOf("// =========== FACTURA MENSUAL PERSONAL ==========="),
+    );
+    // Nada se borra: cotizaciones se archivan y proyectos pasan a voided.
+    expect(cleanup).toContain("archivedAt: now");
+    expect(cleanup).toContain('status: "voided"');
+    expect(cleanup).not.toContain("db.delete(");
+    // A diferencia del reset viejo, no se bloquea en producción.
+    expect(cleanup).not.toContain('NODE_ENV === "production"');
+    // Sólo Admin.
+    expect(cleanup.match(/req\.user\?\.isAdmin/g)?.length).toBe(2);
+  });
+
+  it("nunca archiva por coincidencia de nombre: exige ids elegidos por una persona", () => {
+    const routes = source("server/routes.ts");
+    const archive = routes.slice(
+      routes.indexOf('app.post("/api/admin/cleanup/archive"'),
+      routes.indexOf("// =========== FACTURA MENSUAL PERSONAL ==========="),
+    );
+    // El endpoint que actúa no conoce el patrón de nombres; sólo ids explícitos.
+    expect(archive).not.toContain("CLEANUP_NAME_PATTERN");
+    expect(archive).toContain("inArray(quotations.id, quotationIds)");
+    expect(archive).toContain("inArray(activeProjects.id, projectIds)");
+    // Sin selección no hace nada.
+    expect(archive).toContain("Elegí al menos una cotización o proyecto para archivar");
+  });
+
+  it("no propone archivar una cotización aprobada y vigente", () => {
+    const routes = source("server/routes.ts");
+    const candidates = routes.slice(
+      routes.indexOf('app.get("/api/admin/cleanup/candidates"'),
+      routes.indexOf('app.post("/api/admin/cleanup/archive"'),
+    );
+    // Sólo entra lo que no originó proyecto y además es prueba, borrador o vencida.
+    expect(candidates).toContain("ap.id IS NULL");
+    expect(candidates).toContain("q.archived_at IS NULL");
+    expect(candidates).toContain("'draft', 'rejected', 'in-negotiation'");
+    // Un proyecto ya cerrado tampoco se vuelve a proponer.
+    expect(candidates).toContain("ap.status NOT IN ('voided', 'cancelled', 'completed')");
+  });
 });

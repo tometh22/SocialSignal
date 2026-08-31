@@ -67,6 +67,7 @@ import {
   Settings, 
   Save,
   Trash,
+  Trash2,
   TrendingUp,
   User2, 
   UserCog, 
@@ -82,6 +83,8 @@ import { RoleSummary } from "@/components/admin/role-summary";
 import { TemplateCost } from "@/components/admin/template-cost";
 import { CostMultipliersManager } from "@/components/cost-multipliers-manager";
 import { ExchangeRateManager } from "@/components/admin/ExchangeRateManager";
+import { TestDataCleanup } from "@/components/admin/TestDataCleanup";
+import { usePermissions } from "@/hooks/use-permissions";
 import { HistoricalCostsTable } from "@/components/admin/HistoricalCostsTable";
 import {
   PERSONNEL_AREAS,
@@ -182,6 +185,10 @@ interface SystemConfig {
 }
 
 export default function Admin() {
+  // La limpieza de datos actúa sobre cotizaciones y proyectos reales, así que
+  // es sólo para Admin. El servidor lo valida igual; esto evita mostrar una
+  // pestaña que devolvería 403.
+  const { isAdmin } = usePermissions();
   // Estado para manejar tabs 
   const [activeTab, setActiveTab] = useState("roles");
 
@@ -1055,7 +1062,7 @@ export default function Admin() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className={cn("grid w-full", isAdmin ? "grid-cols-6" : "grid-cols-5")}>
           <TabsTrigger value="roles" className="flex items-center gap-2">
             <Users className="h-4 w-4" />
             Roles
@@ -1076,6 +1083,12 @@ export default function Admin() {
             <DollarSign className="h-4 w-4" />
             Tipos de Cambio
           </TabsTrigger>
+          {isAdmin && (
+            <TabsTrigger value="cleanup" className="flex items-center gap-2">
+              <Trash2 className="h-4 w-4" />
+              Limpieza
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="roles">
@@ -1482,6 +1495,12 @@ export default function Admin() {
             <ExchangeRateManager />
           </div>
         </TabsContent>
+
+        {isAdmin && (
+          <TabsContent value="cleanup">
+            <TestDataCleanup />
+          </TabsContent>
+        )}
 
         <TabsContent value="inflation">
           <Card className="standard-card mb-6">
