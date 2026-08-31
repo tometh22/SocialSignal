@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { describeRoleAffinity, scoreCandidateForRole } from '@shared/utils/personnel-classification';
+import { personMatchesRole } from '@shared/utils/personnel-classification';
 import { Separator } from '@/components/ui/separator';
 import { Personnel, Role } from '@shared/schema';
 import { parseDecimalInput } from '@/lib/number-utils';
@@ -98,6 +98,8 @@ const EnhancedTeamConfig: React.FC<EnhancedTeamConfigProps> = ({ validationMessa
   // Estados para la nueva UI
   const [draggedMembers, setDraggedMembers] = useState<DragDropTeamMember[]>([]);
   const [editingMember, setEditingMember] = useState<string | null>(null);
+  // Puesto cuyo selector muestra además los perfiles de otra clasificación.
+  const [expandedCandidates, setExpandedCandidates] = useState<string | null>(null);
 
   // Estados para agregar miembros rápidamente
   const [quickAddMode, setQuickAddMode] = useState(false);
@@ -339,13 +341,13 @@ const EnhancedTeamConfig: React.FC<EnhancedTeamConfigProps> = ({ validationMessa
   };
 
   /**
-   * Candidatos para un puesto, ordenados por afinidad con el rol cotizado.
-   * Los roles del catálogo mezclan seniority ("Lead PM") y función ("Data
-   * Scientist"), así que se puntúan las dos dimensiones: cruzar sólo por nivel
-   * no ordenaba nada para roles como Project Manager o Content Specialist.
+   * Candidatos para un puesto. Un rol canónico define nivel, subnivel y área, y
+   * sólo se ofrece a quienes coinciden: pedirlo así fue el pedido explícito
+   * ("si ponemos 04 Lead, deberían aparecerme opciones que en Roles tengan esa
+   * categorización").
    *
-   * No se filtra en duro: un puesto sin nadie afín dejaría el selector vacío y
-   * bloquearía el armado del equipo.
+   * `matching` puede quedar vacío a propósito. La UI muestra por qué y ofrece
+   * ver el resto, para que un puesto sin perfiles no bloquee el armado.
    */
   const candidatesForMember = (member: DragDropTeamMember) => {
     const taken = new Set(
@@ -354,17 +356,12 @@ const EnhancedTeamConfig: React.FC<EnhancedTeamConfigProps> = ({ validationMessa
         .map((teamMember) => teamMember.personnelId),
     );
     const available = availablePersonnel.filter((person) => !taken.has(person.id));
-    const roleName = getRoleInfo(member.roleId)?.name;
-    const affinity = describeRoleAffinity(roleName);
-    if (!affinity) return { matching: [], others: available, affinity: null };
-    const scored = available
-      .map((person) => ({ person, score: scoreCandidateForRole(roleName, person as any) }));
+    const role = getRoleInfo(member.roleId) as any;
+    if (!role?.roleLevel) return { matching: [], others: available, roleName: role?.name ?? null };
     return {
-      matching: scored.filter((item) => item.score > 0)
-        .sort((left, right) => right.score - left.score)
-        .map((item) => item.person),
-      others: scored.filter((item) => item.score === 0).map((item) => item.person),
-      affinity,
+      matching: available.filter((person) => personMatchesRole(role, person as any)),
+      others: available.filter((person) => !personMatchesRole(role, person as any)),
+      roleName: role.name as string,
     };
   };
 
@@ -784,20 +781,35 @@ const EnhancedTeamConfig: React.FC<EnhancedTeamConfigProps> = ({ validationMessa
                                     </SelectTrigger>
                                     <SelectContent>
                                       {(() => {
-                                        const { matching, others, affinity } = candidatesForMember(member);
+                                        const { matching, others, roleName } = candidatesForMember(member);
+                                        const showOthers = expandedCandidates === member.id || !roleName;
                                         return (
                                           <>
                                             {matching.length > 0 && (
                                               <SelectGroup>
-                                                <SelectLabel className="text-[11px] text-emerald-700">{affinity} · perfil del rol</SelectLabel>
+                                                {roleName && <SelectLabel className="text-[11px] text-emerald-700">{roleName}</SelectLabel>}
                                                 {matching.map((candidate) => (
                                                   <SelectItem key={candidate.id} value={String(candidate.id)}>{candidate.name}</SelectItem>
                                                 ))}
                                               </SelectGroup>
                                             )}
-                                            {others.length > 0 && (
+                                            {roleName && matching.length === 0 && (
+                                              <p className="px-2 py-1.5 text-[11px] text-amber-700">
+                                                Nadie con la clasificación {roleName}.
+                                              </p>
+                                            )}
+                                            {roleName && !showOthers && others.length > 0 && (
+                                              <button
+                                                type="button"
+                                                className="w-full px-2 py-1.5 text-left text-[11px] text-slate-500 underline hover:text-slate-800"
+                                                onClick={(event) => { event.preventDefault(); event.stopPropagation(); setExpandedCandidates(member.id); }}
+                                              >
+                                                Ver los {others.length} perfiles de otra clasificación
+                                              </button>
+                                            )}
+                                            {showOthers && others.length > 0 && (
                                               <SelectGroup>
-                                                {matching.length > 0 && <SelectLabel className="text-[11px] text-slate-500">Otros perfiles</SelectLabel>}
+                                                {roleName && <SelectLabel className="text-[11px] text-slate-500">Otra clasificación</SelectLabel>}
                                                 {others.map((candidate) => (
                                                   <SelectItem key={candidate.id} value={String(candidate.id)}>
                                                     {candidate.name}

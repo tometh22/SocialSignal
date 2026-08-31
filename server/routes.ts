@@ -15,6 +15,7 @@ import { aggregateWeeklyEstimatesByTask } from "@shared/utils/taskEstimates";
 import { deriveMonthlySalariesFromHourlyRates } from "@shared/utils/personnel-cost";
 import {
   allowedSublevelsForRole,
+  formatCanonicalRoleName,
   normalizePersonnelArea,
   normalizePersonnelRole,
   normalizePersonnelSublevel,
@@ -238,45 +239,54 @@ function canonicalizePersonnelClassification(
 }
 
 /**
- * Personal ya no pide el rol del catálogo legacy: Nivel + Subnivel son la única
- * clasificación que elige un usuario. `personnel.role_id` sigue siendo NOT NULL
- * porque cotizaciones y plantillas todavía lo referencian, así que se deriva del
- * nivel canónico en vez de pedirlo por segunda vez.
+ * Personal ya no pide el rol del catálogo legacy: Nivel + Subnivel + Área son la
+ * única clasificación que elige un usuario. `personnel.role_id` sigue siendo
+ * NOT NULL porque cotizaciones y plantillas todavía lo referencian, así que se
+ * deriva de esa clasificación en vez de pedirlo por segunda vez.
  *
- * El orden de resolución preserva la asignación existente (no genera churn al
- * editar) y sólo crea una fila nueva si ningún rol del catálogo mapea al nivel.
+ * El rol canónico incluye el área porque el cotizador filtra candidatos por
+ * ella: sin área, un "04 Lead A" de Operaciones y uno de DataTech serían el
+ * mismo rol y las recetas no podrían repartir horas por función.
  */
 async function resolveCanonicalRoleId(
   currentRole: unknown,
+  sublevel: unknown,
+  area: unknown,
   fallbackRoleId?: number | null,
 ): Promise<number> {
-  const canonical = normalizePersonnelRole(currentRole);
-  if (!canonical) {
+  const level = normalizePersonnelRole(currentRole);
+  if (!level) {
     if (fallbackRoleId && fallbackRoleId > 0) return fallbackRoleId;
     throw Object.assign(
       new Error("El rol debe ser Junior, Semi Senior, Senior, Lead o Lead de Leads"),
       { status: 400, field: "currentRole" },
     );
   }
+  const canonicalSublevel = normalizePersonnelSublevel(sublevel);
+  const canonicalArea = normalizePersonnelArea(area);
 
-  const catalogue = await db.select().from(roles).orderBy(roles.id);
-  const matchesCanonical = (role: { name: string }) => normalizePersonnelRole(role.name) === canonical;
+  const [existing] = await db.select().from(roles).where(and(
+    eq(roles.roleLevel, level),
+    canonicalSublevel ? eq(roles.sublevel, canonicalSublevel) : isNull(roles.sublevel),
+    canonicalArea ? eq(roles.area, canonicalArea) : isNull(roles.area),
+  )).limit(1);
+  if (existing) {
+    // Un rol que vuelve a usarse deja de estar retirado.
+    if (!existing.isActive) {
+      await db.update(roles).set({ isActive: true }).where(eq(roles.id, existing.id));
+    }
+    return existing.id;
+  }
 
-  // 1. La fila ya asignada, si sigue representando el mismo nivel.
-  const current = fallbackRoleId ? catalogue.find((role) => role.id === fallbackRoleId) : undefined;
-  if (current && matchesCanonical(current)) return current.id;
-  // 2. Un rol nombrado exactamente como el nivel canónico.
-  const exact = catalogue.find((role) => role.name.trim() === canonical);
-  if (exact) return exact.id;
-  // 3. Cualquier rol legacy que mapee al nivel (CEO/COO → 5 Lead de Leads, etc.).
-  const equivalent = catalogue.find(matchesCanonical);
-  if (equivalent) return equivalent.id;
-  // 4. Sin equivalencia: se materializa el nivel canónico una única vez.
   const [created] = await db.insert(roles).values({
-    name: canonical,
-    description: "Nivel canónico de la clasificación de Personal",
+    name: formatCanonicalRoleName(level, canonicalSublevel, canonicalArea) ?? level,
+    description: "Rol canónico derivado de la clasificación de Personal",
     defaultRate: 0,
     defaultRateUsd: 0,
+    roleLevel: level,
+    sublevel: canonicalSublevel,
+    area: canonicalArea,
+    isActive: true,
   }).returning();
   return created.id;
 }
@@ -4693,7 +4703,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const incoming = { ...req.body, hourlyRate: 0 };
       canonicalizePersonnelClassification(incoming);
-      incoming.roleId = await resolveCanonicalRoleId(incoming.currentRole, incoming.roleId);
+      incoming.roleId = await resolveCanonicalRoleId(incoming.currentRole, incoming.sublevel, incoming.area, incoming.roleId);
       const parseCanonicalRate = (value: unknown) => {
         if (value == null || value === "") return null;
         const parsed = Number(String(value).replace(",", "."));
@@ -4764,6 +4774,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (Object.prototype.hasOwnProperty.call(data, "currentRole")) {
         data.roleId = await resolveCanonicalRoleId(
           data.currentRole ?? currentPerson?.currentRole,
+          data.sublevel ?? currentPerson?.sublevel,
+          data.area ?? currentPerson?.area,
           data.roleId ?? currentPerson?.roleId,
         );
       }

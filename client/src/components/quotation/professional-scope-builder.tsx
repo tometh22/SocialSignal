@@ -19,6 +19,7 @@ import {
   type EffortBenchmark,
 } from "@shared/quotation-professional";
 import { isBlueprintCompatibleWithProjectType } from "@/utils/quotation-ux";
+import { resolveCanonicalRoleForBlueprintKey } from "@shared/utils/personnel-classification";
 
 type BlueprintWithWorkload = ServiceBlueprint & { workload: ReturnType<typeof estimateBlueprintWorkload> };
 type WeeklyCapacity = { personnel: Array<{ personnelId: number; name: string; maxCapacity: number; actualHours: number; estimatedTaskHours: number; isOverloaded: boolean }> };
@@ -401,6 +402,10 @@ function Metric({ label, value }: { label: string; value: string }) {
 }
 
 function resolveRole(roleKey: string, roles: Array<{ id: number; name: string; defaultRate: number; defaultRateUsd?: number | null }>) {
+  // Catálogo canónico: la función de la receta se traduce a área + nivel.
+  const canonical = resolveCanonicalRoleForBlueprintKey(roleKey, roles as any);
+  if (canonical) return canonical as (typeof roles)[number];
+  // Catálogo viejo (o una base todavía sin migrar): se cae al match por nombre.
   const aliases: Record<string, string[]> = {
     director: ["director", "cuentas"], pm: ["project manager", "pm", "proyecto"], analyst: ["analista", "analyst"],
     data: ["data", "datos"], tech: ["tech", "tecnología", "tecnologia"], design: ["diseñ", "design"],

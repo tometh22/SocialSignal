@@ -239,6 +239,16 @@ export const roles = pgTable("roles", {
   description: text("description"),
   defaultRate: doublePrecision("default_rate").notNull(),
   defaultRateUsd: doublePrecision("default_rate_usd"),
+  // Clasificación canónica del rol, guardada estructurada en vez de deducida
+  // del nombre: el cotizador filtra las personas por estas tres dimensiones y
+  // parsear el texto sería frágil. `name` queda como etiqueta derivada.
+  roleLevel: text("role_level"),
+  sublevel: text("sublevel"),
+  area: text("area"),
+  // Los roles del catálogo viejo (p. ej. "Account Director", que no existe en
+  // la escala vigente) se retiran en vez de borrarse: las cotizaciones
+  // históricas los siguen referenciando.
+  isActive: boolean("is_active").notNull().default(true),
 });
 
 export const insertRoleSchema = createInsertSchema(roles).pick({
@@ -246,6 +256,10 @@ export const insertRoleSchema = createInsertSchema(roles).pick({
   description: true,
   defaultRate: true,
   defaultRateUsd: true,
+  roleLevel: true,
+  sublevel: true,
+  area: true,
+  isActive: true,
 });
 
 // ==================== PERSONAL ====================

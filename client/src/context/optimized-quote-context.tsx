@@ -322,9 +322,16 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
   }, [exchangeRate, exchangeRateReady, quotationData.exchangeRateSnapshot, quotationData.requiresExchangeRateConfirmation]);
 
   // Get data from queries first
-  const { data: roles = [] } = useQuery<Role[]>({
+  const { data: allRoles = [] } = useQuery<Role[]>({
     queryKey: ["/api/roles"],
   });
+  // Una cotización nueva sólo ofrece roles de la escala vigente. Los del
+  // catálogo viejo quedan retirados pero se siguen resolviendo cuando una
+  // cotización histórica los referencia por id.
+  const roles = useMemo(() => {
+    const canonical = allRoles.filter((role) => (role as any).isActive !== false && (role as any).roleLevel);
+    return canonical.length > 0 ? canonical : allRoles;
+  }, [allRoles]);
 
   const { data: personnel = [] } = useQuery<Personnel[]>({
     queryKey: ["/api/personnel"],
