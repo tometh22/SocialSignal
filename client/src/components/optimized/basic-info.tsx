@@ -1,8 +1,11 @@
 import React from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { AlertCircle, Calendar, DollarSign, FolderOpen, RefreshCw, User } from 'lucide-react';
 import { Client, ClientBillingEntity, projectDurationOptions } from '@shared/schema';
 import { parseLocalizedDecimal } from '@shared/utils/quotation-pricing';
+import { apiRequest } from '@/lib/queryClient';
+import { getApiErrorMessage } from '@/lib/api-error';
+import { useToast } from '@/hooks/use-toast';
 import { useOptimizedQuote } from '@/context/optimized-quote-context';
 import { useCurrency } from '@/hooks/use-currency';
 import { Input } from '@/components/ui/input';
@@ -168,11 +171,17 @@ const OptimizedBasicInfo: React.FC<OptimizedBasicInfoProps> = ({ errors = {}, mo
               <div className="mt-4 border-t border-slate-100 pt-4">
                 <Label htmlFor="billing-entity" className="text-sm font-medium text-slate-700">Entidad legal receptora</Label>
                 <Select value={quotationData.billingEntityId ? String(quotationData.billingEntityId) : ''} onValueChange={(value) => updateQuotationData({ billingEntityId: Number(value) })} disabled={billingEntitiesLoading || billingEntities.length === 0}>
-                  <SelectTrigger id="billing-entity" className="mt-2 h-10 border-slate-200"><SelectValue placeholder={billingEntitiesLoading ? 'Cargando entidades…' : billingEntities.length === 0 ? 'Sin entidades configuradas' : 'Seleccionar razón social'} /></SelectTrigger>
+                  <SelectTrigger id="billing-entity" className="mt-2 h-10 border-slate-200"><SelectValue placeholder={billingEntitiesLoading ? 'Cargando entidades…' : billingEntities.length === 0 ? 'Agregá la razón social abajo' : 'Seleccionar razón social'} /></SelectTrigger>
                   <SelectContent>{billingEntities.map((entity) => <SelectItem key={entity.id} value={String(entity.id)}>{entity.razonSocial}{entity.taxId ? ` · ${entity.taxId}` : ''}{entity.country ? ` · ${entity.country}` : ''}</SelectItem>)}</SelectContent>
                 </Select>
                 {billingEntitiesError && <p className="mt-2 text-xs text-red-700">No pudimos cargar las entidades. <button type="button" className="underline" onClick={() => void refetchBillingEntities()}>Reintentar</button></p>}
-                {!billingEntitiesLoading && !billingEntitiesError && billingEntities.length === 0 && <p className="mt-2 text-xs text-amber-700">Configurá la razón social desde <a className="font-medium underline" href="/clients">Clientes</a>.</p>}
+                {!billingEntitiesLoading && !billingEntitiesError && (
+                  <InlineBillingEntity
+                    clientId={quotationData.client.id}
+                    isFirst={billingEntities.length === 0}
+                    onCreated={(entity) => { void refetchBillingEntities(); updateQuotationData({ billingEntityId: entity.id }); }}
+                  />
+                )}
               </div>
             )}
           </CardContent>
@@ -234,3 +243,65 @@ function Field({ label, icon: Icon, required, error, errorId, children }: { labe
 }
 
 export default OptimizedBasicInfo;
+
+/**
+ * Alta de razón social sin salir del cotizador. Antes, un cliente sin entidades
+ * dejaba el selector deshabilitado y obligaba a ir a Clientes, volver y rearmar
+ * la cotización: el bloqueo reportado como "no me deja seleccionar entidad legal".
+ */
+function InlineBillingEntity({ clientId, isFirst, onCreated }: {
+  clientId: number;
+  isFirst: boolean;
+  onCreated: (entity: ClientBillingEntity) => void;
+}) {
+  const { toast } = useToast();
+  const [open, setOpen] = React.useState(false);
+  const [razonSocial, setRazonSocial] = React.useState('');
+  const [taxId, setTaxId] = React.useState('');
+  const [country, setCountry] = React.useState('');
+
+  const createMutation = useMutation({
+    mutationFn: () => apiRequest(`/api/clients/${clientId}/billing-entities`, 'POST', {
+      razonSocial: razonSocial.trim(),
+      taxId: taxId.trim() || null,
+      country: country.trim() || null,
+      isDefault: isFirst,
+    }),
+    onSuccess: (entity: ClientBillingEntity) => {
+      setOpen(false);
+      setRazonSocial(''); setTaxId(''); setCountry('');
+      onCreated(entity);
+      toast({ title: 'Entidad legal creada', description: 'Quedó seleccionada para esta cotización.' });
+    },
+    onError: (error) => toast({
+      title: 'No pudimos crear la entidad',
+      description: getApiErrorMessage(error, 'Revisá la razón social e intentá de nuevo.'),
+      variant: 'destructive',
+    }),
+  });
+
+  if (!open) {
+    return (
+      <p className={`mt-2 text-xs ${isFirst ? 'text-amber-700' : 'text-slate-500'}`}>
+        {isFirst ? 'Este cliente todavía no tiene razón social cargada. ' : '¿Falta una razón social? '}
+        <button type="button" className="font-medium underline" onClick={() => setOpen(true)}>Agregar una acá</button>
+      </p>
+    );
+  }
+
+  return (
+    <div className="mt-3 space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
+      <Input autoFocus placeholder="Razón social" value={razonSocial} onChange={(event) => setRazonSocial(event.target.value)} className="h-9 bg-white" />
+      <div className="grid gap-2 sm:grid-cols-2">
+        <Input placeholder="CUIT / Tax ID (opcional)" value={taxId} onChange={(event) => setTaxId(event.target.value)} className="h-9 bg-white" />
+        <Input placeholder="País (opcional)" value={country} onChange={(event) => setCountry(event.target.value)} className="h-9 bg-white" />
+      </div>
+      <div className="flex gap-2">
+        <Button type="button" size="sm" disabled={!razonSocial.trim() || createMutation.isPending} onClick={() => createMutation.mutate()}>
+          {createMutation.isPending ? 'Creando…' : 'Crear y seleccionar'}
+        </Button>
+        <Button type="button" size="sm" variant="ghost" onClick={() => setOpen(false)}>Cancelar</Button>
+      </div>
+    </div>
+  );
+}

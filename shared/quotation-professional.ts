@@ -28,7 +28,10 @@ export const serviceDeliverableSchema = z.object({
   type: z.enum(["report", "executive_report", "dashboard", "alert", "workshop", "presentation", "dataset", "ad_hoc"]),
   format: z.enum(["pdf", "pptx", "dashboard", "email", "whatsapp", "meeting", "xlsx", "mixed"]),
   cadence: z.enum(["once", "daily", "weekly", "biweekly", "monthly", "quarterly", "event", "on_demand"]),
-  quantity: z.number().int().positive().default(1),
+  // Cero es una cantidad legítima: un entregable previsto por la receta que este
+  // cliente no contrata (por ejemplo, sin instancia ejecutiva) queda en cero y
+  // deja de aportar horas, sin tener que reescribir la receta.
+  quantity: z.number().int().nonnegative().default(1),
   pageRange: z.string().trim().max(80).nullable().default(null),
   languages: z.array(proposalLocaleSchema).min(1).default(["es"]),
   modules: z.array(z.string()).default([]),

@@ -1,6 +1,6 @@
 ---
-version: 2.9.3
-updatedAt: 2026-08-14
+version: 2.13.0
+updatedAt: 2026-08-31
 feedbackCount: 70
 ---
 
@@ -221,3 +221,27 @@ cancellation_requested -> cancelled | approved
 ## Decisiones diferidas
 
 PRO-12 y TAR-16 permanecen diferidos. Su implementación exige una definición funcional aprobada en una versión futura de este documento.
+## Addendum — Feedback Mind V2-13 (ronda 27-8)
+
+Las rondas 23-7 a 20-8 quedaron cerradas en las versiones 2.9.x a 2.11.x. Esta versión
+resuelve la ronda del 27 de agosto de 2026, que no había sido procesada. No altera la
+identidad ni el conteo de las 70 entradas originales.
+
+| ID | Estado | Definición y resolución |
+|---|---|---|
+| F27-01 | Implementado | Personal expone una sola taxonomía. Nivel, Subnivel y Área son la clasificación canónica; `personnel.role_id` se deriva del nivel en el servidor y deja de pedirse en el formulario. La resolución reutiliza la fila ya asignada cuando sigue representando el mismo nivel, después un rol homónimo, después cualquier rol legacy equivalente, y sólo entonces materializa el nivel. |
+| F27-02 | Implementado | El promedio de tarifa por Rol + Subnivel excluye a los freelancers. Su valor hora está por encima de la escala fija y desplazaba el promedio del nivel. |
+| F27-03 | Implementado | "Proyectado" significa siempre "mes que todavía no terminó". Los valores del Máster se registran como observados, retiran la estimación REM del mismo período y toman `end_of_month` cuando el mes ya cerró. Una importación REM no puede crear estimaciones de meses cerrados y cada sincronización retira las proyecciones vencidas que ya tienen dato observado. |
+| F27-04 | Implementado | Los campos de lista de Alcance (Mercados, Marcas, Competidores, Fuentes) y Objetivos se editan como texto libre y se parsean al salir del campo. Parsear en cada tecla borraba la coma, el espacio final y el Enter en el mismo keystroke. |
+| F27-05 | Implementado | La cantidad de un entregable admite cero: un entregable previsto por la receta que este cliente no contrata deja de aportar horas sin reescribir la receta. La cadencia es editable. |
+| F27-06 | Implementado | Al asignar una persona a un puesto, los candidatos se ordenan por afinidad con el nivel del rol cotizado y se muestran agrupados. No se filtra en duro para no dejar sin candidatos a un puesto sin perfiles de ese nivel. |
+| F27-07 | Requiere definición | "Account Director" no existe en la escala vigente: son Leads. Unificar el catálogo de roles de receta con los cinco niveles canónicos requiere decisión funcional. |
+| F27-08 | Implementado | Una tarea de la Home abre su proyecto en `/tasks/projects/:id`. Sin proyecto asociado degrada a texto plano en vez de a un enlace muerto. |
+| F27-09 | Implementado | Las cargas se corrigen y se eliminan desde el reloj de la fila, sin entrar a la tarea. |
+| F27-10 | Implementado | La prioridad editada en la fila invalida también el detalle de la tarea. El panel lee `["/api/tasks", id]` con `staleTime` infinito y `"/api/tasks/project"` no es prefijo suyo. |
+| F27-11 | Implementado | Las horas cargadas desde la fila invalidan la lista del proyecto, que es la fuente de `loggedHours` de esa misma fila. |
+| F27-12 | Implementado | La carga rápida atribuye por defecto al responsable de la tarea: lo que rige es el dueño, no quien carga. |
+| F27-13 | Implementado | La duración admite minutos reales (`45m`, `1h30`, `1:30`, `2,5`) con un mínimo de un minuto, y se redondea al minuto en vez de al cuarto de hora. La razón social puede crearse desde el propio cotizador. |
+
+Las decisiones diferidas PRO-12, TAR-16, F14-10 y F14-13 no se modifican. F14-10 (Kanban de
+proyectos) se implementó en 2.10.0 con las cinco etapas y sin exponer importes.

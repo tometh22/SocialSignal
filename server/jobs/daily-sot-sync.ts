@@ -101,32 +101,34 @@ async function runFullPipeline() {
     // 3. FX rates UPSERT
     try {
       const rates = await googleSheetsWorkingService.getTiposCambio();
-      const { exchangeRates } = await import('../../shared/schema');
+      const { recordObservedRate, demoteStaleProjections } = await import('../services/fxSync');
       const MONTH_NUM: Record<string, number> = {
         ene:1,feb:2,mar:3,abr:4,may:5,jun:6,jul:7,ago:8,sep:9,oct:10,nov:11,dic:12,
       };
       let fxSynced = 0;
-      for (const r of rates as any[]) {
-        const month = MONTH_NUM[r.mes?.toLowerCase()?.substring(0, 3) ?? ''];
-        if (!month || !r.año || !r.tipoCambio) continue;
-        const existing = await db
-          .select({ id: exchangeRates.id })
-          .from(exchangeRates)
-          .where(and(eq(exchangeRates.year, r.año), eq(exchangeRates.month, month), eq(exchangeRates.isActive, true)))
-          .limit(1);
-        if (existing.length > 0) {
-          await db.update(exchangeRates)
-            .set({ rate: r.tipoCambio.toString(), source: 'auto_sync_maestro', updatedAt: new Date() })
-            .where(eq(exchangeRates.id, existing[0].id));
-        } else if (systemUserId) {
-          await db.insert(exchangeRates).values({
-            year: r.año, month, rate: r.tipoCambio.toString(),
-            source: 'auto_sync_maestro', isActive: true, createdBy: systemUserId,
+      if (systemUserId) {
+        for (const r of rates as any[]) {
+          const month = MONTH_NUM[r.mes?.toLowerCase()?.substring(0, 3) ?? ''];
+          const rate = Number(r.tipoCambio);
+          // Una celda rota del Máster se saltea: no puede tumbar la corrida ni
+          // escribir un tipo de cambio inválido sobre un período válido.
+          if (!month || !r.año || !Number.isFinite(rate) || rate <= 0) continue;
+          // El Máster publica valores observados, no proyecciones: se registran
+          // como cierre real del período y desactivan la estimación REM previa.
+          await recordObservedRate({
+            year: r.año,
+            month,
+            rate,
+            source: 'auto_sync_maestro',
+            createdBy: systemUserId,
           });
+          fxSynced++;
         }
-        fxSynced++;
+        const demoted = await demoteStaleProjections(systemUserId);
+        console.log(`✅ [SoT Sync] FX: ${fxSynced} tipos de cambio sincronizados · ${demoted} proyecciones vencidas retiradas`);
+      } else {
+        console.warn('⚠️ [SoT Sync] FX: sin usuario de sistema, se omite la sincronización');
       }
-      console.log(`✅ [SoT Sync] FX: ${fxSynced} tipos de cambio sincronizados`);
     } catch (e: any) {
       console.warn('⚠️ [SoT Sync] FX sync falló:', e?.message);
     }

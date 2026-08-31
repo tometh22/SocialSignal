@@ -30,6 +30,11 @@ const MODULES = [
   ["culture", "Cultura"], ["trends", "Tendencias"], ["category", "Categoría"], ["multisource", "Multifuente"],
 ] as const;
 
+const CADENCES = [
+  ["once", "Única vez"], ["daily", "Diaria"], ["weekly", "Semanal"], ["biweekly", "Quincenal"],
+  ["monthly", "Mensual"], ["quarterly", "Trimestral"], ["event", "Por evento"], ["on_demand", "A demanda"],
+] as const;
+
 export function ProfessionalScopeBuilder({ mode = "all", headless = false }: { mode?: ScopeBuilderMode; headless?: boolean }) {
   const { quotationData, updateQuotationData, updateTeamMembers, availableRoles } = useOptimizedQuote();
   const { data: blueprints = [], isLoading } = useQuery<BlueprintWithWorkload[]>({ queryKey: ["/api/service-blueprints?status=published"] });
@@ -290,7 +295,7 @@ export function ProfessionalScopeBuilder({ mode = "all", headless = false }: { m
             <CardContent className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2 md:col-span-2"><Label>Contexto y desafío del cliente</Label><Textarea rows={3} value={String(quotationData.decisionContext?.context || "")} onChange={(event) => updateQuotationData({ decisionContext: { ...(quotationData.decisionContext || {}), context: event.target.value } })} placeholder="¿Qué cambió, qué tensión existe y por qué importa ahora?" /></div>
               <div className="space-y-2"><Label>Decisión que debe habilitar</Label><Textarea rows={3} value={String(quotationData.decisionContext?.decision || "")} onChange={(event) => updateQuotationData({ decisionContext: { ...(quotationData.decisionContext || {}), decision: event.target.value } })} placeholder="¿Qué podrá decidir el cliente con este servicio?" /></div>
-              <div className="space-y-2"><Label>Objetivos · uno por línea</Label><Textarea rows={3} value={Array.isArray(quotationData.decisionContext?.objectives) ? (quotationData.decisionContext.objectives as string[]).join("\n") : ""} onChange={(event) => updateQuotationData({ decisionContext: { ...(quotationData.decisionContext || {}), objectives: event.target.value.split("\n").map((item) => item.trim()).filter(Boolean) } })} /></div>
+              <div className="space-y-2"><Label>Objetivos · uno por línea</Label><DeferredTextarea rows={3} value={Array.isArray(quotationData.decisionContext?.objectives) ? (quotationData.decisionContext.objectives as string[]).join("\n") : ""} onCommit={(raw) => updateQuotationData({ decisionContext: { ...(quotationData.decisionContext || {}), objectives: raw.split("\n").map((item) => item.trim()).filter(Boolean) } })} /></div>
               {["renewal", "expansion"].includes(quotationData.commercialMotion || "new_business") && <><div className="space-y-2"><Label>Situación actual</Label><Textarea rows={3} value={String(quotationData.decisionContext?.currentSituation || "")} onChange={(event) => updateQuotationData({ decisionContext: { ...(quotationData.decisionContext || {}), currentSituation: event.target.value } })} placeholder="Servicio, mercados, entregables y costo actual" /></div><div className="space-y-2"><Label>Cambios y valor esperado</Label><Textarea rows={3} value={String(quotationData.decisionContext?.changes || "")} onChange={(event) => updateQuotationData({ decisionContext: { ...(quotationData.decisionContext || {}), changes: event.target.value } })} placeholder="Ahorros, ampliaciones, eficiencia o nuevas capacidades" /></div></>}
             </CardContent>
           </Card>
@@ -321,11 +326,18 @@ export function ProfessionalScopeBuilder({ mode = "all", headless = false }: { m
           <Card>
             <CardHeader><CardTitle className="text-base">Entregables y frecuencia</CardTitle></CardHeader>
             <CardContent className="space-y-3">
+              {/* La cadencia pasó de badge a selector: necesita algo más de
+                  ancho que la columna original de 7rem. */}
               {scope.deliverables.map((deliverable) => (
-                <div key={deliverable.id} className="grid gap-3 rounded-xl border border-slate-200 p-4 md:grid-cols-[minmax(0,1fr)_7rem_7rem] md:items-center">
+                <div key={deliverable.id} className="grid gap-3 rounded-xl border border-slate-200 p-4 md:grid-cols-[minmax(0,1fr)_6rem_9.5rem] md:items-center">
                   <label className="flex items-start gap-3"><Checkbox className="mt-1" checked={deliverable.included} onCheckedChange={(checked) => updateScope({ ...scope, deliverables: scope.deliverables.map((item) => item.id === deliverable.id ? { ...item, included: checked === true } : item) })} /><span><strong className="block text-sm">{deliverable.name}</strong><span className="mt-1 block text-xs leading-5 text-slate-500">{deliverable.description}</span></span></label>
-                  <div className="space-y-1"><Label className="text-xs">Cantidad</Label><Input type="number" min={1} value={deliverable.quantity} onChange={(event) => updateScope({ ...scope, deliverables: scope.deliverables.map((item) => item.id === deliverable.id ? { ...item, quantity: Math.max(1, Number(event.target.value) || 1) } : item) })} /></div>
-                  <div><span className="text-xs text-slate-500">Cadencia</span><Badge variant="outline" className="mt-1 block w-fit">{deliverable.cadence}</Badge></div>
+                  <div className="space-y-1"><Label className="text-xs">Cantidad</Label><Input type="number" min={0} value={deliverable.quantity} onChange={(event) => updateScope({ ...scope, deliverables: scope.deliverables.map((item) => item.id === deliverable.id ? { ...item, quantity: Math.max(0, Math.trunc(Number(event.target.value) || 0)) } : item) })} /></div>
+                  <div className="space-y-1"><Label className="text-xs">Cadencia</Label>
+                    <Select value={deliverable.cadence} onValueChange={(cadence: any) => updateScope({ ...scope, deliverables: scope.deliverables.map((item) => item.id === deliverable.id ? { ...item, cadence } : item) })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>{CADENCES.map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </div>
                 </div>
               ))}
             </CardContent>
@@ -351,8 +363,37 @@ export function ProfessionalScopeBuilder({ mode = "all", headless = false }: { m
   );
 }
 
+/**
+ * Los campos de lista se editan como texto libre y sólo se parsean al salir del
+ * campo. Parsear en cada tecla normalizaba el valor contra el array ya guardado,
+ * así que la coma, el espacio final y el Enter desaparecían en el mismo keystroke
+ * y era imposible empezar a escribir el segundo ítem.
+ */
+function useDeferredText(value: string, commit: (raw: string) => void) {
+  const [draft, setDraft] = useState(value);
+  const [editing, setEditing] = useState(false);
+  useEffect(() => {
+    if (!editing) setDraft(value);
+  }, [editing, value]);
+  return {
+    value: draft,
+    onChange: (event: { target: { value: string } }) => setDraft(event.target.value),
+    onFocus: () => setEditing(true),
+    onBlur: () => {
+      setEditing(false);
+      commit(draft);
+    },
+  };
+}
+
 function ListField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
-  return <div className="space-y-2"><Label>{label}</Label><Input value={value} onChange={(event) => onChange(event.target.value)} placeholder="Separá valores con comas" /></div>;
+  const field = useDeferredText(value, onChange);
+  return <div className="space-y-2"><Label>{label}</Label><Input {...field} placeholder="Separá valores con comas" /></div>;
+}
+
+function DeferredTextarea({ value, onCommit, rows, placeholder }: { value: string; onCommit: (raw: string) => void; rows?: number; placeholder?: string }) {
+  const field = useDeferredText(value, onCommit);
+  return <Textarea rows={rows} placeholder={placeholder} {...field} />;
 }
 
 function Metric({ label, value }: { label: string; value: string }) {
