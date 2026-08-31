@@ -54,6 +54,17 @@ export default function QuickTaskHours({ taskId, className }: { taskId: number; 
     enabled: open && isOperations,
   });
 
+  // El servidor sólo deja corregir o borrar la carga propia, salvo Operaciones.
+  // Sin esto la fila ofrecía lápiz y papelera sobre la carga de un compañero y
+  // el click terminaba en un 403.
+  const { data: myIdentity } = useQuery<{ personnelId: number | null }>({
+    queryKey: ["/api/tasks/my-hours"],
+    queryFn: () => authFetchJson("/api/tasks/my-hours"),
+    enabled: open,
+  });
+  const canModify = (entry: TimeEntrySummary) =>
+    isOperations || (myIdentity?.personnelId != null && entry.personnelId === myIdentity.personnelId);
+
   // Lo que rige es el dueño de la tarea, no quien la carga: si Operaciones abre
   // el reloj de una tarea ajena, la atribución arranca apuntando al responsable
   // en vez de obligar a elegirlo en un paso extra.
@@ -248,7 +259,7 @@ export default function QuickTaskHours({ taskId, className }: { taskId: number; 
             <p className="py-1 text-xs text-muted-foreground">Todavía no hay horas registradas.</p>
           ) : entries.slice(0, 4).map((entry) => (
             <div key={entry.id} className="flex items-center gap-1.5 border-b border-border/50 py-1.5 text-xs last:border-0">
-              {editingEntryId === entry.id ? (
+              {editingEntryId === entry.id && canModify(entry) ? (
                 <>
                   <Input
                     autoFocus
@@ -273,26 +284,30 @@ export default function QuickTaskHours({ taskId, className }: { taskId: number; 
                   <span className="w-14 font-medium">{formatHours(Number(entry.hours))}</span>
                   <span className="text-muted-foreground">{format(new Date(`${entry.date.slice(0, 10)}T00:00:00`), "d MMM", { locale: es })}</span>
                   <span className="min-w-0 flex-1 truncate text-right text-muted-foreground">{entry.personnelName || entry.description || "Carga"}</span>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-7 w-7 shrink-0 p-0"
-                    disabled={busy}
-                    aria-label={`Corregir la carga de ${formatHours(Number(entry.hours))}`}
-                    onClick={() => { setEditingEntryId(entry.id); setEditingHours(String(Math.round(Number(entry.hours) * 100) / 100)); }}
-                  >
-                    <Pencil className="h-3 w-3" />
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-7 w-7 shrink-0 p-0 text-destructive hover:text-destructive"
-                    disabled={busy}
-                    aria-label={`Eliminar la carga de ${formatHours(Number(entry.hours))}`}
-                    onClick={() => deleteMutation.mutate(entry.id)}
-                  >
-                    <Trash2 className="h-3 w-3" />
-                  </Button>
+                  {canModify(entry) && (
+                    <>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 w-7 shrink-0 p-0"
+                        disabled={busy}
+                        aria-label={`Corregir la carga de ${formatHours(Number(entry.hours))}`}
+                        onClick={() => { setEditingEntryId(entry.id); setEditingHours(String(Math.round(Number(entry.hours) * 100) / 100)); }}
+                      >
+                        <Pencil className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 w-7 shrink-0 p-0 text-destructive hover:text-destructive"
+                        disabled={busy}
+                        aria-label={`Eliminar la carga de ${formatHours(Number(entry.hours))}`}
+                        onClick={() => deleteMutation.mutate(entry.id)}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </>
+                  )}
                 </>
               )}
             </div>

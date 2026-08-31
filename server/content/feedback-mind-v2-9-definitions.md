@@ -1,5 +1,5 @@
 ---
-version: 2.13.0
+version: 2.13.1
 updatedAt: 2026-08-31
 feedbackCount: 70
 ---
@@ -245,3 +245,14 @@ identidad ni el conteo de las 70 entradas originales.
 
 Las decisiones diferidas PRO-12, TAR-16, F14-10 y F14-13 no se modifican. F14-10 (Kanban de
 proyectos) se implementó en 2.10.0 con las cinco etapas y sin exponer importes.
+
+### Revisión 2.13.1 — cruce de la auditoría contra el código desplegado
+
+Re-auditar lo implementado contra `main` encontró tres resoluciones incompletas
+de la propia versión 2.13.0. Se corrigen acá.
+
+| ID | Estado | Corrección |
+|---|---|---|
+| F27-05a | Implementado | `isDeliverableSold` es el predicado único de alcance vendido: incluido **y** con unidades. Antes la cantidad en cero quitaba horas y tareas pero el entregable seguía apareciendo en la propuesta que ve el cliente y en los conteos de "N entregables". |
+| F27-06a | Implementado | El cruce de candidatos puntúa nivel **y** área. Los roles del catálogo mezclan seniority ("Lead PM") con función ("Data Scientist", "Project Manager", "Content Specialist"): cruzar sólo por seniority no ordenaba nada para la mitad de ellos. El nivel pesa el doble que el área porque es lo que define la tarifa. |
+| F27-09a | Implementado | El reloj de la fila sólo ofrece corregir o eliminar cargas que el usuario puede modificar. El servidor ya rechazaba la carga ajena con 403; la UI ofrecía la acción igual. |

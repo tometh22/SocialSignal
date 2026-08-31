@@ -174,7 +174,7 @@ import { createLedgerRouter } from "./routes-ledger";
 import { createFinancialIntelligenceRouter } from "./routes-financial-intelligence";
 import { registerProposalStudioRoutes } from "./routes-proposal-studio";
 import { runDocumentQa } from "./routes-proposal-studio";
-import { blueprintDefinitionSchema, estimateBlueprintWorkload, proposalDocumentSchema } from "@shared/quotation-professional";
+import { blueprintDefinitionSchema, estimateBlueprintWorkload, isDeliverableSold, proposalDocumentSchema } from "@shared/quotation-professional";
 import { renderProposalPdf } from "./services/proposal-studio";
 import { reviewRooms, reviewRoomMembers, capacityOverrides } from "@shared/schema";
 import path from 'path';
@@ -11346,7 +11346,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const definition = scope.data;
         const workload = estimateBlueprintWorkload(definition);
         const projectStart = validatedData.startDate;
-        const includedDeliverables = definition.deliverables.filter((item) => item.included);
+        const includedDeliverables = definition.deliverables.filter(isDeliverableSold);
         const slaDefinition = {
           level: definition.coverage.slaLevel,
           channels: definition.alertChannels,

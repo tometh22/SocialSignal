@@ -44,6 +44,18 @@ export const serviceDeliverableSchema = z.object({
 });
 export type ServiceDeliverable = z.infer<typeof serviceDeliverableSchema>;
 
+/**
+ * Un entregable forma parte del alcance vendido sólo si está incluido y tiene
+ * unidades. Poner la cantidad en cero es la forma de sacar del alcance un
+ * entregable que la receta trae por defecto (por ejemplo, cuando no hay
+ * instancia ejecutiva) sin tener que reescribir la receta. Todo consumidor
+ * —horas, tareas, conteos y la propuesta que ve el cliente— usa este predicado
+ * para no mostrar como vendido algo que se cotizó en cero.
+ */
+export function isDeliverableSold(item: { included?: boolean; quantity?: number | null }) {
+  return item.included !== false && Number(item.quantity ?? 1) > 0;
+}
+
 export const operationalMilestoneSchema = z.object({
   id: z.string().uuid(),
   name: z.string().trim().min(1),
@@ -126,7 +138,7 @@ export function estimateBlueprintWorkload(definition: BlueprintDefinition) {
     });
   }
 
-  for (const deliverable of definition.deliverables.filter((item) => item.included)) {
+  for (const deliverable of definition.deliverables.filter(isDeliverableSold)) {
     for (const [roleKey, hours] of Object.entries(deliverable.roleHours)) {
       lines.push({
         sourceId: deliverable.id,

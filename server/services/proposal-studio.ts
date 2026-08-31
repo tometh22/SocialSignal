@@ -6,6 +6,7 @@ import PptxGenJS from "pptxgenjs";
 import OpenAI from "openai";
 import { z } from "zod";
 import {
+  isDeliverableSold,
   proposalDocumentSchema,
   type ProposalBlock,
   type ProposalDocumentContent,
@@ -72,7 +73,7 @@ export function buildDefaultProposalDocument(input: {
     },
     {
       id: randomUUID(), type: "deliverables", title: es ? "Entregables diseñados para actuar" : "Deliverables designed for action",
-      body: "", bullets: deliverables.filter((item: any) => item.included !== false).map((item: any) => `${item.name} · ${cadenceLabel(item.cadence, es)}${item.quantity ? ` · ${item.quantity}` : ""}`),
+      body: "", bullets: deliverables.filter(isDeliverableSold).map((item: any) => `${item.name} · ${cadenceLabel(item.cadence, es)}${item.quantity ? ` · ${item.quantity}` : ""}`),
       data: { deliverables }, visible: true, internalOnly: false,
     },
     {

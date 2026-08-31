@@ -5,8 +5,14 @@ import {
   SERVICE_BLUEPRINT_SEEDS,
   blueprintDefinitionSchema,
   estimateBlueprintWorkload,
+  isDeliverableSold,
   serviceDeliverableSchema,
 } from "../shared/quotation-professional";
+import {
+  describeRoleAffinity,
+  inferAreaFromRoleName,
+  scoreCandidateForRole,
+} from "../shared/utils/personnel-classification";
 import { insertTaskTimeEntrySchema } from "../shared/schema";
 import { parseHoursInput, roundToMinute } from "../client/src/lib/task-hours";
 import { isClosedPeriod } from "../shared/utils/fx-periods";
@@ -108,6 +114,27 @@ describe("Feedback Mind V2-13 · ronda 27-8", () => {
     expect(estimateBlueprintWorkload(zeroed).totalHours).toBe(0);
   });
 
+  it("saca del alcance vendido un entregable cotizado en cero", () => {
+    // Cero unidades no es "incluido con cantidad cero": es no vendido. Si no,
+    // el entregable seguía apareciendo en la propuesta que ve el cliente.
+    expect(isDeliverableSold({ included: true, quantity: 0 })).toBe(false);
+    expect(isDeliverableSold({ included: true, quantity: 1 })).toBe(true);
+    expect(isDeliverableSold({ included: false, quantity: 3 })).toBe(false);
+    // Sin cantidad explícita se asume una unidad (recetas y datos legacy).
+    expect(isDeliverableSold({ included: true })).toBe(true);
+    expect(isDeliverableSold({})).toBe(true);
+  });
+
+  it("aplica ese predicado en todo consumidor, no sólo en el cálculo de horas", () => {
+    // La propuesta al cliente, los conteos de entregables y la generación de
+    // tareas tienen que coincidir con las horas cotizadas.
+    expect(source("server/services/proposal-studio.ts")).toContain("deliverables.filter(isDeliverableSold)");
+    expect(source("server/routes.ts")).toContain("definition.deliverables.filter(isDeliverableSold)");
+    const variants = source("client/src/components/optimized/QuotationVariants.tsx");
+    expect(variants.match(/filter\(isDeliverableSold\)/g)?.length).toBe(3);
+    expect(variants).not.toContain("filter((item) => item.included)");
+  });
+
   it("permite editar la cadencia del entregable", () => {
     const builder = source("client/src/components/quotation/professional-scope-builder.tsx");
     expect(builder).toContain("const CADENCES = [");
@@ -118,14 +145,46 @@ describe("Feedback Mind V2-13 · ronda 27-8", () => {
   });
 
   // ── F27-06 · Candidatos cruzados con el rol ──────────────────────────────
-  it("ordena los candidatos de un puesto por afinidad con el nivel del rol", () => {
+  it("infiere el área de los roles que nombran una función, no un nivel", () => {
+    // Estos son los nombres reales del catálogo. Cruzar sólo por seniority
+    // dejaba a la mitad sin ordenar, que era el agujero de la primera pasada.
+    expect(inferAreaFromRoleName("Data Scientist")).toBe("DataTech");
+    expect(inferAreaFromRoleName("Project Manager")).toBe("Operaciones");
+    expect(inferAreaFromRoleName("Content Specialist")).toBe("Marketing");
+    expect(inferAreaFromRoleName("Account Director")).toBe("Cuenta");
+    // "Analista" es ambiguo entre áreas: no se adivina.
+    expect(inferAreaFromRoleName("Analista Senior")).toBeNull();
+    expect(inferAreaFromRoleName("")).toBeNull();
+  });
+
+  it("puntúa candidatos por nivel y por área, con el nivel pesando más", () => {
+    const leadOps = { currentRole: "4 Lead", area: "Operaciones" };
+    const juniorOps = { currentRole: "1 Junior", area: "Operaciones" };
+    const leadData = { currentRole: "4 Lead", area: "DataTech" };
+
+    // "Lead PM" codifica ambas dimensiones: nivel 4 Lead + área Operaciones.
+    expect(scoreCandidateForRole("Lead PM", leadOps)).toBe(3);
+    expect(scoreCandidateForRole("Lead PM", leadData)).toBe(2);
+    expect(scoreCandidateForRole("Lead PM", juniorOps)).toBe(1);
+    expect(scoreCandidateForRole("Lead PM", { currentRole: "1 Junior", area: "Marketing" })).toBe(0);
+
+    // El nivel pesa más que el área.
+    expect(scoreCandidateForRole("Lead PM", leadData))
+      .toBeGreaterThan(scoreCandidateForRole("Lead PM", juniorOps));
+
+    // Un rol que sólo nombra función ordena igual, que era lo que no pasaba.
+    expect(scoreCandidateForRole("Data Scientist", leadData)).toBe(1);
+    expect(scoreCandidateForRole("Data Scientist", leadOps)).toBe(0);
+
+    // Un rol del que no se infiere nada no ordena a nadie.
+    expect(describeRoleAffinity("Colaborador")).toBeNull();
+    expect(scoreCandidateForRole("Colaborador", leadOps)).toBe(0);
+  });
+
+  it("no filtra en duro: un puesto sin perfiles afines conserva candidatos", () => {
     const team = source("client/src/components/optimized/EnhancedTeamConfig.tsx");
-    expect(team).toContain("const candidatesForMember = (member: DragDropTeamMember)");
-    expect(team).toContain("normalizePersonnelRole(getRoleInfo(member.roleId)?.name)");
-    expect(team).toContain("perfil del rol");
-    // Sin filtro duro: un puesto sin perfiles del nivel conserva candidatos.
-    expect(team).toContain("if (!targetLevel) return { matching: [], others: available };");
-    expect(team).toContain("<SelectLabel");
+    expect(team).toContain("if (!affinity) return { matching: [], others: available, affinity: null };");
+    expect(team).toContain("others: scored.filter((item) => item.score === 0)");
   });
 
   // ── F27-08 · La tarea de la Home abre su proyecto ────────────────────────
