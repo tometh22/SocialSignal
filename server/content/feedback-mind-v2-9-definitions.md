@@ -1,5 +1,5 @@
 ---
-version: 2.15.0
+version: 2.16.0
 updatedAt: 2026-08-31
 feedbackCount: 70
 ---
@@ -287,3 +287,20 @@ Lead, deberían aparecerme opciones que en Roles tengan esa categorización."*
 El catálogo de productos de seis modalidades (GEN-02) sigue pendiente: "Créditos"
 y "Fee + créditos" son modelos comerciales nuevos y necesitan definición antes de
 poder cotizarse.
+
+### Revisión 2.16.0 — bloqueo simétrico y candidatos reales de limpieza
+
+Dos correcciones a la limpieza de datos de prueba (GEN-01), tras verificar el
+impacto de anular un proyecto contra financiero, capacidad y tareas.
+
+| ID | Estado | Definición y resolución |
+|---|---|---|
+| GEN-09 | Implementado | Archivar un proyecto por Limpieza bloquea cargas nuevas igual que el botón oficial de "Anular proyecto" (`isFinished`, `closedAt`, `closedBy`). Antes sólo cambiaba `status`: el proyecto desaparecía de la vista pero seguía técnicamente abierto a cargas si alguien conservaba el link. |
+| GEN-10 | Implementado | `POST /api/admin/cleanup/restore-project` reactiva un proyecto anulado, simétrico al restore de cotizaciones que ya existía. La pestaña Limpieza muestra los últimos 20 anulados con un botón de restaurar. |
+| GEN-11 | Implementado | Los candidatos a proyecto ya no se filtran por nombre de prueba: el feedback original ("borrar el histórico de proyectos") no daba ese criterio, a diferencia de cotizaciones ("pruebas, viejas o caducadas"), y filtrar por nombre dejaba afuera exactamente el histórico real que se pedía sacar. Ahora se listan todos los proyectos no terminales con última actividad y horas cargadas, ordenados por candidato más probable (prueba por nombre → sin horas → sin actividad hace más de 6 meses → con actividad reciente); el admin sigue eligiendo uno por uno. |
+
+Verificado: anular un proyecto no altera ningún número financiero histórico.
+`financial-aggregator.ts` y `view-aggregator.ts` calculan por fecha desde las
+tablas de hechos (`fact_labor_month`, `income_sot`), no desde
+`active_projects.status`. Sí deja de contar en "proyectos activos" y saca sus
+tareas de "Mis tareas" de un colaborador (comportamiento esperado).
