@@ -6371,6 +6371,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Lista lo que hoy no tiene ninguna otra ventana: la app archivaba
+  // cotizaciones desde dos lugares (el tacho de Gestión de Cotizaciones,
+  // preexistente, y la Limpieza) sin que hubiera forma de ver qué quedó
+  // archivado ni recuperarlo salvo conociendo el id de memoria.
+  //
+  // Registrada ANTES de "/api/quotations/:id": Express matchea por orden de
+  // registro y ":id" habría interceptado "archived" como si fuera un id.
+  app.get("/api/quotations/archived", requireAuth, requirePermission("quotations"), async (_req, res) => {
+    try {
+      const rows = await db.select({
+        id: quotations.id,
+        projectName: quotations.projectName,
+        clientId: quotations.clientId,
+        status: quotations.status,
+        totalAmount: quotations.totalAmount,
+        archivedAt: quotations.archivedAt,
+        updatedBy: quotations.updatedBy,
+      }).from(quotations)
+        .where(isNotNull(quotations.archivedAt))
+        .orderBy(desc(quotations.archivedAt))
+        .limit(200);
+      const clientIds = [...new Set(rows.map((row) => row.clientId).filter(Boolean))];
+      const clientRows = clientIds.length === 0 ? [] : await db.select({ id: clients.id, name: clients.name })
+        .from(clients).where(inArray(clients.id, clientIds as number[]));
+      const clientNameById = new Map(clientRows.map((client) => [client.id, client.name]));
+      res.json(rows.map((row) => ({ ...row, clientName: clientNameById.get(row.clientId) ?? null })));
+    } catch (error) {
+      console.error("Error listando cotizaciones archivadas:", error);
+      res.status(500).json({ message: "No se pudieron listar las cotizaciones archivadas" });
+    }
+  });
+
   app.get("/api/quotations/:id", requireAuth, async (req, res) => {
     try {
       const id = parseInt(req.params.id);

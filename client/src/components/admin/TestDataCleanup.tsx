@@ -18,6 +18,7 @@ import {
 import { apiRequest, authFetchJson } from "@/lib/queryClient";
 import { getApiErrorMessage } from "@/lib/api-error";
 import { useToast } from "@/hooks/use-toast";
+import { ArchivedQuotationsList } from "@/components/quotation/archived-quotations-dialog";
 
 type ProjectCandidate = {
   id: number;
@@ -303,6 +304,11 @@ export function TestDataCleanup() {
           </CardContent>
         </Card>
       )}
+
+      {/* Mismo listado que "Ver archivadas" en Gestión de Cotizaciones —
+          se repite acá para que Admin tenga todo (proyectos y cotizaciones)
+          en un solo lugar al hacer la limpieza. */}
+      <ArchivedQuotationsList />
 
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <AlertDialogContent>
