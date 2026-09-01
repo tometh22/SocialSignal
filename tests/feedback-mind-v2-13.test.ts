@@ -209,6 +209,24 @@ describe("Feedback Mind V2-13 · ronda 27-8", () => {
     expect(context).toContain("canonical.length > 0 ? canonical : allRoles");
   });
 
+  // ── GEN-14 · No duplicar un rol cuando dos funciones de receta colisionan ──
+  it("agrupa por rol canónico en vez de crear una fila por función de receta", () => {
+    // Reporte real de Victoria Puricelli: "repite lead de leads más de una
+    // vez, y es la misma persona... es normal?" — no lo era. Cuando dos
+    // funciones de la receta (p. ej. "pm" y "analyst") caían por fallback en
+    // el mismo rol canónico porque esa área no tiene el nivel exacto, cada
+    // una generaba su propia fila con Object.entries(...).flatMap(...),
+    // duplicando literalmente el rol y la persona ya asignada.
+    const builder = source("client/src/components/quotation/professional-scope-builder.tsx");
+    expect(builder).toContain("const hoursByRoleId = new Map<number,");
+    expect(builder).toContain("const accumulated = hoursByRoleId.get(role.id);");
+    expect(builder).toContain("if (accumulated) accumulated.hours += hours;");
+    // Una sola fila por rol.id: el flatMap de 1 fila por función de receta
+    // quedó atrás.
+    expect(builder).not.toContain("Object.entries(workload.byRole).flatMap(([roleKey, hours]) => {");
+    expect(builder).toContain("[...hoursByRoleId.values()].map(({ role, hours }) => {");
+  });
+
   // ── F27-08 · La tarea de la Home abre su proyecto ────────────────────────
   it("enlaza cada fila de la home al proyecto asociado", () => {
     const home = source("client/src/pages/tasks/tasks-home.tsx");
