@@ -16,6 +16,7 @@ const PROJECT_TYPE_LABELS: Record<string, string> = {
   'comprehensive': 'Comprehensive',
   'executive': 'Executive',
   'demo': 'Demo',
+  'credit-pack': 'Bolsa de créditos',
 };
 
 const ANALYSIS_LABELS: Record<string, string> = {
@@ -53,6 +54,7 @@ export function ExecutiveSummary() {
   const totalHours = team.reduce((s: number, m: any) => s + (m.hours || 0), 0);
   const projectTypeLabel = PROJECT_TYPE_LABELS[project?.type] || project?.type || '';
   const analysisLabel = ANALYSIS_LABELS[quotationData.analysisType] || quotationData.analysisType || '';
+  const creditProgram = quotationData.creditProgram?.enabled ? quotationData.creditProgram : null;
 
   const fmt = (n: number) => formatCurrency(toDisplayCurrency(n), currency);
   const tax = calculateTaxBreakdown(
@@ -84,6 +86,7 @@ CONDICIONES
 • Esta propuesta tiene validez hasta el ${expiryStr}.
 • Los precios están expresados en ${currency}.
 • Condición de pago: ${quotationData.paymentTermsDays ?? 0} días.
+${creditProgram ? `• Bolsa: ${creditProgram.totalCredits} créditos, vigente del ${creditProgram.validityStart} al ${creditProgram.validityEnd}. Carry-over máximo: ${creditProgram.carryoverPercentage}% durante ${creditProgram.graceMonths} meses.` : ''}
 ${quotationData.proposalLink ? `• Propuesta completa: ${quotationData.proposalLink}` : ''}
 
 Quedamos a disposición para cualquier consulta.
@@ -149,6 +152,14 @@ Saludos cordiales`;
           </div>
         </div>
       </div>
+
+      {creditProgram && (
+        <div className="rounded-xl border border-indigo-100 bg-indigo-50/50 p-4">
+          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-indigo-700"><Briefcase className="h-3.5 w-3.5" /> Alcance de la bolsa</div>
+          <p className="mt-2 text-sm text-slate-700">{creditProgram.totalCredits} créditos para consumir durante la vigencia, con hasta {creditProgram.carryoverPercentage}% de carry-over por {creditProgram.graceMonths} meses.</p>
+          <div className="mt-3 grid gap-2 text-xs text-slate-600 sm:grid-cols-2"><span>Informe ejecutivo: 1 crédito</span><span>Estudio en profundidad: 3 créditos</span><span>Vigencia: {creditProgram.validityStart} a {creditProgram.validityEnd}</span><span>{creditProgram.hasActiveFee ? 'Incluye stack y seteo por fee activo' : 'Setup inicial cotizado aparte'}</span></div>
+        </div>
+      )}
 
       {/* Team */}
       {team.length > 0 && (

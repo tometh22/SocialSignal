@@ -85,4 +85,34 @@ describe('quotation UX workflow', () => {
       'manual-price',
     ]);
   });
+
+  it('targets the visible team-step justification when hours diverge from a recipe', () => {
+    const quotation = validQuotation();
+    quotation.scopeSnapshot = {
+      commercialMotion: 'new_business',
+      modality: 'one_shot',
+      durationMonths: 1,
+      coverage: { markets: ['Argentina'], brands: ['Cliente'], competitors: [], sources: ['Social'], languages: ['es'], mentionVolume: 'medium', analysisModules: [], slaLevel: 'standard', designLevel: 'standard' },
+      setupRoleHours: {},
+      deliverables: [{ id: crypto.randomUUID(), name: 'Informe', type: 'report', format: 'pdf', cadence: 'once', quantity: 1, description: 'Informe', roleHours: { analyst: 10 } }],
+    };
+    quotation.teamMembers[0].hours = 20;
+    const issue = validateQuotationPhase(2, quotation).find((item) => item.message.includes('desvío'));
+    expect(issue?.field).toBe('effort-override-reason');
+  });
+
+  it('compares recurring team hours with the monthly recipe reference', () => {
+    const quotation = validQuotation();
+    quotation.project.type = 'fee-mensual';
+    quotation.scopeSnapshot = {
+      commercialMotion: 'new_business',
+      modality: 'monthly_fee',
+      durationMonths: 3,
+      coverage: { markets: ['Argentina'], brands: ['Cliente'], competitors: [], sources: ['Social'], languages: ['es'], mentionVolume: 'medium', analysisModules: [], slaLevel: 'standard', designLevel: 'standard' },
+      setupRoleHours: {},
+      deliverables: [{ id: crypto.randomUUID(), name: 'Informe mensual', type: 'report', format: 'pdf', cadence: 'monthly', quantity: 3, description: 'Informe', roleHours: { analyst: 10 } }],
+    };
+    quotation.teamMembers[0].hours = 10;
+    expect(validateQuotationPhase(2, quotation).some((item) => item.field === 'effort-override-reason')).toBe(false);
+  });
 });

@@ -6766,6 +6766,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         message: "La finalización requiere pricing v2",
       }]);
     }
+    if (quotation.creditProgram?.enabled) {
+      const start = new Date(`${quotation.creditProgram.validityStart}T00:00:00`);
+      const end = new Date(`${quotation.creditProgram.validityEnd}T23:59:59`);
+      if (!Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime()) || end <= start) {
+        throw new z.ZodError([{
+          code: z.ZodIssueCode.custom,
+          path: ["creditProgram", "validityEnd"],
+          message: "La vigencia de la bolsa debe finalizar después de su inicio",
+        }]);
+      }
+    }
   };
 
   const quotationInflationFactor = (quotation: z.infer<typeof insertQuotationSchema>) => {
@@ -6940,7 +6951,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!quotation.commercialTerms?.trim()) {
         issues.push({ code: z.ZodIssueCode.custom, path: ["commercialTerms"], message: "Los términos comerciales son obligatorios" });
       }
-      if ((quotation.priceMode === "manual" || Number(quotation.discountPercentage || 0) > 0)
+      if (((quotation.priceMode === "manual" && !quotation.creditProgram?.enabled) || Number(quotation.discountPercentage || 0) > 0)
         && !quotation.adjustmentReason?.trim()) {
         issues.push({ code: z.ZodIssueCode.custom, path: ["adjustmentReason"], message: "Justificá el precio manual o descuento" });
       }
@@ -6959,6 +6970,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     monthly_fee: "fee-mensual",
     annual_program: "always-on",
     renewal: "fee-mensual",
+    credit_pack: "credit-pack",
   };
 
   const quotationGroupCandidateSchema = z.object({
@@ -6967,7 +6979,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     summary: z.string().trim().max(5_000).default(""),
     objective: z.string().trim().max(5_000).default(""),
     decision: z.string().trim().max(5_000).default(""),
-    modality: z.enum(["demo", "one_shot", "event_pack", "monthly_fee", "annual_program", "renewal"]).nullable().optional(),
+    modality: z.enum(["demo", "one_shot", "event_pack", "monthly_fee", "annual_program", "renewal", "credit_pack"]).nullable().optional(),
     durationMonths: z.number().positive().max(120).nullable().optional(),
     markets: z.array(z.string().trim().max(100)).max(50).default([]),
     languages: z.array(z.enum(["es", "en"])).max(2).default(["es"]),

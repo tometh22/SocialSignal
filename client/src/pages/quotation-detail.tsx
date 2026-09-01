@@ -282,6 +282,7 @@ const QuotationDetail: React.FC = () => {
       'on-demand': 'Proyecto On-Demand',
       'fee-mensual': 'Fee mensual',
       'always-on': 'Always-On',
+      'credit-pack': 'Bolsa de créditos',
     };
     
     return projectTypes[type] || type;

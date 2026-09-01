@@ -1238,6 +1238,8 @@ export class DatabaseStorage implements IStorage {
       return projectDurationOptions["fee-mensual"];
     } else if (projectType === 'always-on') {
       return projectDurationOptions["always-on"];
+    } else if (projectType === 'credit-pack') {
+      return projectDurationOptions["credit-pack"];
     }
     return [];
   }

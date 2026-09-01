@@ -874,7 +874,7 @@ export default function ManageQuotes() {
                                     {quote.projectType && (
                                       <span className="flex items-center gap-1">
                                         <Briefcase className="h-3.5 w-3.5" />
-                                        {quote.projectType === 'always-on' ? 'Always-On' : 
+                                        {quote.projectType === 'credit-pack' ? 'Bolsa de créditos' : quote.projectType === 'always-on' ? 'Always-On' :
                                          quote.projectType === 'monitoring' ? 'Monitoreo' : 'One-Shot'}
                                       </span>
                                     )}

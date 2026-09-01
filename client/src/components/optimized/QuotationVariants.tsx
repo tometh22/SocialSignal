@@ -26,7 +26,7 @@ import { useOptimizedQuote } from '@/context/optimized-quote-context';
 import { useLocation } from 'wouter';
 import { useCurrency } from '@/hooks/use-currency';
 import { calculateQuotationPricing } from '@shared/utils/quotation-pricing';
-import { blueprintDefinitionSchema, estimateBlueprintWorkload, isDeliverableSold, type BlueprintDefinition } from '@shared/quotation-professional';
+import { blueprintDefinitionSchema, estimateBlueprintWorkload, isDeliverableSold, workloadForBillingPeriod, type BlueprintDefinition } from '@shared/quotation-professional';
 
 interface QuotationVariant {
   id: number;
@@ -1098,7 +1098,7 @@ function professionalVariantDefinitions(base: BlueprintDefinition) {
 }
 
 function teamForScope(scope: BlueprintDefinition, team: TeamMember[], roles: Array<{ id: number; name: string }>) {
-  const workload = estimateBlueprintWorkload(scope);
+  const workload = workloadForBillingPeriod(scope, estimateBlueprintWorkload(scope));
   const grouped = new Map<string, TeamMember[]>();
   for (const member of team) {
     const key = roleKeyForName(member.roleName || roles.find((role) => role.id === member.roleId)?.name || "");
@@ -1130,7 +1130,7 @@ function unitMetricsFor(scope: BlueprintDefinition, total: number) {
   const months = Math.max(1, scope.durationMonths);
   const deliveries = Math.max(1, scope.deliverables.filter(isDeliverableSold).reduce((sum, item) => sum + item.quantity, 0));
   return {
-    perMonth: Number((total / months).toFixed(2)),
+    perMonth: Number((total / (['monthly_fee', 'annual_program', 'renewal'].includes(scope.modality) ? 1 : months)).toFixed(2)),
     perMarket: Number((total / Math.max(1, scope.coverage.markets.length)).toFixed(2)),
     perBrand: Number((total / Math.max(1, scope.coverage.brands.length)).toFixed(2)),
     perDeliverable: Number((total / deliveries).toFixed(2)),

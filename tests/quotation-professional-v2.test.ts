@@ -4,6 +4,7 @@ import {
   SERVICE_BLUEPRINT_SEEDS,
   HISTORICAL_PROPOSAL_EVIDENCE,
   estimateBlueprintWorkload,
+  workloadForBillingPeriod,
   runProposalQa,
 } from "../shared/quotation-professional";
 import {
@@ -16,9 +17,9 @@ import {
 const source = (path: string) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
 
 describe("professional service catalog and workload", () => {
-  it("ships the six versioned commercial modalities with stable sold-item IDs", () => {
+  it("ships the seven versioned commercial modalities with stable sold-item IDs", () => {
     expect(SERVICE_BLUEPRINT_SEEDS.map((seed) => seed.definition.modality)).toEqual([
-      "demo", "one_shot", "event_pack", "monthly_fee", "annual_program", "renewal",
+      "demo", "one_shot", "event_pack", "monthly_fee", "annual_program", "renewal", "credit_pack",
     ]);
     for (const seed of SERVICE_BLUEPRINT_SEEDS) {
       expect(seed.version).toBe(1);
@@ -41,6 +42,14 @@ describe("professional service catalog and workload", () => {
     expect(expanded.totalHours).toBeGreaterThan(baseline.totalHours);
     expect(expanded.byRole.analyst).toBeGreaterThan(baseline.byRole.analyst);
     expect(expanded.lines.some((line) => line.sourceName === "Pulso táctico mensual")).toBe(true);
+  });
+
+  it("normalizes recurring recipe effort to the monthly billing period", () => {
+    const definition = structuredClone(SERVICE_BLUEPRINT_SEEDS.find((seed) => seed.definition.modality === "monthly_fee")!.definition);
+    const contract = estimateBlueprintWorkload(definition);
+    const monthly = workloadForBillingPeriod(definition, contract);
+    expect(contract.totalHours).toBeGreaterThan(monthly.totalHours);
+    expect(monthly.totalHours).toBe(Math.round((contract.totalHours / definition.durationMonths) * 2) / 2);
   });
 });
 

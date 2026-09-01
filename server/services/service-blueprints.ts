@@ -10,6 +10,7 @@ const SOURCE_LABELS: Record<string, string> = {
   "fee-mensual-inteligencia": "Tortugas Mall · ganada; Uber julio/agosto 2026 · abierta",
   "programa-regional-anual": "Pepsico octubre 2025 · ganada",
   "renovacion-expansion": "Patrones de continuidad Epical; Warner excluida hasta incorporar archivo",
+  "bolsa-creditos-epical": "Modelo comercial de créditos Epical",
 };
 
 export async function ensureServiceBlueprintSeeds() {

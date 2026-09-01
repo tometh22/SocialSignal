@@ -14,6 +14,7 @@ import { feedbackMindV29MigrationSql } from "./migrations/feedback-mind-v2-9";
 import { personnelCostSyncWarningsMigrationSql } from "./migrations/personnel-cost-sync-warnings";
 import { feedbackMindV210MigrationSql } from "./migrations/feedback-mind-v2-10";
 import { canonicalQuotationRolesMigrationSql } from "./migrations/canonical-quotation-roles";
+import { creditProgramMigrationSql } from "./migrations/credit-program";
 import { feedbackMindV211MigrationSql } from "./migrations/feedback-mind-v2-11";
 import { quotationProfessionalWorkflowMigrationSql } from "./migrations/quotation-professional-workflow";
 import {
@@ -845,6 +846,7 @@ async function applyPendingMigrations() {
     await run('0052 quotation groups', quotationGroupsMigrationSql);
     await run('0054 ipc price adjustments', ipcPriceAdjustmentsMigrationSql);
     await run('0055 canonical quotation roles', canonicalQuotationRolesMigrationSql);
+    await run('0056 quotation credit program', creditProgramMigrationSql);
 
     // 0033: feriados duplicados (mismo date+name insertado más de una vez desde el
     // formulario) — borra duplicados conservando la fila más antigua y agrega la
