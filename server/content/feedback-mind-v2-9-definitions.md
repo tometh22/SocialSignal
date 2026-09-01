@@ -1,6 +1,6 @@
 ---
-version: 2.16.0
-updatedAt: 2026-08-31
+version: 2.17.0
+updatedAt: 2026-09-01
 feedbackCount: 70
 ---
 
@@ -304,3 +304,18 @@ Verificado: anular un proyecto no altera ningún número financiero histórico.
 tablas de hechos (`fact_labor_month`, `income_sot`), no desde
 `active_projects.status`. Sí deja de contar en "proyectos activos" y saca sus
 tareas de "Mis tareas" de un colaborador (comportamiento esperado).
+
+### Revisión 2.17.0 — visibilidad y recuperación de cotizaciones archivadas
+
+Motivada por un reporte de "desaparecieron cotizaciones históricas". Se
+investigó el impacto y se confirmó que archivar nunca borra físicamente
+(`archivedAt`), pero la app no tenía ninguna pantalla para ver qué estaba
+archivado ni recuperarlo sin conocer el id de memoria — un problema
+preexistente a la Limpieza, que ya podía archivar por dos caminos: el tacho
+individual en Gestión de Cotizaciones (anterior a esta versión) y la Limpieza
+de Admin.
+
+| ID | Estado | Definición y resolución |
+|---|---|---|
+| GEN-12 | Implementado | `GET /api/quotations/archived` lista las cotizaciones archivadas con nombre de cliente, monto y fecha de archivado, con el mismo permiso que ya usan las demás rutas de Gestión de Cotizaciones (no exige Admin). "Ver archivadas" en la cabecera de Gestión de Cotizaciones y una card equivalente en la pestaña Limpieza reutilizan el mismo listado, con restaurar por fila. |
+| GEN-13 | Implementado | La ruta se registra antes de `GET /api/quotations/:id`: Express matchea por orden de registro y `:id` habría interceptado `archived` como si fuera un id, dejando el endpoint nuevo inalcanzable. Lo detectó la red de seguridad de `tests/express-route-order.test.ts`, que ahora también cubre esta ruta. |

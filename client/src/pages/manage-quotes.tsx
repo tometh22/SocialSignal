@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Search, FileText, CheckCircle, AlertCircle, Clock, Edit, Eye, Archive, PenLine, Plus, X, MessageCircle, Filter, Loader2, Calendar, DollarSign, TrendingUp, Zap, Users, Handshake, Briefcase, Target, ThumbsDown, TrendingDown, AlertOctagon, ChevronDown, FolderOpen, List, Send, GitBranch, Layers3 } from "lucide-react";
 import { LossReasonDialog } from "@/components/quotation/loss-reason-dialog";
+import { ArchivedQuotationsDialog } from "@/components/quotation/archived-quotations-dialog";
 import { PageLayout } from "@/components/ui/page-layout";
 import { Loader } from "@/components/ui/loader";
 import { MetricCard, MetricGrid } from "@/components/ui/metric-card";
@@ -712,13 +713,16 @@ export default function ManageQuotes() {
             <CardHeader className="border-b border-slate-200 bg-slate-50/70 py-4">
               <CardTitle className="text-lg font-semibold text-slate-800 flex items-center justify-between gap-3">
                 <span className="flex items-center"><Users className="h-5 w-5 mr-2 text-slate-600" />Lista de Cotizaciones</span>
-                <span className="flex items-center rounded-md border bg-white p-0.5">
-                  <Button type="button" variant={quoteView === "folders" ? "secondary" : "ghost"} size="sm" className="h-7 px-2 text-xs" onClick={() => setQuoteView("folders")}>
-                    <FolderOpen className="mr-1 h-3.5 w-3.5" />Carpetas
-                  </Button>
-                  <Button type="button" variant={quoteView === "list" ? "secondary" : "ghost"} size="sm" className="h-7 px-2 text-xs" onClick={() => setQuoteView("list")}>
-                    <List className="mr-1 h-3.5 w-3.5" />Lista
-                  </Button>
+                <span className="flex items-center gap-2">
+                  <ArchivedQuotationsDialog />
+                  <span className="flex items-center rounded-md border bg-white p-0.5">
+                    <Button type="button" variant={quoteView === "folders" ? "secondary" : "ghost"} size="sm" className="h-7 px-2 text-xs" onClick={() => setQuoteView("folders")}>
+                      <FolderOpen className="mr-1 h-3.5 w-3.5" />Carpetas
+                    </Button>
+                    <Button type="button" variant={quoteView === "list" ? "secondary" : "ghost"} size="sm" className="h-7 px-2 text-xs" onClick={() => setQuoteView("list")}>
+                      <List className="mr-1 h-3.5 w-3.5" />Lista
+                    </Button>
+                  </span>
                 </span>
               </CardTitle>
             </CardHeader>

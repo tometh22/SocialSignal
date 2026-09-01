@@ -364,4 +364,35 @@ describe("Feedback Mind V2-13 · ronda 27-8", () => {
     // Un proyecto ya cerrado tampoco se vuelve a proponer.
     expect(candidates).toContain("ap.status NOT IN ('voided', 'cancelled', 'completed')");
   });
+  // ── GEN-12 · Recuperar cotizaciones archivadas sin saber el id ──────────
+  it("expone un listado de cotizaciones archivadas, accesible sin ser Admin", () => {
+    const routes = source("server/routes.ts");
+    const archivedIndex = routes.indexOf('app.get("/api/quotations/archived"');
+    const byIdIndex = routes.indexOf('app.get("/api/quotations/:id"');
+    expect(archivedIndex).toBeGreaterThan(-1);
+    // Express matchea rutas en orden de registro: ":id" habría interceptado
+    // "archived" como si fuera un id si se registraba después. La red de
+    // seguridad de tests/express-route-order.test.ts detectó exactamente esto.
+    expect(archivedIndex).toBeLessThan(byIdIndex);
+    const listRoute = routes.slice(archivedIndex, byIdIndex);
+    // El mismo permiso que ya usan las demás rutas de Gestión de Cotizaciones,
+    // no el de Admin: la limpieza de datos ya existía por dos caminos
+    // (el tacho preexistente de Gestión y la Limpieza de Admin) y las dos
+    // debían quedar visibles desde donde se archivó.
+    expect(listRoute).toContain('requirePermission("quotations")');
+    expect(listRoute).toContain("isNotNull(quotations.archivedAt)");
+  });
+
+  it("ofrece ver y restaurar archivadas tanto en Gestión de Cotizaciones como en Limpieza", () => {
+    const dialog = source("client/src/components/quotation/archived-quotations-dialog.tsx");
+    expect(dialog).toContain("export function ArchivedQuotationsList()");
+    expect(dialog).toContain("export function ArchivedQuotationsDialog()");
+    expect(dialog).toContain('apiRequest(`/api/quotations/${id}/restore`, "POST")');
+
+    const manageQuotes = source("client/src/pages/manage-quotes.tsx");
+    expect(manageQuotes).toContain("<ArchivedQuotationsDialog />");
+
+    const cleanup = source("client/src/components/admin/TestDataCleanup.tsx");
+    expect(cleanup).toContain("<ArchivedQuotationsList />");
+  });
 });
