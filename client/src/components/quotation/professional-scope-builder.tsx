@@ -115,22 +115,34 @@ export function ProfessionalScopeBuilder({ mode = "all", headless = false }: { m
     const benchmark = benchmarkFor(blueprint?.id ?? quotationData.serviceBlueprintId, nextProjectType);
     const workload = applyHistoricalEffortBenchmark(recipeWorkload, benchmark);
     const missing: string[] = [];
-    const nextMembers = Object.entries(workload.byRole).flatMap(([roleKey, hours]) => {
+    // Distintas funciones de la receta (pm, analyst, data…) pueden resolver al
+    // mismo rol canónico cuando el nivel exacto no existe en esa área y se cae
+    // al primer rol disponible (resolveCanonicalRoleForBlueprintKey). Antes eso
+    // creaba una fila por función igual, duplicando literalmente el mismo rol
+    // —y la misma persona ya asignada— con las horas repartidas entre ambas.
+    // Agrupar por role.id y sumar las horas deja una única fila por rol real.
+    const hoursByRoleId = new Map<number, { role: NonNullable<ReturnType<typeof resolveRole>>; hours: number }>();
+    for (const [roleKey, hours] of Object.entries(workload.byRole)) {
       const role = resolveRole(roleKey, availableRoles);
       if (!role) {
         missing.push(roleKey);
-        return [];
+        continue;
       }
+      const accumulated = hoursByRoleId.get(role.id);
+      if (accumulated) accumulated.hours += hours;
+      else hoursByRoleId.set(role.id, { role, hours });
+    }
+    const nextMembers = [...hoursByRoleId.values()].map(({ role, hours }) => {
       const existing = quotationData.teamMembers.find((member) => member.roleId === role.id);
       const rate = existing?.rate || (quotationData.quotationCurrency === "USD" ? Number(role.defaultRateUsd || role.defaultRate || 0) : Number(role.defaultRate || 0));
-      return [{
+      return {
         id: existing?.id || crypto.randomUUID(),
         roleId: role.id,
         personnelId: existing?.personnelId ?? null,
         hours,
         rate,
         cost: hours * rate,
-      }];
+      };
     });
     setUnmappedRoles(missing);
     updateTeamMembers(nextMembers);

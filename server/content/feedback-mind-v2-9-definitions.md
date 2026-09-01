@@ -1,5 +1,5 @@
 ---
-version: 2.17.0
+version: 2.18.0
 updatedAt: 2026-09-01
 feedbackCount: 70
 ---
@@ -319,3 +319,22 @@ de Admin.
 |---|---|---|
 | GEN-12 | Implementado | `GET /api/quotations/archived` lista las cotizaciones archivadas con nombre de cliente, monto y fecha de archivado, con el mismo permiso que ya usan las demás rutas de Gestión de Cotizaciones (no exige Admin). "Ver archivadas" en la cabecera de Gestión de Cotizaciones y una card equivalente en la pestaña Limpieza reutilizan el mismo listado, con restaurar por fila. |
 | GEN-13 | Implementado | La ruta se registra antes de `GET /api/quotations/:id`: Express matchea por orden de registro y `:id` habría interceptado `archived` como si fuera un id, dejando el endpoint nuevo inalcanzable. Lo detectó la red de seguridad de `tests/express-route-order.test.ts`, que ahora también cubre esta ruta. |
+
+### Revisión 2.18.0 — un rol de receta no se duplica al caer por fallback
+
+Reporte de Victoria Puricelli probando el cotizador: *"repite lead de leads
+más de una vez, y es la misma persona... es normal?"*. No lo era.
+
+| ID | Estado | Definición y resolución |
+|---|---|---|
+| GEN-14 | Implementado | Al aplicar una receta, cada función (`director`, `pm`, `analyst`, `data`, `tech`, `design`) se resolvía a un rol canónico por separado y generaba su propia fila. Cuando dos funciones distintas caían por fallback en el mismo rol canónico —porque esa área no tiene el nivel exacto que pide `BLUEPRINT_ROLE_PROFILES`—, el resultado eran dos filas idénticas, duplicando el rol y la persona ya asignada. Ahora se agrupa por `role.id` antes de construir el equipo y las horas de funciones que colisionan se suman en una sola fila. |
+
+El segundo síntoma reportado en la misma sesión ("todos los valores hora están
+en cero") no se tocó: no está relacionado con el catálogo de roles. Apunta a
+`quotationExchangeRate` sin confirmar — `requiresExchangeRateConfirmation` se
+activa en cotizaciones con `pricingVersion < 2`, y mientras esté activo el
+snapshot de tipo de cambio no se hidrata solo. `resolveQuotationPersonnelRate`
+devuelve 0 para cualquier persona cuando el tipo de cambio de la cotización no
+es positivo, sin importar la tarifa real de esa persona. Confirmar el tipo de
+cambio en el paso de Inversión debería resolverlo; queda pendiente de
+verificación directa sobre esa cotización.
