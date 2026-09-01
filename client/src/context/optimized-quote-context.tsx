@@ -13,6 +13,7 @@ import {
   getMentionsVolumeFactor,
 } from "@shared/utils/quotation-complexity";
 import type { BlueprintDefinition, CommercialMotion } from "@shared/quotation-professional";
+import { calculateCreditProgramTotals, createDefaultCreditProgram, type CreditProgram } from "@shared/utils/credit-program";
 
 export interface OptimizedTeamMember {
   id: string;
@@ -106,6 +107,7 @@ export interface QuotationData {
   billingEntityId?: number | null;
   expiresAt?: string;
   quotationType?: 'one-time' | 'recurring' | 'fee';
+  creditProgram?: CreditProgram | null;
   taxRate?: number;
   taxLabel?: string;
   pricesIncludeTax?: boolean;
@@ -260,6 +262,7 @@ const initialQuotationData: QuotationData = {
     rateProjectionMode: "current"
   },
   quotationType: 'one-time',
+  creditProgram: createDefaultCreditProgram(),
   expiresAt: defaultExpiryDate(),
   taxRate: 0,
   taxLabel: 'IVA',
@@ -631,16 +634,20 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
       deviationPercentage: quotationData.financials.deviationPercentage,
       discountPercentage: quotationData.financials.discountPercentage,
       inflationFactor,
-      priceMode: quotationData.financials.priceMode,
-      manualPrice: quotationData.financials.manualPrice,
-      manualPriceCurrency: quotationData.financials.manualPriceCurrency ?? (quotationData.quotationCurrency === "USD" ? "USD" : "ARS"),
+      priceMode: quotationData.creditProgram?.enabled ? 'manual' : quotationData.financials.priceMode,
+      manualPrice: quotationData.creditProgram?.enabled
+        ? calculateCreditProgramTotals(quotationData.creditProgram).packagePriceUSD
+        : quotationData.financials.manualPrice,
+      manualPriceCurrency: quotationData.creditProgram?.enabled
+        ? 'USD'
+        : (quotationData.financials.manualPriceCurrency ?? (quotationData.quotationCurrency === "USD" ? "USD" : "ARS")),
     });
     setPricingResult(result);
     setBaseCost(result.canonicalARS.baseCost);
     setComplexityAdjustment(result.canonicalARS.complexityAdjustment);
     setMarkupAmount(result.canonicalARS.markupAmount);
     setTotalAmount(result.canonicalARS.total);
-  }, [quotationData.teamMembers, quotationData.financials, quotationData.quotationCurrency, quotationData.inflation, complexityFactors, recalculationTrigger, effectiveExchangeRate]);
+  }, [quotationData.teamMembers, quotationData.financials, quotationData.creditProgram, quotationData.quotationCurrency, quotationData.inflation, complexityFactors, recalculationTrigger, effectiveExchangeRate]);
 
   // Navigation functions
   const nextStep = useCallback(() => {
@@ -678,7 +685,12 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
   const updateProjectType = useCallback((type: string) => {
     setQuotationData(prev => ({ 
       ...prev, 
-      project: { ...prev.project, type }
+      project: { ...prev.project, type },
+      creditProgram: type === 'credit-pack'
+        ? { ...(prev.creditProgram || createDefaultCreditProgram()), enabled: true }
+        : prev.project.type === 'credit-pack' && prev.creditProgram
+          ? { ...prev.creditProgram, enabled: false }
+          : prev.creditProgram,
     }));
   }, []);
 
@@ -1025,6 +1037,9 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
         serviceBlueprintVersion: quotation.serviceBlueprintVersion ?? null,
         commercialMotion: quotation.commercialMotion || 'new_business',
         scopeSnapshot: quotation.scopeSnapshot || null,
+        creditProgram: (quotation.creditProgram?.enabled || quotation.projectType === 'credit-pack')
+          ? { ...createDefaultCreditProgram(), ...quotation.creditProgram }
+          : null,
         decisionContext: quotation.decisionContext || {},
         operationalPlan: quotation.operationalPlan || {},
         effortOverrideReason: quotation.effortOverrideReason || null,
@@ -1089,6 +1104,7 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
         decisionContext: quotationData.decisionContext || {},
         operationalPlan: quotationData.operationalPlan || {},
         effortOverrideReason: quotationData.effortOverrideReason || null,
+        creditProgram: quotationData.creditProgram || null,
         baseCost: pricingResult.display.baseCost,
         complexityAdjustment: pricingResult.display.complexityAdjustment,
         markupAmount: pricingResult.display.markupAmount,
@@ -1101,9 +1117,13 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
         toolsCost: pricingResult.display.toolsCost,
         deliverables: quotationData.deliverables || [],
         additionalDeliverableCost: pricingResult.display.additionalDeliverableCost,
-        priceMode: quotationData.financials.priceMode || 'auto',
-        manualPrice: quotationData.financials.manualPrice || null,
-        manualPriceCurrency: quotationData.financials.manualPriceCurrency ?? quotationData.quotationCurrency,
+        priceMode: quotationData.creditProgram?.enabled ? 'manual' : quotationData.financials.priceMode || 'auto',
+        manualPrice: quotationData.creditProgram?.enabled
+          ? calculateCreditProgramTotals(quotationData.creditProgram).packagePriceUSD
+          : quotationData.financials.manualPrice || null,
+        manualPriceCurrency: quotationData.creditProgram?.enabled
+          ? 'USD'
+          : quotationData.financials.manualPriceCurrency ?? quotationData.quotationCurrency,
         pricingVersion: 2,
         applyInflationAdjustment: false,
         inflationMethod: 'manual',

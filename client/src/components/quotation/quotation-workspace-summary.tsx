@@ -17,11 +17,12 @@ export function QuotationWorkspaceSummary({ currentPhase, totalSteps = 4, compac
     style: 'currency', currency, minimumFractionDigits: currency === 'USD' ? 2 : 0, maximumFractionDigits: currency === 'USD' ? 2 : 0,
   }).format(amount || 0);
   const totalHours = quotationData.teamMembers.reduce((sum, member) => sum + Number(member.hours || 0), 0);
+  const recurring = ['fee-mensual', 'always-on'].includes(quotationData.project.type);
   const total = pricingResult.display.total || 0;
   const margin = pricingResult.display.markupAmount || 0;
   const marginPercent = total > 0 ? Math.max(0, (margin / total) * 100) : 0;
   const projectTypeLabel = {
-    'on-demand': 'Proyecto puntual', 'fee-mensual': 'Fee mensual', 'always-on': 'Servicio recurrente', monitoring: 'Monitoreo', demo: 'Demo',
+    'on-demand': 'Proyecto puntual', 'fee-mensual': 'Fee mensual', 'always-on': 'Servicio recurrente', monitoring: 'Monitoreo', demo: 'Demo', 'credit-pack': 'Bolsa de créditos',
   }[quotationData.project.type] || quotationData.project.type || 'Sin definir';
   const motionLabel = {
     new_business: 'Nuevo negocio', renewal: 'Renovación', expansion: 'Expansión', demo: 'Demo',
@@ -40,7 +41,7 @@ export function QuotationWorkspaceSummary({ currentPhase, totalSteps = 4, compac
       <div className="divide-y divide-slate-100 rounded-xl border border-slate-200">
         <SummaryRow icon={BriefcaseBusiness} label="Cliente" value={quotationData.client?.name || 'Pendiente'} />
         <SummaryRow icon={Clock3} label="Modalidad" value={`${motionLabel} · ${projectTypeLabel}`} />
-        <SummaryRow icon={Users} label="Equipo" value={totalHours > 0 ? `${quotationData.teamMembers.length} integrantes · ${totalHours.toFixed(1)} h` : 'Pendiente'} />
+        <SummaryRow icon={Users} label="Equipo" value={totalHours > 0 ? `${quotationData.teamMembers.length} integrantes · ${totalHours.toFixed(1)} h${recurring ? '/mes' : ''}` : 'Pendiente'} />
       </div>
 
       <div className="space-y-2">

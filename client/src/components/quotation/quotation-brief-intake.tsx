@@ -16,7 +16,7 @@ export type BriefProposalCandidate = {
   projectName: string;
   objective: string;
   decision: string;
-  modality: "demo" | "one_shot" | "event_pack" | "monthly_fee" | "annual_program" | "renewal" | null;
+  modality: "demo" | "one_shot" | "event_pack" | "monthly_fee" | "annual_program" | "renewal" | "credit_pack" | null;
   durationMonths: number | null;
   markets: string[];
   brands: string[];
@@ -56,6 +56,7 @@ const modalityLabel: Record<string, string> = {
   event_pack: "Pack de evento",
   monthly_fee: "Fee mensual",
   annual_program: "Programa anual",
+  credit_pack: "Bolsa de créditos",
   renewal: "Renovación",
 };
 

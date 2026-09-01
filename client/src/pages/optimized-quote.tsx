@@ -38,6 +38,7 @@ import {
 } from 'lucide-react';
 import AutosaveIndicator from '@/components/ui/autosave-indicator';
 import { useOnlineStatus } from '@/hooks/use-online-status';
+import { createDefaultCreditProgram } from '@shared/utils/credit-program';
 
 import OptimizedBasicInfo from '@/components/optimized/basic-info';
 import QuotationErrorBoundary from '@/components/quotation-error-boundary';
@@ -508,10 +509,13 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
                     onCreateGroup={handleCreateGroup}
                     onApply={(proposal: BriefProposalCandidate, analysis: BriefIntakeAnalysis) => {
                     const motion = proposal.modality === 'renewal' ? 'renewal' : proposal.modality === 'demo' ? 'demo' : quotationData.commercialMotion || 'new_business';
-                    const projectType = proposal.modality === 'monthly_fee' || proposal.modality === 'renewal' ? 'fee-mensual' : proposal.modality === 'annual_program' ? 'always-on' : 'on-demand';
+                    const projectType = proposal.modality === 'monthly_fee' || proposal.modality === 'renewal' ? 'fee-mensual' : proposal.modality === 'annual_program' ? 'always-on' : proposal.modality === 'credit_pack' ? 'credit-pack' : 'on-demand';
                     updateQuotationData({
                       project: { ...quotationData.project, name: proposal.projectName || quotationData.project.name, type: projectType, duration: durationValueFromMonths(proposal.durationMonths, projectType, quotationData.project.duration) },
                       commercialMotion: motion,
+                      creditProgram: proposal.modality === 'credit_pack'
+                        ? { ...(quotationData.creditProgram || createDefaultCreditProgram()), enabled: true }
+                        : quotationData.creditProgram,
                       decisionContext: { ...(quotationData.decisionContext || {}), source: 'brief_or_meeting_minute', summary: proposal.summary, context: proposal.summary, objective: proposal.objective, decision: proposal.decision, markets: proposal.markets, brands: proposal.brands, competitors: proposal.competitors, sources: proposal.sources, modules: proposal.modules, languages: proposal.languages, mentionVolume: proposal.mentionVolume, slaLevel: proposal.slaLevel, designLevel: proposal.designLevel, missingQuestions: proposal.missingQuestions, recommendationReason: proposal.recommendationReason, recommendedBlueprintId: proposal.recommendedBlueprint?.id || null, recommendedBlueprintSlug: proposal.recommendationSlug, recommendationConfidence: proposal.confidence, detectedProposalCount: analysis.proposals.length, selectedProposalId: proposal.id },
                     });
                     toast({ title: 'Propuesta seleccionada', description: proposal.recommendedBlueprint ? `${proposal.projectName}. La receta ${proposal.recommendedBlueprint.name} quedará destacada en Servicio.` : `${proposal.projectName}. Completá los datos esenciales para continuar.` });
@@ -566,6 +570,7 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
                 <div className="space-y-6">
                   <SectionHeading title="Confirmá el equipo" description="Partimos del equipo sugerido por la receta. Ajustá personas u horas sólo cuando el proyecto lo requiera." />
                   <EnhancedTeamConfig validationMessage={fieldErrors['team-config']} />
+                  <EffortOverrideReason quotationData={quotationData} validationMessage={fieldErrors['effort-override-reason']} updateQuotationData={updateQuotationData} />
                   <details className="rounded-xl border border-slate-200 bg-slate-50/60 p-4">
                     <summary className="cursor-pointer text-sm font-semibold text-slate-800">Ajustes avanzados de complejidad</summary>
                     <p className="mt-2 text-xs leading-5 text-slate-500">Estos controles existen para casos excepcionales. La receta ya trae una configuración recomendada.</p>
@@ -671,6 +676,43 @@ function EmptyStep({ message }: { message: string }) {
   );
 }
 
+function EffortOverrideReason({
+  quotationData,
+  validationMessage,
+  updateQuotationData,
+}: {
+  quotationData: any;
+  validationMessage?: string;
+  updateQuotationData: (changes: any) => void;
+}) {
+  if (!quotationData.scopeSnapshot) return null;
+  const referenceHours = Number(quotationData.operationalPlan?.workload?.totalHours || 0);
+  const configuredHours = (quotationData.teamMembers || []).reduce((sum: number, member: any) => sum + Number(member.hours || 0), 0);
+  const deviation = referenceHours > 0 ? ((configuredHours - referenceHours) / referenceHours) * 100 : 0;
+  if (Math.abs(deviation) <= 10 && !validationMessage) return null;
+
+  const recurring = ['fee-mensual', 'always-on'].includes(quotationData.project.type);
+  return (
+    <div className={`rounded-xl border p-4 ${validationMessage ? 'border-red-200 bg-red-50/60' : 'border-amber-200 bg-amber-50/60'}`}>
+      <div className="space-y-1">
+        <Label htmlFor="effort-override-reason">Justificación del ajuste operativo</Label>
+        <p className="text-xs leading-5 text-slate-600">
+          El equipo quedó {Math.abs(deviation).toFixed(1)}% {deviation >= 0 ? 'por encima' : 'por debajo'} de la referencia{recurring ? ' mensual' : ''}. Explicá el motivo para que la persona aprobadora pueda evaluarlo.
+        </p>
+      </div>
+      <Textarea
+        id="effort-override-reason"
+        className="mt-3 bg-white"
+        aria-invalid={Boolean(validationMessage)}
+        value={quotationData.effortOverrideReason || ''}
+        onChange={(event) => updateQuotationData({ effortOverrideReason: event.target.value })}
+        placeholder="Ej.: cobertura adicional solicitada por el cliente, SLA prioritario o capacidad dedicada…"
+      />
+      {validationMessage && <p className="mt-2 text-xs font-medium text-red-700" role="alert">{validationMessage}</p>}
+    </div>
+  );
+}
+
 function CommercialMotionField({ quotationData, updateQuotationData }: { quotationData: { commercialMotion?: string }; updateQuotationData: (data: { commercialMotion: 'new_business' | 'renewal' | 'expansion' | 'demo' }) => void }) {
   return (
     <details className="rounded-xl border border-slate-200 bg-white px-4 py-3">
@@ -704,6 +746,7 @@ function durationValueFromMonths(months: number | null, projectType: string, fal
     if (months <= 4) return '4-months';
   }
   if (months === 6) return '6-months';
+  if (projectType === 'credit-pack' && months >= 12) return '1-year';
   if (months === 12) return '1-year';
   if (months === 18) return '18-months';
   if (months === 24) return '2-years';

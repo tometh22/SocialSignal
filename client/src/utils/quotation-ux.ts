@@ -1,5 +1,5 @@
 import type { QuotationData } from '@/context/optimized-quote-context';
-import { blueprintDefinitionSchema, estimateBlueprintWorkload } from '@shared/quotation-professional';
+import { blueprintDefinitionSchema, estimateBlueprintWorkload, workloadForBillingPeriod } from '@shared/quotation-professional';
 
 export const QUOTATION_PHASES = [
   { num: 1, title: 'Proyecto', shortTitle: 'Proyecto', description: 'Cliente, modalidad, moneda y plantilla' },
@@ -37,6 +37,7 @@ export function isBlueprintCompatibleWithProjectType(projectType: string | undef
   if (!projectType) return true;
   if (projectType === 'on-demand') return ['one_shot', 'event_pack', 'demo'].includes(modality);
   if (projectType === 'fee-mensual' || projectType === 'always-on') return ['monthly_fee', 'annual_program'].includes(modality);
+  if (projectType === 'credit-pack') return modality === 'credit_pack';
   return true;
 }
 
@@ -80,11 +81,12 @@ export function validateQuotationPhase(
       issues.push({ field: 'complexity-config', message: 'Completá volumen y cobertura para calcular la complejidad.' });
     }
     if (quotation.scopeSnapshot) {
-      const standardHours = estimateBlueprintWorkload(blueprintDefinitionSchema.parse(quotation.scopeSnapshot)).totalHours;
+      const definition = blueprintDefinitionSchema.parse(quotation.scopeSnapshot);
+      const standardHours = workloadForBillingPeriod(definition, estimateBlueprintWorkload(definition)).totalHours;
       const configuredHours = quotation.teamMembers.reduce((sum, member) => sum + Number(member.hours || 0), 0);
       const deviation = standardHours > 0 ? Math.abs(configuredHours - standardHours) / standardHours : 0;
       if (deviation > 0.1 && !quotation.effortOverrideReason?.trim()) {
-        issues.push({ field: 'professional-scope', message: 'Justificá el desvío de horas frente a la receta profesional.' });
+        issues.push({ field: 'effort-override-reason', message: 'Justificá el desvío de horas frente a la receta profesional.' });
       }
     }
     if (quotation.project.type === 'always-on') {
@@ -100,6 +102,30 @@ export function validateQuotationPhase(
   if (phase === 3) {
     const issues: QuotationValidationIssue[] = [];
     const financials = quotation.financials;
+    if (quotation.creditProgram?.enabled) {
+      const program = quotation.creditProgram;
+      if (!Number.isInteger(program.totalCredits) || program.totalCredits <= 0) {
+        issues.push({ field: 'credit-total', message: 'La bolsa debe tener al menos un crédito.' });
+      }
+      if (!program.validityStart || !program.validityEnd || new Date(`${program.validityEnd}T23:59:59`) <= new Date(`${program.validityStart}T00:00:00`)) {
+        issues.push({ field: 'credit-validity', message: 'La vigencia debe tener una fecha de cierre posterior al inicio.' });
+      }
+      if (program.carryoverPercentage < 0 || program.carryoverPercentage > 20) {
+        issues.push({ field: 'credit-carryover', message: 'El carry-over no puede superar el 20%.' });
+      }
+      if (program.graceMonths < 0 || program.graceMonths > 4) {
+        issues.push({ field: 'credit-grace', message: 'La ventana de gracia puede ser de hasta 4 meses.' });
+      }
+      if (program.executiveCreditValueUSD < 500 || program.executiveCreditValueUSD > 1900) {
+        issues.push({ field: 'credit-executive-value', message: 'El valor del informe ejecutivo debe estar entre USD 500 y USD 1.900.' });
+      }
+      if (program.deepStudyCreditValueUSD < 1500 || program.deepStudyCreditValueUSD > 5800) {
+        issues.push({ field: 'credit-deep-value', message: 'El valor del estudio en profundidad debe estar entre USD 1.500 y USD 5.800.' });
+      }
+      if (program.packagePriceUSD <= 0) {
+        issues.push({ field: 'credit-package-price', message: 'Definí un precio total de bolsa mayor a cero.' });
+      }
+    }
     if (financials.priceMode === 'manual' && Number(financials.manualPrice) <= 0) {
       issues.push({ field: 'manual-price', message: 'Ingresá un precio objetivo mayor a cero.' });
     }

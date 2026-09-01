@@ -67,7 +67,7 @@ export type OperationalMilestone = z.infer<typeof operationalMilestoneSchema>;
 
 export const blueprintDefinitionSchema = z.object({
   commercialMotion: commercialMotionSchema,
-  modality: z.enum(["demo", "one_shot", "event_pack", "monthly_fee", "annual_program", "renewal"]),
+  modality: z.enum(["demo", "one_shot", "event_pack", "monthly_fee", "annual_program", "renewal", "credit_pack"]),
   durationMonths: z.number().positive(),
   minimumTermMonths: z.number().nonnegative().default(0),
   coverage: scopeCoverageSchema,
@@ -190,6 +190,40 @@ export function applyHistoricalEffortBenchmark(
     byRole,
     lines,
     historicalFactor: Number(historicalFactor.toFixed(4)),
+  };
+}
+
+/**
+ * Recurring recipes describe the complete contract window, while pricing and
+ * staffing for a fee are monthly. Keep the complete workload for delivery
+ * planning and expose this normalized view to the quotation UI/pricing.
+ */
+export function isRecurringBlueprintModality(modality: BlueprintDefinition["modality"]) {
+  return ["monthly_fee", "annual_program", "renewal"].includes(modality);
+}
+
+export function workloadForBillingPeriod(
+  definition: BlueprintDefinition,
+  workload: ReturnType<typeof estimateBlueprintWorkload> & { historicalFactor?: number },
+) {
+  const divisor = isRecurringBlueprintModality(definition.modality)
+    ? Math.max(1, definition.durationMonths)
+    : 1;
+  if (divisor === 1) return workload;
+
+  const byRole = Object.fromEntries(
+    Object.entries(workload.byRole).map(([roleKey, hours]) => [roleKey, roundHalfHour(hours / divisor)]),
+  );
+  const lines = workload.lines.map((line) => ({
+    ...line,
+    estimatedHours: roundHalfHour(line.estimatedHours / divisor),
+  }));
+
+  return {
+    ...workload,
+    totalHours: roundHalfHour(Object.values(byRole).reduce((sum, hours) => sum + hours, 0)),
+    byRole,
+    lines,
   };
 }
 
@@ -426,6 +460,23 @@ export const SERVICE_BLUEPRINT_SEEDS: ServiceBlueprintSeed[] = [
       ],
       milestones: [{ id: id("a0000000-0000-4000-8000-000000000511"), name: "Renovación", offsetDays: 0, taskNames: ["Confirmar baseline", "Acordar mejoras"] }, { id: id("a0000000-0000-4000-8000-000000000512"), name: "Revisión de valor", offsetDays: 90, taskNames: ["Comparar eficiencia", "Revisar expansión"] }],
       monitoringWindow: "Días hábiles", alertChannels: ["email", "whatsapp"], includedLicenses: true, intellectualProperty: "client", inclusions: ["Continuidad histórica", "Automatización", "Dashboard"], exclusions: ["Nuevas marcas o mercados no seleccionados"], paymentTermsDays: 120, proposalValidityBusinessDays: 15, priceAdjustment: "annual_review",
+    }),
+  },
+  {
+    slug: "bolsa-creditos-epical",
+    name: "Bolsa de créditos Epical",
+    description: "Capacidad anual prepaga para combinar informes ejecutivos y estudios en profundidad según las prioridades del cliente.",
+    version: 1,
+    definition: blueprintDefinitionSchema.parse({
+      commercialMotion: "new_business", modality: "credit_pack", durationMonths: 12, minimumTermMonths: 12,
+      coverage: { markets: ["Argentina"], brands: ["Cliente"], competitors: [], sources: ["Social", "Reviews", "News"], languages: ["es"], mentionVolume: "large", analysisModules: ["brand", "campaign", "competition", "crisis", "trends"], slaLevel: "priority", designLevel: "executive" },
+      setupRoleHours: { director: 8, pm: 24, analyst: 32, data: 16, tech: 8 },
+      deliverables: [
+        { id: id("a0000000-0000-4000-8000-000000000601"), name: "Informe ejecutivo (1 crédito)", type: "executive_report", format: "pptx", cadence: "on_demand", quantity: 1, description: "Respuesta rápida ante un evento puntual, alerta crítica o mención sensible.", acceptanceCriteria: ["Volumen, nube de palabras y sentimiento", "Drivers e highlights identificados"], roleHours: { director: 2, pm: 4, analyst: 16, data: 4, design: 4 } },
+        { id: id("a0000000-0000-4000-8000-000000000602"), name: "Estudio en profundidad (3 créditos)", type: "report", format: "pptx", cadence: "on_demand", quantity: 1, description: "Landscape integral o seguimiento extendido de tres a cuatro semanas, con insights accionables.", acceptanceCriteria: ["Sentimiento por subtema y país", "Timeline con drivers y benchmark", "Insights y recomendaciones accionables"], roleHours: { director: 4, pm: 8, analyst: 32, data: 8, design: 12 } },
+      ],
+      milestones: [{ id: id("a0000000-0000-4000-8000-000000000611"), name: "Planificación de consumos", offsetDays: 0, taskNames: ["Acordar calendario operativo", "Confirmar prioridades"] }, { id: id("a0000000-0000-4000-8000-000000000612"), name: "Revisión de bolsa", offsetDays: 240, taskNames: ["Revisar saldo", "Planificar carry-over"] }],
+      monitoringWindow: "Según calendario operativo acordado", alertChannels: ["email", "whatsapp", "meeting"], includedLicenses: true, intellectualProperty: "client", inclusions: ["Bolsa de créditos prepaga", "Informes ejecutivos", "Estudios en profundidad", "Stack tecnológico y seteo cuando hay fee activo"], exclusions: ["Créditos no utilizados fuera del período de gracia", "Setup inicial si no hay fee o plataforma activa"], paymentTermsDays: 0, proposalValidityBusinessDays: 15, priceAdjustment: "annual_review",
     }),
   },
 ];

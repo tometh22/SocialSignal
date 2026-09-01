@@ -3,6 +3,7 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations, sql } from "drizzle-orm";
 import { blueprintDefinitionSchema, type BlueprintDefinition, type ProposalDocumentContent, type ProposalQaIssue } from "./quotation-professional";
+import type { CreditProgram } from "./utils/credit-program";
 
 // ==================== USUARIOS ====================
 // Tabla de usuarios
@@ -761,7 +762,7 @@ export const quotations = pgTable("quotations", {
   billingEntityId: integer("billing_entity_id").references(() => clientBillingEntities.id, { onDelete: "set null" }),
   projectName: text("project_name").notNull(),
   analysisType: text("analysis_type").notNull(), // 'basic', 'standard', 'deep'
-  projectType: text("project_type").notNull(), // 'demo', 'executive', 'comprehensive', 'always-on', 'monitoring'
+  projectType: text("project_type").notNull(), // 'demo', 'executive', 'comprehensive', 'always-on', 'monitoring', 'credit-pack'
   projectDuration: text("project_duration"),
   mentionsVolume: text("mentions_volume").notNull(), // 'small', 'medium', 'large', 'xlarge'
   countriesCovered: text("countries_covered").notNull(), // '1', '2-5', '6-10', '10+'
@@ -772,6 +773,7 @@ export const quotations = pgTable("quotations", {
   serviceBlueprintVersion: integer("service_blueprint_version"),
   commercialMotion: varchar("commercial_motion", { length: 30 }).notNull().default("new_business"),
   scopeSnapshot: jsonb("scope_snapshot").$type<BlueprintDefinition | null>(),
+  creditProgram: jsonb("credit_program").$type<CreditProgram | null>(),
   decisionContext: jsonb("decision_context").$type<Record<string, unknown>>().notNull().default({}),
   operationalPlan: jsonb("operational_plan").$type<Record<string, unknown>>().notNull().default({}),
   effortOverrideReason: text("effort_override_reason"),
@@ -859,6 +861,18 @@ export const insertQuotationSchema = baseInsertQuotationSchema.extend({
   serviceBlueprintVersion: z.number().int().positive().nullable().optional(),
   commercialMotion: z.enum(["new_business", "renewal", "expansion", "demo"]).optional(),
   scopeSnapshot: blueprintDefinitionSchema.nullable().optional(),
+  creditProgram: z.object({
+    enabled: z.boolean(),
+    totalCredits: z.number().int().positive().max(10_000),
+    validityStart: z.string().date(),
+    validityEnd: z.string().date(),
+    carryoverPercentage: z.number().finite().min(0).max(20),
+    graceMonths: z.number().int().min(0).max(4),
+    executiveCreditValueUSD: z.number().finite().min(500).max(1900),
+    deepStudyCreditValueUSD: z.number().finite().min(1500).max(5800),
+    packagePriceUSD: z.number().finite().positive(),
+    hasActiveFee: z.boolean(),
+  }).nullable().optional(),
   decisionContext: z.record(z.unknown()).optional(),
   operationalPlan: z.record(z.unknown()).optional(),
   effortOverrideReason: z.string().trim().min(3).max(2_000).nullable().optional(),
@@ -2470,6 +2484,7 @@ export const projectTypes = [
   { value: "demo", label: "Demo (sin contratación)" },
   { value: "monitoring", label: "Intelligence Event Pack (monitoreo puntual)" },
   { value: "comprehensive", label: "Cobertura integral" },
+  { value: "credit-pack", label: "Bolsa de créditos (consumo flexible)" },
 ];
 
 // Opciones de duración según tipo de proyecto
@@ -2493,6 +2508,10 @@ export const projectDurationOptions = {
     { value: "6-months", label: "6 meses" },
     { value: "1-year", label: "1 año" },
     { value: "open-ended", label: "Continuo" },
+    { value: "custom", label: "Personalizada" },
+  ],
+  "credit-pack": [
+    { value: "1-year", label: "12 meses (vigencia anual)" },
     { value: "custom", label: "Personalizada" },
   ],
 };

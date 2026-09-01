@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { CommercialTermsCard } from "@/components/quotation/commercial-terms-card";
+import { CreditProgramCard } from "@/components/quotation/credit-program-card";
 import ToolsAndPricing from "@/components/optimized/tools-and-pricing";
 import { Separator } from "@/components/ui/separator";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -279,6 +280,7 @@ export default function FinancialReviewFinal({ revealAdvanced = false, validatio
             {validationMessage}
           </div>
         )}
+        {quotationData.creditProgram?.enabled && <div className="mb-6"><CreditProgramCard /></div>}
         {/* Executive Summary Cards */}
         <div className="mb-8 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <Tooltip>
@@ -331,7 +333,9 @@ export default function FinancialReviewFinal({ revealAdvanced = false, validatio
                 <div>
                   <p className="text-xs text-slate-500">Multiplicador</p>
                   <p className="text-lg font-semibold tabular-nums text-slate-950">
-                    {quotationData.financials.priceMode === 'manual' && quotationData.financials.manualPrice
+                    {quotationData.creditProgram?.enabled
+                      ? `${pricingResult.effectiveMarginFactor.toFixed(1)}x`
+                      : quotationData.financials.priceMode === 'manual' && quotationData.financials.manualPrice
                       ? `${((subtotalWithMarginARS / subtotalWithPlatformARS) || 1).toFixed(1)}x`
                       : `${markupMultiplier.toFixed(1)}x`}
                   </p>
