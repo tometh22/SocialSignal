@@ -12995,22 +12995,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/admin/cleanup/candidates", requireAuth, async (req, res) => {
     if (!req.user?.isAdmin) return res.status(403).json({ message: "Se requiere acceso de administrador" });
     try {
+      // El feedback original pedía "borrar el histórico de proyectos" sin dar
+      // un criterio de nombre — a diferencia de las cotizaciones, que sí
+      // especificaban "pruebas, viejas o caducadas". Filtrar proyectos sólo por
+      // nombre de prueba dejaba afuera exactamente lo que se pedía: el
+      // histórico real. Se listan todos los no terminales, con última
+      // actividad y horas cargadas para decidir con criterio, y se ordenan
+      // poniendo primero los candidatos más obvios — el admin sigue eligiendo
+      // uno por uno, nada se preselecciona.
       const projects = await db.execute(sql`
         SELECT ap.id,
                COALESCE(NULLIF(TRIM(ap.name), ''), q.project_name, 'Sin nombre') AS name,
                c.name AS client_name,
                ap.status,
                ap.created_at,
-               COALESCE(labor.hours, 0)::float AS logged_hours
+               COALESCE(labor.hours, 0)::float AS logged_hours,
+               labor.last_activity_at,
+               CASE
+                 WHEN LOWER(COALESCE(NULLIF(TRIM(ap.name), ''), q.project_name, '')) ~ ${CLEANUP_NAME_PATTERN} THEN 'prueba'
+                 WHEN labor.hours IS NULL THEN 'sin horas cargadas'
+                 WHEN labor.last_activity_at < NOW() - INTERVAL '180 days' THEN 'sin actividad hace más de 6 meses'
+                 ELSE 'con actividad reciente'
+               END AS reason
         FROM active_projects ap
         LEFT JOIN quotations q ON q.id = ap.quotation_id
         LEFT JOIN clients c ON c.id = ap.client_id
         LEFT JOIN LATERAL (
-          SELECT SUM(te.hours) AS hours FROM time_entries te WHERE te.project_id = ap.id
+          SELECT SUM(te.hours) AS hours, MAX(te.date) AS last_activity_at
+          FROM time_entries te WHERE te.project_id = ap.id
         ) labor ON TRUE
         WHERE ap.status NOT IN ('voided', 'cancelled', 'completed')
-          AND LOWER(COALESCE(NULLIF(TRIM(ap.name), ''), q.project_name, '')) ~ ${CLEANUP_NAME_PATTERN}
-        ORDER BY ap.created_at DESC NULLS LAST, ap.id DESC
+        ORDER BY
+          CASE
+            WHEN LOWER(COALESCE(NULLIF(TRIM(ap.name), ''), q.project_name, '')) ~ ${CLEANUP_NAME_PATTERN} THEN 0
+            WHEN labor.hours IS NULL THEN 1
+            WHEN labor.last_activity_at < NOW() - INTERVAL '180 days' THEN 2
+            ELSE 3
+          END,
+          labor.last_activity_at ASC NULLS FIRST,
+          ap.created_at DESC NULLS LAST,
+          ap.id DESC
       `);
 
       // Una cotización se sugiere si nunca originó un proyecto y además es de
@@ -13036,7 +13060,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ORDER BY q.created_at DESC NULLS LAST, q.id DESC
       `);
 
-      res.json({ projects: projects.rows, quotations: quotes.rows });
+      // Últimos anulados: para poder deshacer un error de tilde sin tener que
+      // pedirlo por soporte. Sólo los que se anularon (no cancelados/completados
+      // por su ciclo de vida normal, que no son "reversibles" en este sentido).
+      const recentlyVoided = await db.execute(sql`
+        SELECT ap.id,
+               COALESCE(NULLIF(TRIM(ap.name), ''), q.project_name, 'Sin nombre') AS name,
+               c.name AS client_name,
+               ap.closed_at
+        FROM active_projects ap
+        LEFT JOIN quotations q ON q.id = ap.quotation_id
+        LEFT JOIN clients c ON c.id = ap.client_id
+        WHERE ap.status = 'voided'
+        ORDER BY ap.closed_at DESC NULLS LAST, ap.updated_at DESC
+        LIMIT 20
+      `);
+
+      res.json({ projects: projects.rows, quotations: quotes.rows, recentlyVoided: recentlyVoided.rows });
     } catch (error) {
       console.error("Error listando candidatos de limpieza:", error);
       res.status(500).json({ message: "No se pudieron listar los candidatos" });
@@ -13076,8 +13116,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
 
+        // Igual que el botón oficial de "Anular proyecto": además de sacarlo de
+        // las listas, closedAt/isFinished bloquean cargas nuevas de horas y
+        // costos vía requireProjectUnlocked. Archivar sin esto dejaba un
+        // proyecto invisible en la UI pero técnicamente seguía aceptando
+        // cargas si alguien tenía el link guardado.
         const voidedProjects = projectIds.length === 0 ? [] : await tx.update(activeProjects).set({
           status: "voided",
+          isFinished: true,
+          closedAt: now,
+          closedBy: actor,
           updatedAt: now,
         }).where(and(
           inArray(activeProjects.id, projectIds),
@@ -13096,6 +13144,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error archivando datos de prueba:", error);
       res.status(500).json({ message: "No se pudo completar la limpieza" });
+    }
+  });
+
+  // Reactivar un proyecto anulado, sea por el botón oficial de "Anular" o por la
+  // Limpieza. Simétrico al restore de cotizaciones: sin esto, volver un proyecto
+  // a estado activo requería una edición manual por API.
+  app.post("/api/admin/cleanup/restore-project", requireAuth, async (req, res) => {
+    if (!req.user?.isAdmin) return res.status(403).json({ message: "Se requiere acceso de administrador" });
+    const id = Number(req.body?.projectId);
+    if (!Number.isInteger(id) || id <= 0) {
+      return res.status(400).json({ message: "Falta el id del proyecto a restaurar" });
+    }
+    try {
+      const [restored] = await db.update(activeProjects).set({
+        status: "active",
+        isFinished: false,
+        closedAt: null,
+        closedBy: null,
+        updatedAt: new Date(),
+      }).where(and(
+        eq(activeProjects.id, id),
+        eq(activeProjects.status, "voided"),
+      )).returning();
+      if (!restored) {
+        return res.status(404).json({ message: "No hay un proyecto anulado con ese id" });
+      }
+      console.log(`↩️  [Limpieza] Proyecto ${id} restaurado a activo por el usuario ${req.user.id}`);
+      res.json(restored);
+    } catch (error) {
+      console.error("Error restaurando proyecto:", error);
+      res.status(500).json({ message: "No se pudo restaurar el proyecto" });
     }
   });
 

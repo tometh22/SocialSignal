@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertCircle, Loader2, RefreshCw, Trash2 } from "lucide-react";
+import { AlertCircle, Loader2, RefreshCw, RotateCcw, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -26,6 +26,8 @@ type ProjectCandidate = {
   status: string;
   created_at: string | null;
   logged_hours: number;
+  last_activity_at: string | null;
+  reason: string;
 };
 
 type QuotationCandidate = {
@@ -39,12 +41,26 @@ type QuotationCandidate = {
   reason: string;
 };
 
-type Candidates = { projects: ProjectCandidate[]; quotations: QuotationCandidate[] };
+type VoidedProject = {
+  id: number;
+  name: string;
+  client_name: string | null;
+  closed_at: string | null;
+};
+
+type Candidates = {
+  projects: ProjectCandidate[];
+  quotations: QuotationCandidate[];
+  recentlyVoided: VoidedProject[];
+};
 
 const REASON_STYLE: Record<string, string> = {
   prueba: "bg-amber-100 text-amber-800",
   vencida: "bg-slate-100 text-slate-700",
   "sin cerrar": "bg-blue-100 text-blue-800",
+  "sin horas cargadas": "bg-amber-100 text-amber-800",
+  "sin actividad hace más de 6 meses": "bg-slate-100 text-slate-700",
+  "con actividad reciente": "bg-emerald-100 text-emerald-800",
 };
 
 const formatDate = (value: string | null) =>
@@ -65,7 +81,15 @@ export function TestDataCleanup() {
 
   const projects = data?.projects ?? [];
   const quotations = data?.quotations ?? [];
+  const recentlyVoided = data?.recentlyVoided ?? [];
   const totalSelected = selectedProjects.size + selectedQuotations.size;
+
+  const invalidateDownstream = () => {
+    void refetch();
+    queryClient.invalidateQueries({ queryKey: ["/api/quotations"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/active-projects"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/tasks/projects"] });
+  };
 
   const archiveMutation = useMutation({
     mutationFn: () => apiRequest("/api/admin/cleanup/archive", "POST", {
@@ -76,10 +100,7 @@ export function TestDataCleanup() {
       setConfirmOpen(false);
       setSelectedProjects(new Set());
       setSelectedQuotations(new Set());
-      void refetch();
-      queryClient.invalidateQueries({ queryKey: ["/api/quotations"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/active-projects"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/tasks/projects"] });
+      invalidateDownstream();
       toast({
         title: "Limpieza aplicada",
         description: `${result.archivedQuotations.length} cotizaciones archivadas y ${result.voidedProjects.length} proyectos anulados. Se puede revertir.`,
@@ -93,6 +114,20 @@ export function TestDataCleanup() {
         variant: "destructive",
       });
     },
+  });
+
+  const restoreMutation = useMutation({
+    mutationFn: (projectId: number) => apiRequest("/api/admin/cleanup/restore-project", "POST", { projectId }),
+    onSuccess: (_result, projectId) => {
+      invalidateDownstream();
+      const name = recentlyVoided.find((item) => item.id === projectId)?.name;
+      toast({ title: "Proyecto restaurado", description: name ? `"${name}" volvió a estar activo.` : undefined });
+    },
+    onError: (mutationError) => toast({
+      title: "No se pudo restaurar",
+      description: getApiErrorMessage(mutationError, "Intentá de nuevo."),
+      variant: "destructive",
+    }),
   });
 
   const toggle = (set: Set<number>, update: (next: Set<number>) => void, id: number) => {
@@ -140,7 +175,7 @@ export function TestDataCleanup() {
             <div>
               <CardTitle className="heading-card">Limpiar datos de prueba</CardTitle>
               <CardDescription>
-                Saca de la vista las cotizaciones y proyectos de prueba para poder probar el ciclo completo con datos reales.
+                Saca de la vista las cotizaciones y proyectos que ya no necesitás ver, para poder trabajar sólo con lo vigente.
               </CardDescription>
             </div>
             <Button variant="outline" size="sm" onClick={() => void refetch()} disabled={isFetching}>
@@ -150,8 +185,9 @@ export function TestDataCleanup() {
         </CardHeader>
         <CardContent>
           <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">
-            <strong>Nada se borra.</strong> Las cotizaciones se archivan y los proyectos quedan como anulados: dejan de
-            aparecer en los listados, pero conservan su historial y se pueden restaurar.
+            <strong>Nada se borra ni cambia ningún número.</strong> Las cotizaciones se archivan y los proyectos quedan
+            anulados: dejan de aparecer en los listados y de aceptar cargas nuevas, pero conservan intacto su historial de
+            horas y facturación — y se pueden restaurar en cualquier momento.
           </div>
           {isLoading ? (
             <div className="flex items-center gap-2 p-6 text-sm text-muted-foreground">
@@ -159,7 +195,7 @@ export function TestDataCleanup() {
             </div>
           ) : projects.length + quotations.length === 0 ? (
             <p className="p-6 text-center text-sm text-muted-foreground">
-              No hay nada para limpiar: no encontramos proyectos ni cotizaciones de prueba, vencidas o sin cerrar.
+              No hay proyectos ni cotizaciones activos para limpiar.
             </p>
           ) : (
             <>
@@ -174,11 +210,11 @@ export function TestDataCleanup() {
               {projects.length > 0 && (
                 <section className="mt-4">
                   <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Proyectos ({projects.length})
+                    Proyectos ({projects.length}) · ordenados de más a menos candidato
                   </h3>
                   <div className="space-y-1">
                     {projects.map((project) => (
-                      <label key={project.id} className="flex items-center gap-3 rounded-md border border-slate-200 px-3 py-2 text-sm hover:bg-accent/30">
+                      <label key={project.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md border border-slate-200 px-3 py-2 text-sm hover:bg-accent/30">
                         <Checkbox
                           checked={selectedProjects.has(project.id)}
                           onCheckedChange={() => toggle(selectedProjects, setSelectedProjects, project.id)}
@@ -186,12 +222,17 @@ export function TestDataCleanup() {
                         />
                         <span className="min-w-0 flex-1 truncate font-medium">{project.name}</span>
                         <span className="hidden truncate text-xs text-muted-foreground sm:inline">{project.client_name || "Sin cliente"}</span>
+                        <Badge variant="outline" className={`shrink-0 border-transparent text-[10px] ${REASON_STYLE[project.reason] || ""}`}>
+                          {project.reason}
+                        </Badge>
                         {project.logged_hours > 0 && (
                           <Badge variant="outline" className="shrink-0 border-amber-200 bg-amber-50 text-[10px] text-amber-800">
                             {project.logged_hours.toFixed(1)} h cargadas
                           </Badge>
                         )}
-                        <span className="shrink-0 text-xs text-muted-foreground">{formatDate(project.created_at)}</span>
+                        <span className="shrink-0 text-xs text-muted-foreground">
+                          {project.last_activity_at ? `última carga ${formatDate(project.last_activity_at)}` : `creado ${formatDate(project.created_at)}`}
+                        </span>
                       </label>
                     ))}
                   </div>
@@ -234,13 +275,43 @@ export function TestDataCleanup() {
         </CardContent>
       </Card>
 
+      {recentlyVoided.length > 0 && (
+        <Card className="standard-card">
+          <CardHeader>
+            <CardTitle className="text-sm">Anulados recientemente</CardTitle>
+            <CardDescription>Si archivaste algo por error, restauralo desde acá.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-1">
+              {recentlyVoided.map((project) => (
+                <div key={project.id} className="flex items-center gap-3 rounded-md border border-slate-200 px-3 py-2 text-sm">
+                  <span className="min-w-0 flex-1 truncate font-medium">{project.name}</span>
+                  <span className="hidden truncate text-xs text-muted-foreground sm:inline">{project.client_name || "Sin cliente"}</span>
+                  <span className="shrink-0 text-xs text-muted-foreground">{formatDate(project.closed_at)}</span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="shrink-0"
+                    disabled={restoreMutation.isPending}
+                    onClick={() => restoreMutation.mutate(project.id)}
+                  >
+                    <RotateCcw className="mr-1.5 h-3.5 w-3.5" />Restaurar
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>¿Archivar {totalSelected} elemento{totalSelected === 1 ? "" : "s"}?</AlertDialogTitle>
             <AlertDialogDescription>
               Se archivarán {selectedQuotations.size} cotizaciones y se anularán {selectedProjects.size} proyectos.
-              Dejan de aparecer en los listados pero conservan su historial, así que se puede revertir.
+              Dejan de aparecer en los listados y de aceptar cargas nuevas, pero conservan su historial y se pueden
+              restaurar desde "Anulados recientemente".
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

@@ -291,8 +291,50 @@ describe("Feedback Mind V2-13 · ronda 27-8", () => {
     expect(cleanup).not.toContain("db.delete(");
     // A diferencia del reset viejo, no se bloquea en producción.
     expect(cleanup).not.toContain('NODE_ENV === "production"');
-    // Sólo Admin.
-    expect(cleanup.match(/req\.user\?\.isAdmin/g)?.length).toBe(2);
+    // El proyecto queda igual de bloqueado que con el botón oficial de
+    // "Anular": si no, dejaba de listarse pero seguía aceptando cargas.
+    expect(cleanup).toContain("isFinished: true");
+    expect(cleanup).toContain("closedAt: now");
+    // Sólo Admin: candidates, archive y restore-project.
+    expect(cleanup.match(/req\.user\?\.isAdmin/g)?.length).toBe(3);
+  });
+
+  it("archivar un proyecto no cambia ningún número financiero histórico", () => {
+    // Las tablas de hechos se calculan por fecha desde las horas cargadas, no
+    // desde el estado del proyecto: archivar no puede alterar un período ya
+    // reportado. Se verifica la ausencia del acoplamiento, no su presencia.
+    const financialAggregator = source("server/domain/financial-aggregator.ts");
+    const viewAggregator = source("server/domain/view-aggregator.ts");
+    expect(financialAggregator).not.toContain("activeProjects.status");
+    expect(viewAggregator).not.toContain("activeProjects.status");
+  });
+
+  it("restaura un proyecto anulado a su estado activo, simétrico al restore de cotizaciones", () => {
+    const routes = source("server/routes.ts");
+    expect(routes).toContain('app.post("/api/admin/cleanup/restore-project"');
+    const restore = routes.slice(
+      routes.indexOf('app.post("/api/admin/cleanup/restore-project"'),
+      routes.indexOf("// =========== FACTURA MENSUAL PERSONAL ==========="),
+    );
+    expect(restore).toContain('status: "active"');
+    expect(restore).toContain("isFinished: false");
+    expect(restore).toContain("closedAt: null");
+    // Sólo restaura lo que la propia limpieza (o el botón oficial) anuló.
+    expect(restore).toContain('eq(activeProjects.status, "voided")');
+  });
+
+  it("no filtra proyectos sólo por nombre: pedía sacar el histórico, no sólo las pruebas", () => {
+    const routes = source("server/routes.ts");
+    const candidates = routes.slice(
+      routes.indexOf('app.get("/api/admin/cleanup/candidates"'),
+      routes.indexOf('app.post("/api/admin/cleanup/archive"'),
+    );
+    const projectsQuery = candidates.slice(0, candidates.indexOf("Una cotización se sugiere"));
+    // El filtro de nombre pasó a ser un criterio de orden/etiqueta, no un WHERE:
+    // ya no hay un segundo AND que descarte todo lo que no matchea el patrón.
+    expect(projectsQuery).not.toContain("AND LOWER(COALESCE(NULLIF(TRIM(ap.name)");
+    expect(projectsQuery).toContain("last_activity_at");
+    expect(projectsQuery).toContain("180 days");
   });
 
   it("nunca archiva por coincidencia de nombre: exige ids elegidos por una persona", () => {
