@@ -153,6 +153,30 @@ export async function recordObservedRate(input: {
     sql`${exchangeRates.rateType} <> 'estimated'`,
   )).limit(1);
 
+  // El tipo de cambio "vigente" que usa el resto de la app (useCurrency, la
+  // confirmación de cotizaciones nuevas) vive aparte, en system_config, y
+  // sólo lo actualizaba el botón manual de "Sincronizar dólar blue". Si nadie
+  // lo clickeaba, esa referencia quedaba vieja o vacía aunque la sync
+  // automática del Máster sí estuviera trayendo datos al día. Se actualiza acá
+  // también, sólo para el mes en curso (rateType "daily"): un mes ya cerrado
+  // que se está registrando en el histórico no debe pisar la referencia de hoy.
+  if (rateType === "daily") {
+    await db.insert(systemConfig).values({
+      configKey: "usd_exchange_rate",
+      configValue: input.rate,
+      description: `${input.source} · sincronización automática del Máster`,
+      updatedBy: input.createdBy,
+    }).onConflictDoUpdate({
+      target: systemConfig.configKey,
+      set: {
+        configValue: input.rate,
+        description: `${input.source} · sincronización automática del Máster`,
+        updatedAt: new Date(),
+        updatedBy: input.createdBy,
+      },
+    });
+  }
+
   if (existing) {
     const [updated] = await db.update(exchangeRates).set({
       rate: String(input.rate),

@@ -1,5 +1,5 @@
 ---
-version: 2.20.0
+version: 2.21.0
 updatedAt: 2026-09-02
 feedbackCount: 70
 ---
@@ -364,3 +364,24 @@ permitirle al usuario usar otro."*
 | ID | Estado | Definición y resolución |
 |---|---|---|
 | GEN-16 | Implementado | El aviso de tipo de cambio faltante en Equipo ofrece dos acciones en el lugar: usar el tipo de cambio vigente con un click, o cargar uno manual con la misma tolerancia a coma decimal que el resto de los inputs numéricos. Las dos llaman a `updateQuotationCurrency`, que ya recalcula la tarifa de todo el equipo con el nuevo snapshot en el mismo paso. "Ir a Inversión" queda como tercera opción, no como único camino. |
+
+### Revisión 2.21.0 — auditoría en vivo simulando un usuario de Epical
+
+Incluye dos entradas retroactivas: GEN-17 y GEN-18 se enviaron a producción
+en la sesión anterior (commits `1b31fc1b` y `6bf594ba`) pero quedaron sin su
+entrada correspondiente en este documento por la presión de contexto de esa
+sesión. Se documentan acá para que el registro sea completo, sin volver a
+tocar código ya en producción.
+
+GEN-19 y GEN-20 son el resultado del pedido explícito más reciente: *"ahora
+simula ser un usuario de epical y hace varias cotizaciones a ver que contras,
+para corregir si hay problemas de lógica, ux y ui."* Se armaron cotizaciones
+reales sobre datos seedeados (no sólo lectura de código) y aparecieron dos
+bugs con causa exacta.
+
+| ID | Estado | Definición y resolución |
+|---|---|---|
+| GEN-17 | Implementado | Reporte con captura: "Valor total" mostraba ARS 13.719.282.826 para 28 cotizaciones (19 aprobadas) — desproporcionado. La suma incluye todas las cotizaciones sin filtrar por estado (borradores, rechazadas, vencidas), no sólo las vigentes, algo previo a esta sesión y no redefinido acá porque cambiar qué cuenta el KPI no es una decisión de UX. Un total de esa magnitud casi siempre es una sola cotización con un monto mal cargado (frecuente en el histórico de pruebas de esta cuenta); encontrarla exigía revisar las 28 una por una. La tarjeta ahora muestra su mayor contribuyente: nombre del proyecto y monto en ARS-equivalente, con la misma lógica de conversión que ya usaba la suma. |
+| GEN-18 | Implementado | Reporte con captura: *"aca seleccione bolsa de creditos por error, quiero des-seleccionar y no anda."* Clickear la tarjeta de una receta ya activa sólo volvía a aplicar la misma receta — no había ningún camino para deshacerla. `clearBlueprintSelection` deshace exactamente lo que `applyDefinition` escribe (id, versión, snapshot, equipo, entregables, plan operativo y la Bolsa de créditos si estaba activa) y evita que el efecto de auto-aplicado la vuelva a poner al desmontar. |
+| GEN-19 | Implementado | GEN-16 resuelve el snapshot de tipo de cambio de la cotización puntual (`exchangeRates`), pero el "tipo de cambio vigente" que sugiere ese mismo botón y que usa el resto de la app (`useCurrency`) vive aparte, en `system_config.usd_exchange_rate`. Esa referencia sólo se actualizaba con el botón manual "Sincronizar dólar blue" — la sync automática del Máster (`recordObservedRate`, que corre sola cada vez que se importa un tipo de cambio real del mes) nunca la tocaba. Si nadie clickeaba el botón manual, la sugerencia de Equipo podía quedar vieja aunque el histórico sí estuviera al día. `recordObservedRate` ahora también actualiza `system_config.usd_exchange_rate`, sólo para el mes en curso (`rateType: "daily"`): un cierre histórico que se está cargando no debe pisar la referencia de hoy. |
+| GEN-20 | Implementado | Al llegar por primera vez al paso Propuesta, un `useEffect` en `QuotationVariants` dispara la creación de las variantes por defecto (Esencial/Recomendada/Expandida) cuando la cotización todavía no tiene ninguna. Ese efecto depende de `[quotationId, baseCost, totalAmount]`, y `baseCost`/`totalAmount` cambian varias veces mientras el precio termina de asentarse recién asignado el equipo. Sin ningún lock, dos disparos casi simultáneos podían ver "0 variantes" cada uno mientras el primero todavía estaba creando el set por defecto, y los dos terminaban creando variantes — confirmado en vivo con dos filas "Esencial" idénticas (id=1 e id=2) y un hueco en la secuencia (id=4, de una fila creada por la corrida perdedora de la carrera). `fetchVariants` ahora usa un lock por instancia (`useRef`) que descarta cualquier disparo del efecto mientras ya hay una sincronización en curso. |
