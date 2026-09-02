@@ -198,6 +198,36 @@ export function ProfessionalScopeBuilder({ mode = "all", headless = false }: { m
     });
   };
 
+  // Clickear la tarjeta ya elegida sólo volvía a aplicar la misma receta: no
+  // había forma de deshacer una selección hecha por error. Deshace
+  // exactamente los campos que applyDefinition escribe, simétrico a esa
+  // función, en vez de adivinar cuáles tocar. El equipo se vacía porque salió
+  // enteramente de la receta; la modalidad vuelve a "sin elegir" para que el
+  // Brief pida una elección consciente en vez de dejar un tipo de proyecto
+  // huérfano. La Bolsa de créditos se desactiva sin perder los valores que el
+  // usuario ya haya cargado, igual que updateProjectType al cambiar de tipo.
+  const clearBlueprintSelection = () => {
+    setUnmappedRoles([]);
+    autoAppliedBlueprintId.current = null;
+    updateTeamMembers([]);
+    updateQuotationData({
+      serviceBlueprintId: null,
+      serviceBlueprintVersion: null,
+      scopeSnapshot: null,
+      project: { ...quotationData.project, type: "", duration: "" },
+      quotationType: "one-time",
+      deliverables: [],
+      paymentTermsDays: 30,
+      inclusions: "",
+      exclusions: "",
+      operationalPlan: {},
+      effortOverrideReason: null,
+      creditProgram: quotationData.creditProgram
+        ? { ...quotationData.creditProgram, enabled: false }
+        : quotationData.creditProgram,
+    });
+  };
+
   // Los grupos de propuestas creados desde el brief guardan serviceBlueprintId
   // en el servidor (para que la receta recomendada aparezca preseleccionada)
   // pero no el scopeSnapshot: recién se materializa cuando el usuario abre
@@ -285,7 +315,19 @@ export function ProfessionalScopeBuilder({ mode = "all", headless = false }: { m
                 <button key={blueprint.id} type="button" onClick={() => applyBlueprint(blueprint)} aria-pressed={active} className={`rounded-xl border p-4 text-left transition ${active ? "border-indigo-500 bg-indigo-50 ring-2 ring-indigo-100" : "border-slate-200 bg-white hover:border-indigo-300"}`}>
                   <span className="flex items-start justify-between gap-2"><span><strong className="text-sm text-slate-950">{blueprint.name}</strong>{recommended && <Badge className="ml-2 bg-emerald-600 text-[10px]">Para este brief</Badge>}</span>{active && <CheckCircle2 className="h-4 w-4 text-indigo-600" />}</span>
                   <span className="mt-2 block text-xs leading-5 text-slate-500">{blueprint.description}</span>
-                  <span className="mt-3 flex flex-wrap gap-1.5"><Badge variant="outline">{historicalWorkload.totalHours} h estimadas</Badge><Badge variant="outline">{blueprint.definition.deliverables.length} entregables</Badge>{benchmark && <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">{benchmark.sampleSize} proyectos reales</Badge>}</span>
+                  <span className="mt-3 flex flex-wrap items-center gap-1.5">
+                    <Badge variant="outline">{historicalWorkload.totalHours} h estimadas</Badge><Badge variant="outline">{blueprint.definition.deliverables.length} entregables</Badge>{benchmark && <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">{benchmark.sampleSize} proyectos reales</Badge>}
+                    {active && (
+                      <span
+                        role="button" tabIndex={0}
+                        className="ml-auto flex items-center gap-1 text-[11px] font-medium text-slate-500 underline hover:text-red-600"
+                        onClick={(event) => { event.stopPropagation(); clearBlueprintSelection(); }}
+                        onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.stopPropagation(); event.preventDefault(); clearBlueprintSelection(); } }}
+                      >
+                        Quitar selección
+                      </span>
+                    )}
+                  </span>
                 </button>
               );
             })}
