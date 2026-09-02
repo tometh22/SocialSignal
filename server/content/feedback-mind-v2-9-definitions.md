@@ -1,5 +1,5 @@
 ---
-version: 2.21.0
+version: 2.22.0
 updatedAt: 2026-09-02
 feedbackCount: 70
 ---
@@ -385,3 +385,20 @@ bugs con causa exacta.
 | GEN-18 | Implementado | Reporte con captura: *"aca seleccione bolsa de creditos por error, quiero des-seleccionar y no anda."* Clickear la tarjeta de una receta ya activa sólo volvía a aplicar la misma receta — no había ningún camino para deshacerla. `clearBlueprintSelection` deshace exactamente lo que `applyDefinition` escribe (id, versión, snapshot, equipo, entregables, plan operativo y la Bolsa de créditos si estaba activa) y evita que el efecto de auto-aplicado la vuelva a poner al desmontar. |
 | GEN-19 | Implementado | GEN-16 resuelve el snapshot de tipo de cambio de la cotización puntual (`exchangeRates`), pero el "tipo de cambio vigente" que sugiere ese mismo botón y que usa el resto de la app (`useCurrency`) vive aparte, en `system_config.usd_exchange_rate`. Esa referencia sólo se actualizaba con el botón manual "Sincronizar dólar blue" — la sync automática del Máster (`recordObservedRate`, que corre sola cada vez que se importa un tipo de cambio real del mes) nunca la tocaba. Si nadie clickeaba el botón manual, la sugerencia de Equipo podía quedar vieja aunque el histórico sí estuviera al día. `recordObservedRate` ahora también actualiza `system_config.usd_exchange_rate`, sólo para el mes en curso (`rateType: "daily"`): un cierre histórico que se está cargando no debe pisar la referencia de hoy. |
 | GEN-20 | Implementado | Al llegar por primera vez al paso Propuesta, un `useEffect` en `QuotationVariants` dispara la creación de las variantes por defecto (Esencial/Recomendada/Expandida) cuando la cotización todavía no tiene ninguna. Ese efecto depende de `[quotationId, baseCost, totalAmount]`, y `baseCost`/`totalAmount` cambian varias veces mientras el precio termina de asentarse recién asignado el equipo. Sin ningún lock, dos disparos casi simultáneos podían ver "0 variantes" cada uno mientras el primero todavía estaba creando el set por defecto, y los dos terminaban creando variantes — confirmado en vivo con dos filas "Esencial" idénticas (id=1 e id=2) y un hueco en la secuencia (id=4, de una fila creada por la corrida perdedora de la carrera). `fetchVariants` ahora usa un lock por instancia (`useRef`) que descarta cualquier disparo del efecto mientras ya hay una sincronización en curso. |
+
+### Revisión 2.22.0 — el indicador de autoguardado no debe sugerir un guardado en servidor
+
+Continuación de la misma auditoría en vivo. El autoguardado del cotizador
+(`optimized-quote-context.tsx`) sólo escribe en `localStorage`; el guardado
+real al servidor pasa exclusivamente por el botón explícito "Guardar
+borrador". El indicador mostraba "Guardado hace Xs" con ícono y color verde
+-- visualmente indistinguible de un guardado real -- y fue exactamente el
+tipo de señal que llevó a pensar que cotizaciones "desaparecían": el
+navegador decía "guardado" mientras el servidor nunca había recibido nada.
+Se confirmó en vivo: `GET /api/quotations` devolvía `[]` con el indicador
+mostrando "Guardado hace 3s" repetidas veces, hasta el primer click en
+"Guardar borrador".
+
+| ID | Estado | Definición y resolución |
+|---|---|---|
+| GEN-21 | Implementado | El texto de cada estado de `AutosaveIndicator` ahora aclara "local"/"en este navegador" en vez de un genérico "Guardado"/"Autoguardado activo" que sugería persistencia en servidor. No se cambió el comportamiento de guardado (seguir persistiendo sólo en localStorage hasta el click explícito en "Guardar borrador" es una decisión de producto, no un bug) ni el ícono/color, sólo la honestidad del texto. De paso, `getTimeSinceLastSave` ya no puede mostrar segundos negativos (se vio "hace -1s" cuando el timer de 1s quedaba un tick atrás del momento exacto del guardado). |

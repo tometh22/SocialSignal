@@ -24,7 +24,11 @@ export const AutosaveIndicator: React.FC<AutosaveIndicatorProps> = ({
 
   const getTimeSinceLastSave = () => {
     if (!lastSaveTime) return '';
-    const seconds = Math.floor((currentTime - lastSaveTime) / 1000);
+    // El timer de currentTime corre en su propio setInterval de 1s, así que
+    // puede quedar un tick atrás del momento exacto en que se guardó --
+    // sin este piso se veía "hace -1s" en el instante justo después de
+    // guardar.
+    const seconds = Math.max(0, Math.floor((currentTime - lastSaveTime) / 1000));
     if (seconds < 60) return `hace ${seconds}s`;
     const minutes = Math.floor(seconds / 60);
     if (minutes < 60) return `hace ${minutes}m`;
@@ -51,20 +55,27 @@ export const AutosaveIndicator: React.FC<AutosaveIndicatorProps> = ({
 
   const getStatusText = () => {
     if (!isOnline) return 'Sin conexión';
-    
+
+    // El autoguardado sólo escribe en localStorage (ver el efecto en
+    // optimized-quote-context.tsx): no hay ningún round-trip al servidor
+    // acá. "Guardado" a secas sugería lo contrario -- con el mismo ícono y
+    // color verde que un guardado real -- y llevó a pensar que cotizaciones
+    // enteras "desaparecían" cuando en realidad nunca habían llegado al
+    // servidor porque nadie clickeó "Guardar borrador". El texto ahora dice
+    // explícitamente "en este navegador".
     switch (status) {
       case 'saved':
-        return `Guardado ${getTimeSinceLastSave()}`;
+        return `Borrador local guardado ${getTimeSinceLastSave()}`;
       case 'saving':
-        return 'Guardando...';
+        return 'Guardando borrador local...';
       case 'pending':
-        return 'Cambios pendientes';
+        return 'Cambios sin guardar en este navegador';
       case 'error':
-        return 'Error al guardar';
+        return 'Error al guardar el borrador local';
       case 'idle':
-        return 'Autoguardado listo';
+        return 'Autoguardado local listo';
       default:
-        return 'Autoguardado activo';
+        return 'Autoguardado local activo';
     }
   };
 
