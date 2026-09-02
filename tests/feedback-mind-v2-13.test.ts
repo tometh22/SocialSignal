@@ -472,4 +472,18 @@ describe("Feedback Mind V2-13 · ronda 27-8", () => {
     const cleanup = source("client/src/components/admin/TestDataCleanup.tsx");
     expect(cleanup).toContain("<ArchivedQuotationsList />");
   });
+  // ── GEN-17 · "Valor total" señala su mayor contribuyente ────────────────
+  it("identifica la cotización que más pesa en el Valor total de la cartera", () => {
+    // Reporte real: un "Valor total" de ARS 13.700 millones para 28
+    // cotizaciones (19 aprobadas) llamó la atención por lo desproporcionado.
+    // La suma ya incluía borradores, rechazadas y vencidas -- no sólo
+    // vigentes -- así que un total así casi siempre es UNA cotización con un
+    // monto mal cargado (frecuente en el histórico de pruebas de esta
+    // cuenta), no un error de cálculo. Sin esto, encontrarla exigía revisar
+    // las 28 una por una.
+    const manageQuotes = source("client/src/pages/manage-quotes.tsx");
+    expect(manageQuotes).toContain("topValueContributor: statsSource.reduce<{ name: string; ars: number } | null>((top, q) => {");
+    expect(manageQuotes).toContain("return !top || ars > top.ars ? { name: q.projectName, ars } : top;");
+    expect(manageQuotes).toContain("detail={stats.topValueContributor ? `Mayor: ${stats.topValueContributor.name}");
+  });
 });

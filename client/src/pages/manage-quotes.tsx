@@ -445,6 +445,16 @@ export default function ManageQuotes() {
       return sum + (q.quotationCurrency === 'USD' ? q.totalAmount * fx : q.totalAmount);
     }, 0),
     conversionRate: funnel?.winRate ?? 0,
+    // La suma incluye borradores, rechazadas y vencidas -- no sólo vigentes --
+    // así que un total que se ve raro casi siempre es UNA cotización con un
+    // monto mal cargado, no un error de cálculo. Se guarda la mayor
+    // contribuyente para poder señalarla en la tarjeta sin tener que salir a
+    // buscarla a mano.
+    topValueContributor: statsSource.reduce<{ name: string; ars: number } | null>((top, q) => {
+      const fx = Number(q.exchangeRateAtQuote) || Number(q.usdExchangeRate) || exchangeRate;
+      const ars = q.quotationCurrency === 'USD' ? q.totalAmount * fx : q.totalAmount;
+      return !top || ars > top.ars ? { name: q.projectName, ars } : top;
+    }, null),
     rejectionRate: (funnel?.sent || 0) > 0
       ? ((funnel?.byStatus?.rejected?.count || 0) / (funnel?.sent || 1)) * 100
       : 0,
@@ -560,6 +570,7 @@ export default function ManageQuotes() {
               tone="info"
               valueSize="compact"
               valueLabel={`Valor total en pesos: ${stats.totalValueARS.toLocaleString("es-AR", { maximumFractionDigits: 0 })}`}
+              detail={stats.topValueContributor ? `Mayor: ${stats.topValueContributor.name} · ARS ${stats.topValueContributor.ars.toLocaleString("es-AR", { maximumFractionDigits: 0 })}` : undefined}
             />
             <MetricCard
               label="Conversión"
