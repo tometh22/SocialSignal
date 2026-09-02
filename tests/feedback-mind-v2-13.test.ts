@@ -227,6 +227,39 @@ describe("Feedback Mind V2-13 · ronda 27-8", () => {
     expect(builder).toContain("[...hoursByRoleId.values()].map(({ role, hours }) => {");
   });
 
+  // ── GEN-15 · $0/hora silencioso cuando falta el tipo de cambio ──────────
+  it("avisa en Equipo cuando el tipo de cambio de la cotización no está confirmado", () => {
+    // Reporte real: "todos los valores hora están en cero, puse a Acha
+    // arriba de todo y no me lo toma". Los datos en Personal estaban
+    // correctos. La causa real: resolveQuotationPersonnelRate corta en 0
+    // para cualquier persona si el tipo de cambio de ESA cotización no es
+    // positivo — y el paso Equipo (4) se puede alcanzar sin haber pasado por
+    // Inversión (5), el único paso que lo exige. No había ninguna señal
+    // visible de por qué el valor daba $0.
+    const teamConfig = source("client/src/components/optimized/EnhancedTeamConfig.tsx");
+    expect(teamConfig).toContain("const missingExchangeRateSnapshot = !(Number(quotationData.exchangeRateSnapshot) > 0);");
+    expect(teamConfig).toContain("Falta confirmar el tipo de cambio de esta cotización.");
+    expect(teamConfig).toContain("onClick={() => goToStep(5)}");
+  });
+
+  it("confirma que la fórmula de tarifa corta en 0 antes de leer ningún dato de Personal", () => {
+    const rateFormula = source("shared/utils/quotation-personnel-rate.ts");
+    const start = rateFormula.indexOf("export function resolveQuotationPersonnelRate");
+    const gate = rateFormula.slice(start, start + 300);
+    expect(gate).toContain("const quotationExchangeRate = positiveNumber(input.quotationExchangeRate);");
+    expect(gate).toContain("if (!quotationExchangeRate) return 0;");
+  });
+
+  it("el paso Equipo se puede alcanzar sin haber confirmado el tipo de cambio en Inversión", () => {
+    const ux = source("client/src/utils/quotation-ux.ts");
+    const step1 = ux.slice(ux.indexOf("if (step === 1) {"), ux.indexOf("if (step === 2 || step === 3)"));
+    const step4Line = ux.slice(ux.indexOf("if (step === 4)"), ux.indexOf("if (step === 5)"));
+    // El tipo de cambio sólo se exige en el paso 5, nunca antes.
+    expect(step1).not.toContain("hasPositiveExchangeRate");
+    expect(step4Line).not.toContain("hasPositiveExchangeRate");
+    expect(ux).toContain("if (!hasPositiveExchangeRate(quotation)) {");
+  });
+
   // ── F27-08 · La tarea de la Home abre su proyecto ────────────────────────
   it("enlaza cada fila de la home al proyecto asociado", () => {
     const home = source("client/src/pages/tasks/tasks-home.tsx");

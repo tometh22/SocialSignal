@@ -92,7 +92,8 @@ const EnhancedTeamConfig: React.FC<EnhancedTeamConfigProps> = ({ validationMessa
     getPersonnelRate,
     getResolvedSalaryMonth,
     updateSalaryMonth,
-    updateInflation
+    updateInflation,
+    goToStep,
   } = useOptimizedQuote();
 
   // Estados para la nueva UI
@@ -378,11 +379,30 @@ const EnhancedTeamConfig: React.FC<EnhancedTeamConfigProps> = ({ validationMessa
     });
   };
 
+  // resolveQuotationPersonnelRate corta en 0 para cualquier persona, sin
+  // importar sus datos en Personal, si el tipo de cambio de ESTA cotización
+  // no es un número positivo confirmado. Esa condición no tenía ninguna señal
+  // visible acá: se veía como "faltan cargar los valores hora" cuando en
+  // realidad el dato de origen estaba bien y el problema era este único
+  // punto de corte, antes de leer ninguna tarifa.
+  const missingExchangeRateSnapshot = !(Number(quotationData.exchangeRateSnapshot) > 0);
+
   return (
     <div id="team-config" className="space-y-6" tabIndex={-1}>
       {validationMessage && (
         <div role="alert" className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
           {validationMessage}
+        </div>
+      )}
+      {missingExchangeRateSnapshot && (
+        <div role="alert" className="flex flex-col gap-3 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800 sm:flex-row sm:items-center sm:justify-between">
+          <span>
+            <strong>Falta confirmar el tipo de cambio de esta cotización.</strong> Sin eso, todas las tarifas se
+            calculan en $0 aunque los valores hora en Personal estén correctos.
+          </span>
+          <Button type="button" size="sm" variant="outline" className="shrink-0 border-red-300 text-red-800 hover:bg-red-100" onClick={() => goToStep(5)}>
+            Confirmar tipo de cambio
+          </Button>
         </div>
       )}
       {(availableRoles.length === 0 || availablePersonnel.length === 0) && (
