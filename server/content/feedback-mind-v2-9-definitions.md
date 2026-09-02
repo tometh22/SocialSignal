@@ -1,5 +1,5 @@
 ---
-version: 2.18.0
+version: 2.19.0
 updatedAt: 2026-09-01
 feedbackCount: 70
 ---
@@ -338,3 +338,19 @@ devuelve 0 para cualquier persona cuando el tipo de cambio de la cotización no
 es positivo, sin importar la tarifa real de esa persona. Confirmar el tipo de
 cambio en el paso de Inversión debería resolverlo; queda pendiente de
 verificación directa sobre esa cotización.
+
+### Revisión 2.19.0 — el $0/hora tenía una causa exacta, no era el dato de origen
+
+Segundo síntoma de la misma prueba de Victoria Puricelli: *"todos los
+valores hora están en cero, puse a Acha arriba de todo y no me lo toma"*.
+Confirmado con el usuario que Configuración → Personal → Ver tabla mensual
+tiene los valores correctos. La causa no era el dato: es un único punto de
+corte en la fórmula de tarifa, sin ninguna señal visible.
+
+| ID | Estado | Definición y resolución |
+|---|---|---|
+| GEN-15 | Implementado | `resolveQuotationPersonnelRate` devuelve 0 para cualquier persona, sin leer sus datos de Personal, si el tipo de cambio de esa cotización puntual no es un número positivo confirmado. El paso Equipo (4) se puede alcanzar sin haber pasado por Inversión (5) —el único paso que exige confirmarlo— así que era posible llegar a asignar horas con el tipo de cambio todavía sin confirmar y ver $0 en todas las filas sin ninguna pista de por qué. Equipo ahora muestra un aviso explícito con acceso directo al paso de Inversión cuando falta ese snapshot. |
+
+No se tocó el orden de los pasos ni se adelantó la validación del tipo de
+cambio a un paso anterior: eso cambiaría el flujo de armado y no fue lo que
+se pidió. La resolución es visibilidad, no bloqueo adicional.
