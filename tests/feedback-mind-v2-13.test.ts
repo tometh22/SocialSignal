@@ -558,6 +558,21 @@ describe("Feedback Mind V2-13 · ronda 27-8", () => {
     const finallyIndex = fetchVariants.lastIndexOf("finally {");
     const releaseIndex = fetchVariants.indexOf("isSyncingVariantsRef.current = false;");
     expect(releaseIndex).toBeGreaterThan(finallyIndex);
+    // createDefaultVariants corre DENTRO de fetchVariants, con el lock ya
+    // tomado. Si su refresh final llamara a fetchVariants() de nuevo (en vez
+    // de al helper sin lock syncVariantsFromServer), ese refresh se
+    // descartaría por el propio lock -- las variantes recién creadas
+    // quedarían en la DB pero nunca se verían en pantalla hasta el próximo
+    // disparo del efecto. Confirmado en vivo probando Bolsa de créditos de
+    // punta a punta: la API tenía las 3 variantes (Esencial/Recomendada/
+    // Expandida) pero "Escenarios de alcance" se veía vacío.
+    const createDefaultVariants = variants.slice(
+      variants.indexOf("const createDefaultVariants = async () => {"),
+      variants.indexOf("const createCustomVariant = async () => {"),
+    );
+    expect(createDefaultVariants).not.toContain("await fetchVariants();");
+    const syncCalls = createDefaultVariants.match(/await syncVariantsFromServer\(\);/g) ?? [];
+    expect(syncCalls.length).toBe(2); // el camino con receta y el camino de fallback
   });
   // ── GEN-21 · El autoguardado no debe sonar a guardado en servidor ───────
   it("el indicador de autoguardado aclara que es local, no un guardado en servidor", () => {

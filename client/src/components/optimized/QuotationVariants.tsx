@@ -118,17 +118,29 @@ export function QuotationVariants({
     }
   }, [quotationId, baseCost, totalAmount]);
 
+  // GET + aplicar al estado, sin pasar por el lock de isSyncingVariantsRef.
+  // fetchVariants la usa para su propia lectura, y createDefaultVariants la
+  // usa para refrescar el estado después de crear -- si createDefaultVariants
+  // llamara a fetchVariants() en cambio, ese refresh quedaría descartado por
+  // el lock (seguimos dentro de la llamada externa que todavía no lo liberó),
+  // y las variantes recién creadas nunca aparecerían hasta el próximo disparo
+  // del efecto.
+  const syncVariantsFromServer = async () => {
+    const response = await apiRequest(`/api/quotations/${quotationId}/variants`, 'GET');
+    setVariants(response);
+    const selectedFromServer = response.filter((variant: QuotationVariant) => variant.isSelected).map((variant: QuotationVariant) => variant.id);
+    const recommended = response.find((variant: QuotationVariant) => variant.isRecommended)
+      || response.find((variant: QuotationVariant) => variant.variantName === 'Intermedio');
+    setSelectedVariantIds(selectedFromServer.length > 0 ? selectedFromServer : recommended ? [recommended.id] : []);
+    return response;
+  };
+
   const fetchVariants = async () => {
     if (isSyncingVariantsRef.current) return;
     isSyncingVariantsRef.current = true;
     try {
       setLoading(true);
-      const response = await apiRequest(`/api/quotations/${quotationId}/variants`, 'GET');
-      setVariants(response);
-      const selectedFromServer = response.filter((variant: QuotationVariant) => variant.isSelected).map((variant: QuotationVariant) => variant.id);
-      const recommended = response.find((variant: QuotationVariant) => variant.isRecommended)
-        || response.find((variant: QuotationVariant) => variant.variantName === 'Intermedio');
-      setSelectedVariantIds(selectedFromServer.length > 0 ? selectedFromServer : recommended ? [recommended.id] : []);
+      const response = await syncVariantsFromServer();
 
       // If no variants exist, create default variants
       if (response.length === 0) {
@@ -301,7 +313,7 @@ export function QuotationVariants({
             teamMembers,
           });
         }
-        await fetchVariants();
+        await syncVariantsFromServer();
         toast({ title: "Escenarios creados", description: "Cada alternativa tiene alcance, equipo y precio propios" });
       } catch (error) {
         console.error('Error creating professional variants:', error);
@@ -354,8 +366,8 @@ export function QuotationVariants({
           isSelected: false // La aceptación pertenece exclusivamente al portal del cliente
         });
       }
-      
-      await fetchVariants();
+
+      await syncVariantsFromServer();
       toast({
         title: "Variantes creadas",
         description: "Se crearon las variantes por defecto"
