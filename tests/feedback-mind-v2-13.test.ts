@@ -559,4 +559,21 @@ describe("Feedback Mind V2-13 · ronda 27-8", () => {
     const releaseIndex = fetchVariants.indexOf("isSyncingVariantsRef.current = false;");
     expect(releaseIndex).toBeGreaterThan(finallyIndex);
   });
+  // ── GEN-21 · El autoguardado no debe sonar a guardado en servidor ───────
+  it("el indicador de autoguardado aclara que es local, no un guardado en servidor", () => {
+    // El autoguardado sólo escribe en localStorage (optimized-quote-context.tsx);
+    // el guardado real al servidor es el botón explícito "Guardar borrador".
+    // "Guardado hace Xs" con ícono/color verde era indistinguible de un
+    // guardado real -- confirmado en vivo: GET /api/quotations devolvía []
+    // con el indicador mostrando "Guardado hace 3s" repetidas veces.
+    const indicator = source("client/src/components/ui/autosave-indicator.tsx");
+    expect(indicator).toContain("`Borrador local guardado ${getTimeSinceLastSave()}`");
+    expect(indicator).toContain("'Guardando borrador local...'");
+    expect(indicator).toContain("'Cambios sin guardar en este navegador'");
+    expect(indicator).toContain("'Error al guardar el borrador local'");
+    expect(indicator).not.toContain("`Guardado ${getTimeSinceLastSave()}`");
+    // No puede mostrar segundos negativos cuando el timer de 1s queda un
+    // tick atrás del momento exacto del guardado.
+    expect(indicator).toContain("Math.max(0, Math.floor((currentTime - lastSaveTime) / 1000))");
+  });
 });
