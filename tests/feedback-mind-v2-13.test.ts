@@ -512,4 +512,51 @@ describe("Feedback Mind V2-13 · ronda 27-8", () => {
     // debe disparar de nuevo con el id que se acaba de limpiar.
     expect(clearFn).toContain("autoAppliedBlueprintId.current = null;");
   });
+  // ── GEN-19 · La sync automática también actualiza el "vigente" ──────────
+  it("recordObservedRate sincroniza system_config.usd_exchange_rate para el mes en curso", () => {
+    // GEN-16 resuelve el snapshot de la cotización puntual, pero el "tipo de
+    // cambio vigente" que ese mismo botón sugiere -- y que usa useCurrency()
+    // en el resto de la app -- vive en system_config, no en exchangeRates.
+    // Antes sólo lo tocaba el botón manual "Sincronizar dólar blue": si
+    // nadie lo clickeaba, la sugerencia podía quedar vieja aunque el
+    // histórico sí estuviera al día.
+    const fxSync = source("server/services/fxSync.ts");
+    const recordObservedRate = fxSync.slice(
+      fxSync.indexOf("export async function recordObservedRate("),
+      fxSync.indexOf("export async function demoteStaleProjections("),
+    );
+    expect(recordObservedRate).toContain('if (rateType === "daily") {');
+    expect(recordObservedRate).toContain("await db.insert(systemConfig).values({");
+    expect(recordObservedRate).toContain('configKey: "usd_exchange_rate"');
+    expect(recordObservedRate).toContain("configValue: input.rate,");
+    // Un mes ya cerrado que se está registrando en el histórico no debe
+    // pisar la referencia de hoy -- sólo actualiza para el mes en curso.
+    const dailyGuardIndex = recordObservedRate.indexOf('if (rateType === "daily") {');
+    const systemConfigIndex = recordObservedRate.indexOf("await db.insert(systemConfig)");
+    expect(dailyGuardIndex).toBeGreaterThan(-1);
+    expect(systemConfigIndex).toBeGreaterThan(dailyGuardIndex);
+  });
+  // ── GEN-20 · No duplicar variantes por defecto al asentarse el precio ───
+  it("fetchVariants usa un lock para no crear variantes duplicadas en carreras", () => {
+    // Confirmado en vivo: dos filas "Esencial" idénticas (id=1 e id=2) con
+    // un hueco en la secuencia (id=4). El useEffect que dispara
+    // fetchVariants depende de [quotationId, baseCost, totalAmount], y esos
+    // dos últimos cambian varias veces mientras el precio se asienta recién
+    // asignado el equipo -- sin lock, dos disparos casi simultáneos podían
+    // ver "0 variantes" cada uno y crear el set por defecto dos veces.
+    const variants = source("client/src/components/optimized/QuotationVariants.tsx");
+    expect(variants).toContain("const isSyncingVariantsRef = useRef(false);");
+    const fetchVariants = variants.slice(
+      variants.indexOf("const fetchVariants = async () => {"),
+      variants.indexOf("const createDefaultVariants = async () => {"),
+    );
+    expect(fetchVariants).toContain("if (isSyncingVariantsRef.current) return;");
+    expect(fetchVariants).toContain("isSyncingVariantsRef.current = true;");
+    // El lock se libera en el finally, incluso si createDefaultVariants o
+    // el fetch fallan, para no dejar el componente bloqueado para siempre.
+    expect(fetchVariants).toContain("isSyncingVariantsRef.current = false;");
+    const finallyIndex = fetchVariants.lastIndexOf("finally {");
+    const releaseIndex = fetchVariants.indexOf("isSyncingVariantsRef.current = false;");
+    expect(releaseIndex).toBeGreaterThan(finallyIndex);
+  });
 });

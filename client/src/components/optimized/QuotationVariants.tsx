@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -100,6 +100,14 @@ export function QuotationVariants({
   const { saveQuotation, availableRoles, availablePersonnel } = useOptimizedQuote();
   const [, setLocation] = useLocation();
   const { exchangeRate } = useCurrency();
+  // baseCost/totalAmount cambian varias veces mientras el precio termina de
+  // asentarse (equipo recién asignado, tipo de cambio recién resuelto), y
+  // ambos están en las dependencias del effect de abajo para poder detectar
+  // cotizaciones que llegan sin variantes. Sin este lock, dos disparos casi
+  // simultáneos podían ver "0 variantes" cada uno mientras el primero
+  // todavía estaba creando el set por defecto, y los dos terminaban
+  // creando variantes duplicadas (visto en vivo: dos "Esencial" idénticas).
+  const isSyncingVariantsRef = useRef(false);
 
   useEffect(() => {
     if (quotationId && quotationId > 0) {
@@ -111,6 +119,8 @@ export function QuotationVariants({
   }, [quotationId, baseCost, totalAmount]);
 
   const fetchVariants = async () => {
+    if (isSyncingVariantsRef.current) return;
+    isSyncingVariantsRef.current = true;
     try {
       setLoading(true);
       const response = await apiRequest(`/api/quotations/${quotationId}/variants`, 'GET');
@@ -119,7 +129,7 @@ export function QuotationVariants({
       const recommended = response.find((variant: QuotationVariant) => variant.isRecommended)
         || response.find((variant: QuotationVariant) => variant.variantName === 'Intermedio');
       setSelectedVariantIds(selectedFromServer.length > 0 ? selectedFromServer : recommended ? [recommended.id] : []);
-      
+
       // If no variants exist, create default variants
       if (response.length === 0) {
         await createDefaultVariants();
@@ -130,6 +140,7 @@ export function QuotationVariants({
       createLocalVariants();
     } finally {
       setLoading(false);
+      isSyncingVariantsRef.current = false;
     }
   };
 
