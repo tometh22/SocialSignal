@@ -77,7 +77,7 @@ type EnhancedTeamConfigProps = {
 };
 
 const EnhancedTeamConfig: React.FC<EnhancedTeamConfigProps> = ({ validationMessage }) => {
-  const { exchangeRate } = useCurrency();
+  const { exchangeRate, exchangeRateReady, exchangeRateSource } = useCurrency();
   const {
     quotationData,
     addTeamMember,
@@ -93,8 +93,14 @@ const EnhancedTeamConfig: React.FC<EnhancedTeamConfigProps> = ({ validationMessa
     getResolvedSalaryMonth,
     updateSalaryMonth,
     updateInflation,
+    updateQuotationCurrency,
     goToStep,
   } = useOptimizedQuote();
+  // Confirmar el tipo de cambio sin salir de Equipo: evita el viaje de ida y
+  // vuelta a Inversión sólo para fijar un número que ya se conoce (o uno
+  // manual). updateQuotationCurrency ya recalcula las tarifas del equipo en
+  // el mismo paso, así que confirmar acá deja todo resuelto de inmediato.
+  const [customExchangeRateInput, setCustomExchangeRateInput] = useState('');
 
   // Estados para la nueva UI
   const [draggedMembers, setDraggedMembers] = useState<DragDropTeamMember[]>([]);
@@ -395,14 +401,45 @@ const EnhancedTeamConfig: React.FC<EnhancedTeamConfigProps> = ({ validationMessa
         </div>
       )}
       {missingExchangeRateSnapshot && (
-        <div role="alert" className="flex flex-col gap-3 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800 sm:flex-row sm:items-center sm:justify-between">
+        <div role="alert" className="flex flex-col gap-3 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
           <span>
             <strong>Falta confirmar el tipo de cambio de esta cotización.</strong> Sin eso, todas las tarifas se
             calculan en $0 aunque los valores hora en Personal estén correctos.
           </span>
-          <Button type="button" size="sm" variant="outline" className="shrink-0 border-red-300 text-red-800 hover:bg-red-100" onClick={() => goToStep(5)}>
-            Confirmar tipo de cambio
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            {exchangeRateReady && (
+              <Button
+                type="button" size="sm" variant="outline"
+                className="shrink-0 border-red-300 bg-white text-red-800 hover:bg-red-100"
+                onClick={() => updateQuotationCurrency(currency, exchangeRate)}
+              >
+                Usar el registrado{exchangeRateSource ? ` (${exchangeRateSource})` : ''}: ${exchangeRate.toLocaleString('es-AR')}
+              </Button>
+            )}
+            <div className="flex shrink-0 items-center gap-1.5">
+              <Input
+                type="text" inputMode="decimal" placeholder="Otro valor"
+                aria-label="Tipo de cambio manual"
+                value={customExchangeRateInput}
+                onChange={(e) => setCustomExchangeRateInput(e.target.value)}
+                className="h-8 w-28 border-red-300 bg-white text-xs"
+              />
+              <Button
+                type="button" size="sm" variant="outline"
+                className="border-red-300 bg-white text-red-800 hover:bg-red-100"
+                disabled={parseDecimalInput(customExchangeRateInput, 0) <= 0}
+                onClick={() => {
+                  const parsed = parseDecimalInput(customExchangeRateInput, 0);
+                  if (parsed > 0) { updateQuotationCurrency(currency, parsed); setCustomExchangeRateInput(''); }
+                }}
+              >
+                Usar este
+              </Button>
+            </div>
+            <Button type="button" size="sm" variant="ghost" className="shrink-0 text-red-800 underline hover:bg-red-100" onClick={() => goToStep(5)}>
+              Ir a Inversión
+            </Button>
+          </div>
         </div>
       )}
       {(availableRoles.length === 0 || availablePersonnel.length === 0) && (

@@ -242,6 +242,32 @@ describe("Feedback Mind V2-13 · ronda 27-8", () => {
     expect(teamConfig).toContain("onClick={() => goToStep(5)}");
   });
 
+  it("resuelve el tipo de cambio sin salir de Equipo: sugiere el registrado o acepta uno manual", () => {
+    // Pedido explícito de negocio: "para evitar fricción en el uso, el
+    // cotizador debería poder sugerir ahí el tipo de cambio registrado o
+    // permitirle al usuario usar otro". Ir a Inversión queda como salida,
+    // no como único camino.
+    const teamConfig = source("client/src/components/optimized/EnhancedTeamConfig.tsx");
+    // Sugiere el vigente con un click.
+    expect(teamConfig).toContain("onClick={() => updateQuotationCurrency(currency, exchangeRate)}");
+    expect(teamConfig).toContain("Usar el registrado");
+    // Acepta uno manual, con la misma tolerancia a coma decimal que el resto
+    // de los inputs numéricos de la app.
+    expect(teamConfig).toContain("value={customExchangeRateInput}");
+    expect(teamConfig).toContain("const parsed = parseDecimalInput(customExchangeRateInput, 0);");
+    expect(teamConfig).toContain("if (parsed > 0) { updateQuotationCurrency(currency, parsed); setCustomExchangeRateInput(\'\'); }");
+    // updateQuotationCurrency ya recalcula las tarifas del equipo con el
+    // nuevo snapshot: confirmar acá no deja al usuario con $0 residuales
+    // hasta volver a tocar algo.
+    const contextFn = source("client/src/context/optimized-quote-context.tsx");
+    const updateFn = contextFn.slice(
+      contextFn.indexOf("const updateQuotationCurrency = useCallback("),
+      contextFn.indexOf("const updateSalaryMonth = useCallback("),
+    );
+    expect(updateFn).toContain("const updatedMembers = prev.teamMembers.map(member =>");
+    expect(updateFn).toContain("requiresExchangeRateConfirmation: exchangeRateOverride && exchangeRateOverride > 0\n          ? false");
+  });
+
   it("confirma que la fórmula de tarifa corta en 0 antes de leer ningún dato de Personal", () => {
     const rateFormula = source("shared/utils/quotation-personnel-rate.ts");
     const start = rateFormula.indexOf("export function resolveQuotationPersonnelRate");
