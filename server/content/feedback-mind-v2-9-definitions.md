@@ -1,6 +1,6 @@
 ---
-version: 2.19.0
-updatedAt: 2026-09-01
+version: 2.20.0
+updatedAt: 2026-09-02
 feedbackCount: 70
 ---
 
@@ -354,3 +354,13 @@ corte en la fórmula de tarifa, sin ninguna señal visible.
 No se tocó el orden de los pasos ni se adelantó la validación del tipo de
 cambio a un paso anterior: eso cambiaría el flujo de armado y no fue lo que
 se pidió. La resolución es visibilidad, no bloqueo adicional.
+
+### Revisión 2.20.0 — resolver el tipo de cambio sin salir de Equipo
+
+Pedido explícito de negocio sobre GEN-15: *"para evitar fricción en el uso,
+el cotizador debería poder sugerir ahí el tipo de cambio registrado o
+permitirle al usuario usar otro."*
+
+| ID | Estado | Definición y resolución |
+|---|---|---|
+| GEN-16 | Implementado | El aviso de tipo de cambio faltante en Equipo ofrece dos acciones en el lugar: usar el tipo de cambio vigente con un click, o cargar uno manual con la misma tolerancia a coma decimal que el resto de los inputs numéricos. Las dos llaman a `updateQuotationCurrency`, que ya recalcula la tarifa de todo el equipo con el nuevo snapshot en el mismo paso. "Ir a Inversión" queda como tercera opción, no como único camino. |
