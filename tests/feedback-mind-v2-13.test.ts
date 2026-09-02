@@ -486,4 +486,30 @@ describe("Feedback Mind V2-13 · ronda 27-8", () => {
     expect(manageQuotes).toContain("return !top || ars > top.ars ? { name: q.projectName, ars } : top;");
     expect(manageQuotes).toContain("detail={stats.topValueContributor ? `Mayor: ${stats.topValueContributor.name}");
   });
+  // ── GEN-18 · Deshacer una receta elegida por error ───────────────────────
+  it("permite quitar la receta seleccionada, simétrico a lo que applyDefinition escribe", () => {
+    // Reporte real, con captura: "aca seleccione bolsa de creditos por
+    // error, quiero des-seleccionar y no anda". Clickear la tarjeta ya
+    // activa sólo volvía a aplicar la misma receta -- no había ningún
+    // camino para deshacer la elección.
+    const builder = source("client/src/components/quotation/professional-scope-builder.tsx");
+    expect(builder).toContain("const clearBlueprintSelection = () => {");
+    expect(builder).toContain("Quitar selección");
+    // Deshace exactamente lo que applyDefinition escribe: id, versión,
+    // snapshot, equipo, entregables y el plan operativo -- no un subconjunto.
+    const clearFn = builder.slice(
+      builder.indexOf("const clearBlueprintSelection = () => {"),
+      builder.indexOf("// Los grupos de propuestas creados desde el brief"),
+    );
+    expect(clearFn).toContain("serviceBlueprintId: null,");
+    expect(clearFn).toContain("scopeSnapshot: null,");
+    expect(clearFn).toContain("updateTeamMembers([]);");
+    expect(clearFn).toContain('project: { ...quotationData.project, type: "", duration: "" },');
+    // La Bolsa de créditos se apaga sin perder los valores ya cargados,
+    // igual que updateProjectType al cambiar de modalidad.
+    expect(clearFn).toContain("enabled: false }");
+    // No reaplica la receta al volver a montar: el efecto de auto-apply no
+    // debe disparar de nuevo con el id que se acaba de limpiar.
+    expect(clearFn).toContain("autoAppliedBlueprintId.current = null;");
+  });
 });
