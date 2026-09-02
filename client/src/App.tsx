@@ -27,6 +27,7 @@ const ProjectDetail = lazy(() => import("@/pages/project-detail"));
 const ProjectSettings = lazy(() => import("@/pages/project-settings"));
 const NewProjectWithTooltips = lazy(() => import("@/pages/new-project-with-tooltips"));
 const TimeEntries = lazy(() => import("@/pages/time-entries"));
+const ProjectFinancialManagement = lazy(() => import("@/pages/project-financial-management"));
 const MyInvoices = lazy(() => import("@/pages/my-invoices"));
 const AdminProviders = lazy(() => import("@/pages/admin-providers"));
 const ProviderDashboard = lazy(() => import("@/pages/provider/dashboard"));
@@ -121,6 +122,11 @@ function OperationsOnlyProjectSettings() {
 function OperationsOnlyProjectTimeEntries() {
   const { isOperations } = usePermissions();
   return isOperations ? <TimeEntries /> : <Redirect to="/tasks/projects" />;
+}
+
+function OperationsOnlyProjectFinancialManagement() {
+  const { isOperations } = usePermissions();
+  return isOperations ? <ProjectFinancialManagement /> : <Redirect to="/tasks/projects" />;
 }
 
 function ProjectTasksRedirect({ params }: { params: { id: string } }) {
@@ -270,6 +276,7 @@ function AppRoutes() {
                   <ProtectedRoute path="/active-projects/:id/edit" component={OperationsOnlyProjectEdit} requiredPermission="projects" />
                   <ProtectedRoute path="/active-projects/:id" component={OperationsOnlyProjectDetail} requiredPermission="projects" />
                   <ProtectedRoute path="/active-projects/:id/time-entries" component={OperationsOnlyProjectTimeEntries} requiredPermission="projects" />
+                  <ProtectedRoute path="/active-projects/:id/financial-management" component={OperationsOnlyProjectFinancialManagement} requiredPermission="projects" />
                   <ProtectedRoute path="/projects/:id" component={ProjectTasksRedirect} requiredPermission="projects" />
                   <ProtectedRoute path="/project-settings/:id" component={OperationsOnlyProjectSettings} requiredPermission="projects" />
                   <ProtectedRoute path="/time-entries/project/:projectId" component={OperationsOnlyProjectTimeEntries} requiredPermission="projects" />

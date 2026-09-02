@@ -457,6 +457,19 @@ export default function ProjectDetail() {
         </Link>
       )}
 
+      {/* ── Acceso a Facturación y Cobranza ────────────────────────── */}
+      {canSeeCosts && (
+        <Link href={`/active-projects/${pid}/financial-management`}>
+          <div className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 cursor-pointer hover:bg-emerald-100 transition-colors">
+            <div className="flex items-center gap-2 text-sm text-emerald-800">
+              <Receipt className="h-4 w-4" />
+              <span>Registrá ventas mensuales y el estado de facturación/cobranza de este proyecto.</span>
+            </div>
+            <span className="flex items-center gap-1 text-sm font-medium text-emerald-700">Abrir facturación y cobranza <ArrowRight className="h-4 w-4" /></span>
+          </div>
+        </Link>
+      )}
+
       <Link href={`/tasks/projects/${pid}`}>
         <div className="mb-4 flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 transition-colors hover:bg-slate-50">
           <div className="flex items-center gap-2 text-sm text-slate-700">
