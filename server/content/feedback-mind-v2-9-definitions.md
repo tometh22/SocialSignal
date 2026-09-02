@@ -1,5 +1,5 @@
 ---
-version: 2.22.0
+version: 2.23.0
 updatedAt: 2026-09-02
 feedbackCount: 70
 ---
@@ -402,3 +402,16 @@ mostrando "Guardado hace 3s" repetidas veces, hasta el primer click en
 | ID | Estado | Definición y resolución |
 |---|---|---|
 | GEN-21 | Implementado | El texto de cada estado de `AutosaveIndicator` ahora aclara "local"/"en este navegador" en vez de un genérico "Guardado"/"Autoguardado activo" que sugería persistencia en servidor. No se cambió el comportamiento de guardado (seguir persistiendo sólo en localStorage hasta el click explícito en "Guardar borrador" es una decisión de producto, no un bug) ni el ícono/color, sólo la honestidad del texto. De paso, `getTimeSinceLastSave` ya no puede mostrar segundos negativos (se vio "hace -1s" cuando el timer de 1s quedaba un tick atrás del momento exacto del guardado). |
+
+### Revisión 2.23.0 — el lock de GEN-20 tapaba su propio refresh
+
+Encontrado probando la modalidad Bolsa de créditos de punta a punta hasta
+Propuesta (paso 6), como continuación de la misma auditoría en vivo: la API
+tenía las 3 variantes por defecto recién creadas (`GET
+/api/quotations/2/variants` devolvía Esencial/Recomendada/Expandida, sin
+duplicados — GEN-20 cumplió su objetivo), pero la sección "Escenarios de
+alcance" se veía completamente vacía en pantalla.
+
+| ID | Estado | Definición y resolución |
+|---|---|---|
+| GEN-22 | Implementado | `createDefaultVariants` corre siempre desde adentro de `fetchVariants`, con el lock de GEN-20 ya tomado. Al terminar de crear, llamaba a `fetchVariants()` de nuevo para refrescar el estado con las variantes recién creadas — pero esa llamada anidada entraba al mismo lock, todavía no liberado por la llamada externa que la originó, y el `if (isSyncingVariantsRef.current) return;` la descartaba en silencio. Las variantes quedaban creadas en la base pero nunca llegaban a `setVariants`. Se extrajo `syncVariantsFromServer` (el GET + `setVariants` + `setSelectedVariantIds`, sin tocar el lock) como helper compartido: `fetchVariants` lo usa para su lectura principal, y `createDefaultVariants` lo usa para su refresh final en vez de reentrar a `fetchVariants`. |
