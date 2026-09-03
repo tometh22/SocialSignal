@@ -591,4 +591,50 @@ describe("Feedback Mind V2-13 · ronda 27-8", () => {
     // tick atrás del momento exacto del guardado.
     expect(indicator).toContain("Math.max(0, Math.floor((currentTime - lastSaveTime) / 1000))");
   });
+  // ── GEN-23 · Las variantes no pueden dar todas el mismo precio ──────────
+  it("calibra el ajuste de precio contra el equipo base, no contra el de cada variante", () => {
+    // Confirmado en vivo probando Fee Mensual de punta a punta: Esencial
+    // (63.5h), Recomendada (99h) y Expandida (105h) mostraban EXACTAMENTE el
+    // mismo "Precio Total" ($8.582.000, el mismo que "Precio estimado" del
+    // equipo base) a pesar de tener equipos y horas distintos. Causa: el
+    // factor de ajuste se recalculaba como totalAmount / totalSinAjustar(el
+    // equipo DE ESA VARIANTE) -- multiplicarlo de nuevo por ese mismo
+    // totalSinAjustar cancela matemáticamente cualquier diferencia de costo
+    // entre variantes, así que las tres terminan dando totalAmount siempre.
+    const variants = source("client/src/components/optimized/QuotationVariants.tsx");
+    expect(variants).toContain("const baseInflationFactor = useMemo(() => {");
+    const baseInflationFactor = variants.slice(
+      variants.indexOf("const baseInflationFactor = useMemo(() => {"),
+      variants.indexOf("const calculateVariantResult = ("),
+    );
+    // Calibra contra baseTeamMembers (el equipo del paso Equipo), no contra
+    // el equipo que reciba calculateVariantResult en cada llamada.
+    expect(baseInflationFactor).toContain("calculateQuotationPricing({ ...pricingCommon(baseTeamMembers), inflationFactor: 1 })");
+    expect(variants).toContain(
+      "const calculateVariantResult = (members: Array<{ hours: number; rate: number; cost?: number }>) =>\n" +
+      "    calculateQuotationPricing({ ...pricingCommon(members), inflationFactor: baseInflationFactor });",
+    );
+  });
+  // ── GEN-24 · "vs. la recomendada" tiene que comparar contra la recomendada ──
+  it("getBaseReferenceTotal compara contra la variante recomendada, no contra el total del equipo base", () => {
+    // Mismo hallazgo, segunda parte: las badges dicen literalmente "% menos
+    // que la recomendada" / "Referencia", pero comparaban contra
+    // toStoredCurrency(totalAmount) -- el total del equipo tal como quedó en
+    // el paso Equipo, no el de la variante "Recomendada". Confirmado en
+    // vivo: la propia tarjeta "Recomendada" mostraba "-34% menos que la
+    // recomendada" comparándose contra sí misma.
+    const variants = source("client/src/components/optimized/QuotationVariants.tsx");
+    const getBaseReferenceTotal = variants.slice(
+      variants.indexOf("const getBaseReferenceTotal = (): number => {"),
+      variants.indexOf("const getDifferenceVsBase = ("),
+    );
+    expect(getBaseReferenceTotal).toContain('variants.find((variant) => variant.isRecommended)');
+    expect(getBaseReferenceTotal).toContain("variant.variantName === 'Recomendada' || variant.variantName === 'Intermedio'");
+    expect(getBaseReferenceTotal).toContain("if (recommended) return computeVariantTotal(recommended);");
+    // El fallback a totalAmount sigue existiendo para cuando todavía no hay
+    // variantes (loading inicial), pero ya no es el camino primario.
+    const recommendedCheckIndex = getBaseReferenceTotal.indexOf("if (recommended) return computeVariantTotal(recommended);");
+    const fallbackIndex = getBaseReferenceTotal.indexOf("toStoredCurrency(totalAmount)");
+    expect(fallbackIndex).toBeGreaterThan(recommendedCheckIndex);
+  });
 });
