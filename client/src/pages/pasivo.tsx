@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { DollarSign, AlertCircle, Clock, CheckCircle, ChevronLeft, ChevronRight } from "lucide-react";
+import { LedgerBackfillPanel } from "@/components/ledger-backfill-panel";
 
 const MONTHS = Array.from({ length: 12 }, (_, i) => ({
   value: String(i + 1).padStart(2, "0"),
@@ -72,6 +73,8 @@ export default function PasivoPage() {
         <h1 className="text-2xl font-bold">Pasivo — Cuentas a Pagar</h1>
         <p className="text-muted-foreground text-sm">Obligaciones de pago importadas desde el Excel MAESTRO</p>
       </div>
+
+      <LedgerBackfillPanel />
 
       {/* Filtros */}
       <div className="flex gap-3 flex-wrap">
