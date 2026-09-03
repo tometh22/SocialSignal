@@ -1,5 +1,5 @@
 ---
-version: 2.23.0
+version: 2.24.0
 updatedAt: 2026-09-02
 feedbackCount: 70
 ---
@@ -415,3 +415,17 @@ alcance" se veía completamente vacía en pantalla.
 | ID | Estado | Definición y resolución |
 |---|---|---|
 | GEN-22 | Implementado | `createDefaultVariants` corre siempre desde adentro de `fetchVariants`, con el lock de GEN-20 ya tomado. Al terminar de crear, llamaba a `fetchVariants()` de nuevo para refrescar el estado con las variantes recién creadas — pero esa llamada anidada entraba al mismo lock, todavía no liberado por la llamada externa que la originó, y el `if (isSyncingVariantsRef.current) return;` la descartaba en silencio. Las variantes quedaban creadas en la base pero nunca llegaban a `setVariants`. Se extrajo `syncVariantsFromServer` (el GET + `setVariants` + `setSelectedVariantIds`, sin tocar el lock) como helper compartido: `fetchVariants` lo usa para su lectura principal, y `createDefaultVariants` lo usa para su refresh final en vez de reentrar a `fetchVariants`. |
+
+### Revisión 2.24.0 — las tres variantes daban exactamente el mismo precio
+
+Encontrado probando Fee Mensual de punta a punta hasta Propuesta, misma
+auditoría en vivo: Esencial (63.5h), Recomendada (99h) y Expandida (105h)
+mostraban el mismo "Precio Total" — $8.582.000, igual al "Precio estimado"
+del equipo base — a pesar de tener equipos, horas y entregables distintos.
+Además, la propia tarjeta "Recomendada" mostraba una badge "-34% menos que
+la recomendada", comparándose contra sí misma.
+
+| ID | Estado | Definición y resolución |
+|---|---|---|
+| GEN-23 | Implementado | `calculateVariantResult` calibraba un `inflationFactor` como `totalAmount / totalSinAjustar(equipoDeEsaVariante)` y lo volvía a multiplicar por ese mismo `totalSinAjustar` dentro de la fórmula canónica (`shared/utils/quotation-pricing.ts`, donde `total` es lineal en `inflationFactor`) — matemáticamente esas dos operaciones se cancelan y el resultado es siempre `totalAmount`, sin importar el equipo o las horas de la variante. Ahora ese factor se calibra una única vez contra `baseTeamMembers` (el equipo del paso Equipo) y se reutiliza igual para las tres variantes, así cada una escala según su propio costo. |
+| GEN-24 | Implementado | Las badges de comparación dicen explícitamente "% menos/más que la recomendada", pero `getBaseReferenceTotal` usaba `totalAmount` (el total del equipo tal como quedó en el paso Equipo) como referencia primaria, no el total de la variante "Recomendada" — el fallback a la variante recomendada (bajo el nombre viejo `'Intermedio'`) sólo se alcanzaba si `totalAmount` era 0, algo que casi nunca pasa a esta altura del wizard. Ahora busca primero la variante con `isRecommended` (o nombrada `'Recomendada'`/`'Intermedio'`) y compara contra su propio total; `totalAmount` queda como fallback sólo para cuando todavía no hay variantes cargadas. |

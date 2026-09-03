@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -260,33 +260,50 @@ export function QuotationVariants({
       ? amountARS / variantExchangeRate
       : amountARS;
 
-  const calculateVariantResult = (members: Array<{ hours: number; rate: number; cost?: number }>) => {
-    const common = {
-      quotationCurrency: quotationData.quotationCurrency === 'USD' ? 'USD' as const : 'ARS' as const,
-      exchangeRate: variantExchangeRate,
-      team: members.map((member) => ({
-        hours: member.hours,
-        rate: member.rate,
-        cost: member.cost ?? member.hours * member.rate,
-        currency: quotationData.quotationCurrency === 'USD' ? 'USD' as const : 'ARS' as const,
-      })),
-      complexityFactor: baseCost > 0 ? complexityAdjustment / baseCost : 0,
-      marginFactor: quotationData.financials.marginFactor || 2,
-      toolsCostUSD: quotationData.financials.toolsCost || 0,
-      additionalDeliverableCostUSD: quotationData.additionalDeliverableCost || 0,
-      platformCostARS: quotationData.financials.platformCost || 0,
-      deviationPercentage: quotationData.financials.deviationPercentage || 0,
-      discountPercentage: quotationData.financials.discountPercentage || 0,
-      priceMode: quotationData.financials.priceMode || 'auto',
-      manualPrice: quotationData.financials.manualPrice,
-      manualPriceCurrency: quotationData.financials.manualPriceCurrency || quotationData.quotationCurrency,
-    };
-    const withoutInflation = calculateQuotationPricing({ ...common, inflationFactor: 1 });
-    const inflationFactor = withoutInflation.canonicalARS.total > 0
+  const pricingCommon = (members: Array<{ hours: number; rate: number; cost?: number }>) => ({
+    quotationCurrency: quotationData.quotationCurrency === 'USD' ? 'USD' as const : 'ARS' as const,
+    exchangeRate: variantExchangeRate,
+    team: members.map((member) => ({
+      hours: member.hours,
+      rate: member.rate,
+      cost: member.cost ?? member.hours * member.rate,
+      currency: quotationData.quotationCurrency === 'USD' ? 'USD' as const : 'ARS' as const,
+    })),
+    complexityFactor: baseCost > 0 ? complexityAdjustment / baseCost : 0,
+    marginFactor: quotationData.financials.marginFactor || 2,
+    toolsCostUSD: quotationData.financials.toolsCost || 0,
+    additionalDeliverableCostUSD: quotationData.additionalDeliverableCost || 0,
+    platformCostARS: quotationData.financials.platformCost || 0,
+    deviationPercentage: quotationData.financials.deviationPercentage || 0,
+    discountPercentage: quotationData.financials.discountPercentage || 0,
+    priceMode: quotationData.financials.priceMode || 'auto',
+    manualPrice: quotationData.financials.manualPrice,
+    manualPriceCurrency: quotationData.financials.manualPriceCurrency || quotationData.quotationCurrency,
+  });
+
+  // Calibra UNA sola vez, contra el equipo base (el de Equipo/paso 4), la
+  // relación entre lo que da la fórmula canónica y totalAmount (que puede
+  // traer un ajuste manual que la fórmula sola no reproduce). Antes esta
+  // calibración se recalculaba adentro de calculateVariantResult usando el
+  // equipo de CADA variante: como el factor se define como
+  // totalAmount / totalSinAjustar(esosMiembros), multiplicarlo de nuevo por
+  // ese mismo totalSinAjustar cancela la diferencia entre variantes -- las
+  // tres terminaban dando exactamente totalAmount sin importar que su
+  // equipo y horas fueran distintos (confirmado en vivo: Esencial/
+  // Recomendada/Expandida con 63.5h/99h/105h mostrando el mismo precio).
+  // Calibrar una sola vez contra el equipo base preserva cualquier ajuste
+  // del quotation y deja que cada variante escale con su propio costo.
+  const baseInflationFactor = useMemo(() => {
+    if (!baseTeamMembers?.length) return 1;
+    const withoutInflation = calculateQuotationPricing({ ...pricingCommon(baseTeamMembers), inflationFactor: 1 });
+    return withoutInflation.canonicalARS.total > 0
       ? Math.max(0, totalAmount / withoutInflation.canonicalARS.total)
       : 1;
-    return calculateQuotationPricing({ ...common, inflationFactor });
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [baseTeamMembers, totalAmount, baseCost, complexityAdjustment, variantExchangeRate, quotationData.quotationCurrency, quotationData.financials]);
+
+  const calculateVariantResult = (members: Array<{ hours: number; rate: number; cost?: number }>) =>
+    calculateQuotationPricing({ ...pricingCommon(members), inflationFactor: baseInflationFactor });
 
   const createDefaultVariants = async () => {
     if (quotationData.scopeSnapshot) {
@@ -651,11 +668,20 @@ export function QuotationVariants({
     return baseTeamMembers.reduce((sum, m) => sum + getEffectiveMemberHours(variant, m), 0);
   };
 
+  // Las badges de esta comparación dicen explícitamente "vs. la recomendada"
+  // (ver más abajo), así que la referencia tiene que ser el total de esa
+  // variante -- no el totalAmount del equipo tal como quedó en el paso
+  // Equipo. Antes usaba totalAmount primero y sólo caía a 'Intermedio' (el
+  // nombre viejo, pre-recetas) si totalAmount era 0, algo que casi nunca
+  // pasa a esta altura del wizard: la tarjeta "Recomendada" terminaba
+  // comparándose contra sí misma y mostrando un "% menos" que no era 0
+  // (confirmado en vivo: -34% en su propia tarjeta).
   const getBaseReferenceTotal = (): number => {
+    const recommended = variants.find((variant) => variant.isRecommended)
+      || variants.find((variant) => variant.variantName === 'Recomendada' || variant.variantName === 'Intermedio');
+    if (recommended) return computeVariantTotal(recommended);
     const persistedBase = toStoredCurrency(totalAmount);
-    if (persistedBase > 0) return persistedBase;
-    const intermediate = variants.find((variant) => variant.variantName === 'Intermedio');
-    return intermediate ? computeVariantTotal(intermediate) : 0;
+    return persistedBase > 0 ? persistedBase : 0;
   };
 
   const getDifferenceVsBase = (variant: QuotationVariant): number => {
