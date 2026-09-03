@@ -18,6 +18,8 @@ import {
 import { eq, and, sql, desc, asc } from "drizzle-orm";
 import { storage } from "./storage";
 import { parseMoneySmart } from "./utils/money";
+import { requirePermission } from "./middleware/requirePermission";
+import { googleSheetsWorkingService } from "./services/googleSheetsWorking";
 
 export function createLedgerRouter(requireAuth: any) {
   const router = Router();
@@ -571,6 +573,64 @@ export function createLedgerRouter(requireAuth: any) {
         missing,
         coverage,
       });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ==================== ADMIN: BACKFILL ACTIVO/PASIVO ====================
+  // Carga histórica manual desde el Excel MAESTRO. El sync automático
+  // (autoSyncService.syncLedger) sólo importa el mes en curso y deja de
+  // tocar activo/pasivo desde app_mode_cutover_date en adelante — por
+  // diseño, para no pisar la carga manual en Mind. Este endpoint es la
+  // excepción explícita: un admin pide un rango puntual (incluso posterior
+  // al cutover) y se trae esos meses tal cual están en la hoja "Activo"/
+  // "Pasivo" del Excel MAESTRO. Reutiliza los mismos parsers que el cron
+  // (importActivoEntries/importPasivoEntries), así que nunca diverge de
+  // cómo se interpreta la planilla. Filas con overrideManual=true (carga
+  // manual previa en Mind) nunca se pisan, sea cual sea el rango pedido.
+  router.post("/ledger/backfill", requireAuth, requirePermission("admin"), async (req, res) => {
+    try {
+      const from = String(req.body?.from || "").trim();
+      const now = new Date();
+      const to = String(req.body?.to || "").trim()
+        || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+
+      if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(from)) {
+        return res.status(400).json({ message: "from es obligatorio y debe tener formato YYYY-MM" });
+      }
+      if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(to)) {
+        return res.status(400).json({ message: "to debe tener formato YYYY-MM" });
+      }
+      if (from > to) {
+        return res.status(400).json({ message: "from no puede ser posterior a to" });
+      }
+
+      const periods: string[] = [];
+      let [y, m] = from.split("-").map(Number);
+      const [toY, toM] = to.split("-").map(Number);
+      while (y < toY || (y === toY && m <= toM)) {
+        periods.push(`${y}-${String(m).padStart(2, "0")}`);
+        m++;
+        if (m > 12) { m = 1; y++; }
+      }
+      if (periods.length > 24) {
+        return res.status(400).json({ message: "Rango demasiado grande (máx. 24 meses por corrida)" });
+      }
+
+      const results: Record<string, { activo: any; pasivo: any }> = {};
+      for (const period of periods) {
+        const [activo, pasivo] = await Promise.allSettled([
+          googleSheetsWorkingService.importActivoEntries(storage, period),
+          googleSheetsWorkingService.importPasivoEntries(storage, period),
+        ]);
+        results[period] = {
+          activo: activo.status === "fulfilled" ? activo.value : { errors: [String((activo as PromiseRejectedResult).reason)] },
+          pasivo: pasivo.status === "fulfilled" ? pasivo.value : { errors: [String((pasivo as PromiseRejectedResult).reason)] },
+        };
+      }
+
+      res.json({ periods, results });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
