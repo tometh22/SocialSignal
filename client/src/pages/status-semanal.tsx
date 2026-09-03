@@ -1747,11 +1747,12 @@ function SortableCompactRow(props: React.ComponentProps<typeof CompactRow>) {
 }
 
 // ─── AlertSidebarCard — expandable card for CEO/COO sidebar ─────────────────
-function AlertSidebarCard({ item, accent, currentUserId, roomId, onUpdate, expanded, onToggle, users, onOpenNotes, onRemove, onResolve }: {
+function AlertSidebarCard({ item, accent, currentUserId, roomId, onUpdate, expanded, onToggle, users, onOpenNotes, onRemove, onResolve, bulkMode, checked, onCheck }: {
   item: Item; accent: 'red' | 'amber'; currentUserId?: number | null; roomId?: number;
   onUpdate: (d: Record<string, any>) => void;
   expanded?: boolean; onToggle?: () => void; onResolve?: () => void;
   users?: AppUser[]; onOpenNotes?: () => void; onRemove?: () => void;
+  bulkMode?: boolean; checked?: boolean; onCheck?: (v: boolean) => void;
 }) {
   const accentBorder = accent === 'red' ? 'border-l-red-500' : 'border-l-amber-400';
   const accentBg = accent === 'red' ? 'bg-red-50/40' : 'bg-amber-50/40';
@@ -1767,6 +1768,11 @@ function AlertSidebarCard({ item, accent, currentUserId, roomId, onUpdate, expan
       {/* Clickable header */}
       <div className={cn("px-3 py-2.5 cursor-pointer")} onClick={onToggle}>
         <div className="flex items-start gap-2">
+          {bulkMode && (
+            <div className="shrink-0 mt-0.5" onClick={e => { e.stopPropagation(); onCheck?.(!checked); }}>
+              {checked ? <CheckSquare className="h-4 w-4 text-indigo-500" /> : <Square className="h-4 w-4 text-slate-300" />}
+            </div>
+          )}
           <div className="shrink-0 mt-0.5" onClick={e => e.stopPropagation()}>
             <HealthDot value={item.healthStatus} onChange={v => onUpdate({ healthStatus: v })} compact />
           </div>
@@ -1915,11 +1921,12 @@ function AlertSidebarCard({ item, accent, currentUserId, roomId, onUpdate, expan
 }
 
 // ─── DecisionSidebarCard — expandable card for decisions sidebar ─────────────
-function DecisionSidebarCard({ item, currentUserId, roomId, expanded, onToggle, users, onUpdate, onOpenNotes, onRemove, onResolve }: {
+function DecisionSidebarCard({ item, currentUserId, roomId, expanded, onToggle, users, onUpdate, onOpenNotes, onRemove, onResolve, bulkMode, checked, onCheck }: {
   item: Item; currentUserId?: number | null; roomId?: number;
   expanded?: boolean; onToggle?: () => void;
   users?: AppUser[]; onUpdate?: (d: Record<string, any>) => void;
   onOpenNotes?: () => void; onRemove?: () => void; onResolve?: () => void;
+  bulkMode?: boolean; checked?: boolean; onCheck?: (v: boolean) => void;
 }) {
   const decMeta = dm(item.decisionNeeded);
   const daysSince = item.updatedAt
@@ -1936,6 +1943,11 @@ function DecisionSidebarCard({ item, currentUserId, roomId, expanded, onToggle, 
       {/* Clickable header */}
       <div className="px-3 py-2.5 cursor-pointer" onClick={onToggle}>
         <div className="flex items-center gap-1.5">
+          {bulkMode && (
+            <div className="shrink-0" onClick={e => { e.stopPropagation(); onCheck?.(!checked); }}>
+              {checked ? <CheckSquare className="h-4 w-4 text-indigo-500" /> : <Square className="h-4 w-4 text-slate-300" />}
+            </div>
+          )}
           <p className="font-semibold text-[13px] leading-snug text-slate-900 break-words flex-1">{item.title}</p>
           <ChevronDown className={cn("h-3 w-3 text-slate-300 shrink-0 transition-transform", !expanded && "-rotate-90")} />
         </div>
@@ -2343,6 +2355,7 @@ export default function StatusSemanalPage() {
   const [filterOwner, setFilterOwner] = useState<number | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<Item | null>(null);
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
   const [aiCooldown, setAiCooldown] = useState(false);
 
   // ── New feature state ───────────────────────────────────────────────────────
@@ -2712,6 +2725,36 @@ export default function StatusSemanalPage() {
     ? [...normalOrder.map(k => normalItems.find(i => i.key === k)).filter(Boolean) as Item[],
        ...normalItems.filter(i => !normalOrder.includes(i.key))]
     : normalItems;
+
+  const selectedItems = useMemo(
+    () => visible.filter(i => selectedKeys.has(i.key)),
+    [visible, selectedKeys]
+  );
+
+  const bulkDeleteSummary = useMemo(() => {
+    const custom = selectedItems.filter(i => i.isCustom);
+    const projects = selectedItems.filter(i => !i.isCustom);
+    return { custom, projects };
+  }, [selectedItems]);
+
+  const runBulkDelete = () => {
+    const { custom, projects } = bulkDeleteSummary;
+    custom.forEach(i => { if (i.customId) deleteCustom.mutate(i.customId); });
+    projects.forEach(i => { if (i.projectId) removeProject.mutate(i.projectId); });
+    const restorable = [...projects];
+    setSelectedKeys(new Set());
+    setBulkMode(false);
+    setConfirmBulkDelete(false);
+    toast({
+      title: `${selectedItems.length} ítem${selectedItems.length === 1 ? '' : 's'} eliminado${selectedItems.length === 1 ? '' : 's'}`,
+      description: custom.length > 0
+        ? (restorable.length > 0 ? `${custom.length} de forma permanente. El resto se puede restaurar.` : 'De forma permanente.')
+        : 'Podés restaurarlos desde "Quitados del status".',
+      action: restorable.length > 0
+        ? <ToastAction altText="Deshacer" onClick={() => restorable.forEach(i => { if (i.projectId) updateProject(i.projectId, { hiddenFromWeekly: false }); })}>Deshacer</ToastAction>
+        : undefined,
+    });
+  };
 
   const getItemHandlers = (item: Item) => ({
     onUpdate: (data: Record<string, any>) => {
@@ -3146,7 +3189,10 @@ export default function StatusSemanalPage() {
                             users={appUsers}
                             onOpenNotes={h.onOpenNotes}
                             onRemove={h.onRemove}
-                            onResolve={h.onResolve} />
+                            onResolve={h.onResolve}
+                            bulkMode={bulkMode}
+                            checked={selectedKeys.has(item.key)}
+                            onCheck={v => setSelectedKeys(prev => { const n = new Set(prev); v ? n.add(item.key) : n.delete(item.key); return n; })} />
                         </motion.div>
                       );
                     })}
@@ -3179,7 +3225,10 @@ export default function StatusSemanalPage() {
                             onUpdate={h.onUpdate}
                             onOpenNotes={h.onOpenNotes}
                             onRemove={h.onRemove}
-                            onResolve={h.onResolve} />
+                            onResolve={h.onResolve}
+                            bulkMode={bulkMode}
+                            checked={selectedKeys.has(item.key)}
+                            onCheck={v => setSelectedKeys(prev => { const n = new Set(prev); v ? n.add(item.key) : n.delete(item.key); return n; })} />
                         </motion.div>
                       );
                     })}
@@ -3358,57 +3407,106 @@ export default function StatusSemanalPage() {
       </div>
 
       {/* ── Bulk Action Bar ───────────────────────────────────────── */}
-      {bulkMode && selectedKeys.size > 0 && (
+      {bulkMode && (
         <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 bg-slate-900 text-white rounded-2xl shadow-2xl px-4 py-2.5 flex items-center gap-3 min-w-[340px]">
           <span className="text-sm font-semibold">{selectedKeys.size} seleccionados</span>
-          <div className="w-px h-4 bg-slate-600" />
-          {/* Change health for selected */}
-          <div className="flex items-center gap-1">
-            {Object.entries(HEALTH).map(([k, m]) => (
-              <button key={k} title={`Cambiar a ${m.label}`}
-                onClick={() => {
+          <button
+            onClick={() => setSelectedKeys(
+              selectedKeys.size === visible.length ? new Set() : new Set(visible.map(i => i.key))
+            )}
+            className="text-xs text-indigo-300 hover:text-indigo-200 font-medium">
+            {selectedKeys.size === visible.length ? 'Ninguno' : 'Seleccionar todo'}
+          </button>
+          {selectedKeys.size > 0 && (
+            <>
+              <div className="w-px h-4 bg-slate-600" />
+              {/* Change health for selected */}
+              <div className="flex items-center gap-1">
+                {Object.entries(HEALTH).map(([k, m]) => (
+                  <button key={k} title={`Cambiar a ${m.label}`}
+                    onClick={() => {
+                      selectedKeys.forEach(key => {
+                        const item = visible.find(i => i.key === key);
+                        if (!item) return;
+                        const h = getItemHandlers(item);
+                        h.onUpdate({ healthStatus: k });
+                      });
+                    }}
+                    className={cn("w-4 h-4 rounded-full border-2 border-white/30 hover:scale-110 transition-transform", m.dot)} />
+                ))}
+              </div>
+              {/* Change owner for selected */}
+              <select className="text-xs bg-slate-700 border border-slate-600 rounded px-2 py-1 text-white focus:outline-none"
+                defaultValue=""
+                onChange={e => {
+                  const ownerId = e.target.value ? parseInt(e.target.value) : null;
                   selectedKeys.forEach(key => {
                     const item = visible.find(i => i.key === key);
                     if (!item) return;
                     const h = getItemHandlers(item);
-                    h.onUpdate({ healthStatus: k });
+                    h.onUpdate({ ownerId });
                   });
-                }}
-                className={cn("w-4 h-4 rounded-full border-2 border-white/30 hover:scale-110 transition-transform", m.dot)} />
-            ))}
-          </div>
-          {/* Change owner for selected */}
-          <select className="text-xs bg-slate-700 border border-slate-600 rounded px-2 py-1 text-white focus:outline-none"
-            defaultValue=""
-            onChange={e => {
-              const ownerId = e.target.value ? parseInt(e.target.value) : null;
-              selectedKeys.forEach(key => {
-                const item = visible.find(i => i.key === key);
-                if (!item) return;
-                const h = getItemHandlers(item);
-                h.onUpdate({ ownerId });
-              });
-              e.target.value = '';
-            }}>
-            <option value="" disabled>Asignar owner...</option>
-            {appUsers.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
-          </select>
-          {/* Hide selected */}
-          <button onClick={() => {
-            selectedKeys.forEach(key => {
-              const item = visible.find(i => i.key === key);
-              if (!item) return;
-              const h = getItemHandlers(item);
-              h.onUpdate({ hiddenFromWeekly: true });
-            });
-            setSelectedKeys(new Set());
-          }} className="text-xs px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 transition-colors flex items-center gap-1">
-            <EyeOff className="h-3 w-3" /> Ocultar
-          </button>
+                  e.target.value = '';
+                }}>
+                <option value="" disabled>Asignar owner...</option>
+                {appUsers.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+              </select>
+              {/* Hide selected */}
+              <button onClick={() => {
+                selectedKeys.forEach(key => {
+                  const item = visible.find(i => i.key === key);
+                  if (!item) return;
+                  const h = getItemHandlers(item);
+                  h.onUpdate({ hiddenFromWeekly: true });
+                });
+                setSelectedKeys(new Set());
+              }} className="text-xs px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 transition-colors flex items-center gap-1">
+                <EyeOff className="h-3 w-3" /> Ocultar
+              </button>
+              {/* Delete selected */}
+              <button onClick={() => setConfirmBulkDelete(true)}
+                className="text-xs px-2 py-1 rounded bg-red-600 hover:bg-red-700 transition-colors flex items-center gap-1">
+                <Trash2 className="h-3 w-3" /> Eliminar
+              </button>
+            </>
+          )}
           <button onClick={() => { setBulkMode(false); setSelectedKeys(new Set()); }}
             className="text-xs px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 transition-colors ml-1">
             Cancelar
           </button>
+        </div>
+      )}
+
+      {/* ── Confirm Bulk Delete Dialog ────────────────────────────── */}
+      {confirmBulkDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm" onClick={() => setConfirmBulkDelete(false)}>
+          <div className="bg-white rounded-xl shadow-2xl border border-slate-200 p-5 max-w-sm w-full mx-4" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center gap-2 mb-3">
+              <div className="h-8 w-8 rounded-full bg-red-100 flex items-center justify-center">
+                <Trash2 className="h-4 w-4 text-red-600" />
+              </div>
+              <h3 className="font-semibold text-sm">Eliminar {selectedItems.length} ítem{selectedItems.length === 1 ? '' : 's'}</h3>
+            </div>
+            <p className="text-xs text-slate-600 mb-1">
+              {bulkDeleteSummary.custom.length > 0 && bulkDeleteSummary.projects.length > 0 && (
+                <>{bulkDeleteSummary.custom.length} ítem{bulkDeleteSummary.custom.length === 1 ? '' : 's'} se eliminará{bulkDeleteSummary.custom.length === 1 ? '' : 'n'} permanentemente (no se puede deshacer) y {bulkDeleteSummary.projects.length} se quitará{bulkDeleteSummary.projects.length === 1 ? '' : 'n'} del review (se puede restaurar después).</>
+              )}
+              {bulkDeleteSummary.custom.length > 0 && bulkDeleteSummary.projects.length === 0 && (
+                <>Se van a eliminar permanentemente. Esta acción no se puede deshacer.</>
+              )}
+              {bulkDeleteSummary.custom.length === 0 && bulkDeleteSummary.projects.length > 0 && (
+                <>Se van a quitar del review. Podés restaurarlos después.</>
+              )}
+            </p>
+            <div className="flex gap-2 mt-4">
+              <Button size="sm" variant="outline" onClick={() => setConfirmBulkDelete(false)} className="flex-1 h-8 text-xs">
+                Cancelar
+              </Button>
+              <Button size="sm" onClick={runBulkDelete} className="flex-1 h-8 text-xs bg-red-600 hover:bg-red-700 text-white">
+                Eliminar
+              </Button>
+            </div>
+          </div>
         </div>
       )}
 
