@@ -26,7 +26,13 @@ function currentPeriod() {
  * y puede tocar meses ya cerrados.
  */
 export function LedgerBackfillPanel() {
-  const { isAdmin } = usePermissions();
+  // hasPermission('admin') matchea exactamente el gate del backend
+  // (requirePermission("admin") acepta isAdmin=true, role="admin" o
+  // permissions.includes("admin")) — isAdmin a secas es más estricto que
+  // eso y es lo que gatea el resto del sidebar (Configuración, Usuarios),
+  // así que un admin real podía no ver este panel.
+  const { hasPermission } = usePermissions();
+  const isAdmin = hasPermission("admin");
   const { toast } = useToast();
   const qc = useQueryClient();
   const [from, setFrom] = useState("2026-01");
