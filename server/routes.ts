@@ -6959,18 +6959,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (issues.length > 0) throw new z.ZodError(issues);
   }
 
-  // Misma correspondencia que professional-scope-builder.tsx#projectTypeFor,
-  // para que las cotizaciones creadas desde un grupo de propuestas queden
-  // con una modalidad real y seleccionable en el paso Brief (ver
-  // shared/schema.ts#projectTypes) en vez del valor genérico "comprehensive".
+  // Compatibilidad de payloads históricos: toda modalidad antigua cae en una
+  // de las cuatro categorías vigentes, sin volver a exponerla como producto.
   const PROJECT_TYPE_BY_MODALITY: Record<string, string> = {
     demo: "demo",
     one_shot: "on-demand",
     event_pack: "monitoring",
     monthly_fee: "fee-mensual",
-    annual_program: "always-on",
+    annual_program: "fee-mensual",
     renewal: "fee-mensual",
-    credit_pack: "credit-pack",
+    credit_pack: "fee-mensual",
   };
 
   const quotationGroupCandidateSchema = z.object({

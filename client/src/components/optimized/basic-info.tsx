@@ -1,7 +1,7 @@
 import React from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { AlertCircle, Calendar, DollarSign, FolderOpen, RefreshCw, User } from 'lucide-react';
-import { Client, ClientBillingEntity, projectDurationOptions } from '@shared/schema';
+import { AlertCircle, DollarSign, FolderOpen, RefreshCw, User } from 'lucide-react';
+import { Client, ClientBillingEntity } from '@shared/schema';
 import { parseLocalizedDecimal } from '@shared/utils/quotation-pricing';
 import { apiRequest } from '@/lib/queryClient';
 import { getApiErrorMessage } from '@/lib/api-error';
@@ -53,8 +53,6 @@ const OptimizedBasicInfo: React.FC<OptimizedBasicInfoProps> = ({ errors = {}, mo
     quotationData,
     updateClient,
     updateProjectName,
-    updateProjectType,
-    updateProjectDuration,
     updateQuotationCurrency,
     updateQuotationData,
   } = useOptimizedQuote();
@@ -117,25 +115,13 @@ const OptimizedBasicInfo: React.FC<OptimizedBasicInfoProps> = ({ errors = {}, mo
     updateQuotationData({ billingEntityId: preferred.id });
   }, [billingEntities, isProjectMode, quotationData.billingEntityId, quotationData.client, updateQuotationData]);
 
-  const { data: projectTypes, isLoading: isLoadingProjectTypes, isError: projectTypesError, refetch: refetchProjectTypes } = useQuery<{value: string; label: string}[]>({
-    queryKey: ['/api/options/project-types'],
-    enabled: isProjectMode,
-  });
-
-  const durationOptions = quotationData.project.type && quotationData.project.type in projectDurationOptions
-    ? projectDurationOptions[quotationData.project.type as keyof typeof projectDurationOptions]
-    : [];
-  const visibleDurationOptions = quotationData.project.duration && !durationOptions.some((option) => option.value === quotationData.project.duration)
-    ? [{ value: quotationData.project.duration, label: quotationData.project.duration }, ...durationOptions]
-    : durationOptions;
-
   if (isProjectMode) {
     return (
       <div className="space-y-4">
-        {(clientsError || projectTypesError) && (
+        {clientsError && (
           <div role="alert" className="flex flex-col gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-start gap-2"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /><span>No pudimos cargar {clientsError && projectTypesError ? 'clientes ni modalidades' : clientsError ? 'los clientes' : 'las modalidades de proyecto'}.</span></div>
-            <Button type="button" size="sm" variant="outline" onClick={() => { void refetchClients(); void refetchProjectTypes(); }}><RefreshCw className="mr-2 h-4 w-4" /> Reintentar</Button>
+            <div className="flex items-start gap-2"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /><span>No pudimos cargar los clientes.</span></div>
+            <Button type="button" size="sm" variant="outline" onClick={() => { void refetchClients(); }}><RefreshCw className="mr-2 h-4 w-4" /> Reintentar</Button>
           </div>
         )}
         <Card className="border-slate-200 shadow-none">
@@ -154,18 +140,7 @@ const OptimizedBasicInfo: React.FC<OptimizedBasicInfoProps> = ({ errors = {}, mo
               {!isGroupMode && <Field label="Nombre del proyecto" icon={FolderOpen} required error={errors['project-name']} errorId="project-name-error">
                 <Input id="project-name" placeholder="Ej. Playbook regional de TikTok Shop" value={quotationData.project.name} onChange={(event) => updateProjectName(event.target.value)} aria-invalid={Boolean(errors['project-name'])} className="h-10 border-slate-200" />
               </Field>}
-              {!isGroupMode && <Field label="Modalidad de servicio" error={errors['project-type']} errorId="project-type-error">
-                <Select value={quotationData.project.type} onValueChange={updateProjectType} disabled={isLoadingProjectTypes}>
-                  <SelectTrigger id="project-type" aria-invalid={Boolean(errors['project-type'])} className="h-10 border-slate-200"><SelectValue placeholder="Seleccionar modalidad" /></SelectTrigger>
-                  <SelectContent>{projectTypes?.map((type) => <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>)}</SelectContent>
-                </Select>
-              </Field>}
-              {!isGroupMode && <Field label="Duración" icon={Calendar} error={errors['project-duration']} errorId="project-duration-error">
-                <Select value={quotationData.project.duration} onValueChange={updateProjectDuration} disabled={!quotationData.project.type}>
-                  <SelectTrigger id="project-duration" aria-invalid={Boolean(errors['project-duration'])} className="h-10 border-slate-200"><SelectValue placeholder="Seleccionar duración" /></SelectTrigger>
-                  <SelectContent>{visibleDurationOptions.map((duration) => <SelectItem key={duration.value} value={duration.value}>{duration.label}</SelectItem>)}</SelectContent>
-                </Select>
-              </Field>}
+              {!isGroupMode && <div className="rounded-xl border border-indigo-100 bg-indigo-50/60 px-4 py-3 text-sm text-indigo-900"><strong>Modalidad y duración:</strong> se eligen una sola vez en el paso Servicio.</div>}
             </div>
             {quotationData.client && (
               <div className="mt-4 border-t border-slate-100 pt-4">

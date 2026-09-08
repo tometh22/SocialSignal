@@ -2,7 +2,7 @@ import { pgTable, text, serial, integer, boolean, timestamp, date, doublePrecisi
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations, sql } from "drizzle-orm";
-import { blueprintDefinitionSchema, type BlueprintDefinition, type ProposalDocumentContent, type ProposalQaIssue } from "./quotation-professional";
+import { CANONICAL_SERVICE_PROJECT_TYPES, blueprintDefinitionSchema, type BlueprintDefinition, type ProposalDocumentContent, type ProposalQaIssue } from "./quotation-professional";
 import type { CreditProgram } from "./utils/credit-program";
 
 // ==================== USUARIOS ====================
@@ -2470,22 +2470,9 @@ export const analysisTypes = [
   { value: "premium", label: "Metodología Premium" },
 ];
 
-// Opciones de tipo de proyecto (modalidad de negocio)
-// Incluye tanto las modalidades de venta activa (on-demand/fee-mensual/
-// always-on) como los valores que otras partes del flujo ya asignan a
-// quotation.project.type (demo, monitoring, comprehensive) al aplicar una
-// receta de Demo o Intelligence Event Pack, o al crear un grupo de
-// propuestas. Si faltan acá, el Select de "Modalidad de servicio" queda en
-// blanco porque el valor no matchea ningún SelectItem.
-export const projectTypes = [
-  { value: "on-demand", label: "On Demand (Proyecto Único)" },
-  { value: "fee-mensual", label: "Fee Mensual (Contrato Recurrente)" },
-  { value: "always-on", label: "Always-On (Servicio continuo con entregables)" },
-  { value: "demo", label: "Demo (sin contratación)" },
-  { value: "monitoring", label: "Intelligence Event Pack (monitoreo puntual)" },
-  { value: "comprehensive", label: "Cobertura integral" },
-  { value: "credit-pack", label: "Bolsa de créditos (consumo flexible)" },
-];
+// Una sola taxonomía para nuevas cotizaciones. Valores legacy continúan
+// aceptándose al leer registros históricos y se normalizan al abrirlos.
+export const projectTypes = [...CANONICAL_SERVICE_PROJECT_TYPES];
 
 // Opciones de duración según tipo de proyecto
 export const projectDurationOptions = {
@@ -2502,6 +2489,18 @@ export const projectDurationOptions = {
     { value: "1-year", label: "1 año" },
     { value: "18-months", label: "18 meses" },
     { value: "2-years", label: "2 años" },
+    { value: "custom", label: "Personalizada" },
+  ],
+  "monitoring": [
+    { value: "1-month", label: "1 mes" },
+    { value: "2-months", label: "2 meses" },
+    { value: "3-months", label: "3 meses" },
+    { value: "custom", label: "Personalizada" },
+  ],
+  "demo": [
+    { value: "3-weeks", label: "3 semanas" },
+    { value: "1-month", label: "1 mes" },
+    { value: "2-months", label: "2 meses" },
     { value: "custom", label: "Personalizada" },
   ],
   "always-on": [

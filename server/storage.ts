@@ -1236,6 +1236,10 @@ export class DatabaseStorage implements IStorage {
       return projectDurationOptions["on-demand"];
     } else if (projectType === 'fee-mensual') {
       return projectDurationOptions["fee-mensual"];
+    } else if (projectType === 'monitoring') {
+      return projectDurationOptions.monitoring;
+    } else if (projectType === 'demo') {
+      return projectDurationOptions.demo;
     } else if (projectType === 'always-on') {
       return projectDurationOptions["always-on"];
     } else if (projectType === 'credit-pack') {

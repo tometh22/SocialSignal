@@ -16,7 +16,7 @@ export type BriefProposalCandidate = {
   projectName: string;
   objective: string;
   decision: string;
-  modality: "demo" | "one_shot" | "event_pack" | "monthly_fee" | "annual_program" | "renewal" | "credit_pack" | null;
+  modality: "demo" | "one_shot" | "event_pack" | "monthly_fee" | null;
   durationMonths: number | null;
   markets: string[];
   brands: string[];
@@ -52,12 +52,9 @@ type Props = {
 
 const modalityLabel: Record<string, string> = {
   demo: "Demo",
-  one_shot: "Proyecto puntual",
-  event_pack: "Pack de evento",
-  monthly_fee: "Fee mensual",
-  annual_program: "Programa anual",
-  credit_pack: "Bolsa de créditos",
-  renewal: "Renovación",
+  one_shot: "One Shot",
+  event_pack: "Intelligence Event Track",
+  monthly_fee: "Fee",
 };
 
 export function QuotationBriefIntake({ onApply, onCreateGroup, onAnalysisChange, canCreateGroup = false, clientName, isCreatingGroup = false }: Props) {

@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { BlueprintDefinition } from "@shared/quotation-professional";
 import { blueprintDefinitionSchema, estimateBlueprintWorkload } from "@shared/quotation-professional";
 
-const MODALITIES = ["demo", "one_shot", "event_pack", "monthly_fee", "annual_program", "renewal", "credit_pack"] as const;
+const MODALITIES = ["demo", "one_shot", "event_pack", "monthly_fee"] as const;
 const MODULES = ["brand", "campaign", "influencers", "competition", "experience", "crisis", "culture", "trends", "category", "multisource"] as const;
 
 const proposalCandidateSchema = z.object({
@@ -81,11 +81,14 @@ function detectModules(text: string) {
 }
 
 function detectModality(text: string): BriefProposalCandidate["modality"] {
-  if (includesAny(text, ["renovación", "renovacion", "renovar el servicio", "continuidad del servicio", "seguir con el servicio"])) return "renewal";
-  if (includesAny(text, ["bolsa de crédito", "bolsa de creditos", "paquete de crédito", "paquete de creditos", "sistema de crédito", "sistema de creditos"])) return "credit_pack";
   if (includesAny(text, ["evento", "mundial", "olímp", "olimp", "cobertura en vivo", "war room"])) return "event_pack";
-  if (includesAny(text, ["programa anual", "contrato anual", "servicio anual", "12 meses de servicio"])) return "annual_program";
-  if (includesAny(text, ["fee mensual", "monitoreo mensual", "reporte mensual recurrente", "entrega mensual recurrente", "todos los meses", "always on", "servicio recurrente"])) return "monthly_fee";
+  if (includesAny(text, [
+    "fee mensual", "monitoreo mensual", "reporte mensual recurrente", "entrega mensual recurrente",
+    "todos los meses", "always on", "servicio recurrente", "programa anual", "contrato anual",
+    "servicio anual", "12 meses de servicio", "regional", "renovación", "renovacion",
+    "renovar el servicio", "continuidad del servicio", "seguir con el servicio", "bolsa de crédito",
+    "bolsa de creditos", "paquete de crédito", "paquete de creditos", "sistema de crédito", "sistema de creditos",
+  ])) return "monthly_fee";
   if (includesAny(text, ["demo", "prueba de concepto", "piloto exploratorio"])) return "demo";
   return "one_shot";
 }
@@ -102,10 +105,10 @@ function findRecommendation(
       let score = 0;
       if (definition.modality === modality) score += 6;
       score += Math.min(4, definition.coverage.analysisModules.filter((module) => modules.includes(module)).length);
-      if (text.includes("regional") && definition.modality === "annual_program") score += 2;
+      if (text.includes("regional") && definition.modality === "monthly_fee") score += 2;
       if (text.includes("evento") && definition.modality === "event_pack") score += 2;
       if (includesAny(text, ["fee mensual", "always on", "servicio recurrente"]) && definition.modality === "monthly_fee") score += 2;
-      if (includesAny(text, ["bolsa de crédito", "bolsa de creditos", "paquete de crédito", "paquete de creditos"]) && definition.modality === "credit_pack") score += 3;
+      if (includesAny(text, ["bolsa de crédito", "bolsa de creditos", "paquete de crédito", "paquete de creditos"]) && definition.modality === "monthly_fee") score += 3;
       return { candidate, score };
     })
     .sort((a, b) => b.score - a.score)[0];
@@ -143,7 +146,7 @@ function buildHeuristicProposal(
   const text = normalize(rawText);
   const modules = overrides.modules || detectModules(text);
   const modality = overrides.modality || detectModality(text);
-  const durationMonths = overrides.durationMonths ?? (modality === "demo" || modality === "one_shot" ? 1 : modality === "event_pack" ? 2 : modality === "annual_program" || modality === "credit_pack" ? 12 : 3);
+  const durationMonths = overrides.durationMonths ?? (modality === "demo" || modality === "one_shot" ? 1 : modality === "event_pack" ? 2 : 3);
   const recommendation = findRecommendation(candidates, modality, modules, text);
   const missingQuestions = overrides.missingQuestions || [
     !/\b(cliente|marca|brand|pepsico)\b/i.test(rawText) ? "¿Qué cliente, marca o unidad de negocio es responsable?" : null,

@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   SERVICE_BLUEPRINT_SEEDS,
+  LEGACY_SERVICE_BLUEPRINT_SEEDS,
   HISTORICAL_PROPOSAL_EVIDENCE,
   estimateBlueprintWorkload,
   workloadForBillingPeriod,
@@ -17,15 +18,19 @@ import {
 const source = (path: string) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
 
 describe("professional service catalog and workload", () => {
-  it("ships the seven versioned commercial modalities with stable sold-item IDs", () => {
+  it("offers the four canonical services and preserves legacy recipes as archived history", () => {
     expect(SERVICE_BLUEPRINT_SEEDS.map((seed) => seed.definition.modality)).toEqual([
-      "demo", "one_shot", "event_pack", "monthly_fee", "annual_program", "renewal", "credit_pack",
+      "demo", "one_shot", "event_pack", "monthly_fee",
+    ]);
+    expect(LEGACY_SERVICE_BLUEPRINT_SEEDS.map((seed) => seed.definition.modality)).toEqual([
+      "annual_program", "renewal", "credit_pack",
     ]);
     for (const seed of SERVICE_BLUEPRINT_SEEDS) {
-      expect(seed.version).toBe(1);
+      expect(seed.version).toBe(2);
       expect(seed.definition.deliverables.length).toBeGreaterThan(0);
       expect(new Set(seed.definition.deliverables.map((item) => item.id)).size).toBe(seed.definition.deliverables.length);
       expect(estimateBlueprintWorkload(seed.definition).totalHours).toBeGreaterThan(0);
+      expect(Object.keys(seed.definition.roleProfiles)).toEqual(expect.arrayContaining(["director", "pm", "analyst"]));
     }
     expect(HISTORICAL_PROPOSAL_EVIDENCE.find((item) => item.label === "Warner")?.use).toBe("classification-only-until-file");
     expect(HISTORICAL_PROPOSAL_EVIDENCE.filter((item) => item.outcome === "won")).toHaveLength(6);
