@@ -38,7 +38,7 @@ import {
 } from 'lucide-react';
 import AutosaveIndicator from '@/components/ui/autosave-indicator';
 import { useOnlineStatus } from '@/hooks/use-online-status';
-import { createDefaultCreditProgram } from '@shared/utils/credit-program';
+import { canonicalProjectTypeForModality } from '@shared/quotation-professional';
 
 import OptimizedBasicInfo from '@/components/optimized/basic-info';
 import QuotationErrorBoundary from '@/components/quotation-error-boundary';
@@ -267,14 +267,21 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
   };
 
   const handleSaveDraft = async () => {
-    const requiredDraftIssues = validateQuotationStep(1, quotationData).filter((issue) =>
+    const requiredBriefIssues = validateQuotationStep(1, quotationData).filter((issue) =>
       ['client', 'project-name', 'quotation-exchange-rate'].includes(issue.field),
     );
-    if (currentStepNumber === 1 && !showValidationIssues(requiredDraftIssues)) return;
-    if (requiredDraftIssues.length > 0) {
+    if (requiredBriefIssues.length > 0) {
       goToStep(1);
       setHighestVisitedPhase((value) => Math.max(value, 1));
-      showValidationIssues(requiredDraftIssues);
+      showValidationIssues(requiredBriefIssues);
+      return;
+    }
+    const requiredServiceIssues = validateQuotationStep(2, quotationData);
+    if (requiredServiceIssues.length > 0) {
+      goToStep(2);
+      setHighestVisitedPhase((value) => Math.max(value, 2));
+      setValidationIssues(requiredServiceIssues);
+      toast({ title: 'Elegí el servicio antes de guardar', description: 'La modalidad y la duración se definen juntas desde una de las cuatro opciones.' });
       return;
     }
     try {
@@ -508,14 +515,11 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
                     isCreatingGroup={isCreatingGroup}
                     onCreateGroup={handleCreateGroup}
                     onApply={(proposal: BriefProposalCandidate, analysis: BriefIntakeAnalysis) => {
-                    const motion = proposal.modality === 'renewal' ? 'renewal' : proposal.modality === 'demo' ? 'demo' : quotationData.commercialMotion || 'new_business';
-                    const projectType = proposal.modality === 'monthly_fee' || proposal.modality === 'renewal' ? 'fee-mensual' : proposal.modality === 'annual_program' ? 'always-on' : proposal.modality === 'credit_pack' ? 'credit-pack' : 'on-demand';
+                    const motion = proposal.modality === 'demo' ? 'demo' : quotationData.commercialMotion || 'new_business';
+                    const projectType = canonicalProjectTypeForModality(proposal.modality || 'one_shot');
                     updateQuotationData({
                       project: { ...quotationData.project, name: proposal.projectName || quotationData.project.name, type: projectType, duration: durationValueFromMonths(proposal.durationMonths, projectType, quotationData.project.duration) },
                       commercialMotion: motion,
-                      creditProgram: proposal.modality === 'credit_pack'
-                        ? { ...(quotationData.creditProgram || createDefaultCreditProgram()), enabled: true }
-                        : quotationData.creditProgram,
                       decisionContext: { ...(quotationData.decisionContext || {}), source: 'brief_or_meeting_minute', summary: proposal.summary, context: proposal.summary, objective: proposal.objective, decision: proposal.decision, markets: proposal.markets, brands: proposal.brands, competitors: proposal.competitors, sources: proposal.sources, modules: proposal.modules, languages: proposal.languages, mentionVolume: proposal.mentionVolume, slaLevel: proposal.slaLevel, designLevel: proposal.designLevel, missingQuestions: proposal.missingQuestions, recommendationReason: proposal.recommendationReason, recommendedBlueprintId: proposal.recommendedBlueprint?.id || null, recommendedBlueprintSlug: proposal.recommendationSlug, recommendationConfidence: proposal.confidence, detectedProposalCount: analysis.proposals.length, selectedProposalId: proposal.id },
                     });
                     toast({ title: 'Propuesta seleccionada', description: proposal.recommendedBlueprint ? `${proposal.projectName}. La receta ${proposal.recommendedBlueprint.name} quedará destacada en Servicio.` : `${proposal.projectName}. Completá los datos esenciales para continuar.` });
@@ -738,7 +742,7 @@ function CommercialMotionField({ quotationData, updateQuotationData }: { quotati
 
 function durationValueFromMonths(months: number | null, projectType: string, fallback: string) {
   if (!months) return fallback;
-  if (projectType === 'on-demand') {
+  if (projectType === 'on-demand' || projectType === 'monitoring' || projectType === 'demo') {
     if (months <= 0.75) return '3-weeks';
     if (months <= 1) return '1-month';
     if (months <= 2) return '2-months';

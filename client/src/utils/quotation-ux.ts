@@ -1,5 +1,5 @@
 import type { QuotationData } from '@/context/optimized-quote-context';
-import { blueprintDefinitionSchema, estimateBlueprintWorkload, workloadForBillingPeriod } from '@shared/quotation-professional';
+import { blueprintDefinitionSchema, estimateBlueprintWorkload, isCanonicalBlueprintCompatible, workloadForBillingPeriod } from '@shared/quotation-professional';
 
 export const QUOTATION_PHASES = [
   { num: 1, title: 'Proyecto', shortTitle: 'Proyecto', description: 'Cliente, modalidad, moneda y plantilla' },
@@ -31,14 +31,7 @@ export type QuotationValidationIssue = {
 };
 
 export function isBlueprintCompatibleWithProjectType(projectType: string | undefined, modality: string) {
-  // Renewal/expansion is a commercial motion applied to an existing quote,
-  // not a standalone service recipe.
-  if (modality === 'renewal') return false;
-  if (!projectType) return true;
-  if (projectType === 'on-demand') return ['one_shot', 'event_pack', 'demo'].includes(modality);
-  if (projectType === 'fee-mensual' || projectType === 'always-on') return ['monthly_fee', 'annual_program'].includes(modality);
-  if (projectType === 'credit-pack') return modality === 'credit_pack';
-  return true;
+  return isCanonicalBlueprintCompatible(projectType, modality);
 }
 
 const hasPositiveExchangeRate = (quotation: QuotationData) =>
@@ -165,11 +158,7 @@ export function validateQuotationStep(
     const issues: QuotationValidationIssue[] = [];
     if (!quotation.client?.id) issues.push({ field: 'client', message: 'Seleccioná un cliente.' });
     if (!quotation.project.name?.trim()) issues.push({ field: 'project-name', message: 'Ingresá el nombre del proyecto.' });
-    if (!quotation.project.type) issues.push({ field: 'project-type', message: 'Seleccioná una modalidad de proyecto.' });
     if (!quotation.commercialMotion) issues.push({ field: 'commercial-motion', message: 'Seleccioná el tipo de oportunidad.' });
-    if (quotation.project.type && quotation.project.type !== 'always-on' && !quotation.project.duration) {
-      issues.push({ field: 'project-duration', message: 'Seleccioná la duración estimada.' });
-    }
     return issues;
   }
 

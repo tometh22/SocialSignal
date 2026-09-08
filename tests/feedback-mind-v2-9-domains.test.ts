@@ -209,11 +209,13 @@ describe("Feedback Mind V2-9 integration contracts", () => {
     expect(variants).toContain('variant="outline" size="sm" className="flex items-center gap-2"');
   });
 
-  it("keeps the hours chart responsive and priority editable inline", () => {
+  it("uses a responsive monthly-hours donut and keeps priority editable inline", () => {
     const tasksHome = source("client/src/pages/tasks/tasks-home.tsx");
     const taskList = source("client/src/components/tasks/ProjectTaskList.tsx");
     expect(tasksHome).toContain("margin={{ top: 8, right: 12, left: 8, bottom: 8 }}");
-    expect(tasksHome).toContain("tickFormatter={(value)");
+    expect(tasksHome).toContain("<PieChart");
+    expect(tasksHome).toContain('innerRadius="56%"');
+    expect(tasksHome).toContain("project.hours / monthlyProjectTotal");
     expect(tasksHome).not.toMatch(/margin=\{\{[^}]*left:\s*-/);
     expect(taskList).toContain('(["low", "medium", "high", "urgent"] as const)');
     expect(taskList).toContain("onError: (_error, _priority, context)");

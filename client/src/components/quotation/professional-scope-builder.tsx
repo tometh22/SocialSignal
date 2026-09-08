@@ -14,6 +14,7 @@ import type { ServiceBlueprint } from "@shared/schema";
 import {
   applyHistoricalEffortBenchmark,
   blueprintDefinitionSchema,
+  canonicalProjectTypeForModality,
   estimateBlueprintWorkload,
   isRecurringBlueprintModality,
   workloadForBillingPeriod,
@@ -21,7 +22,7 @@ import {
   type EffortBenchmark,
 } from "@shared/quotation-professional";
 import { isBlueprintCompatibleWithProjectType } from "@/utils/quotation-ux";
-import { resolveCanonicalRoleForBlueprintKey } from "@shared/utils/personnel-classification";
+import { formatCanonicalRoleName, resolveCanonicalRoleForBlueprintKey } from "@shared/utils/personnel-classification";
 
 type BlueprintWithWorkload = ServiceBlueprint & { workload: ReturnType<typeof estimateBlueprintWorkload> };
 type WeeklyCapacity = { personnel: Array<{ personnelId: number; name: string; maxCapacity: number; actualHours: number; estimatedTaskHours: number; isOverloaded: boolean }> };
@@ -37,6 +38,15 @@ const CADENCES = [
   ["once", "Única vez"], ["daily", "Diaria"], ["weekly", "Semanal"], ["biweekly", "Quincenal"],
   ["monthly", "Mensual"], ["quarterly", "Trimestral"], ["event", "Por evento"], ["on_demand", "A demanda"],
 ] as const;
+
+const ROLE_KEY_LABELS: Record<string, string> = {
+  director: "Dirección",
+  pm: "PM",
+  analyst: "Análisis",
+  data: "Data",
+  tech: "Tech",
+  design: "Diseño",
+};
 
 export function ProfessionalScopeBuilder({ mode = "all", headless = false }: { mode?: ScopeBuilderMode; headless?: boolean }) {
   const { quotationData, updateQuotationData, updateTeamMembers, availableRoles } = useOptimizedQuote();
@@ -126,7 +136,7 @@ export function ProfessionalScopeBuilder({ mode = "all", headless = false }: { m
     // Agrupar por role.id y sumar las horas deja una única fila por rol real.
     const hoursByRoleId = new Map<number, { role: NonNullable<ReturnType<typeof resolveRole>>; hours: number }>();
     for (const [roleKey, hours] of Object.entries(workload.byRole)) {
-      const role = resolveRole(roleKey, availableRoles);
+      const role = resolveRole(roleKey, availableRoles, definition.roleProfiles[roleKey]);
       if (!role) {
         missing.push(roleKey);
         continue;
@@ -305,9 +315,10 @@ export function ProfessionalScopeBuilder({ mode = "all", headless = false }: { m
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {orderedBlueprints.map((blueprint) => {
               const active = quotationData.serviceBlueprintId === blueprint.id;
-              const blueprintProjectType = isBlueprintCompatibleWithProjectType(quotationData.project.type, blueprintDefinitionSchema.parse(blueprint.definition).modality)
+              const definition = blueprintDefinitionSchema.parse(blueprint.definition);
+              const blueprintProjectType = isBlueprintCompatibleWithProjectType(quotationData.project.type, definition.modality)
                 ? quotationData.project.type
-                : projectTypeFor(blueprintDefinitionSchema.parse(blueprint.definition).modality);
+                : projectTypeFor(definition.modality);
               const benchmark = benchmarkFor(blueprint.id, blueprintProjectType);
               const historicalWorkload = applyHistoricalEffortBenchmark(blueprint.workload, benchmark);
               const recommended = blueprint.id === recommendedBlueprintId;
@@ -327,6 +338,13 @@ export function ProfessionalScopeBuilder({ mode = "all", headless = false }: { m
                         Quitar selección
                       </span>
                     )}
+                  </span>
+                  <span className="mt-3 block border-t border-slate-100 pt-3 text-[11px] leading-5 text-slate-500">
+                    <strong className="text-slate-700">Perfiles sugeridos:</strong>{" "}
+                    {Object.entries(definition.roleProfiles)
+                      .filter(([roleKey]) => Number(definition.setupRoleHours[roleKey] || 0) > 0 || definition.deliverables.some((item) => Number(item.roleHours[roleKey] || 0) > 0))
+                      .map(([roleKey, profile]) => `${ROLE_KEY_LABELS[roleKey] || roleKey}: ${formatCanonicalRoleName(profile.level, null, profile.area) || `${profile.level} · ${profile.area}`}`)
+                      .join(" · ")}
                   </span>
                 </button>
               );
@@ -460,9 +478,13 @@ function Metric({ label, value }: { label: string; value: string }) {
   return <div className="rounded-lg bg-slate-50 p-3"><span className="block text-xs text-slate-500">{label}</span><strong className="mt-1 block text-lg tabular-nums">{value}</strong></div>;
 }
 
-function resolveRole(roleKey: string, roles: Array<{ id: number; name: string; defaultRate: number; defaultRateUsd?: number | null }>) {
+function resolveRole(
+  roleKey: string,
+  roles: Array<{ id: number; name: string; defaultRate: number; defaultRateUsd?: number | null; roleLevel?: string | null; sublevel?: string | null; area?: string | null; isActive?: boolean }>,
+  configuredProfile?: BlueprintDefinition["roleProfiles"][string],
+) {
   // Catálogo canónico: la función de la receta se traduce a área + nivel.
-  const canonical = resolveCanonicalRoleForBlueprintKey(roleKey, roles as any);
+  const canonical = resolveCanonicalRoleForBlueprintKey(roleKey, roles, configuredProfile);
   if (canonical) return canonical as (typeof roles)[number];
   // Catálogo viejo (o una base todavía sin migrar): se cae al match por nombre.
   const aliases: Record<string, string[]> = {
@@ -473,7 +495,7 @@ function resolveRole(roleKey: string, roles: Array<{ id: number; name: string; d
 }
 
 function projectTypeFor(modality: BlueprintDefinition["modality"]) {
-  return ({ demo: "demo", one_shot: "on-demand", event_pack: "monitoring", monthly_fee: "fee-mensual", annual_program: "always-on", renewal: "fee-mensual", credit_pack: "credit-pack" } as const)[modality];
+  return canonicalProjectTypeForModality(modality);
 }
 
 function countryBucket(count: number) {

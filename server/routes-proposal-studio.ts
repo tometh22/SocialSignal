@@ -18,6 +18,7 @@ import {
 import {
   blueprintDefinitionSchema,
   estimateBlueprintWorkload,
+  isCanonicalBlueprintCompatible,
   proposalDocumentSchema,
   proposalLocaleSchema,
   runProposalQa,
@@ -42,7 +43,10 @@ export function registerProposalStudioRoutes(app: Express, requireAuth: AuthMidd
       const { brief } = z.object({ brief: z.string().trim().min(20).max(50_000) }).parse(req.body);
       const rows = await db.select({ id: serviceBlueprints.id, slug: serviceBlueprints.slug, name: serviceBlueprints.name, description: serviceBlueprints.description, definition: serviceBlueprints.definition })
         .from(serviceBlueprints).where(eq(serviceBlueprints.status, "published"));
-      const result = await analyzeQuotationBrief(brief, rows.map((row) => ({ ...row, definition: blueprintDefinitionSchema.parse(row.definition) })));
+      const candidates = rows
+        .map((row) => ({ ...row, definition: blueprintDefinitionSchema.parse(row.definition) }))
+        .filter((row) => isCanonicalBlueprintCompatible(undefined, row.definition.modality));
+      const result = await analyzeQuotationBrief(brief, candidates);
       res.json(result);
     } catch (error: any) {
       if (error instanceof z.ZodError) return res.status(400).json({ message: "El brief o minuta no es válido", errors: error.errors });

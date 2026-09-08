@@ -1,7 +1,7 @@
-import { and, eq, max } from "drizzle-orm";
+import { and, eq, inArray, max, ne } from "drizzle-orm";
 import { db } from "../db";
 import { serviceBlueprints } from "@shared/schema";
-import { blueprintDefinitionSchema, SERVICE_BLUEPRINT_SEEDS } from "@shared/quotation-professional";
+import { blueprintDefinitionSchema, LEGACY_SERVICE_BLUEPRINT_SEEDS, SERVICE_BLUEPRINT_SEEDS } from "@shared/quotation-professional";
 
 const SOURCE_LABELS: Record<string, string> = {
   "demo-exploratoria": "PeYa / Mercado Libre · demo sin conversión",
@@ -14,7 +14,24 @@ const SOURCE_LABELS: Record<string, string> = {
 };
 
 export async function ensureServiceBlueprintSeeds() {
+  // These used to appear as separate products. They remain archived so every
+  // historical quotation keeps its recipe id and definition, while new quotes
+  // see only One Shot, Fee, Intelligence Event Track and Demo.
+  const legacySlugs = LEGACY_SERVICE_BLUEPRINT_SEEDS.map((seed) => seed.slug);
+  if (legacySlugs.length > 0) {
+    await db.update(serviceBlueprints)
+      .set({ status: "archived", updatedAt: new Date() })
+      .where(and(inArray(serviceBlueprints.slug, legacySlugs), ne(serviceBlueprints.status, "archived")));
+  }
+
   for (const seed of SERVICE_BLUEPRINT_SEEDS) {
+    await db.update(serviceBlueprints)
+      .set({ status: "archived", updatedAt: new Date() })
+      .where(and(
+        eq(serviceBlueprints.slug, seed.slug),
+        ne(serviceBlueprints.version, seed.version),
+        ne(serviceBlueprints.status, "archived"),
+      ));
     const existing = await db.select({ id: serviceBlueprints.id })
       .from(serviceBlueprints)
       .where(and(eq(serviceBlueprints.slug, seed.slug), eq(serviceBlueprints.version, seed.version)))

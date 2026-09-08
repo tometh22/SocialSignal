@@ -12,7 +12,7 @@ import {
   getCountriesFactor,
   getMentionsVolumeFactor,
 } from "@shared/utils/quotation-complexity";
-import type { BlueprintDefinition, CommercialMotion } from "@shared/quotation-professional";
+import { normalizeCanonicalProjectType, type BlueprintDefinition, type CommercialMotion } from "@shared/quotation-professional";
 import { calculateCreditProgramTotals, createDefaultCreditProgram, type CreditProgram } from "@shared/utils/credit-program";
 
 export interface OptimizedTeamMember {
@@ -967,7 +967,7 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
         client: clientData,
         project: {
           name: quotation.projectName || "",
-          type: quotation.projectType || "on-demand",
+          type: normalizeCanonicalProjectType(quotation.projectType) || "on-demand",
           duration: quotation.projectDuration || ""
         },
         analysisType: quotation.analysisType ||"standard",
@@ -1387,7 +1387,7 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
   const loadFromTemplate = useCallback((template: { projectType: string; analysisType: string; mentionsVolume: string; countriesCovered: string; clientEngagement: string; teamConfig: string }) => {
     setQuotationData(prev => ({
       ...prev,
-      project: { ...prev.project, type: template.projectType },
+      project: { ...prev.project, type: normalizeCanonicalProjectType(template.projectType) || "on-demand" },
       analysisType: template.analysisType,
       mentionsVolume: template.mentionsVolume,
       countriesCovered: template.countriesCovered,

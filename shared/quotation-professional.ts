@@ -3,6 +3,41 @@ import { z } from "zod";
 export const commercialMotionSchema = z.enum(["new_business", "renewal", "expansion", "demo"]);
 export type CommercialMotion = z.infer<typeof commercialMotionSchema>;
 
+/**
+ * The four service choices exposed when creating a quotation. Older project
+ * types and blueprint modalities remain readable below so historical quotes
+ * keep rendering, but new business is classified through this single list.
+ */
+export const CANONICAL_SERVICE_PROJECT_TYPES = [
+  { value: "on-demand", label: "One Shot" },
+  { value: "fee-mensual", label: "Fee" },
+  { value: "monitoring", label: "Intelligence Event Track" },
+  { value: "demo", label: "Demo" },
+] as const;
+
+export type CanonicalServiceProjectType = typeof CANONICAL_SERVICE_PROJECT_TYPES[number]["value"];
+
+export function canonicalProjectTypeForModality(modality: string): CanonicalServiceProjectType {
+  if (modality === "demo") return "demo";
+  if (modality === "event_pack") return "monitoring";
+  if (["monthly_fee", "annual_program", "renewal", "credit_pack"].includes(modality)) return "fee-mensual";
+  return "on-demand";
+}
+
+export function normalizeCanonicalProjectType(projectType: string | null | undefined): CanonicalServiceProjectType | "" {
+  if (!projectType) return "";
+  if (projectType === "demo") return "demo";
+  if (projectType === "monitoring") return "monitoring";
+  if (["fee-mensual", "always-on", "credit-pack"].includes(projectType)) return "fee-mensual";
+  return "on-demand";
+}
+
+export function isCanonicalBlueprintCompatible(projectType: string | null | undefined, modality: string) {
+  if (!projectType) return ["demo", "one_shot", "event_pack", "monthly_fee"].includes(modality);
+  return canonicalProjectTypeForModality(modality) === normalizeCanonicalProjectType(projectType)
+    && ["demo", "one_shot", "event_pack", "monthly_fee"].includes(modality);
+}
+
 export const proposalLocaleSchema = z.enum(["es", "en"]);
 export type ProposalLocale = z.infer<typeof proposalLocaleSchema>;
 
@@ -65,6 +100,22 @@ export const operationalMilestoneSchema = z.object({
 });
 export type OperationalMilestone = z.infer<typeof operationalMilestoneSchema>;
 
+export const blueprintRoleProfileSchema = z.object({
+  area: z.enum(["Operaciones", "Marketing", "DataTech", "Cuenta"]),
+  level: z.enum(["1 Junior", "2 Semi Senior", "3 Senior", "4 Lead", "5 Lead de Leads"]),
+});
+export type BlueprintRoleProfile = z.infer<typeof blueprintRoleProfileSchema>;
+
+/** Versioned defaults: every recipe can override these profiles in its JSON definition. */
+export const STANDARD_BLUEPRINT_ROLE_PROFILES: Record<string, BlueprintRoleProfile> = {
+  director: { area: "Cuenta", level: "5 Lead de Leads" },
+  pm: { area: "Operaciones", level: "4 Lead" },
+  analyst: { area: "Operaciones", level: "3 Senior" },
+  data: { area: "DataTech", level: "3 Senior" },
+  tech: { area: "DataTech", level: "3 Senior" },
+  design: { area: "Marketing", level: "2 Semi Senior" },
+};
+
 export const blueprintDefinitionSchema = z.object({
   commercialMotion: commercialMotionSchema,
   modality: z.enum(["demo", "one_shot", "event_pack", "monthly_fee", "annual_program", "renewal", "credit_pack"]),
@@ -73,6 +124,7 @@ export const blueprintDefinitionSchema = z.object({
   coverage: scopeCoverageSchema,
   deliverables: z.array(serviceDeliverableSchema).min(1),
   setupRoleHours: z.record(z.number().nonnegative()).default({}),
+  roleProfiles: z.record(blueprintRoleProfileSchema).default(STANDARD_BLUEPRINT_ROLE_PROFILES),
   milestones: z.array(operationalMilestoneSchema).default([]),
   monitoringWindow: z.string().trim().max(240).nullable().default(null),
   alertChannels: z.array(z.enum(["email", "whatsapp", "slack", "meeting"])).default([]),
@@ -360,16 +412,16 @@ export const HISTORICAL_PROPOSAL_EVIDENCE = [
   { label: "Banco Galicia", outcome: "evidence", use: "deliverables-and-qa" },
 ] as const;
 
-export const SERVICE_BLUEPRINT_SEEDS: ServiceBlueprintSeed[] = [
+const ALL_SERVICE_BLUEPRINT_SEEDS: ServiceBlueprintSeed[] = [
   {
     slug: "demo-exploratoria",
     name: "Demo exploratoria",
     description: "Diagnóstico acotado para demostrar la capacidad analítica durante un proceso comercial.",
-    version: 1,
+    version: 2,
     definition: blueprintDefinitionSchema.parse({
       commercialMotion: "demo", modality: "demo", durationMonths: 1.5, minimumTermMonths: 0,
       coverage: { markets: ["Argentina"], brands: ["Cliente"], competitors: ["Competidor"], sources: ["Social", "Reviews"], languages: ["es"], mentionVolume: "medium", analysisModules: ["brand", "competition", "experience"], slaLevel: "standard", designLevel: "branded" },
-      setupRoleHours: { pm: 5, analyst: 8, data: 4 },
+      setupRoleHours: { pm: 5, analyst: 8, data: 4 }, roleProfiles: STANDARD_BLUEPRINT_ROLE_PROFILES,
       deliverables: [{ id: id("a0000000-0000-4000-8000-000000000001"), name: "Demo ejecutiva", type: "executive_report", format: "pptx", cadence: "once", quantity: 1, description: "Hallazgos de muestra, hipótesis y oportunidades para decidir el siguiente paso.", acceptanceCriteria: ["Metodología y período visibles", "Hallazgos sustentados", "Próximo paso explícito"], roleHours: { director: 3, pm: 7, analyst: 24, data: 8, design: 10 } }],
       milestones: [{ id: id("a0000000-0000-4000-8000-000000000011"), name: "Kickoff", offsetDays: 0, taskNames: ["Confirmar brief", "Definir muestra"] }, { id: id("a0000000-0000-4000-8000-000000000012"), name: "Presentación", offsetDays: 15, taskNames: ["QA", "Presentar demo"] }],
       includedLicenses: true, intellectualProperty: "epical", inclusions: ["Muestra de datos", "Presentación ejecutiva"], exclusions: ["Monitoreo continuo", "Implementación posterior"], paymentTermsDays: 0, proposalValidityBusinessDays: 10, priceAdjustment: "none",
@@ -379,11 +431,11 @@ export const SERVICE_BLUEPRINT_SEEDS: ServiceBlueprintSeed[] = [
     slug: "estudio-one-shot",
     name: "Estudio estratégico one-shot",
     description: "Investigación completa con informe final y presentación ejecutiva.",
-    version: 1,
+    version: 2,
     definition: blueprintDefinitionSchema.parse({
       commercialMotion: "new_business", modality: "one_shot", durationMonths: 1.5, minimumTermMonths: 0,
       coverage: { markets: ["Argentina"], brands: ["Cliente"], competitors: ["Competidor A", "Competidor B"], sources: ["Social", "Reviews"], languages: ["es"], mentionVolume: "large", analysisModules: ["brand", "competition", "experience", "trends"], slaLevel: "standard", designLevel: "branded" },
-      setupRoleHours: { pm: 8, analyst: 12, data: 8, tech: 4 },
+      setupRoleHours: { pm: 8, analyst: 12, data: 8, tech: 4 }, roleProfiles: STANDARD_BLUEPRINT_ROLE_PROFILES,
       deliverables: [
         { id: id("a0000000-0000-4000-8000-000000000101"), name: "Informe estratégico", type: "report", format: "pdf", cadence: "once", quantity: 1, pageRange: "25-40", description: "Diagnóstico, evidencia, insights y recomendaciones accionables.", acceptanceCriteria: ["Dataset y metodología definidos", "Conclusiones trazables", "Recomendaciones accionables"], roleHours: { director: 6, pm: 16, analyst: 72, data: 20, design: 28, tech: 8 } },
         { id: id("a0000000-0000-4000-8000-000000000102"), name: "Presentación ejecutiva", type: "presentation", format: "meeting", cadence: "once", quantity: 1, description: "Sesión de presentación, discusión y próximos pasos.", acceptanceCriteria: ["Agenda acordada", "Preguntas registradas"], roleHours: { director: 3, pm: 5, analyst: 8, design: 4 } },
@@ -396,11 +448,11 @@ export const SERVICE_BLUEPRINT_SEEDS: ServiceBlueprintSeed[] = [
     slug: "intelligence-event-pack",
     name: "Intelligence Event Pack",
     description: "Cobertura intensiva y entregas periódicas durante un evento de alta conversación.",
-    version: 1,
+    version: 2,
     definition: blueprintDefinitionSchema.parse({
       commercialMotion: "new_business", modality: "event_pack", durationMonths: 2, minimumTermMonths: 0,
       coverage: { markets: ["Argentina"], brands: ["Cliente"], competitors: ["Benchmark 1", "Benchmark 2", "Benchmark 3", "Benchmark 4"], sources: ["Social", "News"], languages: ["es"], mentionVolume: "xlarge", analysisModules: ["campaign", "competition", "culture", "trends", "crisis"], slaLevel: "priority", designLevel: "branded" },
-      setupRoleHours: { pm: 10, analyst: 16, data: 10, tech: 6 },
+      setupRoleHours: { pm: 10, analyst: 16, data: 10, tech: 6 }, roleProfiles: STANDARD_BLUEPRINT_ROLE_PROFILES,
       deliverables: [
         { id: id("a0000000-0000-4000-8000-000000000201"), name: "Informe semanal", type: "report", format: "pdf", cadence: "weekly", quantity: 8, pageRange: "8-14", description: "Pulso de conversación, desempeño de marca, benchmark y evolución acumulada.", acceptanceCriteria: ["Comparabilidad semanal", "Benchmark de cinco marcas", "Recomendaciones concretas"], roleHours: { director: 1, pm: 3, analyst: 13, data: 3, design: 4 } },
         { id: id("a0000000-0000-4000-8000-000000000202"), name: "Cierre ejecutivo", type: "executive_report", format: "pptx", cadence: "once", quantity: 1, description: "Síntesis acumulada, aprendizajes y próximos pasos.", acceptanceCriteria: ["Síntesis de las ocho semanas", "Recomendaciones priorizadas"], roleHours: { director: 4, pm: 6, analyst: 18, design: 10 } },
@@ -413,11 +465,11 @@ export const SERVICE_BLUEPRINT_SEEDS: ServiceBlueprintSeed[] = [
     slug: "fee-mensual-inteligencia",
     name: "Fee mensual de inteligencia",
     description: "Pulso táctico mensual, lectura estratégica trimestral y alertas continuas.",
-    version: 1,
+    version: 2,
     definition: blueprintDefinitionSchema.parse({
       commercialMotion: "new_business", modality: "monthly_fee", durationMonths: 3, minimumTermMonths: 3,
       coverage: { markets: ["Argentina", "Chile"], brands: ["Marca"], competitors: ["Competidor"], sources: ["Social", "Reviews", "News"], languages: ["es"], mentionVolume: "large", analysisModules: ["brand", "competition", "experience", "crisis", "trends"], slaLevel: "priority", designLevel: "branded" },
-      setupRoleHours: { pm: 12, analyst: 16, data: 10, tech: 8 },
+      setupRoleHours: { pm: 12, analyst: 16, data: 10, tech: 8 }, roleProfiles: STANDARD_BLUEPRINT_ROLE_PROFILES,
       deliverables: [
         { id: id("a0000000-0000-4000-8000-000000000301"), name: "Pulso táctico mensual", type: "report", format: "pdf", cadence: "monthly", quantity: 3, pageRange: "15-25", description: "Desempeño, drivers, riesgos y oportunidades del mes.", acceptanceCriteria: ["KPIs comparables", "Implicancias para negocio", "Acciones sugeridas"], roleHours: { director: 1, pm: 5, analyst: 24, data: 5, design: 7 } },
         { id: id("a0000000-0000-4000-8000-000000000302"), name: "Cierre estratégico trimestral", type: "report", format: "pptx", cadence: "quarterly", quantity: 1, pageRange: "20-30", description: "Lectura acumulada, patrones y decisiones estratégicas.", acceptanceCriteria: ["Tendencias acumuladas", "Recomendaciones priorizadas"], roleHours: { director: 4, pm: 8, analyst: 28, data: 6, design: 12 } },
@@ -480,6 +532,21 @@ export const SERVICE_BLUEPRINT_SEEDS: ServiceBlueprintSeed[] = [
     }),
   },
 ];
+
+const CANONICAL_SERVICE_BLUEPRINT_SLUGS = new Set([
+  "demo-exploratoria",
+  "estudio-one-shot",
+  "intelligence-event-pack",
+  "fee-mensual-inteligencia",
+]);
+
+/** The only recipes offered for new quotations. */
+export const SERVICE_BLUEPRINT_SEEDS = ALL_SERVICE_BLUEPRINT_SEEDS
+  .filter((seed) => CANONICAL_SERVICE_BLUEPRINT_SLUGS.has(seed.slug));
+
+/** Kept as archived definitions so historical quotations remain explainable. */
+export const LEGACY_SERVICE_BLUEPRINT_SEEDS = ALL_SERVICE_BLUEPRINT_SEEDS
+  .filter((seed) => !CANONICAL_SERVICE_BLUEPRINT_SLUGS.has(seed.slug));
 
 export function cloneBlueprintDefinition(definition: BlueprintDefinition): BlueprintDefinition {
   return blueprintDefinitionSchema.parse(structuredClone(definition));

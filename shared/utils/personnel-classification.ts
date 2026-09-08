@@ -141,8 +141,13 @@ export const BLUEPRINT_ROLE_PROFILES: Record<string, { area: PersonnelArea; leve
 export function resolveCanonicalRoleForBlueprintKey<T extends { roleLevel?: string | null; area?: string | null; isActive?: boolean }>(
   roleKey: string,
   roles: T[],
+  configuredProfile?: { area?: string | null; level?: string | null },
 ): T | undefined {
-  const profile = BLUEPRINT_ROLE_PROFILES[roleKey];
+  const configuredArea = normalizePersonnelArea(configuredProfile?.area);
+  const configuredLevel = normalizePersonnelRole(configuredProfile?.level);
+  const profile = configuredArea && configuredLevel
+    ? { area: configuredArea, level: configuredLevel }
+    : BLUEPRINT_ROLE_PROFILES[roleKey];
   if (!profile) return undefined;
   const usable = roles.filter((role) => role.isActive !== false && normalizePersonnelRole(role.roleLevel));
   const sameArea = usable.filter((role) => normalizePersonnelArea(role.area) === profile.area);

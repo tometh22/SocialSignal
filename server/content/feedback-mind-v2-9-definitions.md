@@ -1,6 +1,6 @@
 ---
-version: 2.24.0
-updatedAt: 2026-09-02
+version: 2.25.0
+updatedAt: 2026-09-08
 feedbackCount: 70
 ---
 
@@ -46,7 +46,7 @@ Este documento es la fuente canónica y versionada de las reglas funcionales cer
 | PRO-09 | Implementado | Separar los destinos por intención: Ops/Admin conservan /active-projects para cartera financiera; /tasks/projects y su detalle son la superficie operativa tipo Asana para todos los usuarios autorizados. |
 | PRO-10 | Implementado | Reflejar costo y horas del proyecto después de altas, ediciones y bajas de tiempo. |
 | PRO-11 | Implementado | Reflejar la actividad del módulo Tareas dentro del proyecto. |
-| PRO-12 | Diferido | Evaluar retirar de Vista de proyectos la actividad propia de Gestión de tareas; no hubo decisión funcional autorizada. |
+| PRO-12 | Implementado | Evaluar retirar la actividad duplicada quedó resuelto: la actividad operativa vive en Tareas; Vista de proyectos conserva la cartera financiera y enlaza al proyecto operativo. |
 | TAR-01 | Implementado | Retirar “Tareas que asigné” de la Home. |
 | TAR-02 | Implementado | Mostrar las horas propias de la semana y del mes. |
 | TAR-03 | Implementado | Impedir tareas raíz sueltas: toda tarea pertenece a un proyecto y una sección. |
@@ -85,7 +85,7 @@ Este documento es la fuente canónica y versionada de las reglas funcionales cer
 
 ## Las 21 correcciones cerradas
 
-Se consideran parte indivisible de esta versión: CFG-03, CFG-04, COT-05, COT-06, COT-07, COT-08, COT-11, COT-12, COT-13, COT-14, COT-15, COT-16, PRO-09, TAR-20, TAR-21, TAR-22, TAR-23, TAR-24, TAR-25, TAR-26 y OPS-08 (workflow transversal de Ausencias/Notificaciones). El cierre no modifica PRO-12 ni TAR-16.
+Se consideran parte indivisible de esta versión: CFG-03, CFG-04, COT-05, COT-06, COT-07, COT-08, COT-11, COT-12, COT-13, COT-14, COT-15, COT-16, PRO-09, TAR-20, TAR-21, TAR-22, TAR-23, TAR-24, TAR-25, TAR-26 y OPS-08 (workflow transversal de Ausencias/Notificaciones). TAR-16 conserva expresamente la clasificación vigente porque el feedback pidió no modificarla todavía.
 
 ## Addendum — revisión visual Feedback 14-8
 
@@ -102,10 +102,10 @@ Este addendum registra las diez capturas recibidas el 14 de agosto de 2026. No a
 | F14-07 | Implementado | Las variantes automáticas permiten ajustar horas por persona, recalculan con el motor canónico y comparan el resultado efectivo contra la cotización base. |
 | F14-08 | Implementado | “Seleccionar todo” y “Nueva variante” usan el mismo tamaño de control. |
 | F14-09 | Implementado | En Gestión, badges y datos de cotización permanecen en flujo responsivo y no se superponen ni desplazan. |
-| F14-10 | Requiere definición | La propuesta de un Kanban global de proyectos con cinco etapas es un producto nuevo: requiere definir si sustituye o complementa cartera, permisos, estados canónicos y reglas de transición. No se agrega dentro de este cierre. |
+| F14-10 | Implementado | El Kanban global usa Aprobado, Listo para empezar, Empezado, Bloqueado y Finalizado; los usuarios operativos acceden sin exponer importes financieros. |
 | F14-11 | Implementado | La cartera financiera incluye proyectos que tengan sólo hechos de labor, usa nombre propio para proyectos sin cotización y publica costo y horas reales tras cada reconstrucción. |
-| F14-12 | Diferido existente | Retirar actividad de Tareas de la vista financiera sigue siendo PRO-12; no hay autorización funcional para cambiarlo. |
-| F14-13 | Requiere definición | Sustituir el gráfico mensual por un donut es una propuesta de visualización nueva. Se conserva el gráfico actual ya corregido hasta definir qué dimensión representa el porcentaje y cuál es su denominador. |
+| F14-12 | Implementado | Se retiró la actividad duplicada de Tareas de la vista financiera y se dejó un enlace al módulo operativo dedicado. |
+| F14-13 | Implementado | La Home usa un donut de horas cargadas en el mes por proyecto. Cada porción representa las horas del proyecto sobre el total mensual distribuido entre proyectos; el centro muestra ese total y la leyenda expone horas y porcentaje. |
 | F14-14 | Implementado | La pestaña Finalizadas sólo incluye `completedAt` de la semana civil vigente en Buenos Aires. |
 | F14-15 | Implementado | Una carga realizada por Operaciones para un tercero guarda `personnelId` del tercero y `createdBy` del operador; panel, capacidad, cierre y cartera agregan por la persona atribuida. |
 | F14-16 | Implementado | `done` no está disponible en desplegables ni drag; el checklist y el endpoint de finalización son el único contrato. |
@@ -220,7 +220,7 @@ cancellation_requested -> cancelled | approved
 
 ## Decisiones diferidas
 
-PRO-12 y TAR-16 permanecen diferidos. Su implementación exige una definición funcional aprobada en una versión futura de este documento.
+TAR-16 permanece diferido por instrucción expresa del feedback. No representa un gap de implementación.
 ## Addendum — Feedback Mind V2-13 (ronda 27-8)
 
 Las rondas 23-7 a 20-8 quedaron cerradas en las versiones 2.9.x a 2.11.x. Esta versión
@@ -235,7 +235,7 @@ identidad ni el conteo de las 70 entradas originales.
 | F27-04 | Implementado | Los campos de lista de Alcance (Mercados, Marcas, Competidores, Fuentes) y Objetivos se editan como texto libre y se parsean al salir del campo. Parsear en cada tecla borraba la coma, el espacio final y el Enter en el mismo keystroke. |
 | F27-05 | Implementado | La cantidad de un entregable admite cero: un entregable previsto por la receta que este cliente no contrata deja de aportar horas sin reescribir la receta. La cadencia es editable. |
 | F27-06 | Implementado | Al asignar una persona a un puesto, los candidatos se ordenan por afinidad con el nivel del rol cotizado y se muestran agrupados. No se filtra en duro para no dejar sin candidatos a un puesto sin perfiles de ese nivel. |
-| F27-07 | Requiere definición | "Account Director" no existe en la escala vigente: son Leads. Unificar el catálogo de roles de receta con los cinco niveles canónicos requiere decisión funcional. |
+| F27-07 | Implementado | El catálogo de roles de receta usa los cinco niveles canónicos; Account Director quedó inactivo y las referencias históricas continúan resolviendo por id. |
 | F27-08 | Implementado | Una tarea de la Home abre su proyecto en `/tasks/projects/:id`. Sin proyecto asociado degrada a texto plano en vez de a un enlace muerto. |
 | F27-09 | Implementado | Las cargas se corrigen y se eliminan desde el reloj de la fila, sin entrar a la tarea. |
 | F27-10 | Implementado | La prioridad editada en la fila invalida también el detalle de la tarea. El panel lee `["/api/tasks", id]` con `staleTime` infinito y `"/api/tasks/project"` no es prefijo suyo. |
@@ -243,8 +243,7 @@ identidad ni el conteo de las 70 entradas originales.
 | F27-12 | Implementado | La carga rápida atribuye por defecto al responsable de la tarea: lo que rige es el dueño, no quien carga. |
 | F27-13 | Implementado | La duración admite minutos reales (`45m`, `1h30`, `1:30`, `2,5`) con un mínimo de un minuto, y se redondea al minuto en vez de al cuarto de hora. La razón social puede crearse desde el propio cotizador. |
 
-Las decisiones diferidas PRO-12, TAR-16, F14-10 y F14-13 no se modifican. F14-10 (Kanban de
-proyectos) se implementó en 2.10.0 con las cinco etapas y sin exponer importes.
+La única decisión todavía diferida de esta ronda es TAR-16, por pedido explícito de no cambiar la clasificación de tareas.
 
 ### Revisión 2.13.1 — cruce de la auditoría contra el código desplegado
 
@@ -266,9 +265,9 @@ producto que quedaron sin devolver.
 | ID | Estado | Definición y resolución |
 |---|---|---|
 | GEN-01 | Implementado | Limpieza de datos de prueba reversible, disponible en producción. Las cotizaciones se archivan (`archivedAt`, con `POST /api/quotations/:id/restore` ya existente) y los proyectos pasan a `voided`, que la cartera ya trata como inactivo. Nada se elimina físicamente. El patrón de nombres sólo sugiere candidatos: archivar exige los ids que una persona eligió de la vista previa. Sólo Admin. Reemplaza a `test-data-reset`, que borraba físicamente y estaba bloqueado justamente en producción, que es donde se prueba el ciclo. |
-| GEN-02 | Requiere definición | Unificar Modalidad de servicio con las recetas y reducir el catálogo a One Shot, Fee, Intelligence Event Track y Demo (con Regional como parte de un Fee). El filtrado de recetas por modalidad ya está; la simplificación del catálogo es una decisión de producto. |
-| GEN-03 | Requiere definición | Si el tipo de análisis y el compromiso del cliente deben seguir siendo puntos de ajuste de costo, y en qué paso del cotizador corresponden. |
-| GEN-04 | Requiere definición | Si conviene mantener el módulo de Inflación. La serie ya se sincroniza sola por IPC, así que dejó de desactualizarse; la pregunta de fondo sigue abierta. |
+| GEN-02 | Implementado | Modalidad y receta dejan de ser dos elecciones paralelas. El catálogo nuevo ofrece sólo One Shot, Fee, Intelligence Event Track y Demo; Regional, renovación y créditos se conservan únicamente como compatibilidad histórica o condiciones dentro de Fee. |
+| GEN-03 | Implementado | Tipo de análisis y compromiso del cliente se retiraron como selectores y factores activos; se conservan sólo como campos históricos compatibles. |
+| GEN-04 | Implementado | Inflación se retiró del flujo y del pricing activo (`inflationFactor = 1`); los datos históricos continúan legibles. |
 
 ### Revisión 2.15.0 — roles del cotizador alineados con la escala de Personal
 
@@ -282,11 +281,11 @@ Lead, deberían aparecerme opciones que en Roles tengan esa categorización."*
 | GEN-05 | Implementado | El catálogo de roles del cotizador es la escala de Personal. Un rol canónico guarda nivel, subnivel y área en columnas propias (no se deduce del nombre) y se muestra como "04 Lead A · Operaciones". El área forma parte del rol porque, sin ella, un 04 Lead A de Operaciones y uno de DataTech serían indistinguibles y las recetas no podrían repartir horas por función. La migración materializa sólo las clasificaciones que existen en Personal, no las ~44 combinaciones teóricas. |
 | GEN-06 | Implementado | Los roles sin clasificación canónica —"Account Director" entre ellos— se retiran con `is_active = FALSE` en vez de borrarse: dejan de ofrecerse en cotizaciones nuevas y las históricas los siguen resolviendo por id. |
 | GEN-07 | Implementado | Al asignar una persona a un puesto sólo se ofrecen quienes coinciden en las dimensiones que el rol define. Un rol que no fija subnivel o área no restringe por esa dimensión. Cuando nadie coincide, la UI lo dice y ofrece ver el resto: filtrar en duro no puede dejar un puesto sin poder completarse. |
-| GEN-08 | Requiere validación | `BLUEPRINT_ROLE_PROFILES` traduce cada función de receta (director, pm, analyst, data, tech, design) a un área y un nivel típico. Las áreas se derivan de la función; los niveles son un punto de partida editable y no una regla de negocio aprobada. Al aplicar una receta el equipo queda propuesto y se ajusta a mano. |
+| GEN-08 | Implementado | Cada definición versionada guarda sus perfiles sugeridos por función (área y nivel), los muestra antes de aplicar el servicio y los usa para proponer el equipo. Ya no existe un supuesto invisible global: una nueva versión de receta puede cambiar los perfiles y la asignación final sigue siendo editable. |
 
-El catálogo de productos de seis modalidades (GEN-02) sigue pendiente: "Créditos"
-y "Fee + créditos" son modelos comerciales nuevos y necesitan definición antes de
-poder cotizarse.
+El catálogo nuevo queda cerrado en cuatro servicios. Las definiciones históricas de
+Programa regional, Renovación y Bolsa de créditos se archivan sin romper cotizaciones
+existentes; Regional y demás condiciones recurrentes se modelan dentro de Fee.
 
 ### Revisión 2.16.0 — bloqueo simétrico y candidatos reales de limpieza
 

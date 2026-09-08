@@ -17,7 +17,7 @@ import { es } from "date-fns/locale";
 import TaskCalendarView from "@/components/tasks/TaskCalendarView";
 import QuickTaskHours from "@/components/tasks/QuickTaskHours";
 import type { DateRange } from "react-day-picker";
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip as ChartTooltip, XAxis, YAxis } from "recharts";
+import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip as ChartTooltip } from "recharts";
 
 type Task = {
   id: number;
@@ -47,6 +47,11 @@ type TaskProject = {
 const PROJECT_PALETTE_BG = [
   "bg-blue-500", "bg-purple-500", "bg-green-500", "bg-orange-500",
   "bg-pink-500", "bg-teal-500", "bg-indigo-500", "bg-rose-500",
+];
+
+const PROJECT_CHART_COLORS = [
+  "#2563eb", "#7c3aed", "#16a34a", "#ea580c",
+  "#db2777", "#0d9488", "#4f46e5", "#e11d48",
 ];
 
 function getProjectColor(id: number) {
@@ -421,6 +426,8 @@ export default function TasksHomePage() {
   );
   const firstName = user?.firstName || "Usuario";
   const MY_LIMIT = 6;
+  const monthlyProjectHours = myHours.byProject.filter((project) => Number(project.hours) > 0);
+  const monthlyProjectTotal = monthlyProjectHours.reduce((sum, project) => sum + Number(project.hours), 0);
 
   return (
     <div className="mx-auto max-w-[1320px] space-y-6">
@@ -475,25 +482,37 @@ export default function TasksHomePage() {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(18rem,1fr)]">
         <div className="mind-panel p-4 sm:p-5">
           <div className="mb-4">
-            <h2 className="text-sm font-semibold">Horas del mes por proyecto</h2>
+            <h2 id="monthly-hours-chart-title" className="text-sm font-semibold">Horas del mes por proyecto</h2>
             <p className="text-xs text-muted-foreground">Tu carga acumulada permite detectar proyectos que quedaron sin registrar.</p>
           </div>
-          {myHours.byProject.length === 0 ? (
+          {monthlyProjectHours.length === 0 ? (
             <div className="flex h-44 items-center justify-center text-xs text-muted-foreground">Todavía no cargaste horas este mes.</div>
           ) : (
-            <div className="h-52 w-full" aria-label="Gráfico de horas del mes por proyecto">
-              {/* Preserve the original responsive margin contract for downstream visual checks. */}
-              {/* margin={{ top: 8, right: 12, left: 8, bottom: 8 }} */}
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={myHours.byProject} margin={{ top: 8, right: 16, left: 4, bottom: 22 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="projectName" tick={{ fontSize: 10 }} interval="preserveStartEnd" height={48} angle={-22} textAnchor="end" tickFormatter={(value) => String(value).length > 16 ? `${String(value).slice(0, 15)}…` : String(value)} />
-                  <YAxis tick={{ fontSize: 10 }} width={36} allowDecimals />
-                  <ChartTooltip formatter={(value: number) => [`${Number(value).toFixed(2)} h`, "Horas"]} />
-                  <Bar dataKey="hours" fill="#e11d48" radius={[5, 5, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+            <figure aria-labelledby="monthly-hours-chart-title">
+              <div role="img" aria-label="Donut de distribución porcentual de las horas del mes por proyecto" className="relative h-52 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart margin={{ top: 8, right: 12, left: 8, bottom: 8 }}>
+                    <Pie data={monthlyProjectHours} dataKey="hours" nameKey="projectName" innerRadius="56%" outerRadius="82%" paddingAngle={2} strokeWidth={0}>
+                      {monthlyProjectHours.map((project, index) => <Cell key={project.projectId} fill={PROJECT_CHART_COLORS[index % PROJECT_CHART_COLORS.length]} />)}
+                    </Pie>
+                    <ChartTooltip formatter={(value: number) => [`${Number(value).toFixed(2)} h`, "Horas"]} />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center" aria-hidden="true">
+                  <strong className="text-2xl tabular-nums text-slate-950">{monthlyProjectTotal.toFixed(2)} h</strong>
+                  <span className="text-[11px] text-muted-foreground">total del mes</span>
+                </div>
+              </div>
+              <ul className="grid gap-2 sm:grid-cols-2" aria-label="Detalle de horas por proyecto">
+                {monthlyProjectHours.map((project, index) => (
+                  <li key={project.projectId} className="flex min-w-0 items-center gap-2 text-xs">
+                    <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: PROJECT_CHART_COLORS[index % PROJECT_CHART_COLORS.length] }} />
+                    <span className="min-w-0 flex-1 truncate" title={project.projectName}>{project.projectName}</span>
+                    <strong className="shrink-0 tabular-nums">{project.hours.toFixed(2)} h · {monthlyProjectTotal > 0 ? Math.round((project.hours / monthlyProjectTotal) * 100) : 0}%</strong>
+                  </li>
+                ))}
+              </ul>
+            </figure>
           )}
         </div>
 
