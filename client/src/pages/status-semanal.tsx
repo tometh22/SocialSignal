@@ -4,6 +4,10 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest, authFetch } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
 import { useMaybeReviewRoom } from "@/hooks/use-review-room";
+import {
+  dailyReasonsFor, formatDuration, isStale, relTime, DAILY_REASON_ORDER,
+  type DailyReason, type DailyReasonKind,
+} from "@/lib/daily-agenda";
 import MemberAvatarsStack from "@/components/review/MemberAvatarsStack";
 import MembersDialog from "@/components/review/MembersDialog";
 import AddProjectDialog from "@/components/review/AddProjectDialog";
@@ -29,6 +33,7 @@ import {
   Printer, List, LayoutList, HelpCircle, CheckSquare, Square,
   PanelLeftOpen, PanelLeftClose,
   Paperclip, FileText, Link2, XCircle, Film, FileCheck2,
+  Play, Mic, MicOff, Copy, Check, Flame, Sun,
 } from "lucide-react";
 import {
   DndContext, closestCenter, DragOverlay,
@@ -68,6 +73,10 @@ type StatusRow = {
   lastNoteAt: string | null;
   lastNoteAuthorId: number | null;
   lastNoteAuthorName: string | null;
+  lastUpdateAt?: string | null;
+  lastHealthChangeAt?: string | null;
+  lastHealthChangeFrom?: string | null;
+  lastDecisionChangeAt?: string | null;
 };
 
 type CustomItem = {
@@ -94,6 +103,11 @@ type CustomItem = {
   lastNoteAt?: string | null;
   lastNoteAuthorId?: number | null;
   lastNoteAuthorName?: string | null;
+  createdAt?: string | null;
+  lastUpdateAt?: string | null;
+  lastHealthChangeAt?: string | null;
+  lastHealthChangeFrom?: string | null;
+  lastDecisionChangeAt?: string | null;
 };
 
 type Note = {
@@ -147,6 +161,32 @@ type Item = {
   lastNoteAt: string | null;
   lastNoteAuthorId: number | null;
   lastNoteAuthorName: string | null;
+  lastUpdateAt: string | null;
+  lastHealthChangeAt: string | null;
+  lastHealthChangeFrom: string | null;
+  lastDecisionChangeAt: string | null;
+  createdAt: string | null;
+};
+
+// ─── Modo Daily ───────────────────────────────────────────────────────────────
+// La lógica de "qué merece conversación hoy" vive en @/lib/daily-agenda.
+// Acá solo queda la presentación.
+
+const DAILY_REASON_META: Record<DailyReasonKind, { label: string; chip: string; border: string; bg: string }> = {
+  rojo:     { label: 'ROJO',     chip: 'text-red-700 bg-red-100',       border: 'border-red-500',    bg: 'bg-red-50/40' },
+  cambio:   { label: 'CAMBIÓ',   chip: 'text-red-600 bg-red-100',       border: 'border-red-400',    bg: 'bg-red-50/30' },
+  vence:    { label: 'VENCE',    chip: 'text-amber-700 bg-amber-100',   border: 'border-amber-400',  bg: 'bg-amber-50/40' },
+  decision: { label: 'DECISIÓN', chip: 'text-purple-700 bg-purple-100', border: 'border-purple-400', bg: 'bg-purple-50/40' },
+  silencio: { label: 'SILENCIO', chip: 'text-slate-600 bg-slate-200',   border: 'border-slate-300',  bg: 'bg-slate-50' },
+  nuevo:    { label: 'NUEVO',    chip: 'text-indigo-700 bg-indigo-100', border: 'border-indigo-400', bg: 'bg-indigo-50/40' },
+};
+
+type DailyStatus = { latest: DailySession | null; todayDone: boolean; streak: number };
+type DailySession = {
+  id: number; userId: number | null; userName: string | null;
+  startedAt: string; finishedAt: string; durationSeconds: number;
+  reviewedCount: number; changedCount: number;
+  summary: { key: string; title: string; changes: string[] }[];
 };
 
 type ActivityEntry =
@@ -213,16 +253,6 @@ function weekLabel() {
   return `${f(mon)} – ${f(fri)}`;
 }
 
-function relTime(s: string) {
-  const diff = Math.floor((Date.now() - new Date(s).getTime()) / 1000);
-  if (diff < 0) return 'ahora';
-  if (diff < 60) return 'ahora';
-  if (diff < 3600) return `hace ${Math.floor(diff / 60)}m`;
-  if (diff < 86400) return `hace ${Math.floor(diff / 3600)}h`;
-  if (diff < 86400 * 7) return `hace ${Math.floor(diff / 86400)}d`;
-  return new Date(s).toLocaleDateString('es-AR', { day: 'numeric', month: 'short' });
-}
-
 function shortDateTime(s: string) {
   const d = new Date(s);
   const now = new Date();
@@ -243,12 +273,6 @@ function fullDateTime(s: string) {
 function initials(name: string | null) {
   if (!name) return '?';
   return name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
-}
-
-function isStale(dateStr: string | null): boolean {
-  if (!dateStr) return true;
-  const diff = Date.now() - new Date(dateStr).getTime();
-  return diff > 5 * 86400 * 1000; // >5 days
 }
 
 function FreshnessIndicator({ updatedAt, updatedByName, updatedById, currentUserId }: {
@@ -2332,6 +2356,495 @@ function ActivityPanel({ projectId, customItemId, projectName, onClose }: { proj
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 
+// ─── Modo Daily: agenda (pantalla 1) ─────────────────────────────────────────
+
+type DailyAgendaEntry = { item: Item; reasons: DailyReason[] };
+
+function DailyAgendaView({ agenda, quiet, dailyStatus, onStart, onOpenList }: {
+  agenda: DailyAgendaEntry[];
+  quiet: Item[];
+  dailyStatus: DailyStatus | undefined;
+  onStart: (startIndex?: number) => void;
+  onOpenList: () => void;
+}) {
+  const estMinutes = Math.max(1, Math.round(agenda.length * 0.7));
+  return (
+    <div className="flex-1 overflow-y-auto min-w-0">
+      <div className="max-w-6xl mx-auto px-6 py-5">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          {/* CTA */}
+          <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between gap-4 bg-gradient-to-r from-indigo-50/70 to-white">
+            <div className="min-w-0">
+              <div className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                <Sun className="h-4 w-4 text-amber-500" />
+                {dailyStatus?.todayDone ? 'Daily de hoy hecha' : 'Daily de hoy'}
+              </div>
+              <div className="text-xs text-slate-500 mt-0.5 flex items-center gap-3 flex-wrap">
+                {dailyStatus?.latest ? (
+                  <span>{dailyStatus.todayDone ? 'Hoy duró' : 'La última duró'} <b className="text-slate-700">{formatDuration(dailyStatus.latest.durationSeconds)}</b>{dailyStatus.latest.userName ? ` · ${dailyStatus.latest.userName.split(' ')[0]}` : ''}</span>
+                ) : (
+                  <span>Todavía no hicieron ninguna daily en este room</span>
+                )}
+                {dailyStatus && dailyStatus.streak > 0 && (
+                  <span className="inline-flex items-center gap-1"><Flame className="h-3 w-3 text-orange-500" /> Racha: <b className="text-slate-700">{dailyStatus.streak} día{dailyStatus.streak === 1 ? '' : 's'}</b></span>
+                )}
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button onClick={onOpenList} className="text-xs text-slate-500 hover:text-slate-800 font-medium px-2 py-1.5">Ver lista completa</button>
+              <button onClick={() => onStart()} disabled={agenda.length === 0}
+                className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white font-bold text-sm px-4 py-2 rounded-lg shadow-sm transition-colors">
+                <Play className="h-3.5 w-3.5 fill-current" />
+                {dailyStatus?.todayDone ? 'Repetir la daily' : 'Hacer la daily'}
+                <span className="text-indigo-200 font-normal">{agenda.length} ítem{agenda.length === 1 ? '' : 's'} · ~{estMinutes} min</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 max-md:grid-cols-1 divide-x max-md:divide-x-0 max-md:divide-y divide-slate-100">
+            {/* Para hablar hoy */}
+            <div className="col-span-2 p-5">
+              <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-3 flex items-center gap-2">
+                Para hablar hoy <span className="bg-slate-100 rounded-full px-2 py-0.5 text-slate-500">{agenda.length}</span>
+              </h3>
+              {agenda.length === 0 ? (
+                <div className="flex items-center gap-2 py-6 px-4 rounded-xl border border-dashed border-emerald-200 bg-emerald-50/50 text-emerald-700 text-sm">
+                  <CheckCircle2 className="h-4 w-4" /> Nada pide conversación hoy. Todo al día.
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {agenda.map(({ item, reasons }, idx) => {
+                    const main = reasons[0];
+                    const meta = DAILY_REASON_META[main.kind];
+                    return (
+                      <button key={item.key} onClick={() => onStart(idx)}
+                        className={cn("w-full text-left flex gap-3 items-start p-3 rounded-xl border-l-4 hover:shadow-sm transition-shadow", meta.border, meta.bg)}>
+                        <div className="flex flex-col gap-1 shrink-0 mt-0.5">
+                          {reasons.map(r => (
+                            <span key={r.kind} className={cn("text-[10px] font-bold rounded px-1.5 py-0.5 whitespace-nowrap", DAILY_REASON_META[r.kind].chip)}>{DAILY_REASON_META[r.kind].label}</span>
+                          ))}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="font-semibold text-sm text-slate-800 flex items-center gap-2 min-w-0">
+                            <span className={cn("w-2 h-2 rounded-full shrink-0", hm(item.healthStatus).dot)} />
+                            <span className="truncate">{item.title}</span>
+                            {item.subtitle && <span className="text-xs text-slate-400 font-normal truncate">· {item.subtitle}</span>}
+                            {item.ownerName && <span className="text-[10px] text-indigo-600 font-medium shrink-0">{item.ownerName.split(' ')[0]}</span>}
+                          </div>
+                          <div className="text-xs text-slate-500 mt-0.5">{main.detail}</div>
+                        </div>
+                        <span className="text-xs text-slate-400 italic shrink-0 max-md:hidden">{main.question}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Sin novedad */}
+            <div className="p-5 bg-slate-50/60">
+              <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-wide mb-3 flex items-center gap-2">
+                Sin novedad <span className="bg-slate-200 rounded-full px-2 py-0.5">{quiet.length}</span>
+              </h3>
+              {quiet.length === 0 ? (
+                <p className="text-xs text-slate-400">Todos los ítems piden conversación hoy.</p>
+              ) : (
+                <ul className="text-xs text-slate-500 space-y-1.5">
+                  {quiet.map(i => (
+                    <li key={i.key} className="flex justify-between gap-2">
+                      <span className="truncate flex items-center gap-1.5 min-w-0"><span className={cn("w-1.5 h-1.5 rounded-full shrink-0", hm(i.healthStatus).dot)} /><span className="truncate">{i.title}</span></span>
+                      <span className="text-slate-300 shrink-0">{(i.lastUpdateAt || i.updatedAt) ? relTime(i.lastUpdateAt || i.updatedAt!) : '—'}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <p className="text-[11px] text-slate-400 mt-4 leading-relaxed">No hace falta hablar de estos. Al cerrar la daily quedan contados como revisados.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Modo Daily: runner (pantallas 2 y 3) ────────────────────────────────────
+
+type DailyChange = { key: string; title: string; changes: string[] };
+
+// Contexto del ítem actual: últimos 2 updates/comentarios del thread.
+function DailyItemContext({ item }: { item: Item }) {
+  const updatesUrl = item.projectId ? `/api/status-semanal/${item.projectId}/updates` : `/api/status-semanal/custom/${item.customId}/updates`;
+  const notesUrl = item.projectId ? `/api/status-semanal/${item.projectId}/notes` : `/api/status-semanal/custom/${item.customId}/notes`;
+  const updatesKey = item.projectId ? ['/api/status-semanal', item.projectId, 'updates'] : ['/api/status-semanal/custom', item.customId, 'updates'];
+  const notesKey = item.projectId ? ['/api/status-semanal', item.projectId, 'notes'] : ['/api/status-semanal/custom', item.customId, 'notes'];
+  const { data: updates = [] } = useQuery<UpdateEntry[]>({ queryKey: updatesKey, queryFn: async () => { const r = await authFetch(updatesUrl); return r.json(); } });
+  const { data: notes = [] } = useQuery<Note[]>({ queryKey: notesKey, queryFn: async () => { const r = await authFetch(notesUrl); return r.json(); } });
+  const thread = [
+    ...updates.map(e => ({ id: `u${e.id}`, content: e.content, authorName: e.authorName, createdAt: e.createdAt })),
+    ...notes.map(n => ({ id: `n${n.id}`, content: n.content, authorName: n.authorName, createdAt: n.createdAt })),
+  ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 2);
+
+  if (thread.length === 0) {
+    return <p className="text-xs text-slate-400 italic">Sin updates todavía{item.currentAction ? ` · acción actual: "${item.currentAction}"` : ''}</p>;
+  }
+  return (
+    <div className="space-y-2">
+      {thread.map((e, i) => (
+        <div key={e.id} className={cn("text-sm bg-slate-50 rounded-lg p-3 border border-slate-100", i > 0 && "opacity-70")}>
+          <div className="text-slate-700 whitespace-pre-wrap">{e.content}</div>
+          <div className="text-[11px] text-slate-400 mt-1">{e.authorName?.split(' ')[0] ?? 'Usuario'} · {shortDateTime(e.createdAt)}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function DailyRunner({ queue, quietCount, users, currentUserId, startIndex, handlersFor, onFinish, onExit }: {
+  queue: DailyAgendaEntry[];
+  quietCount: number;
+  users: AppUser[];
+  currentUserId: number | null;
+  startIndex: number;
+  handlersFor: (item: Item) => { onUpdate: (data: Record<string, any>) => void; onResolve: () => void };
+  onFinish: (payload: { startedAt: string; reviewedCount: number; changedCount: number; summary: DailyChange[] }) => Promise<void>;
+  onExit: () => void;
+}) {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const [startedAt] = useState(() => new Date());
+  const [idx, setIdx] = useState(startIndex);
+  const [draft, setDraft] = useState('');
+  const [picker, setPicker] = useState<'decision' | 'owner' | 'deadline' | null>(null);
+  const [changes, setChanges] = useState<Map<string, DailyChange>>(new Map());
+  // Overrides locales para reflejar cambios al instante sin esperar el refetch.
+  const [local, setLocal] = useState<Map<string, Partial<Item>>>(new Map());
+  const [elapsed, setElapsed] = useState(0);
+  const [saving, setSaving] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [listening, setListening] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const dateRef = useRef<HTMLInputElement>(null);
+  const recognitionRef = useRef<any>(null);
+
+  useEffect(() => {
+    const t = setInterval(() => setElapsed(Math.floor((Date.now() - startedAt.getTime()) / 1000)), 1000);
+    return () => clearInterval(t);
+  }, [startedAt]);
+
+  const done = idx >= queue.length;
+  const entry = done ? null : queue[idx];
+  const item = entry ? { ...entry.item, ...(local.get(entry.item.key) ?? {}) } as Item : null;
+
+  useEffect(() => { setDraft(''); setPicker(null); if (!done) setTimeout(() => textareaRef.current?.focus(), 30); }, [idx, done]);
+
+  const record = (it: Item, text: string) => {
+    setChanges(prev => {
+      const n = new Map(prev);
+      const cur = n.get(it.key) ?? { key: it.key, title: it.title, changes: [] };
+      n.set(it.key, { ...cur, changes: [...cur.changes, text] });
+      return n;
+    });
+  };
+  const patchLocal = (it: Item, data: Partial<Item>) => setLocal(prev => { const n = new Map(prev); n.set(it.key, { ...(n.get(it.key) ?? {}), ...data }); return n; });
+
+  const postUpdate = async (it: Item, content: string) => {
+    const url = it.projectId ? `/api/status-semanal/${it.projectId}/updates` : `/api/status-semanal/custom/${it.customId}/updates`;
+    await mutationFetch(url, 'POST', { content });
+    const key = it.projectId ? ['/api/status-semanal', it.projectId, 'updates'] : ['/api/status-semanal/custom', it.customId, 'updates'];
+    queryClient.refetchQueries({ queryKey: key });
+    queryClient.refetchQueries({ queryKey: ['/api/status-semanal?includeHidden=true'] });
+    if (it.isCustom) queryClient.refetchQueries({ queryKey: ['/api/status-semanal/custom?includeHidden=true'] });
+  };
+
+  const next = async () => {
+    if (!item) return;
+    const t = draft.trim();
+    if (t) {
+      try {
+        await postUpdate(item, t);
+        record(item, `💬 ${t}`);
+      } catch (err: any) {
+        toast({ title: 'No se pudo guardar el update', description: err.message, variant: 'destructive' });
+        return;
+      }
+    }
+    setIdx(i => i + 1);
+  };
+  const prev = () => setIdx(i => Math.max(0, i - 1));
+
+  const setHealth = (h: string) => {
+    if (!item || item.healthStatus === h) return;
+    handlersFor(item).onUpdate({ healthStatus: h });
+    patchLocal(item, { healthStatus: h });
+    record(item, `${h === 'verde' ? '🟢' : h === 'amarillo' ? '🟡' : '🔴'} pasó a ${hm(h).label.toLowerCase()}`);
+  };
+  const setDecision = (d: string) => {
+    if (!item) return;
+    setPicker(null);
+    if (item.decisionNeeded === d || (!item.decisionNeeded && d === 'ninguna')) return;
+    handlersFor(item).onUpdate({ decisionNeeded: d });
+    patchLocal(item, { decisionNeeded: d });
+    record(item, d === 'ninguna' ? '✓ decisión resuelta' : `⚡ pide decisión: ${dm(d).label.toLowerCase()}`);
+  };
+  const setOwner = (id: number | null) => {
+    if (!item) return;
+    setPicker(null);
+    if (item.ownerId === id) return;
+    const name = users.find(u => u.id === id)?.name ?? null;
+    handlersFor(item).onUpdate({ ownerId: id });
+    patchLocal(item, { ownerId: id, ownerName: name });
+    record(item, name ? `👤 se lo lleva ${name.split(' ')[0]}` : '👤 sin owner');
+  };
+  const setDeadline = (iso: string | null) => {
+    if (!item) return;
+    setPicker(null);
+    handlersFor(item).onUpdate({ deadline: iso });
+    patchLocal(item, { deadline: iso, isOverdue: false });
+    record(item, iso ? `📅 deadline ${deadlineLabel(iso)}` : '📅 sin deadline');
+  };
+  const resolve = () => {
+    if (!item) return;
+    handlersFor(item).onResolve();
+    record(item, '✅ cerrado');
+    setIdx(i => i + 1);
+  };
+
+  // Dictado por voz (Web Speech API, si el navegador lo tiene).
+  const SpeechRecognition = typeof window !== 'undefined' ? ((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition) : null;
+  const toggleListening = () => {
+    if (!SpeechRecognition) { toast({ title: 'Este navegador no soporta dictado', variant: 'destructive' }); return; }
+    if (listening) { recognitionRef.current?.stop(); setListening(false); return; }
+    const rec = new SpeechRecognition();
+    rec.lang = 'es-AR'; rec.interimResults = false; rec.continuous = true;
+    rec.onresult = (ev: any) => {
+      let text = '';
+      for (let i = ev.resultIndex; i < ev.results.length; i++) if (ev.results[i].isFinal) text += ev.results[i][0].transcript;
+      if (text) setDraft(d => (d ? `${d} ` : '') + text.trim());
+    };
+    rec.onend = () => setListening(false);
+    rec.onerror = () => setListening(false);
+    recognitionRef.current = rec;
+    rec.start();
+    setListening(true);
+  };
+  useEffect(() => () => { recognitionRef.current?.stop?.(); }, []);
+
+  // Atajos: Enter fuera del textarea (o ⌘/Ctrl+Enter adentro) avanza.
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const el = document.activeElement as HTMLElement | null;
+      const inText = el?.tagName === 'TEXTAREA' || el?.tagName === 'INPUT' || el?.tagName === 'SELECT' || el?.isContentEditable;
+      if (e.key === 'Escape') { e.preventDefault(); if (picker) setPicker(null); else if (listening) toggleListening(); else onExit(); return; }
+      if (done) { if (e.key === 'Enter' && !inText) { e.preventDefault(); void finish(); } return; }
+      // Enter guarda y avanza (Shift+Enter hace salto de línea), igual que los comentarios.
+      const inTextarea = el === textareaRef.current;
+      if (e.key === 'Enter' && (!inText || (inTextarea && !e.shiftKey) || e.metaKey || e.ctrlKey)) { e.preventDefault(); void next(); return; }
+      if (inText) return;
+      if (e.key === '1') { e.preventDefault(); setHealth('verde'); }
+      else if (e.key === '2') { e.preventDefault(); setHealth('amarillo'); }
+      else if (e.key === '3') { e.preventDefault(); setHealth('rojo'); }
+      else if (e.key === 'd' || e.key === 'D') { e.preventDefault(); setPicker(p => p === 'decision' ? null : 'decision'); }
+      else if (e.key === 'f' || e.key === 'F') { e.preventDefault(); setPicker('deadline'); setTimeout(() => dateRef.current?.showPicker?.(), 20); }
+      else if (e.key === '@') { e.preventDefault(); setPicker(p => p === 'owner' ? null : 'owner'); }
+      else if (e.key === 'r' || e.key === 'R') { e.preventDefault(); resolve(); }
+      else if (e.key === 'ArrowLeft') { e.preventDefault(); prev(); }
+      else if (e.key === 'ArrowRight') { e.preventDefault(); void next(); }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  });
+
+  const summaryList = useMemo(() => Array.from(changes.values()), [changes]);
+  const buildShareText = () => {
+    const lines = [`Daily · ${new Date().toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'short' })} · ${formatDuration(elapsed)}`, ''];
+    if (summaryList.length === 0) lines.push('Sin cambios. Todo sigue igual.');
+    for (const s of summaryList) lines.push(`• ${s.title}: ${s.changes.join(' · ')}`);
+    const untouched = queue.length - summaryList.length + quietCount;
+    if (untouched > 0) lines.push('', `+ ${untouched} ítems revisados sin cambios`);
+    return lines.join('\n');
+  };
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(buildShareText()); setCopied(true); setTimeout(() => setCopied(false), 2000); }
+    catch { toast({ title: 'No se pudo copiar', variant: 'destructive' }); }
+  };
+  const finish = async () => {
+    if (saving) return;
+    setSaving(true);
+    try {
+      await onFinish({ startedAt: startedAt.toISOString(), reviewedCount: queue.length + quietCount, changedCount: summaryList.length, summary: summaryList });
+    } finally { setSaving(false); }
+  };
+
+  const mm = String(Math.floor(elapsed / 60)).padStart(2, '0');
+  const ss = String(elapsed % 60).padStart(2, '0');
+  const nextEntry = queue[idx + 1];
+
+  return (
+    <div className="fixed inset-0 z-50 bg-slate-100/95 backdrop-blur-sm flex items-start justify-center overflow-y-auto">
+      <div className="w-full max-w-5xl mx-4 my-6 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
+        {/* Progreso */}
+        <div className="px-6 pt-5">
+          <div className="flex items-center justify-between text-xs text-slate-500 mb-2">
+            <span>{done ? 'Daily lista' : <>Ítem <b className="text-slate-800">{idx + 1}</b> de {queue.length}</>}</span>
+            <span className="flex items-center gap-3">
+              <span className="font-mono">{mm}:{ss}</span>
+              <button onClick={onExit} className="text-slate-400 hover:text-slate-700 underline">salir</button>
+            </span>
+          </div>
+          <div className="flex gap-1">
+            {queue.map((q, i) => (
+              <div key={q.item.key} className={cn("h-1.5 flex-1 rounded transition-colors", i < idx ? "bg-emerald-400" : i === idx && !done ? "bg-indigo-500" : "bg-slate-200")} />
+            ))}
+          </div>
+        </div>
+
+        {done ? (
+          /* ── Pantalla 3: cierre ── */
+          <div className="p-6 grid grid-cols-3 max-md:grid-cols-1 gap-6">
+            <div className="col-span-2">
+              <h2 className="text-xl font-bold text-slate-800">Daily lista · {formatDuration(elapsed)}</h2>
+              {summaryList.length === 0 ? (
+                <p className="mt-3 text-sm text-slate-500">Sin cambios registrados. Todo sigue igual.</p>
+              ) : (
+                <ul className="mt-3 text-sm space-y-1.5 text-slate-700">
+                  {summaryList.map(s => (
+                    <li key={s.key}><b>{s.title}</b> · {s.changes.join(' · ')}</li>
+                  ))}
+                </ul>
+              )}
+              <p className="text-xs text-slate-400 mt-3">+ {queue.length - summaryList.length + quietCount} ítems revisados sin cambios</p>
+              <p className="text-xs text-slate-400 mt-4 leading-relaxed">Lo que escribiste ya quedó guardado como update de cada ítem. Este resumen queda registrado como la daily de hoy.</p>
+            </div>
+            <div className="bg-indigo-50 rounded-xl p-4 text-sm flex flex-col gap-2">
+              <div className="text-[11px] text-indigo-500 uppercase tracking-wide font-bold">Compartir</div>
+              <button onClick={copy} className="w-full flex items-center justify-center gap-2 bg-white border border-indigo-200 text-indigo-700 rounded-lg py-2 font-medium hover:bg-indigo-100 transition-colors">
+                {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />} {copied ? 'Copiado' : 'Copiar para WhatsApp / mail'}
+              </button>
+              <button onClick={finish} disabled={saving} className="mt-auto w-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-lg py-2 font-semibold flex items-center justify-center gap-2">
+                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null} Cerrar daily <kbd className="text-[10px] bg-indigo-500 rounded px-1.5">⏎</kbd>
+              </button>
+            </div>
+          </div>
+        ) : item && entry ? (
+          /* ── Pantalla 2: ítem actual ── */
+          <div className="grid grid-cols-5 max-md:grid-cols-1">
+            <div className="col-span-3 p-6">
+              <div className="flex items-center gap-2 mb-1 flex-wrap">
+                {entry.reasons.map(r => (
+                  <span key={r.kind} className={cn("text-[10px] font-bold rounded px-1.5 py-0.5", DAILY_REASON_META[r.kind].chip)}>{DAILY_REASON_META[r.kind].label}</span>
+                ))}
+                <span className="text-[10px] text-slate-400">Owner: {item.ownerName?.split(' ')[0] ?? 'sin owner'}</span>
+              </div>
+              <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+                <span className={cn("w-3 h-3 rounded-full shrink-0", hm(item.healthStatus).dot)} />
+                <span className="truncate">{item.title}</span>
+              </h2>
+              {item.subtitle && <p className="text-sm text-slate-400">{item.subtitle}</p>}
+              <p className="text-sm text-slate-500 mt-2">{entry.reasons[0].detail}. Pregunta para hoy: <b className="text-slate-700">{entry.reasons[0].question}</b></p>
+
+              <div className="mt-5 space-y-2">
+                <div className="text-[11px] text-slate-400 uppercase tracking-wide font-bold">Lo último</div>
+                <DailyItemContext item={item} />
+              </div>
+
+              <div className="mt-5">
+                <div className="relative">
+                  <textarea ref={textareaRef} rows={3} value={draft} onChange={e => setDraft(e.target.value)}
+                    placeholder="Qué pasó hoy… (⏎ guarda y sigue · ⇧⏎ salto de línea)"
+                    className="w-full border border-slate-200 rounded-xl p-3 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none" />
+                  <button onClick={toggleListening} title={listening ? 'Detener dictado' : 'Dictar'}
+                    className={cn("absolute right-2 bottom-2 p-1.5 rounded-full transition-colors", listening ? "bg-red-100 text-red-600 animate-pulse" : "text-slate-400 hover:text-indigo-600 hover:bg-indigo-50")}>
+                    {listening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+                  </button>
+                </div>
+                {changes.get(item.key)?.changes.length ? (
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {changes.get(item.key)!.changes.map((c, i) => <span key={i} className="text-[11px] bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full px-2 py-0.5">{c}</span>)}
+                  </div>
+                ) : null}
+              </div>
+            </div>
+
+            {/* Acciones */}
+            <div className="col-span-2 bg-slate-50 border-l max-md:border-l-0 max-md:border-t border-slate-100 p-6 flex flex-col">
+              <div className="text-[11px] text-slate-400 uppercase tracking-wide font-bold mb-3">Acciones</div>
+              <div className="space-y-2 text-sm">
+                <button onClick={() => void next()} className="w-full flex items-center justify-between bg-white border border-slate-200 rounded-lg px-3 py-2.5 hover:border-indigo-300 transition-colors">
+                  <span>{draft.trim() ? 'Guardar y siguiente' : 'Todo igual, siguiente'}</span><kbd className="text-[10px] bg-slate-100 border rounded px-1.5 text-slate-500">⏎</kbd>
+                </button>
+                <div className="w-full flex items-center justify-between bg-white border border-slate-200 rounded-lg px-3 py-2">
+                  <span>Semáforo</span>
+                  <span className="flex gap-1.5 items-center">
+                    {(['verde', 'amarillo', 'rojo'] as const).map((h, i) => (
+                      <button key={h} onClick={() => setHealth(h)} title={`${HEALTH[h].label} (${i + 1})`}
+                        className={cn("w-5 h-5 rounded-full border-2 transition-transform hover:scale-110", HEALTH[h].dot, item.healthStatus === h || (!item.healthStatus && h === 'verde') ? "border-slate-700 scale-110" : "border-white")} />
+                    ))}
+                    <kbd className="text-[10px] bg-slate-100 border rounded px-1.5 text-slate-500 ml-1">1 2 3</kbd>
+                  </span>
+                </div>
+                <div>
+                  <button onClick={() => setPicker(p => p === 'decision' ? null : 'decision')} className={cn("w-full flex items-center justify-between bg-white border rounded-lg px-3 py-2.5 transition-colors", picker === 'decision' ? "border-indigo-400" : "border-slate-200 hover:border-indigo-300")}>
+                    <span>{dm(item.decisionNeeded).urgent ? <>Decisión: <b>{dm(item.decisionNeeded).label}</b></> : 'Pedir decisión'}</span><kbd className="text-[10px] bg-slate-100 border rounded px-1.5 text-slate-500">D</kbd>
+                  </button>
+                  {picker === 'decision' && (
+                    <div className="mt-1 bg-white border border-slate-200 rounded-lg p-1.5 grid grid-cols-2 gap-1">
+                      {Object.entries(DECISION).map(([k, m]) => (
+                        <button key={k} onClick={() => setDecision(k)} className={cn("text-xs px-2 py-1.5 rounded border text-left", m.color, (item.decisionNeeded ?? 'ninguna') === k && "ring-2 ring-indigo-300")}>{k === 'ninguna' ? '✓ Resuelta / ninguna' : m.label}</button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <button onClick={() => { setPicker('deadline'); setTimeout(() => dateRef.current?.showPicker?.(), 20); }} className={cn("w-full flex items-center justify-between bg-white border rounded-lg px-3 py-2.5 transition-colors relative", picker === 'deadline' ? "border-indigo-400" : "border-slate-200 hover:border-indigo-300")}>
+                    <span>{item.deadline ? <>Deadline: <b className={item.isOverdue ? 'text-red-600' : ''}>{deadlineLabel(item.deadline)}</b></> : 'Poner deadline'}</span><kbd className="text-[10px] bg-slate-100 border rounded px-1.5 text-slate-500">F</kbd>
+                  </button>
+                  {picker === 'deadline' && (
+                    <div className="mt-1 bg-white border border-slate-200 rounded-lg p-2 flex items-center gap-2">
+                      <input ref={dateRef} type="date" autoFocus defaultValue={item.deadline ? new Date(item.deadline).toISOString().split('T')[0] : ''}
+                        onChange={e => e.target.value && setDeadline(new Date(e.target.value).toISOString())}
+                        className="text-xs border border-slate-200 rounded px-2 py-1 flex-1" />
+                      {item.deadline && <button onClick={() => setDeadline(null)} className="text-xs text-red-500 hover:underline">Quitar</button>}
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <button onClick={() => setPicker(p => p === 'owner' ? null : 'owner')} className={cn("w-full flex items-center justify-between bg-white border rounded-lg px-3 py-2.5 transition-colors", picker === 'owner' ? "border-indigo-400" : "border-slate-200 hover:border-indigo-300")}>
+                    <span>Pasárselo a…</span><kbd className="text-[10px] bg-slate-100 border rounded px-1.5 text-slate-500">@</kbd>
+                  </button>
+                  {picker === 'owner' && (
+                    <div className="mt-1 bg-white border border-slate-200 rounded-lg p-1.5 max-h-40 overflow-y-auto">
+                      {users.map(u => (
+                        <button key={u.id} onClick={() => setOwner(u.id)} className={cn("w-full text-left text-xs px-2 py-1.5 rounded hover:bg-slate-100 flex items-center gap-2", item.ownerId === u.id && "bg-slate-100")}>
+                          <span className="h-5 w-5 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-[9px] font-bold">{initials(u.name)}</span>{u.name}{u.id === currentUserId ? ' (yo)' : ''}
+                        </button>
+                      ))}
+                      <button onClick={() => setOwner(null)} className="w-full text-left text-xs px-2 py-1.5 rounded hover:bg-slate-100 text-slate-400">Sin owner</button>
+                    </div>
+                  )}
+                </div>
+                <button onClick={resolve} className="w-full flex items-center justify-between bg-white border border-emerald-200 text-emerald-700 rounded-lg px-3 py-2.5 hover:bg-emerald-50 transition-colors">
+                  <span>✓ Resolver / cerrar</span><kbd className="text-[10px] bg-slate-100 border rounded px-1.5 text-slate-500">R</kbd>
+                </button>
+              </div>
+
+              <div className="mt-auto pt-5 flex items-end justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-[11px] text-slate-400 uppercase tracking-wide font-bold mb-1">Siguiente</div>
+                  <div className="text-xs text-slate-500 truncate">{nextEntry ? <>{nextEntry.item.title} <span className="text-slate-300">· {DAILY_REASON_META[nextEntry.reasons[0].kind].label.toLowerCase()}</span></> : 'Cierre de la daily'}</div>
+                </div>
+                <div className="flex gap-1 shrink-0">
+                  <button onClick={prev} disabled={idx === 0} className="p-1.5 rounded border border-slate-200 bg-white text-slate-500 hover:text-slate-800 disabled:opacity-30"><ChevronLeft className="h-4 w-4" /></button>
+                  <button onClick={() => void next()} className="p-1.5 rounded border border-slate-200 bg-white text-slate-500 hover:text-slate-800"><ChevronRight className="h-4 w-4" /></button>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 export default function StatusSemanalPage() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -2364,7 +2877,21 @@ export default function StatusSemanalPage() {
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const [normalOrder, setNormalOrder] = useState<string[]>([]);
   const [dragActiveId, setDragActiveId] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<'list' | 'timeline'>('list');
+  // 'daily' es la vista por defecto al entrar al room: agenda de qué hablar hoy.
+  const [viewMode, setViewModeRaw] = useState<'list' | 'timeline' | 'daily'>(() => {
+    try {
+      const v = localStorage.getItem('status-view-mode');
+      return v === 'list' || v === 'timeline' || v === 'daily' ? v : 'daily';
+    } catch { return 'daily'; }
+  });
+  const setViewMode = (v: 'list' | 'timeline' | 'daily' | ((p: 'list' | 'timeline' | 'daily') => 'list' | 'timeline' | 'daily')) => {
+    setViewModeRaw(prev => {
+      const nextMode = typeof v === 'function' ? v(prev) : v;
+      try { localStorage.setItem('status-view-mode', nextMode); } catch {}
+      return nextMode;
+    });
+  };
+  const [dailyRun, setDailyRun] = useState<{ startIndex: number } | null>(null);
   const [showExport, setShowExport] = useState(false);
   const [showKbHelp, setShowKbHelp] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -2376,6 +2903,9 @@ export default function StatusSemanalPage() {
     const handler = (e: KeyboardEvent) => {
       const tag = (document.activeElement as HTMLElement)?.tagName;
       const isInput = tag === 'INPUT' || tag === 'TEXTAREA' || (document.activeElement as HTMLElement)?.isContentEditable;
+
+      // El runner de la daily maneja sus propios atajos.
+      if (dailyRun) return;
 
       if (e.key === 'Escape') {
         if (confirmDelete) { setConfirmDelete(null); return; }
@@ -2406,7 +2936,7 @@ export default function StatusSemanalPage() {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [notesOpen, confirmDelete, kbFocusKey, showExport]);
+  }, [notesOpen, confirmDelete, kbFocusKey, showExport, dailyRun]);
 
   const aiCooldownRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => () => { if (aiCooldownRef.current) clearTimeout(aiCooldownRef.current); }, []);
@@ -2607,6 +3137,11 @@ export default function StatusSemanalPage() {
     lastNoteAt: r.lastNoteAt ?? null,
     lastNoteAuthorId: r.lastNoteAuthorId ?? null,
     lastNoteAuthorName: r.lastNoteAuthorName ?? null,
+    lastUpdateAt: r.lastUpdateAt ?? null,
+    lastHealthChangeAt: r.lastHealthChangeAt ?? null,
+    lastHealthChangeFrom: r.lastHealthChangeFrom ?? null,
+    lastDecisionChangeAt: r.lastDecisionChangeAt ?? null,
+    createdAt: null,
   });
 
   const toCustomItem = (c: CustomItem): Item => ({
@@ -2636,6 +3171,11 @@ export default function StatusSemanalPage() {
     lastNoteAt: c.lastNoteAt ?? null,
     lastNoteAuthorId: c.lastNoteAuthorId ?? null,
     lastNoteAuthorName: c.lastNoteAuthorName ?? null,
+    lastUpdateAt: c.lastUpdateAt ?? null,
+    lastHealthChangeAt: c.lastHealthChangeAt ?? null,
+    lastHealthChangeFrom: c.lastHealthChangeFrom ?? null,
+    lastDecisionChangeAt: c.lastDecisionChangeAt ?? null,
+    createdAt: c.createdAt ?? null,
   });
 
   const allItems = useMemo<Item[]>(() => [
@@ -2695,7 +3235,7 @@ export default function StatusSemanalPage() {
     const handler = (e: KeyboardEvent) => {
       const tag = (document.activeElement as HTMLElement)?.tagName;
       const isInput = tag === 'INPUT' || tag === 'TEXTAREA' || (document.activeElement as HTMLElement)?.isContentEditable;
-      if (isInput) return;
+      if (isInput || dailyRun) return;
 
       const navKeys = ['j', 'k', 'J', 'K', 'ArrowDown', 'ArrowUp', 'e', 'E'];
       if (!navKeys.includes(e.key)) return;
@@ -2718,7 +3258,49 @@ export default function StatusSemanalPage() {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [kbFocusKey, flatNavItems, expandedKey]);
+  }, [kbFocusKey, flatNavItems, expandedKey, dailyRun]);
+
+  // ── Modo Daily: agenda del día ───────────────────────────────────────────────
+  const { data: dailyStatus, refetch: refetchDailyStatus } = useQuery<DailyStatus>({
+    queryKey: ['/api/status-semanal/daily-sessions/latest'],
+    queryFn: async () => { const r = await authFetch('/api/status-semanal/daily-sessions/latest'); if (!r.ok) throw new Error('daily status'); return r.json(); },
+    staleTime: 30_000,
+    refetchOnWindowFocus: true,
+  });
+
+  const { dailyAgenda, dailyQuiet } = useMemo(() => {
+    const since = dailyStatus?.latest ? new Date(dailyStatus.latest.finishedAt) : null;
+    const agenda: DailyAgendaEntry[] = [];
+    const quiet: Item[] = [];
+    for (const item of visible) {
+      const reasons = dailyReasonsFor(item, since);
+      if (reasons.length > 0) agenda.push({ item, reasons }); else quiet.push(item);
+    }
+    agenda.sort((a, b) => DAILY_REASON_ORDER.indexOf(a.reasons[0].kind) - DAILY_REASON_ORDER.indexOf(b.reasons[0].kind));
+    return { dailyAgenda: agenda, dailyQuiet: quiet };
+  }, [visible, dailyStatus?.latest]);
+
+  // La cola del runner se congela al arrancar: si un ítem deja de tener razones
+  // a mitad de camino (ej. pasó a verde) no debe desaparecer bajo los pies.
+  const [dailyQueue, setDailyQueue] = useState<DailyAgendaEntry[]>([]);
+  const startDaily = (startIndex = 0) => {
+    if (dailyAgenda.length === 0) return;
+    setDailyQueue(dailyAgenda);
+    setDailyRun({ startIndex });
+  };
+
+  const finishDaily = async (payload: { startedAt: string; reviewedCount: number; changedCount: number; summary: DailyChange[] }) => {
+    try {
+      await mutationFetch('/api/status-semanal/daily-sessions', 'POST', payload);
+      setDailyRun(null);
+      toast({ title: 'Daily cerrada', description: payload.changedCount > 0 ? `${payload.changedCount} ítem${payload.changedCount === 1 ? '' : 's'} con cambios.` : 'Sin cambios. Todo sigue igual.' });
+      refetchDailyStatus();
+      queryClient.refetchQueries({ queryKey: ['/api/status-semanal?includeHidden=true'] });
+      queryClient.refetchQueries({ queryKey: ['/api/status-semanal/custom?includeHidden=true'] });
+    } catch (err: any) {
+      toast({ title: 'No se pudo cerrar la daily', description: err.message, variant: 'destructive' });
+    }
+  };
 
   // Sorted normal items with drag-and-drop order
   const sortedNormalItems = normalOrder.length > 0
@@ -2842,6 +3424,24 @@ export default function StatusSemanalPage() {
                 )}
               </div>
 
+              {/* Vista: daily / lista */}
+              <div className="flex items-center rounded-full border border-white/15 bg-white/10 p-0.5 shrink-0 max-md:hidden">
+                {([['daily', 'Daily'], ['list', 'Lista']] as const).map(([mode, label]) => (
+                  <button key={mode} onClick={() => setViewMode(mode)}
+                    className={cn("text-[11px] font-medium px-2.5 py-0.5 rounded-full transition-colors",
+                      viewMode === mode || (mode === 'list' && viewMode === 'timeline') ? "bg-white text-indigo-700" : "text-indigo-200 hover:text-white")}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+              {!isLoading && dailyAgenda.length > 0 && (
+                <button onClick={() => startDaily()} title="Recorrer los ítems de hoy uno por uno"
+                  className="inline-flex items-center gap-1.5 text-[11px] font-bold text-indigo-700 bg-white hover:bg-indigo-50 rounded-full px-3 py-1 shadow-sm shrink-0 transition-colors">
+                  <Play className="h-3 w-3 fill-current" /> Hacer la daily
+                  <span className="text-indigo-400 font-medium">{dailyAgenda.length}</span>
+                </button>
+              )}
+
               {/* Sidebar toggle (visible when sidebar has items) */}
               {(alertItems.length > 0 || decisionItems.length > 0) && viewMode === 'list' && (
                 <button
@@ -2915,11 +3515,17 @@ export default function StatusSemanalPage() {
                     </button>
                   </PopoverTrigger>
                   <PopoverContent className="w-48 p-1" align="end">
-                    <button onClick={() => setViewMode(v => v === 'list' ? 'timeline' : 'list')}
+                    <button onClick={() => setViewMode(v => v === 'timeline' ? 'list' : 'timeline')}
                       className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded text-xs text-slate-700 hover:bg-slate-100">
-                      {viewMode === 'list' ? <LayoutList className="h-3.5 w-3.5 text-slate-400" /> : <List className="h-3.5 w-3.5 text-slate-400" />}
-                      {viewMode === 'list' ? 'Ver timeline' : 'Ver lista'}
+                      {viewMode === 'timeline' ? <List className="h-3.5 w-3.5 text-slate-400" /> : <LayoutList className="h-3.5 w-3.5 text-slate-400" />}
+                      {viewMode === 'timeline' ? 'Ver lista' : 'Ver timeline'}
                     </button>
+                    {viewMode !== 'daily' && (
+                      <button onClick={() => setViewMode('daily')}
+                        className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded text-xs text-slate-700 hover:bg-slate-100">
+                        <Sun className="h-3.5 w-3.5 text-slate-400" /> Ver agenda de la daily
+                      </button>
+                    )}
                     <button onClick={() => setShowExport(true)}
                       className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded text-xs text-slate-700 hover:bg-slate-100">
                       <Printer className="h-3.5 w-3.5 text-slate-400" /> Exportar semana
@@ -3075,6 +3681,14 @@ export default function StatusSemanalPage() {
         <div className="flex-1 overflow-hidden flex min-h-0">
           {isLoading ? (
             <div className="flex-1 flex items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-slate-300" /></div>
+          ) : viewMode === 'daily' ? (
+            <DailyAgendaView
+              agenda={dailyAgenda}
+              quiet={dailyQuiet}
+              dailyStatus={dailyStatus}
+              onStart={startDaily}
+              onOpenList={() => setViewMode('list')}
+            />
           ) : viewMode === 'timeline' ? (
             /* ── Timeline View ── */
             (() => {
@@ -3601,6 +4215,20 @@ export default function StatusSemanalPage() {
         </div>
       )}
 
+      {/* ── Modo Daily: runner ────────────────────────────────────── */}
+      {dailyRun && (
+        <DailyRunner
+          queue={dailyQueue}
+          quietCount={dailyQuiet.length}
+          users={appUsers}
+          currentUserId={currentUserId}
+          startIndex={Math.min(dailyRun.startIndex, Math.max(0, dailyQueue.length - 1))}
+          handlersFor={getItemHandlers}
+          onFinish={finishDaily}
+          onExit={() => setDailyRun(null)}
+        />
+      )}
+
       {/* ── Keyboard Shortcuts Help ───────────────────────────────── */}
       {showKbHelp && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center" onClick={() => setShowKbHelp(false)}>
@@ -3617,6 +4245,13 @@ export default function StatusSemanalPage() {
                 ['/', 'Enfocar búsqueda'],
                 ['Esc', 'Colapsar / cerrar'],
                 ['?', 'Mostrar esta ayuda'],
+                ['— Daily —', ''],
+                ['⏎', 'Guardar y siguiente'],
+                ['1 2 3', 'Verde / amarillo / rojo'],
+                ['D', 'Decisión'],
+                ['F', 'Deadline'],
+                ['@', 'Pasárselo a alguien'],
+                ['R', 'Resolver / cerrar'],
               ].map(([key, desc]) => (
                 <div key={key} className="flex items-center justify-between">
                   <kbd className="px-2 py-0.5 rounded bg-slate-100 border border-slate-200 font-mono text-[11px] font-semibold">{key}</kbd>

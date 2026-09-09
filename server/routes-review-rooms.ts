@@ -12,6 +12,7 @@ import {
   statusItemProposals,
   statusItemProposalAttachments,
   reviewItemReadState,
+  reviewDailySessions,
   activeProjects,
   clients,
   quotations,
@@ -264,6 +265,100 @@ export function createReviewRoomsRouter(requireAuth: RequireAuth): Router {
     }
   });
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Daily sessions (Modo Daily)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  // GET /api/reviews/:roomId/daily-sessions/latest — última daily del room, si
+  // ya se hizo hoy, y la racha de días hábiles consecutivos con daily.
+  router.get('/:roomId/daily-sessions/latest', requireAuth, requireRoomMember(), async (req: Request, res: Response) => {
+    try {
+      const roomId = req.roomMember!.roomId;
+      const recent = await db
+        .select({
+          id: reviewDailySessions.id,
+          userId: reviewDailySessions.userId,
+          userName: sql<string | null>`(SELECT ${users.firstName} || ' ' || ${users.lastName} FROM ${users} WHERE ${users.id} = ${reviewDailySessions.userId})`,
+          startedAt: reviewDailySessions.startedAt,
+          finishedAt: reviewDailySessions.finishedAt,
+          durationSeconds: reviewDailySessions.durationSeconds,
+          reviewedCount: reviewDailySessions.reviewedCount,
+          changedCount: reviewDailySessions.changedCount,
+          summary: reviewDailySessions.summary,
+        })
+        .from(reviewDailySessions)
+        .where(eq(reviewDailySessions.roomId, roomId))
+        .orderBy(desc(reviewDailySessions.finishedAt))
+        .limit(60);
+
+      const dayKey = (d: Date) => {
+        const local = new Date(d);
+        return `${local.getFullYear()}-${local.getMonth() + 1}-${local.getDate()}`;
+      };
+      const days = new Set(recent.map(s => dayKey(new Date(s.finishedAt))));
+      const today = new Date();
+      const todayDone = days.has(dayKey(today));
+
+      // Racha: días hábiles consecutivos hacia atrás (fines de semana no cortan).
+      let streak = 0;
+      const cursor = new Date(today);
+      if (!todayDone) cursor.setDate(cursor.getDate() - 1);
+      for (let guard = 0; guard < 90; guard++) {
+        const dow = cursor.getDay();
+        if (dow === 0 || dow === 6) { cursor.setDate(cursor.getDate() - 1); continue; }
+        if (!days.has(dayKey(cursor))) break;
+        streak++;
+        cursor.setDate(cursor.getDate() - 1);
+      }
+
+      res.setHeader('Cache-Control', 'no-store');
+      res.json({ latest: recent[0] ?? null, todayDone, streak });
+    } catch (error) {
+      console.error('GET daily-sessions/latest error:', error);
+      res.status(500).json({ message: "Error al obtener la última daily" });
+    }
+  });
+
+  // POST /api/reviews/:roomId/daily-sessions — cierra una daily
+  router.post('/:roomId/daily-sessions', requireAuth, requireRoomMember(), async (req: Request, res: Response) => {
+    try {
+      const roomId = req.roomMember!.roomId;
+      const userId = req.user!.id;
+      const { startedAt, reviewedCount, changedCount, summary } = req.body ?? {};
+      const started = startedAt ? new Date(startedAt) : new Date();
+      if (Number.isNaN(started.getTime())) return res.status(400).json({ message: "startedAt inválido" });
+      const finished = new Date();
+      const durationSeconds = Math.max(0, Math.round((finished.getTime() - started.getTime()) / 1000));
+      const cleanSummary = Array.isArray(summary)
+        ? summary.slice(0, 200).map((s: any) => ({
+            key: String(s?.key ?? ''),
+            title: String(s?.title ?? '').slice(0, 200),
+            changes: Array.isArray(s?.changes) ? s.changes.slice(0, 20).map((c: any) => String(c).slice(0, 300)) : [],
+          }))
+        : [];
+
+      const [row] = await db.insert(reviewDailySessions).values({
+        roomId,
+        userId,
+        startedAt: started,
+        finishedAt: finished,
+        durationSeconds,
+        reviewedCount: Number.isFinite(reviewedCount) ? Math.max(0, Math.trunc(reviewedCount)) : 0,
+        changedCount: Number.isFinite(changedCount) ? Math.max(0, Math.trunc(changedCount)) : 0,
+        summary: cleanSummary,
+      }).returning();
+
+      // Hacer la daily cuenta como visita al room.
+      await db.update(reviewRoomMembers).set({ lastVisitedAt: finished })
+        .where(and(eq(reviewRoomMembers.roomId, roomId), eq(reviewRoomMembers.userId, userId)));
+
+      res.status(201).json(row);
+    } catch (error) {
+      console.error('POST daily-sessions error:', error);
+      res.status(500).json({ message: "Error al guardar la daily" });
+    }
+  });
+
   // POST /api/reviews/:roomId/items/:kind/:targetId/seen — mark item as read
   // up to NOW. UPSERT with GREATEST so concurrent calls don't regress the timestamp.
   router.post('/:roomId/items/:kind/:targetId/seen', requireAuth, requireRoomMember(), async (req: Request, res: Response) => {
@@ -458,6 +553,28 @@ export function createReviewRoomsRouter(requireAuth: RequireAuth): Router {
             )`,
             ownerName: sql<string | null>`(SELECT ${users.firstName} || ' ' || ${users.lastName} FROM ${users} WHERE ${users.id} = ${projectStatusReviews.ownerId})`,
             reviewUpdatedByName: sql<string | null>`(SELECT ${users.firstName} || ' ' || ${users.lastName} FROM ${users} WHERE ${users.id} = ${projectStatusReviews.updatedBy})`,
+            // Señales para el Modo Daily: último update real, último cambio de
+            // semáforo (y desde qué color) y desde cuándo está pedida la decisión.
+            lastUpdateAt: sql<string | null>`(
+              SELECT created_at FROM status_update_entries
+              WHERE project_id = ${activeProjects.id} AND room_id = ${roomId}
+              ORDER BY created_at DESC LIMIT 1
+            )`,
+            lastHealthChangeAt: sql<string | null>`(
+              SELECT created_at FROM status_change_log
+              WHERE project_id = ${activeProjects.id} AND room_id = ${roomId} AND field_name = 'healthStatus'
+              ORDER BY created_at DESC LIMIT 1
+            )`,
+            lastHealthChangeFrom: sql<string | null>`(
+              SELECT old_value FROM status_change_log
+              WHERE project_id = ${activeProjects.id} AND room_id = ${roomId} AND field_name = 'healthStatus'
+              ORDER BY created_at DESC LIMIT 1
+            )`,
+            lastDecisionChangeAt: sql<string | null>`(
+              SELECT created_at FROM status_change_log
+              WHERE project_id = ${activeProjects.id} AND room_id = ${roomId} AND field_name = 'decisionNeeded'
+              ORDER BY created_at DESC LIMIT 1
+            )`,
           })
           .from(projectStatusReviews)
           .innerJoin(activeProjects, eq(activeProjects.id, projectStatusReviews.projectId))
@@ -750,6 +867,27 @@ export function createReviewRoomsRouter(requireAuth: RequireAuth): Router {
             WHERE last_note.weekly_status_item_id = ${outerCustomItemId}
               AND last_note.room_id = ${roomId}
             ORDER BY last_note.created_at DESC LIMIT 1
+          )`,
+          createdAt: weeklyStatusItems.createdAt,
+          lastUpdateAt: sql<string | null>`(
+            SELECT sue.created_at FROM status_update_entries AS sue
+            WHERE sue.weekly_status_item_id = ${outerCustomItemId} AND sue.room_id = ${roomId}
+            ORDER BY sue.created_at DESC LIMIT 1
+          )`,
+          lastHealthChangeAt: sql<string | null>`(
+            SELECT scl.created_at FROM status_change_log AS scl
+            WHERE scl.weekly_status_item_id = ${outerCustomItemId} AND scl.room_id = ${roomId} AND scl.field_name = 'healthStatus'
+            ORDER BY scl.created_at DESC LIMIT 1
+          )`,
+          lastHealthChangeFrom: sql<string | null>`(
+            SELECT scl.old_value FROM status_change_log AS scl
+            WHERE scl.weekly_status_item_id = ${outerCustomItemId} AND scl.room_id = ${roomId} AND scl.field_name = 'healthStatus'
+            ORDER BY scl.created_at DESC LIMIT 1
+          )`,
+          lastDecisionChangeAt: sql<string | null>`(
+            SELECT scl.created_at FROM status_change_log AS scl
+            WHERE scl.weekly_status_item_id = ${outerCustomItemId} AND scl.room_id = ${roomId} AND scl.field_name = 'decisionNeeded'
+            ORDER BY scl.created_at DESC LIMIT 1
           )`,
         }).from(weeklyStatusItems)
           .where(whereConditions)
