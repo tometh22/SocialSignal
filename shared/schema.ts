@@ -4506,6 +4506,24 @@ export const insertReviewRoomMemberSchema = createInsertSchema(reviewRoomMembers
 export type ReviewRoomMember = typeof reviewRoomMembers.$inferSelect;
 export type InsertReviewRoomMember = z.infer<typeof insertReviewRoomMemberSchema>;
 
+// Cada recorrido del room en Modo Daily (ítem por ítem) queda registrado con su
+// duración y un resumen de lo que cambió. Alimenta la racha y el "ayer duró X".
+export const reviewDailySessions = pgTable("review_daily_sessions", {
+  id: serial("id").primaryKey(),
+  roomId: integer("room_id").notNull().references(() => reviewRooms.id, { onDelete: 'cascade' }),
+  userId: integer("user_id").references(() => users.id, { onDelete: 'set null' }),
+  startedAt: timestamp("started_at").notNull(),
+  finishedAt: timestamp("finished_at").notNull().defaultNow(),
+  durationSeconds: integer("duration_seconds").notNull().default(0),
+  reviewedCount: integer("reviewed_count").notNull().default(0),
+  changedCount: integer("changed_count").notNull().default(0),
+  summary: jsonb("summary").notNull().default([]),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => ({
+  idxRoomFinished: index("idx_rds_room_finished").on(t.roomId, t.finishedAt),
+}));
+export type ReviewDailySession = typeof reviewDailySessions.$inferSelect;
+
 // ==================== FACTURA MENSUAL PERSONAL ====================
 // Cada usuario (interno o external_provider) sube una factura por mes.
 // La última subida reemplaza la anterior (UNIQUE userId+period). El historial se
