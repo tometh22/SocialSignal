@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.3.1 — 2026-09-11
+## 1.3.2 — 2026-09-11
 
 - Permite renombrar y describir un ítem propio desde el recorrido de la daily.
 - Rediseña "Agregar ítem" para la daily: título, qué está pasando (queda como primer update), quién lo lleva, semáforo y deadline; el ítem nace con contexto en vez de caer vacío en NUEVO/SILENCIO.
