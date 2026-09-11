@@ -1,11 +1,17 @@
 # Changelog
 
-## 1.3.1 — 2026-09-11
+## 1.3.3 — 2026-09-11
 
 - Hace visibles desde la navegación principal la cartera, el Kanban general, las tareas y el calendario de proyectos para Administración y Operaciones.
 - Agrega un selector explícito de estado operativo en cada tarjeta del Kanban, manteniendo también el arrastre entre columnas.
 - Retira de las pantallas operativas los roles históricos: Administración muestra sólo la taxonomía vigente y la edición rápida de Personal usa Nivel, Subnivel y Área.
 - Distingue en la grilla mensual de costos qué períodos son reales cerrados, cuál es el mes actual y cuáles son proyecciones.
+
+## 1.3.2 — 2026-09-11
+
+- Permite renombrar y describir un ítem propio desde el recorrido de la daily.
+- Rediseña "Agregar ítem" para la daily: título, qué está pasando (queda como primer update), quién lo lleva, semáforo y deadline; el ítem nace con contexto en vez de caer vacío en NUEVO/SILENCIO.
+- Agrega el botón de alta en la agenda de la daily y muestra el owner en los ítems nuevos.
 
 ## 1.3.0 — 2026-09-09
 

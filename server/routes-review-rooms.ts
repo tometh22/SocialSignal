@@ -933,11 +933,28 @@ export function createReviewRoomsRouter(requireAuth: RequireAuth): Router {
 
   router.post('/:roomId/items/custom', requireAuth, requireRoomMember(), async (req: Request, res: Response) => {
     try {
-      const { title, subtitle } = req.body ?? {};
+      const { title, subtitle, ownerId, healthStatus, deadline, firstUpdate } = req.body ?? {};
       if (!title?.trim()) return res.status(400).json({ message: "El título es requerido" });
+      if (healthStatus !== undefined && healthStatus !== null && !VALID_HEALTH.includes(healthStatus)) return res.status(400).json({ message: "healthStatus inválido" });
+      const roomId = req.roomMember!.roomId;
+      const userId = req.user!.id;
+      const update = typeof firstUpdate === 'string' && firstUpdate.trim() ? firstUpdate.trim() : null;
       const [item] = await db.insert(weeklyStatusItems)
-        .values({ roomId: req.roomMember!.roomId, title: title.trim(), subtitle: subtitle?.trim() || null, updatedBy: req.user!.id })
+        .values({
+          roomId,
+          title: title.trim(),
+          subtitle: subtitle?.trim() || null,
+          ownerId: Number.isFinite(ownerId) ? ownerId : null,
+          healthStatus: healthStatus || 'verde',
+          deadline: deadline ? new Date(deadline) : null,
+          // El primer update nace como "acción actual" para que el ítem no entre en silencio recién creado.
+          currentAction: update,
+          updatedBy: userId,
+        })
         .returning();
+      if (update) {
+        await db.insert(statusUpdateEntries).values({ roomId, weeklyStatusItemId: item.id, content: update, authorId: userId });
+      }
       res.status(201).json(item);
     } catch (error) {
       console.error('POST /items/custom error:', error);

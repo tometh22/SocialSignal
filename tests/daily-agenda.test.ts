@@ -128,6 +128,13 @@ describe('dailyReasonsFor — razones individuales', () => {
     expect(kinds(base({ isCustom: true, createdAt: hoursAgo(5), updatedAt: hoursAgo(5), lastUpdateAt: hoursAgo(5) }))).toEqual(['nuevo']);
   });
 
+  test('un ítem nuevo con owner pregunta si arrancamos, no quién lo lleva', () => {
+    const r = dailyReasonsFor(base({ isCustom: true, createdAt: hoursAgo(5), updatedAt: hoursAgo(5), lastUpdateAt: hoursAgo(5), ownerName: 'Victoria Pérez' }), null, NOW);
+    expect(r[0].kind).toBe('nuevo');
+    expect(r[0].detail).toBe('Creado hace 5h · lo lleva Victoria');
+    expect(r[0].question).toBe('¿arrancamos?');
+  });
+
   test('los proyectos (no custom) nunca son "nuevo"', () => {
     expect(kinds(base({ isCustom: false, createdAt: hoursAgo(5) }))).toEqual([]);
   });

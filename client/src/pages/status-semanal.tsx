@@ -1677,31 +1677,40 @@ function ItemThread({ projectId, customId, currentUserId, users = [], onOpenFull
 
 // ─── Add custom item dialog ───────────────────────────────────────────────────
 
-const ITEM_TEMPLATES = [
-  { label: 'Reunión de cierre', subtitle: 'Seguimiento comercial' },
-  { label: 'Propuesta comercial', subtitle: '' },
-  { label: 'Demo de producto', subtitle: '' },
-  { label: 'Negociación contrato', subtitle: '' },
-  { label: 'Seguimiento cliente', subtitle: '' },
-];
+type NewItemInput = { title: string; subtitle: string; ownerId: number | null; healthStatus: string; deadline: string | null; firstUpdate: string };
 
-function AddItemButton({ onAdd, variant = 'header' }: { onAdd: (title: string, subtitle: string) => void; variant?: 'header' | 'inline' }) {
+// Alta de ítem pensada para la daily: título + "qué está pasando" + quién lo lleva.
+// Con esas tres cosas el ítem nace con contexto y no cae en NUEVO/SILENCIO vacío.
+function AddItemButton({ onAdd, variant = 'header', users = [], currentUserId = null }: {
+  onAdd: (d: NewItemInput) => void; variant?: 'header' | 'inline' | 'daily'; users?: AppUser[]; currentUserId?: number | null;
+}) {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState('');
-  const [subtitle, setSubtitle] = useState('');
+  const [firstUpdate, setFirstUpdate] = useState('');
+  const [ownerId, setOwnerId] = useState<number | null>(currentUserId);
+  const [health, setHealth] = useState('verde');
+  const [deadline, setDeadline] = useState('');
 
+  useEffect(() => { if (open) setOwnerId(prev => prev ?? currentUserId); }, [open, currentUserId]);
+
+  const reset = () => { setTitle(''); setFirstUpdate(''); setOwnerId(currentUserId); setHealth('verde'); setDeadline(''); };
   const submit = () => {
     if (!title.trim()) return;
-    onAdd(title.trim(), subtitle.trim());
-    setTitle(''); setSubtitle(''); setOpen(false);
+    onAdd({ title: title.trim(), subtitle: '', ownerId, healthStatus: health, deadline: deadline ? new Date(deadline).toISOString() : null, firstUpdate: firstUpdate.trim() });
+    reset(); setOpen(false);
   };
+  const onKey = (e: React.KeyboardEvent) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(); } };
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={o => { setOpen(o); if (!o) reset(); }}>
       <PopoverTrigger asChild>
         {variant === 'inline' ? (
           <button className="flex items-center gap-1 text-xs text-slate-400 hover:text-indigo-600 font-medium transition-colors ml-1">
             <Plus className="h-3.5 w-3.5" />
+          </button>
+        ) : variant === 'daily' ? (
+          <button className="inline-flex items-center gap-1.5 text-xs font-medium text-indigo-600 hover:text-indigo-800 px-2 py-1.5">
+            <Plus className="h-3.5 w-3.5" /> Agregar ítem
           </button>
         ) : (
           <Button variant="outline" size="sm" className="h-7 text-xs gap-1.5 text-indigo-600 border-indigo-200 hover:bg-indigo-50">
@@ -1710,34 +1719,29 @@ function AddItemButton({ onAdd, variant = 'header' }: { onAdd: (title: string, s
           </Button>
         )}
       </PopoverTrigger>
-      <PopoverContent className="w-72 p-3" align={variant === 'inline' ? 'start' : 'end'}>
-        <p className="text-sm font-semibold mb-2">Nuevo ítem de seguimiento</p>
-        {/* Templates */}
-        <div className="mb-3">
-          <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wide mb-1.5">Plantillas</p>
-          <div className="flex flex-wrap gap-1">
-            {ITEM_TEMPLATES.map(t => (
-              <button key={t.label} onClick={() => { setTitle(t.label); setSubtitle(t.subtitle); }}
-                className="text-[11px] px-2 py-1 rounded-md border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition-colors font-medium">
-                {t.label}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="space-y-2">
-          <div>
-            <label className="text-[10px] text-slate-400 uppercase font-bold tracking-wide mb-1 block">Título *</label>
-            <input value={title} onChange={e => setTitle(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && submit()}
-              placeholder="Ej: Reunión con inversores..."
-              className="w-full text-sm border border-input rounded px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-400" autoFocus />
-          </div>
-          <div>
-            <label className="text-[10px] text-slate-400 uppercase font-bold tracking-wide mb-1 block">Descripción (opcional)</label>
-            <input value={subtitle} onChange={e => setSubtitle(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && submit()}
-              placeholder="Contexto adicional..."
-              className="w-full text-sm border border-input rounded px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-400" />
+      <PopoverContent className="w-80 p-3" align={variant === 'inline' ? 'start' : 'end'}>
+        <p className="text-sm font-semibold mb-2">Nuevo ítem</p>
+        <div className="space-y-2.5">
+          <input value={title} onChange={e => setTitle(e.target.value)} onKeyDown={onKey}
+            placeholder="Qué es (ej: Propuesta Café Martínez)"
+            className="w-full text-sm border border-input rounded px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-400 font-medium" autoFocus />
+          <textarea value={firstUpdate} onChange={e => setFirstUpdate(e.target.value)} onKeyDown={onKey} rows={2}
+            placeholder="Qué está pasando (queda como primer update)"
+            className="w-full text-sm border border-input rounded px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-400 resize-none" />
+          <div className="flex items-center gap-2">
+            <select value={ownerId?.toString() ?? ''} onChange={e => setOwnerId(e.target.value ? parseInt(e.target.value) : null)}
+              className="flex-1 text-xs border border-input rounded px-2 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-indigo-400">
+              <option value="">Sin owner</option>
+              {users.map(u => <option key={u.id} value={u.id}>{u.name}{u.id === currentUserId ? ' (yo)' : ''}</option>)}
+            </select>
+            <div className="flex items-center gap-1 px-1.5" title="Semáforo inicial">
+              {(['verde', 'amarillo', 'rojo'] as const).map(h => (
+                <button key={h} onClick={() => setHealth(h)} title={HEALTH[h].label}
+                  className={cn("w-4 h-4 rounded-full border-2 transition-transform hover:scale-110", HEALTH[h].dot, health === h ? "border-slate-700 scale-110" : "border-white")} />
+              ))}
+            </div>
+            <input type="date" value={deadline} onChange={e => setDeadline(e.target.value)} title="Deadline (opcional)"
+              className="text-xs border border-input rounded px-1.5 py-1.5 w-[118px] focus:outline-none focus:ring-1 focus:ring-indigo-400 text-slate-500" />
           </div>
         </div>
         <div className="flex gap-2 mt-3">
@@ -2360,12 +2364,13 @@ function ActivityPanel({ projectId, customItemId, projectName, onClose }: { proj
 
 type DailyAgendaEntry = { item: Item; reasons: DailyReason[] };
 
-function DailyAgendaView({ agenda, quiet, dailyStatus, onStart, onOpenList }: {
+function DailyAgendaView({ agenda, quiet, dailyStatus, onStart, onOpenList, addItem }: {
   agenda: DailyAgendaEntry[];
   quiet: Item[];
   dailyStatus: DailyStatus | undefined;
   onStart: (startIndex?: number) => void;
   onOpenList: () => void;
+  addItem?: React.ReactNode;
 }) {
   const estMinutes = Math.max(1, Math.round(agenda.length * 0.7));
   return (
@@ -2391,6 +2396,7 @@ function DailyAgendaView({ agenda, quiet, dailyStatus, onStart, onOpenList }: {
               </div>
             </div>
             <div className="flex items-center gap-2 shrink-0">
+              {addItem}
               <button onClick={onOpenList} className="text-xs text-slate-500 hover:text-slate-800 font-medium px-2 py-1.5">Ver lista completa</button>
               <button onClick={() => onStart()} disabled={agenda.length === 0}
                 className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white font-bold text-sm px-4 py-2 rounded-lg shadow-sm transition-colors">
@@ -2737,9 +2743,19 @@ function DailyRunner({ queue, quietCount, users, currentUserId, startIndex, hand
               </div>
               <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
                 <span className={cn("w-3 h-3 rounded-full shrink-0", hm(item.healthStatus).dot)} />
-                <span className="truncate">{item.title}</span>
+                {item.isCustom ? (
+                  <InlineText value={item.title} placeholder="Título" required
+                    onSave={v => { handlersFor(item).onUpdate({ title: v }); patchLocal(item, { title: v }); record(item, `✏️ renombrado a "${v}"`); }}
+                    className="text-2xl font-bold text-slate-800 -mx-1.5" />
+                ) : (
+                  <span className="truncate" title="El nombre viene del cliente del proyecto">{item.title}</span>
+                )}
               </h2>
-              {item.subtitle && <p className="text-sm text-slate-400">{item.subtitle}</p>}
+              {item.isCustom ? (
+                <InlineText value={item.subtitle ?? null} placeholder="Agregar descripción…"
+                  onSave={v => { handlersFor(item).onUpdate({ subtitle: v || null }); patchLocal(item, { subtitle: v || null }); }}
+                  className="text-sm text-slate-400 -mx-1.5" />
+              ) : item.subtitle ? <p className="text-sm text-slate-400">{item.subtitle}</p> : null}
               <p className="text-sm text-slate-500 mt-2">{entry.reasons[0].detail}. Pregunta para hoy: <b className="text-slate-700">{entry.reasons[0].question}</b></p>
 
               <div className="mt-5 space-y-2">
@@ -3042,8 +3058,8 @@ export default function StatusSemanalPage() {
   });
 
   const createCustom = useMutation({
-    mutationFn: ({ title, subtitle }: { title: string; subtitle: string }) =>
-      mutationFetch('/api/status-semanal/custom', 'POST', { title, subtitle: subtitle || null }),
+    mutationFn: (data: NewItemInput) =>
+      mutationFetch('/api/status-semanal/custom', 'POST', { ...data, subtitle: data.subtitle || null }),
     onError: (err: Error) => toast({ title: 'Error al crear ítem', description: err.message, variant: 'destructive' }),
     onSettled: () => {
       queryClient.refetchQueries({ queryKey: ['/api/status-semanal/custom?includeHidden=true'], exact: true });
@@ -3608,7 +3624,7 @@ export default function StatusSemanalPage() {
                     )}
                   </PopoverContent>
                 </Popover>
-                <AddItemButton onAdd={(title, subtitle) => createCustom.mutate({ title, subtitle })} />
+                <AddItemButton onAdd={d => createCustom.mutate(d)} users={appUsers} currentUserId={currentUserId} />
               </div>
             </div>
 
@@ -3688,6 +3704,7 @@ export default function StatusSemanalPage() {
               dailyStatus={dailyStatus}
               onStart={startDaily}
               onOpenList={() => setViewMode('list')}
+              addItem={<AddItemButton variant="daily" onAdd={d => createCustom.mutate(d)} users={appUsers} currentUserId={currentUserId} />}
             />
           ) : viewMode === 'timeline' ? (
             /* ── Timeline View ── */
@@ -3782,7 +3799,7 @@ export default function StatusSemanalPage() {
               <div>
                 <div className="flex items-center gap-1.5 mb-2 px-1">
                   <span className="text-[11px] text-slate-500 flex-1">Requieren atención · {alertItems.length}</span>
-                  <AddItemButton variant="inline" onAdd={(title, subtitle) => createCustom.mutate({ title, subtitle })} />
+                  <AddItemButton variant="inline" onAdd={d => createCustom.mutate(d)} users={appUsers} currentUserId={currentUserId} />
                 </div>
                 <div className="rounded-xl border border-slate-200/60 bg-white overflow-hidden">
                   <AnimatePresence initial={false}>
@@ -3868,7 +3885,7 @@ export default function StatusSemanalPage() {
                     <span className="text-xs font-medium text-amber-500 bg-amber-50 border border-amber-100 rounded-full px-2 py-0.5">{sc} sin update</span>
                   ) : null; })()}
                   <div className="flex-1" />
-                  <AddItemButton variant="inline" onAdd={(title, subtitle) => createCustom.mutate({ title, subtitle })} />
+                  <AddItemButton variant="inline" onAdd={d => createCustom.mutate(d)} users={appUsers} currentUserId={currentUserId} />
                   {expandedKey && (
                     <button onClick={() => setExpandedKey(null)} className="text-[10px] text-slate-400 hover:text-slate-600 font-medium">colapsar</button>
                   )}
