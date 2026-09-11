@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.3.1 — 2026-09-11
+
+- Permite renombrar y describir un ítem propio desde el recorrido de la daily.
+- Rediseña "Agregar ítem" para la daily: título, qué está pasando (queda como primer update), quién lo lleva, semáforo y deadline; el ítem nace con contexto en vez de caer vacío en NUEVO/SILENCIO.
+- Agrega el botón de alta en la agenda de la daily y muestra el owner en los ítems nuevos.
+
 ## 1.3.0 — 2026-09-09
 
 - Agrega el Modo Daily en Status: al entrar a un room se muestra qué ítems merecen conversación hoy (rojo, cambió, vence, decisión, silencio, nuevo) y cuáles no tienen novedad.
