@@ -6,13 +6,19 @@
  * Vive en `shared` y sin dependencias para que la regla sea verificable sin
  * levantar la base.
  */
-export function isClosedPeriod(year: number, month: number, now = new Date()) {
+export function getBuenosAiresPeriod(now = new Date()) {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: "America/Argentina/Buenos_Aires",
     year: "numeric",
     month: "2-digit",
   }).formatToParts(now);
-  const currentYear = Number(parts.find((part) => part.type === "year")?.value);
-  const currentMonth = Number(parts.find((part) => part.type === "month")?.value);
+  return {
+    year: Number(parts.find((part) => part.type === "year")?.value),
+    month: Number(parts.find((part) => part.type === "month")?.value),
+  };
+}
+
+export function isClosedPeriod(year: number, month: number, now = new Date()) {
+  const { year: currentYear, month: currentMonth } = getBuenosAiresPeriod(now);
   return year * 100 + month < currentYear * 100 + currentMonth;
 }

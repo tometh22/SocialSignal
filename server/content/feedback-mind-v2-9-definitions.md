@@ -1,6 +1,6 @@
 ---
-version: 2.25.0
-updatedAt: 2026-09-08
+version: 2.26.0
+updatedAt: 2026-09-11
 feedbackCount: 70
 ---
 
@@ -428,3 +428,17 @@ la recomendada", comparándose contra sí misma.
 |---|---|---|
 | GEN-23 | Implementado | `calculateVariantResult` calibraba un `inflationFactor` como `totalAmount / totalSinAjustar(equipoDeEsaVariante)` y lo volvía a multiplicar por ese mismo `totalSinAjustar` dentro de la fórmula canónica (`shared/utils/quotation-pricing.ts`, donde `total` es lineal en `inflationFactor`) — matemáticamente esas dos operaciones se cancelan y el resultado es siempre `totalAmount`, sin importar el equipo o las horas de la variante. Ahora ese factor se calibra una única vez contra `baseTeamMembers` (el equipo del paso Equipo) y se reutiliza igual para las tres variantes, así cada una escala según su propio costo. |
 | GEN-24 | Implementado | Las badges de comparación dicen explícitamente "% menos/más que la recomendada", pero `getBaseReferenceTotal` usaba `totalAmount` (el total del equipo tal como quedó en el paso Equipo) como referencia primaria, no el total de la variante "Recomendada" — el fallback a la variante recomendada (bajo el nombre viejo `'Intermedio'`) sólo se alcanzaba si `totalAmount` era 0, algo que casi nunca pasa a esta altura del wizard. Ahora busca primero la variante con `isRecommended` (o nombrada `'Recomendada'`/`'Intermedio'`) y compara contra su propio total; `totalAmount` queda como fallback sólo para cuando todavía no hay variantes cargadas. |
+
+### Revisión 2.26.0 — todos los puntos deben ser descubribles para Victoria Achabal
+
+La auditoría funcional confirmó que varias capacidades estaban implementadas y
+accesibles por URL, pero no eran descubribles desde la navegación de una cuenta
+Admin/Operaciones. Esta revisión cierra esa brecha sin borrar la trazabilidad
+histórica que todavía necesitan cotizaciones y registros anteriores.
+
+| ID | Estado | Definición y resolución |
+|---|---|---|
+| GEN-25 | Implementado | Administración y Operaciones ven en la navegación principal cuatro accesos inequívocos: Cartera de proyectos, Kanban de proyectos, Tareas y Calendario. El Kanban general deja de depender de conocer una URL interna. |
+| GEN-26 | Implementado | La administración de Roles lista únicamente clasificaciones activas de la taxonomía vigente. Los roles históricos continúan en base de datos para trazabilidad, pero no vuelven a ofrecerse como opciones operativas. |
+| GEN-27 | Implementado | La edición rápida de Personal usa exclusivamente Nivel, Subnivel y Área. Ya no muestra ni envía `roleId` o Rol viejo; el servidor deriva el rol canónico y las personas pendientes quedan señaladas para completar su clasificación. |
+| GEN-28 | Implementado | Cada proyecto del Kanban permite actualizar su Estado operativo tanto con un selector visible como mediante arrastre. La grilla mensual de costos etiqueta cada columna como Real cerrado, Mes actual o Proyección para evitar confundir históricos con estimaciones. |

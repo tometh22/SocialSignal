@@ -22,13 +22,16 @@ describe("Feedback Mind V2.7 — personal y cotizaciones", () => {
     expect(table).not.toContain("cost.year === 2025");
   });
 
-  test("rol vigente y subnivel se pueden corregir desde Personal", () => {
+  test("nivel, subnivel y área vigentes se corrigen sin reintroducir el rol histórico", () => {
     const inline = source("client/src/components/admin/inline-edit-personnel.tsx");
 
     expect(inline).toContain('currentRole: person.currentRole ?? ""');
-    expect(inline).toContain('legacyRole: person.legacyRole ?? ""');
-    expect(inline).toContain('sublevel: form.sublevel.trim() || null');
+    expect(inline).toContain("normalizePersonnelSublevel(form.sublevel)");
+    expect(inline).toContain("normalizePersonnelArea(form.area)");
     expect(inline).toContain('aria-label="Subnivel"');
+    expect(inline).toContain('aria-label="Área"');
+    expect(inline).not.toContain("form.legacyRole");
+    expect(inline).not.toContain("form.roleId");
   });
 
   test("la moneda se elige con confirmación y el flujo usa seis pasos responsive", () => {

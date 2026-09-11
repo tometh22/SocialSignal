@@ -10,7 +10,9 @@ import {
   PERSONNEL_AREAS,
   PERSONNEL_ROLE_LEVELS,
   allowedSublevelsForRole,
+  normalizePersonnelArea,
   normalizePersonnelRole,
+  normalizePersonnelSublevel,
 } from "@shared/utils/personnel-classification";
 
 interface PersonnelRow {
@@ -18,11 +20,8 @@ interface PersonnelRow {
   id: number;
   name: string;
   email?: string | null;
-  roleId: number;
-  roleName: string;
   currentRole?: string | null;
   sublevel?: string | null;
-  legacyRole?: string | null;
   area?: string | null;
   contractType?: string;
   monthlyHours?: number;
@@ -38,10 +37,7 @@ interface PersonnelRow {
   ratePeriod?: string | null;
 }
 
-interface InlineEditPersonnelProps {
-  person: PersonnelRow;
-  roles: Array<{ id: number; name: string }>;
-}
+interface InlineEditPersonnelProps { person: PersonnelRow; }
 
 const contractLabel: Record<string, string> = {
   "full-time": "Full-time",
@@ -49,16 +45,14 @@ const contractLabel: Record<string, string> = {
   freelance: "Freelance",
 };
 
-export default function InlineEditPersonnel({ person, roles }: InlineEditPersonnelProps) {
+export default function InlineEditPersonnel({ person }: InlineEditPersonnelProps) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [isEditing, setIsEditing] = useState(false);
   const [form, setForm] = useState({
     name: person.name,
     email: person.email ?? "",
-    roleId: String(person.roleId),
     currentRole: person.currentRole ?? "",
-    legacyRole: person.legacyRole ?? "",
     area: person.area ?? "",
     sublevel: person.sublevel ?? "",
     contractType: person.contractType ?? "full-time",
@@ -75,9 +69,7 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
     setForm({
       name: person.name,
       email: person.email ?? "",
-      roleId: String(person.roleId),
       currentRole: person.currentRole ?? "",
-      legacyRole: person.legacyRole ?? "",
       area: person.area ?? "",
       sublevel: person.sublevel ?? "",
       contractType: person.contractType ?? "full-time",
@@ -102,14 +94,18 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
       if ((hourlyRateARS != null && (!Number.isFinite(hourlyRateARS) || hourlyRateARS < 0)) || (hourlyRateUSD != null && (!Number.isFinite(hourlyRateUSD) || hourlyRateUSD < 0))) {
         throw new Error("El valor hora debe ser mayor o igual a cero");
       }
+      const currentRole = normalizePersonnelRole(form.currentRole);
+      const sublevel = normalizePersonnelSublevel(form.sublevel);
+      const area = normalizePersonnelArea(form.area);
+      if (!currentRole || !sublevel || !area) {
+        throw new Error("Completá Nivel, Subnivel y Área con la clasificación vigente");
+      }
       const payload: Record<string, unknown> = {
         name: form.name.trim(),
         email: form.email.trim(),
-        roleId: Number(form.roleId),
-        currentRole: form.currentRole.trim() || null,
-        legacyRole: form.legacyRole.trim() || person.legacyRole || null,
-        sublevel: form.sublevel.trim() || null,
-        area: form.area || null,
+        currentRole,
+        sublevel,
+        area,
         contractType: form.contractType,
         monthlyHours: form.contractType === "freelance" ? undefined : monthlyHours,
         includeInRealCosts: form.includeInRealCosts,
@@ -161,11 +157,7 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
         <td className="px-6 py-4"><Input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></td>
         <td className="px-6 py-4"><Input type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} /></td>
         <td className="px-6 py-4">
-          <div className="min-w-44 space-y-1">
-            <Select value={form.roleId} onValueChange={(roleId) => setForm({ ...form, roleId })}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>{roles.map((role) => <SelectItem key={role.id} value={String(role.id)}>{role.name}</SelectItem>)}</SelectContent>
-            </Select>
+          <div className="min-w-44">
             <Select value={normalizePersonnelRole(form.currentRole) ?? undefined} onValueChange={(currentRole) => {
               const permitted = allowedSublevelsForRole(currentRole);
               setForm({ ...form, currentRole, sublevel: permitted.includes(form.sublevel) ? form.sublevel : "A" });
@@ -173,7 +165,6 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
               <SelectTrigger aria-label="Rol actual"><SelectValue placeholder="Seleccionar nivel" /></SelectTrigger>
               <SelectContent>{PERSONNEL_ROLE_LEVELS.map((role) => <SelectItem key={role} value={role}>{role}</SelectItem>)}</SelectContent>
             </Select>
-            {form.contractType === "freelance" && <Input aria-label="Rol histórico" placeholder="Rol histórico del Máster" value={form.legacyRole} onChange={(event) => setForm({ ...form, legacyRole: event.target.value })} />}
           </div>
         </td>
         <td className="px-6 py-4">
@@ -248,7 +239,7 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
       <td className="px-6 py-4 font-medium">{person.name}</td>
       <td className="px-6 py-4 text-sm text-muted-foreground">{person.email || "—"}</td>
       <td className="px-6 py-4 text-sm">
-        {person.currentRole || person.legacyRole || "Pendiente de asignar"}
+        {normalizePersonnelRole(person.currentRole) || <span className="font-medium text-amber-700">Pendiente de clasificación</span>}
       </td>
       <td className="px-6 py-4 text-sm">{person.sublevel || "—"}</td>
       <td className="px-6 py-4 text-sm">{person.area || "—"}</td>

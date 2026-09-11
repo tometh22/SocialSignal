@@ -104,6 +104,24 @@ export default function ProjectsKanbanPage() {
                         <span>{project.pendingCount}/{project.taskCount} tareas pendientes</span>
                         <span>{project.members.length} miembros</span>
                       </div>
+                      <label className="mt-3 block text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                        Estado operativo
+                        <select
+                          aria-label={`Estado operativo de ${project.name || "proyecto"}`}
+                          draggable={false}
+                          value={project.workflowStage ?? "aprobado"}
+                          disabled={moveMutation.isPending}
+                          onPointerDown={(event) => event.stopPropagation()}
+                          onDragStart={(event) => event.stopPropagation()}
+                          onChange={(event) => {
+                            event.stopPropagation();
+                            moveMutation.mutate({ projectId: project.id, workflowStage: event.target.value as WorkflowStage });
+                          }}
+                          className="mt-1 h-8 w-full rounded-md border border-input bg-background px-2 text-xs font-normal normal-case tracking-normal text-foreground"
+                        >
+                          {STAGES.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                        </select>
+                      </label>
                     </div>
                   </div>
                 </article>
