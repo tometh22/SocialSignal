@@ -32,6 +32,8 @@ import { factEstimatedCostMonthMigrationSql } from "./migrations/fact-estimated-
 import { quotationGroupsMigrationSql } from "./migrations/quotation-groups";
 import { ipcPriceAdjustmentsMigrationSql } from "./migrations/ipc-price-adjustments";
 import { reviewDailySessionsMigrationSql } from "./migrations/review-daily-sessions";
+import { financialNativeIntakeMigrationSql } from "./migrations/financial-native-intake";
+import { financialLedgerNativeMigrationSql } from "./migrations/financial-ledger-native";
 import { ensureServiceBlueprintSeeds } from "./services/service-blueprints";
 import cors from 'cors';
 import { execSync } from 'child_process';
@@ -849,6 +851,8 @@ async function applyPendingMigrations() {
     await run('0055 canonical quotation roles', canonicalQuotationRolesMigrationSql);
     await run('0056 quotation credit program', creditProgramMigrationSql);
     await run('0057 review daily sessions', reviewDailySessionsMigrationSql);
+    await run('0058 financial native intake', financialNativeIntakeMigrationSql);
+    await run('0059 financial native ledger', financialLedgerNativeMigrationSql);
 
     // 0033: feriados duplicados (mismo date+name insertado más de una vez desde el
     // formulario) — borra duplicados conservando la fila más antigua y agrega la

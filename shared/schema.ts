@@ -4651,6 +4651,26 @@ export const insertProviderProjectAccessSchema = createInsertSchema(providerProj
 
 // ==================== LEDGER TABLES ====================
 
+// Cuentas financieras canónicas. Los saldos se derivan de balance inicial +
+// movimientos conciliados; no se editan como columnas por transacción.
+export const financialAccounts = pgTable("financial_accounts", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 120 }).notNull(),
+  bankName: varchar("bank_name", { length: 120 }),
+  accountType: varchar("account_type", { length: 30 }).notNull().default("bank"),
+  currency: varchar("currency", { length: 3 }).notNull().default("USD"),
+  openingBalance: numeric("opening_balance", { precision: 18, scale: 2 }).notNull().default("0"),
+  openingBalanceDate: timestamp("opening_balance_date"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (t) => ({
+  uniqueNameCurrency: unique("uq_financial_account_name_currency").on(t.name, t.currency),
+}));
+
+export const insertFinancialAccountSchema = createInsertSchema(financialAccounts).omit({ id: true, createdAt: true, updatedAt: true });
+export type FinancialAccount = typeof financialAccounts.$inferSelect;
+
 // Cuentas a cobrar — refleja la solapa "Activo" del Excel MAESTRO
 export const activoEntries = pgTable("activo_entries", {
   id: serial("id").primaryKey(),
@@ -4670,6 +4690,23 @@ export const activoEntries = pgTable("activo_entries", {
   cobradoAlCierre: boolean("cobrado_al_cierre").default(false),
   nroFactura: varchar("nro_factura", { length: 100 }),
   razonSocial: text("razon_social"),
+  detalle: text("detalle"),
+  projectId: integer("project_id").references(() => activeProjects.id, { onDelete: "set null" }),
+  documentType: varchar("document_type", { length: 30 }).notNull().default("invoice"),
+  currency: varchar("currency", { length: 3 }),
+  originalAmount: numeric("original_amount", { precision: 18, scale: 2 }),
+  netAmount: numeric("net_amount", { precision: 18, scale: 2 }),
+  taxAmount: numeric("tax_amount", { precision: 18, scale: 2 }),
+  grossAmount: numeric("gross_amount", { precision: 18, scale: 2 }),
+  status: varchar("status", { length: 20 }).notNull().default("PENDING"),
+  outstandingAmount: numeric("outstanding_amount", { precision: 18, scale: 2 }),
+  source: varchar("source", { length: 40 }).notNull().default("excel"),
+  externalId: text("external_id"),
+  createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
+  updatedBy: integer("updated_by").references(() => users.id, { onDelete: "set null" }),
+  voidedAt: timestamp("voided_at"),
+  voidedBy: integer("voided_by").references(() => users.id, { onDelete: "set null" }),
+  voidReason: text("void_reason"),
   overrideManual: boolean("override_manual").default(false),
   sourceRowKey: varchar("source_row_key", { length: 80 }),
   importedAt: timestamp("imported_at").defaultNow(),
@@ -4705,6 +4742,24 @@ export const pasivoEntries = pgTable("pasivo_entries", {
   fechaVencimiento: timestamp("fecha_vencimiento"),
   vencido: boolean("vencido").default(false),
   pagadoAlCierre: boolean("pagado_al_cierre").default(false),
+  documentNumber: varchar("document_number", { length: 100 }),
+  vendorName: text("vendor_name"),
+  projectId: integer("project_id").references(() => activeProjects.id, { onDelete: "set null" }),
+  currency: varchar("currency", { length: 3 }),
+  originalAmount: numeric("original_amount", { precision: 18, scale: 2 }),
+  netAmount: numeric("net_amount", { precision: 18, scale: 2 }),
+  taxAmount: numeric("tax_amount", { precision: 18, scale: 2 }),
+  grossAmount: numeric("gross_amount", { precision: 18, scale: 2 }),
+  status: varchar("status", { length: 20 }).notNull().default("PENDING"),
+  outstandingAmount: numeric("outstanding_amount", { precision: 18, scale: 2 }),
+  costTreatment: varchar("cost_treatment", { length: 20 }).notNull().default("unclassified"),
+  source: varchar("source", { length: 40 }).notNull().default("excel"),
+  externalId: text("external_id"),
+  createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
+  updatedBy: integer("updated_by").references(() => users.id, { onDelete: "set null" }),
+  voidedAt: timestamp("voided_at"),
+  voidedBy: integer("voided_by").references(() => users.id, { onDelete: "set null" }),
+  voidReason: text("void_reason"),
   overrideManual: boolean("override_manual").default(false),
   sourceRowKey: varchar("source_row_key", { length: 80 }),
   importedAt: timestamp("imported_at").defaultNow(),
@@ -4735,6 +4790,12 @@ export const provisionEntries = pgTable("provision_entries", {
   criterio: text("criterio"),
   mesAplicacion: varchar("mes_aplicacion", { length: 7 }),
   unwoundAmount: numeric("unwound_amount", { precision: 12, scale: 2 }),
+  currency: varchar("currency", { length: 3 }).notNull().default("USD"),
+  status: varchar("status", { length: 20 }).notNull().default("PROPOSED"),
+  remainingAmount: numeric("remaining_amount", { precision: 14, scale: 2 }),
+  approvedBy: integer("approved_by").references(() => users.id, { onDelete: "set null" }),
+  approvedAt: timestamp("approved_at"),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
   importedAt: timestamp("imported_at").defaultNow(),
   importBatch: varchar("import_batch", { length: 100 }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -4747,6 +4808,23 @@ export const provisionEntries = pgTable("provision_entries", {
 export const insertProvisionEntrySchema = createInsertSchema(provisionEntries).omit({ id: true, createdAt: true, importedAt: true });
 export type ProvisionEntry = typeof provisionEntries.$inferSelect;
 export type InsertProvisionEntry = z.infer<typeof insertProvisionEntrySchema>;
+
+export const provisionMovements = pgTable("provision_movements", {
+  id: serial("id").primaryKey(),
+  provisionId: integer("provision_id").notNull().references(() => provisionEntries.id, { onDelete: "cascade" }),
+  periodKey: varchar("period_key", { length: 7 }).notNull(),
+  movementType: varchar("movement_type", { length: 20 }).notNull(), // initial | addition | release | adjustment | void
+  amount: numeric("amount", { precision: 14, scale: 2 }).notNull(),
+  currency: varchar("currency", { length: 3 }).notNull().default("USD"),
+  note: text("note"),
+  sourceCostId: integer("source_cost_id"),
+  createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => ({
+  provisionIdx: index("idx_provision_movement_provision").on(t.provisionId, t.periodKey),
+}));
+
+export type ProvisionMovement = typeof provisionMovements.$inferSelect;
 
 // Movimientos de cashflow — refleja la solapa "Cashflow" del Excel MAESTRO
 export const cashflowTransactions = pgTable("cashflow_transactions", {
@@ -4766,6 +4844,20 @@ export const cashflowTransactions = pgTable("cashflow_transactions", {
   saldoBOA: numeric("saldo_boa", { precision: 14, scale: 2 }),
   saldoCaja: numeric("saldo_caja", { precision: 14, scale: 2 }),
   saldoTotalUSD: numeric("saldo_total_usd", { precision: 14, scale: 2 }),
+  accountId: integer("account_id").references(() => financialAccounts.id, { onDelete: "set null" }),
+  counterparty: text("counterparty"),
+  projectId: integer("project_id").references(() => activeProjects.id, { onDelete: "set null" }),
+  originalAmount: numeric("original_amount", { precision: 18, scale: 2 }),
+  externalId: text("external_id"),
+  source: varchar("source", { length: 40 }).notNull().default("excel"),
+  reconciliationStatus: varchar("reconciliation_status", { length: 20 }).notNull().default("unmatched"),
+  transferGroupId: varchar("transfer_group_id", { length: 80 }),
+  createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
+  updatedBy: integer("updated_by").references(() => users.id, { onDelete: "set null" }),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  voidedAt: timestamp("voided_at"),
+  voidedBy: integer("voided_by").references(() => users.id, { onDelete: "set null" }),
+  voidReason: text("void_reason"),
   /**
    * Hash de la clave natural (fecha, period_key, tipo_movimiento, banco,
    * detalle_operacion, monto_ars, monto_usd). Columna GENERADA en la base
@@ -4785,6 +4877,28 @@ export const cashflowTransactions = pgTable("cashflow_transactions", {
 export const insertCashflowTransactionSchema = createInsertSchema(cashflowTransactions).omit({ id: true, createdAt: true, importedAt: true });
 export type CashflowTransaction = typeof cashflowTransactions.$inferSelect;
 export type InsertCashflowTransaction = z.infer<typeof insertCashflowTransactionSchema>;
+
+export const financialDocumentApplications = pgTable("financial_document_applications", {
+  id: serial("id").primaryKey(),
+  direction: varchar("direction", { length: 12 }).notNull(), // receivable | payable
+  activoEntryId: integer("activo_entry_id").references(() => activoEntries.id, { onDelete: "cascade" }),
+  pasivoEntryId: integer("pasivo_entry_id").references(() => pasivoEntries.id, { onDelete: "cascade" }),
+  cashflowTransactionId: integer("cashflow_transaction_id").notNull().references(() => cashflowTransactions.id, { onDelete: "cascade" }),
+  amountOriginal: numeric("amount_original", { precision: 18, scale: 2 }).notNull(),
+  amountUSD: numeric("amount_usd", { precision: 16, scale: 2 }),
+  appliedAt: timestamp("applied_at").notNull(),
+  notes: text("notes"),
+  createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  voidedAt: timestamp("voided_at"),
+  voidedBy: integer("voided_by").references(() => users.id, { onDelete: "set null" }),
+}, (t) => ({
+  activoIdx: index("idx_financial_application_activo").on(t.activoEntryId, t.appliedAt),
+  pasivoIdx: index("idx_financial_application_pasivo").on(t.pasivoEntryId, t.appliedAt),
+  cashflowIdx: index("idx_financial_application_cashflow").on(t.cashflowTransactionId),
+}));
+
+export type FinancialDocumentApplication = typeof financialDocumentApplications.$inferSelect;
 
 export type ProviderProjectAccess = typeof providerProjectAccess.$inferSelect;
 export type InsertProviderProjectAccess = z.infer<typeof insertProviderProjectAccessSchema>;
@@ -4933,3 +5047,130 @@ export const clientPaymentTerms = pgTable("client_payment_terms", {
 });
 
 export type ClientPaymentTerms = typeof clientPaymentTerms.$inferSelect;
+
+// ==================== FINANCIAL NATIVE INTAKE & CLOSE (0058) ====================
+
+/**
+ * Entrada unificada de información financiera. El archivo original nunca es
+ * una fila contable por sí mismo: primero se extrae a un borrador, luego una
+ * persona de Finanzas lo aprueba y recién entonces se crean los registros
+ * canónicos vinculados en Activo/Pasivo/Cashflow/etc.
+ */
+export const financialIntakeItems = pgTable("financial_intake_items", {
+  id: serial("id").primaryKey(),
+  inputKind: varchar("input_kind", { length: 20 }).notNull(), // text | file | image | connection
+  originalText: text("original_text"),
+  originalFileName: text("original_file_name"),
+  mimeType: varchar("mime_type", { length: 160 }),
+  fileSize: integer("file_size"),
+  fileHash: varchar("file_hash", { length: 64 }),
+  storageKey: text("storage_key"),
+
+  documentKind: varchar("document_kind", { length: 40 }).notNull().default("unknown"),
+  suggestedTarget: varchar("suggested_target", { length: 40 }),
+  status: varchar("status", { length: 30 }).notNull().default("received"),
+  extractedData: jsonb("extracted_data").$type<Record<string, unknown>>().notNull().default({}),
+  fieldConfidence: jsonb("field_confidence").$type<Record<string, number>>().notNull().default({}),
+  warnings: jsonb("warnings").$type<string[]>().notNull().default([]),
+  extractionError: text("extraction_error"),
+  extractorProvider: varchar("extractor_provider", { length: 40 }),
+  extractorModel: varchar("extractor_model", { length: 120 }),
+  extractorVersion: varchar("extractor_version", { length: 40 }),
+
+  reviewNotes: text("review_notes"),
+  rejectionReason: text("rejection_reason"),
+  linkedRecords: jsonb("linked_records").$type<Array<{ type: string; id: number }>>().notNull().default([]),
+
+  createdBy: integer("created_by").notNull().references(() => users.id, { onDelete: "restrict" }),
+  reviewedBy: integer("reviewed_by").references(() => users.id, { onDelete: "set null" }),
+  reviewedAt: timestamp("reviewed_at"),
+  postedAt: timestamp("posted_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (t) => ({
+  statusIdx: index("idx_financial_intake_status").on(t.status, t.createdAt),
+  hashIdx: index("idx_financial_intake_hash").on(t.fileHash),
+  kindIdx: index("idx_financial_intake_kind").on(t.documentKind),
+}));
+
+export const insertFinancialIntakeItemSchema = createInsertSchema(financialIntakeItems).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type FinancialIntakeItem = typeof financialIntakeItems.$inferSelect;
+export type InsertFinancialIntakeItem = z.infer<typeof insertFinancialIntakeItemSchema>;
+
+/** Estado auditable de cada cierre financiero mensual. */
+export const financialClosePeriods = pgTable("financial_close_periods", {
+  id: serial("id").primaryKey(),
+  periodKey: varchar("period_key", { length: 7 }).notNull().unique(),
+  status: varchar("status", { length: 20 }).notNull().default("OPEN"),
+  officialFxRateId: integer("official_fx_rate_id").references(() => exchangeRates.id, { onDelete: "set null" }),
+  checklistVersion: integer("checklist_version").notNull().default(1),
+  snapshotVersion: integer("snapshot_version").notNull().default(0),
+  notes: text("notes"),
+  requestedBy: integer("requested_by").references(() => users.id, { onDelete: "set null" }),
+  requestedAt: timestamp("requested_at"),
+  closedBy: integer("closed_by").references(() => users.id, { onDelete: "set null" }),
+  closedAt: timestamp("closed_at"),
+  reopenedBy: integer("reopened_by").references(() => users.id, { onDelete: "set null" }),
+  reopenedAt: timestamp("reopened_at"),
+  reopenReason: text("reopen_reason"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (t) => ({
+  statusIdx: index("idx_financial_close_status").on(t.status, t.periodKey),
+}));
+
+export const insertFinancialClosePeriodSchema = createInsertSchema(financialClosePeriods).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type FinancialClosePeriod = typeof financialClosePeriods.$inferSelect;
+
+/** Checklist regenerable del período. Las resoluciones humanas permanecen. */
+export const financialCloseChecks = pgTable("financial_close_checks", {
+  id: serial("id").primaryKey(),
+  closePeriodId: integer("close_period_id").notNull().references(() => financialClosePeriods.id, { onDelete: "cascade" }),
+  code: varchar("code", { length: 80 }).notNull(),
+  severity: varchar("severity", { length: 20 }).notNull(),
+  status: varchar("status", { length: 20 }).notNull().default("pending"),
+  title: varchar("title", { length: 255 }).notNull(),
+  detail: text("detail"),
+  expectedValue: numeric("expected_value", { precision: 18, scale: 4 }),
+  actualValue: numeric("actual_value", { precision: 18, scale: 4 }),
+  delta: numeric("delta", { precision: 18, scale: 4 }),
+  evidence: jsonb("evidence").$type<Record<string, unknown>>().notNull().default({}),
+  resolution: text("resolution"),
+  resolvedBy: integer("resolved_by").references(() => users.id, { onDelete: "set null" }),
+  resolvedAt: timestamp("resolved_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (t) => ({
+  uniqueCode: unique("uq_financial_close_check").on(t.closePeriodId, t.code),
+  statusIdx: index("idx_financial_close_check_status").on(t.closePeriodId, t.status, t.severity),
+}));
+
+export type FinancialCloseCheck = typeof financialCloseChecks.$inferSelect;
+
+/** Bitácora append-only para toda mutación financiera nativa. */
+export const financialAuditEvents = pgTable("financial_audit_events", {
+  id: serial("id").primaryKey(),
+  periodKey: varchar("period_key", { length: 7 }),
+  entityType: varchar("entity_type", { length: 60 }).notNull(),
+  entityId: integer("entity_id"),
+  action: varchar("action", { length: 60 }).notNull(),
+  beforeData: jsonb("before_data").$type<Record<string, unknown> | null>(),
+  afterData: jsonb("after_data").$type<Record<string, unknown> | null>(),
+  intakeItemId: integer("intake_item_id").references(() => financialIntakeItems.id, { onDelete: "set null" }),
+  actorUserId: integer("actor_user_id").references(() => users.id, { onDelete: "set null" }),
+  reason: text("reason"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => ({
+  entityIdx: index("idx_financial_audit_entity").on(t.entityType, t.entityId, t.createdAt),
+  periodIdx: index("idx_financial_audit_period").on(t.periodKey, t.createdAt),
+}));
+
+export type FinancialAuditEvent = typeof financialAuditEvents.$inferSelect;

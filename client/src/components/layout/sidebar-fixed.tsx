@@ -45,6 +45,8 @@ import {
   Repeat,
   Coins,
   LayoutGrid,
+  UploadCloud,
+  LockKeyhole,
 } from "lucide-react";
 
 type NavItem = {
@@ -176,6 +178,8 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
     {
       title: "Finanzas",
       items: [
+        { href: "/finance/cargar", title: "Cargar información", icon: UploadCloud, description: "Texto, documentos y capturas", permission: 'finance' as AppSection },
+        { href: "/finance/cierre", title: "Cierre financiero", icon: LockKeyhole, description: "Checklist y cierre mensual", permission: 'finance' as AppSection },
         { href: "/dashboard", title: "Resumen financiero", icon: LayoutDashboard, description: "KPIs económicos y operativos", anyPermissions: FINANCE_SUMMARY_ACCESS_SECTIONS },
         { href: "/finance/proyeccion", title: "Proyección", icon: Target, description: "Ejecutado vs proyectado del ejercicio", anyPermissions: FINANCE_SUMMARY_ACCESS_SECTIONS },
         { href: "/finance/arr", title: "ARR", icon: Repeat, description: "Ingreso recurrente anualizado", anyPermissions: FINANCE_SUMMARY_ACCESS_SECTIONS },
