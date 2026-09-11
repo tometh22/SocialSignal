@@ -37,6 +37,7 @@ export type DailyItemInput = {
   lastHealthChangeFrom: string | null;
   lastDecisionChangeAt: string | null;
   createdAt: string | null;
+  ownerName?: string | null;
 };
 
 export function relTime(s: string, now: number = Date.now()): string {
@@ -133,7 +134,11 @@ export function dailyReasonsFor(item: DailyItemInput, since: Date | null, now: n
   }
 
   if (item.isCustom && reasons.length === 0 && isNews(item.createdAt)) {
-    reasons.push({ kind: 'nuevo', detail: `Creado ${relTime(item.createdAt!, now)}`, question: '¿quién lo lleva?' });
+    reasons.push({
+      kind: 'nuevo',
+      detail: `Creado ${relTime(item.createdAt!, now)}${item.ownerName ? ` · lo lleva ${item.ownerName.split(' ')[0]}` : ''}`,
+      question: item.ownerName ? '¿arrancamos?' : '¿quién lo lleva?',
+    });
   }
 
   return reasons.sort((a, b) => DAILY_REASON_ORDER.indexOf(a.kind) - DAILY_REASON_ORDER.indexOf(b.kind));
