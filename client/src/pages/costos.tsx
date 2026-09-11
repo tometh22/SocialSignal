@@ -72,7 +72,7 @@ export default function CostosPage() {
     <PageShell>
       <CompactPageHeader
         title="Costos"
-        description="Desglose por concepto, tipo y equipo, sobre el Excel MAESTRO"
+        description="Desglose por concepto, tipo y equipo desde los registros nativos de Mind"
       />
 
       <ToolbarPanel>
@@ -93,7 +93,7 @@ export default function CostosPage() {
             <MetricGrid>
               <MetricCard
                 label={<span className="flex items-center justify-between gap-2"><span>Costo total</span>
-                  <InfoTip>Suma de los costos estimados del ejercicio, del Excel MAESTRO. Incluye impuestos e intereses.</InfoTip></span>}
+                  <InfoTip>Suma de costos del ejercicio. Desde el corte combina horas, proveedores, impuestos y provisiones registrados en Mind.</InfoTip></span>}
                 value={fmt(data.totalConceptos)}
                 icon={<Coins className="h-5 w-5" />}
                 detail={`${data.conceptos.length} conceptos`}

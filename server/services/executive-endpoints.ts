@@ -325,24 +325,19 @@ export async function getCashflowData(periodKeys: string[]): Promise<CashflowDat
   
   const { rows: [cashData] } = await pool.query(`
     SELECT 
-      COALESCE(SUM(CASE WHEN type = 'IN' THEN amount_usd::numeric ELSE 0 END), 0) as cash_in_usd,
-      COALESCE(SUM(CASE WHEN type = 'OUT' THEN amount_usd::numeric ELSE 0 END), 0) as cash_out_usd,
+      COALESCE(SUM(CASE WHEN tipo_movimiento = 'Ingreso' THEN COALESCE(monto_usd::numeric,monto_ars::numeric/NULLIF(cotizacion::numeric,0),0) ELSE 0 END), 0) as cash_in_usd,
+      COALESCE(SUM(CASE WHEN tipo_movimiento = 'Egreso' THEN COALESCE(monto_usd::numeric,monto_ars::numeric/NULLIF(cotizacion::numeric,0),0) ELSE 0 END), 0) as cash_out_usd,
       COUNT(*) as movement_count
-    FROM cash_movements
-    WHERE period_key = ANY($1)
+    FROM cashflow_transactions
+    WHERE period_key = ANY($1) AND voided_at IS NULL AND transfer_group_id IS NULL
   `, [periodKeys]);
   
-  const { rows: [excelData] } = await pool.query(`
-    SELECT caja_total
-    FROM monthly_financial_summary
-    WHERE period_key = $1
-  `, [lastPeriodKey]);
+  const financialSummary = await fetchFinancialSummary(lastPeriodKey);
   
   const cashInUsd = parseFloat(cashData?.cash_in_usd || '0');
   const cashOutUsd = parseFloat(cashData?.cash_out_usd || '0');
   const cashFlowNetoUsd = cashInUsd - cashOutUsd;
-  // FIX: null caja_total = data missing (not zero); negative = valid overdraft
-  const cajaTotalUsd = excelData?.caja_total != null ? parseFloat(excelData.caja_total) : 0;
+  const cajaTotalUsd = financialSummary.cajaTotal;
   
   const [year, month] = lastPeriodKey.split('-').map(Number);
   const monthNames = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 
@@ -361,8 +356,8 @@ export async function getCashflowData(periodKeys: string[]): Promise<CashflowDat
       neto: 'Ingresos - Egresos'
     },
     source: {
-      movements: 'cash_movements',
-      cajaTotal: 'monthly_financial_summary.caja_total_usd (snapshot Excel Maestro)'
+      movements: 'cashflow_transactions',
+      cajaTotal: 'snapshot de cierre o saldo vivo de Mind'
     }
   };
 }

@@ -67,11 +67,34 @@ const BOARD_Y_HOLDING = ['Tomi Criado', 'Vicky Puricelli', 'Honorarios Oxean'];
 export async function getCostBreakdown(year: number): Promise<CostBreakdown> {
   const [conceptosRes, mensualRes, equipoRes] = await Promise.all([
     pool.query(
-      `SELECT detalle AS concepto, SUM(monto_total_usd)::float AS monto
-         FROM fact_estimated_cost_month
-        WHERE month_key LIKE $1 AND detalle IS NOT NULL AND monto_total_usd IS NOT NULL
-        GROUP BY detalle
-        HAVING SUM(monto_total_usd) <> 0
+      `WITH cutover AS (
+         SELECT description AS period_key FROM system_config WHERE config_key='app_mode_cutover_date' AND description IS NOT NULL
+       ), native_periods AS (
+         SELECT DISTINCT period_key FROM pasivo_entries WHERE source <> 'excel'
+         UNION
+         SELECT DISTINCT invoice_period FROM revenue_events WHERE source_tab='mind_intake'
+       )
+       SELECT concepto, SUM(monto)::float AS monto
+         FROM (
+           SELECT detalle AS concepto, monto_total_usd::numeric AS monto
+             FROM fact_estimated_cost_month
+            WHERE month_key LIKE $1 AND detalle IS NOT NULL AND monto_total_usd IS NOT NULL
+              AND NOT EXISTS (SELECT 1 FROM native_periods n WHERE n.period_key=month_key)
+              AND (NOT EXISTS (SELECT 1 FROM cutover) OR month_key < (SELECT period_key FROM cutover))
+           UNION ALL
+           SELECT COALESCE(vendor_name, detalle, subtipo_costo, 'Sin clasificar') AS concepto,
+                  COALESCE(CASE WHEN currency='ARS' THEN net_amount/NULLIF(cotizacion,0) ELSE net_amount END,monto_total_usd,monto_usd,monto_ars/NULLIF(cotizacion,0),0)::numeric AS monto
+             FROM pasivo_entries
+            WHERE period_key LIKE $1 AND voided_at IS NULL AND source <> 'excel'
+           UNION ALL
+           SELECT COALESCE(p.name, 'Equipo sin asignar') AS concepto, COALESCE(f.cost_usd,0)::numeric AS monto
+             FROM fact_labor_month f
+             LEFT JOIN personnel p ON p.id=f.person_id
+            WHERE f.period_key LIKE $1
+              AND EXISTS (SELECT 1 FROM native_periods n WHERE n.period_key=f.period_key)
+         ) native_and_historical
+        GROUP BY concepto
+        HAVING SUM(monto) <> 0
         ORDER BY 2 DESC`,
       [`${year}%`],
     ),

@@ -7,13 +7,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, ShieldAlert } from "lucide-react";
-import { useForm } from "react-hook-form";
-import { z } from "zod";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { ShieldAlert, UploadCloud } from "lucide-react";
+import { Link } from "wouter";
+import { Label } from "@/components/ui/label";
 
 const MONTHS = Array.from({ length: 12 }, (_, i) => ({
   value: String(i + 1).padStart(2, "0"),
@@ -26,18 +24,12 @@ function fmtUSD(n: number) {
   return new Intl.NumberFormat("es-AR", { style: "currency", currency: "USD", minimumFractionDigits: 0 }).format(n);
 }
 
-const provisionSchema = z.object({
-  periodKey: z.string().min(7),
-  clienteNombre: z.string().min(1, "Requerido"),
-  tipo: z.enum(["RECUPERO", "NUEVA_PROVISION"]),
-  montoProvision: z.string().min(1, "Requerido"),
-  criterio: z.string().optional(),
-});
-
 export default function ProvisionsPage() {
   const [year, setYear] = useState(String(new Date().getFullYear()));
   const [month, setMonth] = useState(String(new Date().getMonth() + 1).padStart(2, "0"));
-  const [dialogOpen, setDialogOpen] = useState(false);
+  const [releaseRow, setReleaseRow] = useState<any | null>(null);
+  const [releaseAmount, setReleaseAmount] = useState("");
+  const [releaseNote, setReleaseNote] = useState("");
   const { toast } = useToast();
   const qc = useQueryClient();
 
@@ -48,24 +40,26 @@ export default function ProvisionsPage() {
     queryFn: () => apiRequest(`/api/provisions?period=${period}`, "GET"),
   });
 
-  const form = useForm<z.infer<typeof provisionSchema>>({
-    resolver: zodResolver(provisionSchema),
-    defaultValues: { periodKey: period, tipo: "NUEVA_PROVISION", montoProvision: "" },
-  });
-
-  const createMutation = useMutation({
-    mutationFn: (data: z.infer<typeof provisionSchema>) => apiRequest("/api/provisions", "POST", data),
+  const approveMutation = useMutation({
+    mutationFn: (id: number) => apiRequest(`/api/provisions/${id}/approve`, "POST", {}),
     onSuccess: () => {
-      toast({ title: "Provisión creada" });
+      toast({ title: "Provisión aprobada" });
       qc.invalidateQueries({ queryKey: ["/api/provisions"] });
-      setDialogOpen(false);
-      form.reset();
     },
-    onError: () => toast({ title: "Error", variant: "destructive" }),
+    onError: (error: Error) => toast({ title: "No se pudo aprobar", description: error.message, variant: "destructive" }),
+  });
+  const releaseMutation = useMutation({
+    mutationFn: () => apiRequest(`/api/provisions/${releaseRow!.id}/release`, "POST", { amount: releaseAmount, periodKey: period, note: releaseNote }),
+    onSuccess: () => {
+      toast({ title: "Liberación registrada" });
+      qc.invalidateQueries({ queryKey: ["/api/provisions"] });
+      setReleaseRow(null); setReleaseAmount(""); setReleaseNote("");
+    },
+    onError: (error: Error) => toast({ title: "No se pudo liberar", description: error.message, variant: "destructive" }),
   });
 
-  const totalActivo = rows.filter(r => r.tipo === "NUEVA_PROVISION").reduce((s, r) => s + parseFloat(r.montoProvision ?? "0"), 0);
-  const totalRecupero = rows.filter(r => r.tipo === "RECUPERO").reduce((s, r) => s + parseFloat(r.montoProvision ?? "0"), 0);
+  const totalActivo = rows.filter(r => r.tipo === "NUEVA_PROVISION" && ["APPROVED", "ACTIVE"].includes(r.status)).reduce((s, r) => s + parseFloat(r.remainingAmount ?? r.montoProvision ?? "0"), 0);
+  const totalRecupero = rows.filter(r => r.tipo === "RECUPERO" && ["APPROVED", "ACTIVE"].includes(r.status)).reduce((s, r) => s + parseFloat(r.montoProvision ?? "0"), 0);
 
   return (
     <div className="space-y-6">
@@ -74,52 +68,7 @@ export default function ProvisionsPage() {
           <h1 className="text-2xl font-bold">Provisiones</h1>
           <p className="text-muted-foreground text-sm">Provisiones de facturación adelantada y contingencias</p>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <Button><Plus className="h-4 w-4 mr-2" />Nueva Provisión</Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader><DialogTitle>Nueva Provisión</DialogTitle></DialogHeader>
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(data => createMutation.mutate(data))} className="space-y-4">
-                <FormField control={form.control} name="clienteNombre" render={({ field }) => (
-                  <FormItem><FormLabel>Cliente</FormLabel>
-                    <FormControl><Input placeholder="Nombre del cliente" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <FormField control={form.control} name="tipo" render={({ field }) => (
-                  <FormItem><FormLabel>Tipo</FormLabel>
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
-                      <SelectContent>
-                        <SelectItem value="NUEVA_PROVISION">Nueva Provisión</SelectItem>
-                        <SelectItem value="RECUPERO">Recupero</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <FormField control={form.control} name="montoProvision" render={({ field }) => (
-                  <FormItem><FormLabel>Monto (USD)</FormLabel>
-                    <FormControl><Input type="number" step="0.01" placeholder="0.00" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <FormField control={form.control} name="criterio" render={({ field }) => (
-                  <FormItem><FormLabel>Criterio (opcional)</FormLabel>
-                    <FormControl><Input placeholder="Descripción del criterio..." {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <div className="flex justify-end gap-2">
-                  <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
-                  <Button type="submit" disabled={createMutation.isPending}>Crear</Button>
-                </div>
-              </form>
-            </Form>
-          </DialogContent>
-        </Dialog>
+        <Button asChild><Link href="/finance/cargar"><UploadCloud className="h-4 w-4 mr-2" />Cargar provisión</Link></Button>
       </div>
 
       {/* Filtros */}
@@ -177,8 +126,11 @@ export default function ProvisionsPage() {
                   <TableHead>Tipo</TableHead>
                   <TableHead>Mes aplicación</TableHead>
                   <TableHead className="text-right">Monto Provisión</TableHead>
+                  <TableHead className="text-right">Saldo</TableHead>
                   <TableHead>Criterio</TableHead>
+                  <TableHead>Estado</TableHead>
                   <TableHead>Fuente</TableHead>
+                  <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -192,13 +144,21 @@ export default function ProvisionsPage() {
                     </TableCell>
                     <TableCell>{row.mesAplicacion || row.periodKey}</TableCell>
                     <TableCell className="text-right font-mono">{fmtUSD(parseFloat(row.montoProvision ?? "0"))}</TableCell>
+                    <TableCell className="text-right font-mono">{fmtUSD(parseFloat(row.remainingAmount ?? row.montoProvision ?? "0"))}</TableCell>
                     <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">{row.criterio || "-"}</TableCell>
+                    <TableCell><Badge variant="outline">{row.status || "PROPOSED"}</Badge></TableCell>
                     <TableCell>
                       {row.importBatch ? (
                         <Badge variant="outline" className="text-xs text-muted-foreground">Excel</Badge>
                       ) : (
-                        <Badge variant="outline" className="text-xs">Manual</Badge>
+                        <Badge variant="outline" className="text-xs">Mind</Badge>
                       )}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-2">
+                        {(row.status || "PROPOSED") === "PROPOSED" && <Button size="sm" variant="outline" disabled={approveMutation.isPending} onClick={() => approveMutation.mutate(row.id)}>Aprobar</Button>}
+                        {["APPROVED", "ACTIVE"].includes(row.status) && Number(row.remainingAmount ?? row.montoProvision ?? 0) > 0 && <Button size="sm" variant="outline" onClick={() => { setReleaseRow(row); setReleaseAmount(String(row.remainingAmount ?? row.montoProvision ?? "")); }}>Liberar</Button>}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -207,6 +167,16 @@ export default function ProvisionsPage() {
           )}
         </CardContent>
       </Card>
+      <Dialog open={Boolean(releaseRow)} onOpenChange={(open) => { if (!open) setReleaseRow(null); }}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Liberar provisión</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <div><Label>Monto ({releaseRow?.currency || "USD"})</Label><Input type="number" min="0.01" step="0.01" value={releaseAmount} onChange={(event) => setReleaseAmount(event.target.value)} /></div>
+            <div><Label>Motivo</Label><Input value={releaseNote} onChange={(event) => setReleaseNote(event.target.value)} placeholder="Explicá por qué se libera" /></div>
+            <div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setReleaseRow(null)}>Cancelar</Button><Button disabled={releaseMutation.isPending || Number(releaseAmount) <= 0 || releaseNote.trim().length < 5} onClick={() => releaseMutation.mutate()}>Confirmar liberación</Button></div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

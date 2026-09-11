@@ -19,22 +19,49 @@ import {
   provisionMovements,
   financialClosePeriods,
   financialAuditEvents,
+  financialDocumentApplications,
+  financialIntakeItems,
+  revenueEvents,
+  exchangeRates,
 } from "@shared/schema";
-import { eq, and, sql, desc, asc, isNull } from "drizzle-orm";
+import { eq, and, sql, desc, asc, isNull, inArray, gte } from "drizzle-orm";
 import { z } from "zod";
 import { storage } from "./storage";
 import { parseMoneySmart } from "./utils/money";
 import { requirePermission } from "./middleware/requirePermission";
 import { googleSheetsWorkingService } from "./services/googleSheetsWorking";
+import { getCutoverDate } from "./etl/time-entries-to-fact-labor";
+import { rebuildNativeFinancialFacts } from "./services/financial-native-builders";
 
 export function createLedgerRouter(requireAuth: any) {
   const router = Router();
   const finance = [requireAuth, requirePermission("finance")];
   const ensurePeriodMutable = async (periodKey: string) => {
     const [close] = await db.select({ status: financialClosePeriods.status }).from(financialClosePeriods).where(eq(financialClosePeriods.periodKey, periodKey)).limit(1);
-    if (close?.status === "CLOSED") throw Object.assign(new Error(`El período ${periodKey} está cerrado.`), { statusCode: 409 });
+    if (["IN_REVIEW", "CLOSED"].includes(close?.status ?? "")) throw Object.assign(new Error(`El período ${periodKey} está ${close?.status === "CLOSED" ? "cerrado" : "en revisión"}.`), { statusCode: 409 });
   };
   const reasonSchema = z.object({ reason: z.string().trim().min(5).max(2000) });
+  const refreshNativeFacts = async (periodKey: string) => {
+    try { await rebuildNativeFinancialFacts(periodKey); }
+    catch (error) { console.error(`[ledger] no se pudieron refrescar los agregados de ${periodKey}:`, error); }
+  };
+  const revenueLinkForDocument = async (tx: any, externalId: string | null) => {
+    const intakeId = Number(externalId?.match(/^intake:(\d+):(activo|pasivo)$/)?.[1]);
+    if (!intakeId) return null;
+    const [source] = await tx.select({ linkedRecords: financialIntakeItems.linkedRecords }).from(financialIntakeItems).where(eq(financialIntakeItems.id, intakeId)).limit(1);
+    const links = Array.isArray(source?.linkedRecords) ? source.linkedRecords as Array<{ type?: string; id?: number }> : [];
+    return links.find((candidate) => ["revenue_event", "revenue_event_linked"].includes(candidate.type ?? "") && Number.isInteger(candidate.id)) ?? null;
+  };
+  const prepareBalanceMutation = async (tx: any, effectiveDate: Date) => {
+    const effectivePeriod = effectiveDate.toISOString().slice(0, 7);
+    const periods = await tx.select().from(financialClosePeriods).where(gte(financialClosePeriods.periodKey, effectivePeriod)).orderBy(asc(financialClosePeriods.periodKey));
+    for (const period of periods) {
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${'financial-period:' + period.periodKey}))`);
+      const [current] = await tx.select({ status: financialClosePeriods.status }).from(financialClosePeriods).where(eq(financialClosePeriods.id, period.id)).limit(1);
+      if (["IN_REVIEW", "CLOSED"].includes(current?.status ?? "")) throw Object.assign(new Error(`La cuenta impacta el período ${period.periodKey}, que está ${current?.status === "CLOSED" ? "cerrado" : "en revisión"}. Reabrilo antes de cambiar el saldo inicial.`), { statusCode: 409 });
+      if (current?.status === "PRE_CLOSE") await tx.update(financialClosePeriods).set({ status: "OPEN", updatedAt: new Date() }).where(eq(financialClosePeriods.id, period.id));
+    }
+  };
   const parseLedgerQuery = (query: Record<string, unknown>) => {
     const period = typeof query.period === "string" ? query.period : "";
     if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(period)) {
@@ -54,11 +81,23 @@ export function createLedgerRouter(requireAuth: any) {
     ${activoEntries.montoARS}::double precision / NULLIF(${activoEntries.cotizacion}::double precision, 0),
     0
   )`;
+  const activoOutstandingUSD = sql<number>`COALESCE(
+    CASE WHEN ${activoEntries.currency} = 'ARS'
+      THEN ${activoEntries.outstandingAmount}::double precision / NULLIF(${activoEntries.cotizacion}::double precision, 0)
+      ELSE ${activoEntries.outstandingAmount}::double precision END,
+    CASE WHEN ${activoEntries.cobradoAlCierre} THEN 0 ELSE ${activoUSD} END
+  )`;
   const pasivoUSD = sql<number>`COALESCE(
     ${pasivoEntries.montoTotalUSD}::double precision,
     ${pasivoEntries.montoUSD}::double precision,
     ${pasivoEntries.montoARS}::double precision / NULLIF(${pasivoEntries.cotizacion}::double precision, 0),
     0
+  )`;
+  const pasivoOutstandingUSD = sql<number>`COALESCE(
+    CASE WHEN ${pasivoEntries.currency} = 'ARS'
+      THEN ${pasivoEntries.outstandingAmount}::double precision / NULLIF(${pasivoEntries.cotizacion}::double precision, 0)
+      ELSE ${pasivoEntries.outstandingAmount}::double precision END,
+    CASE WHEN ${pasivoEntries.pagadoAlCierre} THEN 0 ELSE ${pasivoUSD} END
   )`;
   const normalizedUSDForWrite = (row: {
     montoUSD?: string | null;
@@ -122,6 +161,8 @@ export function createLedgerRouter(requireAuth: any) {
           cobradoAlCierre: activoEntries.cobradoAlCierre,
           overrideManual: activoEntries.overrideManual,
           montoTotalUSD: activoUSD,
+          outstandingUSD: activoOutstandingUSD,
+          status: activoEntries.status,
         }).from(activoEntries)
           .where(where)
           .orderBy(desc(activoEntries.createdAt), desc(activoEntries.id))
@@ -152,9 +193,10 @@ export function createLedgerRouter(requireAuth: any) {
       if ("error" in parsed) return res.status(400).json({ message: parsed.error });
       const [summary] = await db.select({
         total: sql<number>`COALESCE(SUM(${activoUSD}), 0)::double precision`,
-        cobrado: sql<number>`COALESCE(SUM(${activoUSD}) FILTER (WHERE ${activoEntries.cobradoAlCierre} = true), 0)::double precision`,
-        vencido: sql<number>`COALESCE(SUM(${activoUSD}) FILTER (
-          WHERE ${activoEntries.vencido} = true AND COALESCE(${activoEntries.cobradoAlCierre}, false) = false
+        cobrado: sql<number>`COALESCE(SUM(${activoUSD} - ${activoOutstandingUSD}), 0)::double precision`,
+        pendiente: sql<number>`COALESCE(SUM(${activoOutstandingUSD}), 0)::double precision`,
+        vencido: sql<number>`COALESCE(SUM(${activoOutstandingUSD}) FILTER (
+          WHERE ${activoEntries.vencido} = true
         ), 0)::double precision`,
         count: sql<number>`COUNT(*)::integer`,
       }).from(activoEntries).where(and(eq(activoEntries.periodKey, parsed.period), isNull(activoEntries.voidedAt)));
@@ -163,7 +205,7 @@ export function createLedgerRouter(requireAuth: any) {
       res.json({
         total,
         cobrado,
-        pendiente: total - cobrado,
+        pendiente: Number(summary?.pendiente ?? total - cobrado),
         vencido: Number(summary?.vencido ?? 0),
         count: Number(summary?.count ?? 0),
       });
@@ -203,26 +245,30 @@ export function createLedgerRouter(requireAuth: any) {
       const [existing] = await db.select().from(activoEntries).where(eq(activoEntries.id, id)).limit(1);
       if (!existing) return res.status(404).json({ message: "Not found" });
       await ensurePeriodMutable(existing.periodKey);
+      if (existing.source === "mind_intake") return res.status(409).json({ message: "Las facturas nativas se corrigen anulando la carga y registrándola nuevamente." });
+      if ("cobradoAlCierre" in parsed.data || "status" in parsed.data || "outstandingAmount" in parsed.data || "fechaPago" in parsed.data) {
+        return res.status(409).json({ message: "Registrá el cobro desde Carga financiera para crear también el movimiento y su conciliación." });
+      }
+      if (parsed.data.periodKey && parsed.data.periodKey !== existing.periodKey) await ensurePeriodMutable(parsed.data.periodKey);
       const monetaryChanged = ["montoARS", "montoUSD", "cotizacion"].some((key) => key in parsed.data);
       const monetaryValues = monetaryChanged
         ? { montoTotalUSD: normalizedUSDForWrite({ ...existing, ...parsed.data }) }
         : {};
-      const changedKeys = Object.keys(parsed.data);
-      const statusOnly = changedKeys.length > 0 && changedKeys.every((key) => key === "cobradoAlCierre");
       const [updated] = await db.update(activoEntries)
         .set({
           ...parsed.data,
           ...monetaryValues,
-          overrideManual: existing.overrideManual || !statusOnly,
+          overrideManual: true,
           updatedAt: new Date(),
           updatedBy: req.user!.id,
         })
         .where(eq(activoEntries.id, id))
         .returning();
       if (!updated) return res.status(404).json({ message: "Not found" });
+      await db.insert(financialAuditEvents).values({ periodKey: existing.periodKey, entityType: "activo_entry", entityId: id, action: "historical_entry_edited", beforeData: existing, afterData: updated, actorUserId: req.user!.id });
       res.json(updated);
     } catch (error: any) {
-      res.status(500).json({ message: error.message });
+      res.status(error.statusCode ?? 500).json({ message: error.message });
     }
   });
 
@@ -253,6 +299,8 @@ export function createLedgerRouter(requireAuth: any) {
           pagadoAlCierre: pasivoEntries.pagadoAlCierre,
           overrideManual: pasivoEntries.overrideManual,
           montoTotalUSD: pasivoUSD,
+          outstandingUSD: pasivoOutstandingUSD,
+          status: pasivoEntries.status,
         }).from(pasivoEntries)
           .where(where)
           .orderBy(desc(pasivoEntries.createdAt), desc(pasivoEntries.id))
@@ -285,10 +333,11 @@ export function createLedgerRouter(requireAuth: any) {
       const [summaryRows, subtipoRows] = await Promise.all([
         db.select({
           total: sql<number>`COALESCE(SUM(${pasivoUSD}), 0)::double precision`,
-          pagado: sql<number>`COALESCE(SUM(${pasivoUSD}) FILTER (WHERE ${pasivoEntries.pagadoAlCierre} = true), 0)::double precision`,
-          vencido: sql<number>`COALESCE(SUM(${pasivoUSD}) FILTER (
-            WHERE ${pasivoEntries.vencido} = true AND COALESCE(${pasivoEntries.pagadoAlCierre}, false) = false
-          ), 0)::double precision`,
+        pagado: sql<number>`COALESCE(SUM(${pasivoUSD} - ${pasivoOutstandingUSD}), 0)::double precision`,
+        pendiente: sql<number>`COALESCE(SUM(${pasivoOutstandingUSD}), 0)::double precision`,
+        vencido: sql<number>`COALESCE(SUM(${pasivoOutstandingUSD}) FILTER (
+          WHERE ${pasivoEntries.vencido} = true
+        ), 0)::double precision`,
           count: sql<number>`COUNT(*)::integer`,
         }).from(pasivoEntries).where(periodCondition),
         db.select({
@@ -307,7 +356,7 @@ export function createLedgerRouter(requireAuth: any) {
       res.json({
         total,
         pagado,
-        pendiente: total - pagado,
+        pendiente: Number(summary?.pendiente ?? total - pagado),
         vencido: Number(summary?.vencido ?? 0),
         bySubtipo,
         count: Number(summary?.count ?? 0),
@@ -333,6 +382,7 @@ export function createLedgerRouter(requireAuth: any) {
         updatedBy: req.user!.id,
       };
       const [created] = await db.insert(pasivoEntries).values(values).returning();
+      await refreshNativeFacts(created.periodKey);
       res.status(201).json(created);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -348,26 +398,32 @@ export function createLedgerRouter(requireAuth: any) {
       const [existing] = await db.select().from(pasivoEntries).where(eq(pasivoEntries.id, id)).limit(1);
       if (!existing) return res.status(404).json({ message: "Not found" });
       await ensurePeriodMutable(existing.periodKey);
+      if (existing.source === "mind_intake") return res.status(409).json({ message: "Las facturas nativas se corrigen anulando la carga y registrándola nuevamente." });
+      if ("pagadoAlCierre" in parsed.data || "status" in parsed.data || "outstandingAmount" in parsed.data || "fechaPago" in parsed.data) {
+        return res.status(409).json({ message: "Registrá el pago desde Carga financiera para crear también el movimiento y su conciliación." });
+      }
+      if (parsed.data.periodKey && parsed.data.periodKey !== existing.periodKey) await ensurePeriodMutable(parsed.data.periodKey);
       const monetaryChanged = ["montoARS", "montoUSD", "cotizacion"].some((key) => key in parsed.data);
       const monetaryValues = monetaryChanged
         ? { montoTotalUSD: normalizedUSDForWrite({ ...existing, ...parsed.data }) }
         : {};
-      const changedKeys = Object.keys(parsed.data);
-      const statusOnly = changedKeys.length > 0 && changedKeys.every((key) => key === "pagadoAlCierre");
       const [updated] = await db.update(pasivoEntries)
         .set({
           ...parsed.data,
           ...monetaryValues,
-          overrideManual: existing.overrideManual || !statusOnly,
+          overrideManual: true,
           updatedAt: new Date(),
           updatedBy: req.user!.id,
         })
         .where(eq(pasivoEntries.id, id))
         .returning();
       if (!updated) return res.status(404).json({ message: "Not found" });
+      await db.insert(financialAuditEvents).values({ periodKey: existing.periodKey, entityType: "pasivo_entry", entityId: id, action: "historical_entry_edited", beforeData: existing, afterData: updated, actorUserId: req.user!.id });
+      await refreshNativeFacts(existing.periodKey);
+      if (updated.periodKey !== existing.periodKey) await refreshNativeFacts(updated.periodKey);
       res.json(updated);
     } catch (error: any) {
-      res.status(500).json({ message: error.message });
+      res.status(error.statusCode ?? 500).json({ message: error.message });
     }
   });
 
@@ -391,6 +447,7 @@ export function createLedgerRouter(requireAuth: any) {
       if (!parsed.success) return res.status(400).json({ message: parsed.error.message });
       await ensurePeriodMutable(parsed.data.periodKey);
       const [created] = await db.insert(provisionEntries).values({ ...parsed.data, createdBy: req.user!.id }).returning();
+      await refreshNativeFacts(created.periodKey);
       res.status(201).json(created);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -408,6 +465,8 @@ export function createLedgerRouter(requireAuth: any) {
       await ensurePeriodMutable(existing.periodKey);
       const [updated] = await db.update(provisionEntries).set({ ...parsed.data, updatedAt: new Date() }).where(eq(provisionEntries.id, id)).returning();
       if (!updated) return res.status(404).json({ message: "Not found" });
+      await refreshNativeFacts(existing.periodKey);
+      if (updated.periodKey !== existing.periodKey) await refreshNativeFacts(updated.periodKey);
       res.json(updated);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -424,25 +483,42 @@ export function createLedgerRouter(requireAuth: any) {
 
   router.post("/financial-accounts", ...finance, async (req, res) => {
     try {
-      const parsed = insertFinancialAccountSchema.safeParse(req.body);
+      const cutover = await getCutoverDate();
+      const rawOpeningDate = req.body?.openingBalanceDate;
+      const openingBalanceDate = rawOpeningDate
+        ? new Date(`${String(rawOpeningDate).slice(0, 10)}T12:00:00.000Z`)
+        : cutover ? new Date(`${cutover}-01T12:00:00.000Z`) : new Date();
+      const parsed = insertFinancialAccountSchema.safeParse({ ...req.body, openingBalanceDate });
       if (!parsed.success) return res.status(400).json({ message: parsed.error.message });
-      const [created] = await db.insert(financialAccounts).values(parsed.data).returning();
-      await db.insert(financialAuditEvents).values({ entityType: "financial_account", entityId: created.id, action: "created", afterData: created, actorUserId: req.user!.id });
+      const created = await db.transaction(async (tx) => {
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext('financial-accounts'))`);
+        await prepareBalanceMutation(tx, openingBalanceDate);
+        const [created] = await tx.insert(financialAccounts).values(parsed.data).returning();
+        await tx.insert(financialAuditEvents).values({ entityType: "financial_account", entityId: created.id, action: "created", afterData: created, actorUserId: req.user!.id });
+        return created;
+      });
       res.status(201).json(created);
-    } catch (error: any) { res.status(error?.code === "23505" ? 409 : 500).json({ message: error?.code === "23505" ? "Ya existe una cuenta con ese nombre y moneda." : error.message }); }
+    } catch (error: any) { res.status(error?.code === "23505" ? 409 : error.statusCode ?? 500).json({ message: error?.code === "23505" ? "Ya existe una cuenta con ese nombre y moneda." : error.message }); }
   });
 
   router.patch("/financial-accounts/:id", ...finance, async (req, res) => {
     try {
       const id = Number(req.params.id);
-      const parsed = insertFinancialAccountSchema.partial().safeParse(req.body);
+      const rawOpeningDate = req.body?.openingBalanceDate;
+      const parsed = insertFinancialAccountSchema.partial().safeParse({ ...req.body, ...(rawOpeningDate ? { openingBalanceDate: new Date(`${String(rawOpeningDate).slice(0, 10)}T12:00:00.000Z`) } : {}) });
       if (!Number.isInteger(id) || !parsed.success) return res.status(400).json({ message: "Datos inválidos." });
-      const [existing] = await db.select().from(financialAccounts).where(eq(financialAccounts.id, id)).limit(1);
-      if (!existing) return res.status(404).json({ message: "Cuenta no encontrada." });
-      const [updated] = await db.update(financialAccounts).set({ ...parsed.data, updatedAt: new Date() }).where(eq(financialAccounts.id, id)).returning();
-      await db.insert(financialAuditEvents).values({ entityType: "financial_account", entityId: id, action: "updated", beforeData: existing, afterData: updated, actorUserId: req.user!.id });
+      const updated = await db.transaction(async (tx) => {
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext('financial-accounts'))`);
+        const [existing] = await tx.select().from(financialAccounts).where(eq(financialAccounts.id, id)).limit(1);
+        if (!existing) throw Object.assign(new Error("Cuenta no encontrada."), { statusCode: 404 });
+        const effectiveDate = parsed.data.openingBalanceDate ?? existing.openingBalanceDate ?? new Date();
+        await prepareBalanceMutation(tx, effectiveDate);
+        const [updated] = await tx.update(financialAccounts).set({ ...parsed.data, updatedAt: new Date() }).where(eq(financialAccounts.id, id)).returning();
+        await tx.insert(financialAuditEvents).values({ entityType: "financial_account", entityId: id, action: "updated", beforeData: existing, afterData: updated, actorUserId: req.user!.id });
+        return updated;
+      });
       res.json(updated);
-    } catch (error: any) { res.status(500).json({ message: error.message }); }
+    } catch (error: any) { res.status(error.statusCode ?? 500).json({ message: error.message }); }
   });
 
   router.get("/cashflow", ...finance, async (req, res) => {
@@ -500,11 +576,20 @@ export function createLedgerRouter(requireAuth: any) {
       const id = Number(req.params.id);
       const input = z.object({ status: z.enum(["matched", "unmatched", "ignored"]), note: z.string().max(2000).nullable().optional() }).safeParse(req.body);
       if (!Number.isInteger(id) || !input.success) return res.status(400).json({ message: "Datos inválidos." });
-      const [existing] = await db.select().from(cashflowTransactions).where(eq(cashflowTransactions.id, id)).limit(1);
-      if (!existing) return res.status(404).json({ message: "Movimiento no encontrado." });
-      await ensurePeriodMutable(existing.periodKey);
-      const [updated] = await db.update(cashflowTransactions).set({ reconciliationStatus: input.data.status, updatedBy: req.user!.id, updatedAt: new Date() }).where(eq(cashflowTransactions.id, id)).returning();
-      await db.insert(financialAuditEvents).values({ periodKey: existing.periodKey, entityType: "cashflow_transaction", entityId: id, action: "reconciled", beforeData: existing, afterData: { reconciliationStatus: input.data.status }, actorUserId: req.user!.id, reason: input.data.note });
+      const updated = await db.transaction(async (tx) => {
+        const [peek] = await tx.select({ periodKey: cashflowTransactions.periodKey }).from(cashflowTransactions).where(eq(cashflowTransactions.id, id)).limit(1);
+        if (!peek) throw Object.assign(new Error("Movimiento no encontrado."), { statusCode: 404 });
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${'financial-period:' + peek.periodKey}))`);
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${'financial-cashflow:' + id}))`);
+        const [existing] = await tx.select().from(cashflowTransactions).where(eq(cashflowTransactions.id, id)).limit(1);
+        if (!existing) throw Object.assign(new Error("Movimiento no encontrado."), { statusCode: 404 });
+        const [close] = await tx.select({ id: financialClosePeriods.id, status: financialClosePeriods.status }).from(financialClosePeriods).where(eq(financialClosePeriods.periodKey, existing.periodKey)).limit(1);
+        if (["IN_REVIEW", "CLOSED"].includes(close?.status ?? "")) throw Object.assign(new Error(`El período ${existing.periodKey} no admite cambios.`), { statusCode: 409 });
+        if (close?.status === "PRE_CLOSE") await tx.update(financialClosePeriods).set({ status: "OPEN", updatedAt: new Date() }).where(eq(financialClosePeriods.id, close.id));
+        const [updated] = await tx.update(cashflowTransactions).set({ reconciliationStatus: input.data.status, updatedBy: req.user!.id, updatedAt: new Date() }).where(eq(cashflowTransactions.id, id)).returning();
+        await tx.insert(financialAuditEvents).values({ periodKey: existing.periodKey, entityType: "cashflow_transaction", entityId: id, action: "reconciled", beforeData: existing, afterData: { reconciliationStatus: input.data.status }, actorUserId: req.user!.id, reason: input.data.note });
+        return updated;
+      });
       res.json(updated);
     } catch (error: any) { res.status(error.statusCode ?? 500).json({ message: error.message }); }
   });
@@ -516,22 +601,33 @@ export function createLedgerRouter(requireAuth: any) {
         return res.status(400).json({ message: "date param required as YYYY-MM-DD" });
       }
       const cutoff = new Date(date + "T23:59:59Z");
-      const rows = await db.select()
-        .from(cashflowTransactions)
-        .where(and(sql`${cashflowTransactions.fecha} <= ${cutoff}`, isNull(cashflowTransactions.voidedAt)))
-        .orderBy(asc(cashflowTransactions.fecha));
+      const cutover = await getCutoverDate();
+      const useNativeLedger = Boolean(cutover && date.slice(0, 7) >= cutover);
+      const [rows, accounts, rates] = await Promise.all([
+        db.select().from(cashflowTransactions).where(and(sql`${cashflowTransactions.fecha} <= ${cutoff}`, isNull(cashflowTransactions.voidedAt), useNativeLedger ? sql`${cashflowTransactions.source} <> 'excel'` : sql`true`)).orderBy(asc(cashflowTransactions.fecha)),
+        db.select().from(financialAccounts).where(and(eq(financialAccounts.isActive, true), sql`(${financialAccounts.openingBalanceDate} IS NULL OR ${financialAccounts.openingBalanceDate} <= ${cutoff})`)),
+        db.select().from(exchangeRates).where(and(eq(exchangeRates.year, cutoff.getUTCFullYear()), eq(exchangeRates.month, cutoff.getUTCMonth() + 1), eq(exchangeRates.isActive, true))).orderBy(desc(exchangeRates.updatedAt)).limit(1),
+      ]);
 
       // Saldos acumulados por banco, calculados sumando ingresos/egresos hasta la fecha
       // (las columnas saldo* nunca se populan en la importación, así que se computa acá).
-      const balances: Record<string, number> = { Santander: 0, BOA: 0, Caja: 0 };
-      let totalUSD = 0;
-      for (const r of rows) {
-        const amt = parseFloat(r.montoUSD ?? "0") || 0;
-        const signed = r.tipoMovimiento === "Egreso" ? -amt : amt;
-        const banco = r.banco || "Otros";
-        balances[banco] = (balances[banco] ?? 0) + signed;
-        totalUSD += signed;
+      const fx = Number(rates[0]?.rate ?? 0);
+      const balances: Record<string, number> = {};
+      const accountNames = new Map(accounts.map((account) => [account.id, account.name]));
+      const accountByLabel = new Map(accounts.flatMap((account) => [account.name, account.bankName].filter(Boolean).map((label) => [String(label).toLocaleLowerCase(), account] as const)));
+      for (const account of accounts) {
+        const opening = Number(account.openingBalance ?? 0);
+        balances[account.name] = account.currency === "ARS" && fx > 0 ? opening / fx : opening;
       }
+      for (const r of rows) {
+        const account = r.accountId ? accounts.find((candidate) => candidate.id === r.accountId) : accountByLabel.get(String(r.banco ?? "").toLocaleLowerCase());
+        if (account?.openingBalanceDate && r.fecha < account.openingBalanceDate) continue;
+        const amt = parseFloat(r.montoUSD ?? "") || ((parseFloat(r.montoARS ?? "") || 0) / (parseFloat(r.cotizacion ?? "") || fx || 1));
+        const signed = r.tipoMovimiento === "Egreso" ? -amt : amt;
+        const banco = (r.accountId ? accountNames.get(r.accountId) : null) || r.banco || "Otros";
+        balances[banco] = (balances[banco] ?? 0) + signed;
+      }
+      const totalUSD = Object.values(balances).reduce((sum, value) => sum + value, 0);
       res.json({ date, balances, totalUSD });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -568,11 +664,25 @@ export function createLedgerRouter(requireAuth: any) {
   router.post("/activo/:id/void", ...finance, async (req, res) => {
     try {
       const id = Number(req.params.id); const { reason } = reasonSchema.parse(req.body);
-      const [existing] = await db.select().from(activoEntries).where(eq(activoEntries.id, id)).limit(1);
-      if (!existing) return res.status(404).json({ message: "Activo no encontrado." });
-      await ensurePeriodMutable(existing.periodKey);
-      const [updated] = await db.update(activoEntries).set({ status: "VOID", voidedAt: new Date(), voidedBy: req.user!.id, voidReason: reason, updatedBy: req.user!.id, updatedAt: new Date() }).where(and(eq(activoEntries.id, id), isNull(activoEntries.voidedAt))).returning();
-      await db.insert(financialAuditEvents).values({ periodKey: existing.periodKey, entityType: "activo_entry", entityId: id, action: "voided", beforeData: existing, afterData: updated, actorUserId: req.user!.id, reason });
+      const { existing, updated } = await db.transaction(async (tx) => {
+        const [peek] = await tx.select({ periodKey: activoEntries.periodKey }).from(activoEntries).where(eq(activoEntries.id, id)).limit(1);
+        if (!peek) throw Object.assign(new Error("Activo no encontrado."), { statusCode: 404 });
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${'financial-period:' + peek.periodKey}))`);
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${'financial-document:receivable:' + id}))`);
+        const [existing] = await tx.select().from(activoEntries).where(eq(activoEntries.id, id)).limit(1);
+        if (!existing) throw Object.assign(new Error("Activo no encontrado."), { statusCode: 404 });
+        const [close] = await tx.select({ status: financialClosePeriods.status }).from(financialClosePeriods).where(eq(financialClosePeriods.periodKey, existing.periodKey)).limit(1);
+        if (["IN_REVIEW", "CLOSED"].includes(close?.status ?? "")) throw Object.assign(new Error(`El período ${existing.periodKey} no admite cambios.`), { statusCode: 409 });
+        if (close?.status === "PRE_CLOSE") await tx.update(financialClosePeriods).set({ status: "OPEN", updatedAt: new Date() }).where(eq(financialClosePeriods.periodKey, existing.periodKey));
+        const applications = await tx.select({ id: financialDocumentApplications.id }).from(financialDocumentApplications).where(and(eq(financialDocumentApplications.activoEntryId, id), isNull(financialDocumentApplications.voidedAt))).limit(1);
+        if (applications.length) throw Object.assign(new Error("Anulá primero el cobro aplicado a esta factura."), { statusCode: 409 });
+        const [updated] = await tx.update(activoEntries).set({ status: "VOID", voidedAt: new Date(), voidedBy: req.user!.id, voidReason: reason, updatedBy: req.user!.id, updatedAt: new Date() }).where(and(eq(activoEntries.id, id), isNull(activoEntries.voidedAt))).returning();
+        const revenueLink = await revenueLinkForDocument(tx, existing.externalId);
+        if (revenueLink?.type === "revenue_event" && revenueLink.id) await tx.update(revenueEvents).set({ status: "cancelled", updatedAt: new Date() }).where(eq(revenueEvents.id, revenueLink.id));
+        await tx.insert(financialAuditEvents).values({ periodKey: existing.periodKey, entityType: "activo_entry", entityId: id, action: "voided", beforeData: existing, afterData: updated, actorUserId: req.user!.id, reason });
+        return { existing, updated };
+      });
+      await refreshNativeFacts(existing.periodKey);
       res.json(updated ?? existing);
     } catch (error: any) { res.status(error.statusCode ?? 400).json({ message: error.message }); }
   });
@@ -580,11 +690,23 @@ export function createLedgerRouter(requireAuth: any) {
   router.post("/pasivo/:id/void", ...finance, async (req, res) => {
     try {
       const id = Number(req.params.id); const { reason } = reasonSchema.parse(req.body);
-      const [existing] = await db.select().from(pasivoEntries).where(eq(pasivoEntries.id, id)).limit(1);
-      if (!existing) return res.status(404).json({ message: "Pasivo no encontrado." });
-      await ensurePeriodMutable(existing.periodKey);
-      const [updated] = await db.update(pasivoEntries).set({ status: "VOID", voidedAt: new Date(), voidedBy: req.user!.id, voidReason: reason, updatedBy: req.user!.id, updatedAt: new Date() }).where(and(eq(pasivoEntries.id, id), isNull(pasivoEntries.voidedAt))).returning();
-      await db.insert(financialAuditEvents).values({ periodKey: existing.periodKey, entityType: "pasivo_entry", entityId: id, action: "voided", beforeData: existing, afterData: updated, actorUserId: req.user!.id, reason });
+      const { existing, updated } = await db.transaction(async (tx) => {
+        const [peek] = await tx.select({ periodKey: pasivoEntries.periodKey }).from(pasivoEntries).where(eq(pasivoEntries.id, id)).limit(1);
+        if (!peek) throw Object.assign(new Error("Pasivo no encontrado."), { statusCode: 404 });
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${'financial-period:' + peek.periodKey}))`);
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${'financial-document:payable:' + id}))`);
+        const [existing] = await tx.select().from(pasivoEntries).where(eq(pasivoEntries.id, id)).limit(1);
+        if (!existing) throw Object.assign(new Error("Pasivo no encontrado."), { statusCode: 404 });
+        const [close] = await tx.select({ status: financialClosePeriods.status }).from(financialClosePeriods).where(eq(financialClosePeriods.periodKey, existing.periodKey)).limit(1);
+        if (["IN_REVIEW", "CLOSED"].includes(close?.status ?? "")) throw Object.assign(new Error(`El período ${existing.periodKey} no admite cambios.`), { statusCode: 409 });
+        if (close?.status === "PRE_CLOSE") await tx.update(financialClosePeriods).set({ status: "OPEN", updatedAt: new Date() }).where(eq(financialClosePeriods.periodKey, existing.periodKey));
+        const applications = await tx.select({ id: financialDocumentApplications.id }).from(financialDocumentApplications).where(and(eq(financialDocumentApplications.pasivoEntryId, id), isNull(financialDocumentApplications.voidedAt))).limit(1);
+        if (applications.length) throw Object.assign(new Error("Anulá primero el pago aplicado a esta factura."), { statusCode: 409 });
+        const [updated] = await tx.update(pasivoEntries).set({ status: "VOID", voidedAt: new Date(), voidedBy: req.user!.id, voidReason: reason, updatedBy: req.user!.id, updatedAt: new Date() }).where(and(eq(pasivoEntries.id, id), isNull(pasivoEntries.voidedAt))).returning();
+        await tx.insert(financialAuditEvents).values({ periodKey: existing.periodKey, entityType: "pasivo_entry", entityId: id, action: "voided", beforeData: existing, afterData: updated, actorUserId: req.user!.id, reason });
+        return { existing, updated };
+      });
+      await refreshNativeFacts(existing.periodKey);
       res.json(updated ?? existing);
     } catch (error: any) { res.status(error.statusCode ?? 400).json({ message: error.message }); }
   });
@@ -592,23 +714,101 @@ export function createLedgerRouter(requireAuth: any) {
   router.post("/cashflow/:id/void", ...finance, async (req, res) => {
     try {
       const id = Number(req.params.id); const { reason } = reasonSchema.parse(req.body);
-      const [existing] = await db.select().from(cashflowTransactions).where(eq(cashflowTransactions.id, id)).limit(1);
-      if (!existing) return res.status(404).json({ message: "Movimiento no encontrado." });
-      await ensurePeriodMutable(existing.periodKey);
-      const [updated] = await db.update(cashflowTransactions).set({ voidedAt: new Date(), voidedBy: req.user!.id, voidReason: reason, updatedBy: req.user!.id, updatedAt: new Date() }).where(and(eq(cashflowTransactions.id, id), isNull(cashflowTransactions.voidedAt))).returning();
-      await db.insert(financialAuditEvents).values({ periodKey: existing.periodKey, entityType: "cashflow_transaction", entityId: id, action: "voided", beforeData: existing, afterData: updated, actorUserId: req.user!.id, reason });
-      res.json(updated ?? existing);
+      const result = await db.transaction(async (tx) => {
+        const [peek] = await tx.select().from(cashflowTransactions).where(eq(cashflowTransactions.id, id)).limit(1);
+        if (!peek) throw Object.assign(new Error("Movimiento no encontrado."), { statusCode: 404 });
+
+        // Una transferencia es un único hecho económico expresado en dos patas.
+        // Si se anula una, se anulan ambas para no fabricar ingresos/egresos.
+        const targets = peek.transferGroupId
+          ? await tx.select().from(cashflowTransactions).where(and(eq(cashflowTransactions.transferGroupId, peek.transferGroupId), isNull(cashflowTransactions.voidedAt)))
+          : [peek];
+        const targetIds = targets.map((row) => row.id).sort((a, b) => a - b);
+        const periods = [...new Set(targets.map((row) => row.periodKey))].sort();
+        for (const periodKey of periods) {
+          await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${'financial-period:' + periodKey}))`);
+          const [close] = await tx.select({ status: financialClosePeriods.status }).from(financialClosePeriods).where(eq(financialClosePeriods.periodKey, periodKey)).limit(1);
+          if (["IN_REVIEW", "CLOSED"].includes(close?.status ?? "")) throw Object.assign(new Error(`El período ${periodKey} no admite cambios.`), { statusCode: 409 });
+          if (close?.status === "PRE_CLOSE") await tx.update(financialClosePeriods).set({ status: "OPEN", updatedAt: new Date() }).where(eq(financialClosePeriods.periodKey, periodKey));
+        }
+        for (const targetId of targetIds) await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${'financial-cashflow:' + targetId}))`);
+
+        const applications = targetIds.length
+          ? await tx.select().from(financialDocumentApplications).where(and(inArray(financialDocumentApplications.cashflowTransactionId, targetIds), isNull(financialDocumentApplications.voidedAt)))
+          : [];
+        const receivableIds = [...new Set(applications.flatMap((application) => application.activoEntryId ? [application.activoEntryId] : []))].sort((a, b) => a - b);
+        const payableIds = [...new Set(applications.flatMap((application) => application.pasivoEntryId ? [application.pasivoEntryId] : []))].sort((a, b) => a - b);
+        for (const documentId of receivableIds) await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${'financial-document:receivable:' + documentId}))`);
+        for (const documentId of payableIds) await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${'financial-document:payable:' + documentId}))`);
+
+        const now = new Date();
+        if (applications.length) {
+          await tx.update(financialDocumentApplications).set({ voidedAt: now, voidedBy: req.user!.id }).where(inArray(financialDocumentApplications.id, applications.map((application) => application.id)));
+        }
+
+        for (const documentId of receivableIds) {
+          const [document] = await tx.select().from(activoEntries).where(eq(activoEntries.id, documentId)).limit(1);
+          if (!document || document.voidedAt) continue;
+          const [applicationTotals] = await tx.select({
+            applied: sql<number>`COALESCE(sum(${financialDocumentApplications.amountOriginal}), 0)::float`,
+            lastAppliedAt: sql<Date | null>`max(${financialDocumentApplications.appliedAt})`,
+          }).from(financialDocumentApplications).where(and(eq(financialDocumentApplications.activoEntryId, documentId), isNull(financialDocumentApplications.voidedAt)));
+          const gross = Number(document.grossAmount ?? document.originalAmount ?? document.montoUSD ?? document.montoARS ?? 0);
+          const applied = Number(applicationTotals?.applied ?? 0);
+          const outstanding = Math.max(0, gross - applied);
+          const status = outstanding <= 0.01 ? "PAID" : applied > 0 ? "PARTIAL" : "PENDING";
+          const [updatedDocument] = await tx.update(activoEntries).set({ outstandingAmount: String(outstanding), status, cobradoAlCierre: status === "PAID", fechaPago: applicationTotals?.lastAppliedAt ?? null, updatedBy: req.user!.id, updatedAt: now }).where(eq(activoEntries.id, documentId)).returning();
+          const revenueLink = await revenueLinkForDocument(tx, document.externalId);
+          if (revenueLink?.id) await tx.update(revenueEvents).set({ collectionPeriodActual: status === "PAID" && applicationTotals?.lastAppliedAt ? new Date(applicationTotals.lastAppliedAt).toISOString().slice(0, 7) : null, updatedAt: now }).where(eq(revenueEvents.id, revenueLink.id));
+          await tx.insert(financialAuditEvents).values({ periodKey: document.periodKey, entityType: "activo_entry", entityId: documentId, action: "payment_application_voided", beforeData: document, afterData: updatedDocument, actorUserId: req.user!.id, reason });
+        }
+
+        for (const documentId of payableIds) {
+          const [document] = await tx.select().from(pasivoEntries).where(eq(pasivoEntries.id, documentId)).limit(1);
+          if (!document || document.voidedAt) continue;
+          const [applicationTotals] = await tx.select({
+            applied: sql<number>`COALESCE(sum(${financialDocumentApplications.amountOriginal}), 0)::float`,
+            lastAppliedAt: sql<Date | null>`max(${financialDocumentApplications.appliedAt})`,
+          }).from(financialDocumentApplications).where(and(eq(financialDocumentApplications.pasivoEntryId, documentId), isNull(financialDocumentApplications.voidedAt)));
+          const gross = Number(document.grossAmount ?? document.originalAmount ?? document.montoUSD ?? document.montoARS ?? 0);
+          const applied = Number(applicationTotals?.applied ?? 0);
+          const outstanding = Math.max(0, gross - applied);
+          const status = outstanding <= 0.01 ? "PAID" : applied > 0 ? "PARTIAL" : "PENDING";
+          const [updatedDocument] = await tx.update(pasivoEntries).set({ outstandingAmount: String(outstanding), status, pagadoAlCierre: status === "PAID", fechaPago: applicationTotals?.lastAppliedAt ?? null, updatedBy: req.user!.id, updatedAt: now }).where(eq(pasivoEntries.id, documentId)).returning();
+          await tx.insert(financialAuditEvents).values({ periodKey: document.periodKey, entityType: "pasivo_entry", entityId: documentId, action: "payment_application_voided", beforeData: document, afterData: updatedDocument, actorUserId: req.user!.id, reason });
+        }
+
+        const updatedRows = targetIds.length
+          ? await tx.update(cashflowTransactions).set({ voidedAt: now, voidedBy: req.user!.id, voidReason: reason, updatedBy: req.user!.id, updatedAt: now }).where(and(inArray(cashflowTransactions.id, targetIds), isNull(cashflowTransactions.voidedAt))).returning()
+          : [];
+        for (const existing of targets) {
+          const updated = updatedRows.find((row) => row.id === existing.id);
+          await tx.insert(financialAuditEvents).values({ periodKey: existing.periodKey, entityType: "cashflow_transaction", entityId: existing.id, action: "voided", beforeData: existing, afterData: updated, actorUserId: req.user!.id, reason });
+        }
+        return { primary: updatedRows.find((row) => row.id === id) ?? peek, periods };
+      });
+      for (const periodKey of result.periods) await refreshNativeFacts(periodKey);
+      res.json(result.primary);
     } catch (error: any) { res.status(error.statusCode ?? 400).json({ message: error.message }); }
   });
 
   router.post("/provisions/:id/approve", ...finance, async (req, res) => {
     try {
       const id = Number(req.params.id);
-      const [existing] = await db.select().from(provisionEntries).where(eq(provisionEntries.id, id)).limit(1);
-      if (!existing) return res.status(404).json({ message: "Provisión no encontrada." });
-      await ensurePeriodMutable(existing.periodKey);
-      const [updated] = await db.update(provisionEntries).set({ status: "APPROVED", approvedBy: req.user!.id, approvedAt: new Date(), updatedAt: new Date() }).where(eq(provisionEntries.id, id)).returning();
-      await db.insert(financialAuditEvents).values({ periodKey: existing.periodKey, entityType: "provision_entry", entityId: id, action: "approved", beforeData: existing, afterData: updated, actorUserId: req.user!.id });
+      const { existing, updated } = await db.transaction(async (tx) => {
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${'financial-provision:' + id}))`);
+        const [existing] = await tx.select().from(provisionEntries).where(eq(provisionEntries.id, id)).limit(1);
+        if (!existing) throw Object.assign(new Error("Provisión no encontrada."), { statusCode: 404 });
+        if (existing.status !== "PROPOSED") return { existing, updated: existing };
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${'financial-period:' + existing.periodKey}))`);
+        const [close] = await tx.select({ status: financialClosePeriods.status }).from(financialClosePeriods).where(eq(financialClosePeriods.periodKey, existing.periodKey)).limit(1);
+        if (["IN_REVIEW", "CLOSED"].includes(close?.status ?? "")) throw Object.assign(new Error(`El período ${existing.periodKey} no admite cambios.`), { statusCode: 409 });
+        if (close?.status === "PRE_CLOSE") await tx.update(financialClosePeriods).set({ status: "OPEN", updatedAt: new Date() }).where(eq(financialClosePeriods.periodKey, existing.periodKey));
+        const [updated] = await tx.update(provisionEntries).set({ status: "APPROVED", approvedBy: req.user!.id, approvedAt: new Date(), updatedAt: new Date() }).where(eq(provisionEntries.id, id)).returning();
+        await tx.insert(financialAuditEvents).values({ periodKey: existing.periodKey, entityType: "provision_entry", entityId: id, action: "approved", beforeData: existing, afterData: updated, actorUserId: req.user!.id });
+        return { existing, updated };
+      });
+      await refreshNativeFacts(existing.periodKey);
       res.json(updated);
     } catch (error: any) { res.status(error.statusCode ?? 500).json({ message: error.message }); }
   });
@@ -617,15 +817,26 @@ export function createLedgerRouter(requireAuth: any) {
     try {
       const id = Number(req.params.id);
       const input = z.object({ amount: z.coerce.number().positive(), periodKey: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/), note: z.string().trim().min(5).max(2000) }).parse(req.body);
-      const [existing] = await db.select().from(provisionEntries).where(eq(provisionEntries.id, id)).limit(1);
-      if (!existing) return res.status(404).json({ message: "Provisión no encontrada." });
-      await ensurePeriodMutable(input.periodKey);
-      const remaining = Number(existing.remainingAmount ?? existing.montoProvision ?? 0);
-      if (input.amount > remaining) return res.status(400).json({ message: "La liberación supera el saldo de la provisión." });
-      const next = remaining - input.amount;
-      const [updated] = await db.update(provisionEntries).set({ remainingAmount: String(next), unwoundAmount: String(Number(existing.unwoundAmount ?? 0) + input.amount), status: next === 0 ? "RELEASED" : "ACTIVE", updatedAt: new Date() }).where(eq(provisionEntries.id, id)).returning();
-      const [movement] = await db.insert(provisionMovements).values({ provisionId: id, periodKey: input.periodKey, movementType: "release", amount: String(-input.amount), currency: existing.currency, note: input.note, createdBy: req.user!.id }).returning();
-      await db.insert(financialAuditEvents).values({ periodKey: input.periodKey, entityType: "provision_entry", entityId: id, action: "released", beforeData: existing, afterData: { provision: updated, movement }, actorUserId: req.user!.id, reason: input.note });
+      const { existing, updated, movement } = await db.transaction(async (tx) => {
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${'financial-provision:' + id}))`);
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${'financial-period:' + input.periodKey}))`);
+        const [close] = await tx.select({ status: financialClosePeriods.status }).from(financialClosePeriods).where(eq(financialClosePeriods.periodKey, input.periodKey)).limit(1);
+        if (["IN_REVIEW", "CLOSED"].includes(close?.status ?? "")) throw Object.assign(new Error(`El período ${input.periodKey} no admite cambios.`), { statusCode: 409 });
+        if (close?.status === "PRE_CLOSE") await tx.update(financialClosePeriods).set({ status: "OPEN", updatedAt: new Date() }).where(eq(financialClosePeriods.periodKey, input.periodKey));
+        const [existing] = await tx.select().from(provisionEntries).where(eq(provisionEntries.id, id)).limit(1);
+        if (!existing) throw Object.assign(new Error("Provisión no encontrada."), { statusCode: 404 });
+        if (!["APPROVED", "ACTIVE"].includes(existing.status)) throw Object.assign(new Error("La provisión debe estar aprobada y activa para liberarla."), { statusCode: 409 });
+        if (input.periodKey < existing.periodKey) throw Object.assign(new Error("La liberación no puede ser anterior a la provisión."), { statusCode: 400 });
+        const remaining = Number(existing.remainingAmount ?? existing.montoProvision ?? 0);
+        if (input.amount > remaining) throw Object.assign(new Error("La liberación supera el saldo de la provisión."), { statusCode: 400 });
+        const next = remaining - input.amount;
+        const [updated] = await tx.update(provisionEntries).set({ remainingAmount: String(next), unwoundAmount: String(Number(existing.unwoundAmount ?? 0) + input.amount), status: next === 0 ? "RELEASED" : "ACTIVE", updatedAt: new Date() }).where(eq(provisionEntries.id, id)).returning();
+        const [movement] = await tx.insert(provisionMovements).values({ provisionId: id, periodKey: input.periodKey, movementType: "release", amount: String(-input.amount), currency: existing.currency, note: input.note, createdBy: req.user!.id }).returning();
+        await tx.insert(financialAuditEvents).values({ periodKey: input.periodKey, entityType: "provision_entry", entityId: id, action: "released", beforeData: existing, afterData: { provision: updated, movement }, actorUserId: req.user!.id, reason: input.note });
+        return { existing, updated, movement };
+      });
+      if (existing.periodKey !== input.periodKey) await refreshNativeFacts(existing.periodKey);
+      await refreshNativeFacts(input.periodKey);
       res.json({ provision: updated, movement });
     } catch (error: any) { res.status(error.statusCode ?? 400).json({ message: error.message }); }
   });
@@ -641,40 +852,30 @@ export function createLedgerRouter(requireAuth: any) {
       const client = await storage.getClient(clientId);
       if (!client) return res.status(404).json({ message: "Client not found" });
 
-      const salesRows = period
-        ? await db.select().from(googleSheetsSales).where(
-            and(
-              sql`lower(${googleSheetsSales.clientName}) = lower(${client.name})`,
-              sql`${googleSheetsSales.monthKey} = ${period}`
-            )
-          )
-        : await db.select().from(googleSheetsSales).where(
-            sql`lower(${googleSheetsSales.clientName}) = lower(${client.name})`
-          );
-
-      const revenue = salesRows.reduce((s, r) => s + parseFloat(r.amountUsd ?? "0"), 0);
-
-      const costsRows = period
-        ? await db.select().from(directCosts).where(
-            and(
-              sql`lower(${directCosts.cliente}) = lower(${client.name})`,
-              eq(directCosts.monthKey, period)
-            )
-          )
-        : await db.select().from(directCosts).where(
-            sql`lower(${directCosts.cliente}) = lower(${client.name})`
-          );
-
-      const cost = costsRows.reduce((s, r) => s + parseFloat(r.montoTotalUSD ?? "0"), 0);
-      const markup = revenue > 0 ? ((revenue - cost) / cost) * 100 : 0;
+      if (period && !/^\d{4}-(0[1-9]|1[0-2])$/.test(period)) return res.status(400).json({ message: "period inválido" });
+      const totalsResult = await db.execute(sql`
+        SELECT COALESCE(sum(f.revenue_usd),0)::float revenue, COALESCE(sum(f.cost_usd),0)::float cost
+        FROM fact_rc_month f
+        JOIN active_projects p ON p.id=f.project_id
+        WHERE p.client_id=${clientId} ${period ? sql`AND f.period_key=${period}` : sql``}
+      `);
+      const totalsRows = Array.isArray(totalsResult) ? totalsResult : (totalsResult as any).rows;
+      const revenue = Number(totalsRows?.[0]?.revenue ?? 0);
+      const cost = Number(totalsRows?.[0]?.cost ?? 0);
+      const markup = cost > 0 ? ((revenue - cost) / cost) * 100 : 0;
       const margin = revenue > 0 ? ((revenue - cost) / revenue) * 100 : 0;
-
-      const teamBreakdown = costsRows.reduce((acc: Record<string, any>, r) => {
-        const key = r.persona || "Unknown";
-        if (!acc[key]) acc[key] = { persona: key, subtipo: r.subtipoCosto || r.rol || null, costoUSD: 0 };
-        acc[key].costoUSD += parseFloat(r.montoTotalUSD ?? "0");
-        return acc;
-      }, {});
+      const teamResult = await db.execute(sql`
+        SELECT COALESCE(person.name,'Sin asignar') persona,
+               COALESCE(person.current_role, person.legacy_role) subtipo,
+               COALESCE(sum(l.cost_usd),0)::float costo_usd
+        FROM fact_labor_month l
+        JOIN active_projects p ON p.id=l.project_id
+        LEFT JOIN personnel person ON person.id=l.person_id
+        WHERE p.client_id=${clientId} ${period ? sql`AND l.period_key=${period}` : sql``}
+        GROUP BY person.name, person.current_role, person.legacy_role
+        ORDER BY 3 DESC
+      `);
+      const teamRows = Array.isArray(teamResult) ? teamResult : (teamResult as any).rows;
 
       res.json({
         client: { id: clientId, name: client.name },
@@ -683,7 +884,7 @@ export function createLedgerRouter(requireAuth: any) {
         cost,
         markup: Math.round(markup * 100) / 100,
         margin: Math.round(margin * 100) / 100,
-        teamBreakdown: Object.values(teamBreakdown),
+        teamBreakdown: (teamRows ?? []).map((row: any) => ({ persona: row.persona, subtipo: row.subtipo, costoUSD: Number(row.costo_usd) || 0 })),
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -721,8 +922,8 @@ export function createLedgerRouter(requireAuth: any) {
   // (autoSyncService.syncLedger) sólo importa el mes en curso y deja de
   // tocar activo/pasivo desde app_mode_cutover_date en adelante — por
   // diseño, para no pisar la carga manual en Mind. Este endpoint es la
-  // excepción explícita: un admin pide un rango puntual (incluso posterior
-  // al cutover) y se trae esos meses tal cual están en la hoja "Activo"/
+  // excepción explícita: un admin pide un rango histórico anterior al
+  // cutover y se trae esos meses tal cual están en la hoja "Activo"/
   // "Pasivo" del Excel MAESTRO. Reutiliza los mismos parsers que el cron
   // (importActivoEntries/importPasivoEntries), así que nunca diverge de
   // cómo se interpreta la planilla. Filas con overrideManual=true (carga
@@ -742,6 +943,10 @@ export function createLedgerRouter(requireAuth: any) {
       }
       if (from > to) {
         return res.status(400).json({ message: "from no puede ser posterior a to" });
+      }
+      const cutoverDate = await getCutoverDate();
+      if (cutoverDate && to >= cutoverDate) {
+        return res.status(400).json({ message: `El backfill sólo admite períodos anteriores al corte ${cutoverDate}. Desde ese mes la fuente es Mind.` });
       }
 
       const periods: string[] = [];

@@ -112,4 +112,3 @@ CREATE INDEX IF NOT EXISTS idx_financial_audit_entity
   ON financial_audit_events(entity_type, entity_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_financial_audit_period
   ON financial_audit_events(period_key, created_at);
-

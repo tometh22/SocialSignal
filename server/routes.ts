@@ -187,6 +187,7 @@ import { googleSheetsServiceAlternative } from "./services/googleSheetsServiceAl
 import { googleSheetsWorkingService } from "./services/googleSheetsWorking";
 import { autoSyncService } from "./services/autoSyncService";
 import { DEFAULT_FX_RATE, getCanonicalFxForMonth } from "./services/fx";
+import { getCutoverDate } from "./etl/time-entries-to-fact-labor";
 import { 
   pickAnalysisCurrency, 
   createAnalysisStructure, 
@@ -9339,7 +9340,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // 📊 DIRECT SHEETS DASHBOARD - reads from Google Sheets in real-time (like Looker Studio)
   // Ingreso recurrente (ARR/MRR) y rendimiento por proyecto. Reemplazan las
   // páginas "ARR", "Rendimiento de Cliente" y "Rendimiento de Proyectos" del
-  // Looker Studio, sobre financial_sot (solapa "Rendimiento Cliente").
+  // Looker Studio, sobre hechos nativos de Mind con fallback histórico.
   const parsePeriodo = (raw: unknown) =>
     typeof raw === 'string' && /^\d{4}-(0[1-9]|1[0-2])$/.test(raw) ? raw : null;
 
@@ -9387,16 +9388,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Ejecutado vs proyectado del ejercicio. Reemplaza la página "Proyección
-  // (resumen)" del Looker Studio, leyendo la misma solapa del Excel MAESTRO.
+  // (resumen)" del Looker Studio, usando hechos y cierres nativos de Mind.
   app.get("/api/v2/executive/proyeccion", requireAuth, requirePermission("dashboard", "finance"), async (req, res) => {
     const year = Number(req.query.year ?? new Date().getFullYear());
     if (!Number.isInteger(year) || year < 2020 || year > 2100) {
       return res.status(400).json({ message: "year inválido" });
     }
     try {
-      const { getProyeccionResumen } = await import('./services/direct-sheets-dashboard');
+      const { getNativeProjectionSummary } = await import('./services/financial-native-dashboard');
       res.setHeader('Cache-Control', 'private, max-age=60, stale-while-revalidate=300');
-      res.json(await getProyeccionResumen(year));
+      res.json(await getNativeProjectionSummary(year));
     } catch (error: any) {
       console.error('❌ Proyección error:', error?.message || error);
       res.status(500).json({ message: 'Error obteniendo la proyección', error: error?.message });
@@ -9414,27 +9415,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const startMonth = p('startMonth');
       const endYear = p('endYear');
       const endMonth = p('endMonth');
-      const {
-        fetchResumenEjecutivoDirectly,
-        getExecutiveDashboardCacheStatus,
-      } = await import('./services/direct-sheets-dashboard');
-      const result = await fetchResumenEjecutivoDirectly(year, month, quarter, yearTotal, startYear, startMonth, endYear, endMonth);
-      const cacheStatus = getExecutiveDashboardCacheStatus();
+      const { fetchNativeExecutiveDashboard } = await import('./services/financial-native-dashboard');
+      const result = await fetchNativeExecutiveDashboard(year, month, quarter, yearTotal, startYear, startMonth, endYear, endMonth);
       res.setHeader('Cache-Control', 'private, max-age=60, stale-while-revalidate=300');
-      res.setHeader('X-Data-Stale', cacheStatus.stale ? 'true' : 'false');
-      if (cacheStatus.fetchedAt) {
-        res.setHeader('X-Data-Fetched-At', new Date(cacheStatus.fetchedAt).toISOString());
-      }
+      res.setHeader('X-Financial-Source', 'mind-native');
       res.json(result);
     } catch (error: any) {
-      console.error('❌ Direct sheets dashboard error:', error?.message || error);
-      res.status(500).json({ message: 'Error fetching dashboard data from Google Sheets', error: error?.message });
+      console.error('❌ Native financial dashboard error:', error?.message || error);
+      res.status(500).json({ message: 'Error construyendo el dashboard financiero de Mind', error: error?.message });
     }
   });
 
   // 📊 MANUAL TRIGGER: ETL Resumen Ejecutivo → monthly_financial_summary
   let resumenSyncInProgress = false;
   app.post("/api/trigger-resumen-ejecutivo-sync", requireAuth, requirePermission("admin"), async (req, res) => {
+    const configuredCutover = await getCutoverDate();
+    if (configuredCutover) return res.status(409).json({ success: false, message: `La importación desde Excel está desactivada desde el corte ${configuredCutover}.` });
     if (resumenSyncInProgress) {
       return res.json({ success: true, skipped: true, message: 'Sync already in progress' });
     }
@@ -9453,7 +9449,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // 🔍 DEBUG: See what Google Sheets returns for Resumen Ejecutivo (helps diagnose missing data)
-  app.get("/api/debug/resumen-ejecutivo-raw", requireAuth, async (req, res) => {
+  app.get("/api/debug/resumen-ejecutivo-raw", requireAuth, requirePermission("admin"), async (req, res) => {
     try {
       const { googleSheetsWorkingService } = await import('./services/googleSheetsWorking');
       const rows = await googleSheetsWorkingService.getResumenEjecutivo();
@@ -9606,8 +9602,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/trigger-activo-sync", requireAuth, async (req, res) => {
+  app.post("/api/trigger-activo-sync", requireAuth, requirePermission("admin"), async (req, res) => {
     try {
+      const configuredCutover = await getCutoverDate();
+      if (configuredCutover) return res.status(409).json({ success: false, message: `La importación desde Excel está desactivada desde el corte ${configuredCutover}.` });
       const { syncActivoToMonthlyFinancialSummary } = await import('./etl/sot-etl.js');
       console.log('🏦 [API] Triggering Activo ETL sync...');
       const result = await syncActivoToMonthlyFinancialSummary();
@@ -9619,7 +9617,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // 🔍 DEBUG: Dry-run Resumen Ejecutivo parsing — shows what the sync WOULD import
-  app.get("/api/debug/resumen-ejecutivo-parsed", requireAuth, async (req, res) => {
+  app.get("/api/debug/resumen-ejecutivo-parsed", requireAuth, requirePermission("admin"), async (req, res) => {
     try {
       const { googleSheetsWorkingService } = await import('./services/googleSheetsWorking.js');
       console.log('🔍 [DEBUG] Parsing Resumen Ejecutivo (dry run)...');
@@ -14478,7 +14476,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Leer fecha de corte del modo app
-  app.get("/api/admin/system-config/cutover-date", requireAuth, async (req, res) => {
+  app.get("/api/admin/system-config/cutover-date", requireAuth, requirePermission("admin"), async (req, res) => {
     try {
       const row = await db.select()
         .from(systemConfig)
@@ -14492,7 +14490,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Establecer fecha de corte del modo app
-  app.post("/api/admin/system-config/cutover-date", requireAuth, async (req, res) => {
+  app.post("/api/admin/system-config/cutover-date", requireAuth, requirePermission("admin"), async (req, res) => {
     try {
       const cutoverDate = String(req.body?.cutoverDate || '').trim();
       if (!/^\d{4}-\d{2}$/.test(cutoverDate)) {
@@ -17792,6 +17790,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Sincronizar datos desde Excel MAESTRO manualmente
   app.post("/api/direct-costs/sync", requireAuth, requirePermission("admin"), async (req, res) => {
     try {
+      const configuredCutover = await getCutoverDate();
+      if (configuredCutover) return res.status(409).json({ success: false, message: `La importación financiera desde Excel está desactivada desde el corte ${configuredCutover}.` });
       console.log('🔄 Iniciando sincronización manual de Excel MAESTRO...');
       
       // Ejecutar sincronización completa usando AutoSyncService
@@ -20067,8 +20067,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // 🔄 CASH FLOW ETL - Sync CashFlow movements from Excel MAESTRO
-  app.post("/api/etl/sot/sync-cashflow", requireAuth, async (req, res) => {
+  app.post("/api/etl/sot/sync-cashflow", requireAuth, requirePermission("admin"), async (req, res) => {
     try {
+      const configuredCutover = await getCutoverDate();
+      if (configuredCutover) return res.status(409).json({ success: false, message: `La importación desde Excel está desactivada desde el corte ${configuredCutover}.` });
       console.log('🔄 Iniciando sincronización de CashFlow...');
       
       const { syncCashFlowMovements } = await import('./etl/sot-etl');
@@ -21025,8 +21027,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ==================== INTERNAL IMPORT INCOMES ENDPOINT ====================
   // Endpoint para importar ingresos desde "Proyectos confirmados y estimados"
-  app.post('/internal/import-incomes', requireAuth, upload.single('file'), async (req: Request, res: Response) => {
+  app.post('/internal/import-incomes', requireAuth, requirePermission("admin"), upload.single('file'), async (req: Request, res: Response) => {
     try {
+      const configuredCutover = await getCutoverDate();
+      if (configuredCutover) return res.status(409).json({ error: `La importación CSV/JSON está desactivada desde el corte ${configuredCutover}; cargá el ingreso en Mind.` });
       console.log('📥 IMPORT INCOMES: Starting import from CSV/JSON');
       
       if (!req.file && !req.body.rows) {
@@ -21074,6 +21078,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Sincronizar ingresos automáticamente desde "Proyectos confirmados y estimados"
   app.get('/internal/sync/income', requireAuth, requirePermission("admin"), async (req: Request, res: Response) => {
     try {
+      const configuredCutover = await getCutoverDate();
+      if (configuredCutover) return res.status(409).json({ error: `La sincronización financiera desde Sheets está desactivada desde el corte ${configuredCutover}.` });
       console.log('🔄 SYNC INCOME: Starting automatic sync from Google Sheets');
       
       // Get data from Google Sheets
@@ -21135,6 +21141,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Sincronizar financial_sot desde "Rendimiento Cliente"
   app.get('/internal/sync/financial', requireAuth, requirePermission("admin"), async (req: Request, res: Response) => {
     try {
+      const configuredCutover = await getCutoverDate();
+      if (configuredCutover) return res.status(409).json({ error: `La sincronización financiera desde Sheets está desactivada desde el corte ${configuredCutover}.` });
       console.log('🔄 SYNC FINANCIAL: Starting sync from "Rendimiento Cliente"');
       
       const { importRendimientoCliente } = await import('./etl/rendimiento-cliente');
@@ -21169,6 +21177,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           error: 'Invalid periodKey format. Expected YYYY-MM (e.g., 2025-08)'
         });
       }
+      const configuredCutover = await getCutoverDate();
+      if (configuredCutover && periodKey >= configuredCutover) return res.status(409).json({ error: `El período ${periodKey} se reconstruye desde Mind; el ETL de Sheets sólo admite meses anteriores a ${configuredCutover}.` });
       
       console.log(`🔄 SYNC MONTHLY AGGREGATES: Processing ${periodKey}...`);
       

@@ -1,5 +1,5 @@
-import { Router, type Request, type Response } from "express";
-import { and, desc, eq, sql } from "drizzle-orm";
+import { Router, type NextFunction, type Request, type Response } from "express";
+import { and, desc, eq, notInArray, sql } from "drizzle-orm";
 import { createHash } from "crypto";
 import { z } from "zod";
 import { db } from "./db";
@@ -10,7 +10,7 @@ import {
   financialIntakeItems,
 } from "@shared/schema";
 import { requirePermission } from "./middleware/requirePermission";
-import { extractFinancialIntake, financialExtractionSchema } from "./services/financial-intake-extractor";
+import { extractFinancialIntake, financialExtractionSchema, financialMissingFields } from "./services/financial-intake-extractor";
 import {
   deleteFinancialIntakeFile,
   financialIntakeUpload,
@@ -71,6 +71,12 @@ async function extractAndSave(itemId: number, input: Parameters<typeof extractFi
 export function createFinancialNativeRouter(requireAuth: any) {
   const router = Router();
   const finance = [requireAuth, requirePermission("finance")];
+  const receiveFiles = (req: Request, res: Response, next: NextFunction) => {
+    financialIntakeUpload.array("files", 10)(req, res, (error: unknown) => {
+      if (error) return res.status(400).json({ message: error instanceof Error ? error.message : "No se pudo leer el archivo." });
+      next();
+    });
+  };
 
   router.get("/intake", ...finance, async (req, res) => {
     try {
@@ -78,8 +84,9 @@ export function createFinancialNativeRouter(requireAuth: any) {
       const pageSize = Math.min(100, Math.max(1, Number(req.query.pageSize) || 30));
       const status = typeof req.query.status === "string" ? req.query.status : null;
       const documentKind = typeof req.query.documentKind === "string" ? req.query.documentKind : null;
-      const conditions = [];
-      if (status && status !== "all") conditions.push(eq(financialIntakeItems.status, status));
+      const conditions: any[] = [];
+      if (status === "open") conditions.push(notInArray(financialIntakeItems.status, ["posted", "rejected"]));
+      else if (status && status !== "all") conditions.push(eq(financialIntakeItems.status, status));
       if (documentKind && documentKind !== "all") conditions.push(eq(financialIntakeItems.documentKind, documentKind));
       const where = conditions.length ? and(...conditions) : undefined;
       const rows = await db.select().from(financialIntakeItems).where(where).orderBy(desc(financialIntakeItems.createdAt)).limit(pageSize).offset((page - 1) * pageSize);
@@ -109,6 +116,8 @@ export function createFinancialNativeRouter(requireAuth: any) {
       res.setHeader("Content-Type", item.mimeType || "application/octet-stream");
       res.setHeader("Content-Disposition", `inline; filename="${safeName}"`);
       res.setHeader("Cache-Control", "private, no-store");
+      res.setHeader("X-Content-Type-Options", "nosniff");
+      res.setHeader("Content-Security-Policy", "sandbox; default-src 'none'");
       res.send(buffer);
     } catch (error) { routeError(res, error); }
   });
@@ -122,7 +131,7 @@ export function createFinancialNativeRouter(requireAuth: any) {
     } catch (error) { routeError(res, error); }
   });
 
-  router.post("/intake/files", ...finance, financialIntakeUpload.array("files", 10), async (req: Request, res: Response) => {
+  router.post("/intake/files", ...finance, receiveFiles, async (req: Request, res: Response) => {
     const createdStorageKeys: string[] = [];
     try {
       const files = (req.files as Express.Multer.File[] | undefined) ?? [];
@@ -147,6 +156,10 @@ export function createFinancialNativeRouter(requireAuth: any) {
           ...stored,
           createdBy: req.user!.id,
         }).returning();
+        // Desde acá el archivo pertenece a una fila persistida y debe
+        // conservarse incluso si la extracción falla, para poder reprocesarlo.
+        const persistedIndex = createdStorageKeys.indexOf(stored.storageKey);
+        if (persistedIndex >= 0) createdStorageKeys.splice(persistedIndex, 1);
         const updated = await extractAndSave(created.id, { text: context, file: { buffer: file.buffer, mimeType: file.mimetype, fileName: file.originalname } });
         items.push(publicItem(updated));
       }
@@ -161,22 +174,23 @@ export function createFinancialNativeRouter(requireAuth: any) {
     try {
       const id = Number(req.params.id);
       const input = updateInputSchema.parse(req.body);
+      const extractedData = { ...input.extractedData, missingFields: financialMissingFields(input.extractedData) };
       const [existing] = await db.select().from(financialIntakeItems).where(eq(financialIntakeItems.id, id)).limit(1);
       if (!existing) return res.status(404).json({ message: "La carga no existe." });
       if (["posted", "rejected"].includes(existing.status)) return res.status(409).json({ message: "Esta carga ya no admite cambios." });
       const [updated] = await db.update(financialIntakeItems).set({
-        extractedData: input.extractedData,
-        documentKind: input.extractedData.documentKind,
-        suggestedTarget: input.extractedData.suggestedTarget,
-        fieldConfidence: input.extractedData.fieldConfidence,
-        warnings: input.extractedData.warnings,
+        extractedData,
+        documentKind: extractedData.documentKind,
+        suggestedTarget: extractedData.suggestedTarget,
+        fieldConfidence: extractedData.fieldConfidence,
+        warnings: extractedData.warnings,
         reviewNotes: input.reviewNotes,
-        status: input.extractedData.missingFields.length ? "needs_review" : "approved",
+        status: extractedData.missingFields.length ? "needs_review" : "approved",
         reviewedBy: req.user!.id,
         reviewedAt: new Date(),
         updatedAt: new Date(),
       }).where(eq(financialIntakeItems.id, id)).returning();
-      await db.insert(financialAuditEvents).values({ entityType: "financial_intake_item", entityId: id, action: "reviewed", beforeData: existing.extractedData, afterData: input.extractedData, intakeItemId: id, actorUserId: req.user!.id });
+      await db.insert(financialAuditEvents).values({ entityType: "financial_intake_item", entityId: id, action: "reviewed", beforeData: existing.extractedData, afterData: extractedData, intakeItemId: id, actorUserId: req.user!.id });
       res.json(publicItem(updated));
     } catch (error) { routeError(res, error); }
   });
@@ -241,8 +255,10 @@ export function createFinancialNativeRouter(requireAuth: any) {
       const input = z.object({ status: z.enum(["accepted", "resolved"]), resolution: z.string().trim().min(5).max(2_000) }).parse(req.body);
       const [period] = await db.select().from(financialClosePeriods).where(eq(financialClosePeriods.periodKey, req.params.period)).limit(1);
       if (!period || period.status === "CLOSED") return res.status(409).json({ message: "El período no admite cambios." });
+      const [check] = await db.select().from(financialCloseChecks).where(and(eq(financialCloseChecks.id, checkId), eq(financialCloseChecks.closePeriodId, period.id))).limit(1);
+      if (!check) return res.status(404).json({ message: "El control no existe." });
+      if (check.severity === "critical") return res.status(409).json({ message: "Los controles críticos no admiten excepción: corregí el dato y ejecutá nuevamente el pre-cierre." });
       const [updated] = await db.update(financialCloseChecks).set({ ...input, resolvedBy: req.user!.id, resolvedAt: new Date(), updatedAt: new Date() }).where(and(eq(financialCloseChecks.id, checkId), eq(financialCloseChecks.closePeriodId, period.id))).returning();
-      if (!updated) return res.status(404).json({ message: "El control no existe." });
       await db.insert(financialAuditEvents).values({ periodKey: req.params.period, entityType: "financial_close_check", entityId: checkId, action: input.status, actorUserId: req.user!.id, reason: input.resolution });
       res.json(updated);
     } catch (error) { routeError(res, error); }

@@ -8,6 +8,7 @@ import { db } from '../db';
 import {
   timeEntries, personnel, roles, activeProjects, clients, quotations,
   exchangeRates, systemConfig, factLaborMonth, tasks, taskTimeEntries,
+  financialClosePeriods,
 } from '@shared/schema';
 import { eq, and, gte, lte, or, isNull, inArray, sql } from 'drizzle-orm';
 import { canon, generateProjectKey } from '../utils/normalize';
@@ -69,6 +70,14 @@ export async function buildFactLaborFromTimeEntries(
     throw new Error(
       `Period ${periodKey} is before cutover date ${cutoverDate}. Set cutover date earlier or use Excel mode for historical periods.`,
     );
+  }
+  const close = await db.select({ status: financialClosePeriods.status })
+    .from(financialClosePeriods)
+    .where(eq(financialClosePeriods.periodKey, periodKey))
+    .limit(1)
+    .then((rows) => rows[0]);
+  if (["IN_REVIEW", "CLOSED"].includes(close?.status ?? "")) {
+    throw new Error(`El período financiero ${periodKey} está ${close?.status === "CLOSED" ? "cerrado" : "en revisión"}; reabrilo antes de reconstruir costos laborales.`);
   }
 
   const [yearStr, monthStr] = periodKey.split('-');

@@ -146,4 +146,3 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_pasivo_native_external
   ON pasivo_entries(source, external_id) WHERE external_id IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS uq_cashflow_native_external
   ON cashflow_transactions(source, external_id) WHERE external_id IS NOT NULL;
-

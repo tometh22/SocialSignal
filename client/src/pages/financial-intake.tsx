@@ -9,11 +9,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { AlertCircle, CheckCircle2, FileText, Image, Loader2, Paperclip, RefreshCw, Send, Sparkles, UploadCloud, XCircle } from "lucide-react";
+import { AlertCircle, CheckCircle2, FileText, Image, Loader2, Paperclip, Plus, RefreshCw, Send, Sparkles, UploadCloud, XCircle } from "lucide-react";
 
-type DocumentKind = "customer_invoice" | "customer_collection" | "supplier_invoice" | "supplier_payment" | "bank_statement" | "fee_confirmation" | "exchange_rate" | "tax_settlement" | "provision" | "unknown";
-type LineItem = { date: string | null; description: string | null; amount: number; currency: "ARS" | "USD" | "EUR" | "OTHER"; direction: "IN" | "OUT"; bank: string | null; reference: string | null };
+type DocumentKind = "customer_invoice" | "customer_collection" | "supplier_invoice" | "supplier_payment" | "bank_statement" | "fee_confirmation" | "exchange_rate" | "inflation" | "tax_settlement" | "provision" | "unknown";
+type LineItem = { date: string | null; description: string | null; amount: number; currency: "ARS" | "USD" | "EUR" | "OTHER"; direction: "IN" | "OUT"; bank: string | null; reference: string | null; isInternalTransfer: boolean; transferReference: string | null };
 type Extraction = {
   documentKind: DocumentKind; suggestedTarget: string; periodKey: string | null; issueDate: string | null;
   dueDate: string | null; paymentDate: string | null; documentNumber: string | null; counterparty: string | null;
@@ -35,14 +36,34 @@ const KIND_LABELS: Record<DocumentKind, string> = {
   customer_invoice: "Factura a cliente", customer_collection: "Cobro de cliente", supplier_invoice: "Factura de proveedor",
   supplier_payment: "Pago a proveedor", bank_statement: "Extracto bancario", fee_confirmation: "Fee confirmado",
   exchange_rate: "Tipo de cambio", tax_settlement: "Liquidación impositiva", provision: "Provisión", unknown: "Sin clasificar",
+  inflation: "Inflación / IPC",
 };
 const TARGET_BY_KIND: Record<DocumentKind, string> = {
   customer_invoice: "activo", customer_collection: "cashflow", supplier_invoice: "pasivo", supplier_payment: "cashflow",
-  bank_statement: "cashflow", fee_confirmation: "revenue", exchange_rate: "fx", tax_settlement: "tax", provision: "provision", unknown: "unknown",
+  bank_statement: "cashflow", fee_confirmation: "revenue", exchange_rate: "fx", inflation: "inflation", tax_settlement: "tax", provision: "provision", unknown: "unknown",
 };
 const STATUS_LABELS: Record<string, string> = { received: "Recibido", processing: "Procesando", needs_review: "Revisar", approved: "Listo", rejected: "Rechazado", posted: "Contabilizado", failed: "Falló" };
 
 function responseError(error: unknown) { return error instanceof Error ? error.message : "No se pudo completar la operación."; }
+function validIsoDate(value: string | null) { if (!value || !/^\d{4}-(0[1-9]|1[0-2])-([0-2]\d|3[01])$/.test(value)) return false; const date = new Date(`${value}T12:00:00.000Z`); return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value; }
+function missingFields(data: Extraction): string[] {
+  const missing = new Set<string>();
+  if (data.documentKind === "unknown") missing.add("documentKind");
+  const hasDatedRateLines = data.documentKind === "exchange_rate" && data.lineItems.length > 0;
+  if (!["unknown", "bank_statement"].includes(data.documentKind) && !hasDatedRateLines && !data.periodKey) missing.add("periodKey");
+  if (data.documentKind === "bank_statement") { if (!data.lineItems.length) missing.add("lineItems"); if (data.lineItems.some((line) => !validIsoDate(line.date))) missing.add("lineItems.date"); if (data.lineItems.some((line) => !(line.amount > 0))) missing.add("lineItems.amount"); if (data.lineItems.some((line) => line.isInternalTransfer && !line.transferReference)) missing.add("lineItems.transferReference"); if (data.lineItems.some((line) => ["EUR", "OTHER"].includes(line.currency))) missing.add("lineItems.currencyConversion"); if (data.lineItems.some((line) => line.currency === "ARS") && !(Number(data.exchangeRate) > 0)) missing.add("exchangeRate"); }
+  else if (data.documentKind === "exchange_rate") { if (data.lineItems.length) { if (data.lineItems.some((line) => !validIsoDate(line.date))) missing.add("lineItems.date"); if (data.lineItems.some((line) => !(line.amount > 0))) missing.add("lineItems.amount"); } else if (!(Number(data.exchangeRate ?? data.totalAmount) > 0)) missing.add("exchangeRate"); }
+  else if (data.documentKind === "inflation") { if (!(Number(data.totalAmount) > 0)) missing.add("totalAmount"); }
+  else if (data.documentKind !== "unknown") { if (!(Number(data.totalAmount) > 0)) missing.add("totalAmount"); if (!data.currency) missing.add("currency"); if (["EUR", "OTHER"].includes(data.currency ?? "")) missing.add("currencyConversion"); if (data.currency === "ARS" && !(Number(data.exchangeRate) > 0)) missing.add("exchangeRate"); if (data.netAmount != null && (data.netAmount < 0 || data.netAmount > Number(data.totalAmount))) missing.add("netAmount"); if (data.taxAmount != null && (data.taxAmount < 0 || data.taxAmount > Number(data.totalAmount))) missing.add("taxAmount"); }
+  if (["customer_invoice", "supplier_invoice"].includes(data.documentKind)) { if (!validIsoDate(data.issueDate)) missing.add("issueDate"); if (!data.documentNumber) missing.add("documentNumber"); if (!data.counterparty && !data.clientName) missing.add("counterparty"); }
+  if (["customer_collection", "supplier_payment"].includes(data.documentKind) && !validIsoDate(data.paymentDate) && !validIsoDate(data.issueDate)) missing.add("paymentDate");
+  if (data.dueDate && !validIsoDate(data.dueDate)) missing.add("dueDate");
+  if (data.deliveryStart && !/^\d{4}-(0[1-9]|1[0-2])$/.test(data.deliveryStart)) missing.add("deliveryStart");
+  if (data.deliveryEnd && !/^\d{4}-(0[1-9]|1[0-2])$/.test(data.deliveryEnd)) missing.add("deliveryEnd");
+  if (data.deliveryStart && data.deliveryEnd && data.deliveryStart > data.deliveryEnd) missing.add("deliveryPeriod");
+  if (data.documentKind === "fee_confirmation" && !data.clientName && !data.counterparty) missing.add("clientName");
+  return [...missing];
+}
 
 export default function FinancialIntakePage() {
   const [text, setText] = useState("");
@@ -56,17 +77,17 @@ export default function FinancialIntakePage() {
   const { toast } = useToast();
   const qc = useQueryClient();
 
-  const statusParam = statusFilter === "open" ? "all" : statusFilter;
+  const statusParam = statusFilter;
   const query = useQuery<{ items: IntakeItem[]; total: number }>({
     queryKey: ["financial-native-intake", statusParam],
     queryFn: () => authFetchJson(`/api/financial-native/intake?status=${statusParam}&pageSize=100`),
   });
   const allItems = query.data?.items ?? [];
-  const items = statusFilter === "open" ? allItems.filter((item) => !["posted", "rejected"].includes(item.status)) : allItems;
+  const items = allItems;
   const selected = allItems.find((item) => item.id === selectedId) ?? null;
 
   useEffect(() => {
-    if (!selectedId && items[0]) setSelectedId(items[0].id);
+    if (!items.some((item) => item.id === selectedId)) setSelectedId(items[0]?.id ?? null);
   }, [items, selectedId]);
   useEffect(() => {
     setDraft(selected?.extractedData ?? null);
@@ -90,7 +111,7 @@ export default function FinancialIntakePage() {
     onError: (e) => toast({ title: "Error al subir", description: responseError(e), variant: "destructive" }),
   });
   const saveMutation = useMutation({
-    mutationFn: () => authFetchJson(`/api/financial-native/intake/${selectedId}`, { method: "PATCH", body: JSON.stringify({ extractedData: draft, reviewNotes: reviewNotes || null }) }),
+    mutationFn: () => authFetchJson(`/api/financial-native/intake/${selectedId}`, { method: "PATCH", body: JSON.stringify({ extractedData: draft ? { ...draft, missingFields: missingFields(draft) } : draft, reviewNotes: reviewNotes || null }) }),
     onSuccess: () => { refresh(); toast({ title: "Revisión guardada" }); },
     onError: (e) => toast({ title: "No se guardó", description: responseError(e), variant: "destructive" }),
   });
@@ -103,6 +124,7 @@ export default function FinancialIntakePage() {
   const busy = textMutation.isPending || uploadMutation.isPending || saveMutation.isPending || actionMutation.isPending;
   const openCount = allItems.filter((i) => !["posted", "rejected"].includes(i.status)).length;
   const needsCount = allItems.filter((i) => i.status === "needs_review" || i.status === "failed").length;
+  const currentMissing = draft ? missingFields(draft) : [];
 
   function acceptFiles(files: File[]) { if (files.length) uploadMutation.mutate(files.slice(0, 10)); }
   function onDrop(event: DragEvent<HTMLDivElement>) { event.preventDefault(); setDragging(false); acceptFiles(Array.from(event.dataTransfer.files)); }
@@ -113,6 +135,12 @@ export default function FinancialIntakePage() {
   function setField<K extends keyof Extraction>(key: K, value: Extraction[K]) { setDraft((old) => old ? { ...old, [key]: value } : old); }
   function numberValue(value: string) { return value.trim() === "" ? null : Number(value); }
   function reject() { const reason = window.prompt("Motivo del rechazo (queda en auditoría):"); if (reason) actionMutation.mutate({ action: "reject", body: { reason } }); }
+  async function publish() {
+    try {
+      await saveMutation.mutateAsync();
+      await actionMutation.mutateAsync({ action: "post" });
+    } catch { /* cada mutación informa su propio error */ }
+  }
 
   return (
     <div className="space-y-6" onPaste={onPaste}>
@@ -132,7 +160,7 @@ export default function FinancialIntakePage() {
             <TabsContent value="file" className="space-y-3 pt-3">
               <div className={`rounded-xl border-2 border-dashed p-8 text-center transition ${dragging ? "border-rose-500 bg-rose-50" : "border-slate-200"}`} onDragOver={(e) => { e.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)} onDrop={onDrop}>
                 <UploadCloud className="mx-auto mb-3 h-8 w-8 text-rose-500" /><p className="font-medium">Arrastrá PDFs, imágenes, Word o Excel</p><p className="mt-1 text-xs text-muted-foreground">También podés pegar una captura con ⌘V. Hasta 10 archivos de 20 MB.</p>
-                <input ref={fileInput} type="file" multiple className="hidden" accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,.csv,.docx,.xlsx" onChange={(e) => acceptFiles(Array.from(e.target.files ?? []))} />
+                <input ref={fileInput} type="file" multiple className="hidden" accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,.docx,.xlsx" onChange={(e) => acceptFiles(Array.from(e.target.files ?? []))} />
                 <Button className="mt-4" variant="outline" onClick={() => fileInput.current?.click()}>Elegir archivos</Button>
               </div>
               <Input value={context} onChange={(e) => setContext(e.target.value)} placeholder="Contexto opcional: banco, cliente, período o cualquier aclaración" />
@@ -155,7 +183,7 @@ export default function FinancialIntakePage() {
           </CardContent>
         </Card>
 
-        {!selected || !draft ? <Card><CardContent className="py-20 text-center text-muted-foreground">Seleccioná una entrada para revisar el borrador.</CardContent></Card> :
+        {!selected ? <Card><CardContent className="py-20 text-center text-muted-foreground">Seleccioná una entrada para revisar el borrador.</CardContent></Card> : !draft ? <Card><CardContent className="space-y-4 py-12 text-center"><AlertCircle className="mx-auto h-8 w-8 text-amber-600" /><div><p className="font-medium">No se pudo generar el borrador</p><p className="mt-1 text-sm text-muted-foreground">{selected.extractionError || "Reintentá el procesamiento o rechazá esta entrada."}</p></div><div className="flex justify-center gap-2"><Button variant="outline" disabled={busy} onClick={() => actionMutation.mutate({ action: "reprocess" })}><RefreshCw className="mr-2 h-4 w-4" />Reprocesar</Button><Button variant="ghost" className="text-red-600" disabled={busy} onClick={reject}><XCircle className="mr-2 h-4 w-4" />Rechazar</Button></div></CardContent></Card> :
           <div className="space-y-4">
             <Card><CardHeader><div className="flex flex-wrap items-center justify-between gap-3"><div><CardTitle className="text-lg">Revisar antes de contabilizar</CardTitle><p className="mt-1 text-xs text-muted-foreground">Confianza de extracción: {Math.round((draft.confidence || 0) * 100)}%</p></div><div className="flex gap-2"><StatusBadge status={selected.status} />{selected.fileAvailable && <Button size="sm" variant="outline" asChild><a href={`/api/financial-native/intake/${selected.id}/file`} target="_blank" rel="noreferrer">Ver original</a></Button>}</div></div></CardHeader>
               <CardContent className="space-y-5">
@@ -183,9 +211,10 @@ export default function FinancialIntakePage() {
                 </div>
                 <Field label="Descripción"><Textarea value={draft.description ?? ""} onChange={(e) => setField("description", e.target.value || null)} /></Field>
                 {draft.documentKind === "bank_statement" && <LineItemsEditor rows={draft.lineItems} onChange={(lineItems) => setField("lineItems", lineItems)} />}
+                {draft.documentKind === "exchange_rate" && <RateItemsEditor rows={draft.lineItems} onChange={(lineItems) => setField("lineItems", lineItems)} />}
                 <Field label="Notas de revisión"><Textarea value={reviewNotes} onChange={(e) => setReviewNotes(e.target.value)} placeholder="Decisiones o aclaraciones que deben quedar en auditoría" /></Field>
-                {draft.missingFields.length > 0 && <p className="text-xs text-amber-700">Pendientes detectados: {draft.missingFields.join(", ")}. Al corregirlos, quitá el nombre correspondiente de la lista.</p>}
-                <div className="flex flex-wrap justify-between gap-2 border-t pt-4"><div className="flex gap-2"><Button variant="ghost" disabled={busy || selected.status === "posted"} onClick={() => actionMutation.mutate({ action: "reprocess" })}><RefreshCw className="mr-2 h-4 w-4" />Reprocesar</Button><Button variant="ghost" className="text-red-600" disabled={busy || selected.status === "posted"} onClick={reject}><XCircle className="mr-2 h-4 w-4" />Rechazar</Button></div><div className="flex gap-2"><Button variant="outline" disabled={busy || selected.status === "posted"} onClick={() => saveMutation.mutate()}>Guardar revisión</Button><Button disabled={busy || selected.status === "posted" || selected.status === "failed" || draft.missingFields.length > 0} onClick={() => actionMutation.mutate({ action: "post" })}><CheckCircle2 className="mr-2 h-4 w-4" />Contabilizar</Button></div></div>
+                {currentMissing.length > 0 && <p className="text-xs text-amber-700">Falta completar: {currentMissing.join(", ")}.</p>}
+                <div className="flex flex-wrap justify-between gap-2 border-t pt-4"><div className="flex gap-2"><Button variant="ghost" disabled={busy || selected.status === "posted"} onClick={() => actionMutation.mutate({ action: "reprocess" })}><RefreshCw className="mr-2 h-4 w-4" />Reprocesar</Button><Button variant="ghost" className="text-red-600" disabled={busy || selected.status === "posted"} onClick={reject}><XCircle className="mr-2 h-4 w-4" />Rechazar</Button></div><div className="flex gap-2"><Button variant="outline" disabled={busy || selected.status === "posted"} onClick={() => saveMutation.mutate()}>Guardar revisión</Button><Button disabled={busy || selected.status === "posted" || selected.status === "failed" || currentMissing.length > 0} onClick={publish}><CheckCircle2 className="mr-2 h-4 w-4" />Guardar y contabilizar</Button></div></div>
               </CardContent>
             </Card>
             {selected.linkedRecords.length > 0 && <Card><CardHeader><CardTitle className="text-base">Registros creados</CardTitle></CardHeader><CardContent className="flex flex-wrap gap-2">{selected.linkedRecords.map((link) => <Badge key={`${link.type}-${link.id}`} variant="secondary">{link.type} #{link.id}</Badge>)}</CardContent></Card>}
@@ -197,8 +226,14 @@ export default function FinancialIntakePage() {
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) { return <div className="space-y-1.5"><Label>{label}</Label>{children}</div>; }
 function StatusBadge({ status }: { status: string }) { return <Badge variant={status === "failed" || status === "rejected" ? "destructive" : status === "posted" ? "default" : "secondary"}>{STATUS_LABELS[status] ?? status}</Badge>; }
+function RateItemsEditor({ rows, onChange }: { rows: LineItem[]; onChange: (rows: LineItem[]) => void }) {
+  const update = (index: number, next: Partial<LineItem>) => onChange(rows.map((row, i) => i === index ? { ...row, ...next } : row));
+  const add = () => onChange([...rows, { date: null, description: "Proyección REM", amount: 0, currency: "ARS", direction: "IN", bank: null, reference: null, isInternalTransfer: false, transferReference: null }]);
+  return <div className="space-y-2"><div className="flex items-center justify-between"><div><Label>Curva REM / tipos de cambio futuros</Label><p className="text-xs text-muted-foreground">Usá una fila por mes sólo cuando el archivo contiene varias proyecciones.</p></div><Button type="button" size="sm" variant="outline" onClick={add}><Plus className="mr-1 h-4 w-4" />Agregar mes</Button></div>{rows.length > 0 && <div className="space-y-2 rounded-lg border p-2">{rows.map((row, index) => <div key={index} className="grid gap-2 md:grid-cols-[150px_150px_1fr_40px]"><Input type="month" value={row.date?.slice(0, 7) ?? ""} onChange={(e) => update(index, { date: e.target.value ? `${e.target.value}-01` : null })} /><Input type="number" step="0.0001" value={row.amount} onChange={(e) => update(index, { amount: Number(e.target.value) })} placeholder="ARS por USD" /><Input value={row.description ?? ""} onChange={(e) => update(index, { description: e.target.value || null })} placeholder="Fuente / horizonte" /><Button size="icon" variant="ghost" onClick={() => onChange(rows.filter((_, i) => i !== index))}><XCircle className="h-4 w-4" /></Button></div>)}</div>}</div>;
+}
 function LineItemsEditor({ rows, onChange }: { rows: LineItem[]; onChange: (rows: LineItem[]) => void }) {
   const totals = useMemo(() => rows.reduce((sum, row) => sum + (row.direction === "IN" ? row.amount : -row.amount), 0), [rows]);
   const update = (index: number, next: Partial<LineItem>) => onChange(rows.map((row, i) => i === index ? { ...row, ...next } : row));
-  return <div className="space-y-2"><div className="flex items-center justify-between"><Label>Movimientos del extracto ({rows.length})</Label><span className="text-xs text-muted-foreground">Neto extraído: {totals.toLocaleString("es-AR")}</span></div><div className="max-h-80 space-y-2 overflow-auto rounded-lg border p-2">{rows.map((row, index) => <div key={index} className="grid grid-cols-[120px_1fr_110px_100px_40px] gap-2"><Input type="date" value={row.date ?? ""} onChange={(e) => update(index, { date: e.target.value || null })} /><Input value={row.description ?? ""} onChange={(e) => update(index, { description: e.target.value || null })} placeholder="Detalle" /><Input type="number" value={row.amount} onChange={(e) => update(index, { amount: Number(e.target.value) })} /><Select value={row.direction} onValueChange={(direction: "IN" | "OUT") => update(index, { direction })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="IN">Ingreso</SelectItem><SelectItem value="OUT">Egreso</SelectItem></SelectContent></Select><Button size="icon" variant="ghost" onClick={() => onChange(rows.filter((_, i) => i !== index))}><XCircle className="h-4 w-4" /></Button></div>)}{!rows.length && <p className="p-4 text-center text-sm text-muted-foreground">No se detectaron movimientos. Reprocesá o cargalos desde un mensaje.</p>}</div></div>;
+  const add = () => onChange([...rows, { date: null, description: null, amount: 0, currency: "USD", direction: "OUT", bank: null, reference: null, isInternalTransfer: false, transferReference: null }]);
+  return <div className="space-y-2"><div className="flex flex-wrap items-center justify-between gap-2"><div><Label>Movimientos del extracto ({rows.length})</Label><p className="text-xs text-muted-foreground">Neto extraído: {totals.toLocaleString("es-AR")}</p></div><Button type="button" size="sm" variant="outline" onClick={add}><Plus className="mr-1 h-4 w-4" />Agregar movimiento</Button></div><div className="max-h-[460px] space-y-2 overflow-auto rounded-lg border p-2">{rows.map((row, index) => <div key={index} className="space-y-2 rounded-lg bg-slate-50 p-3"><div className="grid gap-2 md:grid-cols-[135px_minmax(180px,1fr)_120px_100px_110px_40px]"><Input type="date" value={row.date ?? ""} onChange={(e) => update(index, { date: e.target.value || null })} /><Input value={row.description ?? ""} onChange={(e) => update(index, { description: e.target.value || null })} placeholder="Detalle" /><Input type="number" step="0.01" value={row.amount} onChange={(e) => update(index, { amount: Number(e.target.value) })} /><Select value={row.currency} onValueChange={(currency: LineItem["currency"]) => update(index, { currency })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ARS">ARS</SelectItem><SelectItem value="USD">USD</SelectItem><SelectItem value="EUR">EUR</SelectItem><SelectItem value="OTHER">Otra</SelectItem></SelectContent></Select><Select value={row.direction} onValueChange={(direction: "IN" | "OUT") => update(index, { direction })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="IN">Ingreso</SelectItem><SelectItem value="OUT">Egreso</SelectItem></SelectContent></Select><Button size="icon" variant="ghost" onClick={() => onChange(rows.filter((_, i) => i !== index))}><XCircle className="h-4 w-4" /></Button></div><div className="grid gap-2 md:grid-cols-2"><Input value={row.bank ?? ""} onChange={(e) => update(index, { bank: e.target.value || null })} placeholder="Banco / cuenta" /><Input value={row.reference ?? ""} onChange={(e) => update(index, { reference: e.target.value || null })} placeholder="Referencia / comprobante" /></div><label className="flex items-center gap-2 text-xs"><Checkbox checked={row.isInternalTransfer} onCheckedChange={(checked) => update(index, { isInternalTransfer: checked === true })} />Transferencia entre cuentas propias</label>{row.isInternalTransfer && <Input value={row.transferReference ?? ""} onChange={(e) => update(index, { transferReference: e.target.value || null })} placeholder="Referencia común para vincular ambas puntas" />}</div>)}{!rows.length && <p className="p-4 text-center text-sm text-muted-foreground">No se detectaron movimientos. Agregalos acá o reprocesá el documento.</p>}</div></div>;
 }

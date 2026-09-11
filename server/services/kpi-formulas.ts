@@ -21,7 +21,7 @@ const pool = {
  * - Facturado: monthly_financial_summary.facturacion_total
  * - Caja/Activo/Pasivo: monthly_financial_summary (snapshots)
  * - Horas: fact_labor_month
- * - Cash In/Out: cash_movements
+ * - Cash In/Out: cashflow_transactions
  */
 
 // =====================================================
@@ -123,7 +123,7 @@ export interface FinancialSummaryResult {
   cajaTotalIsNull: boolean;
   activoTotal: number;
   pasivoTotal: number;
-  facturadoSource: 'monthly_financial_summary' | 'fact_rc_month' | 'financial_sot' | 'none';
+  facturadoSource: 'monthly_financial_summary' | 'revenue_events' | 'financial_sot' | 'none';
   warnings: string[];
 }
 
@@ -131,9 +131,12 @@ export async function fetchFinancialSummary(periodKey: string): Promise<Financia
   const warnings: string[] = [];
 
   const { rows: [data] } = await pool.query(`
-    SELECT facturacion_total, caja_total, total_activo, total_pasivo
-    FROM monthly_financial_summary
-    WHERE period_key = $1
+    WITH cutover AS (SELECT description period_key FROM system_config WHERE config_key='app_mode_cutover_date' AND description IS NOT NULL)
+    SELECT m.facturacion_total, m.caja_total, m.total_activo, m.total_pasivo
+    FROM monthly_financial_summary m
+    LEFT JOIN financial_close_periods c ON c.period_key=m.period_key
+    WHERE m.period_key = $1
+      AND (NOT EXISTS (SELECT 1 FROM cutover) OR m.period_key < (SELECT period_key FROM cutover) OR c.status='CLOSED')
   `, [periodKey]);
 
   let facturado = parseFloat(data?.facturacion_total || '0');
@@ -148,28 +151,25 @@ export async function fetchFinancialSummary(periodKey: string): Promise<Financia
 
   // Fallback para facturado con WARNINGS explícitos
   if (facturado === 0) {
-    const { rows: [rcData] } = await pool.query(`
-      SELECT COALESCE(SUM(revenue_usd::numeric), 0) as total_revenue
-      FROM fact_rc_month
-      WHERE period_key = $1
+    const { rows: [nativeData] } = await pool.query(`
+      SELECT COALESCE(SUM(amount_usd::numeric), 0) as total_revenue
+      FROM revenue_events
+      WHERE invoice_period = $1 AND status <> 'cancelled'
     `, [periodKey]);
-    const rcRevenue = parseFloat(rcData?.total_revenue || '0');
-    if (rcRevenue > 0) {
-      facturadoSource = 'fact_rc_month';
-      warnings.push(`⚠️ Facturado: monthly_financial_summary vacío, usando fact_rc_month ($${rcRevenue.toFixed(2)})`);
-      console.warn(`⚠️ [Finanzas] Facturado fallback a fact_rc_month para ${periodKey}: $${rcRevenue.toFixed(2)}`);
-      facturado = rcRevenue;
+    const nativeRevenue = parseFloat(nativeData?.total_revenue || '0');
+    if (nativeRevenue > 0) {
+      facturadoSource = 'revenue_events';
+      facturado = nativeRevenue;
     } else {
       const { rows: [sotData] } = await pool.query(`
-        SELECT COALESCE(SUM(revenue_usd::numeric), 0) as total_revenue
+        WITH cutover AS (SELECT description period_key FROM system_config WHERE config_key='app_mode_cutover_date' AND description IS NOT NULL)
+        SELECT COALESCE(SUM(revenue_usd::numeric),0) AS total_revenue
         FROM financial_sot
-        WHERE month_key = $1
+        WHERE month_key=$1 AND (NOT EXISTS (SELECT 1 FROM cutover) OR month_key < (SELECT period_key FROM cutover))
       `, [periodKey]);
       const sotRevenue = parseFloat(sotData?.total_revenue || '0');
       if (sotRevenue > 0) {
         facturadoSource = 'financial_sot';
-        warnings.push(`⚠️ Facturado: ambas fuentes principales vacías, usando financial_sot ($${sotRevenue.toFixed(2)})`);
-        console.warn(`⚠️ [Finanzas] Facturado fallback a financial_sot para ${periodKey}: $${sotRevenue.toFixed(2)}`);
         facturado = sotRevenue;
       } else {
         facturadoSource = 'none';
@@ -179,16 +179,40 @@ export async function fetchFinancialSummary(periodKey: string): Promise<Financia
     }
   }
 
+  let liveCaja = cajaTotalRaw;
+  let liveActivo = activoTotal;
+  let livePasivo = pasivoTotal;
   if (cajaTotalIsNull) {
-    warnings.push(`⚠️ Caja total: dato no disponible en monthly_financial_summary para ${periodKey}`);
+    const { rows: [live] } = await pool.query(`
+      WITH fx AS (
+        SELECT COALESCE((SELECT rate::numeric FROM exchange_rates WHERE year=left($1,4)::int AND month=right($1,2)::int AND is_active=true ORDER BY CASE WHEN rate_type='end_of_month' THEN 0 WHEN rate_type='average' THEN 1 ELSE 2 END,updated_at DESC,id DESC LIMIT 1),1) rate
+      ), cash AS (
+        SELECT COALESCE(sum(CASE WHEN tipo_movimiento='Ingreso' AND transfer_group_id IS NULL THEN COALESCE(monto_usd,monto_ars/NULLIF(cotizacion,0),0) WHEN tipo_movimiento='Egreso' AND transfer_group_id IS NULL THEN -COALESCE(monto_usd,monto_ars/NULLIF(cotizacion,0),0) ELSE 0 END),0) total
+        FROM cashflow_transactions WHERE period_key<=$1 AND source<>'excel' AND voided_at IS NULL
+      ), opening AS (
+        SELECT COALESCE(sum(CASE WHEN currency='ARS' THEN opening_balance/(SELECT rate FROM fx) ELSE opening_balance END),0) total FROM financial_accounts WHERE is_active=true
+      ), receivables AS (
+        SELECT COALESCE(sum(CASE WHEN currency='ARS' THEN COALESCE(outstanding_amount,0)/NULLIF(cotizacion,0) ELSE COALESCE(outstanding_amount,0) END),0) total FROM activo_entries WHERE period_key<=$1 AND voided_at IS NULL
+      ), payables AS (
+        SELECT COALESCE(sum(CASE WHEN currency='ARS' THEN COALESCE(outstanding_amount,0)/NULLIF(cotizacion,0) ELSE COALESCE(outstanding_amount,0) END),0) total FROM pasivo_entries WHERE period_key<=$1 AND voided_at IS NULL
+      ), provisions AS (
+        SELECT COALESCE(sum(CASE WHEN currency='ARS' THEN COALESCE(remaining_amount,0)/(SELECT rate FROM fx) ELSE COALESCE(remaining_amount,0) END),0) total FROM provision_entries WHERE period_key<=$1 AND status IN ('APPROVED','ACTIVE')
+      )
+      SELECT (opening.total+cash.total)::float caja, (opening.total+cash.total+receivables.total)::float activo, (payables.total+provisions.total)::float pasivo
+      FROM opening,cash,receivables,payables,provisions
+    `, [periodKey]);
+    liveCaja = Number(live?.caja ?? 0);
+    liveActivo = Number(live?.activo ?? 0);
+    livePasivo = Number(live?.pasivo ?? 0);
+    warnings.push(`Caja, Activo y Pasivo calculados en vivo desde el ledger de Mind para ${periodKey}`);
   }
 
   return {
     facturado,
-    cajaTotal: cajaTotalRaw ?? 0,
+    cajaTotal: liveCaja ?? 0,
     cajaTotalIsNull,
-    activoTotal,
-    pasivoTotal,
+    activoTotal: liveActivo,
+    pasivoTotal: livePasivo,
     facturadoSource,
     warnings,
   };
@@ -197,10 +221,10 @@ export async function fetchFinancialSummary(periodKey: string): Promise<Financia
 export async function fetchCashMovements(periodKeys: string[]): Promise<{ cashIn: number; cashOut: number }> {
   const { rows: [data] } = await pool.query(`
     SELECT 
-      COALESCE(SUM(CASE WHEN type = 'IN' THEN amount_usd::numeric ELSE 0 END), 0) as cash_in_usd,
-      COALESCE(SUM(CASE WHEN type = 'OUT' THEN amount_usd::numeric ELSE 0 END), 0) as cash_out_usd
-    FROM cash_movements
-    WHERE period_key = ANY($1)
+      COALESCE(SUM(CASE WHEN tipo_movimiento = 'Ingreso' AND transfer_group_id IS NULL THEN COALESCE(monto_usd::numeric,monto_ars::numeric/NULLIF(cotizacion::numeric,0),0) ELSE 0 END), 0) as cash_in_usd,
+      COALESCE(SUM(CASE WHEN tipo_movimiento = 'Egreso' AND transfer_group_id IS NULL THEN COALESCE(monto_usd::numeric,monto_ars::numeric/NULLIF(cotizacion::numeric,0),0) ELSE 0 END), 0) as cash_out_usd
+    FROM cashflow_transactions
+    WHERE period_key = ANY($1) AND voided_at IS NULL
   `, [periodKeys]);
   return {
     cashIn: parseFloat(data?.cash_in_usd || '0'),
@@ -474,7 +498,7 @@ export const FORMULA_DESCRIPTIONS = {
     ebit: 'Facturado − Directos − Overhead − Provisiones',
     margen: 'EBIT Contable / Facturado',
     burnRate: 'Directos + Overhead + Provisiones',
-    cajaTotal: 'Snapshot del Excel Maestro',
+    cajaTotal: 'Saldos de cuentas + movimientos conciliados en Mind',
     cashFlow: 'Cash In − Cash Out',
     patrimonio: 'Activo − Pasivo',
     runway: 'Caja Total / Burn Rate',
@@ -521,10 +545,10 @@ export const DATA_SOURCES = {
   directos: 'fact_cost_month.direct_usd',
   overhead: 'fact_cost_month.indirect_usd',
   provisiones: 'fact_cost_month.provisions_usd',
-  facturado: 'monthly_financial_summary.facturacion_total',
-  cajaTotal: 'monthly_financial_summary.caja_total',
-  activoTotal: 'monthly_financial_summary.total_activo',
-  pasivoTotal: 'monthly_financial_summary.total_pasivo',
+  facturado: 'revenue_events / snapshot financiero de Mind',
+  cajaTotal: 'ledger de Mind / snapshot de cierre',
+  activoTotal: 'ledger de Mind / snapshot de cierre',
+  pasivoTotal: 'ledger de Mind / snapshot de cierre',
   horas: 'fact_labor_month',
-  cash: 'cash_movements',
+  cash: 'cashflow_transactions',
 } as const;

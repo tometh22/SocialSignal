@@ -1,4 +1,4 @@
-import { and, eq, sql } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "../db";
 import {
   exchangeRates,
@@ -8,6 +8,8 @@ import {
   monthlyFinancialSummary,
   revenueEvents,
 } from "@shared/schema";
+import { rebuildNativeFinancialFacts } from "./financial-native-builders";
+import { buildFactLaborFromTimeEntries, getCutoverDate } from "../etl/time-entries-to-fact-labor";
 
 export type CloseCheckDefinition = {
   code: string;
@@ -40,15 +42,16 @@ function numeric(value: unknown): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-async function collectCloseChecks(periodKey: string): Promise<{ checks: CloseCheckDefinition[]; officialFxRateId: number | null }> {
+async function collectCloseChecks(periodKey: string, runner: any = db): Promise<{ checks: CloseCheckDefinition[]; officialFxRateId: number | null }> {
   assertPeriodKey(periodKey);
   const [year, month] = periodKey.split("-").map(Number);
-  const [officialFx] = await db.select({ id: exchangeRates.id, rate: exchangeRates.rate })
+  const [officialFx] = await runner.select({ id: exchangeRates.id, rate: exchangeRates.rate })
     .from(exchangeRates)
-    .where(and(eq(exchangeRates.year, year), eq(exchangeRates.month, month), eq(exchangeRates.isActive, true)))
+    .where(and(eq(exchangeRates.year, year), eq(exchangeRates.month, month), eq(exchangeRates.isActive, true), sql`${exchangeRates.rateType} <> 'estimated'`))
+    .orderBy(sql`CASE WHEN ${exchangeRates.rateType} = 'end_of_month' THEN 0 WHEN ${exchangeRates.rateType} = 'average' THEN 1 ELSE 2 END`, desc(exchangeRates.updatedAt), desc(exchangeRates.id))
     .limit(1);
 
-  const statsResult = await db.execute(sql`
+  const statsResult = await runner.execute(sql`
     SELECT
       (SELECT count(*) FROM financial_intake_items
         WHERE status IN ('received','processing','needs_review','approved','failed')
@@ -66,15 +69,34 @@ async function collectCloseChecks(periodKey: string): Promise<{ checks: CloseChe
         WHERE period_key = ${periodKey} AND voided_at IS NULL
           AND reconciliation_status = 'unmatched')::int AS unmatched_cashflow,
       (SELECT count(*) FROM provision_entries
-        WHERE period_key = ${periodKey} AND status = 'PROPOSED')::int AS proposed_provisions
+        WHERE period_key = ${periodKey} AND status = 'PROPOSED')::int AS proposed_provisions,
+      (SELECT count(*) FROM (
+        SELECT transfer_group_id
+        FROM cashflow_transactions
+        WHERE period_key = ${periodKey} AND voided_at IS NULL AND transfer_group_id IS NOT NULL
+        GROUP BY transfer_group_id
+        HAVING count(*) <> 2 OR abs(sum(CASE WHEN tipo_movimiento='Ingreso' THEN COALESCE(monto_usd, monto_ars/NULLIF(cotizacion,0),0) ELSE -COALESCE(monto_usd, monto_ars/NULLIF(cotizacion,0),0) END)) > 0.01
+      ) unbalanced)::int AS unbalanced_transfers
   `);
   const stats = rowsOf<Record<string, unknown>>(statsResult)[0] ?? {};
   const pendingIntake = numeric(stats.pending_intake);
   const invalidAmounts = numeric(stats.invalid_activo) + numeric(stats.invalid_pasivo) + numeric(stats.invalid_cashflow);
   const unmatchedCashflow = numeric(stats.unmatched_cashflow);
   const proposedProvisions = numeric(stats.proposed_provisions);
+  const unbalancedTransfers = numeric(stats.unbalanced_transfers);
 
   const checks: CloseCheckDefinition[] = [
+    {
+      code: "internal_transfers_balanced",
+      severity: "critical",
+      status: unbalancedTransfers === 0 ? "passed" : "failed",
+      title: "Transferencias internas balanceadas",
+      detail: unbalancedTransfers === 0
+        ? "Las transferencias entre cuentas propias tienen ambas contrapartidas."
+        : `Hay ${unbalancedTransfers} transferencia(s) interna(s) sin contrapartida o con diferencia.`,
+      expectedValue: 0,
+      actualValue: unbalancedTransfers,
+    },
     {
       code: "official_fx",
       severity: "critical",
@@ -141,9 +163,12 @@ async function collectCloseChecks(periodKey: string): Promise<{ checks: CloseChe
 }
 
 export async function runFinancialPreClose(periodKey: string, actorUserId: number) {
-  const { checks, officialFxRateId } = await collectCloseChecks(periodKey);
+  assertPeriodKey(periodKey);
+  const cutoverDate = await getCutoverDate();
+  if (cutoverDate && periodKey >= cutoverDate) await buildFactLaborFromTimeEntries(periodKey);
   return db.transaction(async (tx) => {
-    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${'financial-close:' + periodKey}))`);
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${'financial-period:' + periodKey}))`);
+    const { checks, officialFxRateId } = await collectCloseChecks(periodKey, tx);
     const [existing] = await tx.select().from(financialClosePeriods)
       .where(eq(financialClosePeriods.periodKey, periodKey)).limit(1);
     if (existing?.status === "CLOSED") throw closeError("El período ya está cerrado.", 409);
@@ -156,12 +181,14 @@ export async function runFinancialPreClose(periodKey: string, actorUserId: numbe
         }).where(eq(financialClosePeriods.id, existing.id)).returning()
       : await tx.insert(financialClosePeriods).values({ periodKey, status: "PRE_CLOSE", officialFxRateId }).returning();
 
+    await rebuildNativeFinancialFacts(periodKey, tx);
+
     for (const check of checks) {
       const [old] = await tx.select().from(financialCloseChecks).where(and(
         eq(financialCloseChecks.closePeriodId, period.id),
         eq(financialCloseChecks.code, check.code),
       )).limit(1);
-      const keepHumanResolution = old && ["accepted", "resolved"].includes(old.status) && check.status === "failed";
+      const keepHumanResolution = old && check.severity !== "critical" && ["accepted", "resolved"].includes(old.status) && check.status === "failed";
       const payload = {
         severity: check.severity,
         status: keepHumanResolution ? old.status : check.status,
@@ -198,55 +225,62 @@ type Snapshot = {
   ivaCompras: number;
   impuestosUsa: number;
   provisiones: number;
+  provisionExpense: number;
 };
 
 async function calculateSnapshot(tx: any, periodKey: string, officialRate: number): Promise<Snapshot> {
   const result = await tx.execute(sql`
     SELECT
-      COALESCE((SELECT sum(COALESCE(monto_total_usd, monto_usd, monto_ars / NULLIF(cotizacion, 0))) FROM activo_entries WHERE period_key=${periodKey} AND voided_at IS NULL),0) AS total_activo,
-      COALESCE((SELECT sum(COALESCE(monto_total_usd, monto_usd, monto_ars / NULLIF(cotizacion, 0))) FROM pasivo_entries WHERE period_key=${periodKey} AND voided_at IS NULL),0) AS total_pasivo,
-      COALESCE((SELECT sum(CASE WHEN tipo_movimiento='Ingreso' THEN COALESCE(monto_usd, monto_ars/NULLIF(cotizacion,0)) ELSE 0 END) FROM cashflow_transactions WHERE period_key=${periodKey} AND voided_at IS NULL),0) AS ingresos,
-      COALESCE((SELECT sum(CASE WHEN tipo_movimiento='Egreso' THEN COALESCE(monto_usd, monto_ars/NULLIF(cotizacion,0)) ELSE 0 END) FROM cashflow_transactions WHERE period_key=${periodKey} AND voided_at IS NULL),0) AS egresos,
+      COALESCE((SELECT sum(CASE WHEN tipo_movimiento='Ingreso' THEN COALESCE(monto_usd, monto_ars/NULLIF(cotizacion,0)) ELSE 0 END) FROM cashflow_transactions WHERE period_key=${periodKey} AND voided_at IS NULL AND transfer_group_id IS NULL),0) AS ingresos,
+      COALESCE((SELECT sum(CASE WHEN tipo_movimiento='Egreso' THEN COALESCE(monto_usd, monto_ars/NULLIF(cotizacion,0)) ELSE 0 END) FROM cashflow_transactions WHERE period_key=${periodKey} AND voided_at IS NULL AND transfer_group_id IS NULL),0) AS egresos,
       COALESCE((SELECT sum(CASE WHEN currency='ARS' THEN opening_balance/${officialRate} ELSE opening_balance END) FROM financial_accounts WHERE is_active=true AND (opening_balance_date IS NULL OR opening_balance_date < (${periodKey} || '-01')::date + interval '1 month')),0) AS opening_cash,
-      COALESCE((SELECT sum(CASE WHEN COALESCE(currency, CASE WHEN monto_usd IS NOT NULL THEN 'USD' ELSE 'ARS' END)='ARS' THEN COALESCE(outstanding_amount,0)/NULLIF(cotizacion,0) ELSE COALESCE(outstanding_amount,0) END) FROM activo_entries WHERE period_key=${periodKey} AND voided_at IS NULL),0) AS cobrar,
-      COALESCE((SELECT sum(CASE WHEN COALESCE(currency, CASE WHEN monto_usd IS NOT NULL THEN 'USD' ELSE 'ARS' END)='ARS' THEN COALESCE(outstanding_amount,0)/NULLIF(cotizacion,0) ELSE COALESCE(outstanding_amount,0) END) FROM pasivo_entries WHERE period_key=${periodKey} AND voided_at IS NULL),0) AS pagar,
+      COALESCE((SELECT sum(CASE WHEN tipo_movimiento='Ingreso' AND transfer_group_id IS NULL THEN COALESCE(monto_usd,monto_ars/NULLIF(cotizacion,0),0) WHEN tipo_movimiento='Egreso' AND transfer_group_id IS NULL THEN -COALESCE(monto_usd,monto_ars/NULLIF(cotizacion,0),0) ELSE 0 END) FROM cashflow_transactions WHERE period_key<=${periodKey} AND source<>'excel' AND voided_at IS NULL),0) AS cumulative_cashflow,
+      COALESCE((SELECT sum(CASE WHEN COALESCE(currency, CASE WHEN monto_usd IS NOT NULL THEN 'USD' ELSE 'ARS' END)='ARS' THEN COALESCE(outstanding_amount,0)/NULLIF(cotizacion,0) ELSE COALESCE(outstanding_amount,0) END) FROM activo_entries WHERE period_key<=${periodKey} AND voided_at IS NULL),0) AS cobrar,
+      COALESCE((SELECT sum(CASE WHEN COALESCE(currency, CASE WHEN monto_usd IS NOT NULL THEN 'USD' ELSE 'ARS' END)='ARS' THEN COALESCE(outstanding_amount,0)/NULLIF(cotizacion,0) ELSE COALESCE(outstanding_amount,0) END) FROM pasivo_entries WHERE period_key<=${periodKey} AND voided_at IS NULL),0) AS pagar,
       COALESCE((SELECT sum(amount_usd) FROM revenue_events WHERE invoice_period=${periodKey} AND status <> 'cancelled'),0) AS facturacion,
-      COALESCE((SELECT sum(COALESCE(monto_total_usd, costo_total,0)) FROM direct_costs WHERE month_key=${periodKey} AND tipo_gasto='Directo'),0)
-        + COALESCE((SELECT sum(COALESCE(monto_total_usd, monto_usd, monto_ars/NULLIF(cotizacion,0))) FROM pasivo_entries WHERE period_key=${periodKey} AND voided_at IS NULL AND cost_treatment='direct'),0) AS costos_directos,
-      COALESCE((SELECT sum(COALESCE(monto_total_usd, costo_total,0)) FROM direct_costs WHERE month_key=${periodKey} AND tipo_gasto='Indirecto'),0)
-        + COALESCE((SELECT sum(COALESCE(monto_total_usd, monto_usd, monto_ars/NULLIF(cotizacion,0))) FROM pasivo_entries WHERE period_key=${periodKey} AND voided_at IS NULL AND cost_treatment IN ('indirect','unclassified')),0) AS costos_indirectos,
+      COALESCE((SELECT direct_usd FROM fact_cost_month WHERE period_key=${periodKey}),0) AS costos_directos,
+      COALESCE((SELECT indirect_usd FROM fact_cost_month WHERE period_key=${periodKey}),0) AS costos_indirectos,
       COALESCE((SELECT sum(COALESCE(tax_amount,0)/CASE WHEN currency='ARS' THEN NULLIF(cotizacion,0) ELSE 1 END) FROM pasivo_entries WHERE period_key=${periodKey} AND voided_at IS NULL),0) AS iva_compras,
       COALESCE((SELECT sum(amount_usd) FROM pl_adjustments WHERE period_key=${periodKey} AND type='impuesto'),0) AS impuestos,
-      COALESCE((SELECT sum(CASE WHEN currency='ARS' THEN COALESCE(remaining_amount,monto_provision,0)/${officialRate} ELSE COALESCE(remaining_amount,monto_provision,0) END) FROM provision_entries WHERE period_key=${periodKey} AND status IN ('APPROVED','ACTIVE')),0) AS provisiones
+      COALESCE((SELECT sum(CASE WHEN currency='ARS' THEN COALESCE(remaining_amount,monto_provision,0)/${officialRate} ELSE COALESCE(remaining_amount,monto_provision,0) END) FROM provision_entries WHERE period_key<=${periodKey} AND status IN ('APPROVED','ACTIVE')),0) AS provisiones,
+      COALESCE((SELECT provisions_usd FROM fact_cost_month WHERE period_key=${periodKey}),0) AS provision_expense
   `);
   const row = rowsOf<Record<string, unknown>>(result)[0] ?? {};
   const ingresos = numeric(row.ingresos);
   const egresos = numeric(row.egresos);
+  const cajaTotal = numeric(row.opening_cash) + numeric(row.cumulative_cashflow);
+  const cuentasCobrarUsd = numeric(row.cobrar);
+  const cuentasPagarUsd = numeric(row.pagar);
+  const provisiones = numeric(row.provisiones);
   return {
-    totalActivo: numeric(row.total_activo), totalPasivo: numeric(row.total_pasivo),
-    cajaTotal: numeric(row.opening_cash) + ingresos - egresos,
+    totalActivo: cajaTotal + cuentasCobrarUsd, totalPasivo: cuentasPagarUsd + provisiones,
+    cajaTotal,
     cashflowIngresos: ingresos, cashflowEgresos: egresos,
-    cuentasCobrarUsd: numeric(row.cobrar), cuentasPagarUsd: numeric(row.pagar),
+    cuentasCobrarUsd, cuentasPagarUsd,
     facturacionTotal: numeric(row.facturacion), costosDirectos: numeric(row.costos_directos),
     costosIndirectos: numeric(row.costos_indirectos), ivaCompras: numeric(row.iva_compras),
-    impuestosUsa: numeric(row.impuestos), provisiones: numeric(row.provisiones),
+    impuestosUsa: numeric(row.impuestos), provisiones, provisionExpense: numeric(row.provision_expense),
   };
 }
 
 export async function requestFinancialCloseReview(periodKey: string, actorUserId: number, notes?: string | null) {
   assertPeriodKey(periodKey);
-  const [period] = await db.select().from(financialClosePeriods).where(eq(financialClosePeriods.periodKey, periodKey)).limit(1);
-  if (!period) throw closeError("Ejecutá el pre-cierre antes de enviar a revisión.", 409);
-  if (period.status === "CLOSED") throw closeError("El período ya está cerrado.", 409);
-  const [updated] = await db.update(financialClosePeriods).set({ status: "IN_REVIEW", requestedBy: actorUserId, requestedAt: new Date(), notes: notes ?? period.notes, updatedAt: new Date() }).where(eq(financialClosePeriods.id, period.id)).returning();
-  await db.insert(financialAuditEvents).values({ periodKey, entityType: "financial_close_period", entityId: period.id, action: "review_requested", actorUserId, afterData: { notes: notes ?? null } });
-  return updated;
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${'financial-period:' + periodKey}))`);
+    const [period] = await tx.select().from(financialClosePeriods).where(eq(financialClosePeriods.periodKey, periodKey)).limit(1);
+    if (!period) throw closeError("Ejecutá el pre-cierre antes de enviar a revisión.", 409);
+    if (period.status === "CLOSED") throw closeError("El período ya está cerrado.", 409);
+    if (period.status !== "PRE_CLOSE") throw closeError("Ejecutá nuevamente el pre-cierre antes de enviar a revisión.", 409);
+    const [updated] = await tx.update(financialClosePeriods).set({ status: "IN_REVIEW", requestedBy: actorUserId, requestedAt: new Date(), notes: notes ?? period.notes, updatedAt: new Date() }).where(eq(financialClosePeriods.id, period.id)).returning();
+    await tx.insert(financialAuditEvents).values({ periodKey, entityType: "financial_close_period", entityId: period.id, action: "review_requested", actorUserId, afterData: { notes: notes ?? null } });
+    return updated;
+  });
 }
 
 export async function closeFinancialPeriod(periodKey: string, actorUserId: number) {
   assertPeriodKey(periodKey);
   return db.transaction(async (tx) => {
-    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${'financial-close:' + periodKey}))`);
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${'financial-period:' + periodKey}))`);
     const [period] = await tx.select().from(financialClosePeriods).where(eq(financialClosePeriods.periodKey, periodKey)).limit(1);
     if (!period) throw closeError("Ejecutá el pre-cierre antes de cerrar.", 409);
     if (period.status === "CLOSED") return period;
@@ -265,7 +299,7 @@ export async function closeFinancialPeriod(periodKey: string, actorUserId: numbe
     const balanceNeto = snapshot.totalActivo - snapshot.totalPasivo;
     const cashflowNeto = snapshot.cashflowIngresos - snapshot.cashflowEgresos;
     const ebit = snapshot.facturacionTotal - snapshot.costosDirectos - snapshot.costosIndirectos - snapshot.impuestosUsa;
-    const beneficio = ebit - snapshot.provisiones;
+    const beneficio = ebit - snapshot.provisionExpense;
     const payload = {
       year, monthNumber, monthLabel: periodKey, cierreDate: new Date(),
       totalActivo: String(snapshot.totalActivo), totalPasivo: String(snapshot.totalPasivo), balanceNeto: String(balanceNeto),
@@ -273,8 +307,9 @@ export async function closeFinancialPeriod(periodKey: string, actorUserId: numbe
       cuentasCobrarUsd: String(snapshot.cuentasCobrarUsd), cuentasPagarUsd: String(snapshot.cuentasPagarUsd), facturacionTotal: String(snapshot.facturacionTotal),
       costosDirectos: String(snapshot.costosDirectos), costosIndirectos: String(snapshot.costosIndirectos), ivaCompras: String(snapshot.ivaCompras), impuestosUsa: String(snapshot.impuestosUsa),
       pasivoFacturacionAdelantada: String(snapshot.provisiones), ebitOperativo: String(ebit), beneficioNeto: String(beneficio),
-      margenOperativo: snapshot.facturacionTotal ? String(ebit / snapshot.facturacionTotal) : null,
-      margenNeto: snapshot.facturacionTotal ? String(beneficio / snapshot.facturacionTotal) : null,
+      markupPromedio: snapshot.costosDirectos ? String(snapshot.facturacionTotal / snapshot.costosDirectos) : null,
+      margenOperativo: snapshot.facturacionTotal ? String((ebit / snapshot.facturacionTotal) * 100) : null,
+      margenNeto: snapshot.facturacionTotal ? String((beneficio / snapshot.facturacionTotal) * 100) : null,
       updatedAt: new Date(),
     };
     await tx.insert(monthlyFinancialSummary).values({ periodKey, ...payload }).onConflictDoUpdate({ target: monthlyFinancialSummary.periodKey, set: payload });
@@ -289,7 +324,7 @@ export async function reopenFinancialPeriod(periodKey: string, actorUserId: numb
   assertPeriodKey(periodKey);
   if (reason.trim().length < 5) throw closeError("Indicá el motivo de reapertura (mínimo 5 caracteres).");
   return db.transaction(async (tx) => {
-    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${'financial-close:' + periodKey}))`);
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${'financial-period:' + periodKey}))`);
     const [period] = await tx.select().from(financialClosePeriods).where(eq(financialClosePeriods.periodKey, periodKey)).limit(1);
     if (!period) throw closeError("El período no existe.", 404);
     if (period.status !== "CLOSED") throw closeError("Sólo se puede reabrir un período cerrado.", 409);

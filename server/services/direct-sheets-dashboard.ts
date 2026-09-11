@@ -112,7 +112,7 @@ export function isBrokenNetProfit(
   return igualAVentas && margenCien;
 }
 
-interface MonthData {
+export interface MonthData {
   periodKey: string;
   year: number;
   month: number;
@@ -187,7 +187,7 @@ function createSheetsClient() {
 }
 
 // Generic aggregation for any set of months (used by quarter, year-total, etc.)
-function aggregateMonths(
+export function aggregateMonths(
   months: MonthData[],
   periodKey: string,
   monthLabel: string,

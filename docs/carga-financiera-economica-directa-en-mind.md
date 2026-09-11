@@ -475,69 +475,35 @@ El cierre del equipo de los días 20–25 también se absorbe: recordatorios y f
 | Reuniones/validación final | checklist y evidencia; aprobación humana | 20–40% |
 | Movimientos bancarios | 90–95% con conexión bancaria; registro directo en Mind si no hay conexión | variable |
 
-## 7. Qué existe hoy en Mind y qué falta
+## 7. Estado implementado en Mind
 
-| Dominio | Ya existe | Brecha para el corte |
-|---|---|---|
-| Archivos/IA | carga de PDF/imágenes en otros módulos y SDKs de IA ya instalados | Bandeja Financiera, OCR/extracción estructurada, storage privado, antivirus y revisión humana |
-| Horas/costo laboral | time entries, importador Asana, cierre mensual, tarifas históricas y rebuild app → `fact_labor_month` | automatizar la ejecución y generar costo real desde el mismo cierre |
-| FX/REM/inflación | CRUD de FX, sincronización Blue, importación REM e inflación | aprobación de cierre, versionado de supuestos y automatizar publicación REM |
-| Proyecto/ingresos | UI y CRUD de ventas mensuales y transacciones financieras; `revenue_events` separa bases | elegir SoT, unificar modelos y conectar con hechos/resumen |
-| Activo | tabla, importación Excel, API POST/PATCH y listado | alta/edición completa, cobros parciales, impuestos, adjuntos y conciliación |
-| Pasivo | tabla, importación Excel, API POST/PATCH y listado | estado parcial, pagos aplicados, impuestos, proyecto/asignación y generación de costos |
-| Cashflow | tabla, API, balance calculado y pantalla de consulta | módulo nativo para registrar/matchear movimientos, cuentas canónicas y transferencias |
-| Provisiones | tabla, API y formulario simple | cabecera + movimientos + saldo + workflow de aprobación |
-| Costos proyectados | fact table importada | fuente editable de templates/schedules y escenarios |
-| Dashboard | KPIs, reportes y snapshots | `monthly_financial_summary` sigue viniendo de Excel; falta builder nativo |
-| Calidad | hallazgos de calidad y algunos checks | checklist de cierre, gates y resolución con dueño/evidencia |
-| Seguridad | permisos en pantallas y varios endpoints | los writes del ledger hoy sólo exigen autenticación; deben exigir Finanzas/admin |
+| Dominio | Implementación disponible |
+|---|---|
+| Bandeja Financiera | carga directa por texto, PDF, imagen/captura, TXT, DOCX o XLSX; extracción estructurada con IA y fallback local; revisión humana; reintento; rechazo y trazabilidad |
+| Evidencia | archivos fuera del directorio público, descarga autenticada con permiso Finanzas, validación de tipo/tamaño/firma, hash SHA-256 y detección de duplicados |
+| Ingresos | `revenue_events` como evento canónico con facturación, devengamiento y cobranza separados; generación de `fact_rc_month` |
+| Activo/Pasivo | documentos con neto, IVA, bruto, moneda, FX, proyecto, vencimiento, saldo y estado; cobros/pagos parciales aplicados; anulación auditada |
+| Cashflow | movimientos nativos, cuentas y saldos iniciales, conciliación, contrapartes y transferencias internas en dos patas vinculadas |
+| Costos | clasificación directa/indirecta/balance; costos de proveedores y laborales consolidados en `fact_cost_month` sin duplicar impuestos |
+| Provisiones | propuesta, aprobación, movimientos, saldo, liberación total/parcial y auditoría |
+| FX, REM e inflación | cotización real, curva mensual REM e IPC pueden entrar por texto, documento o captura; el cierre exige un FX real y no confunde una estimación REM con la cotización oficial |
+| Cierre | pre-cierre, checks críticos/warnings, bloqueo por período, revisión, cierre, snapshot y reapertura con motivo |
+| Reporting | dashboard financiero, proyección, facturación, cashflow, costos, ARR/MRR y P&L por cliente leen hechos nativos; el histórico previo al corte conserva fallback |
+| Cutover | el auto-sync financiero desde Excel se detiene desde `app_mode_cutover_date`; no hay importación Excel/CSV en el circuito mensual |
+| Seguridad | lecturas y escrituras sensibles requieren permiso `finance`; evidencia privada, auditoría de cambios y locks transaccionales |
 
-Hay también deuda que debe resolverse antes de abrir la carga a usuarios:
+Las fórmulas y tablas derivadas del Excel no se portan literalmente. Mind conserva los hechos fuente y reconstruye los agregados; así se evita replicar dependencias frágiles —incluido el `#REF!` detectado en el libro— y se puede explicar cada total con drill-down.
 
-- La infraestructura de adjuntos existente guarda archivos en rutas públicas del servidor; no es apropiada para comprobantes financieros sensibles y debe reemplazarse por storage privado.
-- Activo, Pasivo y Cashflow muestran datos pero no ofrecen todavía acciones nativas completas para crear, corregir, aplicar pagos/cobros o anular.
-- No hay `DELETE`/anulación uniforme en el ledger; para períodos cerrados debe usarse anulación, no borrado físico.
-- Cashflow no guarda `updated_at/by` ni monto USD original separado del normalizado.
-- El modelo de Provisiones no representa un ciclo de vida.
-- El P&L por cliente del ledger todavía consulta tablas heredadas de Google Sheets/direct costs.
-- Hay múltiples modelos de ingresos que pueden divergir.
-- El auto-sync sigue leyendo Excel para Resumen, Cashflow, Activo, Pasivo, ingresos y costos; el cutover sólo protege parte de las tablas.
-- El Excel contiene al menos una fórmula `#REF!` en la tabla de costos y muchas dependencias por rangos/pestañas específicas. No se deben portar fórmulas literalmente.
+## 8. Mejoras posteriores al corte
 
-## 8. Backlog priorizado
+El flujo directo ya no depende de estas mejoras. Son automatizaciones externas opcionales para reducir todavía más la registración del equipo:
 
-### P0 — obligatorio antes de escribir directamente
-
-1. Construir la Bandeja Financiera MVP para texto, archivos y capturas, con extracción, revisión y trazabilidad.
-2. Definir fuente canónica de ingresos y estrategia de compatibilidad para las tablas duplicadas.
-3. Crear `financial_close_periods`, checklist, lock/reopen y auditoría.
-4. Aplicar permisos `finance`/admin a todas las lecturas sensibles y escrituras del ledger.
-5. Completar estados parciales, pagos/cobros aplicados y anulación.
-6. Incorporar cuentas financieras, balances iniciales, transferencias y conciliación.
-7. Completar los módulos nativos de Activo, Pasivo y Cashflow con acciones contextuales para crear, corregir, conciliar, aplicar pagos/cobros y anular.
-8. Construir builders app-native para ingresos, costos y `monthly_financial_summary`.
-9. Hacer idempotentes las conexiones automáticas y el backfill histórico; guardar origen, external ID y trazabilidad.
-10. Parametrizar reglas Pasivo → Costos, IVA, exclusiones, Fee/One Shot y excepciones.
-11. Agregar tests de período anterior/posterior al cutover y de no mutación de meses cerrados.
-
-### P1 — necesario para automatizar el cierre
-
-1. Modelo fuente de gastos recurrentes, costos estimados y staffing.
-2. Provisiones con movimientos, saldo y aprobación.
-3. Motor de conciliación factura–movimiento y pantalla de excepciones.
-4. Liquidación impositiva mensual y proyección.
-5. Dashboard de cierre con checks, diferencias y drill-down.
-6. Markup/rendimiento general y por cliente sin pestañas específicas.
-7. Jobs programados para horas, FX, calidad y rebuild de período abierto.
-8. Exportes contables/BI estables.
-
-### P2 — optimización
-
-1. Integraciones bancarias/API y sistema de facturación.
-2. Descarga/parseo automático del REM.
-3. Reglas de matching aprendibles y sugerencias.
-4. Alertas de caja, vencimientos, margen y desvíos de forecast.
-5. Escenarios y rolling forecast.
+1. Conectar bancos y el sistema de facturación cuando estén disponibles credenciales, contratos de API y reglas de seguridad.
+2. Agregar análisis antivirus administrado al storage de comprobantes; hoy se valida tamaño, tipo declarado y firma real del archivo.
+3. Descargar y parsear automáticamente nuevas publicaciones REM.
+4. Evolucionar el matching hacia sugerencias aprendibles para referencias incompletas.
+5. Agregar alertas proactivas de caja, vencimientos, margen y desvíos de forecast.
+6. Incorporar escenarios múltiples y rolling forecast.
 
 ## 9. Migración y cutover
 
