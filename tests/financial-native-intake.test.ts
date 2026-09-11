@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { extractFinancialTextHeuristically, financialExtractionSchema, financialMissingFields } from "../server/services/financial-intake-extractor";
+import { getFinancialIntakeImpact, getLinkedRecordPresentation } from "../client/src/lib/financial-intake-presentation";
 
 describe("financial native intake", () => {
   it("interpreta un cobro escrito en lenguaje natural", () => {
@@ -90,5 +91,39 @@ describe("financial native integration contracts", () => {
     expect(intake).toContain('placeholder="Banco / cuenta"');
     expect(intake).toContain('placeholder="Referencia / comprobante"');
     expect(intake).toContain("Curva REM / tipos de cambio futuros");
+  });
+
+  it("separa la carga de la gestión y los reportes en la navegación", () => {
+    const sidebar = read("client/src/components/layout/sidebar-fixed.tsx");
+    expect(sidebar).toContain('title: "Carga financiera"');
+    expect(sidebar).toContain('title: "Gestión financiera"');
+    expect(sidebar).toContain('title: "Reportes financieros"');
+    expect(sidebar.indexOf('title: "Carga financiera"')).toBeLessThan(sidebar.indexOf('title: "Reportes financieros"'));
+  });
+
+  it("explica el destino antes y después de contabilizar", () => {
+    const intake = read("client/src/pages/financial-intake.tsx");
+    expect(intake).toContain("Al confirmar, Mind actualizará");
+    expect(intake).toContain("Resultado de la carga");
+    expect(intake).toContain("único lugar para ingresar información financiera y económica");
+  });
+});
+
+describe("financial intake presentation", () => {
+  it("muestra el impacto doble de facturas, cobros, pagos e impuestos", () => {
+    expect(getFinancialIntakeImpact("customer_invoice").destinations).toEqual(["Activo", "Ingresos"]);
+    expect(getFinancialIntakeImpact("customer_collection").destinations).toEqual(["Cashflow", "Activo"]);
+    expect(getFinancialIntakeImpact("supplier_payment").destinations).toEqual(["Cashflow", "Pasivo"]);
+    expect(getFinancialIntakeImpact("tax_settlement").destinations).toEqual(["Pasivo", "Resultado impositivo"]);
+  });
+
+  it("informa cuántos movimientos generará un extracto", () => {
+    expect(getFinancialIntakeImpact("bank_statement", 12).description).toContain("12 movimientos");
+  });
+
+  it("traduce los registros técnicos y enlaza sólo a módulos existentes", () => {
+    expect(getLinkedRecordPresentation("activo_entry", "customer_invoice")).toEqual({ label: "Cuenta a cobrar", href: "/finance/activo" });
+    expect(getLinkedRecordPresentation("financial_document_application", "supplier_payment").href).toBe("/finance/pasivo");
+    expect(getLinkedRecordPresentation("monthly_inflation", "inflation")).toEqual({ label: "Inflación mensual", href: null });
   });
 });

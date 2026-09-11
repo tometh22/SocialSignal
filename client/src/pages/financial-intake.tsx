@@ -11,9 +11,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { AlertCircle, CheckCircle2, FileText, Image, Loader2, Paperclip, Plus, RefreshCw, Send, Sparkles, UploadCloud, XCircle } from "lucide-react";
+import { Link } from "wouter";
+import { getFinancialIntakeImpact, getLinkedRecordPresentation, type FinancialIntakeDocumentKind } from "@/lib/financial-intake-presentation";
+import { AlertCircle, ArrowRight, Building2, CheckCircle2, FileText, Image, Landmark, Loader2, Paperclip, Plus, RefreshCw, Send, ShieldAlert, Sparkles, TrendingUp, UploadCloud, WalletCards, XCircle } from "lucide-react";
 
-type DocumentKind = "customer_invoice" | "customer_collection" | "supplier_invoice" | "supplier_payment" | "bank_statement" | "fee_confirmation" | "exchange_rate" | "inflation" | "tax_settlement" | "provision" | "unknown";
+type DocumentKind = FinancialIntakeDocumentKind;
 type LineItem = { date: string | null; description: string | null; amount: number; currency: "ARS" | "USD" | "EUR" | "OTHER"; direction: "IN" | "OUT"; bank: string | null; reference: string | null; isInternalTransfer: boolean; transferReference: string | null };
 type Extraction = {
   documentKind: DocumentKind; suggestedTarget: string; periodKey: string | null; issueDate: string | null;
@@ -43,6 +45,37 @@ const TARGET_BY_KIND: Record<DocumentKind, string> = {
   bank_statement: "cashflow", fee_confirmation: "revenue", exchange_rate: "fx", inflation: "inflation", tax_settlement: "tax", provision: "provision", unknown: "unknown",
 };
 const STATUS_LABELS: Record<string, string> = { received: "Recibido", processing: "Procesando", needs_review: "Revisar", approved: "Listo", rejected: "Rechazado", posted: "Contabilizado", failed: "Falló" };
+const MISSING_FIELD_LABELS: Record<string, string> = {
+  documentKind: "tipo de información",
+  periodKey: "período contable",
+  lineItems: "movimientos del extracto",
+  "lineItems.date": "fecha de cada movimiento",
+  "lineItems.amount": "importe de cada movimiento",
+  "lineItems.transferReference": "referencia común de la transferencia propia",
+  "lineItems.currencyConversion": "conversión a ARS o USD de los movimientos",
+  totalAmount: "importe total",
+  currency: "moneda",
+  currencyConversion: "conversión a ARS o USD",
+  exchangeRate: "cotización ARS/USD",
+  netAmount: "importe neto válido",
+  taxAmount: "importe de impuestos válido",
+  issueDate: "fecha de emisión",
+  documentNumber: "número de documento",
+  counterparty: "cliente o contraparte",
+  clientName: "cliente",
+  paymentDate: "fecha de pago o cobro",
+  dueDate: "fecha de vencimiento válida",
+  deliveryStart: "inicio del devengamiento",
+  deliveryEnd: "fin del devengamiento",
+  deliveryPeriod: "período de devengamiento válido",
+};
+const LOAD_GUIDE = [
+  { title: "Clientes", detail: "Facturas, fees y comprobantes de cobro", destinations: "Activo · Ingresos · Cashflow", icon: WalletCards },
+  { title: "Proveedores e impuestos", detail: "Facturas, pagos y liquidaciones", destinations: "Pasivo · Costos · Impuestos", icon: Building2 },
+  { title: "Bancos", detail: "Extractos, movimientos y transferencias propias", destinations: "Cashflow · Conciliación", icon: Landmark },
+  { title: "Provisiones", detail: "Altas, recuperos y documentación de respaldo", destinations: "Provisiones", icon: ShieldAlert },
+  { title: "Economía", detail: "Tipo de cambio real, REM e IPC", destinations: "Variables económicas", icon: TrendingUp },
+];
 
 function responseError(error: unknown) { return error instanceof Error ? error.message : "No se pudo completar la operación."; }
 function validIsoDate(value: string | null) { if (!value || !/^\d{4}-(0[1-9]|1[0-2])-([0-2]\d|3[01])$/.test(value)) return false; const date = new Date(`${value}T12:00:00.000Z`); return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value; }
@@ -125,6 +158,7 @@ export default function FinancialIntakePage() {
   const openCount = allItems.filter((i) => !["posted", "rejected"].includes(i.status)).length;
   const needsCount = allItems.filter((i) => i.status === "needs_review" || i.status === "failed").length;
   const currentMissing = draft ? missingFields(draft) : [];
+  const currentImpact = draft ? getFinancialIntakeImpact(draft.documentKind, draft.lineItems.length) : null;
 
   function acceptFiles(files: File[]) { if (files.length) uploadMutation.mutate(files.slice(0, 10)); }
   function onDrop(event: DragEvent<HTMLDivElement>) { event.preventDefault(); setDragging(false); acceptFiles(Array.from(event.dataTransfer.files)); }
@@ -145,12 +179,30 @@ export default function FinancialIntakePage() {
   return (
     <div className="space-y-6" onPaste={onPaste}>
       <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
-        <div><p className="text-sm font-medium text-rose-600">Finanzas · carga nativa</p><h1 className="text-3xl font-semibold tracking-tight">Bandeja financiera</h1><p className="text-sm text-muted-foreground">Pegá un mensaje, arrastrá un documento o pegá una captura. Mind prepara el registro; Administración lo confirma.</p></div>
+        <div><p className="text-sm font-medium text-rose-600">Módulo operativo · separado de Reportes</p><h1 className="text-3xl font-semibold tracking-tight">Carga financiera</h1><p className="text-sm text-muted-foreground">Este es el único lugar para ingresar información financiera y económica en Mind.</p></div>
         <div className="flex gap-2"><Badge variant="outline">{openCount} abiertas</Badge><Badge variant={needsCount ? "destructive" : "outline"}>{needsCount} requieren atención</Badge></div>
       </div>
 
+      <Card className="border-slate-200 bg-slate-50/70">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">¿Qué se carga acá?</CardTitle>
+          <p className="text-sm text-muted-foreground">Todo se ingresa abajo con texto, archivo o captura. No necesitás elegir una pantalla ni preparar un CSV: Mind detecta el tipo y te muestra el impacto antes de confirmar.</p>
+        </CardHeader>
+        <CardContent className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+          {LOAD_GUIDE.map((item) => {
+            const Icon = item.icon;
+            return <div key={item.title} className="rounded-xl border bg-white p-3">
+              <div className="flex items-center gap-2"><span className="rounded-lg bg-rose-50 p-1.5 text-rose-600"><Icon className="h-4 w-4" /></span><p className="text-sm font-semibold">{item.title}</p></div>
+              <p className="mt-2 text-xs text-muted-foreground">{item.detail}</p>
+              <p className="mt-2 text-[11px] font-medium text-slate-700">Actualiza: {item.destinations}</p>
+            </div>;
+          })}
+        </CardContent>
+      </Card>
+
       <Card className="overflow-hidden border-rose-100 bg-gradient-to-br from-white to-rose-50/50">
-        <CardContent className="pt-6">
+        <CardHeader className="pb-0"><CardTitle className="text-base">Nueva carga</CardTitle><p className="text-sm text-muted-foreground">Pegá un mensaje, arrastrá documentación o pegá una captura con ⌘V.</p></CardHeader>
+        <CardContent className="pt-4">
           <Tabs defaultValue="text">
             <TabsList><TabsTrigger value="text"><Sparkles className="mr-2 h-4 w-4" />Escribir o pegar</TabsTrigger><TabsTrigger value="file"><Paperclip className="mr-2 h-4 w-4" />Archivo o captura</TabsTrigger></TabsList>
             <TabsContent value="text" className="space-y-3 pt-3">
@@ -189,6 +241,11 @@ export default function FinancialIntakePage() {
               <CardContent className="space-y-5">
                 {(draft.warnings.length > 0 || selected.extractionError) && <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"><div className="flex gap-2"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /><div>{selected.extractionError || draft.warnings.join(" · ")}</div></div></div>}
                 {selected.fileAvailable && selected.mimeType?.startsWith("image/") && <img src={`/api/financial-native/intake/${selected.id}/file`} className="max-h-64 rounded-lg border object-contain" alt="Documento original" />}
+                {currentImpact && <div className="rounded-xl border border-sky-200 bg-sky-50 p-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-sky-800">{selected.status === "posted" ? "Mind actualizó" : "Al confirmar, Mind actualizará"}</p>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">{currentImpact.destinations.map((destination) => <Badge key={destination} className="bg-sky-700 text-white hover:bg-sky-700">{destination}</Badge>)}</div>
+                  <p className="mt-2 text-sm text-sky-950">{currentImpact.description}</p>
+                </div>}
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                   <Field label="Tipo"><Select value={draft.documentKind} onValueChange={(v: DocumentKind) => setDraft({ ...draft, documentKind: v, suggestedTarget: TARGET_BY_KIND[v] })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{Object.entries(KIND_LABELS).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectContent></Select></Field>
                   <Field label="Período"><Input type="month" value={draft.periodKey ?? ""} onChange={(e) => setField("periodKey", e.target.value || null)} /></Field>
@@ -213,11 +270,16 @@ export default function FinancialIntakePage() {
                 {draft.documentKind === "bank_statement" && <LineItemsEditor rows={draft.lineItems} onChange={(lineItems) => setField("lineItems", lineItems)} />}
                 {draft.documentKind === "exchange_rate" && <RateItemsEditor rows={draft.lineItems} onChange={(lineItems) => setField("lineItems", lineItems)} />}
                 <Field label="Notas de revisión"><Textarea value={reviewNotes} onChange={(e) => setReviewNotes(e.target.value)} placeholder="Decisiones o aclaraciones que deben quedar en auditoría" /></Field>
-                {currentMissing.length > 0 && <p className="text-xs text-amber-700">Falta completar: {currentMissing.join(", ")}.</p>}
+                {currentMissing.length > 0 && <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"><p className="font-medium">Para poder contabilizar, completá:</p><ul className="mt-1 list-inside list-disc">{currentMissing.map((field) => <li key={field}>{MISSING_FIELD_LABELS[field] ?? field}</li>)}</ul></div>}
                 <div className="flex flex-wrap justify-between gap-2 border-t pt-4"><div className="flex gap-2"><Button variant="ghost" disabled={busy || selected.status === "posted"} onClick={() => actionMutation.mutate({ action: "reprocess" })}><RefreshCw className="mr-2 h-4 w-4" />Reprocesar</Button><Button variant="ghost" className="text-red-600" disabled={busy || selected.status === "posted"} onClick={reject}><XCircle className="mr-2 h-4 w-4" />Rechazar</Button></div><div className="flex gap-2"><Button variant="outline" disabled={busy || selected.status === "posted"} onClick={() => saveMutation.mutate()}>Guardar revisión</Button><Button disabled={busy || selected.status === "posted" || selected.status === "failed" || currentMissing.length > 0} onClick={publish}><CheckCircle2 className="mr-2 h-4 w-4" />Guardar y contabilizar</Button></div></div>
               </CardContent>
             </Card>
-            {selected.linkedRecords.length > 0 && <Card><CardHeader><CardTitle className="text-base">Registros creados</CardTitle></CardHeader><CardContent className="flex flex-wrap gap-2">{selected.linkedRecords.map((link) => <Badge key={`${link.type}-${link.id}`} variant="secondary">{link.type} #{link.id}</Badge>)}</CardContent></Card>}
+            {selected.linkedRecords.length > 0 && <Card><CardHeader><CardTitle className="text-base">Resultado de la carga</CardTitle><p className="text-sm text-muted-foreground">Estos son los registros que Mind creó. Abrí el módulo correspondiente para verificarlos.</p></CardHeader><CardContent className="flex flex-wrap gap-2">{selected.linkedRecords.map((record) => {
+              const presentation = getLinkedRecordPresentation(record.type, selected.documentKind);
+              return presentation.href
+                ? <Button key={`${record.type}-${record.id}`} asChild size="sm" variant="outline"><Link href={presentation.href}>{presentation.label} #{record.id}<ArrowRight className="ml-2 h-3.5 w-3.5" /></Link></Button>
+                : <Badge key={`${record.type}-${record.id}`} variant="secondary">{presentation.label} #{record.id}</Badge>;
+            })}</CardContent></Card>}
           </div>}
       </div>
     </div>

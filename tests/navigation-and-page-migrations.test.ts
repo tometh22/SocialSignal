@@ -27,7 +27,9 @@ describe("navigation and high-traffic page migrations", () => {
       'title: "Comercial"',
       'title: "Proyectos"',
       'title: "Operaciones"',
-      'title: "Finanzas"',
+      'title: "Carga financiera"',
+      'title: "Gestión financiera"',
+      'title: "Reportes financieros"',
       'title: "Administración"',
     ];
     const positions = labels.map((label) => sidebar.indexOf(label));

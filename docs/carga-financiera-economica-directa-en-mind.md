@@ -479,6 +479,7 @@ El cierre del equipo de los días 20–25 también se absorbe: recordatorios y f
 
 | Dominio | Implementación disponible |
 |---|---|
+| Navegación y claridad | `Carga financiera` es una sección operativa propia, separada de `Gestión financiera` y `Reportes financieros`; una guía visible indica qué se carga y, antes de confirmar, Mind anticipa los módulos que actualizará |
 | Bandeja Financiera | carga directa por texto, PDF, imagen/captura, TXT, DOCX o XLSX; extracción estructurada con IA y fallback local; revisión humana; reintento; rechazo y trazabilidad |
 | Evidencia | archivos fuera del directorio público, descarga autenticada con permiso Finanzas, validación de tipo/tamaño/firma, hash SHA-256 y detección de duplicados |
 | Ingresos | `revenue_events` como evento canónico con facturación, devengamiento y cobranza separados; generación de `fact_rc_month` |
@@ -566,6 +567,7 @@ No se considera terminado hasta cumplir:
 - Activo/Pasivo y sus totales tienen drill-down completo;
 - cada monto convertido conserva moneda, original, FX, fuente y versión;
 - cada registro creado desde la Bandeja conserva su evidencia, extracción, aprobador y vínculo al dato canónico;
+- antes de confirmar, la interfaz indica con lenguaje funcional qué registros y módulos actualizará; al terminar ofrece accesos a los libros creados;
 - un adjunto duplicado no puede generar dos obligaciones o movimientos;
 - ninguna extracción ambigua se contabiliza sin confirmación;
 - costos laborales conservan horas, tarifa y FX del cierre;
