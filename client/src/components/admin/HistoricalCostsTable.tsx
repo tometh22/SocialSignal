@@ -5,6 +5,8 @@ import type { Personnel, PersonnelHistoricalCost } from "@shared/schema";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { normalizePersonnelRole } from "@shared/utils/personnel-classification";
+import { getBuenosAiresPeriod, isClosedPeriod } from "@shared/utils/fx-periods";
 
 interface HistoricalCostsTableProps {
   personnel: Personnel[];
@@ -20,7 +22,7 @@ const MONTHS = [
 export function HistoricalCostsTable({ personnel }: HistoricalCostsTableProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const currentYear = new Date().getFullYear();
+  const { year: currentYear, month: currentMonth } = getBuenosAiresPeriod();
   const [selectedYear, setSelectedYear] = useState(currentYear);
   const [editingCells, setEditingCells] = useState<Record<string, string>>({});
 
@@ -172,7 +174,22 @@ export function HistoricalCostsTable({ personnel }: HistoricalCostsTableProps) {
                 <th className="sticky left-0 z-30 min-w-52 border-r bg-gray-100 px-3 py-2 text-left font-medium text-gray-700">Personal</th>
                 <th className="w-36 border-r px-2 py-2 text-left font-medium text-gray-700">Concepto</th>
                 {MONTHS.map((month, index) => (
-                  <th key={month} className="min-w-24 border-r px-2 py-2 text-center font-medium text-gray-700">{month} {selectedYear}</th>
+                  <th key={month} className="min-w-24 border-r px-2 py-2 text-center font-medium text-gray-700">
+                    <span className="block">{month} {selectedYear}</span>
+                    <span className={`mt-0.5 block text-[9px] font-semibold uppercase tracking-wide ${
+                      isClosedPeriod(selectedYear, index + 1)
+                        ? "text-emerald-700"
+                        : selectedYear * 100 + index + 1 === currentYear * 100 + currentMonth
+                          ? "text-blue-700"
+                          : "text-slate-500"
+                    }`}>
+                      {isClosedPeriod(selectedYear, index + 1)
+                        ? "Real cerrado"
+                        : selectedYear * 100 + index + 1 === currentYear * 100 + currentMonth
+                          ? "Mes actual"
+                          : "Proyección"}
+                    </span>
+                  </th>
                 ))}
               </tr>
             </thead>
@@ -200,9 +217,7 @@ export function HistoricalCostsTable({ personnel }: HistoricalCostsTableProps) {
                             <>
                               <p className="text-sm font-medium text-gray-900">{person.name}</p>
                               <p className="text-[11px] text-gray-500">
-                                {((person as any).currentRole || (person as any).legacyRole)
-                                  || (person as any).roleName
-                                  || "Rol pendiente"}
+                                {normalizePersonnelRole((person as any).currentRole) || "Nivel pendiente"}
                                 {(person as any).sublevel ? ` · ${(person as any).sublevel}` : ""}
                                 {billingCurrency === "MIXED" ? " · Mixto" : ` · ${billingCurrency}`}
                               </p>

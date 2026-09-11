@@ -44,6 +44,7 @@ import {
   BookOpen,
   Repeat,
   Coins,
+  LayoutGrid,
 } from "lucide-react";
 
 type NavItem = {
@@ -156,8 +157,10 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
     {
       title: "Proyectos",
       items: [
-        { href: isOperations ? "/active-projects" : "/tasks/projects", title: isOperations ? "Proyectos" : "Mis proyectos", icon: Briefcase, badge: projectCount > 0 ? projectCount.toString() : undefined, description: isOperations ? "Gestión y rentabilidad" : "Proyectos activos asignados", permission: 'projects' as AppSection },
+        { href: isOperations ? "/active-projects" : "/tasks/projects", title: isOperations ? "Cartera de proyectos" : "Mis proyectos", icon: Briefcase, badge: projectCount > 0 ? projectCount.toString() : undefined, description: isOperations ? "Gestión y rentabilidad" : "Proyectos activos asignados", permission: 'projects' as AppSection },
+        { href: "/tasks/projects/kanban", title: "Kanban de proyectos", icon: LayoutGrid, description: "Estado operativo de cada proyecto", permission: 'projects' as AppSection },
         { href: "/tasks", title: "Tareas", icon: CheckSquare, description: "Gestión de tareas", permission: 'projects' as AppSection },
+        { href: "/tasks/team-calendar", title: "Calendario", icon: Calendar, description: "Fechas y responsables de tareas", permission: 'projects' as AppSection },
         { href: "/review", title: "Status", icon: ClipboardList, badge: totalReviewPending > 0 ? totalReviewPending.toString() : undefined, description: "Seguimiento y decisiones", permission: 'status' as AppSection },
       ]
     },

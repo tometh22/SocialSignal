@@ -90,6 +90,8 @@ import {
   PERSONNEL_AREAS,
   PERSONNEL_ROLE_LEVELS,
   allowedSublevelsForRole,
+  isCanonicalRoleClassification,
+  normalizePersonnelRole,
 } from "@shared/utils/personnel-classification";
 
 
@@ -928,12 +930,6 @@ export default function Admin() {
     }
   };
 
-  // Función para obtener el nombre del rol por ID
-  const getRoleName = (roleId: number) => {
-    const role = roles?.find(r => r.id === roleId);
-    return role ? role.name : "Rol no encontrado";
-  };
-
   // Funciones para manejar inflación
   const onInflationSubmit = async (values: InflationFormValues) => {
     if (values.inflationRate <= 0) {
@@ -1014,8 +1010,14 @@ export default function Admin() {
     if (!people) return currency === "ARS" ? Number(role.defaultRate || 0) : Number(role.defaultRateUsd || 0);
     return populated.reduce((sum: number, row: any) => sum + Number(row[currency === "ARS" ? "averageRateARS" : "averageRateUSD"]) * Number(row.personnelCount), 0) / people;
   };
-  // Ordenar por la tarifa canónica observada; el default queda sólo como fallback.
-  const sortedRoles = roles ? [...roles].sort((a, b) => roleObservedAverage(b, "ARS") - roleObservedAverage(a, "ARS")) : [];
+  // La pantalla operativa muestra únicamente la taxonomía vigente. Los roles
+  // legacy siguen en la base para resolver cotizaciones históricas, pero no son
+  // opciones ni filas administrables del plan de carrera actual.
+  const sortedRoles = roles
+    ? roles
+        .filter((role) => role.isActive !== false && isCanonicalRoleClassification(role))
+        .sort((a, b) => roleObservedAverage(b, "ARS") - roleObservedAverage(a, "ARS"))
+    : [];
   const observedSummary = (field: "averageRateARS" | "averageRateUSD") => {
     const classifications = new Map<string, any>();
     for (const role of sortedRoles as any[]) {
@@ -1036,6 +1038,7 @@ export default function Admin() {
   const observedRoleAverageARS = observedARS.people ? observedARS.total / observedARS.people : 0;
   const observedRoleAverageUSD = observedUSD.people ? observedUSD.total / observedUSD.people : 0;
   const sortedPersonnel = personnel ? [...personnel].sort((a, b) => getCurrentHourlyRate(b) - getCurrentHourlyRate(a)) : [];
+  const unclassifiedPersonnel = sortedPersonnel.filter((person: any) => !normalizePersonnelRole(person.currentRole));
 
   return (
     <div className="page-container">
@@ -1097,7 +1100,7 @@ export default function Admin() {
               <div className="flex justify-between items-center">
                 <div>
                   <CardTitle className="heading-card">Roles del Equipo</CardTitle>
-                  <CardDescription>Gestiona los roles y sus tarifas por defecto</CardDescription>
+                  <CardDescription>Plan de carrera vigente; los roles históricos se conservan sólo para trazabilidad.</CardDescription>
                 </div>
                 <Button onClick={openNewRoleDialog}>
                   <PlusCircle className="mr-2 h-4 w-4" />
@@ -1169,6 +1172,12 @@ export default function Admin() {
               </div>
             </CardHeader>
             <CardContent className="card-content">
+              {unclassifiedPersonnel.length > 0 && (
+                <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900" role="status">
+                  <strong>{unclassifiedPersonnel.length} {unclassifiedPersonnel.length === 1 ? "persona necesita" : "personas necesitan"} clasificación.</strong>{" "}
+                  Completá Nivel, Subnivel y Área desde el lápiz; el rol histórico no se ofrece como clasificación vigente.
+                </div>
+              )}
               {personnelLoading || rolesLoading ? (
                 <div className="flex justify-center py-8">
                   <Loader variant="dots" size="md" text="Cargando personal" />
@@ -1304,11 +1313,8 @@ export default function Admin() {
                             id: person.id,
                             name: person.name,
                             email: person.email || '',
-                            roleId: person.roleId,
-                            roleName: getRoleName(person.roleId),
                             currentRole: person.currentRole,
                             sublevel: person.sublevel,
-                            legacyRole: person.legacyRole,
                             area: person.area,
                             contractType: person.contractType,
                             currentHourlyRateARS: person.currentHourlyRateARS,
@@ -1323,7 +1329,6 @@ export default function Admin() {
                             usdBillingFraction: person.usdBillingFraction,
                             activeUntil: person.activeUntil,
                           }}
-                          roles={roles || []} 
                         />
                       ))}
                     </TableBody>

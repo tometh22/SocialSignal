@@ -296,7 +296,7 @@ function canonicalizePersonnelDisplay(person: any) {
     ...person,
     currentRole: normalizePersonnelRole(person.currentRole)
       ?? normalizePersonnelRole(person.legacyRole)
-      ?? person.currentRole,
+      ?? null,
     sublevel: normalizePersonnelSublevel(person.sublevel) ?? null,
     area: normalizePersonnelArea(person.area) ?? person.area,
   };
