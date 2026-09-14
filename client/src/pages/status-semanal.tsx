@@ -227,6 +227,44 @@ const mlm = (v: string | null) => MARGIN_LEVEL[v ?? 'medio'] ?? MARGIN_LEVEL.med
 const tlm = (v: string | null) => TEAM_LEVEL[v ?? 'medio'] ?? TEAM_LEVEL.medio;
 const dm = (v: string | null) => DECISION[v ?? 'ninguna'] ?? DECISION.ninguna;
 
+function statusItemPath(roomId: number | null | undefined, itemKey: string): string | null {
+  return roomId ? `/review/${roomId}?item=${encodeURIComponent(itemKey)}` : null;
+}
+
+function statusItemUrl(roomId: number | null | undefined, itemKey: string): string | null {
+  const path = statusItemPath(roomId, itemKey);
+  if (!path) return null;
+  return typeof window !== 'undefined' ? `${window.location.origin}${path}` : path;
+}
+
+function ItemShareButton({ item, roomId }: { item: Item; roomId?: number | null }) {
+  const { toast } = useToast();
+  const url = statusItemUrl(roomId, item.key);
+  if (!url) return null;
+
+  const copy = async (event: React.MouseEvent) => {
+    event.stopPropagation();
+    try {
+      await navigator.clipboard.writeText(url);
+      toast({ title: 'Link copiado', description: `Acceso directo a “${item.title}”.` });
+    } catch {
+      toast({ title: 'No se pudo copiar el link', variant: 'destructive' });
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={copy}
+      aria-label={`Copiar link de ${item.title}`}
+      title="Copiar link personalizado"
+      className="p-1 rounded text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+    >
+      <Link2 className="h-3.5 w-3.5" />
+    </button>
+  );
+}
+
 const highlightConfig = {
   risk: { icon: Shield, bg: 'bg-red-50 border-red-200', text: 'text-red-700', iconColor: 'text-red-500' },
   win: { icon: TrendingUp, bg: 'bg-emerald-50 border-emerald-200', text: 'text-emerald-700', iconColor: 'text-emerald-500' },
@@ -1342,6 +1380,7 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
           )}
           <OwnerSelect value={item.ownerId} name={item.ownerName} onChange={v => onUpdate({ ownerId: v })} users={users} />
           <DeadlinePicker value={item.deadline} isOverdue={item.isOverdue} onChange={v => onUpdate({ deadline: v })} />
+          <ItemShareButton item={item} roomId={roomId} />
           {handleOpenNotes && item.noteCount > 0 && (
             <button onClick={handleOpenNotes}
               className={cn(
@@ -1809,6 +1848,7 @@ function AlertSidebarCard({ item, accent, currentUserId, roomId, onUpdate, expan
             <div className="flex items-center gap-1.5">
               {item.isCustom && <Tag className="h-3 w-3 text-indigo-400 shrink-0" />}
               <p className="font-semibold text-[13px] leading-snug text-slate-900 break-words flex-1">{item.title}</p>
+              <ItemShareButton item={item} roomId={roomId} />
               <ChevronDown className={cn("h-3 w-3 text-slate-300 shrink-0 transition-transform", !expanded && "-rotate-90")} />
             </div>
             {!expanded && item.currentAction && (
@@ -1978,6 +2018,7 @@ function DecisionSidebarCard({ item, currentUserId, roomId, expanded, onToggle, 
             </div>
           )}
           <p className="font-semibold text-[13px] leading-snug text-slate-900 break-words flex-1">{item.title}</p>
+          <ItemShareButton item={item} roomId={roomId} />
           <ChevronDown className={cn("h-3 w-3 text-slate-300 shrink-0 transition-transform", !expanded && "-rotate-90")} />
         </div>
         {!expanded && item.currentAction && (
@@ -2365,10 +2406,11 @@ function ActivityPanel({ projectId, customItemId, projectName, onClose }: { proj
 
 type DailyAgendaEntry = { item: Item; reasons: DailyReason[] };
 
-function DailyAgendaView({ agenda, quiet, dailyStatus, onStart, onOpenList, addItem }: {
+function DailyAgendaView({ agenda, quiet, dailyStatus, roomId, onStart, onOpenList, addItem }: {
   agenda: DailyAgendaEntry[];
   quiet: Item[];
   dailyStatus: DailyStatus | undefined;
+  roomId?: number | null;
   onStart: (startIndex?: number, opts?: { includeQuiet?: boolean; startKey?: string }) => void;
   onOpenList: () => void;
   addItem?: React.ReactNode;
@@ -2428,7 +2470,9 @@ function DailyAgendaView({ agenda, quiet, dailyStatus, onStart, onOpenList, addI
                     const main = reasons[0];
                     const meta = DAILY_REASON_META[main.kind];
                     return (
-                      <button key={item.key} onClick={() => onStart(idx)}
+                      <div key={item.key} role="button" tabIndex={0}
+                        onClick={() => onStart(idx)}
+                        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onStart(idx); } }}
                         className={cn("w-full text-left flex gap-3 items-start p-3 rounded-xl border-l-4 hover:shadow-sm transition-shadow", meta.border, meta.bg)}>
                         <div className="flex flex-col gap-1 shrink-0 mt-0.5">
                           {reasons.map(r => (
@@ -2445,7 +2489,8 @@ function DailyAgendaView({ agenda, quiet, dailyStatus, onStart, onOpenList, addI
                           <div className="text-xs text-slate-500 mt-0.5">{main.detail}</div>
                         </div>
                         <span className="text-xs text-slate-400 italic shrink-0 max-md:hidden">{main.question}</span>
-                      </button>
+                        <ItemShareButton item={item} roomId={roomId} />
+                      </div>
                     );
                   })}
                 </div>
@@ -2513,11 +2558,12 @@ function DailyItemContext({ item }: { item: Item }) {
   );
 }
 
-function DailyRunner({ queue, quietCount, users, currentUserId, startIndex, handlersFor, onFinish, onExit }: {
+function DailyRunner({ queue, quietCount, users, currentUserId, roomId, startIndex, handlersFor, onFinish, onExit }: {
   queue: DailyAgendaEntry[];
   quietCount: number;
   users: AppUser[];
   currentUserId: number | null;
+  roomId?: number | null;
   startIndex: number;
   handlersFor: (item: Item) => { onUpdate: (data: Record<string, any>) => void; onResolve: () => void };
   onFinish: (payload: { startedAt: string; reviewedCount: number; changedCount: number; summary: DailyChange[] }) => Promise<void>;
@@ -2672,7 +2718,10 @@ function DailyRunner({ queue, quietCount, users, currentUserId, startIndex, hand
   const buildShareText = () => {
     const lines = [`Daily · ${new Date().toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'short' })} · ${formatDuration(elapsed)}`, ''];
     if (summaryList.length === 0) lines.push('Sin cambios. Todo sigue igual.');
-    for (const s of summaryList) lines.push(`• ${s.title}: ${s.changes.join(' · ')}`);
+    for (const s of summaryList) {
+      const url = statusItemUrl(roomId, s.key);
+      lines.push(`• ${s.title}: ${s.changes.join(' · ')}${url ? ` · ${url}` : ''}`);
+    }
     const untouched = queue.length - summaryList.length + quietCount;
     if (untouched > 0) lines.push('', `+ ${untouched} ítems revisados sin cambios`);
     return lines.join('\n');
@@ -2869,7 +2918,7 @@ function DailyRunner({ queue, quietCount, users, currentUserId, startIndex, hand
   );
 }
 
-export default function StatusSemanalPage() {
+export default function StatusSemanalPage({ initialItemKey }: { initialItemKey?: string } = {}) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { user } = useAuth();
@@ -2919,6 +2968,7 @@ export default function StatusSemanalPage() {
   const [showExport, setShowExport] = useState(false);
   const [showKbHelp, setShowKbHelp] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const deepLinkHandledRef = useRef<string | null>(null);
 
   // ── AI Summary mutation ─────────────────────────────────────────────────────
 
@@ -3228,6 +3278,16 @@ export default function StatusSemanalPage() {
     if (filterOwner !== null && i.ownerId !== filterOwner) return false;
     return true;
   }), [allItems, searchQuery, filterHealth, filterOwner]);
+
+  useEffect(() => {
+    if (!initialItemKey || deepLinkHandledRef.current === initialItemKey || allItems.length === 0) return;
+    const target = allItems.find(item => item.key === initialItemKey);
+    if (!target) return;
+    deepLinkHandledRef.current = initialItemKey;
+    setViewMode('list');
+    setExpandedKey(target.key);
+    window.setTimeout(() => document.getElementById(`row-${target.key}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
+  }, [initialItemKey, allItems]);
 
   const { alertItems, decisionItems, normalItems, alertKeys, decisionKeys, flatNavItems } = useMemo(() => {
     const rojoItems     = visible.filter(i => i.healthStatus === 'rojo');
@@ -3714,6 +3774,7 @@ export default function StatusSemanalPage() {
               agenda={dailyAgenda}
               quiet={dailyQuiet}
               dailyStatus={dailyStatus}
+              roomId={roomCtx?.roomId}
               onStart={startDaily}
               onOpenList={() => setViewMode('list')}
               addItem={<AddItemButton variant="daily" onAdd={d => createCustom.mutate(d)} users={appUsers} currentUserId={currentUserId} />}
@@ -3756,11 +3817,12 @@ export default function StatusSemanalPage() {
                           {bucket.items.map(item => {
                             const dot = hm(item.healthStatus).dot;
                             return (
-                              <div key={item.key} className="bg-white border border-slate-200 rounded-lg px-3 py-2 shadow-sm hover:border-indigo-300 transition-colors cursor-pointer"
+                              <div key={item.key} id={`row-${item.key}`} className="bg-white border border-slate-200 rounded-lg px-3 py-2 shadow-sm hover:border-indigo-300 transition-colors cursor-pointer"
                                 onClick={() => setExpandedKey(expandedKey === item.key ? null : item.key)}>
                                 <div className="flex items-center gap-1.5 mb-1">
                                   <div className={cn("w-2 h-2 rounded-full shrink-0", dot)} />
                                   <span className="text-xs font-medium text-slate-800 truncate flex-1">{item.title}</span>
+                                  <ItemShareButton item={item} roomId={roomCtx?.roomId} />
                                 </div>
                                 {item.ownerName && (
                                   <div className="flex items-center gap-1">
@@ -3957,7 +4019,7 @@ export default function StatusSemanalPage() {
                                   <span className="text-[10px] text-amber-600">Sin update · {staleItems.length}</span>
                                 </div>
                                 {staleItems.map((item) => (
-                                  <div key={item.key} className="border-b border-slate-100/80 last:border-b-0">
+                                  <div key={item.key} id={`row-${item.key}`} className="border-b border-slate-100/80 last:border-b-0">
                                     {renderRow(item, true)}
                                   </div>
                                 ))}
@@ -3969,7 +4031,7 @@ export default function StatusSemanalPage() {
                               </div>
                             )}
                             {freshItems.map((item) => (
-                              <div key={item.key} className="border-b border-slate-100/80 last:border-b-0">
+                              <div key={item.key} id={`row-${item.key}`} className="border-b border-slate-100/80 last:border-b-0">
                                 {renderRow(item, false)}
                               </div>
                             ))}
@@ -4251,6 +4313,7 @@ export default function StatusSemanalPage() {
           quietCount={dailyQuiet.filter(q => !dailyQueue.some(e => e.item.key === q.key)).length}
           users={appUsers}
           currentUserId={currentUserId}
+          roomId={roomCtx?.roomId}
           startIndex={Math.min(dailyRun.startIndex, Math.max(0, dailyQueue.length - 1))}
           handlersFor={getItemHandlers}
           onFinish={finishDaily}

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useParams, useLocation } from "wouter";
+import { useParams, useLocation, useSearch } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Loader2, AlertTriangle, FolderPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,8 @@ export default function ReviewRoomPage() {
   const params = useParams<{ roomId: string }>();
   const roomId = parseInt(params?.roomId ?? '', 10);
   const [, navigate] = useLocation();
+  const search = useSearch();
+  const initialItemKey = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search).get('item') ?? undefined;
 
   // Set the room context SYNCHRONOUSLY during render so any child query on first mount
   // hits the room-scoped URL (child useEffects run before parent useEffects).
@@ -76,7 +78,7 @@ export default function ReviewRoomPage() {
 
   return (
     <ReviewRoomContext.Provider value={ctxValue}>
-      <RoomBody roomId={roomId} />
+      <RoomBody roomId={roomId} initialItemKey={initialItemKey} />
     </ReviewRoomContext.Provider>
   );
 }
@@ -84,7 +86,7 @@ export default function ReviewRoomPage() {
 // Renders either an empty-state banner or the full board, based on whether the
 // room has any items. Uses the SAME cache keys as StatusSemanalPage so the
 // queries are shared (no duplicate fetches).
-function RoomBody({ roomId }: { roomId: number }) {
+function RoomBody({ roomId, initialItemKey }: { roomId: number; initialItemKey?: string }) {
   const [addProjectOpen, setAddProjectOpen] = useState(false);
 
   const { data: projects = [], isLoading: l1 } = useQuery<unknown[]>({
@@ -123,7 +125,7 @@ function RoomBody({ roomId }: { roomId: number }) {
       )}
       {/* StatusSemanalPage uses legacy /api/status-semanal/* URLs; queryClient rewrites
           them to /api/reviews/:roomId/* because the room context is set above. */}
-      <StatusSemanalPage />
+      <StatusSemanalPage initialItemKey={initialItemKey} />
       <AddProjectDialog open={addProjectOpen} onClose={() => setAddProjectOpen(false)} roomId={roomId} />
     </>
   );
