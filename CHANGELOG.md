@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.3.4 — 2026-09-14
+
+- La daily se puede hacer aunque ningún ítem tenga novedad: "Recorrer todos igual", y cada ítem de "Sin novedad" se abre con un clic para dejarle un update.
+- Con novedades, aparece "Recorrer todos" para incluir también los ítems al día.
+
 ## 1.3.3 — 2026-09-11
 
 - Hace visibles desde la navegación principal la cartera, el Kanban general, las tareas y el calendario de proyectos para Administración y Operaciones.

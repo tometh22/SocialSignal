@@ -1,11 +1,15 @@
 // Modo Daily — lógica pura (sin React) de "qué ítems merecen conversación hoy".
 // Vive fuera de la página para poder testearla en node.
 
-export type DailyReasonKind = 'rojo' | 'cambio' | 'vence' | 'decision' | 'silencio' | 'nuevo';
+// 'aldia' no la produce dailyReasonsFor: la asigna la agenda cuando el usuario
+// decide recorrer también los ítems sin novedad.
+export type DailyReasonKind = 'rojo' | 'cambio' | 'vence' | 'decision' | 'silencio' | 'nuevo' | 'aldia';
 export type DailyReason = { kind: DailyReasonKind; detail: string; question: string };
 
 // Prioridad visual y orden de recorrido en el runner.
-export const DAILY_REASON_ORDER: DailyReasonKind[] = ['rojo', 'cambio', 'vence', 'decision', 'silencio', 'nuevo'];
+export const DAILY_REASON_ORDER: DailyReasonKind[] = ['rojo', 'cambio', 'vence', 'decision', 'silencio', 'nuevo', 'aldia'];
+
+export const AL_DIA_REASON: DailyReason = { kind: 'aldia', detail: 'Sin novedad desde la última daily', question: '¿algo para sumar?' };
 
 // Chip "sin update" de la vista de lista (ritmo semanal): más de 5 días sin update.
 export const STALE_DAYS = 5;

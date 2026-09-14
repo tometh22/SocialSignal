@@ -5,7 +5,7 @@ import { apiRequest, authFetch } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
 import { useMaybeReviewRoom } from "@/hooks/use-review-room";
 import {
-  dailyReasonsFor, formatDuration, isStale, relTime, DAILY_REASON_ORDER,
+  dailyReasonsFor, formatDuration, isStale, relTime, DAILY_REASON_ORDER, AL_DIA_REASON,
   type DailyReason, type DailyReasonKind,
 } from "@/lib/daily-agenda";
 import MemberAvatarsStack from "@/components/review/MemberAvatarsStack";
@@ -179,6 +179,7 @@ const DAILY_REASON_META: Record<DailyReasonKind, { label: string; chip: string; 
   decision: { label: 'DECISIÓN', chip: 'text-purple-700 bg-purple-100', border: 'border-purple-400', bg: 'bg-purple-50/40' },
   silencio: { label: 'SILENCIO', chip: 'text-slate-600 bg-slate-200',   border: 'border-slate-300',  bg: 'bg-slate-50' },
   nuevo:    { label: 'NUEVO',    chip: 'text-indigo-700 bg-indigo-100', border: 'border-indigo-400', bg: 'bg-indigo-50/40' },
+  aldia:    { label: 'AL DÍA',   chip: 'text-emerald-700 bg-emerald-100', border: 'border-emerald-300', bg: 'bg-emerald-50/30' },
 };
 
 type DailyStatus = { latest: DailySession | null; todayDone: boolean; streak: number };
@@ -2368,7 +2369,7 @@ function DailyAgendaView({ agenda, quiet, dailyStatus, onStart, onOpenList, addI
   agenda: DailyAgendaEntry[];
   quiet: Item[];
   dailyStatus: DailyStatus | undefined;
-  onStart: (startIndex?: number) => void;
+  onStart: (startIndex?: number, opts?: { includeQuiet?: boolean; startKey?: string }) => void;
   onOpenList: () => void;
   addItem?: React.ReactNode;
 }) {
@@ -2398,11 +2399,15 @@ function DailyAgendaView({ agenda, quiet, dailyStatus, onStart, onOpenList, addI
             <div className="flex items-center gap-2 shrink-0">
               {addItem}
               <button onClick={onOpenList} className="text-xs text-slate-500 hover:text-slate-800 font-medium px-2 py-1.5">Ver lista completa</button>
-              <button onClick={() => onStart()} disabled={agenda.length === 0}
+              {agenda.length > 0 && quiet.length > 0 && (
+                <button onClick={() => onStart(0, { includeQuiet: true })} title="Recorrer también los que no tienen novedad"
+                  className="text-xs text-slate-500 hover:text-slate-800 font-medium px-2 py-1.5">Recorrer todos ({agenda.length + quiet.length})</button>
+              )}
+              <button onClick={() => onStart(0, { includeQuiet: agenda.length === 0 })} disabled={agenda.length + quiet.length === 0}
                 className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white font-bold text-sm px-4 py-2 rounded-lg shadow-sm transition-colors">
                 <Play className="h-3.5 w-3.5 fill-current" />
-                {dailyStatus?.todayDone ? 'Repetir la daily' : 'Hacer la daily'}
-                <span className="text-indigo-200 font-normal">{agenda.length} ítem{agenda.length === 1 ? '' : 's'} · ~{estMinutes} min</span>
+                {agenda.length === 0 ? 'Recorrer todos igual' : dailyStatus?.todayDone ? 'Repetir la daily' : 'Hacer la daily'}
+                <span className="text-indigo-200 font-normal">{agenda.length === 0 ? quiet.length : agenda.length} ítem{(agenda.length === 0 ? quiet.length : agenda.length) === 1 ? '' : 's'} · ~{agenda.length === 0 ? Math.max(1, Math.round(quiet.length * 0.5)) : estMinutes} min</span>
               </button>
             </div>
           </div>
@@ -2457,14 +2462,17 @@ function DailyAgendaView({ agenda, quiet, dailyStatus, onStart, onOpenList, addI
               ) : (
                 <ul className="text-xs text-slate-500 space-y-1.5">
                   {quiet.map(i => (
-                    <li key={i.key} className="flex justify-between gap-2">
-                      <span className="truncate flex items-center gap-1.5 min-w-0"><span className={cn("w-1.5 h-1.5 rounded-full shrink-0", hm(i.healthStatus).dot)} /><span className="truncate">{i.title}</span></span>
-                      <span className="text-slate-300 shrink-0">{(i.lastUpdateAt || i.updatedAt) ? relTime(i.lastUpdateAt || i.updatedAt!) : '—'}</span>
+                    <li key={i.key}>
+                      <button onClick={() => onStart(0, { includeQuiet: true, startKey: i.key })} title="Abrir para dejar un update"
+                        className="w-full flex justify-between gap-2 rounded px-1 py-0.5 -mx-1 hover:bg-white hover:text-slate-800 transition-colors text-left">
+                        <span className="truncate flex items-center gap-1.5 min-w-0"><span className={cn("w-1.5 h-1.5 rounded-full shrink-0", hm(i.healthStatus).dot)} /><span className="truncate">{i.title}</span></span>
+                        <span className="text-slate-300 shrink-0">{(i.lastUpdateAt || i.updatedAt) ? relTime(i.lastUpdateAt || i.updatedAt!) : '—'}</span>
+                      </button>
                     </li>
                   ))}
                 </ul>
               )}
-              <p className="text-[11px] text-slate-400 mt-4 leading-relaxed">No hace falta hablar de estos. Al cerrar la daily quedan contados como revisados.</p>
+              <p className="text-[11px] text-slate-400 mt-4 leading-relaxed">No hace falta hablar de estos, pero podés tocar uno para dejarle un update igual. Al cerrar la daily quedan contados como revisados.</p>
             </div>
           </div>
         </div>
@@ -3299,10 +3307,14 @@ export default function StatusSemanalPage() {
   // La cola del runner se congela al arrancar: si un ítem deja de tener razones
   // a mitad de camino (ej. pasó a verde) no debe desaparecer bajo los pies.
   const [dailyQueue, setDailyQueue] = useState<DailyAgendaEntry[]>([]);
-  const startDaily = (startIndex = 0) => {
-    if (dailyAgenda.length === 0) return;
-    setDailyQueue(dailyAgenda);
-    setDailyRun({ startIndex });
+  const startDaily = (startIndex = 0, opts?: { includeQuiet?: boolean; startKey?: string }) => {
+    const queue: DailyAgendaEntry[] = opts?.includeQuiet
+      ? [...dailyAgenda, ...dailyQuiet.map(item => ({ item, reasons: [AL_DIA_REASON] }))]
+      : dailyAgenda;
+    if (queue.length === 0) return;
+    const idx = opts?.startKey ? Math.max(0, queue.findIndex(e => e.item.key === opts.startKey)) : startIndex;
+    setDailyQueue(queue);
+    setDailyRun({ startIndex: idx });
   };
 
   const finishDaily = async (payload: { startedAt: string; reviewedCount: number; changedCount: number; summary: DailyChange[] }) => {
@@ -4236,7 +4248,7 @@ export default function StatusSemanalPage() {
       {dailyRun && (
         <DailyRunner
           queue={dailyQueue}
-          quietCount={dailyQuiet.length}
+          quietCount={dailyQuiet.filter(q => !dailyQueue.some(e => e.item.key === q.key)).length}
           users={appUsers}
           currentUserId={currentUserId}
           startIndex={Math.min(dailyRun.startIndex, Math.max(0, dailyQueue.length - 1))}
