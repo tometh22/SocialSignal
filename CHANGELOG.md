@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.4.1 — 2026-09-14
+
+- Habilita la extracción inteligente de capturas y PDFs financieros mediante Anthropic cuando OpenAI no está configurado, conservando las reglas locales como último fallback.
+- Configura en producción almacenamiento privado persistente para que la evidencia financiera sobreviva a nuevos despliegues.
+
 ## 1.4.0 — 2026-09-14
 
 - Incorpora una sección independiente de Carga financiera para ingresar texto, documentos o capturas directamente en Mind, sin formularios separados ni CSV operativo.
