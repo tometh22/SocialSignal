@@ -161,8 +161,8 @@ export default function MyInvoices() {
   const summary = projectQuery.data?.summary;
   const financialCostMode = summary?.financialCostMode ?? existing?.financialCostMode;
   const isFreelance = financialCostMode === "hourly";
-  const requiresMixedSettlement = summary?.billingCurrency?.toUpperCase() === "MIXED";
   const settlement = settlementQuery.data ?? null;
+  const requiresMixedSettlement = settlement?.billingCurrencySnapshot?.toUpperCase() === "MIXED" || summary?.billingCurrency?.toUpperCase() === "MIXED";
   const locked = existing?.approvalStatus === "approved";
 
   useEffect(() => {

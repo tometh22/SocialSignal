@@ -84,6 +84,7 @@ describe("personal invoice integration contracts", () => {
     expect(routes).toContain('/api/finance/personnel-settlements');
     expect(routes).toContain('/api/me/invoices/settlement');
     expect(adminPage).toContain("% a facturar en USD");
+    expect(adminPage).toContain("Cómo factura este mes");
     expect(adminPage).toContain("Extras / bono en USD");
     expect(employeePage).toContain("Tipo de cambio al facturar");
     expect(employeePage).toContain("Tipo de cambio al cobrar");

@@ -13446,7 +13446,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!person) return res.status(404).json({ message: "Persona no encontrada" });
       if (!closing) return res.status(409).json({ message: "Primero cerrá las horas de esta persona en Operaciones → Cierre mensual" });
 
-      const billingCurrency = String(closing.billingCurrency ?? person.billingCurrency ?? "ARS").toUpperCase();
+      const requestedBillingCurrency = String(req.body?.billingCurrency ?? closing.billingCurrency ?? person.billingCurrency ?? "ARS").toUpperCase();
+      const billingCurrency = ["ARS", "USD", "MIXED"].includes(requestedBillingCurrency) ? requestedBillingCurrency : "ARS";
       const parseNonNegative = (value: unknown, field: string) => {
         const parsed = Number(value ?? 0);
         if (!Number.isFinite(parsed) || parsed < 0) throw Object.assign(new Error(`${field} inválido`), { statusCode: 400 });

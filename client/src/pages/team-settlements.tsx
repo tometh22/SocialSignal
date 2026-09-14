@@ -14,6 +14,7 @@ import { AlertCircle, Calculator, CheckCircle2, Loader2, Search, Send, UsersRoun
 type Settlement = {
   id: number;
   status: "draft" | "published";
+  billingCurrencySnapshot: string;
   usdPercentage: number;
   plannedUSDARS: number;
   bonusUSD: number;
@@ -35,7 +36,7 @@ type SettlementRow = {
   settlement: Settlement | null;
 };
 
-type Draft = { usdPercentage: string; bonusUSD: string; extrasARS: string; adminNotes: string };
+type Draft = { billingCurrency: "ARS" | "USD" | "MIXED"; usdPercentage: string; bonusUSD: string; extrasARS: string; adminNotes: string };
 
 function currentPeriod() {
   const now = new Date();
@@ -53,7 +54,7 @@ function usd(value: number | null | undefined) {
 export default function TeamSettlements() {
   const [period, setPeriod] = useState(currentPeriod());
   const [search, setSearch] = useState("");
-  const [scope, setScope] = useState("mixed");
+  const [scope, setScope] = useState("ready");
   const [drafts, setDrafts] = useState<Record<number, Draft>>({});
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -65,6 +66,7 @@ export default function TeamSettlements() {
   useEffect(() => {
     if (!query.data) return;
     setDrafts(Object.fromEntries(query.data.map((row) => [row.person.id, {
+      billingCurrency: (row.settlement?.billingCurrencySnapshot?.toUpperCase() ?? row.person.billingCurrency?.toUpperCase() ?? "ARS") as Draft["billingCurrency"],
       usdPercentage: String(row.settlement?.usdPercentage ?? (row.person.billingCurrency?.toUpperCase() === "USD" ? 100 : 0)),
       bonusUSD: String(row.settlement?.bonusUSD ?? 0),
       extrasARS: String(row.settlement?.extrasARS ?? 0),
@@ -92,15 +94,16 @@ export default function TeamSettlements() {
   });
 
   const rows = useMemo(() => (query.data ?? []).filter((row) => {
-    if (scope === "mixed" && row.person.billingCurrency?.toUpperCase() !== "MIXED") return false;
+    if (scope === "ready" && !row.closing) return false;
+    if (scope === "mixed" && (row.settlement?.billingCurrencySnapshot ?? row.person.billingCurrency)?.toUpperCase() !== "MIXED") return false;
     return `${row.person.name} ${row.person.email ?? ""}`.toLowerCase().includes(search.trim().toLowerCase());
   }), [query.data, scope, search]);
   const published = (query.data ?? []).filter((row) => row.settlement?.status === "published").length;
-  const mixed = (query.data ?? []).filter((row) => row.person.billingCurrency?.toUpperCase() === "MIXED").length;
+  const mixed = (query.data ?? []).filter((row) => (row.settlement?.billingCurrencySnapshot ?? row.person.billingCurrency)?.toUpperCase() === "MIXED").length;
 
   const update = (personId: number, field: keyof Draft, value: string) => setDrafts((current) => ({
     ...current,
-    [personId]: { ...(current[personId] ?? { usdPercentage: "0", bonusUSD: "0", extrasARS: "0", adminNotes: "" }), [field]: value },
+    [personId]: { ...(current[personId] ?? { billingCurrency: "ARS", usdPercentage: "0", bonusUSD: "0", extrasARS: "0", adminNotes: "" }), [field]: value },
   }));
 
   return <div className="mx-auto max-w-7xl space-y-6">
@@ -111,7 +114,7 @@ export default function TeamSettlements() {
     </div>
 
     <div className="grid gap-3 sm:grid-cols-3">
-      <Metric icon={UsersRound} label="Personas con esquema mixto" value={String(mixed)} />
+      <Metric icon={UsersRound} label="Liquidaciones con esquema mixto" value={String(mixed)} />
       <Metric icon={CheckCircle2} label="Liquidaciones publicadas" value={String(published)} />
       <Metric icon={Calculator} label="Cálculos manuales" value="0" detail="Mind reemplaza las fórmulas del Excel" />
     </div>
@@ -120,7 +123,7 @@ export default function TeamSettlements() {
       <CardHeader className="pb-3"><CardTitle className="text-base">Período y equipo</CardTitle></CardHeader>
       <CardContent className="flex flex-col gap-3 sm:flex-row">
         <div className="w-full sm:w-52"><Label htmlFor="settlement-period">Mes de cierre</Label><Input id="settlement-period" className="mt-1.5" type="month" value={period} onChange={(event) => setPeriod(event.target.value)} /></div>
-        <div className="w-full sm:w-60"><Label>Personas</Label><Select value={scope} onValueChange={setScope}><SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="mixed">Sólo facturación mixta</SelectItem><SelectItem value="all">Todo el equipo</SelectItem></SelectContent></Select></div>
+        <div className="w-full sm:w-60"><Label>Personas</Label><Select value={scope} onValueChange={setScope}><SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ready">Con cierre operativo</SelectItem><SelectItem value="mixed">Liquidaciones mixtas</SelectItem><SelectItem value="all">Todo el equipo</SelectItem></SelectContent></Select></div>
         <div className="min-w-0 flex-1"><Label htmlFor="settlement-search">Buscar</Label><div className="relative mt-1.5"><Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" /><Input id="settlement-search" className="pl-9" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Nombre o email" /></div></div>
       </CardContent>
     </Card>
@@ -131,13 +134,13 @@ export default function TeamSettlements() {
 
     <div className="space-y-4">
       {rows.map((row) => {
-        const draft = drafts[row.person.id] ?? { usdPercentage: "0", bonusUSD: "0", extrasARS: "0", adminNotes: "" };
-        const isMixed = row.person.billingCurrency?.toUpperCase() === "MIXED";
-        const pct = isMixed ? Math.min(100, Math.max(0, Number(draft.usdPercentage) || 0)) : row.person.billingCurrency?.toUpperCase() === "USD" ? 100 : 0;
+        const draft = drafts[row.person.id] ?? { billingCurrency: "ARS" as const, usdPercentage: "0", bonusUSD: "0", extrasARS: "0", adminNotes: "" };
+        const isMixed = draft.billingCurrency === "MIXED";
+        const pct = isMixed ? Math.min(100, Math.max(0, Number(draft.usdPercentage) || 0)) : draft.billingCurrency === "USD" ? 100 : 0;
         const planned = Number(row.system.totalARS ?? 0) * pct / 100;
         return <Card key={row.person.id} className={row.settlement?.status === "published" ? "border-emerald-200" : ""}>
           <CardHeader className="pb-3">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between"><div><CardTitle className="text-base">{row.person.name}</CardTitle><p className="text-xs text-muted-foreground">{row.person.email || "Sin email vinculado"} · {row.person.contractType} · {isMixed ? "USD + ARS" : row.person.billingCurrency}</p></div><Badge variant="outline" className={row.settlement?.status === "published" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-slate-200 bg-slate-50"}>{row.settlement?.status === "published" ? "Publicada" : "Borrador"}</Badge></div>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between"><div><CardTitle className="text-base">{row.person.name}</CardTitle><p className="text-xs text-muted-foreground">{row.person.email || "Sin email vinculado"} · {row.person.contractType}</p></div><Badge variant="outline" className={row.settlement?.status === "published" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-slate-200 bg-slate-50"}>{row.settlement?.status === "published" ? "Publicada" : "Borrador"}</Badge></div>
           </CardHeader>
           <CardContent className="space-y-4">
             {!row.closing ? <div className="flex gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /><span>Falta el cierre operativo. Cerrá primero sus horas en Operaciones → Cierre mensual; recién entonces Mind congela el valor hora y el total.</span></div> : <>
@@ -146,6 +149,7 @@ export default function TeamSettlements() {
                 <ReadOnly label="Valor hora ARS" value={ars(row.system.hourlyRateARS)} />
                 <ReadOnly label="Total a cobrar ARS" value={ars(row.system.totalARS)} />
               </div>
+              <div className="max-w-sm"><Label>Cómo factura este mes</Label><Select value={draft.billingCurrency} onValueChange={(value: Draft["billingCurrency"]) => update(row.person.id, "billingCurrency", value)}><SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ARS">Sólo ARS</SelectItem><SelectItem value="USD">Sólo USD</SelectItem><SelectItem value="MIXED">USD + ARS</SelectItem></SelectContent></Select><p className="mt-1 text-xs text-muted-foreground">La modalidad se define por mes; no cambia la ficha general de Personal.</p></div>
               {isMixed ? <>
                 <div className="grid gap-4 sm:grid-cols-3">
                   <div><Label htmlFor={`pct-${row.person.id}`}>% a facturar en USD</Label><Input id={`pct-${row.person.id}`} className="mt-1.5" type="number" min="0" max="100" step="0.01" value={draft.usdPercentage} onChange={(event) => update(row.person.id, "usdPercentage", event.target.value)} /></div>
