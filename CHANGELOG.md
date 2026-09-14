@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.6.1 — 2026-09-14
+
+- Permite elegir la modalidad ARS, USD o USD + ARS por persona y por mes desde la liquidación, sin depender de una configuración fija en Personal.
+- Abre la pantalla mostrando primero a quienes ya tienen cierre operativo, para que Administración pueda continuar de inmediato con los datos actuales.
+
 ## 1.6.0 — 2026-09-14
 
 - Reemplaza el Excel de liquidación mixta con una sección de carga exclusiva para Administración, separada de reportes.
