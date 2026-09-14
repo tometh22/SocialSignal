@@ -58,6 +58,14 @@ describe("financial native integration contracts", () => {
     expect(files).not.toContain('"text/csv"');
   });
 
+  it("puede interpretar capturas y PDFs con el proveedor de IA disponible", () => {
+    const extractor = read("server/services/financial-intake-extractor.ts");
+    expect(extractor).toContain("ANTHROPIC_API_KEY");
+    expect(extractor).toContain('type: "image"');
+    expect(extractor).toContain('type: "document"');
+    expect(extractor).toContain('provider: "anthropic"');
+  });
+
   it("registra migraciones y alimenta tableros desde Mind", () => {
     const index = read("server/index.ts");
     expect(index).toContain("0058 financial native intake");
