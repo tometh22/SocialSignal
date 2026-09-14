@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.4.0 — 2026-09-14
+
+- Incorpora una sección independiente de Carga financiera para ingresar texto, documentos o capturas directamente en Mind, sin formularios separados ni CSV operativo.
+- Extrae y permite revisar facturas, cobros, pagos, extractos, fees, provisiones, impuestos, tipo de cambio, REM e IPC antes de contabilizarlos.
+- Crea y concilia registros nativos de Activo, Pasivo, Cashflow, ingresos, costos, provisiones y variables económicas, con evidencia privada, deduplicación y auditoría.
+- Agrega cierre financiero por período con pre-cierre, controles críticos, snapshot, bloqueo, revisión y reapertura justificada.
+- Alimenta reportes y tableros desde hechos financieros nativos a partir del corte, manteniendo compatibilidad histórica previa.
+- Separa en la navegación Carga financiera, Gestión financiera y Reportes financieros, y anticipa en pantalla qué módulos actualizará cada confirmación.
+
 ## 1.3.4 — 2026-09-14
 
 - La daily se puede hacer aunque ningún ítem tenga novedad: "Recorrer todos igual", y cada ítem de "Sin novedad" se abre con un clic para dejarle un update.
