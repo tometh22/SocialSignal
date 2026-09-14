@@ -108,6 +108,22 @@ export class AutoSyncService {
     etlResult?: any;
   }> {
     try {
+      const { getCutoverDate } = await import('../etl/time-entries-to-fact-labor');
+      const cutoverDate = await getCutoverDate();
+      const now = new Date();
+      const currentPeriod = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+      if (cutoverDate && currentPeriod >= cutoverDate) {
+        console.log(`📊 Auto-sync financiero desde Excel desactivado por cutover ${cutoverDate}; la fuente operativa es Mind.`);
+        return {
+          salesImported: 0,
+          salesUpdated: 0,
+          costsImported: 0,
+          costsUpdated: 0,
+          errors: [],
+          lineasGeneralesProcessed: 0,
+          etlExecuted: false,
+        };
+      }
       console.log('📊 UNIFICADO: Sincronizando ventas + costos desde Excel MAESTRO...');
 
       // 1. Obtener datos de ventas desde Excel MAESTRO "Ventas Tomi"

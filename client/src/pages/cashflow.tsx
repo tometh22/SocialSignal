@@ -1,11 +1,17 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { DollarSign, ArrowUp, ArrowDown, Wallet } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useToast } from "@/hooks/use-toast";
+import { Link } from "wouter";
+import { DollarSign, ArrowUp, ArrowDown, Wallet, Settings2, UploadCloud, Ban } from "lucide-react";
 
 const MONTHS = Array.from({ length: 12 }, (_, i) => ({
   value: String(i + 1).padStart(2, "0"),
@@ -26,18 +32,28 @@ interface CashflowRow {
   detalleOperacion?: string;
   concepto?: string;
   montoUSD?: string;
+  reconciliationStatus?: "matched" | "unmatched" | "ignored";
+  transferGroupId?: string | null;
 }
 
 interface CashflowBalance {
   balances: Record<string, number>;
   totalUSD?: number;
 }
+interface FinancialAccount { id: number; name: string; bankName?: string | null; currency: string; openingBalance: string; isActive: boolean }
 
 export default function CashflowPage() {
   const [year, setYear] = useState(String(new Date().getFullYear()));
   const [month, setMonth] = useState(String(new Date().getMonth() + 1).padStart(2, "0"));
   const [banco, setBanco] = useState("todos");
   const [tipo, setTipo] = useState("todos");
+  const [accountOpen, setAccountOpen] = useState(false);
+  const [accountName, setAccountName] = useState("");
+  const [accountCurrency, setAccountCurrency] = useState("USD");
+  const [openingBalance, setOpeningBalance] = useState("0");
+  const [openingBalanceDate, setOpeningBalanceDate] = useState(`${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}-01`);
+  const qc = useQueryClient();
+  const { toast } = useToast();
 
   const period = `${year}-${month}`;
 
@@ -60,15 +76,44 @@ export default function CashflowPage() {
     queryFn: () => apiRequest(`/api/cashflow/balance?date=${dateStr}`, "GET"),
     enabled: !!dateStr,
   });
+  const { data: accounts = [] } = useQuery<FinancialAccount[]>({ queryKey: ["/api/financial-accounts"], queryFn: () => apiRequest("/api/financial-accounts", "GET") });
+  const accountMutation = useMutation({
+    mutationFn: () => apiRequest("/api/financial-accounts", "POST", { name: accountName, bankName: accountName, currency: accountCurrency, openingBalance, openingBalanceDate, accountType: "bank", isActive: true }),
+    onSuccess: () => { setAccountName(""); setOpeningBalance("0"); qc.invalidateQueries({ queryKey: ["/api/financial-accounts"] }); qc.invalidateQueries({ queryKey: ["/api/cashflow/balance"] }); toast({ title: "Cuenta creada" }); },
+    onError: (error: Error) => toast({ title: "No se pudo crear", description: error.message, variant: "destructive" }),
+  });
+  const reconcileMutation = useMutation({
+    mutationFn: (id: number) => apiRequest(`/api/cashflow/${id}/reconcile`, "POST", { status: "matched" }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/cashflow"] });
+      toast({ title: "Movimiento conciliado" });
+    },
+    onError: (error: Error) => toast({ title: "No se pudo conciliar", description: error.message, variant: "destructive" }),
+  });
+  const voidMutation = useMutation({
+    mutationFn: ({ id, reason }: { id: number; reason: string }) => apiRequest(`/api/cashflow/${id}/void`, "POST", { reason }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/cashflow"] });
+      qc.invalidateQueries({ queryKey: ["/api/cashflow/balance"] });
+      toast({ title: "Movimiento anulado", description: "Si tenía una factura aplicada, su saldo fue restaurado." });
+    },
+    onError: (error: Error) => toast({ title: "No se pudo anular", description: error.message, variant: "destructive" }),
+  });
+  const voidRow = (row: CashflowRow) => {
+    const reason = window.prompt(`Motivo de anulación de ${row.detalleOperacion || row.concepto || "este movimiento"}:`);
+    if (reason?.trim() && reason.trim().length >= 5) voidMutation.mutate({ id: row.id, reason: reason.trim() });
+    else if (reason != null) toast({ title: "Ingresá un motivo de al menos 5 caracteres", variant: "destructive" });
+  };
 
-  const ingresos = rows.filter(r => r.tipoMovimiento === "Ingreso").reduce((s, r) => s + parseFloat(r.montoUSD ?? "0"), 0);
-  const egresos = rows.filter(r => r.tipoMovimiento === "Egreso").reduce((s, r) => s + parseFloat(r.montoUSD ?? "0"), 0);
+  const operatingRows = rows.filter((row) => !row.transferGroupId);
+  const ingresos = operatingRows.filter(r => r.tipoMovimiento === "Ingreso").reduce((s, r) => s + parseFloat(r.montoUSD ?? "0"), 0);
+  const egresos = operatingRows.filter(r => r.tipoMovimiento === "Egreso").reduce((s, r) => s + parseFloat(r.montoUSD ?? "0"), 0);
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Cashflow</h1>
-        <p className="text-muted-foreground text-sm">Movimientos bancarios importados desde el Excel MAESTRO</p>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div><h1 className="text-2xl font-semibold">Cashflow</h1><p className="text-muted-foreground text-sm">Movimientos y saldos registrados directamente en Mind</p></div>
+        <div className="flex gap-2"><Button variant="outline" asChild><Link href="/finance/cargar"><UploadCloud className="mr-2 h-4 w-4" />Cargar movimientos</Link></Button><Dialog open={accountOpen} onOpenChange={setAccountOpen}><DialogTrigger asChild><Button variant="outline"><Settings2 className="mr-2 h-4 w-4" />Cuentas</Button></DialogTrigger><DialogContent><DialogHeader><DialogTitle>Cuentas financieras</DialogTitle></DialogHeader><div className="space-y-2">{accounts.map((account) => <div key={account.id} className="flex items-center justify-between rounded-lg border p-3 text-sm"><span>{account.name}</span><Badge variant="outline">{account.currency} · inicial {account.openingBalance}</Badge></div>)}</div><div className="grid gap-3 border-t pt-4"><div><Label>Nombre / banco</Label><Input value={accountName} onChange={(e) => setAccountName(e.target.value)} placeholder="Ej. Santander USD" /></div><div className="grid grid-cols-2 gap-3"><div><Label>Moneda</Label><Select value={accountCurrency} onValueChange={setAccountCurrency}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="USD">USD</SelectItem><SelectItem value="ARS">ARS</SelectItem><SelectItem value="EUR">EUR</SelectItem></SelectContent></Select></div><div><Label>Saldo inicial</Label><Input type="number" value={openingBalance} onChange={(e) => setOpeningBalance(e.target.value)} /></div></div><div><Label>Fecha del saldo inicial</Label><Input type="date" value={openingBalanceDate} onChange={(e) => setOpeningBalanceDate(e.target.value)} /></div><Button disabled={!accountName.trim() || !openingBalanceDate || accountMutation.isPending} onClick={() => accountMutation.mutate()}>Agregar cuenta</Button></div></DialogContent></Dialog></div>
       </div>
 
       {/* Filtros */}
@@ -89,9 +134,7 @@ export default function CashflowPage() {
           <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="todos">Todos los bancos</SelectItem>
-            <SelectItem value="Santander">Santander</SelectItem>
-            <SelectItem value="BOA">BOA</SelectItem>
-            <SelectItem value="CAJA">Caja</SelectItem>
+            {accounts.map((account) => <SelectItem key={account.id} value={account.name}>{account.name}</SelectItem>)}
           </SelectContent>
         </Select>
         <Select value={tipo} onValueChange={setTipo}>
@@ -169,7 +212,9 @@ export default function CashflowPage() {
                   <TableHead>Tipo</TableHead>
                   <TableHead>Banco</TableHead>
                   <TableHead>Detalle</TableHead>
+                  <TableHead>Conciliación</TableHead>
                   <TableHead className="text-right">Monto USD</TableHead>
+                  <TableHead className="text-right">Acción</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -185,9 +230,11 @@ export default function CashflowPage() {
                     </TableCell>
                     <TableCell>{row.banco || "-"}</TableCell>
                     <TableCell className="max-w-[250px] truncate text-sm">{row.detalleOperacion || row.concepto || "-"}</TableCell>
+                    <TableCell><Badge variant={row.reconciliationStatus === "matched" ? "default" : "outline"}>{row.reconciliationStatus === "matched" ? "Conciliado" : row.reconciliationStatus === "ignored" ? "Ignorado" : "Pendiente"}</Badge></TableCell>
                     <TableCell className={`text-right font-mono ${row.tipoMovimiento === "Ingreso" ? "text-green-600" : "text-red-600"}`}>
                       {fmtUSD(parseFloat(row.montoUSD ?? "0"))}
                     </TableCell>
+                    <TableCell className="text-right"><div className="flex justify-end gap-1">{row.reconciliationStatus !== "matched" && <Button size="sm" variant="outline" disabled={reconcileMutation.isPending} onClick={() => reconcileMutation.mutate(row.id)}>Conciliar</Button>}<Button size="sm" variant="ghost" disabled={voidMutation.isPending} onClick={() => voidRow(row)}><Ban className="mr-1 h-4 w-4" />Anular</Button></div></TableCell>
                   </TableRow>
                 ))}
               </TableBody>

@@ -9,8 +9,9 @@ const pool = {
 /**
  * INGRESO RECURRENTE Y RENDIMIENTO POR CLIENTE
  *
- * Fuente: financial_sot, que sale de la solapa "Rendimiento Cliente" del Excel
- * MAESTRO. Es la única que tiene facturación Y costo por proyecto.
+ * Fuente operativa: revenue_events y fact_rc_month, reconstruidas desde las
+ * cargas nativas de Mind. financial_sot queda únicamente como histórico: un
+ * período deja de leer Excel en cuanto existe actividad nativa para ese mes.
  *
  * Definiciones verificadas contra el reporte de Looker sobre la misma planilla
  * (jul-2026): MRR 45.081,72 exacto, 47,55% de fee exacto, Warner ARR 420.420
@@ -49,8 +50,39 @@ export interface RecurringRevenue {
 
 export async function getRecurringRevenue(periodKey: string): Promise<RecurringRevenue> {
   const { rows: porCliente } = await pool.query(
-    `SELECT client_name, SUM(revenue_usd)::float AS mrr
-       FROM financial_sot
+    `WITH cutover AS (
+       SELECT description AS period_key FROM system_config WHERE config_key='app_mode_cutover_date' AND description IS NOT NULL
+     ), native_periods AS (
+       SELECT DISTINCT invoice_period AS period_key
+         FROM revenue_events
+        WHERE source_tab = 'mind_intake'
+     ), revenue_base AS (
+       SELECT r.invoice_period AS month_key,
+              r.client_name,
+              r.amount_usd::numeric AS revenue_usd,
+              CASE
+                WHEN fii.document_kind = 'fee_confirmation'
+                  OR COALESCE(ap.is_always_on_macro, false)
+                  OR lower(COALESCE(q.quotation_type, q.project_type, '')) IN
+                    ('fee', 'recurring', 'always-on', 'always on', 'monitoring')
+                THEN 'fee' ELSE 'one shot'
+              END AS project_type
+         FROM revenue_events r
+         LEFT JOIN active_projects ap ON ap.id = r.project_id
+         LEFT JOIN quotations q ON q.id = ap.quotation_id
+         LEFT JOIN financial_intake_items fii
+           ON r.source_row_id = 'intake:' || fii.id::text || ':revenue'
+        WHERE r.confirmed = true AND r.is_estimate = false AND r.status <> 'cancelled'
+       UNION ALL
+       SELECT f.month_key, f.client_name, f.revenue_usd, f.project_type
+         FROM financial_sot f
+       WHERE NOT EXISTS (
+          SELECT 1 FROM native_periods n WHERE n.period_key = f.month_key
+        )
+          AND (NOT EXISTS (SELECT 1 FROM cutover) OR f.month_key < (SELECT period_key FROM cutover))
+     )
+     SELECT client_name, SUM(revenue_usd)::float AS mrr
+       FROM revenue_base
       WHERE month_key = $1 AND project_type ILIKE 'fee'
       GROUP BY client_name
       ORDER BY 2 DESC`,
@@ -58,9 +90,39 @@ export async function getRecurringRevenue(periodKey: string): Promise<RecurringR
   );
 
   const { rows: totales } = await pool.query(
-    `SELECT COALESCE(SUM(revenue_usd) FILTER (WHERE project_type ILIKE 'fee'), 0)::float AS mrr,
+    `WITH cutover AS (
+       SELECT description AS period_key FROM system_config WHERE config_key='app_mode_cutover_date' AND description IS NOT NULL
+     ), native_periods AS (
+       SELECT DISTINCT invoice_period AS period_key
+         FROM revenue_events
+        WHERE source_tab = 'mind_intake'
+     ), revenue_base AS (
+       SELECT r.invoice_period AS month_key,
+              r.amount_usd::numeric AS revenue_usd,
+              CASE
+                WHEN fii.document_kind = 'fee_confirmation'
+                  OR COALESCE(ap.is_always_on_macro, false)
+                  OR lower(COALESCE(q.quotation_type, q.project_type, '')) IN
+                    ('fee', 'recurring', 'always-on', 'always on', 'monitoring')
+                THEN 'fee' ELSE 'one shot'
+              END AS project_type
+         FROM revenue_events r
+         LEFT JOIN active_projects ap ON ap.id = r.project_id
+         LEFT JOIN quotations q ON q.id = ap.quotation_id
+         LEFT JOIN financial_intake_items fii
+           ON r.source_row_id = 'intake:' || fii.id::text || ':revenue'
+        WHERE r.confirmed = true AND r.is_estimate = false AND r.status <> 'cancelled'
+       UNION ALL
+       SELECT f.month_key, f.revenue_usd, f.project_type
+         FROM financial_sot f
+       WHERE NOT EXISTS (
+          SELECT 1 FROM native_periods n WHERE n.period_key = f.month_key
+        )
+          AND (NOT EXISTS (SELECT 1 FROM cutover) OR f.month_key < (SELECT period_key FROM cutover))
+     )
+     SELECT COALESCE(SUM(revenue_usd) FILTER (WHERE project_type ILIKE 'fee'), 0)::float AS mrr,
             COALESCE(SUM(revenue_usd), 0)::float AS revenue_total
-       FROM financial_sot
+       FROM revenue_base
       WHERE month_key = $1`,
     [periodKey],
   );
@@ -68,8 +130,38 @@ export async function getRecurringRevenue(periodKey: string): Promise<RecurringR
   // Serie histórica: MRR mes a mes para ver si la base recurrente crece o se
   // erosiona. Es la pregunta que un solo mes no puede responder.
   const { rows: serieRows } = await pool.query(
-    `SELECT month_key, SUM(revenue_usd)::float AS mrr
-       FROM financial_sot
+    `WITH cutover AS (
+       SELECT description AS period_key FROM system_config WHERE config_key='app_mode_cutover_date' AND description IS NOT NULL
+     ), native_periods AS (
+       SELECT DISTINCT invoice_period AS period_key
+         FROM revenue_events
+        WHERE source_tab = 'mind_intake'
+     ), revenue_base AS (
+       SELECT r.invoice_period AS month_key,
+              r.amount_usd::numeric AS revenue_usd,
+              CASE
+                WHEN fii.document_kind = 'fee_confirmation'
+                  OR COALESCE(ap.is_always_on_macro, false)
+                  OR lower(COALESCE(q.quotation_type, q.project_type, '')) IN
+                    ('fee', 'recurring', 'always-on', 'always on', 'monitoring')
+                THEN 'fee' ELSE 'one shot'
+              END AS project_type
+         FROM revenue_events r
+         LEFT JOIN active_projects ap ON ap.id = r.project_id
+         LEFT JOIN quotations q ON q.id = ap.quotation_id
+         LEFT JOIN financial_intake_items fii
+           ON r.source_row_id = 'intake:' || fii.id::text || ':revenue'
+        WHERE r.confirmed = true AND r.is_estimate = false AND r.status <> 'cancelled'
+       UNION ALL
+       SELECT f.month_key, f.revenue_usd, f.project_type
+         FROM financial_sot f
+       WHERE NOT EXISTS (
+          SELECT 1 FROM native_periods n WHERE n.period_key = f.month_key
+        )
+          AND (NOT EXISTS (SELECT 1 FROM cutover) OR f.month_key < (SELECT period_key FROM cutover))
+     )
+     SELECT month_key, SUM(revenue_usd)::float AS mrr
+       FROM revenue_base
       WHERE project_type ILIKE 'fee'
       GROUP BY month_key
       ORDER BY month_key`,
@@ -127,10 +219,42 @@ export interface RendimientoFila {
  */
 export async function getRendimiento(periodKey: string): Promise<RendimientoFila[]> {
   const { rows } = await pool.query(
-    `SELECT client_name, project_name, project_type,
+    `WITH cutover AS (
+       SELECT description AS period_key FROM system_config WHERE config_key='app_mode_cutover_date' AND description IS NOT NULL
+     ), native_periods AS (
+       SELECT DISTINCT period_key
+         FROM fact_rc_month
+        WHERE source_row_id LIKE 'mind_native:%'
+     ), performance_base AS (
+       SELECT f.period_key AS month_key,
+              c.name AS client_name,
+              COALESCE(ap.name, q.project_name, 'Proyecto #' || ap.id::text) AS project_name,
+              CASE
+                WHEN COALESCE(ap.is_always_on_macro, false)
+                  OR lower(COALESCE(q.quotation_type, q.project_type, '')) IN
+                    ('fee', 'recurring', 'always-on', 'always on', 'monitoring')
+                THEN 'Fee' ELSE 'One Shot'
+              END AS project_type,
+              COALESCE(f.revenue_usd, 0)::numeric AS revenue_usd,
+              COALESCE(f.cost_usd, 0)::numeric AS cost_usd
+         FROM fact_rc_month f
+         JOIN active_projects ap ON ap.id = f.project_id
+         JOIN clients c ON c.id = ap.client_id
+         LEFT JOIN quotations q ON q.id = ap.quotation_id
+        WHERE f.source_row_id LIKE 'mind_native:%'
+       UNION ALL
+       SELECT old.month_key, old.client_name, old.project_name, old.project_type,
+              old.revenue_usd, old.cost_usd
+         FROM financial_sot old
+       WHERE NOT EXISTS (
+          SELECT 1 FROM native_periods n WHERE n.period_key = old.month_key
+        )
+          AND (NOT EXISTS (SELECT 1 FROM cutover) OR old.month_key < (SELECT period_key FROM cutover))
+     )
+     SELECT client_name, project_name, project_type,
             COALESCE(SUM(revenue_usd), 0)::float AS facturacion,
             COALESCE(SUM(cost_usd), 0)::float AS costos
-       FROM financial_sot
+       FROM performance_base
       WHERE month_key = $1
       GROUP BY client_name, project_name, project_type
       ORDER BY 4 DESC`,
@@ -155,12 +279,32 @@ export async function getRendimiento(periodKey: string): Promise<RendimientoFila
   });
 }
 
-/** Períodos con datos en financial_sot, del más reciente al más viejo. */
+/** Períodos nativos más histórico anterior, del más reciente al más viejo. */
 export async function getPeriodosDisponibles(): Promise<string[]> {
   const { rows } = await pool.query(
-    `SELECT DISTINCT month_key FROM financial_sot ORDER BY month_key DESC`,
+    `WITH cutover AS (
+       SELECT description AS period_key FROM system_config WHERE config_key='app_mode_cutover_date' AND description IS NOT NULL
+     ), native_periods AS (
+       SELECT invoice_period AS period_key
+         FROM revenue_events
+        WHERE source_tab = 'mind_intake'
+       UNION
+       SELECT period_key
+         FROM fact_rc_month
+        WHERE source_row_id LIKE 'mind_native:%'
+     )
+     SELECT period_key
+       FROM native_periods
+     UNION
+     SELECT month_key
+       FROM financial_sot old
+      WHERE NOT EXISTS (
+        SELECT 1 FROM native_periods n WHERE n.period_key = old.month_key
+      )
+        AND (NOT EXISTS (SELECT 1 FROM cutover) OR old.month_key < (SELECT period_key FROM cutover))
+     ORDER BY 1 DESC`,
   );
-  return rows.map((r: any) => r.month_key);
+  return rows.map((r: any) => r.period_key);
 }
 
 export const __testing = { round2 };

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { keepPreviousData, useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -7,9 +7,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { DollarSign, AlertCircle, Clock, CheckCircle, ChevronLeft, ChevronRight, UploadCloud, Ban } from "lucide-react";
+import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
-import { DollarSign, AlertCircle, Clock, CheckCircle, ChevronLeft, ChevronRight } from "lucide-react";
-import { LedgerBackfillPanel } from "@/components/ledger-backfill-panel";
 
 const MONTHS = Array.from({ length: 12 }, (_, i) => ({
   value: String(i + 1).padStart(2, "0"),
@@ -33,8 +33,8 @@ export default function PasivoPage() {
   const [estado, setEstado] = useState("todos");
   const [subtipo, setSubtipo] = useState("todos");
   const [page, setPage] = useState(1);
+  const queryClient = useQueryClient();
   const { toast } = useToast();
-  const qc = useQueryClient();
 
   const period = `${year}-${month}`;
 
@@ -55,26 +55,28 @@ export default function PasivoPage() {
     queryKey: ["/api/pasivo/summary", period],
     queryFn: () => apiRequest(`/api/pasivo/summary?period=${period}`, "GET"),
   });
-
-  const markPagadoMutation = useMutation({
-    mutationFn: (id: number) => apiRequest(`/api/pasivo/${id}`, "PATCH", { pagadoAlCierre: true }),
+  const voidMutation = useMutation({
+    mutationFn: ({ id, reason }: { id: number; reason: string }) => apiRequest(`/api/pasivo/${id}/void`, "POST", { reason }),
     onSuccess: () => {
-      toast({ title: "Marcado como pagado" });
-      qc.invalidateQueries({ queryKey: ["/api/pasivo"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/pasivo"] });
+      toast({ title: "Factura anulada", description: "El cambio quedó registrado en la auditoría." });
     },
-    onError: () => toast({ title: "Error", variant: "destructive" }),
+    onError: (error: Error) => toast({ title: "No se pudo anular", description: error.message, variant: "destructive" }),
   });
+  const voidRow = (row: any) => {
+    const reason = window.prompt(`Motivo de anulación de ${row.documentNumber || row.detalle || "la factura"}:`);
+    if (reason?.trim() && reason.trim().length >= 5) voidMutation.mutate({ id: row.id, reason: reason.trim() });
+    else if (reason != null) toast({ title: "Ingresá un motivo de al menos 5 caracteres", variant: "destructive" });
+  };
 
   const subtipoEntries = Object.entries(summary?.bySubtipo ?? {}) as [string, number][];
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Pasivo — Cuentas a Pagar</h1>
-        <p className="text-muted-foreground text-sm">Obligaciones de pago importadas desde el Excel MAESTRO</p>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div><h1 className="text-2xl font-bold">Pasivo — Cuentas a Pagar</h1><p className="text-muted-foreground text-sm">Obligaciones y pagos registrados directamente en Mind</p></div>
+        <Button asChild><Link href="/finance/cargar"><UploadCloud className="mr-2 h-4 w-4" />Cargar información</Link></Button>
       </div>
-
-      <LedgerBackfillPanel />
 
       {/* Filtros */}
       <div className="flex gap-3 flex-wrap">
@@ -184,6 +186,7 @@ export default function PasivoPage() {
                       <TableHead>Emisión</TableHead>
                       <TableHead>Vencimiento</TableHead>
                       <TableHead className="text-right">Monto USD</TableHead>
+                      <TableHead className="text-right">Saldo</TableHead>
                       <TableHead>Estado</TableHead>
                       <TableHead>Fuente</TableHead>
                       <TableHead className="text-right">Acción</TableHead>
@@ -207,9 +210,12 @@ export default function PasivoPage() {
                         <TableCell className="text-right font-mono">
                           {fmtUSD(Number(row.montoTotalUSD ?? 0))}
                         </TableCell>
+                        <TableCell className="text-right font-mono">{fmtUSD(Number(row.outstandingUSD ?? row.montoTotalUSD ?? 0))}</TableCell>
                         <TableCell>
                           {row.pagadoAlCierre ? (
                             <Badge className="bg-green-100 text-green-800">Pagado</Badge>
+                          ) : row.status === "PARTIAL" ? (
+                            <Badge variant="outline">Parcial</Badge>
                           ) : row.vencido ? (
                             <Badge variant="destructive">Vencido</Badge>
                           ) : (
@@ -218,21 +224,10 @@ export default function PasivoPage() {
                         </TableCell>
                         <TableCell>
                           <Badge variant="outline" className="text-xs">
-                            {row.overrideManual ? "Manual" : "Máster"}
+                            {row.overrideManual ? "Mind" : "Histórico"}
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-right">
-                          {!row.pagadoAlCierre && row.id && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => markPagadoMutation.mutate(row.id)}
-                              disabled={markPagadoMutation.isPending}
-                            >
-                              Marcar pagado
-                            </Button>
-                          )}
-                        </TableCell>
+                        <TableCell className="text-right"><Button size="sm" variant="ghost" disabled={voidMutation.isPending} onClick={() => voidRow(row)}><Ban className="mr-1 h-4 w-4" />Anular</Button></TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

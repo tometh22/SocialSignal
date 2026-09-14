@@ -1,6 +1,5 @@
 /**
- * Executive Dashboard V2 - Reads directly from Google Sheets
- * No ETL, no DB intermediary. Same data source as Looker Studio.
+ * Executive Dashboard V2 - Reads native financial snapshots from Mind.
  */
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -180,7 +179,7 @@ export default function ExecutiveDashboardV2() {
         <div className="flex items-center justify-center min-h-[40vh]">
           <div className="text-center space-y-2">
             <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto" />
-            <p className="text-sm text-muted-foreground">Consultando Google Sheets...</p>
+            <p className="text-sm text-muted-foreground">Construyendo el resumen de Mind...</p>
           </div>
         </div>
       ) : !d ? (
@@ -193,7 +192,7 @@ export default function ExecutiveDashboardV2() {
               viewMode === "custom" ? `${MONTHS[customStartMonth - 1]} ${customStartYear} → ${MONTHS[customEndMonth - 1]} ${customEndYear}` :
               `${MONTHS[selectedMonth - 1]} ${selectedYear}`
             }</p>
-            <p className="text-sm text-muted-foreground mt-1">Verificá que el Excel tenga datos para este período.</p>
+            <p className="text-sm text-muted-foreground mt-1">Verificá que el período tenga datos cargados o un cierre generado en Mind.</p>
           </CardContent>
         </Card>
       ) : (
@@ -268,22 +267,19 @@ export default function ExecutiveDashboardV2() {
                 value: `${d.markupProyectado.toFixed(2)}×`, pct: null, color: kpiColor(d.markupProyectado, 2.5), icon: TrendingUp,
                 tone: d.markupProyectado >= 2.5 ? "success" as const : d.markupProyectado >= 0 ? "warning" as const : "danger" as const,
                 tooltip: `Markup implícito en los ${d.markupMesesProyectados} meses aún no cerrados del período. `
-                  + `No mide ejecución: es lo que la proyección del Excel MAESTRO asume. `
-                  + `Si difiere mucho del ejecutado, revisar la base de costo de esos meses en la planilla.`,
+                  + `No mide ejecución: surge del forecast registrado en Mind. `
+                  + `Si difiere mucho del ejecutado, revisá la base de costo de esos meses.`,
               }] : []),
               {
-                // El Excel deja la fórmula de Beneficio Neto rota en los meses sin
-                // cerrar (devuelve las Ventas con margen 100%). El backend excluye
-                // esos meses en vez de sumarlos; acá se avisa que el total es parcial
-                // para que nadie lo lea como el resultado del período completo.
+                // Los snapshots históricos pueden marcar meses incompletos; el
+                // backend los excluye del agregado para no inflar el resultado.
                 label: d.beneficioNetoParcial ? "Beneficio Neto (parcial)" : "Beneficio Neto",
                 value: fmt(d.beneficioNeto), pct: null, color: kpiColor(d.beneficioNeto, 0), icon: Wallet,
                 tone: d.beneficioNeto == null ? "neutral" as const : d.beneficioNeto >= 0 ? "success" as const : "danger" as const,
                 tooltip: d.beneficioNetoParcial
                   ? `Cubre sólo ${(d.mesesAgregados ?? 0) - (d.mesesSinBeneficioNeto?.length ?? 0)} de ${d.mesesAgregados ?? 0} meses. `
-                    + `En el Excel MAESTRO, ${(d.mesesSinBeneficioNeto ?? []).join(", ")} tienen la fórmula de Beneficio Neto rota `
-                    + `(devuelve las Ventas del mes con margen 100%), así que se excluyen en lugar de inflar el total. `
-                    + `Para cerrar el período hay que corregir esas celdas en la planilla.`
+                    + `${(d.mesesSinBeneficioNeto ?? []).join(", ")} no tienen un resultado neto confiable y se excluyen del total. `
+                    + `Revisá esos períodos en Mind antes de cerrar.`
                   : "EBIT − Impuestos. Ganancia final del período después de todos los costos e impuestos. Equivale al Margen Neto aplicado sobre las ventas.",
               },
             ].map((kpi, i) => (
@@ -410,7 +406,7 @@ export default function ExecutiveDashboardV2() {
                           <div className="flex items-center gap-1.5">
                             <span className="text-muted-foreground">Proyección resultado</span>
                             <InfoTip label="Más información sobre la proyección de resultado" side="right">
-                              Resultado proyectado del período según el Excel Maestro (Resumen Ejecutivo).
+                              Resultado proyectado del período desde ingresos y costos registrados en Mind.
                             </InfoTip>
                           </div>
                           <span className={`tabular-nums font-medium ${kpiColor(d.proyeccionResultado, 0)}`}>{fmt(d.proyeccionResultado)}</span>

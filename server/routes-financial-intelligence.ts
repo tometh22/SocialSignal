@@ -7,6 +7,7 @@ import { monthRange, getCurrentMonthKey, isValidMonthKey } from "./services/date
 import { getRevenueByBasis, REVENUE_BASIS_LABELS, REVENUE_BASIS_DESCRIPTIONS } from "./services/revenue-basis";
 import { getFinancialIntelligence, getYearSnapshot, buildCoverage } from "./services/financial-intelligence";
 import { runAllDetectors } from "./services/data-quality";
+import { requirePermission } from "./middleware/requirePermission";
 
 /**
  * API de inteligencia financiera.
@@ -17,6 +18,8 @@ import { runAllDetectors } from "./services/data-quality";
  */
 export function createFinancialIntelligenceRouter(requireAuth: any) {
   const router = Router();
+  const finance = [requireAuth, requirePermission("dashboard", "finance")];
+  const financeWrite = [requireAuth, requirePermission("finance")];
 
   const parseYear = (raw: unknown): number | null => {
     const year = Number(raw ?? new Date().getFullYear());
@@ -25,7 +28,7 @@ export function createFinancialIntelligenceRouter(requireAuth: any) {
   };
 
   // Payload completo del dashboard: tres bases, resultado, neto, puente y hallazgos.
-  router.get("/", requireAuth, async (req, res) => {
+  router.get("/", ...finance, async (req, res) => {
     const year = parseYear(req.query.year);
     if (year === null) {
       return res.status(400).json({ error: "year inválido" });
@@ -44,7 +47,7 @@ export function createFinancialIntelligenceRouter(requireAuth: any) {
   });
 
   // Serie mensual de las tres bases.
-  router.get("/basis", requireAuth, async (req, res) => {
+  router.get("/basis", ...finance, async (req, res) => {
     const from = String(req.query.from ?? "");
     const to = String(req.query.to ?? "");
     if (!isValidMonthKey(from) || !isValidMonthKey(to)) {
@@ -73,7 +76,7 @@ export function createFinancialIntelligenceRouter(requireAuth: any) {
 
   // Ingreso cargado contra costo proyectado, mes a mes.
   // Responde "cómo quedan gastos vs ventas los próximos meses".
-  router.get("/coverage", requireAuth, async (req, res) => {
+  router.get("/coverage", ...finance, async (req, res) => {
     const from = String(req.query.from ?? getCurrentMonthKey());
     const year = parseYear(req.query.year ?? from.slice(0, 4));
     if (!isValidMonthKey(from) || year === null) {
@@ -115,7 +118,7 @@ export function createFinancialIntelligenceRouter(requireAuth: any) {
   });
 
   // Snapshot de un ejercicio.
-  router.get("/year/:year", requireAuth, async (req, res) => {
+  router.get("/year/:year", ...finance, async (req, res) => {
     const year = parseYear(req.params.year);
     if (year === null) return res.status(400).json({ error: "year inválido" });
     try {
@@ -128,7 +131,7 @@ export function createFinancialIntelligenceRouter(requireAuth: any) {
 
   // ─── Hallazgos de calidad de dato ──────────────────────────────────────────
 
-  router.get("/findings", requireAuth, async (req, res) => {
+  router.get("/findings", ...finance, async (req, res) => {
     const statuses = typeof req.query.status === "string"
       ? req.query.status.split(",").filter(Boolean)
       : ["open"];
@@ -153,7 +156,7 @@ export function createFinancialIntelligenceRouter(requireAuth: any) {
     mutedUntil: z.string().datetime().optional(),
   });
 
-  router.patch("/findings/:id", requireAuth, async (req, res) => {
+  router.patch("/findings/:id", ...financeWrite, async (req, res) => {
     const id = Number(req.params.id);
     if (!Number.isInteger(id) || id <= 0) {
       return res.status(400).json({ error: "id inválido" });
@@ -180,7 +183,7 @@ export function createFinancialIntelligenceRouter(requireAuth: any) {
     }
   });
 
-  router.post("/detectors/run", requireAuth, async (req, res) => {
+  router.post("/detectors/run", ...financeWrite, async (req, res) => {
     const year = parseYear(req.body?.year);
     if (year === null) return res.status(400).json({ error: "year inválido" });
     try {
@@ -194,7 +197,7 @@ export function createFinancialIntelligenceRouter(requireAuth: any) {
 
   // ─── Partidas no recurrentes ───────────────────────────────────────────────
 
-  router.get("/one-offs", requireAuth, async (req, res) => {
+  router.get("/one-offs", ...finance, async (req, res) => {
     const year = parseYear(req.query.year);
     if (year === null) return res.status(400).json({ error: "year inválido" });
     try {
@@ -210,7 +213,7 @@ export function createFinancialIntelligenceRouter(requireAuth: any) {
     }
   });
 
-  router.post("/one-offs", requireAuth, async (req, res) => {
+  router.post("/one-offs", ...financeWrite, async (req, res) => {
     const parsed = insertOneOffItemSchema.safeParse(req.body);
     if (!parsed.success) {
       return res.status(400).json({ error: "Payload inválido", details: parsed.error.flatten() });
@@ -230,7 +233,7 @@ export function createFinancialIntelligenceRouter(requireAuth: any) {
     }
   });
 
-  router.delete("/one-offs/:id", requireAuth, async (req, res) => {
+  router.delete("/one-offs/:id", ...financeWrite, async (req, res) => {
     const id = Number(req.params.id);
     if (!Number.isInteger(id) || id <= 0) {
       return res.status(400).json({ error: "id inválido" });

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { keepPreviousData, useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -7,9 +7,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { CheckCircle, DollarSign, AlertCircle, Clock, ChevronLeft, ChevronRight, UploadCloud, Ban } from "lucide-react";
+import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle, DollarSign, AlertCircle, Clock, ChevronLeft, ChevronRight } from "lucide-react";
-import { LedgerBackfillPanel } from "@/components/ledger-backfill-panel";
 
 const MONTHS = Array.from({ length: 12 }, (_, i) => ({
   value: String(i + 1).padStart(2, "0"),
@@ -32,8 +32,8 @@ export default function ActivoPage() {
   const [month, setMonth] = useState(String(new Date().getMonth() + 1).padStart(2, "0"));
   const [estado, setEstado] = useState("todos");
   const [page, setPage] = useState(1);
+  const queryClient = useQueryClient();
   const { toast } = useToast();
-  const qc = useQueryClient();
 
   const period = `${year}-${month}`;
 
@@ -53,24 +53,26 @@ export default function ActivoPage() {
     queryKey: ["/api/activo/summary", period],
     queryFn: () => apiRequest(`/api/activo/summary?period=${period}`, "GET"),
   });
-
-  const markCobradoMutation = useMutation({
-    mutationFn: (id: number) => apiRequest(`/api/activo/${id}`, "PATCH", { cobradoAlCierre: true }),
+  const voidMutation = useMutation({
+    mutationFn: ({ id, reason }: { id: number; reason: string }) => apiRequest(`/api/activo/${id}/void`, "POST", { reason }),
     onSuccess: () => {
-      toast({ title: "Marcado como cobrado" });
-      qc.invalidateQueries({ queryKey: ["/api/activo"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/activo"] });
+      toast({ title: "Factura anulada", description: "El cambio quedó registrado en la auditoría." });
     },
-    onError: () => toast({ title: "Error", variant: "destructive" }),
+    onError: (error: Error) => toast({ title: "No se pudo anular", description: error.message, variant: "destructive" }),
   });
+  const voidRow = (row: any) => {
+    const reason = window.prompt(`Motivo de anulación de ${row.nroFactura || row.concepto || "la factura"}:`);
+    if (reason?.trim() && reason.trim().length >= 5) voidMutation.mutate({ id: row.id, reason: reason.trim() });
+    else if (reason != null) toast({ title: "Ingresá un motivo de al menos 5 caracteres", variant: "destructive" });
+  };
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Activo — Cuentas a Cobrar</h1>
-        <p className="text-muted-foreground text-sm">Facturas emitidas y liquidez importadas desde el Excel MAESTRO</p>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div><h1 className="text-2xl font-semibold">Activo — Cuentas a Cobrar</h1><p className="text-muted-foreground text-sm">Facturas emitidas, cobros y saldos registrados en Mind</p></div>
+        <Button asChild><Link href="/finance/cargar"><UploadCloud className="mr-2 h-4 w-4" />Cargar información</Link></Button>
       </div>
-
-      <LedgerBackfillPanel />
 
       {/* Filtros */}
       <div className="flex gap-3 flex-wrap">
@@ -158,6 +160,7 @@ export default function ActivoPage() {
                       <TableHead>Factura</TableHead>
                       <TableHead>Vencimiento</TableHead>
                       <TableHead className="text-right">Monto USD</TableHead>
+                      <TableHead className="text-right">Saldo</TableHead>
                       <TableHead>Estado</TableHead>
                       <TableHead>Fuente</TableHead>
                       <TableHead className="text-right">Acción</TableHead>
@@ -175,9 +178,12 @@ export default function ActivoPage() {
                         <TableCell className="text-right font-mono">
                           {fmtUSD(Number(row.montoTotalUSD ?? 0))}
                         </TableCell>
+                        <TableCell className="text-right font-mono">{fmtUSD(Number(row.outstandingUSD ?? row.montoTotalUSD ?? 0))}</TableCell>
                         <TableCell>
                           {row.cobradoAlCierre ? (
                             <Badge className="bg-green-100 text-green-800">Cobrado</Badge>
+                          ) : row.status === "PARTIAL" ? (
+                            <Badge variant="outline">Parcial</Badge>
                           ) : row.vencido ? (
                             <Badge variant="destructive">Vencido</Badge>
                           ) : (
@@ -186,21 +192,10 @@ export default function ActivoPage() {
                         </TableCell>
                         <TableCell>
                           <Badge variant="outline" className="text-xs">
-                            {row.overrideManual ? "Manual" : "Máster"}
+                            {row.overrideManual ? "Mind" : "Histórico"}
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-right">
-                          {!row.cobradoAlCierre && row.id && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => markCobradoMutation.mutate(row.id)}
-                              disabled={markCobradoMutation.isPending}
-                            >
-                              Marcar cobrado
-                            </Button>
-                          )}
-                        </TableCell>
+                        <TableCell className="text-right"><Button size="sm" variant="ghost" disabled={voidMutation.isPending} onClick={() => voidRow(row)}><Ban className="mr-1 h-4 w-4" />Anular</Button></TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
