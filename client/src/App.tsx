@@ -56,6 +56,7 @@ const ProvisionsPage = lazy(() => import("@/pages/provisions"));
 const CashflowPage = lazy(() => import("@/pages/cashflow"));
 const ClientPnlPage = lazy(() => import("@/pages/client-pnl"));
 const FinancialIntakePage = lazy(() => import("@/pages/financial-intake"));
+const TeamSettlementsPage = lazy(() => import("@/pages/team-settlements"));
 const FinancialClosePage = lazy(() => import("@/pages/financial-close"));
 
 // Task Management Module
@@ -325,6 +326,7 @@ function AppRoutes() {
 
                   {/* Finance Ledger */}
                   <ProtectedRoute path="/finance/cargar" component={FinancialIntakePage} requiredPermission="finance" />
+                  <ProtectedRoute path="/finance/liquidaciones-equipo" component={TeamSettlementsPage} requiredPermission="finance" />
                   <ProtectedRoute path="/finance/cierre" component={FinancialClosePage} requiredPermission="finance" />
                   <ProtectedRoute path="/finance/proyeccion" component={ProyeccionPage} requiredAnyPermission={FINANCE_SUMMARY_ACCESS_SECTIONS} />
                   <ProtectedRoute path="/finance/arr" component={ArrPage} requiredAnyPermission={FINANCE_SUMMARY_ACCESS_SECTIONS} />

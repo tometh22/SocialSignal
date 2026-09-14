@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.6.0 — 2026-09-14
+
+- Reemplaza el Excel de liquidación mixta con una sección de carga exclusiva para Administración, separada de reportes.
+- Toma horas, valor hora y total ARS del cierre operativo; Administración sólo define el porcentaje USD, el bono USD y los extras ARS de cada persona.
+- Guía al colaborador en dos momentos: tipo de cambio bancario al facturar y tipo de cambio/comisión al recibir la transferencia.
+- Calcula automáticamente los pesos convertidos a USD, el comprobante USD con bono, la pesificación al cobro y la diferencia final a facturar en ARS.
+- Permite adjuntar hasta diez comprobantes privados por liquidación y conserva juntos los documentos USD y ARS para revisión y costo directo por proyecto.
+
 ## 1.5.0 — 2026-09-14
 
 - Agrega un espacio personal para que cada integrante cargue su factura mensual mediante PDF, imagen o captura, con lectura automática y revisión financiera.

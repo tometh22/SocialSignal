@@ -67,12 +67,27 @@ describe("personal invoice integration contracts", () => {
 
   it("guarda comprobantes en privado y limita su lectura", () => {
     const routes = source("server/routes.ts");
-    expect(routes).toContain("storeFinancialIntakeFile(req.file)");
+    expect(routes).toContain("storeFinancialIntakeFile(file)");
+    expect(routes).toContain('name: "files", maxCount: 10');
     expect(routes).toContain('app.get("/api/me/invoices/:id/file"');
+    expect(routes).toContain('app.get("/api/me/invoices/:id/files/:index"');
     expect(routes).toContain('Cache-Control", "private, no-store"');
     expect(routes).toContain("row.userId !== req.user!.id && !canReview");
     expect(routes).toContain("storage_key: _storageKeySnake");
     expect(routes).toContain("file_hash: _fileHashSnake");
+  });
+
+  it("publica la liquidación mixta antes de pedir los comprobantes", () => {
+    const routes = source("server/routes.ts");
+    const employeePage = source("client/src/pages/my-invoices.tsx");
+    const adminPage = source("client/src/pages/team-settlements.tsx");
+    expect(routes).toContain('/api/finance/personnel-settlements');
+    expect(routes).toContain('/api/me/invoices/settlement');
+    expect(adminPage).toContain("% a facturar en USD");
+    expect(adminPage).toContain("Extras / bono en USD");
+    expect(employeePage).toContain("Tipo de cambio al facturar");
+    expect(employeePage).toContain("Tipo de cambio al cobrar");
+    expect(employeePage).toContain("Comisión bancaria USD");
   });
 
   it("no duplica el costo y conserva el vínculo por proyecto", () => {
