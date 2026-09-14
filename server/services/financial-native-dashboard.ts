@@ -66,6 +66,7 @@ export async function fetchNativeExecutiveDashboard(
     SELECT p.period_key,
       COALESCE((SELECT sum(amount_usd) FROM revenue_events WHERE invoice_period=p.period_key AND status<>'cancelled'),0)::float facturacion_total,
       COALESCE((SELECT direct_usd FROM fact_cost_month WHERE period_key=p.period_key),0)::float costos_directos,
+      COALESCE((SELECT sum(cost_usd) FROM fact_labor_month WHERE period_key=p.period_key),0)::float costos_directos_operativos,
       COALESCE((SELECT indirect_usd FROM fact_cost_month WHERE period_key=p.period_key),0)::float costos_indirectos,
       COALESCE((SELECT provisions_usd FROM fact_cost_month WHERE period_key=p.period_key),0)::float gasto_provisiones,
       COALESCE((SELECT sum(CASE WHEN COALESCE(currency,CASE WHEN monto_usd IS NOT NULL THEN 'USD' ELSE 'ARS' END)='ARS' THEN COALESCE(outstanding_amount,0)/NULLIF(cotizacion,0) ELSE COALESCE(outstanding_amount,0) END) FROM activo_entries WHERE period_key<=p.period_key AND voided_at IS NULL),0)::float cuentas_cobrar_usd,
@@ -93,6 +94,7 @@ export async function fetchNativeExecutiveDashboard(
     if (row.is_closed && dataByPeriod.has(row.period_key)) continue;
     const revenue = Number(row.facturacion_total) || 0;
     const direct = Number(row.costos_directos) || 0;
+    const operationalDirect = Number(row.costos_directos_operativos) || 0;
     const indirect = Number(row.costos_indirectos) || 0;
     const provisionExpense = Number(row.gasto_provisiones) || 0;
     const provisionLiability = Number(row.provision_liability) || 0;
@@ -106,7 +108,7 @@ export async function fetchNativeExecutiveDashboard(
       periodKey: row.period_key, year, month, monthLabel: row.period_key, cierre: Boolean(row.is_closed),
       ventasDelMes: revenue, ebitOperativo: ebit, beneficioNeto: benefit,
       margenOperativo: revenue ? ebit / revenue * 100 : null, margenNeto: revenue ? benefit / revenue * 100 : null,
-      markup: direct ? revenue / direct : null, proyeccionResultado: benefit,
+      markup: operationalDirect ? revenue / operationalDirect : null, proyeccionResultado: benefit,
       activoLiquido: cash, activoMedPlazo: null, clientesACobrar: receivables,
       activoTotal: cash + receivables, pasivoImpuestosUSA: null, pasivoFacturacionAdelantada: provisionLiability,
       pasivoProveedores: payables, pasivoTotal: payables + provisionLiability,

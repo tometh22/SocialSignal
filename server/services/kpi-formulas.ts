@@ -93,6 +93,16 @@ export async function fetchCosts(periodKeys: string[]): Promise<{ directos: numb
   };
 }
 
+/** Cost model used only by Operations: worked hours valued at historical rate. */
+export async function fetchOperationalDirectCosts(periodKeys: string[]): Promise<number> {
+  const { rows: [data] } = await pool.query(`
+    SELECT COALESCE(SUM(cost_usd), 0) as direct_usd
+    FROM fact_labor_month
+    WHERE period_key = ANY($1)
+  `, [periodKeys]);
+  return parseFloat(data?.direct_usd || '0');
+}
+
 export async function fetchHours(periodKeys: string[]): Promise<{ total: number; billable: number; peopleActive: number }> {
   const { rows: [data] } = await pool.query(`
     SELECT 
@@ -542,7 +552,8 @@ export async function checkDataFreshness(): Promise<{
 
 export const DATA_SOURCES = {
   devengado: 'fact_rc_month.revenue_usd',
-  directos: 'fact_cost_month.direct_usd',
+  directos: 'fact_cost_month.direct_usd (factura aprobada para contratos fijos; horas × tarifa para freelance)',
+  directosOperativos: 'fact_labor_month.cost_usd (horas × tarifa histórica)',
   overhead: 'fact_cost_month.indirect_usd',
   provisiones: 'fact_cost_month.provisions_usd',
   facturado: 'revenue_events / snapshot financiero de Mind',

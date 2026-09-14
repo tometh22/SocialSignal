@@ -41,6 +41,7 @@ export interface EquipoMes {
   horasObjetivo: number;
   horasAsana: number;
   horasFacturacion: number;
+  /** Valuación operativa de horas × tarifa histórica (no costo contable). */
   costoUsd: number;
   /** Costo por hora efectivamente trabajada. */
   valorHora: number | null;
@@ -73,6 +74,32 @@ export async function getCostBreakdown(year: number): Promise<CostBreakdown> {
          SELECT DISTINCT period_key FROM pasivo_entries WHERE source <> 'excel'
          UNION
          SELECT DISTINCT invoice_period FROM revenue_events WHERE source_tab='mind_intake'
+         UNION
+         SELECT DISTINCT period FROM personal_monthly_invoices
+       ), modeled_team AS (
+         SELECT f.period_key,f.person_id,COALESCE(p.name,'Equipo sin asignar') AS concepto,
+                COALESCE(SUM(f.cost_usd),0)::numeric AS modeled_usd
+           FROM fact_labor_month f
+           LEFT JOIN personnel p ON p.id=f.person_id
+          WHERE f.period_key LIKE $1
+            AND EXISTS (SELECT 1 FROM native_periods n WHERE n.period_key=f.period_key)
+          GROUP BY f.period_key,f.person_id,p.name
+       ), actual_fixed_team AS (
+         SELECT DISTINCT ON (invoice.period,invoice.personnel_id)
+                invoice.period,invoice.personnel_id,
+                COALESCE(invoice.financial_cost_usd,invoice.declared_invoice_usd,
+                  invoice.financial_cost_ars/NULLIF(invoice.bank_fx,0),invoice.declared_invoice_ars/NULLIF(invoice.bank_fx,0),0)::numeric AS actual_usd
+           FROM personal_monthly_invoices invoice
+           LEFT JOIN personnel person ON person.id=invoice.personnel_id
+          WHERE invoice.period LIKE $1 AND invoice.approval_status='approved'
+            AND COALESCE(invoice.financial_cost_mode,CASE WHEN COALESCE(invoice.contract_type_snapshot,person.contract_type,'full-time')='freelance' THEN 'hourly' ELSE 'invoice_actual' END)='invoice_actual'
+            AND COALESCE(invoice.financial_cost_usd,invoice.declared_invoice_usd,invoice.financial_cost_ars,invoice.declared_invoice_ars,0)>0
+            AND EXISTS (
+              SELECT 1 FROM personal_invoice_project_allocations allocation
+              WHERE allocation.invoice_id=invoice.id
+              HAVING abs(sum(allocation.allocation_percent)-100)<=0.01
+            )
+          ORDER BY invoice.period,invoice.personnel_id,invoice.updated_at DESC,invoice.id DESC
        )
        SELECT concepto, SUM(monto)::float AS monto
          FROM (
@@ -87,11 +114,9 @@ export async function getCostBreakdown(year: number): Promise<CostBreakdown> {
              FROM pasivo_entries
             WHERE period_key LIKE $1 AND voided_at IS NULL AND source <> 'excel'
            UNION ALL
-           SELECT COALESCE(p.name, 'Equipo sin asignar') AS concepto, COALESCE(f.cost_usd,0)::numeric AS monto
-             FROM fact_labor_month f
-             LEFT JOIN personnel p ON p.id=f.person_id
-            WHERE f.period_key LIKE $1
-              AND EXISTS (SELECT 1 FROM native_periods n WHERE n.period_key=f.period_key)
+           SELECT modeled.concepto,COALESCE(actual.actual_usd,modeled.modeled_usd)::numeric AS monto
+             FROM modeled_team modeled
+             LEFT JOIN actual_fixed_team actual ON actual.period=modeled.period_key AND actual.personnel_id=modeled.person_id
          ) native_and_historical
         GROUP BY concepto
         HAVING SUM(monto) <> 0

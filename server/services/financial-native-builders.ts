@@ -21,9 +21,36 @@ export async function rebuildNativeFinancialFacts(periodKey: string, runner: Sql
   await runner.execute(sql`
     WITH fx AS (
       SELECT COALESCE((SELECT rate::numeric FROM exchange_rates WHERE year=${year} AND month=${month} AND is_active=true ORDER BY CASE WHEN rate_type='end_of_month' THEN 0 WHEN rate_type='average' THEN 1 ELSE 2 END, updated_at DESC, id DESC LIMIT 1), 1) AS rate
-    ), labor AS (
-      SELECT COALESCE(sum(cost_usd),0) direct_usd, COALESCE(sum(cost_ars),0) direct_ars, count(*)::int rows
+    ), labor_by_person AS (
+      SELECT person_id, COALESCE(sum(cost_usd),0) model_usd, COALESCE(sum(cost_ars),0) model_ars, count(*)::int rows
       FROM fact_labor_month WHERE period_key=${periodKey}
+      GROUP BY person_id
+    ), approved_fixed_invoice AS (
+      SELECT DISTINCT ON (invoice.personnel_id)
+        invoice.personnel_id,
+        COALESCE(invoice.financial_cost_usd, invoice.declared_invoice_usd, invoice.financial_cost_ars/NULLIF((SELECT rate FROM fx),0), invoice.declared_invoice_ars/NULLIF((SELECT rate FROM fx),0), 0)::numeric actual_usd,
+        COALESCE(invoice.financial_cost_ars, invoice.declared_invoice_ars, invoice.financial_cost_usd*(SELECT rate FROM fx), invoice.declared_invoice_usd*(SELECT rate FROM fx), 0)::numeric actual_ars
+      FROM personal_monthly_invoices invoice
+      LEFT JOIN personnel person ON person.id=invoice.personnel_id
+      WHERE invoice.period=${periodKey} AND invoice.approval_status='approved'
+        AND COALESCE(invoice.financial_cost_mode, CASE WHEN COALESCE(invoice.contract_type_snapshot,person.contract_type,'full-time')='freelance' THEN 'hourly' ELSE 'invoice_actual' END)='invoice_actual'
+        AND COALESCE(invoice.financial_cost_usd,invoice.declared_invoice_usd,invoice.financial_cost_ars,invoice.declared_invoice_ars,0)>0
+        AND EXISTS (
+          SELECT 1 FROM personal_invoice_project_allocations allocation
+          WHERE allocation.invoice_id=invoice.id
+          HAVING abs(sum(allocation.allocation_percent)-100)<=0.01
+        )
+      ORDER BY invoice.personnel_id, invoice.updated_at DESC, invoice.id DESC
+    ), labor AS (
+      -- Operaciones keeps the hour-valued model in fact_labor_month. For the
+      -- financial/economic fact we replace fixed-contract estimates with the
+      -- approved invoice; freelancers remain hours × historical rate.
+      SELECT
+        COALESCE(sum(CASE WHEN approved.personnel_id IS NOT NULL THEN approved.actual_usd ELSE labor.model_usd END),0) direct_usd,
+        COALESCE(sum(CASE WHEN approved.personnel_id IS NOT NULL THEN approved.actual_ars ELSE labor.model_ars END),0) direct_ars,
+        COALESCE(sum(labor.rows),0)::int rows
+      FROM labor_by_person labor
+      LEFT JOIN approved_fixed_invoice approved ON approved.personnel_id=labor.person_id
     ), bills AS (
       SELECT
         COALESCE(sum(CASE WHEN cost_treatment='direct' THEN COALESCE(CASE WHEN currency='ARS' THEN net_amount/NULLIF(cotizacion,0) ELSE net_amount END,monto_total_usd,monto_usd,monto_ars/NULLIF(cotizacion,0),0) ELSE 0 END),0) direct_usd,
@@ -91,9 +118,43 @@ export async function rebuildNativeFinancialFacts(periodKey: string, runner: Sql
       WHERE project_id IS NOT NULL AND status <> 'cancelled'
         AND (invoice_period=${periodKey} OR ${periodKey} BETWEEN COALESCE(delivery_start,invoice_period) AND COALESCE(delivery_end,delivery_start,invoice_period))
       GROUP BY project_id
+    ), modeled_labor AS (
+      SELECT project_id,person_id,sum(COALESCE(cost_usd,0)) model_usd,sum(COALESCE(cost_ars,0)) model_ars
+      FROM fact_labor_month WHERE period_key=${periodKey} GROUP BY project_id,person_id
+    ), approved_fixed_invoice AS (
+      SELECT DISTINCT ON (invoice.personnel_id)
+        invoice.id invoice_id,
+        invoice.personnel_id,
+        COALESCE(invoice.financial_cost_usd,invoice.declared_invoice_usd,invoice.financial_cost_ars/NULLIF((SELECT rate FROM fx),0),invoice.declared_invoice_ars/NULLIF((SELECT rate FROM fx),0),0)::numeric actual_usd,
+        COALESCE(invoice.financial_cost_ars,invoice.declared_invoice_ars,invoice.financial_cost_usd*(SELECT rate FROM fx),invoice.declared_invoice_usd*(SELECT rate FROM fx),0)::numeric actual_ars
+      FROM personal_monthly_invoices invoice
+      LEFT JOIN personnel person ON person.id=invoice.personnel_id
+      WHERE invoice.period=${periodKey} AND invoice.approval_status='approved'
+        AND COALESCE(invoice.financial_cost_mode,CASE WHEN COALESCE(invoice.contract_type_snapshot,person.contract_type,'full-time')='freelance' THEN 'hourly' ELSE 'invoice_actual' END)='invoice_actual'
+        AND COALESCE(invoice.financial_cost_usd,invoice.declared_invoice_usd,invoice.financial_cost_ars,invoice.declared_invoice_ars,0)>0
+        AND EXISTS (
+          SELECT 1 FROM personal_invoice_project_allocations allocation
+          WHERE allocation.invoice_id=invoice.id
+          HAVING abs(sum(allocation.allocation_percent)-100)<=0.01
+        )
+      ORDER BY invoice.personnel_id,invoice.updated_at DESC,invoice.id DESC
+    ), fixed_allocations AS (
+      SELECT allocation.project_id,invoice.personnel_id,
+        invoice.actual_usd*allocation.allocation_percent/100 cost_usd,
+        invoice.actual_ars*allocation.allocation_percent/100 cost_ars
+      FROM approved_fixed_invoice invoice
+      JOIN personal_invoice_project_allocations allocation ON allocation.invoice_id=invoice.invoice_id
     ), labor AS (
-      SELECT project_id,sum(COALESCE(cost_usd,0)) cost_usd,sum(COALESCE(cost_ars,0)) cost_ars
-      FROM fact_labor_month WHERE period_key=${periodKey} GROUP BY project_id
+      -- Rentabilidad económica por proyecto usa el costo real distribuido de la
+      -- factura fija. Sin factura aprobada (y para freelancers), conserva el
+      -- modelo operativo de horas × tarifa.
+      SELECT modeled.project_id,
+        sum(CASE WHEN invoice.personnel_id IS NOT NULL THEN COALESCE(allocation.cost_usd,0) ELSE modeled.model_usd END) cost_usd,
+        sum(CASE WHEN invoice.personnel_id IS NOT NULL THEN COALESCE(allocation.cost_ars,0) ELSE modeled.model_ars END) cost_ars
+      FROM modeled_labor modeled
+      LEFT JOIN approved_fixed_invoice invoice ON invoice.personnel_id=modeled.person_id
+      LEFT JOIN fixed_allocations allocation ON allocation.personnel_id=modeled.person_id AND allocation.project_id=modeled.project_id
+      GROUP BY modeled.project_id
     ), bills AS (
       SELECT project_id,
         sum(COALESCE(CASE WHEN currency='ARS' THEN net_amount/NULLIF(cotizacion,0) ELSE net_amount END,monto_total_usd,monto_usd,monto_ars/NULLIF(cotizacion,0),0)) cost_usd,

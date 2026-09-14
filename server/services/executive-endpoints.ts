@@ -3,6 +3,7 @@ const { Pool } = pg;
 import { 
   fetchDevengado, 
   fetchCosts, 
+  fetchOperationalDirectCosts,
   fetchHours, 
   fetchProjectsActive, 
   fetchFinancialSummary, 
@@ -137,16 +138,16 @@ export interface CashflowData {
 export async function getOperativoData(periodKeys: string[]): Promise<OperativoData> {
   const lastPeriodKey = periodKeys[periodKeys.length - 1];
   
-  const [devengadoUsd, costs, hours, proyectosActivos] = await Promise.all([
+  const [devengadoUsd, directosOperativos, hours, proyectosActivos] = await Promise.all([
     fetchDevengado(periodKeys),
-    fetchCosts(periodKeys),
+    fetchOperationalDirectCosts(periodKeys),
     fetchHours(periodKeys),
     fetchProjectsActive()
   ]);
   
   const kpis = calculateOperativoKPIs(
     devengadoUsd,
-    costs.directos,
+    directosOperativos,
     hours.total,
     hours.billable,
     hours.peopleActive,
@@ -184,7 +185,7 @@ export async function getOperativoData(periodKeys: string[]): Promise<OperativoD
     },
     source: {
       devengado: DATA_SOURCES.devengado,
-      directos: DATA_SOURCES.directos,
+      directos: DATA_SOURCES.directosOperativos,
       horas: DATA_SOURCES.horas
     }
   };

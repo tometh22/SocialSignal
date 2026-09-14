@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.5.0 — 2026-09-14
+
+- Agrega un espacio personal para que cada integrante cargue su factura mensual mediante PDF, imagen o captura, con lectura automática y revisión financiera.
+- Vincula cada factura con los proyectos trabajados y guarda un reparto auditable que suma 100%.
+- Separa la valuación operativa de horas × tarifa de los costos financieros: freelancers usan el costo horario real y contratos fijos usan el importe aprobado de la factura.
+- Distribuye el costo real de contratos fijos entre proyectos para la rentabilidad económica, manteniendo horas y tarifas para markup y eficiencia operativa.
+- Impide cerrar un período financiero mientras falten facturas requeridas del equipo fijo, importes normalizados o repartos completos.
+
 ## 1.4.1 — 2026-09-14
 
 - Habilita la extracción inteligente de capturas y PDFs financieros mediante Anthropic cuando OpenAI no está configurado, conservando las reglas locales como último fallback.
