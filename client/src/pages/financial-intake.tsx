@@ -13,7 +13,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Link } from "wouter";
 import { getFinancialIntakeImpact, getLinkedRecordPresentation, type FinancialIntakeDocumentKind } from "@/lib/financial-intake-presentation";
-import { AlertCircle, ArrowRight, Building2, CheckCircle2, FileText, Image, Landmark, Loader2, Paperclip, Plus, RefreshCw, Send, ShieldAlert, Sparkles, TrendingUp, UploadCloud, WalletCards, XCircle } from "lucide-react";
+import { AlertCircle, ArrowRight, Building2, CheckCircle2, FileText, Image, Landmark, Loader2, Paperclip, Plus, RefreshCw, Search, Send, ShieldAlert, Sparkles, TrendingUp, UploadCloud, WalletCards, XCircle } from "lucide-react";
 
 type DocumentKind = FinancialIntakeDocumentKind;
 type LineItem = { date: string | null; description: string | null; amount: number; currency: "ARS" | "USD" | "EUR" | "OTHER"; direction: "IN" | "OUT"; bank: string | null; reference: string | null; isInternalTransfer: boolean; transferReference: string | null };
@@ -105,18 +105,27 @@ export default function FinancialIntakePage() {
   const [draft, setDraft] = useState<Extraction | null>(null);
   const [reviewNotes, setReviewNotes] = useState("");
   const [statusFilter, setStatusFilter] = useState("open");
+  const [search, setSearch] = useState("");
   const [dragging, setDragging] = useState(false);
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const fileInput = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const qc = useQueryClient();
 
-  const statusParam = statusFilter;
   const query = useQuery<{ items: IntakeItem[]; total: number }>({
-    queryKey: ["financial-native-intake", statusParam],
-    queryFn: () => authFetchJson(`/api/financial-native/intake?status=${statusParam}&pageSize=100`),
+    queryKey: ["financial-native-intake", "all"],
+    queryFn: () => authFetchJson("/api/financial-native/intake?status=all&pageSize=100"),
   });
   const allItems = query.data?.items ?? [];
-  const items = allItems;
+  const normalizedSearch = search.trim().toLocaleLowerCase("es");
+  const items = allItems.filter((item) => {
+    const matchesStatus = statusFilter === "all"
+      || (statusFilter === "open" ? !["posted", "rejected"].includes(item.status) : item.status === statusFilter);
+    if (!matchesStatus) return false;
+    if (!normalizedSearch) return true;
+    return [item.originalFileName, item.originalText, item.extractedData?.description, item.extractedData?.documentNumber, item.extractedData?.counterparty, item.extractedData?.clientName, item.extractedData?.projectName, KIND_LABELS[item.documentKind]]
+      .some((value) => String(value ?? "").toLocaleLowerCase("es").includes(normalizedSearch));
+  });
   const selected = allItems.find((item) => item.id === selectedId) ?? null;
 
   useEffect(() => {
@@ -140,7 +149,7 @@ export default function FinancialIntakePage() {
       if (!response.ok) throw new Error((await response.json().catch(() => ({}))).message || "No se pudieron subir los archivos.");
       return response.json() as Promise<{ items: IntakeItem[] }>;
     },
-    onSuccess: ({ items }) => { setSelectedId(items[0]?.id ?? null); refresh(); toast({ title: `${items.length} documento(s) procesado(s)` }); },
+    onSuccess: ({ items }) => { setPendingFiles([]); setContext(""); if (fileInput.current) fileInput.current.value = ""; setSelectedId(items[0]?.id ?? null); refresh(); toast({ title: `${items.length} documento(s) procesado(s)`, description: "Revisá cada borrador antes de contabilizar." }); },
     onError: (e) => toast({ title: "Error al subir", description: responseError(e), variant: "destructive" }),
   });
   const saveMutation = useMutation({
@@ -160,7 +169,7 @@ export default function FinancialIntakePage() {
   const currentMissing = draft ? missingFields(draft) : [];
   const currentImpact = draft ? getFinancialIntakeImpact(draft.documentKind, draft.lineItems.length) : null;
 
-  function acceptFiles(files: File[]) { if (files.length) uploadMutation.mutate(files.slice(0, 10)); }
+  function acceptFiles(files: File[]) { if (files.length) setPendingFiles(files.slice(0, 10)); }
   function onDrop(event: DragEvent<HTMLDivElement>) { event.preventDefault(); setDragging(false); acceptFiles(Array.from(event.dataTransfer.files)); }
   function onPaste(event: ClipboardEvent<HTMLDivElement>) {
     const images = Array.from(event.clipboardData.items).filter((item) => item.kind === "file").map((item) => item.getAsFile()).filter(Boolean) as File[];
@@ -200,6 +209,10 @@ export default function FinancialIntakePage() {
         </CardContent>
       </Card>
 
+      <div className="grid gap-3 sm:grid-cols-3">
+        {[{ n: 1, title: "Cargá", text: "Texto, archivos o capturas." }, { n: 2, title: "Revisá", text: "Mind completa un borrador editable." }, { n: 3, title: "Confirmá", text: "Recién ahí impacta en Finanzas." }].map((step) => <div key={step.n} className="flex gap-3 rounded-xl border bg-white p-3"><span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-rose-50 text-xs font-semibold text-rose-700">{step.n}</span><div><p className="text-sm font-semibold">{step.title}</p><p className="text-xs text-muted-foreground">{step.text}</p></div></div>)}
+      </div>
+
       <Card className="overflow-hidden border-rose-100 bg-gradient-to-br from-white to-rose-50/50">
         <CardHeader className="pb-0"><CardTitle className="text-base">Nueva carga</CardTitle><p className="text-sm text-muted-foreground">Pegá un mensaje, arrastrá documentación o pegá una captura con ⌘V.</p></CardHeader>
         <CardContent className="pt-4">
@@ -210,12 +223,13 @@ export default function FinancialIntakePage() {
               <div className="flex justify-end"><Button disabled={busy || text.trim().length < 3} onClick={() => textMutation.mutate()}><Send className="mr-2 h-4 w-4" />Interpretar con Mind</Button></div>
             </TabsContent>
             <TabsContent value="file" className="space-y-3 pt-3">
-              <div className={`rounded-xl border-2 border-dashed p-8 text-center transition ${dragging ? "border-rose-500 bg-rose-50" : "border-slate-200"}`} onDragOver={(e) => { e.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)} onDrop={onDrop}>
-                <UploadCloud className="mx-auto mb-3 h-8 w-8 text-rose-500" /><p className="font-medium">Arrastrá PDFs, imágenes, Word o Excel</p><p className="mt-1 text-xs text-muted-foreground">También podés pegar una captura con ⌘V. Hasta 10 archivos de 20 MB.</p>
+              <div className={`rounded-xl border-2 border-dashed p-8 text-center transition ${dragging ? "border-rose-500 bg-rose-50" : pendingFiles.length ? "border-emerald-300 bg-emerald-50/40" : "border-slate-200"}`} onDragOver={(e) => { e.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)} onDrop={onDrop}>
+                {pendingFiles.length ? <><CheckCircle2 className="mx-auto mb-3 h-8 w-8 text-emerald-600" /><p className="font-medium">{pendingFiles.length} archivo(s) listo(s)</p><div className="mx-auto mt-2 max-w-xl space-y-1 text-xs text-muted-foreground">{pendingFiles.slice(0, 3).map((file) => <p key={`${file.name}-${file.size}`} className="truncate">{file.name}</p>)}{pendingFiles.length > 3 && <p>+ {pendingFiles.length - 3} archivo(s) más</p>}</div></> : <><UploadCloud className="mx-auto mb-3 h-8 w-8 text-rose-500" /><p className="font-medium">Arrastrá PDFs, imágenes, Word o Excel</p><p className="mt-1 text-xs text-muted-foreground">También podés pegar una captura con ⌘V. Hasta 10 archivos de 20 MB.</p></>}
                 <input ref={fileInput} type="file" multiple className="hidden" accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,.docx,.xlsx" onChange={(e) => acceptFiles(Array.from(e.target.files ?? []))} />
-                <Button className="mt-4" variant="outline" onClick={() => fileInput.current?.click()}>Elegir archivos</Button>
+                <Button className="mt-4" variant="outline" onClick={() => fileInput.current?.click()}>{pendingFiles.length ? "Cambiar selección" : "Elegir archivos"}</Button>
               </div>
               <Input value={context} onChange={(e) => setContext(e.target.value)} placeholder="Contexto opcional: banco, cliente, período o cualquier aclaración" />
+              {pendingFiles.length > 0 && <div className="flex items-center justify-between gap-3"><p className="text-xs text-muted-foreground">Podrás revisar cada resultado por separado.</p><Button disabled={busy} onClick={() => uploadMutation.mutate(pendingFiles)}><Sparkles className="mr-2 h-4 w-4" />Interpretar {pendingFiles.length} archivo(s)</Button></div>}
             </TabsContent>
           </Tabs>
           {busy && <div className="mt-3 flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />Mind está procesando la información…</div>}
@@ -223,7 +237,7 @@ export default function FinancialIntakePage() {
       </Card>
 
       <div className="grid gap-5 xl:grid-cols-[360px_minmax(0,1fr)]">
-        <Card className="h-fit"><CardHeader className="pb-3"><div className="flex items-center justify-between"><CardTitle className="text-base">Entradas</CardTitle><Select value={statusFilter} onValueChange={setStatusFilter}><SelectTrigger className="w-36"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="open">Pendientes</SelectItem><SelectItem value="all">Todas</SelectItem><SelectItem value="needs_review">A revisar</SelectItem><SelectItem value="posted">Contabilizadas</SelectItem><SelectItem value="rejected">Rechazadas</SelectItem></SelectContent></Select></div></CardHeader>
+        <Card className="h-fit"><CardHeader className="space-y-3 pb-3"><div className="flex items-center justify-between"><CardTitle className="text-base">Entradas</CardTitle><Select value={statusFilter} onValueChange={setStatusFilter}><SelectTrigger className="w-36"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="open">Pendientes</SelectItem><SelectItem value="all">Todas</SelectItem><SelectItem value="needs_review">A revisar</SelectItem><SelectItem value="posted">Contabilizadas</SelectItem><SelectItem value="rejected">Rechazadas</SelectItem></SelectContent></Select></div><div className="relative"><Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" /><Input className="pl-9" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar archivo, cliente o proyecto" /></div></CardHeader>
           <CardContent className="max-h-[720px] space-y-2 overflow-auto">
             {query.isLoading && <p className="text-sm text-muted-foreground">Cargando…</p>}
             {!query.isLoading && !items.length && <div className="py-10 text-center text-sm text-muted-foreground"><CheckCircle2 className="mx-auto mb-2 h-7 w-7" />No hay cargas en esta vista.</div>}

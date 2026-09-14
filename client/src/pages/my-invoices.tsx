@@ -1,8 +1,29 @@
-import React, { useMemo, useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { authFetch } from "@/lib/queryClient";
+import { useEffect, useMemo, useRef, useState, type ClipboardEvent, type DragEvent } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { authFetch, authFetchJson } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Upload, FileText, Trash2, Clock, DollarSign } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { AlertCircle, Check, CheckCircle2, Clock, FileText, FolderKanban, Loader2, LockKeyhole, Receipt, ShieldCheck, Trash2, UploadCloud } from "lucide-react";
+
+type Allocation = {
+  projectId: number;
+  projectName: string;
+  clientName: string | null;
+  hours: number;
+  allocationPercent: number | string;
+  computedCostARS: number | null;
+  computedCostUSD: number | null;
+  allocatedInvoiceAmount?: number | null;
+  invoiceCurrency?: "ARS" | "USD" | null;
+};
 
 type InvoiceRow = {
   id: number;
@@ -10,18 +31,19 @@ type InvoiceRow = {
   fileUrl: string;
   fileName: string;
   fileSize: number;
-  mimeType: string;
   computedTotalCostARS: number | null;
   computedTotalCostUSD: number | null;
   hoursTotal: number | null;
   notes: string | null;
   uploadedAt: string;
-  updatedAt: string;
-  suggestedInvoiceUSD?: number | null;
-  declaredInvoiceUSD?: number | null;
+  invoiceNumber?: string | null;
+  issueDate?: string | null;
+  invoiceCurrency?: "ARS" | "USD" | null;
+  declaredInvoiceAmount?: number | null;
   bankFx?: number | null;
-  differenceUSD?: number | null;
   approvalStatus?: "pending" | "approved" | "rejected";
+  reviewReason?: string | null;
+  allocations?: Allocation[];
 };
 
 type MonthSummary = {
@@ -33,456 +55,263 @@ type MonthSummary = {
   totalCostUSD: number;
   grandTotalARS?: number;
   grandTotalUSD?: number;
-  fxUsd?: number;
-  fxArs?: number;
   opsFxRate?: number;
   billingCurrency?: string;
-  usdFraction?: number;
   isClosed?: boolean;
+  availableHours?: number;
   entryCount: number;
 };
 
+type ProjectResponse = { summary: MonthSummary | null; projects: Allocation[] };
+
+const STATUS = {
+  pending: { label: "En revisión", className: "border-amber-200 bg-amber-50 text-amber-800" },
+  approved: { label: "Aprobada", className: "border-emerald-200 bg-emerald-50 text-emerald-800" },
+  rejected: { label: "Requiere corrección", className: "border-rose-200 bg-rose-50 text-rose-800" },
+} as const;
+
 function currentPeriod(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 }
 
-function formatARS(n: number | null | undefined): string {
-  if (n == null || !isFinite(n)) return "—";
-  return new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 0 }).format(n);
+function formatMoney(value: number | null | undefined, currency: "ARS" | "USD") {
+  if (value == null || !Number.isFinite(Number(value))) return "—";
+  return new Intl.NumberFormat(currency === "ARS" ? "es-AR" : "en-US", {
+    style: "currency", currency, maximumFractionDigits: currency === "ARS" ? 0 : 2,
+  }).format(Number(value));
 }
 
-function formatUSD(n: number | null | undefined): string {
-  if (n == null || !isFinite(n) || n === 0) return "—";
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 }).format(n);
+function formatPeriod(period: string) {
+  const [year, month] = period.split("-").map(Number);
+  return new Date(year, month - 1, 1).toLocaleDateString("es-AR", { month: "long", year: "numeric" });
 }
 
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("es-AR", { day: "numeric", month: "short", year: "numeric" });
-}
-
-function formatPeriodLabel(period: string): string {
-  const [y, m] = period.split("-").map(Number);
-  const d = new Date(y, m - 1, 1);
-  return d.toLocaleDateString("es-AR", { month: "long", year: "numeric" });
+function percentFor(project: Allocation, selected: Allocation[]) {
+  const totalCost = selected.reduce((sum, item) => sum + Math.max(0, Number(item.computedCostARS) || 0), 0);
+  if (totalCost > 0) return Math.max(0, Number(project.computedCostARS) || 0) / totalCost * 100;
+  const totalHours = selected.reduce((sum, item) => sum + Math.max(0, Number(item.hours) || 0), 0);
+  return totalHours > 0 ? Math.max(0, Number(project.hours) || 0) / totalHours * 100 : 0;
 }
 
 export default function MyInvoices() {
   const { toast } = useToast();
-  const qc = useQueryClient();
+  const queryClient = useQueryClient();
+  const fileInput = useRef<HTMLInputElement>(null);
   const [period, setPeriod] = useState(currentPeriod());
   const [file, setFile] = useState<File | null>(null);
-  const [notes, setNotes] = useState("");
-  const [declaredInvoiceUSD, setDeclaredInvoiceUSD] = useState("");
+  const [dragging, setDragging] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [invoiceAmount, setInvoiceAmount] = useState("");
+  const [invoiceCurrency, setInvoiceCurrency] = useState<"ARS" | "USD">("ARS");
+  const [invoiceNumber, setInvoiceNumber] = useState("");
+  const [issueDate, setIssueDate] = useState("");
   const [bankFx, setBankFx] = useState("");
+  const [notes, setNotes] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<InvoiceRow | null>(null);
 
   const invoicesQuery = useQuery<InvoiceRow[]>({
-    queryKey: ["/api/me/invoices"],
-    queryFn: async () => {
-      const res = await authFetch("/api/me/invoices");
-      if (!res.ok) throw new Error("Error al cargar facturas");
-      return res.json();
-    },
+    queryKey: ["personal-invoices"],
+    queryFn: () => authFetchJson("/api/me/invoices"),
   });
-
-  const summaryQuery = useQuery<MonthSummary>({
-    queryKey: ["/api/me/invoices/summary", period],
-    queryFn: async () => {
-      const res = await authFetch(`/api/me/invoices/summary?period=${period}`);
-      if (!res.ok) throw new Error("Error al cargar resumen");
-      return res.json();
-    },
+  const projectQuery = useQuery<ProjectResponse>({
+    queryKey: ["personal-invoice-projects", period],
+    queryFn: () => authFetchJson(`/api/me/invoices/projects?period=${period}`),
   });
+  const existing = useMemo(() => (invoicesQuery.data ?? []).find((item) => item.period === period) ?? null, [invoicesQuery.data, period]);
+  const projects = projectQuery.data?.projects ?? [];
+  const selectedProjects = projects.filter((project) => selectedIds.includes(project.projectId));
+  const summary = projectQuery.data?.summary;
+  const locked = existing?.approvalStatus === "approved";
 
-  // TC propio de la persona (de su banco). Se inicializa desde el resumen.
-  const [fxUsdInput, setFxUsdInput] = useState<string>("");
-  const [fxArsInput, setFxArsInput] = useState<string>("");
-  React.useEffect(() => {
-    setFxUsdInput(summaryQuery.data?.fxUsd != null ? String(summaryQuery.data.fxUsd) : "");
-    setFxArsInput(summaryQuery.data?.fxArs != null ? String(summaryQuery.data.fxArs) : "");
-  }, [period, summaryQuery.data?.fxUsd, summaryQuery.data?.fxArs]);
-
-  const fxMutation = useMutation({
-    mutationFn: async () => {
-      const res = await authFetch("/api/me/invoices/fx", {
-        method: "PUT",
-        body: JSON.stringify({
-          period,
-          fxUsd: fxUsdInput.trim() === "" ? null : Number(fxUsdInput),
-          fxArs: fxArsInput.trim() === "" ? null : Number(fxArsInput),
-        }),
-      });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.message ?? "Error al guardar TC");
-      }
-      return res.json();
-    },
-    onSuccess: () => {
-      toast({ title: "TC guardado", description: "Se recalculó tu total con tu tipo de cambio." });
-      qc.invalidateQueries({ queryKey: ["/api/me/invoices/summary", period] });
-    },
-    onError: (err: Error) => {
-      toast({ title: "No se pudo guardar el TC", description: err.message, variant: "destructive" });
-    },
-  });
+  useEffect(() => {
+    if (!projectQuery.data) return;
+    const savedIds = existing?.allocations?.map((allocation) => allocation.projectId) ?? [];
+    setSelectedIds(savedIds.length ? savedIds : projectQuery.data.projects.map((project) => project.projectId));
+    setInvoiceAmount(existing?.declaredInvoiceAmount == null ? "" : String(existing.declaredInvoiceAmount));
+    setInvoiceCurrency(existing?.invoiceCurrency ?? (projectQuery.data.summary?.billingCurrency === "USD" ? "USD" : "ARS"));
+    setInvoiceNumber(existing?.invoiceNumber ?? "");
+    setIssueDate(existing?.issueDate?.slice(0, 10) ?? "");
+    setBankFx(existing?.bankFx == null ? "" : String(existing.bankFx));
+    setNotes(existing?.notes ?? "");
+    setFile(null);
+    if (fileInput.current) fileInput.current.value = "";
+  }, [period, projectQuery.data, existing?.id]);
 
   const uploadMutation = useMutation({
     mutationFn: async () => {
-      if (!file) throw new Error("Seleccioná un archivo");
-      const fd = new FormData();
-      fd.append("file", file);
-      fd.append("period", period);
-      if (notes) fd.append("notes", notes);
-      if (declaredInvoiceUSD.trim()) fd.append("declaredInvoiceUSD", declaredInvoiceUSD);
-      if (bankFx.trim()) fd.append("bankFx", bankFx);
-      const res = await authFetch("/api/me/invoices", { method: "POST", body: fd });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.message ?? "Error al subir factura");
-      }
-      return res.json();
-    },
-    onSuccess: () => {
-      toast({ title: "Factura guardada", description: `Se subió la factura de ${formatPeriodLabel(period)}.` });
-      setFile(null);
-      setNotes("");
-      qc.invalidateQueries({ queryKey: ["/api/me/invoices"] });
-    },
-    onError: (err: Error) => {
-      toast({ title: "No se pudo subir", description: err.message, variant: "destructive" });
-    },
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: async (id: number) => {
-      const res = await authFetch(`/api/me/invoices/${id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Error al borrar factura");
-      return res.json();
-    },
-    onSuccess: () => {
-      toast({ title: "Factura borrada" });
-      qc.invalidateQueries({ queryKey: ["/api/me/invoices"] });
-    },
-    onError: (err: Error) => {
-      toast({ title: "Error al borrar", description: err.message, variant: "destructive" });
-    },
-  });
-
-  const existingForPeriod = useMemo(
-    () => (invoicesQuery.data ?? []).find(i => i.period === period) ?? null,
-    [invoicesQuery.data, period]
-  );
-
-  React.useEffect(() => {
-    setDeclaredInvoiceUSD(existingForPeriod?.declaredInvoiceUSD == null ? "" : String(existingForPeriod.declaredInvoiceUSD));
-    setBankFx(existingForPeriod?.bankFx == null ? "" : String(existingForPeriod.bankFx));
-  }, [existingForPeriod?.id, existingForPeriod?.declaredInvoiceUSD, existingForPeriod?.bankFx]);
-
-  const reviewMutation = useMutation({
-    mutationFn: async () => {
-      if (!existingForPeriod) throw new Error("Primero subí la factura del período");
-      const response = await authFetch(`/api/me/invoices/${existingForPeriod.id}/review`, {
-        method: "PATCH",
-        body: JSON.stringify({
-          declaredInvoiceUSD: declaredInvoiceUSD.trim() === "" ? null : Number(declaredInvoiceUSD),
-          bankFx: bankFx.trim() === "" ? null : Number(bankFx),
-        }),
-      });
-      if (!response.ok) throw new Error((await response.json().catch(() => ({}))).message ?? "No se pudo enviar la revisión");
+      if (!file) throw new Error("Adjuntá la factura en PDF o imagen");
+      if (!selectedIds.length) throw new Error("Seleccioná al menos un proyecto");
+      const form = new FormData();
+      form.append("file", file);
+      form.append("period", period);
+      form.append("projectIds", JSON.stringify(selectedIds));
+      form.append("invoiceCurrency", invoiceCurrency);
+      if (invoiceAmount.trim()) form.append("invoiceAmount", invoiceAmount);
+      if (invoiceNumber.trim()) form.append("invoiceNumber", invoiceNumber);
+      if (issueDate) form.append("issueDate", issueDate);
+      if (bankFx.trim()) form.append("bankFx", bankFx);
+      if (notes.trim()) form.append("notes", notes);
+      const response = await authFetch("/api/me/invoices", { method: "POST", body: form });
+      if (!response.ok) throw new Error((await response.json().catch(() => ({}))).message ?? "No se pudo enviar la factura");
       return response.json();
     },
     onSuccess: () => {
-      toast({ title: "Revisión enviada", description: "Operaciones recibirá la factura para aprobarla." });
-      qc.invalidateQueries({ queryKey: ["/api/me/invoices"] });
+      toast({ title: "Factura enviada", description: "Finanzas ya puede revisarla. El estado quedará visible en esta pantalla." });
+      setFile(null);
+      if (fileInput.current) fileInput.current.value = "";
+      queryClient.invalidateQueries({ queryKey: ["personal-invoices"] });
     },
     onError: (error: Error) => toast({ title: "No se pudo enviar", description: error.message, variant: "destructive" }),
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => authFetchJson(`/api/me/invoices/${id}`, { method: "DELETE" }),
+    onSuccess: () => {
+      toast({ title: "Factura eliminada" });
+      setDeleteTarget(null);
+      queryClient.invalidateQueries({ queryKey: ["personal-invoices"] });
+    },
+    onError: (error: Error) => toast({ title: "No se pudo eliminar", description: error.message, variant: "destructive" }),
+  });
+
+  function acceptFiles(files: File[]) {
+    const candidate = files[0];
+    if (!candidate) return;
+    if (!["application/pdf", "image/jpeg", "image/png", "image/webp"].includes(candidate.type)) {
+      toast({ title: "Formato no admitido", description: "Usá PDF, JPG, PNG o WEBP.", variant: "destructive" });
+      return;
+    }
+    if (candidate.size > 20 * 1024 * 1024) {
+      toast({ title: "Archivo demasiado grande", description: "El máximo es 20 MB.", variant: "destructive" });
+      return;
+    }
+    setFile(candidate);
+  }
+  function onDrop(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    setDragging(false);
+    acceptFiles(Array.from(event.dataTransfer.files));
+  }
+  function onPaste(event: ClipboardEvent<HTMLDivElement>) {
+    const pasted = Array.from(event.clipboardData.items).find((item) => item.kind === "file")?.getAsFile();
+    if (pasted) { event.preventDefault(); acceptFiles([pasted]); }
+  }
+  function toggleProject(projectId: number, checked: boolean) {
+    setSelectedIds((current) => checked ? [...new Set([...current, projectId])] : current.filter((id) => id !== projectId));
+  }
+
+  const stepReady = Boolean(summary?.personnelId && selectedIds.length && file && !locked);
+  const status = existing?.approvalStatus ? STATUS[existing.approvalStatus] : null;
+
   return (
-    <div className="mx-auto max-w-4xl p-5 sm:p-8">
-      <h1 className="text-2xl font-semibold text-slate-900 mb-1">Mis facturas</h1>
-      <p className="text-sm text-slate-500 mb-6">
-        Subí la factura de cada mes. Solo vos la ves. El total sugerido se calcula desde tus horas cargadas;
-        compará con tus horas disponibles del mes (días hábiles sin feriados) para detectar horas no cargadas.
-      </p>
-
-      {summaryQuery.data?.isClosed && (
-        <div className="mb-4 inline-flex items-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-200 px-3 py-1 text-xs text-emerald-700">
-          Mes cerrado en Cierre Mensual — estos valores ya son definitivos
+    <div className="mx-auto max-w-6xl space-y-6" onPaste={onPaste}>
+      <AlertDialog open={deleteTarget !== null} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader><AlertDialogTitle>¿Eliminar esta factura?</AlertDialogTitle><AlertDialogDescription>Se eliminarán el comprobante pendiente y su vínculo con los proyectos. Esta acción no modifica los costos ya calculados.</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction disabled={deleteMutation.isPending} onClick={(event) => { event.preventDefault(); if (deleteTarget) deleteMutation.mutate(deleteTarget.id); }} className="bg-rose-600 hover:bg-rose-700">Eliminar factura</AlertDialogAction></AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+        <div>
+          <p className="text-sm font-medium text-indigo-600">Espacio personal</p>
+          <h1 className="text-3xl font-semibold tracking-tight">Mis facturas</h1>
+          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">Subí tu comprobante mensual. Mind lo relaciona con los proyectos donde trabajaste y Finanzas lo valida antes de cerrar.</p>
         </div>
-      )}
-
-      {/* Hero: resumen del mes */}
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-6">
-        <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <div className="flex items-center gap-2 text-xs text-slate-500 mb-1">
-            <Clock className="h-3.5 w-3.5" /> Horas del mes
-          </div>
-          <div className="text-2xl font-semibold text-slate-800 tabular-nums">
-            {summaryQuery.data ? summaryQuery.data.hours.toFixed(2) : "—"}
-            {(summaryQuery.data as any)?.availableHours > 0 && (
-              <span className="text-sm font-normal text-slate-400"> / {(summaryQuery.data as any).availableHours}h</span>
-            )}
-          </div>
-          <div className="text-[11px] text-slate-400 mt-1">
-            {summaryQuery.data?.entryCount ?? 0} registros
-            {(summaryQuery.data as any)?.availableHours > 0 && (
-              <> · {Math.round((summaryQuery.data!.hours / (summaryQuery.data as any).availableHours) * 100)}% de disponibles</>
-            )}
-          </div>
-        </div>
-        <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <div className="flex items-center gap-2 text-xs text-slate-500 mb-1">
-            <DollarSign className="h-3.5 w-3.5" />
-            {summaryQuery.data?.billingCurrency === 'mixed'
-              ? `ARS (${Math.round((1 - (summaryQuery.data?.usdFraction ?? 0)) * 100)}%)`
-              : "Total (ARS)"}
-          </div>
-          <div className="text-2xl font-semibold text-emerald-700 tabular-nums">
-            {summaryQuery.data ? formatARS(summaryQuery.data.totalCostARS) : "—"}
-          </div>
-        </div>
-        <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <div className="flex items-center gap-2 text-xs text-slate-500 mb-1">
-            <DollarSign className="h-3.5 w-3.5" />
-            {summaryQuery.data?.billingCurrency === 'mixed'
-              ? `USD (${Math.round((summaryQuery.data?.usdFraction ?? 0) * 100)}%)`
-              : "Total (USD)"}
-          </div>
-          <div className="text-2xl font-semibold text-blue-700 tabular-nums">
-            {summaryQuery.data ? formatUSD(summaryQuery.data.totalCostUSD) : "—"}
-          </div>
-          {summaryQuery.data?.billingCurrency === 'USD' && (
-            <div className="text-[11px] text-blue-400 mt-1">Tarifa USD directa</div>
-          )}
-          {summaryQuery.data?.billingCurrency === 'mixed' && (
-            <div className="text-[11px] text-blue-400 mt-1">Facturación mixta</div>
-          )}
-          {summaryQuery.data?.billingCurrency === 'ARS' && summaryQuery.data?.totalCostUSD === 0 && (
-            <div className="text-[11px] text-slate-400 mt-1">Sin TC del mes</div>
-          )}
-        </div>
-        <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <div className="flex items-center gap-2 text-xs text-slate-500 mb-1">Período</div>
-          <input
-            type="month"
-            value={period}
-            onChange={e => setPeriod(e.target.value)}
-            className="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
-          />
-          <div className="text-[11px] text-slate-400 mt-1 capitalize">{formatPeriodLabel(period)}</div>
-        </div>
+        {status && <Badge variant="outline" className={status.className}>{status.label}</Badge>}
       </div>
 
-      {/* TC propio de la persona (de su banco). No depende de Operaciones. */}
-      {summaryQuery.data && summaryQuery.data.personnelId != null && (
-        <div className="rounded-xl border border-slate-200 bg-white p-5 mb-6">
-          <h2 className="text-sm font-semibold text-slate-700 mb-1">Tu tipo de cambio</h2>
-          <p className="text-xs text-slate-500 mb-3">
-            Usá el TC de tu banco para valuar tu factura. No depende del TC de Operaciones.
-            {summaryQuery.data.opsFxRate ? (
-              <> TC de referencia de Operaciones: <span className="tabular-nums">{summaryQuery.data.opsFxRate.toLocaleString("es-AR")}</span>.</>
-            ) : null}
-          </p>
-
-          <div className="flex flex-wrap items-end gap-4">
-            <div>
-              <label className="block text-xs text-slate-500 mb-1">
-                {summaryQuery.data.billingCurrency === 'mixed'
-                  ? "TC tramo USD (ARS por USD)"
-                  : summaryQuery.data.billingCurrency === 'USD'
-                    ? "TC para valuar en ARS (ARS por USD)"
-                    : "Tu TC (ARS por USD)"}
-              </label>
-              <input
-                type="number"
-                inputMode="decimal"
-                min={0}
-                step="0.01"
-                value={fxUsdInput}
-                disabled={summaryQuery.data.isClosed}
-                onChange={e => setFxUsdInput(e.target.value)}
-                placeholder={summaryQuery.data.opsFxRate ? String(summaryQuery.data.opsFxRate) : "1445"}
-                className="w-40 rounded-lg border border-slate-200 px-3 py-1.5 text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-indigo-400 disabled:bg-slate-50"
-              />
-            </div>
-
-            {summaryQuery.data.billingCurrency === 'mixed' && (
-              <div>
-                <label className="block text-xs text-slate-500 mb-1">TC tramo ARS (ARS por USD)</label>
-                <input
-                  type="number"
-                  inputMode="decimal"
-                  min={0}
-                  step="0.01"
-                  value={fxArsInput}
-                  disabled={summaryQuery.data.isClosed}
-                  onChange={e => setFxArsInput(e.target.value)}
-                  placeholder={summaryQuery.data.opsFxRate ? String(summaryQuery.data.opsFxRate) : "1445"}
-                  className="w-40 rounded-lg border border-slate-200 px-3 py-1.5 text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-indigo-400 disabled:bg-slate-50"
-                />
-              </div>
-            )}
-
-            {!summaryQuery.data.isClosed && (
-              <button
-                onClick={() => fxMutation.mutate()}
-                disabled={fxMutation.isPending}
-                className="rounded-lg bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60"
-              >
-                {fxMutation.isPending ? "Guardando…" : "Guardar TC"}
-              </button>
-            )}
-          </div>
-
-          {/* Total unificado con el TC propio */}
-          {(summaryQuery.data.grandTotalARS != null || summaryQuery.data.grandTotalUSD != null) && (
-            <div className="mt-4 flex flex-wrap gap-6 border-t border-slate-100 pt-3 text-sm">
-              <div>
-                <div className="text-[11px] text-slate-500">Total unificado (ARS)</div>
-                <div className="font-semibold text-emerald-700 tabular-nums">{formatARS(summaryQuery.data.grandTotalARS)}</div>
-              </div>
-              <div>
-                <div className="text-[11px] text-slate-500">Total unificado (USD)</div>
-                <div className="font-semibold text-blue-700 tabular-nums">{formatUSD(summaryQuery.data.grandTotalUSD)}</div>
-              </div>
-              {summaryQuery.data.billingCurrency === 'mixed' && (
-                <div className="text-[11px] text-slate-400 self-end">
-                  Suma el tramo USD y el tramo ARS valuados con tus TC.
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Upload form */}
-      <div className="rounded-xl border border-slate-200 bg-white p-5 mb-8">
-        <h2 className="text-sm font-semibold text-slate-700 mb-3">
-          {existingForPeriod ? "Reemplazar factura de este mes" : "Subir factura del mes"}
-        </h2>
-        {existingForPeriod && (
-          <div className="mb-3 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-800">
-            Ya tenés una factura cargada para {formatPeriodLabel(period)} (<a className="underline" href={existingForPeriod.fileUrl} target="_blank" rel="noreferrer">{existingForPeriod.fileName}</a>).
-            Si subís un archivo nuevo, se reemplaza.
-          </div>
-        )}
-        <div className="space-y-3">
-          <input
-            type="file"
-            accept="application/pdf,image/jpeg,image/png,image/webp"
-            onChange={e => setFile(e.target.files?.[0] ?? null)}
-            className="block w-full text-sm text-slate-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 file:cursor-pointer"
-          />
-          <textarea
-            placeholder="Notas opcionales (número de factura, concepto…)"
-            value={notes}
-            onChange={e => setNotes(e.target.value)}
-            rows={2}
-            className="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
-          />
-          <button
-            onClick={() => uploadMutation.mutate()}
-            disabled={!file || uploadMutation.isPending}
-            className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 text-white px-4 py-2 text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors"
-          >
-            <Upload className="h-4 w-4" />
-            {uploadMutation.isPending ? "Subiendo…" : existingForPeriod ? "Reemplazar factura" : "Subir factura"}
-          </button>
-        </div>
+      <div className="grid gap-3 sm:grid-cols-3">
+        {[
+          { number: 1, title: "Elegí el período", text: "Mind trae tus horas y proyectos." },
+          { number: 2, title: "Revisá el reparto", text: "Se calcula automáticamente." },
+          { number: 3, title: "Adjuntá y enviá", text: "Finanzas controla antes de aprobar." },
+        ].map((step) => <div key={step.number} className="flex gap-3 rounded-xl border bg-white p-4"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-sm font-semibold text-indigo-700">{step.number}</span><div><p className="text-sm font-semibold">{step.title}</p><p className="text-xs text-muted-foreground">{step.text}</p></div></div>)}
       </div>
 
-      {summaryQuery.data?.isClosed && (
-        <div className="rounded-xl border border-indigo-200 bg-indigo-50/50 p-5 mb-8">
-          <h2 className="text-sm font-semibold text-indigo-900 mb-1">Revisión post-cierre</h2>
-          <p className="text-xs text-indigo-800/80 mb-4">
-            El monto sugerido para facturar es el 90% del total unificado del cierre. El cierre de Operaciones no se modifica.
-          </p>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-5">
-            <div>
-              <div className="text-[11px] text-indigo-700">Sugerido (90%)</div>
-              <div className="text-lg font-semibold text-indigo-900">{formatUSD((summaryQuery.data.grandTotalUSD ?? 0) * 0.9)}</div>
-            </div>
-            <label className="text-[11px] text-indigo-700">
-              Monto declarado USD
-              <input value={declaredInvoiceUSD} onChange={e => setDeclaredInvoiceUSD(e.target.value)} type="number" min="0" step="0.01" className="mt-1 w-full rounded-lg border border-indigo-200 bg-white px-3 py-1.5 text-sm text-slate-900" />
-            </label>
-            <label className="text-[11px] text-indigo-700">
-              TC bancario
-              <input value={bankFx} onChange={e => setBankFx(e.target.value)} type="number" min="0" step="0.01" className="mt-1 w-full rounded-lg border border-indigo-200 bg-white px-3 py-1.5 text-sm text-slate-900" />
-            </label>
-            <div>
-              <div className="text-[11px] text-indigo-700">Sugerido equivalente ARS</div>
-              <div className="mt-1 text-lg font-semibold text-indigo-900">
-                {bankFx.trim() === "" ? "—" : formatARS(Number(bankFx) * Number((summaryQuery.data.grandTotalUSD ?? 0) * 0.9))}
-              </div>
-            </div>
-            <div>
-              <div className="text-[11px] text-indigo-700">Diferencia USD</div>
-              <div className="mt-1 text-lg font-semibold text-indigo-900">
-                {declaredInvoiceUSD.trim() === "" ? "—" : formatUSD(Number(declaredInvoiceUSD) - Number((summaryQuery.data.grandTotalUSD ?? 0) * 0.9))}
-              </div>
-            </div>
-          </div>
-          <div className="mt-4 flex flex-wrap items-center gap-3">
-            <button onClick={() => reviewMutation.mutate()} disabled={reviewMutation.isPending || !existingForPeriod} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50">
-              {reviewMutation.isPending ? "Enviando…" : "Enviar a aprobación de Operaciones"}
-            </button>
-            {existingForPeriod?.approvalStatus && <span className="text-xs text-indigo-700">Estado: {existingForPeriod.approvalStatus}</span>}
-          </div>
-        </div>
-      )}
+      <Card>
+        <CardHeader className="pb-3"><CardTitle className="flex items-center gap-2 text-base"><Clock className="h-4 w-4 text-indigo-600" />1. Período y resumen</CardTitle></CardHeader>
+        <CardContent className="grid gap-4 sm:grid-cols-[220px_repeat(3,minmax(0,1fr))]">
+          <div><Label htmlFor="invoice-period">Mes a facturar</Label><Input id="invoice-period" className="mt-1.5" type="month" value={period} onChange={(event) => setPeriod(event.target.value)} /></div>
+          <Summary label="Horas cargadas" value={summary ? `${Number(summary.hours).toFixed(1)} h` : "—"} detail={`${summary?.entryCount ?? 0} registros`} />
+          <Summary label="Costo calculado ARS" value={formatMoney(summary?.grandTotalARS ?? summary?.totalCostARS, "ARS")} detail="Según horas y tarifa histórica" />
+          <Summary label="Costo calculado USD" value={formatMoney(summary?.grandTotalUSD ?? summary?.totalCostUSD, "USD")} detail={summary?.isClosed ? "Mes cerrado" : "Estimación del período"} />
+        </CardContent>
+      </Card>
 
-      {/* Historial */}
-      <h2 className="text-sm font-semibold text-slate-700 mb-2">Historial</h2>
-      <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-slate-50 text-left">
-            <tr className="text-[11px] uppercase tracking-wide text-slate-500">
-              <th className="px-4 py-2.5">Mes</th>
-              <th className="px-4 py-2.5 text-right">Horas</th>
-              <th className="px-4 py-2.5 text-right">ARS</th>
-              <th className="px-4 py-2.5 text-right">USD</th>
-              <th className="px-4 py-2.5">Archivo</th>
-              <th className="px-4 py-2.5">Subida</th>
-              <th className="px-4 py-2.5"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {invoicesQuery.isLoading && (
-              <tr><td colSpan={7} className="px-4 py-6 text-center text-sm text-slate-400">Cargando…</td></tr>
-            )}
-            {invoicesQuery.data && invoicesQuery.data.length === 0 && (
-              <tr><td colSpan={7} className="px-4 py-6 text-center text-sm text-slate-400">Todavía no subiste ninguna factura.</td></tr>
-            )}
-            {(invoicesQuery.data ?? []).map(row => (
-              <tr key={row.id} className="border-t border-slate-100">
-                <td className="px-4 py-2.5 capitalize">{formatPeriodLabel(row.period)}</td>
-                <td className="px-4 py-2.5 text-right tabular-nums">{row.hoursTotal?.toFixed(2) ?? "—"}</td>
-                <td className="px-4 py-2.5 text-right tabular-nums">{formatARS(row.computedTotalCostARS)}</td>
-                <td className="px-4 py-2.5 text-right tabular-nums text-blue-700">{formatUSD(row.computedTotalCostUSD)}</td>
-                <td className="px-4 py-2.5">
-                  <a href={row.fileUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-indigo-600 hover:underline">
-                    <FileText className="h-3.5 w-3.5" />
-                    {row.fileName}
-                  </a>
-                </td>
-                <td className="px-4 py-2.5 text-slate-500">{formatDate(row.uploadedAt)}</td>
-                <td className="px-4 py-2.5 text-right">
-                  <button
-                    onClick={() => { if (confirm("¿Borrar esta factura?")) deleteMutation.mutate(row.id); }}
-                    className="text-rose-600 hover:text-rose-700"
-                    title="Borrar"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <Card>
+        <CardHeader className="pb-3"><CardTitle className="flex items-center gap-2 text-base"><FolderKanban className="h-4 w-4 text-indigo-600" />2. Proyectos incluidos</CardTitle><p className="text-sm text-muted-foreground">Seleccionamos tus proyectos facturables y distribuimos el comprobante según el costo de tus horas. Sólo desmarcá uno si no corresponde a esta factura.</p></CardHeader>
+        <CardContent>
+          {projectQuery.isLoading && <div className="flex items-center gap-2 py-8 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />Calculando tus proyectos…</div>}
+          {projectQuery.isError && <Notice tone="danger" title="No pudimos traer tus proyectos" text="Actualizá la página o contactá a Administración si el problema continúa." />}
+          {!projectQuery.isLoading && !projectQuery.isError && !summary?.personnelId && <Notice tone="danger" title="Falta vincular tu usuario" text="Administración debe asociar tu email con tu ficha de persona antes de que puedas cargar facturas." />}
+          {!projectQuery.isLoading && !projectQuery.isError && summary?.personnelId && !projects.length && <Notice tone="warning" title="No encontramos proyectos facturables" text={`No hay horas facturables cargadas para ${formatPeriod(period)}. Revisá tus horas o elegí otro período.`} />}
+          {projects.length > 0 && <div className="overflow-hidden rounded-xl border">
+            <div className="hidden grid-cols-[44px_minmax(0,1fr)_110px_110px_150px] gap-3 bg-slate-50 px-4 py-2 text-xs font-medium text-muted-foreground md:grid"><span /><span>Cliente y proyecto</span><span className="text-right">Horas</span><span className="text-right">Reparto</span><span className="text-right">Costo calculado</span></div>
+            {projects.map((project) => {
+              const checked = selectedIds.includes(project.projectId);
+              const pct = checked ? percentFor(project, selectedProjects) : 0;
+              return <label key={project.projectId} className={`grid cursor-pointer items-center gap-3 border-t px-4 py-3 first:border-t-0 md:grid-cols-[44px_minmax(0,1fr)_110px_110px_150px] ${checked ? "bg-white" : "bg-slate-50/70 opacity-65"}`}>
+                <Checkbox checked={checked} disabled={locked} onCheckedChange={(value) => toggleProject(project.projectId, value === true)} />
+                <span><span className="block text-xs text-muted-foreground">{project.clientName ?? "Sin cliente"}</span><span className="block text-sm font-medium">{project.projectName}</span></span>
+                <span className="text-sm tabular-nums md:text-right">{Number(project.hours).toFixed(1)} h</span>
+                <span className="text-sm font-medium tabular-nums text-indigo-700 md:text-right">{pct.toFixed(1)}%</span>
+                <span className="text-sm tabular-nums md:text-right">{formatMoney(project.computedCostARS, "ARS")}</span>
+              </label>;
+            })}
+          </div>}
+          {selectedIds.length > 0 && <p className="mt-3 flex items-center gap-2 text-xs text-emerald-700"><Check className="h-3.5 w-3.5" />El reparto suma 100% y quedará guardado como respaldo del costo directo. No duplica costos.</p>}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-3"><CardTitle className="flex items-center gap-2 text-base"><Receipt className="h-4 w-4 text-indigo-600" />3. Comprobante</CardTitle><p className="text-sm text-muted-foreground">Adjuntá un PDF o una captura. Mind leerá número, fecha, moneda e importe; completá estos datos sólo si querés adelantarlos.</p></CardHeader>
+        <CardContent className="space-y-4">
+          {locked && <Notice tone="success" title="Factura aprobada" text="Este período quedó bloqueado para preservar el respaldo contable. Si necesitás corregirlo, contactá a Finanzas." />}
+          {existing?.approvalStatus === "rejected" && <Notice tone="danger" title="Finanzas pidió una corrección" text={existing.reviewReason || "Revisá los datos y reemplazá el comprobante."} />}
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div><Label htmlFor="invoice-number">Número <span className="font-normal text-muted-foreground">(opcional)</span></Label><Input id="invoice-number" disabled={locked} className="mt-1.5" value={invoiceNumber} onChange={(event) => setInvoiceNumber(event.target.value)} placeholder="Ej. FC A 0001-123" /></div>
+            <div><Label htmlFor="invoice-date">Fecha <span className="font-normal text-muted-foreground">(opcional)</span></Label><Input id="invoice-date" disabled={locked} className="mt-1.5" type="date" value={issueDate} onChange={(event) => setIssueDate(event.target.value)} /></div>
+            <div><Label>Moneda</Label><Select disabled={locked} value={invoiceCurrency} onValueChange={(value: "ARS" | "USD") => setInvoiceCurrency(value)}><SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ARS">ARS</SelectItem><SelectItem value="USD">USD</SelectItem></SelectContent></Select></div>
+            <div><Label htmlFor="invoice-amount">Importe <span className="font-normal text-muted-foreground">(opcional)</span></Label><Input id="invoice-amount" disabled={locked} className="mt-1.5" type="number" min="0" step="0.01" value={invoiceAmount} onChange={(event) => setInvoiceAmount(event.target.value)} placeholder="Mind lo detecta" /></div>
+          </div>
+          {invoiceCurrency === "ARS" && <div className="max-w-xs"><Label htmlFor="invoice-fx">TC bancario <span className="font-normal text-muted-foreground">(opcional)</span></Label><Input id="invoice-fx" disabled={locked} className="mt-1.5" type="number" min="0" step="0.01" value={bankFx} onChange={(event) => setBankFx(event.target.value)} placeholder={summary?.opsFxRate ? `Referencia ${summary.opsFxRate}` : "ARS por USD"} /></div>}
+          <div className={`rounded-xl border-2 border-dashed p-7 text-center transition ${dragging ? "border-indigo-500 bg-indigo-50" : file ? "border-emerald-300 bg-emerald-50/50" : "border-slate-200"}`} onDragOver={(event) => { event.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)} onDrop={onDrop}>
+            {file ? <><CheckCircle2 className="mx-auto mb-2 h-8 w-8 text-emerald-600" /><p className="text-sm font-semibold">{file.name}</p><p className="text-xs text-muted-foreground">{(file.size / 1024 / 1024).toFixed(2)} MB · listo para enviar</p><Button className="mt-3" size="sm" variant="outline" disabled={locked} onClick={() => fileInput.current?.click()}>Cambiar archivo</Button></> : <><UploadCloud className="mx-auto mb-2 h-8 w-8 text-indigo-500" /><p className="text-sm font-semibold">Arrastrá la factura o pegá una captura con ⌘V</p><p className="mt-1 text-xs text-muted-foreground">PDF, JPG, PNG o WEBP · máximo 20 MB</p><Button className="mt-3" size="sm" variant="outline" disabled={locked} onClick={() => fileInput.current?.click()}>Elegir archivo</Button></>}
+            <input ref={fileInput} type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png,.webp" onChange={(event) => acceptFiles(Array.from(event.target.files ?? []))} />
+          </div>
+          <div><Label htmlFor="invoice-notes">Aclaración <span className="font-normal text-muted-foreground">(opcional)</span></Label><Textarea id="invoice-notes" disabled={locked} className="mt-1.5" rows={2} value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Sólo si Finanzas necesita contexto adicional" /></div>
+          <div className="flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
+            <p className="flex max-w-xl items-start gap-2 text-xs text-muted-foreground"><ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />El archivo se guarda de forma privada. La aprobación valida el respaldo y nunca vuelve a sumar el costo directo.</p>
+            <Button disabled={!stepReady || uploadMutation.isPending} onClick={() => uploadMutation.mutate()}>{uploadMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UploadCloud className="mr-2 h-4 w-4" />}{uploadMutation.isPending ? "Leyendo y enviando…" : existing ? "Reemplazar y reenviar" : "Enviar a Finanzas"}</Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-3"><CardTitle className="text-base">Historial</CardTitle><p className="text-sm text-muted-foreground">Seguimiento de tus comprobantes y su estado de revisión.</p></CardHeader>
+        <CardContent className="space-y-3">
+          {invoicesQuery.isLoading && <p className="py-6 text-center text-sm text-muted-foreground">Cargando…</p>}
+          {!invoicesQuery.isLoading && !(invoicesQuery.data ?? []).length && <p className="py-6 text-center text-sm text-muted-foreground">Todavía no enviaste ninguna factura.</p>}
+          {(invoicesQuery.data ?? []).map((invoice) => {
+            const itemStatus = STATUS[invoice.approvalStatus ?? "pending"];
+            return <div key={invoice.id} className="flex flex-col gap-3 rounded-xl border p-4 lg:flex-row lg:items-center lg:justify-between">
+              <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><p className="font-semibold capitalize">{formatPeriod(invoice.period)}</p><Badge variant="outline" className={itemStatus.className}>{itemStatus.label}</Badge></div><p className="mt-1 text-sm text-muted-foreground">{invoice.invoiceNumber || invoice.fileName} · {(invoice.allocations ?? []).length} proyecto(s) · {Number(invoice.hoursTotal ?? 0).toFixed(1)} h</p>{invoice.reviewReason && <p className="mt-1 text-xs text-rose-700">{invoice.reviewReason}</p>}</div>
+              <div className="flex flex-wrap items-center gap-2"><Button asChild size="sm" variant="outline"><a href={invoice.fileUrl} target="_blank" rel="noreferrer"><FileText className="mr-2 h-4 w-4" />Ver factura</a></Button>{invoice.approvalStatus !== "approved" && <Button size="icon" variant="ghost" className="text-rose-600" title="Eliminar factura" aria-label={`Eliminar factura de ${formatPeriod(invoice.period)}`} onClick={() => setDeleteTarget(invoice)}><Trash2 className="h-4 w-4" /></Button>}</div>
+            </div>;
+          })}
+        </CardContent>
+      </Card>
     </div>
   );
+}
+
+function Summary({ label, value, detail }: { label: string; value: string; detail: string }) {
+  return <div className="rounded-xl border bg-slate-50/70 p-3"><p className="text-xs text-muted-foreground">{label}</p><p className="mt-1 text-lg font-semibold tabular-nums">{value}</p><p className="text-[11px] text-muted-foreground">{detail}</p></div>;
+}
+
+function Notice({ tone, title, text }: { tone: "danger" | "warning" | "success"; title: string; text: string }) {
+  const styles = tone === "danger" ? "border-rose-200 bg-rose-50 text-rose-900" : tone === "warning" ? "border-amber-200 bg-amber-50 text-amber-900" : "border-emerald-200 bg-emerald-50 text-emerald-900";
+  const Icon = tone === "success" ? LockKeyhole : AlertCircle;
+  return <div className={`flex gap-3 rounded-xl border p-4 ${styles}`}><Icon className="mt-0.5 h-5 w-5 shrink-0" /><div><p className="text-sm font-semibold">{title}</p><p className="text-xs opacity-80">{text}</p></div></div>;
 }

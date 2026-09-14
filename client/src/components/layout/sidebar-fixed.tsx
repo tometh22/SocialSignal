@@ -149,6 +149,12 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
       ]
     },
     {
+      title: "Mi gestión",
+      items: [
+        { href: "/my-invoices", title: "Mis facturas", icon: Receipt, description: "Comprobantes y proyectos" },
+      ]
+    },
+    {
       title: "Comercial",
       items: [
         { href: "/crm", title: "CRM", icon: Target, badge: crmOverdue > 0 ? crmOverdue.toString() : undefined, description: "Pipeline comercial", permission: 'crm' as AppSection },

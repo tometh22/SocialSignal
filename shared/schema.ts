@@ -4549,6 +4549,17 @@ export const personalMonthlyInvoices = pgTable("personal_monthly_invoices", {
   reviewedBy: integer("reviewed_by").references(() => users.id, { onDelete: "set null" }),
   reviewedAt: timestamp("reviewed_at"),
   reviewReason: text("review_reason"),
+  // Las facturas nuevas se guardan fuera del directorio público. fileUrl se
+  // conserva por compatibilidad con comprobantes históricos.
+  storageKey: text("storage_key"),
+  fileHash: varchar("file_hash", { length: 64 }),
+  invoiceNumber: varchar("invoice_number", { length: 120 }),
+  issueDate: timestamp("issue_date"),
+  invoiceCurrency: varchar("invoice_currency", { length: 3 }),
+  declaredInvoiceAmount: doublePrecision("declared_invoice_amount"),
+  extractionProvider: varchar("extraction_provider", { length: 40 }),
+  extractionModel: varchar("extraction_model", { length: 120 }),
+  extractionWarnings: jsonb("extraction_warnings").$type<string[]>().notNull().default([]),
   uploadedAt: timestamp("uploaded_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (t) => ({
@@ -4567,6 +4578,28 @@ export const insertPersonalMonthlyInvoiceSchema = createInsertSchema(personalMon
 
 export type PersonalMonthlyInvoice = typeof personalMonthlyInvoices.$inferSelect;
 export type InsertPersonalMonthlyInvoice = z.infer<typeof insertPersonalMonthlyInvoiceSchema>;
+
+// Snapshot auditable de cómo se reparte una factura personal entre los
+// proyectos trabajados. No crea un segundo costo: vincula el comprobante con
+// el costo directo que ya se calcula desde las horas y tarifas históricas.
+export const personalInvoiceProjectAllocations = pgTable("personal_invoice_project_allocations", {
+  id: serial("id").primaryKey(),
+  invoiceId: integer("invoice_id").notNull().references(() => personalMonthlyInvoices.id, { onDelete: "cascade" }),
+  projectId: integer("project_id").notNull().references(() => activeProjects.id, { onDelete: "restrict" }),
+  hours: doublePrecision("hours").notNull().default(0),
+  allocationPercent: numeric("allocation_percent", { precision: 7, scale: 4 }).notNull(),
+  computedCostARS: doublePrecision("computed_cost_ars"),
+  computedCostUSD: doublePrecision("computed_cost_usd"),
+  allocatedInvoiceAmount: doublePrecision("allocated_invoice_amount"),
+  invoiceCurrency: varchar("invoice_currency", { length: 3 }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => ({
+  uqInvoiceProject: unique("personal_invoice_project_allocations_unique").on(t.invoiceId, t.projectId),
+  idxInvoice: index("idx_pipa_invoice").on(t.invoiceId),
+  idxProject: index("idx_pipa_project").on(t.projectId),
+}));
+
+export type PersonalInvoiceProjectAllocation = typeof personalInvoiceProjectAllocations.$inferSelect;
 
 // Tipo de cambio propio de cada persona por período, para "Mis Facturas". No depende
 // del TC de Operaciones: cada uno usa el TC de su banco. Para quienes facturan mixto

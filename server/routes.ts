@@ -163,8 +163,8 @@ import { ActiveProjectsAggregator } from "./domain/projectsActive";import { reso
 import { CoverageCalculator } from "./domain/coverage";
 import { eq, and, or, isNull, isNotNull, desc, sql, asc, gte, lte, lt, inArray } from "drizzle-orm";
 import { reinitializeDatabase } from "./reinit-data";
-import { upload, uploadDocument, uploadInvoice, deleteOldFile } from "./upload";
-import { personalMonthlyInvoices, personalFxOverrides, externalProviders as externalProvidersTable, providerProjectAccess as providerProjectAccessTable, exchangeRates } from "@shared/schema";
+import { upload, uploadDocument, deleteOldFile } from "./upload";
+import { personalMonthlyInvoices, personalInvoiceProjectAllocations, personalFxOverrides, externalProviders as externalProvidersTable, providerProjectAccess as providerProjectAccessTable, exchangeRates } from "@shared/schema";
 import { sanitizeInput } from "./input-sanitization";
 import { setupAuth, hashPassword } from "./auth";
 import { requireProjectUnlocked, projectIdFromTimeEntry } from "./middleware/projectLocked";
@@ -188,6 +188,9 @@ import { googleSheetsWorkingService } from "./services/googleSheetsWorking";
 import { autoSyncService } from "./services/autoSyncService";
 import { DEFAULT_FX_RATE, getCanonicalFxForMonth } from "./services/fx";
 import { getCutoverDate } from "./etl/time-entries-to-fact-labor";
+import { extractFinancialIntake } from "./services/financial-intake-extractor";
+import { deleteFinancialIntakeFile, financialIntakeUpload, readFinancialIntakeFile, storeFinancialIntakeFile } from "./services/financial-intake-files";
+import { buildPersonalInvoiceAllocations } from "./services/personal-invoice-allocations";
 import { 
   pickAnalysisCurrency, 
   createAnalysisStructure, 
@@ -13610,6 +13613,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
     };
   }
 
+  async function getPersonalInvoiceProjects(userId: number, period: string) {
+    const summary = await getMonthlyPersonalSummary(userId, period);
+    if (!summary?.personnelId) return { summary, projects: [] };
+    const [year, month] = period.split("-").map(Number);
+    const start = new Date(year, month - 1, 1);
+    const end = new Date(year, month, 1);
+    const result = await db.execute(sql`
+      WITH worked AS (
+        SELECT project_id, hours::numeric AS hours, COALESCE(total_cost, 0)::numeric AS cost_ars
+        FROM time_entries
+        WHERE personnel_id=${summary.personnelId} AND date >= ${start} AND date < ${end} AND COALESCE(billable, true)=true
+        UNION ALL
+        SELECT t.project_id, tte.hours::numeric AS hours, COALESCE(tte.total_cost, 0)::numeric AS cost_ars
+        FROM task_time_entries tte
+        JOIN tasks t ON t.id=tte.task_id
+        WHERE tte.personnel_id=${summary.personnelId} AND tte.date >= ${start} AND tte.date < ${end} AND COALESCE(tte.billable, true)=true
+      )
+      SELECT ap.id AS project_id,
+        COALESCE(NULLIF(TRIM(ap.name), ''), q.project_name, 'Proyecto #' || ap.id::text) AS project_name,
+        c.name AS client_name,
+        SUM(worked.hours)::float AS hours,
+        SUM(worked.cost_ars)::float AS computed_cost_ars
+      FROM worked
+      JOIN active_projects ap ON ap.id=worked.project_id
+      LEFT JOIN quotations q ON q.id=ap.quotation_id
+      LEFT JOIN clients c ON c.id=ap.client_id
+      WHERE ap.project_category='billable' AND ap.status NOT IN ('cancelled','voided')
+      GROUP BY ap.id, ap.name, q.project_name, c.name
+      HAVING SUM(worked.hours) > 0
+      ORDER BY c.name NULLS LAST, project_name
+    `);
+    const rows = (result as any).rows ?? result;
+    const projects = rows.map((row: any) => ({
+      projectId: Number(row.project_id),
+      projectName: String(row.project_name),
+      clientName: row.client_name ? String(row.client_name) : null,
+      hours: Number(row.hours) || 0,
+      computedCostARS: Number(row.computed_cost_ars) || 0,
+    }));
+    return {
+      summary,
+      projects: buildPersonalInvoiceAllocations({
+        projects,
+        computedTotalUSD: Number(summary.grandTotalUSD ?? 0),
+      }),
+    };
+  }
+
+  function publicPersonalInvoice(row: any) {
+    // Drizzle returns camelCase while the review queue still uses a raw SQL
+    // projection in snake_case. Normalize both shapes and never expose private
+    // storage identifiers or hashes to the browser.
+    const storageKey = row.storageKey ?? row.storage_key;
+    const legacyFileUrl = row.fileUrl ?? row.file_url;
+    const {
+      storageKey: _storageKey,
+      storage_key: _storageKeySnake,
+      fileHash: _fileHash,
+      file_hash: _fileHashSnake,
+      ...safe
+    } = row;
+    return {
+      ...safe,
+      fileUrl: storageKey ? `/api/me/invoices/${row.id}/file` : legacyFileUrl,
+      fileAvailable: Boolean(storageKey || legacyFileUrl),
+    };
+  }
+
   // Historial de facturas del usuario logueado
   app.get("/api/me/invoices", requireAuth, async (req, res) => {
     try {
@@ -13618,10 +13689,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .from(personalMonthlyInvoices)
         .where(eq(personalMonthlyInvoices.userId, req.user!.id))
         .orderBy(desc(personalMonthlyInvoices.period));
-      res.json(rows);
+      const invoiceIds = rows.map((row) => row.id);
+      const allocations = invoiceIds.length ? await db
+        .select({
+          id: personalInvoiceProjectAllocations.id,
+          invoiceId: personalInvoiceProjectAllocations.invoiceId,
+          projectId: personalInvoiceProjectAllocations.projectId,
+          projectName: sql<string>`COALESCE(NULLIF(TRIM(${activeProjects.name}), ''), ${quotations.projectName}, 'Proyecto #' || ${activeProjects.id}::text)`,
+          clientName: clients.name,
+          hours: personalInvoiceProjectAllocations.hours,
+          allocationPercent: personalInvoiceProjectAllocations.allocationPercent,
+          computedCostARS: personalInvoiceProjectAllocations.computedCostARS,
+          computedCostUSD: personalInvoiceProjectAllocations.computedCostUSD,
+          allocatedInvoiceAmount: personalInvoiceProjectAllocations.allocatedInvoiceAmount,
+          invoiceCurrency: personalInvoiceProjectAllocations.invoiceCurrency,
+        })
+        .from(personalInvoiceProjectAllocations)
+        .innerJoin(activeProjects, eq(activeProjects.id, personalInvoiceProjectAllocations.projectId))
+        .leftJoin(quotations, eq(quotations.id, activeProjects.quotationId))
+        .leftJoin(clients, eq(clients.id, activeProjects.clientId))
+        .where(inArray(personalInvoiceProjectAllocations.invoiceId, invoiceIds)) : [];
+      res.json(rows.map((row) => publicPersonalInvoice({
+        ...row,
+        allocations: allocations.filter((allocation) => allocation.invoiceId === row.id),
+      })));
     } catch (error) {
       console.error("Error obteniendo facturas personales:", error);
       res.status(500).json({ message: "Error al obtener facturas" });
+    }
+  });
+
+  // Proyectos facturables trabajados en el período. Mind propone el reparto
+  // automáticamente para que la persona sólo tenga que revisarlo.
+  app.get("/api/me/invoices/projects", requireAuth, async (req, res) => {
+    try {
+      const period = typeof req.query.period === "string" ? req.query.period : "";
+      if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(period)) {
+        return res.status(400).json({ message: "Formato de período inválido (YYYY-MM)" });
+      }
+      res.json(await getPersonalInvoiceProjects(req.user!.id, period));
+    } catch (error) {
+      console.error("Error calculando proyectos de factura personal:", error);
+      res.status(500).json({ message: "No se pudieron calcular los proyectos del período" });
     }
   });
 
@@ -13688,8 +13797,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Subir/reemplazar factura del mes
-  app.post("/api/me/invoices", requireAuth, uploadInvoice.single("file"), async (req, res) => {
+  const receivePersonalInvoice = (req: Request, res: Response, next: NextFunction) => {
+    financialIntakeUpload.single("file")(req, res, (error: unknown) => {
+      if (error) return res.status(400).json({ message: error instanceof Error ? error.message : "No se pudo leer el comprobante" });
+      next();
+    });
+  };
+
+  // Subir/reemplazar factura del mes. El comprobante queda privado y Mind
+  // propone su reparto entre los proyectos facturables trabajados.
+  app.post("/api/me/invoices", requireAuth, receivePersonalInvoice, async (req, res) => {
+    let newStorageKey: string | null = null;
     try {
       const period = String(req.body?.period ?? "");
       if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(period)) {
@@ -13698,90 +13816,185 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!req.file) {
         return res.status(400).json({ message: "No se recibió el archivo" });
       }
+      if (!new Set(["application/pdf", "image/jpeg", "image/png", "image/webp"]).has(req.file.mimetype)) {
+        return res.status(400).json({ message: "La factura debe ser un PDF o una imagen JPG, PNG o WEBP" });
+      }
 
-      const summary = await getMonthlyPersonalSummary(req.user!.id, period);
-      const relPath = `/uploads/invoices/${req.user!.id}/${req.file.filename}`;
+      const projectData = await getPersonalInvoiceProjects(req.user!.id, period);
+      const summary = projectData.summary;
+      if (!summary?.personnelId) {
+        return res.status(409).json({ message: "Tu usuario todavía no está vinculado a una persona del equipo. Pedile a Administración que revise tu email." });
+      }
+      const parsedProjectIds = (() => {
+        try {
+          const value = JSON.parse(String(req.body?.projectIds ?? "[]"));
+          return Array.isArray(value) ? [...new Set(value.map(Number).filter((id) => Number.isInteger(id) && id > 0))] : [];
+        } catch { return []; }
+      })();
+      const availableIds = new Set(projectData.projects.map((project) => project.projectId));
+      const selectedProjectIds = (parsedProjectIds.length ? parsedProjectIds : [...availableIds]).filter((id) => availableIds.has(id));
+      if (!selectedProjectIds.length) {
+        return res.status(409).json({ message: "No hay proyectos facturables con horas cargadas en este período. Revisá tus horas antes de enviar la factura." });
+      }
+
+      const [existing] = await db.select().from(personalMonthlyInvoices).where(and(
+        eq(personalMonthlyInvoices.userId, req.user!.id),
+        eq(personalMonthlyInvoices.period, period),
+      )).limit(1);
+      if (existing?.approvalStatus === "approved") {
+        return res.status(409).json({ message: "Esta factura ya fue aprobada. Pedile a Finanzas que la reabra antes de reemplazarla." });
+      }
+
+      const stored = await storeFinancialIntakeFile(req.file);
+      newStorageKey = stored.storageKey;
+      let extracted: Awaited<ReturnType<typeof extractFinancialIntake>> | null = null;
+      try {
+        extracted = await extractFinancialIntake({
+          text: `Factura personal del período ${period}. ${String(req.body?.notes ?? "").slice(0, 2000)}`,
+          file: { buffer: req.file.buffer, mimeType: req.file.mimetype, fileName: req.file.originalname },
+        });
+      } catch (error) {
+        console.warn("No se pudo extraer la factura personal; se conservará para revisión manual:", error);
+      }
+      const extractedData = extracted?.data;
+      const invoiceCurrency = ["ARS", "USD"].includes(String(req.body?.invoiceCurrency ?? ""))
+        ? String(req.body.invoiceCurrency) as "ARS" | "USD"
+        : ["ARS", "USD"].includes(String(extractedData?.currency ?? ""))
+          ? extractedData!.currency as "ARS" | "USD"
+          : summary.billingCurrency === "USD" ? "USD" : "ARS";
+      const requestedAmount = Number(req.body?.invoiceAmount);
+      const extractedAmount = Number(extractedData?.totalAmount);
+      const declaredInvoiceAmount = Number.isFinite(requestedAmount) && requestedAmount > 0
+        ? requestedAmount
+        : Number.isFinite(extractedAmount) && extractedAmount > 0
+          ? extractedAmount
+          : invoiceCurrency === "USD" ? Number(summary.grandTotalUSD ?? 0) : Number(summary.grandTotalARS ?? 0);
+      if (!(declaredInvoiceAmount > 0)) {
+        await deleteFinancialIntakeFile(stored.storageKey);
+        newStorageKey = null;
+        return res.status(400).json({ message: "No pudimos detectar el importe. Ingresalo para continuar." });
+      }
       const suggestedInvoiceUSD = summary?.grandTotalUSD != null
         ? Math.round(Number(summary.grandTotalUSD) * 0.9 * 100) / 100
         : null;
-      const declaredInvoiceUSD = req.body?.declaredInvoiceUSD === undefined || req.body?.declaredInvoiceUSD === ""
-        ? null
-        : Number(req.body.declaredInvoiceUSD);
       const bankFx = req.body?.bankFx === undefined || req.body?.bankFx === ""
         ? null
         : Number(req.body.bankFx);
-      if (declaredInvoiceUSD != null && (!Number.isFinite(declaredInvoiceUSD) || declaredInvoiceUSD < 0)) {
-        return res.status(400).json({ message: "Monto declarado inválido" });
-      }
       if (bankFx != null && (!Number.isFinite(bankFx) || bankFx <= 0)) {
+        await deleteFinancialIntakeFile(stored.storageKey);
+        newStorageKey = null;
         return res.status(400).json({ message: "Tipo de cambio bancario inválido" });
       }
+      const effectiveFx = bankFx ?? Number(summary.opsFxRate ?? 0);
+      const declaredInvoiceUSD = invoiceCurrency === "USD"
+        ? declaredInvoiceAmount
+        : effectiveFx > 0 ? Math.round(declaredInvoiceAmount / effectiveFx * 100) / 100 : null;
       const differenceUSD = declaredInvoiceUSD != null && suggestedInvoiceUSD != null
         ? Math.round((declaredInvoiceUSD - suggestedInvoiceUSD) * 100) / 100
         : null;
+      const selectedProjects = projectData.projects.filter((project) => selectedProjectIds.includes(project.projectId));
+      const allCostARS = projectData.projects.reduce((total, project) => total + Math.max(0, Number(project.computedCostARS) || 0), 0);
+      const selectedCostARS = selectedProjects.reduce((total, project) => total + Math.max(0, Number(project.computedCostARS) || 0), 0);
+      const allHours = projectData.projects.reduce((total, project) => total + Math.max(0, Number(project.hours) || 0), 0);
+      const selectedHours = selectedProjects.reduce((total, project) => total + Math.max(0, Number(project.hours) || 0), 0);
+      const selectedShare = allCostARS > 0
+        ? selectedCostARS / allCostARS
+        : allHours > 0 ? selectedHours / allHours : 1;
+      const allocations = buildPersonalInvoiceAllocations({
+        projects: projectData.projects,
+        selectedProjectIds,
+        computedTotalUSD: Number(summary.grandTotalUSD ?? 0) * selectedShare,
+        invoiceAmount: declaredInvoiceAmount,
+        invoiceCurrency,
+      });
+      const rawIssueDate = String(req.body?.issueDate || extractedData?.issueDate || "");
+      const issueDate = /^\d{4}-\d{2}-\d{2}$/.test(rawIssueDate) ? new Date(`${rawIssueDate}T12:00:00.000Z`) : null;
+      const invoiceNumber = String(req.body?.invoiceNumber || extractedData?.documentNumber || "").trim().slice(0, 120) || null;
 
-      // Check if an invoice already exists for this user+period — delete the old file first
-      const [existing] = await db
-        .select()
-        .from(personalMonthlyInvoices)
-        .where(and(
-          eq(personalMonthlyInvoices.userId, req.user!.id),
-          eq(personalMonthlyInvoices.period, period),
-        ));
-
-      if (existing) {
-        if (existing.fileUrl) deleteOldFile(existing.fileUrl);
-        const [updated] = await db
-          .update(personalMonthlyInvoices)
-          .set({
-            fileUrl: relPath,
-            fileName: req.file.originalname,
-            fileSize: req.file.size,
-            mimeType: req.file.mimetype,
-            computedTotalCostARS: summary?.totalCostARS ?? null,
-            computedTotalCostUSD: summary?.totalCostUSD ?? null,
-            hoursTotal: summary?.hours ?? null,
-            personnelId: summary?.personnelId ?? null,
-            updatedAt: new Date(),
-            notes: req.body?.notes ?? existing.notes,
-            suggestedInvoiceUSD,
-            declaredInvoiceUSD,
-            bankFx,
-            differenceUSD,
-            approvalStatus: "pending",
-            reviewedBy: null,
-            reviewedAt: null,
-            reviewReason: null,
-          })
-          .where(eq(personalMonthlyInvoices.id, existing.id))
-          .returning();
-        return res.json(updated);
-      }
-
-      const [created] = await db
-        .insert(personalMonthlyInvoices)
-        .values({
-          userId: req.user!.id,
-          personnelId: summary?.personnelId ?? null,
-          period,
-          fileUrl: relPath,
-          fileName: req.file.originalname,
-          fileSize: req.file.size,
-          mimeType: req.file.mimetype,
-          computedTotalCostARS: summary?.totalCostARS ?? null,
-          computedTotalCostUSD: summary?.totalCostUSD ?? null,
-          hoursTotal: summary?.hours ?? null,
-          notes: req.body?.notes ?? null,
+      const saved = await db.transaction(async (tx) => {
+        const values = {
+          personnelId: summary.personnelId,
+          fileUrl: "private",
+          fileName: stored.originalFileName,
+          fileSize: stored.fileSize,
+          mimeType: stored.mimeType,
+          storageKey: stored.storageKey,
+          fileHash: stored.fileHash,
+          computedTotalCostARS: summary.grandTotalARS ?? null,
+          computedTotalCostUSD: summary.grandTotalUSD ?? null,
+          hoursTotal: summary.hours ?? null,
+          notes: String(req.body?.notes ?? "").trim().slice(0, 2000) || null,
           suggestedInvoiceUSD,
           declaredInvoiceUSD,
+          declaredInvoiceAmount,
+          invoiceCurrency,
+          invoiceNumber,
+          issueDate,
           bankFx,
           differenceUSD,
-        })
-        .returning();
-      res.status(201).json(created);
+          extractionProvider: extracted?.provider ?? "manual",
+          extractionModel: extracted?.model ?? null,
+          extractionWarnings: extractedData?.warnings ?? ["Mind no pudo leer automáticamente el comprobante; Finanzas lo revisará manualmente."],
+          approvalStatus: "pending" as const,
+          reviewedBy: null,
+          reviewedAt: null,
+          reviewReason: null,
+          updatedAt: new Date(),
+        };
+        const [invoice] = existing
+          ? await tx.update(personalMonthlyInvoices).set(values).where(eq(personalMonthlyInvoices.id, existing.id)).returning()
+          : await tx.insert(personalMonthlyInvoices).values({ userId: req.user!.id, period, ...values }).returning();
+        await tx.delete(personalInvoiceProjectAllocations).where(eq(personalInvoiceProjectAllocations.invoiceId, invoice.id));
+        await tx.insert(personalInvoiceProjectAllocations).values(allocations.map((allocation) => ({
+          invoiceId: invoice.id,
+          projectId: allocation.projectId,
+          hours: allocation.hours,
+          allocationPercent: String(allocation.allocationPercent),
+          computedCostARS: allocation.computedCostARS,
+          computedCostUSD: allocation.computedCostUSD,
+          allocatedInvoiceAmount: allocation.allocatedInvoiceAmount,
+          invoiceCurrency: allocation.invoiceCurrency,
+        })));
+        return invoice;
+      });
+      newStorageKey = null;
+      try {
+        if (existing?.storageKey) await deleteFinancialIntakeFile(existing.storageKey);
+        else if (existing?.fileUrl && existing.fileUrl !== "private") deleteOldFile(existing.fileUrl);
+      } catch (cleanupError) {
+        // The new invoice is already committed; a stale orphan must not make
+        // the employee think the upload failed.
+        console.warn("No se pudo limpiar el comprobante personal anterior:", cleanupError);
+      }
+      res.status(existing ? 200 : 201).json(publicPersonalInvoice({ ...saved, allocations }));
     } catch (error: any) {
+      if (newStorageKey) await deleteFinancialIntakeFile(newStorageKey);
       console.error("Error subiendo factura personal:", error);
       res.status(500).json({ message: error?.message ?? "Error al subir factura" });
+    }
+  });
+
+  // Descarga privada: sólo el dueño o Finanzas/Operaciones pueden abrirla.
+  app.get("/api/me/invoices/:id/file", requireAuth, async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const [row] = await db.select().from(personalMonthlyInvoices).where(eq(personalMonthlyInvoices.id, id)).limit(1);
+      if (!row) return res.status(404).json({ message: "Factura no encontrada" });
+      const permissions = (req.user as any)?.permissions ?? [];
+      const canReview = isOperationsRequest(req) || permissions.includes("finance");
+      if (row.userId !== req.user!.id && !canReview) return res.status(403).json({ message: "No podés abrir esta factura" });
+      if (!row.storageKey) return row.fileUrl && row.fileUrl !== "private" ? res.redirect(row.fileUrl) : res.status(404).json({ message: "El archivo no está disponible" });
+      const buffer = await readFinancialIntakeFile(row.storageKey);
+      const safeName = (row.fileName || `factura-${row.id}`).replace(/["\r\n]/g, "_");
+      res.setHeader("Content-Type", row.mimeType || "application/octet-stream");
+      res.setHeader("Content-Disposition", `inline; filename="${safeName}"`);
+      res.setHeader("Cache-Control", "private, no-store");
+      res.setHeader("X-Content-Type-Options", "nosniff");
+      res.setHeader("Content-Security-Policy", "sandbox; default-src 'none'");
+      res.send(buffer);
+    } catch (error) {
+      console.error("Error abriendo factura personal:", error);
+      res.status(500).json({ message: "No se pudo abrir la factura" });
     }
   });
 
@@ -13794,6 +14007,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!row) return res.status(404).json({ message: "Factura no encontrada" });
       if (row.userId !== req.user!.id && !req.user!.isAdmin) {
         return res.status(403).json({ message: "No podés editar esta factura" });
+      }
+      if (row.approvalStatus === "approved" && row.userId === req.user!.id && !req.user!.isAdmin) {
+        return res.status(409).json({ message: "La factura ya fue aprobada y no admite cambios" });
       }
       const declaredInvoiceUSD = req.body?.declaredInvoiceUSD === undefined || req.body?.declaredInvoiceUSD === ""
         ? null : Number(req.body.declaredInvoiceUSD);
@@ -13831,7 +14047,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Operations review queue for post-closing invoices.
   app.get("/api/operations/invoices/review", requireAuth, async (req, res) => {
-    if (!isOperationsRequest(req)) return res.status(403).json({ message: "Acceso exclusivo de Operaciones" });
+    const permissions = (req.user as any)?.permissions ?? [];
+    if (!isOperationsRequest(req) && !permissions.includes("finance")) return res.status(403).json({ message: "Acceso exclusivo de Finanzas u Operaciones" });
     try {
       const period = req.query.period ? String(req.query.period) : null;
       const result = await db.execute(sql`
@@ -13843,7 +14060,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         WHERE ${period ? sql`i.period = ${period}` : sql`TRUE`}
         ORDER BY i.period DESC, i.uploaded_at DESC
       `);
-      res.json(result.rows);
+      const rows = result.rows as any[];
+      const invoiceIds = rows.map((row) => Number(row.id));
+      const allocations = invoiceIds.length ? await db.select({
+        invoiceId: personalInvoiceProjectAllocations.invoiceId,
+        projectId: personalInvoiceProjectAllocations.projectId,
+        projectName: sql<string>`COALESCE(NULLIF(TRIM(${activeProjects.name}), ''), ${quotations.projectName}, 'Proyecto #' || ${activeProjects.id}::text)`,
+        clientName: clients.name,
+        hours: personalInvoiceProjectAllocations.hours,
+        allocationPercent: personalInvoiceProjectAllocations.allocationPercent,
+        computedCostARS: personalInvoiceProjectAllocations.computedCostARS,
+        computedCostUSD: personalInvoiceProjectAllocations.computedCostUSD,
+        allocatedInvoiceAmount: personalInvoiceProjectAllocations.allocatedInvoiceAmount,
+        invoiceCurrency: personalInvoiceProjectAllocations.invoiceCurrency,
+      }).from(personalInvoiceProjectAllocations)
+        .innerJoin(activeProjects, eq(activeProjects.id, personalInvoiceProjectAllocations.projectId))
+        .leftJoin(quotations, eq(quotations.id, activeProjects.quotationId))
+        .leftJoin(clients, eq(clients.id, activeProjects.clientId))
+        .where(inArray(personalInvoiceProjectAllocations.invoiceId, invoiceIds)) : [];
+      res.json(rows.map((row) => publicPersonalInvoice({
+        ...row,
+        allocations: allocations.filter((allocation: any) => Number(allocation.invoiceId) === Number(row.id)),
+      })));
     } catch (error) {
       console.error("Error obteniendo revisiones de facturas:", error);
       res.status(500).json({ message: "Error obteniendo revisiones" });
@@ -13851,22 +14089,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.patch("/api/operations/invoices/review/:id", requireAuth, async (req, res) => {
-    if (!isOperationsRequest(req)) return res.status(403).json({ message: "Acceso exclusivo de Operaciones" });
+    const permissions = (req.user as any)?.permissions ?? [];
+    if (!isOperationsRequest(req) && !permissions.includes("finance")) return res.status(403).json({ message: "Acceso exclusivo de Finanzas u Operaciones" });
     try {
       const id = Number(req.params.id);
       const approvalStatus = String(req.body?.approvalStatus ?? "");
-      if (!Number.isInteger(id) || !["approved", "rejected"].includes(approvalStatus)) {
+      if (!Number.isInteger(id) || !["approved", "rejected", "pending"].includes(approvalStatus)) {
         return res.status(400).json({ message: "Revisión inválida" });
+      }
+      const [existing] = await db.select().from(personalMonthlyInvoices).where(eq(personalMonthlyInvoices.id, id)).limit(1);
+      if (!existing) return res.status(404).json({ message: "Factura no encontrada" });
+      const reviewReason = String(req.body?.reviewReason ?? "").trim().slice(0, 2000) || null;
+      if (approvalStatus === "rejected" && !reviewReason) {
+        return res.status(400).json({ message: "Indicá qué debe corregir la persona" });
+      }
+      if (approvalStatus === "approved" && existing.storageKey) {
+        const allocationRows = await db.select({ id: personalInvoiceProjectAllocations.id })
+          .from(personalInvoiceProjectAllocations)
+          .where(eq(personalInvoiceProjectAllocations.invoiceId, id));
+        if (!allocationRows.length) return res.status(409).json({ message: "La factura no tiene proyectos asociados" });
       }
       const [updated] = await db.update(personalMonthlyInvoices).set({
         approvalStatus,
-        reviewedBy: req.user!.id,
-        reviewedAt: new Date(),
-        reviewReason: req.body?.reviewReason ? String(req.body.reviewReason) : null,
+        reviewedBy: approvalStatus === "pending" ? null : req.user!.id,
+        reviewedAt: approvalStatus === "pending" ? null : new Date(),
+        reviewReason,
         updatedAt: new Date(),
       }).where(eq(personalMonthlyInvoices.id, id)).returning();
-      if (!updated) return res.status(404).json({ message: "Factura no encontrada" });
-      res.json(updated);
+      res.json(publicPersonalInvoice(updated));
     } catch (error) {
       console.error("Error revisando factura:", error);
       res.status(500).json({ message: "Error revisando factura" });
@@ -13886,8 +14136,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (row.userId !== req.user!.id && !req.user!.isAdmin) {
         return res.status(403).json({ message: "No podés borrar esta factura" });
       }
-      if (row.fileUrl) deleteOldFile(row.fileUrl);
+      if (row.approvalStatus === "approved") {
+        return res.status(409).json({ message: "Una factura aprobada no se puede borrar. Pedile a Finanzas que la reabra." });
+      }
       await db.delete(personalMonthlyInvoices).where(eq(personalMonthlyInvoices.id, id));
+      try {
+        if (row.storageKey) await deleteFinancialIntakeFile(row.storageKey);
+        else if (row.fileUrl && row.fileUrl !== "private") deleteOldFile(row.fileUrl);
+      } catch (cleanupError) {
+        console.warn("No se pudo limpiar el archivo de la factura eliminada:", cleanupError);
+      }
       res.json({ ok: true });
     } catch (error) {
       console.error("Error borrando factura personal:", error);

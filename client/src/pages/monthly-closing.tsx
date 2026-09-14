@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -51,6 +52,8 @@ export default function MonthlyClosing() {
   const [closingPersonnelId, setClosingPersonnelId] = useState<number | null>(null);
   // Re-close confirmation target
   const [reCloseTarget, setReCloseTarget] = useState<any>(null);
+  const [correctionTarget, setCorrectionTarget] = useState<any>(null);
+  const [correctionReason, setCorrectionReason] = useState("");
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -98,9 +101,17 @@ export default function MonthlyClosing() {
     }).then((r) => r.ok ? r.json() : []),
   });
   const invoiceReviewMutation = useMutation({
-    mutationFn: ({ id, approvalStatus }: { id: number; approvalStatus: "approved" | "rejected" }) =>
-      apiRequest(`/api/operations/invoices/review/${id}`, "PATCH", { approvalStatus }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/operations/invoices/review"] }),
+    mutationFn: ({ id, approvalStatus, reviewReason }: { id: number; approvalStatus: "approved" | "rejected" | "pending"; reviewReason?: string }) =>
+      apiRequest(`/api/operations/invoices/review/${id}`, "PATCH", { approvalStatus, reviewReason }),
+    onSuccess: (_result, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/operations/invoices/review"] });
+      setCorrectionTarget(null);
+      setCorrectionReason("");
+      toast({
+        title: variables.approvalStatus === "approved" ? "Factura aprobada" : variables.approvalStatus === "rejected" ? "Corrección solicitada" : "Factura reabierta",
+      });
+    },
+    onError: (error: unknown) => toast({ title: "No se pudo actualizar la factura", description: getApiErrorMessage(error), variant: "destructive" }),
   });
 
   // Number of holidays falling on weekdays in the selected month
@@ -506,6 +517,34 @@ export default function MonthlyClosing() {
         </AlertDialogContent>
       </AlertDialog>
 
+      <AlertDialog open={correctionTarget !== null} onOpenChange={(open) => { if (!open) { setCorrectionTarget(null); setCorrectionReason(""); } }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Pedir corrección de la factura</AlertDialogTitle>
+            <AlertDialogDescription>
+              Explicá concretamente qué debe corregir la persona. El mensaje aparecerá en su espacio de facturas.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <Textarea
+            autoFocus
+            value={correctionReason}
+            onChange={(event) => setCorrectionReason(event.target.value)}
+            placeholder="Ej. El importe no coincide con el comprobante; revisá moneda y total."
+            rows={4}
+          />
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={!correctionReason.trim() || invoiceReviewMutation.isPending}
+              onClick={(event) => {
+                event.preventDefault();
+                if (correctionTarget && correctionReason.trim()) invoiceReviewMutation.mutate({ id: correctionTarget.id, approvalStatus: "rejected", reviewReason: correctionReason.trim() });
+              }}
+            >Enviar pedido</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Unsaved changes banner */}
       {hasUnsavedChanges && (
         <div className="rounded-md border border-yellow-400 bg-yellow-50 px-4 py-3 text-sm text-yellow-800">
@@ -572,22 +611,25 @@ export default function MonthlyClosing() {
 
       {invoiceReviews.length > 0 && (
         <Card className="border-indigo-200 bg-indigo-50/30">
-          <CardHeader className="pb-3"><CardTitle className="text-base">Facturas post-cierre para revisar</CardTitle></CardHeader>
+          <CardHeader className="pb-3"><CardTitle className="text-base">Facturas del equipo para revisar</CardTitle><p className="text-sm text-muted-foreground">Cada comprobante muestra el reparto que respaldará el costo directo de los proyectos. Aprobar no duplica el costo calculado desde horas.</p></CardHeader>
           <CardContent className="space-y-2">
             {invoiceReviews.map((invoice: any) => (
-              <div key={invoice.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-background px-3 py-2 text-sm">
-                <div>
-                  <div className="font-medium">{invoice.personnel_name || invoice.user_name || invoice.email || "Persona"}</div>
+              <div key={invoice.id} className="flex flex-wrap items-start justify-between gap-3 rounded-lg border bg-background px-4 py-3 text-sm">
+                <div className="min-w-0 flex-1">
+                  <div className="font-medium">{invoice.personnel_name || invoice.user_name || invoice.email || "Persona"} · {invoice.invoice_number || invoice.file_name || "Factura"}</div>
                   <div className="text-xs text-muted-foreground">
-                    {invoice.period} · sugerido USD {Number(invoice.suggested_invoice_usd || 0).toFixed(2)} · declarado USD {invoice.declared_invoice_usd == null ? "—" : Number(invoice.declared_invoice_usd).toFixed(2)} · diferencia {invoice.difference_usd == null ? "—" : Number(invoice.difference_usd).toFixed(2)}
+                    {invoice.period} · {invoice.invoice_currency || "USD"} {invoice.declared_invoice_amount == null ? (invoice.declared_invoice_usd == null ? "—" : Number(invoice.declared_invoice_usd).toFixed(2)) : Number(invoice.declared_invoice_amount).toLocaleString("es-AR", { maximumFractionDigits: 2 })} · diferencia USD {invoice.difference_usd == null ? "—" : Number(invoice.difference_usd).toFixed(2)}
                   </div>
+                  {invoice.allocations?.length > 0 && <div className="mt-2 flex flex-wrap gap-1.5">{invoice.allocations.map((allocation: any) => <Badge key={`${invoice.id}-${allocation.projectId}`} variant="secondary">{allocation.clientName ? `${allocation.clientName} · ` : ""}{allocation.projectName} · {Number(allocation.allocationPercent).toFixed(1)}%</Badge>)}</div>}
                 </div>
                 <div className="flex items-center gap-2">
-                  <Badge variant="outline">{invoice.approval_status}</Badge>
+                  <Button asChild size="sm" variant="outline"><a href={invoice.fileUrl || invoice.file_url} target="_blank" rel="noreferrer">Ver factura</a></Button>
+                  <Badge variant="outline">{invoice.approval_status === "approved" ? "Aprobada" : invoice.approval_status === "rejected" ? "Corregir" : "Pendiente"}</Badge>
                   {invoice.approval_status === "pending" && <>
-                    <Button size="sm" onClick={() => invoiceReviewMutation.mutate({ id: invoice.id, approvalStatus: "approved" })}><Check className="mr-1 h-3 w-3" />Aprobar</Button>
-                    <Button size="sm" variant="outline" onClick={() => invoiceReviewMutation.mutate({ id: invoice.id, approvalStatus: "rejected" })}><X className="mr-1 h-3 w-3" />Rechazar</Button>
+                    <Button size="sm" disabled={invoiceReviewMutation.isPending} onClick={() => invoiceReviewMutation.mutate({ id: invoice.id, approvalStatus: "approved" })}><Check className="mr-1 h-3 w-3" />Aprobar</Button>
+                    <Button size="sm" variant="outline" disabled={invoiceReviewMutation.isPending} onClick={() => { setCorrectionTarget(invoice); setCorrectionReason(""); }}><X className="mr-1 h-3 w-3" />Pedir corrección</Button>
                   </>}
+                  {invoice.approval_status === "approved" && <Button size="sm" variant="outline" disabled={invoiceReviewMutation.isPending} onClick={() => invoiceReviewMutation.mutate({ id: invoice.id, approvalStatus: "pending", reviewReason: "Reabierta por Finanzas para permitir una corrección." })}>Reabrir</Button>}
                 </div>
               </div>
             ))}

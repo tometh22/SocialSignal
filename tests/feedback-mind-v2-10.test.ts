@@ -35,7 +35,7 @@ describe("Feedback Mind V2-10 contracts", () => {
     expect(routes).toContain('/api/me/invoices/:id/review');
     expect(routes).toContain('/api/operations/invoices/review/:id');
     expect(routes).toContain("grandTotalUSD) * 0.9");
-    expect(personalUi).toContain("Enviar a aprobación de Operaciones");
+    expect(personalUi).toContain("Enviar a Finanzas");
   });
 
   it("keeps third-party attribution and project refresh contracts", () => {

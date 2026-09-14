@@ -109,6 +109,15 @@ describe("financial native integration contracts", () => {
     expect(sidebar.indexOf('title: "Carga financiera"')).toBeLessThan(sidebar.indexOf('title: "Reportes financieros"'));
   });
 
+  it("hace explícitos los tres pasos y permite buscar y revisar un lote antes de procesarlo", () => {
+    const intake = read("client/src/pages/financial-intake.tsx");
+    expect(intake).toContain('title: "Cargá"');
+    expect(intake).toContain('title: "Revisá"');
+    expect(intake).toContain('title: "Confirmá"');
+    expect(intake).toContain("pendingFiles");
+    expect(intake).toContain("Buscar archivo, cliente o proyecto");
+  });
+
   it("explica el destino antes y después de contabilizar", () => {
     const intake = read("client/src/pages/financial-intake.tsx");
     expect(intake).toContain("Al confirmar, Mind actualizará");
