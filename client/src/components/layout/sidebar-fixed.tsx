@@ -47,6 +47,7 @@ import {
   LayoutGrid,
   UploadCloud,
   LockKeyhole,
+  Calculator,
 } from "lucide-react";
 
 type NavItem = {
@@ -185,6 +186,7 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
       title: "Carga financiera",
       items: [
         { href: "/finance/cargar", title: "Cargar datos", icon: UploadCloud, description: "Texto, archivos y capturas", permission: 'finance' as AppSection },
+        { href: "/finance/liquidaciones-equipo", title: "Liquidaciones equipo", icon: Calculator, description: "Definir cuánto factura cada persona", permission: 'finance' as AppSection },
       ]
     },
     {

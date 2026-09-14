@@ -4524,6 +4524,44 @@ export const reviewDailySessions = pgTable("review_daily_sessions", {
 }));
 export type ReviewDailySession = typeof reviewDailySessions.$inferSelect;
 
+// ==================== LIQUIDACION MENSUAL DEL EQUIPO ====================
+// Administración publica la instrucción mensual antes de que la persona facture.
+// Los importes amarillos del Excel pasan a ser snapshots auditables; los dos TC
+// y la comisión los completa la persona en los momentos correspondientes.
+export const personnelMonthlySettlements = pgTable("personnel_monthly_settlements", {
+  id: serial("id").primaryKey(),
+  personnelId: integer("personnel_id").notNull().references(() => personnel.id, { onDelete: "cascade" }),
+  period: varchar("period", { length: 7 }).notNull(), // YYYY-MM
+  contractTypeSnapshot: varchar("contract_type_snapshot", { length: 20 }).notNull(),
+  billingCurrencySnapshot: varchar("billing_currency_snapshot", { length: 10 }).notNull(),
+  hoursSnapshot: doublePrecision("hours_snapshot").notNull(),
+  hourlyRateARSSnapshot: doublePrecision("hourly_rate_ars_snapshot").notNull(),
+  totalARS: doublePrecision("total_ars").notNull(),
+  usdPercentage: doublePrecision("usd_percentage").notNull().default(0),
+  plannedUSDARS: doublePrecision("planned_usd_ars").notNull().default(0),
+  bonusUSD: doublePrecision("bonus_usd").notNull().default(0),
+  extrasARS: doublePrecision("extras_ars").notNull().default(0),
+  invoiceFx: doublePrecision("invoice_fx"),
+  baseInvoiceUSD: doublePrecision("base_invoice_usd"),
+  totalInvoiceUSD: doublePrecision("total_invoice_usd"),
+  receivedFx: doublePrecision("received_fx"),
+  bankCommissionUSD: doublePrecision("bank_commission_usd").notNull().default(0),
+  pesifiedBaseARS: doublePrecision("pesified_base_ars"),
+  finalInvoiceARS: doublePrecision("final_invoice_ars"),
+  adminNotes: text("admin_notes"),
+  status: varchar("status", { length: 20 }).notNull().default("draft"), // draft | published
+  createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
+  publishedBy: integer("published_by").references(() => users.id, { onDelete: "set null" }),
+  publishedAt: timestamp("published_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (t) => ({
+  uqPersonPeriod: unique("personnel_monthly_settlements_person_period_unique").on(t.personnelId, t.period),
+  idxPeriodStatus: index("personnel_monthly_settlements_period_status_idx").on(t.period, t.status),
+}));
+
+export type PersonnelMonthlySettlement = typeof personnelMonthlySettlements.$inferSelect;
+
 // ==================== FACTURA MENSUAL PERSONAL ====================
 // Cada usuario (interno o external_provider) sube una factura por mes.
 // La última subida reemplaza la anterior (UNIQUE userId+period). El historial se
@@ -4532,6 +4570,7 @@ export const personalMonthlyInvoices = pgTable("personal_monthly_invoices", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
   personnelId: integer("personnel_id").references(() => personnel.id, { onDelete: 'set null' }),
+  settlementId: integer("settlement_id").references(() => personnelMonthlySettlements.id, { onDelete: 'set null' }),
   period: varchar("period", { length: 7 }).notNull(), // YYYY-MM
   fileUrl: text("file_url").notNull(),
   fileName: text("file_name").notNull(),
@@ -4565,6 +4604,13 @@ export const personalMonthlyInvoices = pgTable("personal_monthly_invoices", {
   extractionProvider: varchar("extraction_provider", { length: 40 }),
   extractionModel: varchar("extraction_model", { length: 120 }),
   extractionWarnings: jsonb("extraction_warnings").$type<string[]>().notNull().default([]),
+  supportingFiles: jsonb("supporting_files").$type<Array<{
+    storageKey: string;
+    fileHash: string;
+    fileName: string;
+    mimeType: string;
+    fileSize: number;
+  }>>().notNull().default([]),
   uploadedAt: timestamp("uploaded_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (t) => ({

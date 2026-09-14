@@ -164,7 +164,7 @@ import { CoverageCalculator } from "./domain/coverage";
 import { eq, and, or, isNull, isNotNull, desc, sql, asc, gte, lte, lt, inArray } from "drizzle-orm";
 import { reinitializeDatabase } from "./reinit-data";
 import { upload, uploadDocument, deleteOldFile } from "./upload";
-import { personalMonthlyInvoices, personalInvoiceProjectAllocations, personalFxOverrides, externalProviders as externalProvidersTable, providerProjectAccess as providerProjectAccessTable, exchangeRates, financialClosePeriods } from "@shared/schema";
+import { personalMonthlyInvoices, personalInvoiceProjectAllocations, personalFxOverrides, personnelMonthlySettlements, externalProviders as externalProvidersTable, providerProjectAccess as providerProjectAccessTable, exchangeRates, financialClosePeriods } from "@shared/schema";
 import { sanitizeInput } from "./input-sanitization";
 import { setupAuth, hashPassword } from "./auth";
 import { requireProjectUnlocked, projectIdFromTimeEntry } from "./middleware/projectLocked";
@@ -191,6 +191,7 @@ import { getCutoverDate } from "./etl/time-entries-to-fact-labor";
 import { extractFinancialIntake } from "./services/financial-intake-extractor";
 import { deleteFinancialIntakeFile, financialIntakeUpload, readFinancialIntakeFile, storeFinancialIntakeFile } from "./services/financial-intake-files";
 import { buildPersonalInvoiceAllocations, personalFinancialCostPolicy } from "./services/personal-invoice-allocations";
+import { calculatePersonnelSettlement } from "./services/personnel-settlement";
 import { rebuildNativeFinancialFacts } from "./services/financial-native-builders";
 import { 
   pickAnalysisCurrency, 
@@ -13382,6 +13383,202 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // =========== LIQUIDACIONES MENSUALES DEL EQUIPO ===========
+  // Sección de carga propia de Finanzas. Reemplaza las columnas amarillas del
+  // Excel y deja los dos tipos de cambio para que los complete la persona.
+  app.get("/api/finance/personnel-settlements", requireAuth, requirePermission("finance"), async (req, res) => {
+    try {
+      const period = typeof req.query.period === "string" ? req.query.period : "";
+      if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(period)) {
+        return res.status(400).json({ message: "Formato de período inválido (YYYY-MM)" });
+      }
+      const [year, month] = period.split("-").map(Number);
+      const [people, closings, settlements] = await Promise.all([
+        db.select({
+          id: personnel.id,
+          name: personnel.name,
+          email: personnel.email,
+          contractType: personnel.contractType,
+          billingCurrency: personnel.billingCurrency,
+          activeUntil: personnel.activeUntil,
+        }).from(personnel).orderBy(asc(personnel.name)),
+        db.select().from(monthlyClosings).where(and(eq(monthlyClosings.year, year), eq(monthlyClosings.month, month))),
+        db.select().from(personnelMonthlySettlements).where(eq(personnelMonthlySettlements.period, period)),
+      ]);
+      const closeByPerson = new Map(closings.map((row) => [row.personnelId, row]));
+      const settlementByPerson = new Map(settlements.map((row) => [row.personnelId, row]));
+      res.json(people
+        .filter((person) => !person.activeUntil || person.activeUntil >= `${period}-01`)
+        .map((person) => {
+          const closing = closeByPerson.get(person.id) ?? null;
+          const settlement = settlementByPerson.get(person.id) ?? null;
+          const totalARS = closing ? Number(closing.grandTotalARS ?? closing.totalCost ?? 0) : null;
+          const hours = closing ? Number(closing.adjustedHours ?? 0) : null;
+          const hourlyRateARS = closing && hours && hours > 0 && totalARS != null ? totalARS / hours : null;
+          return { person, closing, system: { hours, hourlyRateARS, totalARS }, settlement };
+        }));
+    } catch (error) {
+      console.error("Error obteniendo liquidaciones mensuales:", error);
+      res.status(500).json({ message: "No se pudieron obtener las liquidaciones" });
+    }
+  });
+
+  app.put("/api/finance/personnel-settlements/:personnelId", requireAuth, requirePermission("finance"), async (req, res) => {
+    try {
+      const personnelId = Number(req.params.personnelId);
+      const period = String(req.body?.period ?? "");
+      if (!Number.isInteger(personnelId) || personnelId <= 0 || !/^\d{4}-(0[1-9]|1[0-2])$/.test(period)) {
+        return res.status(400).json({ message: "Persona o período inválido" });
+      }
+      const [year, month] = period.split("-").map(Number);
+      const [[person], [closing], [existing]] = await Promise.all([
+        db.select().from(personnel).where(eq(personnel.id, personnelId)).limit(1),
+        db.select().from(monthlyClosings).where(and(
+          eq(monthlyClosings.personnelId, personnelId),
+          eq(monthlyClosings.year, year),
+          eq(monthlyClosings.month, month),
+        )).limit(1),
+        db.select().from(personnelMonthlySettlements).where(and(
+          eq(personnelMonthlySettlements.personnelId, personnelId),
+          eq(personnelMonthlySettlements.period, period),
+        )).limit(1),
+      ]);
+      if (!person) return res.status(404).json({ message: "Persona no encontrada" });
+      if (!closing) return res.status(409).json({ message: "Primero cerrá las horas de esta persona en Operaciones → Cierre mensual" });
+
+      const billingCurrency = String(closing.billingCurrency ?? person.billingCurrency ?? "ARS").toUpperCase();
+      const parseNonNegative = (value: unknown, field: string) => {
+        const parsed = Number(value ?? 0);
+        if (!Number.isFinite(parsed) || parsed < 0) throw Object.assign(new Error(`${field} inválido`), { statusCode: 400 });
+        return parsed;
+      };
+      const requestedPercentage = parseNonNegative(req.body?.usdPercentage, "Porcentaje USD");
+      const usdPercentage = billingCurrency === "USD" ? 100 : billingCurrency === "ARS" ? 0 : requestedPercentage;
+      if (usdPercentage > 100) return res.status(400).json({ message: "El porcentaje USD debe estar entre 0 y 100" });
+      const bonusUSD = parseNonNegative(req.body?.bonusUSD, "Extra USD");
+      const extrasARS = parseNonNegative(req.body?.extrasARS, "Extra ARS");
+      const totalARS = Number(closing.grandTotalARS ?? closing.totalCost ?? 0);
+      const hoursSnapshot = Number(closing.adjustedHours ?? 0);
+      const hourlyRateARSSnapshot = hoursSnapshot > 0 ? totalARS / hoursSnapshot : 0;
+      const calculated = calculatePersonnelSettlement({
+        totalARS,
+        usdPercentage,
+        bonusUSD,
+        extrasARS,
+        invoiceFx: existing?.invoiceFx,
+        receivedFx: existing?.receivedFx,
+        bankCommissionUSD: existing?.bankCommissionUSD,
+      });
+      const publish = req.body?.publish === true;
+      const status = publish ? "published" : existing?.status === "published" ? "published" : "draft";
+      const values = {
+        contractTypeSnapshot: person.contractType ?? "full-time",
+        billingCurrencySnapshot: billingCurrency,
+        hoursSnapshot,
+        hourlyRateARSSnapshot,
+        totalARS,
+        usdPercentage,
+        plannedUSDARS: calculated.plannedUSDARS,
+        bonusUSD,
+        extrasARS,
+        baseInvoiceUSD: calculated.baseInvoiceUSD,
+        totalInvoiceUSD: calculated.totalInvoiceUSD,
+        pesifiedBaseARS: calculated.pesifiedBaseARS,
+        finalInvoiceARS: calculated.finalInvoiceARS,
+        adminNotes: String(req.body?.adminNotes ?? "").trim().slice(0, 2000) || null,
+        status,
+        publishedBy: publish ? req.user!.id : existing?.publishedBy ?? null,
+        publishedAt: publish ? new Date() : existing?.publishedAt ?? null,
+        updatedAt: new Date(),
+      };
+      const [saved] = await db.insert(personnelMonthlySettlements)
+        .values({ personnelId, period, createdBy: req.user!.id, ...values })
+        .onConflictDoUpdate({
+          target: [personnelMonthlySettlements.personnelId, personnelMonthlySettlements.period],
+          set: values,
+        })
+        .returning();
+      res.json(saved);
+    } catch (error: any) {
+      console.error("Error guardando liquidación mensual:", error);
+      res.status(error?.statusCode ?? 500).json({ message: error?.message ?? "No se pudo guardar la liquidación" });
+    }
+  });
+
+  async function personnelForUser(userId: number) {
+    const user = await storage.getUser(userId);
+    if (!user?.email) return null;
+    return (await storage.getPersonnel()).find((row) => row.email?.trim().toLowerCase() === user.email?.trim().toLowerCase()) ?? null;
+  }
+
+  app.get("/api/me/invoices/settlement", requireAuth, async (req, res) => {
+    try {
+      const period = typeof req.query.period === "string" ? req.query.period : "";
+      if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(period)) return res.status(400).json({ message: "Período inválido" });
+      const person = await personnelForUser(req.user!.id);
+      if (!person) return res.json(null);
+      const [settlement] = await db.select().from(personnelMonthlySettlements).where(and(
+        eq(personnelMonthlySettlements.personnelId, person.id),
+        eq(personnelMonthlySettlements.period, period),
+        eq(personnelMonthlySettlements.status, "published"),
+      )).limit(1);
+      res.json(settlement ?? null);
+    } catch (error) {
+      console.error("Error obteniendo liquidación personal:", error);
+      res.status(500).json({ message: "No se pudo obtener tu liquidación" });
+    }
+  });
+
+  app.patch("/api/me/invoices/settlement", requireAuth, async (req, res) => {
+    try {
+      const period = String(req.body?.period ?? "");
+      if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(period)) return res.status(400).json({ message: "Período inválido" });
+      const person = await personnelForUser(req.user!.id);
+      if (!person) return res.status(409).json({ message: "Tu usuario no está vinculado a una persona del equipo" });
+      const [row] = await db.select().from(personnelMonthlySettlements).where(and(
+        eq(personnelMonthlySettlements.personnelId, person.id),
+        eq(personnelMonthlySettlements.period, period),
+        eq(personnelMonthlySettlements.status, "published"),
+      )).limit(1);
+      if (!row) return res.status(409).json({ message: "Administración todavía no publicó tu liquidación de este mes" });
+      const parseOptionalRate = (value: unknown, label: string): number | null => {
+        if (value === undefined || value === null || value === "") return null;
+        const parsed = Number(value);
+        if (!Number.isFinite(parsed) || parsed <= 0) throw Object.assign(new Error(`${label} inválido`), { statusCode: 400 });
+        return parsed;
+      };
+      const invoiceFx = req.body?.invoiceFx === undefined ? row.invoiceFx : parseOptionalRate(req.body.invoiceFx, "TC al facturar");
+      const receivedFx = req.body?.receivedFx === undefined ? row.receivedFx : parseOptionalRate(req.body.receivedFx, "TC al cobrar");
+      const bankCommissionUSD = req.body?.bankCommissionUSD === undefined
+        ? Number(row.bankCommissionUSD ?? 0)
+        : Number(req.body.bankCommissionUSD ?? 0);
+      if (!Number.isFinite(bankCommissionUSD) || bankCommissionUSD < 0) return res.status(400).json({ message: "Comisión bancaria inválida" });
+      const calculated = calculatePersonnelSettlement({
+        totalARS: row.totalARS,
+        usdPercentage: row.usdPercentage,
+        bonusUSD: row.bonusUSD,
+        extrasARS: row.extrasARS,
+        invoiceFx,
+        receivedFx,
+        bankCommissionUSD,
+      });
+      const [saved] = await db.update(personnelMonthlySettlements).set({
+        invoiceFx,
+        receivedFx,
+        bankCommissionUSD,
+        baseInvoiceUSD: calculated.baseInvoiceUSD,
+        totalInvoiceUSD: calculated.totalInvoiceUSD,
+        pesifiedBaseARS: calculated.pesifiedBaseARS,
+        finalInvoiceARS: calculated.finalInvoiceARS,
+        updatedAt: new Date(),
+      }).where(eq(personnelMonthlySettlements.id, row.id)).returning();
+      res.json(saved);
+    } catch (error: any) {
+      console.error("Error actualizando liquidación personal:", error);
+      res.status(error?.statusCode ?? 500).json({ message: error?.message ?? "No se pudo actualizar tu liquidación" });
+    }
+  });
+
   // =========== FACTURA MENSUAL PERSONAL ===========
   // Endpoints para que cada usuario gestione su factura del mes (una por mes).
 
@@ -13672,17 +13869,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     // storage identifiers or hashes to the browser.
     const storageKey = row.storageKey ?? row.storage_key;
     const legacyFileUrl = row.fileUrl ?? row.file_url;
+    const supportingFiles = row.supportingFiles ?? row.supporting_files ?? [];
     const {
       storageKey: _storageKey,
       storage_key: _storageKeySnake,
       fileHash: _fileHash,
       file_hash: _fileHashSnake,
+      supportingFiles: _supportingFiles,
+      supporting_files: _supportingFilesSnake,
       ...safe
     } = row;
+    const documents = Array.isArray(supportingFiles) && supportingFiles.length
+      ? supportingFiles.map((file: any, index: number) => ({
+          index,
+          fileName: file.fileName,
+          fileSize: file.fileSize,
+          mimeType: file.mimeType,
+          fileUrl: `/api/me/invoices/${row.id}/files/${index}`,
+        }))
+      : storageKey || legacyFileUrl
+        ? [{ index: 0, fileName: row.fileName ?? row.file_name, fileSize: row.fileSize ?? row.file_size, mimeType: row.mimeType ?? row.mime_type, fileUrl: storageKey ? `/api/me/invoices/${row.id}/file` : legacyFileUrl }]
+        : [];
     return {
       ...safe,
       fileUrl: storageKey ? `/api/me/invoices/${row.id}/file` : legacyFileUrl,
       fileAvailable: Boolean(storageKey || legacyFileUrl),
+      documents,
     };
   }
 
@@ -13813,7 +14025,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   const receivePersonalInvoice = (req: Request, res: Response, next: NextFunction) => {
-    financialIntakeUpload.single("file")(req, res, (error: unknown) => {
+    financialIntakeUpload.fields([{ name: "file", maxCount: 1 }, { name: "files", maxCount: 10 }])(req, res, (error: unknown) => {
       if (error) return res.status(400).json({ message: error instanceof Error ? error.message : "No se pudo leer el comprobante" });
       next();
     });
@@ -13822,17 +14034,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Subir/reemplazar factura del mes. El comprobante queda privado y Mind
   // propone su reparto entre los proyectos facturables trabajados.
   app.post("/api/me/invoices", requireAuth, receivePersonalInvoice, async (req, res) => {
-    let newStorageKey: string | null = null;
+    let newStorageKeys: string[] = [];
     try {
       const period = String(req.body?.period ?? "");
       if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(period)) {
         return res.status(400).json({ message: "Formato de período inválido (YYYY-MM)" });
       }
-      if (!req.file) {
-        return res.status(400).json({ message: "No se recibió el archivo" });
-      }
-      if (!new Set(["application/pdf", "image/jpeg", "image/png", "image/webp"]).has(req.file.mimetype)) {
-        return res.status(400).json({ message: "La factura debe ser un PDF o una imagen JPG, PNG o WEBP" });
+      const uploadedFiles = Object.values((req.files as Record<string, Express.Multer.File[]>) ?? {}).flat();
+      if (!uploadedFiles.length) return res.status(400).json({ message: "No se recibió ningún comprobante" });
+      if (uploadedFiles.some((file) => !new Set(["application/pdf", "image/jpeg", "image/png", "image/webp"]).has(file.mimetype))) {
+        return res.status(400).json({ message: "Los comprobantes deben ser PDF o imágenes JPG, PNG o WEBP" });
       }
 
       await assertPersonalInvoicePeriodMutable(period);
@@ -13862,13 +14073,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(409).json({ message: "Esta factura ya fue aprobada. Pedile a Finanzas que la reabra antes de reemplazarla." });
       }
 
-      const stored = await storeFinancialIntakeFile(req.file);
-      newStorageKey = stored.storageKey;
+      const [publishedSettlement] = await db.select().from(personnelMonthlySettlements).where(and(
+        eq(personnelMonthlySettlements.personnelId, summary.personnelId),
+        eq(personnelMonthlySettlements.period, period),
+        eq(personnelMonthlySettlements.status, "published"),
+      )).limit(1);
+      const usesPublishedMixedSettlement = publishedSettlement?.billingCurrencySnapshot === "MIXED";
+      if (String(summary.billingCurrency).toUpperCase() === "MIXED" && !usesPublishedMixedSettlement) {
+        return res.status(409).json({ message: "Administración todavía no publicó tu liquidación mixta de este mes" });
+      }
+      const settlementCalculation = publishedSettlement ? calculatePersonnelSettlement({
+        totalARS: publishedSettlement.totalARS,
+        usdPercentage: publishedSettlement.usdPercentage,
+        bonusUSD: publishedSettlement.bonusUSD,
+        extrasARS: publishedSettlement.extrasARS,
+        invoiceFx: publishedSettlement.invoiceFx,
+        receivedFx: publishedSettlement.receivedFx,
+        bankCommissionUSD: publishedSettlement.bankCommissionUSD,
+      }) : null;
+      if (usesPublishedMixedSettlement && (
+        settlementCalculation?.totalInvoiceUSD == null
+        || settlementCalculation.finalInvoiceARS == null
+        || settlementCalculation.financialCostUSD == null
+        || settlementCalculation.financialCostARS == null
+      )) {
+        return res.status(409).json({ message: "Completá el tipo de cambio al facturar y el tipo de cambio al cobrar antes de enviar los comprobantes" });
+      }
+
+      const storedFiles: Awaited<ReturnType<typeof storeFinancialIntakeFile>>[] = [];
+      for (const file of uploadedFiles) {
+        const storedFile = await storeFinancialIntakeFile(file);
+        storedFiles.push(storedFile);
+        newStorageKeys.push(storedFile.storageKey);
+      }
+      const stored = storedFiles[0];
       let extracted: Awaited<ReturnType<typeof extractFinancialIntake>> | null = null;
       try {
         extracted = await extractFinancialIntake({
           text: `Factura personal del período ${period}. ${String(req.body?.notes ?? "").slice(0, 2000)}`,
-          file: { buffer: req.file.buffer, mimeType: req.file.mimetype, fileName: req.file.originalname },
+          file: { buffer: uploadedFiles[0].buffer, mimeType: uploadedFiles[0].mimetype, fileName: uploadedFiles[0].originalname },
         });
       } catch (error) {
         console.warn("No se pudo extraer la factura personal; se conservará para revisión manual:", error);
@@ -13888,10 +14131,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ? extractedAmount
           : financialCostPolicy.costMode === "hourly"
             ? invoiceCurrency === "USD" ? Number(summary.grandTotalUSD ?? 0) : Number(summary.grandTotalARS ?? 0)
-            : 0;
+            : usesPublishedMixedSettlement ? Number(settlementCalculation?.financialCostUSD ?? 0) : 0;
       if (!(declaredInvoiceAmount > 0)) {
-        await deleteFinancialIntakeFile(stored.storageKey);
-        newStorageKey = null;
+        await Promise.all(newStorageKeys.map(deleteFinancialIntakeFile));
+        newStorageKeys = [];
         return res.status(400).json({ message: "No pudimos detectar el importe. Ingresalo para continuar." });
       }
       const suggestedInvoiceUSD = financialCostPolicy.costMode === "hourly" && summary?.grandTotalUSD != null
@@ -13901,20 +14144,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ? null
         : Number(req.body.bankFx);
       if (bankFx != null && (!Number.isFinite(bankFx) || bankFx <= 0)) {
-        await deleteFinancialIntakeFile(stored.storageKey);
-        newStorageKey = null;
+        await Promise.all(newStorageKeys.map(deleteFinancialIntakeFile));
+        newStorageKeys = [];
         return res.status(400).json({ message: "Tipo de cambio bancario inválido" });
       }
       const effectiveFx = bankFx ?? Number(summary.opsFxRate ?? 0);
-      const declaredInvoiceUSD = invoiceCurrency === "USD"
+      const declaredInvoiceUSD = usesPublishedMixedSettlement
+        ? settlementCalculation!.financialCostUSD
+        : invoiceCurrency === "USD"
         ? declaredInvoiceAmount
         : effectiveFx > 0 ? Math.round(declaredInvoiceAmount / effectiveFx * 100) / 100 : null;
-      const declaredInvoiceARS = invoiceCurrency === "ARS"
+      const declaredInvoiceARS = usesPublishedMixedSettlement
+        ? settlementCalculation!.financialCostARS
+        : invoiceCurrency === "ARS"
         ? declaredInvoiceAmount
         : effectiveFx > 0 ? Math.round(declaredInvoiceAmount * effectiveFx * 100) / 100 : null;
       if (financialCostPolicy.costMode === "invoice_actual" && declaredInvoiceUSD == null) {
-        await deleteFinancialIntakeFile(stored.storageKey);
-        newStorageKey = null;
+        await Promise.all(newStorageKeys.map(deleteFinancialIntakeFile));
+        newStorageKeys = [];
         return res.status(400).json({ message: "Falta un tipo de cambio para convertir el costo real a USD. Completá el TC bancario o pedile a Finanzas que cargue la cotización del mes." });
       }
       const differenceUSD = declaredInvoiceUSD != null && suggestedInvoiceUSD != null
@@ -13934,8 +14181,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         projects: projectData.projects,
         selectedProjectIds,
         computedTotalUSD: Number(summary.grandTotalUSD ?? 0) * selectedShare,
-        invoiceAmount: declaredInvoiceAmount,
-        invoiceCurrency,
+        invoiceAmount: usesPublishedMixedSettlement ? settlementCalculation!.financialCostUSD : declaredInvoiceAmount,
+        invoiceCurrency: usesPublishedMixedSettlement ? "USD" : invoiceCurrency,
         allocationBasis: financialCostPolicy.allocationBasis,
       });
       const rawIssueDate = String(req.body?.issueDate || extractedData?.issueDate || "");
@@ -13945,12 +14192,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const saved = await db.transaction(async (tx) => {
         const values = {
           personnelId: summary.personnelId,
+          settlementId: publishedSettlement?.id ?? null,
           fileUrl: "private",
           fileName: stored.originalFileName,
           fileSize: stored.fileSize,
           mimeType: stored.mimeType,
           storageKey: stored.storageKey,
           fileHash: stored.fileHash,
+          supportingFiles: storedFiles.map((item) => ({
+            storageKey: item.storageKey,
+            fileHash: item.fileHash,
+            fileName: item.originalFileName,
+            mimeType: item.mimeType,
+            fileSize: item.fileSize,
+          })),
           computedTotalCostARS: summary.grandTotalARS ?? null,
           computedTotalCostUSD: summary.grandTotalUSD ?? null,
           hoursTotal: summary.hours ?? null,
@@ -13964,9 +14219,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           issueDate,
           contractTypeSnapshot: summary.contractType,
           financialCostMode: financialCostPolicy.costMode,
-          financialCostARS: financialCostPolicy.costMode === "hourly" ? summary.grandTotalARS ?? null : declaredInvoiceARS,
-          financialCostUSD: financialCostPolicy.costMode === "hourly" ? summary.grandTotalUSD ?? null : declaredInvoiceUSD,
-          bankFx,
+          financialCostARS: usesPublishedMixedSettlement ? settlementCalculation!.financialCostARS : financialCostPolicy.costMode === "hourly" ? summary.grandTotalARS ?? null : declaredInvoiceARS,
+          financialCostUSD: usesPublishedMixedSettlement ? settlementCalculation!.financialCostUSD : financialCostPolicy.costMode === "hourly" ? summary.grandTotalUSD ?? null : declaredInvoiceUSD,
+          bankFx: usesPublishedMixedSettlement ? publishedSettlement!.receivedFx : bankFx,
           differenceUSD,
           extractionProvider: extracted?.provider ?? "manual",
           extractionModel: extracted?.model ?? null,
@@ -13993,9 +14248,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         })));
         return invoice;
       });
-      newStorageKey = null;
+      newStorageKeys = [];
       try {
-        if (existing?.storageKey) await deleteFinancialIntakeFile(existing.storageKey);
+        const previousKeys = Array.isArray(existing?.supportingFiles)
+          ? existing.supportingFiles.map((item: any) => item?.storageKey).filter(Boolean)
+          : existing?.storageKey ? [existing.storageKey] : [];
+        if (previousKeys.length) await Promise.all(previousKeys.map(deleteFinancialIntakeFile));
         else if (existing?.fileUrl && existing.fileUrl !== "private") deleteOldFile(existing.fileUrl);
       } catch (cleanupError) {
         // The new invoice is already committed; a stale orphan must not make
@@ -14004,7 +14262,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       res.status(existing ? 200 : 201).json(publicPersonalInvoice({ ...saved, allocations }));
     } catch (error: any) {
-      if (newStorageKey) await deleteFinancialIntakeFile(newStorageKey);
+      await Promise.all(newStorageKeys.map(deleteFinancialIntakeFile));
       console.error("Error subiendo factura personal:", error);
       res.status(error?.statusCode ?? 500).json({ message: error?.message ?? "Error al subir factura" });
     }
@@ -14031,6 +14289,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error abriendo factura personal:", error);
       res.status(500).json({ message: "No se pudo abrir la factura" });
+    }
+  });
+
+  app.get("/api/me/invoices/:id/files/:index", requireAuth, async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const index = Number(req.params.index);
+      const [row] = await db.select().from(personalMonthlyInvoices).where(eq(personalMonthlyInvoices.id, id)).limit(1);
+      if (!row) return res.status(404).json({ message: "Factura no encontrada" });
+      const permissions = (req.user as any)?.permissions ?? [];
+      const canReview = isOperationsRequest(req) || permissions.includes("finance");
+      if (row.userId !== req.user!.id && !canReview) return res.status(403).json({ message: "No podés abrir esta factura" });
+      const files = Array.isArray(row.supportingFiles) ? row.supportingFiles : [];
+      const file = files[index];
+      if (!file?.storageKey) return res.status(404).json({ message: "El comprobante no está disponible" });
+      const buffer = await readFinancialIntakeFile(file.storageKey);
+      const safeName = String(file.fileName || `comprobante-${id}-${index + 1}`).replace(/["\r\n]/g, "_");
+      res.setHeader("Content-Type", file.mimeType || "application/octet-stream");
+      res.setHeader("Content-Disposition", `inline; filename="${safeName}"`);
+      res.setHeader("Cache-Control", "private, no-store");
+      res.setHeader("X-Content-Type-Options", "nosniff");
+      res.setHeader("Content-Security-Policy", "sandbox; default-src 'none'");
+      res.send(buffer);
+    } catch (error) {
+      console.error("Error abriendo comprobante personal:", error);
+      res.status(500).json({ message: "No se pudo abrir el comprobante" });
     }
   });
 
@@ -14097,10 +14381,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const period = req.query.period ? String(req.query.period) : null;
       const result = await db.execute(sql`
         SELECT i.*, u.email, CONCAT_WS(' ', u.first_name, u.last_name) AS user_name,
-               p.name AS personnel_name
+               p.name AS personnel_name,
+               settlement.total_invoice_usd AS settlement_total_invoice_usd,
+               settlement.final_invoice_ars AS settlement_final_invoice_ars,
+               settlement.bonus_usd AS settlement_bonus_usd,
+               settlement.extras_ars AS settlement_extras_ars,
+               settlement.invoice_fx AS settlement_invoice_fx,
+               settlement.received_fx AS settlement_received_fx
         FROM personal_monthly_invoices i
         LEFT JOIN users u ON u.id = i.user_id
         LEFT JOIN personnel p ON p.id = i.personnel_id
+        LEFT JOIN personnel_monthly_settlements settlement ON settlement.id = i.settlement_id
         WHERE ${period ? sql`i.period = ${period}` : sql`TRUE`}
         ORDER BY i.period DESC, i.uploaded_at DESC
       `);
@@ -14155,10 +14446,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           : [];
         const contractTypeSnapshot = existing.contractTypeSnapshot ?? invoicePerson?.contractType ?? "full-time";
         const reviewCostMode = existing.financialCostMode ?? personalFinancialCostPolicy(contractTypeSnapshot).costMode;
-        const financialCostUSD = reviewCostMode === "hourly"
+        const financialCostUSD = existing.settlementId != null
+          ? existing.financialCostUSD ?? existing.declaredInvoiceUSD
+          : reviewCostMode === "hourly"
           ? existing.computedTotalCostUSD
           : existing.financialCostUSD ?? existing.declaredInvoiceUSD;
-        const financialCostARS = reviewCostMode === "hourly"
+        const financialCostARS = existing.settlementId != null
+          ? existing.financialCostARS ?? existing.declaredInvoiceARS
+          : reviewCostMode === "hourly"
           ? existing.computedTotalCostARS
           : existing.financialCostARS ?? existing.declaredInvoiceARS
             ?? (financialCostUSD != null && Number(existing.bankFx) > 0 ? Number(financialCostUSD) * Number(existing.bankFx) : null);
@@ -14174,7 +14469,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (Math.abs(allocationTotal - 100) > 0.01) {
             throw Object.assign(new Error(`El reparto entre proyectos suma ${allocationTotal.toFixed(2)}% y debe cerrar en 100%`), { statusCode: 409 });
           }
-          if (reviewCostMode === "invoice_actual" && !(Number(financialCostUSD) > 0)) {
+          if ((reviewCostMode === "invoice_actual" || existing.settlementId != null) && !(Number(financialCostUSD) > 0)) {
             throw Object.assign(new Error("La factura no tiene un costo real normalizado en USD"), { statusCode: 409 });
           }
         }
@@ -14218,7 +14513,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await assertPersonalInvoicePeriodMutable(row.period);
       await db.delete(personalMonthlyInvoices).where(eq(personalMonthlyInvoices.id, id));
       try {
-        if (row.storageKey) await deleteFinancialIntakeFile(row.storageKey);
+        const storedKeys = Array.isArray(row.supportingFiles)
+          ? row.supportingFiles.map((item: any) => item?.storageKey).filter(Boolean)
+          : row.storageKey ? [row.storageKey] : [];
+        if (storedKeys.length) await Promise.all(storedKeys.map(deleteFinancialIntakeFile));
         else if (row.fileUrl && row.fileUrl !== "private") deleteOldFile(row.fileUrl);
       } catch (cleanupError) {
         console.warn("No se pudo limpiar el archivo de la factura eliminada:", cleanupError);

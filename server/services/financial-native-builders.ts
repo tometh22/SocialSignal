@@ -33,7 +33,7 @@ export async function rebuildNativeFinancialFacts(periodKey: string, runner: Sql
       FROM personal_monthly_invoices invoice
       LEFT JOIN personnel person ON person.id=invoice.personnel_id
       WHERE invoice.period=${periodKey} AND invoice.approval_status='approved'
-        AND COALESCE(invoice.financial_cost_mode, CASE WHEN COALESCE(invoice.contract_type_snapshot,person.contract_type,'full-time')='freelance' THEN 'hourly' ELSE 'invoice_actual' END)='invoice_actual'
+        AND (invoice.settlement_id IS NOT NULL OR COALESCE(invoice.financial_cost_mode, CASE WHEN COALESCE(invoice.contract_type_snapshot,person.contract_type,'full-time')='freelance' THEN 'hourly' ELSE 'invoice_actual' END)='invoice_actual')
         AND COALESCE(invoice.financial_cost_usd,invoice.declared_invoice_usd,invoice.financial_cost_ars,invoice.declared_invoice_ars,0)>0
         AND EXISTS (
           SELECT 1 FROM personal_invoice_project_allocations allocation
@@ -44,7 +44,8 @@ export async function rebuildNativeFinancialFacts(periodKey: string, runner: Sql
     ), labor AS (
       -- Operaciones keeps the hour-valued model in fact_labor_month. For the
       -- financial/economic fact we replace fixed-contract estimates with the
-      -- approved invoice; freelancers remain hours × historical rate.
+      -- approved invoice. A published mixed settlement also replaces the model
+      -- because its base still comes from hours, but its extras are real cost.
       SELECT
         COALESCE(sum(CASE WHEN approved.personnel_id IS NOT NULL THEN approved.actual_usd ELSE labor.model_usd END),0) direct_usd,
         COALESCE(sum(CASE WHEN approved.personnel_id IS NOT NULL THEN approved.actual_ars ELSE labor.model_ars END),0) direct_ars,
@@ -130,7 +131,7 @@ export async function rebuildNativeFinancialFacts(periodKey: string, runner: Sql
       FROM personal_monthly_invoices invoice
       LEFT JOIN personnel person ON person.id=invoice.personnel_id
       WHERE invoice.period=${periodKey} AND invoice.approval_status='approved'
-        AND COALESCE(invoice.financial_cost_mode,CASE WHEN COALESCE(invoice.contract_type_snapshot,person.contract_type,'full-time')='freelance' THEN 'hourly' ELSE 'invoice_actual' END)='invoice_actual'
+        AND (invoice.settlement_id IS NOT NULL OR COALESCE(invoice.financial_cost_mode,CASE WHEN COALESCE(invoice.contract_type_snapshot,person.contract_type,'full-time')='freelance' THEN 'hourly' ELSE 'invoice_actual' END)='invoice_actual')
         AND COALESCE(invoice.financial_cost_usd,invoice.declared_invoice_usd,invoice.financial_cost_ars,invoice.declared_invoice_ars,0)>0
         AND EXISTS (
           SELECT 1 FROM personal_invoice_project_allocations allocation
@@ -146,7 +147,7 @@ export async function rebuildNativeFinancialFacts(periodKey: string, runner: Sql
       JOIN personal_invoice_project_allocations allocation ON allocation.invoice_id=invoice.invoice_id
     ), labor AS (
       -- Rentabilidad económica por proyecto usa el costo real distribuido de la
-      -- factura fija. Sin factura aprobada (y para freelancers), conserva el
+      -- factura fija o liquidación mixta. Sin factura aprobada conserva el
       -- modelo operativo de horas × tarifa.
       SELECT modeled.project_id,
         sum(CASE WHEN invoice.personnel_id IS NOT NULL THEN COALESCE(allocation.cost_usd,0) ELSE modeled.model_usd END) cost_usd,

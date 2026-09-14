@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { AlertCircle, Check, CheckCircle2, Clock, FileText, FolderKanban, Loader2, LockKeyhole, Receipt, ShieldCheck, Trash2, UploadCloud } from "lucide-react";
+import { AlertCircle, Calculator, Check, CheckCircle2, Clock, FileText, FolderKanban, Loader2, LockKeyhole, Receipt, ShieldCheck, Trash2, UploadCloud, X } from "lucide-react";
 
 type Allocation = {
   projectId: number;
@@ -48,6 +48,28 @@ type InvoiceRow = {
   approvalStatus?: "pending" | "approved" | "rejected";
   reviewReason?: string | null;
   allocations?: Allocation[];
+  documents?: Array<{ index: number; fileName: string; fileSize: number; mimeType: string; fileUrl: string }>;
+};
+
+type Settlement = {
+  id: number;
+  period: string;
+  billingCurrencySnapshot: string;
+  hoursSnapshot: number;
+  hourlyRateARSSnapshot: number;
+  totalARS: number;
+  usdPercentage: number;
+  plannedUSDARS: number;
+  bonusUSD: number;
+  extrasARS: number;
+  invoiceFx: number | null;
+  baseInvoiceUSD: number | null;
+  totalInvoiceUSD: number | null;
+  receivedFx: number | null;
+  bankCommissionUSD: number;
+  pesifiedBaseARS: number | null;
+  finalInvoiceARS: number | null;
+  adminNotes: string | null;
 };
 
 type MonthSummary = {
@@ -107,7 +129,7 @@ export default function MyInvoices() {
   const queryClient = useQueryClient();
   const fileInput = useRef<HTMLInputElement>(null);
   const [period, setPeriod] = useState(currentPeriod());
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
   const [dragging, setDragging] = useState(false);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [invoiceAmount, setInvoiceAmount] = useState("");
@@ -116,6 +138,9 @@ export default function MyInvoices() {
   const [issueDate, setIssueDate] = useState("");
   const [bankFx, setBankFx] = useState("");
   const [notes, setNotes] = useState("");
+  const [invoiceFx, setInvoiceFx] = useState("");
+  const [receivedFx, setReceivedFx] = useState("");
+  const [bankCommissionUSD, setBankCommissionUSD] = useState("0");
   const [deleteTarget, setDeleteTarget] = useState<InvoiceRow | null>(null);
 
   const invoicesQuery = useQuery<InvoiceRow[]>({
@@ -126,12 +151,18 @@ export default function MyInvoices() {
     queryKey: ["personal-invoice-projects", period],
     queryFn: () => authFetchJson(`/api/me/invoices/projects?period=${period}`),
   });
+  const settlementQuery = useQuery<Settlement | null>({
+    queryKey: ["personal-settlement", period],
+    queryFn: () => authFetchJson(`/api/me/invoices/settlement?period=${period}`),
+  });
   const existing = useMemo(() => (invoicesQuery.data ?? []).find((item) => item.period === period) ?? null, [invoicesQuery.data, period]);
   const projects = projectQuery.data?.projects ?? [];
   const selectedProjects = projects.filter((project) => selectedIds.includes(project.projectId));
   const summary = projectQuery.data?.summary;
   const financialCostMode = summary?.financialCostMode ?? existing?.financialCostMode;
   const isFreelance = financialCostMode === "hourly";
+  const requiresMixedSettlement = summary?.billingCurrency?.toUpperCase() === "MIXED";
+  const settlement = settlementQuery.data ?? null;
   const locked = existing?.approvalStatus === "approved";
 
   useEffect(() => {
@@ -144,16 +175,35 @@ export default function MyInvoices() {
     setIssueDate(existing?.issueDate?.slice(0, 10) ?? "");
     setBankFx(existing?.bankFx == null ? "" : String(existing.bankFx));
     setNotes(existing?.notes ?? "");
-    setFile(null);
+    setFiles([]);
     if (fileInput.current) fileInput.current.value = "";
   }, [period, projectQuery.data, existing?.id]);
 
+  useEffect(() => {
+    setInvoiceFx(settlement?.invoiceFx == null ? "" : String(settlement.invoiceFx));
+    setReceivedFx(settlement?.receivedFx == null ? "" : String(settlement.receivedFx));
+    setBankCommissionUSD(String(settlement?.bankCommissionUSD ?? 0));
+  }, [settlement?.id, settlement?.invoiceFx, settlement?.receivedFx, settlement?.bankCommissionUSD]);
+
+  const settlementMutation = useMutation({
+    mutationFn: () => authFetchJson("/api/me/invoices/settlement", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ period, invoiceFx, receivedFx, bankCommissionUSD }),
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["personal-settlement", period] });
+      toast({ title: "Tipos de cambio guardados", description: "Mind recalculó automáticamente los importes a facturar." });
+    },
+    onError: (error: Error) => toast({ title: "No se pudo calcular", description: error.message, variant: "destructive" }),
+  });
+
   const uploadMutation = useMutation({
     mutationFn: async () => {
-      if (!file) throw new Error("Adjuntá la factura en PDF o imagen");
+      if (!files.length) throw new Error("Adjuntá al menos un comprobante en PDF o imagen");
       if (!selectedIds.length) throw new Error("Seleccioná al menos un proyecto");
       const form = new FormData();
-      form.append("file", file);
+      files.forEach((file) => form.append("files", file));
       form.append("period", period);
       form.append("projectIds", JSON.stringify(selectedIds));
       form.append("invoiceCurrency", invoiceCurrency);
@@ -168,7 +218,7 @@ export default function MyInvoices() {
     },
     onSuccess: () => {
       toast({ title: "Factura enviada", description: "Finanzas ya puede revisarla. El estado quedará visible en esta pantalla." });
-      setFile(null);
+      setFiles([]);
       if (fileInput.current) fileInput.current.value = "";
       queryClient.invalidateQueries({ queryKey: ["personal-invoices"] });
     },
@@ -186,17 +236,17 @@ export default function MyInvoices() {
   });
 
   function acceptFiles(files: File[]) {
-    const candidate = files[0];
-    if (!candidate) return;
-    if (!["application/pdf", "image/jpeg", "image/png", "image/webp"].includes(candidate.type)) {
+    const candidates = files.slice(0, 10);
+    if (!candidates.length) return;
+    if (candidates.some((candidate) => !["application/pdf", "image/jpeg", "image/png", "image/webp"].includes(candidate.type))) {
       toast({ title: "Formato no admitido", description: "Usá PDF, JPG, PNG o WEBP.", variant: "destructive" });
       return;
     }
-    if (candidate.size > 20 * 1024 * 1024) {
+    if (candidates.some((candidate) => candidate.size > 20 * 1024 * 1024)) {
       toast({ title: "Archivo demasiado grande", description: "El máximo es 20 MB.", variant: "destructive" });
       return;
     }
-    setFile(candidate);
+    setFiles((current) => [...current, ...candidates].slice(0, 10));
   }
   function onDrop(event: DragEvent<HTMLDivElement>) {
     event.preventDefault();
@@ -211,8 +261,17 @@ export default function MyInvoices() {
     setSelectedIds((current) => checked ? [...new Set([...current, projectId])] : current.filter((id) => id !== projectId));
   }
 
-  const stepReady = Boolean(summary?.personnelId && selectedIds.length && file && !locked);
+  const mixedReady = !requiresMixedSettlement || Boolean(settlement?.invoiceFx && settlement?.receivedFx && settlement?.finalInvoiceARS != null);
+  const stepReady = Boolean(summary?.personnelId && selectedIds.length && files.length && mixedReady && !locked);
   const status = existing?.approvalStatus ? STATUS[existing.approvalStatus] : null;
+  const invoiceFxNumber = Number(invoiceFx) > 0 ? Number(invoiceFx) : null;
+  const receivedFxNumber = Number(receivedFx) > 0 ? Number(receivedFx) : null;
+  const previewBaseUSD = settlement && invoiceFxNumber ? settlement.plannedUSDARS / invoiceFxNumber : null;
+  const previewTotalUSD = previewBaseUSD == null ? null : previewBaseUSD + Number(settlement?.bonusUSD ?? 0);
+  const previewPesifiedARS = previewBaseUSD != null && receivedFxNumber ? previewBaseUSD * receivedFxNumber : null;
+  const previewFinalARS = settlement && previewPesifiedARS != null && receivedFxNumber
+    ? settlement.totalARS - previewPesifiedARS + settlement.extrasARS + (Number(bankCommissionUSD) || 0) * receivedFxNumber
+    : null;
 
   return (
     <div className="mx-auto max-w-6xl space-y-6" onPaste={onPaste}>
@@ -231,12 +290,17 @@ export default function MyInvoices() {
         {status && <Badge variant="outline" className={status.className}>{status.label}</Badge>}
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-3">
-        {[
+      <div className={`grid gap-3 ${requiresMixedSettlement ? "sm:grid-cols-2 lg:grid-cols-4" : "sm:grid-cols-3"}`}>
+        {(requiresMixedSettlement ? [
+          { number: 1, title: "Elegí el período", text: "Mind trae tus horas y proyectos." },
+          { number: 2, title: "Revisá tu liquidación", text: "Completá los TC de tu banco." },
+          { number: 3, title: "Revisá el reparto", text: "Se calcula automáticamente." },
+          { number: 4, title: "Adjuntá y enviá", text: "Subí los comprobantes USD y ARS." },
+        ] : [
           { number: 1, title: "Elegí el período", text: "Mind trae tus horas y proyectos." },
           { number: 2, title: "Revisá el reparto", text: "Se calcula automáticamente." },
           { number: 3, title: "Adjuntá y enviá", text: "Finanzas controla antes de aprobar." },
-        ].map((step) => <div key={step.number} className="flex gap-3 rounded-xl border bg-white p-4"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-sm font-semibold text-indigo-700">{step.number}</span><div><p className="text-sm font-semibold">{step.title}</p><p className="text-xs text-muted-foreground">{step.text}</p></div></div>)}
+        ]).map((step) => <div key={step.number} className="flex gap-3 rounded-xl border bg-white p-4"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-sm font-semibold text-indigo-700">{step.number}</span><div><p className="text-sm font-semibold">{step.title}</p><p className="text-xs text-muted-foreground">{step.text}</p></div></div>)}
       </div>
 
       <Card>
@@ -250,8 +314,39 @@ export default function MyInvoices() {
         {summary?.personnelId && <CardContent className="pt-0"><Notice tone="info" title={isFreelance ? "Contrato freelance: el costo sale de las horas" : "Contrato fijo: el costo real sale de la factura"} text={isFreelance ? "Mind calcula el costo financiero con tus horas por la tarifa histórica. La factura funciona como comprobante y Finanzas controla cualquier diferencia." : "Tus horas se usan para markup, eficiencia y para repartir el trabajo entre proyectos. Cuando Finanzas aprueba la factura, su importe reemplaza la estimación únicamente en Finanzas y Economía."} /></CardContent>}
       </Card>
 
+      {requiresMixedSettlement && <Card className={settlement ? "border-indigo-200" : "border-amber-200"}>
+        <CardHeader className="pb-3"><CardTitle className="flex items-center gap-2 text-base"><Calculator className="h-4 w-4 text-indigo-600" />2. Tu liquidación USD + ARS</CardTitle><p className="text-sm text-muted-foreground">Administración define el porcentaje y los extras. Vos sólo cargás el tipo de cambio real de tu banco en cada momento; Mind hace el resto.</p></CardHeader>
+        <CardContent className="space-y-4">
+          {settlementQuery.isLoading && <div className="flex items-center gap-2 py-5 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />Buscando tu liquidación…</div>}
+          {!settlementQuery.isLoading && !settlement && <Notice tone="warning" title="Administración todavía no publicó este cierre" text="No tenés que calcular ni adivinar importes. Cuando esté listo, vas a ver acá exactamente cuánto facturar en USD y luego en ARS." />}
+          {settlement && <>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+              <Summary label="Total base del mes" value={formatMoney(settlement.totalARS, "ARS")} detail={`${settlement.hoursSnapshot.toFixed(1)} h × ${formatMoney(settlement.hourlyRateARSSnapshot, "ARS")}`} />
+              <Summary label="Porción en USD" value={`${Number(settlement.usdPercentage).toFixed(2)}%`} detail={formatMoney(settlement.plannedUSDARS, "ARS")} />
+              <Summary label="Extra / bono USD" value={formatMoney(settlement.bonusUSD, "USD")} detail="Se suma, no descuenta del sueldo" />
+              <Summary label="Extras ARS" value={formatMoney(settlement.extrasARS, "ARS")} detail="Se suman al comprobante ARS" />
+              <Summary label="Comprobantes esperados" value="USD + ARS" detail="Adjuntalos juntos al finalizar" />
+            </div>
+            {settlement.adminNotes && <Notice tone="info" title="Indicación de Administración" text={settlement.adminNotes} />}
+            <div className="grid gap-4 lg:grid-cols-2">
+              <div className="rounded-xl border p-4">
+                <div className="mb-3 flex items-start justify-between gap-3"><div><p className="font-semibold">A. Al momento de facturar USD</p><p className="text-xs text-muted-foreground">Ingresá el tipo de cambio comprador más bajo que te muestra tu banco.</p></div><Badge variant="secondary">Paso 1</Badge></div>
+                <Label htmlFor="settlement-invoice-fx">Tipo de cambio al facturar</Label><Input id="settlement-invoice-fx" className="mt-1.5" type="number" min="0" step="0.01" value={invoiceFx} onChange={(event) => setInvoiceFx(event.target.value)} placeholder="ARS por USD" disabled={locked} />
+                <div className="mt-3 grid gap-2 sm:grid-cols-2"><Summary label="USD base" value={formatMoney(previewBaseUSD, "USD")} detail={`${formatMoney(settlement.plannedUSDARS, "ARS")} ÷ TC`} /><Summary label="Total a facturar USD" value={formatMoney(previewTotalUSD, "USD")} detail="USD base + extra/bono" /></div>
+              </div>
+              <div className="rounded-xl border p-4">
+                <div className="mb-3 flex items-start justify-between gap-3"><div><p className="font-semibold">B. Una vez recibida la transferencia</p><p className="text-xs text-muted-foreground">Cargá el nuevo TC y la comisión que descontó el banco.</p></div><Badge variant="secondary">Paso 2</Badge></div>
+                <div className="grid gap-3 sm:grid-cols-2"><div><Label htmlFor="settlement-received-fx">Tipo de cambio al cobrar</Label><Input id="settlement-received-fx" className="mt-1.5" type="number" min="0" step="0.01" value={receivedFx} onChange={(event) => setReceivedFx(event.target.value)} placeholder="ARS por USD" disabled={locked} /></div><div><Label htmlFor="settlement-bank-fee">Comisión bancaria USD</Label><Input id="settlement-bank-fee" className="mt-1.5" type="number" min="0" step="0.01" value={bankCommissionUSD} onChange={(event) => setBankCommissionUSD(event.target.value)} disabled={locked} /></div></div>
+                <div className="mt-3 grid gap-2 sm:grid-cols-2"><Summary label="USD base pesificados" value={formatMoney(previewPesifiedARS, "ARS")} detail="USD base × nuevo TC" /><Summary label="Diferencia a facturar ARS" value={formatMoney(previewFinalARS, "ARS")} detail="Saldo + extras + comisión" /></div>
+              </div>
+            </div>
+            <div className="flex flex-col gap-2 border-t pt-4 sm:flex-row sm:items-center sm:justify-between"><p className="text-xs text-muted-foreground">El bono USD queda separado de la base para que no reduzca por error la diferencia en pesos.</p><Button variant="outline" disabled={locked || settlementMutation.isPending || !invoiceFxNumber} onClick={() => settlementMutation.mutate()}>{settlementMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}Guardar y recalcular</Button></div>
+          </>}
+        </CardContent>
+      </Card>}
+
       <Card>
-        <CardHeader className="pb-3"><CardTitle className="flex items-center gap-2 text-base"><FolderKanban className="h-4 w-4 text-indigo-600" />2. Proyectos incluidos</CardTitle><p className="text-sm text-muted-foreground">Seleccionamos tus proyectos facturables y distribuimos el comprobante {isFreelance ? "según el costo horario" : "según las horas trabajadas"}. Sólo desmarcá uno si no corresponde a esta factura.</p></CardHeader>
+        <CardHeader className="pb-3"><CardTitle className="flex items-center gap-2 text-base"><FolderKanban className="h-4 w-4 text-indigo-600" />{requiresMixedSettlement ? "3" : "2"}. Proyectos incluidos</CardTitle><p className="text-sm text-muted-foreground">Seleccionamos tus proyectos facturables y distribuimos el comprobante {isFreelance ? "según el costo horario" : "según las horas trabajadas"}. Sólo desmarcá uno si no corresponde a esta factura.</p></CardHeader>
         <CardContent>
           {projectQuery.isLoading && <div className="flex items-center gap-2 py-8 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />Calculando tus proyectos…</div>}
           {projectQuery.isError && <Notice tone="danger" title="No pudimos traer tus proyectos" text="Actualizá la página o contactá a Administración si el problema continúa." />}
@@ -276,20 +371,21 @@ export default function MyInvoices() {
       </Card>
 
       <Card>
-        <CardHeader className="pb-3"><CardTitle className="flex items-center gap-2 text-base"><Receipt className="h-4 w-4 text-indigo-600" />3. Comprobante</CardTitle><p className="text-sm text-muted-foreground">Adjuntá un PDF o una captura. Mind leerá número, fecha, moneda e importe; completá estos datos sólo si querés adelantarlos.</p></CardHeader>
+        <CardHeader className="pb-3"><CardTitle className="flex items-center gap-2 text-base"><Receipt className="h-4 w-4 text-indigo-600" />{requiresMixedSettlement ? "4" : "3"}. Comprobantes</CardTitle><p className="text-sm text-muted-foreground">Adjuntá PDF o capturas. Si facturás USD + ARS, seleccioná ambos comprobantes; Mind los guarda juntos en el mismo cierre.</p></CardHeader>
         <CardContent className="space-y-4">
           {locked && <Notice tone="success" title="Factura aprobada" text="Este período quedó bloqueado para preservar el respaldo contable. Si necesitás corregirlo, contactá a Finanzas." />}
           {existing?.approvalStatus === "rejected" && <Notice tone="danger" title="Finanzas pidió una corrección" text={existing.reviewReason || "Revisá los datos y reemplazá el comprobante."} />}
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {!requiresMixedSettlement && <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <div><Label htmlFor="invoice-number">Número <span className="font-normal text-muted-foreground">(opcional)</span></Label><Input id="invoice-number" disabled={locked} className="mt-1.5" value={invoiceNumber} onChange={(event) => setInvoiceNumber(event.target.value)} placeholder="Ej. FC A 0001-123" /></div>
             <div><Label htmlFor="invoice-date">Fecha <span className="font-normal text-muted-foreground">(opcional)</span></Label><Input id="invoice-date" disabled={locked} className="mt-1.5" type="date" value={issueDate} onChange={(event) => setIssueDate(event.target.value)} /></div>
             <div><Label>Moneda</Label><Select disabled={locked} value={invoiceCurrency} onValueChange={(value: "ARS" | "USD") => setInvoiceCurrency(value)}><SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ARS">ARS</SelectItem><SelectItem value="USD">USD</SelectItem></SelectContent></Select></div>
             <div><Label htmlFor="invoice-amount">{isFreelance ? "Importe facturado" : "Importe real"} <span className="font-normal text-muted-foreground">(Mind lo detecta)</span></Label><Input id="invoice-amount" disabled={locked} className="mt-1.5" type="number" min="0" step="0.01" value={invoiceAmount} onChange={(event) => setInvoiceAmount(event.target.value)} placeholder="Completalo sólo si hace falta" /></div>
-          </div>
-          {invoiceCurrency === "ARS" && <div className="max-w-xs"><Label htmlFor="invoice-fx">TC bancario <span className="font-normal text-muted-foreground">(opcional)</span></Label><Input id="invoice-fx" disabled={locked} className="mt-1.5" type="number" min="0" step="0.01" value={bankFx} onChange={(event) => setBankFx(event.target.value)} placeholder={summary?.opsFxRate ? `Referencia ${summary.opsFxRate}` : "ARS por USD"} /></div>}
-          <div className={`rounded-xl border-2 border-dashed p-7 text-center transition ${dragging ? "border-indigo-500 bg-indigo-50" : file ? "border-emerald-300 bg-emerald-50/50" : "border-slate-200"}`} onDragOver={(event) => { event.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)} onDrop={onDrop}>
-            {file ? <><CheckCircle2 className="mx-auto mb-2 h-8 w-8 text-emerald-600" /><p className="text-sm font-semibold">{file.name}</p><p className="text-xs text-muted-foreground">{(file.size / 1024 / 1024).toFixed(2)} MB · listo para enviar</p><Button className="mt-3" size="sm" variant="outline" disabled={locked} onClick={() => fileInput.current?.click()}>Cambiar archivo</Button></> : <><UploadCloud className="mx-auto mb-2 h-8 w-8 text-indigo-500" /><p className="text-sm font-semibold">Arrastrá la factura o pegá una captura con ⌘V</p><p className="mt-1 text-xs text-muted-foreground">PDF, JPG, PNG o WEBP · máximo 20 MB</p><Button className="mt-3" size="sm" variant="outline" disabled={locked} onClick={() => fileInput.current?.click()}>Elegir archivo</Button></>}
-            <input ref={fileInput} type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png,.webp" onChange={(event) => acceptFiles(Array.from(event.target.files ?? []))} />
+          </div>}
+          {!requiresMixedSettlement && invoiceCurrency === "ARS" && <div className="max-w-xs"><Label htmlFor="invoice-fx">TC bancario <span className="font-normal text-muted-foreground">(opcional)</span></Label><Input id="invoice-fx" disabled={locked} className="mt-1.5" type="number" min="0" step="0.01" value={bankFx} onChange={(event) => setBankFx(event.target.value)} placeholder={summary?.opsFxRate ? `Referencia ${summary.opsFxRate}` : "ARS por USD"} /></div>}
+          {requiresMixedSettlement && !mixedReady && <Notice tone="warning" title="Primero completá tu liquidación" text="Guardá el TC al facturar y, una vez cobrada la transferencia, el TC al cobrar. Mind habilitará el envío cuando pueda calcular el comprobante final en ARS." />}
+          <div className={`rounded-xl border-2 border-dashed p-7 text-center transition ${dragging ? "border-indigo-500 bg-indigo-50" : files.length ? "border-emerald-300 bg-emerald-50/50" : "border-slate-200"}`} onDragOver={(event) => { event.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)} onDrop={onDrop}>
+            {files.length ? <><CheckCircle2 className="mx-auto mb-2 h-8 w-8 text-emerald-600" /><p className="text-sm font-semibold">{files.length} comprobante{files.length === 1 ? "" : "s"} listo{files.length === 1 ? "" : "s"}</p><div className="mx-auto mt-3 max-w-xl space-y-2 text-left">{files.map((file, index) => <div key={`${file.name}-${file.lastModified}-${index}`} className="flex items-center justify-between gap-3 rounded-lg border bg-white px-3 py-2"><span className="min-w-0 truncate text-xs">{file.name} · {(file.size / 1024 / 1024).toFixed(2)} MB</span><Button type="button" size="icon" variant="ghost" className="h-7 w-7 shrink-0" onClick={() => setFiles((current) => current.filter((_, itemIndex) => itemIndex !== index))}><X className="h-3.5 w-3.5" /></Button></div>)}</div><Button className="mt-3" size="sm" variant="outline" disabled={locked || files.length >= 10} onClick={() => fileInput.current?.click()}>Agregar otro</Button></> : <><UploadCloud className="mx-auto mb-2 h-8 w-8 text-indigo-500" /><p className="text-sm font-semibold">Arrastrá las facturas o pegá capturas con ⌘V</p><p className="mt-1 text-xs text-muted-foreground">Hasta 10 archivos PDF, JPG, PNG o WEBP · máximo 20 MB cada uno</p><Button className="mt-3" size="sm" variant="outline" disabled={locked} onClick={() => fileInput.current?.click()}>Elegir comprobantes</Button></>}
+            <input ref={fileInput} type="file" multiple className="hidden" accept=".pdf,.jpg,.jpeg,.png,.webp" onChange={(event) => { acceptFiles(Array.from(event.target.files ?? [])); event.currentTarget.value = ""; }} />
           </div>
           <div><Label htmlFor="invoice-notes">Aclaración <span className="font-normal text-muted-foreground">(opcional)</span></Label><Textarea id="invoice-notes" disabled={locked} className="mt-1.5" rows={2} value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Sólo si Finanzas necesita contexto adicional" /></div>
           <div className="flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
@@ -308,7 +404,7 @@ export default function MyInvoices() {
             const itemStatus = STATUS[invoice.approvalStatus ?? "pending"];
             return <div key={invoice.id} className="flex flex-col gap-3 rounded-xl border p-4 lg:flex-row lg:items-center lg:justify-between">
               <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><p className="font-semibold capitalize">{formatPeriod(invoice.period)}</p><Badge variant="outline" className={itemStatus.className}>{itemStatus.label}</Badge><Badge variant="secondary">{invoice.financialCostMode === "hourly" ? "Costo por horas" : "Importe real"}</Badge></div><p className="mt-1 text-sm text-muted-foreground">{invoice.invoiceNumber || invoice.fileName} · {(invoice.allocations ?? []).length} proyecto(s) · {Number(invoice.hoursTotal ?? 0).toFixed(1)} h{invoice.financialCostUSD != null ? ` · ${formatMoney(invoice.financialCostUSD, "USD")}` : ""}</p>{invoice.reviewReason && <p className="mt-1 text-xs text-rose-700">{invoice.reviewReason}</p>}</div>
-              <div className="flex flex-wrap items-center gap-2"><Button asChild size="sm" variant="outline"><a href={invoice.fileUrl} target="_blank" rel="noreferrer"><FileText className="mr-2 h-4 w-4" />Ver factura</a></Button>{invoice.approvalStatus !== "approved" && <Button size="icon" variant="ghost" className="text-rose-600" title="Eliminar factura" aria-label={`Eliminar factura de ${formatPeriod(invoice.period)}`} onClick={() => setDeleteTarget(invoice)}><Trash2 className="h-4 w-4" /></Button>}</div>
+              <div className="flex flex-wrap items-center gap-2">{(invoice.documents?.length ? invoice.documents : [{ index: 0, fileName: invoice.fileName, fileSize: invoice.fileSize, mimeType: "", fileUrl: invoice.fileUrl }]).map((document, index) => <Button key={document.fileUrl} asChild size="sm" variant="outline"><a href={document.fileUrl} target="_blank" rel="noreferrer"><FileText className="mr-2 h-4 w-4" />{invoice.documents && invoice.documents.length > 1 ? `Comprobante ${index + 1}` : "Ver factura"}</a></Button>)}{invoice.approvalStatus !== "approved" && <Button size="icon" variant="ghost" className="text-rose-600" title="Eliminar factura" aria-label={`Eliminar factura de ${formatPeriod(invoice.period)}`} onClick={() => setDeleteTarget(invoice)}><Trash2 className="h-4 w-4" /></Button>}</div>
             </div>;
           })}
         </CardContent>
