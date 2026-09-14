@@ -91,6 +91,25 @@ describe("personal invoice integration contracts", () => {
     expect(employeePage).toContain("Comisión bancaria USD");
   });
 
+  it("repite el método mensual con sugerencias y seguimiento por etapa", () => {
+    const routes = source("server/routes.ts");
+    const employeePage = source("client/src/pages/my-invoices.tsx");
+    const adminPage = source("client/src/pages/team-settlements.tsx");
+    expect(routes).toContain("priorSettlements");
+    expect(routes).toContain("invoiceByPerson");
+    expect(routes).toContain("La liquidación ya está publicada");
+    expect(adminPage).toContain("Preparar {bulkRows.length");
+    expect(adminPage).toContain("Usar {periodLabel(row.suggestion.sourcePeriod)}");
+    expect(adminPage).toContain("Acción de Administración");
+    expect(adminPage).toContain("Esperando cobro y segundo TC");
+    expect(employeePage).toContain('settlementMutation.mutate("invoice")');
+    expect(employeePage).toContain('settlementMutation.mutate("receipt")');
+    expect(employeePage).toContain("Confirmar TC y calcular USD");
+    expect(employeePage).toContain("Confirmar cobro y calcular ARS");
+    expect(employeePage).toContain("effectiveBillingCurrency");
+    expect(routes).toContain('String(summary.billingCurrency).toUpperCase() === "MIXED" && !publishedSettlement');
+  });
+
   it("no duplica el costo y conserva el vínculo por proyecto", () => {
     const migration = source("migrations/0060_employee_invoice_projects.sql");
     const page = source("client/src/pages/my-invoices.tsx");

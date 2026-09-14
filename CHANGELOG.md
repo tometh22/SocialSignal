@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.7.0 — 2026-09-14
+
+- Reordena el cierre mensual del equipo según las etapas conocidas del Excel: cierre operativo, preparación de Administración, carga del colaborador y revisión financiera.
+- Propone automáticamente la modalidad y el porcentaje USD del último cierre de cada persona, sin arrastrar bonos ni extras variables.
+- Permite preparar en un clic todos los borradores que ya tienen cierre operativo y después revisarlos individualmente antes de publicar.
+- Agrupa a las personas por la próxima acción requerida y muestra el avance de tipos de cambio, comprobantes y aprobación sin abrir otras pantallas.
+- Separa la experiencia del colaborador en los dos momentos reales del proceso: primero calcular la factura USD y, después del cobro, calcular la diferencia ARS.
+- Evita que un guardado de borrador modifique silenciosamente una liquidación ya publicada; los cambios publicados requieren una actualización explícita.
+
 ## 1.6.1 — 2026-09-14
 
 - Permite elegir la modalidad ARS, USD o USD + ARS por persona y por mes desde la liquidación, sin depender de una configuración fija en Personal.
