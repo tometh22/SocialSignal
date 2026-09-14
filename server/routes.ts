@@ -13393,7 +13393,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Formato de período inválido (YYYY-MM)" });
       }
       const [year, month] = period.split("-").map(Number);
-      const [people, closings, settlements] = await Promise.all([
+      const [people, closings, settlements, priorSettlements, invoices] = await Promise.all([
         db.select({
           id: personnel.id,
           name: personnel.name,
@@ -13404,9 +13404,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }).from(personnel).orderBy(asc(personnel.name)),
         db.select().from(monthlyClosings).where(and(eq(monthlyClosings.year, year), eq(monthlyClosings.month, month))),
         db.select().from(personnelMonthlySettlements).where(eq(personnelMonthlySettlements.period, period)),
+        db.select({
+          personnelId: personnelMonthlySettlements.personnelId,
+          period: personnelMonthlySettlements.period,
+          billingCurrencySnapshot: personnelMonthlySettlements.billingCurrencySnapshot,
+          usdPercentage: personnelMonthlySettlements.usdPercentage,
+        }).from(personnelMonthlySettlements)
+          .where(and(
+            lt(personnelMonthlySettlements.period, period),
+            eq(personnelMonthlySettlements.status, "published"),
+          ))
+          .orderBy(desc(personnelMonthlySettlements.period)),
+        db.select({
+          id: personalMonthlyInvoices.id,
+          personnelId: personalMonthlyInvoices.personnelId,
+          approvalStatus: personalMonthlyInvoices.approvalStatus,
+          supportingFiles: personalMonthlyInvoices.supportingFiles,
+          uploadedAt: personalMonthlyInvoices.uploadedAt,
+          reviewReason: personalMonthlyInvoices.reviewReason,
+        }).from(personalMonthlyInvoices).where(eq(personalMonthlyInvoices.period, period)),
       ]);
       const closeByPerson = new Map(closings.map((row) => [row.personnelId, row]));
       const settlementByPerson = new Map(settlements.map((row) => [row.personnelId, row]));
+      const priorByPerson = new Map<number, typeof priorSettlements[number]>();
+      for (const prior of priorSettlements) {
+        if (!priorByPerson.has(prior.personnelId)) priorByPerson.set(prior.personnelId, prior);
+      }
+      const invoiceByPerson = new Map(invoices
+        .filter((row) => row.personnelId != null)
+        .map((row) => [Number(row.personnelId), {
+          id: row.id,
+          approvalStatus: row.approvalStatus,
+          documentCount: Array.isArray(row.supportingFiles) ? row.supportingFiles.length : 0,
+          uploadedAt: row.uploadedAt,
+          reviewReason: row.reviewReason,
+        }]));
       res.json(people
         .filter((person) => !person.activeUntil || person.activeUntil >= `${period}-01`)
         .map((person) => {
@@ -13415,7 +13447,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const totalARS = closing ? Number(closing.grandTotalARS ?? closing.totalCost ?? 0) : null;
           const hours = closing ? Number(closing.adjustedHours ?? 0) : null;
           const hourlyRateARS = closing && hours && hours > 0 && totalARS != null ? totalARS / hours : null;
-          return { person, closing, system: { hours, hourlyRateARS, totalARS }, settlement };
+          const prior = priorByPerson.get(person.id);
+          return {
+            person,
+            closing,
+            system: { hours, hourlyRateARS, totalARS },
+            settlement,
+            suggestion: prior ? {
+              sourcePeriod: prior.period,
+              billingCurrency: prior.billingCurrencySnapshot,
+              usdPercentage: Number(prior.usdPercentage),
+            } : null,
+            invoice: invoiceByPerson.get(person.id) ?? null,
+          };
         }));
     } catch (error) {
       console.error("Error obteniendo liquidaciones mensuales:", error);
@@ -13445,6 +13489,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       ]);
       if (!person) return res.status(404).json({ message: "Persona no encontrada" });
       if (!closing) return res.status(409).json({ message: "Primero cerrá las horas de esta persona en Operaciones → Cierre mensual" });
+      const publish = req.body?.publish === true;
+      if (existing?.status === "published" && !publish) {
+        return res.status(409).json({ message: "La liquidación ya está publicada. Para cambiarla, revisá los datos y elegí Actualizar publicación." });
+      }
 
       const requestedBillingCurrency = String(req.body?.billingCurrency ?? closing.billingCurrency ?? person.billingCurrency ?? "ARS").toUpperCase();
       const billingCurrency = ["ARS", "USD", "MIXED"].includes(requestedBillingCurrency) ? requestedBillingCurrency : "ARS";
@@ -13456,8 +13504,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const requestedPercentage = parseNonNegative(req.body?.usdPercentage, "Porcentaje USD");
       const usdPercentage = billingCurrency === "USD" ? 100 : billingCurrency === "ARS" ? 0 : requestedPercentage;
       if (usdPercentage > 100) return res.status(400).json({ message: "El porcentaje USD debe estar entre 0 y 100" });
-      const bonusUSD = parseNonNegative(req.body?.bonusUSD, "Extra USD");
-      const extrasARS = parseNonNegative(req.body?.extrasARS, "Extra ARS");
+      const bonusUSD = billingCurrency === "MIXED" ? parseNonNegative(req.body?.bonusUSD, "Extra USD") : 0;
+      const extrasARS = billingCurrency === "MIXED" ? parseNonNegative(req.body?.extrasARS, "Extra ARS") : 0;
       const totalARS = Number(closing.grandTotalARS ?? closing.totalCost ?? 0);
       const hoursSnapshot = Number(closing.adjustedHours ?? 0);
       const hourlyRateARSSnapshot = hoursSnapshot > 0 ? totalARS / hoursSnapshot : 0;
@@ -13470,7 +13518,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         receivedFx: existing?.receivedFx,
         bankCommissionUSD: existing?.bankCommissionUSD,
       });
-      const publish = req.body?.publish === true;
       const status = publish ? "published" : existing?.status === "published" ? "published" : "draft";
       const values = {
         contractTypeSnapshot: person.contractType ?? "full-time",
@@ -14080,7 +14127,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         eq(personnelMonthlySettlements.status, "published"),
       )).limit(1);
       const usesPublishedMixedSettlement = publishedSettlement?.billingCurrencySnapshot === "MIXED";
-      if (String(summary.billingCurrency).toUpperCase() === "MIXED" && !usesPublishedMixedSettlement) {
+      if (String(summary.billingCurrency).toUpperCase() === "MIXED" && !publishedSettlement) {
         return res.status(409).json({ message: "Administración todavía no publicó tu liquidación mixta de este mes" });
       }
       const settlementCalculation = publishedSettlement ? calculatePersonnelSettlement({

@@ -162,7 +162,8 @@ export default function MyInvoices() {
   const financialCostMode = summary?.financialCostMode ?? existing?.financialCostMode;
   const isFreelance = financialCostMode === "hourly";
   const settlement = settlementQuery.data ?? null;
-  const requiresMixedSettlement = settlement?.billingCurrencySnapshot?.toUpperCase() === "MIXED" || summary?.billingCurrency?.toUpperCase() === "MIXED";
+  const effectiveBillingCurrency = settlement?.billingCurrencySnapshot?.toUpperCase() ?? summary?.billingCurrency?.toUpperCase() ?? "ARS";
+  const requiresMixedSettlement = effectiveBillingCurrency === "MIXED";
   const locked = existing?.approvalStatus === "approved";
 
   useEffect(() => {
@@ -170,14 +171,14 @@ export default function MyInvoices() {
     const savedIds = existing?.allocations?.map((allocation) => allocation.projectId) ?? [];
     setSelectedIds(savedIds.length ? savedIds : projectQuery.data.projects.map((project) => project.projectId));
     setInvoiceAmount(existing?.declaredInvoiceAmount == null ? "" : String(existing.declaredInvoiceAmount));
-    setInvoiceCurrency(existing?.invoiceCurrency ?? (projectQuery.data.summary?.billingCurrency === "USD" ? "USD" : "ARS"));
+    setInvoiceCurrency(existing?.invoiceCurrency ?? (effectiveBillingCurrency === "USD" ? "USD" : "ARS"));
     setInvoiceNumber(existing?.invoiceNumber ?? "");
     setIssueDate(existing?.issueDate?.slice(0, 10) ?? "");
     setBankFx(existing?.bankFx == null ? "" : String(existing.bankFx));
     setNotes(existing?.notes ?? "");
     setFiles([]);
     if (fileInput.current) fileInput.current.value = "";
-  }, [period, projectQuery.data, existing?.id]);
+  }, [period, projectQuery.data, existing?.id, effectiveBillingCurrency]);
 
   useEffect(() => {
     setInvoiceFx(settlement?.invoiceFx == null ? "" : String(settlement.invoiceFx));
@@ -186,14 +187,18 @@ export default function MyInvoices() {
   }, [settlement?.id, settlement?.invoiceFx, settlement?.receivedFx, settlement?.bankCommissionUSD]);
 
   const settlementMutation = useMutation({
-    mutationFn: () => authFetchJson("/api/me/invoices/settlement", {
+    mutationFn: (phase: "invoice" | "receipt") => authFetchJson("/api/me/invoices/settlement", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ period, invoiceFx, receivedFx, bankCommissionUSD }),
+      body: JSON.stringify(phase === "invoice"
+        ? { period, invoiceFx }
+        : { period, receivedFx, bankCommissionUSD }),
     }),
-    onSuccess: () => {
+    onSuccess: (_data, phase) => {
       queryClient.invalidateQueries({ queryKey: ["personal-settlement", period] });
-      toast({ title: "Tipos de cambio guardados", description: "Mind recalculó automáticamente los importes a facturar." });
+      toast(phase === "invoice"
+        ? { title: "Importe USD calculado", description: "Ya podés emitir la factura en USD. Cuando recibas la transferencia, continuá con el paso B." }
+        : { title: "Importe ARS calculado", description: "La liquidación quedó lista para adjuntar los comprobantes y enviarla a Finanzas." });
     },
     onError: (error: Error) => toast({ title: "No se pudo calcular", description: error.message, variant: "destructive" }),
   });
@@ -261,7 +266,9 @@ export default function MyInvoices() {
     setSelectedIds((current) => checked ? [...new Set([...current, projectId])] : current.filter((id) => id !== projectId));
   }
 
-  const mixedReady = !requiresMixedSettlement || Boolean(settlement?.invoiceFx && settlement?.receivedFx && settlement?.finalInvoiceARS != null);
+  const invoiceFxSaved = Boolean(settlement?.invoiceFx);
+  const receivedFxSaved = Boolean(settlement?.receivedFx && settlement?.finalInvoiceARS != null);
+  const mixedReady = !requiresMixedSettlement || Boolean(invoiceFxSaved && receivedFxSaved);
   const stepReady = Boolean(summary?.personnelId && selectedIds.length && files.length && mixedReady && !locked);
   const status = existing?.approvalStatus ? STATUS[existing.approvalStatus] : null;
   const invoiceFxNumber = Number(invoiceFx) > 0 ? Number(invoiceFx) : null;
@@ -325,22 +332,26 @@ export default function MyInvoices() {
               <Summary label="Porción en USD" value={`${Number(settlement.usdPercentage).toFixed(2)}%`} detail={formatMoney(settlement.plannedUSDARS, "ARS")} />
               <Summary label="Extra / bono USD" value={formatMoney(settlement.bonusUSD, "USD")} detail="Se suma, no descuenta del sueldo" />
               <Summary label="Extras ARS" value={formatMoney(settlement.extrasARS, "ARS")} detail="Se suman al comprobante ARS" />
-              <Summary label="Comprobantes esperados" value="USD + ARS" detail="Adjuntalos juntos al finalizar" />
+              <Summary label="Comprobantes esperados" value="USD + ARS" detail="Dos archivos o un PDF combinado" />
             </div>
             {settlement.adminNotes && <Notice tone="info" title="Indicación de Administración" text={settlement.adminNotes} />}
             <div className="grid gap-4 lg:grid-cols-2">
-              <div className="rounded-xl border p-4">
-                <div className="mb-3 flex items-start justify-between gap-3"><div><p className="font-semibold">A. Al momento de facturar USD</p><p className="text-xs text-muted-foreground">Ingresá el tipo de cambio comprador más bajo que te muestra tu banco.</p></div><Badge variant="secondary">Paso 1</Badge></div>
+              <div className={`rounded-xl border p-4 ${invoiceFxSaved ? "border-emerald-200 bg-emerald-50/30" : "border-indigo-200"}`}>
+                <div className="mb-3 flex items-start justify-between gap-3"><div><p className="font-semibold">A. Al momento de facturar USD</p><p className="text-xs text-muted-foreground">Ingresá el tipo de cambio comprador más bajo que te muestra tu banco.</p></div><Badge variant="outline" className={invoiceFxSaved ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-indigo-200 bg-indigo-50 text-indigo-800"}>{invoiceFxSaved ? "Completado" : "Hacer ahora"}</Badge></div>
                 <Label htmlFor="settlement-invoice-fx">Tipo de cambio al facturar</Label><Input id="settlement-invoice-fx" className="mt-1.5" type="number" min="0" step="0.01" value={invoiceFx} onChange={(event) => setInvoiceFx(event.target.value)} placeholder="ARS por USD" disabled={locked} />
                 <div className="mt-3 grid gap-2 sm:grid-cols-2"><Summary label="USD base" value={formatMoney(previewBaseUSD, "USD")} detail={`${formatMoney(settlement.plannedUSDARS, "ARS")} ÷ TC`} /><Summary label="Total a facturar USD" value={formatMoney(previewTotalUSD, "USD")} detail="USD base + extra/bono" /></div>
+                <Button className="mt-3 w-full" disabled={locked || settlementMutation.isPending || !invoiceFxNumber} onClick={() => settlementMutation.mutate("invoice")}>{settlementMutation.isPending && settlementMutation.variables === "invoice" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : invoiceFxSaved ? <Check className="mr-2 h-4 w-4" /> : <Calculator className="mr-2 h-4 w-4" />}{invoiceFxSaved ? "Actualizar TC y recalcular USD" : "Confirmar TC y calcular USD"}</Button>
+                {invoiceFxSaved && <p className="mt-2 flex items-center gap-1.5 text-xs text-emerald-700"><CheckCircle2 className="h-3.5 w-3.5" />Ya podés emitir la factura USD por {formatMoney(settlement.totalInvoiceUSD, "USD")}.</p>}
               </div>
-              <div className="rounded-xl border p-4">
-                <div className="mb-3 flex items-start justify-between gap-3"><div><p className="font-semibold">B. Una vez recibida la transferencia</p><p className="text-xs text-muted-foreground">Cargá el nuevo TC y la comisión que descontó el banco.</p></div><Badge variant="secondary">Paso 2</Badge></div>
-                <div className="grid gap-3 sm:grid-cols-2"><div><Label htmlFor="settlement-received-fx">Tipo de cambio al cobrar</Label><Input id="settlement-received-fx" className="mt-1.5" type="number" min="0" step="0.01" value={receivedFx} onChange={(event) => setReceivedFx(event.target.value)} placeholder="ARS por USD" disabled={locked} /></div><div><Label htmlFor="settlement-bank-fee">Comisión bancaria USD</Label><Input id="settlement-bank-fee" className="mt-1.5" type="number" min="0" step="0.01" value={bankCommissionUSD} onChange={(event) => setBankCommissionUSD(event.target.value)} disabled={locked} /></div></div>
+              <div className={`rounded-xl border p-4 ${!invoiceFxSaved ? "bg-slate-50 opacity-70" : receivedFxSaved ? "border-emerald-200 bg-emerald-50/30" : "border-indigo-200"}`}>
+                <div className="mb-3 flex items-start justify-between gap-3"><div><p className="font-semibold">B. Una vez recibida la transferencia</p><p className="text-xs text-muted-foreground">Cargá el nuevo TC y la comisión que descontó el banco.</p></div><Badge variant="outline" className={receivedFxSaved ? "border-emerald-200 bg-emerald-50 text-emerald-800" : ""}>{receivedFxSaved ? "Completado" : invoiceFxSaved ? "Siguiente paso" : "Esperá el paso A"}</Badge></div>
+                <div className="grid gap-3 sm:grid-cols-2"><div><Label htmlFor="settlement-received-fx">Tipo de cambio al cobrar</Label><Input id="settlement-received-fx" className="mt-1.5" type="number" min="0" step="0.01" value={receivedFx} onChange={(event) => setReceivedFx(event.target.value)} placeholder="ARS por USD" disabled={locked || !invoiceFxSaved} /></div><div><Label htmlFor="settlement-bank-fee">Comisión bancaria USD</Label><Input id="settlement-bank-fee" className="mt-1.5" type="number" min="0" step="0.01" value={bankCommissionUSD} onChange={(event) => setBankCommissionUSD(event.target.value)} disabled={locked || !invoiceFxSaved} /></div></div>
                 <div className="mt-3 grid gap-2 sm:grid-cols-2"><Summary label="USD base pesificados" value={formatMoney(previewPesifiedARS, "ARS")} detail="USD base × nuevo TC" /><Summary label="Diferencia a facturar ARS" value={formatMoney(previewFinalARS, "ARS")} detail="Saldo + extras + comisión" /></div>
+                <Button className="mt-3 w-full" disabled={locked || !invoiceFxSaved || settlementMutation.isPending || !receivedFxNumber} onClick={() => settlementMutation.mutate("receipt")}>{settlementMutation.isPending && settlementMutation.variables === "receipt" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : receivedFxSaved ? <Check className="mr-2 h-4 w-4" /> : <Calculator className="mr-2 h-4 w-4" />}{receivedFxSaved ? "Actualizar TC y recalcular ARS" : "Confirmar cobro y calcular ARS"}</Button>
+                {receivedFxSaved && <p className="mt-2 flex items-center gap-1.5 text-xs text-emerald-700"><CheckCircle2 className="h-3.5 w-3.5" />Emití la factura ARS por {formatMoney(settlement.finalInvoiceARS, "ARS")} y adjuntá ambos comprobantes.</p>}
               </div>
             </div>
-            <div className="flex flex-col gap-2 border-t pt-4 sm:flex-row sm:items-center sm:justify-between"><p className="text-xs text-muted-foreground">El bono USD queda separado de la base para que no reduzca por error la diferencia en pesos.</p><Button variant="outline" disabled={locked || settlementMutation.isPending || !invoiceFxNumber} onClick={() => settlementMutation.mutate()}>{settlementMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}Guardar y recalcular</Button></div>
+            <p className="border-t pt-4 text-xs text-muted-foreground">Mind guarda cada etapa por separado. El bono USD queda fuera de la base para que no reduzca por error la diferencia en pesos.</p>
           </>}
         </CardContent>
       </Card>}
@@ -371,7 +382,7 @@ export default function MyInvoices() {
       </Card>
 
       <Card>
-        <CardHeader className="pb-3"><CardTitle className="flex items-center gap-2 text-base"><Receipt className="h-4 w-4 text-indigo-600" />{requiresMixedSettlement ? "4" : "3"}. Comprobantes</CardTitle><p className="text-sm text-muted-foreground">Adjuntá PDF o capturas. Si facturás USD + ARS, seleccioná ambos comprobantes; Mind los guarda juntos en el mismo cierre.</p></CardHeader>
+        <CardHeader className="pb-3"><CardTitle className="flex items-center gap-2 text-base"><Receipt className="h-4 w-4 text-indigo-600" />{requiresMixedSettlement ? "4" : "3"}. Comprobantes</CardTitle><p className="text-sm text-muted-foreground">Adjuntá PDF o capturas. Si facturás USD + ARS, podés subir ambos archivos o un único PDF combinado; Mind los guarda juntos en el mismo cierre.</p></CardHeader>
         <CardContent className="space-y-4">
           {locked && <Notice tone="success" title="Factura aprobada" text="Este período quedó bloqueado para preservar el respaldo contable. Si necesitás corregirlo, contactá a Finanzas." />}
           {existing?.approvalStatus === "rejected" && <Notice tone="danger" title="Finanzas pidió una corrección" text={existing.reviewReason || "Revisá los datos y reemplazá el comprobante."} />}
