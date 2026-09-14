@@ -611,14 +611,14 @@ export default function MonthlyClosing() {
 
       {invoiceReviews.length > 0 && (
         <Card className="border-indigo-200 bg-indigo-50/30">
-          <CardHeader className="pb-3"><CardTitle className="text-base">Facturas del equipo para revisar</CardTitle><p className="text-sm text-muted-foreground">Cada comprobante muestra el reparto que respaldará el costo directo de los proyectos. Aprobar no duplica el costo calculado desde horas.</p></CardHeader>
+          <CardHeader className="pb-3"><CardTitle className="text-base">Facturas del equipo para revisar</CardTitle><p className="text-sm text-muted-foreground">Freelance se valúa por horas × tarifa. En contratos fijos, el importe aprobado es el costo real de Finanzas y Economía; las horas se conservan para Operaciones.</p></CardHeader>
           <CardContent className="space-y-2">
             {invoiceReviews.map((invoice: any) => (
               <div key={invoice.id} className="flex flex-wrap items-start justify-between gap-3 rounded-lg border bg-background px-4 py-3 text-sm">
                 <div className="min-w-0 flex-1">
-                  <div className="font-medium">{invoice.personnel_name || invoice.user_name || invoice.email || "Persona"} · {invoice.invoice_number || invoice.file_name || "Factura"}</div>
+                  <div className="flex flex-wrap items-center gap-2"><span className="font-medium">{invoice.personnel_name || invoice.user_name || invoice.email || "Persona"} · {invoice.invoice_number || invoice.file_name || "Factura"}</span><Badge variant="secondary">{invoice.financial_cost_mode === "hourly" ? "Freelance · por horas" : "Contrato fijo · importe real"}</Badge></div>
                   <div className="text-xs text-muted-foreground">
-                    {invoice.period} · {invoice.invoice_currency || "USD"} {invoice.declared_invoice_amount == null ? (invoice.declared_invoice_usd == null ? "—" : Number(invoice.declared_invoice_usd).toFixed(2)) : Number(invoice.declared_invoice_amount).toLocaleString("es-AR", { maximumFractionDigits: 2 })} · diferencia USD {invoice.difference_usd == null ? "—" : Number(invoice.difference_usd).toFixed(2)}
+                    {invoice.period} · Factura {invoice.invoice_currency || "USD"} {invoice.declared_invoice_amount == null ? (invoice.declared_invoice_usd == null ? "—" : Number(invoice.declared_invoice_usd).toFixed(2)) : Number(invoice.declared_invoice_amount).toLocaleString("es-AR", { maximumFractionDigits: 2 })} · costo financiero USD {invoice.financial_cost_usd == null ? "—" : Number(invoice.financial_cost_usd).toFixed(2)}{invoice.difference_usd == null ? "" : ` · diferencia USD ${Number(invoice.difference_usd).toFixed(2)}`}
                   </div>
                   {invoice.allocations?.length > 0 && <div className="mt-2 flex flex-wrap gap-1.5">{invoice.allocations.map((allocation: any) => <Badge key={`${invoice.id}-${allocation.projectId}`} variant="secondary">{allocation.clientName ? `${allocation.clientName} · ` : ""}{allocation.projectName} · {Number(allocation.allocationPercent).toFixed(1)}%</Badge>)}</div>}
                 </div>

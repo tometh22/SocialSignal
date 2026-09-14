@@ -4557,6 +4557,11 @@ export const personalMonthlyInvoices = pgTable("personal_monthly_invoices", {
   issueDate: timestamp("issue_date"),
   invoiceCurrency: varchar("invoice_currency", { length: 3 }),
   declaredInvoiceAmount: doublePrecision("declared_invoice_amount"),
+  declaredInvoiceARS: doublePrecision("declared_invoice_ars"),
+  contractTypeSnapshot: varchar("contract_type_snapshot", { length: 20 }),
+  financialCostMode: varchar("financial_cost_mode", { length: 20 }), // hourly | invoice_actual
+  financialCostARS: doublePrecision("financial_cost_ars"),
+  financialCostUSD: doublePrecision("financial_cost_usd"),
   extractionProvider: varchar("extraction_provider", { length: 40 }),
   extractionModel: varchar("extraction_model", { length: 120 }),
   extractionWarnings: jsonb("extraction_warnings").$type<string[]>().notNull().default([]),
@@ -4580,8 +4585,8 @@ export type PersonalMonthlyInvoice = typeof personalMonthlyInvoices.$inferSelect
 export type InsertPersonalMonthlyInvoice = z.infer<typeof insertPersonalMonthlyInvoiceSchema>;
 
 // Snapshot auditable de cómo se reparte una factura personal entre los
-// proyectos trabajados. No crea un segundo costo: vincula el comprobante con
-// el costo directo que ya se calcula desde las horas y tarifas históricas.
+// proyectos trabajados. Para contratos fijos distribuye el costo financiero
+// real de la factura; para freelancers documenta el costo de horas × tarifa.
 export const personalInvoiceProjectAllocations = pgTable("personal_invoice_project_allocations", {
   id: serial("id").primaryKey(),
   invoiceId: integer("invoice_id").notNull().references(() => personalMonthlyInvoices.id, { onDelete: "cascade" }),

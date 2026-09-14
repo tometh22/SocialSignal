@@ -70,6 +70,29 @@ async function collectCloseChecks(periodKey: string, runner: any = db): Promise<
           AND reconciliation_status = 'unmatched')::int AS unmatched_cashflow,
       (SELECT count(*) FROM provision_entries
         WHERE period_key = ${periodKey} AND status = 'PROPOSED')::int AS proposed_provisions,
+      (SELECT count(DISTINCT fl.person_id)
+        FROM fact_labor_month fl
+        JOIN personnel p ON p.id=fl.person_id
+        WHERE fl.period_key=${periodKey} AND COALESCE(fl.asana_hours,0)>0
+          AND COALESCE(p.contract_type,'full-time')<>'freelance'
+          AND EXISTS (SELECT 1 FROM system_config sc WHERE sc.config_key='app_mode_cutover_date' AND sc.description<=${periodKey}))::int AS fixed_invoice_expected,
+      (SELECT count(DISTINCT fl.person_id)
+        FROM fact_labor_month fl
+        JOIN personnel p ON p.id=fl.person_id
+        WHERE fl.period_key=${periodKey} AND COALESCE(fl.asana_hours,0)>0
+          AND COALESCE(p.contract_type,'full-time')<>'freelance'
+          AND EXISTS (SELECT 1 FROM system_config sc WHERE sc.config_key='app_mode_cutover_date' AND sc.description<=${periodKey})
+          AND EXISTS (
+            SELECT 1 FROM personal_monthly_invoices i
+            WHERE i.personnel_id=fl.person_id AND i.period=${periodKey} AND i.approval_status='approved'
+              AND COALESCE(i.financial_cost_mode,CASE WHEN COALESCE(i.contract_type_snapshot,p.contract_type,'full-time')='freelance' THEN 'hourly' ELSE 'invoice_actual' END)='invoice_actual'
+              AND COALESCE(i.financial_cost_usd,i.declared_invoice_usd,i.financial_cost_ars,i.declared_invoice_ars,0)>0
+              AND EXISTS (
+                SELECT 1 FROM personal_invoice_project_allocations allocation
+                WHERE allocation.invoice_id=i.id
+                HAVING abs(sum(allocation.allocation_percent)-100)<=0.01
+              )
+          ))::int AS fixed_invoice_approved,
       (SELECT count(*) FROM (
         SELECT transfer_group_id
         FROM cashflow_transactions
@@ -83,6 +106,9 @@ async function collectCloseChecks(periodKey: string, runner: any = db): Promise<
   const invalidAmounts = numeric(stats.invalid_activo) + numeric(stats.invalid_pasivo) + numeric(stats.invalid_cashflow);
   const unmatchedCashflow = numeric(stats.unmatched_cashflow);
   const proposedProvisions = numeric(stats.proposed_provisions);
+  const fixedInvoiceExpected = numeric(stats.fixed_invoice_expected);
+  const fixedInvoiceApproved = numeric(stats.fixed_invoice_approved);
+  const fixedInvoiceMissing = Math.max(0, fixedInvoiceExpected - fixedInvoiceApproved);
   const unbalancedTransfers = numeric(stats.unbalanced_transfers);
 
   const checks: CloseCheckDefinition[] = [
@@ -119,6 +145,18 @@ async function collectCloseChecks(periodKey: string, runner: any = db): Promise<
         : `Hay ${pendingIntake} carga(s) sin publicar o rechazar.`,
       expectedValue: 0,
       actualValue: pendingIntake,
+    },
+    {
+      code: "fixed_team_invoices_approved",
+      severity: "critical",
+      status: fixedInvoiceMissing === 0 ? "passed" : "failed",
+      title: "Facturas del equipo fijo aprobadas",
+      detail: fixedInvoiceMissing === 0
+        ? `Las ${fixedInvoiceApproved} factura(s) requeridas del equipo fijo están aprobadas.`
+        : `Faltan aprobar ${fixedInvoiceMissing} de ${fixedInvoiceExpected} factura(s) del equipo fijo. Sin ellas el costo financiero seguiría siendo estimado.`,
+      expectedValue: fixedInvoiceExpected,
+      actualValue: fixedInvoiceApproved,
+      evidence: { expected: fixedInvoiceExpected, approved: fixedInvoiceApproved },
     },
     {
       code: "normalized_amounts",
@@ -221,6 +259,7 @@ type Snapshot = {
   cuentasPagarUsd: number;
   facturacionTotal: number;
   costosDirectos: number;
+  costosDirectosOperativos: number;
   costosIndirectos: number;
   ivaCompras: number;
   impuestosUsa: number;
@@ -239,6 +278,7 @@ async function calculateSnapshot(tx: any, periodKey: string, officialRate: numbe
       COALESCE((SELECT sum(CASE WHEN COALESCE(currency, CASE WHEN monto_usd IS NOT NULL THEN 'USD' ELSE 'ARS' END)='ARS' THEN COALESCE(outstanding_amount,0)/NULLIF(cotizacion,0) ELSE COALESCE(outstanding_amount,0) END) FROM pasivo_entries WHERE period_key<=${periodKey} AND voided_at IS NULL),0) AS pagar,
       COALESCE((SELECT sum(amount_usd) FROM revenue_events WHERE invoice_period=${periodKey} AND status <> 'cancelled'),0) AS facturacion,
       COALESCE((SELECT direct_usd FROM fact_cost_month WHERE period_key=${periodKey}),0) AS costos_directos,
+      COALESCE((SELECT sum(cost_usd) FROM fact_labor_month WHERE period_key=${periodKey}),0) AS costos_directos_operativos,
       COALESCE((SELECT indirect_usd FROM fact_cost_month WHERE period_key=${periodKey}),0) AS costos_indirectos,
       COALESCE((SELECT sum(COALESCE(tax_amount,0)/CASE WHEN currency='ARS' THEN NULLIF(cotizacion,0) ELSE 1 END) FROM pasivo_entries WHERE period_key=${periodKey} AND voided_at IS NULL),0) AS iva_compras,
       COALESCE((SELECT sum(amount_usd) FROM pl_adjustments WHERE period_key=${periodKey} AND type='impuesto'),0) AS impuestos,
@@ -258,6 +298,7 @@ async function calculateSnapshot(tx: any, periodKey: string, officialRate: numbe
     cashflowIngresos: ingresos, cashflowEgresos: egresos,
     cuentasCobrarUsd, cuentasPagarUsd,
     facturacionTotal: numeric(row.facturacion), costosDirectos: numeric(row.costos_directos),
+    costosDirectosOperativos: numeric(row.costos_directos_operativos),
     costosIndirectos: numeric(row.costos_indirectos), ivaCompras: numeric(row.iva_compras),
     impuestosUsa: numeric(row.impuestos), provisiones, provisionExpense: numeric(row.provision_expense),
   };
@@ -307,7 +348,9 @@ export async function closeFinancialPeriod(periodKey: string, actorUserId: numbe
       cuentasCobrarUsd: String(snapshot.cuentasCobrarUsd), cuentasPagarUsd: String(snapshot.cuentasPagarUsd), facturacionTotal: String(snapshot.facturacionTotal),
       costosDirectos: String(snapshot.costosDirectos), costosIndirectos: String(snapshot.costosIndirectos), ivaCompras: String(snapshot.ivaCompras), impuestosUsa: String(snapshot.impuestosUsa),
       pasivoFacturacionAdelantada: String(snapshot.provisiones), ebitOperativo: String(ebit), beneficioNeto: String(beneficio),
-      markupPromedio: snapshot.costosDirectos ? String(snapshot.facturacionTotal / snapshot.costosDirectos) : null,
+      // Markup is an operational efficiency metric, so it stays on hours ×
+      // historical rate even though P&L uses the approved real invoice cost.
+      markupPromedio: snapshot.costosDirectosOperativos ? String(snapshot.facturacionTotal / snapshot.costosDirectosOperativos) : null,
       margenOperativo: snapshot.facturacionTotal ? String((ebit / snapshot.facturacionTotal) * 100) : null,
       margenNeto: snapshot.facturacionTotal ? String((beneficio / snapshot.facturacionTotal) * 100) : null,
       updatedAt: new Date(),

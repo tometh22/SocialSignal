@@ -7,6 +7,11 @@ ALTER TABLE personal_monthly_invoices
   ADD COLUMN IF NOT EXISTS issue_date timestamp,
   ADD COLUMN IF NOT EXISTS invoice_currency varchar(3),
   ADD COLUMN IF NOT EXISTS declared_invoice_amount double precision,
+  ADD COLUMN IF NOT EXISTS declared_invoice_ars double precision,
+  ADD COLUMN IF NOT EXISTS contract_type_snapshot varchar(20),
+  ADD COLUMN IF NOT EXISTS financial_cost_mode varchar(20),
+  ADD COLUMN IF NOT EXISTS financial_cost_ars double precision,
+  ADD COLUMN IF NOT EXISTS financial_cost_usd double precision,
   ADD COLUMN IF NOT EXISTS extraction_provider varchar(40),
   ADD COLUMN IF NOT EXISTS extraction_model varchar(120),
   ADD COLUMN IF NOT EXISTS extraction_warnings jsonb NOT NULL DEFAULT '[]'::jsonb;

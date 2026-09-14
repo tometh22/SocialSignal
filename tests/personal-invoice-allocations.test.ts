@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { buildPersonalInvoiceAllocations } from "../server/services/personal-invoice-allocations";
+import { buildPersonalInvoiceAllocations, personalFinancialCostPolicy } from "../server/services/personal-invoice-allocations";
 
 describe("personal invoice project allocations", () => {
   const projects = [
@@ -25,6 +25,23 @@ describe("personal invoice project allocations", () => {
   it("usa horas cuando todavía no existe costo histórico", () => {
     const rows = buildPersonalInvoiceAllocations({ projects: projects.map((project) => ({ ...project, computedCostARS: 0 })), computedTotalUSD: 800 });
     expect(rows.map((row) => row.allocationPercent)).toEqual([75, 25]);
+  });
+
+  it("separa el costo por contrato y reparte los contratos fijos por horas", () => {
+    expect(personalFinancialCostPolicy("freelance")).toEqual({ costMode: "hourly", allocationBasis: "cost" });
+    expect(personalFinancialCostPolicy("full-time")).toEqual({ costMode: "invoice_actual", allocationBasis: "hours" });
+    expect(personalFinancialCostPolicy("part-time")).toEqual({ costMode: "invoice_actual", allocationBasis: "hours" });
+    const rows = buildPersonalInvoiceAllocations({
+      projects: [
+        { projectId: 1, projectName: "Uno", clientName: null, hours: 1, computedCostARS: 900 },
+        { projectId: 2, projectName: "Dos", clientName: null, hours: 3, computedCostARS: 100 },
+      ],
+      computedTotalUSD: 100,
+      invoiceAmount: 1000,
+      invoiceCurrency: "USD",
+      allocationBasis: "hours",
+    });
+    expect(rows.map((row) => row.allocationPercent)).toEqual([25, 75]);
   });
 
   it("absorbe redondeos en el último proyecto", () => {
@@ -63,7 +80,20 @@ describe("personal invoice integration contracts", () => {
     const page = source("client/src/pages/my-invoices.tsx");
     expect(migration).toContain("personal_invoice_project_allocations");
     expect(migration).toContain("REFERENCES active_projects");
-    expect(page).toContain("No duplica costos");
+    expect(page).toContain("Contrato fijo: el costo real sale de la factura");
+    expect(page).toContain("Finanzas y Economía usan el importe real de la factura");
+    const builder = source("server/services/financial-native-builders.ts");
+    expect(builder).toContain("approved_fixed_invoice");
+    expect(builder).toContain("personal_invoice_project_allocations");
+    expect(builder).toContain("invoice.actual_usd*allocation.allocation_percent/100");
+    expect(source("server/services/executive-endpoints.ts")).toContain("fetchOperationalDirectCosts");
+  });
+
+  it("bloquea el cierre si falta el costo real del equipo fijo", () => {
+    const close = source("server/services/financial-close.ts");
+    expect(close).toContain('code: "fixed_team_invoices_approved"');
+    expect(close).toContain("i.financial_cost_mode");
+    expect(close).toContain("i.financial_cost_usd");
   });
 
   it("permite pedir una corrección profesional y reabrir una factura aprobada", () => {

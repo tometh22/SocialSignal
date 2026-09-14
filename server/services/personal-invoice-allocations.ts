@@ -13,6 +13,23 @@ export type PersonalInvoiceAllocation = PersonalInvoiceProject & {
   invoiceCurrency: "ARS" | "USD" | null;
 };
 
+export type PersonalFinancialCostMode = "hourly" | "invoice_actual";
+export type PersonalAllocationBasis = "cost" | "hours";
+
+/**
+ * Freelancers are paid from hours × their historical rate. Fixed contracts
+ * use hours only for operational allocation; their approved invoice is the
+ * real amount consumed by Finance and Economics.
+ */
+export function personalFinancialCostPolicy(contractType: string | null | undefined): {
+  costMode: PersonalFinancialCostMode;
+  allocationBasis: PersonalAllocationBasis;
+} {
+  return String(contractType ?? "full-time").toLowerCase() === "freelance"
+    ? { costMode: "hourly", allocationBasis: "cost" }
+    : { costMode: "invoice_actual", allocationBasis: "hours" };
+}
+
 function round(value: number, decimals = 2): number {
   const factor = 10 ** decimals;
   return Math.round((value + Number.EPSILON) * factor) / factor;
@@ -30,6 +47,7 @@ export function buildPersonalInvoiceAllocations(input: {
   computedTotalUSD: number;
   invoiceAmount?: number | null;
   invoiceCurrency?: "ARS" | "USD" | null;
+  allocationBasis?: PersonalAllocationBasis;
 }): PersonalInvoiceAllocation[] {
   const selected = input.selectedProjectIds?.length
     ? new Set(input.selectedProjectIds)
@@ -39,9 +57,10 @@ export function buildPersonalInvoiceAllocations(input: {
 
   const totalCost = projects.reduce((sum, project) => sum + Math.max(0, project.computedCostARS), 0);
   const totalHours = projects.reduce((sum, project) => sum + Math.max(0, project.hours), 0);
-  const weight = (project: PersonalInvoiceProject) => totalCost > 0
-    ? Math.max(0, project.computedCostARS) / totalCost
-    : totalHours > 0 ? Math.max(0, project.hours) / totalHours : 1 / projects.length;
+  const useHours = input.allocationBasis === "hours" || totalCost <= 0;
+  const weight = (project: PersonalInvoiceProject) => useHours && totalHours > 0
+    ? Math.max(0, project.hours) / totalHours
+    : totalCost > 0 ? Math.max(0, project.computedCostARS) / totalCost : 1 / projects.length;
 
   let usedPercent = 0;
   let usedUsd = 0;

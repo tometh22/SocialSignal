@@ -102,8 +102,8 @@ export async function getOperativoTrendsAndDiffs(periodKey: string): Promise<{
   const revByPeriod = new Map(revenueRows.map((r: any) => [r.period_key, parseFloat(r.devengado_usd)]));
 
   const { rows: costsRows } = await pool.query(`
-    SELECT period_key, COALESCE(SUM(direct_usd), 0) as direct_usd
-    FROM fact_cost_month
+    SELECT period_key, COALESCE(SUM(cost_usd), 0) as direct_usd
+    FROM fact_labor_month
     WHERE period_key = ANY($1)
     GROUP BY period_key
   `, [allPeriods]);

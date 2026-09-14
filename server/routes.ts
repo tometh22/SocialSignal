@@ -164,7 +164,7 @@ import { CoverageCalculator } from "./domain/coverage";
 import { eq, and, or, isNull, isNotNull, desc, sql, asc, gte, lte, lt, inArray } from "drizzle-orm";
 import { reinitializeDatabase } from "./reinit-data";
 import { upload, uploadDocument, deleteOldFile } from "./upload";
-import { personalMonthlyInvoices, personalInvoiceProjectAllocations, personalFxOverrides, externalProviders as externalProvidersTable, providerProjectAccess as providerProjectAccessTable, exchangeRates } from "@shared/schema";
+import { personalMonthlyInvoices, personalInvoiceProjectAllocations, personalFxOverrides, externalProviders as externalProvidersTable, providerProjectAccess as providerProjectAccessTable, exchangeRates, financialClosePeriods } from "@shared/schema";
 import { sanitizeInput } from "./input-sanitization";
 import { setupAuth, hashPassword } from "./auth";
 import { requireProjectUnlocked, projectIdFromTimeEntry } from "./middleware/projectLocked";
@@ -190,7 +190,8 @@ import { DEFAULT_FX_RATE, getCanonicalFxForMonth } from "./services/fx";
 import { getCutoverDate } from "./etl/time-entries-to-fact-labor";
 import { extractFinancialIntake } from "./services/financial-intake-extractor";
 import { deleteFinancialIntakeFile, financialIntakeUpload, readFinancialIntakeFile, storeFinancialIntakeFile } from "./services/financial-intake-files";
-import { buildPersonalInvoiceAllocations } from "./services/personal-invoice-allocations";
+import { buildPersonalInvoiceAllocations, personalFinancialCostPolicy } from "./services/personal-invoice-allocations";
+import { rebuildNativeFinancialFacts } from "./services/financial-native-builders";
 import { 
   pickAnalysisCurrency, 
   createAnalysisStructure, 
@@ -13397,7 +13398,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const user = await storage.getUser(userId);
     if (!user) return null;
     const personnelRow = user.email
-      ? (await storage.getPersonnel()).find(p => p.email === user.email)
+      ? (await storage.getPersonnel()).find(p => p.email?.trim().toLowerCase() === user.email?.trim().toLowerCase())
       : null;
 
     if (!personnelRow) {
@@ -13591,6 +13592,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       : splitByBillingCurrency(totalCostARSFull, hours, usdHourlyRate, fxRate);
 
+    const costPolicy = personalFinancialCostPolicy((personnelRow as any).contractType);
     return {
       period,
       userId,
@@ -13609,6 +13611,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       isClosed: !!closing,
       availableHours,
       contractType: (personnelRow as any).contractType ?? "full-time",
+      financialCostMode: costPolicy.costMode,
+      allocationBasis: costPolicy.allocationBasis,
       entryCount,
     };
   }
@@ -13657,6 +13661,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       projects: buildPersonalInvoiceAllocations({
         projects,
         computedTotalUSD: Number(summary.grandTotalUSD ?? 0),
+        allocationBasis: summary.allocationBasis,
       }),
     };
   }
@@ -13679,6 +13684,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       fileUrl: storageKey ? `/api/me/invoices/${row.id}/file` : legacyFileUrl,
       fileAvailable: Boolean(storageKey || legacyFileUrl),
     };
+  }
+
+  async function assertPersonalInvoicePeriodMutable(period: string, runner: any = db) {
+    const [close] = await runner.select({ status: financialClosePeriods.status })
+      .from(financialClosePeriods)
+      .where(eq(financialClosePeriods.periodKey, period))
+      .limit(1);
+    if (["IN_REVIEW", "CLOSED"].includes(close?.status ?? "")) {
+      throw Object.assign(new Error(`El período financiero ${period} está ${close?.status === "CLOSED" ? "cerrado" : "en revisión"}. Finanzas debe reabrirlo antes de cambiar facturas.`), { statusCode: 409 });
+    }
   }
 
   // Historial de facturas del usuario logueado
@@ -13820,6 +13835,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "La factura debe ser un PDF o una imagen JPG, PNG o WEBP" });
       }
 
+      await assertPersonalInvoicePeriodMutable(period);
+
       const projectData = await getPersonalInvoiceProjects(req.user!.id, period);
       const summary = projectData.summary;
       if (!summary?.personnelId) {
@@ -13864,18 +13881,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
           : summary.billingCurrency === "USD" ? "USD" : "ARS";
       const requestedAmount = Number(req.body?.invoiceAmount);
       const extractedAmount = Number(extractedData?.totalAmount);
+      const financialCostPolicy = personalFinancialCostPolicy(summary.contractType);
       const declaredInvoiceAmount = Number.isFinite(requestedAmount) && requestedAmount > 0
         ? requestedAmount
         : Number.isFinite(extractedAmount) && extractedAmount > 0
           ? extractedAmount
-          : invoiceCurrency === "USD" ? Number(summary.grandTotalUSD ?? 0) : Number(summary.grandTotalARS ?? 0);
+          : financialCostPolicy.costMode === "hourly"
+            ? invoiceCurrency === "USD" ? Number(summary.grandTotalUSD ?? 0) : Number(summary.grandTotalARS ?? 0)
+            : 0;
       if (!(declaredInvoiceAmount > 0)) {
         await deleteFinancialIntakeFile(stored.storageKey);
         newStorageKey = null;
         return res.status(400).json({ message: "No pudimos detectar el importe. Ingresalo para continuar." });
       }
-      const suggestedInvoiceUSD = summary?.grandTotalUSD != null
-        ? Math.round(Number(summary.grandTotalUSD) * 0.9 * 100) / 100
+      const suggestedInvoiceUSD = financialCostPolicy.costMode === "hourly" && summary?.grandTotalUSD != null
+        ? Math.round(Number(summary.grandTotalUSD) * 100) / 100
         : null;
       const bankFx = req.body?.bankFx === undefined || req.body?.bankFx === ""
         ? null
@@ -13889,6 +13909,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const declaredInvoiceUSD = invoiceCurrency === "USD"
         ? declaredInvoiceAmount
         : effectiveFx > 0 ? Math.round(declaredInvoiceAmount / effectiveFx * 100) / 100 : null;
+      const declaredInvoiceARS = invoiceCurrency === "ARS"
+        ? declaredInvoiceAmount
+        : effectiveFx > 0 ? Math.round(declaredInvoiceAmount * effectiveFx * 100) / 100 : null;
+      if (financialCostPolicy.costMode === "invoice_actual" && declaredInvoiceUSD == null) {
+        await deleteFinancialIntakeFile(stored.storageKey);
+        newStorageKey = null;
+        return res.status(400).json({ message: "Falta un tipo de cambio para convertir el costo real a USD. Completá el TC bancario o pedile a Finanzas que cargue la cotización del mes." });
+      }
       const differenceUSD = declaredInvoiceUSD != null && suggestedInvoiceUSD != null
         ? Math.round((declaredInvoiceUSD - suggestedInvoiceUSD) * 100) / 100
         : null;
@@ -13897,7 +13925,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const selectedCostARS = selectedProjects.reduce((total, project) => total + Math.max(0, Number(project.computedCostARS) || 0), 0);
       const allHours = projectData.projects.reduce((total, project) => total + Math.max(0, Number(project.hours) || 0), 0);
       const selectedHours = selectedProjects.reduce((total, project) => total + Math.max(0, Number(project.hours) || 0), 0);
-      const selectedShare = allCostARS > 0
+      const selectedShare = financialCostPolicy.allocationBasis === "hours"
+        ? allHours > 0 ? selectedHours / allHours : 1
+        : allCostARS > 0
         ? selectedCostARS / allCostARS
         : allHours > 0 ? selectedHours / allHours : 1;
       const allocations = buildPersonalInvoiceAllocations({
@@ -13906,6 +13936,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         computedTotalUSD: Number(summary.grandTotalUSD ?? 0) * selectedShare,
         invoiceAmount: declaredInvoiceAmount,
         invoiceCurrency,
+        allocationBasis: financialCostPolicy.allocationBasis,
       });
       const rawIssueDate = String(req.body?.issueDate || extractedData?.issueDate || "");
       const issueDate = /^\d{4}-\d{2}-\d{2}$/.test(rawIssueDate) ? new Date(`${rawIssueDate}T12:00:00.000Z`) : null;
@@ -13927,9 +13958,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           suggestedInvoiceUSD,
           declaredInvoiceUSD,
           declaredInvoiceAmount,
+          declaredInvoiceARS,
           invoiceCurrency,
           invoiceNumber,
           issueDate,
+          contractTypeSnapshot: summary.contractType,
+          financialCostMode: financialCostPolicy.costMode,
+          financialCostARS: financialCostPolicy.costMode === "hourly" ? summary.grandTotalARS ?? null : declaredInvoiceARS,
+          financialCostUSD: financialCostPolicy.costMode === "hourly" ? summary.grandTotalUSD ?? null : declaredInvoiceUSD,
           bankFx,
           differenceUSD,
           extractionProvider: extracted?.provider ?? "manual",
@@ -13970,7 +14006,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       if (newStorageKey) await deleteFinancialIntakeFile(newStorageKey);
       console.error("Error subiendo factura personal:", error);
-      res.status(500).json({ message: error?.message ?? "Error al subir factura" });
+      res.status(error?.statusCode ?? 500).json({ message: error?.message ?? "Error al subir factura" });
     }
   });
 
@@ -14023,25 +14059,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const suggestedInvoiceUSD = row.suggestedInvoiceUSD != null
         ? Number(row.suggestedInvoiceUSD)
-        : row.computedTotalCostUSD != null ? Math.round(Number(row.computedTotalCostUSD) * 0.9 * 100) / 100 : null;
+        : row.financialCostMode === "hourly" && row.computedTotalCostUSD != null
+          ? Math.round(Number(row.computedTotalCostUSD) * 100) / 100 : null;
       const differenceUSD = declaredInvoiceUSD != null && suggestedInvoiceUSD != null
         ? Math.round((declaredInvoiceUSD - suggestedInvoiceUSD) * 100) / 100
         : null;
-      const [updated] = await db.update(personalMonthlyInvoices).set({
-        suggestedInvoiceUSD,
-        declaredInvoiceUSD,
-        bankFx,
-        differenceUSD,
-        approvalStatus: "pending",
-        reviewedBy: null,
-        reviewedAt: null,
-        reviewReason: null,
-        updatedAt: new Date(),
-      }).where(eq(personalMonthlyInvoices.id, id)).returning();
+      const updated = await db.transaction(async (tx) => {
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${'personal-invoice:' + row.period}))`);
+        await assertPersonalInvoicePeriodMutable(row.period, tx);
+        const [saved] = await tx.update(personalMonthlyInvoices).set({
+          suggestedInvoiceUSD,
+          declaredInvoiceUSD,
+          financialCostUSD: row.financialCostMode === "invoice_actual" ? declaredInvoiceUSD : row.financialCostUSD,
+          bankFx,
+          differenceUSD,
+          approvalStatus: "pending",
+          reviewedBy: null,
+          reviewedAt: null,
+          reviewReason: null,
+          updatedAt: new Date(),
+        }).where(eq(personalMonthlyInvoices.id, id)).returning();
+        await rebuildNativeFinancialFacts(row.period, tx);
+        return saved;
+      });
       res.json(updated);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error actualizando revisión de factura:", error);
-      res.status(500).json({ message: "Error actualizando revisión" });
+      res.status(error?.statusCode ?? 500).json({ message: error?.message ?? "Error actualizando revisión" });
     }
   });
 
@@ -14103,23 +14147,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (approvalStatus === "rejected" && !reviewReason) {
         return res.status(400).json({ message: "Indicá qué debe corregir la persona" });
       }
-      if (approvalStatus === "approved" && existing.storageKey) {
-        const allocationRows = await db.select({ id: personalInvoiceProjectAllocations.id })
-          .from(personalInvoiceProjectAllocations)
-          .where(eq(personalInvoiceProjectAllocations.invoiceId, id));
-        if (!allocationRows.length) return res.status(409).json({ message: "La factura no tiene proyectos asociados" });
-      }
-      const [updated] = await db.update(personalMonthlyInvoices).set({
-        approvalStatus,
-        reviewedBy: approvalStatus === "pending" ? null : req.user!.id,
-        reviewedAt: approvalStatus === "pending" ? null : new Date(),
-        reviewReason,
-        updatedAt: new Date(),
-      }).where(eq(personalMonthlyInvoices.id, id)).returning();
+      const updated = await db.transaction(async (tx) => {
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${'personal-invoice:' + existing.period}))`);
+        await assertPersonalInvoicePeriodMutable(existing.period, tx);
+        const [invoicePerson] = existing.personnelId
+          ? await tx.select({ contractType: personnel.contractType }).from(personnel).where(eq(personnel.id, existing.personnelId)).limit(1)
+          : [];
+        const contractTypeSnapshot = existing.contractTypeSnapshot ?? invoicePerson?.contractType ?? "full-time";
+        const reviewCostMode = existing.financialCostMode ?? personalFinancialCostPolicy(contractTypeSnapshot).costMode;
+        const financialCostUSD = reviewCostMode === "hourly"
+          ? existing.computedTotalCostUSD
+          : existing.financialCostUSD ?? existing.declaredInvoiceUSD;
+        const financialCostARS = reviewCostMode === "hourly"
+          ? existing.computedTotalCostARS
+          : existing.financialCostARS ?? existing.declaredInvoiceARS
+            ?? (financialCostUSD != null && Number(existing.bankFx) > 0 ? Number(financialCostUSD) * Number(existing.bankFx) : null);
+        if (approvalStatus === "approved") {
+          const allocationRows = await tx.select({
+            id: personalInvoiceProjectAllocations.id,
+            allocationPercent: personalInvoiceProjectAllocations.allocationPercent,
+          })
+            .from(personalInvoiceProjectAllocations)
+            .where(eq(personalInvoiceProjectAllocations.invoiceId, id));
+          if (!allocationRows.length) throw Object.assign(new Error("La factura no tiene proyectos asociados"), { statusCode: 409 });
+          const allocationTotal = allocationRows.reduce((total, allocation) => total + Number(allocation.allocationPercent), 0);
+          if (Math.abs(allocationTotal - 100) > 0.01) {
+            throw Object.assign(new Error(`El reparto entre proyectos suma ${allocationTotal.toFixed(2)}% y debe cerrar en 100%`), { statusCode: 409 });
+          }
+          if (reviewCostMode === "invoice_actual" && !(Number(financialCostUSD) > 0)) {
+            throw Object.assign(new Error("La factura no tiene un costo real normalizado en USD"), { statusCode: 409 });
+          }
+        }
+        const [row] = await tx.update(personalMonthlyInvoices).set({
+          contractTypeSnapshot,
+          financialCostMode: reviewCostMode,
+          financialCostARS,
+          financialCostUSD,
+          approvalStatus,
+          reviewedBy: approvalStatus === "pending" ? null : req.user!.id,
+          reviewedAt: approvalStatus === "pending" ? null : new Date(),
+          reviewReason,
+          updatedAt: new Date(),
+        }).where(eq(personalMonthlyInvoices.id, id)).returning();
+        await rebuildNativeFinancialFacts(existing.period, tx);
+        return row;
+      });
       res.json(publicPersonalInvoice(updated));
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error revisando factura:", error);
-      res.status(500).json({ message: "Error revisando factura" });
+      res.status(error?.statusCode ?? 500).json({ message: error?.message ?? "Error revisando factura" });
     }
   });
 
@@ -14139,6 +14215,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (row.approvalStatus === "approved") {
         return res.status(409).json({ message: "Una factura aprobada no se puede borrar. Pedile a Finanzas que la reabra." });
       }
+      await assertPersonalInvoicePeriodMutable(row.period);
       await db.delete(personalMonthlyInvoices).where(eq(personalMonthlyInvoices.id, id));
       try {
         if (row.storageKey) await deleteFinancialIntakeFile(row.storageKey);

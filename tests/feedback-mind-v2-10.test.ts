@@ -34,7 +34,7 @@ describe("Feedback Mind V2-10 contracts", () => {
     expect(schema).toContain('approvalStatus: varchar("approval_status"');
     expect(routes).toContain('/api/me/invoices/:id/review');
     expect(routes).toContain('/api/operations/invoices/review/:id');
-    expect(routes).toContain("grandTotalUSD) * 0.9");
+    expect(routes).toContain('financialCostPolicy.costMode === "hourly"');
     expect(personalUi).toContain("Enviar a Finanzas");
   });
 

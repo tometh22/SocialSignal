@@ -41,6 +41,10 @@ type InvoiceRow = {
   invoiceCurrency?: "ARS" | "USD" | null;
   declaredInvoiceAmount?: number | null;
   bankFx?: number | null;
+  contractTypeSnapshot?: string | null;
+  financialCostMode?: "hourly" | "invoice_actual" | null;
+  financialCostARS?: number | null;
+  financialCostUSD?: number | null;
   approvalStatus?: "pending" | "approved" | "rejected";
   reviewReason?: string | null;
   allocations?: Allocation[];
@@ -57,6 +61,9 @@ type MonthSummary = {
   grandTotalUSD?: number;
   opsFxRate?: number;
   billingCurrency?: string;
+  contractType?: string;
+  financialCostMode?: "hourly" | "invoice_actual";
+  allocationBasis?: "cost" | "hours";
   isClosed?: boolean;
   availableHours?: number;
   entryCount: number;
@@ -87,10 +94,11 @@ function formatPeriod(period: string) {
   return new Date(year, month - 1, 1).toLocaleDateString("es-AR", { month: "long", year: "numeric" });
 }
 
-function percentFor(project: Allocation, selected: Allocation[]) {
+function percentFor(project: Allocation, selected: Allocation[], basis: "cost" | "hours" = "cost") {
   const totalCost = selected.reduce((sum, item) => sum + Math.max(0, Number(item.computedCostARS) || 0), 0);
-  if (totalCost > 0) return Math.max(0, Number(project.computedCostARS) || 0) / totalCost * 100;
   const totalHours = selected.reduce((sum, item) => sum + Math.max(0, Number(item.hours) || 0), 0);
+  if (basis === "hours" && totalHours > 0) return Math.max(0, Number(project.hours) || 0) / totalHours * 100;
+  if (totalCost > 0) return Math.max(0, Number(project.computedCostARS) || 0) / totalCost * 100;
   return totalHours > 0 ? Math.max(0, Number(project.hours) || 0) / totalHours * 100 : 0;
 }
 
@@ -122,6 +130,8 @@ export default function MyInvoices() {
   const projects = projectQuery.data?.projects ?? [];
   const selectedProjects = projects.filter((project) => selectedIds.includes(project.projectId));
   const summary = projectQuery.data?.summary;
+  const financialCostMode = summary?.financialCostMode ?? existing?.financialCostMode;
+  const isFreelance = financialCostMode === "hourly";
   const locked = existing?.approvalStatus === "approved";
 
   useEffect(() => {
@@ -216,7 +226,7 @@ export default function MyInvoices() {
         <div>
           <p className="text-sm font-medium text-indigo-600">Espacio personal</p>
           <h1 className="text-3xl font-semibold tracking-tight">Mis facturas</h1>
-          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">Subí tu comprobante mensual. Mind lo relaciona con los proyectos donde trabajaste y Finanzas lo valida antes de cerrar.</p>
+          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">Subí tu comprobante mensual. Mind separa la distribución operativa por horas del costo real que usa Finanzas.</p>
         </div>
         {status && <Badge variant="outline" className={status.className}>{status.label}</Badge>}
       </div>
@@ -234,23 +244,24 @@ export default function MyInvoices() {
         <CardContent className="grid gap-4 sm:grid-cols-[220px_repeat(3,minmax(0,1fr))]">
           <div><Label htmlFor="invoice-period">Mes a facturar</Label><Input id="invoice-period" className="mt-1.5" type="month" value={period} onChange={(event) => setPeriod(event.target.value)} /></div>
           <Summary label="Horas cargadas" value={summary ? `${Number(summary.hours).toFixed(1)} h` : "—"} detail={`${summary?.entryCount ?? 0} registros`} />
-          <Summary label="Costo calculado ARS" value={formatMoney(summary?.grandTotalARS ?? summary?.totalCostARS, "ARS")} detail="Según horas y tarifa histórica" />
-          <Summary label="Costo calculado USD" value={formatMoney(summary?.grandTotalUSD ?? summary?.totalCostUSD, "USD")} detail={summary?.isClosed ? "Mes cerrado" : "Estimación del período"} />
+          <Summary label={isFreelance ? "Costo por horas ARS" : "Referencia operativa ARS"} value={formatMoney(summary?.grandTotalARS ?? summary?.totalCostARS, "ARS")} detail="Horas × tarifa histórica" />
+          <Summary label={isFreelance ? "Costo por horas USD" : "Referencia operativa USD"} value={formatMoney(summary?.grandTotalUSD ?? summary?.totalCostUSD, "USD")} detail={summary?.isClosed ? "Mes operativo cerrado" : "Estimación operativa"} />
         </CardContent>
+        {summary?.personnelId && <CardContent className="pt-0"><Notice tone="info" title={isFreelance ? "Contrato freelance: el costo sale de las horas" : "Contrato fijo: el costo real sale de la factura"} text={isFreelance ? "Mind calcula el costo financiero con tus horas por la tarifa histórica. La factura funciona como comprobante y Finanzas controla cualquier diferencia." : "Tus horas se usan para markup, eficiencia y para repartir el trabajo entre proyectos. Cuando Finanzas aprueba la factura, su importe reemplaza la estimación únicamente en Finanzas y Economía."} /></CardContent>}
       </Card>
 
       <Card>
-        <CardHeader className="pb-3"><CardTitle className="flex items-center gap-2 text-base"><FolderKanban className="h-4 w-4 text-indigo-600" />2. Proyectos incluidos</CardTitle><p className="text-sm text-muted-foreground">Seleccionamos tus proyectos facturables y distribuimos el comprobante según el costo de tus horas. Sólo desmarcá uno si no corresponde a esta factura.</p></CardHeader>
+        <CardHeader className="pb-3"><CardTitle className="flex items-center gap-2 text-base"><FolderKanban className="h-4 w-4 text-indigo-600" />2. Proyectos incluidos</CardTitle><p className="text-sm text-muted-foreground">Seleccionamos tus proyectos facturables y distribuimos el comprobante {isFreelance ? "según el costo horario" : "según las horas trabajadas"}. Sólo desmarcá uno si no corresponde a esta factura.</p></CardHeader>
         <CardContent>
           {projectQuery.isLoading && <div className="flex items-center gap-2 py-8 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />Calculando tus proyectos…</div>}
           {projectQuery.isError && <Notice tone="danger" title="No pudimos traer tus proyectos" text="Actualizá la página o contactá a Administración si el problema continúa." />}
           {!projectQuery.isLoading && !projectQuery.isError && !summary?.personnelId && <Notice tone="danger" title="Falta vincular tu usuario" text="Administración debe asociar tu email con tu ficha de persona antes de que puedas cargar facturas." />}
           {!projectQuery.isLoading && !projectQuery.isError && summary?.personnelId && !projects.length && <Notice tone="warning" title="No encontramos proyectos facturables" text={`No hay horas facturables cargadas para ${formatPeriod(period)}. Revisá tus horas o elegí otro período.`} />}
           {projects.length > 0 && <div className="overflow-hidden rounded-xl border">
-            <div className="hidden grid-cols-[44px_minmax(0,1fr)_110px_110px_150px] gap-3 bg-slate-50 px-4 py-2 text-xs font-medium text-muted-foreground md:grid"><span /><span>Cliente y proyecto</span><span className="text-right">Horas</span><span className="text-right">Reparto</span><span className="text-right">Costo calculado</span></div>
+            <div className="hidden grid-cols-[44px_minmax(0,1fr)_110px_110px_150px] gap-3 bg-slate-50 px-4 py-2 text-xs font-medium text-muted-foreground md:grid"><span /><span>Cliente y proyecto</span><span className="text-right">Horas</span><span className="text-right">Reparto</span><span className="text-right">{isFreelance ? "Costo por horas" : "Referencia operativa"}</span></div>
             {projects.map((project) => {
               const checked = selectedIds.includes(project.projectId);
-              const pct = checked ? percentFor(project, selectedProjects) : 0;
+              const pct = checked ? percentFor(project, selectedProjects, summary?.allocationBasis) : 0;
               return <label key={project.projectId} className={`grid cursor-pointer items-center gap-3 border-t px-4 py-3 first:border-t-0 md:grid-cols-[44px_minmax(0,1fr)_110px_110px_150px] ${checked ? "bg-white" : "bg-slate-50/70 opacity-65"}`}>
                 <Checkbox checked={checked} disabled={locked} onCheckedChange={(value) => toggleProject(project.projectId, value === true)} />
                 <span><span className="block text-xs text-muted-foreground">{project.clientName ?? "Sin cliente"}</span><span className="block text-sm font-medium">{project.projectName}</span></span>
@@ -260,7 +271,7 @@ export default function MyInvoices() {
               </label>;
             })}
           </div>}
-          {selectedIds.length > 0 && <p className="mt-3 flex items-center gap-2 text-xs text-emerald-700"><Check className="h-3.5 w-3.5" />El reparto suma 100% y quedará guardado como respaldo del costo directo. No duplica costos.</p>}
+          {selectedIds.length > 0 && <p className="mt-3 flex items-center gap-2 text-xs text-emerald-700"><Check className="h-3.5 w-3.5" />El reparto suma 100% y quedará guardado como respaldo del costo directo. {isFreelance ? "Se calcula por costo horario." : "Se distribuye según las horas trabajadas."}</p>}
         </CardContent>
       </Card>
 
@@ -273,7 +284,7 @@ export default function MyInvoices() {
             <div><Label htmlFor="invoice-number">Número <span className="font-normal text-muted-foreground">(opcional)</span></Label><Input id="invoice-number" disabled={locked} className="mt-1.5" value={invoiceNumber} onChange={(event) => setInvoiceNumber(event.target.value)} placeholder="Ej. FC A 0001-123" /></div>
             <div><Label htmlFor="invoice-date">Fecha <span className="font-normal text-muted-foreground">(opcional)</span></Label><Input id="invoice-date" disabled={locked} className="mt-1.5" type="date" value={issueDate} onChange={(event) => setIssueDate(event.target.value)} /></div>
             <div><Label>Moneda</Label><Select disabled={locked} value={invoiceCurrency} onValueChange={(value: "ARS" | "USD") => setInvoiceCurrency(value)}><SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ARS">ARS</SelectItem><SelectItem value="USD">USD</SelectItem></SelectContent></Select></div>
-            <div><Label htmlFor="invoice-amount">Importe <span className="font-normal text-muted-foreground">(opcional)</span></Label><Input id="invoice-amount" disabled={locked} className="mt-1.5" type="number" min="0" step="0.01" value={invoiceAmount} onChange={(event) => setInvoiceAmount(event.target.value)} placeholder="Mind lo detecta" /></div>
+            <div><Label htmlFor="invoice-amount">{isFreelance ? "Importe facturado" : "Importe real"} <span className="font-normal text-muted-foreground">(Mind lo detecta)</span></Label><Input id="invoice-amount" disabled={locked} className="mt-1.5" type="number" min="0" step="0.01" value={invoiceAmount} onChange={(event) => setInvoiceAmount(event.target.value)} placeholder="Completalo sólo si hace falta" /></div>
           </div>
           {invoiceCurrency === "ARS" && <div className="max-w-xs"><Label htmlFor="invoice-fx">TC bancario <span className="font-normal text-muted-foreground">(opcional)</span></Label><Input id="invoice-fx" disabled={locked} className="mt-1.5" type="number" min="0" step="0.01" value={bankFx} onChange={(event) => setBankFx(event.target.value)} placeholder={summary?.opsFxRate ? `Referencia ${summary.opsFxRate}` : "ARS por USD"} /></div>}
           <div className={`rounded-xl border-2 border-dashed p-7 text-center transition ${dragging ? "border-indigo-500 bg-indigo-50" : file ? "border-emerald-300 bg-emerald-50/50" : "border-slate-200"}`} onDragOver={(event) => { event.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)} onDrop={onDrop}>
@@ -282,7 +293,7 @@ export default function MyInvoices() {
           </div>
           <div><Label htmlFor="invoice-notes">Aclaración <span className="font-normal text-muted-foreground">(opcional)</span></Label><Textarea id="invoice-notes" disabled={locked} className="mt-1.5" rows={2} value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Sólo si Finanzas necesita contexto adicional" /></div>
           <div className="flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
-            <p className="flex max-w-xl items-start gap-2 text-xs text-muted-foreground"><ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />El archivo se guarda de forma privada. La aprobación valida el respaldo y nunca vuelve a sumar el costo directo.</p>
+            <p className="flex max-w-xl items-start gap-2 text-xs text-muted-foreground"><ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />El archivo se guarda de forma privada. {isFreelance ? "Finanzas usa el costo calculado por horas." : "Al aprobar, Finanzas y Economía usan el importe real de la factura; Operaciones conserva el cálculo por horas."}</p>
             <Button disabled={!stepReady || uploadMutation.isPending} onClick={() => uploadMutation.mutate()}>{uploadMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UploadCloud className="mr-2 h-4 w-4" />}{uploadMutation.isPending ? "Leyendo y enviando…" : existing ? "Reemplazar y reenviar" : "Enviar a Finanzas"}</Button>
           </div>
         </CardContent>
@@ -296,7 +307,7 @@ export default function MyInvoices() {
           {(invoicesQuery.data ?? []).map((invoice) => {
             const itemStatus = STATUS[invoice.approvalStatus ?? "pending"];
             return <div key={invoice.id} className="flex flex-col gap-3 rounded-xl border p-4 lg:flex-row lg:items-center lg:justify-between">
-              <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><p className="font-semibold capitalize">{formatPeriod(invoice.period)}</p><Badge variant="outline" className={itemStatus.className}>{itemStatus.label}</Badge></div><p className="mt-1 text-sm text-muted-foreground">{invoice.invoiceNumber || invoice.fileName} · {(invoice.allocations ?? []).length} proyecto(s) · {Number(invoice.hoursTotal ?? 0).toFixed(1)} h</p>{invoice.reviewReason && <p className="mt-1 text-xs text-rose-700">{invoice.reviewReason}</p>}</div>
+              <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><p className="font-semibold capitalize">{formatPeriod(invoice.period)}</p><Badge variant="outline" className={itemStatus.className}>{itemStatus.label}</Badge><Badge variant="secondary">{invoice.financialCostMode === "hourly" ? "Costo por horas" : "Importe real"}</Badge></div><p className="mt-1 text-sm text-muted-foreground">{invoice.invoiceNumber || invoice.fileName} · {(invoice.allocations ?? []).length} proyecto(s) · {Number(invoice.hoursTotal ?? 0).toFixed(1)} h{invoice.financialCostUSD != null ? ` · ${formatMoney(invoice.financialCostUSD, "USD")}` : ""}</p>{invoice.reviewReason && <p className="mt-1 text-xs text-rose-700">{invoice.reviewReason}</p>}</div>
               <div className="flex flex-wrap items-center gap-2"><Button asChild size="sm" variant="outline"><a href={invoice.fileUrl} target="_blank" rel="noreferrer"><FileText className="mr-2 h-4 w-4" />Ver factura</a></Button>{invoice.approvalStatus !== "approved" && <Button size="icon" variant="ghost" className="text-rose-600" title="Eliminar factura" aria-label={`Eliminar factura de ${formatPeriod(invoice.period)}`} onClick={() => setDeleteTarget(invoice)}><Trash2 className="h-4 w-4" /></Button>}</div>
             </div>;
           })}
@@ -310,8 +321,8 @@ function Summary({ label, value, detail }: { label: string; value: string; detai
   return <div className="rounded-xl border bg-slate-50/70 p-3"><p className="text-xs text-muted-foreground">{label}</p><p className="mt-1 text-lg font-semibold tabular-nums">{value}</p><p className="text-[11px] text-muted-foreground">{detail}</p></div>;
 }
 
-function Notice({ tone, title, text }: { tone: "danger" | "warning" | "success"; title: string; text: string }) {
-  const styles = tone === "danger" ? "border-rose-200 bg-rose-50 text-rose-900" : tone === "warning" ? "border-amber-200 bg-amber-50 text-amber-900" : "border-emerald-200 bg-emerald-50 text-emerald-900";
-  const Icon = tone === "success" ? LockKeyhole : AlertCircle;
+function Notice({ tone, title, text }: { tone: "danger" | "warning" | "success" | "info"; title: string; text: string }) {
+  const styles = tone === "danger" ? "border-rose-200 bg-rose-50 text-rose-900" : tone === "warning" ? "border-amber-200 bg-amber-50 text-amber-900" : tone === "info" ? "border-indigo-200 bg-indigo-50 text-indigo-950" : "border-emerald-200 bg-emerald-50 text-emerald-900";
+  const Icon = tone === "success" ? LockKeyhole : tone === "info" ? ShieldCheck : AlertCircle;
   return <div className={`flex gap-3 rounded-xl border p-4 ${styles}`}><Icon className="mt-0.5 h-5 w-5 shrink-0" /><div><p className="text-sm font-semibold">{title}</p><p className="text-xs opacity-80">{text}</p></div></div>;
 }
