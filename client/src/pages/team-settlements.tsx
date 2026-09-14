@@ -220,7 +220,7 @@ export default function TeamSettlements() {
           <CardHeader className="p-0">
             <button type="button" className="flex w-full items-center gap-4 px-5 py-4 text-left" onClick={() => setOpenId(isOpen ? null : row.person.id)} aria-expanded={isOpen}>
               <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${state.group === "done" ? "bg-emerald-100 text-emerald-700" : state.group === "admin" ? "bg-indigo-100 text-indigo-700" : "bg-slate-100 text-slate-700"}`}>{state.step}</span>
-              <span className="min-w-0 flex-1"><span className="block truncate font-semibold">{row.person.name}</span><span className="block truncate text-xs text-muted-foreground">{row.person.contractType} · {row.person.email || "Sin email vinculado"}</span></span>
+              <span className="min-w-0 flex-1"><span className="block truncate font-semibold">{row.person.name}</span><span className="block truncate text-xs text-muted-foreground">{row.person.contractType} · {row.person.email || "Sin email vinculado"}</span><span className="mt-0.5 block text-xs font-medium text-indigo-700 md:hidden">{state.label}</span></span>
               <span className="hidden text-right sm:block"><span className="block text-xs text-muted-foreground">Total del cierre</span><span className="block font-semibold tabular-nums">{ars(row.system.totalARS)}</span></span>
               <StageBadge tone={state.tone} label={state.label} />
               <ChevronDown className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${isOpen ? "rotate-180" : ""}`} />
@@ -242,7 +242,14 @@ export default function TeamSettlements() {
                   }}><WandSparkles className="mr-2 h-3.5 w-3.5" />Usar {periodLabel(row.suggestion.sourcePeriod)}</Button>}
                 </div>
                 <div className={`grid gap-4 ${isMixed ? "lg:grid-cols-4" : "lg:grid-cols-2"}`}>
-                  <div><Label>Cómo factura este mes</Label><Select value={draft.billingCurrency} onValueChange={(value: BillingCurrency) => update(row.person.id, "billingCurrency", value)}><SelectTrigger className="mt-1.5 bg-white"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ARS">Sólo ARS</SelectItem><SelectItem value="USD">Sólo USD</SelectItem><SelectItem value="MIXED">USD + ARS</SelectItem></SelectContent></Select><p className="mt-1 text-xs text-muted-foreground">Se define por mes.</p></div>
+                  <div><Label>Cómo factura este mes</Label><Select value={draft.billingCurrency} onValueChange={(value: BillingCurrency) => {
+                    update(row.person.id, "billingCurrency", value);
+                    if (value !== "MIXED") {
+                      update(row.person.id, "usdPercentage", value === "USD" ? "100" : "0");
+                      update(row.person.id, "bonusUSD", "0");
+                      update(row.person.id, "extrasARS", "0");
+                    }
+                  }}><SelectTrigger className="mt-1.5 bg-white"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ARS">Sólo ARS</SelectItem><SelectItem value="USD">Sólo USD</SelectItem><SelectItem value="MIXED">USD + ARS</SelectItem></SelectContent></Select><p className="mt-1 text-xs text-muted-foreground">Se define por mes.</p></div>
                   {isMixed && <><div><Label htmlFor={`pct-${row.person.id}`}>% a facturar en USD</Label><Input id={`pct-${row.person.id}`} className="mt-1.5 bg-white" type="number" min="0" max="100" step="0.01" value={draft.usdPercentage} onChange={(event) => update(row.person.id, "usdPercentage", event.target.value)} /></div><div><Label htmlFor={`bonus-${row.person.id}`}>Extras / bono en USD</Label><Input id={`bonus-${row.person.id}`} className="mt-1.5 bg-white" type="number" min="0" step="0.01" value={draft.bonusUSD} onChange={(event) => update(row.person.id, "bonusUSD", event.target.value)} /></div><div><Label htmlFor={`extra-${row.person.id}`}>Extras ARS</Label><Input id={`extra-${row.person.id}`} className="mt-1.5 bg-white" type="number" min="0" step="0.01" value={draft.extrasARS} onChange={(event) => update(row.person.id, "extrasARS", event.target.value)} /></div></>}
                 </div>
               </div>

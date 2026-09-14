@@ -13504,8 +13504,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const requestedPercentage = parseNonNegative(req.body?.usdPercentage, "Porcentaje USD");
       const usdPercentage = billingCurrency === "USD" ? 100 : billingCurrency === "ARS" ? 0 : requestedPercentage;
       if (usdPercentage > 100) return res.status(400).json({ message: "El porcentaje USD debe estar entre 0 y 100" });
-      const bonusUSD = parseNonNegative(req.body?.bonusUSD, "Extra USD");
-      const extrasARS = parseNonNegative(req.body?.extrasARS, "Extra ARS");
+      const bonusUSD = billingCurrency === "MIXED" ? parseNonNegative(req.body?.bonusUSD, "Extra USD") : 0;
+      const extrasARS = billingCurrency === "MIXED" ? parseNonNegative(req.body?.extrasARS, "Extra ARS") : 0;
       const totalARS = Number(closing.grandTotalARS ?? closing.totalCost ?? 0);
       const hoursSnapshot = Number(closing.adjustedHours ?? 0);
       const hourlyRateARSSnapshot = hoursSnapshot > 0 ? totalARS / hoursSnapshot : 0;
