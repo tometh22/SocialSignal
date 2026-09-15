@@ -86,7 +86,7 @@ export async function ensureObjectivesPlanSeed(): Promise<void> {
   const [personnelRows, clientRows, existingObjectives, existingAccounts, existingActions] = await Promise.all([
     db.select({ id: personnel.id, name: personnel.name }).from(personnel),
     db.select({ id: clients.id, name: clients.name }).from(clients),
-    db.select({ id: objectives.id, slug: objectives.slug, year: objectives.year }).from(objectives).where(eq(objectives.year, 2026)),
+    db.select({ id: objectives.id, slug: objectives.slug, year: objectives.year, ownerPersonnelId: objectives.ownerPersonnelId }).from(objectives).where(eq(objectives.year, 2026)),
     db.select({ id: objectiveAccounts.id, name: objectiveAccounts.name, clientId: objectiveAccounts.clientId }).from(objectiveAccounts),
     db.select({ id: objectiveActions.id, slug: objectiveActions.slug, dependencyActionIds: objectiveActions.dependencyActionIds }).from(objectiveActions),
   ]);
@@ -118,6 +118,26 @@ export async function ensureObjectivesPlanSeed(): Promise<void> {
 
   const objectiveRows = await db.select({ id: objectives.id, slug: objectives.slug }).from(objectives).where(eq(objectives.year, 2026));
   const objectiveIdsBySlug = new Map(objectiveRows.map((row) => [row.slug, row.id]));
+
+  // The plan is the source of truth for strategic ownership. Reconcile rows
+  // created by earlier seeds as well as newly inserted rows, otherwise a
+  // corrected owner in the source would never reach an existing production
+  // record.
+  const objectiveRowsWithOwners = await db
+    .select({ id: objectives.id, slug: objectives.slug, ownerPersonnelId: objectives.ownerPersonnelId })
+    .from(objectives)
+    .where(eq(objectives.year, 2026));
+  const objectivePlanBySlug = new Map(plan.objectives.map((objective) => [objective.slug, objective]));
+  for (const row of objectiveRowsWithOwners) {
+    const source = objectivePlanBySlug.get(row.slug);
+    if (!source) continue;
+    const ownerPersonnelId = resolveOwner(source.ownerName, personnelRows, personnelByName, unresolvedOwners);
+    if (row.ownerPersonnelId !== ownerPersonnelId) {
+      await db.update(objectives)
+        .set({ ownerPersonnelId, updatedAt: new Date() })
+        .where(eq(objectives.id, row.id));
+    }
+  }
 
   const accountsToInsert = plan.accounts
     .filter((account) => !accountByName.has(normalize(account.name)))

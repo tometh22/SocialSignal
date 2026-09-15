@@ -30,4 +30,11 @@ describe("objective plan 2026 coverage", () => {
     expect(actions.find((action) => action.slug === "oct-w5-santi-frontier-content")?.dueDate).toBe("2026-11-06");
     expect(actions.find((action) => action.slug === "dec-w3-vicky-kimberly-deadline")?.dueDate).toBe("2026-12-21");
   });
+
+  it("keeps strategic objective owners within the partner ownership policy", () => {
+    const owners = new Set(OBJECTIVE_PLAN_2026.objectives.map((objective) => objective.ownerName));
+    expect(owners).toEqual(new Set(["Tomás", "Vicky", "Acha"]));
+    expect(OBJECTIVE_PLAN_2026.objectives.every((objective) => ["Tomás", "Vicky", "Acha"].includes(objective.ownerName))).toBe(true);
+    expect(OBJECTIVE_PLAN_2026.objectives.filter((objective) => objective.ownerName === "Acha").every((objective) => objective.slug.startsWith("area-operations-") || objective.slug.startsWith("person-acha-"))).toBe(true);
+  });
 });

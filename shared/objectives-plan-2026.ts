@@ -53,7 +53,7 @@ export interface ObjectivePlan2026 {
   actions: Action2026[];
 }
 
-export const OBJECTIVE_PLAN_2026: ObjectivePlan2026 = {
+const RAW_OBJECTIVE_PLAN_2026: ObjectivePlan2026 = {
   objectives: [
     // Empresa — norte anual y del cuatrimestre.
     {
@@ -2102,4 +2102,25 @@ export const OBJECTIVE_PLAN_2026: ObjectivePlan2026 = {
       sortOrder: 60,
     },
   ],
+};
+
+/**
+ * The closing plan is owned by the two partners. Team members can execute
+ * actions, but they must not appear as owners of the strategic objectives.
+ * Acha is the only exception: her objectives are the operational work Vicky
+ * cascades to her.
+ */
+export const OBJECTIVE_OWNER_REMAP: Record<string, "Tomás" | "Vicky" | "Acha"> = {
+  Sil: "Tomás",
+  Santi: "Tomás",
+  Pau: "Tomás",
+  PMs: "Vicky",
+};
+
+export const OBJECTIVE_PLAN_2026: ObjectivePlan2026 = {
+  ...RAW_OBJECTIVE_PLAN_2026,
+  objectives: RAW_OBJECTIVE_PLAN_2026.objectives.map((objective) => ({
+    ...objective,
+    ownerName: OBJECTIVE_OWNER_REMAP[objective.ownerName] ?? objective.ownerName,
+  })),
 };
