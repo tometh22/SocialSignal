@@ -25,33 +25,14 @@ export async function rebuildNativeFinancialFacts(periodKey: string, runner: Sql
       SELECT person_id, COALESCE(sum(cost_usd),0) model_usd, COALESCE(sum(cost_ars),0) model_ars, count(*)::int rows
       FROM fact_labor_month WHERE period_key=${periodKey}
       GROUP BY person_id
-    ), approved_fixed_invoice AS (
-      SELECT DISTINCT ON (invoice.personnel_id)
-        invoice.personnel_id,
-        COALESCE(invoice.financial_cost_usd, invoice.declared_invoice_usd, invoice.financial_cost_ars/NULLIF((SELECT rate FROM fx),0), invoice.declared_invoice_ars/NULLIF((SELECT rate FROM fx),0), 0)::numeric actual_usd,
-        COALESCE(invoice.financial_cost_ars, invoice.declared_invoice_ars, invoice.financial_cost_usd*(SELECT rate FROM fx), invoice.declared_invoice_usd*(SELECT rate FROM fx), 0)::numeric actual_ars
-      FROM personal_monthly_invoices invoice
-      LEFT JOIN personnel person ON person.id=invoice.personnel_id
-      WHERE invoice.period=${periodKey} AND invoice.approval_status='approved'
-        AND (invoice.settlement_id IS NOT NULL OR COALESCE(invoice.financial_cost_mode, CASE WHEN COALESCE(invoice.contract_type_snapshot,person.contract_type,'full-time')='freelance' THEN 'hourly' ELSE 'invoice_actual' END)='invoice_actual')
-        AND COALESCE(invoice.financial_cost_usd,invoice.declared_invoice_usd,invoice.financial_cost_ars,invoice.declared_invoice_ars,0)>0
-        AND EXISTS (
-          SELECT 1 FROM personal_invoice_project_allocations allocation
-          WHERE allocation.invoice_id=invoice.id
-          HAVING abs(sum(allocation.allocation_percent)-100)<=0.01
-        )
-      ORDER BY invoice.personnel_id, invoice.updated_at DESC, invoice.id DESC
     ), labor AS (
-      -- Operaciones keeps the hour-valued model in fact_labor_month. For the
-      -- financial/economic fact we replace fixed-contract estimates with the
-      -- approved invoice. A published mixed settlement also replaces the model
-      -- because its base still comes from hours, but its extras are real cost.
+      -- El costo del equipo se devenga 100% desde el cierre de Operaciones.
+      -- La modalidad, fecha e importe de las facturas sólo alimentan Pasivo.
       SELECT
-        COALESCE(sum(CASE WHEN approved.personnel_id IS NOT NULL THEN approved.actual_usd ELSE labor.model_usd END),0) direct_usd,
-        COALESCE(sum(CASE WHEN approved.personnel_id IS NOT NULL THEN approved.actual_ars ELSE labor.model_ars END),0) direct_ars,
-        COALESCE(sum(labor.rows),0)::int rows
-      FROM labor_by_person labor
-      LEFT JOIN approved_fixed_invoice approved ON approved.personnel_id=labor.person_id
+        COALESCE(sum(model_usd),0) direct_usd,
+        COALESCE(sum(model_ars),0) direct_ars,
+        COALESCE(sum(rows),0)::int rows
+      FROM labor_by_person
     ), bills AS (
       SELECT
         COALESCE(sum(CASE WHEN cost_treatment='direct' THEN COALESCE(CASE WHEN currency='ARS' THEN net_amount/NULLIF(cotizacion,0) ELSE net_amount END,monto_total_usd,monto_usd,monto_ars/NULLIF(cotizacion,0),0) ELSE 0 END),0) direct_usd,
@@ -122,40 +103,12 @@ export async function rebuildNativeFinancialFacts(periodKey: string, runner: Sql
     ), modeled_labor AS (
       SELECT project_id,person_id,sum(COALESCE(cost_usd,0)) model_usd,sum(COALESCE(cost_ars,0)) model_ars
       FROM fact_labor_month WHERE period_key=${periodKey} GROUP BY project_id,person_id
-    ), approved_fixed_invoice AS (
-      SELECT DISTINCT ON (invoice.personnel_id)
-        invoice.id invoice_id,
-        invoice.personnel_id,
-        COALESCE(invoice.financial_cost_usd,invoice.declared_invoice_usd,invoice.financial_cost_ars/NULLIF((SELECT rate FROM fx),0),invoice.declared_invoice_ars/NULLIF((SELECT rate FROM fx),0),0)::numeric actual_usd,
-        COALESCE(invoice.financial_cost_ars,invoice.declared_invoice_ars,invoice.financial_cost_usd*(SELECT rate FROM fx),invoice.declared_invoice_usd*(SELECT rate FROM fx),0)::numeric actual_ars
-      FROM personal_monthly_invoices invoice
-      LEFT JOIN personnel person ON person.id=invoice.personnel_id
-      WHERE invoice.period=${periodKey} AND invoice.approval_status='approved'
-        AND (invoice.settlement_id IS NOT NULL OR COALESCE(invoice.financial_cost_mode,CASE WHEN COALESCE(invoice.contract_type_snapshot,person.contract_type,'full-time')='freelance' THEN 'hourly' ELSE 'invoice_actual' END)='invoice_actual')
-        AND COALESCE(invoice.financial_cost_usd,invoice.declared_invoice_usd,invoice.financial_cost_ars,invoice.declared_invoice_ars,0)>0
-        AND EXISTS (
-          SELECT 1 FROM personal_invoice_project_allocations allocation
-          WHERE allocation.invoice_id=invoice.id
-          HAVING abs(sum(allocation.allocation_percent)-100)<=0.01
-        )
-      ORDER BY invoice.personnel_id,invoice.updated_at DESC,invoice.id DESC
-    ), fixed_allocations AS (
-      SELECT allocation.project_id,invoice.personnel_id,
-        invoice.actual_usd*allocation.allocation_percent/100 cost_usd,
-        invoice.actual_ars*allocation.allocation_percent/100 cost_ars
-      FROM approved_fixed_invoice invoice
-      JOIN personal_invoice_project_allocations allocation ON allocation.invoice_id=invoice.invoice_id
     ), labor AS (
-      -- Rentabilidad económica por proyecto usa el costo real distribuido de la
-      -- factura fija o liquidación mixta. Sin factura aprobada conserva el
-      -- modelo operativo de horas × tarifa.
-      SELECT modeled.project_id,
-        sum(CASE WHEN invoice.personnel_id IS NOT NULL THEN COALESCE(allocation.cost_usd,0) ELSE modeled.model_usd END) cost_usd,
-        sum(CASE WHEN invoice.personnel_id IS NOT NULL THEN COALESCE(allocation.cost_ars,0) ELSE modeled.model_ars END) cost_ars
-      FROM modeled_labor modeled
-      LEFT JOIN approved_fixed_invoice invoice ON invoice.personnel_id=modeled.person_id
-      LEFT JOIN fixed_allocations allocation ON allocation.personnel_id=modeled.person_id AND allocation.project_id=modeled.project_id
-      GROUP BY modeled.project_id
+      -- La distribución proyecto/Epical es la del cierre operativo. No vuelve a
+      -- repartirse ni cambia cuando llega una factura.
+      SELECT project_id, sum(model_usd) cost_usd, sum(model_ars) cost_ars
+      FROM modeled_labor
+      GROUP BY project_id
     ), bills AS (
       SELECT project_id,
         sum(COALESCE(CASE WHEN currency='ARS' THEN net_amount/NULLIF(cotizacion,0) ELSE net_amount END,monto_total_usd,monto_usd,monto_ars/NULLIF(cotizacion,0),0)) cost_usd,

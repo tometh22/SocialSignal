@@ -101,6 +101,8 @@ const routeLabels: Record<string, string> = {
   crm: "CRM",
   dashboard: "Resumen financiero",
   "my-invoices": "Mis facturas",
+  "liquidaciones-equipo": "Liquidaciones equipo",
+  "facturas-equipo": "Facturas equipo",
 };
 
 const standalonePages = new Set([

@@ -4563,15 +4563,16 @@ export const personnelMonthlySettlements = pgTable("personnel_monthly_settlement
 export type PersonnelMonthlySettlement = typeof personnelMonthlySettlements.$inferSelect;
 
 // ==================== FACTURA MENSUAL PERSONAL ====================
-// Cada usuario (interno o external_provider) sube una factura por mes.
-// La última subida reemplaza la anterior (UNIQUE userId+period). El historial se
-// consulta ordenando por period DESC. Totales son snapshot al momento de subir.
+// Cada usuario (interno o external_provider) sube comprobantes por período.
+// La facturación mixta conserva por separado la factura USD y la diferencia ARS,
+// porque cada documento alimenta Pasivo según su propia fecha de emisión.
 export const personalMonthlyInvoices = pgTable("personal_monthly_invoices", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
   personnelId: integer("personnel_id").references(() => personnel.id, { onDelete: 'set null' }),
   settlementId: integer("settlement_id").references(() => personnelMonthlySettlements.id, { onDelete: 'set null' }),
   period: varchar("period", { length: 7 }).notNull(), // YYYY-MM
+  invoiceComponent: varchar("invoice_component", { length: 10 }).notNull().default("single"), // single | usd | ars
   fileUrl: text("file_url").notNull(),
   fileName: text("file_name").notNull(),
   fileSize: integer("file_size").notNull(),
@@ -4614,9 +4615,10 @@ export const personalMonthlyInvoices = pgTable("personal_monthly_invoices", {
   uploadedAt: timestamp("uploaded_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (t) => ({
-  uqUserPeriod: unique("personal_monthly_invoices_user_period_unique").on(t.userId, t.period),
+  uqUserPeriodComponent: unique("personal_monthly_invoices_user_period_component_unique").on(t.userId, t.period, t.invoiceComponent),
   idxUser: index("idx_pmi_user").on(t.userId),
   idxPeriod: index("idx_pmi_period").on(t.period),
+  idxPeriodComponent: index("personal_monthly_invoices_period_component_idx").on(t.period, t.invoiceComponent, t.approvalStatus),
 }));
 
 export const insertPersonalMonthlyInvoiceSchema = createInsertSchema(personalMonthlyInvoices).omit({

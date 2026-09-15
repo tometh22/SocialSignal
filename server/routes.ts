@@ -164,7 +164,7 @@ import { CoverageCalculator } from "./domain/coverage";
 import { eq, and, or, isNull, isNotNull, desc, sql, asc, gte, lte, lt, inArray } from "drizzle-orm";
 import { reinitializeDatabase } from "./reinit-data";
 import { upload, uploadDocument, deleteOldFile } from "./upload";
-import { personalMonthlyInvoices, personalInvoiceProjectAllocations, personalFxOverrides, personnelMonthlySettlements, externalProviders as externalProvidersTable, providerProjectAccess as providerProjectAccessTable, exchangeRates, financialClosePeriods } from "@shared/schema";
+import { personalMonthlyInvoices, personalInvoiceProjectAllocations, personalFxOverrides, personnelMonthlySettlements, externalProviders as externalProvidersTable, providerProjectAccess as providerProjectAccessTable, exchangeRates, financialClosePeriods, pasivoEntries, financialDocumentApplications } from "@shared/schema";
 import { sanitizeInput } from "./input-sanitization";
 import { setupAuth, hashPassword } from "./auth";
 import { requireProjectUnlocked, projectIdFromTimeEntry } from "./middleware/projectLocked";
@@ -190,7 +190,6 @@ import { DEFAULT_FX_RATE, getCanonicalFxForMonth } from "./services/fx";
 import { getCutoverDate } from "./etl/time-entries-to-fact-labor";
 import { extractFinancialIntake } from "./services/financial-intake-extractor";
 import { deleteFinancialIntakeFile, financialIntakeUpload, readFinancialIntakeFile, storeFinancialIntakeFile } from "./services/financial-intake-files";
-import { buildPersonalInvoiceAllocations, personalFinancialCostPolicy } from "./services/personal-invoice-allocations";
 import { calculatePersonnelSettlement } from "./services/personnel-settlement";
 import { rebuildNativeFinancialFacts } from "./services/financial-native-builders";
 import { 
@@ -13384,9 +13383,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // =========== LIQUIDACIONES MENSUALES DEL EQUIPO ===========
-  // Sección de carga propia de Finanzas. Reemplaza las columnas amarillas del
-  // Excel y deja los dos tipos de cambio para que los complete la persona.
-  app.get("/api/finance/personnel-settlements", requireAuth, requirePermission("finance"), async (req, res) => {
+  // Operaciones prepara la instrucción mensual de facturación. Finanzas puede
+  // leer el resultado para hacer matching, pero no modificarlo.
+  app.get("/api/finance/personnel-settlements", requireAuth, requirePermission("operations", "finance"), async (req, res) => {
     try {
       const period = typeof req.query.period === "string" ? req.query.period : "";
       if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(period)) {
@@ -13418,6 +13417,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         db.select({
           id: personalMonthlyInvoices.id,
           personnelId: personalMonthlyInvoices.personnelId,
+          invoiceComponent: personalMonthlyInvoices.invoiceComponent,
+          invoiceCurrency: personalMonthlyInvoices.invoiceCurrency,
+          declaredInvoiceAmount: personalMonthlyInvoices.declaredInvoiceAmount,
+          issueDate: personalMonthlyInvoices.issueDate,
           approvalStatus: personalMonthlyInvoices.approvalStatus,
           supportingFiles: personalMonthlyInvoices.supportingFiles,
           uploadedAt: personalMonthlyInvoices.uploadedAt,
@@ -13430,15 +13433,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
       for (const prior of priorSettlements) {
         if (!priorByPerson.has(prior.personnelId)) priorByPerson.set(prior.personnelId, prior);
       }
-      const invoiceByPerson = new Map(invoices
-        .filter((row) => row.personnelId != null)
-        .map((row) => [Number(row.personnelId), {
+      const invoicesByPerson = new Map<number, Array<{
+        id: number;
+        invoiceComponent: string;
+        invoiceCurrency: string | null;
+        declaredInvoiceAmount: number | null;
+        issueDate: Date | null;
+        approvalStatus: string;
+        documentCount: number;
+        uploadedAt: Date;
+        reviewReason: string | null;
+      }>>();
+      for (const row of invoices.filter((item) => item.personnelId != null)) {
+        const personInvoices = invoicesByPerson.get(Number(row.personnelId)) ?? [];
+        personInvoices.push({
           id: row.id,
+          invoiceComponent: row.invoiceComponent,
+          invoiceCurrency: row.invoiceCurrency,
+          declaredInvoiceAmount: row.declaredInvoiceAmount,
+          issueDate: row.issueDate,
           approvalStatus: row.approvalStatus,
           documentCount: Array.isArray(row.supportingFiles) ? row.supportingFiles.length : 0,
           uploadedAt: row.uploadedAt,
           reviewReason: row.reviewReason,
-        }]));
+        });
+        invoicesByPerson.set(Number(row.personnelId), personInvoices);
+      }
       res.json(people
         .filter((person) => !person.activeUntil || person.activeUntil >= `${period}-01`)
         .map((person) => {
@@ -13458,7 +13478,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
               billingCurrency: prior.billingCurrencySnapshot,
               usdPercentage: Number(prior.usdPercentage),
             } : null,
-            invoice: invoiceByPerson.get(person.id) ?? null,
+            invoices: invoicesByPerson.get(person.id) ?? [],
+            invoice: invoicesByPerson.get(person.id)?.[0] ?? null,
           };
         }));
     } catch (error) {
@@ -13467,7 +13488,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/finance/personnel-settlements/:personnelId", requireAuth, requirePermission("finance"), async (req, res) => {
+  app.put("/api/finance/personnel-settlements/:personnelId", requireAuth, requirePermission("operations"), async (req, res) => {
     try {
       const personnelId = Number(req.params.personnelId);
       const period = String(req.body?.period ?? "");
@@ -13628,7 +13649,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // =========== FACTURA MENSUAL PERSONAL ===========
-  // Endpoints para que cada usuario gestione su factura del mes (una por mes).
+  // Cada persona puede emitir un comprobante único o dos tramos (USD y ARS).
 
   // Helper: suma horas/costos del mes a partir de timeEntries.
   // fxOverride permite usar el TC propio de la persona (de su banco) en vez del de
@@ -13837,7 +13858,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       : splitByBillingCurrency(totalCostARSFull, hours, usdHourlyRate, fxRate);
 
-    const costPolicy = personalFinancialCostPolicy((personnelRow as any).contractType);
     return {
       period,
       userId,
@@ -13856,58 +13876,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       isClosed: !!closing,
       availableHours,
       contractType: (personnelRow as any).contractType ?? "full-time",
-      financialCostMode: costPolicy.costMode,
-      allocationBasis: costPolicy.allocationBasis,
       entryCount,
-    };
-  }
-
-  async function getPersonalInvoiceProjects(userId: number, period: string) {
-    const summary = await getMonthlyPersonalSummary(userId, period);
-    if (!summary?.personnelId) return { summary, projects: [] };
-    const [year, month] = period.split("-").map(Number);
-    const start = new Date(year, month - 1, 1);
-    const end = new Date(year, month, 1);
-    const result = await db.execute(sql`
-      WITH worked AS (
-        SELECT project_id, hours::numeric AS hours, COALESCE(total_cost, 0)::numeric AS cost_ars
-        FROM time_entries
-        WHERE personnel_id=${summary.personnelId} AND date >= ${start} AND date < ${end} AND COALESCE(billable, true)=true
-        UNION ALL
-        SELECT t.project_id, tte.hours::numeric AS hours, COALESCE(tte.total_cost, 0)::numeric AS cost_ars
-        FROM task_time_entries tte
-        JOIN tasks t ON t.id=tte.task_id
-        WHERE tte.personnel_id=${summary.personnelId} AND tte.date >= ${start} AND tte.date < ${end} AND COALESCE(tte.billable, true)=true
-      )
-      SELECT ap.id AS project_id,
-        COALESCE(NULLIF(TRIM(ap.name), ''), q.project_name, 'Proyecto #' || ap.id::text) AS project_name,
-        c.name AS client_name,
-        SUM(worked.hours)::float AS hours,
-        SUM(worked.cost_ars)::float AS computed_cost_ars
-      FROM worked
-      JOIN active_projects ap ON ap.id=worked.project_id
-      LEFT JOIN quotations q ON q.id=ap.quotation_id
-      LEFT JOIN clients c ON c.id=ap.client_id
-      WHERE ap.project_category='billable' AND ap.status NOT IN ('cancelled','voided')
-      GROUP BY ap.id, ap.name, q.project_name, c.name
-      HAVING SUM(worked.hours) > 0
-      ORDER BY c.name NULLS LAST, project_name
-    `);
-    const rows = (result as any).rows ?? result;
-    const projects = rows.map((row: any) => ({
-      projectId: Number(row.project_id),
-      projectName: String(row.project_name),
-      clientName: row.client_name ? String(row.client_name) : null,
-      hours: Number(row.hours) || 0,
-      computedCostARS: Number(row.computed_cost_ars) || 0,
-    }));
-    return {
-      summary,
-      projects: buildPersonalInvoiceAllocations({
-        projects,
-        computedTotalUSD: Number(summary.grandTotalUSD ?? 0),
-        allocationBasis: summary.allocationBasis,
-      }),
     };
   }
 
@@ -13964,48 +13933,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .from(personalMonthlyInvoices)
         .where(eq(personalMonthlyInvoices.userId, req.user!.id))
         .orderBy(desc(personalMonthlyInvoices.period));
-      const invoiceIds = rows.map((row) => row.id);
-      const allocations = invoiceIds.length ? await db
-        .select({
-          id: personalInvoiceProjectAllocations.id,
-          invoiceId: personalInvoiceProjectAllocations.invoiceId,
-          projectId: personalInvoiceProjectAllocations.projectId,
-          projectName: sql<string>`COALESCE(NULLIF(TRIM(${activeProjects.name}), ''), ${quotations.projectName}, 'Proyecto #' || ${activeProjects.id}::text)`,
-          clientName: clients.name,
-          hours: personalInvoiceProjectAllocations.hours,
-          allocationPercent: personalInvoiceProjectAllocations.allocationPercent,
-          computedCostARS: personalInvoiceProjectAllocations.computedCostARS,
-          computedCostUSD: personalInvoiceProjectAllocations.computedCostUSD,
-          allocatedInvoiceAmount: personalInvoiceProjectAllocations.allocatedInvoiceAmount,
-          invoiceCurrency: personalInvoiceProjectAllocations.invoiceCurrency,
-        })
-        .from(personalInvoiceProjectAllocations)
-        .innerJoin(activeProjects, eq(activeProjects.id, personalInvoiceProjectAllocations.projectId))
-        .leftJoin(quotations, eq(quotations.id, activeProjects.quotationId))
-        .leftJoin(clients, eq(clients.id, activeProjects.clientId))
-        .where(inArray(personalInvoiceProjectAllocations.invoiceId, invoiceIds)) : [];
-      res.json(rows.map((row) => publicPersonalInvoice({
-        ...row,
-        allocations: allocations.filter((allocation) => allocation.invoiceId === row.id),
-      })));
+      res.json(rows.map(publicPersonalInvoice));
     } catch (error) {
       console.error("Error obteniendo facturas personales:", error);
       res.status(500).json({ message: "Error al obtener facturas" });
-    }
-  });
-
-  // Proyectos facturables trabajados en el período. Mind propone el reparto
-  // automáticamente para que la persona sólo tenga que revisarlo.
-  app.get("/api/me/invoices/projects", requireAuth, async (req, res) => {
-    try {
-      const period = typeof req.query.period === "string" ? req.query.period : "";
-      if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(period)) {
-        return res.status(400).json({ message: "Formato de período inválido (YYYY-MM)" });
-      }
-      res.json(await getPersonalInvoiceProjects(req.user!.id, period));
-    } catch (error) {
-      console.error("Error calculando proyectos de factura personal:", error);
-      res.status(500).json({ message: "No se pudieron calcular los proyectos del período" });
     }
   });
 
@@ -14079,8 +14010,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   };
 
-  // Subir/reemplazar factura del mes. El comprobante queda privado y Mind
-  // propone su reparto entre los proyectos facturables trabajados.
+  // Subir/reemplazar un comprobante del período. La factura alimenta Pasivo;
+  // el costo económico ya fue devengado por Operaciones y nunca se recalcula acá.
   app.post("/api/me/invoices", requireAuth, receivePersonalInvoice, async (req, res) => {
     let newStorageKeys: string[] = [];
     try {
@@ -14094,31 +14025,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Los comprobantes deben ser PDF o imágenes JPG, PNG o WEBP" });
       }
 
-      await assertPersonalInvoicePeriodMutable(period);
-
-      const projectData = await getPersonalInvoiceProjects(req.user!.id, period);
-      const summary = projectData.summary;
+      const summary = await getMonthlyPersonalSummary(req.user!.id, period);
       if (!summary?.personnelId) {
         return res.status(409).json({ message: "Tu usuario todavía no está vinculado a una persona del equipo. Pedile a Administración que revise tu email." });
-      }
-      const parsedProjectIds = (() => {
-        try {
-          const value = JSON.parse(String(req.body?.projectIds ?? "[]"));
-          return Array.isArray(value) ? [...new Set(value.map(Number).filter((id) => Number.isInteger(id) && id > 0))] : [];
-        } catch { return []; }
-      })();
-      const availableIds = new Set(projectData.projects.map((project) => project.projectId));
-      const selectedProjectIds = (parsedProjectIds.length ? parsedProjectIds : [...availableIds]).filter((id) => availableIds.has(id));
-      if (!selectedProjectIds.length) {
-        return res.status(409).json({ message: "No hay proyectos facturables con horas cargadas en este período. Revisá tus horas antes de enviar la factura." });
-      }
-
-      const [existing] = await db.select().from(personalMonthlyInvoices).where(and(
-        eq(personalMonthlyInvoices.userId, req.user!.id),
-        eq(personalMonthlyInvoices.period, period),
-      )).limit(1);
-      if (existing?.approvalStatus === "approved") {
-        return res.status(409).json({ message: "Esta factura ya fue aprobada. Pedile a Finanzas que la reabra antes de reemplazarla." });
       }
 
       const [publishedSettlement] = await db.select().from(personnelMonthlySettlements).where(and(
@@ -14126,9 +14035,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         eq(personnelMonthlySettlements.period, period),
         eq(personnelMonthlySettlements.status, "published"),
       )).limit(1);
+      if (!publishedSettlement) {
+        return res.status(409).json({ message: "Operaciones todavía no publicó tu liquidación de este mes" });
+      }
       const usesPublishedMixedSettlement = publishedSettlement?.billingCurrencySnapshot === "MIXED";
-      if (String(summary.billingCurrency).toUpperCase() === "MIXED" && !publishedSettlement) {
-        return res.status(409).json({ message: "Administración todavía no publicó tu liquidación mixta de este mes" });
+      const requestedComponent = String(req.body?.invoiceComponent ?? "single").toLowerCase();
+      const invoiceComponent = usesPublishedMixedSettlement
+        ? requestedComponent === "usd" || requestedComponent === "ars" ? requestedComponent : null
+        : requestedComponent === "single" ? "single" : null;
+      if (!invoiceComponent) {
+        return res.status(400).json({ message: usesPublishedMixedSettlement ? "Elegí si corresponde a la factura USD o ARS" : "Componente de factura inválido" });
+      }
+      const [existing] = await db.select().from(personalMonthlyInvoices).where(and(
+        eq(personalMonthlyInvoices.userId, req.user!.id),
+        eq(personalMonthlyInvoices.period, period),
+        eq(personalMonthlyInvoices.invoiceComponent, invoiceComponent),
+      )).limit(1);
+      if (existing?.approvalStatus === "approved") {
+        return res.status(409).json({ message: "Esta factura ya fue aprobada. Pedile a Finanzas que la reabra antes de reemplazarla." });
       }
       const settlementCalculation = publishedSettlement ? calculatePersonnelSettlement({
         totalARS: publishedSettlement.totalARS,
@@ -14139,13 +14063,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         receivedFx: publishedSettlement.receivedFx,
         bankCommissionUSD: publishedSettlement.bankCommissionUSD,
       }) : null;
-      if (usesPublishedMixedSettlement && (
-        settlementCalculation?.totalInvoiceUSD == null
-        || settlementCalculation.finalInvoiceARS == null
-        || settlementCalculation.financialCostUSD == null
-        || settlementCalculation.financialCostARS == null
-      )) {
-        return res.status(409).json({ message: "Completá el tipo de cambio al facturar y el tipo de cambio al cobrar antes de enviar los comprobantes" });
+      if (usesPublishedMixedSettlement && invoiceComponent === "usd" && settlementCalculation?.totalInvoiceUSD == null) {
+        return res.status(409).json({ message: "Completá el tipo de cambio al facturar antes de enviar la factura USD" });
+      }
+      if (usesPublishedMixedSettlement && invoiceComponent === "ars" && settlementCalculation?.finalInvoiceARS == null) {
+        return res.status(409).json({ message: "Completá el tipo de cambio al cobrar antes de enviar la factura ARS" });
       }
 
       const storedFiles: Awaited<ReturnType<typeof storeFinancialIntakeFile>>[] = [];
@@ -14165,29 +14087,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.warn("No se pudo extraer la factura personal; se conservará para revisión manual:", error);
       }
       const extractedData = extracted?.data;
-      const invoiceCurrency = ["ARS", "USD"].includes(String(req.body?.invoiceCurrency ?? ""))
+      const invoiceCurrency = invoiceComponent === "usd" ? "USD" : invoiceComponent === "ars" ? "ARS" : ["ARS", "USD"].includes(String(req.body?.invoiceCurrency ?? ""))
         ? String(req.body.invoiceCurrency) as "ARS" | "USD"
         : ["ARS", "USD"].includes(String(extractedData?.currency ?? ""))
           ? extractedData!.currency as "ARS" | "USD"
           : summary.billingCurrency === "USD" ? "USD" : "ARS";
       const requestedAmount = Number(req.body?.invoiceAmount);
       const extractedAmount = Number(extractedData?.totalAmount);
-      const financialCostPolicy = personalFinancialCostPolicy(summary.contractType);
+      const expectedInvoiceAmount = invoiceComponent === "usd"
+        ? Number(settlementCalculation?.totalInvoiceUSD ?? 0)
+        : invoiceComponent === "ars"
+          ? Number(settlementCalculation?.finalInvoiceARS ?? 0)
+          : invoiceCurrency === "ARS"
+            ? Number(publishedSettlement.totalARS ?? 0)
+            : Number(summary.grandTotalUSD ?? 0);
       const declaredInvoiceAmount = Number.isFinite(requestedAmount) && requestedAmount > 0
         ? requestedAmount
         : Number.isFinite(extractedAmount) && extractedAmount > 0
           ? extractedAmount
-          : financialCostPolicy.costMode === "hourly"
-            ? invoiceCurrency === "USD" ? Number(summary.grandTotalUSD ?? 0) : Number(summary.grandTotalARS ?? 0)
-            : usesPublishedMixedSettlement ? Number(settlementCalculation?.financialCostUSD ?? 0) : 0;
+          : expectedInvoiceAmount;
       if (!(declaredInvoiceAmount > 0)) {
         await Promise.all(newStorageKeys.map(deleteFinancialIntakeFile));
         newStorageKeys = [];
         return res.status(400).json({ message: "No pudimos detectar el importe. Ingresalo para continuar." });
       }
-      const suggestedInvoiceUSD = financialCostPolicy.costMode === "hourly" && summary?.grandTotalUSD != null
-        ? Math.round(Number(summary.grandTotalUSD) * 100) / 100
-        : null;
+      const suggestedInvoiceUSD = invoiceCurrency === "USD" ? Math.round(expectedInvoiceAmount * 100) / 100 : null;
       const bankFx = req.body?.bankFx === undefined || req.body?.bankFx === ""
         ? null
         : Number(req.body.bankFx);
@@ -14196,18 +14120,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         newStorageKeys = [];
         return res.status(400).json({ message: "Tipo de cambio bancario inválido" });
       }
-      const effectiveFx = bankFx ?? Number(summary.opsFxRate ?? 0);
-      const declaredInvoiceUSD = usesPublishedMixedSettlement
-        ? settlementCalculation!.financialCostUSD
-        : invoiceCurrency === "USD"
+      const componentFx = invoiceComponent === "usd"
+        ? Number(publishedSettlement.invoiceFx ?? 0)
+        : invoiceComponent === "ars"
+          ? Number(publishedSettlement.receivedFx ?? 0)
+          : 0;
+      const effectiveFx = bankFx ?? (componentFx || Number(summary.opsFxRate ?? 0));
+      const declaredInvoiceUSD = invoiceCurrency === "USD"
         ? declaredInvoiceAmount
         : effectiveFx > 0 ? Math.round(declaredInvoiceAmount / effectiveFx * 100) / 100 : null;
-      const declaredInvoiceARS = usesPublishedMixedSettlement
-        ? settlementCalculation!.financialCostARS
-        : invoiceCurrency === "ARS"
+      const declaredInvoiceARS = invoiceCurrency === "ARS"
         ? declaredInvoiceAmount
         : effectiveFx > 0 ? Math.round(declaredInvoiceAmount * effectiveFx * 100) / 100 : null;
-      if (financialCostPolicy.costMode === "invoice_actual" && declaredInvoiceUSD == null) {
+      if (declaredInvoiceUSD == null) {
         await Promise.all(newStorageKeys.map(deleteFinancialIntakeFile));
         newStorageKeys = [];
         return res.status(400).json({ message: "Falta un tipo de cambio para convertir el costo real a USD. Completá el TC bancario o pedile a Finanzas que cargue la cotización del mes." });
@@ -14215,32 +14140,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const differenceUSD = declaredInvoiceUSD != null && suggestedInvoiceUSD != null
         ? Math.round((declaredInvoiceUSD - suggestedInvoiceUSD) * 100) / 100
         : null;
-      const selectedProjects = projectData.projects.filter((project) => selectedProjectIds.includes(project.projectId));
-      const allCostARS = projectData.projects.reduce((total, project) => total + Math.max(0, Number(project.computedCostARS) || 0), 0);
-      const selectedCostARS = selectedProjects.reduce((total, project) => total + Math.max(0, Number(project.computedCostARS) || 0), 0);
-      const allHours = projectData.projects.reduce((total, project) => total + Math.max(0, Number(project.hours) || 0), 0);
-      const selectedHours = selectedProjects.reduce((total, project) => total + Math.max(0, Number(project.hours) || 0), 0);
-      const selectedShare = financialCostPolicy.allocationBasis === "hours"
-        ? allHours > 0 ? selectedHours / allHours : 1
-        : allCostARS > 0
-        ? selectedCostARS / allCostARS
-        : allHours > 0 ? selectedHours / allHours : 1;
-      const allocations = buildPersonalInvoiceAllocations({
-        projects: projectData.projects,
-        selectedProjectIds,
-        computedTotalUSD: Number(summary.grandTotalUSD ?? 0) * selectedShare,
-        invoiceAmount: usesPublishedMixedSettlement ? settlementCalculation!.financialCostUSD : declaredInvoiceAmount,
-        invoiceCurrency: usesPublishedMixedSettlement ? "USD" : invoiceCurrency,
-        allocationBasis: financialCostPolicy.allocationBasis,
-      });
       const rawIssueDate = String(req.body?.issueDate || extractedData?.issueDate || "");
       const issueDate = /^\d{4}-\d{2}-\d{2}$/.test(rawIssueDate) ? new Date(`${rawIssueDate}T12:00:00.000Z`) : null;
+      if (!issueDate) {
+        await Promise.all(newStorageKeys.map(deleteFinancialIntakeFile));
+        newStorageKeys = [];
+        return res.status(400).json({ message: "No pudimos detectar la fecha de emisión. Ingresala para registrar la factura en el mes correcto de Pasivo." });
+      }
+      await assertPersonalInvoicePeriodMutable(issueDate ? issueDate.toISOString().slice(0, 7) : period);
       const invoiceNumber = String(req.body?.invoiceNumber || extractedData?.documentNumber || "").trim().slice(0, 120) || null;
 
       const saved = await db.transaction(async (tx) => {
         const values = {
           personnelId: summary.personnelId,
           settlementId: publishedSettlement?.id ?? null,
+          invoiceComponent,
           fileUrl: "private",
           fileName: stored.originalFileName,
           fileSize: stored.fileSize,
@@ -14266,10 +14180,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           invoiceNumber,
           issueDate,
           contractTypeSnapshot: summary.contractType,
-          financialCostMode: financialCostPolicy.costMode,
-          financialCostARS: usesPublishedMixedSettlement ? settlementCalculation!.financialCostARS : financialCostPolicy.costMode === "hourly" ? summary.grandTotalARS ?? null : declaredInvoiceARS,
-          financialCostUSD: usesPublishedMixedSettlement ? settlementCalculation!.financialCostUSD : financialCostPolicy.costMode === "hourly" ? summary.grandTotalUSD ?? null : declaredInvoiceUSD,
-          bankFx: usesPublishedMixedSettlement ? publishedSettlement!.receivedFx : bankFx,
+          financialCostMode: null,
+          financialCostARS: null,
+          financialCostUSD: null,
+          bankFx: effectiveFx > 0 ? effectiveFx : null,
           differenceUSD,
           extractionProvider: extracted?.provider ?? "manual",
           extractionModel: extracted?.model ?? null,
@@ -14283,17 +14197,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const [invoice] = existing
           ? await tx.update(personalMonthlyInvoices).set(values).where(eq(personalMonthlyInvoices.id, existing.id)).returning()
           : await tx.insert(personalMonthlyInvoices).values({ userId: req.user!.id, period, ...values }).returning();
+        // Limpia repartos heredados de 1.5/1.7. Desde este release la factura
+        // sólo documenta Pasivo y nunca participa del costo por proyecto.
         await tx.delete(personalInvoiceProjectAllocations).where(eq(personalInvoiceProjectAllocations.invoiceId, invoice.id));
-        await tx.insert(personalInvoiceProjectAllocations).values(allocations.map((allocation) => ({
-          invoiceId: invoice.id,
-          projectId: allocation.projectId,
-          hours: allocation.hours,
-          allocationPercent: String(allocation.allocationPercent),
-          computedCostARS: allocation.computedCostARS,
-          computedCostUSD: allocation.computedCostUSD,
-          allocatedInvoiceAmount: allocation.allocatedInvoiceAmount,
-          invoiceCurrency: allocation.invoiceCurrency,
-        })));
         return invoice;
       });
       newStorageKeys = [];
@@ -14308,7 +14214,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // the employee think the upload failed.
         console.warn("No se pudo limpiar el comprobante personal anterior:", cleanupError);
       }
-      res.status(existing ? 200 : 201).json(publicPersonalInvoice({ ...saved, allocations }));
+      res.status(existing ? 200 : 201).json(publicPersonalInvoice({ ...saved, allocations: [] }));
     } catch (error: any) {
       await Promise.all(newStorageKeys.map(deleteFinancialIntakeFile));
       console.error("Error subiendo factura personal:", error);
@@ -14316,14 +14222,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Descarga privada: sólo el dueño o Finanzas/Operaciones pueden abrirla.
+  // Descarga privada: sólo el dueño o Administración/Finanzas pueden abrirla.
   app.get("/api/me/invoices/:id/file", requireAuth, async (req, res) => {
     try {
       const id = Number(req.params.id);
       const [row] = await db.select().from(personalMonthlyInvoices).where(eq(personalMonthlyInvoices.id, id)).limit(1);
       if (!row) return res.status(404).json({ message: "Factura no encontrada" });
       const permissions = (req.user as any)?.permissions ?? [];
-      const canReview = isOperationsRequest(req) || permissions.includes("finance");
+      const canReview = Boolean(req.user!.isAdmin) || permissions.includes("finance");
       if (row.userId !== req.user!.id && !canReview) return res.status(403).json({ message: "No podés abrir esta factura" });
       if (!row.storageKey) return row.fileUrl && row.fileUrl !== "private" ? res.redirect(row.fileUrl) : res.status(404).json({ message: "El archivo no está disponible" });
       const buffer = await readFinancialIntakeFile(row.storageKey);
@@ -14347,7 +14253,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const [row] = await db.select().from(personalMonthlyInvoices).where(eq(personalMonthlyInvoices.id, id)).limit(1);
       if (!row) return res.status(404).json({ message: "Factura no encontrada" });
       const permissions = (req.user as any)?.permissions ?? [];
-      const canReview = isOperationsRequest(req) || permissions.includes("finance");
+      const canReview = Boolean(req.user!.isAdmin) || permissions.includes("finance");
       if (row.userId !== req.user!.id && !canReview) return res.status(403).json({ message: "No podés abrir esta factura" });
       const files = Array.isArray(row.supportingFiles) ? row.supportingFiles : [];
       const file = files[index];
@@ -14402,7 +14308,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const [saved] = await tx.update(personalMonthlyInvoices).set({
           suggestedInvoiceUSD,
           declaredInvoiceUSD,
-          financialCostUSD: row.financialCostMode === "invoice_actual" ? declaredInvoiceUSD : row.financialCostUSD,
           bankFx,
           differenceUSD,
           approvalStatus: "pending",
@@ -14411,7 +14316,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           reviewReason: null,
           updatedAt: new Date(),
         }).where(eq(personalMonthlyInvoices.id, id)).returning();
-        await rebuildNativeFinancialFacts(row.period, tx);
         return saved;
       });
       res.json(updated);
@@ -14421,10 +14325,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Operations review queue for post-closing invoices.
-  app.get("/api/operations/invoices/review", requireAuth, async (req, res) => {
-    const permissions = (req.user as any)?.permissions ?? [];
-    if (!isOperationsRequest(req) && !permissions.includes("finance")) return res.status(403).json({ message: "Acceso exclusivo de Finanzas u Operaciones" });
+  // Cola de matching de Administración/Finanzas.
+  app.get("/api/operations/invoices/review", requireAuth, requirePermission("finance"), async (req, res) => {
     try {
       const period = req.query.period ? String(req.query.period) : null;
       const result = await db.execute(sql`
@@ -14432,6 +14334,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
                p.name AS personnel_name,
                settlement.total_invoice_usd AS settlement_total_invoice_usd,
                settlement.final_invoice_ars AS settlement_final_invoice_ars,
+               settlement.total_ars AS settlement_total_ars,
+               settlement.billing_currency_snapshot AS settlement_billing_currency,
                settlement.bonus_usd AS settlement_bonus_usd,
                settlement.extras_ars AS settlement_extras_ars,
                settlement.invoice_fx AS settlement_invoice_fx,
@@ -14443,37 +14347,90 @@ export async function registerRoutes(app: Express): Promise<Server> {
         WHERE ${period ? sql`i.period = ${period}` : sql`TRUE`}
         ORDER BY i.period DESC, i.uploaded_at DESC
       `);
-      const rows = result.rows as any[];
-      const invoiceIds = rows.map((row) => Number(row.id));
-      const allocations = invoiceIds.length ? await db.select({
-        invoiceId: personalInvoiceProjectAllocations.invoiceId,
-        projectId: personalInvoiceProjectAllocations.projectId,
-        projectName: sql<string>`COALESCE(NULLIF(TRIM(${activeProjects.name}), ''), ${quotations.projectName}, 'Proyecto #' || ${activeProjects.id}::text)`,
-        clientName: clients.name,
-        hours: personalInvoiceProjectAllocations.hours,
-        allocationPercent: personalInvoiceProjectAllocations.allocationPercent,
-        computedCostARS: personalInvoiceProjectAllocations.computedCostARS,
-        computedCostUSD: personalInvoiceProjectAllocations.computedCostUSD,
-        allocatedInvoiceAmount: personalInvoiceProjectAllocations.allocatedInvoiceAmount,
-        invoiceCurrency: personalInvoiceProjectAllocations.invoiceCurrency,
-      }).from(personalInvoiceProjectAllocations)
-        .innerJoin(activeProjects, eq(activeProjects.id, personalInvoiceProjectAllocations.projectId))
-        .leftJoin(quotations, eq(quotations.id, activeProjects.quotationId))
-        .leftJoin(clients, eq(clients.id, activeProjects.clientId))
-        .where(inArray(personalInvoiceProjectAllocations.invoiceId, invoiceIds)) : [];
-      res.json(rows.map((row) => publicPersonalInvoice({
-        ...row,
-        allocations: allocations.filter((allocation: any) => Number(allocation.invoiceId) === Number(row.id)),
-      })));
+      res.json((result.rows as any[]).map(publicPersonalInvoice));
     } catch (error) {
       console.error("Error obteniendo revisiones de facturas:", error);
       res.status(500).json({ message: "Error obteniendo revisiones" });
     }
   });
 
-  app.patch("/api/operations/invoices/review/:id", requireAuth, async (req, res) => {
-    const permissions = (req.user as any)?.permissions ?? [];
-    if (!isOperationsRequest(req) && !permissions.includes("finance")) return res.status(403).json({ message: "Acceso exclusivo de Finanzas u Operaciones" });
+  async function syncPersonalInvoicePayable(tx: any, invoice: any, actorUserId: number) {
+    const externalId = `personal-invoice:${invoice.id}`;
+    const [existingPayable] = await tx.select().from(pasivoEntries)
+      .where(eq(pasivoEntries.externalId, externalId)).limit(1);
+    const applications = existingPayable ? await tx.select({ id: financialDocumentApplications.id })
+      .from(financialDocumentApplications)
+      .where(and(
+        eq(financialDocumentApplications.pasivoEntryId, existingPayable.id),
+        isNull(financialDocumentApplications.voidedAt),
+      )) : [];
+
+    if (invoice.approvalStatus !== "approved") {
+      if (existingPayable && !existingPayable.voidedAt) {
+        if (applications.length) {
+          throw Object.assign(new Error("La factura ya tiene pagos conciliados en Cashflow y no puede reabrirse"), { statusCode: 409 });
+        }
+        await tx.update(pasivoEntries).set({
+          voidedAt: new Date(), voidedBy: actorUserId,
+          voidReason: "Factura del equipo reabierta o rechazada", updatedBy: actorUserId, updatedAt: new Date(),
+        }).where(eq(pasivoEntries.id, existingPayable.id));
+      }
+      return;
+    }
+
+    const amount = Number(invoice.declaredInvoiceAmount ?? 0);
+    const currency = String(invoice.invoiceCurrency ?? "ARS").toUpperCase();
+    if (!(amount > 0) || !["ARS", "USD"].includes(currency)) {
+      throw Object.assign(new Error("La factura no tiene moneda e importe válidos para registrar en Pasivo"), { statusCode: 409 });
+    }
+    const issueDate = invoice.issueDate ? new Date(invoice.issueDate) : new Date(`${invoice.period}-01T12:00:00.000Z`);
+    const issuePeriod = issueDate.toISOString().slice(0, 7);
+    await assertPersonalInvoicePeriodMutable(issuePeriod, tx);
+    const fx = Number(invoice.bankFx ?? 0);
+    const amountARS = currency === "ARS" ? amount : fx > 0 ? amount * fx : null;
+    const amountUSD = currency === "USD" ? amount : fx > 0 ? amount / fx : null;
+    const [person] = invoice.personnelId ? await tx.select({ name: personnel.name })
+      .from(personnel).where(eq(personnel.id, invoice.personnelId)).limit(1) : [];
+    const componentLabel = invoice.invoiceComponent === "usd" ? "tramo USD" : invoice.invoiceComponent === "ars" ? "diferencia ARS" : "factura mensual";
+    const values = {
+      periodKey: issuePeriod,
+      detalle: person?.name ?? "Integrante del equipo",
+      vendorName: person?.name ?? null,
+      concepto: invoice.invoiceNumber ?? `Factura equipo #${invoice.id}`,
+      descripcion: `${componentLabel} correspondiente al trabajo de ${invoice.period}`,
+      documentNumber: invoice.invoiceNumber,
+      fechaEmision: issueDate,
+      subtipoCosto: "Honorarios equipo",
+      status: "PENDING",
+      costTreatment: "balance_only",
+      source: "personal_invoice",
+      externalId,
+      originalAmount: String(amount),
+      netAmount: String(amount),
+      grossAmount: String(amount),
+      outstandingAmount: String(amount),
+      currency,
+      montoARS: amountARS == null ? null : String(amountARS),
+      montoUSD: amountUSD == null ? null : String(amountUSD),
+      cotizacion: fx > 0 ? String(fx) : null,
+      montoTotalUSD: amountUSD == null ? null : String(amountUSD),
+      overrideManual: false,
+      sourceRowKey: `personal-invoice:${invoice.id}`,
+      updatedBy: actorUserId,
+      updatedAt: new Date(),
+      voidedAt: null,
+      voidedBy: null,
+      voidReason: null,
+    };
+    if (existingPayable) {
+      if (applications.length) return;
+      await tx.update(pasivoEntries).set(values).where(eq(pasivoEntries.id, existingPayable.id));
+    } else {
+      await tx.insert(pasivoEntries).values({ ...values, createdBy: actorUserId });
+    }
+  }
+
+  app.patch("/api/operations/invoices/review/:id", requireAuth, requirePermission("finance"), async (req, res) => {
     try {
       const id = Number(req.params.id);
       const approvalStatus = String(req.body?.approvalStatus ?? "");
@@ -14488,51 +14445,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const updated = await db.transaction(async (tx) => {
         await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${'personal-invoice:' + existing.period}))`);
-        await assertPersonalInvoicePeriodMutable(existing.period, tx);
-        const [invoicePerson] = existing.personnelId
-          ? await tx.select({ contractType: personnel.contractType }).from(personnel).where(eq(personnel.id, existing.personnelId)).limit(1)
-          : [];
-        const contractTypeSnapshot = existing.contractTypeSnapshot ?? invoicePerson?.contractType ?? "full-time";
-        const reviewCostMode = existing.financialCostMode ?? personalFinancialCostPolicy(contractTypeSnapshot).costMode;
-        const financialCostUSD = existing.settlementId != null
-          ? existing.financialCostUSD ?? existing.declaredInvoiceUSD
-          : reviewCostMode === "hourly"
-          ? existing.computedTotalCostUSD
-          : existing.financialCostUSD ?? existing.declaredInvoiceUSD;
-        const financialCostARS = existing.settlementId != null
-          ? existing.financialCostARS ?? existing.declaredInvoiceARS
-          : reviewCostMode === "hourly"
-          ? existing.computedTotalCostARS
-          : existing.financialCostARS ?? existing.declaredInvoiceARS
-            ?? (financialCostUSD != null && Number(existing.bankFx) > 0 ? Number(financialCostUSD) * Number(existing.bankFx) : null);
         if (approvalStatus === "approved") {
-          const allocationRows = await tx.select({
-            id: personalInvoiceProjectAllocations.id,
-            allocationPercent: personalInvoiceProjectAllocations.allocationPercent,
-          })
-            .from(personalInvoiceProjectAllocations)
-            .where(eq(personalInvoiceProjectAllocations.invoiceId, id));
-          if (!allocationRows.length) throw Object.assign(new Error("La factura no tiene proyectos asociados"), { statusCode: 409 });
-          const allocationTotal = allocationRows.reduce((total, allocation) => total + Number(allocation.allocationPercent), 0);
-          if (Math.abs(allocationTotal - 100) > 0.01) {
-            throw Object.assign(new Error(`El reparto entre proyectos suma ${allocationTotal.toFixed(2)}% y debe cerrar en 100%`), { statusCode: 409 });
-          }
-          if ((reviewCostMode === "invoice_actual" || existing.settlementId != null) && !(Number(financialCostUSD) > 0)) {
-            throw Object.assign(new Error("La factura no tiene un costo real normalizado en USD"), { statusCode: 409 });
+          if (!(Number(existing.declaredInvoiceAmount) > 0)) throw Object.assign(new Error("La factura no tiene un importe válido"), { statusCode: 409 });
+          const [settlement] = existing.settlementId ? await tx.select().from(personnelMonthlySettlements)
+            .where(eq(personnelMonthlySettlements.id, existing.settlementId)).limit(1) : [];
+          const expectedAmount = existing.invoiceComponent === "usd"
+            ? Number(settlement?.totalInvoiceUSD ?? 0)
+            : existing.invoiceComponent === "ars"
+              ? Number(settlement?.finalInvoiceARS ?? 0)
+              : existing.invoiceCurrency === "ARS" ? Number(settlement?.totalARS ?? 0) : 0;
+          const tolerance = existing.invoiceCurrency === "ARS" ? 1 : 0.01;
+          if (expectedAmount > 0 && Math.abs(Number(existing.declaredInvoiceAmount) - expectedAmount) > tolerance) {
+            throw Object.assign(new Error("El importe de la factura no coincide con la liquidación publicada por Operaciones"), { statusCode: 409 });
           }
         }
         const [row] = await tx.update(personalMonthlyInvoices).set({
-          contractTypeSnapshot,
-          financialCostMode: reviewCostMode,
-          financialCostARS,
-          financialCostUSD,
           approvalStatus,
           reviewedBy: approvalStatus === "pending" ? null : req.user!.id,
           reviewedAt: approvalStatus === "pending" ? null : new Date(),
           reviewReason,
           updatedAt: new Date(),
         }).where(eq(personalMonthlyInvoices.id, id)).returning();
-        await rebuildNativeFinancialFacts(existing.period, tx);
+        await syncPersonalInvoicePayable(tx, row, req.user!.id);
         return row;
       });
       res.json(publicPersonalInvoice(updated));

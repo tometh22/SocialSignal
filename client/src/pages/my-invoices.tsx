@@ -1,38 +1,23 @@
 import { useEffect, useMemo, useRef, useState, type ClipboardEvent, type DragEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { authFetch, authFetchJson } from "@/lib/queryClient";
-import { useToast } from "@/hooks/use-toast";
+import { AlertCircle, Calculator, Check, CheckCircle2, FileText, Loader2, ShieldCheck, UploadCloud, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { AlertCircle, Calculator, Check, CheckCircle2, Clock, FileText, FolderKanban, Loader2, LockKeyhole, Receipt, ShieldCheck, Trash2, UploadCloud, X } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { authFetch, authFetchJson } from "@/lib/queryClient";
 
-type Allocation = {
-  projectId: number;
-  projectName: string;
-  clientName: string | null;
-  hours: number;
-  allocationPercent: number | string;
-  computedCostARS: number | null;
-  computedCostUSD: number | null;
-  allocatedInvoiceAmount?: number | null;
-  invoiceCurrency?: "ARS" | "USD" | null;
-};
-
+type InvoiceComponent = "single" | "usd" | "ars";
 type InvoiceRow = {
   id: number;
   period: string;
+  invoiceComponent: InvoiceComponent;
   fileUrl: string;
   fileName: string;
   fileSize: number;
-  computedTotalCostARS: number | null;
-  computedTotalCostUSD: number | null;
   hoursTotal: number | null;
   notes: string | null;
   uploadedAt: string;
@@ -40,17 +25,10 @@ type InvoiceRow = {
   issueDate?: string | null;
   invoiceCurrency?: "ARS" | "USD" | null;
   declaredInvoiceAmount?: number | null;
-  bankFx?: number | null;
-  contractTypeSnapshot?: string | null;
-  financialCostMode?: "hourly" | "invoice_actual" | null;
-  financialCostARS?: number | null;
-  financialCostUSD?: number | null;
   approvalStatus?: "pending" | "approved" | "rejected";
   reviewReason?: string | null;
-  allocations?: Allocation[];
   documents?: Array<{ index: number; fileName: string; fileSize: number; mimeType: string; fileUrl: string }>;
 };
-
 type Settlement = {
   id: number;
   period: string;
@@ -71,114 +49,51 @@ type Settlement = {
   finalInvoiceARS: number | null;
   adminNotes: string | null;
 };
-
 type MonthSummary = {
   period: string;
-  userId: number;
   personnelId: number | null;
   hours: number;
-  totalCostARS: number;
-  totalCostUSD: number;
   grandTotalARS?: number;
   grandTotalUSD?: number;
-  opsFxRate?: number;
-  billingCurrency?: string;
-  contractType?: string;
-  financialCostMode?: "hourly" | "invoice_actual";
-  allocationBasis?: "cost" | "hours";
   isClosed?: boolean;
-  availableHours?: number;
   entryCount: number;
 };
 
-type ProjectResponse = { summary: MonthSummary | null; projects: Allocation[] };
-
 const STATUS = {
   pending: { label: "En revisión", className: "border-amber-200 bg-amber-50 text-amber-800" },
-  approved: { label: "Aprobada", className: "border-emerald-200 bg-emerald-50 text-emerald-800" },
+  approved: { label: "Aprobada · registrada en Pasivo", className: "border-emerald-200 bg-emerald-50 text-emerald-800" },
   rejected: { label: "Requiere corrección", className: "border-rose-200 bg-rose-50 text-rose-800" },
 } as const;
 
-function currentPeriod(): string {
+function currentPeriod() {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 }
-
-function formatMoney(value: number | null | undefined, currency: "ARS" | "USD") {
+function money(value: number | null | undefined, currency: "ARS" | "USD") {
   if (value == null || !Number.isFinite(Number(value))) return "—";
-  return new Intl.NumberFormat(currency === "ARS" ? "es-AR" : "en-US", {
-    style: "currency", currency, maximumFractionDigits: currency === "ARS" ? 0 : 2,
-  }).format(Number(value));
+  return new Intl.NumberFormat(currency === "ARS" ? "es-AR" : "en-US", { style: "currency", currency, maximumFractionDigits: currency === "ARS" ? 0 : 2 }).format(Number(value));
 }
-
-function formatPeriod(period: string) {
+function periodLabel(period: string) {
   const [year, month] = period.split("-").map(Number);
   return new Date(year, month - 1, 1).toLocaleDateString("es-AR", { month: "long", year: "numeric" });
 }
 
-function percentFor(project: Allocation, selected: Allocation[], basis: "cost" | "hours" = "cost") {
-  const totalCost = selected.reduce((sum, item) => sum + Math.max(0, Number(item.computedCostARS) || 0), 0);
-  const totalHours = selected.reduce((sum, item) => sum + Math.max(0, Number(item.hours) || 0), 0);
-  if (basis === "hours" && totalHours > 0) return Math.max(0, Number(project.hours) || 0) / totalHours * 100;
-  if (totalCost > 0) return Math.max(0, Number(project.computedCostARS) || 0) / totalCost * 100;
-  return totalHours > 0 ? Math.max(0, Number(project.hours) || 0) / totalHours * 100 : 0;
-}
-
 export default function MyInvoices() {
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
-  const fileInput = useRef<HTMLInputElement>(null);
   const [period, setPeriod] = useState(currentPeriod());
-  const [files, setFiles] = useState<File[]>([]);
-  const [dragging, setDragging] = useState(false);
-  const [selectedIds, setSelectedIds] = useState<number[]>([]);
-  const [invoiceAmount, setInvoiceAmount] = useState("");
-  const [invoiceCurrency, setInvoiceCurrency] = useState<"ARS" | "USD">("ARS");
-  const [invoiceNumber, setInvoiceNumber] = useState("");
-  const [issueDate, setIssueDate] = useState("");
-  const [bankFx, setBankFx] = useState("");
-  const [notes, setNotes] = useState("");
   const [invoiceFx, setInvoiceFx] = useState("");
   const [receivedFx, setReceivedFx] = useState("");
   const [bankCommissionUSD, setBankCommissionUSD] = useState("0");
-  const [deleteTarget, setDeleteTarget] = useState<InvoiceRow | null>(null);
-
-  const invoicesQuery = useQuery<InvoiceRow[]>({
-    queryKey: ["personal-invoices"],
-    queryFn: () => authFetchJson("/api/me/invoices"),
-  });
-  const projectQuery = useQuery<ProjectResponse>({
-    queryKey: ["personal-invoice-projects", period],
-    queryFn: () => authFetchJson(`/api/me/invoices/projects?period=${period}`),
-  });
-  const settlementQuery = useQuery<Settlement | null>({
-    queryKey: ["personal-settlement", period],
-    queryFn: () => authFetchJson(`/api/me/invoices/settlement?period=${period}`),
-  });
-  const existing = useMemo(() => (invoicesQuery.data ?? []).find((item) => item.period === period) ?? null, [invoicesQuery.data, period]);
-  const projects = projectQuery.data?.projects ?? [];
-  const selectedProjects = projects.filter((project) => selectedIds.includes(project.projectId));
-  const summary = projectQuery.data?.summary;
-  const financialCostMode = summary?.financialCostMode ?? existing?.financialCostMode;
-  const isFreelance = financialCostMode === "hourly";
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const invoicesQuery = useQuery<InvoiceRow[]>({ queryKey: ["personal-invoices"], queryFn: () => authFetchJson("/api/me/invoices") });
+  const summaryQuery = useQuery<MonthSummary | null>({ queryKey: ["personal-invoice-summary", period], queryFn: () => authFetchJson(`/api/me/invoices/summary?period=${period}`) });
+  const settlementQuery = useQuery<Settlement | null>({ queryKey: ["personal-settlement", period], queryFn: () => authFetchJson(`/api/me/invoices/settlement?period=${period}`) });
   const settlement = settlementQuery.data ?? null;
-  const effectiveBillingCurrency = settlement?.billingCurrencySnapshot?.toUpperCase() ?? summary?.billingCurrency?.toUpperCase() ?? "ARS";
-  const requiresMixedSettlement = effectiveBillingCurrency === "MIXED";
-  const locked = existing?.approvalStatus === "approved";
-
-  useEffect(() => {
-    if (!projectQuery.data) return;
-    const savedIds = existing?.allocations?.map((allocation) => allocation.projectId) ?? [];
-    setSelectedIds(savedIds.length ? savedIds : projectQuery.data.projects.map((project) => project.projectId));
-    setInvoiceAmount(existing?.declaredInvoiceAmount == null ? "" : String(existing.declaredInvoiceAmount));
-    setInvoiceCurrency(existing?.invoiceCurrency ?? (effectiveBillingCurrency === "USD" ? "USD" : "ARS"));
-    setInvoiceNumber(existing?.invoiceNumber ?? "");
-    setIssueDate(existing?.issueDate?.slice(0, 10) ?? "");
-    setBankFx(existing?.bankFx == null ? "" : String(existing.bankFx));
-    setNotes(existing?.notes ?? "");
-    setFiles([]);
-    if (fileInput.current) fileInput.current.value = "";
-  }, [period, projectQuery.data, existing?.id, effectiveBillingCurrency]);
+  const summary = summaryQuery.data ?? null;
+  const periodInvoices = useMemo(() => (invoicesQuery.data ?? []).filter((item) => item.period === period), [invoicesQuery.data, period]);
+  const invoiceFor = (component: InvoiceComponent) => periodInvoices.find((item) => (item.invoiceComponent ?? "single") === component) ?? null;
+  const billing = settlement?.billingCurrencySnapshot?.toUpperCase() ?? "";
+  const isMixed = billing === "MIXED";
 
   useEffect(() => {
     setInvoiceFx(settlement?.invoiceFx == null ? "" : String(settlement.invoiceFx));
@@ -188,248 +103,132 @@ export default function MyInvoices() {
 
   const settlementMutation = useMutation({
     mutationFn: (phase: "invoice" | "receipt") => authFetchJson("/api/me/invoices/settlement", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(phase === "invoice"
-        ? { period, invoiceFx }
-        : { period, receivedFx, bankCommissionUSD }),
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(phase === "invoice" ? { period, invoiceFx } : { period, receivedFx, bankCommissionUSD }),
     }),
     onSuccess: (_data, phase) => {
       queryClient.invalidateQueries({ queryKey: ["personal-settlement", period] });
-      toast(phase === "invoice"
-        ? { title: "Importe USD calculado", description: "Ya podés emitir la factura en USD. Cuando recibas la transferencia, continuá con el paso B." }
-        : { title: "Importe ARS calculado", description: "La liquidación quedó lista para adjuntar los comprobantes y enviarla a Finanzas." });
+      toast(phase === "invoice" ? { title: "Factura USD calculada", description: "Ya podés emitirla y enviarla sin esperar el segundo tramo." } : { title: "Diferencia ARS calculada", description: "Ya podés emitir y enviar la factura ARS." });
     },
     onError: (error: Error) => toast({ title: "No se pudo calcular", description: error.message, variant: "destructive" }),
   });
 
-  const uploadMutation = useMutation({
-    mutationFn: async () => {
-      if (!files.length) throw new Error("Adjuntá al menos un comprobante en PDF o imagen");
-      if (!selectedIds.length) throw new Error("Seleccioná al menos un proyecto");
-      const form = new FormData();
-      files.forEach((file) => form.append("files", file));
-      form.append("period", period);
-      form.append("projectIds", JSON.stringify(selectedIds));
-      form.append("invoiceCurrency", invoiceCurrency);
-      if (invoiceAmount.trim()) form.append("invoiceAmount", invoiceAmount);
-      if (invoiceNumber.trim()) form.append("invoiceNumber", invoiceNumber);
-      if (issueDate) form.append("issueDate", issueDate);
-      if (bankFx.trim()) form.append("bankFx", bankFx);
-      if (notes.trim()) form.append("notes", notes);
-      const response = await authFetch("/api/me/invoices", { method: "POST", body: form });
-      if (!response.ok) throw new Error((await response.json().catch(() => ({}))).message ?? "No se pudo enviar la factura");
-      return response.json();
-    },
-    onSuccess: () => {
-      toast({ title: "Factura enviada", description: "Finanzas ya puede revisarla. El estado quedará visible en esta pantalla." });
-      setFiles([]);
-      if (fileInput.current) fileInput.current.value = "";
-      queryClient.invalidateQueries({ queryKey: ["personal-invoices"] });
-    },
-    onError: (error: Error) => toast({ title: "No se pudo enviar", description: error.message, variant: "destructive" }),
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: (id: number) => authFetchJson(`/api/me/invoices/${id}`, { method: "DELETE" }),
-    onSuccess: () => {
-      toast({ title: "Factura eliminada" });
-      setDeleteTarget(null);
-      queryClient.invalidateQueries({ queryKey: ["personal-invoices"] });
-    },
-    onError: (error: Error) => toast({ title: "No se pudo eliminar", description: error.message, variant: "destructive" }),
-  });
-
-  function acceptFiles(files: File[]) {
-    const candidates = files.slice(0, 10);
-    if (!candidates.length) return;
-    if (candidates.some((candidate) => !["application/pdf", "image/jpeg", "image/png", "image/webp"].includes(candidate.type))) {
-      toast({ title: "Formato no admitido", description: "Usá PDF, JPG, PNG o WEBP.", variant: "destructive" });
-      return;
-    }
-    if (candidates.some((candidate) => candidate.size > 20 * 1024 * 1024)) {
-      toast({ title: "Archivo demasiado grande", description: "El máximo es 20 MB.", variant: "destructive" });
-      return;
-    }
-    setFiles((current) => [...current, ...candidates].slice(0, 10));
-  }
-  function onDrop(event: DragEvent<HTMLDivElement>) {
-    event.preventDefault();
-    setDragging(false);
-    acceptFiles(Array.from(event.dataTransfer.files));
-  }
-  function onPaste(event: ClipboardEvent<HTMLDivElement>) {
-    const pasted = Array.from(event.clipboardData.items).find((item) => item.kind === "file")?.getAsFile();
-    if (pasted) { event.preventDefault(); acceptFiles([pasted]); }
-  }
-  function toggleProject(projectId: number, checked: boolean) {
-    setSelectedIds((current) => checked ? [...new Set([...current, projectId])] : current.filter((id) => id !== projectId));
-  }
-
-  const invoiceFxSaved = Boolean(settlement?.invoiceFx);
-  const receivedFxSaved = Boolean(settlement?.receivedFx && settlement?.finalInvoiceARS != null);
-  const mixedReady = !requiresMixedSettlement || Boolean(invoiceFxSaved && receivedFxSaved);
-  const stepReady = Boolean(summary?.personnelId && selectedIds.length && files.length && mixedReady && !locked);
-  const status = existing?.approvalStatus ? STATUS[existing.approvalStatus] : null;
   const invoiceFxNumber = Number(invoiceFx) > 0 ? Number(invoiceFx) : null;
   const receivedFxNumber = Number(receivedFx) > 0 ? Number(receivedFx) : null;
   const previewBaseUSD = settlement && invoiceFxNumber ? settlement.plannedUSDARS / invoiceFxNumber : null;
   const previewTotalUSD = previewBaseUSD == null ? null : previewBaseUSD + Number(settlement?.bonusUSD ?? 0);
   const previewPesifiedARS = previewBaseUSD != null && receivedFxNumber ? previewBaseUSD * receivedFxNumber : null;
   const previewFinalARS = settlement && previewPesifiedARS != null && receivedFxNumber
-    ? settlement.totalARS - previewPesifiedARS + settlement.extrasARS + (Number(bankCommissionUSD) || 0) * receivedFxNumber
-    : null;
+    ? settlement.totalARS - previewPesifiedARS + settlement.extrasARS + (Number(bankCommissionUSD) || 0) * receivedFxNumber : null;
+  const invoiceFxSaved = Boolean(settlement?.invoiceFx && settlement?.totalInvoiceUSD != null);
+  const receivedFxSaved = Boolean(settlement?.receivedFx && settlement?.finalInvoiceARS != null);
 
-  return (
-    <div className="mx-auto max-w-6xl space-y-6" onPaste={onPaste}>
-      <AlertDialog open={deleteTarget !== null} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
-        <AlertDialogContent>
-          <AlertDialogHeader><AlertDialogTitle>¿Eliminar esta factura?</AlertDialogTitle><AlertDialogDescription>Se eliminarán el comprobante pendiente y su vínculo con los proyectos. Esta acción no modifica los costos ya calculados.</AlertDialogDescription></AlertDialogHeader>
-          <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction disabled={deleteMutation.isPending} onClick={(event) => { event.preventDefault(); if (deleteTarget) deleteMutation.mutate(deleteTarget.id); }} className="bg-rose-600 hover:bg-rose-700">Eliminar factura</AlertDialogAction></AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-        <div>
-          <p className="text-sm font-medium text-indigo-600">Espacio personal</p>
-          <h1 className="text-3xl font-semibold tracking-tight">Mis facturas</h1>
-          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">Subí tu comprobante mensual. Mind separa la distribución operativa por horas del costo real que usa Finanzas.</p>
-        </div>
-        {status && <Badge variant="outline" className={status.className}>{status.label}</Badge>}
-      </div>
-
-      <div className={`grid gap-3 ${requiresMixedSettlement ? "sm:grid-cols-2 lg:grid-cols-4" : "sm:grid-cols-3"}`}>
-        {(requiresMixedSettlement ? [
-          { number: 1, title: "Elegí el período", text: "Mind trae tus horas y proyectos." },
-          { number: 2, title: "Revisá tu liquidación", text: "Completá los TC de tu banco." },
-          { number: 3, title: "Revisá el reparto", text: "Se calcula automáticamente." },
-          { number: 4, title: "Adjuntá y enviá", text: "Subí los comprobantes USD y ARS." },
-        ] : [
-          { number: 1, title: "Elegí el período", text: "Mind trae tus horas y proyectos." },
-          { number: 2, title: "Revisá el reparto", text: "Se calcula automáticamente." },
-          { number: 3, title: "Adjuntá y enviá", text: "Finanzas controla antes de aprobar." },
-        ]).map((step) => <div key={step.number} className="flex gap-3 rounded-xl border bg-white p-4"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-sm font-semibold text-indigo-700">{step.number}</span><div><p className="text-sm font-semibold">{step.title}</p><p className="text-xs text-muted-foreground">{step.text}</p></div></div>)}
-      </div>
-
-      <Card>
-        <CardHeader className="pb-3"><CardTitle className="flex items-center gap-2 text-base"><Clock className="h-4 w-4 text-indigo-600" />1. Período y resumen</CardTitle></CardHeader>
-        <CardContent className="grid gap-4 sm:grid-cols-[220px_repeat(3,minmax(0,1fr))]">
-          <div><Label htmlFor="invoice-period">Mes a facturar</Label><Input id="invoice-period" className="mt-1.5" type="month" value={period} onChange={(event) => setPeriod(event.target.value)} /></div>
-          <Summary label="Horas cargadas" value={summary ? `${Number(summary.hours).toFixed(1)} h` : "—"} detail={`${summary?.entryCount ?? 0} registros`} />
-          <Summary label={isFreelance ? "Costo por horas ARS" : "Referencia operativa ARS"} value={formatMoney(summary?.grandTotalARS ?? summary?.totalCostARS, "ARS")} detail="Horas × tarifa histórica" />
-          <Summary label={isFreelance ? "Costo por horas USD" : "Referencia operativa USD"} value={formatMoney(summary?.grandTotalUSD ?? summary?.totalCostUSD, "USD")} detail={summary?.isClosed ? "Mes operativo cerrado" : "Estimación operativa"} />
-        </CardContent>
-        {summary?.personnelId && <CardContent className="pt-0"><Notice tone="info" title={isFreelance ? "Contrato freelance: el costo sale de las horas" : "Contrato fijo: el costo real sale de la factura"} text={isFreelance ? "Mind calcula el costo financiero con tus horas por la tarifa histórica. La factura funciona como comprobante y Finanzas controla cualquier diferencia." : "Tus horas se usan para markup, eficiencia y para repartir el trabajo entre proyectos. Cuando Finanzas aprueba la factura, su importe reemplaza la estimación únicamente en Finanzas y Economía."} /></CardContent>}
-      </Card>
-
-      {requiresMixedSettlement && <Card className={settlement ? "border-indigo-200" : "border-amber-200"}>
-        <CardHeader className="pb-3"><CardTitle className="flex items-center gap-2 text-base"><Calculator className="h-4 w-4 text-indigo-600" />2. Tu liquidación USD + ARS</CardTitle><p className="text-sm text-muted-foreground">Administración define el porcentaje y los extras. Vos sólo cargás el tipo de cambio real de tu banco en cada momento; Mind hace el resto.</p></CardHeader>
-        <CardContent className="space-y-4">
-          {settlementQuery.isLoading && <div className="flex items-center gap-2 py-5 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />Buscando tu liquidación…</div>}
-          {!settlementQuery.isLoading && !settlement && <Notice tone="warning" title="Administración todavía no publicó este cierre" text="No tenés que calcular ni adivinar importes. Cuando esté listo, vas a ver acá exactamente cuánto facturar en USD y luego en ARS." />}
-          {settlement && <>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-              <Summary label="Total base del mes" value={formatMoney(settlement.totalARS, "ARS")} detail={`${settlement.hoursSnapshot.toFixed(1)} h × ${formatMoney(settlement.hourlyRateARSSnapshot, "ARS")}`} />
-              <Summary label="Porción en USD" value={`${Number(settlement.usdPercentage).toFixed(2)}%`} detail={formatMoney(settlement.plannedUSDARS, "ARS")} />
-              <Summary label="Extra / bono USD" value={formatMoney(settlement.bonusUSD, "USD")} detail="Se suma, no descuenta del sueldo" />
-              <Summary label="Extras ARS" value={formatMoney(settlement.extrasARS, "ARS")} detail="Se suman al comprobante ARS" />
-              <Summary label="Comprobantes esperados" value="USD + ARS" detail="Dos archivos o un PDF combinado" />
-            </div>
-            {settlement.adminNotes && <Notice tone="info" title="Indicación de Administración" text={settlement.adminNotes} />}
-            <div className="grid gap-4 lg:grid-cols-2">
-              <div className={`rounded-xl border p-4 ${invoiceFxSaved ? "border-emerald-200 bg-emerald-50/30" : "border-indigo-200"}`}>
-                <div className="mb-3 flex items-start justify-between gap-3"><div><p className="font-semibold">A. Al momento de facturar USD</p><p className="text-xs text-muted-foreground">Ingresá el tipo de cambio comprador más bajo que te muestra tu banco.</p></div><Badge variant="outline" className={invoiceFxSaved ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-indigo-200 bg-indigo-50 text-indigo-800"}>{invoiceFxSaved ? "Completado" : "Hacer ahora"}</Badge></div>
-                <Label htmlFor="settlement-invoice-fx">Tipo de cambio al facturar</Label><Input id="settlement-invoice-fx" className="mt-1.5" type="number" min="0" step="0.01" value={invoiceFx} onChange={(event) => setInvoiceFx(event.target.value)} placeholder="ARS por USD" disabled={locked} />
-                <div className="mt-3 grid gap-2 sm:grid-cols-2"><Summary label="USD base" value={formatMoney(previewBaseUSD, "USD")} detail={`${formatMoney(settlement.plannedUSDARS, "ARS")} ÷ TC`} /><Summary label="Total a facturar USD" value={formatMoney(previewTotalUSD, "USD")} detail="USD base + extra/bono" /></div>
-                <Button className="mt-3 w-full" disabled={locked || settlementMutation.isPending || !invoiceFxNumber} onClick={() => settlementMutation.mutate("invoice")}>{settlementMutation.isPending && settlementMutation.variables === "invoice" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : invoiceFxSaved ? <Check className="mr-2 h-4 w-4" /> : <Calculator className="mr-2 h-4 w-4" />}{invoiceFxSaved ? "Actualizar TC y recalcular USD" : "Confirmar TC y calcular USD"}</Button>
-                {invoiceFxSaved && <p className="mt-2 flex items-center gap-1.5 text-xs text-emerald-700"><CheckCircle2 className="h-3.5 w-3.5" />Ya podés emitir la factura USD por {formatMoney(settlement.totalInvoiceUSD, "USD")}.</p>}
-              </div>
-              <div className={`rounded-xl border p-4 ${!invoiceFxSaved ? "bg-slate-50 opacity-70" : receivedFxSaved ? "border-emerald-200 bg-emerald-50/30" : "border-indigo-200"}`}>
-                <div className="mb-3 flex items-start justify-between gap-3"><div><p className="font-semibold">B. Una vez recibida la transferencia</p><p className="text-xs text-muted-foreground">Cargá el nuevo TC y la comisión que descontó el banco.</p></div><Badge variant="outline" className={receivedFxSaved ? "border-emerald-200 bg-emerald-50 text-emerald-800" : ""}>{receivedFxSaved ? "Completado" : invoiceFxSaved ? "Siguiente paso" : "Esperá el paso A"}</Badge></div>
-                <div className="grid gap-3 sm:grid-cols-2"><div><Label htmlFor="settlement-received-fx">Tipo de cambio al cobrar</Label><Input id="settlement-received-fx" className="mt-1.5" type="number" min="0" step="0.01" value={receivedFx} onChange={(event) => setReceivedFx(event.target.value)} placeholder="ARS por USD" disabled={locked || !invoiceFxSaved} /></div><div><Label htmlFor="settlement-bank-fee">Comisión bancaria USD</Label><Input id="settlement-bank-fee" className="mt-1.5" type="number" min="0" step="0.01" value={bankCommissionUSD} onChange={(event) => setBankCommissionUSD(event.target.value)} disabled={locked || !invoiceFxSaved} /></div></div>
-                <div className="mt-3 grid gap-2 sm:grid-cols-2"><Summary label="USD base pesificados" value={formatMoney(previewPesifiedARS, "ARS")} detail="USD base × nuevo TC" /><Summary label="Diferencia a facturar ARS" value={formatMoney(previewFinalARS, "ARS")} detail="Saldo + extras + comisión" /></div>
-                <Button className="mt-3 w-full" disabled={locked || !invoiceFxSaved || settlementMutation.isPending || !receivedFxNumber} onClick={() => settlementMutation.mutate("receipt")}>{settlementMutation.isPending && settlementMutation.variables === "receipt" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : receivedFxSaved ? <Check className="mr-2 h-4 w-4" /> : <Calculator className="mr-2 h-4 w-4" />}{receivedFxSaved ? "Actualizar TC y recalcular ARS" : "Confirmar cobro y calcular ARS"}</Button>
-                {receivedFxSaved && <p className="mt-2 flex items-center gap-1.5 text-xs text-emerald-700"><CheckCircle2 className="h-3.5 w-3.5" />Emití la factura ARS por {formatMoney(settlement.finalInvoiceARS, "ARS")} y adjuntá ambos comprobantes.</p>}
-              </div>
-            </div>
-            <p className="border-t pt-4 text-xs text-muted-foreground">Mind guarda cada etapa por separado. El bono USD queda fuera de la base para que no reduzca por error la diferencia en pesos.</p>
-          </>}
-        </CardContent>
-      </Card>}
-
-      <Card>
-        <CardHeader className="pb-3"><CardTitle className="flex items-center gap-2 text-base"><FolderKanban className="h-4 w-4 text-indigo-600" />{requiresMixedSettlement ? "3" : "2"}. Proyectos incluidos</CardTitle><p className="text-sm text-muted-foreground">Seleccionamos tus proyectos facturables y distribuimos el comprobante {isFreelance ? "según el costo horario" : "según las horas trabajadas"}. Sólo desmarcá uno si no corresponde a esta factura.</p></CardHeader>
-        <CardContent>
-          {projectQuery.isLoading && <div className="flex items-center gap-2 py-8 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />Calculando tus proyectos…</div>}
-          {projectQuery.isError && <Notice tone="danger" title="No pudimos traer tus proyectos" text="Actualizá la página o contactá a Administración si el problema continúa." />}
-          {!projectQuery.isLoading && !projectQuery.isError && !summary?.personnelId && <Notice tone="danger" title="Falta vincular tu usuario" text="Administración debe asociar tu email con tu ficha de persona antes de que puedas cargar facturas." />}
-          {!projectQuery.isLoading && !projectQuery.isError && summary?.personnelId && !projects.length && <Notice tone="warning" title="No encontramos proyectos facturables" text={`No hay horas facturables cargadas para ${formatPeriod(period)}. Revisá tus horas o elegí otro período.`} />}
-          {projects.length > 0 && <div className="overflow-hidden rounded-xl border">
-            <div className="hidden grid-cols-[44px_minmax(0,1fr)_110px_110px_150px] gap-3 bg-slate-50 px-4 py-2 text-xs font-medium text-muted-foreground md:grid"><span /><span>Cliente y proyecto</span><span className="text-right">Horas</span><span className="text-right">Reparto</span><span className="text-right">{isFreelance ? "Costo por horas" : "Referencia operativa"}</span></div>
-            {projects.map((project) => {
-              const checked = selectedIds.includes(project.projectId);
-              const pct = checked ? percentFor(project, selectedProjects, summary?.allocationBasis) : 0;
-              return <label key={project.projectId} className={`grid cursor-pointer items-center gap-3 border-t px-4 py-3 first:border-t-0 md:grid-cols-[44px_minmax(0,1fr)_110px_110px_150px] ${checked ? "bg-white" : "bg-slate-50/70 opacity-65"}`}>
-                <Checkbox checked={checked} disabled={locked} onCheckedChange={(value) => toggleProject(project.projectId, value === true)} />
-                <span><span className="block text-xs text-muted-foreground">{project.clientName ?? "Sin cliente"}</span><span className="block text-sm font-medium">{project.projectName}</span></span>
-                <span className="text-sm tabular-nums md:text-right">{Number(project.hours).toFixed(1)} h</span>
-                <span className="text-sm font-medium tabular-nums text-indigo-700 md:text-right">{pct.toFixed(1)}%</span>
-                <span className="text-sm tabular-nums md:text-right">{formatMoney(project.computedCostARS, "ARS")}</span>
-              </label>;
-            })}
-          </div>}
-          {selectedIds.length > 0 && <p className="mt-3 flex items-center gap-2 text-xs text-emerald-700"><Check className="h-3.5 w-3.5" />El reparto suma 100% y quedará guardado como respaldo del costo directo. {isFreelance ? "Se calcula por costo horario." : "Se distribuye según las horas trabajadas."}</p>}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="pb-3"><CardTitle className="flex items-center gap-2 text-base"><Receipt className="h-4 w-4 text-indigo-600" />{requiresMixedSettlement ? "4" : "3"}. Comprobantes</CardTitle><p className="text-sm text-muted-foreground">Adjuntá PDF o capturas. Si facturás USD + ARS, podés subir ambos archivos o un único PDF combinado; Mind los guarda juntos en el mismo cierre.</p></CardHeader>
-        <CardContent className="space-y-4">
-          {locked && <Notice tone="success" title="Factura aprobada" text="Este período quedó bloqueado para preservar el respaldo contable. Si necesitás corregirlo, contactá a Finanzas." />}
-          {existing?.approvalStatus === "rejected" && <Notice tone="danger" title="Finanzas pidió una corrección" text={existing.reviewReason || "Revisá los datos y reemplazá el comprobante."} />}
-          {!requiresMixedSettlement && <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <div><Label htmlFor="invoice-number">Número <span className="font-normal text-muted-foreground">(opcional)</span></Label><Input id="invoice-number" disabled={locked} className="mt-1.5" value={invoiceNumber} onChange={(event) => setInvoiceNumber(event.target.value)} placeholder="Ej. FC A 0001-123" /></div>
-            <div><Label htmlFor="invoice-date">Fecha <span className="font-normal text-muted-foreground">(opcional)</span></Label><Input id="invoice-date" disabled={locked} className="mt-1.5" type="date" value={issueDate} onChange={(event) => setIssueDate(event.target.value)} /></div>
-            <div><Label>Moneda</Label><Select disabled={locked} value={invoiceCurrency} onValueChange={(value: "ARS" | "USD") => setInvoiceCurrency(value)}><SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ARS">ARS</SelectItem><SelectItem value="USD">USD</SelectItem></SelectContent></Select></div>
-            <div><Label htmlFor="invoice-amount">{isFreelance ? "Importe facturado" : "Importe real"} <span className="font-normal text-muted-foreground">(Mind lo detecta)</span></Label><Input id="invoice-amount" disabled={locked} className="mt-1.5" type="number" min="0" step="0.01" value={invoiceAmount} onChange={(event) => setInvoiceAmount(event.target.value)} placeholder="Completalo sólo si hace falta" /></div>
-          </div>}
-          {!requiresMixedSettlement && invoiceCurrency === "ARS" && <div className="max-w-xs"><Label htmlFor="invoice-fx">TC bancario <span className="font-normal text-muted-foreground">(opcional)</span></Label><Input id="invoice-fx" disabled={locked} className="mt-1.5" type="number" min="0" step="0.01" value={bankFx} onChange={(event) => setBankFx(event.target.value)} placeholder={summary?.opsFxRate ? `Referencia ${summary.opsFxRate}` : "ARS por USD"} /></div>}
-          {requiresMixedSettlement && !mixedReady && <Notice tone="warning" title="Primero completá tu liquidación" text="Guardá el TC al facturar y, una vez cobrada la transferencia, el TC al cobrar. Mind habilitará el envío cuando pueda calcular el comprobante final en ARS." />}
-          <div className={`rounded-xl border-2 border-dashed p-7 text-center transition ${dragging ? "border-indigo-500 bg-indigo-50" : files.length ? "border-emerald-300 bg-emerald-50/50" : "border-slate-200"}`} onDragOver={(event) => { event.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)} onDrop={onDrop}>
-            {files.length ? <><CheckCircle2 className="mx-auto mb-2 h-8 w-8 text-emerald-600" /><p className="text-sm font-semibold">{files.length} comprobante{files.length === 1 ? "" : "s"} listo{files.length === 1 ? "" : "s"}</p><div className="mx-auto mt-3 max-w-xl space-y-2 text-left">{files.map((file, index) => <div key={`${file.name}-${file.lastModified}-${index}`} className="flex items-center justify-between gap-3 rounded-lg border bg-white px-3 py-2"><span className="min-w-0 truncate text-xs">{file.name} · {(file.size / 1024 / 1024).toFixed(2)} MB</span><Button type="button" size="icon" variant="ghost" className="h-7 w-7 shrink-0" onClick={() => setFiles((current) => current.filter((_, itemIndex) => itemIndex !== index))}><X className="h-3.5 w-3.5" /></Button></div>)}</div><Button className="mt-3" size="sm" variant="outline" disabled={locked || files.length >= 10} onClick={() => fileInput.current?.click()}>Agregar otro</Button></> : <><UploadCloud className="mx-auto mb-2 h-8 w-8 text-indigo-500" /><p className="text-sm font-semibold">Arrastrá las facturas o pegá capturas con ⌘V</p><p className="mt-1 text-xs text-muted-foreground">Hasta 10 archivos PDF, JPG, PNG o WEBP · máximo 20 MB cada uno</p><Button className="mt-3" size="sm" variant="outline" disabled={locked} onClick={() => fileInput.current?.click()}>Elegir comprobantes</Button></>}
-            <input ref={fileInput} type="file" multiple className="hidden" accept=".pdf,.jpg,.jpeg,.png,.webp" onChange={(event) => { acceptFiles(Array.from(event.target.files ?? [])); event.currentTarget.value = ""; }} />
-          </div>
-          <div><Label htmlFor="invoice-notes">Aclaración <span className="font-normal text-muted-foreground">(opcional)</span></Label><Textarea id="invoice-notes" disabled={locked} className="mt-1.5" rows={2} value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Sólo si Finanzas necesita contexto adicional" /></div>
-          <div className="flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
-            <p className="flex max-w-xl items-start gap-2 text-xs text-muted-foreground"><ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />El archivo se guarda de forma privada. {isFreelance ? "Finanzas usa el costo calculado por horas." : "Al aprobar, Finanzas y Economía usan el importe real de la factura; Operaciones conserva el cálculo por horas."}</p>
-            <Button disabled={!stepReady || uploadMutation.isPending} onClick={() => uploadMutation.mutate()}>{uploadMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UploadCloud className="mr-2 h-4 w-4" />}{uploadMutation.isPending ? "Leyendo y enviando…" : existing ? "Reemplazar y reenviar" : "Enviar a Finanzas"}</Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="pb-3"><CardTitle className="text-base">Historial</CardTitle><p className="text-sm text-muted-foreground">Seguimiento de tus comprobantes y su estado de revisión.</p></CardHeader>
-        <CardContent className="space-y-3">
-          {invoicesQuery.isLoading && <p className="py-6 text-center text-sm text-muted-foreground">Cargando…</p>}
-          {!invoicesQuery.isLoading && !(invoicesQuery.data ?? []).length && <p className="py-6 text-center text-sm text-muted-foreground">Todavía no enviaste ninguna factura.</p>}
-          {(invoicesQuery.data ?? []).map((invoice) => {
-            const itemStatus = STATUS[invoice.approvalStatus ?? "pending"];
-            return <div key={invoice.id} className="flex flex-col gap-3 rounded-xl border p-4 lg:flex-row lg:items-center lg:justify-between">
-              <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><p className="font-semibold capitalize">{formatPeriod(invoice.period)}</p><Badge variant="outline" className={itemStatus.className}>{itemStatus.label}</Badge><Badge variant="secondary">{invoice.financialCostMode === "hourly" ? "Costo por horas" : "Importe real"}</Badge></div><p className="mt-1 text-sm text-muted-foreground">{invoice.invoiceNumber || invoice.fileName} · {(invoice.allocations ?? []).length} proyecto(s) · {Number(invoice.hoursTotal ?? 0).toFixed(1)} h{invoice.financialCostUSD != null ? ` · ${formatMoney(invoice.financialCostUSD, "USD")}` : ""}</p>{invoice.reviewReason && <p className="mt-1 text-xs text-rose-700">{invoice.reviewReason}</p>}</div>
-              <div className="flex flex-wrap items-center gap-2">{(invoice.documents?.length ? invoice.documents : [{ index: 0, fileName: invoice.fileName, fileSize: invoice.fileSize, mimeType: "", fileUrl: invoice.fileUrl }]).map((document, index) => <Button key={document.fileUrl} asChild size="sm" variant="outline"><a href={document.fileUrl} target="_blank" rel="noreferrer"><FileText className="mr-2 h-4 w-4" />{invoice.documents && invoice.documents.length > 1 ? `Comprobante ${index + 1}` : "Ver factura"}</a></Button>)}{invoice.approvalStatus !== "approved" && <Button size="icon" variant="ghost" className="text-rose-600" title="Eliminar factura" aria-label={`Eliminar factura de ${formatPeriod(invoice.period)}`} onClick={() => setDeleteTarget(invoice)}><Trash2 className="h-4 w-4" /></Button>}</div>
-            </div>;
-          })}
-        </CardContent>
-      </Card>
+  return <div className="mx-auto max-w-6xl space-y-6">
+    <div>
+      <p className="text-sm font-medium text-indigo-600">Espacio personal</p>
+      <h1 className="text-3xl font-semibold tracking-tight">Mis facturas</h1>
+      <p className="mt-1 max-w-3xl text-sm text-muted-foreground">Operaciones calcula tu liquidación. Vos emitís cada factura en su momento y Administración la compara con el importe esperado antes de registrarla en Pasivo.</p>
     </div>
-  );
+
+    <div className="grid gap-3 md:grid-cols-4">
+      <Step number={1} label="Cierre operativo" detail="Costo del mes" done={Boolean(summary?.isClosed)} />
+      <Step number={2} label="Liquidación" detail="Operaciones publica" done={Boolean(settlement)} />
+      <Step number={3} label="Facturación" detail={isMixed ? "USD y luego ARS" : "Comprobante"} active={Boolean(settlement)} />
+      <Step number={4} label="Pasivo" detail="Administración aprueba" done={periodInvoices.length > 0 && periodInvoices.every((invoice) => invoice.approvalStatus === "approved")} />
+    </div>
+
+    <Card><CardHeader className="pb-3"><CardTitle className="text-base">1. Período y referencia operativa</CardTitle></CardHeader><CardContent className="grid gap-4 sm:grid-cols-4">
+      <div><Label htmlFor="invoice-period">Mes trabajado</Label><Input id="invoice-period" className="mt-1.5" type="month" value={period} onChange={(event) => setPeriod(event.target.value)} /></div>
+      <Summary label="Horas cerradas" value={`${Number(summary?.hours ?? 0).toFixed(1)} h`} detail={`${summary?.entryCount ?? 0} registros`} />
+      <Summary label="Costo operativo ARS" value={money(summary?.grandTotalARS, "ARS")} detail="Independiente de la factura" />
+      <Summary label="Costo operativo USD" value={money(summary?.grandTotalUSD, "USD")} detail="Para Costos y rentabilidad" />
+    </CardContent></Card>
+
+    {!settlementQuery.isLoading && !settlement && <Notice tone="warning" title="Esperando a Operaciones" text={`Todavía no publicaron tu liquidación de ${periodLabel(period)}. El costo ya pertenece al cierre operativo, pero aún no hay una instrucción para facturar.`} />}
+    {settlement?.adminNotes && <Notice tone="info" title="Indicación de Operaciones" text={settlement.adminNotes} />}
+
+    {settlement && !isMixed && <Card><CardHeader><CardTitle className="text-base">2. Factura mensual</CardTitle><p className="text-sm text-muted-foreground">La factura alimenta Pasivo según su fecha de emisión. No modifica el costo operativo.</p></CardHeader><CardContent>
+      <InvoiceUpload period={period} component="single" currency={billing === "USD" ? "USD" : "ARS"} expected={billing === "USD" ? Number(summary?.grandTotalUSD ?? 0) : settlement.totalARS} existing={invoiceFor("single")} enabled onSaved={() => queryClient.invalidateQueries({ queryKey: ["personal-invoices"] })} />
+    </CardContent></Card>}
+
+    {settlement && isMixed && <div className="space-y-4">
+      <Card className={invoiceFxSaved ? "border-emerald-200" : "border-indigo-200"}><CardHeader><div className="flex items-start justify-between gap-3"><div><CardTitle className="text-base">A. Fin de mes: factura USD</CardTitle><p className="mt-1 text-sm text-muted-foreground">Cargá el TC comprador más bajo del banco. Mind calcula el importe y habilita la factura USD inmediatamente.</p></div><Badge variant="outline">{invoiceFxSaved ? "Importe confirmado" : "Hacer ahora"}</Badge></div></CardHeader><CardContent className="space-y-4">
+        <div className="grid gap-3 sm:grid-cols-[minmax(0,280px)_1fr_1fr]"><div><Label htmlFor="invoice-fx">TC al facturar</Label><Input id="invoice-fx" className="mt-1.5" type="number" min="0" step="0.01" value={invoiceFx} onChange={(event) => setInvoiceFx(event.target.value)} /></div><Summary label="USD base" value={money(previewBaseUSD, "USD")} detail="Pesos del tramo ÷ TC" /><Summary label="Factura USD esperada" value={money(previewTotalUSD, "USD")} detail="Incluye extra USD informado" /></div>
+        <Button disabled={!invoiceFxNumber || settlementMutation.isPending} onClick={() => settlementMutation.mutate("invoice")}>{settlementMutation.isPending && settlementMutation.variables === "invoice" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Calculator className="mr-2 h-4 w-4" />}{invoiceFxSaved ? "Actualizar cálculo USD" : "Confirmar TC y calcular USD"}</Button>
+        {invoiceFxSaved && <div className="border-t pt-4"><InvoiceUpload period={period} component="usd" currency="USD" expected={Number(settlement.totalInvoiceUSD ?? 0)} existing={invoiceFor("usd")} enabled onSaved={() => queryClient.invalidateQueries({ queryKey: ["personal-invoices"] })} /></div>}
+      </CardContent></Card>
+
+      <Card className={!invoiceFxSaved ? "opacity-65" : receivedFxSaved ? "border-emerald-200" : "border-indigo-200"}><CardHeader><div className="flex items-start justify-between gap-3"><div><CardTitle className="text-base">B. Después del cobro: factura ARS</CardTitle><p className="mt-1 text-sm text-muted-foreground">Cuando recibas los USD, cargá el segundo TC y la comisión. Esta factura puede emitirse al comienzo del mes siguiente.</p></div><Badge variant="outline">{receivedFxSaved ? "Importe confirmado" : invoiceFxSaved ? "Siguiente paso" : "Esperá el paso A"}</Badge></div></CardHeader><CardContent className="space-y-4">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><div><Label htmlFor="received-fx">TC al cobrar</Label><Input id="received-fx" className="mt-1.5" type="number" min="0" step="0.01" value={receivedFx} onChange={(event) => setReceivedFx(event.target.value)} disabled={!invoiceFxSaved} /></div><div><Label htmlFor="bank-fee">Comisión bancaria USD</Label><Input id="bank-fee" className="mt-1.5" type="number" min="0" step="0.01" value={bankCommissionUSD} onChange={(event) => setBankCommissionUSD(event.target.value)} disabled={!invoiceFxSaved} /></div><Summary label="USD base pesificados" value={money(previewPesifiedARS, "ARS")} detail="USD base × segundo TC" /><Summary label="Factura ARS esperada" value={money(previewFinalARS, "ARS")} detail="Diferencia final" /></div>
+        <Button disabled={!invoiceFxSaved || !receivedFxNumber || settlementMutation.isPending} onClick={() => settlementMutation.mutate("receipt")}>{settlementMutation.isPending && settlementMutation.variables === "receipt" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Calculator className="mr-2 h-4 w-4" />}{receivedFxSaved ? "Actualizar cálculo ARS" : "Confirmar cobro y calcular ARS"}</Button>
+        {receivedFxSaved && <div className="border-t pt-4"><InvoiceUpload period={period} component="ars" currency="ARS" expected={Number(settlement.finalInvoiceARS ?? 0)} existing={invoiceFor("ars")} enabled onSaved={() => queryClient.invalidateQueries({ queryKey: ["personal-invoices"] })} /></div>}
+      </CardContent></Card>
+    </div>}
+
+    <Card><CardHeader className="pb-3"><CardTitle className="text-base">Historial del período</CardTitle></CardHeader><CardContent className="space-y-3">{!periodInvoices.length ? <p className="py-4 text-sm text-muted-foreground">Todavía no enviaste facturas para este período.</p> : periodInvoices.map((invoice) => <InvoiceStatus key={invoice.id} invoice={invoice} />)}</CardContent></Card>
+  </div>;
 }
 
-function Summary({ label, value, detail }: { label: string; value: string; detail: string }) {
-  return <div className="rounded-xl border bg-slate-50/70 p-3"><p className="text-xs text-muted-foreground">{label}</p><p className="mt-1 text-lg font-semibold tabular-nums">{value}</p><p className="text-[11px] text-muted-foreground">{detail}</p></div>;
+function InvoiceUpload({ period, component, currency, expected, existing, enabled, onSaved }: { period: string; component: InvoiceComponent; currency: "ARS" | "USD"; expected: number; existing: InvoiceRow | null; enabled: boolean; onSaved: () => void }) {
+  const [files, setFiles] = useState<File[]>([]);
+  const [dragging, setDragging] = useState(false);
+  const [invoiceNumber, setInvoiceNumber] = useState("");
+  const [issueDate, setIssueDate] = useState("");
+  const [amount, setAmount] = useState("");
+  const [notes, setNotes] = useState("");
+  const input = useRef<HTMLInputElement>(null);
+  const { toast } = useToast();
+  const locked = existing?.approvalStatus === "approved";
+  useEffect(() => {
+    setInvoiceNumber(existing?.invoiceNumber ?? "");
+    setIssueDate(existing?.issueDate?.slice(0, 10) ?? "");
+    setAmount(existing?.declaredInvoiceAmount == null ? "" : String(existing.declaredInvoiceAmount));
+    setNotes(existing?.notes ?? "");
+    setFiles([]);
+  }, [existing?.id, period, component]);
+  const mutation = useMutation({
+    mutationFn: async () => {
+      if (!files.length) throw new Error("Adjuntá al menos un comprobante");
+      const form = new FormData();
+      files.forEach((file) => form.append("files", file));
+      form.append("period", period);
+      form.append("invoiceComponent", component);
+      form.append("invoiceCurrency", currency);
+      if (invoiceNumber.trim()) form.append("invoiceNumber", invoiceNumber.trim());
+      if (issueDate) form.append("issueDate", issueDate);
+      if (amount.trim()) form.append("invoiceAmount", amount);
+      if (notes.trim()) form.append("notes", notes.trim());
+      const response = await authFetch("/api/me/invoices", { method: "POST", body: form });
+      if (!response.ok) throw new Error((await response.json().catch(() => ({}))).message ?? "No se pudo enviar la factura");
+      return response.json();
+    },
+    onSuccess: () => { setFiles([]); if (input.current) input.current.value = ""; onSaved(); toast({ title: "Factura enviada a Administración", description: "La revisarán contra el importe publicado por Operaciones." }); },
+    onError: (error: Error) => toast({ title: "No se pudo enviar", description: error.message, variant: "destructive" }),
+  });
+  function accept(candidates: File[]) {
+    const next = candidates.slice(0, 10);
+    if (next.some((file) => !["application/pdf", "image/jpeg", "image/png", "image/webp"].includes(file.type))) return toast({ title: "Formato no admitido", description: "Usá PDF, JPG, PNG o WEBP.", variant: "destructive" });
+    if (next.some((file) => file.size > 20 * 1024 * 1024)) return toast({ title: "Archivo demasiado grande", description: "El máximo es 20 MB por archivo.", variant: "destructive" });
+    setFiles((current) => [...current, ...next].slice(0, 10));
+  }
+  function drop(event: DragEvent<HTMLDivElement>) { event.preventDefault(); setDragging(false); accept(Array.from(event.dataTransfer.files)); }
+  function paste(event: ClipboardEvent<HTMLDivElement>) { const file = Array.from(event.clipboardData.items).find((item) => item.kind === "file")?.getAsFile(); if (file) { event.preventDefault(); accept([file]); } }
+  return <div className="space-y-4" onPaste={paste}>
+    <div className="flex flex-wrap items-center justify-between gap-2"><div><p className="font-semibold">Adjuntar {component === "usd" ? "factura USD" : component === "ars" ? "factura ARS" : "factura"}</p><p className="text-xs text-muted-foreground">Importe esperado: {money(expected, currency)}. Mind intentará leer el importe real del archivo.</p></div>{existing?.approvalStatus && <Badge variant="outline" className={STATUS[existing.approvalStatus].className}>{STATUS[existing.approvalStatus].label}</Badge>}</div>
+    {existing?.approvalStatus === "rejected" && <Notice tone="danger" title="Administración pidió una corrección" text={existing.reviewReason || "Revisá el comprobante y volvé a enviarlo."} />}
+    <div className="grid gap-3 sm:grid-cols-3"><div><Label>Número <span className="font-normal text-muted-foreground">(opcional)</span></Label><Input className="mt-1.5" value={invoiceNumber} onChange={(event) => setInvoiceNumber(event.target.value)} disabled={locked} /></div><div><Label>Fecha de emisión</Label><Input className="mt-1.5" type="date" value={issueDate} onChange={(event) => setIssueDate(event.target.value)} disabled={locked} /></div><div><Label>Importe real <span className="font-normal text-muted-foreground">(si Mind no lo lee)</span></Label><Input className="mt-1.5" type="number" min="0" step="0.01" value={amount} onChange={(event) => setAmount(event.target.value)} disabled={locked} placeholder={String(expected || "")} /></div></div>
+    <div className={`rounded-xl border-2 border-dashed p-6 text-center ${dragging ? "border-indigo-500 bg-indigo-50" : files.length ? "border-emerald-300 bg-emerald-50" : "border-slate-200"}`} onDragOver={(event) => { event.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)} onDrop={drop}>{files.length ? <><CheckCircle2 className="mx-auto h-7 w-7 text-emerald-600" /><p className="mt-1 text-sm font-medium">{files.length} archivo{files.length === 1 ? "" : "s"} listo{files.length === 1 ? "" : "s"}</p><div className="mt-2 space-y-1">{files.map((file, index) => <div key={`${file.name}-${index}`} className="mx-auto flex max-w-lg items-center justify-between rounded border bg-white px-3 py-1.5 text-xs"><span className="truncate">{file.name}</span><Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => setFiles((current) => current.filter((_, item) => item !== index))}><X className="h-3 w-3" /></Button></div>)}</div></> : <><UploadCloud className="mx-auto h-7 w-7 text-indigo-500" /><p className="mt-1 text-sm font-medium">Arrastrá el PDF o pegá una captura con ⌘V</p></>}<Button className="mt-3" size="sm" variant="outline" disabled={locked} onClick={() => input.current?.click()}>{files.length ? "Agregar archivo" : "Elegir comprobante"}</Button><input ref={input} className="hidden" type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.webp" onChange={(event) => { accept(Array.from(event.target.files ?? [])); event.currentTarget.value = ""; }} /></div>
+    <div><Label>Aclaración <span className="font-normal text-muted-foreground">(opcional)</span></Label><Textarea className="mt-1.5" rows={2} value={notes} onChange={(event) => setNotes(event.target.value)} disabled={locked} /></div>
+    <div className="flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between"><p className="flex max-w-2xl items-start gap-2 text-xs text-muted-foreground"><ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />Al aprobarla, Administración crea el Pasivo en el mes de emisión. El costo del equipo y los proyectos no cambian.</p><Button disabled={!enabled || !files.length || locked || mutation.isPending} onClick={() => mutation.mutate()}>{mutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UploadCloud className="mr-2 h-4 w-4" />}{existing ? "Reemplazar y reenviar" : "Enviar a Administración"}</Button></div>
+  </div>;
 }
 
-function Notice({ tone, title, text }: { tone: "danger" | "warning" | "success" | "info"; title: string; text: string }) {
-  const styles = tone === "danger" ? "border-rose-200 bg-rose-50 text-rose-900" : tone === "warning" ? "border-amber-200 bg-amber-50 text-amber-900" : tone === "info" ? "border-indigo-200 bg-indigo-50 text-indigo-950" : "border-emerald-200 bg-emerald-50 text-emerald-900";
-  const Icon = tone === "success" ? LockKeyhole : tone === "info" ? ShieldCheck : AlertCircle;
-  return <div className={`flex gap-3 rounded-xl border p-4 ${styles}`}><Icon className="mt-0.5 h-5 w-5 shrink-0" /><div><p className="text-sm font-semibold">{title}</p><p className="text-xs opacity-80">{text}</p></div></div>;
+function InvoiceStatus({ invoice }: { invoice: InvoiceRow }) {
+  const status = STATUS[invoice.approvalStatus ?? "pending"];
+  return <div className="flex flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-center sm:justify-between"><div><div className="flex flex-wrap items-center gap-2"><p className="font-semibold">{invoice.invoiceComponent === "usd" ? "Factura USD" : invoice.invoiceComponent === "ars" ? "Factura ARS" : "Factura mensual"}</p><Badge variant="outline" className={status.className}>{status.label}</Badge></div><p className="mt-1 text-xs text-muted-foreground">{invoice.invoiceNumber || invoice.fileName} · {money(invoice.declaredInvoiceAmount, invoice.invoiceCurrency ?? "ARS")}{invoice.issueDate ? ` · emitida ${new Date(invoice.issueDate).toLocaleDateString("es-AR")}` : ""}</p></div><div className="flex flex-wrap gap-2">{(invoice.documents ?? []).map((document, index) => <Button key={document.fileUrl} asChild size="sm" variant="outline"><a href={document.fileUrl} target="_blank" rel="noreferrer"><FileText className="mr-2 h-4 w-4" />{invoice.documents!.length > 1 ? `Archivo ${index + 1}` : "Ver factura"}</a></Button>)}</div></div>;
 }
+function Step({ number, label, detail, done = false, active = false }: { number: number; label: string; detail: string; done?: boolean; active?: boolean }) {
+  return <div className={`flex items-center gap-3 rounded-xl border p-4 ${done ? "border-emerald-200 bg-emerald-50/40" : active ? "border-indigo-200" : "bg-slate-50/50"}`}><span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${done ? "bg-emerald-600 text-white" : active ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-500"}`}>{done ? <Check className="h-4 w-4" /> : number}</span><span><span className="block text-sm font-semibold">{label}</span><span className="block text-xs text-muted-foreground">{detail}</span></span></div>;
+}
+function Summary({ label, value, detail }: { label: string; value: string; detail: string }) { return <div className="rounded-xl border bg-slate-50/70 p-3"><p className="text-xs text-muted-foreground">{label}</p><p className="mt-1 text-lg font-semibold tabular-nums">{value}</p><p className="text-[11px] text-muted-foreground">{detail}</p></div>; }
+function Notice({ tone, title, text }: { tone: "danger" | "warning" | "info"; title: string; text: string }) { const styles = tone === "danger" ? "border-rose-200 bg-rose-50 text-rose-900" : tone === "warning" ? "border-amber-200 bg-amber-50 text-amber-900" : "border-indigo-200 bg-indigo-50 text-indigo-950"; const Icon = tone === "info" ? ShieldCheck : AlertCircle; return <div className={`flex gap-3 rounded-xl border p-4 ${styles}`}><Icon className="mt-0.5 h-5 w-5 shrink-0" /><div><p className="text-sm font-semibold">{title}</p><p className="text-xs opacity-80">{text}</p></div></div>; }

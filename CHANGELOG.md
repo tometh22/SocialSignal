@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.8.0 — 2026-09-15
+
+- Separa definitivamente costo económico y facturación: el costo del equipo se devenga al 100% desde el cierre de Operaciones y no cambia cuando llega, se corrige o se aprueba una factura.
+- Mueve la preparación mensual de liquidaciones a Operaciones, que define modalidad ARS, USD o mixta, porcentaje USD, bonos y extras sin intervenir en el matching contable.
+- Incorpora una bandeja exclusiva de Administración para comparar cada factura con el importe final publicado y, al aprobarla, crear el Pasivo en el mes real de emisión.
+- Divide la facturación mixta en dos documentos independientes: factura USD al cierre del mes y factura ARS por la diferencia luego del cobro, incluso si se emite al mes siguiente.
+- Elimina el reparto de facturas entre proyectos: Costos y rentabilidad conservan linealmente la distribución operativa por proyecto o Epical; bonos, extras y comisiones de la factura no alteran esos costos.
+- Convierte las facturas faltantes en un control documental de Pasivo que no bloquea el cierre ni el reconocimiento completo del costo del equipo.
+
 ## 1.7.0 — 2026-09-14
 
 - Reordena el cierre mensual del equipo según las etapas conocidas del Excel: cierre operativo, preparación de Administración, carga del colaborador y revisión financiera.
