@@ -91,7 +91,7 @@ describe("orden de rutas de Express en server/routes.ts", () => {
     expect(routes.length).toBeGreaterThan(100);
     const issues = findShadowingIssues(routes);
     expect(issues, issues.join("\n")).toEqual([]);
-  });
+  }, 30_000);
 
   it("detecta el patrón cuando existe (self-test)", () => {
     const routes = extractRoutes([

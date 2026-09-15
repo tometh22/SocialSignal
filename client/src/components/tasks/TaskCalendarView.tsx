@@ -54,9 +54,11 @@ export default function TaskCalendarView({ projectId, tasks: tasksProp }: Props)
     : Array.isArray(data?.tasks)
       ? data.tasks
       : [];
-  const rootTasks = sourceTasks.filter(t => !t.parentTaskId);
-  const tasksWithDate = rootTasks.filter(t => t.dueDate || t.startDate);
-  const tasksWithoutDate = rootTasks.filter(t => !t.dueDate && !t.startDate && t.status !== "cancelled" && t.status !== "done");
+  // El calendario representa trabajo asignado, no sólo tareas raíz. Las
+  // subtareas también pueden tener fechas propias y antes desaparecían de la
+  // Home por este filtro.
+  const tasksWithDate = sourceTasks.filter(t => t.dueDate || t.startDate);
+  const tasksWithoutDate = sourceTasks.filter(t => !t.dueDate && !t.startDate && t.status !== "cancelled" && t.status !== "done");
 
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(currentMonth);

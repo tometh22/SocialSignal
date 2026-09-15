@@ -52,6 +52,9 @@ export const scopeCoverageSchema = z.object({
     "brand", "campaign", "influencers", "competition", "experience",
     "crisis", "culture", "trends", "category", "multisource",
   ])).default([]),
+  // Impacto esperado de la decisión: no cambia el precio directamente, pero
+  // sí la profundidad de análisis y por lo tanto el esfuerzo operativo.
+  impactLevel: z.enum(["low", "medium", "high", "critical"]).default("medium"),
   slaLevel: z.enum(["standard", "priority", "real_time"]).default("standard"),
   designLevel: z.enum(["standard", "branded", "executive"]).default("branded"),
 });
@@ -163,6 +166,13 @@ const volumeFactor: Record<ScopeCoverage["mentionVolume"], number> = {
   xlarge: 1.35,
 };
 
+const impactFactor: Record<ScopeCoverage["impactLevel"], number> = {
+  low: 0.9,
+  medium: 1,
+  high: 1.18,
+  critical: 1.4,
+};
+
 /** Deterministic effort model. Prices remain the responsibility of quotation-pricing. */
 export function estimateBlueprintWorkload(definition: BlueprintDefinition) {
   const coverage = definition.coverage;
@@ -175,7 +185,7 @@ export function estimateBlueprintWorkload(definition: BlueprintDefinition) {
     * (1 + Math.max(0, coverage.analysisModules.length - 3) * 0.05);
   const slaFactor = coverage.slaLevel === "real_time" ? 1.25 : coverage.slaLevel === "priority" ? 1.12 : 1;
   const designFactor = coverage.designLevel === "executive" ? 1.18 : coverage.designLevel === "branded" ? 1.1 : 1;
-  const factor = coverageFactor * slaFactor * designFactor * volumeFactor[coverage.mentionVolume];
+  const factor = coverageFactor * slaFactor * designFactor * volumeFactor[coverage.mentionVolume] * impactFactor[coverage.impactLevel];
   const lines: WorkloadLine[] = [];
 
   for (const [roleKey, hours] of Object.entries(definition.setupRoleHours)) {
