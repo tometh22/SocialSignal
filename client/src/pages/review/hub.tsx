@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
+import { Plus, Target } from "lucide-react";
 import { reviewApi, reviewKeys, type ReviewRoomSummary } from "@/lib/review-api";
 import { setCurrentReviewRoomId, getCurrentReviewRoomId } from "@/lib/queryClient";
 import CreateReviewDialog from "@/components/review/CreateReviewDialog";
@@ -57,10 +57,15 @@ export default function ReviewHubPage() {
           <h1 className="text-2xl font-semibold text-slate-900">Status</h1>
           <p className="text-sm text-slate-500 mt-0.5">Tus salas de seguimiento semanal</p>
         </div>
-        <Button onClick={() => setCreateOpen(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          Nueva sala
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" asChild>
+            <a href="/review/objectives"><Target className="h-4 w-4" /> Objetivos</a>
+          </Button>
+          <Button onClick={() => setCreateOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Nueva sala
+          </Button>
+        </div>
       </div>
 
       <WhatIsReviewBanner />

@@ -46,6 +46,7 @@ const CRMPage = lazy(() => import("@/pages/crm"));
 const CRMLeadPage = lazy(() => import("@/pages/crm-lead"));
 const ReviewHubPage = lazy(() => import("@/pages/review/hub"));
 const ReviewRoomPage = lazy(() => import("@/pages/review/room"));
+const StatusObjectivesPage = lazy(() => import("@/pages/status-objectives"));
 import ProyeccionPage from "@/pages/proyeccion";
 import ArrPage from "@/pages/arr";
 import RendimientoPage from "@/pages/rendimiento";
@@ -315,6 +316,7 @@ function AppRoutes() {
                   <ProtectedRoute path="/crm" component={CRMPage} requiredPermission="crm" />
                   <ProtectedRoute path="/crm/:id" component={CRMLeadPage} requiredPermission="crm" />
                   <ProtectedRoute path="/review" component={ReviewHubPage} requiredPermission="status" />
+                  <ProtectedRoute path="/review/objectives" component={StatusObjectivesPage} requiredPermission="status" />
                   <ProtectedRoute path="/review/:roomId" component={ReviewRoomPage} requiredPermission="status" />
                   <Route path="/status-semanal">{() => <Redirect to="/review" />}</Route>
 
