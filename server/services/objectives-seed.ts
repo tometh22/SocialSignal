@@ -21,7 +21,9 @@ const MONTH_NUMBERS: Record<string, number> = {
 // the full names from the Master. Keep this mapping explicit so a new person
 // with a similar name cannot silently receive someone else's actions.
 const OWNER_ALIASES: Record<string, string[]> = {
-  "tomás": ["Tomi Criado", "Tomas Criado", "Tomi C"],
+  // Keys are normalized before lookup; keeping this unaccented prevents the
+  // fallback from mistaking Tomás Criado for the unrelated Tomas Facio.
+  tomas: ["Tomi Criado", "Tomas Criado", "Tomi C"],
   vicky: ["Vicky Puricelli", "Vicky P"],
   acha: ["Victoria Achabal"],
   santi: ["Santi Berisso"],

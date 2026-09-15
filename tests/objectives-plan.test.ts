@@ -37,4 +37,5 @@ describe("objective plan 2026 coverage", () => {
     expect(OBJECTIVE_PLAN_2026.objectives.every((objective) => ["Tomás", "Vicky", "Acha"].includes(objective.ownerName))).toBe(true);
     expect(OBJECTIVE_PLAN_2026.objectives.filter((objective) => objective.ownerName === "Acha").every((objective) => objective.slug.startsWith("area-operations-") || objective.slug.startsWith("person-acha-"))).toBe(true);
   });
+
 });
