@@ -83,6 +83,7 @@ const routeLabels: Record<string, string> = {
   new: "Nuevo",
   history: "Historial",
   review: "Status",
+  objectives: "Objetivos",
   operations: "Operaciones",
   capacity: "Capacidad semanal",
   "monthly-closing": "Cierre mensual",
