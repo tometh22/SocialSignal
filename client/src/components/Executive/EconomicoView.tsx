@@ -19,7 +19,7 @@ export default function EconomicoView({ selectedPeriod }: EconomicoViewProps) {
     queryKey: ["/api/v1/executive/economico", selectedPeriod],
     queryFn: async () => {
       const res = await authFetch(`/api/v1/executive/economico?period=${selectedPeriod}`);
-      if (!res.ok) throw new Error('Failed to fetch economico data');
+      if (!res.ok) throw new Error('No se pudieron traer los datos económicos');
       return res.json();
     },
     staleTime: 60000,

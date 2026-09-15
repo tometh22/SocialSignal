@@ -580,7 +580,7 @@ export class UniversalAggregator {
       return {
         isValid: true,
         violations: [],
-        details: { message: 'No date filter applied, uniqueness not applicable' }
+        details: { message: 'No se aplicó filtro de fecha, la unicidad no aplica' }
       };
     }
 

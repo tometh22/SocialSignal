@@ -134,8 +134,8 @@ export default function ReviewQuote({ onPrevious }: { onPrevious: () => void }) 
       queryClient.invalidateQueries({ queryKey: ["/api/quotations"] });
       
       toast({
-        title: "Success",
-        description: "Quotation has been generated successfully.",
+        title: "Listo",
+        description: "La cotización se generó correctamente.",
       });
       
       navigate("/manage-quotes");
@@ -143,7 +143,7 @@ export default function ReviewQuote({ onPrevious }: { onPrevious: () => void }) 
     onError: () => {
       toast({
         title: "Error",
-        description: "Failed to generate quotation.",
+        description: "No se pudo generar la cotización.",
         variant: "destructive",
       });
       setIsSaving(false);
@@ -154,8 +154,8 @@ export default function ReviewQuote({ onPrevious }: { onPrevious: () => void }) 
   const generateQuote = async () => {
     if (!projectDetails.clientId || !projectDetails.projectName) {
       toast({
-        title: "Missing Information",
-        description: "Client and project name are required.",
+        title: "Faltan datos",
+        description: "El cliente y el nombre del proyecto son obligatorios.",
         variant: "destructive",
       });
       return;

@@ -99,7 +99,7 @@ export default function ExecutiveOperativo({ period }: ExecutiveOperativoProps) 
         ? `/api/v1/executive/operativo?period=${period}` 
         : '/api/v1/executive/operativo';
       const res = await authFetch(url);
-      if (!res.ok) throw new Error('Failed to fetch operativo data');
+      if (!res.ok) throw new Error('No se pudieron traer los datos operativos');
       return res.json();
     }
   });

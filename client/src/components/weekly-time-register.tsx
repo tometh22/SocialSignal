@@ -106,7 +106,7 @@ export default function WeeklyTimeRegister({ projectId, onSuccess, onCancel }: W
           try {
             const parsedWeek = new Date(data.selectedWeek);
             if (isNaN(parsedWeek.getTime())) {
-              throw new Error('Invalid date in storage');
+              throw new Error('Fecha inválida en el almacenamiento');
             }
             setSelectedWeek(parsedWeek);
           } catch (error) {

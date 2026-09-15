@@ -76,7 +76,7 @@ export default function AlertsBanner({ alerts, viewName }: AlertsBannerProps) {
               <button
                 onClick={() => handleDismiss(alert.metric)}
                 className="p-0.5 rounded hover:bg-black/5 transition-colors flex-shrink-0"
-                aria-label="Dismiss"
+                aria-label="Descartar"
               >
                 <X className="h-3.5 w-3.5 text-gray-400" />
               </button>

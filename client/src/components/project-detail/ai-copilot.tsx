@@ -346,7 +346,7 @@ export default function AICopilot(props: AICopilotProps) {
             className="w-full flex items-center gap-2 px-4 py-2.5 bg-indigo-50/30 hover:bg-indigo-50/60 transition-colors"
           >
             <FlaskConical className="h-3.5 w-3.5 text-indigo-500" />
-            <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Escenarios What-If</p>
+            <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Escenarios hipotéticos</p>
             <span className="text-[10px] text-slate-300 ml-0.5">— simulación instantánea</span>
             <ChevronRight className={`h-3.5 w-3.5 text-slate-400 ml-auto transition-transform ${showWhatIf ? "rotate-90" : ""}`} />
           </button>

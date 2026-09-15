@@ -20,7 +20,7 @@ export default function FinanzasView({ selectedPeriod }: FinanzasViewProps) {
     queryKey: ["/api/v1/executive/finanzas", selectedPeriod],
     queryFn: async () => {
       const res = await authFetch(`/api/v1/executive/finanzas?period=${selectedPeriod}`);
-      if (!res.ok) throw new Error('Failed to fetch finanzas data');
+      if (!res.ok) throw new Error('No se pudieron traer los datos de finanzas');
       return res.json();
     },
     staleTime: 60000,

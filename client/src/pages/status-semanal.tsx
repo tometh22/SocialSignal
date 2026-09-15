@@ -2508,7 +2508,7 @@ function DailyAgendaView({ agenda, quiet, dailyStatus, roomId, onStart, onOpenLi
                 <ul className="text-xs text-slate-500 space-y-1.5">
                   {quiet.map(i => (
                     <li key={i.key}>
-                      <button onClick={() => onStart(0, { includeQuiet: true, startKey: i.key })} title="Abrir para dejar un update"
+                      <button onClick={() => onStart(0, { includeQuiet: true, startKey: i.key })} title="Abrir para dejar una novedad"
                         className="w-full flex justify-between gap-2 rounded px-1 py-0.5 -mx-1 hover:bg-white hover:text-slate-800 transition-colors text-left">
                         <span className="truncate flex items-center gap-1.5 min-w-0"><span className={cn("w-1.5 h-1.5 rounded-full shrink-0", hm(i.healthStatus).dot)} /><span className="truncate">{i.title}</span></span>
                         <span className="text-slate-300 shrink-0">{(i.lastUpdateAt || i.updatedAt) ? relTime(i.lastUpdateAt || i.updatedAt!) : '—'}</span>
@@ -2517,7 +2517,7 @@ function DailyAgendaView({ agenda, quiet, dailyStatus, roomId, onStart, onOpenLi
                   ))}
                 </ul>
               )}
-              <p className="text-[11px] text-slate-400 mt-4 leading-relaxed">No hace falta hablar de estos, pero podés tocar uno para dejarle un update igual. Al cerrar la daily quedan contados como revisados.</p>
+              <p className="text-[11px] text-slate-400 mt-4 leading-relaxed">No hace falta hablar de estos, pero podés tocar uno para dejarle una novedad igual. Al cerrar la daily quedan contados como revisados.</p>
             </div>
           </div>
         </div>

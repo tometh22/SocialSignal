@@ -68,7 +68,7 @@ export default function QuarterlyNpsSurvey() {
         body: JSON.stringify(data),
       });
       if (!response.ok) {
-        throw new Error('Failed to save survey');
+        throw new Error('No se pudo guardar la encuesta');
       }
       return response.json();
     },

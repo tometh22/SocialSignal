@@ -145,7 +145,7 @@ export default function RecurringTemplatesPage() {
         method: 'POST',
         body: JSON.stringify(data)
       });
-      if (!response.ok) throw new Error('Failed to create template');
+      if (!response.ok) throw new Error('No se pudo crear la plantilla');
       return response.json();
     },
     onSuccess: () => {
@@ -163,7 +163,7 @@ export default function RecurringTemplatesPage() {
       const response = await authFetch(`/api/recurring-templates/${id}`, {
         method: 'DELETE'
       });
-      if (!response.ok) throw new Error('Failed to delete template');
+      if (!response.ok) throw new Error('No se pudo borrar la plantilla');
       return response.json();
     },
     onSuccess: () => {

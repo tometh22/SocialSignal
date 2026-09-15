@@ -28,7 +28,7 @@ export function EconomicRankings({
     queryFn: async () => {
       console.log(`🔍 RANKINGS: Fetching data for project ${projectId} with filter ${timeFilter}`);
       const response = await fetch(`/api/projects/${projectId}/performance-rankings?timeFilter=${timeFilter}`);
-      if (!response.ok) throw new Error('Failed to fetch performance rankings');
+      if (!response.ok) throw new Error('No se pudieron traer los rankings de performance');
       const data = await response.json();
       console.log(`📊 RANKINGS: Received ${data.rankings?.length || 0} rankings for ${timeFilter}`);
       return data;

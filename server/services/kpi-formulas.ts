@@ -30,15 +30,15 @@ const pool = {
 
 export function validatePeriodKey(periodKey: string): { valid: boolean; error?: string } {
   if (!periodKey || typeof periodKey !== 'string') {
-    return { valid: false, error: 'period_key is required and must be a string' };
+    return { valid: false, error: 'period_key es obligatorio y debe ser un string' };
   }
   const match = periodKey.match(/^(\d{4})-(\d{2})$/);
   if (!match) {
-    return { valid: false, error: `Invalid period_key format: "${periodKey}" (expected YYYY-MM)` };
+    return { valid: false, error: `Formato de period_key inválido: "${periodKey}" (se espera YYYY-MM)` };
   }
   const month = parseInt(match[2]);
   if (month < 1 || month > 12) {
-    return { valid: false, error: `Invalid month ${month} in period_key "${periodKey}" (must be 01-12)` };
+    return { valid: false, error: `Mes inválido ${month} en period_key "${periodKey}" (debe ser 01-12)` };
   }
   const year = parseInt(match[1]);
   if (year < 2020 || year > 2030) {

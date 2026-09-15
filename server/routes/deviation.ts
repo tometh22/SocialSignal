@@ -21,7 +21,7 @@ async function deviationAnalysisHandler(req: Request, res: Response) {
     const basis = (String(req.query.basis ?? 'ECON').toUpperCase() === 'EXEC') ? 'EXEC' : 'ECON';
 
     if (isNaN(projectId) || !timeFilter) {
-      return res.status(400).json({ error: 'projectId and timeFilter are required' });
+      return res.status(400).json({ error: 'Se requieren projectId y timeFilter' });
     }
 
     const tf = resolveTimeFilter(timeFilter); // {start,end, period:'YYYY-MM'}
@@ -64,7 +64,7 @@ async function deviationAnalysisHandler(req: Request, res: Response) {
       deviations
     });
   } catch (e:any) {
-    return res.status(500).json({ error: 'deviation-analysis failed', detail: e?.message });
+    return res.status(500).json({ error: 'Falló deviation-analysis', detail: e?.message });
   }
 }
 

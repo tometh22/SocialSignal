@@ -354,7 +354,7 @@ export default function Clients() {
       });
       
       if (!response.ok) {
-        throw new Error('Failed to upload logo');
+        throw new Error('No se pudo subir el logo');
       }
       
       return response.json();
@@ -393,7 +393,7 @@ export default function Clients() {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to import clients');
+        throw new Error('No se pudieron importar los clientes');
       }
 
       return response.json();

@@ -56,7 +56,7 @@ export const useCurrency = () => {
   const getQuotationInCurrency = async (quotationId: number, currency: string) => {
     const response = await fetch(`/api/quotations/${quotationId}/display/${currency}`);
     if (!response.ok) {
-      throw new Error('Failed to fetch quotation with currency conversion');
+      throw new Error('No se pudo traer la cotización con conversión de moneda');
     }
     return response.json();
   };
@@ -85,7 +85,7 @@ export const useQuotationWithCurrency = (quotationId?: number, currency: string 
       if (!quotationId) return null;
       const response = await fetch(`/api/quotations/${quotationId}/display/${currency}`);
       if (!response.ok) {
-        throw new Error('Failed to fetch quotation with currency conversion');
+        throw new Error('No se pudo traer la cotización con conversión de moneda');
       }
       return response.json();
     },

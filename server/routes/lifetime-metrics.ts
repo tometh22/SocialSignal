@@ -9,7 +9,7 @@ export async function lifetimeMetricsHandler(req: Request, res: Response) {
     const projectId = parseInt(req.params.id);
     
     if (isNaN(projectId)) {
-      return res.status(400).json({ message: "Invalid project ID" });
+      return res.status(400).json({ message: "ID de proyecto inválido" });
     }
 
     // Get project and quotation data
@@ -18,7 +18,7 @@ export async function lifetimeMetricsHandler(req: Request, res: Response) {
     });
 
     if (!projectData) {
-      return res.status(404).json({ error: 'Project not found' });
+      return res.status(404).json({ error: 'No se encontró el proyecto' });
     }
 
     const quotationData = projectData.quotationId 
@@ -52,7 +52,7 @@ export async function lifetimeMetricsHandler(req: Request, res: Response) {
         projectId,
         isOneShot,
         hasData: false,
-        message: "No lifetime data available"
+        message: "No hay datos históricos disponibles"
       });
     }
 
@@ -176,6 +176,6 @@ export async function lifetimeMetricsHandler(req: Request, res: Response) {
 
   } catch (error: any) {
     console.error('❌ LIFETIME-METRICS ERROR:', error.message);
-    return res.status(500).json({ error: 'lifetime-metrics failed', detail: error?.message });
+    return res.status(500).json({ error: 'Falló lifetime-metrics', detail: error?.message });
   }
 }

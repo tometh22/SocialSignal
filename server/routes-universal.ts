@@ -25,7 +25,7 @@ export function addUniversalRankingsEndpoint(app: Express, storage: any, require
     const timeFilter = req.query.timeFilter as string || 'all';
     console.log(`🌟 UNIVERSAL API CALL: GET /${id}/performance-rankings-universal?timeFilter=${timeFilter}`);
     
-    if (isNaN(id)) return res.status(400).json({ message: "Invalid project ID" });
+    if (isNaN(id)) return res.status(400).json({ message: "ID de proyecto inválido" });
 
     try {
       // 1. Obtener configuración del proyecto (multi-proyecto)
@@ -117,7 +117,7 @@ export function addUniversalRankingsEndpoint(app: Express, storage: any, require
     } catch (error) {
       console.error('❌ Error in universal performance rankings:', error);
       res.status(500).json({ 
-        message: "Failed to get universal performance rankings",
+        message: "No se pudieron obtener los rankings universales de performance",
         error: error instanceof Error ? error.message : 'Unknown error'
       });
     }

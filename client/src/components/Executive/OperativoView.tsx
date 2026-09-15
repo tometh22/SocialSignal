@@ -21,7 +21,7 @@ export default function OperativoView({ selectedPeriod }: OperativoViewProps) {
     queryKey: ["/api/v1/executive/operativo", selectedPeriod],
     queryFn: async () => {
       const res = await authFetch(`/api/v1/executive/operativo?period=${selectedPeriod}`);
-      if (!res.ok) throw new Error('Failed to fetch operativo data');
+      if (!res.ok) throw new Error('No se pudieron traer los datos operativos');
       return res.json();
     },
     staleTime: 60000,

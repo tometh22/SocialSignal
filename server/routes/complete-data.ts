@@ -243,7 +243,7 @@ export async function completeDataHandler(req: Request, res: Response) {
         periods = [period];
       }
     } else {
-      return res.status(400).json({ error: 'Either period (YYYY-MM) or timeFilter is required' });
+      return res.status(400).json({ error: 'Se requiere period (YYYY-MM) o timeFilter' });
     }
 
     // Get project data - support both numeric ID and projectKey
@@ -256,7 +256,7 @@ export async function completeDataHandler(req: Request, res: Response) {
       const resolved = await resolveProjectKey(projectId);
       if (!resolved) {
         return res.status(404).json({
-          error: 'Project not found',
+          error: 'No se encontró el proyecto',
           message: `Could not resolve projectKey "${projectId}" to an active project`,
           hint: 'ProjectKey format should be "clientname|projectname" (case-insensitive)'
         });
@@ -267,7 +267,7 @@ export async function completeDataHandler(req: Request, res: Response) {
     const projectData = await db.query.activeProjects.findFirst({
       where: eq(activeProjects.id, resolvedProjectId)
     });
-    if (!projectData) return res.status(404).json({ error: 'Project not found' });
+    if (!projectData) return res.status(404).json({ error: 'No se encontró el proyecto' });
 
     const quotationData = projectData.quotationId
       ? await db.query.quotations.findFirst({ where: eq(quotations.id, projectData.quotationId) })
@@ -382,7 +382,7 @@ export async function completeDataHandler(req: Request, res: Response) {
       } catch (error) {
         console.error(`❌ LIFETIME AGGREGATION ERROR:`, error);
         return res.status(500).json({
-          error: 'Failed to aggregate lifetime data',
+          error: 'No se pudieron agregar los datos históricos',
           message: error instanceof Error ? error.message : String(error)
         });
       }
@@ -815,6 +815,6 @@ export async function completeDataHandler(req: Request, res: Response) {
     }, canSeeFinancials));
   } catch (e: any) {
     console.error('❌ COMPLETE-DATA ERROR:', e.message);
-    return res.status(500).json({ error: 'complete-data failed', detail: e?.message });
+    return res.status(500).json({ error: 'Falló complete-data', detail: e?.message });
   }
 }
