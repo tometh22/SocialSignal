@@ -169,12 +169,24 @@ async function resolvePersonnelReference(value: number | string | null | undefin
   return rows[0].id;
 }
 
-function currentWeekStart(): string {
-  const today = new Date();
-  const day = today.getUTCDay();
+function currentWeekStart(actions: Array<{ weekStart: string | null; dueDate: string | null }>): string {
+  const today = new Date().toISOString().slice(0, 10);
+  const planWeeks = actions
+    .map((action) => ({
+      weekStart: action.weekStart ? String(action.weekStart).slice(0, 10) : null,
+      dueDate: action.dueDate ? String(action.dueDate).slice(0, 10) : null,
+    }))
+    .filter((action) => action.weekStart && action.weekStart <= today && (!action.dueDate || action.dueDate >= today))
+    .map((action) => action.weekStart as string)
+    .sort();
+  if (planWeeks.length) return planWeeks[planWeeks.length - 1];
+
+  // Keep a useful fallback outside the seeded plan (e.g. before September).
+  const fallbackDate = new Date();
+  const day = fallbackDate.getUTCDay();
   const daysSinceMonday = day === 0 ? 6 : day - 1;
-  today.setUTCDate(today.getUTCDate() - daysSinceMonday);
-  return today.toISOString().slice(0, 10);
+  fallbackDate.setUTCDate(fallbackDate.getUTCDate() - daysSinceMonday);
+  return fallbackDate.toISOString().slice(0, 10);
 }
 
 function handleError(res: Response, error: unknown, fallback: string) {
@@ -371,7 +383,7 @@ export function createObjectivesRouter(requireAuth: RequireAuth): Router {
         totalActions: responseActions.length,
         completedActions: doneActions,
         atRiskObjectives: responseObjectives.filter((objective) => ["blocked", "at_risk"].includes(objective.status)).length,
-        currentWeekStart: currentWeekStart(),
+        currentWeekStart: currentWeekStart(actionRows),
         completionPercent: responseActions.length ? Math.round((doneActions / responseActions.length) * 100) : 0,
         actionStatusCounts,
         objectiveLevelCounts: Object.fromEntries(
