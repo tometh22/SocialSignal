@@ -9,6 +9,7 @@ import {
   personnel,
 } from "@shared/schema";
 import { OBJECTIVE_PLAN_2026 } from "@shared/objectives-plan-2026";
+import { buildNameIndex, normalize, resolveOwner } from "./objective-owner-resolver";
 
 const MONTH_NUMBERS: Record<string, number> = {
   septiembre: 9,
@@ -16,61 +17,6 @@ const MONTH_NUMBERS: Record<string, number> = {
   noviembre: 11,
   diciembre: 12,
 };
-
-// The strategy uses short names while the canonical personnel table contains
-// the full names from the Master. Keep this mapping explicit so a new person
-// with a similar name cannot silently receive someone else's actions.
-const OWNER_ALIASES: Record<string, string[]> = {
-  // Keys are normalized before lookup; keeping this unaccented prevents the
-  // fallback from mistaking Tomás Criado for the unrelated Tomas Facio.
-  tomas: ["Tomi Criado", "Tomas Criado", "Tomi C"],
-  vicky: ["Vicky Puricelli", "Vicky P"],
-  acha: ["Victoria Achabal"],
-  santi: ["Santi Berisso"],
-  sil: ["Sil Vera"],
-  pau: ["Paula Setrini"],
-};
-
-function normalize(value: string): string {
-  return value
-    .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim();
-}
-
-function buildNameIndex(rows: Array<{ id: number; name: string }>): Map<string, number> {
-  const index = new Map<string, number>();
-  for (const row of rows) {
-    const key = normalize(row.name);
-    if (!index.has(key)) index.set(key, row.id);
-  }
-  return index;
-}
-
-function resolveOwner(
-  shortName: string,
-  personnelRows: Array<{ id: number; name: string }>,
-  personnelByName: Map<string, number>,
-  unresolved: Set<string>,
-): number | null {
-  if (shortName === "PMs") return null;
-  const candidates = [shortName, ...(OWNER_ALIASES[normalize(shortName)] ?? [])];
-  for (const candidate of candidates) {
-    const id = personnelByName.get(normalize(candidate));
-    if (id != null) return id;
-  }
-
-  // A conservative last resort for names such as "Santi" when the canonical
-  // table only has the surname-expanded form. Never pick from two matches.
-  const short = normalize(shortName);
-  const matches = personnelRows.filter((person) => normalize(person.name).split(" ")[0] === short);
-  if (matches.length === 1) return matches[0].id;
-
-  unresolved.add(shortName);
-  return null;
-}
 
 function resolveClientId(accountName: string, clientRows: Array<{ id: number; name: string }>): number | null {
   const normalizedAccount = normalize(accountName);
@@ -182,7 +128,7 @@ export async function ensureObjectivesPlanSeed(): Promise<void> {
   }
   const seededActionSlugs = new Set(actionsToInsert.map((action) => action.slug));
 
-  const actionRows = await db.select({ id: objectiveActions.id, slug: objectiveActions.slug, dependencyActionIds: objectiveActions.dependencyActionIds }).from(objectiveActions);
+  const actionRows = await db.select({ id: objectiveActions.id, slug: objectiveActions.slug, accountableOwnerId: objectiveActions.accountableOwnerId, dependencyActionIds: objectiveActions.dependencyActionIds }).from(objectiveActions);
   const actionIdsBySlug = new Map(actionRows.map((row) => [row.slug, row.id]));
 
   const ownerRows = plan.actions.flatMap((action) => {
@@ -202,6 +148,70 @@ export async function ensureObjectivesPlanSeed(): Promise<void> {
   });
   if (ownerRows.length) {
     await db.insert(objectiveActionOwners).values(ownerRows).onConflictDoNothing();
+  }
+
+  // Actions seeded before the owner aliases were corrected kept an owner the
+  // plan never names: "Tomás" fell through to the unrelated Tomas Facio and
+  // "Santi" resolved to nobody at all. Repair exactly those rows. An action
+  // already owned by somebody the plan does name is left untouched, so a
+  // reassignment made from the UI is never reverted.
+  const planOwnerIds = new Set<number>();
+  const ownersForAction = new Map<string, Map<number, "accountable" | "support">>();
+  for (const action of plan.actions) {
+    const owners = new Map<number, "accountable" | "support">();
+    const accountable = resolveOwner(action.accountableOwnerName, personnelRows, personnelByName, unresolvedOwners);
+    if (accountable != null) owners.set(accountable, "accountable");
+    for (const ownerName of action.supportingOwnerNames) {
+      const support = resolveOwner(ownerName, personnelRows, personnelByName, unresolvedOwners);
+      if (support != null && !owners.has(support)) owners.set(support, "support");
+    }
+    for (const personnelId of owners.keys()) planOwnerIds.add(personnelId);
+    ownersForAction.set(action.slug, owners);
+  }
+
+  const actionRowById = new Map(actionRows.map((row) => [row.id, row]));
+  const staleOwnerRows = await db
+    .select({ id: objectiveActionOwners.id, actionId: objectiveActionOwners.actionId, personnelId: objectiveActionOwners.personnelId })
+    .from(objectiveActionOwners);
+  const repairedActionIds = new Set<number>();
+
+  for (const action of plan.actions) {
+    if (seededActionSlugs.has(action.slug)) continue;
+    const actionId = actionIdsBySlug.get(action.slug);
+    if (actionId == null) continue;
+    const stored = actionRowById.get(actionId)?.accountableOwnerId ?? null;
+    const [expected] = [...(ownersForAction.get(action.slug) ?? new Map()).entries()]
+      .filter(([, role]) => role === "accountable")
+      .map(([personnelId]) => personnelId);
+    if (expected == null || stored === expected) continue;
+    if (stored != null && planOwnerIds.has(stored)) continue;
+    await db.update(objectiveActions)
+      .set({ accountableOwnerId: expected, updatedAt: new Date() })
+      .where(eq(objectiveActions.id, actionId));
+    repairedActionIds.add(actionId);
+  }
+
+  const planActionIds = new Set(
+    plan.actions.map((action) => actionIdsBySlug.get(action.slug)).filter((id): id is number => id != null),
+  );
+  for (const row of staleOwnerRows) {
+    if (!planActionIds.has(row.actionId)) continue;
+    if (planOwnerIds.has(row.personnelId)) continue;
+    await db.delete(objectiveActionOwners).where(eq(objectiveActionOwners.id, row.id));
+    repairedActionIds.add(row.actionId);
+  }
+
+  const repairedOwnerRows = plan.actions.flatMap((action) => {
+    const actionId = actionIdsBySlug.get(action.slug);
+    if (actionId == null || !repairedActionIds.has(actionId)) return [];
+    return [...(ownersForAction.get(action.slug) ?? new Map()).entries()]
+      .map(([personnelId, role]) => ({ actionId, personnelId, role }));
+  });
+  if (repairedOwnerRows.length) {
+    await db.insert(objectiveActionOwners).values(repairedOwnerRows).onConflictDoNothing();
+  }
+  if (repairedActionIds.size) {
+    console.log(`🎯 Objectives plan: repaired ownership on ${repairedActionIds.size} actions seeded with an unresolved owner.`);
   }
 
   // Resolve dependencies only after every action has an ID. Existing actions
