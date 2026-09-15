@@ -174,6 +174,7 @@ import { createReviewRoomsRouter } from "./routes-review-rooms";
 import { createLedgerRouter } from "./routes-ledger";
 import { createFinancialIntelligenceRouter } from "./routes-financial-intelligence";
 import { createFinancialNativeRouter } from "./routes-financial-native";
+import { createObjectivesRouter } from "./routes-objectives";
 import { registerProposalStudioRoutes } from "./routes-proposal-studio";
 import { runDocumentQa } from "./routes-proposal-studio";
 import { blueprintDefinitionSchema, estimateBlueprintWorkload, isDeliverableSold, proposalDocumentSchema } from "@shared/quotation-professional";
@@ -1015,6 +1016,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use('/api', createLedgerRouter(requireAuth));
   app.use('/api/financial-intelligence', createFinancialIntelligenceRouter(requireAuth));
   app.use('/api/financial-native', createFinancialNativeRouter(requireAuth));
+  app.use('/api', createObjectivesRouter(requireAuth));
 
   // Legacy aliases: resuelven /api/status-semanal/* → /api/reviews/:miReviewId/*
   // para no romper bookmarks/clientes stale mientras migran. Borrar en v1.1.
