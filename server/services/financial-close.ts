@@ -70,29 +70,19 @@ async function collectCloseChecks(periodKey: string, runner: any = db): Promise<
           AND reconciliation_status = 'unmatched')::int AS unmatched_cashflow,
       (SELECT count(*) FROM provision_entries
         WHERE period_key = ${periodKey} AND status = 'PROPOSED')::int AS proposed_provisions,
-      (SELECT count(DISTINCT fl.person_id)
-        FROM fact_labor_month fl
-        JOIN personnel p ON p.id=fl.person_id
-        WHERE fl.period_key=${periodKey} AND COALESCE(fl.asana_hours,0)>0
-          AND COALESCE(p.contract_type,'full-time')<>'freelance'
-          AND EXISTS (SELECT 1 FROM system_config sc WHERE sc.config_key='app_mode_cutover_date' AND sc.description<=${periodKey}))::int AS fixed_invoice_expected,
-      (SELECT count(DISTINCT fl.person_id)
-        FROM fact_labor_month fl
-        JOIN personnel p ON p.id=fl.person_id
-        WHERE fl.period_key=${periodKey} AND COALESCE(fl.asana_hours,0)>0
-          AND COALESCE(p.contract_type,'full-time')<>'freelance'
-          AND EXISTS (SELECT 1 FROM system_config sc WHERE sc.config_key='app_mode_cutover_date' AND sc.description<=${periodKey})
-          AND EXISTS (
-            SELECT 1 FROM personal_monthly_invoices i
-            WHERE i.personnel_id=fl.person_id AND i.period=${periodKey} AND i.approval_status='approved'
-              AND COALESCE(i.financial_cost_mode,CASE WHEN COALESCE(i.contract_type_snapshot,p.contract_type,'full-time')='freelance' THEN 'hourly' ELSE 'invoice_actual' END)='invoice_actual'
-              AND COALESCE(i.financial_cost_usd,i.declared_invoice_usd,i.financial_cost_ars,i.declared_invoice_ars,0)>0
-              AND EXISTS (
-                SELECT 1 FROM personal_invoice_project_allocations allocation
-                WHERE allocation.invoice_id=i.id
-                HAVING abs(sum(allocation.allocation_percent)-100)<=0.01
-              )
-          ))::int AS fixed_invoice_approved,
+      (SELECT COALESCE(sum(CASE WHEN settlement.billing_currency_snapshot='MIXED' THEN 2 ELSE 1 END),0)
+        FROM (
+          SELECT DISTINCT fl.person_id
+          FROM fact_labor_month fl
+          WHERE fl.period_key=${periodKey} AND COALESCE(fl.asana_hours,0)>0
+            AND EXISTS (SELECT 1 FROM system_config sc WHERE sc.config_key='app_mode_cutover_date' AND sc.description<=${periodKey})
+        ) expected
+        LEFT JOIN personnel_monthly_settlements settlement
+          ON settlement.personnel_id=expected.person_id AND settlement.period=${periodKey} AND settlement.status='published')::int AS fixed_invoice_expected,
+      (SELECT count(*)
+        FROM personal_monthly_invoices i
+        WHERE i.period=${periodKey} AND i.approval_status='approved'
+          AND COALESCE(i.declared_invoice_amount,0)>0)::int AS fixed_invoice_approved,
       (SELECT count(*) FROM (
         SELECT transfer_group_id
         FROM cashflow_transactions
@@ -148,12 +138,12 @@ async function collectCloseChecks(periodKey: string, runner: any = db): Promise<
     },
     {
       code: "fixed_team_invoices_approved",
-      severity: "critical",
+      severity: "warning",
       status: fixedInvoiceMissing === 0 ? "passed" : "failed",
-      title: "Facturas del equipo fijo aprobadas",
+      title: "Pasivo del equipo documentado",
       detail: fixedInvoiceMissing === 0
-        ? `Las ${fixedInvoiceApproved} factura(s) requeridas del equipo fijo están aprobadas.`
-        : `Faltan aprobar ${fixedInvoiceMissing} de ${fixedInvoiceExpected} factura(s) del equipo fijo. Sin ellas el costo financiero seguiría siendo estimado.`,
+        ? `Los ${fixedInvoiceApproved} comprobante(s) esperados del equipo están aprobados en Pasivo.`
+        : `Faltan aprobar ${fixedInvoiceMissing} de ${fixedInvoiceExpected} comprobante(s) del equipo. El costo del mes ya está devengado por Operaciones; esta diferencia afecta sólo Pasivo.`,
       expectedValue: fixedInvoiceExpected,
       actualValue: fixedInvoiceApproved,
       evidence: { expected: fixedInvoiceExpected, approved: fixedInvoiceApproved },
@@ -348,8 +338,8 @@ export async function closeFinancialPeriod(periodKey: string, actorUserId: numbe
       cuentasCobrarUsd: String(snapshot.cuentasCobrarUsd), cuentasPagarUsd: String(snapshot.cuentasPagarUsd), facturacionTotal: String(snapshot.facturacionTotal),
       costosDirectos: String(snapshot.costosDirectos), costosIndirectos: String(snapshot.costosIndirectos), ivaCompras: String(snapshot.ivaCompras), impuestosUsa: String(snapshot.impuestosUsa),
       pasivoFacturacionAdelantada: String(snapshot.provisiones), ebitOperativo: String(ebit), beneficioNeto: String(beneficio),
-      // Markup is an operational efficiency metric, so it stays on hours ×
-      // historical rate even though P&L uses the approved real invoice cost.
+      // Markup y P&L devengan el costo del equipo desde el mismo cierre de
+      // Operaciones; la facturación sólo determina Pasivo y sus fechas.
       markupPromedio: snapshot.costosDirectosOperativos ? String(snapshot.facturacionTotal / snapshot.costosDirectosOperativos) : null,
       margenOperativo: snapshot.facturacionTotal ? String((ebit / snapshot.facturacionTotal) * 100) : null,
       margenNeto: snapshot.facturacionTotal ? String((beneficio / snapshot.facturacionTotal) * 100) : null,

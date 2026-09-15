@@ -179,6 +179,7 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
         { href: "/tasks/hours-dashboard", title: "Panel de horas", icon: BarChart2, description: "Horas por persona y proyecto", anyPermissions: HOURS_DASHBOARD_ACCESS_SECTIONS },
         { href: "/operations/capacity", title: "Capacidad", icon: Gauge, description: "Capacidad semanal del equipo", permission: 'operations' as AppSection },
         { href: "/operations/monthly-closing", title: "Cierre mensual", icon: CalendarCheck, description: "Cierre de horas del mes", permission: 'operations' as AppSection },
+        { href: "/operations/liquidaciones-equipo", title: "Liquidaciones equipo", icon: Calculator, description: "Definir cómo factura cada persona", permission: 'operations' as AppSection },
         { href: "/operations/holidays", title: "Feriados", icon: Calendar, description: "Gestión de feriados", permission: 'operations' as AppSection },
       ]
     },
@@ -186,7 +187,7 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
       title: "Carga financiera",
       items: [
         { href: "/finance/cargar", title: "Cargar datos", icon: UploadCloud, description: "Texto, archivos y capturas", permission: 'finance' as AppSection },
-        { href: "/finance/liquidaciones-equipo", title: "Liquidaciones equipo", icon: Calculator, description: "Definir cuánto factura cada persona", permission: 'finance' as AppSection },
+        { href: "/finance/facturas-equipo", title: "Facturas equipo", icon: Receipt, description: "Comparar facturas y registrar Pasivo", permission: 'finance' as AppSection },
       ]
     },
     {

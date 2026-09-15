@@ -26,7 +26,7 @@ describe("Feedback Mind V2-10 contracts", () => {
     expect(rolesUi).toContain("fallback");
   });
 
-  it("supports post-closing invoice submission and operations approval", () => {
+  it("supports post-closing invoice submission and finance matching", () => {
     const schema = source("shared/schema.ts");
     const routes = source("server/routes.ts");
     const personalUi = source("client/src/pages/my-invoices.tsx");
@@ -34,8 +34,9 @@ describe("Feedback Mind V2-10 contracts", () => {
     expect(schema).toContain('approvalStatus: varchar("approval_status"');
     expect(routes).toContain('/api/me/invoices/:id/review');
     expect(routes).toContain('/api/operations/invoices/review/:id');
-    expect(routes).toContain('financialCostPolicy.costMode === "hourly"');
-    expect(personalUi).toContain("Enviar a Finanzas");
+    expect(routes).toContain('costTreatment: "balance_only"');
+    expect(routes).not.toContain('financialCostPolicy.costMode === "hourly"');
+    expect(personalUi).toContain("Enviar a Administración");
   });
 
   it("keeps third-party attribution and project refresh contracts", () => {

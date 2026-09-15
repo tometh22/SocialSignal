@@ -84,22 +84,6 @@ export async function getCostBreakdown(year: number): Promise<CostBreakdown> {
           WHERE f.period_key LIKE $1
             AND EXISTS (SELECT 1 FROM native_periods n WHERE n.period_key=f.period_key)
           GROUP BY f.period_key,f.person_id,p.name
-       ), actual_fixed_team AS (
-         SELECT DISTINCT ON (invoice.period,invoice.personnel_id)
-                invoice.period,invoice.personnel_id,
-                COALESCE(invoice.financial_cost_usd,invoice.declared_invoice_usd,
-                  invoice.financial_cost_ars/NULLIF(invoice.bank_fx,0),invoice.declared_invoice_ars/NULLIF(invoice.bank_fx,0),0)::numeric AS actual_usd
-           FROM personal_monthly_invoices invoice
-           LEFT JOIN personnel person ON person.id=invoice.personnel_id
-          WHERE invoice.period LIKE $1 AND invoice.approval_status='approved'
-            AND COALESCE(invoice.financial_cost_mode,CASE WHEN COALESCE(invoice.contract_type_snapshot,person.contract_type,'full-time')='freelance' THEN 'hourly' ELSE 'invoice_actual' END)='invoice_actual'
-            AND COALESCE(invoice.financial_cost_usd,invoice.declared_invoice_usd,invoice.financial_cost_ars,invoice.declared_invoice_ars,0)>0
-            AND EXISTS (
-              SELECT 1 FROM personal_invoice_project_allocations allocation
-              WHERE allocation.invoice_id=invoice.id
-              HAVING abs(sum(allocation.allocation_percent)-100)<=0.01
-            )
-          ORDER BY invoice.period,invoice.personnel_id,invoice.updated_at DESC,invoice.id DESC
        )
        SELECT concepto, SUM(monto)::float AS monto
          FROM (
@@ -113,10 +97,10 @@ export async function getCostBreakdown(year: number): Promise<CostBreakdown> {
                   COALESCE(CASE WHEN currency='ARS' THEN net_amount/NULLIF(cotizacion,0) ELSE net_amount END,monto_total_usd,monto_usd,monto_ars/NULLIF(cotizacion,0),0)::numeric AS monto
              FROM pasivo_entries
             WHERE period_key LIKE $1 AND voided_at IS NULL AND source <> 'excel'
+              AND COALESCE(cost_treatment,'direct') <> 'balance_only'
            UNION ALL
-           SELECT modeled.concepto,COALESCE(actual.actual_usd,modeled.modeled_usd)::numeric AS monto
+           SELECT modeled.concepto,modeled.modeled_usd::numeric AS monto
              FROM modeled_team modeled
-             LEFT JOIN actual_fixed_team actual ON actual.period=modeled.period_key AND actual.personnel_id=modeled.person_id
          ) native_and_historical
         GROUP BY concepto
         HAVING SUM(monto) <> 0

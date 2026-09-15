@@ -36,6 +36,7 @@ import { financialNativeIntakeMigrationSql } from "./migrations/financial-native
 import { financialLedgerNativeMigrationSql } from "./migrations/financial-ledger-native";
 import { employeeInvoiceProjectsMigrationSql } from "./migrations/employee-invoice-projects";
 import { personnelMonthlySettlementsMigrationSql } from "./migrations/personnel-monthly-settlements";
+import { personalInvoiceComponentsMigrationSql } from "./migrations/personal-invoice-components";
 import { ensureServiceBlueprintSeeds } from "./services/service-blueprints";
 import cors from 'cors';
 import { execSync } from 'child_process';
@@ -857,6 +858,7 @@ async function applyPendingMigrations() {
     await run('0059 financial native ledger', financialLedgerNativeMigrationSql);
     await run('0060 employee invoice project allocations', employeeInvoiceProjectsMigrationSql);
     await run('0061 personnel monthly settlements', personnelMonthlySettlementsMigrationSql);
+    await run('0062 personal invoice components', personalInvoiceComponentsMigrationSql);
 
     // 0033: feriados duplicados (mismo date+name insertado más de una vez desde el
     // formulario) — borra duplicados conservando la fila más antigua y agrega la

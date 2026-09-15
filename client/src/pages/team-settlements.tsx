@@ -38,10 +38,10 @@ type SettlementRow = {
   system: { hours: number | null; hourlyRateARS: number | null; totalARS: number | null };
   settlement: Settlement | null;
   suggestion: { sourcePeriod: string; billingCurrency: string; usdPercentage: number } | null;
-  invoice: { id: number; approvalStatus: "pending" | "approved" | "rejected"; documentCount: number; uploadedAt: string; reviewReason: string | null } | null;
+  invoices: Array<{ id: number; invoiceComponent: "single" | "usd" | "ars"; approvalStatus: "pending" | "approved" | "rejected"; documentCount: number; uploadedAt: string; reviewReason: string | null }>;
 };
 type Draft = { billingCurrency: BillingCurrency; usdPercentage: string; bonusUSD: string; extrasARS: string; adminNotes: string };
-type WorkflowGroup = "admin" | "team" | "review" | "done" | "no_close";
+type WorkflowGroup = "ops" | "team" | "review" | "done" | "no_close";
 
 const EMPTY_DRAFT: Draft = { billingCurrency: "ARS", usdPercentage: "0", bonusUSD: "0", extrasARS: "0", adminNotes: "" };
 
@@ -74,14 +74,18 @@ function draftFor(row: SettlementRow): Draft {
 
 function workflow(row: SettlementRow) {
   if (!row.closing) return { group: "no_close" as WorkflowGroup, label: "Falta cierre operativo", tone: "amber" as const, step: 1 };
-  if (!row.settlement || row.settlement.status === "draft") return { group: "admin" as WorkflowGroup, label: row.settlement ? "Borrador para publicar" : "Preparar liquidación", tone: "indigo" as const, step: 2 };
-  if (row.invoice?.approvalStatus === "approved") return { group: "done" as WorkflowGroup, label: "Cierre completo", tone: "emerald" as const, step: 4 };
-  if (row.invoice?.approvalStatus === "pending") return { group: "review" as WorkflowGroup, label: "Factura para revisar", tone: "blue" as const, step: 4 };
-  if (row.invoice?.approvalStatus === "rejected") return { group: "team" as WorkflowGroup, label: "Esperando corrección", tone: "rose" as const, step: 3 };
+  if (!row.settlement || row.settlement.status === "draft") return { group: "ops" as WorkflowGroup, label: row.settlement ? "Borrador para publicar" : "Preparar liquidación", tone: "indigo" as const, step: 2 };
+  const invoices = row.invoices ?? [];
+  if (invoices.some((invoice) => invoice.approvalStatus === "rejected")) return { group: "team" as WorkflowGroup, label: "Esperando corrección", tone: "rose" as const, step: 3 };
   if (normalizeBillingCurrency(row.settlement.billingCurrencySnapshot) === "MIXED") {
     if (!row.settlement.invoiceFx) return { group: "team" as WorkflowGroup, label: "Esperando TC al facturar", tone: "amber" as const, step: 3 };
+    if (!invoices.some((invoice) => invoice.invoiceComponent === "usd")) return { group: "team" as WorkflowGroup, label: "Esperando factura USD", tone: "amber" as const, step: 3 };
     if (!row.settlement.receivedFx) return { group: "team" as WorkflowGroup, label: "Esperando cobro y segundo TC", tone: "amber" as const, step: 3 };
+    if (!invoices.some((invoice) => invoice.invoiceComponent === "ars")) return { group: "team" as WorkflowGroup, label: "Esperando factura ARS", tone: "amber" as const, step: 3 };
   }
+  const expectedInvoices = normalizeBillingCurrency(row.settlement.billingCurrencySnapshot) === "MIXED" ? 2 : 1;
+  if (invoices.length >= expectedInvoices && invoices.every((invoice) => invoice.approvalStatus === "approved")) return { group: "done" as WorkflowGroup, label: "Facturación completa", tone: "emerald" as const, step: 4 };
+  if (invoices.some((invoice) => invoice.approvalStatus === "pending")) return { group: "review" as WorkflowGroup, label: "Factura para Administración", tone: "blue" as const, step: 4 };
   return { group: "team" as WorkflowGroup, label: "Esperando comprobantes", tone: "amber" as const, step: 3 };
 }
 
@@ -96,7 +100,7 @@ function usd(value: number | null | undefined) {
 export default function TeamSettlements() {
   const [period, setPeriod] = useState(currentPeriod());
   const [search, setSearch] = useState("");
-  const [scope, setScope] = useState("admin");
+  const [scope, setScope] = useState("ops");
   const [drafts, setDrafts] = useState<Record<number, Draft>>({});
   const [openId, setOpenId] = useState<number | null>(null);
   const { toast } = useToast();
@@ -123,7 +127,7 @@ export default function TeamSettlements() {
       queryClient.invalidateQueries({ queryKey: ["personnel-settlements", period] });
       toast({
         title: variables.publish ? (variables.row.settlement?.status === "published" ? "Publicación actualizada" : "Liquidación publicada") : "Borrador guardado",
-        description: variables.publish ? `${variables.row.person.name} ya ve los importes e instrucciones vigentes.` : "Quedó preparado para que Administración lo revise antes de publicar.",
+        description: variables.publish ? `${variables.row.person.name} ya ve los importes e instrucciones vigentes.` : "Quedó preparado para que Operaciones lo revise antes de publicar.",
       });
     },
     onError: (error: Error) => toast({ title: "No se pudo guardar", description: error.message, variant: "destructive" }),
@@ -151,7 +155,7 @@ export default function TeamSettlements() {
   const counts = useMemo(() => allRows.reduce((result, row) => {
     result[workflow(row).group] += 1;
     return result;
-  }, { admin: 0, team: 0, review: 0, done: 0, no_close: 0 } as Record<WorkflowGroup, number>), [allRows]);
+  }, { ops: 0, team: 0, review: 0, done: 0, no_close: 0 } as Record<WorkflowGroup, number>), [allRows]);
   const rows = useMemo(() => allRows.filter((row) => {
     const group = workflow(row).group;
     if (scope !== "all" && scope !== "ready" && group !== scope) return false;
@@ -167,9 +171,9 @@ export default function TeamSettlements() {
   return <div className="mx-auto max-w-7xl space-y-6">
     <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
       <div>
-        <p className="text-sm font-medium text-indigo-600">Carga financiera</p>
+        <p className="text-sm font-medium text-indigo-600">Operaciones</p>
         <h1 className="text-3xl font-semibold tracking-tight">Cierre mensual del equipo</h1>
-        <p className="mt-1 max-w-3xl text-sm text-muted-foreground">El mismo orden del Excel, sin copiar horas ni hacer cuentas: Mind trae el cierre, Administración define lo variable y cada persona completa sus tipos de cambio y comprobantes.</p>
+        <p className="mt-1 max-w-3xl text-sm text-muted-foreground">El mismo orden del Excel, sin copiar horas ni hacer cuentas: Mind trae el cierre, Operaciones define cómo se factura y cada persona completa sus tipos de cambio y comprobantes.</p>
       </div>
       <Button variant="outline" disabled={!bulkRows.length || bulkMutation.isPending} onClick={() => bulkMutation.mutate()}>
         {bulkMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <WandSparkles className="mr-2 h-4 w-4" />}
@@ -179,13 +183,13 @@ export default function TeamSettlements() {
 
     <div className="grid gap-3 md:grid-cols-4">
       <WorkflowStep number={1} label="Cierre operativo" detail="Horas y valor hora" done={allRows.some((row) => Boolean(row.closing))} />
-      <WorkflowStep number={2} label="Administración" detail="Modalidad, % y extras" active={counts.admin > 0} />
+      <WorkflowStep number={2} label="Operaciones" detail="Modalidad, % y extras" active={counts.ops > 0} />
       <WorkflowStep number={3} label="Colaborador" detail="TC y comprobantes" active={counts.team > 0} />
-      <WorkflowStep number={4} label="Revisión final" detail="Aprobación de Finanzas" active={counts.review > 0} done={counts.done > 0 && counts.admin + counts.team + counts.review === 0} />
+      <WorkflowStep number={4} label="Administración" detail="Matching y Pasivo" active={counts.review > 0} done={counts.done > 0 && counts.ops + counts.team + counts.review === 0} />
     </div>
 
     <div className="grid gap-3 sm:grid-cols-3">
-      <Metric icon={Calculator} label="Requieren acción de Administración" value={String(counts.admin)} />
+      <Metric icon={Calculator} label="Requieren acción de Operaciones" value={String(counts.ops)} />
       <Metric icon={Clock3} label="Esperando al equipo" value={String(counts.team)} />
       <Metric icon={FileCheck2} label="Para revisar / completas" value={`${counts.review} / ${counts.done}`} />
     </div>
@@ -194,7 +198,7 @@ export default function TeamSettlements() {
       <CardHeader className="pb-3"><p className="font-semibold">¿Qué requiere atención en {periodLabel(period)}?</p></CardHeader>
       <CardContent className="flex flex-col gap-3 lg:flex-row">
         <div className="w-full lg:w-52"><Label htmlFor="settlement-period">Mes de cierre</Label><Input id="settlement-period" className="mt-1.5" type="month" value={period} onChange={(event) => setPeriod(event.target.value)} /></div>
-        <div className="w-full lg:w-72"><Label>Estado del flujo</Label><Select value={scope} onValueChange={setScope}><SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="admin">Acción de Administración ({counts.admin})</SelectItem><SelectItem value="team">Esperando al equipo ({counts.team})</SelectItem><SelectItem value="review">Para revisar ({counts.review})</SelectItem><SelectItem value="done">Completas ({counts.done})</SelectItem><SelectItem value="ready">Con cierre operativo</SelectItem><SelectItem value="no_close">Sin cierre operativo ({counts.no_close})</SelectItem><SelectItem value="all">Todo el equipo</SelectItem></SelectContent></Select></div>
+        <div className="w-full lg:w-72"><Label>Estado del flujo</Label><Select value={scope} onValueChange={setScope}><SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ops">Acción de Operaciones ({counts.ops})</SelectItem><SelectItem value="team">Esperando al equipo ({counts.team})</SelectItem><SelectItem value="review">En Administración ({counts.review})</SelectItem><SelectItem value="done">Completas ({counts.done})</SelectItem><SelectItem value="ready">Con cierre operativo</SelectItem><SelectItem value="no_close">Sin cierre operativo ({counts.no_close})</SelectItem><SelectItem value="all">Todo el equipo</SelectItem></SelectContent></Select></div>
         <div className="min-w-0 flex-1"><Label htmlFor="settlement-search">Buscar</Label><div className="relative mt-1.5"><Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" /><Input id="settlement-search" className="pl-9" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Nombre o email" /></div></div>
       </CardContent>
     </Card>
@@ -216,10 +220,10 @@ export default function TeamSettlements() {
         const pct = isMixed ? Math.min(100, Math.max(0, Number(draft.usdPercentage) || 0)) : draft.billingCurrency === "USD" ? 100 : 0;
         const planned = Number(row.system.totalARS ?? 0) * pct / 100;
         const published = row.settlement?.status === "published";
-        return <Card key={row.person.id} className={state.group === "admin" ? "border-indigo-200" : state.group === "done" ? "border-emerald-200" : ""}>
+        return <Card key={row.person.id} className={state.group === "ops" ? "border-indigo-200" : state.group === "done" ? "border-emerald-200" : ""}>
           <CardHeader className="p-0">
             <button type="button" className="flex w-full items-center gap-4 px-5 py-4 text-left" onClick={() => setOpenId(isOpen ? null : row.person.id)} aria-expanded={isOpen}>
-              <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${state.group === "done" ? "bg-emerald-100 text-emerald-700" : state.group === "admin" ? "bg-indigo-100 text-indigo-700" : "bg-slate-100 text-slate-700"}`}>{state.step}</span>
+              <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${state.group === "done" ? "bg-emerald-100 text-emerald-700" : state.group === "ops" ? "bg-indigo-100 text-indigo-700" : "bg-slate-100 text-slate-700"}`}>{state.step}</span>
               <span className="min-w-0 flex-1"><span className="block truncate font-semibold">{row.person.name}</span><span className="block truncate text-xs text-muted-foreground">{row.person.contractType} · {row.person.email || "Sin email vinculado"}</span><span className="mt-0.5 block text-xs font-medium text-indigo-700 md:hidden">{state.label}</span></span>
               <span className="hidden text-right sm:block"><span className="block text-xs text-muted-foreground">Total del cierre</span><span className="block font-semibold tabular-nums">{ars(row.system.totalARS)}</span></span>
               <StageBadge tone={state.tone} label={state.label} />
@@ -235,7 +239,7 @@ export default function TeamSettlements() {
 
               <div className="rounded-xl border border-amber-200 bg-amber-50/40 p-4">
                 <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                  <div><p className="text-xs font-semibold uppercase tracking-wide text-amber-800">Administración completa</p><p className="text-sm text-muted-foreground">Son los únicos campos variables que antes estaban en amarillo.</p></div>
+                  <div><p className="text-xs font-semibold uppercase tracking-wide text-amber-800">Operaciones completa</p><p className="text-sm text-muted-foreground">Son los únicos campos variables que antes estaban en amarillo. Definen la facturación y no modifican el costo del mes.</p></div>
                   {row.suggestion && <Button size="sm" variant="outline" onClick={() => {
                     update(row.person.id, "billingCurrency", normalizeBillingCurrency(row.suggestion?.billingCurrency));
                     update(row.person.id, "usdPercentage", String(row.suggestion?.usdPercentage ?? 0));
@@ -256,7 +260,7 @@ export default function TeamSettlements() {
 
               {isMixed ? <div className="rounded-xl border border-indigo-100 bg-indigo-50/60 p-4"><div className="flex items-center gap-2"><Calculator className="h-4 w-4 text-indigo-600" /><p className="text-xs font-semibold uppercase tracking-wide text-indigo-700">Mind calcula y el colaborador completa los dos TC</p></div><div className="mt-3 grid gap-3 sm:grid-cols-3"><ReadOnly label="Pesos a cobrar en USD" value={ars(planned)} /><ReadOnly label="USD a facturar" value={row.settlement?.invoiceFx ? usd(planned / row.settlement.invoiceFx + Number(draft.bonusUSD || 0)) : "Se calcula con su TC"} /><ReadOnly label="Diferencia final ARS" value={row.settlement?.finalInvoiceARS == null ? "Se calcula al cobrar" : ars(row.settlement.finalInvoiceARS)} /></div></div> : <div className="rounded-lg border bg-slate-50 p-3 text-sm text-muted-foreground">{draft.billingCurrency === "USD" ? "Mind usa el total del cierre como base y la persona adjunta su comprobante en USD." : "Mind usa directamente el total ARS del cierre. No se piden porcentajes ni doble tipo de cambio."}</div>}
 
-              {published && <div className="grid gap-3 sm:grid-cols-3"><ProgressItem done={Boolean(row.settlement?.invoiceFx) || !isMixed} label={isMixed ? "TC al facturar" : "Liquidación publicada"} /><ProgressItem done={Boolean(row.settlement?.receivedFx) || !isMixed} label={isMixed ? "TC al cobrar" : "Esperando factura"} /><ProgressItem done={Boolean(row.invoice)} label={row.invoice ? `${row.invoice.documentCount || 1} comprobante${(row.invoice.documentCount || 1) === 1 ? "" : "s"} · ${row.invoice.approvalStatus === "approved" ? "aprobada" : row.invoice.approvalStatus === "rejected" ? "a corregir" : "en revisión"}` : "Comprobantes pendientes"} /></div>}
+              {published && <div className={`grid gap-3 ${isMixed ? "sm:grid-cols-4" : "sm:grid-cols-3"}`}><ProgressItem done={Boolean(row.settlement?.invoiceFx) || !isMixed} label={isMixed ? "TC al facturar" : "Liquidación publicada"} />{isMixed && <ProgressItem done={Boolean((row.invoices ?? []).find((invoice) => invoice.invoiceComponent === "usd"))} label="Factura USD" />}<ProgressItem done={Boolean(row.settlement?.receivedFx) || !isMixed} label={isMixed ? "TC al cobrar" : "Factura emitida"} /><ProgressItem done={isMixed ? Boolean((row.invoices ?? []).find((invoice) => invoice.invoiceComponent === "ars")) : Boolean((row.invoices ?? []).find((invoice) => invoice.invoiceComponent === "single"))} label={isMixed ? "Factura ARS" : "En Administración"} /></div>}
 
               <div><Label htmlFor={`notes-${row.person.id}`}>Indicaciones para la persona <span className="font-normal text-muted-foreground">(opcional)</span></Label><Textarea id={`notes-${row.person.id}`} className="mt-1.5" rows={2} value={draft.adminNotes} onChange={(event) => update(row.person.id, "adminNotes", event.target.value)} placeholder="Ej. El bono corresponde al proyecto X" /></div>
               <div className="flex flex-col gap-2 border-t pt-4 sm:flex-row sm:items-center sm:justify-between"><p className="text-xs text-muted-foreground">{published ? "Los cambios se hacen visibles recién cuando actualizás la publicación." : "Guardar borrador no avisa al colaborador. Publicar habilita su siguiente paso."}</p><div className="flex gap-2">{!published && <Button variant="outline" disabled={mutation.isPending} onClick={() => mutation.mutate({ row, publish: false })}>Guardar borrador</Button>}<Button disabled={mutation.isPending || !row.person.email} onClick={() => mutation.mutate({ row, publish: true })}>{mutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}{published ? "Actualizar publicación" : "Publicar"}</Button></div></div>

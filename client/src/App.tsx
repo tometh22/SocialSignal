@@ -57,6 +57,7 @@ const CashflowPage = lazy(() => import("@/pages/cashflow"));
 const ClientPnlPage = lazy(() => import("@/pages/client-pnl"));
 const FinancialIntakePage = lazy(() => import("@/pages/financial-intake"));
 const TeamSettlementsPage = lazy(() => import("@/pages/team-settlements"));
+const TeamInvoiceReviewPage = lazy(() => import("@/pages/team-invoice-review"));
 const FinancialClosePage = lazy(() => import("@/pages/financial-close"));
 
 // Task Management Module
@@ -326,7 +327,8 @@ function AppRoutes() {
 
                   {/* Finance Ledger */}
                   <ProtectedRoute path="/finance/cargar" component={FinancialIntakePage} requiredPermission="finance" />
-                  <ProtectedRoute path="/finance/liquidaciones-equipo" component={TeamSettlementsPage} requiredPermission="finance" />
+                  <ProtectedRoute path="/finance/facturas-equipo" component={TeamInvoiceReviewPage} requiredPermission="finance" />
+                  <Route path="/finance/liquidaciones-equipo">{() => <Redirect to="/operations/liquidaciones-equipo" />}</Route>
                   <ProtectedRoute path="/finance/cierre" component={FinancialClosePage} requiredPermission="finance" />
                   <ProtectedRoute path="/finance/proyeccion" component={ProyeccionPage} requiredAnyPermission={FINANCE_SUMMARY_ACCESS_SECTIONS} />
                   <ProtectedRoute path="/finance/arr" component={ArrPage} requiredAnyPermission={FINANCE_SUMMARY_ACCESS_SECTIONS} />
@@ -341,6 +343,7 @@ function AppRoutes() {
                   {/* Operations Management */}
                   <ProtectedRoute path="/operations/capacity" component={CapacityDashboard} requiredPermission="operations" />
                   <ProtectedRoute path="/operations/monthly-closing" component={MonthlyClosing} requiredPermission="operations" />
+                  <ProtectedRoute path="/operations/liquidaciones-equipo" component={TeamSettlementsPage} requiredPermission="operations" />
                   <ProtectedRoute path="/operations/estimated-rates" component={EstimatedRates} requiredPermission="operations" />
                   <ProtectedRoute path="/operations/holidays" component={HolidaysManagement} requiredPermission="operations" />
                   <ProtectedRoute path="/operations/absences" component={() => <Redirect to="/absences" />} requiredPermission="operations" />
