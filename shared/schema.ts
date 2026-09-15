@@ -2347,6 +2347,166 @@ export const insertTaskProjectMemberSchema = createInsertSchema(taskProjectMembe
 export type TaskProjectMember = typeof taskProjectMembers.$inferSelect;
 export type InsertTaskProjectMember = z.infer<typeof insertTaskProjectMemberSchema>;
 
+// ==================== OBJECTIVES TRACKING ====================
+// Persistent company/area/person objectives and their weekly execution plan.
+export const OBJECTIVE_LEVELS = ["company", "area", "person"] as const;
+export type ObjectiveLevel = typeof OBJECTIVE_LEVELS[number];
+
+export const OBJECTIVE_ACTION_STATUSES = [
+  "planned",
+  "in_progress",
+  "blocked",
+  "done",
+  "cancelled",
+] as const;
+export type ObjectiveActionStatus = typeof OBJECTIVE_ACTION_STATUSES[number];
+
+export const OBJECTIVE_ACTION_OWNER_ROLES = ["accountable", "support"] as const;
+export type ObjectiveActionOwnerRole = typeof OBJECTIVE_ACTION_OWNER_ROLES[number];
+
+export const objectives = pgTable("objectives", {
+  id: serial("id").primaryKey(),
+  level: varchar("level", { length: 20 }).notNull(),
+  slug: varchar("slug", { length: 160 }).notNull(),
+  year: integer("year").notNull(),
+  areaKey: varchar("area_key", { length: 80 }),
+  title: varchar("title", { length: 255 }).notNull(),
+  metric: text("metric"),
+  // Targets in the strategy are human-readable thresholds/scenarios (for
+  // example, "USD 655K; piso aceptable USD 610K"). Keep the source wording
+  // intact and store numeric progress separately.
+  target: text("target"),
+  currentValue: text("current_value"),
+  progressPercent: numeric("progress_percent", { precision: 5, scale: 2 }),
+  status: varchar("status", { length: 30 }).notNull().default("planned"),
+  ownerPersonnelId: integer("owner_personnel_id").references(() => personnel.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  slugYearUnique: unique("objectives_slug_year_unique").on(table.slug, table.year),
+  yearIdx: index("idx_objectives_year").on(table.year),
+  ownerIdx: index("idx_objectives_owner").on(table.ownerPersonnelId),
+}));
+
+export const objectiveAccounts = pgTable("objective_accounts", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 180 }).notNull().unique(),
+  clientId: integer("client_id").references(() => clients.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  clientIdx: index("idx_objective_accounts_client").on(table.clientId),
+}));
+
+export const objectiveActions = pgTable("objective_actions", {
+  id: serial("id").primaryKey(),
+  slug: varchar("slug", { length: 180 }).notNull(),
+  objectiveId: integer("objective_id").references(() => objectives.id, { onDelete: "set null" }),
+  accountId: integer("account_id").references(() => objectiveAccounts.id, { onDelete: "set null" }),
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description"),
+  month: integer("month"),
+  weekLabel: varchar("week_label", { length: 80 }),
+  weekStart: date("week_start"),
+  dueDate: date("due_date"),
+  focus: varchar("focus", { length: 120 }),
+  status: varchar("status", { length: 20 }).notNull().default("planned"),
+  accountableOwnerId: integer("accountable_owner_id").references(() => personnel.id, { onDelete: "set null" }),
+  evidence: text("evidence"),
+  dependencyActionIds: jsonb("dependency_action_ids").$type<number[]>().notNull().default([]),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  slugUnique: unique("objective_actions_slug_unique").on(table.slug),
+  objectiveIdx: index("idx_objective_actions_objective").on(table.objectiveId),
+  accountIdx: index("idx_objective_actions_account").on(table.accountId),
+  weekIdx: index("idx_objective_actions_week").on(table.weekStart, table.dueDate),
+  statusIdx: index("idx_objective_actions_status").on(table.status),
+  ownerIdx: index("idx_objective_actions_owner").on(table.accountableOwnerId),
+}));
+
+export const objectiveActionOwners = pgTable("objective_action_owners", {
+  id: serial("id").primaryKey(),
+  actionId: integer("action_id").notNull().references(() => objectiveActions.id, { onDelete: "cascade" }),
+  personnelId: integer("personnel_id").notNull().references(() => personnel.id, { onDelete: "cascade" }),
+  role: varchar("role", { length: 20 }).notNull().default("support"),
+}, (table) => ({
+  uniqueOwnerRole: unique("objective_action_owners_unique").on(table.actionId, table.personnelId, table.role),
+  actionIdx: index("idx_objective_action_owners_action").on(table.actionId),
+  personnelIdx: index("idx_objective_action_owners_personnel").on(table.personnelId),
+}));
+
+export const objectiveActionEvents = pgTable("objective_action_events", {
+  id: serial("id").primaryKey(),
+  actionId: integer("action_id").notNull().references(() => objectiveActions.id, { onDelete: "cascade" }),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "restrict" }),
+  fromStatus: varchar("from_status", { length: 20 }).notNull(),
+  toStatus: varchar("to_status", { length: 20 }).notNull(),
+  note: text("note"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  actionIdx: index("idx_objective_action_events_action").on(table.actionId, table.createdAt),
+  userIdx: index("idx_objective_action_events_user").on(table.userId),
+}));
+
+export const insertObjectiveSchema = createInsertSchema(objectives).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const insertObjectiveAccountSchema = createInsertSchema(objectiveAccounts).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const insertObjectiveActionSchema = createInsertSchema(objectiveActions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const insertObjectiveActionOwnerSchema = createInsertSchema(objectiveActionOwners).omit({ id: true });
+export const insertObjectiveActionEventSchema = createInsertSchema(objectiveActionEvents).omit({ id: true, createdAt: true });
+
+export type Objective = typeof objectives.$inferSelect;
+export type InsertObjective = z.infer<typeof insertObjectiveSchema>;
+export type ObjectiveAccount = typeof objectiveAccounts.$inferSelect;
+export type InsertObjectiveAccount = z.infer<typeof insertObjectiveAccountSchema>;
+export type ObjectiveAction = typeof objectiveActions.$inferSelect;
+export type InsertObjectiveAction = z.infer<typeof insertObjectiveActionSchema>;
+export type ObjectiveActionOwner = typeof objectiveActionOwners.$inferSelect;
+export type InsertObjectiveActionOwner = z.infer<typeof insertObjectiveActionOwnerSchema>;
+export type ObjectiveActionEvent = typeof objectiveActionEvents.$inferSelect;
+export type InsertObjectiveActionEvent = z.infer<typeof insertObjectiveActionEventSchema>;
+
+export const objectivesRelations = relations(objectives, ({ one, many }) => ({
+  owner: one(personnel, { fields: [objectives.ownerPersonnelId], references: [personnel.id] }),
+  actions: many(objectiveActions),
+}));
+
+export const objectiveAccountsRelations = relations(objectiveAccounts, ({ one, many }) => ({
+  client: one(clients, { fields: [objectiveAccounts.clientId], references: [clients.id] }),
+  actions: many(objectiveActions),
+}));
+
+export const objectiveActionsRelations = relations(objectiveActions, ({ one, many }) => ({
+  objective: one(objectives, { fields: [objectiveActions.objectiveId], references: [objectives.id] }),
+  account: one(objectiveAccounts, { fields: [objectiveActions.accountId], references: [objectiveAccounts.id] }),
+  accountableOwner: one(personnel, { fields: [objectiveActions.accountableOwnerId], references: [personnel.id] }),
+  owners: many(objectiveActionOwners),
+  events: many(objectiveActionEvents),
+}));
+
+export const objectiveActionOwnersRelations = relations(objectiveActionOwners, ({ one }) => ({
+  action: one(objectiveActions, { fields: [objectiveActionOwners.actionId], references: [objectiveActions.id] }),
+  personnel: one(personnel, { fields: [objectiveActionOwners.personnelId], references: [personnel.id] }),
+}));
+
+export const objectiveActionEventsRelations = relations(objectiveActionEvents, ({ one }) => ({
+  action: one(objectiveActions, { fields: [objectiveActionEvents.actionId], references: [objectiveActions.id] }),
+  user: one(users, { fields: [objectiveActionEvents.userId], references: [users.id] }),
+}));
+
 // ==================== RELACIONES ====================
 
 // Relaciones de clientes

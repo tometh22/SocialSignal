@@ -37,7 +37,9 @@ import { financialLedgerNativeMigrationSql } from "./migrations/financial-ledger
 import { employeeInvoiceProjectsMigrationSql } from "./migrations/employee-invoice-projects";
 import { personnelMonthlySettlementsMigrationSql } from "./migrations/personnel-monthly-settlements";
 import { personalInvoiceComponentsMigrationSql } from "./migrations/personal-invoice-components";
+import { objectivesTrackingMigrationSql } from "./migrations/objectives-tracking";
 import { ensureServiceBlueprintSeeds } from "./services/service-blueprints";
+import { ensureObjectivesPlanSeed } from "./services/objectives-seed";
 import cors from 'cors';
 import { execSync } from 'child_process';
 
@@ -859,6 +861,7 @@ async function applyPendingMigrations() {
     await run('0060 employee invoice project allocations', employeeInvoiceProjectsMigrationSql);
     await run('0061 personnel monthly settlements', personnelMonthlySettlementsMigrationSql);
     await run('0062 personal invoice components', personalInvoiceComponentsMigrationSql);
+    await run('0063 objectives tracking', objectivesTrackingMigrationSql);
 
     // 0033: feriados duplicados (mismo date+name insertado más de una vez desde el
     // formulario) — borra duplicados conservando la fila más antigua y agrega la
@@ -1073,6 +1076,7 @@ const port = Number(process.env.PORT || 5000);
     // Initialize database connection and data
     await initializeDatabase();
     await ensureServiceBlueprintSeeds();
+    await ensureObjectivesPlanSeed();
     console.log("💾 Database initialized successfully");
 
     await backfillNativeLaborOnce();
