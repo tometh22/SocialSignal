@@ -99,6 +99,7 @@ export function ProfessionalScopeBuilder({ mode = "all", headless = false }: { m
     const mentionVolumeFromBrief = ["small", "medium", "large", "xlarge"].includes(String(briefContext.mentionVolume)) ? String(briefContext.mentionVolume) as BlueprintDefinition["coverage"]["mentionVolume"] : baseDefinition.coverage.mentionVolume;
     const slaFromBrief = ["standard", "priority", "real_time"].includes(String(briefContext.slaLevel)) ? String(briefContext.slaLevel) as BlueprintDefinition["coverage"]["slaLevel"] : baseDefinition.coverage.slaLevel;
     const designFromBrief = ["standard", "branded", "executive"].includes(String(briefContext.designLevel)) ? String(briefContext.designLevel) as BlueprintDefinition["coverage"]["designLevel"] : baseDefinition.coverage.designLevel;
+    const impactFromBrief = ["low", "medium", "high", "critical"].includes(String(briefContext.impactLevel)) ? String(briefContext.impactLevel) as BlueprintDefinition["coverage"]["impactLevel"] : baseDefinition.coverage.impactLevel;
     const definition = blueprintDefinitionSchema.parse({
       ...baseDefinition,
       coverage: {
@@ -111,6 +112,7 @@ export function ProfessionalScopeBuilder({ mode = "all", headless = false }: { m
         mentionVolume: mentionVolumeFromBrief,
         slaLevel: slaFromBrief,
         designLevel: designFromBrief,
+        impactLevel: impactFromBrief,
         analysisModules: listFromBrief("modules").filter((item): item is BlueprintDefinition["coverage"]["analysisModules"][number] => MODULES.some(([value]) => value === item)).length
           ? listFromBrief("modules") as BlueprintDefinition["coverage"]["analysisModules"]
           : baseDefinition.coverage.analysisModules,
@@ -261,34 +263,10 @@ export function ProfessionalScopeBuilder({ mode = "all", headless = false }: { m
   };
 
   const updateScope = (definition: BlueprintDefinition) => {
-    const recipeWorkload = estimateBlueprintWorkload(definition);
-    const benchmark = benchmarkFor(quotationData.serviceBlueprintId, quotationData.project.type);
-    const contractWorkload = applyHistoricalEffortBenchmark(recipeWorkload, benchmark);
-    const workload = workloadForBillingPeriod(definition, contractWorkload);
-    updateQuotationData({
-      scopeSnapshot: definition,
-      deliverables: definition.deliverables.map((deliverable) => ({
-        id: deliverable.id, type: deliverable.type, frequency: deliverable.cadence,
-        description: deliverable.description, budget: deliverable.optionalPrice || 0,
-        quantity: deliverable.quantity, format: deliverable.format,
-        acceptanceCriteria: deliverable.acceptanceCriteria, dueRule: deliverable.dueRule, included: deliverable.included,
-      })),
-      operationalPlan: {
-        ...(quotationData.operationalPlan || {}),
-        milestones: definition.milestones,
-        monitoringWindow: definition.monitoringWindow,
-        alertChannels: definition.alertChannels,
-        workload,
-        contractWorkload,
-        effortBenchmark: benchmark ? {
-          sampleSize: benchmark.sampleSize,
-          averageActualHours: benchmark.averageActualHours,
-          medianActualHours: benchmark.medianActualHours,
-          historicalFactor: workload.historicalFactor,
-        } : null,
-      },
-      effortOverrideReason: historicalReason(recipeWorkload.totalHours, workload.historicalFactor || 1, benchmark),
-    });
+    // Todas las ediciones de alcance pasan por el mismo camino que la carga
+    // inicial de la receta: así cantidad, cadencia, cobertura e impacto
+    // actualizan horas, equipo y snapshot juntos.
+    applyDefinition(definition, selected);
   };
 
   // Modo headless: no renderiza UI, pero corre todos los hooks de arriba —
@@ -393,7 +371,8 @@ export function ProfessionalScopeBuilder({ mode = "all", headless = false }: { m
                   {MODULES.map(([value, label]) => <label key={value} className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm"><Checkbox checked={scope.coverage.analysisModules.includes(value)} onCheckedChange={(checked) => updateScope({ ...scope, coverage: { ...scope.coverage, analysisModules: checked ? [...scope.coverage.analysisModules, value] : scope.coverage.analysisModules.filter((item) => item !== value) } })} />{label}</label>)}
                 </div>
               </div>
-              <div className="grid gap-4 sm:grid-cols-3">
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="space-y-2"><Label>Nivel de impacto</Label><Select value={scope.coverage.impactLevel} onValueChange={(value: any) => updateScope({ ...scope, coverage: { ...scope.coverage, impactLevel: value } })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="low">Bajo</SelectItem><SelectItem value="medium">Medio</SelectItem><SelectItem value="high">Alto</SelectItem><SelectItem value="critical">Crítico</SelectItem></SelectContent></Select></div>
                 <div className="space-y-2"><Label>Tiempo de respuesta</Label><Select value={scope.coverage.slaLevel} onValueChange={(value: any) => updateScope({ ...scope, coverage: { ...scope.coverage, slaLevel: value } })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="standard">Estándar</SelectItem><SelectItem value="priority">Prioritario</SelectItem><SelectItem value="real_time">Tiempo real</SelectItem></SelectContent></Select></div>
                 <div className="space-y-2"><Label>Nivel de presentación</Label><Select value={scope.coverage.designLevel} onValueChange={(value: any) => updateScope({ ...scope, coverage: { ...scope.coverage, designLevel: value } })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="standard">Estándar</SelectItem><SelectItem value="branded">Con identidad de marca</SelectItem><SelectItem value="executive">Ejecutivo</SelectItem></SelectContent></Select></div>
                 <div className="space-y-2"><Label>Idiomas</Label><Select value={scope.coverage.languages.join("+")} onValueChange={(value) => updateScope({ ...scope, coverage: { ...scope.coverage, languages: value === "es+en" ? ["es", "en"] : [value as "es" | "en"] } })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="es">Español</SelectItem><SelectItem value="en">Inglés</SelectItem><SelectItem value="es+en">Español + inglés</SelectItem></SelectContent></Select></div>

@@ -9,6 +9,7 @@ import {
   RefreshCcw, Search, ChevronDown, ChevronRight,
   Filter, DollarSign, TrendingUp, Clock, BriefcaseBusiness, ExternalLink, Download,
   Plus, Database, Lock, Unlock,
+  Trash2,
 } from "lucide-react";
 import { Link } from "wouter";
 import { cn } from "@/lib/utils";
@@ -616,13 +617,44 @@ function ProjectStatusToggle({
   );
 }
 
+function ProjectVoidButton({ projectId }: { projectId: number }) {
+  const queryClient = useQueryClient();
+  const mutation = useMutation({
+    mutationFn: async () => {
+      const res = await authFetch(`/api/active-projects/${projectId}/void`, { method: "PATCH" });
+      if (!res.ok) throw new Error(`API ${res.status}`);
+      return res.json();
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["projects"] }),
+  });
+
+  return (
+    <button
+      type="button"
+      disabled={mutation.isPending}
+      onClick={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        if (window.confirm("¿Anular este proyecto? Se conservarán sus datos y dejará de aparecer entre los activos.")) mutation.mutate();
+      }}
+      title="Anular proyecto (baja lógica, conserva los datos)"
+      className="inline-flex items-center gap-1 rounded-md border border-red-200 px-2 py-1 text-[11px] font-medium text-red-600 transition-colors hover:border-red-300 hover:bg-red-50 disabled:opacity-50"
+    >
+      <Trash2 className="h-3 w-3" />
+      {mutation.isPending ? "…" : "Anular"}
+    </button>
+  );
+}
+
 function ProjectRow({
   p,
   isOperations,
+  isAdmin,
   period,
 }: {
   p: ProjectItem;
   isOperations: boolean;
+  isAdmin: boolean;
   period: string;
 }) {
   const health = getHealth(p.metrics.markup);
@@ -692,6 +724,9 @@ function ProjectRow({
           {isOperations && p.projectId != null && (
             <ProjectStatusToggle projectId={p.projectId} isFinished={!!p.isFinished} />
           )}
+          {isAdmin && p.projectId != null && p.lifecycleStatus !== "voided" && (
+            <ProjectVoidButton projectId={p.projectId} />
+          )}
         </div>
       </td>
 
@@ -742,12 +777,14 @@ function ClientGroup({
   client,
   projects,
   isOperations,
+  isAdmin,
   period,
   defaultOpen,
 }: {
   client: string;
   projects: ProjectItem[];
   isOperations: boolean;
+  isAdmin: boolean;
   period: string;
   defaultOpen: boolean;
 }) {
@@ -825,6 +862,7 @@ function ClientGroup({
                   key={p.projectId ?? p.projectKey}
                   p={p}
                   isOperations={isOperations}
+                  isAdmin={isAdmin}
                   period={period}
                 />
               ))}
@@ -839,7 +877,7 @@ function ClientGroup({
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function ActiveProjectsNext() {
-  const { isOperations } = usePermissions();
+  const { isOperations, isAdmin } = usePermissions();
 
   const initialPeriod = useMemo(() => {
     if (typeof window !== "undefined") {
@@ -1103,6 +1141,7 @@ export default function ActiveProjectsNext() {
                 client={client}
                 projects={projects}
                 isOperations={isOperations}
+                isAdmin={isAdmin}
                 period={period}
                 defaultOpen={false}
               />

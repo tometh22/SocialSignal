@@ -4,6 +4,7 @@ import {
   SERVICE_BLUEPRINT_SEEDS,
   LEGACY_SERVICE_BLUEPRINT_SEEDS,
   HISTORICAL_PROPOSAL_EVIDENCE,
+  blueprintDefinitionSchema,
   estimateBlueprintWorkload,
   workloadForBillingPeriod,
   runProposalQa,
@@ -47,6 +48,17 @@ describe("professional service catalog and workload", () => {
     expect(expanded.totalHours).toBeGreaterThan(baseline.totalHours);
     expect(expanded.byRole.analyst).toBeGreaterThan(baseline.byRole.analyst);
     expect(expanded.lines.some((line) => line.sourceName === "Pulso táctico mensual")).toBe(true);
+  });
+
+  it("uses impact level in effort and keeps legacy snapshots compatible", () => {
+    const definition = structuredClone(SERVICE_BLUEPRINT_SEEDS[0].definition);
+    const medium = estimateBlueprintWorkload({ ...definition, coverage: { ...definition.coverage, impactLevel: "medium" } });
+    const critical = estimateBlueprintWorkload({ ...definition, coverage: { ...definition.coverage, impactLevel: "critical" } });
+    expect(critical.totalHours).toBeGreaterThan(medium.totalHours);
+    expect(critical.factor).toBeGreaterThan(medium.factor);
+    const legacy = { ...definition.coverage } as Record<string, unknown>;
+    delete legacy.impactLevel;
+    expect((blueprintDefinitionSchema.parse({ ...definition, coverage: legacy })).coverage.impactLevel).toBe("medium");
   });
 
   it("normalizes recurring recipe effort to the monthly billing period", () => {

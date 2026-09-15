@@ -30,6 +30,7 @@ export default function ProjectsKanbanPage() {
   const { isOperations } = usePermissions();
   const queryClient = useQueryClient();
   const [draggedId, setDraggedId] = useState<number | null>(null);
+  const [managerFilter, setManagerFilter] = useState("all");
   const { data: projects = [], isLoading } = useQuery<Project[]>({
     queryKey: ["/api/tasks/projects", "kanban", isOperations],
     queryFn: async () => {
@@ -49,8 +50,21 @@ export default function ProjectsKanbanPage() {
   const grouped = useMemo(() => {
     const map = new Map<WorkflowStage, Project[]>();
     for (const stage of STAGES) map.set(stage.value, []);
-    for (const project of projects) (map.get(project.workflowStage ?? "aprobado") ?? map.get("aprobado")!).push(project);
+    for (const project of projects) {
+      const manager = project.members.find((member) => member.role === "owner");
+      if (managerFilter !== "all" && String(manager?.personnelId ?? "") !== managerFilter) continue;
+      (map.get(project.workflowStage ?? "aprobado") ?? map.get("aprobado")!).push(project);
+    }
     return map;
+  }, [managerFilter, projects]);
+
+  const managers = useMemo(() => {
+    const unique = new Map<number, string>();
+    for (const project of projects) {
+      const manager = project.members.find((member) => member.role === "owner");
+      if (manager) unique.set(manager.personnelId, manager.name);
+    }
+    return [...unique.entries()].sort((a, b) => a[1].localeCompare(b[1], "es"));
   }, [projects]);
 
   if (isLoading) return <div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin" /></div>;
@@ -65,9 +79,23 @@ export default function ProjectsKanbanPage() {
           <h1 className="text-xl font-bold">Kanban de proyectos</h1>
           <p className="text-sm text-muted-foreground">Etapa operativa independiente del estado financiero.</p>
         </div>
-        <span className="rounded-full border bg-muted/30 px-3 py-1 text-xs text-muted-foreground">
-          {projects.length} proyectos visibles
-        </span>
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="flex items-center gap-2 text-xs text-muted-foreground">
+            PM
+            <select
+              aria-label="Filtrar por project manager"
+              value={managerFilter}
+              onChange={(event) => setManagerFilter(event.target.value)}
+              className="h-8 rounded-md border border-input bg-background px-2 text-xs text-foreground"
+            >
+              <option value="all">Todos</option>
+              {managers.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+            </select>
+          </label>
+          <span className="rounded-full border bg-muted/30 px-3 py-1 text-xs text-muted-foreground">
+            {[...grouped.values()].reduce((count, list) => count + list.length, 0)} proyectos visibles
+          </span>
+        </div>
       </div>
 
       <div className="grid min-h-[520px] grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
@@ -102,7 +130,7 @@ export default function ProjectsKanbanPage() {
                       {project.clientName && <p className="mt-0.5 truncate text-[11px] text-muted-foreground">{project.clientName}</p>}
                       <div className="mt-3 flex items-center justify-between text-[11px] text-muted-foreground">
                         <span>{project.pendingCount}/{project.taskCount} tareas pendientes</span>
-                        <span>{project.members.length} miembros</span>
+                        <span>{project.members.find((member) => member.role === "owner")?.name || `${project.members.length} miembros`}</span>
                       </div>
                       <label className="mt-3 block text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
                         Estado operativo
