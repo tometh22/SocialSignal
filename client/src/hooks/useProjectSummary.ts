@@ -84,7 +84,7 @@ export function useProjectSummary(
       const listRes = await authFetch(listUrl);
       
       if (!listRes.ok) {
-        throw new Error(`Failed to fetch projects list: ${listRes.statusText}`);
+        throw new Error(`No se pudo traer la lista de proyectos: ${listRes.statusText}`);
       }
       
       const listData = await listRes.json();
@@ -95,7 +95,7 @@ export function useProjectSummary(
       );
       
       if (!projectData) {
-        throw new Error(`Project ${projectKey} not found in period ${period}`);
+        throw new Error(`No se encontró el proyecto ${projectKey} en el período ${period}`);
       }
       
       // Extract KPIs from list (same as card view)

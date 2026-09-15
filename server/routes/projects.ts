@@ -52,7 +52,7 @@ router.get('/', async (req, res) => {
       if (query.periodType === 'custom') {
         if (!query.startDate || !query.endDate) {
           return res.status(400).json({
-            error: 'Custom period requires startDate and endDate'
+            error: 'El período personalizado requiere startDate y endDate'
           });
         }
         
@@ -156,7 +156,7 @@ router.post('/etl', async (req, res) => {
   } catch (error) {
     console.error('❌ Error in ETL endpoint:', error);
     res.status(500).json({
-      error: 'ETL process failed',
+      error: 'Falló el proceso de ETL',
       message: error instanceof Error ? error.message : String(error)
     });
   }
@@ -174,7 +174,7 @@ router.post('/etl-lineas-generales', async (req, res) => {
     const { data, sourceType, autoDetect } = req.body;
     if (!data || !Array.isArray(data) || data.length === 0) {
       return res.status(400).json({
-        error: 'Invalid request',
+        error: 'Solicitud inválida',
         message: 'Se requiere un array de datos en el campo "data"'
       });
     }

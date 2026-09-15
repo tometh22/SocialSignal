@@ -19,7 +19,7 @@ router.get('/:id/performance-rankings', async (req, res) => {
     const { timeFilter = 'current_month', basis = 'ECON' } = req.query;
     
     if (isNaN(projectId)) {
-      return res.status(400).json({ message: "Invalid project ID" });
+      return res.status(400).json({ message: "ID de proyecto inválido" });
     }
 
     // USAR MOTOR ÚNICO - garantiza consistencia total
@@ -95,7 +95,7 @@ router.get('/:id/performance-rankings', async (req, res) => {
   } catch (error) {
     console.error("❌ Error in unified performance rankings:", error);
     res.status(500).json({ 
-      message: "Failed to get unified performance rankings",
+      message: "No se pudieron obtener los rankings unificados de performance",
       error: error instanceof Error ? error.message : String(error)
     });
   }

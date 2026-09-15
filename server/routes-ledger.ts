@@ -239,11 +239,11 @@ export function createLedgerRouter(requireAuth: any) {
   router.patch("/activo/:id", ...finance, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      if (isNaN(id)) return res.status(400).json({ message: "Invalid id" });
+      if (isNaN(id)) return res.status(400).json({ message: "ID inválido" });
       const parsed = insertActivoEntrySchema.partial().safeParse(normalizeLedgerMoneyInput(req.body));
       if (!parsed.success) return res.status(400).json({ message: parsed.error.message });
       const [existing] = await db.select().from(activoEntries).where(eq(activoEntries.id, id)).limit(1);
-      if (!existing) return res.status(404).json({ message: "Not found" });
+      if (!existing) return res.status(404).json({ message: "No encontrado" });
       await ensurePeriodMutable(existing.periodKey);
       if (existing.source === "mind_intake") return res.status(409).json({ message: "Las facturas nativas se corrigen anulando la carga y registrándola nuevamente." });
       if ("cobradoAlCierre" in parsed.data || "status" in parsed.data || "outstandingAmount" in parsed.data || "fechaPago" in parsed.data) {
@@ -264,7 +264,7 @@ export function createLedgerRouter(requireAuth: any) {
         })
         .where(eq(activoEntries.id, id))
         .returning();
-      if (!updated) return res.status(404).json({ message: "Not found" });
+      if (!updated) return res.status(404).json({ message: "No encontrado" });
       await db.insert(financialAuditEvents).values({ periodKey: existing.periodKey, entityType: "activo_entry", entityId: id, action: "historical_entry_edited", beforeData: existing, afterData: updated, actorUserId: req.user!.id });
       res.json(updated);
     } catch (error: any) {
@@ -392,11 +392,11 @@ export function createLedgerRouter(requireAuth: any) {
   router.patch("/pasivo/:id", ...finance, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      if (isNaN(id)) return res.status(400).json({ message: "Invalid id" });
+      if (isNaN(id)) return res.status(400).json({ message: "ID inválido" });
       const parsed = insertPasivoEntrySchema.partial().safeParse(normalizeLedgerMoneyInput(req.body));
       if (!parsed.success) return res.status(400).json({ message: parsed.error.message });
       const [existing] = await db.select().from(pasivoEntries).where(eq(pasivoEntries.id, id)).limit(1);
-      if (!existing) return res.status(404).json({ message: "Not found" });
+      if (!existing) return res.status(404).json({ message: "No encontrado" });
       await ensurePeriodMutable(existing.periodKey);
       if (existing.source === "mind_intake") return res.status(409).json({ message: "Las facturas nativas se corrigen anulando la carga y registrándola nuevamente." });
       if ("pagadoAlCierre" in parsed.data || "status" in parsed.data || "outstandingAmount" in parsed.data || "fechaPago" in parsed.data) {
@@ -417,7 +417,7 @@ export function createLedgerRouter(requireAuth: any) {
         })
         .where(eq(pasivoEntries.id, id))
         .returning();
-      if (!updated) return res.status(404).json({ message: "Not found" });
+      if (!updated) return res.status(404).json({ message: "No encontrado" });
       await db.insert(financialAuditEvents).values({ periodKey: existing.periodKey, entityType: "pasivo_entry", entityId: id, action: "historical_entry_edited", beforeData: existing, afterData: updated, actorUserId: req.user!.id });
       await refreshNativeFacts(existing.periodKey);
       if (updated.periodKey !== existing.periodKey) await refreshNativeFacts(updated.periodKey);
@@ -457,14 +457,14 @@ export function createLedgerRouter(requireAuth: any) {
   router.patch("/provisions/:id", ...finance, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      if (isNaN(id)) return res.status(400).json({ message: "Invalid id" });
+      if (isNaN(id)) return res.status(400).json({ message: "ID inválido" });
       const parsed = insertProvisionEntrySchema.partial().safeParse(req.body);
       if (!parsed.success) return res.status(400).json({ message: parsed.error.message });
       const [existing] = await db.select().from(provisionEntries).where(eq(provisionEntries.id, id)).limit(1);
-      if (!existing) return res.status(404).json({ message: "Not found" });
+      if (!existing) return res.status(404).json({ message: "No encontrado" });
       await ensurePeriodMutable(existing.periodKey);
       const [updated] = await db.update(provisionEntries).set({ ...parsed.data, updatedAt: new Date() }).where(eq(provisionEntries.id, id)).returning();
-      if (!updated) return res.status(404).json({ message: "Not found" });
+      if (!updated) return res.status(404).json({ message: "No encontrado" });
       await refreshNativeFacts(existing.periodKey);
       if (updated.periodKey !== existing.periodKey) await refreshNativeFacts(updated.periodKey);
       res.json(updated);
@@ -554,17 +554,17 @@ export function createLedgerRouter(requireAuth: any) {
   router.patch("/cashflow/:id", ...finance, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      if (isNaN(id)) return res.status(400).json({ message: "Invalid id" });
+      if (isNaN(id)) return res.status(400).json({ message: "ID inválido" });
       const parsed = insertCashflowTransactionSchema.partial().safeParse(req.body);
       if (!parsed.success) return res.status(400).json({ message: parsed.error.message });
       const [existing] = await db.select().from(cashflowTransactions).where(eq(cashflowTransactions.id, id)).limit(1);
-      if (!existing) return res.status(404).json({ message: "Not found" });
+      if (!existing) return res.status(404).json({ message: "No encontrado" });
       await ensurePeriodMutable(existing.periodKey);
       const [updated] = await db.update(cashflowTransactions)
         .set({ ...parsed.data, updatedBy: req.user!.id, updatedAt: new Date() })
         .where(eq(cashflowTransactions.id, id))
         .returning();
-      if (!updated) return res.status(404).json({ message: "Not found" });
+      if (!updated) return res.status(404).json({ message: "No encontrado" });
       res.json(updated);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -598,7 +598,7 @@ export function createLedgerRouter(requireAuth: any) {
     try {
       const { date } = req.query as Record<string, string>;
       if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-        return res.status(400).json({ message: "date param required as YYYY-MM-DD" });
+        return res.status(400).json({ message: "Se requiere el parámetro date con formato YYYY-MM-DD" });
       }
       const cutoff = new Date(date + "T23:59:59Z");
       const cutover = await getCutoverDate();
@@ -846,11 +846,11 @@ export function createLedgerRouter(requireAuth: any) {
   router.get("/clients/:id/pnl", ...finance, async (req, res) => {
     try {
       const clientId = parseInt(req.params.id);
-      if (isNaN(clientId)) return res.status(400).json({ message: "Invalid client id" });
+      if (isNaN(clientId)) return res.status(400).json({ message: "ID de cliente inválido" });
       const { period } = req.query as Record<string, string>;
 
       const client = await storage.getClient(clientId);
-      if (!client) return res.status(404).json({ message: "Client not found" });
+      if (!client) return res.status(404).json({ message: "No se encontró el cliente" });
 
       if (period && !/^\d{4}-(0[1-9]|1[0-2])$/.test(period)) return res.status(400).json({ message: "period inválido" });
       const totalsResult = await db.execute(sql`

@@ -129,7 +129,7 @@ export default function ExecutiveFinanciero({ period }: ExecutiveFinancieroProps
         ? `/api/v1/executive/finanzas?period=${period}`
         : '/api/v1/executive/finanzas';
       const res = await authFetch(url);
-      if (!res.ok) throw new Error('Failed to fetch financiero data');
+      if (!res.ok) throw new Error('No se pudieron traer los datos financieros');
       return res.json();
     }
   });

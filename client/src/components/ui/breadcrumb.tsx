@@ -110,7 +110,7 @@ const BreadcrumbEllipsis = React.forwardRef<
       <circle cx="19" cy="12" r="1" />
       <circle cx="5" cy="12" r="1" />
     </svg>
-    <span className="sr-only">More</span>
+    <span className="sr-only">Más</span>
   </span>
 ))
 BreadcrumbEllipsis.displayName = "BreadcrumbElipssis"

@@ -74,15 +74,15 @@ export function InlineEditTemplate({ template, onUpdate, onDelete }: InlineEditT
       // Invalidar la consulta para refrescar los datos
       queryClient.invalidateQueries({ queryKey: ["/api/templates"] });
       toast({
-        title: "Success",
-        description: "Template has been updated successfully.",
+        title: "Listo",
+        description: "La plantilla se actualizó correctamente.",
       });
       setIsEditing(false);
     },
     onError: () => {
       toast({
         title: "Error",
-        description: "Failed to update template.",
+        description: "No se pudo actualizar la plantilla.",
         variant: "destructive",
       });
     },
@@ -93,7 +93,7 @@ export function InlineEditTemplate({ template, onUpdate, onDelete }: InlineEditT
     if (!editName.trim()) {
       toast({
         title: "Error",
-        description: "Template name cannot be empty",
+        description: "El nombre de la plantilla no puede quedar vacío",
         variant: "destructive",
       });
       return;
@@ -153,7 +153,7 @@ export function InlineEditTemplate({ template, onUpdate, onDelete }: InlineEditT
           {isEditing ? (
             <Select value={editComplexity} onValueChange={setEditComplexity}>
               <SelectTrigger className="w-full h-9"> {/* Altura fija */}
-                <SelectValue placeholder="Select complexity" />
+                <SelectValue placeholder="Elegí la complejidad" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="low">Baja</SelectItem>

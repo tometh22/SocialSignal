@@ -79,8 +79,8 @@ export const sanitizeInput = (req: Request, res: Response, next: NextFunction) =
   } catch (error) {
     console.error('Input sanitization error:', error);
     res.status(400).json({ 
-      message: 'Invalid or potentially dangerous input detected',
-      error: 'Input validation failed'
+      message: 'Se detectaron datos inválidos o potencialmente peligrosos',
+      error: 'La validación de los datos falló'
     });
   }
 };
@@ -90,8 +90,8 @@ export const rateLimitConfig = {
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 100, // Limit each IP to 100 requests per windowMs
   message: {
-    error: "Too many requests from this IP, please try again later.",
-    retryAfter: "15 minutes"
+    error: "Demasiadas solicitudes desde esta IP, intentá de nuevo más tarde.",
+    retryAfter: "15 minutos"
   },
   standardHeaders: true,
   legacyHeaders: false,

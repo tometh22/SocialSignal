@@ -1072,7 +1072,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!queryValidation.success) {
         console.error('❌ Query validation failed:', queryValidation.error);
         return res.status(400).json({
-          error: 'Invalid query parameters',
+          error: 'Parámetros de consulta inválidos',
           details: queryValidation.error.issues
         });
       }
@@ -1107,7 +1107,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!responseValidation.success) {
         console.error('❌ Response validation failed:', responseValidation.error);
         return res.status(500).json({
-          error: 'Internal server error - invalid response format',
+          error: 'Error interno del servidor: formato de respuesta inválido',
           details: responseValidation.error.issues
         });
       }
@@ -1118,7 +1118,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error('❌ Error in unified active projects endpoint:', error);
       
       return res.status(500).json({
-        error: 'Failed to get active projects data',
+        error: 'No se pudieron obtener los datos de proyectos activos',
         message: error instanceof Error ? (error as Error).message : String(error),
         engine: 'unified_aggregator'
       });
@@ -1327,7 +1327,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error('❌ Error in consolidated projects endpoint:', error);
       
       return res.status(500).json({
-        error: 'Failed to get projects data',
+        error: 'No se pudieron obtener los datos de proyectos',
         message: error instanceof Error ? (error as Error).message : String(error),
         engine: 'consolidated_aggregator'
       });
@@ -1393,15 +1393,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (!scope || !thru) {
         return res.status(400).json({
-          error: 'Missing required parameters',
-          message: 'Both scope (acum|total) and thru (YYYY-MM) are required'
+          error: 'Faltan parámetros obligatorios',
+          message: 'Se requieren scope (acum|total) y thru (YYYY-MM)'
         });
       }
 
       if (scope !== 'acum' && scope !== 'total') {
         return res.status(400).json({
-          error: 'Invalid scope',
-          message: 'scope must be either "acum" or "total"'
+          error: 'Alcance inválido',
+          message: 'scope debe ser "acum" o "total"'
         });
       }
 
@@ -1409,8 +1409,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const [clientName, projectName] = decodeURIComponent(key).split('|');
       if (!clientName || !projectName) {
         return res.status(400).json({
-          error: 'Invalid project key',
-          message: 'Project key must be in format "clientname|projectname"'
+          error: 'Clave de proyecto inválida',
+          message: 'La clave de proyecto debe tener el formato "nombrecliente|nombreproyecto"'
         });
       }
 
@@ -1432,7 +1432,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('❌ Error in rollup endpoint:', error);
       return res.status(500).json({
-        error: 'Failed to get rollup data',
+        error: 'No se pudieron obtener los datos consolidados',
         message: error instanceof Error ? (error as Error).message : String(error)
       });
     }
@@ -1447,11 +1447,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const period = String(req.query.period || '');
       
       if (isNaN(projectId)) {
-        return res.status(400).json({ error: 'Invalid project ID' });
+        return res.status(400).json({ error: 'ID de proyecto inválido' });
       }
       
       if (!period || !/^\d{4}-\d{2}$/.test(period)) {
-        return res.status(400).json({ error: 'period=YYYY-MM is required' });
+        return res.status(400).json({ error: 'Se requiere period=YYYY-MM' });
       }
       
       // Get project data with client and quotation relations
@@ -1464,7 +1464,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       
       if (!projectData) {
-        return res.status(404).json({ error: 'Project not found' });
+        return res.status(404).json({ error: 'No se encontró el proyecto' });
       }
       
       const { getProjectsSummary, getProjectSummary } = await import('./domain/metrics/period_ledger');
@@ -1528,7 +1528,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('❌ Error in consistency check:', error);
       return res.status(500).json({
-        error: 'Failed to check consistency',
+        error: 'No se pudo verificar la consistencia',
         message: error instanceof Error ? (error as Error).message : String(error)
       });
     }
@@ -1544,8 +1544,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (!status) {
         return res.status(400).json({
-          error: 'Missing status',
-          message: 'status field is required'
+          error: 'Falta el estado',
+          message: 'El campo status es obligatorio'
         });
       }
 
@@ -1553,8 +1553,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const [clientName, projectName] = decodeURIComponent(key).split('|');
       if (!clientName || !projectName) {
         return res.status(400).json({
-          error: 'Invalid project key',
-          message: 'Project key must be in format "clientname|projectname"'
+          error: 'Clave de proyecto inválida',
+          message: 'La clave de proyecto debe tener el formato "nombrecliente|nombreproyecto"'
         });
       }
 
@@ -1563,7 +1563,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Find and update the project status
       const validStatuses = ['active', 'completed', 'cancelled', 'on-hold'];
       if (!validStatuses.includes(status)) {
-        return res.status(400).json({ error: 'Invalid status', message: `Status must be one of: ${validStatuses.join(', ')}` });
+        return res.status(400).json({ error: 'Estado inválido', message: `Status must be one of: ${validStatuses.join(', ')}` });
       }
       const [project] = await db.select({ id: activeProjects.id })
         .from(activeProjects)
@@ -1574,7 +1574,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           sql`LOWER(${quotations.projectName}) = LOWER(${projectName})`
         ));
       if (!project) {
-        return res.status(404).json({ error: 'Project not found' });
+        return res.status(404).json({ error: 'No se encontró el proyecto' });
       }
       const updateData: Record<string, any> = { status, updatedAt: new Date() };
       if (status === 'completed' && endMonthKey) {
@@ -1591,7 +1591,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('❌ Error in status update endpoint:', error);
       return res.status(500).json({
-        error: 'Failed to update project status',
+        error: 'No se pudo actualizar el estado del proyecto',
         message: error instanceof Error ? (error as Error).message : String(error)
       });
     }
@@ -1603,14 +1603,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.log(`📊 Query params:`, req.query);
     
     const projectId = parseInt(req.params.id);
-    if (isNaN(projectId)) return res.status(400).json({ message: "Invalid project ID" });
+    if (isNaN(projectId)) return res.status(400).json({ message: "ID de proyecto inválido" });
     const { timeFilter, basis } = req.query as { timeFilter?: string; basis?: 'EXEC' | 'ECON' };
 
     try {
       // Get project using existing storage functions
       const project = await storage.getActiveProject(projectId);
       if (!project) {
-        return res.status(404).json({ message: "Project not found" });
+        return res.status(404).json({ message: "No se encontró el proyecto" });
       }
 
       // Get Excel MAESTRO data (using existing logic)
@@ -1655,7 +1655,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
       
       if (!completeProjectData || !completeProjectData.project) {
-        return res.status(404).json({ message: "Project not found" });
+        return res.status(404).json({ message: "No se encontró el proyecto" });
       }
       
       const { excelDirectCosts = [] } = completeProjectData;
@@ -1740,7 +1740,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       console.error("❌ Error in test deviation analysis:", error);
-      res.status(500).json({ message: "Failed to analyze project deviations", error: (error as Error).message });
+      res.status(500).json({ message: "No se pudieron analizar los desvíos del proyecto", error: (error as Error).message });
     }
   });
 
@@ -1895,7 +1895,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Debug endpoint - Verificar mapeo de costos directos 
   app.get('/api/debug/costs-mapping/:projectId', requireAuth, async (req, res) => {
     const projectId = parseInt(req.params.projectId);
-    if (isNaN(projectId)) return res.status(400).json({ message: "Invalid project ID" });
+    if (isNaN(projectId)) return res.status(400).json({ message: "ID de proyecto inválido" });
     console.log(`🔍 DEBUG - Verificando mapeo de costos para proyecto ${projectId}`);
     
     try {
@@ -1927,7 +1927,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Debug endpoint para investigar discrepancia de costos
   app.get('/api/debug/costs-filtered/:projectId', requireAuth, async (req, res) => {
     const projectId = parseInt(req.params.projectId);
-    if (isNaN(projectId)) return res.status(400).json({ message: "Invalid project ID" });
+    if (isNaN(projectId)) return res.status(400).json({ message: "ID de proyecto inválido" });
     const timeFilter = req.query.timeFilter as string || '2025-05-01_to_2025-08-31';
     
     try {
@@ -2142,10 +2142,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const period = req.query.period as string | undefined;
 
       if (isNaN(projectId)) {
-        return res.status(400).json({ message: 'Invalid project ID' });
+        return res.status(400).json({ message: 'ID de proyecto inválido' });
       }
       if (period && !/^\d{4}-\d{2}$/.test(period)) {
-        return res.status(400).json({ message: 'Invalid period format. Use YYYY-MM' });
+        return res.status(400).json({ message: 'Formato de período inválido. Usá YYYY-MM' });
       }
 
       const whereClause = period
@@ -2197,7 +2197,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ teamBreakdown, totals });
     } catch (error) {
       console.error('[hours-summary] Error:', error);
-      res.status(500).json({ message: 'Error fetching hours summary', error: String(error) });
+      res.status(500).json({ message: 'No se pudo traer el resumen de horas', error: String(error) });
     }
   });
 
@@ -2209,7 +2209,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const timeFilter = req.query.timeFilter as string || 'all';
       
       if (isNaN(projectId)) {
-        return res.status(400).json({ message: "Invalid project ID" });
+        return res.status(400).json({ message: "ID de proyecto inválido" });
       }
 
       // 1. Convertir timeFilter a rango de fechas
@@ -2482,7 +2482,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("❌ Error calculating operational metrics:", error);
       res.status(500).json({ 
-        message: "Failed to calculate operational metrics",
+        message: "No se pudieron calcular las métricas operativas",
         error: error instanceof Error ? (error as Error).message : String(error)
       });
     }
@@ -2493,7 +2493,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const projectId = parseInt(req.params.id);
       if (isNaN(projectId)) {
-        return res.status(400).json({ message: "Invalid project ID" });
+        return res.status(400).json({ message: "ID de proyecto inválido" });
       }
 
       const { months = '6' } = req.query;
@@ -2546,7 +2546,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("❌ Error fetching monthly trends:", error);
       res.status(500).json({ 
-        message: "Failed to fetch monthly trends",
+        message: "No se pudieron traer las tendencias mensuales",
         error: error instanceof Error ? (error as Error).message : String(error)
       });
     }
@@ -2558,7 +2558,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const timeFilter = req.query.timeFilter as string || 'all';
     console.log(`🔥🔥🔥 COMPLETE DATA ENDPOINT HIT - ID: ${id}, Filter: ${timeFilter}`);
     
-    if (isNaN(id)) return res.status(400).json({ message: "Invalid project ID" });
+    if (isNaN(id)) return res.status(400).json({ message: "ID de proyecto inválido" });
 
     try {
       console.log(`📊 Getting complete data for project ${id} with filter: ${timeFilter}`);
@@ -2596,7 +2596,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // 1. Obtener datos base del proyecto
       const project = await storage.getActiveProject(id);
-      if (!project) return res.status(404).json({ message: "Project not found" });
+      if (!project) return res.status(404).json({ message: "No se encontró el proyecto" });
 
       // 2. Obtener datos de la cotización (FUENTE ÚNICA para horas estimadas)
       let quotationTeam: any[] = [];
@@ -3813,7 +3813,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(enhancedResponseData);
     } catch (error) {
       console.error("Error getting complete project data:", error);
-      res.status(500).json({ message: "Failed to get complete project data" });
+      res.status(500).json({ message: "No se pudieron obtener los datos completos del proyecto" });
     }
   });
   */
@@ -3827,7 +3827,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const timeFilter = req.query.timeFilter as string || 'all';
     console.log(`🌟 PROJECT API CALL: GET /${id}/performance-rankings?timeFilter=${timeFilter}`);
     
-    if (isNaN(id)) return res.status(400).json({ message: "Invalid project ID" });
+    if (isNaN(id)) return res.status(400).json({ message: "ID de proyecto inválido" });
 
     try {
       if (USE_UNIVERSAL_RANKINGS) {
@@ -3860,7 +3860,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Obtener datos básicos del proyecto
       const project = await storage.getActiveProject(id);
-      if (!project) return res.status(404).json({ message: "Project not found" });
+      if (!project) return res.status(404).json({ message: "No se encontró el proyecto" });
 
       // Obtener datos de costos integrados con filtro temporal normalizado
       const costSummary = await storage.getProjectCostSummary(id, timeFilter);
@@ -3966,7 +3966,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("❌ Error getting performance rankings for project", id, "with filter", timeFilter, ":", error);
       console.error("❌ Error stack:", (error as Error).stack);
-      res.status(500).json({ message: "Failed to get performance rankings" });
+      res.status(500).json({ message: "No se pudieron obtener los rankings de performance" });
     }
   });
 
@@ -3976,7 +3976,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { projectId, personnelId, estimatedHours, hourlyRate } = req.body;
       
       if (!projectId || !personnelId || !estimatedHours) {
-        return res.status(400).json({ message: "Missing required fields" });
+        return res.status(400).json({ message: "Faltan campos obligatorios" });
       }
 
       console.log(`🔧 Assigning ${estimatedHours} hours to unquoted personnel ${personnelId} in project ${projectId}`);
@@ -3993,7 +3993,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       console.error("Error assigning hours to unquoted personnel:", error);
-      res.status(500).json({ message: "Failed to assign hours to unquoted personnel" });
+      res.status(500).json({ message: "No se pudieron asignar las horas al personal no cotizado" });
     }
   });
 
@@ -4011,10 +4011,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/clients/:id", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ message: "Invalid client ID" });
+    if (isNaN(id)) return res.status(400).json({ message: "ID de cliente inválido" });
 
     const client = await storage.getClient(id);
-    if (!client) return res.status(404).json({ message: "Client not found" });
+    if (!client) return res.status(404).json({ message: "No se encontró el cliente" });
 
     res.json(client);
   });
@@ -4030,19 +4030,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(client);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid client data", errors: error.errors });
+        return res.status(400).json({ message: "Datos de cliente inválidos", errors: error.errors });
       }
       // Handle unique constraint violation
       if ((error as any)?.code === '23505' || (error as any)?.constraint?.includes('unique')) {
         return res.status(409).json({ message: "Ya existe un cliente con ese nombre" });
       }
-      res.status(500).json({ message: "Failed to create client" });
+      res.status(500).json({ message: "No se pudo crear el cliente" });
     }
   });
 
   app.patch("/api/clients/:id", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ message: "Invalid client ID" });
+    if (isNaN(id)) return res.status(400).json({ message: "ID de cliente inválido" });
 
     try {
 
@@ -4056,7 +4056,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updatedClient = await storage.updateClient(id, validatedData);
 
       if (!updatedClient) {
-        return res.status(404).json({ message: "Client not found" });
+        return res.status(404).json({ message: "No se encontró el cliente" });
       }
 
       res.json(updatedClient);
@@ -4064,33 +4064,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Error actualizando cliente:", error);
       if (error instanceof z.ZodError) {
         console.error("Error de validación Zod:", error.errors);
-        return res.status(400).json({ message: "Invalid client data", errors: error.errors });
+        return res.status(400).json({ message: "Datos de cliente inválidos", errors: error.errors });
       }
-      res.status(500).json({ message: "Failed to update client" });
+      res.status(500).json({ message: "No se pudo actualizar el cliente" });
     }
   });
 
   // Delete client route
   app.delete("/api/clients/:id", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ message: "Invalid client ID" });
+    if (isNaN(id)) return res.status(400).json({ message: "ID de cliente inválido" });
 
     try {
       const client = await storage.getClient(id);
-      if (!client) return res.status(404).json({ message: "Client not found" });
+      if (!client) return res.status(404).json({ message: "No se encontró el cliente" });
 
       const success = await storage.deleteClient(id);
       
       if (!success) {
         return res.status(400).json({ 
-          message: "Cannot delete this client because it has active projects or quotations. Remove or reassign them before deleting." 
+          message: "No se puede borrar este cliente porque tiene proyectos o cotizaciones activas. Borralas o reasignalas antes de continuar." 
         });
       }
 
       res.json({ success: true, message: "Client deleted successfully" });
     } catch (error) {
       console.error("Error deleting client:", error);
-      res.status(500).json({ message: "Failed to delete client" });
+      res.status(500).json({ message: "No se pudo borrar el cliente" });
     }
   });
 
@@ -4160,7 +4160,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // bajo entidades distintas según el proyecto.
   app.get("/api/clients/:id/billing-entities", requireAuth, async (req, res) => {
     const clientId = parseInt(req.params.id);
-    if (isNaN(clientId)) return res.status(400).json({ message: "Invalid client ID" });
+    if (isNaN(clientId)) return res.status(400).json({ message: "ID de cliente inválido" });
     try {
       const entities = await db.select().from(clientBillingEntities)
         .where(eq(clientBillingEntities.clientId, clientId))
@@ -4168,13 +4168,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(entities);
     } catch (error) {
       console.error("Error fetching client billing entities:", error);
-      res.status(500).json({ message: "Failed to fetch billing entities" });
+      res.status(500).json({ message: "No se pudieron traer las entidades de facturación" });
     }
   });
 
   app.post("/api/clients/:id/billing-entities", requireAuth, async (req, res) => {
     const clientId = parseInt(req.params.id);
-    if (isNaN(clientId)) return res.status(400).json({ message: "Invalid client ID" });
+    if (isNaN(clientId)) return res.status(400).json({ message: "ID de cliente inválido" });
     try {
       const parsed = insertClientBillingEntitySchema.parse({ ...req.body, clientId });
       const created = await db.transaction(async (tx) => {
@@ -4188,16 +4188,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       if (error?.issues) return res.status(400).json({ message: "Datos inválidos", issues: error.issues });
       console.error("Error creating client billing entity:", error);
-      res.status(500).json({ message: "Failed to create billing entity" });
+      res.status(500).json({ message: "No se pudo crear la entidad de facturación" });
     }
   });
 
   app.patch("/api/clients/billing-entities/:entityId", requireAuth, async (req, res) => {
     const entityId = parseInt(req.params.entityId);
-    if (isNaN(entityId)) return res.status(400).json({ message: "Invalid billing entity ID" });
+    if (isNaN(entityId)) return res.status(400).json({ message: "ID de entidad de facturación inválido" });
     try {
       const [existing] = await db.select().from(clientBillingEntities).where(eq(clientBillingEntities.id, entityId));
-      if (!existing) return res.status(404).json({ message: "Billing entity not found" });
+      if (!existing) return res.status(404).json({ message: "No se encontró la entidad de facturación" });
 
       const parsed = insertClientBillingEntitySchema.partial().parse(req.body);
       const updated = await db.transaction(async (tx) => {
@@ -4212,19 +4212,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       if (error?.issues) return res.status(400).json({ message: "Datos inválidos", issues: error.issues });
       console.error("Error updating client billing entity:", error);
-      res.status(500).json({ message: "Failed to update billing entity" });
+      res.status(500).json({ message: "No se pudo actualizar la entidad de facturación" });
     }
   });
 
   app.delete("/api/clients/billing-entities/:entityId", requireAuth, async (req, res) => {
     const entityId = parseInt(req.params.entityId);
-    if (isNaN(entityId)) return res.status(400).json({ message: "Invalid billing entity ID" });
+    if (isNaN(entityId)) return res.status(400).json({ message: "ID de entidad de facturación inválido" });
     try {
       await db.delete(clientBillingEntities).where(eq(clientBillingEntities.id, entityId));
       res.json({ success: true });
     } catch (error) {
       console.error("Error deleting client billing entity:", error);
-      res.status(500).json({ message: "Failed to delete billing entity" });
+      res.status(500).json({ message: "No se pudo borrar la entidad de facturación" });
     }
   });
 
@@ -4232,7 +4232,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/clients/:id/logo", requireAuth, upload.single('logo'), async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      if (isNaN(id)) return res.status(400).json({ message: "Invalid client ID" });
+      if (isNaN(id)) return res.status(400).json({ message: "ID de cliente inválido" });
 
       if (!req.file) {
         return res.status(400).json({ message: "No logo file provided" });
@@ -4241,7 +4241,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Obtener el cliente actual para ver si ya tiene un logo
       const client = await storage.getClient(id);
       if (!client) {
-        return res.status(404).json({ message: "Client not found" });
+        return res.status(404).json({ message: "No se encontró el cliente" });
       }
 
       // Si existe un logo anterior, eliminar el archivo
@@ -4259,7 +4259,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(updatedClient);
     } catch (error) {
       console.error("Error uploading client logo:", error);
-      res.status(500).json({ message: "Failed to upload client logo", error: String(error) });
+      res.status(500).json({ message: "No se pudo subir el logo del cliente", error: String(error) });
     }
   });
 
@@ -4351,10 +4351,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/roles/:id", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ message: "Invalid role ID" });
+    if (isNaN(id)) return res.status(400).json({ message: "ID de rol inválido" });
 
     const role = await storage.getRole(id);
-    if (!role) return res.status(404).json({ message: "Role not found" });
+    if (!role) return res.status(404).json({ message: "No se encontró el rol" });
 
     res.json(role);
   });
@@ -4366,50 +4366,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(role);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid role data", errors: error.errors });
+        return res.status(400).json({ message: "Datos de rol inválidos", errors: error.errors });
       }
-      res.status(500).json({ message: "Failed to create role" });
+      res.status(500).json({ message: "No se pudo crear el rol" });
     }
   });
 
   app.patch("/api/roles/:id", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ message: "Invalid role ID" });
+    if (isNaN(id)) return res.status(400).json({ message: "ID de rol inválido" });
 
     try {
       const validatedData = insertRoleSchema.partial().parse(req.body);
       const updatedRole = await storage.updateRole(id, validatedData);
 
       if (!updatedRole) {
-        return res.status(404).json({ message: "Role not found" });
+        return res.status(404).json({ message: "No se encontró el rol" });
       }
 
       res.json(updatedRole);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid role data", errors: error.errors });
+        return res.status(400).json({ message: "Datos de rol inválidos", errors: error.errors });
       }
-      res.status(500).json({ message: "Failed to update role" });
+      res.status(500).json({ message: "No se pudo actualizar el rol" });
     }
   });
 
   app.delete("/api/roles/:id", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ message: "Invalid role ID" });
+    if (isNaN(id)) return res.status(400).json({ message: "ID de rol inválido" });
 
     try {
       const success = await storage.deleteRole(id);
 
       if (!success) {
         return res.status(400).json({ 
-          message: "Cannot delete this role because it has personnel assigned to it. Reassign personnel before deleting." 
+          message: "No se puede borrar este rol porque tiene personal asignado. Reasigná al personal antes de continuar." 
         });
       }
 
       res.json({ success: true, message: "Role deleted successfully" });
     } catch (error) {
       console.error("Error deleting role:", error);
-      res.status(500).json({ message: "Failed to delete role" });
+      res.status(500).json({ message: "No se pudo borrar el rol" });
     }
   });
 
@@ -4632,7 +4632,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/personnel/role/:roleId", requireAuth, async (req, res) => {
     const roleId = parseInt(req.params.roleId);
-    if (isNaN(roleId)) return res.status(400).json({ message: "Invalid role ID" });
+    if (isNaN(roleId)) return res.status(400).json({ message: "ID de rol inválido" });
 
     const personnel = await storage.getPersonnelByRole(roleId);
     res.json(personnel);
@@ -4640,10 +4640,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/personnel/:id", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ message: "Invalid personnel ID" });
+    if (isNaN(id)) return res.status(400).json({ message: "ID de personal inválido" });
 
     const person = await storage.getPersonnelById(id);
-    if (!person) return res.status(404).json({ message: "Personnel not found" });
+    if (!person) return res.status(404).json({ message: "No se encontró el registro de personal" });
 
     const [rawRateRows, activeExchangeRates] = await Promise.all([
       db.select()
@@ -4759,16 +4759,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(person);
     } catch (error: any) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid personnel data", errors: error.errors });
+        return res.status(400).json({ message: "Datos de personal inválidos", errors: error.errors });
       }
       if (error?.status === 400) return res.status(400).json({ message: error.message });
-      res.status(500).json({ message: "Failed to create personnel" });
+      res.status(500).json({ message: "No se pudo crear el personal" });
     }
   });
 
   app.patch("/api/personnel/:id", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ message: "Invalid personnel ID" });
+    if (isNaN(id)) return res.status(400).json({ message: "ID de personal inválido" });
 
     try {
       // Get current person name for better logging
@@ -4932,7 +4932,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (!updatedPerson) {
         console.error(`❌ [${personName}] Personnel not found after update`);
-        return res.status(404).json({ message: "Personnel not found" });
+        return res.status(404).json({ message: "No se encontró el registro de personal" });
       }
 
       console.log(`✅ [${personName}] Sending response with monthlyHours: ${updatedPerson.monthlyHours}`);
@@ -4941,10 +4941,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Error al actualizar personal:", error);
 
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid personnel data", errors: error.errors });
+        return res.status(400).json({ message: "Datos de personal inválidos", errors: error.errors });
       }
       if (error?.status === 400) return res.status(400).json({ message: error.message });
-      res.status(500).json({ message: "Failed to update personnel" });
+      res.status(500).json({ message: "No se pudo actualizar el personal" });
     }
   });
 
@@ -5168,7 +5168,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get personnel dependencies before deletion
   app.get("/api/personnel/:id/dependencies", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ message: "Invalid personnel ID" });
+    if (isNaN(id)) return res.status(400).json({ message: "ID de personal inválido" });
 
     try {
       const dependencies = await storage.getPersonnelDependencies(id);
@@ -5181,7 +5181,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/personnel/:id", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ message: "Invalid personnel ID" });
+    if (isNaN(id)) return res.status(400).json({ message: "ID de personal inválido" });
 
     try {
       // Primero verificar las dependencias
@@ -5239,10 +5239,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/templates/:id", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ message: "Invalid template ID" });
+    if (isNaN(id)) return res.status(400).json({ message: "ID de plantilla inválido" });
 
     const template = await storage.getReportTemplate(id);
-    if (!template) return res.status(404).json({ message: "Template not found" });
+    if (!template) return res.status(404).json({ message: "No se encontró la plantilla" });
 
     res.json(template);
   });
@@ -5250,10 +5250,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Ruta alternativa para obtener una plantilla específica (para compatibilidad con el flujo optimizado)
   app.get("/api/report-templates/:id", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ message: "Invalid template ID" });
+    if (isNaN(id)) return res.status(400).json({ message: "ID de plantilla inválido" });
 
     const template = await storage.getReportTemplate(id);
-    if (!template) return res.status(404).json({ message: "Template not found" });
+    if (!template) return res.status(404).json({ message: "No se encontró la plantilla" });
 
     res.json(template);
   });
@@ -5265,43 +5265,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(template);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid template data", errors: error.errors });
+        return res.status(400).json({ message: "Datos de plantilla inválidos", errors: error.errors });
       }
-      res.status(500).json({ message: "Failed to create template" });
+      res.status(500).json({ message: "No se pudo crear la plantilla" });
     }
   });
 
   app.patch("/api/templates/:id", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ message: "Invalid template ID" });
+    if (isNaN(id)) return res.status(400).json({ message: "ID de plantilla inválido" });
 
     try {
       const validatedData = insertReportTemplateSchema.partial().parse(req.body);
       const updatedTemplate = await storage.updateReportTemplate(id, validatedData);
 
       if (!updatedTemplate) {
-        return res.status(404).json({ message: "Template not found" });
+        return res.status(404).json({ message: "No se encontró la plantilla" });
       }
 
       res.json(updatedTemplate);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid template data", errors: error.errors });
+        return res.status(400).json({ message: "Datos de plantilla inválidos", errors: error.errors });
       }
-      res.status(500).json({ message: "Failed to update template" });
+      res.status(500).json({ message: "No se pudo actualizar la plantilla" });
     }
   });
 
   // Eliminar plantilla de reporte
   app.delete("/api/templates/:id", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ message: "Invalid template ID" });
+    if (isNaN(id)) return res.status(400).json({ message: "ID de plantilla inválido" });
 
     try {
       // Verificar si la plantilla existe
       const template = await storage.getReportTemplate(id);
       if (!template) {
-        return res.status(404).json({ message: "Template not found" });
+        return res.status(404).json({ message: "No se encontró la plantilla" });
       }
 
       // Intentar eliminar la plantilla
@@ -5309,7 +5309,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (!deleted) {
         return res.status(409).json({ 
-          message: "Cannot delete template. It may be in use by existing quotations." 
+          message: "No se puede borrar la plantilla. Puede estar en uso por cotizaciones existentes." 
         });
       }
 
@@ -5319,20 +5319,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       console.error("Error deleting template:", error);
-      res.status(500).json({ message: "Failed to delete template" });
+      res.status(500).json({ message: "No se pudo borrar la plantilla" });
     }
   });
 
   // Ruta para obtener asignaciones de roles para una plantilla específica
   app.get("/api/templates/:id/role-assignments", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ message: "Invalid template ID" });
+    if (isNaN(id)) return res.status(400).json({ message: "ID de plantilla inválido" });
 
     try {
       const assignments = await storage.getTemplateRoleAssignments(id);
       res.json(assignments);
     } catch (error) {
-      res.status(500).json({ message: "Failed to fetch template role assignments" });
+      res.status(500).json({ message: "No se pudieron traer las asignaciones de rol de la plantilla" });
     }
   });
 
@@ -5345,7 +5345,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(multipliers);
     } catch (error) {
       console.error("Error fetching cost multipliers:", error);
-      res.status(500).json({ message: "Failed to fetch cost multipliers" });
+      res.status(500).json({ message: "No se pudieron traer los multiplicadores de costo" });
     }
   });
 
@@ -5358,14 +5358,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(multipliers);
     } catch (error) {
       console.error("Error fetching cost multipliers by category:", error);
-      res.status(500).json({ message: "Failed to fetch cost multipliers by category" });
+      res.status(500).json({ message: "No se pudieron traer los multiplicadores de costo por categoría" });
     }
   });
 
   // Actualizar multiplicador de costo
   app.patch("/api/cost-multipliers/:id", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ message: "Invalid multiplier ID" });
+    if (isNaN(id)) return res.status(400).json({ message: "ID de multiplicador inválido" });
 
     try {
       const { multiplier, label, description, isActive } = req.body;
@@ -5379,13 +5379,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updated = await storage.updateCostMultiplier(id, updateData);
 
       if (!updated) {
-        return res.status(404).json({ message: "Cost multiplier not found" });
+        return res.status(404).json({ message: "No se encontró el multiplicador de costo" });
       }
 
       res.json(updated);
     } catch (error) {
       console.error("Error updating cost multiplier:", error);
-      res.status(500).json({ message: "Failed to update cost multiplier" });
+      res.status(500).json({ message: "No se pudo actualizar el multiplicador de costo" });
     }
   });
 
@@ -5395,7 +5395,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { category, subcategory, multiplier, label, description } = req.body;
 
       if (!category || !subcategory || !label || multiplier === undefined) {
-        return res.status(400).json({ message: "Missing required fields" });
+        return res.status(400).json({ message: "Faltan campos obligatorios" });
       }
 
       const newMultiplier = await storage.createCostMultiplier({
@@ -5410,26 +5410,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(newMultiplier);
     } catch (error) {
       console.error("Error creating cost multiplier:", error);
-      res.status(500).json({ message: "Failed to create cost multiplier" });
+      res.status(500).json({ message: "No se pudo crear el multiplicador de costo" });
     }
   });
 
   // Eliminar multiplicador de costo
   app.delete("/api/cost-multipliers/:id", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ message: "Invalid multiplier ID" });
+    if (isNaN(id)) return res.status(400).json({ message: "ID de multiplicador inválido" });
 
     try {
       const deleted = await storage.deleteCostMultiplier(id);
 
       if (!deleted) {
-        return res.status(404).json({ message: "Cost multiplier not found" });
+        return res.status(404).json({ message: "No se encontró el multiplicador de costo" });
       }
 
       res.json({ message: "Cost multiplier deleted successfully" });
     } catch (error) {
       console.error("Error deleting cost multiplier:", error);
-      res.status(500).json({ message: "Failed to delete cost multiplier" });
+      res.status(500).json({ message: "No se pudo borrar el multiplicador de costo" });
     }
   });
 
@@ -5659,7 +5659,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   async function requireDraftQuotation(quotationId: number, res: Response) {
     const quotation = await storage.getQuotation(quotationId);
     if (!quotation) {
-      res.status(404).json({ message: "Quotation not found" });
+      res.status(404).json({ message: "No se encontró la cotización" });
       return null;
     }
     if (quotation.status !== "draft") {
@@ -6251,7 +6251,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const leadIdParam = req.query.leadId;
       if (leadIdParam) {
         const leadId = parseInt(leadIdParam as string);
-        if (isNaN(leadId)) return res.status(400).json({ message: "Invalid leadId" });
+        if (isNaN(leadId)) return res.status(400).json({ message: "leadId inválido" });
         const result = await db.select().from(quotations).where(eq(quotations.leadId, leadId)).orderBy(desc(quotations.createdAt));
         return res.json(result);
       }
@@ -6259,7 +6259,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(result);
     } catch (err) {
       console.error('GET /api/quotations error:', err);
-      res.status(500).json({ message: 'Error fetching quotations' });
+      res.status(500).json({ message: 'No se pudieron traer las cotizaciones' });
     }
   });
 
@@ -6297,12 +6297,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/quotations/client/:clientId", requireAuth, async (req, res) => {
     try {
       const clientId = parseInt(req.params.clientId);
-      if (isNaN(clientId)) return res.status(400).json({ message: "Invalid client ID" });
+      if (isNaN(clientId)) return res.status(400).json({ message: "ID de cliente inválido" });
       const result = await storage.getQuotationsByClient(clientId);
       res.json(result);
     } catch (err) {
       console.error('GET /api/quotations/client error:', err);
-      res.status(500).json({ message: 'Error fetching quotations' });
+      res.status(500).json({ message: 'No se pudieron traer las cotizaciones' });
     }
   });
 
@@ -6420,18 +6420,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log('🔍 Getting quotation with ID:', req.params.id, 'parsed:', id);
       if (isNaN(id)) {
         console.error('❌ Invalid quotation ID:', req.params.id);
-        return res.status(400).json({ message: "Invalid quotation ID" });
+        return res.status(400).json({ message: "ID de cotización inválido" });
       }
       const quotation = await storage.getQuotation(id);
       if (!quotation) {
         console.error('❌ Quotation not found for ID:', id);
-        return res.status(404).json({ message: "Quotation not found" });
+        return res.status(404).json({ message: "No se encontró la cotización" });
       }
       console.log('✅ Quotation found:', quotation.id, quotation.projectName);
       res.json(quotation);
     } catch (err) {
       console.error('GET /api/quotations/:id error:', err);
-      res.status(500).json({ message: 'Error fetching quotation' });
+      res.status(500).json({ message: 'No se pudo traer la cotización' });
     }
   });
 
@@ -6444,10 +6444,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/quotations/:id/margin-drift", requireAuth, requirePermission("quotations"), async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      if (isNaN(id)) return res.status(400).json({ message: "Invalid quotation ID" });
+      if (isNaN(id)) return res.status(400).json({ message: "ID de cotización inválido" });
 
       const [quotation] = await db.select().from(quotations).where(eq(quotations.id, id));
-      if (!quotation) return res.status(404).json({ message: "Quotation not found" });
+      if (!quotation) return res.status(404).json({ message: "No se encontró la cotización" });
 
       if (quotation.quotationType === "one-time") {
         return res.json({ applicable: false, reason: "one-time" });
@@ -6568,7 +6568,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // respuesta para que alguien lo mande a mano.
   app.post("/api/quotation-price-adjustments/:id/approve", requireAuth, requirePermission("quotations_approve", "operations"), async (req, res) => {
     const id = Number(req.params.id);
-    if (!Number.isInteger(id)) return res.status(400).json({ message: "Invalid ID" });
+    if (!Number.isInteger(id)) return res.status(400).json({ message: "ID inválido" });
     let result: { updatedQuotation: typeof quotations.$inferSelect; updatedAdjustment: typeof quotationPriceAdjustments.$inferSelect };
     try {
       result = await db.transaction(async (tx) => {
@@ -6700,7 +6700,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // desde el fin de este período (no se re-propone el mismo).
   app.post("/api/quotation-price-adjustments/:id/reject", requireAuth, requirePermission("quotations_approve", "operations"), async (req, res) => {
     const id = Number(req.params.id);
-    if (!Number.isInteger(id)) return res.status(400).json({ message: "Invalid ID" });
+    if (!Number.isInteger(id)) return res.status(400).json({ message: "ID inválido" });
     try {
       const input = z.object({ reason: z.string().trim().max(2000).optional() }).parse(req.body ?? {});
       const now = new Date();
@@ -7179,7 +7179,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/quotation-groups/:id", requireAuth, async (req, res) => {
     const id = Number(req.params.id);
-    if (!Number.isInteger(id)) return res.status(400).json({ message: "Invalid group ID" });
+    if (!Number.isInteger(id)) return res.status(400).json({ message: "ID de grupo inválido" });
     const workspace = await loadQuotationGroupWorkspace(id);
     if (!workspace) return res.status(404).json({ message: "Grupo no encontrado" });
     res.json(workspace);
@@ -7425,7 +7425,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     async (req, res) => {
       const groupId = Number(req.params.id);
       const idempotencyKey = req.get("Idempotency-Key")?.trim();
-      if (!Number.isInteger(groupId)) return res.status(400).json({ message: "Invalid group ID" });
+      if (!Number.isInteger(groupId)) return res.status(400).json({ message: "ID de grupo inválido" });
       if (!idempotencyKey || idempotencyKey.length < 12 || idempotencyKey.length > 120) {
         return res.status(400).json({ message: "Idempotency-Key es obligatorio para enviar" });
       }
@@ -7661,7 +7661,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     } catch (error) {
       console.error("Error al crear cotización:", error);
-      res.status(500).json({ message: "Failed to create quotation" });
+      res.status(500).json({ message: "No se pudo crear la cotización" });
     }
   });
 
@@ -7670,13 +7670,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
       
-      if (isNaN(id)) return res.status(400).json({ message: "Invalid quotation ID" });
+      if (isNaN(id)) return res.status(400).json({ message: "ID de cotización inválido" });
 
       // Validar que la cotización existe
       const existingQuotation = await storage.getQuotation(id);
       if (!existingQuotation) {
         console.log('❌ Quotation not found for ID:', id);
-        return res.status(404).json({ message: "Quotation not found" });
+        return res.status(404).json({ message: "No se encontró la cotización" });
       }
       if (quotationNeedsImmutableRevision(existingQuotation.status)) {
         return res.status(409).json({
@@ -7825,7 +7825,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: error.message });
       }
       console.error("Error al actualizar cotización:", error);
-      res.status(500).json({ message: "Failed to update quotation" });
+      res.status(500).json({ message: "No se pudo actualizar la cotización" });
     }
   });
 
@@ -7840,7 +7840,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch("/api/quotations/:id", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ message: "Invalid quotation ID" });
+    if (isNaN(id)) return res.status(400).json({ message: "ID de cotización inválido" });
 
     try {
       const current = await requireDraftQuotation(id, res);
@@ -7867,7 +7867,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       if (!updatedQuotation) {
-        return res.status(404).json({ message: "Quotation not found" });
+        return res.status(404).json({ message: "No se encontró la cotización" });
       }
 
       res.json(updatedQuotation);
@@ -7875,13 +7875,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "La cotización tiene campos inválidos; revisá el detalle de errores por campo.", errors: error.errors });
       }
-      res.status(500).json({ message: "Failed to update quotation" });
+      res.status(500).json({ message: "No se pudo actualizar la cotización" });
     }
   });
 
   app.patch("/api/quotations/:id/status", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ message: "Invalid quotation ID" });
+    if (isNaN(id)) return res.status(400).json({ message: "ID de cotización inválido" });
 
     try {
       const { status, lossReason } = z.object({
@@ -7891,7 +7891,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const currentQuotation = await storage.getQuotation(id);
       if (!currentQuotation) {
-        return res.status(404).json({ message: "Quotation not found" });
+        return res.status(404).json({ message: "No se encontró la cotización" });
       }
       if (["internally-approved", "sent", "viewed", "approved", "expired", "superseded"].includes(status)) {
         return res.status(409).json({
@@ -7963,7 +7963,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       if (!updatedQuotation) {
-        return res.status(404).json({ message: "Quotation not found" });
+        return res.status(404).json({ message: "No se encontró la cotización" });
       }
 
       res.json(updatedQuotation);
@@ -7979,13 +7979,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       if ((error as any)?.statusCode === 409) return res.status(409).json({ message: (error as Error).message });
       console.error(`[API] Error actualizando estado de cotización ID ${id}:`, error);
-      res.status(500).json({ message: "Failed to update quotation status" });
+      res.status(500).json({ message: "No se pudo actualizar el estado de la cotización" });
     }
   });
 
   app.get("/api/quotations/:id/commercial-history", requireAuth, async (req, res) => {
     const id = Number(req.params.id);
-    if (!Number.isInteger(id)) return res.status(400).json({ message: "Invalid quotation ID" });
+    if (!Number.isInteger(id)) return res.status(400).json({ message: "ID de cotización inválido" });
     const [revisions, events, approvals, deliveries] = await Promise.all([
       db.select().from(quotationRevisions).where(eq(quotationRevisions.quotationId, id)).orderBy(desc(quotationRevisions.revisionNumber)),
       db.select().from(quotationEvents).where(eq(quotationEvents.quotationId, id)).orderBy(desc(quotationEvents.createdAt)),
@@ -7997,11 +7997,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/quotations/:id/revisions", requireAuth, async (req, res) => {
     const id = Number(req.params.id);
-    if (!Number.isInteger(id)) return res.status(400).json({ message: "Invalid quotation ID" });
+    if (!Number.isInteger(id)) return res.status(400).json({ message: "ID de cotización inválido" });
     try {
       const { reason } = z.object({ reason: z.string().trim().min(3).max(1000) }).parse(req.body);
       const current = await storage.getQuotation(id);
-      if (!current) return res.status(404).json({ message: "Quotation not found" });
+      if (!current) return res.status(404).json({ message: "No se encontró la cotización" });
       if (!quotationNeedsImmutableRevision(current.status) && !["rejected", "expired", "cancelled"].includes(current.status)) {
         return res.status(409).json({ message: "La cotización todavía puede editarse sin abrir una nueva revisión" });
       }
@@ -8064,7 +8064,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     async (req, res) => {
       const quotationId = Number(req.params.quotationId);
       const approvalId = Number(req.params.approvalId);
-      if (!Number.isInteger(quotationId) || !Number.isInteger(approvalId)) return res.status(400).json({ message: "Invalid ID" });
+      if (!Number.isInteger(quotationId) || !Number.isInteger(approvalId)) return res.status(400).json({ message: "ID inválido" });
       try {
         const input = z.object({
           decision: z.enum(["approved", "rejected"]),
@@ -8074,7 +8074,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           eq(quotationApprovals.id, approvalId),
           eq(quotationApprovals.quotationId, quotationId),
         ));
-        if (!approval) return res.status(404).json({ message: "Approval not found" });
+        if (!approval) return res.status(404).json({ message: "No se encontró la aprobación" });
         if (approval.status !== "pending") return res.status(409).json({ message: "La aprobación ya fue decidida" });
         if (approval.requestedBy && approval.requestedBy === req.user?.id) {
           return res.status(409).json({ message: "Quien solicita no puede aprobar su propia cotización" });
@@ -8137,7 +8137,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/quotations/:id/document.pdf", requireAuth, async (req, res) => {
     const id = Number(req.params.id);
-    if (!Number.isInteger(id)) return res.status(400).json({ message: "Invalid quotation ID" });
+    if (!Number.isInteger(id)) return res.status(400).json({ message: "ID de cotización inválido" });
     try {
       const latest = (await db.select().from(quotationRevisions)
         .where(eq(quotationRevisions.quotationId, id))
@@ -8170,7 +8170,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     requirePermission("quotations_send", "quotations", "operations"),
     async (req, res) => {
       const id = Number(req.params.id);
-      if (!Number.isInteger(id)) return res.status(400).json({ message: "Invalid quotation ID" });
+      if (!Number.isInteger(id)) return res.status(400).json({ message: "ID de cotización inválido" });
       const idempotencyKey = req.get("Idempotency-Key")?.trim();
       if (!idempotencyKey || idempotencyKey.length < 12 || idempotencyKey.length > 120) {
         return res.status(400).json({ message: "Idempotency-Key es obligatorio para enviar" });
@@ -8185,7 +8185,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .where(eq(quotationEvents.eventKey, `send:${id}:${idempotencyKey}`)).limit(1))[0];
         if (duplicate) return res.json({ success: true, idempotentReplay: true });
         const quotation = await storage.getQuotation(id);
-        if (!quotation) return res.status(404).json({ message: "Quotation not found" });
+        if (!quotation) return res.status(404).json({ message: "No se encontró la cotización" });
         if (quotation.status !== "internally-approved") {
           return res.status(409).json({ message: "La cotización debe estar aprobada internamente antes de enviarse" });
         }
@@ -8388,10 +8388,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // GET /api/quotations/:id/profitability — cotización vs horas reales del proyecto
   app.get("/api/quotations/:id/profitability", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ message: "Invalid ID" });
+    if (isNaN(id)) return res.status(400).json({ message: "ID inválido" });
     try {
       const quotation = await storage.getQuotation(id);
-      if (!quotation) return res.status(404).json({ message: "Quotation not found" });
+      if (!quotation) return res.status(404).json({ message: "No se encontró la cotización" });
 
       // Buscar proyecto asociado
       const [project] = await db.select().from(activeProjects).where(eq(activeProjects.quotationId, id));
@@ -8440,7 +8440,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
       });
     } catch (e) {
-      res.status(500).json({ message: "Error fetching profitability", error: String(e) });
+      res.status(500).json({ message: "No se pudo traer la rentabilidad", error: String(e) });
     }
   });
 
@@ -8477,7 +8477,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // DELETE /api/quotation-templates/:id
   app.delete("/api/quotation-templates/:id", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ message: "Invalid ID" });
+    if (isNaN(id)) return res.status(400).json({ message: "ID inválido" });
     try {
       await db.delete(quotationTemplates).where(eq(quotationTemplates.id, id));
       res.json({ success: true });
@@ -8487,7 +8487,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Archivar una cotización. La evidencia comercial nunca se elimina físicamente.
   app.delete("/api/quotations/:id", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ message: "Invalid quotation ID" });
+    if (isNaN(id)) return res.status(400).json({ message: "ID de cotización inválido" });
 
     try {
 
@@ -8537,7 +8537,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/quotations/:id/restore", requireAuth, async (req, res) => {
     const id = Number(req.params.id);
-    if (!Number.isInteger(id)) return res.status(400).json({ message: "Invalid quotation ID" });
+    if (!Number.isInteger(id)) return res.status(400).json({ message: "ID de cotización inválido" });
     const [restored] = await db.transaction(async (tx) => {
       const [row] = await tx.update(quotations).set({
         archivedAt: null,
@@ -8553,27 +8553,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       return [row];
     });
-    if (!restored) return res.status(404).json({ message: "Quotation not found" });
+    if (!restored) return res.status(404).json({ message: "No se encontró la cotización" });
     res.json(restored);
   });
 
   // Actualizar el cliente asociado a una cotización
   app.patch("/api/quotations/:id/client", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ message: "Invalid quotation ID" });
+    if (isNaN(id)) return res.status(400).json({ message: "ID de cotización inválido" });
 
     try {
       const current = await requireDraftQuotation(id, res);
       if (!current) return;
       const { clientId } = req.body;
       if (!clientId || isNaN(clientId)) {
-        return res.status(400).json({ message: "Valid client ID is required" });
+        return res.status(400).json({ message: "Se requiere un ID de cliente válido" });
       }
 
       // Verificar que el cliente existe
       const client = await storage.getClient(clientId);
       if (!client) {
-        return res.status(404).json({ message: "Client not found" });
+        return res.status(404).json({ message: "No se encontró el cliente" });
       }
 
       // Actualizar la cotización con el nuevo cliente
@@ -8599,13 +8599,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       if (!updatedQuotation) {
-        return res.status(404).json({ message: "Quotation not found" });
+        return res.status(404).json({ message: "No se encontró la cotización" });
       }
 
       res.json(updatedQuotation);
     } catch (error) {
       console.error("Error updating quotation client:", error);
-      res.status(500).json({ message: "Failed to update quotation client" });
+      res.status(500).json({ message: "No se pudo actualizar el cliente de la cotización" });
     }
   });
 
@@ -8614,26 +8614,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get negotiation history for a quotation
   app.get("/api/quotations/:id/negotiation-history", requireAuth, async (req, res) => {
     const quotationId = parseInt(req.params.id);
-    if (isNaN(quotationId)) return res.status(400).json({ message: "Invalid quotation ID" });
+    if (isNaN(quotationId)) return res.status(400).json({ message: "ID de cotización inválido" });
 
     try {
       const history = await storage.getNegotiationHistory(quotationId);
       res.json(history);
     } catch (error) {
       console.error("Error fetching negotiation history:", error);
-      res.status(500).json({ message: "Failed to fetch negotiation history" });
+      res.status(500).json({ message: "No se pudo traer el historial de negociación" });
     }
   });
 
   // Create new negotiation history entry
   app.post("/api/quotations/:id/negotiation-history", requireAuth, async (req, res) => {
     const quotationId = parseInt(req.params.id);
-    if (isNaN(quotationId)) return res.status(400).json({ message: "Invalid quotation ID" });
+    if (isNaN(quotationId)) return res.status(400).json({ message: "ID de cotización inválido" });
 
     try {
       const quotation = await storage.getQuotation(quotationId);
       if (!quotation) {
-        return res.status(404).json({ message: "Quotation not found" });
+        return res.status(404).json({ message: "No se encontró la cotización" });
       }
       if (quotation.status !== "in-negotiation") {
         return res.status(409).json({ message: "La cotización debe estar en negociación para registrar cambios" });
@@ -8669,55 +8669,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Los datos de negociación son inválidos", errors: error instanceof z.ZodError ? error.errors : undefined });
       }
       console.error("Error creating negotiation history:", error);
-      res.status(500).json({ message: "Failed to create negotiation history" });
+      res.status(500).json({ message: "No se pudo crear el historial de negociación" });
     }
   });
 
   // Get latest negotiation for a quotation
   app.get("/api/quotations/:id/latest-negotiation", requireAuth, async (req, res) => {
     const quotationId = parseInt(req.params.id);
-    if (isNaN(quotationId)) return res.status(400).json({ message: "Invalid quotation ID" });
+    if (isNaN(quotationId)) return res.status(400).json({ message: "ID de cotización inválido" });
 
     try {
       const latest = await storage.getLatestNegotiation(quotationId);
       res.json(latest || null);
     } catch (error) {
       console.error("Error fetching latest negotiation:", error);
-      res.status(500).json({ message: "Failed to fetch latest negotiation" });
+      res.status(500).json({ message: "No se pudo traer la última negociación" });
     }
   });
 
   // Asignar cliente a un proyecto específico
   app.patch("/api/active-projects/:id/assign-client", requireAuth, requirePermission("operations"), async (req, res) => {
     const projectId = parseInt(req.params.id);
-    if (isNaN(projectId)) return res.status(400).json({ message: "Invalid project ID" });
+    if (isNaN(projectId)) return res.status(400).json({ message: "ID de proyecto inválido" });
 
     try {
       const { clientId } = req.body;
       if (!clientId || isNaN(clientId)) {
-        return res.status(400).json({ message: "Valid client ID is required" });
+        return res.status(400).json({ message: "Se requiere un ID de cliente válido" });
       }
 
       // Verificar que el cliente existe
       const client = await storage.getClient(clientId);
       if (!client) {
-        return res.status(404).json({ message: "Client not found" });
+        return res.status(404).json({ message: "No se encontró el cliente" });
       }
 
       // Obtener el proyecto
       const project = await storage.getActiveProject(projectId);
       if (!project) {
-        return res.status(404).json({ message: "Project not found" });
+        return res.status(404).json({ message: "No se encontró el proyecto" });
       }
 
       if (!project.quotationId) {
-        return res.status(400).json({ message: "Project has no quotation" });
+        return res.status(400).json({ message: "El proyecto no tiene cotización" });
       }
 
       // Obtener la cotización actual
       const currentQuotation = await storage.getQuotation(project.quotationId);
       if (!currentQuotation) {
-        return res.status(404).json({ message: "Original quotation not found" });
+        return res.status(404).json({ message: "No se encontró la cotización original" });
       }
 
       let updatedProject;
@@ -8737,7 +8737,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const createdQuotation = await storage.createQuotation(newQuotation);
 
         if (!createdQuotation) {
-          return res.status(500).json({ message: "Failed to create new quotation" });
+          return res.status(500).json({ message: "No se pudo crear la cotización nueva" });
         }
 
         // Actualizar el proyecto para usar la nueva cotización
@@ -8751,34 +8751,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       if (!updatedProject) {
-        return res.status(404).json({ message: "Failed to update project" });
+        return res.status(404).json({ message: "No se pudo actualizar el proyecto" });
       }
 
       res.json(updatedProject);
     } catch (error) {
       console.error("Error assigning client to project:", error);
-      res.status(500).json({ message: "Failed to assign client to project" });
+      res.status(500).json({ message: "No se pudo asignar el cliente al proyecto" });
     }
   });
 
   // Quotation team members routes
   app.get("/api/quotation-team/:quotationId", requireAuth, async (req, res) => {
     const quotationId = parseInt(req.params.quotationId);
-    if (isNaN(quotationId)) return res.status(400).json({ message: "Invalid quotation ID" });
+    if (isNaN(quotationId)) return res.status(400).json({ message: "ID de cotización inválido" });
 
     try {
       const members = await storage.getQuotationTeamMembers(quotationId);
       res.json(members);
     } catch (error) {
       console.error(`❌ Error fetching team members for quotation ${quotationId}:`, error);
-      res.status(500).json({ message: "Failed to fetch team members", error: String(error) });
+      res.status(500).json({ message: "No se pudieron traer los integrantes del equipo", error: String(error) });
     }
   });
 
   // Assign personnel to a quotation team member
   app.patch("/api/quotation-team/:quotationId/assign-personnel", requireAuth, async (req, res) => {
     const quotationId = parseInt(req.params.quotationId);
-    if (isNaN(quotationId)) return res.status(400).json({ message: "Invalid quotation ID" });
+    if (isNaN(quotationId)) return res.status(400).json({ message: "ID de cotización inválido" });
 
     try {
       if (!await requireDraftQuotation(quotationId, res)) return;
@@ -8795,7 +8795,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const targetMember = teamMembers.find(member => member.roleId === roleId && member.personnelId === null);
       
       if (!targetMember) {
-        return res.status(404).json({ message: "Role-only team member not found" });
+        return res.status(404).json({ message: "No se encontró el integrante de equipo sin persona asignada" });
       }
 
       // Update the team member with personnel assignment
@@ -8809,10 +8809,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(updatedMember);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid assignment data", errors: error.errors });
+        return res.status(400).json({ message: "Datos de asignación inválidos", errors: error.errors });
       }
       console.error("Error assigning personnel to quotation team:", error);
-      res.status(500).json({ message: "Failed to assign personnel" });
+      res.status(500).json({ message: "No se pudo asignar el personal" });
     }
   });
 
@@ -8829,14 +8829,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const validatedData = insertQuotationTeamMemberSchema.parse(teamMemberData);
         await validateQuotationTeamReferences([validatedData]);
         const quotation = await storage.getQuotation(validatedData.quotationId);
-        if (!quotation) return res.status(404).json({ message: "Quotation not found" });
+        if (!quotation) return res.status(404).json({ message: "No se encontró la cotización" });
         if (quotation.status !== "draft") {
           return res.status(409).json({ message: "El equipo sólo puede modificarse en borrador", code: "QUOTATION_REVISION_REQUIRED" });
         }
         if (validatedData.variantId) {
           const variant = await storage.getQuotationVariant(validatedData.variantId);
           if (!variant || variant.quotationId !== validatedData.quotationId) {
-            return res.status(400).json({ message: "Variant does not belong to quotation" });
+            return res.status(400).json({ message: "La variante no pertenece a la cotización" });
           }
         }
 
@@ -8877,7 +8877,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (validationError instanceof z.ZodError) {
           console.error("Error de validación Zod en miembro:", JSON.stringify(validationError.errors, null, 2));
           return res.status(400).json({ 
-            message: "Invalid team member data", 
+            message: "Datos de integrante del equipo inválidos", 
             errors: validationError.errors 
           });
         }
@@ -8885,14 +8885,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     } catch (error) {
       console.error("Error al crear miembro del equipo:", error);
-      res.status(500).json({ message: "Failed to add team member", error: String(error) });
+      res.status(500).json({ message: "No se pudo agregar el integrante del equipo", error: String(error) });
     }
   });
 
   // Eliminar todos los miembros del equipo de una cotización
   app.delete("/api/quotation-team/:quotationId", requireAuth, async (req, res) => {
     const quotationId = parseInt(req.params.quotationId);
-    if (isNaN(quotationId)) return res.status(400).json({ message: "Invalid quotation ID" });
+    if (isNaN(quotationId)) return res.status(400).json({ message: "ID de cotización inválido" });
 
     if (!await requireDraftQuotation(quotationId, res)) return;
     // Delete team members associated with the quotation
@@ -8906,25 +8906,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Eliminar un miembro específico del equipo por su ID
   app.delete("/api/quotation-team-member/:id", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ message: "Invalid team member ID" });
+    if (isNaN(id)) return res.status(400).json({ message: "ID de integrante del equipo inválido" });
 
     try {
       const [member] = await db.select().from(quotationTeamMembers).where(eq(quotationTeamMembers.id, id));
-      if (!member) return res.status(404).json({ message: "Team member not found" });
+      if (!member) return res.status(404).json({ message: "No se encontró el integrante del equipo" });
       if (!await requireDraftQuotation(member.quotationId, res)) return;
       // Usamos el método de storage para manejar la eliminación en lugar de acceder directamente a la base de datos
       await storage.deleteQuotationTeamMemberById(id);
       res.status(204).send();
     } catch (error) {
       console.error(`Error al eliminar miembro del equipo ID ${id}:`, error);
-      res.status(500).json({ message: "Failed to delete team member" });
+      res.status(500).json({ message: "No se pudo borrar el integrante del equipo" });
     }
   });
 
   // Ruta alternativa para la misma funcionalidad (mantener compatibilidad con el cliente)
   app.delete("/api/quotation-team/by-quotation/:quotationId", requireAuth, async (req, res) => {
     const quotationId = parseInt(req.params.quotationId);
-    if (isNaN(quotationId)) return res.status(400).json({ message: "Invalid quotation ID" });
+    if (isNaN(quotationId)) return res.status(400).json({ message: "ID de cotización inválido" });
 
     // Delete team members associated with the quotation
     const teamMembers = await storage.getQuotationTeamMembers(quotationId);
@@ -8969,7 +8969,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Template role assignments routes
   app.get("/api/template-roles/:templateId", requireAuth, async (req, res) => {
     const templateId = parseInt(req.params.templateId);
-    if (isNaN(templateId)) return res.status(400).json({ message: "Invalid template ID" });
+    if (isNaN(templateId)) return res.status(400).json({ message: "ID de plantilla inválido" });
 
     const assignments = await storage.getTemplateRoleAssignments(templateId);
     res.json(assignments);
@@ -8978,7 +8978,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Ruta alternativa para asignaciones de roles (para compatibilidad con roles recomendados)
   app.get("/api/report-templates/:templateId/role-assignments", requireAuth, async (req, res) => {
     const templateId = parseInt(req.params.templateId);
-    if (isNaN(templateId)) return res.status(400).json({ message: "Invalid template ID" });
+    if (isNaN(templateId)) return res.status(400).json({ message: "ID de plantilla inválido" });
 
     const assignments = await storage.getTemplateRoleAssignments(templateId);
     res.json(assignments);
@@ -8986,7 +8986,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/template-roles/:templateId/with-roles", requireAuth, async (req, res) => {
     const templateId = parseInt(req.params.templateId);
-    if (isNaN(templateId)) return res.status(400).json({ message: "Invalid template ID" });
+    if (isNaN(templateId)) return res.status(400).json({ message: "ID de plantilla inválido" });
 
     const assignmentsWithRoles = await storage.getTemplateRoleAssignmentsWithRoles(templateId);
     res.json(assignmentsWithRoles);
@@ -8999,59 +8999,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(assignment);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid assignment data", errors: error.errors });
+        return res.status(400).json({ message: "Datos de asignación inválidos", errors: error.errors });
       }
-      res.status(500).json({ message: "Failed to create template role assignment" });
+      res.status(500).json({ message: "No se pudo crear la asignación de rol de la plantilla" });
     }
   });
 
   app.patch("/api/template-roles/:id", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ message: "Invalid assignment ID" });
+    if (isNaN(id)) return res.status(400).json({ message: "ID de asignación inválido" });
 
     try {
       const validatedData = insertTemplateRoleAssignmentSchema.partial().parse(req.body);
       const updatedAssignment = await storage.updateTemplateRoleAssignment(id, validatedData);
 
       if (!updatedAssignment) {
-        return res.status(404).json({ message: "Assignment not found" });
+        return res.status(404).json({ message: "No se encontró la asignación" });
       }
 
       res.json(updatedAssignment);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid assignment data", errors: error.errors });
+        return res.status(400).json({ message: "Datos de asignación inválidos", errors: error.errors });
       }
-      res.status(500).json({ message: "Failed to update template role assignment" });
+      res.status(500).json({ message: "No se pudo actualizar la asignación de rol de la plantilla" });
     }
   });
 
   app.delete("/api/template-roles/:id", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ message: "Invalid assignment ID" });
+    if (isNaN(id)) return res.status(400).json({ message: "ID de asignación inválido" });
 
     try {
       const success = await storage.deleteTemplateRoleAssignment(id);
 
       if (!success) {
-        return res.status(404).json({ message: "Assignment not found" });
+        return res.status(404).json({ message: "No se encontró la asignación" });
       }
 
       res.json({ success: true, message: "Template role assignment deleted successfully" });
     } catch (error) {
-      res.status(500).json({ message: "Failed to delete template role assignment" });
+      res.status(500).json({ message: "No se pudo borrar la asignación de rol de la plantilla" });
     }
   });
 
   app.delete("/api/template-roles/template/:templateId", requireAuth, async (req, res) => {
     const templateId = parseInt(req.params.templateId);
-    if (isNaN(templateId)) return res.status(400).json({ message: "Invalid template ID" });
+    if (isNaN(templateId)) return res.status(400).json({ message: "ID de plantilla inválido" });
 
     try {
       await storage.deleteTemplateRoleAssignments(templateId);
       res.status(204).send();
     } catch (error) {
-      res.status(500).json({ message: "Failed to delete template role assignments" });
+      res.status(500).json({ message: "No se pudieron borrar las asignaciones de rol de la plantilla" });
     }
   });
 
@@ -9060,38 +9060,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get all variants for a quotation
   app.get("/api/quotations/:quotationId/variants", requireAuth, async (req, res) => {
     const quotationId = parseInt(req.params.quotationId);
-    if (isNaN(quotationId)) return res.status(400).json({ message: "Invalid quotation ID" });
+    if (isNaN(quotationId)) return res.status(400).json({ message: "ID de cotización inválido" });
 
     try {
       const variants = await storage.getQuotationVariants(quotationId);
       res.json(variants);
     } catch (error) {
       console.error(`❌ Error fetching variants for quotation ${quotationId}:`, error);
-      res.status(500).json({ message: "Failed to fetch variants", error: String(error) });
+      res.status(500).json({ message: "No se pudieron traer las variantes", error: String(error) });
     }
   });
 
   // Get a specific variant
   app.get("/api/quotation-variants/:variantId", requireAuth, async (req, res) => {
     const variantId = parseInt(req.params.variantId);
-    if (isNaN(variantId)) return res.status(400).json({ message: "Invalid variant ID" });
+    if (isNaN(variantId)) return res.status(400).json({ message: "ID de variante inválido" });
 
     try {
       const variant = await storage.getQuotationVariant(variantId);
       if (!variant) {
-        return res.status(404).json({ message: "Variant not found" });
+        return res.status(404).json({ message: "No se encontró la variante" });
       }
       res.json(variant);
     } catch (error) {
       console.error(`❌ Error fetching variant ${variantId}:`, error);
-      res.status(500).json({ message: "Failed to fetch variant", error: String(error) });
+      res.status(500).json({ message: "No se pudo traer la variante", error: String(error) });
     }
   });
 
   // Create a new quotation variant
   app.post("/api/quotations/:quotationId/variants", requireAuth, async (req, res) => {
     const quotationId = parseInt(req.params.quotationId);
-    if (isNaN(quotationId)) return res.status(400).json({ message: "Invalid quotation ID" });
+    if (isNaN(quotationId)) return res.status(400).json({ message: "ID de cotización inválido" });
 
     try {
       if (!await requireDraftQuotation(quotationId, res)) return;
@@ -9106,20 +9106,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("❌ Error creating quotation variant:", error);
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid variant data", errors: error.errors });
+        return res.status(400).json({ message: "Datos de variante inválidos", errors: error.errors });
       }
-      res.status(500).json({ message: "Failed to create quotation variant" });
+      res.status(500).json({ message: "No se pudo crear la variante de la cotización" });
     }
   });
 
   // Update a quotation variant
   app.patch("/api/quotation-variants/:variantId", requireAuth, async (req, res) => {
     const variantId = parseInt(req.params.variantId);
-    if (isNaN(variantId)) return res.status(400).json({ message: "Invalid variant ID" });
+    if (isNaN(variantId)) return res.status(400).json({ message: "ID de variante inválido" });
 
     try {
       const currentVariant = await storage.getQuotationVariant(variantId);
-      if (!currentVariant) return res.status(404).json({ message: "Variant not found" });
+      if (!currentVariant) return res.status(404).json({ message: "No se encontró la variante" });
       if (!await requireDraftQuotation(currentVariant.quotationId, res)) return;
       const validatedData = insertQuotationVariantSchema.pick({
         variantName: true,
@@ -9132,50 +9132,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updatedVariant = await storage.updateQuotationVariant(variantId, validatedData);
 
       if (!updatedVariant) {
-        return res.status(404).json({ message: "Variant not found" });
+        return res.status(404).json({ message: "No se encontró la variante" });
       }
 
       res.json(updatedVariant);
     } catch (error) {
       console.error("❌ Error updating quotation variant:", error);
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid variant data", errors: error.errors });
+        return res.status(400).json({ message: "Datos de variante inválidos", errors: error.errors });
       }
-      res.status(500).json({ message: "Failed to update quotation variant" });
+      res.status(500).json({ message: "No se pudo actualizar la variante de la cotización" });
     }
   });
 
   // Delete a quotation variant
   app.delete("/api/quotation-variants/:variantId", requireAuth, async (req, res) => {
     const variantId = parseInt(req.params.variantId);
-    if (isNaN(variantId)) return res.status(400).json({ message: "Invalid variant ID" });
+    if (isNaN(variantId)) return res.status(400).json({ message: "ID de variante inválido" });
 
     try {
       const currentVariant = await storage.getQuotationVariant(variantId);
-      if (!currentVariant) return res.status(404).json({ message: "Variant not found" });
+      if (!currentVariant) return res.status(404).json({ message: "No se encontró la variante" });
       if (!await requireDraftQuotation(currentVariant.quotationId, res)) return;
       const success = await storage.deleteQuotationVariant(variantId);
       if (!success) {
-        return res.status(404).json({ message: "Variant not found" });
+        return res.status(404).json({ message: "No se encontró la variante" });
       }
       res.json({ success: true, message: "Quotation variant deleted successfully" });
     } catch (error) {
       console.error("❌ Error deleting quotation variant:", error);
-      res.status(500).json({ message: "Failed to delete quotation variant" });
+      res.status(500).json({ message: "No se pudo borrar la variante de la cotización" });
     }
   });
 
   // Get team members for a specific variant
   app.get("/api/quotation-variants/:variantId/team", requireAuth, async (req, res) => {
     const variantId = parseInt(req.params.variantId);
-    if (isNaN(variantId)) return res.status(400).json({ message: "Invalid variant ID" });
+    if (isNaN(variantId)) return res.status(400).json({ message: "ID de variante inválido" });
 
     try {
       const members = await storage.getQuotationTeamMembersByVariant(variantId);
       res.json(members);
     } catch (error) {
       console.error(`❌ Error fetching team members for variant ${variantId}:`, error);
-      res.status(500).json({ message: "Failed to fetch team members", error: String(error) });
+      res.status(500).json({ message: "No se pudieron traer los integrantes del equipo", error: String(error) });
     }
   });
 
@@ -9185,8 +9185,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const quotationId = parseInt(req.params.quotationId);
     const variantId = parseInt(req.params.variantId);
     
-    if (isNaN(quotationId)) return res.status(400).json({ message: "Invalid quotation ID" });
-    if (isNaN(variantId)) return res.status(400).json({ message: "Invalid variant ID" });
+    if (isNaN(quotationId)) return res.status(400).json({ message: "ID de cotización inválido" });
+    if (isNaN(variantId)) return res.status(400).json({ message: "ID de variante inválido" });
 
     return res.status(409).json({
       message: "La variante aceptada sólo puede seleccionarse mediante el portal del cliente",
@@ -9212,7 +9212,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ count });
     } catch (error) {
       console.error("Error fetching active projects count:", error);
-      res.status(500).json({ message: "Failed to fetch active projects count", count: 0 });
+      res.status(500).json({ message: "No se pudo traer la cantidad de proyectos activos", count: 0 });
     }
   });
 
@@ -9291,7 +9291,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ projects });
     } catch (error) {
       console.error("Error fetching project alerts summary:", error);
-      res.status(500).json({ message: "Failed to fetch project alerts summary", projects: [] });
+      res.status(500).json({ message: "No se pudo traer el resumen de alertas del proyecto", projects: [] });
     }
   });
 
@@ -9324,7 +9324,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("❌ HEALTH: Error calculating Excel coverage metrics:", error);
       res.status(500).json({ 
         success: false,
-        error: "Failed to calculate coverage metrics",
+        error: "No se pudieron calcular las métricas de cobertura",
         details: String(error)
       });
     }
@@ -9438,7 +9438,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const configuredCutover = await getCutoverDate();
     if (configuredCutover) return res.status(409).json({ success: false, message: `La importación desde Excel está desactivada desde el corte ${configuredCutover}.` });
     if (resumenSyncInProgress) {
-      return res.json({ success: true, skipped: true, message: 'Sync already in progress' });
+      return res.json({ success: true, skipped: true, message: 'Ya hay una sincronización en curso' });
     }
     resumenSyncInProgress = true;
     try {
@@ -9673,7 +9673,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { periods } = req.body;
       if (!periods || !Array.isArray(periods) || periods.length === 0) {
-        return res.status(400).json({ success: false, error: "Body must have periods array" });
+        return res.status(400).json({ success: false, error: "El cuerpo debe incluir el arreglo periods" });
       }
 
       const { monthlyFinancialSummary } = await import('@shared/schema.js');
@@ -10496,7 +10496,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("❌ DASHBOARD: Error fetching enhanced dashboard metrics:", error);
       res.status(500).json({ 
-        error: "Failed to fetch dashboard metrics",
+        error: "No se pudieron traer las métricas del tablero",
         details: String(error)
       });
     }
@@ -10696,7 +10696,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("❌ DEBUG SUMMARY Error:", error);
       res.status(500).json({ 
-        error: "Failed to generate debug summary",
+        error: "No se pudo generar el resumen de diagnóstico",
         details: String(error)
       });
     }
@@ -10881,21 +10881,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.json(projects);
     } catch (error) {
       console.error("Error fetching active projects:", error);
-      res.status(500).json({ message: "Failed to fetch active projects" });
+      res.status(500).json({ message: "No se pudieron traer los proyectos activos" });
     }
   });
 
   // Obtener proyectos activos por cliente
   app.get("/api/active-projects/client/:clientId", requireAuth, requirePermission("operations"), async (req, res) => {
     const clientId = parseInt(req.params.clientId);
-    if (isNaN(clientId)) return res.status(400).json({ message: "Invalid client ID" });
+    if (isNaN(clientId)) return res.status(400).json({ message: "ID de cliente inválido" });
 
     try {
       const projects = await storage.getActiveProjectsByClient(clientId);
       res.json(projects);
     } catch (error) {
       console.error("Error fetching client active projects:", error);
-      res.status(500).json({ message: "Failed to fetch client active projects" });
+      res.status(500).json({ message: "No se pudieron traer los proyectos activos del cliente" });
     }
   });
 
@@ -10916,14 +10916,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/time-entries/client/:clientId", requireAuth, async (req, res) => {
     if (!isOperationsRequest(req)) return res.status(403).json({ message: "Acceso exclusivo de Operaciones" });
     const clientId = parseInt(req.params.clientId);
-    if (isNaN(clientId)) return res.status(400).json({ message: "Invalid client ID" });
+    if (isNaN(clientId)) return res.status(400).json({ message: "ID de cliente inválido" });
 
     try {
       const entries = await storage.getTimeEntriesByClient(clientId);
       res.json(entries);
     } catch (error) {
       console.error("Error fetching client time entries:", error);
-      res.status(500).json({ message: "Failed to fetch client time entries" });
+      res.status(500).json({ message: "No se pudieron traer las cargas de horas del cliente" });
     }
   });
 
@@ -10931,14 +10931,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/clients/:clientId/cost-summary", requireAuth, async (req, res) => {
     if (!isOperationsRequest(req)) return res.status(403).json({ message: "Acceso exclusivo de Operaciones" });
     const clientId = parseInt(req.params.clientId);
-    if (isNaN(clientId)) return res.status(400).json({ message: "Invalid client ID" });
+    if (isNaN(clientId)) return res.status(400).json({ message: "ID de cliente inválido" });
 
     try {
       const summary = await storage.getClientCostSummary(clientId);
       res.json(summary);
     } catch (error) {
       console.error("Error getting client cost summary:", error);
-      res.status(500).json({ message: "Failed to calculate client cost summary" });
+      res.status(500).json({ message: "No se pudo calcular el resumen de costos del cliente" });
     }
   });
 
@@ -10948,11 +10948,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Obtener un proyecto activo específico (mantenido para compatibilidad)
   app.get("/api/active-projects/:id", requireAuth, requirePermission("operations"), async (req, res) => {
     const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ message: "Invalid project ID" });
+    if (isNaN(id)) return res.status(400).json({ message: "ID de proyecto inválido" });
 
     try {
       const project = await storage.getActiveProject(id);
-      if (!project) return res.status(404).json({ message: "Project not found" });
+      if (!project) return res.status(404).json({ message: "No se encontró el proyecto" });
 
       // Calcular horas estimadas desde los miembros del equipo de la cotización
       let estimatedHours = 0;
@@ -10994,7 +10994,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       console.error("Error fetching active project:", error);
-      res.status(500).json({ message: "Failed to fetch active project" });
+      res.status(500).json({ message: "No se pudo traer el proyecto activo" });
     }
   });
 
@@ -11015,13 +11015,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Actualizar estado de finalización de subproyecto
   app.patch("/api/active-projects/:id/status", requireAuth, requirePermission("operations"), async (req, res) => {
     const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ message: "Invalid project ID" });
+    if (isNaN(id)) return res.status(400).json({ message: "ID de proyecto inválido" });
 
     try {
       const { completionStatus, completedDate } = req.body;
 
       if (!completionStatus) {
-        return res.status(400).json({ message: "Completion status is required" });
+        return res.status(400).json({ message: "El estado de avance es obligatorio" });
       }
 
       const updateData: any = { completionStatus };
@@ -11032,13 +11032,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updatedProject = await storage.updateActiveProject(id, updateData);
 
       if (!updatedProject) {
-        return res.status(404).json({ message: "Project not found" });
+        return res.status(404).json({ message: "No se encontró el proyecto" });
       }
 
       res.json(updatedProject);
     } catch (error) {
       console.error("Error updating project completion status:", error);
-      res.status(500).json({ message: "Failed to update project completion status" });
+      res.status(500).json({ message: "No se pudo actualizar el estado de avance del proyecto" });
     }
   });
 
@@ -11047,7 +11047,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const id = parseInt(req.params.id);
     if (isNaN(id)) {
       console.log('ID de proyecto inválido:', req.params.id);
-      return res.status(400).json({ message: "Invalid project ID" });
+      return res.status(400).json({ message: "ID de proyecto inválido" });
     }
 
     console.log(`Iniciando eliminación del proyecto ${id}`);
@@ -11057,7 +11057,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const project = await storage.getActiveProject(id);
       if (!project) {
         console.log(`Proyecto ${id} no encontrado`);
-        return res.status(404).json({ message: "Project not found" });
+        return res.status(404).json({ message: "No se encontró el proyecto" });
       }
 
       console.log(`Proyecto encontrado: ${project.quotation?.projectName || 'Sin nombre'}`);
@@ -11073,7 +11073,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (!deleted) {
         console.log(`Falló la eliminación del proyecto ${id}`);
-        return res.status(500).json({ message: "Failed to delete project" });
+        return res.status(500).json({ message: "No se pudo borrar el proyecto" });
       }
 
       console.log(`Proyecto ${id} eliminado exitosamente`);
@@ -11085,7 +11085,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting active project:", error);
       res.status(500).json({ 
-        message: "Failed to delete project",
+        message: "No se pudo borrar el proyecto",
         error: error instanceof Error ? (error as Error).message : 'Unknown error'
       });
     }
@@ -11098,7 +11098,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const allProjects = await storage.getActiveProjects();
       
       if (allProjects.length === 0) {
-        return res.json({ message: "No projects to delete", deletedCount: 0 });
+        return res.json({ message: "No hay proyectos para borrar", deletedCount: 0 });
       }
 
       console.log(`Eliminando ${allProjects.length} proyectos activos...`);
@@ -11123,7 +11123,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       console.error("Error deleting all active projects:", error);
-      res.status(500).json({ message: "Failed to delete all projects" });
+      res.status(500).json({ message: "No se pudieron borrar todos los proyectos" });
     }
   });
 
@@ -11132,7 +11132,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Actualizar proyecto completo (nombre, estado, descripción)
   app.patch("/api/active-projects/:id/update", requireAuth, requirePermission("operations"), async (req, res) => {
     const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ message: "Invalid project ID" });
+    if (isNaN(id)) return res.status(400).json({ message: "ID de proyecto inválido" });
 
     try {
       const { name, status, description } = req.body;
@@ -11145,7 +11145,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (status) {
         const validStatuses = ["pending", "in_progress", "completed", "paused", "cancelled"];
         if (!validStatuses.includes(status)) {
-          return res.status(400).json({ message: "Invalid status" });
+          return res.status(400).json({ message: "Estado inválido" });
         }
         updateData.completionStatus = status;
 
@@ -11163,26 +11163,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updatedProject = await storage.updateActiveProject(id, updateData);
 
       if (!updatedProject) {
-        return res.status(404).json({ message: "Project not found" });
+        return res.status(404).json({ message: "No se encontró el proyecto" });
       }
 
       res.json(updatedProject);
     } catch (error) {
       console.error("Error updating project:", error);
-      res.status(500).json({ message: "Failed to update project" });
+      res.status(500).json({ message: "No se pudo actualizar el proyecto" });
     }
   });
 
   // Actualizar nombre de subproyecto
   app.patch("/api/active-projects/:id/name", requireAuth, requirePermission("operations"), async (req, res) => {
     const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ message: "Invalid project ID" });
+    if (isNaN(id)) return res.status(400).json({ message: "ID de proyecto inválido" });
 
     try {
       const { subprojectName } = req.body;
 
       if (!subprojectName || subprojectName.trim().length === 0) {
-        return res.status(400).json({ message: "Subproject name is required" });
+        return res.status(400).json({ message: "El nombre del subproyecto es obligatorio" });
       }
 
       const updatedProject = await storage.updateActiveProject(id, { 
@@ -11190,13 +11190,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       if (!updatedProject) {
-        return res.status(404).json({ message: "Project not found" });
+        return res.status(404).json({ message: "No se encontró el proyecto" });
       }
 
       res.json(updatedProject);
     } catch (error) {
       console.error("Error updating subproject name:", error);
-      res.status(500).json({ message: "Failed to update subproject name" });
+      res.status(500).json({ message: "No se pudo actualizar el nombre del subproyecto" });
     }
   });
 
@@ -11506,7 +11506,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Actualizar un proyecto activo
   app.patch("/api/active-projects/:id", requireAuth, requirePermission("operations"), async (req, res) => {
     const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ message: "Invalid project ID" });
+    if (isNaN(id)) return res.status(400).json({ message: "ID de proyecto inválido" });
 
     try {
       console.log("PATCH /api/active-projects/:id - Request body:", req.body);
@@ -11541,24 +11541,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updatedProject = await storage.updateActiveProject(id, validatedData);
 
       if (!updatedProject) {
-        return res.status(404).json({ message: "Project not found" });
+        return res.status(404).json({ message: "No se encontró el proyecto" });
       }
 
       res.json(updatedProject);
     } catch (error) {
       if (error instanceof z.ZodError) {
         console.error("Validation error:", error.errors);
-        return res.status(400).json({ message: "Invalid project data", errors: error.errors });
+        return res.status(400).json({ message: "Datos de proyecto inválidos", errors: error.errors });
       }
       console.error("Error updating active project:", error);
-      res.status(500).json({ message: "Failed to update active project" });
+      res.status(500).json({ message: "No se pudo actualizar el proyecto activo" });
     }
   });
 
   // Marcar proyecto como terminado
   app.patch("/api/active-projects/:id/finish", requireAuth, requirePermission("operations"), async (req, res) => {
     const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ message: "Invalid project ID" });
+    if (isNaN(id)) return res.status(400).json({ message: "ID de proyecto inválido" });
 
     try {
       const updatedProject = await storage.updateActiveProject(id, {
@@ -11570,20 +11570,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } as any);
 
       if (!updatedProject) {
-        return res.status(404).json({ message: "Project not found" });
+        return res.status(404).json({ message: "No se encontró el proyecto" });
       }
 
       res.json(updatedProject);
     } catch (error) {
       console.error("Error marking project as finished:", error);
-      res.status(500).json({ message: "Failed to mark project as finished" });
+      res.status(500).json({ message: "No se pudo marcar el proyecto como terminado" });
     }
   });
 
   // Reabrir proyecto (admin only). Desbloquea carga de horas/costos.
   app.patch("/api/active-projects/:id/reopen", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ message: "Invalid project ID" });
+    if (isNaN(id)) return res.status(400).json({ message: "ID de proyecto inválido" });
     if (!req.user?.isAdmin) {
       return res.status(403).json({ message: "Solo administradores pueden reabrir proyectos" });
     }
@@ -11598,49 +11598,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } as any);
 
       if (!updatedProject) {
-        return res.status(404).json({ message: "Project not found" });
+        return res.status(404).json({ message: "No se encontró el proyecto" });
       }
 
       res.json(updatedProject);
     } catch (error) {
       console.error("Error reopening project:", error);
-      res.status(500).json({ message: "Failed to reopen project" });
+      res.status(500).json({ message: "No se pudo reabrir el proyecto" });
     }
   });
 
   // Marcar como entregado al cliente.
   app.patch("/api/active-projects/:id/deliver", requireAuth, requirePermission("operations"), async (req, res) => {
     const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ message: "Invalid project ID" });
+    if (isNaN(id)) return res.status(400).json({ message: "ID de proyecto inválido" });
 
     try {
       const updatedProject = await storage.updateActiveProject(id, {
         status: "delivered",
         deliveredAt: new Date(),
       } as any);
-      if (!updatedProject) return res.status(404).json({ message: "Project not found" });
+      if (!updatedProject) return res.status(404).json({ message: "No se encontró el proyecto" });
       res.json(updatedProject);
     } catch (error) {
       console.error("Error marking project as delivered:", error);
-      res.status(500).json({ message: "Failed to mark as delivered" });
+      res.status(500).json({ message: "No se pudo marcar como entregado" });
     }
   });
 
   // Marcar como facturado.
   app.patch("/api/active-projects/:id/invoice", requireAuth, requirePermission("operations"), async (req, res) => {
     const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ message: "Invalid project ID" });
+    if (isNaN(id)) return res.status(400).json({ message: "ID de proyecto inválido" });
 
     try {
       const updatedProject = await storage.updateActiveProject(id, {
         status: "invoiced",
         invoicedAt: new Date(),
       } as any);
-      if (!updatedProject) return res.status(404).json({ message: "Project not found" });
+      if (!updatedProject) return res.status(404).json({ message: "No se encontró el proyecto" });
       res.json(updatedProject);
     } catch (error) {
       console.error("Error marking project as invoiced:", error);
-      res.status(500).json({ message: "Failed to mark as invoiced" });
+      res.status(500).json({ message: "No se pudo marcar como facturado" });
     }
   });
 
@@ -11651,20 +11651,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // requirePermission("operations") para igualar el resto de rutas financieras de este archivo.
   app.get("/api/projects/:projectId/monthly-sales", requireAuth, requirePermission("operations"), async (req, res) => {
     const projectId = parseInt(req.params.projectId);
-    if (isNaN(projectId)) return res.status(400).json({ message: "Invalid project ID" });
+    if (isNaN(projectId)) return res.status(400).json({ message: "ID de proyecto inválido" });
 
     try {
       const sales = await storage.getProjectMonthlySales(projectId);
       res.json(sales);
     } catch (error) {
       console.error("Error fetching project monthly sales:", error);
-      res.status(500).json({ message: "Failed to fetch project monthly sales" });
+      res.status(500).json({ message: "No se pudieron traer las ventas mensuales del proyecto" });
     }
   });
 
   app.post("/api/projects/:projectId/monthly-sales", requireAuth, requirePermission("operations"), async (req, res) => {
     const projectId = parseInt(req.params.projectId);
-    if (isNaN(projectId)) return res.status(400).json({ message: "Invalid project ID" });
+    if (isNaN(projectId)) return res.status(400).json({ message: "ID de proyecto inválido" });
 
     try {
       const validatedData = insertProjectMonthlySalesSchema.parse({
@@ -11677,70 +11677,70 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(sales);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid sales data", errors: error.errors });
+        return res.status(400).json({ message: "Datos de venta inválidos", errors: error.errors });
       }
       console.error("Error creating project monthly sales:", error);
-      res.status(500).json({ message: "Failed to create project monthly sales" });
+      res.status(500).json({ message: "No se pudieron crear las ventas mensuales del proyecto" });
     }
   });
 
   app.patch("/api/projects/:projectId/monthly-sales/:id", requireAuth, requirePermission("operations"), async (req, res) => {
     const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ message: "Invalid sales ID" });
+    if (isNaN(id)) return res.status(400).json({ message: "ID de venta inválido" });
 
     try {
       const validatedData = insertProjectMonthlySalesSchema.partial().parse(req.body);
       const updatedSales = await storage.updateProjectMonthlySales(id, validatedData);
       
       if (!updatedSales) {
-        return res.status(404).json({ message: "Monthly sales record not found" });
+        return res.status(404).json({ message: "No se encontró el registro de ventas mensuales" });
       }
       
       res.json(updatedSales);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid sales data", errors: error.errors });
+        return res.status(400).json({ message: "Datos de venta inválidos", errors: error.errors });
       }
       console.error("Error updating project monthly sales:", error);
-      res.status(500).json({ message: "Failed to update project monthly sales" });
+      res.status(500).json({ message: "No se pudieron actualizar las ventas mensuales del proyecto" });
     }
   });
 
   app.delete("/api/projects/:projectId/monthly-sales/:id", requireAuth, requirePermission("operations"), async (req, res) => {
     const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ message: "Invalid sales ID" });
+    if (isNaN(id)) return res.status(400).json({ message: "ID de venta inválido" });
 
     try {
       const success = await storage.deleteProjectMonthlySales(id);
       
       if (!success) {
-        return res.status(404).json({ message: "Monthly sales record not found" });
+        return res.status(404).json({ message: "No se encontró el registro de ventas mensuales" });
       }
       
       res.json({ success: true, message: "Monthly sales record deleted successfully" });
     } catch (error) {
       console.error("Error deleting project monthly sales:", error);
-      res.status(500).json({ message: "Failed to delete project monthly sales" });
+      res.status(500).json({ message: "No se pudieron borrar las ventas mensuales del proyecto" });
     }
   });
 
   // Project Financial Transactions Operations (para análisis financiero)
   app.get("/api/projects/:projectId/financial-transactions", requireAuth, requirePermission("operations"), async (req, res) => {
     const projectId = parseInt(req.params.projectId);
-    if (isNaN(projectId)) return res.status(400).json({ message: "Invalid project ID" });
+    if (isNaN(projectId)) return res.status(400).json({ message: "ID de proyecto inválido" });
 
     try {
       const transactions = await storage.getProjectFinancialTransactions(projectId);
       res.json(transactions);
     } catch (error) {
       console.error("Error fetching project financial transactions:", error);
-      res.status(500).json({ message: "Failed to fetch project financial transactions" });
+      res.status(500).json({ message: "No se pudieron traer los movimientos financieros del proyecto" });
     }
   });
 
   app.post("/api/projects/:projectId/financial-transactions", requireAuth, requirePermission("operations"), async (req, res) => {
     const projectId = parseInt(req.params.projectId);
-    if (isNaN(projectId)) return res.status(400).json({ message: "Invalid project ID" });
+    if (isNaN(projectId)) return res.status(400).json({ message: "ID de proyecto inválido" });
 
     try {
       const validatedData = insertProjectFinancialTransactionSchema.parse({
@@ -11753,57 +11753,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(transaction);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid transaction data", errors: error.errors });
+        return res.status(400).json({ message: "Datos de movimiento inválidos", errors: error.errors });
       }
       console.error("Error creating project financial transaction:", error);
-      res.status(500).json({ message: "Failed to create project financial transaction" });
+      res.status(500).json({ message: "No se pudo crear el movimiento financiero del proyecto" });
     }
   });
 
   app.patch("/api/projects/:projectId/financial-transactions/:id", requireAuth, requirePermission("operations"), async (req, res) => {
     const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ message: "Invalid transaction ID" });
+    if (isNaN(id)) return res.status(400).json({ message: "ID de movimiento inválido" });
 
     try {
       const validatedData = insertProjectFinancialTransactionSchema.partial().parse(req.body);
       const updatedTransaction = await storage.updateProjectFinancialTransaction(id, validatedData);
       
       if (!updatedTransaction) {
-        return res.status(404).json({ message: "Financial transaction not found" });
+        return res.status(404).json({ message: "No se encontró el movimiento financiero" });
       }
       
       res.json(updatedTransaction);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid transaction data", errors: error.errors });
+        return res.status(400).json({ message: "Datos de movimiento inválidos", errors: error.errors });
       }
       console.error("Error updating project financial transaction:", error);
-      res.status(500).json({ message: "Failed to update project financial transaction" });
+      res.status(500).json({ message: "No se pudo actualizar el movimiento financiero del proyecto" });
     }
   });
 
   app.delete("/api/projects/:projectId/financial-transactions/:id", requireAuth, requirePermission("operations"), async (req, res) => {
     const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ message: "Invalid transaction ID" });
+    if (isNaN(id)) return res.status(400).json({ message: "ID de movimiento inválido" });
 
     try {
       const success = await storage.deleteProjectFinancialTransaction(id);
       
       if (!success) {
-        return res.status(404).json({ message: "Financial transaction not found" });
+        return res.status(404).json({ message: "No se encontró el movimiento financiero" });
       }
       
       res.json({ success: true, message: "Financial transaction deleted successfully" });
     } catch (error) {
       console.error("Error deleting project financial transaction:", error);
-      res.status(500).json({ message: "Failed to delete project financial transaction" });
+      res.status(500).json({ message: "No se pudo borrar el movimiento financiero del proyecto" });
     }
   });
 
   // Anular proyecto (void). No borra datos, sólo cambia estado.
   app.patch("/api/active-projects/:id/void", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ message: "Invalid project ID" });
+    if (isNaN(id)) return res.status(400).json({ message: "ID de proyecto inválido" });
     if (!req.user?.isAdmin) {
       return res.status(403).json({ message: "Solo administradores pueden anular proyectos" });
     }
@@ -11815,11 +11815,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         closedBy: req.user?.id ?? null,
         isFinished: true,
       } as any);
-      if (!updatedProject) return res.status(404).json({ message: "Project not found" });
+      if (!updatedProject) return res.status(404).json({ message: "No se encontró el proyecto" });
       res.json(updatedProject);
     } catch (error) {
       console.error("Error voiding project:", error);
-      res.status(500).json({ message: "Failed to void project" });
+      res.status(500).json({ message: "No se pudo anular el proyecto" });
     }
   });
 
@@ -11954,7 +11954,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (projectId) {
         const id = parseInt(projectId as string);
-        if (isNaN(id)) return res.status(400).json({ message: "Invalid project ID" });
+        if (isNaN(id)) return res.status(400).json({ message: "ID de proyecto inválido" });
 
         const entries = await storage.getTimeEntriesByProject(id);
         res.json(entries);
@@ -11965,7 +11965,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     } catch (error) {
       console.error("Error fetching time entries:", error);
-      res.status(500).json({ message: "Failed to fetch time entries" });
+      res.status(500).json({ message: "No se pudieron traer las cargas de horas" });
     }
   });
 
@@ -12019,14 +12019,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(groupedByProject);
     } catch (error) {
       console.error("Error fetching all projects time entries:", error);
-      res.status(500).json({ message: "Failed to fetch time entries data" });
+      res.status(500).json({ message: "No se pudieron traer los datos de cargas de horas" });
     }
   });
 
   // Obtener registros de horas por proyecto con información del personal
   app.get("/api/time-entries/project/:projectId", requireAuth, async (req, res) => {
     const projectId = parseInt(req.params.projectId);
-    if (isNaN(projectId)) return res.status(400).json({ message: "Invalid project ID" });
+    if (isNaN(projectId)) return res.status(400).json({ message: "ID de proyecto inválido" });
 
     try {
       if (!isOperationsRequest(req)) return res.status(403).json({ message: "Acceso exclusivo de Operaciones" });
@@ -12054,7 +12054,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(entries);
     } catch (error) {
       console.error("Error fetching project time entries:", error);
-      res.status(500).json({ message: "Failed to fetch project time entries" });
+      res.status(500).json({ message: "No se pudieron traer las cargas de horas del proyecto" });
     }
   });
 
@@ -12068,7 +12068,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // de asumir automáticamente cuál es la duplicada (evita perder horas reales).
   app.get("/api/projects/:id/profitability-time-entries", requireAuth, async (req, res) => {
     const projectId = parseInt(req.params.id);
-    if (isNaN(projectId)) return res.status(400).json({ message: "Invalid project ID" });
+    if (isNaN(projectId)) return res.status(400).json({ message: "ID de proyecto inválido" });
 
     try {
       if (!isOperationsRequest(req)) return res.status(403).json({ message: "Acceso exclusivo de Operaciones" });
@@ -12131,7 +12131,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ entries, warnings });
     } catch (error) {
       console.error("Error fetching profitability time entries:", error);
-      res.status(500).json({ message: "Failed to fetch profitability time entries" });
+      res.status(500).json({ message: "No se pudieron traer las cargas de horas de rentabilidad" });
     }
   });
 
@@ -12140,7 +12140,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Se muestra junto a (no en reemplazo de) la estimación fija de la cotización.
   app.get("/api/tasks/planned-hours/:projectId", requireAuth, async (req, res) => {
     const projectId = parseInt(req.params.projectId);
-    if (isNaN(projectId)) return res.status(400).json({ message: "Invalid project ID" });
+    if (isNaN(projectId)) return res.status(400).json({ message: "ID de proyecto inválido" });
     try {
       if (!(await canAccessTaskProject(req, projectId))) {
         return res.status(403).json({ message: "No tenés acceso a este proyecto" });
@@ -12150,14 +12150,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ plannedHours });
     } catch (error) {
       console.error("Error fetching planned hours from weekly estimates:", error);
-      res.status(500).json({ message: "Failed to fetch planned hours" });
+      res.status(500).json({ message: "No se pudieron traer las horas planificadas" });
     }
   });
 
   // Obtener registros de horas por persona
   app.get("/api/time-entries/personnel/:personnelId", requireAuth, async (req, res) => {
     const personnelId = parseInt(req.params.personnelId);
-    if (isNaN(personnelId)) return res.status(400).json({ message: "Invalid personnel ID" });
+    if (isNaN(personnelId)) return res.status(400).json({ message: "ID de personal inválido" });
 
     try {
       const accessContext = await getTaskAccessContext(req);
@@ -12168,7 +12168,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(entries);
     } catch (error) {
       console.error("Error fetching personnel time entries:", error);
-      res.status(500).json({ message: "Failed to fetch personnel time entries" });
+      res.status(500).json({ message: "No se pudieron traer las cargas de horas del personal" });
     }
   });
 
@@ -12177,11 +12177,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Obtener una entrada de tiempo específica
   app.get("/api/time-entries/:id", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ message: "Invalid time entry ID" });
+    if (isNaN(id)) return res.status(400).json({ message: "ID de carga de horas inválido" });
 
     try {
       const entry = await storage.getTimeEntryById(id);
-      if (!entry) return res.status(404).json({ message: "Time entry not found" });
+      if (!entry) return res.status(404).json({ message: "No se encontró la carga de horas" });
 
       const currentUser = req.user as any;
       const canManageOthers = !!currentUser?.isAdmin || (currentUser?.permissions || []).includes("operations");
@@ -12200,7 +12200,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(entry);
     } catch (error) {
       console.error("Error fetching time entry:", error);
-      res.status(500).json({ message: "Failed to fetch time entry" });
+      res.status(500).json({ message: "No se pudo traer la carga de horas" });
     }
   });
 
@@ -12438,12 +12438,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Actualizar un registro de horas
   app.patch("/api/time-entries/:id", requireAuth, requireProjectUnlocked(projectIdFromTimeEntry), async (req, res) => {
     const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ message: "Invalid time entry ID" });
+    if (isNaN(id)) return res.status(400).json({ message: "ID de carga de horas inválido" });
 
     try {
       const existingEntry = await storage.getTimeEntryById(id);
       if (!existingEntry) {
-        return res.status(404).json({ message: "Time entry not found" });
+        return res.status(404).json({ message: "No se encontró la carga de horas" });
       }
       const currentUser = req.user as any;
       const canManageOthers = !!currentUser?.isAdmin || (currentUser?.permissions || []).includes("operations");
@@ -12510,29 +12510,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updatedEntry = await storage.updateTimeEntry(id, validatedData);
 
       if (!updatedEntry) {
-        return res.status(404).json({ message: "Time entry not found" });
+        return res.status(404).json({ message: "No se encontró la carga de horas" });
       }
 
       await triggerLaborRebuildForDates([existingEntry.date, updatedEntry.date]);
       res.json(updatedEntry);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid time entry data", errors: error.errors });
+        return res.status(400).json({ message: "Datos de carga de horas inválidos", errors: error.errors });
       }
       console.error("Error updating time entry:", error);
-      res.status(500).json({ message: "Failed to update time entry" });
+      res.status(500).json({ message: "No se pudo actualizar la carga de horas" });
     }
   });
 
   // Eliminar un registro de horas
   app.delete("/api/time-entries/:id", requireAuth, requireProjectUnlocked(projectIdFromTimeEntry), async (req, res) => {
     const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ message: "Invalid time entry ID" });
+    if (isNaN(id)) return res.status(400).json({ message: "ID de carga de horas inválido" });
 
     try {
       const entryBeforeDelete = await storage.getTimeEntryById(id);
       if (!entryBeforeDelete) {
-        return res.status(404).json({ message: "Time entry not found" });
+        return res.status(404).json({ message: "No se encontró la carga de horas" });
       }
       const currentUser = req.user as any;
       const canManageOthers = !!currentUser?.isAdmin || (currentUser?.permissions || []).includes("operations");
@@ -12550,14 +12550,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const deleted = await storage.deleteTimeEntry(id);
 
       if (!deleted) {
-        return res.status(404).json({ message: "Time entry not found" });
+        return res.status(404).json({ message: "No se encontró la carga de horas" });
       }
 
       if (entryBeforeDelete?.date) await triggerLaborRebuild(entryBeforeDelete.date);
       res.json({ success: true, message: "Time entry deleted successfully" });
     } catch (error) {
       console.error("Error deleting time entry:", error);
-      res.status(500).json({ message: "Failed to delete time entry" });
+      res.status(500).json({ message: "No se pudo borrar la carga de horas" });
     }
   });
 
@@ -12565,28 +12565,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/time-entries/:id/approve", requireAuth, async (req, res) => {
     if (!isOperationsRequest(req)) return res.status(403).json({ message: "Acceso exclusivo de Operaciones" });
     const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ message: "Invalid time entry ID" });
+    if (isNaN(id)) return res.status(400).json({ message: "ID de carga de horas inválido" });
 
     const { approverId } = req.body;
     if (!approverId || isNaN(parseInt(approverId))) {
-      return res.status(400).json({ message: "Valid approver ID is required" });
+      return res.status(400).json({ message: "Se requiere un ID de aprobador válido" });
     }
 
     try {
       const entry = await storage.getTimeEntryById(id);
       if (!entry) {
-        return res.status(404).json({ message: "Time entry not found" });
+        return res.status(404).json({ message: "No se encontró la carga de horas" });
       }
 
       if (entry.approved) {
-        return res.status(400).json({ message: "Time entry already approved" });
+        return res.status(400).json({ message: "La carga de horas ya está aprobada" });
       }
 
       const updatedEntry = await storage.approveTimeEntry(id, parseInt(approverId));
       res.json(updatedEntry);
     } catch (error) {
       console.error("Error approving time entry:", error);
-      res.status(500).json({ message: "Failed to approve time entry" });
+      res.status(500).json({ message: "No se pudo aprobar la carga de horas" });
     }
   });
 
@@ -12595,30 +12595,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Obtener informes de progreso por proyecto
   app.get("/api/progress-reports/project/:projectId", requireAuth, async (req, res) => {
     const projectId = parseInt(req.params.projectId);
-    if (isNaN(projectId)) return res.status(400).json({ message: "Invalid project ID" });
+    if (isNaN(projectId)) return res.status(400).json({ message: "ID de proyecto inválido" });
 
     try {
       const reports = await storage.getProgressReportsByProject(projectId);
       res.json(reports);
     } catch (error) {
       console.error("Error fetching progress reports:", error);
-      res.status(500).json({ message: "Failed to fetch progress reports" });
+      res.status(500).json({ message: "No se pudieron traer los reportes de avance" });
     }
   });
 
   // Obtener un informe de progreso específico
   app.get("/api/progress-reports/:id", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ message: "Invalid report ID" });
+    if (isNaN(id)) return res.status(400).json({ message: "ID de reporte inválido" });
 
     try {
       const report = await storage.getProgressReport(id);
-      if (!report) return res.status(404).json({ message: "Progress report not found" });
+      if (!report) return res.status(404).json({ message: "No se encontró el reporte de avance" });
 
       res.json(report);
     } catch (error) {
       console.error("Error fetching progress report:", error);
-      res.status(500).json({ message: "Failed to fetch progress report" });
+      res.status(500).json({ message: "No se pudo traer el reporte de avance" });
     }
   });
 
@@ -12630,46 +12630,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Verificar que el proyecto existe
       const project = await storage.getActiveProject(validatedData.projectId);
       if (!project) {
-        return res.status(404).json({ message: "Project not found" });
+        return res.status(404).json({ message: "No se encontró el proyecto" });
       }
 
       // Verificar que la persona existe
       const person = await storage.getPersonnelById(validatedData.createdBy);
       if (!person) {
-        return res.status(404).json({ message: "Creator not found" });
+        return res.status(404).json({ message: "No se encontró el creador" });
       }
 
       const report = await storage.createProgressReport(validatedData);
       res.status(201).json(report);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid report data", errors: error.errors });
+        return res.status(400).json({ message: "Datos de reporte inválidos", errors: error.errors });
       }
       console.error("Error creating progress report:", error);
-      res.status(500).json({ message: "Failed to create progress report" });
+      res.status(500).json({ message: "No se pudo crear el reporte de avance" });
     }
   });
 
   // Actualizar un informe de progreso
   app.patch("/api/progress-reports/:id", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ message: "Invalid report ID" });
+    if (isNaN(id)) return res.status(400).json({ message: "ID de reporte inválido" });
 
     try {
       const validatedData = insertProgressReportSchema.partial().parse(req.body);
       const updatedReport = await storage.updateProgressReport(id, validatedData);
 
       if (!updatedReport) {
-        return res.status(404).json({ message: "Progress report not found" });
+        return res.status(404).json({ message: "No se encontró el reporte de avance" });
       }
 
       res.json(updatedReport);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid report data", errors: error.errors });
+        return res.status(400).json({ message: "Datos de reporte inválidos", errors: error.errors });
       }
       console.error("Error updating progress report:", error);
-      res.status(500).json({ message: "Failed to update progress report" });
+      res.status(500).json({ message: "No se pudo actualizar el reporte de avance" });
     }
   });
 
@@ -12680,7 +12680,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/projects/:id/cost-summary/period", requireAuth, async (req, res) => {
     if (!isOperationsRequest(req)) return res.status(403).json({ message: "Acceso exclusivo de Operaciones" });
     const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ message: "Invalid project ID" });
+    if (isNaN(id)) return res.status(400).json({ message: "ID de proyecto inválido" });
 
     try {
       // Obtener parámetros de fecha (opcionales)
@@ -12702,7 +12702,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const [project] = await db.select().from(activeProjects).where(eq(activeProjects.id, id));
 
       if (!project) {
-        return res.status(404).json({ message: "Project not found" });
+        return res.status(404).json({ message: "No se encontró el proyecto" });
       }
 
       // Si es un proyecto Always-On con subproyectos
@@ -12804,7 +12804,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(filteredSummary);
     } catch (error) {
       console.error("Error fetching filtered cost summary:", error);
-      res.status(500).json({ message: "Failed to fetch filtered cost summary" });
+      res.status(500).json({ message: "No se pudo traer el resumen de costos filtrado" });
     }
   });
 
@@ -12812,14 +12812,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/projects/:id/cost-summary", requireAuth, async (req, res) => {
     if (!isOperationsRequest(req)) return res.status(403).json({ message: "Acceso exclusivo de Operaciones" });
     const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ message: "Invalid project ID" });
+    if (isNaN(id)) return res.status(400).json({ message: "ID de proyecto inválido" });
 
     try {
       const summary = await storage.getProjectCostSummary(id);
       res.json(summary);
     } catch (error) {
       console.error("Error fetching project cost summary:", error);
-      res.status(500).json({ message: "Failed to fetch project cost summary" });
+      res.status(500).json({ message: "No se pudo traer el resumen de costos del proyecto" });
     }
   });
 
@@ -12828,7 +12828,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     const id = parseInt(req.params.id);
     if (isNaN(id)) {
-      return res.status(400).json({ message: "Invalid project ID" });
+      return res.status(400).json({ message: "ID de proyecto inválido" });
     }
 
 
@@ -12836,21 +12836,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { name } = req.body;
 
       if (!name || typeof name !== 'string' || name.trim() === '') {
-        return res.status(400).json({ message: "Project name is required" });
+        return res.status(400).json({ message: "El nombre del proyecto es obligatorio" });
       }
 
       const project = await storage.getActiveProject(id);
       if (!project) {
-        return res.status(404).json({ message: "Project not found" });
+        return res.status(404).json({ message: "No se encontró el proyecto" });
       }
 
       if (!project.quotationId) {
-        return res.status(400).json({ message: "Project has no quotation" });
+        return res.status(400).json({ message: "El proyecto no tiene cotización" });
       }
 
       const quotation = await storage.getQuotation(project.quotationId);
       if (!quotation) {
-        return res.status(404).json({ message: "Quotation not found" });
+        return res.status(404).json({ message: "No se encontró la cotización" });
       }
 
       // Verificar si hay otros proyectos que usan la misma cotización
@@ -12865,7 +12865,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         const createdQuotation = await storage.createQuotation(newQuotation);
         if (!createdQuotation) {
-          return res.status(500).json({ message: "Failed to create quotation copy" });
+          return res.status(500).json({ message: "No se pudo crear la copia de la cotización" });
         }
 
 
@@ -12875,7 +12875,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
 
         if (!updatedProject) {
-          return res.status(500).json({ message: "Failed to update project" });
+          return res.status(500).json({ message: "No se pudo actualizar el proyecto" });
         }
 
 
@@ -12891,7 +12891,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
 
         if (!updatedQuotation) {
-          return res.status(500).json({ message: "Failed to update project name" });
+          return res.status(500).json({ message: "No se pudo actualizar el nombre del proyecto" });
         }
 
 
@@ -12901,7 +12901,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     } catch (error) {
       console.error("Error updating project name:", error);
-      res.status(500).json({ message: "Failed to update project name" });
+      res.status(500).json({ message: "No se pudo actualizar el nombre del proyecto" });
     }
   });
 
@@ -12937,7 +12937,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(costs);
     } catch (error) {
       console.error("Error fetching personnel historical costs:", error);
-      res.status(500).json({ message: "Failed to fetch personnel historical costs" });
+      res.status(500).json({ message: "No se pudieron traer los costos históricos del personal" });
     }
   });
 
@@ -12999,27 +12999,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error creating personnel historical cost:", error);
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+        return res.status(400).json({ message: "Datos inválidos", errors: error.errors });
       }
       if ((error as any)?.code === "23505") {
         return res.status(409).json({
           message: "Ya existe un registro de costo histórico para este personal en el período especificado",
         });
       }
-      res.status(500).json({ message: "Failed to create personnel historical cost" });
+      res.status(500).json({ message: "No se pudo crear el costo histórico del personal" });
     }
   });
 
   // Actualizar costo histórico
   app.patch("/api/personnel-historical-costs/:id", requireAuth, requirePermission("admin"), async (req, res) => {
     const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ message: "Invalid cost ID" });
+    if (isNaN(id)) return res.status(400).json({ message: "ID de costo inválido" });
 
     try {
       const [currentCost] = await db.select()
         .from(personnelHistoricalCosts)
         .where(and(eq(personnelHistoricalCosts.id, id), eq(personnelHistoricalCosts.isActive, true)));
-      if (!currentCost) return res.status(404).json({ message: "Personnel historical cost not found" });
+      if (!currentCost) return res.status(404).json({ message: "No se encontró el costo histórico del personal" });
 
       const [person] = await db.select({ monthlyHours: personnel.monthlyHours, contractType: personnel.contractType })
         .from(personnel)
@@ -13061,28 +13061,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .returning();
 
       if (result.length === 0) {
-        return res.status(404).json({ message: "Personnel historical cost not found" });
+        return res.status(404).json({ message: "No se encontró el costo histórico del personal" });
       }
 
       res.json(result[0]);
     } catch (error) {
       console.error("Error updating personnel historical cost:", error);
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+        return res.status(400).json({ message: "Datos inválidos", errors: error.errors });
       }
       if ((error as any)?.code === "23505") {
         return res.status(409).json({
           message: "Ya existe un registro de costo histórico para este personal en el período especificado",
         });
       }
-      res.status(500).json({ message: "Failed to update personnel historical cost" });
+      res.status(500).json({ message: "No se pudo actualizar el costo histórico del personal" });
     }
   });
 
   // Eliminar costo histórico (soft delete)
   app.delete("/api/personnel-historical-costs/:id", requireAuth, requirePermission("admin"), async (req, res) => {
     const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ message: "Invalid cost ID" });
+    if (isNaN(id)) return res.status(400).json({ message: "ID de costo inválido" });
 
     try {
       const result = await db
@@ -13092,13 +13092,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .returning();
 
       if (result.length === 0) {
-        return res.status(404).json({ message: "Personnel historical cost not found" });
+        return res.status(404).json({ message: "No se encontró el costo histórico del personal" });
       }
 
       res.json({ success: true, message: "Personnel historical cost deleted successfully" });
     } catch (error) {
       console.error("Error deleting personnel historical cost:", error);
-      res.status(500).json({ message: "Failed to delete personnel historical cost" });
+      res.status(500).json({ message: "No se pudo borrar el costo histórico del personal" });
     }
   });
 
@@ -13111,7 +13111,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(options);
     } catch (error) {
       console.error("Error fetching project status options:", error);
-      res.status(500).json({ message: "Failed to fetch project status options" });
+      res.status(500).json({ message: "No se pudieron traer las opciones de estado del proyecto" });
     }
   });
 
@@ -13122,26 +13122,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(options);
     } catch (error) {
       console.error("Error fetching tracking frequency options:", error);
-      res.status(500).json({ message: "Failed to fetch tracking frequency options" });
+      res.status(500).json({ message: "No se pudieron traer las opciones de frecuencia de seguimiento" });
     }
   });
 
   // Admin route para reinicializar la base de datos con los nuevos datos
   app.post("/api/admin/reinit-database", requireAuth, async (req, res) => {
-    if (!req.user?.isAdmin) return res.status(403).json({ message: "Admin access required" });
+    if (!req.user?.isAdmin) return res.status(403).json({ message: "Se requiere acceso de administrador" });
     try {
       await reinitializeDatabase();
       res.json({ message: "Database reinitialized successfully" });
     } catch (error) {
       console.error("Error reinitializing database:", error);
-      res.status(500).json({ message: "Failed to reinitialize database" });
+      res.status(500).json({ message: "No se pudo reinicializar la base de datos" });
     }
   });
 
   // Safe cleanup for local/staging feedback-cycle data. It never runs in
   // production and defaults to a dry-run preview.
   app.post("/api/admin/test-data-reset", requireAuth, async (req, res) => {
-    if (!req.user?.isAdmin) return res.status(403).json({ message: "Admin access required" });
+    if (!req.user?.isAdmin) return res.status(403).json({ message: "Se requiere acceso de administrador" });
     if (process.env.NODE_ENV === "production") {
       return res.status(409).json({ message: "El reset de datos de prueba está bloqueado en producción" });
     }
@@ -14885,7 +14885,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(inflation);
     } catch (error) {
       console.error("Error fetching monthly inflation:", error);
-      res.status(500).json({ message: "Failed to fetch inflation data" });
+      res.status(500).json({ message: "No se pudieron traer los datos de inflación" });
     }
   });
 
@@ -14896,7 +14896,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(inflation);
     } catch (error) {
       console.error("Error fetching inflation data:", error);
-      res.status(500).json({ message: "Failed to fetch inflation data" });
+      res.status(500).json({ message: "No se pudieron traer los datos de inflación" });
     }
   });
 
@@ -14919,7 +14919,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       console.error("Error fetching exchange rate:", error);
-      return res.status(500).json({ message: "Failed to fetch exchange rate" });
+      return res.status(500).json({ message: "No se pudo traer el tipo de cambio" });
     }
   });
 
@@ -14993,7 +14993,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     } catch (error) {
       console.error("Error creating/updating inflation:", error);
-      res.status(500).json({ message: "Failed to save inflation data" });
+      res.status(500).json({ message: "No se pudieron guardar los datos de inflación" });
     }
   });
 
@@ -15016,13 +15016,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .returning();
       
       if (updated.length === 0) {
-        return res.status(404).json({ message: "Inflation data not found" });
+        return res.status(404).json({ message: "No se encontraron los datos de inflación" });
       }
       
       res.json(updated[0]);
     } catch (error) {
       console.error("Error updating inflation:", error);
-      res.status(500).json({ message: "Failed to update inflation data" });
+      res.status(500).json({ message: "No se pudieron actualizar los datos de inflación" });
     }
   });
 
@@ -15036,13 +15036,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .returning();
       
       if (deleted.length === 0) {
-        return res.status(404).json({ message: "Inflation data not found" });
+        return res.status(404).json({ message: "No se encontraron los datos de inflación" });
       }
       
       res.json({ message: "Inflation data deleted successfully" });
     } catch (error) {
       console.error("Error deleting inflation:", error);
-      res.status(500).json({ message: "Failed to delete inflation data" });
+      res.status(500).json({ message: "No se pudieron borrar los datos de inflación" });
     }
   });
 
@@ -15053,7 +15053,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(config);
     } catch (error) {
       console.error("Error fetching system config:", error);
-      res.status(500).json({ message: "Failed to fetch system configuration" });
+      res.status(500).json({ message: "No se pudo traer la configuración del sistema" });
     }
   });
 
@@ -15088,7 +15088,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     } catch (error) {
       console.error("Error creating/updating system config:", error);
-      res.status(500).json({ message: "Failed to save system configuration" });
+      res.status(500).json({ message: "No se pudo guardar la configuración del sistema" });
     }
   });
 
@@ -15134,7 +15134,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(surveys);
     } catch (error) {
       console.error("Error fetching all NPS surveys:", error);
-      res.status(500).json({ message: "Failed to fetch NPS surveys" });
+      res.status(500).json({ message: "No se pudieron traer las encuestas NPS" });
     }
   });
 
@@ -15146,7 +15146,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(newSurvey);
     } catch (error) {
       console.error("Error creating NPS survey:", error);
-      res.status(500).json({ message: "Failed to create NPS survey" });
+      res.status(500).json({ message: "No se pudo crear la encuesta NPS" });
     }
   });
 
@@ -15155,14 +15155,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const clientId = parseInt(req.params.clientId);
       if (isNaN(clientId)) {
-        return res.status(400).json({ message: "Invalid client ID" });
+        return res.status(400).json({ message: "ID de cliente inválido" });
       }
 
       const surveys = await storage.getNpsSurveysByClient(clientId);
       res.json(surveys);
     } catch (error) {
       console.error("Error fetching NPS surveys:", error);
-      res.status(500).json({ message: "Failed to fetch NPS surveys" });
+      res.status(500).json({ message: "No se pudieron traer las encuestas NPS" });
     }
   });
 
@@ -15171,18 +15171,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const surveyId = parseInt(req.params.id);
       if (isNaN(surveyId)) {
-        return res.status(400).json({ message: "Invalid survey ID" });
+        return res.status(400).json({ message: "ID de encuesta inválido" });
       }
 
       const survey = await storage.getNpsSurvey(surveyId);
       if (!survey) {
-        return res.status(404).json({ message: "NPS survey not found" });
+        return res.status(404).json({ message: "No se encontró la encuesta NPS" });
       }
 
       res.json(survey);
     } catch (error) {
       console.error("Error fetching NPS survey:", error);
-      res.status(500).json({ message: "Failed to fetch NPS survey" });
+      res.status(500).json({ message: "No se pudo traer la encuesta NPS" });
     }
   });
 
@@ -15191,20 +15191,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const surveyId = parseInt(req.params.id);
       if (isNaN(surveyId)) {
-        return res.status(400).json({ message: "Invalid survey ID" });
+        return res.status(400).json({ message: "ID de encuesta inválido" });
       }
 
       const updateData = req.body;
       const updatedSurvey = await storage.updateNpsSurvey(surveyId, updateData);
 
       if (!updatedSurvey) {
-        return res.status(404).json({ message: "NPS survey not found" });
+        return res.status(404).json({ message: "No se encontró la encuesta NPS" });
       }
 
       res.json(updatedSurvey);
     } catch (error) {
       console.error("Error updating NPS survey:", error);
-      res.status(500).json({ message: "Failed to update NPS survey" });
+      res.status(500).json({ message: "No se pudo actualizar la encuesta NPS" });
     }
   });
 
@@ -15213,18 +15213,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const surveyId = parseInt(req.params.id);
       if (isNaN(surveyId)) {
-        return res.status(400).json({ message: "Invalid survey ID" });
+        return res.status(400).json({ message: "ID de encuesta inválido" });
       }
 
       const deleted = await storage.deleteNpsSurvey(surveyId);
       if (!deleted) {
-        return res.status(404).json({ message: "NPS survey not found" });
+        return res.status(404).json({ message: "No se encontró la encuesta NPS" });
       }
 
       res.json({ message: "NPS survey deleted successfully" });
     } catch (error) {
       console.error("Error deleting NPS survey:", error);
-      res.status(500).json({ message: "Failed to delete NPS survey" });
+      res.status(500).json({ message: "No se pudo borrar la encuesta NPS" });
     }
   });
 
@@ -15235,14 +15235,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const projectId = parseInt(req.params.projectId);
       if (isNaN(projectId)) {
-        return res.status(400).json({ message: "Invalid project ID" });
+        return res.status(400).json({ message: "ID de proyecto inválido" });
       }
 
       const templates = await storage.getRecurringTemplatesWithTeam(projectId);
       res.json(templates);
     } catch (error) {
       console.error("Error fetching recurring templates:", error);
-      res.status(500).json({ message: "Failed to fetch recurring templates" });
+      res.status(500).json({ message: "No se pudieron traer las plantillas recurrentes" });
     }
   });
 
@@ -15258,7 +15258,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(newTemplate);
     } catch (error) {
       console.error("Error creating recurring template:", error);
-      res.status(500).json({ message: "Failed to create recurring template" });
+      res.status(500).json({ message: "No se pudo crear la plantilla recurrente" });
     }
   });
 
@@ -15267,18 +15267,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const templateId = parseInt(req.params.id);
       if (isNaN(templateId)) {
-        return res.status(400).json({ message: "Invalid template ID" });
+        return res.status(400).json({ message: "ID de plantilla inválido" });
       }
 
       const updatedTemplate = await storage.updateRecurringTemplateWithTeam(templateId, req.body);
       if (!updatedTemplate) {
-        return res.status(404).json({ message: "Template not found" });
+        return res.status(404).json({ message: "No se encontró la plantilla" });
       }
 
       res.json(updatedTemplate);
     } catch (error) {
       console.error("Error updating recurring template:", error);
-      res.status(500).json({ message: "Failed to update recurring template" });
+      res.status(500).json({ message: "No se pudo actualizar la plantilla recurrente" });
     }
   });
 
@@ -15287,18 +15287,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const templateId = parseInt(req.params.id);
       if (isNaN(templateId)) {
-        return res.status(400).json({ message: "Invalid template ID" });
+        return res.status(400).json({ message: "ID de plantilla inválido" });
       }
 
       const deleted = await storage.deleteRecurringTemplateWithTeam(templateId);
       if (!deleted) {
-        return res.status(404).json({ message: "Template not found" });
+        return res.status(404).json({ message: "No se encontró la plantilla" });
       }
 
       res.json({ message: "Template deleted successfully" });
     } catch (error) {
       console.error("Error deleting recurring template:", error);
-      res.status(500).json({ message: "Failed to delete recurring template" });
+      res.status(500).json({ message: "No se pudo borrar la plantilla recurrente" });
     }
   });
 
@@ -15312,7 +15312,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(deliverables);
     } catch (error) {
       console.error("Error fetching deliverables:", error);
-      res.status(500).json({ message: "Failed to fetch deliverables" });
+      res.status(500).json({ message: "No se pudieron traer los entregables" });
     }
   });
 
@@ -15362,17 +15362,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Obtener un entregable por ID
   app.get("/api/deliverables/:id", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ message: "Invalid deliverable ID" });
+    if (isNaN(id)) return res.status(400).json({ message: "ID de entregable inválido" });
 
     try {
       const deliverable = await storage.getDeliverable(id);
       if (!deliverable) {
-        return res.status(404).json({ message: "Deliverable not found" });
+        return res.status(404).json({ message: "No se encontró el entregable" });
       }
       res.json(deliverable);
     } catch (error) {
       console.error("Error fetching deliverable:", error);
-      res.status(500).json({ message: "Failed to fetch deliverable" });
+      res.status(500).json({ message: "No se pudo traer el entregable" });
     }
   });
 
@@ -15387,17 +15387,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(deliverable);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid deliverable data", errors: error.errors });
+        return res.status(400).json({ message: "Datos de entregable inválidos", errors: error.errors });
       }
       console.error("Error creating deliverable:", error);
-      res.status(500).json({ message: "Failed to create deliverable" });
+      res.status(500).json({ message: "No se pudo crear el entregable" });
     }
   });
 
   // Actualizar un entregable
   app.patch("/api/deliverables/:id", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ message: "Invalid deliverable ID" });
+    if (isNaN(id)) return res.status(400).json({ message: "ID de entregable inválido" });
 
     try {
 
@@ -15405,20 +15405,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updatedDeliverable = await storage.updateDeliverable(id, req.body);
 
       if (!updatedDeliverable) {
-        return res.status(404).json({ message: "Deliverable not found" });
+        return res.status(404).json({ message: "No se encontró el entregable" });
       }
 
       res.json(updatedDeliverable);
     } catch (error) {
       console.error("Error updating deliverable:", error);
-      res.status(500).json({ message: "Failed to update deliverable", error: String(error) });
+      res.status(500).json({ message: "No se pudo actualizar el entregable", error: String(error) });
     }
   });
 
   // Actualizar los indicadores de robustez de un entregable (ruta simplificada)
   app.post("/api/deliverables/:id/indicators", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ message: "Invalid deliverable ID" });
+    if (isNaN(id)) return res.status(400).json({ message: "ID de entregable inválido" });
 
     try {
 
@@ -15461,44 +15461,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updatedDeliverable = rows[0];
 
       if (!updatedDeliverable) {
-        return res.status(404).json({ message: "Deliverable not found" });
+        return res.status(404).json({ message: "No se encontró el entregable" });
       }
 
       res.json(updatedDeliverable);
     } catch (error) {
       console.error("Error updating deliverable indicators:", error);
-      res.status(500).json({ message: "Failed to update deliverable indicators", error: String(error) });
+      res.status(500).json({ message: "No se pudieron actualizar los indicadores del entregable", error: String(error) });
     }
   });
 
   // Eliminar un entregable
   app.delete("/api/deliverables/:id", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ message: "Invalid deliverable ID" });
+    if (isNaN(id)) return res.status(400).json({ message: "ID de entregable inválido" });
 
     try {
       const success = await storage.deleteDeliverable(id);
       if (!success) {
-        return res.status(404).json({ message: "Deliverable not found" });
+        return res.status(404).json({ message: "No se encontró el entregable" });
       }
       res.status(204).send();
     } catch (error) {
       console.error("Error deleting deliverable:", error);
-      res.status(500).json({ message: "Failed to delete deliverable" });
+      res.status(500).json({ message: "No se pudo borrar el entregable" });
     }
   });
 
   // Obtener comentarios MODO por cliente
   app.get("/api/modo-comments/client/:clientId", requireAuth, async (req, res) => {
     const clientId = parseInt(req.params.clientId);
-    if (isNaN(clientId)) return res.status(400).json({ message: "Invalid client ID" });
+    if (isNaN(clientId)) return res.status(400).json({ message: "ID de cliente inválido" });
 
     try {
       const comments = await storage.getClientModoComments(clientId);
       res.json(comments);
     } catch (error) {
       console.error("Error fetching MODO comments:", error);
-      res.status(500).json({ message: "Failed to fetch MODO comments" });
+      res.status(500).json({ message: "No se pudieron traer los comentarios MODO" });
     }
   });
 
@@ -15512,35 +15512,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const year = req.query.year ? parseInt(req.query.year as string) : null;
 
     if (!clientId || !quarter || !year || isNaN(clientId) || isNaN(quarter) || isNaN(year)) {
-      return res.status(400).json({ message: "Missing or invalid parameters. Required: clientId, quarter, year" });
+      return res.status(400).json({ message: "Faltan parámetros o son inválidos. Se requieren: clientId, quarter, year" });
     }
 
     try {
       const comment = await storage.getClientModoCommentByQuarter(clientId, quarter, year);
       if (!comment) {
-        return res.status(404).json({ message: "MODO comment not found for the specified quarter" });
+        return res.status(404).json({ message: "No se encontró el comentario MODO para el trimestre indicado" });
       }
       res.json(comment);
     } catch (error) {
       console.error("Error fetching MODO comment by quarter:", error);
-      res.status(500).json({ message: "Failed to fetch MODO comment" });
+      res.status(500).json({ message: "No se pudo traer el comentario MODO" });
     }
   });
 
   // Obtener un comentario MODO por ID
   app.get("/api/modo-comments/:id", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ message: "Invalid comment ID" });
+    if (isNaN(id)) return res.status(400).json({ message: "ID de comentario inválido" });
 
     try {
       const comment = await storage.getClientModoComment(id, 1, 2024);
       if (!comment) {
-        return res.status(404).json({ message: "MODO comment not found" });
+        return res.status(404).json({ message: "No se encontró el comentario MODO" });
       }
       res.json(comment);
     } catch (error) {
       console.error("Error fetching MODO comment:", error);
-      res.status(500).json({ message: "Failed to fetch MODO comment" });
+      res.status(500).json({ message: "No se pudo traer el comentario MODO" });
     }
   });
 
@@ -15552,64 +15552,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(comment);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid MODO comment data", errors: error.errors });
+        return res.status(400).json({ message: "Datos de comentario MODO inválidos", errors: error.errors });
       }
       console.error("Error creating MODO comment:", error);
-      res.status(500).json({ message: "Failed to create MODO comment" });
+      res.status(500).json({ message: "No se pudo crear el comentario MODO" });
     }
   });
 
   // Actualizar un comentario MODO
   app.patch("/api/modo-comments/:id", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ message: "Invalid comment ID" });
+    if (isNaN(id)) return res.status(400).json({ message: "ID de comentario inválido" });
 
     try {
       const validatedData = insertClientModoCommentSchema.partial().parse(req.body);
       const updatedComment = await storage.updateClientModoComment(id, validatedData);
 
       if (!updatedComment) {
-        return res.status(404).json({ message: "MODO comment not found" });
+        return res.status(404).json({ message: "No se encontró el comentario MODO" });
       }
 
       res.json(updatedComment);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid MODO comment data", errors: error.errors });
+        return res.status(400).json({ message: "Datos de comentario MODO inválidos", errors: error.errors });
       }
       console.error("Error updating MODO comment:", error);
-      res.status(500).json({ message: "Failed to update MODO comment" });
+      res.status(500).json({ message: "No se pudo actualizar el comentario MODO" });
     }
   });
 
   // Eliminar un comentario MODO
   app.delete("/api/modo-comments/:id", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ message: "Invalid comment ID" });
+    if (isNaN(id)) return res.status(400).json({ message: "ID de comentario inválido" });
 
     try {
       const success = await storage.deleteClientModoComment(id);
       if (!success) {
-        return res.status(404).json({ message: "MODO comment not found" });
+        return res.status(404).json({ message: "No se encontró el comentario MODO" });
       }
       res.status(204).send();
     } catch (error) {
       console.error("Error deleting MODO comment:", error);
-      res.status(500).json({ message: "Failed to delete MODO comment" });
+      res.status(500).json({ message: "No se pudo borrar el comentario MODO" });
     }
   });
 
   // Obtener resumen MODO por cliente
   app.get("/api/modo-summary/client/:clientId", requireAuth, async (req, res) => {
     const clientId = parseInt(req.params.clientId);
-    if (isNaN(clientId)) return res.status(400).json({ message: "Invalid client ID" });
+    if (isNaN(clientId)) return res.status(400).json({ message: "ID de cliente inválido" });
 
     try {
       const summary = await storage.getClientModoSummary(clientId);
       res.json(summary);
     } catch (error) {
       console.error("Error fetching MODO summary:", error);
-      res.status(500).json({ message: "Failed to fetch MODO summary" });
+      res.status(500).json({ message: "No se pudo traer el resumen MODO" });
     }
   });
 
@@ -15930,14 +15930,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const parentProjectId = parseInt(req.params.parentProjectId);
       if (isNaN(parentProjectId)) {
-        return res.status(400).json({ message: "Invalid parent project ID" });
+        return res.status(400).json({ message: "ID de proyecto padre inválido" });
       }
 
       const cycles = await storage.getProjectCycles(parentProjectId);
       res.json(cycles);
     } catch (error) {
       console.error("Error fetching project cycles:", error);
-      res.status(500).json({ message: "Failed to fetch project cycles" });
+      res.status(500).json({ message: "No se pudieron traer los ciclos del proyecto" });
     }
   });
 
@@ -15949,10 +15949,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(cycle);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid cycle data", errors: error.errors });
+        return res.status(400).json({ message: "Datos de ciclo inválidos", errors: error.errors });
       }
       console.error("Error creating project cycle:", error);
-      res.status(500).json({ message: "Failed to create project cycle" });
+      res.status(500).json({ message: "No se pudo crear el ciclo del proyecto" });
     }
   });
 
@@ -15961,18 +15961,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const cycleId = parseInt(req.params.id);
       if (isNaN(cycleId)) {
-        return res.status(400).json({ message: "Invalid cycle ID" });
+        return res.status(400).json({ message: "ID de ciclo inválido" });
       }
 
       const completedCycle = await storage.completeProjectCycle(cycleId);
       if (!completedCycle) {
-        return res.status(404).json({ message: "Cycle not found" });
+        return res.status(404).json({ message: "No se encontró el ciclo" });
       }
 
       res.json(completedCycle);
     } catch (error) {
       console.error("Error completing project cycle:", error);
-      res.status(500).json({ message: "Failed to complete project cycle" });
+      res.status(500).json({ message: "No se pudo cerrar el ciclo del proyecto" });
     }
   });
 
@@ -15983,7 +15983,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const parentProjectId = parseInt(req.params.parentProjectId);
       if (isNaN(parentProjectId)) {
-        return res.status(400).json({ message: "Invalid parent project ID" });
+        return res.status(400).json({ message: "ID de proyecto padre inválido" });
       }
 
       const { templateId, periodStart, periodEnd } = req.body;
@@ -15998,7 +15998,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(generatedProjects);
     } catch (error) {
       console.error("Error auto-generating subprojects:", error);
-      res.status(500).json({ message: "Failed to auto-generate subprojects" });
+      res.status(500).json({ message: "No se pudieron generar automáticamente los subproyectos" });
     }
   });
 
@@ -16013,7 +16013,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       console.error("Error checking pending cycles:", error);
-      res.status(500).json({ message: "Failed to check pending cycles" });
+      res.status(500).json({ message: "No se pudieron revisar los ciclos pendientes" });
     }
   });
 
@@ -16024,7 +16024,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const projectId = parseInt(req.params.id);
       if (isNaN(projectId)) {
-        return res.status(400).json({ message: "Invalid project ID" });
+        return res.status(400).json({ message: "ID de proyecto inválido" });
       }
 
       let baseTeam = await storage.getProjectBaseTeam(projectId);
@@ -16113,7 +16113,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(enrichedTeam);
     } catch (error) {
       console.error("Error fetching project base team:", error);
-      res.status(500).json({ message: "Failed to fetch project base team" });
+      res.status(500).json({ message: "No se pudo traer el equipo base del proyecto" });
     }
   });
 
@@ -16122,17 +16122,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const projectId = parseInt(req.params.id);
       if (isNaN(projectId)) {
-        return res.status(400).json({ message: "Invalid project ID" });
+        return res.status(400).json({ message: "ID de proyecto inválido" });
       }
 
       // Obtener la cotización del proyecto
       const [project] = await db.select().from(activeProjects).where(eq(activeProjects.id, projectId));
       if (!project) {
-        return res.status(404).json({ message: "Project not found" });
+        return res.status(404).json({ message: "No se encontró el proyecto" });
       }
 
       if (!project.quotationId) {
-        return res.status(400).json({ message: "Project has no quotation" });
+        return res.status(400).json({ message: "El proyecto no tiene cotización" });
       }
 
       // Verificar si ya existe equipo base
@@ -16153,7 +16153,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       console.error("Error copying quotation team to project:", error);
-      res.status(500).json({ message: "Failed to copy quotation team" });
+      res.status(500).json({ message: "No se pudo copiar el equipo de la cotización" });
     }
   });
 
@@ -16162,7 +16162,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const projectId = parseInt(req.params.id);
       if (isNaN(projectId)) {
-        return res.status(400).json({ message: "Invalid project ID" });
+        return res.status(400).json({ message: "ID de proyecto inválido" });
       }
 
       const teamData = insertProjectBaseTeamSchema.parse({
@@ -16174,7 +16174,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(member);
     } catch (error) {
       console.error("Error creating base team member:", error);
-      res.status(500).json({ message: "Failed to create base team member" });
+      res.status(500).json({ message: "No se pudo crear el integrante del equipo base" });
     }
   });
 
@@ -16183,20 +16183,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
-        return res.status(400).json({ message: "Invalid team member ID" });
+        return res.status(400).json({ message: "ID de integrante del equipo inválido" });
       }
 
       const updateData = req.body;
       const member = await storage.updateProjectBaseTeam(id, updateData);
       
       if (!member) {
-        return res.status(404).json({ message: "Team member not found" });
+        return res.status(404).json({ message: "No se encontró el integrante del equipo" });
       }
 
       res.json(member);
     } catch (error) {
       console.error("Error updating base team member:", error);
-      res.status(500).json({ message: "Failed to update base team member" });
+      res.status(500).json({ message: "No se pudo actualizar el integrante del equipo base" });
     }
   });
 
@@ -16205,14 +16205,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
-        return res.status(400).json({ message: "Invalid team member ID" });
+        return res.status(400).json({ message: "ID de integrante del equipo inválido" });
       }
 
       const success = await storage.deleteProjectBaseTeam(id);
       res.json({ success });
     } catch (error) {
       console.error("Error deleting base team member:", error);
-      res.status(500).json({ message: "Failed to delete base team member" });
+      res.status(500).json({ message: "No se pudo borrar el integrante del equipo base" });
     }
   });
 
@@ -16223,14 +16223,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const projectId = parseInt(req.params.id);
       if (isNaN(projectId)) {
-        return res.status(400).json({ message: "Invalid project ID" });
+        return res.status(400).json({ message: "ID de proyecto inválido" });
       }
 
       const entries = await storage.getQuickTimeEntries(projectId);
       res.json(entries);
     } catch (error) {
       console.error("Error fetching quick time entries:", error);
-      res.status(500).json({ message: "Failed to fetch quick time entries" });
+      res.status(500).json({ message: "No se pudieron traer las cargas rápidas de horas" });
     }
   });
 
@@ -16239,7 +16239,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const projectId = parseInt(req.params.id);
       if (isNaN(projectId)) {
-        return res.status(400).json({ message: "Invalid project ID" });
+        return res.status(400).json({ message: "ID de proyecto inválido" });
       }
       if (!(await canAccessTaskProject(req, projectId))) {
         return res.status(403).json({ message: "No tenés acceso a este proyecto" });
@@ -16255,7 +16255,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(entry);
     } catch (error) {
       console.error("Error creating quick time entry:", error);
-      res.status(500).json({ message: "Failed to create quick time entry" });
+      res.status(500).json({ message: "No se pudo crear la carga rápida de horas" });
     }
   });
 
@@ -16264,7 +16264,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
-        return res.status(400).json({ message: "Invalid entry ID" });
+        return res.status(400).json({ message: "ID de carga inválido" });
       }
 
       const details = await storage.getQuickTimeEntryDetails(id);
@@ -16286,7 +16286,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(enrichedDetails);
     } catch (error) {
       console.error("Error fetching quick time entry details:", error);
-      res.status(500).json({ message: "Failed to fetch quick time entry details" });
+      res.status(500).json({ message: "No se pudieron traer los detalles de la carga rápida de horas" });
     }
   });
 
@@ -16295,12 +16295,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const quickTimeEntryId = parseInt(req.params.id);
       if (isNaN(quickTimeEntryId)) {
-        return res.status(400).json({ message: "Invalid entry ID" });
+        return res.status(400).json({ message: "ID de carga inválido" });
       }
 
       const [quickEntry] = await db.select().from(quickTimeEntries)
         .where(eq(quickTimeEntries.id, quickTimeEntryId)).limit(1);
-      if (!quickEntry) return res.status(404).json({ message: "Quick time entry not found" });
+      if (!quickEntry) return res.status(404).json({ message: "No se encontró la carga rápida de horas" });
       if (quickEntry.status !== "draft") {
         return res.status(409).json({ message: "El período ya fue enviado y no admite cambios" });
       }
@@ -16342,7 +16342,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(detail);
     } catch (error) {
       console.error("Error creating quick time entry detail:", error);
-      res.status(500).json({ message: "Failed to create quick time entry detail" });
+      res.status(500).json({ message: "No se pudo crear el detalle de la carga rápida de horas" });
     }
   });
 
@@ -16351,20 +16351,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
-        return res.status(400).json({ message: "Invalid detail ID" });
+        return res.status(400).json({ message: "ID de detalle inválido" });
       }
 
       const updateData = req.body;
       const detail = await storage.updateQuickTimeEntryDetail(id, updateData);
       
       if (!detail) {
-        return res.status(404).json({ message: "Detail not found" });
+        return res.status(404).json({ message: "No se encontró el detalle" });
       }
 
       res.json(detail);
     } catch (error) {
       console.error("Error updating quick time entry detail:", error);
-      res.status(500).json({ message: "Failed to update quick time entry detail" });
+      res.status(500).json({ message: "No se pudo actualizar el detalle de la carga rápida de horas" });
     }
   });
 
@@ -16373,14 +16373,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
-        return res.status(400).json({ message: "Invalid detail ID" });
+        return res.status(400).json({ message: "ID de detalle inválido" });
       }
 
       const success = await storage.deleteQuickTimeEntryDetail(id);
       res.json({ success });
     } catch (error) {
       console.error("Error deleting quick time entry detail:", error);
-      res.status(500).json({ message: "Failed to delete quick time entry detail" });
+      res.status(500).json({ message: "No se pudo borrar el detalle de la carga rápida de horas" });
     }
   });
 
@@ -16389,14 +16389,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
-        return res.status(400).json({ message: "Invalid entry ID" });
+        return res.status(400).json({ message: "ID de carga inválido" });
       }
 
       const entry = await storage.submitQuickTimeEntry(id);
       res.json(entry);
     } catch (error) {
       console.error("Error submitting quick time entry:", error);
-      res.status(500).json({ message: "Failed to submit quick time entry" });
+      res.status(500).json({ message: "No se pudo enviar la carga rápida de horas" });
     }
   });
 
@@ -16405,11 +16405,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
-        return res.status(400).json({ message: "Invalid entry ID" });
+        return res.status(400).json({ message: "ID de carga inválido" });
       }
 
       const [qte] = await db.select().from(quickTimeEntries).where(eq(quickTimeEntries.id, id)).limit(1);
-      if (!qte) return res.status(404).json({ message: "Quick time entry not found" });
+      if (!qte) return res.status(404).json({ message: "No se encontró la carga rápida de horas" });
 
       const entry = await storage.approveQuickTimeEntry(id, req.user?.id || 1);
 
@@ -16440,7 +16440,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await triggerLaborRebuild(entryDate);
     } catch (error) {
       console.error("Error approving quick time entry:", error);
-      res.status(500).json({ message: "Failed to approve quick time entry" });
+      res.status(500).json({ message: "No se pudo aprobar la carga rápida de horas" });
     }
   });
 
@@ -16451,14 +16451,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const projectId = parseInt(req.params.id);
       if (isNaN(projectId)) {
-        return res.status(400).json({ message: "Invalid project ID" });
+        return res.status(400).json({ message: "ID de proyecto inválido" });
       }
 
       const adjustments = await storage.getMonthlyHourAdjustments(projectId);
       res.json(adjustments);
     } catch (error) {
       console.error("Error fetching monthly hour adjustments:", error);
-      res.status(500).json({ message: "Failed to fetch monthly hour adjustments" });
+      res.status(500).json({ message: "No se pudieron traer los ajustes mensuales de horas" });
     }
   });
 
@@ -16467,7 +16467,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const projectId = parseInt(req.params.id);
       if (isNaN(projectId)) {
-        return res.status(400).json({ message: "Invalid project ID" });
+        return res.status(400).json({ message: "ID de proyecto inválido" });
       }
 
       const adjustmentData = insertMonthlyHourAdjustmentSchema.parse({
@@ -16481,9 +16481,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error creating monthly hour adjustment:", error);
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+        return res.status(400).json({ message: "Datos inválidos", errors: error.errors });
       }
-      res.status(500).json({ message: "Failed to create monthly hour adjustment" });
+      res.status(500).json({ message: "No se pudo crear el ajuste mensual de horas" });
     }
   });
 
@@ -16496,18 +16496,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const month = parseInt(req.params.month);
 
       if (isNaN(projectId) || isNaN(personnelId) || isNaN(year) || isNaN(month)) {
-        return res.status(400).json({ message: "Invalid parameters" });
+        return res.status(400).json({ message: "Parámetros inválidos" });
       }
 
       const adjustment = await storage.getMonthlyHourAdjustment(projectId, personnelId, year, month);
       if (!adjustment) {
-        return res.status(404).json({ message: "Adjustment not found" });
+        return res.status(404).json({ message: "No se encontró el ajuste" });
       }
 
       res.json(adjustment);
     } catch (error) {
       console.error("Error fetching monthly hour adjustment:", error);
-      res.status(500).json({ message: "Failed to fetch monthly hour adjustment" });
+      res.status(500).json({ message: "No se pudo traer el ajuste mensual de horas" });
     }
   });
 
@@ -16516,23 +16516,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
-        return res.status(400).json({ message: "Invalid adjustment ID" });
+        return res.status(400).json({ message: "ID de ajuste inválido" });
       }
 
       const updateData = insertMonthlyHourAdjustmentSchema.partial().parse(req.body);
       const adjustment = await storage.updateMonthlyHourAdjustment(id, updateData);
       
       if (!adjustment) {
-        return res.status(404).json({ message: "Adjustment not found" });
+        return res.status(404).json({ message: "No se encontró el ajuste" });
       }
 
       res.json(adjustment);
     } catch (error) {
       console.error("Error updating monthly hour adjustment:", error);
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+        return res.status(400).json({ message: "Datos inválidos", errors: error.errors });
       }
-      res.status(500).json({ message: "Failed to update monthly hour adjustment" });
+      res.status(500).json({ message: "No se pudo actualizar el ajuste mensual de horas" });
     }
   });
 
@@ -16541,18 +16541,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
-        return res.status(400).json({ message: "Invalid adjustment ID" });
+        return res.status(400).json({ message: "ID de ajuste inválido" });
       }
 
       const success = await storage.deleteMonthlyHourAdjustment(id);
       if (!success) {
-        return res.status(404).json({ message: "Adjustment not found" });
+        return res.status(404).json({ message: "No se encontró el ajuste" });
       }
 
       res.status(204).send();
     } catch (error) {
       console.error("Error deleting monthly hour adjustment:", error);
-      res.status(500).json({ message: "Failed to delete monthly hour adjustment" });
+      res.status(500).json({ message: "No se pudo borrar el ajuste mensual de horas" });
     }
   });
 
@@ -16563,14 +16563,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const projectId = parseInt(req.params.id);
       if (isNaN(projectId)) {
-        return res.status(400).json({ message: "Invalid project ID" });
+        return res.status(400).json({ message: "ID de proyecto inválido" });
       }
 
       const adjustments = await storage.getProjectPriceAdjustments(projectId);
       res.json(adjustments);
     } catch (error) {
       console.error("Error fetching project price adjustments:", error);
-      res.status(500).json({ message: "Failed to fetch project price adjustments" });
+      res.status(500).json({ message: "No se pudieron traer los ajustes de precio del proyecto" });
     }
   });
 
@@ -16579,7 +16579,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const projectId = parseInt(req.params.id);
       if (isNaN(projectId)) {
-        return res.status(400).json({ message: "Invalid project ID" });
+        return res.status(400).json({ message: "ID de proyecto inválido" });
       }
 
       const adjustmentData = insertProjectPriceAdjustmentSchema.parse({
@@ -16593,9 +16593,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error creating project price adjustment:", error);
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+        return res.status(400).json({ message: "Datos inválidos", errors: error.errors });
       }
-      res.status(500).json({ message: "Failed to create project price adjustment" });
+      res.status(500).json({ message: "No se pudo crear el ajuste de precio del proyecto" });
     }
   });
 
@@ -16604,18 +16604,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
-        return res.status(400).json({ message: "Invalid adjustment ID" });
+        return res.status(400).json({ message: "ID de ajuste inválido" });
       }
 
       const adjustment = await storage.getProjectPriceAdjustment(id);
       if (!adjustment) {
-        return res.status(404).json({ message: "Price adjustment not found" });
+        return res.status(404).json({ message: "No se encontró el ajuste de precio" });
       }
 
       res.json(adjustment);
     } catch (error) {
       console.error("Error fetching project price adjustment:", error);
-      res.status(500).json({ message: "Failed to fetch project price adjustment" });
+      res.status(500).json({ message: "No se pudo traer el ajuste de precio del proyecto" });
     }
   });
 
@@ -16624,23 +16624,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
-        return res.status(400).json({ message: "Invalid adjustment ID" });
+        return res.status(400).json({ message: "ID de ajuste inválido" });
       }
 
       const updateData = insertProjectPriceAdjustmentSchema.partial().parse(req.body);
       const adjustment = await storage.updateProjectPriceAdjustment(id, updateData);
       
       if (!adjustment) {
-        return res.status(404).json({ message: "Price adjustment not found" });
+        return res.status(404).json({ message: "No se encontró el ajuste de precio" });
       }
 
       res.json(adjustment);
     } catch (error) {
       console.error("Error updating project price adjustment:", error);
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+        return res.status(400).json({ message: "Datos inválidos", errors: error.errors });
       }
-      res.status(500).json({ message: "Failed to update project price adjustment" });
+      res.status(500).json({ message: "No se pudo actualizar el ajuste de precio del proyecto" });
     }
   });
 
@@ -16649,18 +16649,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
-        return res.status(400).json({ message: "Invalid adjustment ID" });
+        return res.status(400).json({ message: "ID de ajuste inválido" });
       }
 
       const success = await storage.deleteProjectPriceAdjustment(id);
       if (!success) {
-        return res.status(404).json({ message: "Price adjustment not found" });
+        return res.status(404).json({ message: "No se encontró el ajuste de precio" });
       }
 
       res.status(204).send();
     } catch (error) {
       console.error("Error deleting project price adjustment:", error);
-      res.status(500).json({ message: "Failed to delete project price adjustment" });
+      res.status(500).json({ message: "No se pudo borrar el ajuste de precio del proyecto" });
     }
   });
 
@@ -16669,14 +16669,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const projectId = parseInt(req.params.id);
       if (isNaN(projectId)) {
-        return res.status(400).json({ message: "Invalid project ID" });
+        return res.status(400).json({ message: "ID de proyecto inválido" });
       }
 
       const currentPrice = await storage.getCurrentProjectPrice(projectId);
       res.json({ currentPrice });
     } catch (error) {
       console.error("Error fetching current project price:", error);
-      res.status(500).json({ message: "Failed to fetch current project price" });
+      res.status(500).json({ message: "No se pudo traer el precio actual del proyecto" });
     }
   });
 
@@ -16733,15 +16733,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const currency = req.params.currency;
       
       if (isNaN(id)) {
-        return res.status(400).json({ message: "Invalid quotation ID" });
+        return res.status(400).json({ message: "ID de cotización inválido" });
       }
       if (currency !== "ARS" && currency !== "USD") {
-        return res.status(400).json({ message: "Currency must be ARS or USD" });
+        return res.status(400).json({ message: "La moneda debe ser ARS o USD" });
       }
 
       const quotation = await storage.getQuotation(id);
       if (!quotation) {
-        return res.status(404).json({ message: "Quotation not found" });
+        return res.status(404).json({ message: "No se encontró la cotización" });
       }
 
       const snapshotRate = Number(quotation.exchangeRateAtQuote) || await getCurrentExchangeRate();
@@ -16765,7 +16765,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(convertedQuotation);
     } catch (error) {
       console.error("Error fetching quotation with currency conversion:", error);
-      res.status(500).json({ message: "Failed to fetch quotation" });
+      res.status(500).json({ message: "No se pudo traer la cotización" });
     }
   });
 
@@ -16775,7 +16775,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { rate } = req.body;
       
       if (!rate || rate <= 0) {
-        return res.status(400).json({ message: "Invalid exchange rate" });
+        return res.status(400).json({ message: "Tipo de cambio inválido" });
       }
 
       await db.insert(exchangeRateHistory).values({
@@ -16787,7 +16787,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ message: "Exchange rate snapshot saved", rate });
     } catch (error) {
       console.error("Error saving exchange rate snapshot:", error);
-      res.status(500).json({ message: "Failed to save exchange rate snapshot" });
+      res.status(500).json({ message: "No se pudo guardar la foto del tipo de cambio" });
     }
   });
 
@@ -16798,17 +16798,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     /*try {
       const projectId = parseInt(req.params.id);
       if (isNaN(projectId)) {
-        return res.status(400).json({ message: "Invalid project ID" });
+        return res.status(400).json({ message: "ID de proyecto inválido" });
       }
 
       const project = await storage.getActiveProject(projectId);
       if (!project) {
-        return res.status(404).json({ message: "Project not found" });
+        return res.status(404).json({ message: "No se encontró el proyecto" });
       }
 
       const quotation = await storage.getQuotation(project.quotationId);
       if (!quotation) {
-        return res.status(404).json({ message: "Quotation not found" });
+        return res.status(404).json({ message: "No se encontró la cotización" });
       }
 
       // Obtener entradas de tiempo del proyecto
@@ -16906,7 +16906,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(analysis);
     } catch (error) {
       console.error("Error in deviation analysis:", error);
-      res.status(500).json({ message: "Failed to analyze project deviations" });
+      res.status(500).json({ message: "No se pudieron analizar los desvíos del proyecto" });
     }
   });*/
 
@@ -16915,12 +16915,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const projectId = parseInt(req.params.id);
       if (isNaN(projectId)) {
-        return res.status(400).json({ message: "Invalid project ID" });
+        return res.status(400).json({ message: "ID de proyecto inválido" });
       }
 
       const project = await storage.getActiveProject(projectId);
       if (!project) {
-        return res.status(404).json({ message: "Project not found" });
+        return res.status(404).json({ message: "No se encontró el proyecto" });
       }
 
       // Handle temporal filter
@@ -17077,7 +17077,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       console.error("Error generating recommendations:", error);
-      res.status(500).json({ message: "Failed to generate recommendations" });
+      res.status(500).json({ message: "No se pudieron generar las recomendaciones" });
     }
   });*/
 
@@ -17088,7 +17088,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const period = req.query.period as string; // YYYY-MM format
       
       if (isNaN(projectId)) {
-        return res.status(400).json({ message: "Invalid project ID" });
+        return res.status(400).json({ message: "ID de proyecto inválido" });
       }
 
       // 🎯 INTENTAR FACT_LABOR_MONTH (Star Schema SoT) primero
@@ -17285,7 +17285,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     } catch (error) {
       console.error("Error in time-tracking endpoint:", error);
-      res.status(500).json({ message: "Failed to load time tracking data" });
+      res.status(500).json({ message: "No se pudieron cargar los datos de registro de horas" });
     }
   });
 
@@ -17297,12 +17297,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { startDate, endDate } = req.query;
       
       if (isNaN(projectId)) {
-        return res.status(400).json({ message: "Invalid project ID" });
+        return res.status(400).json({ message: "ID de proyecto inválido" });
       }
 
       const project = await storage.getActiveProject(projectId);
       if (!project) {
-        return res.status(404).json({ message: "Project not found" });
+        return res.status(404).json({ message: "No se encontró el proyecto" });
       }
 
       // ⚠️ Star Schema solo tiene granularidad mensual, deprecar 'weekly'
@@ -17422,7 +17422,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       console.error("Error generating trend data:", error);
-      res.status(500).json({ message: "Failed to generate trend data" });
+      res.status(500).json({ message: "No se pudieron generar los datos de tendencia" });
     }
   });
 
@@ -17565,7 +17565,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`🔍 PARAMS: timeFilter=${timeFilter}, basis=${basis}`);
       
       if (isNaN(projectId)) {
-        return res.status(400).json({ message: "Invalid project ID" });
+        return res.status(400).json({ message: "ID de proyecto inválido" });
       }
 
       // 🎯 USAR MOTOR ÚNICO - garantiza consistencia total con Dashboard y Performance  
@@ -17606,7 +17606,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     } catch (error) {
       console.error("❌ Universal deviation analysis error:", error);
-      res.status(500).json({ message: "Failed to generate deviation analysis" });
+      res.status(500).json({ message: "No se pudo generar el análisis de desvíos" });
     }
   });*/
   // DUPLICATE: recommendations-dup1 deleted (periodKey/basis ReferenceError — dead code)
@@ -17621,7 +17621,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const project = await storage.getActiveProject(projectId);
       if (!project) {
-        return res.status(404).json({ message: "Project not found" });
+        return res.status(404).json({ message: "No se encontró el proyecto" });
       }
 
       const quotation = project.quotationId ? await storage.getQuotation(project.quotationId) : null;
@@ -18030,7 +18030,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       console.error("Error generating recommendations:", error);
-      res.status(500).json({ message: "Failed to generate recommendations" });
+      res.status(500).json({ message: "No se pudieron generar las recomendaciones" });
     }
   });
 
@@ -18043,7 +18043,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(categories);
     } catch (error) {
       console.error("Error fetching indirect cost categories:", error);
-      res.status(500).json({ message: "Failed to fetch indirect cost categories" });
+      res.status(500).json({ message: "No se pudieron traer las categorías de costo indirecto" });
     }
   });
 
@@ -18051,18 +18051,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
-        return res.status(400).json({ message: "Invalid category ID" });
+        return res.status(400).json({ message: "ID de categoría inválido" });
       }
 
       const category = await storage.getIndirectCostCategory(id);
       if (!category) {
-        return res.status(404).json({ message: "Category not found" });
+        return res.status(404).json({ message: "No se encontró la categoría" });
       }
 
       res.json(category);
     } catch (error) {
       console.error("Error fetching indirect cost category:", error);
-      res.status(500).json({ message: "Failed to fetch indirect cost category" });
+      res.status(500).json({ message: "No se pudo traer la categoría de costo indirecto" });
     }
   });
 
@@ -18073,10 +18073,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(category);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+        return res.status(400).json({ message: "Datos inválidos", errors: error.errors });
       }
       console.error("Error creating indirect cost category:", error);
-      res.status(500).json({ message: "Failed to create indirect cost category" });
+      res.status(500).json({ message: "No se pudo crear la categoría de costo indirecto" });
     }
   });
 
@@ -18084,23 +18084,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
-        return res.status(400).json({ message: "Invalid category ID" });
+        return res.status(400).json({ message: "ID de categoría inválido" });
       }
 
       const categoryData = insertIndirectCostCategorySchema.partial().parse(req.body);
       const category = await storage.updateIndirectCostCategory(id, categoryData);
       
       if (!category) {
-        return res.status(404).json({ message: "Category not found" });
+        return res.status(404).json({ message: "No se encontró la categoría" });
       }
 
       res.json(category);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+        return res.status(400).json({ message: "Datos inválidos", errors: error.errors });
       }
       console.error("Error updating indirect cost category:", error);
-      res.status(500).json({ message: "Failed to update indirect cost category" });
+      res.status(500).json({ message: "No se pudo actualizar la categoría de costo indirecto" });
     }
   });
 
@@ -18108,18 +18108,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
-        return res.status(400).json({ message: "Invalid category ID" });
+        return res.status(400).json({ message: "ID de categoría inválido" });
       }
 
       const success = await storage.deleteIndirectCostCategory(id);
       if (!success) {
-        return res.status(404).json({ message: "Category not found" });
+        return res.status(404).json({ message: "No se encontró la categoría" });
       }
 
       res.status(204).send();
     } catch (error) {
       console.error("Error deleting indirect cost category:", error);
-      res.status(500).json({ message: "Failed to delete indirect cost category" });
+      res.status(500).json({ message: "No se pudo borrar la categoría de costo indirecto" });
     }
   });
 
@@ -18130,7 +18130,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(costs);
     } catch (error) {
       console.error("Error fetching indirect costs:", error);
-      res.status(500).json({ message: "Failed to fetch indirect costs" });
+      res.status(500).json({ message: "No se pudieron traer los costos indirectos" });
     }
   });
 
@@ -18138,14 +18138,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const categoryId = parseInt(req.params.categoryId);
       if (isNaN(categoryId)) {
-        return res.status(400).json({ message: "Invalid category ID" });
+        return res.status(400).json({ message: "ID de categoría inválido" });
       }
 
       const costs = await storage.getIndirectCostsByCategory(categoryId);
       res.json(costs);
     } catch (error) {
       console.error("Error fetching indirect costs by category:", error);
-      res.status(500).json({ message: "Failed to fetch indirect costs" });
+      res.status(500).json({ message: "No se pudieron traer los costos indirectos" });
     }
   });
 
@@ -18153,18 +18153,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
-        return res.status(400).json({ message: "Invalid cost ID" });
+        return res.status(400).json({ message: "ID de costo inválido" });
       }
 
       const cost = await storage.getIndirectCost(id);
       if (!cost) {
-        return res.status(404).json({ message: "Cost not found" });
+        return res.status(404).json({ message: "No se encontró el costo" });
       }
 
       res.json(cost);
     } catch (error) {
       console.error("Error fetching indirect cost:", error);
-      res.status(500).json({ message: "Failed to fetch indirect cost" });
+      res.status(500).json({ message: "No se pudo traer el costo indirecto" });
     }
   });
 
@@ -18178,10 +18178,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(cost);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+        return res.status(400).json({ message: "Datos inválidos", errors: error.errors });
       }
       console.error("Error creating indirect cost:", error);
-      res.status(500).json({ message: "Failed to create indirect cost" });
+      res.status(500).json({ message: "No se pudo crear el costo indirecto" });
     }
   });
 
@@ -18189,23 +18189,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
-        return res.status(400).json({ message: "Invalid cost ID" });
+        return res.status(400).json({ message: "ID de costo inválido" });
       }
 
       const costData = insertIndirectCostSchema.partial().parse(req.body);
       const cost = await storage.updateIndirectCost(id, costData);
       
       if (!cost) {
-        return res.status(404).json({ message: "Cost not found" });
+        return res.status(404).json({ message: "No se encontró el costo" });
       }
 
       res.json(cost);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+        return res.status(400).json({ message: "Datos inválidos", errors: error.errors });
       }
       console.error("Error updating indirect cost:", error);
-      res.status(500).json({ message: "Failed to update indirect cost" });
+      res.status(500).json({ message: "No se pudo actualizar el costo indirecto" });
     }
   });
 
@@ -18213,18 +18213,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
-        return res.status(400).json({ message: "Invalid cost ID" });
+        return res.status(400).json({ message: "ID de costo inválido" });
       }
 
       const success = await storage.deleteIndirectCost(id);
       if (!success) {
-        return res.status(404).json({ message: "Cost not found" });
+        return res.status(404).json({ message: "No se encontró el costo" });
       }
 
       res.status(204).send();
     } catch (error) {
       console.error("Error deleting indirect cost:", error);
-      res.status(500).json({ message: "Failed to delete indirect cost" });
+      res.status(500).json({ message: "No se pudo borrar el costo indirecto" });
     }
   });
 
@@ -18235,7 +18235,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(hours);
     } catch (error) {
       console.error("Error fetching non-billable hours:", error);
-      res.status(500).json({ message: "Failed to fetch non-billable hours" });
+      res.status(500).json({ message: "No se pudieron traer las horas no facturables" });
     }
   });
 
@@ -18243,14 +18243,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const personnelId = parseInt(req.params.personnelId);
       if (isNaN(personnelId)) {
-        return res.status(400).json({ message: "Invalid personnel ID" });
+        return res.status(400).json({ message: "ID de personal inválido" });
       }
 
       const hours = await storage.getNonBillableHoursByPersonnel(personnelId);
       res.json(hours);
     } catch (error) {
       console.error("Error fetching non-billable hours by personnel:", error);
-      res.status(500).json({ message: "Failed to fetch non-billable hours" });
+      res.status(500).json({ message: "No se pudieron traer las horas no facturables" });
     }
   });
 
@@ -18264,10 +18264,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(hours);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+        return res.status(400).json({ message: "Datos inválidos", errors: error.errors });
       }
       console.error("Error creating non-billable hours:", error);
-      res.status(500).json({ message: "Failed to create non-billable hours" });
+      res.status(500).json({ message: "No se pudieron crear las horas no facturables" });
     }
   });
 
@@ -18275,23 +18275,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
-        return res.status(400).json({ message: "Invalid hours ID" });
+        return res.status(400).json({ message: "ID de horas inválido" });
       }
 
       const hoursData = insertNonBillableHoursSchema.partial().parse(req.body);
       const hours = await storage.updateNonBillableHours(id, hoursData);
       
       if (!hours) {
-        return res.status(404).json({ message: "Hours entry not found" });
+        return res.status(404).json({ message: "No se encontró la carga de horas" });
       }
 
       res.json(hours);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+        return res.status(400).json({ message: "Datos inválidos", errors: error.errors });
       }
       console.error("Error updating non-billable hours:", error);
-      res.status(500).json({ message: "Failed to update non-billable hours" });
+      res.status(500).json({ message: "No se pudieron actualizar las horas no facturables" });
     }
   });
 
@@ -18299,18 +18299,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
-        return res.status(400).json({ message: "Invalid hours ID" });
+        return res.status(400).json({ message: "ID de horas inválido" });
       }
 
       const success = await storage.deleteNonBillableHours(id);
       if (!success) {
-        return res.status(404).json({ message: "Hours entry not found" });
+        return res.status(404).json({ message: "No se encontró la carga de horas" });
       }
 
       res.status(204).send();
     } catch (error) {
       console.error("Error deleting non-billable hours:", error);
-      res.status(500).json({ message: "Failed to delete non-billable hours" });
+      res.status(500).json({ message: "No se pudieron borrar las horas no facturables" });
     }
   });
 
@@ -18576,7 +18576,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error('❌ Error in income-dashboard-rows:', error);
       res.status(500).json({ 
-        error: 'Error fetching income data',
+        error: 'No se pudieron traer los datos de ingresos',
         message: (error as Error).message 
       });
     }
@@ -18592,7 +18592,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.log(`🔧 LEGACY ADAPTER: GET /projects/${projectId}/incomes?timeFilter=${timeFilter}`);
     
     if (isNaN(projectId)) {
-      return res.status(400).json({ message: "Invalid project ID" });
+      return res.status(400).json({ message: "ID de proyecto inválido" });
     }
 
     try {
@@ -18779,7 +18779,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("❌ Error getting project incomes:", error);
       res.status(500).json({ 
-        message: "Failed to get project incomes",
+        message: "No se pudieron obtener los ingresos del proyecto",
         error: error instanceof Error ? (error as Error).message : String(error)
       });
     }
@@ -18793,7 +18793,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.log(`💰 COSTS API: GET /projects/${projectId}/costs?timeFilter=${timeFilter}`);
     
     if (isNaN(projectId)) {
-      return res.status(400).json({ message: "Invalid project ID" });
+      return res.status(400).json({ message: "ID de proyecto inválido" });
     }
 
     try {
@@ -18947,7 +18947,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("❌ Error getting project costs:", error);
       res.status(500).json({ 
-        message: "Failed to get project costs",
+        message: "No se pudieron obtener los costos del proyecto",
         error: error instanceof Error ? (error as Error).message : String(error)
       });
     }
@@ -19306,7 +19306,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("❌ Error in universal projects listing:", error);
       res.status(500).json({ 
-        message: "Failed to get universal projects listing",
+        message: "No se pudo obtener el listado universal de proyectos",
         error: error instanceof Error ? (error as Error).message : String(error)
       });
     }
@@ -19323,12 +19323,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { timeFilter = 'current_month', basis = 'ECON' } = req.query;
       
       if (isNaN(projectId)) {
-        return res.status(400).json({ message: "Invalid project ID" });
+        return res.status(400).json({ message: "ID de proyecto inválido" });
       }
 
       const project = await storage.getActiveProject(projectId);
       if (!project) {
-        return res.status(404).json({ message: "Project not found" });
+        return res.status(404).json({ message: "No se encontró el proyecto" });
       }
 
       const timeFilterParsed = getUniversalTimeFilter(timeFilter as string);
@@ -19469,7 +19469,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("❌ Error in universal complete data:", error);
       res.status(500).json({ 
-        message: "Failed to get universal complete data",
+        message: "No se pudieron obtener los datos completos universales",
         error: error instanceof Error ? (error as Error).message : String(error)
       });
     }
@@ -19528,7 +19528,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       console.error('Error fetching sales data:', error);
-      res.status(500).json({ error: 'Failed to fetch sales data' });
+      res.status(500).json({ error: 'No se pudieron traer los datos de ventas' });
     }
   });
 
@@ -19566,7 +19566,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
     } catch (error) {
       console.error('❌ Cost backfill error:', error);
-      res.status(500).json({ error: 'Failed to perform cost backfill', details: (error as Error).message });
+      res.status(500).json({ error: 'No se pudo completar la recarga de costos', details: (error as Error).message });
     }
   });
 
@@ -19663,7 +19663,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
     } catch (error) {
       console.error('❌ Golden status check error:', error);
-      res.status(500).json({ error: 'Failed to check golden status', details: (error as Error).message });
+      res.status(500).json({ error: 'No se pudo verificar el estado golden', details: (error as Error).message });
     }
   });
 
@@ -19679,7 +19679,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
       
       if (!sheetData || sheetData.length === 0) {
-        return res.json({ error: 'No data found in sheet', headers: [] });
+        return res.json({ error: 'No se encontraron datos en la hoja', headers: [] });
       }
       
       const headers = sheetData[0];
@@ -19733,7 +19733,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
     } catch (error) {
       console.error('❌ Excel headers inspection error:', error);
-      res.status(500).json({ error: 'Failed to fetch Excel headers', details: (error as Error).message });
+      res.status(500).json({ error: 'No se pudieron traer los encabezados del Excel', details: (error as Error).message });
     }
   });
 
@@ -19814,7 +19814,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
     } catch (error) {
       console.error('❌ Data structure inspection error:', error);
-      res.status(500).json({ error: 'Failed to inspect data structure' });
+      res.status(500).json({ error: 'No se pudo inspeccionar la estructura de datos' });
     }
   });
 
@@ -20601,7 +20601,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (!periods || !Array.isArray(periods) || periods.length === 0) {
         return res.status(400).json({ 
-          error: 'periods array is required (e.g., ["2025-05", "2025-06"])' 
+          error: 'Se requiere el arreglo periods (por ejemplo, ["2025-05", "2025-06"])' 
         });
       }
       
@@ -21053,7 +21053,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Find the target project
       const targetProject = allMetrics.find(m => m.projectKey === projectKey);
       if (!targetProject) {
-        return res.status(404).json({ error: 'Project not found' });
+        return res.status(404).json({ error: 'No se encontró el proyecto' });
       }
       
       // Calculate rankings
@@ -21454,7 +21454,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!period.match(/^\d{4}-\d{2}$/)) {
         console.log(`❌ REBUILD SOT: Invalid period format: ${period}`);
         return _res.status(400).json({ 
-          error: 'Invalid period format. Use YYYY-MM' 
+          error: 'Formato de período inválido. Usá YYYY-MM' 
         });
       }
       
@@ -21465,7 +21465,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!response || !response.projects) {
         console.log(`❌ REBUILD SOT: Failed to get aggregator data`);
         return _res.status(500).json({ 
-          error: 'Failed to get aggregator data' 
+          error: 'No se pudieron obtener los datos del agregador' 
         });
       }
       
@@ -21651,7 +21651,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log('📥 IMPORT INCOMES: Starting import from CSV/JSON');
       
       if (!req.file && !req.body.rows) {
-        return res.status(400).json({ error: 'No file or rows provided' });
+        return res.status(400).json({ error: 'No se envió ningún archivo ni filas' });
       }
 
       let rows: any[] = [];
@@ -21791,7 +21791,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (!periodKey || !/^\d{4}-\d{2}$/.test(periodKey)) {
         return res.status(400).json({
-          error: 'Invalid periodKey format. Expected YYYY-MM (e.g., 2025-08)'
+          error: 'Formato de periodKey inválido. Se espera YYYY-MM (por ejemplo, 2025-08)'
         });
       }
       const configuredCutover = await getCutoverDate();
@@ -21852,7 +21852,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.json(rates);
     } catch (error) {
       console.error("Error fetching exchange rates:", error);
-      return res.status(500).json({ message: "Failed to fetch exchange rates" });
+      return res.status(500).json({ message: "No se pudieron traer los tipos de cambio" });
     }
   });
 
@@ -21894,14 +21894,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
-        return res.status(400).json({ message: "Invalid exchange rate ID" });
+        return res.status(400).json({ message: "ID de tipo de cambio inválido" });
       }
       
       const { exchangeRates, insertExchangeRateSchema } = await import('../shared/schema');
 
       const validatedData = insertExchangeRateSchema.partial().parse(req.body);
       const [existingRate] = await db.select().from(exchangeRates).where(eq(exchangeRates.id, id));
-      if (!existingRate) return res.status(404).json({ message: "Exchange rate not found" });
+      if (!existingRate) return res.status(404).json({ message: "No se encontró el tipo de cambio" });
       const effectiveYear = validatedData.year ?? existingRate.year;
       const effectiveMonth = validatedData.month ?? existingRate.month;
       const effectiveType = validatedData.rateType ?? existingRate.rateType;
@@ -21926,7 +21926,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .returning();
       
       if (!updatedRate) {
-        return res.status(404).json({ message: "Exchange rate not found" });
+        return res.status(404).json({ message: "No se encontró el tipo de cambio" });
       }
       
       return res.json(updatedRate);
@@ -21969,7 +21969,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { workspaceGid, from, to } = req.body ?? {};
       if (!workspaceGid || !from || !to) {
-        return res.status(400).json({ message: "Body requiere workspaceGid, from y to" });
+        return res.status(400).json({ message: "El cuerpo requiere workspaceGid, from y to" });
       }
       const { importAsanaHours } = await import('./services/asanaSync');
       const result = await importAsanaHours({
@@ -22052,7 +22052,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
-        return res.status(400).json({ message: "Invalid exchange rate ID" });
+        return res.status(400).json({ message: "ID de tipo de cambio inválido" });
       }
       
       const { exchangeRates } = await import('../shared/schema');
@@ -22063,7 +22063,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.json({ success: true });
     } catch (error) {
       console.error("Error deleting exchange rate:", error);
-      return res.status(500).json({ message: "Failed to delete exchange rate" });
+      return res.status(500).json({ message: "No se pudo borrar el tipo de cambio" });
     }
   });
 
@@ -22161,7 +22161,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { googleSheetsWorkingService } = await import('./services/googleSheetsWorking');
       const svc = googleSheetsWorkingService as any;
       const sheets = svc.createSheetsClientFromJSON();
-      if (!sheets) return res.status(500).json({ error: 'Failed to create sheets client' });
+      if (!sheets) return res.status(500).json({ error: 'No se pudo crear el cliente de Google Sheets' });
 
       // Get raw data from "Activo" sheet
       const response = await sheets.spreadsheets.values.get({
@@ -22593,7 +22593,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
       const [lead] = await db.select().from(crmLeads).where(eq(crmLeads.id, id));
-      if (!lead) return res.status(404).json({ error: 'Lead not found' });
+      if (!lead) return res.status(404).json({ error: 'No se encontró el lead' });
 
       const contacts = await db.select().from(crmContacts)
         .where(eq(crmContacts.leadId, id))
@@ -22624,7 +22624,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/crm/leads/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const id = parseInt(req.params.id);
-      if (isNaN(id)) return res.status(400).json({ error: 'Invalid lead ID' });
+      if (isNaN(id)) return res.status(400).json({ error: 'ID de lead inválido' });
 
       // Allowlist of patchable fields — prevents mass-assignment of id, createdBy, etc.
       const ALLOWED = ['companyName', 'stage', 'source', 'estimatedValueUsd', 'notes', 'clientId', 'assignedTo', 'lostReason'] as const;
@@ -22638,7 +22638,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (req.body.stage === 'lost') updates.lostAt = new Date();
 
       const [lead] = await db.update(crmLeads).set(updates).where(eq(crmLeads.id, id)).returning();
-      if (!lead) return res.status(404).json({ error: 'Lead not found' });
+      if (!lead) return res.status(404).json({ error: 'No se encontró el lead' });
       res.json(lead);
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? (error as Error).message : String(error) });
@@ -22649,9 +22649,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/crm/leads/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const id = parseInt(req.params.id);
-      if (isNaN(id)) return res.status(400).json({ error: 'Invalid lead ID' });
+      if (isNaN(id)) return res.status(400).json({ error: 'ID de lead inválido' });
       const [deleted] = await db.delete(crmLeads).where(eq(crmLeads.id, id)).returning();
-      if (!deleted) return res.status(404).json({ error: 'Lead not found' });
+      if (!deleted) return res.status(404).json({ error: 'No se encontró el lead' });
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? (error as Error).message : String(error) });
@@ -22687,7 +22687,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/crm/contacts/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const id = parseInt(req.params.id);
-      if (isNaN(id)) return res.status(400).json({ error: 'Invalid contact ID' });
+      if (isNaN(id)) return res.status(400).json({ error: 'ID de contacto inválido' });
 
       // Validate with partial schema to only allow known fields
       const validatedData = insertCrmContactSchema.partial().parse(req.body);
@@ -22696,7 +22696,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const [contact] = await db.update(crmContacts).set(updateData)
         .where(eq(crmContacts.id, id)).returning();
-      if (!contact) return res.status(404).json({ error: 'Contact not found' });
+      if (!contact) return res.status(404).json({ error: 'No se encontró el contacto' });
       res.json(contact);
     } catch (error) {
       if (error instanceof z.ZodError) return res.status(400).json({ error: error.errors });
@@ -22708,9 +22708,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/crm/contacts/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const id = parseInt(req.params.id);
-      if (isNaN(id)) return res.status(400).json({ error: 'Invalid contact ID' });
+      if (isNaN(id)) return res.status(400).json({ error: 'ID de contacto inválido' });
       const [deleted] = await db.delete(crmContacts).where(eq(crmContacts.id, id)).returning();
-      if (!deleted) return res.status(404).json({ error: 'Contact not found' });
+      if (!deleted) return res.status(404).json({ error: 'No se encontró el contacto' });
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? (error as Error).message : String(error) });
@@ -22751,7 +22751,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/crm/activities/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const id = parseInt(req.params.id);
-      if (isNaN(id)) return res.status(400).json({ error: 'Invalid activity ID' });
+      if (isNaN(id)) return res.status(400).json({ error: 'ID de actividad inválido' });
       await db.delete(crmActivities).where(eq(crmActivities.id, id));
       res.json({ success: true });
     } catch (error) {
@@ -22881,7 +22881,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/crm/reminders/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const id = parseInt(req.params.id);
-      if (isNaN(id)) return res.status(400).json({ error: 'Invalid reminder ID' });
+      if (isNaN(id)) return res.status(400).json({ error: 'ID de recordatorio inválido' });
       const updates: any = {};
       if (req.body.completed !== undefined) updates.completed = req.body.completed;
       if (req.body.completed === true) updates.completedAt = new Date();
@@ -22889,7 +22889,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (req.body.dueDate !== undefined) updates.dueDate = new Date(req.body.dueDate);
       const [reminder] = await db.update(crmReminders).set(updates)
         .where(eq(crmReminders.id, id)).returning();
-      if (!reminder) return res.status(404).json({ error: 'Reminder not found' });
+      if (!reminder) return res.status(404).json({ error: 'No se encontró el recordatorio' });
       res.json(reminder);
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? (error as Error).message : String(error) });
@@ -22900,7 +22900,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/crm/reminders/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const id = parseInt(req.params.id);
-      if (isNaN(id)) return res.status(400).json({ error: 'Invalid reminder ID' });
+      if (isNaN(id)) return res.status(400).json({ error: 'ID de recordatorio inválido' });
       await db.delete(crmReminders).where(eq(crmReminders.id, id));
       res.json({ success: true });
     } catch (error) {
@@ -23230,7 +23230,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { projectId } = req.params;
       const parsedProjectId = parseInt(projectId);
-      if (isNaN(parsedProjectId)) return res.status(400).json({ message: "Invalid project ID" });
+      if (isNaN(parsedProjectId)) return res.status(400).json({ message: "ID de proyecto inválido" });
       if (!(await canAccessTaskProject(req, parsedProjectId))) {
         return res.status(403).json({ message: "No tenés acceso a este proyecto" });
       }
@@ -24535,7 +24535,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/tasks/projects/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const projectId = parseInt(req.params.id);
-      if (isNaN(projectId)) return res.status(400).json({ message: "Invalid project ID" });
+      if (isNaN(projectId)) return res.status(400).json({ message: "ID de proyecto inválido" });
       if (!(await canAccessTaskProject(req, projectId))) {
         return res.status(403).json({ message: "No tenés acceso a este proyecto" });
       }
@@ -25776,7 +25776,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(result.rows);
     } catch (error: any) {
       console.error("BI pnl-mensual error:", error);
-      res.status(500).json({ message: "Error fetching P&L data", error: (error as Error).message });
+      res.status(500).json({ message: "No se pudieron traer los datos de P&L", error: (error as Error).message });
     }
   });
 
@@ -25786,7 +25786,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(result.rows);
     } catch (error: any) {
       console.error("BI proyectos-mensual error:", error);
-      res.status(500).json({ message: "Error fetching project data", error: (error as Error).message });
+      res.status(500).json({ message: "No se pudieron traer los datos del proyecto", error: (error as Error).message });
     }
   });
 
@@ -25796,7 +25796,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(result.rows);
     } catch (error: any) {
       console.error("BI costos-mensual error:", error);
-      res.status(500).json({ message: "Error fetching cost data", error: (error as Error).message });
+      res.status(500).json({ message: "No se pudieron traer los datos de costos", error: (error as Error).message });
     }
   });
 
@@ -25806,7 +25806,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(result.rows);
     } catch (error: any) {
       console.error("BI equipo-mensual error:", error);
-      res.status(500).json({ message: "Error fetching team data", error: (error as Error).message });
+      res.status(500).json({ message: "No se pudieron traer los datos del equipo", error: (error as Error).message });
     }
   });
 
@@ -25816,7 +25816,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(result.rows);
     } catch (error: any) {
       console.error("BI cashflow error:", error);
-      res.status(500).json({ message: "Error fetching cashflow data", error: (error as Error).message });
+      res.status(500).json({ message: "No se pudieron traer los datos de cashflow", error: (error as Error).message });
     }
   });
 
@@ -25826,7 +25826,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(result.rows);
     } catch (error: any) {
       console.error("BI revenue-por-cliente error:", error);
-      res.status(500).json({ message: "Error fetching client revenue data", error: (error as Error).message });
+      res.status(500).json({ message: "No se pudieron traer los ingresos por cliente", error: (error as Error).message });
     }
   });
 
@@ -25836,7 +25836,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const year = req.query.year ? parseInt(req.query.year as string) : new Date().getFullYear();
       const result = await db.select().from(holidays).where(eq(holidays.year, year));
       res.json(result);
-    } catch (error) { res.status(500).json({ message: "Error fetching holidays" }); }
+    } catch (error) { res.status(500).json({ message: "No se pudieron traer los feriados" }); }
   });
 
   app.post("/api/holidays", requireAuth, async (req, res) => {
@@ -25882,7 +25882,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const result = await query;
       res.json(result);
-    } catch (error) { res.status(500).json({ message: "Error fetching monthly closings" }); }
+    } catch (error) { res.status(500).json({ message: "No se pudieron traer los cierres mensuales" }); }
   });
 
   // Real hours per person for a month (time_entries + task_time_entries), to auto-fill the closing
@@ -25923,7 +25923,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(map);
     } catch (error) {
       console.error("Error fetching real hours:", error);
-      res.status(500).json({ message: "Error fetching real hours" });
+      res.status(500).json({ message: "No se pudieron traer las horas reales" });
     }
   });
 
@@ -26061,7 +26061,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         estimatedRateARS: rate.hourlyRateARS == null ? null : Number(rate.hourlyRateARS),
         source: "personnel_historical_costs",
       })));
-    } catch (error) { res.status(500).json({ message: "Error fetching estimated rates" }); }
+    } catch (error) { res.status(500).json({ message: "No se pudieron traer las tarifas estimadas" }); }
   });
 
   app.post("/api/estimated-rates", requireAuth, requirePermission("operations"), async (req, res) => {
@@ -26477,7 +26477,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       console.error("Error in capacity dashboard:", error);
-      res.status(500).json({ message: "Error fetching capacity data" });
+      res.status(500).json({ message: "No se pudieron traer los datos de capacidad" });
     }
   });
 

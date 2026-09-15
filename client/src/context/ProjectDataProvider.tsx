@@ -65,7 +65,7 @@ export const ProjectDataProvider: React.FC<ProjectDataProviderProps> = ({
     queryKey: ['projects', projectId, 'performance-rankings', period],
     queryFn: async () => {
       const response = await authFetch(`/api/projects/${projectId}/performance-rankings?timeFilter=${period}`);
-      if (!response.ok) throw new Error('Failed to fetch rankings');
+      if (!response.ok) throw new Error('No se pudieron traer los rankings');
       return response.json();
     },
     enabled: !!projectId,
@@ -83,7 +83,7 @@ export const ProjectDataProvider: React.FC<ProjectDataProviderProps> = ({
     queryKey: ['projects', projectId, 'incomes', period],
     queryFn: async () => {
       const response = await authFetch(`/api/projects/${projectId}/incomes?timeFilter=${period}`);
-      if (!response.ok) throw new Error('Failed to fetch incomes');
+      if (!response.ok) throw new Error('No se pudieron traer los ingresos');
       return response.json();
     },
     enabled: !!projectId,
@@ -101,7 +101,7 @@ export const ProjectDataProvider: React.FC<ProjectDataProviderProps> = ({
     queryKey: ['projects', projectId, 'costs', period],
     queryFn: async () => {
       const response = await authFetch(`/api/projects/${projectId}/costs?timeFilter=${period}`);
-      if (!response.ok) throw new Error('Failed to fetch costs');
+      if (!response.ok) throw new Error('No se pudieron traer los costos');
       return response.json();
     },
     enabled: !!projectId,
