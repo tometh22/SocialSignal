@@ -199,7 +199,6 @@ describe("Feedback Mind V2-13 · ronda 27-8", () => {
     expect(team).toContain("personMatchesRole(role, person as any)");
     expect(team).toContain("const roleAssignablePersonnel = availablePersonnel.filter((person) => person.contractType !== 'freelance');");
     expect(team).toContain("if (!person || person.contractType === 'freelance') return;");
-
     const quickAdd = source("client/src/components/optimized/financial-review-redesigned.tsx");
     expect(quickAdd).toContain("person.contractType !== 'freelance'");
 
