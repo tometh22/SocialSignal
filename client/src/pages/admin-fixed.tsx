@@ -1021,7 +1021,7 @@ export default function Admin() {
   const observedSummary = (field: "averageRateARS" | "averageRateUSD") => {
     const classifications = new Map<string, any>();
     for (const role of sortedRoles as any[]) {
-      for (const row of role.rateAverages || []) classifications.set(`${row.roleName}-${row.sublevel}`, row);
+      for (const row of role.rateAverages || []) classifications.set(`${row.roleName}-${row.sublevel}-${row.area}`, row);
     }
     return [...classifications.values()].reduce((summary, row: any) => {
       const value = Number(row[field]);

@@ -17,6 +17,7 @@ interface InlineEditRoleProps {
     rateAverages?: Array<{
       roleName: string;
       sublevel: string;
+      area: string;
       averageRateARS: number | null;
       averageRateUSD: number | null;
       personnelCount: number;
@@ -258,7 +259,7 @@ function InlineEditRole({ role }: InlineEditRoleProps) {
           <div className="mt-1 space-y-0.5 text-[11px] text-muted-foreground">
             {displayRole.rateAverages.map((average) => (
               <div key={`${average.roleName}-${average.sublevel}`}>
-                {average.roleName} · {average.sublevel}: {average.personnelCount} persona{average.personnelCount === 1 ? "" : "s"}
+                {average.roleName} · {average.sublevel} · {average.area}: {average.personnelCount} persona{average.personnelCount === 1 ? "" : "s"}
               </div>
             ))}
           </div>

@@ -4298,6 +4298,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         SELECT
           COALESCE(NULLIF(TRIM(p.current_role), ''), NULLIF(TRIM(r.name), ''), 'Sin rol') AS role_name,
           COALESCE(NULLIF(TRIM(p.sublevel), ''), 'Sin subnivel') AS sublevel,
+          COALESCE(NULLIF(TRIM(p.area), ''), 'Sin área') AS area,
           AVG(NULLIF(latest.hourly_rate_ars, 0)) AS average_rate_ars,
           AVG(NULLIF(COALESCE(
             latest.hourly_rate_usd,
@@ -4311,16 +4312,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         -- promedio del nivel hacia arriba y deja de representar al equipo.
         WHERE p.include_in_real_costs = TRUE
           AND COALESCE(p.contract_type, '') <> 'freelance'
-        GROUP BY 1, 2
+          AND (p.active_until IS NULL OR p.active_until >= CURRENT_DATE::text)
+        GROUP BY 1, 2, 3
       ), role_classifications AS (
         SELECT DISTINCT
           p.role_id,
           COALESCE(NULLIF(TRIM(p.current_role), ''), NULLIF(TRIM(r.name), ''), 'Sin rol') AS role_name,
-          COALESCE(NULLIF(TRIM(p.sublevel), ''), 'Sin subnivel') AS sublevel
+          COALESCE(NULLIF(TRIM(p.sublevel), ''), 'Sin subnivel') AS sublevel,
+          COALESCE(NULLIF(TRIM(p.area), ''), 'Sin área') AS area
         FROM personnel p
         LEFT JOIN roles r ON r.id = p.role_id
         WHERE p.include_in_real_costs = TRUE
           AND COALESCE(p.contract_type, '') <> 'freelance'
+          AND (p.active_until IS NULL OR p.active_until >= CURRENT_DATE::text)
       )
       SELECT
         classification.role_id,
@@ -4333,6 +4337,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       INNER JOIN classification_averages average
         ON average.role_name = classification.role_name
         AND average.sublevel = classification.sublevel
+        AND average.area = classification.area
       ORDER BY average.role_name, average.sublevel
     `);
     res.json(roleRows.map((role: any) => ({
@@ -4340,8 +4345,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       rateAverages: (averageRows.rows as any[])
         .filter((row) => Number(row.role_id) === Number(role.id) || String(row.role_name).trim().toLowerCase() === String(role.name).trim().toLowerCase())
         .map((row) => ({
-          roleName: row.role_name,
-          sublevel: row.sublevel,
+        roleName: row.role_name,
+        sublevel: row.sublevel,
+        area: row.area,
           averageRateARS: row.average_rate_ars == null ? null : Number(row.average_rate_ars),
           averageRateUSD: row.average_rate_usd == null ? null : Number(row.average_rate_usd),
           personnelCount: Number(row.personnel_count),

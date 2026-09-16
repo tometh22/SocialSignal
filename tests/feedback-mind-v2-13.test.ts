@@ -48,6 +48,10 @@ describe("Feedback Mind V2-13 · ronda 27-8", () => {
       routes.indexOf("ORDER BY average.role_name, average.sublevel"),
     );
     expect(rolesQuery).toContain("COALESCE(p.contract_type, '') <> 'freelance'");
+    expect(rolesQuery).toContain("COALESCE(NULLIF(TRIM(p.area), ''), 'Sin área') AS area");
+    expect(rolesQuery).toContain("p.active_until IS NULL OR p.active_until >= CURRENT_DATE");
+    expect(rolesQuery).toContain("AND average.area = classification.area");
+    expect(source("client/src/components/admin/inline-edit-role.tsx")).toContain("{average.roleName} · {average.sublevel} · {average.area}");
     // Tanto el promedio como el mapeo rol→clasificación aplican el filtro.
     expect(rolesQuery.match(/<> 'freelance'/g)).toHaveLength(2);
   });
