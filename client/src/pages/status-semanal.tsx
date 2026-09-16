@@ -2796,7 +2796,7 @@ function DailyRunner({ queue, quietCount, users, currentUserId, roomId, startInd
                 {entry.reasons.map(r => (
                   <span key={r.kind} className={cn("text-[10px] font-bold rounded px-1.5 py-0.5", DAILY_REASON_META[r.kind].chip)}>{DAILY_REASON_META[r.kind].label}</span>
                 ))}
-                <span className="text-[10px] text-slate-400">Owner: {item.ownerName?.split(' ')[0] ?? 'sin owner'}</span>
+                <span className="text-[10px] text-slate-400">Responsable: {item.ownerName?.split(' ')[0] ?? 'sin asignar'}</span>
               </div>
               <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
                 <span className={cn("w-3 h-3 rounded-full shrink-0", hm(item.healthStatus).dot)} />
@@ -3714,7 +3714,7 @@ export default function StatusSemanalPage({ initialItemKey }: { initialItemKey?:
                   ))}
                 </div>
                 <span className="text-white/20">|</span>
-                <span className="text-[10px] text-indigo-300 font-bold uppercase tracking-wide">Owner:</span>
+                <span className="text-[10px] text-indigo-300 font-bold uppercase tracking-wide">Responsable:</span>
                 <select value={filterOwner?.toString() ?? ''} onChange={e => setFilterOwner(e.target.value ? parseInt(e.target.value) : null)}
                   className="text-[11px] px-2 py-0.5 rounded-md border border-white/20 bg-white/10 text-white focus:outline-none focus:ring-1 focus:ring-white/30">
                   <option value="" className="text-slate-800">Todos</option>

@@ -38,6 +38,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Link } from 'wouter';
+import { statusLabel } from "@/lib/status-labels";
 
 // Interfaces para los datos del cliente
 interface Client {
@@ -712,7 +713,7 @@ export default function ManageQuotes() {
               <CardContent className="grid gap-3 p-4 sm:p-5 lg:grid-cols-2">
                 {commercialGroups.filter((entry) => entry.items.some((item) => item.projectName.toLowerCase().includes(searchTerm.toLowerCase()) && (statusFilter === 'all' || item.status === statusFilter))).map((entry) => (
                   <button key={entry.group.id} type="button" onClick={() => navigate(`/quotation-groups/${entry.group.id}`)} className="rounded-xl border border-slate-200 bg-white p-4 text-left transition hover:border-indigo-300 hover:shadow-sm">
-                    <div className="flex items-start justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{entry.client?.name || 'Cliente'}</p><h3 className="mt-1 font-semibold text-slate-950">{entry.group.name}</h3><p className="mt-1 text-xs text-slate-500">{entry.group.groupNumber} · {entry.items.length} propuestas</p></div><Badge variant="outline">{entry.status.replaceAll('_', ' ')}</Badge></div>
+                    <div className="flex items-start justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{entry.client?.name || 'Cliente'}</p><h3 className="mt-1 font-semibold text-slate-950">{entry.group.name}</h3><p className="mt-1 text-xs text-slate-500">{entry.group.groupNumber} · {entry.items.length} propuestas</p></div><Badge variant="outline">{statusLabel(entry.status)}</Badge></div>
                     <div className="mt-4 space-y-2 border-t border-slate-100 pt-3">{entry.items.map((item) => <div key={item.quotationId} className="flex items-center justify-between gap-3 text-xs"><span className="truncate text-slate-700">{item.projectName}</span><span className="shrink-0 font-medium text-slate-900">{formatCurrency(item.totalAmount, item.currency)}</span></div>)}</div>
                   </button>
                 ))}

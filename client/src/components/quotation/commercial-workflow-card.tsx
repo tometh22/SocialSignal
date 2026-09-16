@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { statusLabel } from "@/lib/status-labels";
 
 type CommercialHistory = {
   revisions: Array<{ id: number; revisionNumber: number; status: string; reason?: string; documentHash: string; createdAt: string }>;
@@ -96,7 +97,7 @@ export function CommercialWorkflowCard({ quotationId, status, recipientEmail, qu
           <span className="flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-indigo-600" /> Gobierno comercial</span>
           <span className="flex items-center gap-2 text-xs font-normal text-slate-500">
             {quotationNumber || `#${quotationId}`} · Revisión {currentRevision?.revisionNumber || '—'}
-            <Badge variant="outline">{status}</Badge>
+            <Badge variant="outline">{statusLabel(status)}</Badge>
           </span>
         </CardTitle>
       </CardHeader>
@@ -119,7 +120,7 @@ export function CommercialWorkflowCard({ quotationId, status, recipientEmail, qu
         )}
         <div className="grid gap-3 md:grid-cols-2">
           <div className="rounded-xl border border-slate-200 p-3"><div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase text-slate-500"><History className="h-3.5 w-3.5" /> Últimos eventos</div>{(data?.events || []).slice(0, 5).map((event) => <div key={event.id} className="flex justify-between py-1 text-xs text-slate-600"><span>{event.eventType}</span><span>{new Date(event.createdAt).toLocaleString('es-AR')}</span></div>)}</div>
-          <div className="rounded-xl border border-slate-200 p-3"><div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase text-slate-500"><Mail className="h-3.5 w-3.5" /> Entregas</div>{data?.deliveries.length ? data.deliveries.slice(0, 5).map((delivery) => <div key={delivery.id} className="flex justify-between py-1 text-xs text-slate-600"><span className="truncate">{delivery.recipientEmail}</span><Badge variant="outline" className="text-[10px]">{delivery.status}</Badge></div>) : <p className="text-xs text-slate-400">Todavía no fue enviada.</p>}</div>
+          <div className="rounded-xl border border-slate-200 p-3"><div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase text-slate-500"><Mail className="h-3.5 w-3.5" /> Entregas</div>{data?.deliveries.length ? data.deliveries.slice(0, 5).map((delivery) => <div key={delivery.id} className="flex justify-between py-1 text-xs text-slate-600"><span className="truncate">{delivery.recipientEmail}</span><Badge variant="outline" className="text-[10px]">{statusLabel(delivery.status)}</Badge></div>) : <p className="text-xs text-slate-400">Todavía no fue enviada.</p>}</div>
         </div>
       </CardContent>
 

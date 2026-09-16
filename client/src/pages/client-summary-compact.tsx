@@ -51,6 +51,7 @@ import {
   Area,
   AreaChart
 } from "recharts";
+import { statusLabel } from "@/lib/status-labels";
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'];
 
@@ -369,7 +370,7 @@ export default function ClientSummaryCompact() {
                       <div key={index} className="flex items-center justify-between text-xs">
                         <span className="truncate">{project?.name || `Proyecto ${index + 1}`}</span>
                         <Badge variant="outline" className="text-xs">
-                          {project?.status || 'Activo'}
+                          {statusLabel(project?.status, 'Activo')}
                         </Badge>
                       </div>
                     ))}
@@ -441,7 +442,7 @@ export default function ClientSummaryCompact() {
                           </div>
                         </div>
                         <Badge variant="outline" className="text-xs">
-                          {quotation?.status || 'Completado'}
+                          {statusLabel(quotation?.status, 'Completado')}
                         </Badge>
                       </div>
                     ))}
@@ -508,7 +509,7 @@ export default function ClientSummaryCompact() {
                             <h3 className="font-semibold text-sm">{project?.name || `Proyecto ${index + 1}`}</h3>
                             <p className="text-xs text-gray-500">{project?.description || 'Sin descripción'}</p>
                           </div>
-                          <Badge variant="outline">{project?.status || 'Activo'}</Badge>
+                          <Badge variant="outline">{statusLabel(project?.status, 'Activo')}</Badge>
                         </div>
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
                           <div>
@@ -677,7 +678,7 @@ export default function ClientSummaryCompact() {
                           <div className="text-gray-500">${quotation?.totalCost?.toLocaleString() || '15,000'}</div>
                         </div>
                         <Badge variant="outline" className="text-xs">
-                          {quotation?.status || 'Pendiente'}
+                          {statusLabel(quotation?.status, 'Pendiente')}
                         </Badge>
                       </div>
                     ))}

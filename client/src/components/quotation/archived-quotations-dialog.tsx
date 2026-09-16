@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { apiRequest, authFetchJson } from "@/lib/queryClient";
 import { getApiErrorMessage } from "@/lib/api-error";
 import { useToast } from "@/hooks/use-toast";
+import { statusLabel } from "@/lib/status-labels";
 
 type ArchivedQuotation = {
   id: number;
@@ -70,7 +71,7 @@ function ArchivedQuotationsBody() {
         <div key={quote.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md border border-slate-200 px-3 py-2 text-sm">
           <span className="min-w-0 flex-1 truncate font-medium">{quote.projectName}</span>
           <span className="hidden truncate text-xs text-muted-foreground sm:inline">{quote.clientName || "Sin cliente"}</span>
-          <Badge variant="outline" className="shrink-0 text-[10px]">{quote.status}</Badge>
+          <Badge variant="outline" className="shrink-0 text-[10px]">{statusLabel(quote.status)}</Badge>
           <span className="shrink-0 text-xs text-muted-foreground">{formatAmount(quote.totalAmount)}</span>
           <span className="shrink-0 text-xs text-muted-foreground">archivada {formatDate(quote.archivedAt)}</span>
           <Button
