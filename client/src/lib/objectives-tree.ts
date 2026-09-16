@@ -1,4 +1,17 @@
 import type { Objective } from "@/lib/objectives-api";
+import {
+  areaGroupOf,
+  FRONT_ORDER,
+  FRONTS,
+  frontOf,
+  CHECKPOINTS,
+  MONTH_CHECKPOINT_SLUGS,
+  NORTH_STAR,
+  NORTH_STAR_SUPPORT,
+  tierFor,
+  type FrontId,
+  type Tier,
+} from "@shared/objectives-fronts";
 
 export type ObjectiveNode = {
   objective: Objective;
@@ -51,7 +64,17 @@ export function priorityRank(objective: Objective, today = todayISO()): number {
   return 2;
 }
 
+function tierRank(objective: Objective, today: string): number {
+  return tierFor(objective.slug, today) === "innegociable" ? 0 : 1;
+}
+
+/**
+ * La prioridad se declara, no se cuenta: manda el tier que el plan fijó para
+ * el mes, y recién después la fecha. "Cuánto cuelga" queda como dato.
+ */
 function compare(a: Objective, b: Objective, today: string): number {
+  const tier = tierRank(a, today) - tierRank(b, today);
+  if (tier !== 0) return tier;
   const rank = priorityRank(a, today) - priorityRank(b, today);
   if (rank !== 0) return rank;
   const da = deadlineOf(a, today)?.date ?? "9999-12-31";
@@ -151,4 +174,213 @@ export function formatDeadline(deadline: Deadline): string {
   if (deadline.daysLeft === 0) return "Vence hoy";
   if (deadline.daysLeft === 1) return "Vence mañana";
   return `Vence en ${deadline.daysLeft} días`;
+}
+
+// ── Frentes ────────────────────────────────────────────────────────────────
+// Encima del árbol de parentesco: un norte y cinco frentes, con un nodo de
+// área entre el objetivo de empresa y sus objetivos de área. El primer nivel
+// pasa de 23 nodos a 1 + 5.
+
+// Octubre y diciembre no escriben la fecha en su meta; el mes igual tiene que
+// caer en la línea de tiempo, así que se ancla al último día del mes.
+const MONTH_CHECKPOINT_DATES: Record<string, string> = {
+  "company-month-sep-open-mesas": "2026-09-30",
+  "company-month-oct-advance": "2026-10-31",
+  "company-month-nov-close": "2026-11-30",
+  "company-month-dec-renew": "2026-12-31",
+};
+
+export type GroupNode = {
+  kind: "group";
+  id: string;
+  label: string;
+  children: ObjectiveNode[];
+  descendants: number;
+};
+
+export type TreeItem = ObjectiveNode | GroupNode;
+
+export function isGroup(item: TreeItem): item is GroupNode {
+  return (item as GroupNode).kind === "group";
+}
+
+export type FrontSummary = {
+  id: FrontId;
+  label: string;
+  /** Objetivos de empresa del frente, ya con su descendencia. */
+  objectives: ObjectiveNode[];
+  total: number;
+  overdue: number;
+  dueSoon: number;
+  nonNegotiable: number;
+  /** Promedio de avance sobre los objetivos que tienen avance cargado. */
+  progress: number | null;
+};
+
+export type ObjectivesMap = {
+  northStar: ObjectiveNode | null;
+  northSupport: ObjectiveNode[];
+  fronts: FrontSummary[];
+  /** Estándares sostenidos: no vencen, se miden por cumplimiento. */
+  standards: Objective[];
+  /** Objetivos de mes: puntos de control, fuera del árbol. */
+  checkpoints: Objective[];
+  /** Lo que vence en los próximos 14 días, sin contar puntos de control. */
+  dueSoon: Objective[];
+  /** Estándares sin avance cargado o por debajo del umbral: el semáforo en rojo. */
+  standardsAtRisk: Objective[];
+  /** Marcadores de la línea de tiempo, en orden. */
+  timeline: Array<{ date: string; label: string; hard: boolean; objective: Objective | null }>;
+  /** Nada que no haya entrado en ninguna de las cajas anteriores. */
+  unplaced: Objective[];
+};
+
+function countDeep(node: ObjectiveNode, today: string, seen = { total: 0, overdue: 0, dueSoon: 0, nonNegotiable: 0, sum: 0, withProgress: 0 }) {
+  const stack: ObjectiveNode[] = [node];
+  while (stack.length) {
+    const current = stack.pop()!;
+    seen.total += 1;
+    const deadline = deadlineOf(current.objective, today);
+    if (deadline?.overdue) seen.overdue += 1;
+    else if (deadline?.soon) seen.dueSoon += 1;
+    if (tierFor(current.objective.slug, today) === "innegociable") seen.nonNegotiable += 1;
+    const progress = current.objective.progressPercent;
+    if (typeof progress === "number" && Number.isFinite(progress)) {
+      seen.sum += Math.max(0, Math.min(100, progress));
+      seen.withProgress += 1;
+    }
+    stack.push(...current.children);
+  }
+  return seen;
+}
+
+/**
+ * Inserta un nodo de área entre un objetivo de empresa y sus hijos de área.
+ * Los hijos de persona que cuelgan directo de empresa (CEO y COO) se quedan
+ * donde están: no pertenecen a un área.
+ */
+function groupAreaChildren(node: ObjectiveNode): TreeItem[] {
+  const groups = new Map<string, { label: string; children: ObjectiveNode[] }>();
+  const loose: ObjectiveNode[] = [];
+  for (const child of node.children) {
+    const group = areaGroupOf(child.objective.slug);
+    if (group && child.objective.level === "area") {
+      const bucket = groups.get(group.id) ?? { label: group.label, children: [] };
+      bucket.children.push(child);
+      groups.set(group.id, bucket);
+    } else {
+      loose.push(child);
+    }
+  }
+  const grouped: TreeItem[] = [...groups.entries()].map(([id, bucket]) => ({
+    kind: "group" as const,
+    id: `${String(node.objective.id)}:${id}`,
+    label: bucket.label,
+    children: bucket.children,
+    descendants: bucket.children.reduce((total, child) => total + 1 + child.descendants, 0),
+  }));
+  // Un solo grupo no aporta nada: sería un nodo con un único hijo.
+  if (grouped.length <= 1) return [...(grouped[0] ? (grouped[0] as GroupNode).children : []), ...loose];
+  return [...grouped, ...loose];
+}
+
+export function childrenOfNode(node: ObjectiveNode): TreeItem[] {
+  return node.depth === 0 ? groupAreaChildren(node) : node.children;
+}
+
+export function buildObjectivesMap(objectives: Objective[], today = todayISO()): ObjectivesMap {
+  const checkpointSlugs = new Set(MONTH_CHECKPOINT_SLUGS);
+  const supportSlugs = new Set(NORTH_STAR_SUPPORT);
+
+  const checkpoints = objectives.filter((o) => o.slug && checkpointSlugs.has(o.slug));
+  const standards = objectives.filter((o) => o.targetKind === "continuous" && !checkpointSlugs.has(String(o.slug)));
+
+  // El árbol se arma sobre todo menos los puntos de control, que no sostienen
+  // nada. Los estándares sí quedan en el árbol: cuelgan de un frente y además
+  // se listan aparte.
+  const tree = buildObjectiveTree(objectives.filter((o) => !(o.slug && checkpointSlugs.has(o.slug))), today);
+  const rootBySlug = new Map(tree.map((node) => [String(node.objective.slug ?? ""), node]));
+
+  const northStar = rootBySlug.get(NORTH_STAR) ?? null;
+  const northSupport = tree.filter((node) => node.objective.slug && supportSlugs.has(node.objective.slug));
+
+  const placed = new Set<ObjectiveNode>();
+  if (northStar) placed.add(northStar);
+  for (const node of northSupport) placed.add(node);
+
+  const fronts: FrontSummary[] = FRONT_ORDER.map((id) => {
+    const nodes = tree.filter((node) => frontOf(node.objective.slug) === id);
+    for (const node of nodes) placed.add(node);
+    const stats = nodes.reduce(
+      (acc, node) => {
+        const counted = countDeep(node, today);
+        return {
+          total: acc.total + counted.total,
+          overdue: acc.overdue + counted.overdue,
+          dueSoon: acc.dueSoon + counted.dueSoon,
+          nonNegotiable: acc.nonNegotiable + counted.nonNegotiable,
+          sum: acc.sum + counted.sum,
+          withProgress: acc.withProgress + counted.withProgress,
+        };
+      },
+      { total: 0, overdue: 0, dueSoon: 0, nonNegotiable: 0, sum: 0, withProgress: 0 },
+    );
+    return {
+      id,
+      label: FRONTS[id],
+      objectives: nodes,
+      total: stats.total,
+      overdue: stats.overdue,
+      dueSoon: stats.dueSoon,
+      nonNegotiable: stats.nonNegotiable,
+      progress: stats.withProgress ? Math.round(stats.sum / stats.withProgress) : null,
+    };
+  });
+
+  // Si mañana aparece un objetivo de empresa sin frente, tiene que verse, no
+  // desaparecer. Se muestra aparte y queda evidente que falta clasificarlo.
+  const unplaced = tree.filter((node) => !placed.has(node)).map((node) => node.objective);
+
+  const inTree = objectives.filter((o) => !(o.slug && checkpointSlugs.has(o.slug)));
+  const dueSoon = dueWithin(inTree, 14, today);
+
+  // Un estándar sin avance cargado no está "bien": está sin medir, y eso es
+  // exactamente lo que el semáforo tiene que mostrar en rojo.
+  const standardsAtRisk = standards.filter((objective) => {
+    const progress = objective.progressPercent;
+    if (typeof progress !== "number" || !Number.isFinite(progress)) return true;
+    return progress < 100;
+  });
+
+  const checkpointBySlug = new Map(checkpoints.map((o) => [String(o.slug), o]));
+  const timeline = [
+    ...MONTH_CHECKPOINT_SLUGS.map((slug) => {
+      const objective = checkpointBySlug.get(slug) ?? null;
+      return {
+        date: objective?.targetDate ? String(objective.targetDate).slice(0, 10) : MONTH_CHECKPOINT_DATES[slug] ?? "",
+        label: objective?.title ?? slug,
+        hard: false,
+        objective,
+      };
+    }),
+    ...CHECKPOINTS.map((checkpoint) => ({ ...checkpoint, objective: null })),
+  ]
+    .filter((entry) => entry.date)
+    .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+
+  return { northStar, northSupport, fronts, standards, standardsAtRisk, checkpoints, dueSoon, timeline, unplaced };
+}
+
+/** Objetivos que vencen dentro de la ventana, ordenados por urgencia. */
+export function dueWithin(objectives: Objective[], days: number, today = todayISO()): Objective[] {
+  return objectives
+    .filter((objective) => {
+      const deadline = deadlineOf(objective, today);
+      return deadline != null && deadline.daysLeft <= days;
+    })
+    .sort((a, b) => compare(a, b, today));
+}
+
+export function tierOf(objective: Objective, today = todayISO()): Tier {
+  return tierFor(objective.slug, today);
 }
