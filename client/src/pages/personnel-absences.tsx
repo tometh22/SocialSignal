@@ -144,7 +144,7 @@ export default function PersonnelAbsencesPage() {
   return (
     <div className="mx-auto max-w-6xl space-y-6 py-2">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div><h1 className="flex items-center gap-2 text-2xl font-semibold"><UserX className="h-5 w-5" />Ausencias</h1><p className="text-sm text-muted-foreground">Solicitudes, saldos y disponibilidad del equipo.</p></div>
+        <div><h1 className="flex items-center gap-2 text-2xl font-semibold"><UserX className="h-5 w-5" />Ausencias</h1><p className="text-sm text-muted-foreground">{isOperations ? "Gestión de Operaciones: aprobá solicitudes, administrá cupos y consultá el equipo." : "Solicitá tus días y consultá el estado de tus ausencias."}</p></div>
         <Select value={String(year)} onValueChange={(value) => setYear(Number(value))}><SelectTrigger className="w-32"><SelectValue /></SelectTrigger><SelectContent>{[year - 1, year, year + 1].map((item) => <SelectItem key={item} value={String(item)}>{item}</SelectItem>)}</SelectContent></Select>
       </div>
 

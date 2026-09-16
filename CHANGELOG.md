@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.9.2 — 2026-09-16
+
+- Hace visible la bandeja de aprobación de ausencias dentro del módulo Operaciones y aclara en pantalla la diferencia entre solicitar y gestionar.
+
 ## 1.9.1 — 2026-09-16
 
 - Excluye freelancers también de los selectores de alta rápida y del configurador legado de equipos, evitando que otra ruta del cotizador los asigne a roles.
