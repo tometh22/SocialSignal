@@ -7,6 +7,14 @@
  * planned para que el seguimiento pueda conectarse luego a persistencia.
  */
 
+import {
+  OBJECTIVE_PARENTS,
+  parseTargetDate,
+  parseTargetValue,
+  targetKindFor,
+  type ObjectiveTargetKind,
+} from "./objectives-hierarchy";
+
 export type ObjectiveLevel = "company" | "area" | "person";
 export type ObjectiveStatus = "planned";
 export type ActionStatus = "planned";
@@ -22,6 +30,14 @@ export interface Objective2026 {
   ownerName: string;
   status: ObjectiveStatus;
   progressPercent: null;
+  /** Slug del objetivo que éste sostiene. null en los 23 de empresa, que son raíz. */
+  parentSlug: string | null;
+  targetKind: ObjectiveTargetKind;
+  /** Número a alcanzar, cuando la meta lo dice sin ambigüedad. */
+  targetValue: number | null;
+  targetUnit: string | null;
+  /** Fecha de corte, extraída del texto de la meta. null si el objetivo es continuo. */
+  targetDate: string | null;
 }
 
 export interface Account2026 {
@@ -53,7 +69,19 @@ export interface ObjectivePlan2026 {
   actions: Action2026[];
 }
 
-const RAW_OBJECTIVE_PLAN_2026: ObjectivePlan2026 = {
+/**
+ * El plan tal como se transcribió del documento de estrategia. La jerarquía y
+ * la lectura de la meta se derivan después, en OBJECTIVE_PLAN_2026, para no
+ * tener que anotar a mano 87 objetivos y que la derivación sea testeable.
+ */
+type RawObjective2026 = Omit<
+  Objective2026,
+  "parentSlug" | "targetKind" | "targetValue" | "targetUnit" | "targetDate"
+>;
+
+const RAW_OBJECTIVE_PLAN_2026: Omit<ObjectivePlan2026, "objectives"> & {
+  objectives: RawObjective2026[];
+} = {
   objectives: [
     // Empresa — norte anual y del cuatrimestre.
     {
@@ -2117,10 +2145,20 @@ export const OBJECTIVE_OWNER_REMAP: Record<string, "Tomás" | "Vicky" | "Acha"> 
   PMs: "Vicky",
 };
 
+export const PLAN_YEAR = 2026;
+
 export const OBJECTIVE_PLAN_2026: ObjectivePlan2026 = {
   ...RAW_OBJECTIVE_PLAN_2026,
-  objectives: RAW_OBJECTIVE_PLAN_2026.objectives.map((objective) => ({
-    ...objective,
-    ownerName: OBJECTIVE_OWNER_REMAP[objective.ownerName] ?? objective.ownerName,
-  })),
+  objectives: RAW_OBJECTIVE_PLAN_2026.objectives.map((objective) => {
+    const amount = parseTargetValue(objective.target, objective.slug);
+    return {
+      ...objective,
+      ownerName: OBJECTIVE_OWNER_REMAP[objective.ownerName] ?? objective.ownerName,
+      parentSlug: OBJECTIVE_PARENTS[objective.slug] ?? null,
+      targetKind: targetKindFor(objective.slug, objective.target),
+      targetValue: amount?.value ?? null,
+      targetUnit: amount?.unit ?? null,
+      targetDate: parseTargetDate(objective.target, PLAN_YEAR, objective.slug),
+    };
+  }),
 };
