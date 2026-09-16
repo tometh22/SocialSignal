@@ -2354,6 +2354,9 @@ export type InsertTaskProjectMember = z.infer<typeof insertTaskProjectMemberSche
 export const OBJECTIVE_LEVELS = ["company", "area", "person"] as const;
 export type ObjectiveLevel = typeof OBJECTIVE_LEVELS[number];
 
+export const OBJECTIVE_TARGET_KINDS = ["metric", "milestone", "continuous"] as const;
+export type ObjectiveTargetKind = typeof OBJECTIVE_TARGET_KINDS[number];
+
 export const OBJECTIVE_ACTION_STATUSES = [
   "planned",
   "in_progress",
@@ -2378,16 +2381,27 @@ export const objectives = pgTable("objectives", {
   // example, "USD 655K; piso aceptable USD 610K"). Keep the source wording
   // intact and store numeric progress separately.
   target: text("target"),
+  // El plan escribe el umbral y la fecha dentro de la misma frase. Se conserva
+  // el texto original y se guardan aparte el número y el corte, que son los
+  // que permiten calcular avance y ordenar por vencimiento.
+  targetKind: varchar("target_kind", { length: 20 }).notNull().default("milestone"),
+  targetValue: numeric("target_value", { precision: 14, scale: 2 }),
+  targetUnit: varchar("target_unit", { length: 40 }),
+  targetDate: date("target_date"),
   currentValue: text("current_value"),
   progressPercent: numeric("progress_percent", { precision: 5, scale: 2 }),
   status: varchar("status", { length: 30 }).notNull().default("planned"),
   ownerPersonnelId: integer("owner_personnel_id").references(() => personnel.id, { onDelete: "set null" }),
+  // Un objetivo cuelga del que lo sostiene. Sin esto los tres niveles son tres
+  // listas planas y la pantalla no puede mostrar de qué depende cada cosa.
+  parentObjectiveId: integer("parent_objective_id"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => ({
   slugYearUnique: unique("objectives_slug_year_unique").on(table.slug, table.year),
   yearIdx: index("idx_objectives_year").on(table.year),
   ownerIdx: index("idx_objectives_owner").on(table.ownerPersonnelId),
+  parentIdx: index("idx_objectives_parent").on(table.parentObjectiveId),
 }));
 
 export const objectiveAccounts = pgTable("objective_accounts", {

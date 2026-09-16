@@ -10,10 +10,15 @@ export type Objective = {
   title: string;
   metric?: string | null;
   target?: string | number | null;
+  targetKind?: "metric" | "milestone" | "continuous" | null;
+  targetValue?: string | number | null;
+  targetUnit?: string | null;
+  targetDate?: string | null;
   currentValue?: string | number | null;
   progressPercent?: number | null;
   status?: string | null;
   owner?: ObjectiveRef | null;
+  parentObjectiveId?: string | number | null;
 };
 
 export type ObjectiveAction = {

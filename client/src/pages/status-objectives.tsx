@@ -8,6 +8,8 @@ import {
   BriefcaseBusiness,
   CalendarDays,
   Check,
+  ChevronDown,
+  ChevronRight,
   CircleDashed,
   Flag,
   ListChecks,
@@ -39,6 +41,14 @@ import {
   updateObjective,
   updateObjectiveAction,
 } from "@/lib/objectives-api";
+import {
+  allNodeIds,
+  buildObjectiveTree,
+  deadlineOf,
+  flattenTree,
+  formatDeadline,
+  ObjectiveNode,
+} from "@/lib/objectives-tree";
 
 type ViewId = "summary" | "objectives" | "week" | "people" | "accounts";
 
@@ -157,20 +167,139 @@ function EmptyState({ title, description }: { title: string; description: string
   return <div className="rounded-2xl border border-dashed border-border bg-card/60 p-8 text-center"><Target className="mx-auto h-6 w-6 text-muted-foreground" /><h2 className="mt-3 text-sm font-bold text-foreground">{title}</h2><p className="mx-auto mt-1 max-w-md text-xs text-muted-foreground">{description}</p></div>;
 }
 
-function GoalCard({ objective, onUpdate, isUpdating }: { objective: Objective; onUpdate: (id: string | number, currentValue: string, progressPercent: number | null) => Promise<void>; isUpdating: boolean }) {
+
+function ProgressForm({ objective, onUpdate, isUpdating }: { objective: Objective; onUpdate: (id: string | number, currentValue: string, progressPercent: number | null) => Promise<void>; isUpdating: boolean }) {
   const [editing, setEditing] = useState(false);
   const [currentValue, setCurrentValue] = useState(String(objective.currentValue ?? ""));
   const [progressPercent, setProgressPercent] = useState(objective.progressPercent == null ? "" : String(objective.progressPercent));
-  const progress = typeof objective.progressPercent === "number" && Number.isFinite(objective.progressPercent) ? Math.max(0, Math.min(100, objective.progressPercent)) : null;
   const save = async (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); const parsedProgress = progressPercent.trim() === "" ? null : Number(progressPercent); if (parsedProgress !== null && (!Number.isFinite(parsedProgress) || parsedProgress < 0 || parsedProgress > 100)) return; await onUpdate(objective.id, currentValue, parsedProgress); setEditing(false); };
+  return <>{editing ? <form onSubmit={save} className="mt-3 rounded-xl border border-primary/20 bg-primary/[0.04] p-3"><div className="grid gap-2 sm:grid-cols-[1fr_9rem_auto_auto]"><div><Label htmlFor={`objective-value-${objective.id}`} className="text-xs">Avance actual</Label><Input id={`objective-value-${objective.id}`} value={currentValue} onChange={(event) => setCurrentValue(event.target.value)} placeholder="Ej. USD 42K" autoFocus /></div><div><Label htmlFor={`objective-progress-${objective.id}`} className="text-xs">Avance %</Label><Input id={`objective-progress-${objective.id}`} type="number" min="0" max="100" step="0.1" value={progressPercent} onChange={(event) => setProgressPercent(event.target.value)} placeholder="0–100" /></div><Button type="submit" size="sm" className="self-end" disabled={isUpdating}>{isUpdating ? <Loader2 className="h-4 w-4 animate-spin" /> : "Guardar"}</Button><Button type="button" size="sm" variant="ghost" className="self-end" onClick={() => setEditing(false)}>Cancelar</Button></div></form> : <Button type="button" variant="ghost" size="sm" className="mt-2 h-8 px-2 text-xs" onClick={() => setEditing(true)}><Pencil className="mr-1.5 h-3.5 w-3.5" />Actualizar avance</Button>}</>;
+}
+
+function DeadlineBadge({ objective }: { objective: Objective }) {
+  if (objective.targetKind === "continuous") {
+    return <span className="rounded-full border border-border bg-muted/40 px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">Estándar sostenido</span>;
+  }
+  const deadline = deadlineOf(objective);
+  if (!deadline) return null;
+  const tone = deadline.overdue
+    ? "border-red-200 bg-red-50 text-red-700"
+    : deadline.soon
+      ? "border-amber-200 bg-amber-50 text-amber-700"
+      : "border-border bg-muted/40 text-muted-foreground";
+  return <span className={cn("rounded-full border px-2 py-0.5 text-[10px] font-semibold", tone)}>{formatDeadline(deadline)}</span>;
+}
+
+function ObjectiveRow({ node, expanded, onToggle, onUpdate, isUpdating }: { node: ObjectiveNode; expanded: boolean; onToggle: () => void; onUpdate: (id: string | number, currentValue: string, progressPercent: number | null) => Promise<void>; isUpdating: boolean }) {
+  const { objective, depth, children, descendants } = node;
+  const progress = typeof objective.progressPercent === "number" && Number.isFinite(objective.progressPercent)
+    ? Math.max(0, Math.min(100, objective.progressPercent))
+    : null;
+  const hasChildren = children.length > 0;
   return (
-    <article className="rounded-2xl border border-border/75 bg-card p-4 shadow-[0_10px_24px_-24px_rgba(15,23,42,0.55)] transition-shadow hover:shadow-[0_18px_32px_-24px_rgba(15,23,42,0.48)]">
-      <div className="flex items-start justify-between gap-3"><div className="min-w-0"><div className="mb-2 flex flex-wrap items-center gap-1.5"><Badge variant="outline" className={cn("px-2 py-1 text-[10px]", levelClass(objective.level))}>{levelLabel(objective.level)}</Badge><Badge variant="outline" className={cn("px-2 py-1 text-[10px]", statusClass(objective.status))}>{statusLabel(objective.status)}</Badge></div><h3 className="text-sm font-bold leading-5 text-foreground">{objective.title}</h3><p className="mt-1 text-xs text-muted-foreground">{objective.metric || "Métrica aún no definida"}</p></div><Target className="mt-0.5 h-4 w-4 shrink-0 text-primary" /></div>
-      <div className="mt-4 flex items-start justify-between gap-3 text-xs"><div><span className="block font-medium text-foreground">Meta: {valueText(objective.target, "Meta aún no definida")}</span><span className="mt-1 block text-muted-foreground">Avance actual: {objective.currentValue === null || objective.currentValue === undefined || objective.currentValue === "" ? "sin avance cargado" : valueText(objective.currentValue)}</span></div>{progress === null ? <span className="font-semibold text-muted-foreground">Avance no cargado</span> : <span className="font-bold text-primary">{progress}%</span>}</div>
-      {progress === null ? <div className="mt-2 rounded-full bg-muted px-3 py-1.5 text-[11px] text-muted-foreground">Esta métrica todavía no tiene avance informado por la API.</div> : <Progress value={progress} className="mt-2 h-1.5 bg-muted" indicatorClassName={statusLabel(objective.status) === "En riesgo" ? "bg-amber-500" : "bg-primary"} />}
-      <div className="mt-3 flex items-center justify-between border-t border-border/60 pt-3 text-[11px] text-muted-foreground"><span>Responsable</span><span className="font-semibold text-foreground">{ownerLabel(objective.owner)}</span></div>
-      {editing ? <form onSubmit={save} className="mt-3 rounded-xl border border-primary/20 bg-primary/[0.04] p-3"><div className="grid gap-2 sm:grid-cols-[1fr_9rem_auto_auto]"><div><Label htmlFor={`objective-value-${objective.id}`} className="text-xs">Avance actual</Label><Input id={`objective-value-${objective.id}`} value={currentValue} onChange={(event) => setCurrentValue(event.target.value)} placeholder="Ej. USD 42K" autoFocus /></div><div><Label htmlFor={`objective-progress-${objective.id}`} className="text-xs">Avance %</Label><Input id={`objective-progress-${objective.id}`} type="number" min="0" max="100" step="0.1" value={progressPercent} onChange={(event) => setProgressPercent(event.target.value)} placeholder="0–100" /></div><Button type="submit" size="sm" className="self-end" disabled={isUpdating}>{isUpdating ? <Loader2 className="h-4 w-4 animate-spin" /> : "Guardar"}</Button><Button type="button" size="sm" variant="ghost" className="self-end" onClick={() => setEditing(false)}>Cancelar</Button></div></form> : <Button type="button" variant="ghost" size="sm" className="mt-2 h-8 px-2 text-xs" onClick={() => setEditing(true)}><Pencil className="mr-1.5 h-3.5 w-3.5" />Actualizar avance</Button>}
-    </article>
+    <div
+      className={cn(
+        "flex items-start gap-3 border-b border-border/60 py-3 last:border-0",
+        depth === 0 && "bg-card",
+      )}
+      style={{ paddingLeft: `${depth * 1.5}rem` }}
+    >
+      {hasChildren ? (
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-expanded={expanded}
+          aria-label={`${expanded ? "Contraer" : "Expandir"} ${objective.title}`}
+          className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-muted"
+        >
+          {expanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+        </button>
+      ) : (
+        <span className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
+      )}
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <Badge variant="outline" className={cn("px-2 py-0.5 text-[10px]", levelClass(objective.level))}>{levelLabel(objective.level)}</Badge>
+          <DeadlineBadge objective={objective} />
+          {hasChildren && <span className="text-[10px] font-semibold text-muted-foreground">{descendants} {descendants === 1 ? "objetivo depende" : "objetivos dependen"} de éste</span>}
+        </div>
+        <h3 className={cn("mt-1 leading-5 text-foreground", depth === 0 ? "text-sm font-bold" : "text-[13px] font-semibold")}>{objective.title}</h3>
+        <p className="mt-0.5 text-xs text-muted-foreground">{valueText(objective.target, "Meta aún no definida")}</p>
+        {progress !== null
+          ? <Progress value={progress} className="mt-2 h-1.5" />
+          : <p className="mt-1 text-[11px] text-muted-foreground">Sin avance cargado</p>}
+        <ProgressForm objective={objective} onUpdate={onUpdate} isUpdating={isUpdating} />
+      </div>
+      <div className="shrink-0 text-right text-[11px]">
+        <span className="block text-muted-foreground">Responsable</span>
+        <span className="font-semibold text-foreground">{ownerLabel(objective.owner)}</span>
+      </div>
+    </div>
+  );
+}
+
+function ObjectiveTree({ objectives, onUpdate, updatingId }: { objectives: Objective[]; onUpdate: (id: string | number, currentValue: string, progressPercent: number | null) => Promise<void>; updatingId: string | number | null }) {
+  const tree = useMemo(() => buildObjectiveTree(objectives), [objectives]);
+  // Las raíces arrancan abiertas: el valor de la pantalla es ver de qué cuelga
+  // cada cosa, y que arranque toda cerrada lo esconde.
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set(tree.map((node) => String(node.objective.id))));
+  const rows = flattenTree(tree, expanded);
+  const everyId = allNodeIds(tree);
+  const allOpen = everyId.length > 0 && everyId.every((id) => expanded.has(id));
+  const toggle = (id: string) => setExpanded((current) => {
+    const next = new Set(current);
+    next.has(id) ? next.delete(id) : next.add(id);
+    return next;
+  });
+  if (tree.length === 0) return <EmptyState title="No hay coincidencias" description="Probá cambiar el nivel o la búsqueda." />;
+  return (
+    <div className="mt-4">
+      <div className="mb-2 flex justify-end">
+        <Button type="button" variant="ghost" size="sm" onClick={() => setExpanded(allOpen ? new Set() : new Set(everyId))}>
+          {allOpen ? "Contraer todo" : "Expandir todo"}
+        </Button>
+      </div>
+      <div className="rounded-2xl border border-border/75 bg-card px-4">
+        {rows.map((node) => (
+          <ObjectiveRow
+            key={String(node.objective.id)}
+            node={node}
+            expanded={expanded.has(String(node.objective.id))}
+            onToggle={() => toggle(String(node.objective.id))}
+            onUpdate={onUpdate}
+            isUpdating={updatingId === node.objective.id}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function CurrentWeekBand({ actions, weekLabel, onToggle, pendingId }: { actions: ObjectiveAction[]; weekLabel: string; onToggle: (action: ObjectiveAction) => void; pendingId: string | number | null }) {
+  const pending = actions.filter((action) => !isDone(action));
+  return (
+    <section aria-label="Acciones de la semana vigente" className="rounded-2xl border border-primary/25 bg-primary/[0.04] p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <CalendarDays className="h-4 w-4 text-primary" />
+          <h2 className="text-sm font-bold text-foreground">Esta semana · {weekLabel}</h2>
+        </div>
+        <span className="text-[11px] font-semibold text-muted-foreground">
+          {pending.length === 0
+            ? `${actions.length} ${actions.length === 1 ? "acción" : "acciones"} · todo cerrado`
+            : `${pending.length} ${pending.length === 1 ? "pendiente" : "pendientes"} de ${actions.length}`}
+        </span>
+      </div>
+      {actions.length === 0 ? (
+        <p className="mt-3 text-xs text-muted-foreground">No hay acciones fechadas en la semana vigente.</p>
+      ) : (
+        <div className="mt-3 grid gap-1.5 md:grid-cols-2">
+          {actions.map((action) => (
+            <ActionCheck key={String(action.id)} action={action} onToggle={() => onToggle(action)} isPending={pendingId === action.id} />
+          ))}
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -249,10 +378,11 @@ export default function StatusObjectivesPage() {
     <div className="flex flex-wrap items-center justify-between gap-3"><SectionNav active={location.startsWith("/review/objectives") ? "objectives" : "status"} /><div className="flex items-center gap-2 text-xs text-muted-foreground"><CalendarDays className="h-3.5 w-3.5" /><span>Plan Cierre {YEAR}</span>{currentWeekStart && <><span className="text-border">·</span><span>Semana desde {formatWeek(currentWeekStart)}</span></>}</div></div>
     <CompactPageHeader eyebrow="Status · seguimiento integrado" title="Objetivos y acciones" description="Objetivos y acciones persistentes, conectados por owner, semana, cuenta y foco." icon={<Target className="h-5 w-5" />} actions={<Button size="sm" onClick={openActionForm} disabled={objectives.length === 0}><Plus className="h-4 w-4" />Nueva acción</Button>} meta={<><Badge variant="outline" className="gap-1.5 border-primary/20 bg-primary/[0.06] text-primary"><CircleDashed className="h-3 w-3" />API persistente</Badge><span className="inline-flex items-center gap-1.5"><Flag className="h-3.5 w-3.5" />Datos del backend</span></>} />
     {showActionForm && <ActionForm form={form} setForm={setForm} objectives={objectives} owners={ownerOptions} accounts={accounts} onSubmit={submitAction} onClose={() => setShowActionForm(false)} isPending={createActionMutation.isPending} error={formError} />}
+    <CurrentWeekBand actions={currentWeekActions} weekLabel={currentWeekLabel} onToggle={toggleAction} pendingId={updateActionMutation.isPending ? updateActionMutation.variables?.id ?? null : null} />
     {mutationError && <div role="alert" className="flex items-center gap-2 rounded-xl border border-destructive/20 bg-destructive/[0.03] px-3 py-2 text-xs text-destructive"><AlertCircle className="h-4 w-4 shrink-0" />{mutationError instanceof Error ? mutationError.message : "No se pudo guardar el cambio."}</div>}
     <div role="tablist" aria-label="Vista de objetivos" className="flex items-center gap-1 overflow-x-auto border-b border-border/80 pb-px">{viewTabs.map((tab) => <button key={tab.id} id={`objectives-tab-${tab.id}`} type="button" role="tab" aria-selected={view === tab.id} aria-controls={`objectives-panel-${tab.id}`} tabIndex={view === tab.id ? 0 : -1} onClick={() => setView(tab.id)} className={cn("whitespace-nowrap border-b-2 px-3 py-2 text-sm font-semibold transition-colors", view === tab.id ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground")}>{tab.label}</button>)}</div>
     {view === "summary" && <div id="objectives-panel-summary" role="tabpanel" aria-labelledby="objectives-tab-summary" tabIndex={0} className="space-y-5"><section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Indicadores principales"><MetricCard label="Objetivos" value={summary?.totalObjectives} detail="Total informado por la API" icon={BarChart3} tone="text-primary" /><MetricCard label="Acciones" value={summary?.totalActions} detail="Total informado por la API" icon={ListChecks} tone="text-violet-600" /><MetricCard label="Acciones completadas" value={summary?.completedActions} detail={summary ? `${summary.completedActions} de ${summary.totalActions}` : "Sin resumen disponible"} icon={Check} tone="text-emerald-600" /><MetricCard label="Objetivos en riesgo" value={summary?.atRiskObjectives} detail="Total informado por la API" icon={TrendingUp} tone="text-amber-600" /></section><StrategicSummary objectives={objectives} actions={actions} onOpenDirectory={(level) => { if (level) setObjectiveLevelFilter(level); setView("objectives"); }} /><section className="rounded-2xl border border-border/75 bg-card p-5"><div className="mb-4 flex items-start justify-between gap-3"><div><h2 className="text-base font-bold text-foreground">Foco de esta semana</h2><p className="mt-1 text-xs text-muted-foreground">{currentWeekStart ? `${currentWeekLabel} · ${currentWeekActions.length} acciones` : "El backend no informó la semana actual."}</p></div><ListChecks className="h-5 w-5 text-emerald-600" /></div>{currentWeekActions.length === 0 ? <EmptyState title="Sin acciones esta semana" description={currentWeekStart ? "No hay acciones con ese weekStart." : "La API todavía no definió currentWeekStart."} /> : <div className="grid gap-2 md:grid-cols-2">{currentWeekActions.map((action) => <ActionCheck key={String(action.id)} action={action} onToggle={() => toggleAction(action)} isPending={updateActionMutation.isPending && updateActionMutation.variables?.id === action.id} />)}</div>}<button type="button" onClick={() => setView("week")} className="mt-4 inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline">Ver todas las acciones de la semana <ArrowUpRight className="h-3.5 w-3.5" /></button></section></div>}
-    {view === "objectives" && <div id="objectives-panel-objectives" role="tabpanel" aria-labelledby="objectives-tab-objectives" tabIndex={0}><section className="rounded-2xl border border-border/75 bg-card p-5"><div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="text-base font-bold text-foreground">Todos los objetivos</h2><p className="mt-1 text-xs text-muted-foreground">Listado completo del plan, filtrable por nivel y búsqueda. La pantalla diaria queda en Resumen.</p></div><div className="flex flex-wrap gap-2"><Label htmlFor="objective-level-filter" className="sr-only">Filtrar por nivel</Label><select id="objective-level-filter" value={objectiveLevelFilter} onChange={(event) => setObjectiveLevelFilter(event.target.value)} className="h-9 rounded-lg border border-border bg-background px-2 text-xs font-semibold text-foreground"><option value="all">Todos los niveles</option><option value="company">Empresa</option><option value="area">Áreas</option><option value="person">Personas</option></select><Label htmlFor="objective-search" className="sr-only">Buscar objetivo</Label><Input id="objective-search" value={objectiveSearch} onChange={(event) => setObjectiveSearch(event.target.value)} placeholder="Buscar objetivo…" className="h-9 w-48 text-xs" /></div></div><p className="mt-4 text-xs text-muted-foreground">Mostrando {directoryObjectives.length} de {objectives.length} objetivos</p>{directoryObjectives.length === 0 ? <div className="mt-5"><EmptyState title="No hay coincidencias" description="Probá cambiar el nivel o la búsqueda." /></div> : <div className="mt-4 grid gap-3 md:grid-cols-2">{directoryObjectives.map((objective) => <GoalCard key={String(objective.id)} objective={objective} onUpdate={updateCurrentValue} isUpdating={updateObjectiveMutation.isPending && updateObjectiveMutation.variables?.id === objective.id} />)}</div>}</section></div>}
+    {view === "objectives" && <div id="objectives-panel-objectives" role="tabpanel" aria-labelledby="objectives-tab-objectives" tabIndex={0}><section className="rounded-2xl border border-border/75 bg-card p-5"><div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="text-base font-bold text-foreground">Todos los objetivos</h2><p className="mt-1 text-xs text-muted-foreground">El plan completo como árbol: cada objetivo cuelga del que sostiene. Ordenado por lo que vence antes.</p></div><div className="flex flex-wrap gap-2"><Label htmlFor="objective-level-filter" className="sr-only">Filtrar por nivel</Label><select id="objective-level-filter" value={objectiveLevelFilter} onChange={(event) => setObjectiveLevelFilter(event.target.value)} className="h-9 rounded-lg border border-border bg-background px-2 text-xs font-semibold text-foreground"><option value="all">Todos los niveles</option><option value="company">Empresa</option><option value="area">Áreas</option><option value="person">Personas</option></select><Label htmlFor="objective-search" className="sr-only">Buscar objetivo</Label><Input id="objective-search" value={objectiveSearch} onChange={(event) => setObjectiveSearch(event.target.value)} placeholder="Buscar objetivo…" className="h-9 w-48 text-xs" /></div></div><p className="mt-4 text-xs text-muted-foreground">Mostrando {directoryObjectives.length} de {objectives.length} objetivos</p><ObjectiveTree objectives={directoryObjectives} onUpdate={updateCurrentValue} updatingId={updateObjectiveMutation.isPending ? updateObjectiveMutation.variables?.id ?? null : null} /></section></div>}
     {view === "week" && <div id="objectives-panel-week" role="tabpanel" aria-labelledby="objectives-tab-week" tabIndex={0}><section className="rounded-2xl border border-border/75 bg-card p-5"><div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="text-base font-bold text-foreground">Acciones por semana</h2><p className="mt-1 text-xs text-muted-foreground">Todos los registros del backend, con owner, objetivo, semana y cuenta.</p></div><div className="flex items-center gap-2"><Users className="h-4 w-4 text-muted-foreground" /><Label htmlFor="owner-filter" className="sr-only">Filtrar por owner</Label><select id="owner-filter" value={ownerFilter} onChange={(event) => setOwnerFilter(event.target.value)} className="h-9 rounded-lg border border-border bg-background px-2 text-xs font-semibold text-foreground"><option value="Todos">Todos los owners</option>{ownerOptions.map((owner, index) => <option key={`${ownerKey(owner)}-${index}`} value={ownerKey(owner)}>{ownerLabel(owner)}</option>)}</select></div></div><ActionTable actions={filteredActions} onToggle={toggleAction} pendingId={updateActionMutation.isPending ? updateActionMutation.variables?.id ?? null : null} /></section></div>}
     {view === "people" && <div id="objectives-panel-people" role="tabpanel" aria-labelledby="objectives-tab-people" tabIndex={0}><section className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{people.length === 0 ? <EmptyState title="No hay owners" description="La API no devolvió owners ni registros con responsable." /> : people.map(({ owner, objectives: personObjectives, actions: personActions }) => <article key={ownerKey(owner)} className="rounded-2xl border border-border/75 bg-card p-4"><div className="flex items-start justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Persona</p><h2 className="mt-1 text-base font-bold text-foreground">{ownerLabel(owner)}</h2></div><Users className="h-5 w-5 text-primary" /></div><div className="mt-4 grid grid-cols-2 gap-2"><div className="rounded-xl bg-muted/50 p-3"><span className="text-[11px] text-muted-foreground">Objetivos</span><strong className="mt-1 block text-xl text-foreground">{personObjectives.length}</strong></div><div className="rounded-xl bg-muted/50 p-3"><span className="text-[11px] text-muted-foreground">Acciones</span><strong className="mt-1 block text-xl text-foreground">{personActions.length}</strong></div></div><div className="mt-4 space-y-2">{personObjectives.length > 0 ? personObjectives.map((objective) => <div key={String(objective.id)} className="rounded-lg border border-border/60 px-3 py-2 text-xs"><span className="font-semibold text-foreground">{objective.title}</span><span className="mt-1 block text-muted-foreground">{objective.metric || "Métrica aún no definida"}</span></div>) : <p className="text-xs text-muted-foreground">Sin objetivos asignados.</p>}</div></article>)}</section></div>}
     {view === "accounts" && <div id="objectives-panel-accounts" role="tabpanel" aria-labelledby="objectives-tab-accounts" tabIndex={0}><section className="grid gap-5 lg:grid-cols-[1.2fr_0.8fr]"><div className="rounded-2xl border border-border/75 bg-card p-5"><div className="flex items-center gap-2"><BriefcaseBusiness className="h-5 w-5 text-primary" /><h2 className="text-base font-bold">Cuentas</h2></div><p className="mt-1 text-xs text-muted-foreground">Cuentas devueltas por la API y acciones asociadas.</p><div className="mt-5 space-y-3">{accountRows.length === 0 ? <EmptyState title="No hay cuentas" description="La API no devolvió cuentas ni acciones asociadas a una cuenta." /> : accountRows.map(({ account, actions: accountActions }) => <div key={String(account.id)} className="rounded-xl border border-border/70 p-3"><div className="flex items-center justify-between gap-3"><div><div className="text-sm font-semibold">{account.name}</div><div className="mt-1 text-[11px] text-muted-foreground">{accountActions.length} acciones asociadas</div></div><Badge variant="outline" className="border-primary/20 bg-primary/[0.06] text-primary">{accountActions.length}</Badge></div>{accountActions.length > 0 && <div className="mt-3 space-y-1.5">{accountActions.map((action) => <div key={String(action.id)} className="text-xs text-muted-foreground">{action.title}</div>)}</div>}</div>)}</div></div><div className="rounded-2xl border border-border/75 bg-card p-5"><div className="flex items-center gap-2"><WalletCards className="h-5 w-5 text-amber-600" /><h2 className="text-base font-bold">Acciones sin cuenta</h2></div><div className="mt-6 text-3xl font-bold tracking-tight">{actions.filter((action) => (action.accountId === null || action.accountId === undefined) && !action.accountName).length}</div><p className="mt-1 text-xs text-muted-foreground">Cantidad derivada de los registros recibidos; no es una métrica simulada.</p></div></section></div>}

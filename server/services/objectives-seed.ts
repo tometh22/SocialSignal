@@ -18,6 +18,13 @@ const MONTH_NUMBERS: Record<string, number> = {
   diciembre: 12,
 };
 
+// numeric(14,2) vuelve de Postgres como "655000.00": comparar como texto
+// marcaría un cambio en cada arranque.
+function numericChanged(stored: string | null, next: string | null): boolean {
+  if (stored == null || next == null) return stored !== next;
+  return Number(stored) !== Number(next);
+}
+
 function resolveClientId(accountName: string, clientRows: Array<{ id: number; name: string }>): number | null {
   const normalizedAccount = normalize(accountName);
   const exact = clientRows.find((client) => normalize(client.name) === normalizedAccount);
@@ -59,6 +66,10 @@ export async function ensureObjectivesPlanSeed(): Promise<void> {
       progressPercent: objective.progressPercent,
       status: objective.status,
       ownerPersonnelId: resolveOwner(objective.ownerName, personnelRows, personnelByName, unresolvedOwners),
+      targetKind: objective.targetKind,
+      targetValue: objective.targetValue != null ? String(objective.targetValue) : null,
+      targetUnit: objective.targetUnit,
+      targetDate: objective.targetDate,
     }));
   if (objectivesToInsert.length) {
     await db.insert(objectives).values(objectivesToInsert).onConflictDoNothing();
@@ -72,17 +83,42 @@ export async function ensureObjectivesPlanSeed(): Promise<void> {
   // corrected owner in the source would never reach an existing production
   // record.
   const objectiveRowsWithOwners = await db
-    .select({ id: objectives.id, slug: objectives.slug, ownerPersonnelId: objectives.ownerPersonnelId })
+    .select({
+      id: objectives.id,
+      slug: objectives.slug,
+      ownerPersonnelId: objectives.ownerPersonnelId,
+      parentObjectiveId: objectives.parentObjectiveId,
+      targetKind: objectives.targetKind,
+      targetValue: objectives.targetValue,
+      targetUnit: objectives.targetUnit,
+      targetDate: objectives.targetDate,
+    })
     .from(objectives)
     .where(eq(objectives.year, 2026));
   const objectivePlanBySlug = new Map(plan.objectives.map((objective) => [objective.slug, objective]));
   for (const row of objectiveRowsWithOwners) {
     const source = objectivePlanBySlug.get(row.slug);
     if (!source) continue;
+    const updates: Record<string, unknown> = {};
+
     const ownerPersonnelId = resolveOwner(source.ownerName, personnelRows, personnelByName, unresolvedOwners);
-    if (row.ownerPersonnelId !== ownerPersonnelId) {
+    if (row.ownerPersonnelId !== ownerPersonnelId) updates.ownerPersonnelId = ownerPersonnelId;
+
+    // La jerarquía y la lectura de la meta se derivan del plan, que es la
+    // fuente. No son campos que se editen desde la pantalla, así que
+    // reconciliarlos siempre no pisa ninguna decisión del usuario.
+    const parentObjectiveId = source.parentSlug ? objectiveIdsBySlug.get(source.parentSlug) ?? null : null;
+    if (row.parentObjectiveId !== parentObjectiveId) updates.parentObjectiveId = parentObjectiveId;
+
+    if (row.targetKind !== source.targetKind) updates.targetKind = source.targetKind;
+    const targetValue = source.targetValue != null ? String(source.targetValue) : null;
+    if (numericChanged(row.targetValue, targetValue)) updates.targetValue = targetValue;
+    if ((row.targetUnit ?? null) !== (source.targetUnit ?? null)) updates.targetUnit = source.targetUnit;
+    if ((row.targetDate ?? null) !== (source.targetDate ?? null)) updates.targetDate = source.targetDate;
+
+    if (Object.keys(updates).length) {
       await db.update(objectives)
-        .set({ ownerPersonnelId, updatedAt: new Date() })
+        .set({ ...updates, updatedAt: new Date() } as typeof objectives.$inferInsert)
         .where(eq(objectives.id, row.id));
     }
   }
