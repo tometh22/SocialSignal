@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.9.3 — 2026-09-16
+
+- Corrige los contadores de personas por rol para que respeten el área, excluyan freelancers y no cuenten personas cuyo período activo ya terminó.
+
 ## 1.9.2 — 2026-09-16
 
 - Hace visible la bandeja de aprobación de ausencias dentro del módulo Operaciones y aclara en pantalla la diferencia entre solicitar y gestionar.
