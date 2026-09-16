@@ -3,7 +3,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import {
   AlertCircle,
-  ArrowUpRight,
   BarChart3,
   BriefcaseBusiness,
   CalendarDays,
@@ -69,8 +68,8 @@ type ActionForm = {
 const YEAR = 2026;
 
 const viewTabs: Array<{ id: ViewId; label: string }> = [
-  { id: "summary", label: "Resumen" },
   { id: "objectives", label: "Mapa" },
+  { id: "summary", label: "Qué mirar" },
   { id: "timeline", label: "Línea de tiempo" },
   { id: "week", label: "Esta semana" },
   { id: "people", label: "Personas" },
@@ -447,7 +446,6 @@ function FrontsView({ map, onUpdate, updatingId }: { map: ReturnType<typeof buil
   const front = map.fronts.find((candidate) => candidate.id === openFront) ?? null;
   return (
     <div className="space-y-5">
-      <NorthStarPanel northStar={map.northStar} support={map.northSupport} />
       <section aria-label="Frentes del plan">
         <h2 className="text-base font-bold text-foreground">Cinco frentes</h2>
         <p className="mt-1 text-xs text-muted-foreground">Abrí uno para ver sus objetivos de empresa. Nunca 87 tarjetas de una.</p>
@@ -536,7 +534,9 @@ function ActionForm({ form, setForm, objectives, owners, accounts, onSubmit, onC
 export default function StatusObjectivesPage() {
   const [location] = useLocation();
   const queryClient = useQueryClient();
-  const [view, setView] = useState<ViewId>("summary");
+  // El plan entra por su mapa: el norte arriba y los cinco frentes. La vista
+  // del lunes queda a un clic, en Resumen.
+  const [view, setView] = useState<ViewId>("objectives");
   const [ownerFilter, setOwnerFilter] = useState("Todos");
   const [showActionForm, setShowActionForm] = useState(false);
   const [form, setForm] = useState<ActionForm>(emptyActionForm);
@@ -585,10 +585,11 @@ export default function StatusObjectivesPage() {
     <div className="flex flex-wrap items-center justify-between gap-3"><SectionNav active={location.startsWith("/review/objectives") ? "objectives" : "status"} /><div className="flex items-center gap-2 text-xs text-muted-foreground"><CalendarDays className="h-3.5 w-3.5" /><span>Plan Cierre {YEAR}</span>{currentWeekStart && <><span className="text-border">·</span><span>Semana desde {formatWeek(currentWeekStart)}</span></>}</div></div>
     <CompactPageHeader eyebrow="Status · seguimiento integrado" title="Objetivos y acciones" description="Objetivos y acciones persistentes, conectados por owner, semana, cuenta y foco." icon={<Target className="h-5 w-5" />} actions={<Button size="sm" onClick={openActionForm} disabled={objectives.length === 0}><Plus className="h-4 w-4" />Nueva acción</Button>} meta={<><Badge variant="outline" className="gap-1.5 border-primary/20 bg-primary/[0.06] text-primary"><CircleDashed className="h-3 w-3" />API persistente</Badge><span className="inline-flex items-center gap-1.5"><Flag className="h-3.5 w-3.5" />Datos del backend</span></>} />
     {showActionForm && <ActionForm form={form} setForm={setForm} objectives={objectives} owners={ownerOptions} accounts={accounts} onSubmit={submitAction} onClose={() => setShowActionForm(false)} isPending={createActionMutation.isPending} error={formError} />}
+    <NorthStarPanel northStar={objectivesMap.northStar} support={objectivesMap.northSupport} />
     <CurrentWeekBand actions={currentWeekActions} weekLabel={currentWeekLabel} onToggle={toggleAction} pendingId={updateActionMutation.isPending ? updateActionMutation.variables?.id ?? null : null} />
     {mutationError && <div role="alert" className="flex items-center gap-2 rounded-xl border border-destructive/20 bg-destructive/[0.03] px-3 py-2 text-xs text-destructive"><AlertCircle className="h-4 w-4 shrink-0" />{mutationError instanceof Error ? mutationError.message : "No se pudo guardar el cambio."}</div>}
     <div role="tablist" aria-label="Vista de objetivos" className="flex items-center gap-1 overflow-x-auto border-b border-border/80 pb-px">{viewTabs.map((tab) => <button key={tab.id} id={`objectives-tab-${tab.id}`} type="button" role="tab" aria-selected={view === tab.id} aria-controls={`objectives-panel-${tab.id}`} tabIndex={view === tab.id ? 0 : -1} onClick={() => setView(tab.id)} className={cn("whitespace-nowrap border-b-2 px-3 py-2 text-sm font-semibold transition-colors", view === tab.id ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground")}>{tab.label}</button>)}</div>
-    {view === "summary" && <div id="objectives-panel-summary" role="tabpanel" aria-labelledby="objectives-tab-summary" tabIndex={0} className="space-y-5"><section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Indicadores principales"><MetricCard label="Objetivos" value={summary?.totalObjectives} detail="Total informado por la API" icon={BarChart3} tone="text-primary" /><MetricCard label="Acciones" value={summary?.totalActions} detail="Total informado por la API" icon={ListChecks} tone="text-violet-600" /><MetricCard label="Acciones completadas" value={summary?.completedActions} detail={summary ? `${summary.completedActions} de ${summary.totalActions}` : "Sin resumen disponible"} icon={Check} tone="text-emerald-600" /><MetricCard label="Objetivos en riesgo" value={summary?.atRiskObjectives} detail="Total informado por la API" icon={TrendingUp} tone="text-amber-600" /></section><MondayView map={objectivesMap} /><section className="rounded-2xl border border-border/75 bg-card p-5"><div className="mb-4 flex items-start justify-between gap-3"><div><h2 className="text-base font-bold text-foreground">Foco de esta semana</h2><p className="mt-1 text-xs text-muted-foreground">{currentWeekStart ? `${currentWeekLabel} · ${currentWeekActions.length} acciones` : "El backend no informó la semana actual."}</p></div><ListChecks className="h-5 w-5 text-emerald-600" /></div>{currentWeekActions.length === 0 ? <EmptyState title="Sin acciones esta semana" description={currentWeekStart ? "No hay acciones con ese weekStart." : "La API todavía no definió currentWeekStart."} /> : <div className="grid gap-2 md:grid-cols-2">{currentWeekActions.map((action) => <ActionCheck key={String(action.id)} action={action} onToggle={() => toggleAction(action)} isPending={updateActionMutation.isPending && updateActionMutation.variables?.id === action.id} />)}</div>}<button type="button" onClick={() => setView("week")} className="mt-4 inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline">Ver todas las acciones de la semana <ArrowUpRight className="h-3.5 w-3.5" /></button></section></div>}
+    {view === "summary" && <div id="objectives-panel-summary" role="tabpanel" aria-labelledby="objectives-tab-summary" tabIndex={0} className="space-y-5"><section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Indicadores principales"><MetricCard label="Objetivos" value={summary?.totalObjectives} detail="Total informado por la API" icon={BarChart3} tone="text-primary" /><MetricCard label="Acciones" value={summary?.totalActions} detail="Total informado por la API" icon={ListChecks} tone="text-violet-600" /><MetricCard label="Acciones completadas" value={summary?.completedActions} detail={summary ? `${summary.completedActions} de ${summary.totalActions}` : "Sin resumen disponible"} icon={Check} tone="text-emerald-600" /><MetricCard label="Objetivos en riesgo" value={summary?.atRiskObjectives} detail="Total informado por la API" icon={TrendingUp} tone="text-amber-600" /></section><MondayView map={objectivesMap} /></div>}
     {view === "objectives" && <div id="objectives-panel-objectives" role="tabpanel" aria-labelledby="objectives-tab-objectives" tabIndex={0}><FrontsView map={objectivesMap} onUpdate={updateCurrentValue} updatingId={updateObjectiveMutation.isPending ? updateObjectiveMutation.variables?.id ?? null : null} /></div>}
     {view === "week" && <div id="objectives-panel-week" role="tabpanel" aria-labelledby="objectives-tab-week" tabIndex={0}><section className="rounded-2xl border border-border/75 bg-card p-5"><div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="text-base font-bold text-foreground">Acciones por semana</h2><p className="mt-1 text-xs text-muted-foreground">Todos los registros del backend, con owner, objetivo, semana y cuenta.</p></div><div className="flex items-center gap-2"><Users className="h-4 w-4 text-muted-foreground" /><Label htmlFor="owner-filter" className="sr-only">Filtrar por owner</Label><select id="owner-filter" value={ownerFilter} onChange={(event) => setOwnerFilter(event.target.value)} className="h-9 rounded-lg border border-border bg-background px-2 text-xs font-semibold text-foreground"><option value="Todos">Todos los owners</option>{ownerOptions.map((owner, index) => <option key={`${ownerKey(owner)}-${index}`} value={ownerKey(owner)}>{ownerLabel(owner)}</option>)}</select></div></div><ActionTable actions={filteredActions} onToggle={toggleAction} pendingId={updateActionMutation.isPending ? updateActionMutation.variables?.id ?? null : null} /></section></div>}
     {view === "timeline" && <div id="objectives-panel-timeline" role="tabpanel" aria-labelledby="objectives-tab-timeline" tabIndex={0}><TimelineView timeline={objectivesMap.timeline} objectives={objectives} /></div>}
