@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.9.1 — 2026-09-16
+
+- Excluye freelancers también de los selectores de alta rápida y del configurador legado de equipos, evitando que otra ruta del cotizador los asigne a roles.
+
 ## 1.9.0 — 2026-09-16
 
 - Excluye freelancers del selector de personas para asignar roles en nuevas cotizaciones, manteniendo la consistencia con los promedios de la escala vigente.

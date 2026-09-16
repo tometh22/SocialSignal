@@ -199,6 +199,13 @@ describe("Feedback Mind V2-13 · ronda 27-8", () => {
     expect(team).toContain("personMatchesRole(role, person as any)");
     expect(team).toContain("const roleAssignablePersonnel = availablePersonnel.filter((person) => person.contractType !== 'freelance');");
     expect(team).toContain("if (!person || person.contractType === 'freelance') return;");
+
+    const quickAdd = source("client/src/components/optimized/financial-review-redesigned.tsx");
+    expect(quickAdd).toContain("person.contractType !== 'freelance'");
+
+    const simpleTeam = source("client/src/components/optimized/SimpleTeamConfig.tsx");
+    expect(simpleTeam).toContain(".filter(person => person.contractType !== 'freelance')");
+    expect(simpleTeam).toContain("selectedPersonnel?.contractType === 'freelance'");
     // Un puesto sin perfiles lo dice, en vez de mostrar un selector vacío.
     expect(team).toContain("Nadie con la clasificación");
     expect(team).toContain("perfiles de otra clasificación");

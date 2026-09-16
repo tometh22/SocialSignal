@@ -35,6 +35,11 @@ const TeamMemberQuickAdd: React.FC = () => {
     const hoursNum = parseFloat(hours);
     const rateNum = parseFloat(rate);
     
+    const selectedPerson = selectedPersonnel && selectedPersonnel !== "0"
+      ? personnel.find(person => person.id === parseInt(selectedPersonnel))
+      : undefined;
+    if (selectedPerson?.contractType === 'freelance') return;
+
     addTeamMember({
       roleId: parseInt(selectedRole),
       personnelId: selectedPersonnel && selectedPersonnel !== "0" ? parseInt(selectedPersonnel) : null,
@@ -64,7 +69,7 @@ const TeamMemberQuickAdd: React.FC = () => {
 
   // Filtrar personal disponible basado en el rol seleccionado
   const availablePersonnelForRole = selectedRole && selectedRole !== '0'
-    ? personnel.filter(person => person.roleId === parseInt(selectedRole))
+    ? personnel.filter(person => person.roleId === parseInt(selectedRole) && person.contractType !== 'freelance')
     : [];
 
   if (!showAddForm) {
