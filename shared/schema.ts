@@ -1554,6 +1554,8 @@ export const activeProjects = pgTable("active_projects", {
   status: text("status").notNull().default("active"), // active, completed, cancelled, on-hold, delivered, invoiced, voided
   // Operational Kanban stage. Kept separate from the financial/lifecycle status.
   workflowStage: text("workflow_stage").notNull().default("aprobado"),
+  workflowBlockedReason: text("workflow_blocked_reason"),
+  workflowBlockedAt: timestamp("workflow_blocked_at"),
   startDate: timestamp("start_date").notNull(),
   expectedEndDate: timestamp("expected_end_date"),
   actualEndDate: timestamp("actual_end_date"),

@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.9.0 — 2026-09-16
+
+- Excluye freelancers del selector de personas para asignar roles en nuevas cotizaciones, manteniendo la consistencia con los promedios de la escala vigente.
+- Permite registrar en el Kanban el motivo y la fecha de bloqueo de un proyecto, con migración idempotente y edición desde la tarjeta.
+- Invalida el calendario al actualizar fechas de tareas desde Home para que las altas y cambios aparezcan sin recarga manual.
+
 ## 1.8.0 — 2026-09-15
 
 - Separa definitivamente costo económico y facturación: el costo del equipo se devenga al 100% desde el cierre de Operaciones y no cambia cuando llega, se corrige o se aprueba una factura.

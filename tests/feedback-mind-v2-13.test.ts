@@ -197,6 +197,8 @@ describe("Feedback Mind V2-13 · ronda 27-8", () => {
   it("filtra en duro por clasificación y deja una salida para no bloquear", () => {
     const team = source("client/src/components/optimized/EnhancedTeamConfig.tsx");
     expect(team).toContain("personMatchesRole(role, person as any)");
+    expect(team).toContain("const roleAssignablePersonnel = availablePersonnel.filter((person) => person.contractType !== 'freelance');");
+    expect(team).toContain("if (!person || person.contractType === 'freelance') return;");
     // Un puesto sin perfiles lo dice, en vez de mostrar un selector vacío.
     expect(team).toContain("Nadie con la clasificación");
     expect(team).toContain("perfiles de otra clasificación");
@@ -294,6 +296,13 @@ describe("Feedback Mind V2-13 · ronda 27-8", () => {
     // Sin proyecto no se emite un enlace muerto.
     expect(home).toContain("if (!projectId) return <div className={className}>{children}</div>;");
     expect(home).toContain("<TaskRowTarget projectId={task.projectId}");
+  });
+
+  it("permite cambiar el estado de una tarea desde Home", () => {
+    const home = source("client/src/pages/tasks/tasks-home.tsx");
+    expect(home).toContain("aria-label={`Cambiar estado de ${task.title}`}");
+    expect(home).toContain('apiRequest(`/api/tasks/${taskId}`, "PUT", { status })');
+    expect(home).toContain('<option value="blocked">Bloqueada</option>');
   });
 
   // ── F27-09 a F27-13 · Reloj rápido ──────────────────────────────────────

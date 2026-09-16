@@ -13,6 +13,8 @@ type Project = {
   name: string;
   clientName: string | null;
   workflowStage?: WorkflowStage;
+  workflowBlockedReason?: string | null;
+  workflowBlockedAt?: string | null;
   taskCount: number;
   pendingCount: number;
   members: Array<{ personnelId: number; name: string; role: string }>;
@@ -31,6 +33,7 @@ export default function ProjectsKanbanPage() {
   const queryClient = useQueryClient();
   const [draggedId, setDraggedId] = useState<number | null>(null);
   const [managerFilter, setManagerFilter] = useState("all");
+  const [blockReasonDrafts, setBlockReasonDrafts] = useState<Record<number, string>>({});
   const { data: projects = [], isLoading } = useQuery<Project[]>({
     queryKey: ["/api/tasks/projects", "kanban", isOperations],
     queryFn: async () => {
@@ -41,8 +44,8 @@ export default function ProjectsKanbanPage() {
     staleTime: 0,
   });
   const moveMutation = useMutation({
-    mutationFn: ({ projectId, workflowStage }: { projectId: number; workflowStage: WorkflowStage }) =>
-      apiRequest(`/api/tasks/projects/${projectId}/workflow-stage`, "PATCH", { workflowStage }),
+    mutationFn: ({ projectId, workflowStage, blockedReason }: { projectId: number; workflowStage: WorkflowStage; blockedReason?: string }) =>
+      apiRequest(`/api/tasks/projects/${projectId}/workflow-stage`, "PATCH", { workflowStage, ...(blockedReason !== undefined ? { blockedReason } : {}) }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/tasks/projects"] });
     },
@@ -150,6 +153,44 @@ export default function ProjectsKanbanPage() {
                           {STAGES.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                         </select>
                       </label>
+                      {project.workflowStage === "bloqueado" && (
+                        <div className="mt-3 rounded-md border border-amber-200 bg-amber-50/70 p-2">
+                          <label className="block text-[10px] font-medium uppercase tracking-wide text-amber-800" htmlFor={`blocked-reason-${project.id}`}>
+                            Motivo del bloqueo
+                          </label>
+                          <textarea
+                            id={`blocked-reason-${project.id}`}
+                            aria-label={`Motivo del bloqueo de ${project.name || "proyecto"}`}
+                            rows={2}
+                            maxLength={500}
+                            value={blockReasonDrafts[project.id] ?? project.workflowBlockedReason ?? ""}
+                            onChange={(event) => setBlockReasonDrafts((current) => ({ ...current, [project.id]: event.target.value }))}
+                            className="mt-1 w-full resize-none rounded border border-amber-200 bg-white px-2 py-1.5 text-xs text-foreground outline-none focus:ring-2 focus:ring-amber-300"
+                            placeholder="Ej.: Bloqueado por falta de información del cliente"
+                          />
+                          <div className="mt-1.5 flex items-center justify-between gap-2">
+                            {project.workflowBlockedAt && (
+                              <span className="text-[10px] text-amber-800/70">
+                                Desde {new Date(project.workflowBlockedAt).toLocaleDateString("es-AR")}
+                              </span>
+                            )}
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              className="ml-auto h-7 border-amber-300 bg-white px-2 text-[11px] text-amber-900 hover:bg-amber-100"
+                              disabled={moveMutation.isPending}
+                              onClick={() => moveMutation.mutate({
+                                projectId: project.id,
+                                workflowStage: "bloqueado",
+                                blockedReason: (blockReasonDrafts[project.id] ?? project.workflowBlockedReason ?? "").trim(),
+                              })}
+                            >
+                              Guardar motivo
+                            </Button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </article>

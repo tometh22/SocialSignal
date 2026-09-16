@@ -333,7 +333,13 @@ const EnhancedTeamConfig: React.FC<EnhancedTeamConfigProps> = ({ validationMessa
   const normalizedRoleSearch = roleSearch.trim().toLocaleLowerCase('es');
   const normalizedPersonnelSearch = personnelSearch.trim().toLocaleLowerCase('es');
   const filteredRoles = availableRoles.filter((role) => role.name.toLocaleLowerCase('es').includes(normalizedRoleSearch));
-  const filteredPersonnel = availablePersonnel.filter((person) =>
+  // Los promedios de tarifa y la escala de Roles excluyen freelancers. La
+  // misma regla debe aplicarse al selector de personas para no sugerir, por
+  // ejemplo, una persona freelance para un puesto Semi Senior A. Los
+  // freelancers siguen siendo visibles en otras pantallas y en cotizaciones
+  // históricas; acá se trata únicamente de la asignación estándar del rol.
+  const roleAssignablePersonnel = availablePersonnel.filter((person) => person.contractType !== 'freelance');
+  const filteredPersonnel = roleAssignablePersonnel.filter((person) =>
     person.name.toLocaleLowerCase('es').includes(normalizedPersonnelSearch) ||
     (person.currentRole || '').toLocaleLowerCase('es').includes(normalizedPersonnelSearch),
   );
@@ -362,7 +368,7 @@ const EnhancedTeamConfig: React.FC<EnhancedTeamConfigProps> = ({ validationMessa
         .filter((teamMember) => teamMember.personnelId && teamMember.id !== member.id)
         .map((teamMember) => teamMember.personnelId),
     );
-    const available = availablePersonnel.filter((person) => !taken.has(person.id));
+    const available = roleAssignablePersonnel.filter((person) => !taken.has(person.id));
     const role = getRoleInfo(member.roleId) as any;
     if (!role?.roleLevel) return { matching: [], others: available, roleName: role?.name ?? null };
     return {
@@ -375,7 +381,7 @@ const EnhancedTeamConfig: React.FC<EnhancedTeamConfigProps> = ({ validationMessa
   const assignPersonnel = (member: DragDropTeamMember, value: string) => {
     const personnelId = Number(value);
     const person = availablePersonnel.find((candidate) => candidate.id === personnelId);
-    if (!person) return;
+    if (!person || person.contractType === 'freelance') return;
     const role = getRoleInfo(member.roleId);
     const rate = getCorrectRate(person, role);
     updateTeamMember(member.id, {

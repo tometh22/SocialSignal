@@ -24447,6 +24447,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           c.name as client_name,
           ap.status,
           ap.workflow_stage,
+          ap.workflow_blocked_reason,
+          ap.workflow_blocked_at,
           COUNT(DISTINCT t.id) as task_count,
           COUNT(DISTINCT CASE WHEN t.status NOT IN ('done', 'cancelled') THEN t.id END) as pending_count,
           MAX(t.updated_at) as last_activity,
@@ -24456,7 +24458,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         JOIN clients c ON c.id = ap.client_id
         LEFT JOIN tasks t ON t.project_id = ap.id
         WHERE ${status} AND ${visibility}
-        GROUP BY ap.id, ap.name, q.project_name, c.name, ap.status, ap.workflow_stage
+        GROUP BY ap.id, ap.name, q.project_name, c.name, ap.status, ap.workflow_stage,
+                 ap.workflow_blocked_reason, ap.workflow_blocked_at
         ORDER BY c.name, COALESCE(ap.name, q.project_name)
       `);
 
@@ -24483,6 +24486,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         clientName: p.client_name,
         status: p.status,
         workflowStage: p.workflow_stage,
+        workflowBlockedReason: p.workflow_blocked_reason,
+        workflowBlockedAt: p.workflow_blocked_at,
         taskCount: parseInt(p.task_count) || 0,
         pendingCount: parseInt(p.pending_count) || 0,
         lastActivity: p.last_activity,
@@ -24540,7 +24545,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "No tenés acceso a este proyecto" });
       }
       const projectResult = await db.execute(sql`
-        SELECT ap.id, COALESCE(ap.name, q.project_name) as name, c.name as client_name, ap.status, ap.workflow_stage, ap.brief_url
+        SELECT ap.id, COALESCE(ap.name, q.project_name) as name, c.name as client_name, ap.status,
+               ap.workflow_stage, ap.workflow_blocked_reason, ap.workflow_blocked_at, ap.brief_url
         FROM active_projects ap
         LEFT JOIN quotations q ON q.id = ap.quotation_id
         JOIN clients c ON c.id = ap.client_id
@@ -24554,6 +24560,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         clientName: p.client_name,
         status: p.status,
         workflowStage: p.workflow_stage,
+        workflowBlockedReason: p.workflow_blocked_reason,
+        workflowBlockedAt: p.workflow_blocked_at,
         briefUrl: p.brief_url ?? null,
         source: 'active_project',
       };
@@ -24630,15 +24638,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!(PROJECT_WORKFLOW_STAGES as readonly string[]).includes(workflowStage)) {
         return res.status(400).json({ message: "Etapa de workflow inválida" });
       }
+      const hasBlockedReason = Object.prototype.hasOwnProperty.call(req.body ?? {}, "blockedReason");
+      const blockedReason = hasBlockedReason ? String(req.body?.blockedReason ?? "").trim() : undefined;
+      if (blockedReason != null && blockedReason.length > 500) {
+        return res.status(400).json({ message: "El motivo del bloqueo no puede superar 500 caracteres" });
+      }
       // Any authorized project member can move the operational stage; financial
       // status and project economics remain restricted to Operations/Admin.
       if (!(await canAccessTaskProject(req, projectId))) {
         return res.status(403).json({ message: "No tenés acceso a este proyecto" });
       }
+      const updateData: Partial<typeof activeProjects.$inferInsert> = {
+        workflowStage,
+        updatedAt: new Date(),
+      };
+      if (workflowStage !== "bloqueado") {
+        updateData.workflowBlockedReason = null;
+        updateData.workflowBlockedAt = null;
+      } else if (hasBlockedReason) {
+        updateData.workflowBlockedReason = blockedReason || null;
+        updateData.workflowBlockedAt = blockedReason ? new Date() : null;
+      }
       const [updated] = await db.update(activeProjects)
-        .set({ workflowStage, updatedAt: new Date() })
+        .set(updateData)
         .where(eq(activeProjects.id, projectId))
-        .returning({ id: activeProjects.id, workflowStage: activeProjects.workflowStage });
+        .returning({
+          id: activeProjects.id,
+          workflowStage: activeProjects.workflowStage,
+          workflowBlockedReason: activeProjects.workflowBlockedReason,
+          workflowBlockedAt: activeProjects.workflowBlockedAt,
+        });
       if (!updated) return res.status(404).json({ message: "Proyecto no encontrado" });
       res.json(updated);
     } catch (error) {
