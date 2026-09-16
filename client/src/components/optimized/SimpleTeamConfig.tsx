@@ -101,6 +101,11 @@ const SimpleTeamConfig: React.FC = () => {
       ? availablePersonnel.find(p => p.id === newMember.personnelId)
       : null;
 
+    if (selectedPersonnel?.contractType === 'freelance') {
+      console.warn('Freelancers cannot be assigned to quote roles');
+      return;
+    }
+
     if (!selectedRole) {
       console.error('No role selected');
       return;
@@ -252,6 +257,10 @@ const SimpleTeamConfig: React.FC = () => {
 
         if (field === 'personnelId') {
           const selectedPersonnel = value ? availablePersonnel.find(p => p.id === value) : null;
+
+          if (selectedPersonnel?.contractType === 'freelance') {
+            return;
+          }
           
           // CORREGIR BUG UX: Usar getPersonnelRate del contexto para mantener consistencia
           // Esto evita el cambio confuso entre USD/ARS durante la edición
@@ -416,6 +425,7 @@ const SimpleTeamConfig: React.FC = () => {
                   <option value="0">Seleccionar personal</option>
                   {availablePersonnel && availablePersonnel
                     .filter(person => !newMember.roleId || person.roleId === newMember.roleId)
+                    .filter(person => person.contractType !== 'freelance')
                     .filter(person => !person.name.includes('Member')) // Filtrar personal genérico
                     .map(person => {
                       const role = availableRoles?.find(r => r.id === person.roleId);
