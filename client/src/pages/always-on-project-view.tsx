@@ -35,6 +35,7 @@ import {
 import { AlwaysOnProjectSummary, Entregable, Equipo } from '@/components/projects/AlwaysOnProjectSummary';
 import { DeliverableConfig, Deliverable } from '@/components/projects/DeliverableConfig';
 import { Link } from 'wouter';
+import { statusLabel } from "@/lib/status-labels";
 
 const AlwaysOnProjectView = () => {
   const [, params] = useRoute('/always-on-project/:projectId');
@@ -251,7 +252,7 @@ const AlwaysOnProjectView = () => {
                 Volver
               </Button>
             </Link>
-            <Badge className="bg-blue-500">{project.status}</Badge>
+            <Badge className="bg-blue-500">{statusLabel(project.status)}</Badge>
             {project.isAlwaysOnProject && (
               <Badge variant="outline" className="bg-blue-50 text-blue-800 border-blue-200">
                 Always-On

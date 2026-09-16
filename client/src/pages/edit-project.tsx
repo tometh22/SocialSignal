@@ -13,6 +13,7 @@ import { ArrowLeft, Save, Loader2, Edit3, Calendar, DollarSign, FileText, Buildi
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { PageLayout } from "@/components/ui/page-layout";
+import { statusLabel } from "@/lib/status-labels";
 
 interface ProjectData {
   id: number;
@@ -151,16 +152,6 @@ export default function EditProject() {
     }
   };
 
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case 'active': return 'Activo';
-      case 'paused': return 'Pausado';
-      case 'completed': return 'Completado';
-      case 'archived': return 'Archivado';
-      default: return status;
-    }
-  };
-
   if (isLoading) {
     return (
       <PageLayout title="Cargando...">
@@ -206,7 +197,7 @@ export default function EditProject() {
                 <div className="flex items-center gap-3 mb-2">
                   <h1 className="text-3xl font-bold text-gray-900">Editar Proyecto</h1>
                   <Badge variant="outline" className={getStatusColor(status)}>
-                    {getStatusLabel(status)}
+                    {statusLabel(status)}
                   </Badge>
                 </div>
                 <p className="text-gray-600">

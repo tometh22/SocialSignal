@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { ShieldAlert, UploadCloud } from "lucide-react";
 import { Link } from "wouter";
 import { Label } from "@/components/ui/label";
+import { statusLabel } from "@/lib/status-labels";
 
 const MONTHS = Array.from({ length: 12 }, (_, i) => ({
   value: String(i + 1).padStart(2, "0"),
@@ -146,7 +147,7 @@ export default function ProvisionsPage() {
                     <TableCell className="text-right font-mono">{fmtUSD(parseFloat(row.montoProvision ?? "0"))}</TableCell>
                     <TableCell className="text-right font-mono">{fmtUSD(parseFloat(row.remainingAmount ?? row.montoProvision ?? "0"))}</TableCell>
                     <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">{row.criterio || "-"}</TableCell>
-                    <TableCell><Badge variant="outline">{row.status || "PROPOSED"}</Badge></TableCell>
+                    <TableCell><Badge variant="outline">{statusLabel(row.status, "Propuesta")}</Badge></TableCell>
                     <TableCell>
                       {row.importBatch ? (
                         <Badge variant="outline" className="text-xs text-muted-foreground">Excel</Badge>
