@@ -42,15 +42,18 @@ import {
   updateObjectiveAction,
 } from "@/lib/objectives-api";
 import {
-  allNodeIds,
-  buildObjectiveTree,
+  buildObjectivesMap,
+  childrenOfNode,
   deadlineOf,
-  flattenTree,
   formatDeadline,
+  isGroup,
   ObjectiveNode,
+  tierOf,
+  TreeItem,
 } from "@/lib/objectives-tree";
+import type { FrontId } from "@shared/objectives-fronts";
 
-type ViewId = "summary" | "objectives" | "week" | "people" | "accounts";
+type ViewId = "summary" | "objectives" | "timeline" | "week" | "people" | "accounts";
 
 type ActionForm = {
   title: string;
@@ -67,7 +70,8 @@ const YEAR = 2026;
 
 const viewTabs: Array<{ id: ViewId; label: string }> = [
   { id: "summary", label: "Resumen" },
-  { id: "objectives", label: "Objetivos" },
+  { id: "objectives", label: "Mapa" },
+  { id: "timeline", label: "Línea de tiempo" },
   { id: "week", label: "Esta semana" },
   { id: "people", label: "Personas" },
   { id: "accounts", label: "Cuentas" },
@@ -190,87 +194,297 @@ function DeadlineBadge({ objective }: { objective: Objective }) {
   return <span className={cn("rounded-full border px-2 py-0.5 text-[10px] font-semibold", tone)}>{formatDeadline(deadline)}</span>;
 }
 
-function ObjectiveRow({ node, expanded, onToggle, onUpdate, isUpdating }: { node: ObjectiveNode; expanded: boolean; onToggle: () => void; onUpdate: (id: string | number, currentValue: string, progressPercent: number | null) => Promise<void>; isUpdating: boolean }) {
-  const { objective, depth, children, descendants } = node;
-  const progress = typeof objective.progressPercent === "number" && Number.isFinite(objective.progressPercent)
-    ? Math.max(0, Math.min(100, objective.progressPercent))
-    : null;
-  const hasChildren = children.length > 0;
-  return (
-    <div
-      className={cn(
-        "flex items-start gap-3 border-b border-border/60 py-3 last:border-0",
-        depth === 0 && "bg-card",
-      )}
-      style={{ paddingLeft: `${depth * 1.5}rem` }}
-    >
-      {hasChildren ? (
+
+function TierBadge({ objective }: { objective: Objective }) {
+  if (tierOf(objective) !== "innegociable") return null;
+  return <span className="rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-red-700">Innegociable</span>;
+}
+
+function ObjectiveBranch({ item, expanded, onToggle, onUpdate, updatingId }: { item: TreeItem; expanded: Set<string>; onToggle: (id: string) => void; onUpdate: (id: string | number, currentValue: string, progressPercent: number | null) => Promise<void>; updatingId: string | number | null }) {
+  if (isGroup(item)) {
+    const open = expanded.has(item.id);
+    return (
+      <div className="border-l border-border/70 pl-3">
         <button
           type="button"
-          onClick={onToggle}
-          aria-expanded={expanded}
-          aria-label={`${expanded ? "Contraer" : "Expandir"} ${objective.title}`}
-          className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-muted"
+          onClick={() => onToggle(item.id)}
+          aria-expanded={open}
+          className="flex w-full items-center gap-2 py-2 text-left"
         >
-          {expanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+          {open ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
+          <span className="text-xs font-bold text-foreground">{item.label}</span>
+          <span className="text-[11px] text-muted-foreground">{item.descendants} {item.descendants === 1 ? "objetivo" : "objetivos"}</span>
         </button>
-      ) : (
-        <span className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
-      )}
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-1.5">
-          <Badge variant="outline" className={cn("px-2 py-0.5 text-[10px]", levelClass(objective.level))}>{levelLabel(objective.level)}</Badge>
-          <DeadlineBadge objective={objective} />
-          {hasChildren && <span className="text-[10px] font-semibold text-muted-foreground">{descendants} {descendants === 1 ? "objetivo depende" : "objetivos dependen"} de éste</span>}
+        {open && <div className="space-y-1 pb-1">{item.children.map((child) => <ObjectiveBranch key={String(child.objective.id)} item={child} expanded={expanded} onToggle={onToggle} onUpdate={onUpdate} updatingId={updatingId} />)}</div>}
+      </div>
+    );
+  }
+
+  const node = item;
+  const id = String(node.objective.id);
+  const kids = childrenOfNode(node);
+  const open = expanded.has(id);
+  const progress = typeof node.objective.progressPercent === "number" && Number.isFinite(node.objective.progressPercent)
+    ? Math.max(0, Math.min(100, node.objective.progressPercent))
+    : null;
+  return (
+    <div className="border-l border-border/70 pl-3">
+      <div className="flex items-start gap-2 py-2">
+        {kids.length > 0 ? (
+          <button type="button" onClick={() => onToggle(id)} aria-expanded={open} aria-label={`${open ? "Contraer" : "Expandir"} ${node.objective.title}`} className="mt-0.5 shrink-0 text-muted-foreground">
+            {open ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+          </button>
+        ) : <span className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />}
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <TierBadge objective={node.objective} />
+            <DeadlineBadge objective={node.objective} />
+            <Badge variant="outline" className={cn("px-1.5 py-0 text-[9px]", levelClass(node.objective.level))}>{levelLabel(node.objective.level)}</Badge>
+          </div>
+          <h4 className="mt-1 text-[13px] font-semibold leading-5 text-foreground">{node.objective.title}</h4>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">{valueText(node.objective.target, "Meta aún no definida")}</p>
+          {progress !== null && <Progress value={progress} className="mt-1.5 h-1" />}
+          <ProgressForm objective={node.objective} onUpdate={onUpdate} isUpdating={updatingId === node.objective.id} />
         </div>
-        <h3 className={cn("mt-1 leading-5 text-foreground", depth === 0 ? "text-sm font-bold" : "text-[13px] font-semibold")}>{objective.title}</h3>
-        <p className="mt-0.5 text-xs text-muted-foreground">{valueText(objective.target, "Meta aún no definida")}</p>
-        {progress !== null
-          ? <Progress value={progress} className="mt-2 h-1.5" />
-          : <p className="mt-1 text-[11px] text-muted-foreground">Sin avance cargado</p>}
-        <ProgressForm objective={objective} onUpdate={onUpdate} isUpdating={isUpdating} />
+        <span className="shrink-0 text-right text-[10px] text-muted-foreground">{ownerLabel(node.objective.owner)}</span>
       </div>
-      <div className="shrink-0 text-right text-[11px]">
-        <span className="block text-muted-foreground">Responsable</span>
-        <span className="font-semibold text-foreground">{ownerLabel(objective.owner)}</span>
-      </div>
+      {open && kids.length > 0 && <div className="space-y-1 pb-1">{kids.map((child) => <ObjectiveBranch key={isGroup(child) ? child.id : String(child.objective.id)} item={child} expanded={expanded} onToggle={onToggle} onUpdate={onUpdate} updatingId={updatingId} />)}</div>}
     </div>
   );
 }
 
-function ObjectiveTree({ objectives, onUpdate, updatingId }: { objectives: Objective[]; onUpdate: (id: string | number, currentValue: string, progressPercent: number | null) => Promise<void>; updatingId: string | number | null }) {
-  const tree = useMemo(() => buildObjectiveTree(objectives), [objectives]);
-  // Las raíces arrancan abiertas: el valor de la pantalla es ver de qué cuelga
-  // cada cosa, y que arranque toda cerrada lo esconde.
-  const [expanded, setExpanded] = useState<Set<string>>(() => new Set(tree.map((node) => String(node.objective.id))));
-  const rows = flattenTree(tree, expanded);
-  const everyId = allNodeIds(tree);
-  const allOpen = everyId.length > 0 && everyId.every((id) => expanded.has(id));
+function NorthStarPanel({ northStar, support }: { northStar: ObjectiveNode | null; support: ObjectiveNode[] }) {
+  if (!northStar) return null;
+  const objective = northStar.objective;
+  const progress = typeof objective.progressPercent === "number" && Number.isFinite(objective.progressPercent) ? Math.max(0, Math.min(100, objective.progressPercent)) : null;
+  return (
+    <section aria-label="El norte del plan" className="rounded-2xl border border-slate-900/15 bg-slate-900 p-5 text-white">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-white/55">El norte</span>
+          <h2 className="mt-1 text-lg font-bold leading-6">{objective.title}</h2>
+          <p className="mt-1 text-xs text-white/70">{valueText(objective.target, "Meta aún no definida")}</p>
+        </div>
+        <div className="text-right">
+          <span className="block text-[10px] uppercase tracking-wide text-white/55">Avance</span>
+          <span className="text-2xl font-bold">{progress === null ? "—" : `${progress}%`}</span>
+        </div>
+      </div>
+      {progress !== null && <Progress value={progress} className="mt-3 h-1.5 bg-white/15" />}
+      {support.length > 0 && (
+        <div className="mt-4 border-t border-white/15 pt-3">
+          {support.map((node) => (
+            <div key={String(node.objective.id)} className="flex items-center justify-between gap-3 text-xs">
+              <span className="text-white/80">{node.objective.title}</span>
+              <span className="text-white/55">{valueText(node.objective.target, "—")}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function FrontCard({ front, active, onSelect }: { front: ReturnType<typeof buildObjectivesMap>["fronts"][number]; active: boolean; onSelect: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      aria-pressed={active}
+      className={cn(
+        "rounded-2xl border p-4 text-left transition-colors",
+        active ? "border-primary bg-primary/[0.06]" : "border-border/75 bg-card hover:bg-muted/40",
+      )}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <span className="text-sm font-bold leading-5 text-foreground">{front.label}</span>
+        <span className="shrink-0 text-lg font-bold text-foreground">{front.progress === null ? "—" : `${front.progress}%`}</span>
+      </div>
+      <p className="mt-2 text-[11px] text-muted-foreground">{front.total} {front.total === 1 ? "objetivo" : "objetivos"}</p>
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        {front.overdue > 0 && <span className="rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[10px] font-bold text-red-700">{front.overdue} vencido{front.overdue === 1 ? "" : "s"}</span>}
+        {front.dueSoon > 0 && <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700">{front.dueSoon} vence{front.dueSoon === 1 ? "" : "n"} pronto</span>}
+        {front.nonNegotiable > 0 && <span className="rounded-full border border-slate-300 bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-700">{front.nonNegotiable} innegociable{front.nonNegotiable === 1 ? "" : "s"}</span>}
+        {front.overdue === 0 && front.dueSoon === 0 && front.nonNegotiable === 0 && <span className="text-[10px] text-muted-foreground">Sin urgencias</span>}
+      </div>
+    </button>
+  );
+}
+
+function StandardsPanel({ standards, atRisk }: { standards: Objective[]; atRisk: Objective[] }) {
+  const riskIds = new Set(atRisk.map((objective) => String(objective.id)));
+  return (
+    <section aria-label="Estándares sostenidos" className="rounded-2xl border border-border/75 bg-card p-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-base font-bold text-foreground">Estándares</h2>
+          <p className="mt-1 text-xs text-muted-foreground">No vencen: se sostienen. El semáforo mira cumplimiento, no avance.</p>
+        </div>
+        <span className="text-xs font-semibold text-muted-foreground">{atRisk.length} de {standards.length} sin verde</span>
+      </div>
+      <div className="mt-4 grid gap-1.5 md:grid-cols-2">
+        {standards.map((objective) => {
+          const rojo = riskIds.has(String(objective.id));
+          return (
+            <div key={String(objective.id)} className="flex items-start gap-2 rounded-xl border border-border/60 px-3 py-2">
+              <span className={cn("mt-1 h-2 w-2 shrink-0 rounded-full", rojo ? "bg-red-500" : "bg-emerald-500")} aria-hidden="true" />
+              <div className="min-w-0">
+                <p className="text-xs font-semibold leading-4 text-foreground">{objective.title}</p>
+                <p className="mt-0.5 text-[11px] text-muted-foreground">{valueText(objective.target, "Sin estándar definido")}</p>
+                <p className="mt-0.5 text-[10px] font-semibold text-muted-foreground">{rojo ? "Sin medición cargada" : "En cumplimiento"} · {ownerLabel(objective.owner)}</p>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function TimelineView({ timeline, objectives }: { timeline: ReturnType<typeof buildObjectivesMap>["timeline"]; objectives: Objective[] }) {
+  const conFecha = objectives
+    .filter((objective) => objective.targetDate && objective.targetKind !== "continuous")
+    .sort((a, b) => String(a.targetDate).localeCompare(String(b.targetDate)));
+  const marcadores = [...timeline].sort((a, b) => a.date.localeCompare(b.date));
+  return (
+    <section className="rounded-2xl border border-border/75 bg-card p-5">
+      <h2 className="text-base font-bold text-foreground">Línea de tiempo</h2>
+      <p className="mt-1 text-xs text-muted-foreground">Cada objetivo cae por su fecha de corte. Los estándares no caen: viven en su propio panel.</p>
+      <div className="mt-5 space-y-4">
+        {marcadores.map((marcador, index) => {
+          const desde = index === 0 ? "0000-01-01" : marcadores[index - 1].date;
+          const enVentana = conFecha.filter((objective) => {
+            const fecha = String(objective.targetDate).slice(0, 10);
+            return fecha > desde && fecha <= marcador.date;
+          });
+          return (
+            <div key={`${marcador.date}-${marcador.label}`}>
+              <div className={cn("flex items-center gap-2 rounded-xl px-3 py-2", marcador.hard ? "border-l-4 border-slate-900 bg-slate-100" : "border-l-4 border-border bg-muted/40")}>
+                <Flag className={cn("h-3.5 w-3.5", marcador.hard ? "text-slate-900" : "text-muted-foreground")} />
+                <span className="text-xs font-bold text-foreground">{marcador.label}</span>
+                <span className="ml-auto text-[11px] text-muted-foreground">{formatWeek(marcador.date)}</span>
+              </div>
+              {enVentana.length === 0 ? (
+                <p className="mt-1 pl-4 text-[11px] text-muted-foreground">Nada vence en este tramo.</p>
+              ) : (
+                <ul className="mt-1 space-y-0.5 pl-4">
+                  {enVentana.map((objective) => (
+                    <li key={String(objective.id)} className="flex items-center gap-2 text-[11px]">
+                      <span className="w-14 shrink-0 text-muted-foreground">{formatWeek(String(objective.targetDate))}</span>
+                      <TierBadge objective={objective} />
+                      <span className="truncate text-foreground">{objective.title}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function MondayView({ map }: { map: ReturnType<typeof buildObjectivesMap> }) {
+  return (
+    <section className="grid gap-4 lg:grid-cols-2">
+      <div className="rounded-2xl border border-border/75 bg-card p-5">
+        <h2 className="text-base font-bold text-foreground">Vence en 14 días</h2>
+        <p className="mt-1 text-xs text-muted-foreground">Primero lo innegociable del mes, después por fecha.</p>
+        {map.dueSoon.length === 0 ? (
+          <p className="mt-4 text-xs text-muted-foreground">Nada vence en los próximos 14 días.</p>
+        ) : (
+          <ul className="mt-4 space-y-1.5">
+            {map.dueSoon.map((objective) => {
+              const deadline = deadlineOf(objective);
+              return (
+                <li key={String(objective.id)} className="flex items-start gap-2 border-b border-border/50 pb-1.5 last:border-0">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <TierBadge objective={objective} />
+                      {deadline && <span className={cn("text-[10px] font-bold", deadline.overdue ? "text-red-600" : "text-amber-600")}>{formatDeadline(deadline)}</span>}
+                    </div>
+                    <p className="text-xs font-semibold leading-4 text-foreground">{objective.title}</p>
+                  </div>
+                  <span className="shrink-0 text-[10px] text-muted-foreground">{ownerLabel(objective.owner)}</span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
+      <div className="rounded-2xl border border-border/75 bg-card p-5">
+        <h2 className="text-base font-bold text-foreground">Estándares en rojo</h2>
+        <p className="mt-1 text-xs text-muted-foreground">Lo que se sostiene y hoy no se está midiendo.</p>
+        {map.standardsAtRisk.length === 0 ? (
+          <p className="mt-4 text-xs text-muted-foreground">Todos los estándares en verde.</p>
+        ) : (
+          <ul className="mt-4 space-y-1.5">
+            {map.standardsAtRisk.map((objective) => (
+              <li key={String(objective.id)} className="flex items-start gap-2 border-b border-border/50 pb-1.5 last:border-0">
+                <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-red-500" aria-hidden="true" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-semibold leading-4 text-foreground">{objective.title}</p>
+                  <p className="text-[10px] text-muted-foreground">{ownerLabel(objective.owner)}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function FrontsView({ map, onUpdate, updatingId }: { map: ReturnType<typeof buildObjectivesMap>; onUpdate: (id: string | number, currentValue: string, progressPercent: number | null) => Promise<void>; updatingId: string | number | null }) {
+  const [openFront, setOpenFront] = useState<FrontId | null>(null);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const toggle = (id: string) => setExpanded((current) => {
     const next = new Set(current);
     next.has(id) ? next.delete(id) : next.add(id);
     return next;
   });
-  if (tree.length === 0) return <EmptyState title="No hay coincidencias" description="Probá cambiar el nivel o la búsqueda." />;
+  const front = map.fronts.find((candidate) => candidate.id === openFront) ?? null;
   return (
-    <div className="mt-4">
-      <div className="mb-2 flex justify-end">
-        <Button type="button" variant="ghost" size="sm" onClick={() => setExpanded(allOpen ? new Set() : new Set(everyId))}>
-          {allOpen ? "Contraer todo" : "Expandir todo"}
-        </Button>
-      </div>
-      <div className="rounded-2xl border border-border/75 bg-card px-4">
-        {rows.map((node) => (
-          <ObjectiveRow
-            key={String(node.objective.id)}
-            node={node}
-            expanded={expanded.has(String(node.objective.id))}
-            onToggle={() => toggle(String(node.objective.id))}
-            onUpdate={onUpdate}
-            isUpdating={updatingId === node.objective.id}
-          />
-        ))}
-      </div>
+    <div className="space-y-5">
+      <NorthStarPanel northStar={map.northStar} support={map.northSupport} />
+      <section aria-label="Frentes del plan">
+        <h2 className="text-base font-bold text-foreground">Cinco frentes</h2>
+        <p className="mt-1 text-xs text-muted-foreground">Abrí uno para ver sus objetivos de empresa. Nunca 87 tarjetas de una.</p>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+          {map.fronts.map((candidate) => (
+            <FrontCard
+              key={candidate.id}
+              front={candidate}
+              active={candidate.id === openFront}
+              onSelect={() => setOpenFront(candidate.id === openFront ? null : candidate.id)}
+            />
+          ))}
+        </div>
+      </section>
+      {front && (
+        <section className="rounded-2xl border border-primary/25 bg-card p-5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h3 className="text-sm font-bold text-foreground">{front.label}</h3>
+            <Button type="button" variant="ghost" size="sm" onClick={() => setOpenFront(null)}>Cerrar</Button>
+          </div>
+          <div className="mt-2 space-y-1">
+            {front.objectives.map((node) => (
+              <ObjectiveBranch key={String(node.objective.id)} item={node} expanded={expanded} onToggle={toggle} onUpdate={onUpdate} updatingId={updatingId} />
+            ))}
+          </div>
+        </section>
+      )}
+      {map.unplaced.length > 0 && (
+        <section className="rounded-2xl border border-amber-300 bg-amber-50/60 p-4">
+          <h3 className="text-sm font-bold text-amber-900">Sin frente asignado</h3>
+          <p className="mt-1 text-xs text-amber-800">Estos objetivos de empresa no están en ningún frente. Hay que clasificarlos en objectives-fronts.ts.</p>
+          <ul className="mt-2 space-y-0.5">
+            {map.unplaced.map((objective) => <li key={String(objective.id)} className="text-xs text-amber-900">· {objective.title}</li>)}
+          </ul>
+        </section>
+      )}
+      <StandardsPanel standards={map.standards} atRisk={map.standardsAtRisk} />
     </div>
   );
 }
@@ -323,8 +537,6 @@ export default function StatusObjectivesPage() {
   const [location] = useLocation();
   const queryClient = useQueryClient();
   const [view, setView] = useState<ViewId>("summary");
-  const [objectiveLevelFilter, setObjectiveLevelFilter] = useState("all");
-  const [objectiveSearch, setObjectiveSearch] = useState("");
   const [ownerFilter, setOwnerFilter] = useState("Todos");
   const [showActionForm, setShowActionForm] = useState(false);
   const [form, setForm] = useState<ActionForm>(emptyActionForm);
@@ -345,14 +557,9 @@ export default function StatusObjectivesPage() {
     const seen = new Set<string>();
     return all.filter((owner) => { const key = ownerKey(owner); if (!key || seen.has(key)) return false; seen.add(key); return true; });
   }, [actions, objectives, owners]);
+  const objectivesMap = useMemo(() => buildObjectivesMap(objectives), [objectives]);
   const currentWeekActions = useMemo(() => !currentWeekStart ? [] : actions.filter((action) => normalizeDate(action.weekStart) === normalizeDate(currentWeekStart)), [actions, currentWeekStart]);
   const filteredActions = useMemo(() => ownerFilter === "Todos" ? actions : actions.filter((action) => ownerKey(action.accountableOwner) === ownerFilter), [actions, ownerFilter]);
-  const directoryObjectives = useMemo(() => objectives.filter((objective) => {
-    const matchesLevel = objectiveLevelFilter === "all" || objective.level === objectiveLevelFilter;
-    const query = objectiveSearch.trim().toLowerCase();
-    const matchesSearch = !query || [objective.title, objective.metric, objective.areaKey, ownerLabel(objective.owner)].filter(Boolean).some((value) => String(value).toLowerCase().includes(query));
-    return matchesLevel && matchesSearch;
-  }), [objectives, objectiveLevelFilter, objectiveSearch]);
   const people = useMemo(() => ownerOptions.map((owner) => { const key = ownerKey(owner); return { owner, objectives: objectives.filter((objective) => ownerKey(objective.owner) === key), actions: actions.filter((action) => [action.accountableOwner, ...(action.supportingOwners ?? [])].some((candidate) => ownerKey(candidate) === key)) }; }), [actions, objectives, ownerOptions]);
   const accountRows = useMemo(() => {
     const rows = accounts.map((account) => ({ account, actions: actions.filter((action) => String(action.accountId ?? "") === String(account.id) || action.accountName === account.name) }));
@@ -381,22 +588,15 @@ export default function StatusObjectivesPage() {
     <CurrentWeekBand actions={currentWeekActions} weekLabel={currentWeekLabel} onToggle={toggleAction} pendingId={updateActionMutation.isPending ? updateActionMutation.variables?.id ?? null : null} />
     {mutationError && <div role="alert" className="flex items-center gap-2 rounded-xl border border-destructive/20 bg-destructive/[0.03] px-3 py-2 text-xs text-destructive"><AlertCircle className="h-4 w-4 shrink-0" />{mutationError instanceof Error ? mutationError.message : "No se pudo guardar el cambio."}</div>}
     <div role="tablist" aria-label="Vista de objetivos" className="flex items-center gap-1 overflow-x-auto border-b border-border/80 pb-px">{viewTabs.map((tab) => <button key={tab.id} id={`objectives-tab-${tab.id}`} type="button" role="tab" aria-selected={view === tab.id} aria-controls={`objectives-panel-${tab.id}`} tabIndex={view === tab.id ? 0 : -1} onClick={() => setView(tab.id)} className={cn("whitespace-nowrap border-b-2 px-3 py-2 text-sm font-semibold transition-colors", view === tab.id ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground")}>{tab.label}</button>)}</div>
-    {view === "summary" && <div id="objectives-panel-summary" role="tabpanel" aria-labelledby="objectives-tab-summary" tabIndex={0} className="space-y-5"><section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Indicadores principales"><MetricCard label="Objetivos" value={summary?.totalObjectives} detail="Total informado por la API" icon={BarChart3} tone="text-primary" /><MetricCard label="Acciones" value={summary?.totalActions} detail="Total informado por la API" icon={ListChecks} tone="text-violet-600" /><MetricCard label="Acciones completadas" value={summary?.completedActions} detail={summary ? `${summary.completedActions} de ${summary.totalActions}` : "Sin resumen disponible"} icon={Check} tone="text-emerald-600" /><MetricCard label="Objetivos en riesgo" value={summary?.atRiskObjectives} detail="Total informado por la API" icon={TrendingUp} tone="text-amber-600" /></section><StrategicSummary objectives={objectives} actions={actions} onOpenDirectory={(level) => { if (level) setObjectiveLevelFilter(level); setView("objectives"); }} /><section className="rounded-2xl border border-border/75 bg-card p-5"><div className="mb-4 flex items-start justify-between gap-3"><div><h2 className="text-base font-bold text-foreground">Foco de esta semana</h2><p className="mt-1 text-xs text-muted-foreground">{currentWeekStart ? `${currentWeekLabel} · ${currentWeekActions.length} acciones` : "El backend no informó la semana actual."}</p></div><ListChecks className="h-5 w-5 text-emerald-600" /></div>{currentWeekActions.length === 0 ? <EmptyState title="Sin acciones esta semana" description={currentWeekStart ? "No hay acciones con ese weekStart." : "La API todavía no definió currentWeekStart."} /> : <div className="grid gap-2 md:grid-cols-2">{currentWeekActions.map((action) => <ActionCheck key={String(action.id)} action={action} onToggle={() => toggleAction(action)} isPending={updateActionMutation.isPending && updateActionMutation.variables?.id === action.id} />)}</div>}<button type="button" onClick={() => setView("week")} className="mt-4 inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline">Ver todas las acciones de la semana <ArrowUpRight className="h-3.5 w-3.5" /></button></section></div>}
-    {view === "objectives" && <div id="objectives-panel-objectives" role="tabpanel" aria-labelledby="objectives-tab-objectives" tabIndex={0}><section className="rounded-2xl border border-border/75 bg-card p-5"><div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="text-base font-bold text-foreground">Todos los objetivos</h2><p className="mt-1 text-xs text-muted-foreground">El plan completo como árbol: cada objetivo cuelga del que sostiene. Ordenado por lo que vence antes.</p></div><div className="flex flex-wrap gap-2"><Label htmlFor="objective-level-filter" className="sr-only">Filtrar por nivel</Label><select id="objective-level-filter" value={objectiveLevelFilter} onChange={(event) => setObjectiveLevelFilter(event.target.value)} className="h-9 rounded-lg border border-border bg-background px-2 text-xs font-semibold text-foreground"><option value="all">Todos los niveles</option><option value="company">Empresa</option><option value="area">Áreas</option><option value="person">Personas</option></select><Label htmlFor="objective-search" className="sr-only">Buscar objetivo</Label><Input id="objective-search" value={objectiveSearch} onChange={(event) => setObjectiveSearch(event.target.value)} placeholder="Buscar objetivo…" className="h-9 w-48 text-xs" /></div></div><p className="mt-4 text-xs text-muted-foreground">Mostrando {directoryObjectives.length} de {objectives.length} objetivos</p><ObjectiveTree objectives={directoryObjectives} onUpdate={updateCurrentValue} updatingId={updateObjectiveMutation.isPending ? updateObjectiveMutation.variables?.id ?? null : null} /></section></div>}
+    {view === "summary" && <div id="objectives-panel-summary" role="tabpanel" aria-labelledby="objectives-tab-summary" tabIndex={0} className="space-y-5"><section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Indicadores principales"><MetricCard label="Objetivos" value={summary?.totalObjectives} detail="Total informado por la API" icon={BarChart3} tone="text-primary" /><MetricCard label="Acciones" value={summary?.totalActions} detail="Total informado por la API" icon={ListChecks} tone="text-violet-600" /><MetricCard label="Acciones completadas" value={summary?.completedActions} detail={summary ? `${summary.completedActions} de ${summary.totalActions}` : "Sin resumen disponible"} icon={Check} tone="text-emerald-600" /><MetricCard label="Objetivos en riesgo" value={summary?.atRiskObjectives} detail="Total informado por la API" icon={TrendingUp} tone="text-amber-600" /></section><MondayView map={objectivesMap} /><section className="rounded-2xl border border-border/75 bg-card p-5"><div className="mb-4 flex items-start justify-between gap-3"><div><h2 className="text-base font-bold text-foreground">Foco de esta semana</h2><p className="mt-1 text-xs text-muted-foreground">{currentWeekStart ? `${currentWeekLabel} · ${currentWeekActions.length} acciones` : "El backend no informó la semana actual."}</p></div><ListChecks className="h-5 w-5 text-emerald-600" /></div>{currentWeekActions.length === 0 ? <EmptyState title="Sin acciones esta semana" description={currentWeekStart ? "No hay acciones con ese weekStart." : "La API todavía no definió currentWeekStart."} /> : <div className="grid gap-2 md:grid-cols-2">{currentWeekActions.map((action) => <ActionCheck key={String(action.id)} action={action} onToggle={() => toggleAction(action)} isPending={updateActionMutation.isPending && updateActionMutation.variables?.id === action.id} />)}</div>}<button type="button" onClick={() => setView("week")} className="mt-4 inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline">Ver todas las acciones de la semana <ArrowUpRight className="h-3.5 w-3.5" /></button></section></div>}
+    {view === "objectives" && <div id="objectives-panel-objectives" role="tabpanel" aria-labelledby="objectives-tab-objectives" tabIndex={0}><FrontsView map={objectivesMap} onUpdate={updateCurrentValue} updatingId={updateObjectiveMutation.isPending ? updateObjectiveMutation.variables?.id ?? null : null} /></div>}
     {view === "week" && <div id="objectives-panel-week" role="tabpanel" aria-labelledby="objectives-tab-week" tabIndex={0}><section className="rounded-2xl border border-border/75 bg-card p-5"><div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="text-base font-bold text-foreground">Acciones por semana</h2><p className="mt-1 text-xs text-muted-foreground">Todos los registros del backend, con owner, objetivo, semana y cuenta.</p></div><div className="flex items-center gap-2"><Users className="h-4 w-4 text-muted-foreground" /><Label htmlFor="owner-filter" className="sr-only">Filtrar por owner</Label><select id="owner-filter" value={ownerFilter} onChange={(event) => setOwnerFilter(event.target.value)} className="h-9 rounded-lg border border-border bg-background px-2 text-xs font-semibold text-foreground"><option value="Todos">Todos los owners</option>{ownerOptions.map((owner, index) => <option key={`${ownerKey(owner)}-${index}`} value={ownerKey(owner)}>{ownerLabel(owner)}</option>)}</select></div></div><ActionTable actions={filteredActions} onToggle={toggleAction} pendingId={updateActionMutation.isPending ? updateActionMutation.variables?.id ?? null : null} /></section></div>}
+    {view === "timeline" && <div id="objectives-panel-timeline" role="tabpanel" aria-labelledby="objectives-tab-timeline" tabIndex={0}><TimelineView timeline={objectivesMap.timeline} objectives={objectives} /></div>}
     {view === "people" && <div id="objectives-panel-people" role="tabpanel" aria-labelledby="objectives-tab-people" tabIndex={0}><section className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{people.length === 0 ? <EmptyState title="No hay owners" description="La API no devolvió owners ni registros con responsable." /> : people.map(({ owner, objectives: personObjectives, actions: personActions }) => <article key={ownerKey(owner)} className="rounded-2xl border border-border/75 bg-card p-4"><div className="flex items-start justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Persona</p><h2 className="mt-1 text-base font-bold text-foreground">{ownerLabel(owner)}</h2></div><Users className="h-5 w-5 text-primary" /></div><div className="mt-4 grid grid-cols-2 gap-2"><div className="rounded-xl bg-muted/50 p-3"><span className="text-[11px] text-muted-foreground">Objetivos</span><strong className="mt-1 block text-xl text-foreground">{personObjectives.length}</strong></div><div className="rounded-xl bg-muted/50 p-3"><span className="text-[11px] text-muted-foreground">Acciones</span><strong className="mt-1 block text-xl text-foreground">{personActions.length}</strong></div></div><div className="mt-4 space-y-2">{personObjectives.length > 0 ? personObjectives.map((objective) => <div key={String(objective.id)} className="rounded-lg border border-border/60 px-3 py-2 text-xs"><span className="font-semibold text-foreground">{objective.title}</span><span className="mt-1 block text-muted-foreground">{objective.metric || "Métrica aún no definida"}</span></div>) : <p className="text-xs text-muted-foreground">Sin objetivos asignados.</p>}</div></article>)}</section></div>}
     {view === "accounts" && <div id="objectives-panel-accounts" role="tabpanel" aria-labelledby="objectives-tab-accounts" tabIndex={0}><section className="grid gap-5 lg:grid-cols-[1.2fr_0.8fr]"><div className="rounded-2xl border border-border/75 bg-card p-5"><div className="flex items-center gap-2"><BriefcaseBusiness className="h-5 w-5 text-primary" /><h2 className="text-base font-bold">Cuentas</h2></div><p className="mt-1 text-xs text-muted-foreground">Cuentas devueltas por la API y acciones asociadas.</p><div className="mt-5 space-y-3">{accountRows.length === 0 ? <EmptyState title="No hay cuentas" description="La API no devolvió cuentas ni acciones asociadas a una cuenta." /> : accountRows.map(({ account, actions: accountActions }) => <div key={String(account.id)} className="rounded-xl border border-border/70 p-3"><div className="flex items-center justify-between gap-3"><div><div className="text-sm font-semibold">{account.name}</div><div className="mt-1 text-[11px] text-muted-foreground">{accountActions.length} acciones asociadas</div></div><Badge variant="outline" className="border-primary/20 bg-primary/[0.06] text-primary">{accountActions.length}</Badge></div>{accountActions.length > 0 && <div className="mt-3 space-y-1.5">{accountActions.map((action) => <div key={String(action.id)} className="text-xs text-muted-foreground">{action.title}</div>)}</div>}</div>)}</div></div><div className="rounded-2xl border border-border/75 bg-card p-5"><div className="flex items-center gap-2"><WalletCards className="h-5 w-5 text-amber-600" /><h2 className="text-base font-bold">Acciones sin cuenta</h2></div><div className="mt-6 text-3xl font-bold tracking-tight">{actions.filter((action) => (action.accountId === null || action.accountId === undefined) && !action.accountName).length}</div><p className="mt-1 text-xs text-muted-foreground">Cantidad derivada de los registros recibidos; no es una métrica simulada.</p></div></section></div>}
   </PageShell>;
 }
 
-function StrategicSummary({ objectives, actions, onOpenDirectory }: { objectives: Objective[]; actions: ObjectiveAction[]; onOpenDirectory: (level?: string) => void }) {
-  const levels = [
-    { key: "company", label: "Empresa", description: "Norte y resultados del cierre", tone: "text-violet-700 bg-violet-50 border-violet-200" },
-    { key: "area", label: "Áreas", description: "Palancas de ejecución", tone: "text-sky-700 bg-sky-50 border-sky-200" },
-    { key: "person", label: "Personas", description: "Responsabilidades individuales", tone: "text-slate-700 bg-slate-100 border-slate-200" },
-  ];
-  return <section className="rounded-2xl border border-border/75 bg-card p-5"><div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="text-base font-bold text-foreground">Mapa estratégico</h2><p className="mt-1 text-xs text-muted-foreground">La cascada completa queda disponible en Objetivos; este resumen muestra sólo la estructura para decidir rápido.</p></div><Button type="button" variant="outline" size="sm" onClick={() => onOpenDirectory()}>Ver todos los objetivos <ArrowUpRight className="ml-1.5 h-3.5 w-3.5" /></Button></div><div className="mt-4 grid gap-2 md:grid-cols-3">{levels.map((level) => { const levelObjectives = objectives.filter((objective) => objective.level === level.key); const levelActions = actions.filter((action) => levelObjectives.some((objective) => String(objective.id) === String(action.objectiveId))); return <button type="button" key={level.key} onClick={() => onOpenDirectory(level.key)} className="rounded-xl border border-border/70 p-4 text-left transition-colors hover:bg-muted/40"><div className="flex items-center justify-between gap-3"><span className={cn("rounded-full border px-2 py-1 text-[10px] font-bold uppercase tracking-wide", level.tone)}>{level.label}</span><span className="text-xl font-bold text-foreground">{levelObjectives.length}</span></div><p className="mt-3 text-sm font-semibold text-foreground">{level.description}</p><p className="mt-1 text-xs text-muted-foreground">{levelActions.length} acciones vinculadas</p></button>; })}</div></section>;
-}
 
 function MetricCard({ label, value, detail, icon: Icon, tone }: { label: string; value: number | undefined; detail: string; icon: typeof BarChart3; tone: string }) {
   return <div className="rounded-2xl border border-border/75 bg-card p-4 shadow-[0_10px_24px_-24px_rgba(15,23,42,0.55)]"><div className="flex items-center justify-between"><span className="text-xs font-semibold text-muted-foreground">{label}</span><Icon className={cn("h-4 w-4", tone)} /></div><div className="mt-3 text-2xl font-bold tracking-tight text-foreground">{value === undefined ? "—" : value}</div><div className="mt-1 text-xs text-muted-foreground">{detail}</div></div>;
