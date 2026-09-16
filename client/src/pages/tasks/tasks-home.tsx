@@ -227,12 +227,14 @@ function HomeTaskRow({
   task,
   onToggle,
   onDateSet,
+  onStatusChange,
   toggling,
   hidingId,
 }: {
   task: Task;
   onToggle: (task: Task) => void;
   onDateSet: (taskId: number, range: DateRange | undefined) => void;
+  onStatusChange: (taskId: number, status: "todo" | "in_progress" | "blocked") => void;
   toggling: boolean;
   hidingId: number | null;
 }) {
@@ -269,6 +271,23 @@ function HomeTaskRow({
           </span>
         )}
       </TaskRowTarget>
+
+      <select
+        aria-label={`Cambiar estado de ${task.title}`}
+        value={task.status === "in_review" ? "in_progress" : task.status}
+        onChange={(event) => {
+          event.stopPropagation();
+          onStatusChange(task.id, event.target.value as "todo" | "in_progress" | "blocked");
+        }}
+        onClick={(event) => event.stopPropagation()}
+        disabled={isDone}
+        className="h-7 max-w-28 rounded-md border border-input bg-background px-1.5 text-[11px] text-muted-foreground outline-none hover:bg-accent focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        <option value="todo">Próxima</option>
+        <option value="in_progress">En curso</option>
+        <option value="blocked">Bloqueada</option>
+        {isDone && <option value="done">Finalizada</option>}
+      </select>
 
       <DateButton
         startDate={task.startDate}
@@ -363,6 +382,7 @@ export default function TasksHomePage() {
   const invalidateRelated = () => {
     queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
     queryClient.invalidateQueries({ queryKey: ["/api/tasks/projects"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/tasks/team-calendar"] });
   };
 
   const toggleMutation = useMutation({
@@ -387,6 +407,12 @@ export default function TasksHomePage() {
     onSuccess: () => { refetchMyTasks(); invalidateRelated(); },
   });
 
+  const statusMutation = useMutation({
+    mutationFn: ({ taskId, status }: { taskId: number; status: "todo" | "in_progress" | "blocked" }) =>
+      apiRequest(`/api/tasks/${taskId}`, "PUT", { status }),
+    onSuccess: () => { refetchMyTasks(); invalidateRelated(); },
+  });
+
   const handleToggle = useCallback((task: Task) => {
     if (task.status !== "done") {
       setHidingTaskId(task.id);
@@ -397,6 +423,10 @@ export default function TasksHomePage() {
   const handleDateSet = useCallback((taskId: number, range: DateRange | undefined) => {
     dateMutation.mutate({ taskId, range });
   }, [dateMutation]);
+
+  const handleStatusChange = useCallback((taskId: number, status: "todo" | "in_progress" | "blocked") => {
+    statusMutation.mutate({ taskId, status });
+  }, [statusMutation]);
 
   const raw = myTasksResponse as any;
   const myTasks: Task[] = Array.isArray(raw) ? raw : Array.isArray(raw?.tasks) ? raw.tasks : [];
@@ -583,6 +613,7 @@ export default function TasksHomePage() {
                     task={task}
                     onToggle={handleToggle}
                     onDateSet={handleDateSet}
+                    onStatusChange={handleStatusChange}
                     toggling={toggleMutation.isPending && hidingTaskId === task.id}
                     hidingId={hidingTaskId}
                   />

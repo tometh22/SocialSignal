@@ -17,6 +17,23 @@ describe("Feedback Mind V2-10 contracts", () => {
     expect(routes).toContain('/api/tasks/projects/:id/workflow-stage');
   });
 
+  it("persists the reason and date for a blocked project", () => {
+    const schema = source("shared/schema.ts");
+    const migration = source("migrations/0064_project_workflow_block_details.sql");
+    const runtimeMigration = source("server/migrations/project-workflow-block-details.ts");
+    const routes = source("server/routes.ts");
+    const kanban = source("client/src/pages/tasks/projects-kanban.tsx");
+
+    expect(schema).toContain('workflowBlockedReason: text("workflow_blocked_reason")');
+    expect(schema).toContain('workflowBlockedAt: timestamp("workflow_blocked_at")');
+    expect(migration).toContain("ADD COLUMN IF NOT EXISTS workflow_blocked_reason");
+    expect(runtimeMigration).toContain("idx_active_projects_workflow_blocked_at");
+    expect(routes).toContain("blockedReason");
+    expect(routes).toContain("workflowBlockedAt");
+    expect(kanban).toContain("Motivo del bloqueo");
+    expect(kanban).toContain("Guardar motivo");
+  });
+
   it("exposes role/sublevel averages without replacing manual defaults", () => {
     const routes = source("server/routes.ts");
     const rolesUi = source("client/src/components/admin/inline-edit-role.tsx");
