@@ -81,6 +81,28 @@ describe("mapa de frentes", () => {
     }
   });
 
+  it("distingue un estándar incumplido de uno que nadie midió", () => {
+    // Pintar los dos de rojo convierte el semáforo en ruido: hoy los 19
+    // estándares del plan están sin medir y nada está realmente mal.
+    const base = asObjectives();
+    const sinMedir = buildObjectivesMap(base, HOY);
+    expect(sinMedir.standardsUnmeasured).toHaveLength(sinMedir.standards.length);
+    expect(sinMedir.standardsBreached).toHaveLength(0);
+
+    const primero = String(sinMedir.standards[0].id);
+    const segundo = String(sinMedir.standards[1].id);
+    const medido = base.map((objective) => {
+      if (String(objective.id) === primero) return { ...objective, progressPercent: 40 };
+      if (String(objective.id) === segundo) return { ...objective, progressPercent: 100 };
+      return objective;
+    });
+    const mapa = buildObjectivesMap(medido, HOY);
+    expect(mapa.standardsBreached.map((o) => String(o.id))).toEqual([primero]);
+    expect(mapa.standardsUnmeasured.map((o) => String(o.id))).not.toContain(primero);
+    expect(mapa.standardsUnmeasured.map((o) => String(o.id))).not.toContain(segundo);
+    expect(mapa.standardsBreached.length + mapa.standardsUnmeasured.length).toBe(mapa.standards.length - 1);
+  });
+
   it("un objetivo de empresa sin frente se muestra aparte en vez de desaparecer", () => {
     const huerfano: Objective = { id: 9999, slug: "company-inventado", level: "company", title: "Sin frente" } as Objective;
     const mapa = buildObjectivesMap([...asObjectives(), huerfano], HOY);
