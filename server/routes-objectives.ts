@@ -239,6 +239,8 @@ export function createObjectivesRouter(requireAuth: RequireAuth): Router {
           ownerPersonnelId: objectives.ownerPersonnelId,
           ownerName: objectiveOwner.name,
           parentObjectiveId: objectives.parentObjectiveId,
+          retiredAt: objectives.retiredAt,
+          retiredReason: objectives.retiredReason,
           createdAt: objectives.createdAt,
           updatedAt: objectives.updatedAt,
         })

@@ -2395,6 +2395,10 @@ export const objectives = pgTable("objectives", {
   // Un objetivo cuelga del que lo sostiene. Sin esto los tres niveles son tres
   // listas planas y la pantalla no puede mostrar de qué depende cada cosa.
   parentObjectiveId: integer("parent_objective_id"),
+  // Una entrada retirada no es un objetivo, pero tampoco se borra: conserva su
+  // avance y su historial, y puede volver sacándola de RETIRED_OBJECTIVES.
+  retiredAt: timestamp("retired_at"),
+  retiredReason: varchar("retired_reason", { length: 40 }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => ({
