@@ -6,7 +6,7 @@ describe("objective plan 2026 coverage", () => {
     const { objectives, accounts, actions } = OBJECTIVE_PLAN_2026;
     expect(objectives).toHaveLength(87);
     expect(accounts).toHaveLength(25);
-    expect(actions).toHaveLength(60);
+    expect(actions).toHaveLength(67);
 
     expect(new Set(objectives.map((objective) => objective.slug)).size).toBe(objectives.length);
     expect(new Set(actions.map((action) => action.slug)).size).toBe(actions.length);
@@ -17,10 +17,12 @@ describe("objective plan 2026 coverage", () => {
     expect(actions.every((action) => !action.objectiveSlug || objectiveSlugs.has(action.objectiveSlug))).toBe(true);
     expect(actions.every((action) => !action.accountSlug || accountSlugs.has(action.accountSlug))).toBe(true);
     expect(actions.every((action) => /^\d{4}-\d{2}-\d{2}$/.test(action.weekStart))).toBe(true);
+    // Las siete acciones nuevas reemplazan a siete entradas que estaban
+    // anotadas como objetivos sin serlo: cinco caen en septiembre y dos en octubre.
     expect(actions.reduce<Record<string, number>>((counts, action) => {
       counts[action.month] = (counts[action.month] ?? 0) + 1;
       return counts;
-    }, {})).toEqual({ septiembre: 24, octubre: 17, noviembre: 11, diciembre: 8 });
+    }, {})).toEqual({ septiembre: 29, octubre: 19, noviembre: 11, diciembre: 8 });
   });
 
   it("preserves the dates and ownership corrections called out in the source", () => {

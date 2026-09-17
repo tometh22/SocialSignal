@@ -244,6 +244,8 @@ export type ObjectivesMap = {
   unplaced: Objective[];
   /** Cuántas entradas del plan son realmente un objetivo, y cuántas otra cosa. */
   counts: Record<PlanRole, number>;
+  /** Entradas retiradas: no son objetivos, pero siguen en la base. */
+  retired: Objective[];
 };
 
 function countDeep(node: ObjectiveNode, today: string, seen = { total: 0, overdue: 0, dueSoon: 0, nonNegotiable: 0, sum: 0, withProgress: 0 }) {
@@ -299,7 +301,10 @@ export function childrenOfNode(node: ObjectiveNode): TreeItem[] {
   return node.depth === 0 ? groupAreaChildren(node) : node.children;
 }
 
-export function buildObjectivesMap(objectives: Objective[], today = todayISO()): ObjectivesMap {
+export function buildObjectivesMap(allObjectives: Objective[], today = todayISO()): ObjectivesMap {
+  // Una entrada retirada sigue en la base con su historial, pero no es un
+  // objetivo: no cuenta, no cuelga de nada y no ocupa lugar en la pantalla.
+  const objectives = allObjectives.filter((objective) => !objective.retiredAt);
   const checkpointSlugs = new Set(MONTH_CHECKPOINT_SLUGS);
   const supportSlugs = new Set(NORTH_STAR_SUPPORT);
 
@@ -392,7 +397,7 @@ export function buildObjectivesMap(objectives: Objective[], today = todayISO()):
     .filter((entry) => entry.date)
     .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
 
-  return { northStar, northSupport, fronts, standards, standardsBreached, standardsUnmeasured, checkpoints, dueSoon, timeline, unplaced, counts };
+  return { northStar, northSupport, fronts, standards, standardsBreached, standardsUnmeasured, checkpoints, dueSoon, timeline, unplaced, counts, retired: allObjectives.filter((objective) => Boolean(objective.retiredAt)) };
 }
 
 /** Objetivos que vencen dentro de la ventana, ordenados por urgencia. */

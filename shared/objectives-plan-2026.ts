@@ -2147,8 +2147,74 @@ export const OBJECTIVE_OWNER_REMAP: Record<string, "Tomás" | "Vicky" | "Acha"> 
 
 export const PLAN_YEAR = 2026;
 
+/**
+ * Siete entradas del plan estaban anotadas como objetivos pero son tareas con
+ * fecha y dueño: son acciones. Acá quedan como tales, colgadas del objetivo de
+ * empresa al que sirven. Los objetivos originales quedan retirados en
+ * RETIRED_OBJECTIVES, con su historial intacto.
+ */
+const ACTIONS_FROM_RETIRED_OBJECTIVES: Action2026[] = [
+  {
+    slug: "sep-w3-vicky-coelsa-retention", objectiveSlug: "company-coelsa-retention", accountSlug: null,
+    title: "Retener COELSA antes de expandir",
+    description: "Cerrar la continuidad antes de abrir cualquier conversación de expansión.",
+    month: "septiembre", weekLabel: "15–21 sep", weekStart: "2026-09-15", dueDate: "2026-09-19",
+    focus: "retención", accountableOwnerName: "Vicky", supportingOwnerNames: [],
+    status: "planned", dependencySlugs: [], sortOrder: 61,
+  },
+  {
+    slug: "sep-w3-acha-radar-relaunch", objectiveSlug: "company-own-products-baseline", accountSlug: null,
+    title: "Relanzar el Radar con medición",
+    description: "Relanzamiento con métricas definidas desde el primer envío.",
+    month: "septiembre", weekLabel: "15–21 sep", weekStart: "2026-09-15", dueDate: "2026-09-19",
+    focus: "producto", accountableOwnerName: "Acha", supportingOwnerNames: ["Santi"],
+    status: "planned", dependencySlugs: [], sortOrder: 62,
+  },
+  {
+    slug: "sep-w4-tomas-radar-cuts", objectiveSlug: "company-own-products-baseline", accountSlug: null,
+    title: "Vender cortes del Radar por industria",
+    description: "Definir el corte por industria y su precio.",
+    month: "septiembre", weekLabel: "22–30 sep", weekStart: "2026-09-22", dueDate: "2026-09-30",
+    focus: "producto", accountableOwnerName: "Tomás", supportingOwnerNames: [],
+    status: "planned", dependencySlugs: [], sortOrder: 63,
+  },
+  {
+    slug: "sep-w4-tomas-paid-diagnosis", objectiveSlug: "company-own-products-baseline", accountSlug: null,
+    title: "Reemplazar demo gratis por diagnóstico pago",
+    description: "Definir alcance y precio del diagnóstico que reemplaza a la demo.",
+    month: "septiembre", weekLabel: "22–30 sep", weekStart: "2026-09-22", dueDate: "2026-09-30",
+    focus: "producto", accountableOwnerName: "Tomás", supportingOwnerNames: [],
+    status: "planned", dependencySlugs: [], sortOrder: 64,
+  },
+  {
+    slug: "sep-w4-vicky-mind-quote", objectiveSlug: "company-own-products-baseline", accountSlug: null,
+    title: "Cotizar Mind sin desarrollarlo para terceros",
+    description: "Dejar la cotización lista sin comprometer desarrollo.",
+    month: "septiembre", weekLabel: "22–30 sep", weekStart: "2026-09-22", dueDate: "2026-09-30",
+    focus: "producto", accountableOwnerName: "Vicky", supportingOwnerNames: ["Tomás"],
+    status: "planned", dependencySlugs: [], sortOrder: 65,
+  },
+  {
+    slug: "oct-w3-tomas-alerts-product", objectiveSlug: "company-alert-subscriptions", accountSlug: null,
+    title: "Definir alertas 24/7 como producto",
+    description: "Alcance, precio y operación de las alertas continuas.",
+    month: "octubre", weekLabel: "13–19 oct", weekStart: "2026-10-13", dueDate: "2026-10-15",
+    focus: "producto", accountableOwnerName: "Tomás", supportingOwnerNames: ["Acha"],
+    status: "planned", dependencySlugs: [], sortOrder: 66,
+  },
+  {
+    slug: "oct-w5-tomas-agentic-dashboard", objectiveSlug: "company-own-products-baseline", accountSlug: null,
+    title: "Ofrecer dashboard agéntico como complemento",
+    description: "Definirlo como complemento vendible, no como desarrollo a medida.",
+    month: "octubre", weekLabel: "27–31 oct", weekStart: "2026-10-27", dueDate: "2026-10-31",
+    focus: "producto", accountableOwnerName: "Tomás", supportingOwnerNames: [],
+    status: "planned", dependencySlugs: [], sortOrder: 67,
+  },
+];
+
 export const OBJECTIVE_PLAN_2026: ObjectivePlan2026 = {
   ...RAW_OBJECTIVE_PLAN_2026,
+  actions: [...RAW_OBJECTIVE_PLAN_2026.actions, ...ACTIONS_FROM_RETIRED_OBJECTIVES],
   objectives: RAW_OBJECTIVE_PLAN_2026.objectives.map((objective) => {
     const amount = parseTargetValue(objective.target, objective.slug);
     return {

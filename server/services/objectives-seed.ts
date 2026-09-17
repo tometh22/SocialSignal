@@ -10,6 +10,7 @@ import {
 } from "@shared/schema";
 import { OBJECTIVE_PLAN_2026 } from "@shared/objectives-plan-2026";
 import { buildNameIndex, normalize, resolveOwner } from "./objective-owner-resolver";
+import { RETIRED_OBJECTIVES } from "@shared/objectives-retirement";
 
 const MONTH_NUMBERS: Record<string, number> = {
   septiembre: 9,
@@ -88,6 +89,8 @@ export async function ensureObjectivesPlanSeed(): Promise<void> {
       slug: objectives.slug,
       ownerPersonnelId: objectives.ownerPersonnelId,
       parentObjectiveId: objectives.parentObjectiveId,
+      retiredAt: objectives.retiredAt,
+      retiredReason: objectives.retiredReason,
       targetKind: objectives.targetKind,
       targetValue: objectives.targetValue,
       targetUnit: objectives.targetUnit,
@@ -115,6 +118,19 @@ export async function ensureObjectivesPlanSeed(): Promise<void> {
     if (numericChanged(row.targetValue, targetValue)) updates.targetValue = targetValue;
     if ((row.targetUnit ?? null) !== (source.targetUnit ?? null)) updates.targetUnit = source.targetUnit;
     if ((row.targetDate ?? null) !== (source.targetDate ?? null)) updates.targetDate = source.targetDate;
+
+    // El retiro también se declara en el plan, así que se reconcilia igual que
+    // el resto: sacar una entrada de RETIRED_OBJECTIVES la devuelve a la vida.
+    const retirement = RETIRED_OBJECTIVES[row.slug] ?? null;
+    if (retirement && row.retiredAt == null) {
+      updates.retiredAt = new Date();
+      updates.retiredReason = retirement.reason;
+    } else if (!retirement && row.retiredAt != null) {
+      updates.retiredAt = null;
+      updates.retiredReason = null;
+    } else if (retirement && row.retiredReason !== retirement.reason) {
+      updates.retiredReason = retirement.reason;
+    }
 
     if (Object.keys(updates).length) {
       await db.update(objectives)

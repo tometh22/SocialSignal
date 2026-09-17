@@ -11,6 +11,7 @@ import {
   tierFor,
 } from "@shared/objectives-fronts";
 import { buildObjectivesMap, dueWithin } from "../client/src/lib/objectives-tree";
+import { RETIRED_OBJECTIVES } from "@shared/objectives-retirement";
 import type { Objective } from "../client/src/lib/objectives-api";
 
 const SLUGS = new Set(OBJECTIVE_PLAN_2026.objectives.map((o) => o.slug));
@@ -145,9 +146,9 @@ describe("vista del lunes", () => {
 });
 
 describe("qué es realmente un objetivo", () => {
-  it("separa los 15 objetivos de las 72 entradas que no lo son", () => {
+  it("separa los 15 objetivos de las entradas que no lo son", () => {
     const mapa = buildObjectivesMap(asObjectives(), HOY);
-    expect(mapa.counts).toEqual({ objetivo: 15, bajada: 49, estandar: 19, checkpoint: 4 });
+    expect(mapa.counts).toEqual({ objetivo: 15, bajada: 46, estandar: 22, checkpoint: 4 });
     const total = Object.values(mapa.counts).reduce((a, b) => a + b, 0);
     expect(total).toBe(OBJECTIVE_PLAN_2026.objectives.length);
   });
@@ -179,5 +180,56 @@ describe("qué es realmente un objetivo", () => {
     const empresa: Objective = { id: 9998, slug: "company-sin-frente", level: "company", title: "Empresa sin frente" } as Objective;
     const mapa = buildObjectivesMap([...asObjectives(), rama, empresa], HOY);
     expect(mapa.unplaced.map((o) => o.slug)).toEqual(["company-sin-frente"]);
+  });
+});
+
+
+describe("entradas retiradas", () => {
+  it("las quince declaradas existen en el plan", () => {
+    for (const slug of Object.keys(RETIRED_OBJECTIVES)) {
+      expect(SLUGS.has(slug), `slug inexistente: ${slug}`).toBe(true);
+    }
+    expect(Object.keys(RETIRED_OBJECTIVES)).toHaveLength(15);
+  });
+
+  it("una retirada no cuenta ni aparece en el mapa, pero no se pierde", () => {
+    const base = asObjectives();
+    const retirados = new Set(Object.keys(RETIRED_OBJECTIVES));
+    const conRetiro = base.map((objective) =>
+      retirados.has(String(objective.slug)) ? { ...objective, retiredAt: "2026-09-17T00:00:00Z" } : objective,
+    );
+    const mapa = buildObjectivesMap(conRetiro, HOY);
+    expect(mapa.retired).toHaveLength(15);
+    expect(mapa.counts.objetivo).toBe(15);
+    // La bajada baja exactamente en las nueve retiradas que no eran acciones.
+    expect(mapa.counts.bajada).toBe(31);
+    const enMapa = new Set<string>();
+    const walk = (nodes: typeof mapa.fronts[number]["objectives"]) => {
+      for (const node of nodes) { enMapa.add(String(node.objective.slug)); walk(node.children); }
+    };
+    for (const front of mapa.fronts) walk(front.objectives);
+    for (const slug of retirados) expect(enMapa.has(slug), `${slug} sigue en el mapa`).toBe(false);
+  });
+
+  it("cada acción que reemplaza a un objetivo retirado existe y apunta a un objetivo vivo", () => {
+    const porSlug = new Map(OBJECTIVE_PLAN_2026.objectives.map((o) => [o.slug, o]));
+    const reemplazos = OBJECTIVE_PLAN_2026.actions.filter((a) => a.sortOrder > 60);
+    expect(reemplazos).toHaveLength(7);
+    for (const action of reemplazos) {
+      expect(action.objectiveSlug).toBeTruthy();
+      const objetivo = porSlug.get(action.objectiveSlug!);
+      expect(objetivo, `${action.slug} apunta a un objetivo inexistente`).toBeDefined();
+      expect(RETIRED_OBJECTIVES[action.objectiveSlug!], `${action.slug} cuelga de un objetivo retirado`).toBeUndefined();
+      expect(objetivo!.level).toBe("company");
+      expect(action.dueDate).toMatch(/^2026-\d{2}-\d{2}$/);
+    }
+  });
+
+  it("las tres conductas del CEO pasaron a ser estándares", () => {
+    const porSlug = new Map(OBJECTIVE_PLAN_2026.objectives.map((o) => [o.slug, o]));
+    for (const slug of ["person-tomas-annual-billing", "person-tomas-sales-focus", "person-tomas-no-build-focus"]) {
+      expect(porSlug.get(slug)!.targetKind, slug).toBe("continuous");
+      expect(porSlug.get(slug)!.targetDate, slug).toBeNull();
+    }
   });
 });

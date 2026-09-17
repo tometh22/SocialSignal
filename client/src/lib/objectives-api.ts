@@ -19,6 +19,8 @@ export type Objective = {
   status?: string | null;
   owner?: ObjectiveRef | null;
   parentObjectiveId?: string | number | null;
+  retiredAt?: string | null;
+  retiredReason?: string | null;
 };
 
 export type ObjectiveAction = {

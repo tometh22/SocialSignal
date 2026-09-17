@@ -113,6 +113,11 @@ const CONTINUOUS_OBJECTIVES = new Set([
   "person-pms-daily-account-relations",
   "person-pms-cases-references",
   "person-pms-no-price-negotiation",
+  // Tres conductas que estaban anotadas como objetivos con fecha. No son metas
+  // que se alcanzan: son cosas que se sostienen, y se miden por cumplimiento.
+  "person-tomas-annual-billing",
+  "person-tomas-sales-focus",
+  "person-tomas-no-build-focus",
 ]);
 
 const MONTHS: Record<string, number> = {
