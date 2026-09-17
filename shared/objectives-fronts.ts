@@ -148,3 +148,27 @@ export function tierFor(slug: string | null | undefined, today: string): Tier {
 export function frontOf(slug: string | null | undefined): FrontId | null {
   return slug ? COMPANY_FRONT[slug] ?? null : null;
 }
+
+/**
+ * Qué es cada entrada del plan. Las 87 se guardaron todas como "objetivo", y
+ * llamarlas así a todas es lo que vuelve ilegible la pantalla: el plan real
+ * son 15 objetivos de empresa y 60 acciones semanales. Lo demás es cómo se
+ * opera, cuándo se controla, o la misma cosa repetida un nivel más abajo.
+ *
+ * - `objetivo`: lo que la empresa se compromete a lograr. Son 15.
+ * - `bajada`: el mismo objetivo expresado a nivel área o persona. No es un
+ *   objetivo aparte: es quién lo ejecuta. Son 49.
+ * - `estandar`: algo que se sostiene, sin línea de llegada. Son 19.
+ * - `checkpoint`: un punto de control en el calendario. Son 4.
+ */
+export type PlanRole = "objetivo" | "bajada" | "estandar" | "checkpoint";
+
+export function planRoleOf(
+  slug: string | null | undefined,
+  level: string | null | undefined,
+  targetKind: string | null | undefined,
+): PlanRole {
+  if (slug && MONTH_CHECKPOINT_SLUGS.includes(slug)) return "checkpoint";
+  if (targetKind === "continuous") return "estandar";
+  return level === "company" ? "objetivo" : "bajada";
+}
