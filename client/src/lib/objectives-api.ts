@@ -142,3 +142,16 @@ export function updateObjectiveAction(id: string | number, input: UpdateObjectiv
 export function updateObjective(id: string | number, input: UpdateObjectiveInput) {
   return apiRequest(`/api/objectives/${encodeURIComponent(String(id))}`, "PATCH", input);
 }
+
+export type ObjectiveProgressUpdate = {
+  id: string | number;
+  currentValue?: string | null;
+  progressPercent?: number | null;
+};
+
+/** Guarda una tanda de avances de una sola vez. */
+export function updateObjectivesProgress(updates: ObjectiveProgressUpdate[]) {
+  return apiRequest("/api/objectives/progress", "PATCH", {
+    updates: updates.map((update) => ({ ...update, id: Number(update.id) })),
+  });
+}

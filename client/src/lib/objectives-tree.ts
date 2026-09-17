@@ -227,8 +227,10 @@ export type ObjectivesMap = {
   checkpoints: Objective[];
   /** Lo que vence en los próximos 14 días, sin contar puntos de control. */
   dueSoon: Objective[];
-  /** Estándares sin avance cargado o por debajo del umbral: el semáforo en rojo. */
-  standardsAtRisk: Objective[];
+  /** Estándares medidos y por debajo del umbral: el semáforo en rojo. */
+  standardsBreached: Objective[];
+  /** Estándares que nadie midió todavía: gris, no rojo. No es lo mismo. */
+  standardsUnmeasured: Objective[];
   /** Marcadores de la línea de tiempo, en orden. */
   timeline: Array<{ date: string; label: string; hard: boolean; objective: Objective | null }>;
   /** Nada que no haya entrado en ninguna de las cajas anteriores. */
@@ -344,13 +346,15 @@ export function buildObjectivesMap(objectives: Objective[], today = todayISO()):
   const inTree = objectives.filter((o) => !(o.slug && checkpointSlugs.has(o.slug)));
   const dueSoon = dueWithin(inTree, 14, today);
 
-  // Un estándar sin avance cargado no está "bien": está sin medir, y eso es
-  // exactamente lo que el semáforo tiene que mostrar en rojo.
-  const standardsAtRisk = standards.filter((objective) => {
-    const progress = objective.progressPercent;
-    if (typeof progress !== "number" || !Number.isFinite(progress)) return true;
-    return progress < 100;
-  });
+  // "Nadie lo midió" y "se está incumpliendo" son cosas distintas, y pintarlas
+  // del mismo color convierte el semáforo en ruido: hoy los 19 estándares
+  // están sin medir, así que todo aparecía en rojo sin que nada esté mal.
+  const isMeasured = (objective: Objective) =>
+    typeof objective.progressPercent === "number" && Number.isFinite(objective.progressPercent);
+  const standardsUnmeasured = standards.filter((objective) => !isMeasured(objective));
+  const standardsBreached = standards.filter(
+    (objective) => isMeasured(objective) && Number(objective.progressPercent) < 100,
+  );
 
   const checkpointBySlug = new Map(checkpoints.map((o) => [String(o.slug), o]));
   const timeline = [
@@ -368,7 +372,7 @@ export function buildObjectivesMap(objectives: Objective[], today = todayISO()):
     .filter((entry) => entry.date)
     .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
 
-  return { northStar, northSupport, fronts, standards, standardsAtRisk, checkpoints, dueSoon, timeline, unplaced };
+  return { northStar, northSupport, fronts, standards, standardsBreached, standardsUnmeasured, checkpoints, dueSoon, timeline, unplaced };
 }
 
 /** Objetivos que vencen dentro de la ventana, ordenados por urgencia. */

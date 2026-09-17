@@ -1,4 +1,4 @@
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import {
@@ -27,6 +27,7 @@ import { CompactPageHeader } from "@/components/ui/compact-page-header";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PageShell } from "@/components/ui/page-shell";
+import { useAuth } from "@/hooks/use-auth";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import {
@@ -39,6 +40,7 @@ import {
   ObjectiveRef,
   updateObjective,
   updateObjectiveAction,
+  updateObjectivesProgress,
 } from "@/lib/objectives-api";
 import {
   buildObjectivesMap,
@@ -50,9 +52,9 @@ import {
   tierOf,
   TreeItem,
 } from "@/lib/objectives-tree";
-import type { FrontId } from "@shared/objectives-fronts";
+import { FRONTS, frontOf, type FrontId } from "@shared/objectives-fronts";
 
-type ViewId = "summary" | "objectives" | "timeline" | "week" | "people" | "accounts";
+type ViewId = "summary" | "objectives" | "timeline" | "load" | "week" | "people" | "accounts";
 
 type ActionForm = {
   title: string;
@@ -71,6 +73,7 @@ const viewTabs: Array<{ id: ViewId; label: string }> = [
   { id: "objectives", label: "Mapa" },
   { id: "summary", label: "Qué mirar" },
   { id: "timeline", label: "Línea de tiempo" },
+  { id: "load", label: "Cargar avance" },
   { id: "week", label: "Esta semana" },
   { id: "people", label: "Personas" },
   { id: "accounts", label: "Cuentas" },
@@ -252,7 +255,7 @@ function ObjectiveBranch({ item, expanded, onToggle, onUpdate, updatingId }: { i
   );
 }
 
-function NorthStarPanel({ northStar, support }: { northStar: ObjectiveNode | null; support: ObjectiveNode[] }) {
+function NorthStarPanel({ northStar, support, onLoadProgress }: { northStar: ObjectiveNode | null; support: ObjectiveNode[]; onLoadProgress: () => void }) {
   if (!northStar) return null;
   const objective = northStar.objective;
   const progress = typeof objective.progressPercent === "number" && Number.isFinite(objective.progressPercent) ? Math.max(0, Math.min(100, objective.progressPercent)) : null;
@@ -264,12 +267,18 @@ function NorthStarPanel({ northStar, support }: { northStar: ObjectiveNode | nul
           <h2 className="mt-1 text-lg font-bold leading-6">{objective.title}</h2>
           <p className="mt-1 text-xs text-white/70">{valueText(objective.target, "Meta aún no definida")}</p>
         </div>
-        <div className="text-right">
+        <div className="shrink-0 text-right">
           <span className="block text-[10px] uppercase tracking-wide text-white/55">Avance</span>
-          <span className="text-2xl font-bold">{progress === null ? "—" : `${progress}%`}</span>
+          {progress === null
+            ? <span className="text-xs font-semibold text-white/70">Sin cargar</span>
+            : <span className="text-2xl font-bold">{progress}%</span>}
         </div>
       </div>
-      {progress !== null && <Progress value={progress} className="mt-3 h-1.5 bg-white/15" />}
+      {progress === null
+        ? <button type="button" onClick={onLoadProgress} className="mt-3 w-full rounded-xl border border-dashed border-white/25 px-3 py-2 text-left text-xs text-white/70 transition-colors hover:bg-white/5">
+            Nadie cargó avance todavía. <span className="font-semibold text-white">Cargá el primero →</span>
+          </button>
+        : <Progress value={progress} className="mt-3 h-1.5 bg-white/15" />}
       {support.length > 0 && (
         <div className="mt-4 border-t border-white/15 pt-3">
           {support.map((node) => (
@@ -297,7 +306,9 @@ function FrontCard({ front, active, onSelect }: { front: ReturnType<typeof build
     >
       <div className="flex items-start justify-between gap-2">
         <span className="text-sm font-bold leading-5 text-foreground">{front.label}</span>
-        <span className="shrink-0 text-lg font-bold text-foreground">{front.progress === null ? "—" : `${front.progress}%`}</span>
+        {front.progress === null
+          ? <span className="shrink-0 text-[10px] font-semibold text-muted-foreground">sin medir</span>
+          : <span className="shrink-0 text-lg font-bold text-foreground">{front.progress}%</span>}
       </div>
       <p className="mt-2 text-[11px] text-muted-foreground">{front.total} {front.total === 1 ? "objetivo" : "objetivos"}</p>
       <div className="mt-2 flex flex-wrap gap-1.5">
@@ -310,8 +321,10 @@ function FrontCard({ front, active, onSelect }: { front: ReturnType<typeof build
   );
 }
 
-function StandardsPanel({ standards, atRisk }: { standards: Objective[]; atRisk: Objective[] }) {
-  const riskIds = new Set(atRisk.map((objective) => String(objective.id)));
+function StandardsPanel({ map }: { map: ReturnType<typeof buildObjectivesMap> }) {
+  const breached = new Set(map.standardsBreached.map((objective) => String(objective.id)));
+  const unmeasured = new Set(map.standardsUnmeasured.map((objective) => String(objective.id)));
+  const ok = map.standards.length - breached.size - unmeasured.size;
   return (
     <section aria-label="Estándares sostenidos" className="rounded-2xl border border-border/75 bg-card p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -319,18 +332,25 @@ function StandardsPanel({ standards, atRisk }: { standards: Objective[]; atRisk:
           <h2 className="text-base font-bold text-foreground">Estándares</h2>
           <p className="mt-1 text-xs text-muted-foreground">No vencen: se sostienen. El semáforo mira cumplimiento, no avance.</p>
         </div>
-        <span className="text-xs font-semibold text-muted-foreground">{atRisk.length} de {standards.length} sin verde</span>
+        <div className="flex items-center gap-3 text-[11px] font-semibold">
+          <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-emerald-500" />{ok} en verde</span>
+          <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-red-500" />{breached.size} en rojo</span>
+          <span className="flex items-center gap-1.5 text-muted-foreground"><span className="h-2 w-2 rounded-full bg-slate-300" />{unmeasured.size} sin medir</span>
+        </div>
       </div>
       <div className="mt-4 grid gap-1.5 md:grid-cols-2">
-        {standards.map((objective) => {
-          const rojo = riskIds.has(String(objective.id));
+        {map.standards.map((objective) => {
+          const id = String(objective.id);
+          const estado = breached.has(id) ? "rojo" : unmeasured.has(id) ? "gris" : "verde";
           return (
-            <div key={String(objective.id)} className="flex items-start gap-2 rounded-xl border border-border/60 px-3 py-2">
-              <span className={cn("mt-1 h-2 w-2 shrink-0 rounded-full", rojo ? "bg-red-500" : "bg-emerald-500")} aria-hidden="true" />
+            <div key={id} className="flex items-start gap-2 rounded-xl border border-border/60 px-3 py-2">
+              <span className={cn("mt-1 h-2 w-2 shrink-0 rounded-full", estado === "rojo" ? "bg-red-500" : estado === "gris" ? "bg-slate-300" : "bg-emerald-500")} aria-hidden="true" />
               <div className="min-w-0">
                 <p className="text-xs font-semibold leading-4 text-foreground">{objective.title}</p>
                 <p className="mt-0.5 text-[11px] text-muted-foreground">{valueText(objective.target, "Sin estándar definido")}</p>
-                <p className="mt-0.5 text-[10px] font-semibold text-muted-foreground">{rojo ? "Sin medición cargada" : "En cumplimiento"} · {ownerLabel(objective.owner)}</p>
+                <p className="mt-0.5 text-[10px] font-semibold text-muted-foreground">
+                  {estado === "rojo" ? "Incumplido" : estado === "gris" ? "Nadie lo midió" : "En cumplimiento"} · {ownerLabel(objective.owner)}
+                </p>
               </div>
             </div>
           );
@@ -384,7 +404,7 @@ function TimelineView({ timeline, objectives }: { timeline: ReturnType<typeof bu
   );
 }
 
-function MondayView({ map }: { map: ReturnType<typeof buildObjectivesMap> }) {
+function MondayView({ map, onLoadProgress }: { map: ReturnType<typeof buildObjectivesMap>; onLoadProgress: () => void }) {
   return (
     <section className="grid gap-4 lg:grid-cols-2">
       <div className="rounded-2xl border border-border/75 bg-card p-5">
@@ -414,12 +434,16 @@ function MondayView({ map }: { map: ReturnType<typeof buildObjectivesMap> }) {
       </div>
       <div className="rounded-2xl border border-border/75 bg-card p-5">
         <h2 className="text-base font-bold text-foreground">Estándares en rojo</h2>
-        <p className="mt-1 text-xs text-muted-foreground">Lo que se sostiene y hoy no se está midiendo.</p>
-        {map.standardsAtRisk.length === 0 ? (
-          <p className="mt-4 text-xs text-muted-foreground">Todos los estándares en verde.</p>
+        <p className="mt-1 text-xs text-muted-foreground">Lo que se sostiene y hoy se está incumpliendo.</p>
+        {map.standardsBreached.length === 0 ? (
+          <p className="mt-4 text-xs text-muted-foreground">
+            {map.standardsUnmeasured.length === map.standards.length
+              ? "Ningún estándar está medido todavía, así que no se puede saber."
+              : "Ningún estándar medido está incumplido."}
+          </p>
         ) : (
           <ul className="mt-4 space-y-1.5">
-            {map.standardsAtRisk.map((objective) => (
+            {map.standardsBreached.map((objective) => (
               <li key={String(objective.id)} className="flex items-start gap-2 border-b border-border/50 pb-1.5 last:border-0">
                 <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-red-500" aria-hidden="true" />
                 <div className="min-w-0 flex-1">
@@ -430,14 +454,159 @@ function MondayView({ map }: { map: ReturnType<typeof buildObjectivesMap> }) {
             ))}
           </ul>
         )}
+        {map.standardsUnmeasured.length > 0 && (
+          <div className="mt-4 rounded-xl border border-dashed border-border bg-muted/30 p-3">
+            <p className="text-xs font-semibold text-foreground">{map.standardsUnmeasured.length} estándares sin medir</p>
+            <p className="mt-0.5 text-[11px] text-muted-foreground">Gris no es rojo: no sabemos si se están cumpliendo.</p>
+            <Button type="button" variant="outline" size="sm" className="mt-2 h-7 text-xs" onClick={onLoadProgress}>Cargar avance</Button>
+          </div>
+        )}
       </div>
     </section>
   );
 }
 
-function FrontsView({ map, onUpdate, updatingId }: { map: ReturnType<typeof buildObjectivesMap>; onUpdate: (id: string | number, currentValue: string, progressPercent: number | null) => Promise<void>; updatingId: string | number | null }) {
+function BulkProgressView({ objectives, onSaved }: { objectives: Objective[]; onSaved: () => void }) {
+  const [draft, setDraft] = useState<Record<string, { currentValue: string; progressPercent: string }>>({});
+  const [query, setQuery] = useState("");
+  const [soloSinMedir, setSoloSinMedir] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const mutation = useMutation({
+    mutationFn: updateObjectivesProgress,
+    onSuccess: () => { setDraft({}); setError(null); onSaved(); },
+    onError: (mutationError: unknown) => setError(mutationError instanceof Error ? mutationError.message : "No se pudo guardar el avance"),
+  });
+
+  const rows = objectives.filter((objective) => {
+    if (soloSinMedir && typeof objective.progressPercent === "number") return false;
+    const text = query.trim().toLowerCase();
+    if (!text) return true;
+    return [objective.title, objective.metric, objective.target, ownerLabel(objective.owner)]
+      .filter(Boolean)
+      .some((value) => String(value).toLowerCase().includes(text));
+  });
+
+  const valueOf = (objective: Objective, field: "currentValue" | "progressPercent") => {
+    const entry = draft[String(objective.id)];
+    if (entry) return entry[field];
+    if (field === "currentValue") return String(objective.currentValue ?? "");
+    return objective.progressPercent == null ? "" : String(objective.progressPercent);
+  };
+
+  const set = (objective: Objective, field: "currentValue" | "progressPercent", value: string) => {
+    const id = String(objective.id);
+    setDraft((current) => ({
+      ...current,
+      [id]: {
+        currentValue: field === "currentValue" ? value : current[id]?.currentValue ?? String(objective.currentValue ?? ""),
+        progressPercent: field === "progressPercent" ? value : current[id]?.progressPercent ?? (objective.progressPercent == null ? "" : String(objective.progressPercent)),
+      },
+    }));
+  };
+
+  const pendientes = Object.keys(draft).length;
+  const guardar = () => {
+    const updates = Object.entries(draft).map(([id, entry]) => {
+      const percent = entry.progressPercent.trim();
+      const parsed = percent === "" ? null : Number(percent);
+      return { id, currentValue: entry.currentValue.trim() === "" ? null : entry.currentValue.trim(), progressPercent: parsed };
+    });
+    const invalido = updates.find((update) => update.progressPercent !== null && (!Number.isFinite(update.progressPercent) || update.progressPercent < 0 || update.progressPercent > 100));
+    if (invalido) { setError("El avance tiene que ser un número entre 0 y 100."); return; }
+    mutation.mutate(updates);
+  };
+
+  return (
+    <section className="rounded-2xl border border-border/75 bg-card p-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-base font-bold text-foreground">Cargar avance</h2>
+          <p className="mt-1 text-xs text-muted-foreground">Toda la tanda de una vez. Tabulá entre campos y guardá al final.</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Label htmlFor="bulk-search" className="sr-only">Buscar objetivo</Label>
+          <Input id="bulk-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar objetivo…" className="h-9 w-52 text-xs" />
+          <label className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+            <input type="checkbox" checked={soloSinMedir} onChange={(event) => setSoloSinMedir(event.target.checked)} />
+            Sólo sin medir
+          </label>
+          <Button type="button" size="sm" onClick={guardar} disabled={pendientes === 0 || mutation.isPending}>
+            {mutation.isPending ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
+            Guardar {pendientes > 0 ? `(${pendientes})` : ""}
+          </Button>
+        </div>
+      </div>
+      {error && <div role="alert" className="mt-3 rounded-xl border border-destructive/20 bg-destructive/[0.04] px-3 py-2 text-xs text-destructive">{error}</div>}
+      <p className="mt-3 text-xs text-muted-foreground">Mostrando {rows.length} de {objectives.length} objetivos</p>
+      <div className="mt-3 overflow-x-auto">
+        <table className="w-full min-w-[760px] text-left text-sm">
+          <thead>
+            <tr className="border-b border-border text-[11px] uppercase tracking-wide text-muted-foreground">
+              <th className="pb-2">Objetivo</th>
+              <th className="pb-2">Meta</th>
+              <th className="w-44 pb-2">Avance actual</th>
+              <th className="w-24 pb-2">%</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((objective) => (
+              <tr key={String(objective.id)} className="border-b border-border/60 last:border-0">
+                <td className="py-2 pr-3">
+                  <p className="text-xs font-semibold leading-4 text-foreground">{objective.title}</p>
+                  <p className="text-[10px] text-muted-foreground">{ownerLabel(objective.owner)}</p>
+                </td>
+                <td className="py-2 pr-3 text-[11px] text-muted-foreground">{valueText(objective.target, "—")}</td>
+                <td className="py-2 pr-2">
+                  <Label htmlFor={`bulk-value-${objective.id}`} className="sr-only">Avance de {objective.title}</Label>
+                  <Input id={`bulk-value-${objective.id}`} value={valueOf(objective, "currentValue")} onChange={(event) => set(objective, "currentValue", event.target.value)} placeholder="Ej. USD 42K" className="h-8 text-xs" />
+                </td>
+                <td className="py-2">
+                  <Label htmlFor={`bulk-pct-${objective.id}`} className="sr-only">Porcentaje de {objective.title}</Label>
+                  <Input id={`bulk-pct-${objective.id}`} type="number" min="0" max="100" step="1" value={valueOf(objective, "progressPercent")} onChange={(event) => set(objective, "progressPercent", event.target.value)} placeholder="0–100" className="h-8 text-xs" />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {rows.length === 0 && <p className="py-6 text-center text-xs text-muted-foreground">No hay objetivos para esos filtros.</p>}
+      </div>
+    </section>
+  );
+}
+
+function SearchResults({ objectives, query, breadcrumbOf, onUpdate, updatingId }: { objectives: Objective[]; query: string; breadcrumbOf: (objective: Objective) => string; onUpdate: (id: string | number, currentValue: string, progressPercent: number | null) => Promise<void>; updatingId: string | number | null }) {
+  const text = query.trim().toLowerCase();
+  const matches = objectives.filter((objective) =>
+    [objective.title, objective.metric, objective.target, objective.areaKey, ownerLabel(objective.owner)]
+      .filter(Boolean)
+      .some((value) => String(value).toLowerCase().includes(text)),
+  );
+  if (matches.length === 0) return <EmptyState title="Sin coincidencias" description={`Ningún objetivo menciona "${query.trim()}".`} />;
+  return (
+    <div className="space-y-1">
+      <p className="text-xs text-muted-foreground">{matches.length} {matches.length === 1 ? "coincidencia" : "coincidencias"}</p>
+      {matches.map((objective) => (
+        <div key={String(objective.id)} className="rounded-xl border border-border/70 p-3">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{breadcrumbOf(objective)}</p>
+          <div className="mt-1 flex flex-wrap items-center gap-1.5">
+            <TierBadge objective={objective} />
+            <DeadlineBadge objective={objective} />
+            <Badge variant="outline" className={cn("px-1.5 py-0 text-[9px]", levelClass(objective.level))}>{levelLabel(objective.level)}</Badge>
+          </div>
+          <h4 className="mt-1 text-[13px] font-semibold text-foreground">{objective.title}</h4>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">{valueText(objective.target, "Meta aún no definida")}</p>
+          <ProgressForm objective={objective} onUpdate={onUpdate} isUpdating={updatingId === objective.id} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function FrontsView({ map, objectives, query, onQueryChange, breadcrumbOf, onUpdate, updatingId }: { map: ReturnType<typeof buildObjectivesMap>; objectives: Objective[]; query: string; onQueryChange: (value: string) => void; breadcrumbOf: (objective: Objective) => string; onUpdate: (id: string | number, currentValue: string, progressPercent: number | null) => Promise<void>; updatingId: string | number | null }) {
   const [openFront, setOpenFront] = useState<FrontId | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const searching = query.trim().length > 0;
   const toggle = (id: string) => setExpanded((current) => {
     const next = new Set(current);
     next.has(id) ? next.delete(id) : next.add(id);
@@ -446,6 +615,15 @@ function FrontsView({ map, onUpdate, updatingId }: { map: ReturnType<typeof buil
   const front = map.fronts.find((candidate) => candidate.id === openFront) ?? null;
   return (
     <div className="space-y-5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <Label htmlFor="objective-search" className="sr-only">Buscar objetivo</Label>
+        <Input id="objective-search" value={query} onChange={(event) => onQueryChange(event.target.value)} placeholder="Buscar un objetivo por nombre, meta o responsable…" className="h-9 w-full max-w-md text-xs" />
+        {searching && <Button type="button" variant="ghost" size="sm" onClick={() => onQueryChange("")}>Limpiar búsqueda</Button>}
+      </div>
+      {searching ? (
+        <SearchResults objectives={objectives} query={query} breadcrumbOf={breadcrumbOf} onUpdate={onUpdate} updatingId={updatingId} />
+      ) : (
+      <>
       <section aria-label="Frentes del plan">
         <h2 className="text-base font-bold text-foreground">Cinco frentes</h2>
         <p className="mt-1 text-xs text-muted-foreground">Abrí uno para ver sus objetivos de empresa. Nunca 87 tarjetas de una.</p>
@@ -482,7 +660,9 @@ function FrontsView({ map, onUpdate, updatingId }: { map: ReturnType<typeof buil
           </ul>
         </section>
       )}
-      <StandardsPanel standards={map.standards} atRisk={map.standardsAtRisk} />
+      <StandardsPanel map={map} />
+      </>
+      )}
     </div>
   );
 }
@@ -533,11 +713,13 @@ function ActionForm({ form, setForm, objectives, owners, accounts, onSubmit, onC
 
 export default function StatusObjectivesPage() {
   const [location] = useLocation();
+  const { user: authUser } = useAuth();
   const queryClient = useQueryClient();
   // El plan entra por su mapa: el norte arriba y los cinco frentes. La vista
   // del lunes queda a un clic, en Resumen.
   const [view, setView] = useState<ViewId>("objectives");
   const [ownerFilter, setOwnerFilter] = useState("Todos");
+  const [objectiveSearch, setObjectiveSearch] = useState("");
   const [showActionForm, setShowActionForm] = useState(false);
   const [form, setForm] = useState<ActionForm>(emptyActionForm);
   const [formError, setFormError] = useState<string | null>(null);
@@ -557,7 +739,41 @@ export default function StatusObjectivesPage() {
     const seen = new Set<string>();
     return all.filter((owner) => { const key = ownerKey(owner); if (!key || seen.has(key)) return false; seen.add(key); return true; });
   }, [actions, objectives, owners]);
-  const objectivesMap = useMemo(() => buildObjectivesMap(objectives), [objectives]);
+  // "¿Qué me toca a mí?" es la pregunta más frecuente, así que la pantalla
+  // arranca mostrando lo del usuario logueado si su cuenta está vinculada a
+  // una persona del equipo. Un clic muestra todo.
+  const myPersonnelId = authUser?.personnelId ?? null;
+  const [onlyMine, setOnlyMine] = useState<boolean>(false);
+  useEffect(() => { if (myPersonnelId != null) setOnlyMine(true); }, [myPersonnelId]);
+  const scopedObjectives = useMemo(() => {
+    if (!onlyMine || myPersonnelId == null) return objectives;
+    const mine = objectives.filter((objective) => String(ownerKey(objective.owner)) === String(myPersonnelId));
+    // Si la persona no tiene objetivos propios, esconder todo sería peor que
+    // no filtrar: se muestra el plan completo.
+    return mine.length > 0 ? mine : objectives;
+  }, [objectives, onlyMine, myPersonnelId]);
+  const objectivesMap = useMemo(() => buildObjectivesMap(scopedObjectives), [scopedObjectives]);
+  const mineCount = useMemo(() => myPersonnelId == null ? 0 : objectives.filter((objective) => String(ownerKey(objective.owner)) === String(myPersonnelId)).length, [objectives, myPersonnelId]);
+
+  // Ruta legible de un objetivo, para que un resultado de búsqueda diga de
+  // dónde cuelga en vez de aparecer sin contexto.
+  const breadcrumbOf = useMemo(() => {
+    const byId = new Map(objectives.map((objective) => [String(objective.id), objective]));
+    return (objective: Objective) => {
+      const chain: string[] = [];
+      let current: Objective | undefined = objective;
+      const seen = new Set<string>();
+      while (current && !seen.has(String(current.id))) {
+        seen.add(String(current.id));
+        const parentId: string | null = current.parentObjectiveId != null ? String(current.parentObjectiveId) : null;
+        current = parentId ? byId.get(parentId) : undefined;
+        if (current) chain.unshift(current.title);
+      }
+      const front = chain.length ? frontOf(objectives.find((candidate) => candidate.title === chain[0])?.slug) : frontOf(objective.slug);
+      const label = front ? FRONTS[front] : null;
+      return [label, ...chain].filter(Boolean).join(" › ") || "Raíz del plan";
+    };
+  }, [objectives]);
   const currentWeekActions = useMemo(() => !currentWeekStart ? [] : actions.filter((action) => normalizeDate(action.weekStart) === normalizeDate(currentWeekStart)), [actions, currentWeekStart]);
   const filteredActions = useMemo(() => ownerFilter === "Todos" ? actions : actions.filter((action) => ownerKey(action.accountableOwner) === ownerFilter), [actions, ownerFilter]);
   const people = useMemo(() => ownerOptions.map((owner) => { const key = ownerKey(owner); return { owner, objectives: objectives.filter((objective) => ownerKey(objective.owner) === key), actions: actions.filter((action) => [action.accountableOwner, ...(action.supportingOwners ?? [])].some((candidate) => ownerKey(candidate) === key)) }; }), [actions, objectives, ownerOptions]);
@@ -585,14 +801,24 @@ export default function StatusObjectivesPage() {
     <div className="flex flex-wrap items-center justify-between gap-3"><SectionNav active={location.startsWith("/review/objectives") ? "objectives" : "status"} /><div className="flex items-center gap-2 text-xs text-muted-foreground"><CalendarDays className="h-3.5 w-3.5" /><span>Plan Cierre {YEAR}</span>{currentWeekStart && <><span className="text-border">·</span><span>Semana desde {formatWeek(currentWeekStart)}</span></>}</div></div>
     <CompactPageHeader eyebrow="Status · seguimiento integrado" title="Objetivos y acciones" description="Objetivos y acciones persistentes, conectados por owner, semana, cuenta y foco." icon={<Target className="h-5 w-5" />} actions={<Button size="sm" onClick={openActionForm} disabled={objectives.length === 0}><Plus className="h-4 w-4" />Nueva acción</Button>} meta={<><Badge variant="outline" className="gap-1.5 border-primary/20 bg-primary/[0.06] text-primary"><CircleDashed className="h-3 w-3" />API persistente</Badge><span className="inline-flex items-center gap-1.5"><Flag className="h-3.5 w-3.5" />Datos del backend</span></>} />
     {showActionForm && <ActionForm form={form} setForm={setForm} objectives={objectives} owners={ownerOptions} accounts={accounts} onSubmit={submitAction} onClose={() => setShowActionForm(false)} isPending={createActionMutation.isPending} error={formError} />}
-    <NorthStarPanel northStar={objectivesMap.northStar} support={objectivesMap.northSupport} />
+    {myPersonnelId != null && mineCount > 0 && (
+      <div className="flex items-center gap-2">
+        <div className="flex w-fit items-center gap-1 rounded-xl border border-border/80 bg-card/80 p-1 shadow-sm">
+          <button type="button" onClick={() => setOnlyMine(true)} aria-pressed={onlyMine} className={cn("rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors", onlyMine ? "bg-slate-900 text-white" : "text-muted-foreground hover:bg-muted")}>Lo mío ({mineCount})</button>
+          <button type="button" onClick={() => setOnlyMine(false)} aria-pressed={!onlyMine} className={cn("rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors", !onlyMine ? "bg-slate-900 text-white" : "text-muted-foreground hover:bg-muted")}>Todo el plan ({objectives.length})</button>
+        </div>
+        {onlyMine && <span className="text-[11px] text-muted-foreground">Mostrando sólo los objetivos de {authUser?.personnelName ?? "tu cuenta"}.</span>}
+      </div>
+    )}
+    <NorthStarPanel northStar={objectivesMap.northStar} support={objectivesMap.northSupport} onLoadProgress={() => setView("load")} />
     <CurrentWeekBand actions={currentWeekActions} weekLabel={currentWeekLabel} onToggle={toggleAction} pendingId={updateActionMutation.isPending ? updateActionMutation.variables?.id ?? null : null} />
     {mutationError && <div role="alert" className="flex items-center gap-2 rounded-xl border border-destructive/20 bg-destructive/[0.03] px-3 py-2 text-xs text-destructive"><AlertCircle className="h-4 w-4 shrink-0" />{mutationError instanceof Error ? mutationError.message : "No se pudo guardar el cambio."}</div>}
     <div role="tablist" aria-label="Vista de objetivos" className="flex items-center gap-1 overflow-x-auto border-b border-border/80 pb-px">{viewTabs.map((tab) => <button key={tab.id} id={`objectives-tab-${tab.id}`} type="button" role="tab" aria-selected={view === tab.id} aria-controls={`objectives-panel-${tab.id}`} tabIndex={view === tab.id ? 0 : -1} onClick={() => setView(tab.id)} className={cn("whitespace-nowrap border-b-2 px-3 py-2 text-sm font-semibold transition-colors", view === tab.id ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground")}>{tab.label}</button>)}</div>
-    {view === "summary" && <div id="objectives-panel-summary" role="tabpanel" aria-labelledby="objectives-tab-summary" tabIndex={0} className="space-y-5"><section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Indicadores principales"><MetricCard label="Objetivos" value={summary?.totalObjectives} detail="Total informado por la API" icon={BarChart3} tone="text-primary" /><MetricCard label="Acciones" value={summary?.totalActions} detail="Total informado por la API" icon={ListChecks} tone="text-violet-600" /><MetricCard label="Acciones completadas" value={summary?.completedActions} detail={summary ? `${summary.completedActions} de ${summary.totalActions}` : "Sin resumen disponible"} icon={Check} tone="text-emerald-600" /><MetricCard label="Objetivos en riesgo" value={summary?.atRiskObjectives} detail="Total informado por la API" icon={TrendingUp} tone="text-amber-600" /></section><MondayView map={objectivesMap} /></div>}
-    {view === "objectives" && <div id="objectives-panel-objectives" role="tabpanel" aria-labelledby="objectives-tab-objectives" tabIndex={0}><FrontsView map={objectivesMap} onUpdate={updateCurrentValue} updatingId={updateObjectiveMutation.isPending ? updateObjectiveMutation.variables?.id ?? null : null} /></div>}
+    {view === "summary" && <div id="objectives-panel-summary" role="tabpanel" aria-labelledby="objectives-tab-summary" tabIndex={0} className="space-y-5"><section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Indicadores principales"><MetricCard label="Objetivos" value={summary?.totalObjectives} detail="Total informado por la API" icon={BarChart3} tone="text-primary" /><MetricCard label="Acciones" value={summary?.totalActions} detail="Total informado por la API" icon={ListChecks} tone="text-violet-600" /><MetricCard label="Acciones completadas" value={summary?.completedActions} detail={summary ? `${summary.completedActions} de ${summary.totalActions}` : "Sin resumen disponible"} icon={Check} tone="text-emerald-600" /><MetricCard label="Objetivos en riesgo" value={summary?.atRiskObjectives} detail="Total informado por la API" icon={TrendingUp} tone="text-amber-600" /></section><MondayView map={objectivesMap} onLoadProgress={() => setView("load")} /></div>}
+    {view === "objectives" && <div id="objectives-panel-objectives" role="tabpanel" aria-labelledby="objectives-tab-objectives" tabIndex={0}><FrontsView map={objectivesMap} objectives={scopedObjectives} query={objectiveSearch} onQueryChange={setObjectiveSearch} breadcrumbOf={breadcrumbOf} onUpdate={updateCurrentValue} updatingId={updateObjectiveMutation.isPending ? updateObjectiveMutation.variables?.id ?? null : null} /></div>}
     {view === "week" && <div id="objectives-panel-week" role="tabpanel" aria-labelledby="objectives-tab-week" tabIndex={0}><section className="rounded-2xl border border-border/75 bg-card p-5"><div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="text-base font-bold text-foreground">Acciones por semana</h2><p className="mt-1 text-xs text-muted-foreground">Todos los registros del backend, con owner, objetivo, semana y cuenta.</p></div><div className="flex items-center gap-2"><Users className="h-4 w-4 text-muted-foreground" /><Label htmlFor="owner-filter" className="sr-only">Filtrar por owner</Label><select id="owner-filter" value={ownerFilter} onChange={(event) => setOwnerFilter(event.target.value)} className="h-9 rounded-lg border border-border bg-background px-2 text-xs font-semibold text-foreground"><option value="Todos">Todos los owners</option>{ownerOptions.map((owner, index) => <option key={`${ownerKey(owner)}-${index}`} value={ownerKey(owner)}>{ownerLabel(owner)}</option>)}</select></div></div><ActionTable actions={filteredActions} onToggle={toggleAction} pendingId={updateActionMutation.isPending ? updateActionMutation.variables?.id ?? null : null} /></section></div>}
     {view === "timeline" && <div id="objectives-panel-timeline" role="tabpanel" aria-labelledby="objectives-tab-timeline" tabIndex={0}><TimelineView timeline={objectivesMap.timeline} objectives={objectives} /></div>}
+    {view === "load" && <div id="objectives-panel-load" role="tabpanel" aria-labelledby="objectives-tab-load" tabIndex={0}><BulkProgressView objectives={objectives} onSaved={() => queryClient.invalidateQueries({ queryKey })} /></div>}
     {view === "people" && <div id="objectives-panel-people" role="tabpanel" aria-labelledby="objectives-tab-people" tabIndex={0}><section className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{people.length === 0 ? <EmptyState title="No hay owners" description="La API no devolvió owners ni registros con responsable." /> : people.map(({ owner, objectives: personObjectives, actions: personActions }) => <article key={ownerKey(owner)} className="rounded-2xl border border-border/75 bg-card p-4"><div className="flex items-start justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Persona</p><h2 className="mt-1 text-base font-bold text-foreground">{ownerLabel(owner)}</h2></div><Users className="h-5 w-5 text-primary" /></div><div className="mt-4 grid grid-cols-2 gap-2"><div className="rounded-xl bg-muted/50 p-3"><span className="text-[11px] text-muted-foreground">Objetivos</span><strong className="mt-1 block text-xl text-foreground">{personObjectives.length}</strong></div><div className="rounded-xl bg-muted/50 p-3"><span className="text-[11px] text-muted-foreground">Acciones</span><strong className="mt-1 block text-xl text-foreground">{personActions.length}</strong></div></div><div className="mt-4 space-y-2">{personObjectives.length > 0 ? personObjectives.map((objective) => <div key={String(objective.id)} className="rounded-lg border border-border/60 px-3 py-2 text-xs"><span className="font-semibold text-foreground">{objective.title}</span><span className="mt-1 block text-muted-foreground">{objective.metric || "Métrica aún no definida"}</span></div>) : <p className="text-xs text-muted-foreground">Sin objetivos asignados.</p>}</div></article>)}</section></div>}
     {view === "accounts" && <div id="objectives-panel-accounts" role="tabpanel" aria-labelledby="objectives-tab-accounts" tabIndex={0}><section className="grid gap-5 lg:grid-cols-[1.2fr_0.8fr]"><div className="rounded-2xl border border-border/75 bg-card p-5"><div className="flex items-center gap-2"><BriefcaseBusiness className="h-5 w-5 text-primary" /><h2 className="text-base font-bold">Cuentas</h2></div><p className="mt-1 text-xs text-muted-foreground">Cuentas devueltas por la API y acciones asociadas.</p><div className="mt-5 space-y-3">{accountRows.length === 0 ? <EmptyState title="No hay cuentas" description="La API no devolvió cuentas ni acciones asociadas a una cuenta." /> : accountRows.map(({ account, actions: accountActions }) => <div key={String(account.id)} className="rounded-xl border border-border/70 p-3"><div className="flex items-center justify-between gap-3"><div><div className="text-sm font-semibold">{account.name}</div><div className="mt-1 text-[11px] text-muted-foreground">{accountActions.length} acciones asociadas</div></div><Badge variant="outline" className="border-primary/20 bg-primary/[0.06] text-primary">{accountActions.length}</Badge></div>{accountActions.length > 0 && <div className="mt-3 space-y-1.5">{accountActions.map((action) => <div key={String(action.id)} className="text-xs text-muted-foreground">{action.title}</div>)}</div>}</div>)}</div></div><div className="rounded-2xl border border-border/75 bg-card p-5"><div className="flex items-center gap-2"><WalletCards className="h-5 w-5 text-amber-600" /><h2 className="text-base font-bold">Acciones sin cuenta</h2></div><div className="mt-6 text-3xl font-bold tracking-tight">{actions.filter((action) => (action.accountId === null || action.accountId === undefined) && !action.accountName).length}</div><p className="mt-1 text-xs text-muted-foreground">Cantidad derivada de los registros recibidos; no es una métrica simulada.</p></div></section></div>}
   </PageShell>;

@@ -543,6 +543,47 @@ export function createObjectivesRouter(requireAuth: RequireAuth): Router {
     }
   });
 
+  // Cargar avance de a uno, con el objetivo escondido detrás de tres clics, no
+  // lo hace nadie: por eso los 87 objetivos estaban sin medir. Este endpoint
+  // recibe la tanda entera y la aplica en una transacción.
+  const bulkProgressSchema = z.object({
+    updates: z.array(z.object({
+      id: idSchema,
+      currentValue: z.string().trim().max(120).nullable().optional(),
+      progressPercent: z.number().min(0).max(100).nullable().optional(),
+    })).min(1).max(500),
+  });
+
+  router.patch("/objectives/progress", async (req: Request, res: Response) => {
+    try {
+      const { updates } = bulkProgressSchema.parse(req.body);
+      const ids = [...new Set(updates.map((update) => update.id))];
+      const existing = await db.select({ id: objectives.id }).from(objectives).where(inArray(objectives.id, ids));
+      const known = new Set(existing.map((row) => row.id));
+      const missing = ids.filter((id) => !known.has(id));
+      if (missing.length) {
+        return res.status(404).json({ message: `No se encontraron estos objetivos: ${missing.join(", ")}` });
+      }
+
+      const saved = await db.transaction(async (tx) => {
+        let count = 0;
+        for (const update of updates) {
+          const patch: Record<string, unknown> = { updatedAt: new Date() };
+          if (Object.prototype.hasOwnProperty.call(update, "currentValue")) patch.currentValue = update.currentValue ?? null;
+          if (Object.prototype.hasOwnProperty.call(update, "progressPercent")) patch.progressPercent = update.progressPercent ?? null;
+          if (Object.keys(patch).length === 1) continue;
+          await tx.update(objectives).set(patch as typeof objectives.$inferInsert).where(eq(objectives.id, update.id));
+          count += 1;
+        }
+        return count;
+      });
+
+      res.json({ updated: saved });
+    } catch (error) {
+      handleError(res, error, "No se pudo guardar el avance");
+    }
+  });
+
   router.patch("/objectives/:id", async (req: Request, res: Response) => {
     try {
       const objectiveId = parseId(req.params.id, "id");
