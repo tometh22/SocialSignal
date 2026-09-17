@@ -209,9 +209,13 @@ function handleError(res: Response, error: unknown, fallback: string) {
 export function createObjectivesRouter(requireAuth: RequireAuth): Router {
   const router = Router();
 
-  // Objectives are part of Status. Keep both checks at the router boundary so
-  // every present and future endpoint under /api/objectives is protected.
-  router.use(requireAuth, requirePermission("status"));
+  // Objectives are part of Status, so every present and future endpoint under
+  // /api/objectives stays protected. The guard is bound to the path, not to
+  // the router: this router is mounted on /api, and a router-wide use() runs
+  // for every request that enters it — including ones it does not handle.
+  // That made /api/crm/stages answer 403 to anyone without "status", because
+  // the request was rejected here before reaching the CRM router.
+  router.use("/objectives", requireAuth, requirePermission("status"));
 
   router.get("/objectives", async (req: Request, res: Response) => {
     try {
