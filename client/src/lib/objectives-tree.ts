@@ -6,10 +6,12 @@ import {
   frontOf,
   CHECKPOINTS,
   MONTH_CHECKPOINT_SLUGS,
+  planRoleOf,
   NORTH_STAR,
   NORTH_STAR_SUPPORT,
   tierFor,
   type FrontId,
+  type PlanRole,
   type Tier,
 } from "@shared/objectives-fronts";
 
@@ -209,7 +211,12 @@ export type FrontSummary = {
   label: string;
   /** Objetivos de empresa del frente, ya con su descendencia. */
   objectives: ObjectiveNode[];
+  /** Entradas del plan bajo el frente, incluida la bajada. */
   total: number;
+  /** Objetivos de empresa del frente: el número que importa. */
+  objectives_: number;
+  /** Estándares que cuelgan del frente. No son objetivos: no se cuentan como tales. */
+  standards_: number;
   overdue: number;
   dueSoon: number;
   nonNegotiable: number;
@@ -233,8 +240,10 @@ export type ObjectivesMap = {
   standardsUnmeasured: Objective[];
   /** Marcadores de la línea de tiempo, en orden. */
   timeline: Array<{ date: string; label: string; hard: boolean; objective: Objective | null }>;
-  /** Nada que no haya entrado en ninguna de las cajas anteriores. */
+  /** Objetivos de empresa que no están en ningún frente: hay que clasificarlos. */
   unplaced: Objective[];
+  /** Cuántas entradas del plan son realmente un objetivo, y cuántas otra cosa. */
+  counts: Record<PlanRole, number>;
 };
 
 function countDeep(node: ObjectiveNode, today: string, seen = { total: 0, overdue: 0, dueSoon: 0, nonNegotiable: 0, sum: 0, withProgress: 0 }) {
@@ -332,6 +341,8 @@ export function buildObjectivesMap(objectives: Objective[], today = todayISO()):
       label: FRONTS[id],
       objectives: nodes,
       total: stats.total,
+      objectives_: nodes.filter((node) => planRoleOf(node.objective.slug, node.objective.level, node.objective.targetKind) === "objetivo").length,
+      standards_: nodes.filter((node) => planRoleOf(node.objective.slug, node.objective.level, node.objective.targetKind) === "estandar").length,
       overdue: stats.overdue,
       dueSoon: stats.dueSoon,
       nonNegotiable: stats.nonNegotiable,
@@ -340,8 +351,17 @@ export function buildObjectivesMap(objectives: Objective[], today = todayISO()):
   });
 
   // Si mañana aparece un objetivo de empresa sin frente, tiene que verse, no
-  // desaparecer. Se muestra aparte y queda evidente que falta clasificarlo.
-  const unplaced = tree.filter((node) => !placed.has(node)).map((node) => node.objective);
+  // desaparecer. Pero una rama que quedó sin padre —porque un filtro lo dejó
+  // fuera— no está "sin clasificar": sólo perdió a su raíz. Confundir las dos
+  // cosas llenaba la pantalla de falsos positivos.
+  const unplaced = tree
+    .filter((node) => !placed.has(node) && node.objective.level === "company")
+    .map((node) => node.objective);
+
+  const counts: Record<PlanRole, number> = { objetivo: 0, bajada: 0, estandar: 0, checkpoint: 0 };
+  for (const objective of objectives) {
+    counts[planRoleOf(objective.slug, objective.level, objective.targetKind)] += 1;
+  }
 
   const inTree = objectives.filter((o) => !(o.slug && checkpointSlugs.has(o.slug)));
   const dueSoon = dueWithin(inTree, 14, today);
@@ -372,7 +392,7 @@ export function buildObjectivesMap(objectives: Objective[], today = todayISO()):
     .filter((entry) => entry.date)
     .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
 
-  return { northStar, northSupport, fronts, standards, standardsBreached, standardsUnmeasured, checkpoints, dueSoon, timeline, unplaced };
+  return { northStar, northSupport, fronts, standards, standardsBreached, standardsUnmeasured, checkpoints, dueSoon, timeline, unplaced, counts };
 }
 
 /** Objetivos que vencen dentro de la ventana, ordenados por urgencia. */

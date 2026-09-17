@@ -143,3 +143,41 @@ describe("vista del lunes", () => {
     }
   });
 });
+
+describe("qué es realmente un objetivo", () => {
+  it("separa los 15 objetivos de las 72 entradas que no lo son", () => {
+    const mapa = buildObjectivesMap(asObjectives(), HOY);
+    expect(mapa.counts).toEqual({ objetivo: 15, bajada: 49, estandar: 19, checkpoint: 4 });
+    const total = Object.values(mapa.counts).reduce((a, b) => a + b, 0);
+    expect(total).toBe(OBJECTIVE_PLAN_2026.objectives.length);
+  });
+
+  it("los objetivos de los frentes más el norte suman los 15", () => {
+    const mapa = buildObjectivesMap(asObjectives(), HOY);
+    const enFrentes = mapa.fronts.reduce((total, front) => total + front.objectives_, 0);
+    expect(enFrentes + (mapa.northStar ? 1 : 0) + mapa.northSupport.length).toBe(mapa.counts.objetivo);
+  });
+
+  it("un frente no cuenta sus estándares como objetivos", () => {
+    const mapa = buildObjectivesMap(asObjectives(), HOY);
+    const opsCaja = mapa.fronts.find((front) => front.id === "front-ops-cash")!;
+    expect(opsCaja.standards_).toBeGreaterThan(0);
+    expect(opsCaja.objectives_).toBeLessThan(opsCaja.objectives_ + opsCaja.standards_);
+  });
+
+  it("ningún frente queda vacío ni aparece un falso 'sin clasificar'", () => {
+    // Antes, filtrar por persona dejaba ramas sin raíz que caían en el balde
+    // de "sin frente" con un mensaje de error, y frentes en cero que decían
+    // "sin urgencias". El mapa ya no se filtra, así que no puede pasar.
+    const mapa = buildObjectivesMap(asObjectives(), HOY);
+    expect(mapa.unplaced).toEqual([]);
+    for (const front of mapa.fronts) expect(front.objectives_ + front.standards_).toBeGreaterThan(0);
+  });
+
+  it("sólo un objetivo de empresa puede caer en 'sin frente'", () => {
+    const rama: Objective = { id: 9999, slug: "area-huerfana", level: "area", title: "Rama sin padre", parentObjectiveId: 123456 } as Objective;
+    const empresa: Objective = { id: 9998, slug: "company-sin-frente", level: "company", title: "Empresa sin frente" } as Objective;
+    const mapa = buildObjectivesMap([...asObjectives(), rama, empresa], HOY);
+    expect(mapa.unplaced.map((o) => o.slug)).toEqual(["company-sin-frente"]);
+  });
+});

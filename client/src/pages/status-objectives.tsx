@@ -52,7 +52,7 @@ import {
   tierOf,
   TreeItem,
 } from "@/lib/objectives-tree";
-import { FRONTS, frontOf, type FrontId } from "@shared/objectives-fronts";
+import { FRONTS, frontOf, planRoleOf, type FrontId } from "@shared/objectives-fronts";
 
 type ViewId = "summary" | "objectives" | "timeline" | "load" | "week" | "people" | "accounts";
 
@@ -202,7 +202,7 @@ function TierBadge({ objective }: { objective: Objective }) {
   return <span className="rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-red-700">Innegociable</span>;
 }
 
-function ObjectiveBranch({ item, expanded, onToggle, onUpdate, updatingId }: { item: TreeItem; expanded: Set<string>; onToggle: (id: string) => void; onUpdate: (id: string | number, currentValue: string, progressPercent: number | null) => Promise<void>; updatingId: string | number | null }) {
+function ObjectiveBranch({ item, expanded, onToggle, onUpdate, updatingId, isMine }: { item: TreeItem; expanded: Set<string>; onToggle: (id: string) => void; onUpdate: (id: string | number, currentValue: string, progressPercent: number | null) => Promise<void>; updatingId: string | number | null; isMine: (owner: ObjectiveRef | null | undefined) => boolean }) {
   if (isGroup(item)) {
     const open = expanded.has(item.id);
     return (
@@ -217,7 +217,7 @@ function ObjectiveBranch({ item, expanded, onToggle, onUpdate, updatingId }: { i
           <span className="text-xs font-bold text-foreground">{item.label}</span>
           <span className="text-[11px] text-muted-foreground">{item.descendants} {item.descendants === 1 ? "objetivo" : "objetivos"}</span>
         </button>
-        {open && <div className="space-y-1 pb-1">{item.children.map((child) => <ObjectiveBranch key={String(child.objective.id)} item={child} expanded={expanded} onToggle={onToggle} onUpdate={onUpdate} updatingId={updatingId} />)}</div>}
+        {open && <div className="space-y-1 pb-1">{item.children.map((child) => <ObjectiveBranch key={String(child.objective.id)} item={child} expanded={expanded} onToggle={onToggle} onUpdate={onUpdate} updatingId={updatingId} isMine={isMine} />)}</div>}
       </div>
     );
   }
@@ -229,9 +229,11 @@ function ObjectiveBranch({ item, expanded, onToggle, onUpdate, updatingId }: { i
   const progress = typeof node.objective.progressPercent === "number" && Number.isFinite(node.objective.progressPercent)
     ? Math.max(0, Math.min(100, node.objective.progressPercent))
     : null;
+  const mine = isMine(node.objective.owner);
+  const role = planRoleOf(node.objective.slug, node.objective.level, node.objective.targetKind);
   return (
     <div className="border-l border-border/70 pl-3">
-      <div className="flex items-start gap-2 py-2">
+      <div className={cn("flex items-start gap-2 py-2", mine && "-mx-2 rounded-lg bg-primary/[0.05] px-2 ring-1 ring-primary/20")}>
         {kids.length > 0 ? (
           <button type="button" onClick={() => onToggle(id)} aria-expanded={open} aria-label={`${open ? "Contraer" : "Expandir"} ${node.objective.title}`} className="mt-0.5 shrink-0 text-muted-foreground">
             {open ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
@@ -241,7 +243,9 @@ function ObjectiveBranch({ item, expanded, onToggle, onUpdate, updatingId }: { i
           <div className="flex flex-wrap items-center gap-1.5">
             <TierBadge objective={node.objective} />
             <DeadlineBadge objective={node.objective} />
-            <Badge variant="outline" className={cn("px-1.5 py-0 text-[9px]", levelClass(node.objective.level))}>{levelLabel(node.objective.level)}</Badge>
+            {role === "bajada"
+              ? <span className="rounded-full border border-border bg-muted/50 px-1.5 py-0 text-[9px] font-semibold text-muted-foreground">Bajada · {levelLabel(node.objective.level)}</span>
+              : <Badge variant="outline" className={cn("px-1.5 py-0 text-[9px]", levelClass(node.objective.level))}>{levelLabel(node.objective.level)}</Badge>}
           </div>
           <h4 className="mt-1 text-[13px] font-semibold leading-5 text-foreground">{node.objective.title}</h4>
           <p className="mt-0.5 text-[11px] text-muted-foreground">{valueText(node.objective.target, "Meta aún no definida")}</p>
@@ -250,7 +254,7 @@ function ObjectiveBranch({ item, expanded, onToggle, onUpdate, updatingId }: { i
         </div>
         <span className="shrink-0 text-right text-[10px] text-muted-foreground">{ownerLabel(node.objective.owner)}</span>
       </div>
-      {open && kids.length > 0 && <div className="space-y-1 pb-1">{kids.map((child) => <ObjectiveBranch key={isGroup(child) ? child.id : String(child.objective.id)} item={child} expanded={expanded} onToggle={onToggle} onUpdate={onUpdate} updatingId={updatingId} />)}</div>}
+      {open && kids.length > 0 && <div className="space-y-1 pb-1">{kids.map((child) => <ObjectiveBranch key={isGroup(child) ? child.id : String(child.objective.id)} item={child} expanded={expanded} onToggle={onToggle} onUpdate={onUpdate} updatingId={updatingId} isMine={isMine} />)}</div>}
     </div>
   );
 }
@@ -310,12 +314,17 @@ function FrontCard({ front, active, onSelect }: { front: ReturnType<typeof build
           ? <span className="shrink-0 text-[10px] font-semibold text-muted-foreground">sin medir</span>
           : <span className="shrink-0 text-lg font-bold text-foreground">{front.progress}%</span>}
       </div>
-      <p className="mt-2 text-[11px] text-muted-foreground">{front.total} {front.total === 1 ? "objetivo" : "objetivos"}</p>
+      <p className="mt-2 text-[11px] text-muted-foreground">
+        {front.objectives_} {front.objectives_ === 1 ? "objetivo" : "objetivos"}
+        {front.standards_ > 0 && <span className="text-muted-foreground/70"> · {front.standards_} estándar{front.standards_ === 1 ? "" : "es"}</span>}
+      </p>
       <div className="mt-2 flex flex-wrap gap-1.5">
         {front.overdue > 0 && <span className="rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[10px] font-bold text-red-700">{front.overdue} vencido{front.overdue === 1 ? "" : "s"}</span>}
         {front.dueSoon > 0 && <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700">{front.dueSoon} vence{front.dueSoon === 1 ? "" : "n"} pronto</span>}
         {front.nonNegotiable > 0 && <span className="rounded-full border border-slate-300 bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-700">{front.nonNegotiable} innegociable{front.nonNegotiable === 1 ? "" : "s"}</span>}
-        {front.overdue === 0 && front.dueSoon === 0 && front.nonNegotiable === 0 && <span className="text-[10px] text-muted-foreground">Sin urgencias</span>}
+        {front.objectives_ === 0 && front.standards_ === 0
+          ? <span className="text-[10px] text-muted-foreground">Sin objetivos cargados</span>
+          : front.overdue === 0 && front.dueSoon === 0 && front.nonNegotiable === 0 && <span className="text-[10px] text-muted-foreground">Sin urgencias</span>}
       </div>
     </button>
   );
@@ -603,7 +612,7 @@ function SearchResults({ objectives, query, breadcrumbOf, onUpdate, updatingId }
   );
 }
 
-function FrontsView({ map, objectives, query, onQueryChange, breadcrumbOf, onUpdate, updatingId }: { map: ReturnType<typeof buildObjectivesMap>; objectives: Objective[]; query: string; onQueryChange: (value: string) => void; breadcrumbOf: (objective: Objective) => string; onUpdate: (id: string | number, currentValue: string, progressPercent: number | null) => Promise<void>; updatingId: string | number | null }) {
+function FrontsView({ map, objectives, query, onQueryChange, breadcrumbOf, onUpdate, updatingId, isMine }: { map: ReturnType<typeof buildObjectivesMap>; objectives: Objective[]; query: string; onQueryChange: (value: string) => void; breadcrumbOf: (objective: Objective) => string; onUpdate: (id: string | number, currentValue: string, progressPercent: number | null) => Promise<void>; updatingId: string | number | null; isMine: (owner: ObjectiveRef | null | undefined) => boolean }) {
   const [openFront, setOpenFront] = useState<FrontId | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const searching = query.trim().length > 0;
@@ -625,8 +634,14 @@ function FrontsView({ map, objectives, query, onQueryChange, breadcrumbOf, onUpd
       ) : (
       <>
       <section aria-label="Frentes del plan">
-        <h2 className="text-base font-bold text-foreground">Cinco frentes</h2>
-        <p className="mt-1 text-xs text-muted-foreground">Abrí uno para ver sus objetivos de empresa. Nunca 87 tarjetas de una.</p>
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="text-base font-bold text-foreground">Cinco frentes</h2>
+          <p className="text-[11px] text-muted-foreground">
+            El plan son <strong className="text-foreground">{map.counts.objetivo} objetivos</strong> y {map.counts.bajada} bajadas a área y persona.
+            Aparte: {map.counts.estandar} estándares y {map.counts.checkpoint} puntos de control.
+          </p>
+        </div>
+        <p className="mt-1 text-xs text-muted-foreground">Abrí un frente para ver sus objetivos. La bajada aparece adentro de cada uno.</p>
         <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
           {map.fronts.map((candidate) => (
             <FrontCard
@@ -646,7 +661,7 @@ function FrontsView({ map, objectives, query, onQueryChange, breadcrumbOf, onUpd
           </div>
           <div className="mt-2 space-y-1">
             {front.objectives.map((node) => (
-              <ObjectiveBranch key={String(node.objective.id)} item={node} expanded={expanded} onToggle={toggle} onUpdate={onUpdate} updatingId={updatingId} />
+              <ObjectiveBranch key={String(node.objective.id)} item={node} expanded={expanded} onToggle={toggle} onUpdate={onUpdate} updatingId={updatingId} isMine={isMine} />
             ))}
           </div>
         </section>
@@ -654,7 +669,7 @@ function FrontsView({ map, objectives, query, onQueryChange, breadcrumbOf, onUpd
       {map.unplaced.length > 0 && (
         <section className="rounded-2xl border border-amber-300 bg-amber-50/60 p-4">
           <h3 className="text-sm font-bold text-amber-900">Sin frente asignado</h3>
-          <p className="mt-1 text-xs text-amber-800">Estos objetivos de empresa no están en ningún frente. Hay que clasificarlos en objectives-fronts.ts.</p>
+          <p className="mt-1 text-xs text-amber-800">Estos objetivos de empresa todavía no están dentro de ningún frente del plan.</p>
           <ul className="mt-2 space-y-0.5">
             {map.unplaced.map((objective) => <li key={String(objective.id)} className="text-xs text-amber-900">· {objective.title}</li>)}
           </ul>
@@ -667,8 +682,9 @@ function FrontsView({ map, objectives, query, onQueryChange, breadcrumbOf, onUpd
   );
 }
 
-function CurrentWeekBand({ actions, weekLabel, onToggle, pendingId }: { actions: ObjectiveAction[]; weekLabel: string; onToggle: (action: ObjectiveAction) => void; pendingId: string | number | null }) {
+function CurrentWeekBand({ actions, weekLabel, onToggle, pendingId, isMine }: { actions: ObjectiveAction[]; weekLabel: string; onToggle: (action: ObjectiveAction) => void; pendingId: string | number | null; isMine: (owner: ObjectiveRef | null | undefined) => boolean }) {
   const pending = actions.filter((action) => !isDone(action));
+  const mineCount = actions.filter((action) => isMine(action.accountableOwner)).length;
   return (
     <section aria-label="Acciones de la semana vigente" className="rounded-2xl border border-primary/25 bg-primary/[0.04] p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -680,6 +696,7 @@ function CurrentWeekBand({ actions, weekLabel, onToggle, pendingId }: { actions:
           {pending.length === 0
             ? `${actions.length} ${actions.length === 1 ? "acción" : "acciones"} · todo cerrado`
             : `${pending.length} ${pending.length === 1 ? "pendiente" : "pendientes"} de ${actions.length}`}
+          {mineCount > 0 && <span className="ml-1.5 rounded-full bg-primary/10 px-1.5 py-0.5 text-primary">{mineCount} tuya{mineCount === 1 ? "" : "s"}</span>}
         </span>
       </div>
       {actions.length === 0 ? (
@@ -687,7 +704,7 @@ function CurrentWeekBand({ actions, weekLabel, onToggle, pendingId }: { actions:
       ) : (
         <div className="mt-3 grid gap-1.5 md:grid-cols-2">
           {actions.map((action) => (
-            <ActionCheck key={String(action.id)} action={action} onToggle={() => onToggle(action)} isPending={pendingId === action.id} />
+            <div key={String(action.id)} className={cn(isMine(action.accountableOwner) && "rounded-lg bg-primary/[0.06] ring-1 ring-primary/20")}><ActionCheck action={action} onToggle={() => onToggle(action)} isPending={pendingId === action.id} /></div>
           ))}
         </div>
       )}
@@ -742,18 +759,19 @@ export default function StatusObjectivesPage() {
   // "¿Qué me toca a mí?" es la pregunta más frecuente, así que la pantalla
   // arranca mostrando lo del usuario logueado si su cuenta está vinculada a
   // una persona del equipo. Un clic muestra todo.
+  // "Lo mío" resalta, no filtra. Filtrar el árbol por persona lo dejaba lleno
+  // de agujeros —el norte desaparecía si era de otro, quedaban ramas sin raíz
+  // y frentes vacíos que decían "sin urgencias"— porque persona y jerarquía
+  // son dos ejes distintos. El mapa siempre muestra el plan completo.
   const myPersonnelId = authUser?.personnelId ?? null;
-  const [onlyMine, setOnlyMine] = useState<boolean>(false);
-  useEffect(() => { if (myPersonnelId != null) setOnlyMine(true); }, [myPersonnelId]);
-  const scopedObjectives = useMemo(() => {
-    if (!onlyMine || myPersonnelId == null) return objectives;
-    const mine = objectives.filter((objective) => String(ownerKey(objective.owner)) === String(myPersonnelId));
-    // Si la persona no tiene objetivos propios, esconder todo sería peor que
-    // no filtrar: se muestra el plan completo.
-    return mine.length > 0 ? mine : objectives;
-  }, [objectives, onlyMine, myPersonnelId]);
-  const objectivesMap = useMemo(() => buildObjectivesMap(scopedObjectives), [scopedObjectives]);
-  const mineCount = useMemo(() => myPersonnelId == null ? 0 : objectives.filter((objective) => String(ownerKey(objective.owner)) === String(myPersonnelId)).length, [objectives, myPersonnelId]);
+  const [highlightMine, setHighlightMine] = useState<boolean>(false);
+  useEffect(() => { if (myPersonnelId != null) setHighlightMine(true); }, [myPersonnelId]);
+  const isMine = useMemo(() => {
+    if (myPersonnelId == null) return () => false;
+    return (owner: ObjectiveRef | null | undefined) => String(ownerKey(owner)) === String(myPersonnelId);
+  }, [myPersonnelId]);
+  const objectivesMap = useMemo(() => buildObjectivesMap(objectives), [objectives]);
+  const mineCount = useMemo(() => objectives.filter((objective) => isMine(objective.owner)).length, [objectives, isMine]);
 
   // Ruta legible de un objetivo, para que un resultado de búsqueda diga de
   // dónde cuelga en vez de aparecer sin contexto.
@@ -802,20 +820,20 @@ export default function StatusObjectivesPage() {
     <CompactPageHeader eyebrow="Status · seguimiento integrado" title="Objetivos y acciones" description="Objetivos y acciones persistentes, conectados por owner, semana, cuenta y foco." icon={<Target className="h-5 w-5" />} actions={<Button size="sm" onClick={openActionForm} disabled={objectives.length === 0}><Plus className="h-4 w-4" />Nueva acción</Button>} meta={<><Badge variant="outline" className="gap-1.5 border-primary/20 bg-primary/[0.06] text-primary"><CircleDashed className="h-3 w-3" />API persistente</Badge><span className="inline-flex items-center gap-1.5"><Flag className="h-3.5 w-3.5" />Datos del backend</span></>} />
     {showActionForm && <ActionForm form={form} setForm={setForm} objectives={objectives} owners={ownerOptions} accounts={accounts} onSubmit={submitAction} onClose={() => setShowActionForm(false)} isPending={createActionMutation.isPending} error={formError} />}
     {myPersonnelId != null && mineCount > 0 && (
-      <div className="flex items-center gap-2">
-        <div className="flex w-fit items-center gap-1 rounded-xl border border-border/80 bg-card/80 p-1 shadow-sm">
-          <button type="button" onClick={() => setOnlyMine(true)} aria-pressed={onlyMine} className={cn("rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors", onlyMine ? "bg-slate-900 text-white" : "text-muted-foreground hover:bg-muted")}>Lo mío ({mineCount})</button>
-          <button type="button" onClick={() => setOnlyMine(false)} aria-pressed={!onlyMine} className={cn("rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors", !onlyMine ? "bg-slate-900 text-white" : "text-muted-foreground hover:bg-muted")}>Todo el plan ({objectives.length})</button>
-        </div>
-        {onlyMine && <span className="text-[11px] text-muted-foreground">Mostrando sólo los objetivos de {authUser?.personnelName ?? "tu cuenta"}.</span>}
+      <div className="flex flex-wrap items-center gap-2">
+        <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-border/80 bg-card/80 px-3 py-1.5 text-xs font-semibold shadow-sm">
+          <input type="checkbox" checked={highlightMine} onChange={(event) => setHighlightMine(event.target.checked)} />
+          Resaltar lo mío ({mineCount})
+        </label>
+        <span className="text-[11px] text-muted-foreground">El mapa muestra siempre el plan completo. Tu lista está en <button type="button" onClick={() => setView("people")} className="font-semibold text-primary hover:underline">Personas</button>.</span>
       </div>
     )}
     <NorthStarPanel northStar={objectivesMap.northStar} support={objectivesMap.northSupport} onLoadProgress={() => setView("load")} />
-    <CurrentWeekBand actions={currentWeekActions} weekLabel={currentWeekLabel} onToggle={toggleAction} pendingId={updateActionMutation.isPending ? updateActionMutation.variables?.id ?? null : null} />
+    <CurrentWeekBand actions={currentWeekActions} weekLabel={currentWeekLabel} isMine={highlightMine ? isMine : () => false} onToggle={toggleAction} pendingId={updateActionMutation.isPending ? updateActionMutation.variables?.id ?? null : null} />
     {mutationError && <div role="alert" className="flex items-center gap-2 rounded-xl border border-destructive/20 bg-destructive/[0.03] px-3 py-2 text-xs text-destructive"><AlertCircle className="h-4 w-4 shrink-0" />{mutationError instanceof Error ? mutationError.message : "No se pudo guardar el cambio."}</div>}
     <div role="tablist" aria-label="Vista de objetivos" className="flex items-center gap-1 overflow-x-auto border-b border-border/80 pb-px">{viewTabs.map((tab) => <button key={tab.id} id={`objectives-tab-${tab.id}`} type="button" role="tab" aria-selected={view === tab.id} aria-controls={`objectives-panel-${tab.id}`} tabIndex={view === tab.id ? 0 : -1} onClick={() => setView(tab.id)} className={cn("whitespace-nowrap border-b-2 px-3 py-2 text-sm font-semibold transition-colors", view === tab.id ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground")}>{tab.label}</button>)}</div>
     {view === "summary" && <div id="objectives-panel-summary" role="tabpanel" aria-labelledby="objectives-tab-summary" tabIndex={0} className="space-y-5"><section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Indicadores principales"><MetricCard label="Objetivos" value={summary?.totalObjectives} detail="Total informado por la API" icon={BarChart3} tone="text-primary" /><MetricCard label="Acciones" value={summary?.totalActions} detail="Total informado por la API" icon={ListChecks} tone="text-violet-600" /><MetricCard label="Acciones completadas" value={summary?.completedActions} detail={summary ? `${summary.completedActions} de ${summary.totalActions}` : "Sin resumen disponible"} icon={Check} tone="text-emerald-600" /><MetricCard label="Objetivos en riesgo" value={summary?.atRiskObjectives} detail="Total informado por la API" icon={TrendingUp} tone="text-amber-600" /></section><MondayView map={objectivesMap} onLoadProgress={() => setView("load")} /></div>}
-    {view === "objectives" && <div id="objectives-panel-objectives" role="tabpanel" aria-labelledby="objectives-tab-objectives" tabIndex={0}><FrontsView map={objectivesMap} objectives={scopedObjectives} query={objectiveSearch} onQueryChange={setObjectiveSearch} breadcrumbOf={breadcrumbOf} onUpdate={updateCurrentValue} updatingId={updateObjectiveMutation.isPending ? updateObjectiveMutation.variables?.id ?? null : null} /></div>}
+    {view === "objectives" && <div id="objectives-panel-objectives" role="tabpanel" aria-labelledby="objectives-tab-objectives" tabIndex={0}><FrontsView map={objectivesMap} objectives={objectives} query={objectiveSearch} onQueryChange={setObjectiveSearch} breadcrumbOf={breadcrumbOf} isMine={highlightMine ? isMine : () => false} onUpdate={updateCurrentValue} updatingId={updateObjectiveMutation.isPending ? updateObjectiveMutation.variables?.id ?? null : null} /></div>}
     {view === "week" && <div id="objectives-panel-week" role="tabpanel" aria-labelledby="objectives-tab-week" tabIndex={0}><section className="rounded-2xl border border-border/75 bg-card p-5"><div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="text-base font-bold text-foreground">Acciones por semana</h2><p className="mt-1 text-xs text-muted-foreground">Todos los registros del backend, con owner, objetivo, semana y cuenta.</p></div><div className="flex items-center gap-2"><Users className="h-4 w-4 text-muted-foreground" /><Label htmlFor="owner-filter" className="sr-only">Filtrar por owner</Label><select id="owner-filter" value={ownerFilter} onChange={(event) => setOwnerFilter(event.target.value)} className="h-9 rounded-lg border border-border bg-background px-2 text-xs font-semibold text-foreground"><option value="Todos">Todos los owners</option>{ownerOptions.map((owner, index) => <option key={`${ownerKey(owner)}-${index}`} value={ownerKey(owner)}>{ownerLabel(owner)}</option>)}</select></div></div><ActionTable actions={filteredActions} onToggle={toggleAction} pendingId={updateActionMutation.isPending ? updateActionMutation.variables?.id ?? null : null} /></section></div>}
     {view === "timeline" && <div id="objectives-panel-timeline" role="tabpanel" aria-labelledby="objectives-tab-timeline" tabIndex={0}><TimelineView timeline={objectivesMap.timeline} objectives={objectives} /></div>}
     {view === "load" && <div id="objectives-panel-load" role="tabpanel" aria-labelledby="objectives-tab-load" tabIndex={0}><BulkProgressView objectives={objectives} onSaved={() => queryClient.invalidateQueries({ queryKey })} /></div>}
