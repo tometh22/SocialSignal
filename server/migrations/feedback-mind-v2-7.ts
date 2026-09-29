@@ -32,25 +32,10 @@ WHERE role.id = person.role_id
   AND person.contract_type = 'freelance'
   AND (person."legacy_role" IS NULL OR BTRIM(person."legacy_role") = '' OR LOWER(BTRIM(person."legacy_role")) = 'postgres');
 
-UPDATE personnel person
-SET "sublevel" = CASE
-      WHEN role.name ILIKE '%semi senior%' THEN 'Semi Senior'
-      WHEN role.name ILIKE '%senior%' THEN 'Senior'
-      WHEN role.name ILIKE '%junior%' THEN 'Junior'
-      WHEN role.name ILIKE '%lead%' THEN 'Lead'
-      WHEN role.name ILIKE '%director%' THEN 'Director'
-      ELSE person."sublevel"
-    END
-FROM roles role
-WHERE role.id = person.role_id
-  AND (person."sublevel" IS NULL OR BTRIM(person."sublevel") = '')
-  AND (
-    role.name ILIKE '%semi senior%'
-    OR role.name ILIKE '%senior%'
-    OR role.name ILIKE '%junior%'
-    OR role.name ILIKE '%lead%'
-    OR role.name ILIKE '%director%'
-  );
+-- El subnivel ya no se deduce del nombre del rol ("Senior", "Lead"...): la
+-- 0049 lo llevó a la escala A/B/C y producción lo protege con
+-- personnel_sublevel_canonical_check. Escribir el vocabulario viejo violaba
+-- esa regla y hacía fallar —y deshacer— esta migración entera en cada arranque.
 
 INSERT INTO system_config(config_key, config_value, description)
 SELECT 'hours_data_source', 1, 'Fuente nativa de horas de la aplicación'
