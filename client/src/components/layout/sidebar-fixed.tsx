@@ -26,6 +26,7 @@ import {
   Building2,
   Settings,
   Target,
+  Flag,
   Users,
   CheckSquare,
   BarChart2,
@@ -146,6 +147,7 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
       title: "",
       items: [
         { href: "/", title: "Inicio", icon: Home, description: "Resumen personal", anyPermissions: HOME_ACCESS_SECTIONS },
+        { href: "/review/objectives", title: "Objetivos", icon: Flag, description: "Plan del año y acciones de la semana", permission: 'status' as AppSection },
         { href: "/absences", title: "Mis ausencias", icon: UserX, description: "Solicitudes y saldos", anyPermissions: HOME_ACCESS_SECTIONS },
       ]
     },
