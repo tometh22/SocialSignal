@@ -2388,6 +2388,9 @@ export const objectives = pgTable("objectives", {
   targetValue: numeric("target_value", { precision: 14, scale: 2 }),
   targetUnit: varchar("target_unit", { length: 40 }),
   targetDate: date("target_date"),
+  // La fecha del plan la reescribe el seed en cada arranque; la que mueve el
+  // equipo desde la pantalla vive acá y, si existe, manda.
+  rescheduledDate: date("rescheduled_date"),
   currentValue: text("current_value"),
   progressPercent: numeric("progress_percent", { precision: 5, scale: 2 }),
   status: varchar("status", { length: 30 }).notNull().default("planned"),

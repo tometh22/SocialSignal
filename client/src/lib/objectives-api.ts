@@ -13,7 +13,11 @@ export type Objective = {
   targetKind?: "metric" | "milestone" | "continuous" | null;
   targetValue?: string | number | null;
   targetUnit?: string | null;
+  /** Fecha de corte vigente: la reprogramada si alguien la movió, si no la del plan. */
   targetDate?: string | null;
+  /** Fecha original del plan, aunque se haya reprogramado. */
+  planTargetDate?: string | null;
+  rescheduled?: boolean;
   currentValue?: string | number | null;
   progressPercent?: number | null;
   status?: string | null;
@@ -93,12 +97,23 @@ export type UpdateObjectiveInput = Partial<{
   currentValue: string | number | null;
   status: string;
   progressPercent: number | null;
+  /** Reprograma la fecha de corte; null vuelve a la del plan. */
+  targetDate: string | null;
 }>;
 
 export const objectivesQueryKey = (year: number) => ["/api/objectives", year] as const;
 
 function asArray<T>(value: unknown): T[] {
   return Array.isArray(value) ? value as T[] : [];
+}
+
+// La columna es numeric y el driver la entrega como texto ("40.00"). Sin
+// convertirla, la pantalla la trata como "sin medir" aunque alguien la haya
+// cargado, porque todo el cálculo de avance pregunta si es un número.
+export function normalizeObjective(objective: Objective): Objective {
+  const raw = objective.progressPercent as unknown;
+  const parsed = raw === null || raw === undefined || raw === "" ? null : Number(raw);
+  return { ...objective, progressPercent: parsed !== null && Number.isFinite(parsed) ? parsed : null };
 }
 
 function normalizeAccount(account: unknown, index: number): ObjectiveAccount | null {
@@ -119,7 +134,7 @@ export async function getObjectives(year: number): Promise<ObjectivesResponse> {
     .filter((account): account is ObjectiveAccount => Boolean(account));
 
   return {
-    objectives: asArray<Objective>(response?.objectives),
+    objectives: asArray<Objective>(response?.objectives).map(normalizeObjective),
     actions: asArray<ObjectiveAction>(response?.actions),
     accounts,
     owners: asArray<ObjectiveRef>(response?.owners),
