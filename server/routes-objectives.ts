@@ -72,6 +72,9 @@ const patchObjectiveSchema = z.object({
   progressPercent: z.number().min(0).max(100).nullable().optional(),
   status: z.string().trim().min(1).max(30).optional(),
   ownerPersonnelId: idSchema.nullable().optional(),
+  // Mover la fecha no toca la del plan: se guarda como reprogramación, que el
+  // seed no pisa. null la devuelve a la fecha original.
+  targetDate: dateSchema,
 }).strict();
 
 function parseId(value: string, label: string): number {
@@ -237,6 +240,7 @@ export function createObjectivesRouter(requireAuth: RequireAuth): Router {
           targetValue: objectives.targetValue,
           targetUnit: objectives.targetUnit,
           targetDate: objectives.targetDate,
+          rescheduledDate: objectives.rescheduledDate,
           currentValue: objectives.currentValue,
           progressPercent: objectives.progressPercent,
           status: objectives.status,
@@ -355,8 +359,13 @@ export function createObjectivesRouter(requireAuth: RequireAuth): Router {
         eventsByAction.set(row.actionId, current);
       }
 
-      const responseObjectives = objectiveRows.map(({ ownerName, ...objective }) => ({
+      // La pantalla trabaja con una sola fecha de corte: la que movió el equipo
+      // si la movió, y si no la del plan. La del plan viaja aparte.
+      const responseObjectives = objectiveRows.map(({ ownerName, rescheduledDate, targetDate, ...objective }) => ({
         ...objective,
+        targetDate: rescheduledDate ?? targetDate,
+        planTargetDate: targetDate,
+        rescheduled: rescheduledDate != null,
         owner: objective.ownerPersonnelId ? { id: objective.ownerPersonnelId, name: ownerName } : null,
       }));
       const responseActions = actionRows.map((row) => {
@@ -606,6 +615,7 @@ export function createObjectivesRouter(requireAuth: RequireAuth): Router {
       for (const field of ["areaKey", "title", "metric", "target", "currentValue", "progressPercent", "status", "ownerPersonnelId"] as const) {
         if (Object.prototype.hasOwnProperty.call(input, field)) updates[field] = input[field];
       }
+      if (Object.prototype.hasOwnProperty.call(input, "targetDate")) updates.rescheduledDate = input.targetDate ?? null;
       const [objective] = await db.update(objectives)
         .set(updates as typeof objectives.$inferInsert)
         .where(eq(objectives.id, objectiveId))

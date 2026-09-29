@@ -38,7 +38,15 @@ export function todayISO(now: Date = new Date()): string {
   return new Date(now.getTime() - now.getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
 }
 
+const CLOSED_OBJECTIVE_STATUSES = ["done", "completed", "complete", "closed", "logrado", "cerrada", "completada", "missed", "cancelled", "canceled"];
+
+/** Un objetivo cerrado —logrado o no— ya tuvo su respuesta: no vence más. */
+export function isClosedObjective(objective: Objective): boolean {
+  return CLOSED_OBJECTIVE_STATUSES.includes(String(objective.status ?? "").toLowerCase());
+}
+
 export function deadlineOf(objective: Objective, today = todayISO()): Deadline | null {
+  if (isClosedObjective(objective)) return null;
   const raw = objective.targetDate ? String(objective.targetDate).slice(0, 10) : null;
   if (!raw) return null;
   const daysLeft = Math.round((Date.parse(`${raw}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / DAY);
@@ -47,8 +55,7 @@ export function deadlineOf(objective: Objective, today = todayISO()): Deadline |
 }
 
 function isDone(objective: Objective): boolean {
-  const status = String(objective.status ?? "").toLowerCase();
-  return ["done", "completed", "complete", "closed", "logrado", "cerrada", "completada"].includes(status);
+  return isClosedObjective(objective);
 }
 
 /**
@@ -412,4 +419,16 @@ export function dueWithin(objectives: Objective[], days: number, today = todayIS
 
 export function tierOf(objective: Objective, today = todayISO()): Tier {
   return tierFor(objective.slug, today);
+}
+
+/**
+ * Lo que venció sin que nadie dijera si se logró. Es lo único rojo que pide
+ * algo concreto: contestar sí, no, o mover la fecha. Los hábitos no vencen y
+ * los retirados no son objetivos, así que no entran.
+ */
+export function awaitingAnswer(objectives: Objective[], today = todayISO()): Objective[] {
+  return objectives
+    .filter((objective) => !objective.retiredAt && objective.targetKind !== "continuous")
+    .filter((objective) => deadlineOf(objective, today)?.overdue)
+    .sort((a, b) => String(a.targetDate).localeCompare(String(b.targetDate)));
 }

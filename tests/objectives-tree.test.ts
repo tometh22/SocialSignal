@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  awaitingAnswer,
   buildObjectiveTree,
+  buildObjectivesMap,
   deadlineOf,
+  isClosedObjective,
   flattenTree,
   formatDeadline,
   priorityRank,
@@ -102,5 +105,35 @@ describe("flattenTree", () => {
     expect(flattenTree(tree, new Set()).map((n) => n.objective.id)).toEqual([1]);
     expect(flattenTree(tree, new Set(["1"])).map((n) => n.objective.id)).toEqual([1, 2]);
     expect(flattenTree(tree, new Set(["1", "2"])).map((n) => n.objective.id)).toEqual([1, 2, 3]);
+  });
+});
+
+describe("lo que necesita una respuesta", () => {
+  it("un objetivo cerrado, se haya logrado o no, deja de vencer", () => {
+    expect(deadlineOf(obj({ id: 1, targetDate: "2026-09-01", status: "done" }), HOY)).toBeNull();
+    expect(deadlineOf(obj({ id: 2, targetDate: "2026-09-01", status: "missed" }), HOY)).toBeNull();
+    expect(isClosedObjective(obj({ id: 3, status: "planned" }))).toBe(false);
+  });
+
+  it("lista sólo lo vencido y abierto, sin hábitos ni retirados, del más viejo al más nuevo", () => {
+    const pendientes = awaitingAnswer([
+      obj({ id: "nuevo", targetDate: "2026-09-10", targetKind: "milestone" }),
+      obj({ id: "viejo", targetDate: "2026-09-01", targetKind: "milestone" }),
+      obj({ id: "logrado", targetDate: "2026-09-01", status: "done" }),
+      obj({ id: "fallido", targetDate: "2026-09-01", status: "missed" }),
+      obj({ id: "habito", targetDate: "2026-09-01", targetKind: "continuous" }),
+      obj({ id: "retirado", targetDate: "2026-09-01", retiredAt: "2026-09-15T00:00:00Z" }),
+      obj({ id: "futuro", targetDate: "2026-09-30" }),
+    ], HOY).map((objective) => objective.id);
+    expect(pendientes).toEqual(["viejo", "nuevo"]);
+  });
+
+  it("un frente no cuenta como vencido lo que ya tuvo respuesta", () => {
+    const map = buildObjectivesMap([
+      obj({ id: 1, slug: "company-warner-mexico", targetDate: "2026-09-01", status: "done" }),
+      obj({ id: 2, slug: "company-expansion-fee", targetDate: "2026-09-01" }),
+    ], HOY);
+    const cerrar = map.fronts.find((front) => front.id === "front-close");
+    expect(cerrar?.overdue).toBe(1);
   });
 });
