@@ -3,28 +3,36 @@ ALTER TABLE personnel
 
 -- Normalize labels left by older migrations. Values that cannot be mapped are
 -- intentionally left pending instead of being presented as a false level.
+-- "current_role" va entre comillas: sin ellas es la función SQL CURRENT_ROLE
+-- (el usuario de la base, "postgres"), no la columna. Así la migración fallaba
+-- en cada arranque, y arreglar sólo el SET habría vaciado el rol de todos.
 UPDATE personnel
-SET current_role = CASE
-  WHEN lower(coalesce(current_role, '')) ~ '(^|[^0-9])(5|05)([^0-9]|$)|(lead de leads|head|director|ceo|coo)' THEN '5 Lead de Leads'
-  WHEN lower(coalesce(current_role, '')) ~ '(^|[^0-9])(4|04)([^0-9]|$)|lead' THEN '4 Lead'
-  WHEN lower(coalesce(current_role, '')) ~ '(^|[^0-9])(2|02)([^0-9]|$)|(semi[ -]?senior|ssr)' THEN '2 Semi Senior'
-  WHEN lower(coalesce(current_role, '')) ~ '(^|[^0-9])(1|01)([^0-9]|$)|(^|[^a-z])(junior|jr)([^a-z]|$)' THEN '1 Junior'
-  WHEN lower(coalesce(current_role, '')) ~ '(^|[^0-9])(3|03)([^0-9]|$)|(^|[^a-z])(senior|sr)([^a-z]|$)' THEN '3 Senior'
+SET "current_role" = CASE
+  WHEN lower(coalesce("current_role", '')) ~ '(^|[^0-9])(5|05)([^0-9]|$)|(lead de leads|head|director|ceo|coo)' THEN '5 Lead de Leads'
+  WHEN lower(coalesce("current_role", '')) ~ '(^|[^0-9])(4|04)([^0-9]|$)|lead' THEN '4 Lead'
+  WHEN lower(coalesce("current_role", '')) ~ '(^|[^0-9])(2|02)([^0-9]|$)|(semi[ -]?senior|ssr)' THEN '2 Semi Senior'
+  WHEN lower(coalesce("current_role", '')) ~ '(^|[^0-9])(1|01)([^0-9]|$)|(^|[^a-z])(junior|jr)([^a-z]|$)' THEN '1 Junior'
+  WHEN lower(coalesce("current_role", '')) ~ '(^|[^0-9])(3|03)([^0-9]|$)|(^|[^a-z])(senior|sr)([^a-z]|$)' THEN '3 Senior'
   WHEN lower(coalesce(legacy_role, '')) ~ '(lead de leads|head|director|ceo|coo)' THEN '5 Lead de Leads'
   WHEN lower(coalesce(legacy_role, '')) ~ 'lead' THEN '4 Lead'
   WHEN lower(coalesce(legacy_role, '')) ~ '(semi[ -]?senior|ssr)' THEN '2 Semi Senior'
   WHEN lower(coalesce(legacy_role, '')) ~ '(^|[^a-z])(junior|jr)([^a-z]|$)' THEN '1 Junior'
   WHEN lower(coalesce(legacy_role, '')) ~ '(^|[^a-z])(senior|sr)([^a-z]|$)' THEN '3 Senior'
   ELSE NULL
-END;
+END
+-- Corre en cada arranque: sólo toca lo que todavía no está en la escala.
+WHERE "current_role" IS NULL
+   OR "current_role" NOT IN ('1 Junior', '2 Semi Senior', '3 Senior', '4 Lead', '5 Lead de Leads');
 
 UPDATE personnel
 SET sublevel = CASE upper(btrim(coalesce(sublevel, '')))
   WHEN 'A' THEN 'A'
   WHEN 'B' THEN 'B'
-  WHEN 'C' THEN CASE WHEN current_role = '4 Lead' THEN 'C' ELSE NULL END
+  WHEN 'C' THEN CASE WHEN "current_role" = '4 Lead' THEN 'C' ELSE NULL END
   ELSE NULL
-END;
+END
+WHERE sublevel IS NOT NULL
+  AND NOT (sublevel IN ('A', 'B') OR (sublevel = 'C' AND "current_role" = '4 Lead'));
 
 -- Once a period has an observed rate, the forecast for that same month must
 -- stop participating in selectors and summaries. Keep the row for audit.

@@ -1,15 +1,21 @@
-/** Runtime copy of migrations/0043 and 0044 for production startup. */
+/**
+ * Runtime copy of migrations/0043 and 0044 for production startup.
+ *
+ * Se aparta de los .sql en dos cosas, a propósito:
+ *
+ * - La regla de montos no negativos se agrega al final. Agregada al principio
+ *   (NOT VALID), los rellenos de más abajo —número de cotización, fecha de
+ *   aprobación— tocan filas viejas que no la cumplen (la #279, "Aprobada" con
+ *   total 0) y Postgres rechaza el UPDATE: la migración entera se deshacía en
+ *   cada arranque y producción quedó sin índices ni reglas de integridad.
+ *
+ * - No normaliza la inflación mensual a decimal ni le agrega la regla 0–1. El
+ *   código no está de acuerdo en la unidad: la carga financiera guarda decimal
+ *   (0.022), pero el formulario de admin y la tarjeta de ajuste por inflación
+ *   trabajan en porcentaje (2.2), y con la regla el formulario dejaría de poder
+ *   guardar. Queda pendiente de decidir la unidad antes de convertir datos.
+ */
 export const quotationProfessionalWorkflowMigrationSql = String.raw`
-UPDATE monthly_inflation
-SET inflation_rate = inflation_rate / 100.0
-WHERE inflation_rate > 1 AND inflation_rate <= 100;
-
-DO $$ BEGIN
-  ALTER TABLE monthly_inflation ADD CONSTRAINT monthly_inflation_decimal_rate_check
-    CHECK (inflation_rate > 0 AND inflation_rate <= 1) NOT VALID;
-EXCEPTION WHEN duplicate_object THEN NULL;
-END $$;
-
 ALTER TABLE quotations
   ADD COLUMN IF NOT EXISTS project_duration TEXT,
   ADD COLUMN IF NOT EXISTS deliverables JSONB NOT NULL DEFAULT '[]'::jsonb,
@@ -56,21 +62,6 @@ DO $$ BEGIN
       AND COALESCE(discount_percentage, 0) < 100
       AND platform_cost / exchange_rate_at_quote::double precision >= 0;
   END IF;
-END $$;
-
-DO $$ BEGIN
-  ALTER TABLE quotations ADD CONSTRAINT quotations_nonnegative_money_check CHECK (
-    base_cost >= 0
-    AND total_amount >= 0
-    AND (status = 'draft' OR total_amount > 0)
-    AND quotation_currency IN ('ARS', 'USD')
-    AND COALESCE(platform_cost, 0) >= 0
-    AND COALESCE(tools_cost, 0) >= 0
-    AND COALESCE(additional_deliverable_cost, 0) >= 0
-    AND COALESCE(discount_percentage, 0) >= 0
-    AND COALESCE(discount_percentage, 0) < 100
-  ) NOT VALID;
-EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
 DO $$ BEGIN
@@ -253,4 +244,19 @@ CREATE UNIQUE INDEX IF NOT EXISTS quotation_deliveries_one_active_revision_idx
 UPDATE quotations
 SET internal_approved_at = COALESCE(internal_approved_at, updated_at)
 WHERE status = 'approved' AND internal_approved_at IS NULL;
+
+DO $$ BEGIN
+  ALTER TABLE quotations ADD CONSTRAINT quotations_nonnegative_money_check CHECK (
+    base_cost >= 0
+    AND total_amount >= 0
+    AND (status = 'draft' OR total_amount > 0)
+    AND quotation_currency IN ('ARS', 'USD')
+    AND COALESCE(platform_cost, 0) >= 0
+    AND COALESCE(tools_cost, 0) >= 0
+    AND COALESCE(additional_deliverable_cost, 0) >= 0
+    AND COALESCE(discount_percentage, 0) >= 0
+    AND COALESCE(discount_percentage, 0) < 100
+  ) NOT VALID;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 `;

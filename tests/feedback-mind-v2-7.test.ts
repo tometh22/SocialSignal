@@ -121,7 +121,10 @@ describe("Feedback Mind V2.7 — atribución, costos y capacidad", () => {
     expect(closure).not.toContain('SET "current_role" = NULL');
     expect(closure).toContain("hourly_rate_usd = cost.hourly_rate_ars");
     expect(closure).toContain("system_config_config_key_unique");
-    expect(closure).toContain("role.name ILIKE '%semi senior%'");
+    // El subnivel se escribe sólo en la escala A/B/C (0049). Volver a deducirlo
+    // del nombre del rol viola personnel_sublevel_canonical_check en producción
+    // y deshace la migración entera en cada arranque.
+    expect(closure).not.toContain('SET "sublevel"');
     expect(closure).toContain("'hours_data_source', 1");
     expect(closure).toContain("'app_mode_cutover_date', 1, '2026-08'");
     expect(server).toContain('const backgroundSyncDisabled = process.env.DISABLE_AUTO_SYNC === "true"');
@@ -232,5 +235,27 @@ describe("Feedback Mind V2.7 — atribución, costos y capacidad", () => {
     expect(projects).toContain("const visibility = isOperations");
     expect(projects).toContain('String(req.query.status || "active")');
     expect(projects).toContain("ap.status =");
+  });
+});
+
+describe("migraciones que fallaban en cada arranque", () => {
+  const v211 = source("server/migrations/feedback-mind-v2-11.ts");
+  const quotation = source("server/migrations/quotation-professional-workflow.ts");
+
+  test("0049 nombra la columna current_role entre comillas", () => {
+    // Sin comillas es la función SQL CURRENT_ROLE (el usuario de la base).
+    const sql = v211.replace(/"current_role"/g, "");
+    expect(sql).not.toMatch(/\bcurrent_role\b/);
+  });
+
+  test("0043-0044 agrega la regla de montos después de los rellenos", () => {
+    const rule = quotation.indexOf("ADD CONSTRAINT quotations_nonnegative_money_check");
+    expect(rule).toBeGreaterThan(quotation.indexOf("SET quotation_number ="));
+    expect(rule).toBeGreaterThan(quotation.indexOf("SET internal_approved_at ="));
+  });
+
+  test("0043-0044 no convierte la inflación mientras la unidad no esté decidida", () => {
+    expect(quotation).not.toContain("UPDATE monthly_inflation");
+    expect(quotation).not.toContain("monthly_inflation_decimal_rate_check");
   });
 });
