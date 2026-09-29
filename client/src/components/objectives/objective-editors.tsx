@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import type { Objective, ObjectiveAction, ObjectiveRef, UpdateObjectiveActionInput, UpdateObjectiveInput } from "@/lib/objectives-api";
+import type { ObjectivePickerGroup } from "@/lib/objectives-tree";
 
 export type PersonOption = { id: string; name: string };
 
@@ -26,6 +27,26 @@ function withCurrent(people: PersonOption[], current: ObjectiveRef | null | unde
   const id = refId(current);
   if (!id || people.some((person) => person.id === id)) return people;
   return [{ id, name: refName(current) || `Persona ${id}` }, ...people];
+}
+
+/**
+ * Los objetivos agrupados por frente. Si la acción ya cuelga de algo que no
+ * está en la lista (una bajada, un hábito), se muestra aparte para no perderlo.
+ */
+export function ObjectiveSelect({ id, value, onChange, groups, current, required, className }: { id: string; value: string; onChange: (value: string) => void; groups: ObjectivePickerGroup[]; current?: { id: string; title: string } | null; required?: boolean; className?: string }) {
+  const listed = groups.some((group) => group.options.some((option) => option.id === value));
+  const showCurrent = Boolean(current && current.id === value && !listed);
+  return (
+    <select id={id} value={value} onChange={(event) => onChange(event.target.value)} required={required} className={className ?? selectClass}>
+      {!value && <option value="">Elegir objetivo</option>}
+      {showCurrent && current && <optgroup label="Actual"><option value={current.id}>{current.title}</option></optgroup>}
+      {groups.map((group) => (
+        <optgroup key={group.label} label={group.label}>
+          {group.options.map((option) => <option key={option.id} value={option.id}>{option.title}</option>)}
+        </optgroup>
+      ))}
+    </select>
+  );
 }
 
 function DeleteConfirm({ what, consequence, isPending, onCancel, onConfirm }: { what: string; consequence: string | null; isPending: boolean; onCancel: () => void; onConfirm: () => void }) {
@@ -160,10 +181,10 @@ export function EditObjectiveDialog({ objective, people, dependents, onClose, on
   );
 }
 
-export function EditActionDialog({ action, people, objectives, onClose, onSave, onDelete }: {
+export function EditActionDialog({ action, people, objectiveGroups, onClose, onSave, onDelete }: {
   action: ObjectiveAction | null;
   people: PersonOption[];
-  objectives: Objective[];
+  objectiveGroups: ObjectivePickerGroup[];
   onClose: () => void;
   onSave: (id: string | number, input: UpdateObjectiveActionInput) => Promise<void>;
   onDelete: (action: ObjectiveAction) => Promise<void>;
@@ -228,10 +249,7 @@ export function EditActionDialog({ action, people, objectives, onClose, onSave, 
           </div>
           <div>
             <Label htmlFor="edit-action-objective">Para qué objetivo</Label>
-            <select id="edit-action-objective" value={objectiveId} onChange={(event) => setObjectiveId(event.target.value)} className={selectClass}>
-              {!objectiveId && <option value="">Sin objetivo</option>}
-              {objectives.map((objective) => <option key={String(objective.id)} value={String(objective.id)}>{objective.title}</option>)}
-            </select>
+            <ObjectiveSelect id="edit-action-objective" value={objectiveId} onChange={setObjectiveId} groups={objectiveGroups} current={action.objectiveId != null ? { id: String(action.objectiveId), title: action.objectiveTitle ?? "Objetivo actual" } : null} />
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <div>

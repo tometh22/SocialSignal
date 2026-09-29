@@ -432,3 +432,23 @@ export function awaitingAnswer(objectives: Objective[], today = todayISO()): Obj
     .filter((objective) => deadlineOf(objective, today)?.overdue)
     .sort((a, b) => String(a.targetDate).localeCompare(String(b.targetDate)));
 }
+
+export type ObjectivePickerGroup = { label: string; options: Array<{ id: string; title: string }> };
+
+/**
+ * A qué objetivo se cuelga una acción. Mostrar las ~70 entradas del plan
+ * —bajadas, hábitos, meses— en una lista plana no deja elegir: se ofrecen sólo
+ * los objetivos de verdad, abiertos, agrupados por frente.
+ */
+export function objectivePickerGroups(map: ObjectivesMap): ObjectivePickerGroup[] {
+  const option = (node: ObjectiveNode) => ({ id: String(node.objective.id), title: node.objective.title });
+  const isGoal = (node: ObjectiveNode) =>
+    !isClosedObjective(node.objective) &&
+    planRoleOf(node.objective.slug, node.objective.level, node.objective.targetKind) === "objetivo";
+  const north = [map.northStar, ...map.northSupport].filter((node): node is ObjectiveNode => node != null && !isClosedObjective(node.objective));
+  const groups: ObjectivePickerGroup[] = [
+    { label: "Meta del año", options: north.map(option) },
+    ...map.fronts.map((front) => ({ label: front.label, options: front.objectives.filter(isGoal).map(option) })),
+  ];
+  return groups.filter((group) => group.options.length > 0);
+}
