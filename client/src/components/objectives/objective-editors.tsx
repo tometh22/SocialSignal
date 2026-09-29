@@ -73,6 +73,7 @@ export function EditObjectiveDialog({ objective, people, dependents, onClose, on
   onDelete: (objective: Objective) => Promise<void>;
 }) {
   const [title, setTitle] = useState("");
+  const [metric, setMetric] = useState("");
   const [target, setTarget] = useState("");
   const [owner, setOwner] = useState("");
   const [date, setDate] = useState("");
@@ -83,6 +84,7 @@ export function EditObjectiveDialog({ objective, people, dependents, onClose, on
   useEffect(() => {
     if (!objective) return;
     setTitle(objective.title ?? "");
+    setMetric(objective.metric ?? "");
     setTarget(objective.target != null ? String(objective.target) : "");
     setOwner(refId(objective.owner));
     setDate(objective.targetDate ? String(objective.targetDate).slice(0, 10) : "");
@@ -103,6 +105,7 @@ export function EditObjectiveDialog({ objective, people, dependents, onClose, on
     if (!title.trim()) { setError("El objetivo necesita un nombre."); return; }
     const input: UpdateObjectiveInput = {};
     if (title.trim() !== objective.title) input.title = title.trim();
+    if (metric.trim() !== (objective.metric ?? "")) input.metric = metric.trim() || null;
     if (target.trim() !== (objective.target != null ? String(objective.target) : "")) input.target = target.trim() || null;
     if (owner !== refId(objective.owner)) input.ownerPersonnelId = owner ? Number(owner) : null;
     // Volver a la fecha del plan es borrar la reprogramación, no fijarla igual.
@@ -140,6 +143,10 @@ export function EditObjectiveDialog({ objective, people, dependents, onClose, on
           <div>
             <Label htmlFor="edit-objective-title">Objetivo</Label>
             <Input id="edit-objective-title" value={title} onChange={(event) => setTitle(event.target.value)} className="mt-1.5" autoFocus />
+          </div>
+          <div>
+            <Label htmlFor="edit-objective-metric">Qué mide</Label>
+            <Input id="edit-objective-metric" value={metric} onChange={(event) => setMetric(event.target.value)} className="mt-1.5" placeholder="Ej. Contratos de suscripción firmados" />
           </div>
           <div>
             <Label htmlFor="edit-objective-target">Meta</Label>
@@ -190,6 +197,7 @@ export function EditActionDialog({ action, people, objectiveGroups, onClose, onS
   onDelete: (action: ObjectiveAction) => Promise<void>;
 }) {
   const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
   const [objectiveId, setObjectiveId] = useState("");
   const [owner, setOwner] = useState("");
   const [dueDate, setDueDate] = useState("");
@@ -200,6 +208,7 @@ export function EditActionDialog({ action, people, objectiveGroups, onClose, onS
   useEffect(() => {
     if (!action) return;
     setTitle(action.title ?? "");
+    setDescription(action.description ?? "");
     setObjectiveId(action.objectiveId != null ? String(action.objectiveId) : "");
     setOwner(refId(action.accountableOwner));
     setDueDate(action.dueDate ? String(action.dueDate).slice(0, 10) : "");
@@ -216,6 +225,7 @@ export function EditActionDialog({ action, people, objectiveGroups, onClose, onS
     if (!title.trim()) { setError("La acción necesita un nombre."); return; }
     const input: UpdateObjectiveActionInput = {};
     if (title.trim() !== action.title) input.title = title.trim();
+    if (description.trim() !== (action.description ?? "")) input.description = description.trim() || null;
     if (objectiveId && objectiveId !== String(action.objectiveId ?? "")) input.objectiveId = objectiveId;
     if (owner && owner !== refId(action.accountableOwner)) input.accountableOwner = owner;
     const currentDue = action.dueDate ? String(action.dueDate).slice(0, 10) : "";
@@ -246,6 +256,10 @@ export function EditActionDialog({ action, people, objectiveGroups, onClose, onS
           <div>
             <Label htmlFor="edit-action-title">Qué hay que hacer</Label>
             <Input id="edit-action-title" value={title} onChange={(event) => setTitle(event.target.value)} className="mt-1.5" autoFocus />
+          </div>
+          <div>
+            <Label htmlFor="edit-action-description">Detalle</Label>
+            <Textarea id="edit-action-description" value={description} onChange={(event) => setDescription(event.target.value)} className="mt-1.5 min-h-[56px]" placeholder="Qué implica, con quién, qué hay que llevar…" />
           </div>
           <div>
             <Label htmlFor="edit-action-objective">Para qué objetivo</Label>
