@@ -1,10 +1,11 @@
 import { Router, type NextFunction, type Request, type Response } from "express";
 import { randomUUID } from "node:crypto";
-import { asc, desc, eq, inArray, isNull, or } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, or } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { z } from "zod";
 import { db } from "./db";
 import { requirePermission } from "./middleware/requirePermission";
+import { descendantIds } from "./services/objective-branch";
 import {
   clients,
   objectiveAccounts,
@@ -254,7 +255,7 @@ export function createObjectivesRouter(requireAuth: RequireAuth): Router {
         })
           .from(objectives)
           .leftJoin(objectiveOwner, eq(objectives.ownerPersonnelId, objectiveOwner.id))
-          .where(eq(objectives.year, year))
+          .where(and(eq(objectives.year, year), isNull(objectives.deletedAt)))
           .orderBy(asc(objectives.level), asc(objectives.id)),
         db.select({
           id: objectiveActions.id,
@@ -287,7 +288,13 @@ export function createObjectivesRouter(requireAuth: RequireAuth): Router {
           .leftJoin(objectiveAccounts, eq(objectiveActions.accountId, objectiveAccounts.id))
           .leftJoin(clients, eq(objectiveAccounts.clientId, clients.id))
           .leftJoin(actionAccountableOwner, eq(objectiveActions.accountableOwnerId, actionAccountableOwner.id))
-          .where(or(eq(objectives.year, year), isNull(objectiveActions.objectiveId)))
+          // Lo eliminado desde la pantalla sigue en la base —para poder
+          // deshacerlo y para que el seed no lo recree—, pero no se muestra.
+          .where(and(
+            or(eq(objectives.year, year), isNull(objectiveActions.objectiveId)),
+            isNull(objectiveActions.deletedAt),
+            isNull(objectives.deletedAt),
+          ))
           .orderBy(asc(objectiveActions.month), asc(objectiveActions.weekStart), asc(objectiveActions.sortOrder), asc(objectiveActions.id)),
         db.select({
           id: objectiveAccounts.id,
@@ -506,6 +513,9 @@ export function createObjectivesRouter(requireAuth: RequireAuth): Router {
         }, tx);
 
         const updates: Record<string, unknown> = { updatedAt: new Date() };
+        // Tildar o destildar no es editar; cualquier otro cambio sí, y el seed
+        // no debe revertirlo.
+        if (Object.keys(input).some((field) => field !== "status" && field !== "note")) updates.editedAt = new Date();
         const fields = [
           "objectiveId", "accountId", "title", "description", "month", "weekLabel", "weekStart",
           "dueDate", "focus", "status", "accountableOwnerId", "evidence", "dependencyActionIds", "sortOrder",
@@ -616,6 +626,11 @@ export function createObjectivesRouter(requireAuth: RequireAuth): Router {
         if (Object.prototype.hasOwnProperty.call(input, field)) updates[field] = input[field];
       }
       if (Object.prototype.hasOwnProperty.call(input, "targetDate")) updates.rescheduledDate = input.targetDate ?? null;
+      // Una corrección de contenido o de responsable es una decisión del
+      // equipo: el seed no la revierte en el próximo arranque.
+      if (["title", "target", "metric", "ownerPersonnelId"].some((field) => Object.prototype.hasOwnProperty.call(input, field))) {
+        updates.editedAt = new Date();
+      }
       const [objective] = await db.update(objectives)
         .set(updates as typeof objectives.$inferInsert)
         .where(eq(objectives.id, objectiveId))
@@ -624,6 +639,90 @@ export function createObjectivesRouter(requireAuth: RequireAuth): Router {
       res.json({ objective });
     } catch (error) {
       handleError(res, error, "No se pudo actualizar el objetivo");
+    }
+  });
+
+  // Eliminar no borra: el seed recrearía la fila por su slug en el próximo
+  // arranque. Marca el objetivo, todo lo que cuelga de él y sus acciones con
+  // la misma hora, que es lo que después permite deshacer la tanda entera.
+  router.delete("/objectives/actions/:id", async (req: Request, res: Response) => {
+    try {
+      const actionId = parseId(req.params.id, "id");
+      const [action] = await db.update(objectiveActions)
+        .set({ deletedAt: new Date(), updatedAt: new Date() })
+        .where(and(eq(objectiveActions.id, actionId), isNull(objectiveActions.deletedAt)))
+        .returning({ id: objectiveActions.id });
+      if (!action) return res.status(404).json({ message: "Acción no encontrada" });
+      res.json({ deletedActions: 1 });
+    } catch (error) {
+      handleError(res, error, "No se pudo eliminar la acción");
+    }
+  });
+
+  router.post("/objectives/actions/:id/restore", async (req: Request, res: Response) => {
+    try {
+      const actionId = parseId(req.params.id, "id");
+      const [action] = await db.update(objectiveActions)
+        .set({ deletedAt: null, updatedAt: new Date() })
+        .where(eq(objectiveActions.id, actionId))
+        .returning({ id: objectiveActions.id });
+      if (!action) return res.status(404).json({ message: "Acción no encontrada" });
+      res.json({ restoredActions: 1 });
+    } catch (error) {
+      handleError(res, error, "No se pudo recuperar la acción");
+    }
+  });
+
+  router.delete("/objectives/:id", async (req: Request, res: Response) => {
+    try {
+      const objectiveId = parseId(req.params.id, "id");
+      const result = await db.transaction(async (tx) => {
+        const [root] = await tx.select({ id: objectives.id, year: objectives.year })
+          .from(objectives)
+          .where(and(eq(objectives.id, objectiveId), isNull(objectives.deletedAt)))
+          .limit(1);
+        if (!root) return null;
+        const alive = await tx.select({ id: objectives.id, parentObjectiveId: objectives.parentObjectiveId })
+          .from(objectives)
+          .where(and(eq(objectives.year, root.year), isNull(objectives.deletedAt)));
+        const ids = descendantIds(root.id, alive);
+        const deletedAt = new Date();
+        await tx.update(objectives).set({ deletedAt, updatedAt: deletedAt }).where(inArray(objectives.id, ids));
+        const actions = await tx.update(objectiveActions)
+          .set({ deletedAt, updatedAt: deletedAt })
+          .where(and(inArray(objectiveActions.objectiveId, ids), isNull(objectiveActions.deletedAt)))
+          .returning({ id: objectiveActions.id });
+        return { deletedObjectives: ids.length, deletedActions: actions.length };
+      });
+      if (!result) return res.status(404).json({ message: "Objetivo no encontrado" });
+      res.json(result);
+    } catch (error) {
+      handleError(res, error, "No se pudo eliminar el objetivo");
+    }
+  });
+
+  router.post("/objectives/:id/restore", async (req: Request, res: Response) => {
+    try {
+      const objectiveId = parseId(req.params.id, "id");
+      const result = await db.transaction(async (tx) => {
+        const [root] = await tx.select({ deletedAt: objectives.deletedAt }).from(objectives).where(eq(objectives.id, objectiveId)).limit(1);
+        if (!root) return null;
+        if (!root.deletedAt) return { restoredObjectives: 0, restoredActions: 0 };
+        // Se recupera la tanda que se eliminó junta, no sólo el objetivo.
+        const restored = await tx.update(objectives)
+          .set({ deletedAt: null, updatedAt: new Date() })
+          .where(eq(objectives.deletedAt, root.deletedAt))
+          .returning({ id: objectives.id });
+        const actions = await tx.update(objectiveActions)
+          .set({ deletedAt: null, updatedAt: new Date() })
+          .where(eq(objectiveActions.deletedAt, root.deletedAt))
+          .returning({ id: objectiveActions.id });
+        return { restoredObjectives: restored.length, restoredActions: actions.length };
+      });
+      if (!result) return res.status(404).json({ message: "Objetivo no encontrado" });
+      res.json(result);
+    } catch (error) {
+      handleError(res, error, "No se pudo recuperar el objetivo");
     }
   });
 

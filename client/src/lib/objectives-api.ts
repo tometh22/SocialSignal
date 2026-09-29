@@ -88,7 +88,7 @@ export type UpdateObjectiveActionInput = Partial<{
   accountableOwner: string;
   weekLabel: string;
   weekStart: string;
-  dueDate: string;
+  dueDate: string | null;
   accountId: string;
   focus: string;
 }>;
@@ -99,6 +99,9 @@ export type UpdateObjectiveInput = Partial<{
   progressPercent: number | null;
   /** Reprograma la fecha de corte; null vuelve a la del plan. */
   targetDate: string | null;
+  title: string;
+  target: string | null;
+  ownerPersonnelId: number | null;
 }>;
 
 export const objectivesQueryKey = (year: number) => ["/api/objectives", year] as const;
@@ -171,4 +174,22 @@ export function updateObjectivesProgress(updates: ObjectiveProgressUpdate[]) {
   return apiRequest("/api/objectives/progress", "PATCH", {
     updates: updates.map((update) => ({ ...update, id: Number(update.id) })),
   });
+}
+
+// Eliminar no borra: marca el objetivo —con todo lo que cuelga de él y sus
+// acciones— para que se pueda deshacer y para que el seed no lo recree.
+export function deleteObjective(id: string | number): Promise<{ deletedObjectives: number; deletedActions: number }> {
+  return apiRequest(`/api/objectives/${encodeURIComponent(String(id))}`, "DELETE");
+}
+
+export function restoreObjective(id: string | number) {
+  return apiRequest(`/api/objectives/${encodeURIComponent(String(id))}/restore`, "POST");
+}
+
+export function deleteObjectiveAction(id: string | number) {
+  return apiRequest(`/api/objectives/actions/${encodeURIComponent(String(id))}`, "DELETE");
+}
+
+export function restoreObjectiveAction(id: string | number) {
+  return apiRequest(`/api/objectives/actions/${encodeURIComponent(String(id))}/restore`, "POST");
 }
