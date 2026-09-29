@@ -17,6 +17,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { ToastAction } from "@/components/ui/toast";
 import { EditActionDialog, EditObjectiveDialog, ObjectiveSelect, type PersonOption } from "@/components/objectives/objective-editors";
+import { ActionDetailSheet, ObjectiveDetailSheet } from "@/components/objectives/objective-detail";
+import { KIND_HELP, KindBadge, MeasureText, ProgressControl, formatAmount as formatTarget, kindOf } from "@/components/objectives/objective-kind";
 import { useToast } from "@/hooks/use-toast";
 import { CompactPageHeader } from "@/components/ui/compact-page-header";
 import { Input } from "@/components/ui/input";
@@ -86,10 +88,23 @@ const YEAR = 2026;
 
 // Cualquier fila de la pantalla puede abrir el editor de su objetivo o su
 // acción. Un contexto evita pasar el callback por seis niveles de componentes.
-const EditContext = createContext<{ editObjective: (objective: Objective) => void; editAction: (action: ObjectiveAction) => void }>({
+const EditContext = createContext<{
+  editObjective: (objective: Objective) => void;
+  editAction: (action: ObjectiveAction) => void;
+  openObjective: (objective: Objective) => void;
+  openAction: (action: ObjectiveAction) => void;
+}>({
   editObjective: () => {},
   editAction: () => {},
+  openObjective: () => {},
+  openAction: () => {},
 });
+
+/** El título abre la ficha con todos los datos: qué mide, meta, qué lo sostiene y sus acciones. */
+function ObjectiveTitle({ objective, className }: { objective: Objective; className?: string }) {
+  const { openObjective } = useContext(EditContext);
+  return <button type="button" onClick={() => openObjective(objective)} className={cn("text-left hover:underline", className)}>{objective.title}</button>;
+}
 
 function EditButton({ label, onClick, tone = "light" }: { label: string; onClick: () => void; tone?: "light" | "dark" }) {
   return (
@@ -174,17 +189,6 @@ function EmptyState({ title, description }: { title: string; description: string
   return <div className="rounded-2xl border border-dashed border-border bg-card/60 p-8 text-center"><Target className="mx-auto h-6 w-6 text-muted-foreground" /><h2 className="mt-3 text-sm font-bold text-foreground">{title}</h2><p className="mx-auto mt-1 max-w-md text-xs text-muted-foreground">{description}</p></div>;
 }
 
-function ProgressForm({ objective, onUpdate, isUpdating, tone = "light" }: { objective: Objective; onUpdate: UpdateObjectiveFn; isUpdating: boolean; tone?: "light" | "dark" }) {
-  const [editing, setEditing] = useState(false);
-  const [currentValue, setCurrentValue] = useState(String(objective.currentValue ?? ""));
-  const [progressPercent, setProgressPercent] = useState(objective.progressPercent == null ? "" : String(objective.progressPercent));
-  const save = async (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); const parsedProgress = progressPercent.trim() === "" ? null : Number(progressPercent); if (parsedProgress !== null && (!Number.isFinite(parsedProgress) || parsedProgress < 0 || parsedProgress > 100)) return; await onUpdate(objective.id, { currentValue, progressPercent: parsedProgress }); setEditing(false); };
-  if (!editing) {
-    return <Button type="button" variant="ghost" size="sm" className={cn("mt-2 h-8 px-2 text-xs", tone === "dark" && "text-white/80 hover:bg-white/10 hover:text-white")} onClick={() => setEditing(true)}><Pencil className="mr-1.5 h-3.5 w-3.5" />{progressOf(objective) === null ? "Cargar avance" : "Actualizar avance"}</Button>;
-  }
-  return <form onSubmit={save} className={cn("mt-3 rounded-xl border p-3", tone === "dark" ? "border-white/20 bg-white/5" : "border-primary/20 bg-primary/[0.04]")}><div className="grid gap-2 sm:grid-cols-[1fr_9rem_auto_auto]"><div><Label htmlFor={`objective-value-${objective.id}`} className="text-xs">Dónde estamos hoy</Label><Input id={`objective-value-${objective.id}`} value={currentValue} onChange={(event) => setCurrentValue(event.target.value)} placeholder="Ej. USD 42K" autoFocus className="text-foreground" /></div><div><Label htmlFor={`objective-progress-${objective.id}`} className="text-xs">Avance %</Label><Input id={`objective-progress-${objective.id}`} type="number" min="0" max="100" step="0.1" value={progressPercent} onChange={(event) => setProgressPercent(event.target.value)} placeholder="0–100" className="text-foreground" /></div><Button type="submit" size="sm" className="self-end" disabled={isUpdating}>{isUpdating ? <Loader2 className="h-4 w-4 animate-spin" /> : "Guardar"}</Button><Button type="button" size="sm" variant="ghost" className="self-end" onClick={() => setEditing(false)}>Cancelar</Button></div></form>;
-}
-
 /** Prioridad del mes: el plan la declara, no se deduce. Una estrella alcanza. */
 function PriorityStar({ objective }: { objective: Objective }) {
   if (tierOf(objective) !== "innegociable") return null;
@@ -196,9 +200,7 @@ function DeadlineBadge({ objective }: { objective: Objective }) {
   if (status === "done") return <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">Logrado</span>;
   if (status === "missed") return <span className="rounded-full border border-slate-300 bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">No se logró</span>;
   if (isClosedObjective(objective)) return <span className="rounded-full border border-border bg-muted/40 px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">Cerrado</span>;
-  if (objective.targetKind === "continuous") {
-    return <span className="rounded-full border border-border bg-muted/40 px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">Hábito</span>;
-  }
+  if (objective.targetKind === "continuous") return null;
   const deadline = deadlineOf(objective);
   if (!deadline) return null;
   const tone = deadline.overdue
@@ -221,19 +223,18 @@ function GoalPanel({ northStar, support, onUpdate, updatingId }: { northStar: Ob
         <div className="min-w-0">
           <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-white/55">Meta del año</span>
           <div className="mt-1 flex items-center gap-1">
-            <h2 className="text-lg font-bold leading-6">{objective.title}</h2>
+            <h2 className="text-lg font-bold leading-6"><ObjectiveTitle objective={objective} /></h2>
             <EditObjectiveButton objective={objective} tone="dark" />
           </div>
           <p className="mt-1 text-xs text-white/70">{valueText(objective.target, "Meta sin definir")}</p>
         </div>
         <div className="shrink-0 text-right">
-          {progress === null
-            ? <span className="text-xs font-semibold text-white/60">Sin avance cargado</span>
-            : <><span className="text-2xl font-bold">{progress}%</span>{objective.currentValue ? <span className="block text-[11px] text-white/60">{String(objective.currentValue)}</span> : null}</>}
+          {progress !== null && <span className="block text-2xl font-bold">{progress}%</span>}
+          <MeasureText objective={objective} className="text-xs text-white/70" />
         </div>
       </div>
       {progress !== null && <Progress value={progress} className="mt-3 h-1.5 bg-white/15" />}
-      <ProgressForm key={`${objective.id}-${objective.progressPercent}`} objective={objective} onUpdate={onUpdate} isUpdating={updatingId === objective.id} tone="dark" />
+      <ProgressControl key={`${objective.id}-${objective.progressPercent}`} objective={objective} onUpdate={onUpdate} isUpdating={updatingId === objective.id} tone="dark" />
       {support.length > 0 && (
         <div className="mt-3 border-t border-white/15 pt-3">
           {support.map((node) => (
@@ -294,20 +295,25 @@ function ActionCheck({ action, onToggle, isPending }: { action: ObjectiveAction;
 }
 
 function ActionToggle({ action, onToggle, isPending }: { action: ObjectiveAction; onToggle: () => void; isPending: boolean }) {
+  const { openAction } = useContext(EditContext);
   const done = isDone(action);
   const due = action.dueDate ? formatWeek(action.dueDate) : null;
+  // El círculo tilda; el título abre la ficha con descripción, cliente,
+  // dependencias e historial. Antes toda la fila tildaba y no había dónde ver más.
   return (
-    <button type="button" onClick={onToggle} disabled={isPending} aria-pressed={done} aria-label={`${done ? "Reabrir" : "Marcar como hecha"}: ${action.title}`} className="flex min-w-0 flex-1 items-start gap-3 py-2.5 text-left transition-colors hover:bg-muted/40 disabled:cursor-wait disabled:opacity-60">
-      <span className={cn("mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full border", done ? "border-emerald-500 bg-emerald-500 text-white" : "border-border bg-background text-transparent")} aria-hidden="true"><Check className="h-3 w-3" /></span>
-      <span className="min-w-0 flex-1">
-        <span className={cn("block text-sm font-semibold leading-5", done && "text-muted-foreground line-through")}>{action.title}</span>
+    <div className="flex min-w-0 flex-1 items-start gap-3 py-2.5">
+      <button type="button" onClick={onToggle} disabled={isPending} aria-pressed={done} aria-label={`${done ? "Reabrir" : "Marcar como hecha"}: ${action.title}`} className={cn("mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full border transition-colors disabled:cursor-wait disabled:opacity-60", done ? "border-emerald-500 bg-emerald-500 text-white" : "border-border bg-background text-transparent hover:border-emerald-400")}>
+        {isPending ? <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" /> : <Check className="h-3 w-3" />}
+      </button>
+      <button type="button" onClick={() => openAction(action)} className="min-w-0 flex-1 text-left">
+        <span className={cn("block text-sm font-semibold leading-5 hover:underline", done && "text-muted-foreground line-through")}>{action.title}</span>
         {action.objectiveTitle && <span className="mt-0.5 block truncate text-[11px] text-muted-foreground">Para: {action.objectiveTitle}</span>}
-      </span>
+      </button>
       <span className="shrink-0 text-right text-[11px] text-muted-foreground">
         <span className="block font-semibold text-foreground/80">{ownerLabel(action.accountableOwner)}</span>
         {due && <span className="block">{due}</span>}
       </span>
-    </button>
+    </div>
   );
 }
 
@@ -321,8 +327,9 @@ function AnswerRow({ objective, onUpdate, isUpdating }: { objective: Objective; 
     <li className="py-3">
       <div>
         <div className="flex items-start gap-1.5">
+          <KindBadge kind={kindOf(objective)} className="mt-0.5 shrink-0" />
           <PriorityStar objective={objective} />
-          <p className="text-sm font-semibold leading-5 text-foreground">{objective.title}</p>
+          <ObjectiveTitle objective={objective} className="text-sm font-semibold leading-5 text-foreground" />
         </div>
         <p className="mt-0.5 text-[11px] text-muted-foreground">{ownerLabel(objective.owner)}{deadline ? <> · <span className="font-semibold text-red-600">{formatDeadline(deadline)}</span></> : null}</p>
         <div className="mt-2 flex flex-wrap items-center gap-1.5">
@@ -378,8 +385,9 @@ function AttentionPanel({ overdue, upcoming, nextCheckpoint, onUpdate, updatingI
               return (
                 <li key={String(objective.id)} className="flex items-start gap-2 text-xs">
                   <span className="w-20 shrink-0 font-semibold text-amber-700">{deadline ? formatDeadline(deadline).replace("Vence ", "") : ""}</span>
+                  <KindBadge kind={kindOf(objective)} className="shrink-0" />
                   <PriorityStar objective={objective} />
-                  <span className="min-w-0 flex-1 text-foreground">{objective.title}</span>
+                  <ObjectiveTitle objective={objective} className="min-w-0 flex-1 text-foreground" />
                   <span className="shrink-0 text-muted-foreground">{ownerLabel(objective.owner)}</span>
                   <span className="-my-1.5"><EditObjectiveButton objective={objective} /></span>
                 </li>
@@ -459,16 +467,16 @@ function ObjectiveBranch({ item, expanded, onToggle, onUpdate, updatingId, isMin
         ) : <span className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />}
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-1.5">
+            <KindBadge kind={kindOf(node.objective)} />
             <PriorityStar objective={node.objective} />
             <DeadlineBadge objective={node.objective} />
             {node.objective.level !== "company" && <span className="text-[10px] font-semibold text-muted-foreground">{levelLabel(node.objective.level)}</span>}
           </div>
-          <h4 className={cn("mt-1 text-[13px] font-semibold leading-5 text-foreground", closed && "text-muted-foreground")}>{node.objective.title}</h4>
+          <h4 className={cn("mt-1 text-[13px] font-semibold leading-5 text-foreground", closed && "text-muted-foreground")}><ObjectiveTitle objective={node.objective} /></h4>
           <p className="mt-0.5 text-[11px] text-muted-foreground">{valueText(node.objective.target, "Meta sin definir")}</p>
-          {progress !== null && <Progress value={progress} className="mt-1.5 h-1" />}
-          {closed
-            ? <Button type="button" variant="ghost" size="sm" className="mt-2 h-8 px-2 text-xs" disabled={updating} onClick={() => onUpdate(node.objective.id, { status: "planned" })}><RefreshCw className="mr-1.5 h-3.5 w-3.5" />Reabrir</Button>
-            : <ProgressForm objective={node.objective} onUpdate={onUpdate} isUpdating={updating} />}
+          <p className="mt-0.5 text-[11px]"><MeasureText objective={node.objective} /></p>
+          {progress !== null && kindOf(node.objective) === "objetivo" && <Progress value={progress} className="mt-1.5 h-1" />}
+          <ProgressControl key={`${id}-${node.objective.status}-${node.objective.progressPercent}`} objective={node.objective} onUpdate={onUpdate} isUpdating={updating} />
         </div>
         <span className="shrink-0 text-right text-[10px] text-muted-foreground">{ownerLabel(node.objective.owner)}</span>
         <span className="-mt-1"><EditObjectiveButton objective={node.objective} /></span>
@@ -550,12 +558,14 @@ function SearchResults({ objectives, query, breadcrumbOf, onUpdate, updatingId }
             <span className="-mt-1"><EditObjectiveButton objective={objective} /></span>
           </div>
           <div className="mt-1 flex flex-wrap items-center gap-1.5">
+            <KindBadge kind={kindOf(objective)} />
             <PriorityStar objective={objective} />
             <DeadlineBadge objective={objective} />
           </div>
-          <h4 className="mt-1 text-[13px] font-semibold text-foreground">{objective.title}</h4>
+          <h4 className="mt-1 text-[13px] font-semibold text-foreground"><ObjectiveTitle objective={objective} /></h4>
           <p className="mt-0.5 text-[11px] text-muted-foreground">{valueText(objective.target, "Meta sin definir")} · {ownerLabel(objective.owner)}</p>
-          <ProgressForm objective={objective} onUpdate={onUpdate} isUpdating={updatingId === objective.id} />
+          <p className="mt-0.5 text-[11px]"><MeasureText objective={objective} /></p>
+          <ProgressControl key={`${objective.id}-${objective.status}-${objective.progressPercent}`} objective={objective} onUpdate={onUpdate} isUpdating={updatingId === objective.id} />
         </div>
       ))}
     </div>
@@ -605,7 +615,7 @@ function CalendarView({ timeline, objectives }: { timeline: ObjectivesMap["timel
   );
 }
 
-function HabitsView({ map }: { map: ObjectivesMap }) {
+function HabitsView({ map, onUpdate, updatingId }: { map: ObjectivesMap; onUpdate: UpdateObjectiveFn; updatingId: string | number | null }) {
   const breached = new Set(map.standardsBreached.map((objective) => String(objective.id)));
   const unmeasured = new Set(map.standardsUnmeasured.map((objective) => String(objective.id)));
   const ok = map.standards.length - breached.size - unmeasured.size;
@@ -627,8 +637,9 @@ function HabitsView({ map }: { map: ObjectivesMap }) {
             <li key={id} className="flex items-start gap-2 py-2">
               <span className={cn("mt-1.5 h-2 w-2 shrink-0 rounded-full", estado === "rojo" ? "bg-red-500" : estado === "gris" ? "bg-slate-300" : "bg-emerald-500")} aria-hidden="true" />
               <div className="min-w-0 flex-1">
-                <p className="text-xs font-semibold leading-4 text-foreground">{objective.title}</p>
+                <ObjectiveTitle objective={objective} className="text-xs font-semibold leading-4 text-foreground" />
                 <p className="mt-0.5 text-[11px] text-muted-foreground">{valueText(objective.target, "Sin definir")}</p>
+                <ProgressControl key={`${id}-${objective.progressPercent}`} objective={objective} onUpdate={onUpdate} isUpdating={updatingId === objective.id} />
               </div>
               <span className="shrink-0 text-[10px] text-muted-foreground">{ownerLabel(objective.owner)}</span>
               <span className="-my-1"><EditObjectiveButton objective={objective} /></span>
@@ -640,8 +651,18 @@ function HabitsView({ map }: { map: ObjectivesMap }) {
   );
 }
 
+// Cargar de corrido, cada cosa en su unidad: un objetivo con número pregunta
+// cuánto va y calcula el porcentaje; un hábito, si se cumple. Los hitos no
+// están: se contestan con "Se logró / No se logró", no con un número.
+type BulkDraft = { value?: string; percent?: string; habit?: "" | "ok" | "bad" };
+
+function bulkTarget(objective: Objective): number | null {
+  const target = typeof objective.targetValue === "number" ? objective.targetValue : Number(objective.targetValue);
+  return Number.isFinite(target) && target > 0 ? target : null;
+}
+
 function BulkProgressView({ objectives, onSaved }: { objectives: Objective[]; onSaved: () => void }) {
-  const [draft, setDraft] = useState<Record<string, { currentValue: string; progressPercent: string }>>({});
+  const [draft, setDraft] = useState<Record<string, BulkDraft>>({});
   const [query, setQuery] = useState("");
   const [soloSinMedir, setSoloSinMedir] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -652,8 +673,8 @@ function BulkProgressView({ objectives, onSaved }: { objectives: Objective[]; on
     onError: (mutationError: unknown) => setError(mutationError instanceof Error ? mutationError.message : "No se pudo guardar el avance"),
   });
 
-  const active = objectives.filter((objective) => !objective.retiredAt);
-  const rows = active.filter((objective) => {
+  const measurable = objectives.filter((objective) => !objective.retiredAt && !isClosedObjective(objective) && kindOf(objective) !== "hito");
+  const rows = measurable.filter((objective) => {
     if (soloSinMedir && progressOf(objective) !== null) return false;
     const text = query.trim().toLowerCase();
     if (!text) return true;
@@ -661,44 +682,41 @@ function BulkProgressView({ objectives, onSaved }: { objectives: Objective[]; on
       .filter(Boolean)
       .some((value) => String(value).toLowerCase().includes(text));
   });
-
-  const valueOf = (objective: Objective, field: "currentValue" | "progressPercent") => {
-    const entry = draft[String(objective.id)];
-    if (entry) return entry[field];
-    if (field === "currentValue") return String(objective.currentValue ?? "");
-    return objective.progressPercent == null ? "" : String(objective.progressPercent);
-  };
-
-  const set = (objective: Objective, field: "currentValue" | "progressPercent", value: string) => {
-    const id = String(objective.id);
-    setDraft((current) => ({
-      ...current,
-      [id]: {
-        currentValue: field === "currentValue" ? value : current[id]?.currentValue ?? String(objective.currentValue ?? ""),
-        progressPercent: field === "progressPercent" ? value : current[id]?.progressPercent ?? (objective.progressPercent == null ? "" : String(objective.progressPercent)),
-      },
-    }));
-  };
+  const set = (objective: Objective, patch: BulkDraft) => setDraft((current) => ({ ...current, [String(objective.id)]: { ...current[String(objective.id)], ...patch } }));
 
   const pendientes = Object.keys(draft).length;
   const guardar = () => {
-    const updates = Object.entries(draft).map(([id, entry]) => {
-      const percent = entry.progressPercent.trim();
-      const parsed = percent === "" ? null : Number(percent);
-      return { id, currentValue: entry.currentValue.trim() === "" ? null : entry.currentValue.trim(), progressPercent: parsed };
-    });
-    const invalido = updates.find((update) => update.progressPercent !== null && (!Number.isFinite(update.progressPercent) || update.progressPercent < 0 || update.progressPercent > 100));
-    if (invalido) { setError("El avance tiene que ser un número entre 0 y 100."); return; }
-    mutation.mutate(updates);
+    const updates: Array<{ id: string; currentValue: string | null; progressPercent: number | null }> = [];
+    for (const [id, entry] of Object.entries(draft)) {
+      const objective = measurable.find((candidate) => String(candidate.id) === id);
+      if (!objective) continue;
+      if (kindOf(objective) === "habito") {
+        if (entry.habit === undefined) continue;
+        updates.push({ id, currentValue: entry.habit === "ok" ? "Se cumple" : entry.habit === "bad" ? "No se cumple" : null, progressPercent: entry.habit === "ok" ? 100 : entry.habit === "bad" ? 0 : null });
+        continue;
+      }
+      const target = bulkTarget(objective);
+      if (target != null) {
+        const raw = (entry.value ?? "").trim();
+        const number = raw === "" ? null : Number(raw);
+        if (number !== null && (!Number.isFinite(number) || number < 0)) { setError(`"${objective.title}": el valor tiene que ser un número.`); return; }
+        updates.push({ id, currentValue: number === null ? null : String(number), progressPercent: number === null ? null : Math.round(Math.min(100, (number / target) * 100) * 10) / 10 });
+        continue;
+      }
+      const percent = (entry.percent ?? "").trim() === "" ? null : Number(entry.percent);
+      if (percent !== null && (!Number.isFinite(percent) || percent < 0 || percent > 100)) { setError("El avance tiene que ser un número entre 0 y 100."); return; }
+      updates.push({ id, currentValue: (entry.value ?? "").trim() || null, progressPercent: percent });
+    }
+    if (updates.length) mutation.mutate(updates);
   };
 
   return (
     <section className="rounded-2xl border border-border/75 bg-card p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <p className="text-xs text-muted-foreground">Cargá todo de una vez: pasá de un campo al otro con Tab y guardá al final.</p>
+        <p className="max-w-xl text-xs text-muted-foreground">Cargá todo de una vez, cada cosa en su unidad: cuánto va cada objetivo y si cada hábito se está cumpliendo. Los hitos no están acá: se contestan con "Se logró" o "No se logró".</p>
         <div className="flex flex-wrap items-center gap-2">
-          <Label htmlFor="bulk-search" className="sr-only">Buscar objetivo</Label>
-          <Input id="bulk-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar objetivo…" className="h-9 w-52 text-xs" />
+          <Label htmlFor="bulk-search" className="sr-only">Buscar</Label>
+          <Input id="bulk-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar…" className="h-9 w-52 text-xs" />
           <label className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
             <input type="checkbox" checked={soloSinMedir} onChange={(event) => setSoloSinMedir(event.target.checked)} />
             Sólo sin medir
@@ -710,38 +728,54 @@ function BulkProgressView({ objectives, onSaved }: { objectives: Objective[]; on
         </div>
       </div>
       {error && <div role="alert" className="mt-3 rounded-xl border border-destructive/20 bg-destructive/[0.04] px-3 py-2 text-xs text-destructive">{error}</div>}
-      <p className="mt-3 text-xs text-muted-foreground">Mostrando {rows.length} de {active.length}</p>
+      <p className="mt-3 text-xs text-muted-foreground">Mostrando {rows.length} de {measurable.length}</p>
       <div className="mt-3 overflow-x-auto">
         <table className="w-full min-w-[760px] text-left text-sm">
           <thead>
             <tr className="border-b border-border text-[11px] uppercase tracking-wide text-muted-foreground">
-              <th className="pb-2">Objetivo</th>
+              <th className="pb-2">Qué</th>
               <th className="pb-2">Meta</th>
-              <th className="w-44 pb-2">Dónde estamos hoy</th>
-              <th className="w-24 pb-2">%</th>
+              <th className="w-72 pb-2">Dónde estamos</th>
             </tr>
           </thead>
           <tbody>
-            {rows.map((objective) => (
-              <tr key={String(objective.id)} className="border-b border-border/60 last:border-0">
-                <td className="py-2 pr-3">
-                  <p className="text-xs font-semibold leading-4 text-foreground">{objective.title}</p>
-                  <p className="text-[10px] text-muted-foreground">{ownerLabel(objective.owner)}</p>
-                </td>
-                <td className="py-2 pr-3 text-[11px] text-muted-foreground">{valueText(objective.target, "—")}</td>
-                <td className="py-2 pr-2">
-                  <Label htmlFor={`bulk-value-${objective.id}`} className="sr-only">Avance de {objective.title}</Label>
-                  <Input id={`bulk-value-${objective.id}`} value={valueOf(objective, "currentValue")} onChange={(event) => set(objective, "currentValue", event.target.value)} placeholder="Ej. USD 42K" className="h-8 text-xs" />
-                </td>
-                <td className="py-2">
-                  <Label htmlFor={`bulk-pct-${objective.id}`} className="sr-only">Porcentaje de {objective.title}</Label>
-                  <Input id={`bulk-pct-${objective.id}`} type="number" min="0" max="100" step="1" value={valueOf(objective, "progressPercent")} onChange={(event) => set(objective, "progressPercent", event.target.value)} placeholder="0–100" className="h-8 text-xs" />
-                </td>
-              </tr>
-            ))}
+            {rows.map((objective) => {
+              const id = String(objective.id);
+              const entry = draft[id] ?? {};
+              const kind = kindOf(objective);
+              const target = bulkTarget(objective);
+              return (
+                <tr key={id} className="border-b border-border/60 last:border-0">
+                  <td className="py-2 pr-3">
+                    <div className="flex items-center gap-1.5"><KindBadge kind={kind} /><p className="text-xs font-semibold leading-4 text-foreground">{objective.title}</p></div>
+                    <p className="mt-0.5 text-[10px] text-muted-foreground">{ownerLabel(objective.owner)}</p>
+                  </td>
+                  <td className="py-2 pr-3 text-[11px] text-muted-foreground">{valueText(objective.target, "—")}</td>
+                  <td className="py-2">
+                    {kind === "habito" ? (
+                      <select aria-label={`¿Se cumple? ${objective.title}`} value={entry.habit ?? (objective.progressPercent == null ? "" : objective.progressPercent >= 100 ? "ok" : "bad")} onChange={(event) => set(objective, { habit: event.target.value as BulkDraft["habit"] })} className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs">
+                        <option value="">Sin medir</option>
+                        <option value="ok">Se cumple</option>
+                        <option value="bad">No se cumple</option>
+                      </select>
+                    ) : target != null ? (
+                      <div className="flex items-center gap-2">
+                        <Input aria-label={`Cuánto va: ${objective.title}`} type="number" min="0" step="any" value={entry.value ?? (Number.isFinite(Number(objective.currentValue)) && objective.currentValue != null && objective.currentValue !== "" ? String(objective.currentValue) : "")} onChange={(event) => set(objective, { value: event.target.value })} className="h-8 w-28 text-xs" />
+                        <span className="text-[11px] text-muted-foreground">de {formatTarget(target, objective.targetUnit)}</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <Input aria-label={`Dónde estamos: ${objective.title}`} value={entry.value ?? String(objective.currentValue ?? "")} onChange={(event) => set(objective, { value: event.target.value })} placeholder="Dónde estamos" className="h-8 text-xs" />
+                        <Input aria-label={`Porcentaje: ${objective.title}`} type="number" min="0" max="100" value={entry.percent ?? (objective.progressPercent == null ? "" : String(objective.progressPercent))} onChange={(event) => set(objective, { percent: event.target.value })} placeholder="%" className="h-8 w-16 text-xs" />
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
-        {rows.length === 0 && <p className="py-6 text-center text-xs text-muted-foreground">No hay objetivos para esos filtros.</p>}
+        {rows.length === 0 && <p className="py-6 text-center text-xs text-muted-foreground">No hay nada para cargar con esos filtros.</p>}
       </div>
     </section>
   );
@@ -867,7 +901,18 @@ export default function StatusObjectivesPage() {
   const { toast } = useToast();
   const [editingObjective, setEditingObjective] = useState<Objective | null>(null);
   const [editingAction, setEditingAction] = useState<ObjectiveAction | null>(null);
-  const editContext = useMemo(() => ({ editObjective: setEditingObjective, editAction: setEditingAction }), []);
+  // Las fichas guardan el id, no la fila: así muestran el dato fresco después
+  // de tildar una acción o cargar cuánto va, sin cerrarse.
+  const [detailObjectiveId, setDetailObjectiveId] = useState<string | null>(null);
+  const [detailActionId, setDetailActionId] = useState<string | null>(null);
+  const detailObjective = detailObjectiveId ? objectives.find((objective) => String(objective.id) === detailObjectiveId) ?? null : null;
+  const detailAction = detailActionId ? actions.find((action) => String(action.id) === detailActionId) ?? null : null;
+  const editContext = useMemo(() => ({
+    editObjective: setEditingObjective,
+    editAction: setEditingAction,
+    openObjective: (objective: Objective) => { setDetailActionId(null); setDetailObjectiveId(String(objective.id)); },
+    openAction: (action: ObjectiveAction) => { setDetailObjectiveId(null); setDetailActionId(String(action.id)); },
+  }), []);
   // El equipo activo, para elegir responsable. Quien ya no está no aparece
   // salvo que sea el responsable actual (el editor lo agrega).
   const people = useMemo<PersonOption[]>(() => {
@@ -900,6 +945,7 @@ export default function StatusObjectivesPage() {
   }, [editingObjective, objectives, actions]);
   const refresh = () => queryClient.invalidateQueries({ queryKey });
   const saveAction = async (id: string | number, input: UpdateObjectiveActionInput) => { await updateObjectiveAction(id, input); await refresh(); };
+  const saveEvidence = async (action: ObjectiveAction, evidence: string | null) => { await saveAction(action.id, { evidence }); };
   const removeObjective = async (objective: Objective) => {
     await deleteObjective(objective.id);
     await refresh();
@@ -926,6 +972,8 @@ export default function StatusObjectivesPage() {
   const searching = objectiveSearch.trim().length > 0;
 
   return <EditContext.Provider value={editContext}><PageShell width="wide" spacing="compact" className="pb-8">
+    {detailObjective && <ObjectiveDetailSheet objective={detailObjective} breadcrumb={breadcrumbOf(detailObjective)} objectives={objectives} actions={actions} onClose={() => setDetailObjectiveId(null)} onUpdate={updateObjectiveFields} isUpdating={updatingObjectiveId === detailObjective.id} onToggleAction={toggleAction} pendingActionId={pendingActionId} onEdit={setEditingObjective} onOpenObjective={editContext.openObjective} onOpenAction={editContext.openAction} />}
+    {detailAction && <ActionDetailSheet action={detailAction} objectives={objectives} actions={actions} onClose={() => setDetailActionId(null)} onToggle={toggleAction} isPending={pendingActionId === detailAction.id} onEdit={setEditingAction} onOpenObjective={editContext.openObjective} onOpenAction={editContext.openAction} onSaveEvidence={saveEvidence} />}
     {editingObjective && <EditObjectiveDialog objective={editingObjective} people={people} dependents={dependents} onClose={() => setEditingObjective(null)} onSave={updateObjectiveFields} onDelete={removeObjective} />}
     {editingAction && <EditActionDialog action={editingAction} people={people} objectiveGroups={objectiveGroups} onClose={() => setEditingAction(null)} onSave={saveAction} onDelete={removeAction} />}
     <CompactPageHeader title={`Objetivos ${YEAR}`} description="Qué perseguimos este año y qué hacemos esta semana para llegar." icon={<Target className="h-5 w-5" />} actions={<Button size="sm" onClick={openActionForm} disabled={objectives.length === 0}><Plus className="h-4 w-4" />Nueva acción</Button>} />
@@ -935,6 +983,9 @@ export default function StatusObjectivesPage() {
       {([{ id: "focus", label: "Foco" }, { id: "plan", label: "Plan completo" }] as Array<{ id: ViewId; label: string }>).map((tab) => <button key={tab.id} id={`objectives-tab-${tab.id}`} type="button" role="tab" aria-selected={view === tab.id} aria-controls={`objectives-panel-${tab.id}`} tabIndex={view === tab.id ? 0 : -1} onClick={() => setView(tab.id)} className={cn("whitespace-nowrap border-b-2 px-3 py-2 text-sm font-semibold transition-colors", view === tab.id ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground")}>{tab.label}</button>)}
     </div>
 
+    <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted-foreground" aria-label="Qué es cada cosa">
+      {(["objetivo", "hito", "habito", "accion"] as const).map((kind) => <span key={kind} className="inline-flex items-center gap-1.5"><KindBadge kind={kind} />{KIND_HELP[kind]}</span>)}
+    </p>
     {view === "focus" && <div id="objectives-panel-focus" role="tabpanel" aria-labelledby="objectives-tab-focus" className="space-y-4">
       <GoalPanel northStar={objectivesMap.northStar} support={objectivesMap.northSupport} onUpdate={updateObjectiveFields} updatingId={updatingObjectiveId} />
       <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
@@ -961,7 +1012,7 @@ export default function StatusObjectivesPage() {
           {planView === "fronts" && <FrontsView map={objectivesMap} openFront={openFront} onOpenFront={setOpenFront} isMine={isMine} onUpdate={updateObjectiveFields} updatingId={updatingObjectiveId} />}
           {planView === "calendar" && <CalendarView timeline={objectivesMap.timeline} objectives={objectives} />}
           {planView === "actions" && <ActionsView actions={actions} owners={ownerOptions} onToggle={toggleAction} pendingId={pendingActionId} />}
-          {planView === "habits" && <HabitsView map={objectivesMap} />}
+          {planView === "habits" && <HabitsView map={objectivesMap} onUpdate={updateObjectiveFields} updatingId={updatingObjectiveId} />}
           {planView === "load" && <BulkProgressView objectives={objectives} onSaved={() => queryClient.invalidateQueries({ queryKey })} />}
         </>}
     </div>}

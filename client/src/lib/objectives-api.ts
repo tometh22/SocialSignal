@@ -46,6 +46,7 @@ export type ObjectiveAction = {
   supportingOwners?: ObjectiveRef[] | null;
   evidence?: string | null;
   dependencyActionIds?: Array<string | number> | null;
+  events?: Array<{ id: string | number; userName?: string | null; fromStatus?: string | null; toStatus?: string | null; note?: string | null; createdAt?: string | null }> | null;
 };
 
 export type ObjectiveAccount = {
@@ -84,6 +85,8 @@ export type CreateObjectiveActionInput = {
 export type UpdateObjectiveActionInput = Partial<{
   status: string;
   title: string;
+  description: string | null;
+  evidence: string | null;
   objectiveId: string | number;
   accountableOwner: string;
   weekLabel: string;
@@ -100,6 +103,7 @@ export type UpdateObjectiveInput = Partial<{
   /** Reprograma la fecha de corte; null vuelve a la del plan. */
   targetDate: string | null;
   title: string;
+  metric: string | null;
   target: string | null;
   ownerPersonnelId: number | null;
 }>;
@@ -113,10 +117,15 @@ function asArray<T>(value: unknown): T[] {
 // La columna es numeric y el driver la entrega como texto ("40.00"). Sin
 // convertirla, la pantalla la trata como "sin medir" aunque alguien la haya
 // cargado, porque todo el cálculo de avance pregunta si es un número.
-export function normalizeObjective(objective: Objective): Objective {
-  const raw = objective.progressPercent as unknown;
+function toNumber(raw: unknown): number | null {
   const parsed = raw === null || raw === undefined || raw === "" ? null : Number(raw);
-  return { ...objective, progressPercent: parsed !== null && Number.isFinite(parsed) ? parsed : null };
+  return parsed !== null && Number.isFinite(parsed) ? parsed : null;
+}
+
+export function normalizeObjective(objective: Objective): Objective {
+  // targetValue también es numeric: "3.00" tiene que llegar como 3 para poder
+  // calcular "1 de 3" sin que nadie cargue el porcentaje a mano.
+  return { ...objective, progressPercent: toNumber(objective.progressPercent), targetValue: toNumber(objective.targetValue) };
 }
 
 function normalizeAccount(account: unknown, index: number): ObjectiveAccount | null {
