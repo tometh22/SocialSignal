@@ -88,6 +88,7 @@ export async function ensureObjectivesPlanSeed(): Promise<void> {
       id: objectives.id,
       slug: objectives.slug,
       ownerPersonnelId: objectives.ownerPersonnelId,
+      editedAt: objectives.editedAt,
       parentObjectiveId: objectives.parentObjectiveId,
       retiredAt: objectives.retiredAt,
       retiredReason: objectives.retiredReason,
@@ -104,8 +105,10 @@ export async function ensureObjectivesPlanSeed(): Promise<void> {
     if (!source) continue;
     const updates: Record<string, unknown> = {};
 
+    // Si alguien corrigió el objetivo desde la pantalla, su responsable es una
+    // decisión del equipo, no un error del seed: no se revierte.
     const ownerPersonnelId = resolveOwner(source.ownerName, personnelRows, personnelByName, unresolvedOwners);
-    if (row.ownerPersonnelId !== ownerPersonnelId) updates.ownerPersonnelId = ownerPersonnelId;
+    if (row.editedAt == null && row.ownerPersonnelId !== ownerPersonnelId) updates.ownerPersonnelId = ownerPersonnelId;
 
     // La jerarquía y la lectura de la meta se derivan del plan, que es la
     // fuente. No son campos que se editen desde la pantalla, así que
@@ -180,7 +183,7 @@ export async function ensureObjectivesPlanSeed(): Promise<void> {
   }
   const seededActionSlugs = new Set(actionsToInsert.map((action) => action.slug));
 
-  const actionRows = await db.select({ id: objectiveActions.id, slug: objectiveActions.slug, accountableOwnerId: objectiveActions.accountableOwnerId, dependencyActionIds: objectiveActions.dependencyActionIds }).from(objectiveActions);
+  const actionRows = await db.select({ id: objectiveActions.id, slug: objectiveActions.slug, accountableOwnerId: objectiveActions.accountableOwnerId, dependencyActionIds: objectiveActions.dependencyActionIds, editedAt: objectiveActions.editedAt }).from(objectiveActions);
   const actionIdsBySlug = new Map(actionRows.map((row) => [row.slug, row.id]));
 
   const ownerRows = plan.actions.flatMap((action) => {
@@ -231,6 +234,9 @@ export async function ensureObjectivesPlanSeed(): Promise<void> {
     if (seededActionSlugs.has(action.slug)) continue;
     const actionId = actionIdsBySlug.get(action.slug);
     if (actionId == null) continue;
+    // Una acción editada desde la pantalla puede quedar a cargo de alguien que
+    // el plan no nombra (por ejemplo Sil): eso es una reasignación, no un resto.
+    if (actionRowById.get(actionId)?.editedAt != null) continue;
     const stored = actionRowById.get(actionId)?.accountableOwnerId ?? null;
     const [expected] = [...(ownersForAction.get(action.slug) ?? new Map()).entries()]
       .filter(([, role]) => role === "accountable")
@@ -248,6 +254,7 @@ export async function ensureObjectivesPlanSeed(): Promise<void> {
   );
   for (const row of staleOwnerRows) {
     if (!planActionIds.has(row.actionId)) continue;
+    if (actionRowById.get(row.actionId)?.editedAt != null) continue;
     if (planOwnerIds.has(row.personnelId)) continue;
     await db.delete(objectiveActionOwners).where(eq(objectiveActionOwners.id, row.id));
     repairedActionIds.add(row.actionId);

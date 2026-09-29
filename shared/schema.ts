@@ -2402,6 +2402,10 @@ export const objectives = pgTable("objectives", {
   // avance y su historial, y puede volver sacándola de RETIRED_OBJECTIVES.
   retiredAt: timestamp("retired_at"),
   retiredReason: varchar("retired_reason", { length: 40 }),
+  // Lo que una persona corrige o elimina desde la pantalla. El seed no revierte
+  // el responsable de una fila editada ni resucita una eliminada.
+  editedAt: timestamp("edited_at"),
+  deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => ({
@@ -2438,6 +2442,8 @@ export const objectiveActions = pgTable("objective_actions", {
   evidence: text("evidence"),
   dependencyActionIds: jsonb("dependency_action_ids").$type<number[]>().notNull().default([]),
   sortOrder: integer("sort_order").notNull().default(0),
+  editedAt: timestamp("edited_at"),
+  deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => ({

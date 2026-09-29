@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { createContext, FormEvent, useContext, useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertCircle,
@@ -15,6 +15,9 @@ import {
   Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ToastAction } from "@/components/ui/toast";
+import { EditActionDialog, EditObjectiveDialog, type PersonOption } from "@/components/objectives/objective-editors";
+import { useToast } from "@/hooks/use-toast";
 import { CompactPageHeader } from "@/components/ui/compact-page-header";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -24,13 +27,18 @@ import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import {
   createObjectiveAction,
+  deleteObjective,
+  deleteObjectiveAction,
   getObjectives,
   objectivesQueryKey,
   Objective,
   ObjectiveAction,
   ObjectiveAccount,
   ObjectiveRef,
+  restoreObjective,
+  restoreObjectiveAction,
   updateObjective,
+  UpdateObjectiveActionInput,
   UpdateObjectiveInput,
   updateObjectiveAction,
   updateObjectivesProgress,
@@ -73,6 +81,26 @@ type UpdateObjectiveFn = (id: string | number, input: UpdateObjectiveInput) => P
 type IsMineFn = (owner: ObjectiveRef | null | undefined) => boolean;
 
 const YEAR = 2026;
+
+// Cualquier fila de la pantalla puede abrir el editor de su objetivo o su
+// acción. Un contexto evita pasar el callback por seis niveles de componentes.
+const EditContext = createContext<{ editObjective: (objective: Objective) => void; editAction: (action: ObjectiveAction) => void }>({
+  editObjective: () => {},
+  editAction: () => {},
+});
+
+function EditButton({ label, onClick, tone = "light" }: { label: string; onClick: () => void; tone?: "light" | "dark" }) {
+  return (
+    <button type="button" onClick={onClick} aria-label={label} title={label} className={cn("grid h-7 w-7 shrink-0 place-items-center rounded-md transition-colors", tone === "dark" ? "text-white/60 hover:bg-white/10 hover:text-white" : "text-muted-foreground hover:bg-muted hover:text-foreground")}>
+      <Pencil className="h-3.5 w-3.5" />
+    </button>
+  );
+}
+
+function EditObjectiveButton({ objective, tone }: { objective: Objective; tone?: "light" | "dark" }) {
+  const { editObjective } = useContext(EditContext);
+  return <EditButton label={`Editar: ${objective.title}`} onClick={() => editObjective(objective)} tone={tone} />;
+}
 
 const planTabs: Array<{ id: PlanViewId; label: string }> = [
   { id: "fronts", label: "Por frente" },
@@ -190,7 +218,10 @@ function GoalPanel({ northStar, support, onUpdate, updatingId }: { northStar: Ob
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-white/55">Meta del año</span>
-          <h2 className="mt-1 text-lg font-bold leading-6">{objective.title}</h2>
+          <div className="mt-1 flex items-center gap-1">
+            <h2 className="text-lg font-bold leading-6">{objective.title}</h2>
+            <EditObjectiveButton objective={objective} tone="dark" />
+          </div>
           <p className="mt-1 text-xs text-white/70">{valueText(objective.target, "Meta sin definir")}</p>
         </div>
         <div className="shrink-0 text-right">
@@ -251,10 +282,20 @@ function WeekFocus({ actions, weekLabel, onToggle, pendingId, isMine, hasIdentit
 }
 
 function ActionCheck({ action, onToggle, isPending }: { action: ObjectiveAction; onToggle: () => void; isPending: boolean }) {
+  const { editAction } = useContext(EditContext);
+  return (
+    <div className="flex items-center gap-1">
+      <ActionToggle action={action} onToggle={onToggle} isPending={isPending} />
+      <EditButton label={`Editar: ${action.title}`} onClick={() => editAction(action)} />
+    </div>
+  );
+}
+
+function ActionToggle({ action, onToggle, isPending }: { action: ObjectiveAction; onToggle: () => void; isPending: boolean }) {
   const done = isDone(action);
   const due = action.dueDate ? formatWeek(action.dueDate) : null;
   return (
-    <button type="button" onClick={onToggle} disabled={isPending} aria-pressed={done} aria-label={`${done ? "Reabrir" : "Marcar como hecha"}: ${action.title}`} className="flex w-full items-start gap-3 py-2.5 text-left transition-colors hover:bg-muted/40 disabled:cursor-wait disabled:opacity-60">
+    <button type="button" onClick={onToggle} disabled={isPending} aria-pressed={done} aria-label={`${done ? "Reabrir" : "Marcar como hecha"}: ${action.title}`} className="flex min-w-0 flex-1 items-start gap-3 py-2.5 text-left transition-colors hover:bg-muted/40 disabled:cursor-wait disabled:opacity-60">
       <span className={cn("mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full border", done ? "border-emerald-500 bg-emerald-500 text-white" : "border-border bg-background text-transparent")} aria-hidden="true"><Check className="h-3 w-3" /></span>
       <span className="min-w-0 flex-1">
         <span className={cn("block text-sm font-semibold leading-5", done && "text-muted-foreground line-through")}>{action.title}</span>
@@ -269,6 +310,7 @@ function ActionCheck({ action, onToggle, isPending }: { action: ObjectiveAction;
 }
 
 function AnswerRow({ objective, onUpdate, isUpdating }: { objective: Objective; onUpdate: UpdateObjectiveFn; isUpdating: boolean }) {
+  const { editObjective } = useContext(EditContext);
   const [moving, setMoving] = useState(false);
   const [date, setDate] = useState("");
   const deadline = deadlineOf(objective);
@@ -286,6 +328,7 @@ function AnswerRow({ objective, onUpdate, isUpdating }: { objective: Objective; 
           <Button type="button" size="sm" variant="outline" className="h-8 border-emerald-300 text-emerald-700 hover:bg-emerald-50" disabled={isUpdating} onClick={() => onUpdate(objective.id, { status: "done" })}>Se logró</Button>
           <Button type="button" size="sm" variant="outline" className="h-8" disabled={isUpdating} onClick={() => onUpdate(objective.id, { status: "missed" })}>No se logró</Button>
           <Button type="button" size="sm" variant="ghost" className="h-8" disabled={isUpdating} onClick={() => setMoving((value) => !value)}>Mover fecha</Button>
+          <Button type="button" size="sm" variant="ghost" className="h-8 text-muted-foreground" disabled={isUpdating} onClick={() => editObjective(objective)}><Pencil className="mr-1 h-3.5 w-3.5" />Editar</Button>
         </div>
       </div>
       {moving && (
@@ -336,6 +379,7 @@ function AttentionPanel({ overdue, upcoming, nextCheckpoint, onUpdate, updatingI
                   <PriorityStar objective={objective} />
                   <span className="min-w-0 flex-1 text-foreground">{objective.title}</span>
                   <span className="shrink-0 text-muted-foreground">{ownerLabel(objective.owner)}</span>
+                  <span className="-my-1.5"><EditObjectiveButton objective={objective} /></span>
                 </li>
               );
             })}
@@ -425,6 +469,7 @@ function ObjectiveBranch({ item, expanded, onToggle, onUpdate, updatingId, isMin
             : <ProgressForm objective={node.objective} onUpdate={onUpdate} isUpdating={updating} />}
         </div>
         <span className="shrink-0 text-right text-[10px] text-muted-foreground">{ownerLabel(node.objective.owner)}</span>
+        <span className="-mt-1"><EditObjectiveButton objective={node.objective} /></span>
       </div>
       {open && kids.length > 0 && <div className="space-y-1 pb-1">{kids.map((child) => <ObjectiveBranch key={isGroup(child) ? child.id : String(child.objective.id)} item={child} expanded={expanded} onToggle={onToggle} onUpdate={onUpdate} updatingId={updatingId} isMine={isMine} />)}</div>}
     </div>
@@ -498,7 +543,10 @@ function SearchResults({ objectives, query, breadcrumbOf, onUpdate, updatingId }
       <p className="text-xs text-muted-foreground">{matches.length} {matches.length === 1 ? "coincidencia" : "coincidencias"}</p>
       {matches.map((objective) => (
         <div key={String(objective.id)} className="rounded-xl border border-border/70 p-3">
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{breadcrumbOf(objective)}</p>
+          <div className="flex items-start justify-between gap-2">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{breadcrumbOf(objective)}</p>
+            <span className="-mt-1"><EditObjectiveButton objective={objective} /></span>
+          </div>
           <div className="mt-1 flex flex-wrap items-center gap-1.5">
             <PriorityStar objective={objective} />
             <DeadlineBadge objective={objective} />
@@ -581,6 +629,7 @@ function HabitsView({ map }: { map: ObjectivesMap }) {
                 <p className="mt-0.5 text-[11px] text-muted-foreground">{valueText(objective.target, "Sin definir")}</p>
               </div>
               <span className="shrink-0 text-[10px] text-muted-foreground">{ownerLabel(objective.owner)}</span>
+              <span className="-my-1"><EditObjectiveButton objective={objective} /></span>
             </li>
           );
         })}
@@ -760,7 +809,6 @@ export default function StatusObjectivesPage() {
     return all.filter((owner) => { const key = ownerKey(owner); if (!key || seen.has(key)) return false; seen.add(key); return true; })
       .sort((a, b) => ownerLabel(a).localeCompare(ownerLabel(b), "es"));
   }, [actions, objectives]);
-  const formOwners = owners.length > 0 ? owners : ownerOptions;
 
   // "Lo mío" resalta, no filtra el árbol: persona y jerarquía son dos ejes
   // distintos, y filtrar uno por el otro dejaba ramas sin raíz.
@@ -812,6 +860,62 @@ export default function StatusObjectivesPage() {
   const submitAction = (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); setFormError(null); createActionMutation.mutate({ title: form.title.trim(), objectiveId: form.objectiveId, accountableOwner: form.owner, weekLabel: form.weekLabel.trim(), ...(form.weekStart ? { weekStart: form.weekStart } : {}), ...(form.dueDate ? { dueDate: form.dueDate } : {}), ...(form.accountId ? { accountId: form.accountId } : {}), ...(form.focus.trim() ? { focus: form.focus.trim() } : {}) }); };
   const toggleAction = (action: ObjectiveAction) => updateActionMutation.mutate({ id: action.id, status: isDone(action) ? "pending" : "done" });
   const updateObjectiveFields: UpdateObjectiveFn = async (id, input) => { await updateObjectiveMutation.mutateAsync({ id, input }); };
+
+  // ── Editar y eliminar ──
+  const { toast } = useToast();
+  const [editingObjective, setEditingObjective] = useState<Objective | null>(null);
+  const [editingAction, setEditingAction] = useState<ObjectiveAction | null>(null);
+  const editContext = useMemo(() => ({ editObjective: setEditingObjective, editAction: setEditingAction }), []);
+  // El equipo activo, para elegir responsable. Quien ya no está no aparece
+  // salvo que sea el responsable actual (el editor lo agrega).
+  const people = useMemo<PersonOption[]>(() => {
+    const today = todayISO();
+    return (owners as Array<{ id?: string | number | null; name?: string | null; activeUntil?: string | null }>)
+      .filter((person) => person && typeof person === "object" && person.id != null && person.name)
+      .filter((person) => !person.activeUntil || String(person.activeUntil).slice(0, 10) >= today)
+      .map((person) => ({ id: String(person.id), name: String(person.name) }))
+      .sort((a, b) => a.name.localeCompare(b.name, "es"));
+  }, [owners]);
+  // Lo que se va con un objetivo: la misma rama que elimina el servidor.
+  const dependents = useMemo(() => {
+    if (!editingObjective) return { objectives: 0, actions: 0 };
+    const branch = new Set<string>([String(editingObjective.id)]);
+    let grew = true;
+    while (grew) {
+      grew = false;
+      for (const objective of objectives) {
+        const parent = objective.parentObjectiveId != null ? String(objective.parentObjectiveId) : null;
+        if (parent && branch.has(parent) && !branch.has(String(objective.id))) { branch.add(String(objective.id)); grew = true; }
+      }
+    }
+    // La rama incluye retirados (el servidor también los marca), pero el aviso
+    // cuenta sólo lo que la persona ve en pantalla.
+    const visible = objectives.filter((objective) => !objective.retiredAt && branch.has(String(objective.id)) && String(objective.id) !== String(editingObjective.id));
+    return {
+      objectives: visible.length,
+      actions: actions.filter((action) => action.objectiveId != null && branch.has(String(action.objectiveId))).length,
+    };
+  }, [editingObjective, objectives, actions]);
+  const refresh = () => queryClient.invalidateQueries({ queryKey });
+  const saveAction = async (id: string | number, input: UpdateObjectiveActionInput) => { await updateObjectiveAction(id, input); await refresh(); };
+  const removeObjective = async (objective: Objective) => {
+    await deleteObjective(objective.id);
+    await refresh();
+    toast({
+      title: "Objetivo eliminado",
+      description: objective.title,
+      action: <ToastAction altText="Deshacer" onClick={async () => { await restoreObjective(objective.id); await refresh(); }}>Deshacer</ToastAction>,
+    });
+  };
+  const removeAction = async (action: ObjectiveAction) => {
+    await deleteObjectiveAction(action.id);
+    await refresh();
+    toast({
+      title: "Acción eliminada",
+      description: action.title,
+      action: <ToastAction altText="Deshacer" onClick={async () => { await restoreObjectiveAction(action.id); await refresh(); }}>Deshacer</ToastAction>,
+    });
+  };
   const openFrontInPlan = (id: FrontId) => { setOpenFront(id); setPlanView("fronts"); setObjectiveSearch(""); setView("plan"); };
 
   if (objectivesQuery.isLoading) return <PageShell width="wide" spacing="compact" className="pb-8"><LoadingState /></PageShell>;
@@ -819,9 +923,11 @@ export default function StatusObjectivesPage() {
 
   const searching = objectiveSearch.trim().length > 0;
 
-  return <PageShell width="wide" spacing="compact" className="pb-8">
+  return <EditContext.Provider value={editContext}><PageShell width="wide" spacing="compact" className="pb-8">
+    {editingObjective && <EditObjectiveDialog objective={editingObjective} people={people} dependents={dependents} onClose={() => setEditingObjective(null)} onSave={updateObjectiveFields} onDelete={removeObjective} />}
+    {editingAction && <EditActionDialog action={editingAction} people={people} objectives={activeObjectives} onClose={() => setEditingAction(null)} onSave={saveAction} onDelete={removeAction} />}
     <CompactPageHeader title={`Objetivos ${YEAR}`} description="Qué perseguimos este año y qué hacemos esta semana para llegar." icon={<Target className="h-5 w-5" />} actions={<Button size="sm" onClick={openActionForm} disabled={objectives.length === 0}><Plus className="h-4 w-4" />Nueva acción</Button>} />
-    {showActionForm && <ActionFormPanel form={form} setForm={setForm} objectives={activeObjectives} owners={formOwners} accounts={accounts} onSubmit={submitAction} onClose={() => setShowActionForm(false)} isPending={createActionMutation.isPending} error={formError} />}
+    {showActionForm && <ActionFormPanel form={form} setForm={setForm} objectives={activeObjectives} owners={people.length > 0 ? people : ownerOptions} accounts={accounts} onSubmit={submitAction} onClose={() => setShowActionForm(false)} isPending={createActionMutation.isPending} error={formError} />}
     {mutationError && <div role="alert" className="flex items-center gap-2 rounded-xl border border-destructive/20 bg-destructive/[0.03] px-3 py-2 text-xs text-destructive"><AlertCircle className="h-4 w-4 shrink-0" />{mutationError instanceof Error ? mutationError.message : "No se pudo guardar el cambio."}</div>}
     <div role="tablist" aria-label="Vista de objetivos" className="flex items-center gap-1 border-b border-border/80 pb-px">
       {([{ id: "focus", label: "Foco" }, { id: "plan", label: "Plan completo" }] as Array<{ id: ViewId; label: string }>).map((tab) => <button key={tab.id} id={`objectives-tab-${tab.id}`} type="button" role="tab" aria-selected={view === tab.id} aria-controls={`objectives-panel-${tab.id}`} tabIndex={view === tab.id ? 0 : -1} onClick={() => setView(tab.id)} className={cn("whitespace-nowrap border-b-2 px-3 py-2 text-sm font-semibold transition-colors", view === tab.id ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground")}>{tab.label}</button>)}
@@ -857,7 +963,7 @@ export default function StatusObjectivesPage() {
           {planView === "load" && <BulkProgressView objectives={objectives} onSaved={() => queryClient.invalidateQueries({ queryKey })} />}
         </>}
     </div>}
-  </PageShell>;
+  </PageShell></EditContext.Provider>;
 }
 
 function LoadingState() {
