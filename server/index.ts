@@ -43,6 +43,7 @@ import { objectivesHierarchyMigrationSql } from "./migrations/objectives-hierarc
 import { objectivesRetirementMigrationSql } from "./migrations/objectives-retirement";
 import { objectivesRescheduledDateMigrationSql } from "./migrations/objectives-rescheduled-date";
 import { objectivesUserEditsMigrationSql } from "./migrations/objectives-user-edits";
+import { feedbackClosure0069MigrationSql } from "./migrations/feedback-closure-0069";
 import { ensureServiceBlueprintSeeds } from "./services/service-blueprints";
 import { ensureObjectivesPlanSeed } from "./services/objectives-seed";
 import cors from 'cors';
@@ -872,6 +873,7 @@ async function applyPendingMigrations() {
     await run('0066 objectives retirement', objectivesRetirementMigrationSql);
     await run('0067 objectives rescheduled date', objectivesRescheduledDateMigrationSql);
     await run('0068 objectives user edits', objectivesUserEditsMigrationSql);
+    await run('0069 feedback closure', feedbackClosure0069MigrationSql);
 
     // 0033: feriados duplicados (mismo date+name insertado más de una vez desde el
     // formulario) — borra duplicados conservando la fila más antigua y agrega la

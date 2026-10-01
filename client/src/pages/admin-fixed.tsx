@@ -121,6 +121,7 @@ const personnelSchema = z.object({
   sublevel: z.enum(["A", "B", "C"]),
   area: z.enum(PERSONNEL_AREAS, { required_error: "Debe seleccionar un área" }),
   email: z.string().email().optional().or(z.literal("")),
+  birthday: z.string().optional().or(z.literal("")),
   contractType: z.enum(["full-time", "part-time", "freelance"]).default("full-time"),
   billingCurrency: z.enum(["ARS", "USD", "mixed"]).default("ARS"),
   monthlyHours: z.coerce.number().int().min(40).max(300).nullable().optional(),
@@ -338,6 +339,7 @@ export default function Admin() {
     defaultValues: {
       name: "",
       email: "",
+      birthday: "",
       currentRole: "1 Junior",
       sublevel: "A",
       area: "Operaciones",
@@ -821,6 +823,7 @@ export default function Admin() {
     personnelForm.reset({
       name: "",
       email: "",
+      birthday: "",
       currentRole: "1 Junior",
       sublevel: "A",
       area: "Operaciones",
@@ -840,6 +843,7 @@ export default function Admin() {
     personnelForm.reset({
       name: personnel.name,
       email: personnel.email || "",
+      birthday: (personnel as any).birthday || "",
       currentRole: ((personnel as any).currentRole || "1 Junior") as any,
       sublevel: ((personnel as any).sublevel || "A") as any,
       area: ((personnel as any).area || "Operaciones") as any,
@@ -858,6 +862,7 @@ export default function Admin() {
   const onPersonnelSubmit = (values: PersonnelFormValues) => {
     const payload: any = {
       ...values,
+      birthday: values.birthday || null,
       monthlyHours: values.contractType === "freelance" ? null : values.monthlyHours,
     };
     if (values.billingCurrency === "ARS") delete payload.hourlyRateUSD;
@@ -1302,6 +1307,7 @@ export default function Admin() {
                             </TooltipProvider>
                           </div>
                         </TableHead>
+                        <TableHead>Cumpleaños</TableHead>
                         <TableHead>Acciones</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -1328,6 +1334,7 @@ export default function Admin() {
                             billingCurrency: person.billingCurrency,
                             usdBillingFraction: person.usdBillingFraction,
                             activeUntil: person.activeUntil,
+                            birthday: person.birthday,
                           }}
                         />
                       ))}
@@ -1793,6 +1800,9 @@ export default function Admin() {
                   </FormItem>
                 )}
               />
+              <FormField control={personnelForm.control} name="birthday" render={({ field }) => (
+                <FormItem><FormLabel>Cumpleaños</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>
+              )} />
 
               {/* La clasificación canónica es Nivel + Subnivel + Área. El rol del
                   catálogo legacy se deriva en el servidor a partir del nivel, así

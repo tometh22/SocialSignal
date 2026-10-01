@@ -29,6 +29,7 @@ interface PersonnelRow {
   billingCurrency?: string;
   usdBillingFraction?: number;
   activeUntil?: string | null;
+  birthday?: string | null;
   currentHourlyRateARS?: number | null;
   currentHourlyRateUSD?: number | null;
   currentMonthlySalaryARS?: number | null;
@@ -63,6 +64,7 @@ export default function InlineEditPersonnel({ person }: InlineEditPersonnelProps
     billingCurrency: person.billingCurrency ?? "ARS",
     usdBillingFraction: String(person.usdBillingFraction ?? 0),
     activeUntil: person.activeUntil ?? "",
+    birthday: person.birthday ?? "",
   });
 
   useEffect(() => {
@@ -80,6 +82,7 @@ export default function InlineEditPersonnel({ person }: InlineEditPersonnelProps
       billingCurrency: person.billingCurrency ?? "ARS",
       usdBillingFraction: String(person.usdBillingFraction ?? 0),
       activeUntil: person.activeUntil ?? "",
+      birthday: person.birthday ?? "",
     });
   }, [person]);
 
@@ -112,6 +115,7 @@ export default function InlineEditPersonnel({ person }: InlineEditPersonnelProps
         billingCurrency: form.billingCurrency,
         usdBillingFraction: Number(form.usdBillingFraction) || 0,
         activeUntil: form.activeUntil || null,
+        birthday: form.birthday || null,
       };
       if (form.billingCurrency !== "USD") payload.hourlyRateARS = hourlyRateARS;
       if (form.billingCurrency !== "ARS") payload.hourlyRateUSD = hourlyRateUSD;
@@ -222,6 +226,7 @@ export default function InlineEditPersonnel({ person }: InlineEditPersonnelProps
           )}
         </td>
         <td className="px-6 py-4"><Input type="date" value={form.activeUntil} onChange={(event) => setForm({ ...form, activeUntil: event.target.value })} /></td>
+        <td className="px-6 py-4"><Input aria-label={`Cumpleaños de ${person.name}`} type="date" value={form.birthday} onChange={(event) => setForm({ ...form, birthday: event.target.value })} /></td>
         <td className="px-6 py-4">
           <div className="flex gap-1">
             <Button size="icon" variant="ghost" onClick={() => updateMutation.mutate()} disabled={updateMutation.isPending}>
@@ -256,6 +261,7 @@ export default function InlineEditPersonnel({ person }: InlineEditPersonnelProps
       <td className="px-6 py-4 text-center">{person.includeInRealCosts === false ? <X className="mx-auto h-4 w-4 text-red-600" /> : <Check className="mx-auto h-4 w-4 text-green-600" />}</td>
       <td className="px-6 py-4 text-sm">{person.billingCurrency ?? "ARS"}</td>
       <td className="px-6 py-4 text-sm">{person.activeUntil ?? "—"}</td>
+      <td className="px-6 py-4 text-sm">{person.birthday ? person.birthday.slice(5) : "—"}</td>
       <td className="px-6 py-4">
         <div className="flex gap-1">
           <Button size="icon" variant="ghost" onClick={() => setIsEditing(true)}><Edit className="h-4 w-4" /></Button>

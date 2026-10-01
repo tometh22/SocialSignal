@@ -173,19 +173,25 @@ const impactFactor: Record<ScopeCoverage["impactLevel"], number> = {
   critical: 1.4,
 };
 
+export function blueprintEffortFactorBreakdown(definition: BlueprintDefinition) {
+  const coverage = definition.coverage;
+  return [
+    { label: "Mercados", value: 1 + Math.max(0, coverage.markets.length - 1) * 0.12 },
+    { label: "Marcas", value: 1 + Math.max(0, coverage.brands.length - 1) * 0.1 },
+    { label: "Competidores", value: 1 + Math.max(0, coverage.competitors.length - 1) * 0.05 },
+    { label: "Fuentes", value: 1 + Math.max(0, coverage.sources.length - 1) * 0.04 },
+    { label: "Idiomas", value: 1 + Math.max(0, coverage.languages.length - 1) * 0.12 },
+    { label: "Módulos adicionales", value: 1 + Math.max(0, coverage.analysisModules.length - 3) * 0.05 },
+    { label: "Volumen", value: volumeFactor[coverage.mentionVolume] },
+    { label: "Impacto", value: impactFactor[coverage.impactLevel] },
+    { label: "SLA", value: coverage.slaLevel === "real_time" ? 1.25 : coverage.slaLevel === "priority" ? 1.12 : 1 },
+    { label: "Presentación visual", value: coverage.designLevel === "executive" ? 1.18 : coverage.designLevel === "branded" ? 1.1 : 1 },
+  ].map((item) => ({ ...item, value: Number(item.value.toFixed(4)) }));
+}
+
 /** Deterministic effort model. Prices remain the responsibility of quotation-pricing. */
 export function estimateBlueprintWorkload(definition: BlueprintDefinition) {
-  const coverage = definition.coverage;
-  const coverageFactor =
-    (1 + Math.max(0, coverage.markets.length - 1) * 0.12)
-    * (1 + Math.max(0, coverage.brands.length - 1) * 0.1)
-    * (1 + Math.max(0, coverage.competitors.length - 1) * 0.05)
-    * (1 + Math.max(0, coverage.sources.length - 1) * 0.04)
-    * (1 + Math.max(0, coverage.languages.length - 1) * 0.12)
-    * (1 + Math.max(0, coverage.analysisModules.length - 3) * 0.05);
-  const slaFactor = coverage.slaLevel === "real_time" ? 1.25 : coverage.slaLevel === "priority" ? 1.12 : 1;
-  const designFactor = coverage.designLevel === "executive" ? 1.18 : coverage.designLevel === "branded" ? 1.1 : 1;
-  const factor = coverageFactor * slaFactor * designFactor * volumeFactor[coverage.mentionVolume] * impactFactor[coverage.impactLevel];
+  const factor = blueprintEffortFactorBreakdown(definition).reduce((product, item) => product * item.value, 1);
   const lines: WorkloadLine[] = [];
 
   for (const [roleKey, hours] of Object.entries(definition.setupRoleHours)) {

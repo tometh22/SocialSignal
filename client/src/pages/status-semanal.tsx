@@ -1243,8 +1243,13 @@ function OwnerSelect({ value, name, onChange, users }: {
 
 function deadlineLabel(d: string | null): string {
   if (!d) return '';
-  const date = new Date(d);
+  const [year, month, day] = d.slice(0, 10).split('-').map(Number);
+  const date = new Date(year, month - 1, day);
   return date.toLocaleDateString('es-AR', { day: 'numeric', month: 'short' });
+}
+
+function encodeCivilDeadline(value: string): string {
+  return new Date(`${value.slice(0, 10)}T12:00:00`).toISOString();
 }
 
 function DeadlinePicker({ value, isOverdue, onChange }: {
@@ -1253,7 +1258,7 @@ function DeadlinePicker({ value, isOverdue, onChange }: {
   const inputRef = useRef<HTMLInputElement>(null);
   const toDateStr = (d: string | null) => {
     if (!d) return '';
-    return new Date(d).toISOString().split('T')[0];
+    return d.slice(0, 10);
   };
 
   if (!value) {
@@ -1264,7 +1269,7 @@ function DeadlinePicker({ value, isOverdue, onChange }: {
         <Calendar className="h-3 w-3" />
         <input ref={inputRef} type="date"
           className="absolute inset-0 opacity-0 cursor-pointer w-full"
-          onChange={e => e.target.value && onChange(new Date(e.target.value).toISOString())} />
+          onChange={e => e.target.value && onChange(encodeCivilDeadline(e.target.value))} />
       </button>
     );
   }
@@ -1280,7 +1285,7 @@ function DeadlinePicker({ value, isOverdue, onChange }: {
       </button>
       <input type="date" value={toDateStr(value)}
         className="absolute inset-0 opacity-0 cursor-pointer w-full"
-        onChange={e => e.target.value ? onChange(new Date(e.target.value).toISOString()) : onChange(null)} />
+        onChange={e => e.target.value ? onChange(encodeCivilDeadline(e.target.value)) : onChange(null)} />
     </div>
   );
 }
@@ -1736,7 +1741,7 @@ function AddItemButton({ onAdd, variant = 'header', users = [], currentUserId = 
   const reset = () => { setTitle(''); setFirstUpdate(''); setOwnerId(currentUserId); setHealth('verde'); setDeadline(''); };
   const submit = () => {
     if (!title.trim()) return;
-    onAdd({ title: title.trim(), subtitle: '', ownerId, healthStatus: health, deadline: deadline ? new Date(deadline).toISOString() : null, firstUpdate: firstUpdate.trim() });
+    onAdd({ title: title.trim(), subtitle: '', ownerId, healthStatus: health, deadline: deadline ? encodeCivilDeadline(deadline) : null, firstUpdate: firstUpdate.trim() });
     reset(); setOpen(false);
   };
   const onKey = (e: React.KeyboardEvent) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(); } };
@@ -2873,8 +2878,8 @@ function DailyRunner({ queue, quietCount, users, currentUserId, roomId, startInd
                   </button>
                   {picker === 'deadline' && (
                     <div className="mt-1 bg-white border border-slate-200 rounded-lg p-2 flex items-center gap-2">
-                      <input ref={dateRef} type="date" autoFocus defaultValue={item.deadline ? new Date(item.deadline).toISOString().split('T')[0] : ''}
-                        onChange={e => e.target.value && setDeadline(new Date(e.target.value).toISOString())}
+                      <input ref={dateRef} type="date" autoFocus defaultValue={item.deadline ? item.deadline.slice(0, 10) : ''}
+                        onChange={e => e.target.value && setDeadline(encodeCivilDeadline(e.target.value))}
                         className="text-xs border border-slate-200 rounded px-2 py-1 flex-1" />
                       {item.deadline && <button onClick={() => setDeadline(null)} className="text-xs text-red-500 hover:underline">Quitar</button>}
                     </div>

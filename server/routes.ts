@@ -139,6 +139,8 @@ import {
   holidays,
   insertHolidaySchema,
   monthlyClosings,
+  monthlySettlementDeclarations,
+  monthlySettlementEvents,
   insertMonthlyClosingSchema,
   PROJECT_WORKFLOW_STAGES,
   personnelAbsences,
@@ -4421,12 +4423,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Personnel historical costs routes
   // Personnel routes
-  app.get("/api/personnel", requireAuth, async (_, res) => {
+  app.get("/api/personnel", requireAuth, async (req, res) => {
     try {
       const personnelData = await db.select({
         id: personnel.id,
         name: personnel.name,
         email: personnel.email,
+        birthday: personnel.birthday,
         roleId: personnel.roleId,
         currentRole: personnel.currentRole,
         sublevel: personnel.sublevel,
@@ -4629,7 +4632,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return canonicalizePersonnelDisplay(normalized);
       });
 
-      res.json(normalizedPersonnel);
+      const currentUser = req.user as any;
+      const [ownPersonnel] = currentUser?.email ? await db.select({ id: personnel.id }).from(personnel).where(sql`LOWER(TRIM(${personnel.email})) = LOWER(TRIM(${currentUser.email}))`).limit(1) : [];
+      res.json(normalizedPersonnel.map((person: any) => {
+        if (isOperationsRequest(req) || person.id === ownPersonnel?.id) return person;
+        const safePerson = { ...person };
+        delete safePerson.birthday;
+        return safePerson;
+      }));
     } catch (error: any) {
       console.error("Error fetching personnel:", error?.message || error);
       res.status(500).json({ message: error?.message || "Error fetching personnel" });
@@ -11304,6 +11314,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Crear un nuevo proyecto activo desde una cotización
+  app.post("/api/active-projects/import", requireAuth, requirePermission("operations"), async (req, res) => {
+    try {
+      const input = z.object({ replace: z.boolean().default(false), projects: z.array(z.object({ name: z.string().trim().min(1).max(500), clientName: z.string().trim().min(1), startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(), expectedEndDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(), trackingFrequency: z.string().optional(), notes: z.string().optional() }).strict()).min(1).max(1000) }).strict().parse(req.body);
+      const allClients = await db.select({ id: clients.id, name: clients.name }).from(clients);
+      const mapped = input.projects.map((row) => {
+        const client = allClients.find((candidate) => candidate.name.trim().toLowerCase() === row.clientName.trim().toLowerCase());
+        if (!client) throw Object.assign(new Error(`No existe el cliente "${row.clientName}"`), { statusCode: 422 });
+        const validCivilDate = (value?: string) => !value || Number.isFinite(new Date(`${value}T12:00:00`).getTime()) && new Date(`${value}T12:00:00`).toISOString().slice(0, 10) === value;
+        if (!validCivilDate(row.startDate) || !validCivilDate(row.expectedEndDate) || (row.startDate && row.expectedEndDate && row.expectedEndDate < row.startDate)) throw Object.assign(new Error(`Fechas inválidas para el proyecto "${row.name}"`), { statusCode: 422 });
+        const frequency = ["daily", "weekly", "biweekly", "monthly"].includes((row.trackingFrequency || "").toLowerCase()) ? row.trackingFrequency!.toLowerCase() : "weekly";
+        return { name: row.name.trim(), clientId: client.id, startDate: row.startDate ? new Date(`${row.startDate}T12:00:00`) : new Date(), expectedEndDate: row.expectedEndDate ? new Date(`${row.expectedEndDate}T12:00:00`) : null, trackingFrequency: frequency, notes: row.notes || null, status: "active", projectCategory: "billable", workflowStage: "aprobado", createdBy: req.user?.id ?? null };
+      });
+      const result = await db.transaction(async (tx) => {
+        let archived = 0;
+        if (input.replace) {
+          const previous = await tx.update(activeProjects).set({ status: "voided", isFinished: true, closedAt: new Date(), closedBy: req.user?.id ?? null, updatedAt: new Date() }).where(inArray(activeProjects.status, ["active", "on_hold", "on-hold", "planning"])).returning({ id: activeProjects.id });
+          archived = previous.length;
+        }
+        const created = await tx.insert(activeProjects).values(mapped).returning({ id: activeProjects.id, name: activeProjects.name, clientId: activeProjects.clientId });
+        return { archived, created };
+      });
+      res.status(201).json({ created: result.created.length, archived: result.archived, projects: result.created });
+    } catch (error: any) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: "Revisá el mapeo y las filas del archivo", errors: error.errors });
+      res.status(error?.statusCode || 500).json({ message: error?.message || "No se pudo importar la cartera" });
+    }
+  });
+
   app.post("/api/active-projects", requireAuth, requirePermission("operations"), async (req, res) => {
     try {
       // Adaptar fechas si vienen como strings ISO
@@ -11378,6 +11416,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         const [created] = await tx.insert(activeProjects).values(validatedData).returning();
+        const requestedMemberIds: unknown[] = Array.isArray(req.body.memberIds) ? req.body.memberIds : [];
+        const selectedMemberIds: number[] = [...new Set(requestedMemberIds.map((id: unknown) => Number(id)).filter((id: number) => Number.isInteger(id) && id > 0))];
+        const projectManagerId = Number(req.body.projectManagerId) || null;
+        const projectMemberships = [...new Set([...selectedMemberIds, ...(projectManagerId ? [projectManagerId] : [])])];
+        if (projectMemberships.length) await tx.insert(taskProjectMembers).values(projectMemberships.map((personnelId: number) => ({ projectId: created.id, personnelId, role: personnelId === projectManagerId ? "owner" : "member" }))).onConflictDoUpdate({ target: [taskProjectMembers.projectId, taskProjectMembers.personnelId], set: { role: sql`EXCLUDED.role` } });
+        const projectTemplate = ["weekly", "monthly", "one_shot"].includes(req.body.projectTemplate) ? req.body.projectTemplate : null;
+        const templateSections: Record<string, Array<{ sectionName: string; title: string }>> = {
+          weekly: [
+            { sectionName: "Planificación semanal", title: "Revisar prioridades y pendientes" },
+            { sectionName: "Producción", title: "Ejecutar entregables de la semana" },
+            { sectionName: "Seguimiento", title: "Compartir avance con el cliente" },
+          ],
+          monthly: [
+            { sectionName: "Planificación mensual", title: "Definir objetivos y calendario" },
+            { sectionName: "Producción", title: "Ejecutar entregables del mes" },
+            { sectionName: "Cierre mensual", title: "Revisar resultados y próximos pasos" },
+          ],
+          one_shot: [
+            { sectionName: "Preparación", title: "Alinear brief, alcance y responsables" },
+            { sectionName: "Ejecución", title: "Completar el entregable" },
+            { sectionName: "Entrega", title: "Revisar y entregar al cliente" },
+          ],
+        };
+        if (projectTemplate) await tx.insert(tasks).values(templateSections[projectTemplate].map((task, index) => ({
+          ...task, projectId: created.id, status: "todo", priority: "medium", position: index, createdBy: req.user?.id ?? null,
+        })));
         if (!quotation) return created;
 
         const selectedVariant = selectedVariantId
@@ -25905,6 +25969,73 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ==================== MONTHLY CLOSINGS CRUD ====================
+  app.get("/api/me/monthly-settlement-declarations", requireAuth, async (req, res) => {
+    const access = await getAbsenceAccessContext(req);
+    if (!access.personnelId) return res.status(409).json({ message: "Tu usuario no está vinculado con Personal" });
+    const rows = await db.select({ closing: monthlyClosings, declaration: monthlySettlementDeclarations })
+      .from(monthlyClosings).leftJoin(monthlySettlementDeclarations, eq(monthlySettlementDeclarations.closingId, monthlyClosings.id))
+      .where(eq(monthlyClosings.personnelId, access.personnelId))
+      .orderBy(desc(monthlyClosings.year), desc(monthlyClosings.month));
+    const result = await Promise.all(rows.map(async ({ closing, declaration }) => ({
+      closingId: closing.id, year: closing.year, month: closing.month, billingCurrency: closing.billingCurrency,
+      usdBillingFraction: closing.usdBillingFraction, amountUSD: closing.totalCostUSD ?? 0,
+      amountARS: closing.totalCostARS ?? 0, closingFxRate: closing.exchangeRateAtClose,
+      declaration: declaration ? { ...declaration, events: await db.select().from(monthlySettlementEvents).where(eq(monthlySettlementEvents.declarationId, declaration.id)).orderBy(desc(monthlySettlementEvents.createdAt)) } : null,
+    })));
+    res.json(result);
+  });
+
+  app.post("/api/me/monthly-settlement-declarations", requireAuth, async (req, res) => {
+    try {
+      const access = await getAbsenceAccessContext(req);
+      if (!access.personnelId) return res.status(409).json({ message: "Tu usuario no está vinculado con Personal" });
+      const { closingId, bankFxRate } = z.object({ closingId: z.number().int().positive(), bankFxRate: z.number().finite().positive() }).strict().parse(req.body);
+      const [closing] = await db.select().from(monthlyClosings).where(and(eq(monthlyClosings.id, closingId), eq(monthlyClosings.personnelId, access.personnelId)));
+      if (!closing) return res.status(404).json({ message: "No existe un cierre mensual para ese período" });
+      const usdAmount = Number(closing.totalCostUSD ?? 0);
+      const closingFxRate = Number(closing.exchangeRateAtClose ?? 0);
+      if (usdAmount <= 0 || closingFxRate <= 0) return res.status(422).json({ message: "Este cierre no tiene un tramo USD y tipo de cambio de referencia válidos" });
+      const differenceARS = Math.round(usdAmount * (bankFxRate - closingFxRate) * 100) / 100;
+      const [declaration] = await db.transaction(async (tx) => {
+        const [row] = await tx.insert(monthlySettlementDeclarations).values({ closingId, personnelId: access.personnelId!, bankFxRate, usdAmount, closingFxRate, differenceARS, status: "pending", submittedAt: new Date(), reviewedBy: null, reviewedAt: null, reviewReason: null, updatedAt: new Date() })
+          .onConflictDoUpdate({ target: monthlySettlementDeclarations.closingId, set: { bankFxRate, usdAmount, closingFxRate, differenceARS, status: "pending", submittedAt: new Date(), reviewedBy: null, reviewedAt: null, reviewReason: null, updatedAt: new Date() } }).returning();
+        await tx.insert(monthlySettlementEvents).values({ declarationId: row.id, action: "submitted", actorUserId: access.userId, metadata: { bankFxRate, differenceARS } });
+        return [row];
+      });
+      await createUserNotifications(await operationsNotificationUserIds(), { eventKey: `monthly-settlement:${declaration.id}:${declaration.updatedAt.toISOString()}`, type: "monthly_settlement", title: "Diferencia cambiaria para revisar", message: `Una persona declaró su tipo de cambio bancario para ${closing.year}-${String(closing.month).padStart(2, "0")}.`, entityId: declaration.id });
+      res.status(201).json(declaration);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: "Datos inválidos", errors: error.errors });
+      res.status(500).json({ message: "No se pudo enviar la declaración" });
+    }
+  });
+
+  app.get("/api/monthly-settlement-declarations", requireAuth, requirePermission("operations"), async (_req, res) => {
+    const rows = await db.select({ declaration: monthlySettlementDeclarations, personName: personnel.name, closingYear: monthlyClosings.year, closingMonth: monthlyClosings.month })
+      .from(monthlySettlementDeclarations).innerJoin(personnel, eq(personnel.id, monthlySettlementDeclarations.personnelId))
+      .innerJoin(monthlyClosings, eq(monthlyClosings.id, monthlySettlementDeclarations.closingId))
+      .orderBy(desc(monthlySettlementDeclarations.submittedAt));
+    res.json(await Promise.all(rows.map(async (row) => ({ ...row, events: await db.select().from(monthlySettlementEvents).where(eq(monthlySettlementEvents.declarationId, row.declaration.id)).orderBy(desc(monthlySettlementEvents.createdAt)) }))));
+  });
+
+  app.patch("/api/monthly-settlement-declarations/:id", requireAuth, requirePermission("operations"), async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const input = z.object({ action: z.enum(["approve", "reject"]), reason: z.string().trim().max(4000).optional() }).strict().parse(req.body);
+      if (input.action === "reject" && !input.reason) return res.status(400).json({ message: "Indicá qué debe corregir la persona" });
+      const [declaration] = await db.update(monthlySettlementDeclarations).set({ status: input.action === "approve" ? "approved" : "rejected", reviewedBy: Number((req.user as any)?.id), reviewedAt: new Date(), reviewReason: input.reason ?? null, updatedAt: new Date() }).where(and(eq(monthlySettlementDeclarations.id, id), eq(monthlySettlementDeclarations.status, "pending"))).returning();
+      if (!declaration) return res.status(404).json({ message: "La declaración no existe o ya fue revisada" });
+      await db.insert(monthlySettlementEvents).values({ declarationId: id, action: input.action, actorUserId: Number((req.user as any)?.id), metadata: { reason: input.reason } });
+      const [person] = await db.select({ email: personnel.email }).from(personnel).where(eq(personnel.id, declaration.personnelId));
+      const [owner] = person?.email ? await db.select({ id: users.id }).from(users).where(sql`LOWER(TRIM(${users.email})) = LOWER(TRIM(${person.email}))`).limit(1) : [];
+      if (owner) await createUserNotifications([owner.id], { eventKey: `monthly-settlement-reviewed:${declaration.id}:${declaration.updatedAt.toISOString()}`, type: "monthly_settlement", title: input.action === "approve" ? "Conciliación aprobada" : "La conciliación requiere cambios", message: input.reason || (input.action === "approve" ? "Operaciones aprobó tu diferencia cambiaria." : "Revisá la declaración y volvé a enviarla."), entityId: declaration.id, actionUrl: "/my-invoices" });
+      res.json(declaration);
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: "Acción inválida", errors: error.errors });
+      res.status(500).json({ message: "No se pudo revisar la declaración" });
+    }
+  });
+
   app.get("/api/monthly-closings", requireAuth, requirePermission("operations"), async (req, res) => {
     try {
       const year = req.query.year ? parseInt(req.query.year as string) : new Date().getFullYear();
@@ -26112,6 +26243,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     type: z.enum(ABSENCE_TYPES),
     notes: z.string().max(4000).nullable().optional(),
+    planningStatus: z.enum(["tentative", "confirmed"]).optional().default("tentative"),
+    personnelId: z.number().int().positive().optional(),
   }).strict();
   const absenceActionSchema = z.object({
     action: z.enum(ABSENCE_ACTIONS),
@@ -26162,27 +26295,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/absence-requests/availability", requireAuth, async (req, res) => {
+    const access = await getAbsenceAccessContext(req);
+    const personnelId = Number(req.query.personnelId);
+    const from = String(req.query.from || "");
+    const to = String(req.query.to || "");
+    if (!Number.isInteger(personnelId) || !/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) return res.status(400).json({ message: "Persona o fechas inválidas" });
+    if (!access.isOperations && access.personnelId !== personnelId) return res.status(403).json({ message: "Sin permiso" });
+    const rows = await db.select({ startDate: personnelAbsences.startDate, endDate: personnelAbsences.endDate, status: personnelAbsences.status, planningStatus: personnelAbsences.planningStatus })
+      .from(personnelAbsences).where(and(eq(personnelAbsences.personnelId, personnelId), inArray(personnelAbsences.status, ["pending", "approved", "cancellation_requested"]), lte(personnelAbsences.startDate, to), gte(personnelAbsences.endDate, from)));
+    res.json({ unavailable: rows.length > 0, overlaps: rows });
+  });
+
   app.post("/api/absence-requests", requireAuth, async (req, res) => {
     try {
       const access = await getAbsenceAccessContext(req);
-      if (!access.personnelId) return res.status(409).json({ message: "Tu usuario no está vinculado con Personal" });
+      if (!access.personnelId && !access.isOperations) return res.status(409).json({ message: "Tu usuario no está vinculado con Personal" });
       const data = absenceRequestSchema.parse(req.body);
+      const personnelId = access.isOperations ? (data.personnelId ?? access.personnelId) : access.personnelId;
+      if (!personnelId) return res.status(400).json({ message: "Seleccioná una persona" });
       const holidayDates = await holidaysForRange(data.startDate, data.endDate);
       const businessDays = enumerateBusinessDays(data.startDate, data.endDate, holidayDates);
       if (businessDays.length === 0) return res.status(400).json({ message: "La solicitud no contiene días hábiles" });
       const [created] = await db.transaction(async (tx) => {
-        await tx.execute(sql`SELECT pg_advisory_xact_lock(291, ${access.personnelId!})`);
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(291, ${personnelId})`);
         const [overlap] = await tx.select({ id: personnelAbsences.id }).from(personnelAbsences).where(and(
-          eq(personnelAbsences.personnelId, access.personnelId!),
+          eq(personnelAbsences.personnelId, personnelId),
           inArray(personnelAbsences.status, ["pending", "approved", "cancellation_requested"]),
           lte(personnelAbsences.startDate, data.endDate),
           gte(personnelAbsences.endDate, data.startDate),
         )).limit(1);
         if (overlap) throw Object.assign(new Error("Ya existe una solicitud activa que se superpone con esas fechas"), { status: 409 });
         const [absence] = await tx.insert(personnelAbsences).values({
-          personnelId: access.personnelId!, startDate: data.startDate, endDate: data.endDate,
-          type: data.type, notes: data.notes || null, createdBy: access.userId, requestedBy: access.userId,
-          status: "pending", businessDays: businessDays.length,
+          personnelId, startDate: data.startDate, endDate: data.endDate,
+          type: data.type, notes: data.notes || null, createdBy: access.userId,
+          requestedBy: access.isOperations && personnelId !== access.personnelId ? null : access.userId,
+          status: "pending", planningStatus: "tentative", businessDays: businessDays.length,
         }).returning();
         await tx.insert(absenceEvents).values({
           absenceId: absence.id, eventKey: `requested:${absence.id}`, action: "requested",
@@ -26190,15 +26338,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
         return [absence];
       });
-      const [person] = await db.select({ name: personnel.name }).from(personnel).where(eq(personnel.id, access.personnelId));
+      const [person] = await db.select({ name: personnel.name, email: personnel.email }).from(personnel).where(eq(personnel.id, personnelId));
+      const [owner] = person?.email ? await db.select({ id: users.id }).from(users).where(sql`LOWER(TRIM(${users.email})) = LOWER(TRIM(${person.email}))`).limit(1) : [];
       await createUserNotifications(await operationsNotificationUserIds(), {
         eventKey: `absence-requested:${created.id}`, type: "absence_request", title: "Nueva solicitud de ausencia",
         message: `${person?.name || "Una persona"} solicitó ${businessDays.length} día(s) hábil(es).`, entityId: created.id,
+      });
+      if (access.isOperations && owner) await createUserNotifications([owner.id], {
+        eventKey: `absence-created-by-ops:${created.id}`, type: "absence_request", title: "Ausencia registrada",
+        message: `Operaciones registró una ausencia para vos (${created.startDate} al ${created.endDate}).`, entityId: created.id,
       });
       res.status(201).json(created);
     } catch (error: any) {
       if (error instanceof z.ZodError) return res.status(400).json({ message: "Datos inválidos", errors: error.errors });
       res.status(error?.status || 500).json({ message: error instanceof Error ? error.message : "Error al solicitar ausencia" });
+    }
+  });
+
+  app.patch("/api/absence-requests/:id", requireAuth, async (req, res) => {
+    try {
+      const absenceId = Number(req.params.id);
+      const access = await getAbsenceAccessContext(req);
+      const input = absenceRequestSchema.omit({ personnelId: true }).partial().strict().parse(req.body);
+      const [current] = await db.select().from(personnelAbsences).where(eq(personnelAbsences.id, absenceId));
+      if (!current) return res.status(404).json({ message: "Solicitud no encontrada" });
+      const owner = access.personnelId === current.personnelId;
+      if (!access.isOperations && !owner) return res.status(403).json({ message: "Sin permiso" });
+      if (!access.isOperations && !["pending", "approved"].includes(current.status)) return res.status(409).json({ message: "Solo podés editar solicitudes pendientes o aprobadas" });
+      const startDate = input.startDate ?? current.startDate;
+      const endDate = input.endDate ?? current.endDate;
+      if (endDate < startDate) return res.status(400).json({ message: "La fecha final debe ser posterior a la inicial" });
+      const holidayDates = await holidaysForRange(startDate, endDate);
+      const businessDays = enumerateBusinessDays(startDate, endDate, holidayDates);
+      if (!businessDays.length) return res.status(400).json({ message: "La solicitud no contiene días hábiles" });
+      const updates: any = { startDate, endDate, businessDays: businessDays.length, updatedAt: new Date() };
+      if (input.type) updates.type = input.type;
+      if (input.notes !== undefined) updates.notes = input.notes;
+      if (input.planningStatus) updates.planningStatus = input.planningStatus;
+      if (!access.isOperations && current.status === "approved") {
+        updates.status = "pending";
+        updates.reviewedBy = null;
+        updates.reviewedAt = null;
+        updates.reviewReason = null;
+      }
+      const [updated] = await db.transaction(async (tx) => {
+        const [overlap] = await tx.select({ id: personnelAbsences.id }).from(personnelAbsences).where(and(
+          eq(personnelAbsences.personnelId, current.personnelId),
+          inArray(personnelAbsences.status, ["pending", "approved", "cancellation_requested"]),
+          lte(personnelAbsences.startDate, endDate), gte(personnelAbsences.endDate, startDate),
+          sql`${personnelAbsences.id} <> ${absenceId}`,
+        )).limit(1);
+        if (overlap) throw Object.assign(new Error("Ya existe otra ausencia para esas fechas"), { status: 409 });
+        const [row] = await tx.update(personnelAbsences).set(updates).where(eq(personnelAbsences.id, absenceId)).returning();
+        await tx.insert(absenceEvents).values({ absenceId, eventKey: `edited:${absenceId}:${Date.now()}`, action: "edited", fromStatus: current.status, toStatus: updates.status ?? current.status, actorUserId: access.userId, metadata: { daysByYear: businessDaysByYear(startDate, endDate, holidayDates), planningStatus: updates.planningStatus ?? current.planningStatus } });
+        return [row];
+      });
+      if (updates.status === "pending" && current.requestedBy) await createUserNotifications(await operationsNotificationUserIds(), { eventKey: `absence-resubmitted:${absenceId}:${Date.now()}`, type: "absence_request", title: "Ausencia modificada", message: "Una solicitud aprobada fue modificada y requiere nueva aprobación.", entityId: absenceId });
+      res.json(updated);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: "Datos inválidos", errors: error.errors });
+      res.status(error?.status || 500).json({ message: error?.message || "No se pudo editar la solicitud" });
     }
   });
 
@@ -26254,7 +26453,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 AND NOT EXISTS (SELECT 1 FROM holidays holiday WHERE holiday.date = day::date)
             `);
             const used = Number((usedResult.rows[0] as any)?.used || 0);
-            const configured = allowanceType === "vacation" ? allowance?.vacationDays : allowance?.epicalDays;
+            const configured = allowanceType === "vacation" ? (allowance?.vacationDays ?? 0) + (allowance?.vacationCarryoverDays ?? 0) : allowance?.epicalDays;
             if ((configured ?? 0) - used < requestedByYear[year] && !input.allowNegativeBalance) {
               throw Object.assign(new Error(`Saldo ${year} insuficiente`), { status: 409 });
             }
@@ -26327,7 +26526,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (row.type === "vacation") used.vacation += days;
       if (row.type === "epical_day") used.epical += days;
     }
-    res.json({ configured: Boolean(allowance), personnelId, year, vacationDays: allowance?.vacationDays ?? null, epicalDays: allowance?.epicalDays ?? null, used });
+    res.json({ configured: Boolean(allowance), personnelId, year, vacationDays: allowance?.vacationDays ?? null, vacationCarryoverDays: allowance?.vacationCarryoverDays ?? 0, epicalDays: allowance?.epicalDays ?? null, used });
   });
 
   app.put("/api/absence-allowances/:personnelId/:year", requireAuth, async (req, res) => {
@@ -26335,7 +26534,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (!access.isOperations) return res.status(403).json({ message: "Se requiere Operaciones" });
     const personnelId = Number(req.params.personnelId);
     const year = Number(req.params.year);
-    const payload = z.object({ vacationDays: z.number().int().nonnegative(), epicalDays: z.number().int().nonnegative() }).strict().parse(req.body);
+    const payload = z.object({ vacationDays: z.number().int().nonnegative(), vacationCarryoverDays: z.number().int().nonnegative().default(0), epicalDays: z.number().int().nonnegative() }).strict().parse(req.body);
     const [row] = await db.insert(absenceAllowances).values({ personnelId, year, ...payload, updatedBy: access.userId })
       .onConflictDoUpdate({ target: [absenceAllowances.personnelId, absenceAllowances.year], set: { ...payload, updatedBy: access.userId, updatedAt: new Date() } }).returning();
     res.json(row);

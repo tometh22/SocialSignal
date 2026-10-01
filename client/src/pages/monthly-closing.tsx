@@ -65,6 +65,8 @@ export default function MonthlyClosing() {
         headers: { "Content-Type": "application/json" },
       }).then((r) => r.json()),
   });
+  const { data: declarations = [], refetch: refetchDeclarations } = useQuery<any[]>({ queryKey: ["monthly-settlement-declarations"], queryFn: () => fetch("/api/monthly-settlement-declarations", { credentials: "include" }).then((r) => r.ok ? r.json() : []) });
+  const declarationReview = useMutation({ mutationFn: ({ id, action, reason }: { id: number; action: string; reason?: string }) => apiRequest(`/api/monthly-settlement-declarations/${id}`, "PATCH", { action, reason }), onSuccess: () => { refetchDeclarations(); toast({ title: "Declaración revisada" }); }, onError: (error: Error) => toast({ title: "No se pudo revisar", description: error.message, variant: "destructive" }) });
   // Real hours logged per person for the month (time_entries + task_time_entries)
   const { data: realHoursMap = {} } = useQuery<Record<number, number>>({
     queryKey: ["/api/monthly-closings/real-hours", year, month + 1],
@@ -762,6 +764,12 @@ export default function MonthlyClosing() {
               </tbody>
             </table>
           )}
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader><CardTitle>Conciliación de tipo de cambio bancario</CardTitle></CardHeader>
+        <CardContent className="overflow-x-auto">
+          {!declarations.length ? <p className="text-sm text-muted-foreground">No hay declaraciones pendientes ni revisadas.</p> : <table className="w-full min-w-[760px] text-sm"><thead><tr className="border-b text-left"><th className="p-2">Persona / período</th><th className="p-2">Tramo USD</th><th className="p-2">FX cierre</th><th className="p-2">FX banco</th><th className="p-2">Diferencia ARS</th><th className="p-2">Estado</th><th className="p-2">Acción</th></tr></thead><tbody>{declarations.map((item: any) => { const row = item.declaration; return <tr key={row.id} className="border-b"><td className="p-2">{item.personName} · {MONTHS[(item.closingMonth ?? 1) - 1]} {item.closingYear}</td><td className="p-2">USD {Number(row.usdAmount).toLocaleString("en-US", { maximumFractionDigits: 2 })}</td><td className="p-2">{Number(row.closingFxRate).toLocaleString("es-AR")}</td><td className="p-2">{Number(row.bankFxRate).toLocaleString("es-AR")}</td><td className="p-2">ARS {Number(row.differenceARS).toLocaleString("es-AR", { maximumFractionDigits: 2 })}</td><td className="p-2"><Badge variant={row.status === "approved" ? "default" : row.status === "rejected" ? "destructive" : "secondary"}>{row.status === "approved" ? "Aprobada" : row.status === "rejected" ? "Rechazada" : "Pendiente"}</Badge>{row.reviewReason && <p className="mt-1 text-xs text-muted-foreground">{row.reviewReason}</p>}</td><td className="p-2">{row.status === "pending" && <div className="flex gap-1"><Button size="sm" onClick={() => declarationReview.mutate({ id: row.id, action: "approve" })}>Aprobar</Button><Button size="sm" variant="outline" onClick={() => { const reason = window.prompt("Qué debe corregir la persona?"); if (reason?.trim()) declarationReview.mutate({ id: row.id, action: "reject", reason }); }}>Rechazar</Button></div>}</td></tr>; })}</tbody></table>}
         </CardContent>
       </Card>
     </div>

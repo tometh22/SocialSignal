@@ -29,6 +29,7 @@ const NewProjectWithTooltips = lazy(() => import("@/pages/new-project-with-toolt
 const TimeEntries = lazy(() => import("@/pages/time-entries"));
 const ProjectFinancialManagement = lazy(() => import("@/pages/project-financial-management"));
 const MyInvoices = lazy(() => import("@/pages/my-invoices"));
+const PortfolioImportPage = lazy(() => import("@/pages/portfolio-import"));
 const AdminProviders = lazy(() => import("@/pages/admin-providers"));
 const ProviderDashboard = lazy(() => import("@/pages/provider/dashboard"));
 const EditProject = lazy(() => import("@/pages/edit-project"));
@@ -345,10 +346,11 @@ function AppRoutes() {
                   {/* Operations Management */}
                   <ProtectedRoute path="/operations/capacity" component={CapacityDashboard} requiredPermission="operations" />
                   <ProtectedRoute path="/operations/monthly-closing" component={MonthlyClosing} requiredPermission="operations" />
+                  <ProtectedRoute path="/operations/portfolio-import" component={PortfolioImportPage} requiredPermission="operations" />
                   <ProtectedRoute path="/operations/liquidaciones-equipo" component={TeamSettlementsPage} requiredPermission="operations" />
                   <ProtectedRoute path="/operations/estimated-rates" component={EstimatedRates} requiredPermission="operations" />
                   <ProtectedRoute path="/operations/holidays" component={HolidaysManagement} requiredPermission="operations" />
-                  <ProtectedRoute path="/operations/absences" component={() => <Redirect to="/absences" />} requiredPermission="operations" />
+                  <ProtectedRoute path="/operations/absences" component={() => <PersonnelAbsences defaultTab="team" />} requiredPermission="operations" />
                   <ProtectedRoute path="/google-sheets" component={GoogleSheetsManager} requiredPermission="admin" />
                   
                   {/* Specialized Tools */}

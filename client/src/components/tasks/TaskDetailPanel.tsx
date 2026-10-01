@@ -653,6 +653,20 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
     updateMutation.mutate({ description: value || null });
   };
 
+  const handleAssigneeChange = async (value: string) => {
+    const assigneeId = value === "none" ? null : Number(value);
+    if (assigneeId && task?.startDate && task?.dueDate) {
+      try {
+        const response = await authFetch(`/api/absence-requests/availability?personnelId=${assigneeId}&from=${task.startDate.slice(0, 10)}&to=${task.dueDate.slice(0, 10)}`);
+        if (response.ok) {
+          const availability = await response.json();
+          if (availability.unavailable) toast({ title: "Aviso: ausencia durante la tarea", description: "La persona seleccionada tiene una ausencia en este rango. Podés guardar la asignación y coordinar la cobertura.", variant: "destructive" });
+        }
+      } catch { /* Assignment remains available if the advisory lookup is unreachable. */ }
+    }
+    updateMutation.mutate({ assigneeId });
+  };
+
   if (!taskId) return null;
 
   const assignee = allPersonnel.find(p => p.id === task?.assigneeId);
@@ -754,7 +768,7 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
                     </div>
                     <Select
                       value={task.assigneeId?.toString() || "none"}
-                      onValueChange={v => updateMutation.mutate({ assigneeId: v === "none" ? null : parseInt(v) })}
+                      onValueChange={handleAssigneeChange}
                     >
                       <SelectTrigger className="h-8 text-sm flex-1 border-dashed hover:bg-accent px-2">
                         <div className="flex items-center gap-2">
