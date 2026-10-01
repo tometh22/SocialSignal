@@ -11316,15 +11316,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Crear un nuevo proyecto activo desde una cotización
   app.post("/api/active-projects/import", requireAuth, requirePermission("operations"), async (req, res) => {
     try {
-      const input = z.object({ replace: z.boolean().default(false), projects: z.array(z.object({ name: z.string().trim().min(1).max(500), clientName: z.string().trim().min(1), startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(), expectedEndDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(), trackingFrequency: z.string().optional(), notes: z.string().optional() }).strict()).min(1).max(1000) }).strict().parse(req.body);
+      const input = z.object({
+        replace: z.boolean().default(false),
+        projects: z.array(z.object({
+          name: z.string().trim().min(1).max(500), clientName: z.string().trim().min(1),
+          startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(), expectedEndDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+          trackingFrequency: z.string().optional(), notes: z.string().max(10000).optional(),
+          sections: z.array(z.object({ name: z.string().trim().min(1).max(200), tasks: z.array(z.object({ title: z.string().trim().min(1).max(500), assigneeName: z.string().trim().min(1).max(200).optional(), parent: z.boolean().optional(), parentTitle: z.string().trim().max(500).optional(), description: z.string().max(10000).optional() }).strict()).max(1000) }).strict()).max(100).optional(),
+        }).strict()).min(1).max(1000),
+      }).strict().parse(req.body);
       const allClients = await db.select({ id: clients.id, name: clients.name }).from(clients);
+      const allPersonnel = await db.select({ id: personnel.id, name: personnel.name }).from(personnel);
+      const normalizeImportName = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim().replace(/\s+/g, " ");
+      const personnelAliases: Record<string, string> = { "lola camara": "dolores camara", "lola camera": "dolores camara" };
       const mapped = input.projects.map((row) => {
-        const client = allClients.find((candidate) => candidate.name.trim().toLowerCase() === row.clientName.trim().toLowerCase());
-        if (!client) throw Object.assign(new Error(`No existe el cliente "${row.clientName}"`), { statusCode: 422 });
+        const requestedClient = normalizeImportName(row.clientName);
+        const exactClient = allClients.find((candidate) => normalizeImportName(candidate.name) === requestedClient);
+        const prefixClients = exactClient ? [] : allClients.filter((candidate) => normalizeImportName(candidate.name).startsWith(`${requestedClient} `));
+        const client = exactClient || (prefixClients.length === 1 ? prefixClients[0] : undefined);
+        if (!client) throw Object.assign(new Error(`No existe un cliente único para "${row.clientName}"`), { statusCode: 422 });
         const validCivilDate = (value?: string) => !value || Number.isFinite(new Date(`${value}T12:00:00`).getTime()) && new Date(`${value}T12:00:00`).toISOString().slice(0, 10) === value;
         if (!validCivilDate(row.startDate) || !validCivilDate(row.expectedEndDate) || (row.startDate && row.expectedEndDate && row.expectedEndDate < row.startDate)) throw Object.assign(new Error(`Fechas inválidas para el proyecto "${row.name}"`), { statusCode: 422 });
         const frequency = ["daily", "weekly", "biweekly", "monthly"].includes((row.trackingFrequency || "").toLowerCase()) ? row.trackingFrequency!.toLowerCase() : "weekly";
-        return { name: row.name.trim(), clientId: client.id, startDate: row.startDate ? new Date(`${row.startDate}T12:00:00`) : new Date(), expectedEndDate: row.expectedEndDate ? new Date(`${row.expectedEndDate}T12:00:00`) : null, trackingFrequency: frequency, notes: row.notes || null, status: "active", projectCategory: "billable", workflowStage: "aprobado", createdBy: req.user?.id ?? null };
+        const sections = (row.sections || []).map((section) => ({ name: section.name, tasks: section.tasks.map((task) => {
+          if (!task.assigneeName) return { ...task, assigneeId: null };
+          const requestedName = normalizeImportName(task.assigneeName);
+          const aliasName = personnelAliases[requestedName] || requestedName;
+          const person = allPersonnel.find((candidate) => normalizeImportName(candidate.name) === aliasName);
+          if (!person) throw Object.assign(new Error(`No encontré el responsable "${task.assigneeName}" del proyecto "${row.name}"`), { statusCode: 422 });
+          return { ...task, assigneeId: person.id };
+        }) }));
+        const memberIds = [...new Set(sections.flatMap((section) => section.tasks.flatMap((task) => task.assigneeId ? [task.assigneeId] : [])))];
+        return { project: { name: row.name.trim(), clientId: client.id, startDate: row.startDate ? new Date(`${row.startDate}T12:00:00`) : new Date(), expectedEndDate: row.expectedEndDate ? new Date(`${row.expectedEndDate}T12:00:00`) : null, trackingFrequency: frequency, notes: row.notes || null, status: "active", projectCategory: client.name.toLowerCase() === "epical" ? "internal" : "billable", internalType: client.name.toLowerCase() === "epical" ? "general" : null, workflowStage: "aprobado", createdBy: req.user?.id ?? null }, sections, memberIds };
       });
       const result = await db.transaction(async (tx) => {
         let archived = 0;
@@ -11332,10 +11355,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const previous = await tx.update(activeProjects).set({ status: "voided", isFinished: true, closedAt: new Date(), closedBy: req.user?.id ?? null, updatedAt: new Date() }).where(inArray(activeProjects.status, ["active", "on_hold", "on-hold", "planning"])).returning({ id: activeProjects.id });
           archived = previous.length;
         }
-        const created = await tx.insert(activeProjects).values(mapped).returning({ id: activeProjects.id, name: activeProjects.name, clientId: activeProjects.clientId });
-        return { archived, created };
+        const created = [] as Array<{ id: number; name: string | null; clientId: number; tasksCreated: number; membersAdded: number }>;
+        let tasksCreated = 0;
+        let membersAdded = 0;
+        for (const item of mapped) {
+          const [project] = await tx.insert(activeProjects).values(item.project).returning({ id: activeProjects.id, name: activeProjects.name, clientId: activeProjects.clientId });
+          if (item.memberIds.length) {
+            await tx.insert(taskProjectMembers).values(item.memberIds.map((personnelId) => ({ projectId: project.id, personnelId, role: "member" }))).onConflictDoNothing();
+            membersAdded += item.memberIds.length;
+          }
+          for (const section of item.sections) {
+            let parentTaskId: number | null = null;
+            for (let position = 0; position < section.tasks.length; position += 1) {
+              const task = section.tasks[position];
+              const insertedTaskRows: Array<{ id: number }> = await tx.insert(tasks).values({
+                title: task.title, description: task.description || null, projectId: project.id, sectionName: section.name,
+                assigneeId: task.assigneeId, collaboratorIds: [], startDate: null, dueDate: null, estimatedHours: null, loggedHours: 0,
+                status: "todo", priority: "medium", parentTaskId: task.parent ? null : (task.parentTitle && parentTaskId ? parentTaskId : null),
+                position, createdBy: req.user?.id ?? null,
+              }).returning({ id: tasks.id });
+              if (task.parent) parentTaskId = insertedTaskRows[0].id;
+              tasksCreated += 1;
+            }
+          }
+          created.push({ ...project, tasksCreated: item.sections.reduce((sum, section) => sum + section.tasks.length, 0), membersAdded: item.memberIds.length });
+        }
+        return { archived, created, tasksCreated, membersAdded };
       });
-      res.status(201).json({ created: result.created.length, archived: result.archived, projects: result.created });
+      res.status(201).json({ created: result.created.length, archived: result.archived, tasksCreated: result.tasksCreated, membersAdded: result.membersAdded, projects: result.created });
     } catch (error: any) {
       if (error instanceof z.ZodError) return res.status(400).json({ message: "Revisá el mapeo y las filas del archivo", errors: error.errors });
       res.status(error?.statusCode || 500).json({ message: error?.message || "No se pudo importar la cartera" });
