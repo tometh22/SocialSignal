@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.10.1 — 2026-10-01
+
+- Permite elegir la hoja de un Excel al importar la cartera y procesa la estructura de proyectos Asana con secciones, tareas, responsables y subtareas.
+- Valida responsables contra Personal y resuelve clientes con un único prefijo coincidente antes de habilitar el reemplazo reversible.
+
 ## 1.10.0 — 2026-10-01
 
 - Agrega cumpleaños en Personal y Home, gestión de ausencias para Operaciones con planificación tentativa/confirmada, traslados de vacaciones, solicitudes para terceros y vista anual con filtro por persona.
