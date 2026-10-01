@@ -130,6 +130,8 @@ export default function MyInvoices() {
       <p className="mt-1 max-w-3xl text-sm text-muted-foreground">Operaciones calcula tu liquidación. Vos emitís cada factura en su momento y Administración la compara con el importe esperado antes de registrarla en Pasivo.</p>
     </div>
 
+    <MonthlyClosingDeclarations />
+
     <div className="grid gap-3 md:grid-cols-4">
       <Step number={1} label="Cierre operativo" detail="Costo del mes" done={Boolean(summary?.isClosed)} />
       <Step number={2} label="Liquidación" detail="Operaciones publica" done={Boolean(settlement)} />
@@ -167,6 +169,38 @@ export default function MyInvoices() {
 
     <Card><CardHeader className="pb-3"><CardTitle className="text-base">Historial del período</CardTitle></CardHeader><CardContent className="space-y-3">{!periodInvoices.length ? <p className="py-4 text-sm text-muted-foreground">Todavía no enviaste facturas para este período.</p> : periodInvoices.map((invoice) => <InvoiceStatus key={invoice.id} invoice={invoice} />)}</CardContent></Card>
   </div>;
+}
+
+type ClosingDeclarationRow = {
+  closingId: number; year: number; month: number; billingCurrency: string;
+  usdBillingFraction: number; amountUSD: number; amountARS: number; closingFxRate: number | null;
+  declaration: null | { id: number; bankFxRate: number; differenceARS: number; status: string; reviewReason?: string | null; events?: Array<{ action: string; createdAt: string }> };
+};
+
+function MonthlyClosingDeclarations() {
+  const { toast } = useToast();
+  const client = useQueryClient();
+  const query = useQuery<ClosingDeclarationRow[]>({ queryKey: ["my-monthly-settlement-declarations"], queryFn: () => authFetchJson("/api/me/monthly-settlement-declarations") });
+  const [rates, setRates] = useState<Record<number, string>>({});
+  const mutation = useMutation({
+    mutationFn: ({ closingId, bankFxRate }: { closingId: number; bankFxRate: number }) => authFetchJson("/api/me/monthly-settlement-declarations", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ closingId, bankFxRate }) }),
+    onSuccess: () => { client.invalidateQueries({ queryKey: ["my-monthly-settlement-declarations"] }); toast({ title: "Declaración enviada a Operaciones" }); },
+    onError: (error: Error) => toast({ title: "No se pudo enviar", description: error.message, variant: "destructive" }),
+  });
+  return <Card><CardHeader><CardTitle className="text-base">Declaración de tipo de cambio bancario</CardTitle><p className="text-sm text-muted-foreground">El cierre original permanece fijo. Informá el tipo de cambio bancario para calcular la diferencia de tu tramo USD; Operaciones revisará la declaración.</p></CardHeader><CardContent className="space-y-3">{query.data?.filter((row) => row.amountUSD > 0).map((row) => {
+    const rate = Number(rates[row.closingId] ?? row.declaration?.bankFxRate ?? "");
+    const difference = Number.isFinite(rate) && row.closingFxRate ? row.amountUSD * (rate - row.closingFxRate) : null;
+    return <div key={row.closingId} className="grid gap-3 rounded-lg border p-3 sm:grid-cols-[1fr_1fr_1fr_1.2fr_auto] sm:items-end">
+      <div><p className="text-xs text-muted-foreground">Período</p><p className="font-medium">{periodLabel(`${row.year}-${String(row.month).padStart(2, "0")}`)}</p></div>
+      <Summary label="Tramo USD" value={money(row.amountUSD, "USD")} detail={`${Math.round(row.usdBillingFraction * 100)}% de la configuración`} />
+      <Summary label="FX de cierre" value={row.closingFxRate ? row.closingFxRate.toLocaleString("es-AR") : "—"} detail="Referencia congelada" />
+      <div><Label>FX recibido por banco</Label><Input type="number" min="0.01" step="0.01" value={rates[row.closingId] ?? (row.declaration?.bankFxRate ? String(row.declaration.bankFxRate) : "")} onChange={(event) => setRates({ ...rates, [row.closingId]: event.target.value })} /><p className="mt-1 text-xs text-muted-foreground">Diferencia: {difference == null ? "—" : money(difference, "ARS")}</p></div>
+      {row.declaration && <Badge variant="outline">{row.declaration.status === "approved" ? "Aprobada" : row.declaration.status === "rejected" ? "Requiere corrección" : "Pendiente"}</Badge>}
+      <Button disabled={!rate || mutation.isPending || row.declaration?.status === "approved"} onClick={() => mutation.mutate({ closingId: row.closingId, bankFxRate: rate })}>{row.declaration?.status === "rejected" ? "Corregir y reenviar" : "Enviar"}</Button>
+      {row.declaration?.reviewReason && <p className="text-xs text-rose-700 sm:col-span-5">Respuesta de Operaciones: {row.declaration.reviewReason}</p>}
+      {!!row.declaration?.events?.length && <p className="text-[11px] text-muted-foreground sm:col-span-5">Historial: {row.declaration.events.map((event) => `${event.action} · ${new Date(event.createdAt).toLocaleDateString("es-AR")}`).join(" → ")}</p>}
+    </div>;
+  })}{query.data?.filter((row) => row.amountUSD > 0).length === 0 && <p className="text-sm text-muted-foreground">Todavía no hay cierres con tramo USD para declarar.</p>}</CardContent></Card>;
 }
 
 function InvoiceUpload({ period, component, currency, expected, existing, enabled, onSaved }: { period: string; component: InvoiceComponent; currency: "ARS" | "USD"; expected: number; existing: InvoiceRow | null; enabled: boolean; onSaved: () => void }) {

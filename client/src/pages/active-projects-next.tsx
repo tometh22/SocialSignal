@@ -975,11 +975,10 @@ export default function ActiveProjectsNext() {
             </>
           }
           actions={
-            <Button asChild>
-              <Link href="/active-projects/new">
-                <Plus className="h-4 w-4" />Nuevo proyecto
-              </Link>
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              {isOperations && <Button asChild variant="outline"><Link href="/operations/portfolio-import"><Database className="h-4 w-4" />Importar cartera</Link></Button>}
+              <Button asChild><Link href="/active-projects/new"><Plus className="h-4 w-4" />Nuevo proyecto</Link></Button>
+            </div>
           }
           aside={
             <div className={cn(

@@ -38,11 +38,26 @@ export default function HomeDashboard() {
   const canCreateQuotation = hasPermission("quotations");
 
   const { data: projectCount } = useQuery<number>({
-    queryKey: ["/api/active-projects/count"],
-    queryFn: () => authFetch("/api/active-projects/count")
-      .then(r => r.json()).then(d => d.count || 0).catch(() => 0),
+    queryKey: ["/api/tasks/projects", "home-count"],
+    queryFn: () => authFetch("/api/tasks/projects?status=active&scope=mine")
+      .then(r => r.json()).then((projects: any[]) => Array.isArray(projects) ? projects.length : 0).catch(() => 0),
     enabled: canAccessTasks,
   });
+
+  const { data: personnel = [] } = useQuery<any[]>({
+    queryKey: ["/api/personnel", "birthday"],
+    queryFn: () => authFetch("/api/personnel").then(r => r.ok ? r.json() : []),
+  });
+  const myPersonnel = personnel.find((person) => person.id === (user as any)?.personnelId)
+    ?? personnel.find((person) => person.email?.trim().toLowerCase() === user?.email?.trim().toLowerCase());
+  const birthday = myPersonnel?.birthday ? (() => {
+    const [month, day] = String(myPersonnel.birthday).slice(5, 10).split("-").map(Number);
+    const today = new Date();
+    const next = new Date(today.getFullYear(), month - 1, day);
+    if (next < new Date(today.getFullYear(), today.getMonth(), today.getDate())) next.setFullYear(next.getFullYear() + 1);
+    const days = Math.round((next.getTime() - new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime()) / 86400000);
+    return { date: next.toLocaleDateString("es-AR", { day: "numeric", month: "long" }), days };
+  })() : null;
 
   const { data: quotationStats } = useQuery<{ total: number; pending: number; draft: number }>({
     queryKey: ["/api/quotations/stats"],
@@ -228,6 +243,7 @@ export default function HomeDashboard() {
           </>
         ) : undefined}
       />
+      {birthday && <Card className="border-pink-200 bg-pink-50/60"><CardContent className="flex items-center gap-3 p-3 text-sm text-pink-950"><span aria-hidden="true">🎂</span><span><strong>Tu cumpleaños:</strong> {birthday.date}{birthday.days === 0 ? " · ¡hoy!" : birthday.days === 1 ? " · mañana" : ` · en ${birthday.days} días`}</span></CardContent></Card>}
 
       {/* Resumen operativo */}
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">

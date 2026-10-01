@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.10.0 — 2026-10-01
+
+- Agrega cumpleaños en Personal y Home, gestión de ausencias para Operaciones con planificación tentativa/confirmada, traslados de vacaciones, solicitudes para terceros y vista anual con filtro por persona.
+- Clasifica tareas por fechas, incorpora el grupo Sin fecha, mejora la actualización de Calendario, advierte sobre asignaciones durante ausencias y permite duplicar secciones.
+- Agrega templates iniciales semanales, mensuales y one-shot para proyectos, selección de PM y miembros, e importación de cartera con mapeo y vista previa.
+- Incorpora la declaración de tipo de cambio bancario del colaborador con cálculo de diferencia, aprobación/rechazo de Operaciones e historial.
+- Aclara fórmulas de impacto en cotizaciones, separa formato de entregable e identidad visual, habilita asignación directa de freelancers y distingue costo estimado del costo real.
+
 ## 1.9.3 — 2026-09-16
 
 - Corrige los contadores de personas por rol para que respeten el área, excluyan freelancers y no cuenten personas cuyo período activo ya terminó.

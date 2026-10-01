@@ -269,6 +269,7 @@ export const personnel = pgTable("personnel", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   email: text("email"), // Email opcional
+  birthday: text("birthday"), // YYYY-MM-DD; the year is ignored for recurring reminders
   roleId: integer("role_id").notNull().references(() => roles.id),
   // Rol vigente y subnivel provenientes de la mirada Nueva Epica.
   // roleId se conserva como compatibilidad para cotizaciones y templates legacy.
@@ -1438,6 +1439,7 @@ export const personnelAbsences = pgTable("personnel_absences", {
   createdBy: integer("created_by").references(() => users.id, { onDelete: 'set null' }),
   requestedBy: integer("requested_by").references(() => users.id, { onDelete: 'set null' }),
   status: text("status").notNull().default('pending'),
+  planningStatus: text("planning_status").notNull().default('tentative'), // tentative | confirmed, independent of approval
   businessDays: integer("business_days").notNull().default(0),
   reviewedBy: integer("reviewed_by").references(() => users.id, { onDelete: 'set null' }),
   reviewedAt: timestamp("reviewed_at"),
@@ -1464,6 +1466,7 @@ export const absenceAllowances = pgTable("absence_allowances", {
   personnelId: integer("personnel_id").notNull().references(() => personnel.id, { onDelete: 'cascade' }),
   year: integer("year").notNull(),
   vacationDays: integer("vacation_days").notNull().default(0),
+  vacationCarryoverDays: integer("vacation_carryover_days").notNull().default(0),
   epicalDays: integer("epical_days").notNull().default(0),
   updatedBy: integer("updated_by").references(() => users.id, { onDelete: 'set null' }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -1540,6 +1543,33 @@ export const insertMonthlyClosingSchema = createInsertSchema(monthlyClosings).om
 
 export type MonthlyClosing = typeof monthlyClosings.$inferSelect;
 export type InsertMonthlyClosing = z.infer<typeof insertMonthlyClosingSchema>;
+
+// Employee declaration against an immutable monthly-closing snapshot.
+export const monthlySettlementDeclarations = pgTable("monthly_settlement_declarations", {
+  id: serial("id").primaryKey(),
+  closingId: integer("closing_id").notNull().references(() => monthlyClosings.id, { onDelete: "cascade" }).unique(),
+  personnelId: integer("personnel_id").notNull().references(() => personnel.id, { onDelete: "cascade" }),
+  bankFxRate: doublePrecision("bank_fx_rate").notNull(),
+  usdAmount: doublePrecision("usd_amount").notNull(),
+  closingFxRate: doublePrecision("closing_fx_rate").notNull(),
+  differenceARS: doublePrecision("difference_ars").notNull(),
+  status: text("status").notNull().default("pending"), // pending | approved | rejected
+  submittedAt: timestamp("submitted_at").notNull().defaultNow(),
+  reviewedBy: integer("reviewed_by").references(() => users.id, { onDelete: "set null" }),
+  reviewedAt: timestamp("reviewed_at"),
+  reviewReason: text("review_reason"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const monthlySettlementEvents = pgTable("monthly_settlement_events", {
+  id: serial("id").primaryKey(),
+  declarationId: integer("declaration_id").notNull().references(() => monthlySettlementDeclarations.id, { onDelete: "cascade" }),
+  action: text("action").notNull(),
+  actorUserId: integer("actor_user_id").references(() => users.id, { onDelete: "set null" }),
+  metadata: jsonb("metadata").$type<Record<string, unknown>>().default({}),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
 
 // ==================== PROYECTOS ACTIVOS ====================
 // Proyectos Activos

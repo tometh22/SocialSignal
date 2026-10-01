@@ -1347,6 +1347,8 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
     queryClient.invalidateQueries({ queryKey: ["/api/tasks/my-tasks"] });
     queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
     queryClient.invalidateQueries({ queryKey: ["/api/tasks/projects"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/tasks/team-calendar"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/tasks/project", projectId] });
   };
 
   const toggleMutation = useMutation({

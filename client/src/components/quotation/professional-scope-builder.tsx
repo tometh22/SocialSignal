@@ -13,6 +13,7 @@ import { useOptimizedQuote } from "@/context/optimized-quote-context";
 import type { ServiceBlueprint } from "@shared/schema";
 import {
   applyHistoricalEffortBenchmark,
+  blueprintEffortFactorBreakdown,
   blueprintDefinitionSchema,
   canonicalProjectTypeForModality,
   estimateBlueprintWorkload,
@@ -374,15 +375,20 @@ export function ProfessionalScopeBuilder({ mode = "all", headless = false }: { m
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 <div className="space-y-2"><Label>Nivel de impacto</Label><Select value={scope.coverage.impactLevel} onValueChange={(value: any) => updateScope({ ...scope, coverage: { ...scope.coverage, impactLevel: value } })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="low">Bajo</SelectItem><SelectItem value="medium">Medio</SelectItem><SelectItem value="high">Alto</SelectItem><SelectItem value="critical">Crítico</SelectItem></SelectContent></Select></div>
                 <div className="space-y-2"><Label>Tiempo de respuesta</Label><Select value={scope.coverage.slaLevel} onValueChange={(value: any) => updateScope({ ...scope, coverage: { ...scope.coverage, slaLevel: value } })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="standard">Estándar</SelectItem><SelectItem value="priority">Prioritario</SelectItem><SelectItem value="real_time">Tiempo real</SelectItem></SelectContent></Select></div>
-                <div className="space-y-2"><Label>Nivel de presentación</Label><Select value={scope.coverage.designLevel} onValueChange={(value: any) => updateScope({ ...scope, coverage: { ...scope.coverage, designLevel: value } })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="standard">Estándar</SelectItem><SelectItem value="branded">Con identidad de marca</SelectItem><SelectItem value="executive">Ejecutivo</SelectItem></SelectContent></Select></div>
+                <div className="space-y-2"><Label>Diseño e identidad visual</Label><Select value={scope.coverage.designLevel} onValueChange={(value: any) => updateScope({ ...scope, coverage: { ...scope.coverage, designLevel: value } })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="standard">Estándar</SelectItem><SelectItem value="branded">Con identidad de marca</SelectItem><SelectItem value="executive">Ejecutivo</SelectItem></SelectContent></Select></div>
                 <div className="space-y-2"><Label>Idiomas</Label><Select value={scope.coverage.languages.join("+")} onValueChange={(value) => updateScope({ ...scope, coverage: { ...scope.coverage, languages: value === "es+en" ? ["es", "en"] : [value as "es" | "en"] } })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="es">Español</SelectItem><SelectItem value="en">Inglés</SelectItem><SelectItem value="es+en">Español + inglés</SelectItem></SelectContent></Select></div>
+              </div>
+              <div className="rounded-lg border border-indigo-100 bg-indigo-50/60 p-3">
+                <p className="text-xs font-semibold text-indigo-950">Cómo se calculan las horas</p>
+                <p className="mt-1 text-xs text-indigo-900">Entregables: horas base por rol × cantidad × producto de los factores. El setup conserva sus horas base (factor ×1). Cada factor es un multiplicador; 1,00 no cambia las horas.</p>
+                <div className="mt-2 flex flex-wrap gap-1.5">{blueprintEffortFactorBreakdown(scope).map((item) => <Badge key={item.label} variant="outline" className="bg-white">{item.label}: ×{item.value.toLocaleString("es-AR", { maximumFractionDigits: 2 })}</Badge>)}<Badge className="bg-indigo-700">Factor combinado: ×{estimateBlueprintWorkload(scope).factor.toLocaleString("es-AR", { maximumFractionDigits: 2 })}</Badge></div>
               </div>
             </CardContent>
           </Card>
           </div>
           <div className="space-y-5">
           <Card>
-            <CardHeader><CardTitle className="text-base">Entregables y frecuencia</CardTitle></CardHeader>
+            <CardHeader><CardTitle className="text-base">Formato de entrega y frecuencia</CardTitle><p className="text-sm text-slate-500">Elegí el tipo y la cantidad de piezas; el diseño e identidad visual se configura por separado en Cobertura.</p></CardHeader>
             <CardContent className="space-y-3">
               {/* La cadencia pasó de badge a selector: necesita algo más de
                   ancho que la columna original de 7rem. */}

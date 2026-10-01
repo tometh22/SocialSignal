@@ -339,7 +339,7 @@ const EnhancedTeamConfig: React.FC<EnhancedTeamConfigProps> = ({ validationMessa
   // freelancers siguen siendo visibles en otras pantallas y en cotizaciones
   // históricas; acá se trata únicamente de la asignación estándar del rol.
   const roleAssignablePersonnel = availablePersonnel.filter((person) => person.contractType !== 'freelance');
-  const filteredPersonnel = roleAssignablePersonnel.filter((person) =>
+  const filteredPersonnel = availablePersonnel.filter((person) =>
     person.name.toLocaleLowerCase('es').includes(normalizedPersonnelSearch) ||
     (person.currentRole || '').toLocaleLowerCase('es').includes(normalizedPersonnelSearch),
   );
@@ -671,7 +671,7 @@ const EnhancedTeamConfig: React.FC<EnhancedTeamConfigProps> = ({ validationMessa
               <p className="mt-1 text-xs text-slate-500">
                 {selectedQuickPersonnel.size > 0
                   ? `${selectedQuickPersonnel.size} persona${selectedQuickPersonnel.size > 1 ? 's' : ''} seleccionada${selectedQuickPersonnel.size > 1 ? 's' : ''}`
-                  : 'Elegí una o más personas de la lista'
+                  : 'Elegí personas para asignarlas directamente; las freelancers no modifican los promedios de roles'
                 }
               </p>
             </div>
@@ -725,6 +725,7 @@ const EnhancedTeamConfig: React.FC<EnhancedTeamConfigProps> = ({ validationMessa
                     <div className="min-w-0 flex-grow">
                       <div className={`flex flex-wrap items-center gap-1 font-medium ${isAlreadyInTeam ? 'text-slate-400' : 'text-slate-950'}`}>
                         <span className="truncate">{person.name}</span>
+                        {person.contractType === 'freelance' && <span className="flex-shrink-0 rounded bg-violet-100 px-1 py-0 text-[10px] font-semibold text-violet-800">Freelance · directo</span>}
                         {(person as any).billingCurrency === 'USD' && (
                           <span className="flex-shrink-0 rounded bg-indigo-100 px-1 py-0 text-[10px] font-semibold text-indigo-700">USD</span>
                         )}

@@ -85,8 +85,20 @@ function capitalize(str: string) {
 }
 
 function isOverdue(task: Task) {
-  const dueDate = parseCivilTaskDate(task.dueDate);
-  return dueDate && dueDate < new Date() && task.status !== "done";
+  return task.status !== "done" && task.status !== "cancelled" && Boolean(task.dueDate && task.dueDate.slice(0, 10) < format(new Date(), "yyyy-MM-dd"));
+}
+
+type ActiveTaskBucket = "upcoming" | "in_progress" | "overdue" | "no_date";
+function taskBucket(task: Task): ActiveTaskBucket | null {
+  if (task.status === "done" || task.status === "cancelled") return null;
+  const today = format(new Date(), "yyyy-MM-dd");
+  const start = task.startDate?.slice(0, 10) || null;
+  const due = task.dueDate?.slice(0, 10) || null;
+  if (!start && !due) return "no_date";
+  if (due && due < today) return "overdue";
+  if (start && start > today) return "upcoming";
+  if (!start && due && due > today) return "upcoming";
+  return "in_progress";
 }
 
 function completedThisWeek(task: Task) {
@@ -302,7 +314,7 @@ function HomeTaskRow({
 }
 
 // ── Tab bar ───────────────────────────────────────────────────────────
-type TabValue = "upcoming" | "in_progress" | "overdue" | "done";
+type TabValue = "upcoming" | "in_progress" | "overdue" | "no_date" | "done";
 
 function TabBar({
   active,
@@ -311,7 +323,7 @@ function TabBar({
 }: {
   active: string;
   onChange: (v: TabValue) => void;
-  counts: { upcoming: number; in_progress: number; overdue: number; done: number };
+  counts: { upcoming: number; in_progress: number; overdue: number; no_date: number; done: number };
 }) {
   return (
     <div className="flex max-w-full gap-0 overflow-x-auto border-b border-border">
@@ -319,6 +331,7 @@ function TabBar({
         ["upcoming",    "Próximas"],
         ["in_progress", "En curso"],
         ["overdue",     "Con retraso"],
+        ["no_date",     "Sin fecha"],
         ["done",        "Finalizadas"],
       ] as const).map(([val, label]) => (
         <button
@@ -433,17 +446,16 @@ export default function TasksHomePage() {
   const projects: TaskProject[] = Array.isArray(rawProjects) ? rawProjects : [];
 
   const taskCounts = {
-    upcoming: myTasks.filter(t => t.status !== "done" && t.status !== "cancelled" && t.status !== "in_progress" && t.status !== "in_review" && t.status !== "blocked" && !isOverdue(t)).length,
-    in_progress: myTasks.filter(t => t.status === "in_progress" || t.status === "in_review" || t.status === "blocked").length,
-    overdue: myTasks.filter(t => !!isOverdue(t) && t.status !== "done").length,
+    upcoming: myTasks.filter(t => taskBucket(t) === "upcoming").length,
+    in_progress: myTasks.filter(t => taskBucket(t) === "in_progress").length,
+    overdue: myTasks.filter(t => taskBucket(t) === "overdue").length,
+    no_date: myTasks.filter(t => taskBucket(t) === "no_date").length,
     done: myTasks.filter(completedThisWeek).length,
   };
 
   const filteredMyTasks = myTasks.filter(t => {
     if (myTab === "done") return completedThisWeek(t);
-    if (myTab === "overdue") return !!isOverdue(t) && t.status !== "done";
-    if (myTab === "in_progress") return t.status === "in_progress" || t.status === "in_review" || t.status === "blocked";
-    return t.status !== "done" && t.status !== "cancelled" && t.status !== "in_progress" && t.status !== "in_review" && t.status !== "blocked" && !isOverdue(t);
+    return taskBucket(t) === myTab;
   });
 
   const recentProjects = projects.slice(0, 6);
@@ -602,7 +614,7 @@ export default function TasksHomePage() {
                   <Check className="h-4 w-4 text-muted-foreground/30" />
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  {myTab === "done" ? "Sin tareas completadas" : myTab === "overdue" ? "Sin tareas vencidas" : myTab === "in_progress" ? "Sin tareas en curso" : "No tenés tareas pendientes"}
+                  {myTab === "done" ? "Sin tareas completadas" : myTab === "overdue" ? "Sin tareas vencidas" : myTab === "in_progress" ? "Sin tareas en curso" : myTab === "no_date" ? "No hay tareas activas sin fecha" : "No tenés tareas pendientes"}
                 </p>
               </div>
             ) : (
