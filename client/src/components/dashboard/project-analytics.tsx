@@ -271,7 +271,7 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
                       const estimatedHours = member.hours || 0;
                       const memberCost = member.cost || 0;
                       const percentOfTeam = (completeData?.quotation?.estimatedHours ?? 0) > 0 
-                        ? ((estimatedHours / completeData!.quotation.estimatedHours) * 100).toFixed(1)
+                        ? ((estimatedHours / (completeData!.quotation.estimatedHours ?? 1)) * 100).toFixed(1)
                         : '0';
 
                       return (
@@ -338,7 +338,7 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
                       const hourlyRate = member.rate || 0;
                       const memberCost = member.cost || 0;
                       const percentOfTeam = (completeData?.quotation?.estimatedHours ?? 0) > 0 
-                        ? ((estimatedHours / completeData!.quotation.estimatedHours) * 100).toFixed(1)
+                        ? ((estimatedHours / (completeData!.quotation.estimatedHours ?? 1)) * 100).toFixed(1)
                         : '0';
 
                       return (

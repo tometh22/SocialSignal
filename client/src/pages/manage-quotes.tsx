@@ -1,3 +1,4 @@
+import { quotationProjectTypeLabel, quotationPriceLabel } from "@shared/utils/quotation-display";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
@@ -886,8 +887,7 @@ export default function ManageQuotes() {
                                     {quote.projectType && (
                                       <span className="flex items-center gap-1">
                                         <Briefcase className="h-3.5 w-3.5" />
-                                        {quote.projectType === 'credit-pack' ? 'Bolsa de créditos' : quote.projectType === 'always-on' ? 'Always-On' :
-                                         quote.projectType === 'monitoring' ? 'Monitoreo' : 'One-Shot'}
+                                        {quotationProjectTypeLabel(quote.projectType)}
                                       </span>
                                     )}
                                     {teamMembersCount > 0 && (
@@ -906,7 +906,7 @@ export default function ManageQuotes() {
                                   {/* Price section with better visual hierarchy */}
                                   <div className="mb-3">
                                     <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">
-                                      {quote.projectType === 'always-on' ? 'Precio Mensual' : 'Precio Total'}
+                                      {quotationPriceLabel(quote.projectType)}
                                     </p>
                                     <p className="text-2xl font-bold text-gray-900">
                                       {(() => {

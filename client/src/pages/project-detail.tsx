@@ -12,6 +12,7 @@ import { AlertTriangle, BarChart3, TrendingUp, Receipt, ListTodo, Users, LayoutD
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
+import { formatEstimatedHours, quotationProjectTypeLabel, formatQuotationAmount } from "@shared/utils/quotation-display";
 
 import { useCompleteProjectData } from "@/hooks/useCompleteProjectData";
 import { toProjectVM } from "@/selectors/projectVM";
@@ -28,7 +29,7 @@ const fmt = (n: number | null | undefined, prefix = "$") =>
   : `${prefix}${Math.abs(Math.round(n)).toLocaleString("es-AR")}`;
 
 const fmtHours = (n: number | null | undefined) =>
-  n == null || !Number.isFinite(n) ? "—" : `${n.toFixed(2)} h`;
+  formatEstimatedHours(n);
 
 // ─── Tab definitions ──────────────────────────────────────────────────────────
 
@@ -219,14 +220,14 @@ function QuotationSummaryCard({
       <div className="p-4 grid grid-cols-2 gap-3">
         {hasQuotation && canSeeCosts && (
           <>
-            <Stat label="Precio cotizado" value={fmt(quotation.totalAmount)} />
-            <Stat label="Costo base" value={fmt(quotation.baseCost)} />
+            <Stat label="Precio cotizado" value={formatQuotationAmount(quotation.totalAmount, quotation.quotationCurrency)} />
+            <Stat label="Costo base" value={formatQuotationAmount(quotation.baseCost, quotation.quotationCurrency)} />
           </>
         )}
         {hasQuotation && (
           <>
             <Stat label="Horas estimadas" value={fmtHours(quotation.estimatedHours)} />
-            <Stat label="Tipo" value={(quotation.quotationType || "—").toString()} capitalize />
+            <Stat label="Tipo" value={quotationProjectTypeLabel(quotation.projectType, quotation.quotationType)} capitalize />
           </>
         )}
         {!hasQuotation && (
@@ -370,7 +371,7 @@ export default function ProjectDetail() {
   const margin           = vm.margin ?? 0;
   const totalHours       = vm.totalHours ?? 0;
   const estimatedHours   = vm.estimatedHours ?? q?.estimatedHours ?? 0;
-  const budget           = q?.totalAmount ?? (unifiedData.project as any)?.budget ?? 0;
+  const budget           = (unifiedData.project as any)?.cotizacion ?? q?.totalAmount ?? (unifiedData.project as any)?.budget ?? 0;
   const budgetUtil       = m?.budgetUtilization ?? (budget > 0 ? (cost / budget) * 100 : 0);
   const hoursDeviation   = m?.hoursDeviation ?? (estimatedHours > 0 ? ((totalHours - estimatedHours) / estimatedHours) * 100 : 0);
   const costDeviation    = m?.costDeviation ?? 0;

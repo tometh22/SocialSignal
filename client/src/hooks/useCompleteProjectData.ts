@@ -37,7 +37,10 @@ interface CompleteProjectData {
     projectName: string;
     baseCost: number;
     totalAmount: number;
-    estimatedHours: number;
+    estimatedHours: number | null;
+    projectType?: string | null;
+    quotationType?: string | null;
+    quotationCurrency?: string | null;
     team: Array<{
       id: number;
       personnelId: number;

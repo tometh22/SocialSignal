@@ -1,3 +1,4 @@
+import { formatQuotationAmount } from "@shared/utils/quotation-display";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Archive, Loader2, RotateCcw } from "lucide-react";
@@ -16,14 +17,14 @@ type ArchivedQuotation = {
   clientName: string | null;
   status: string;
   totalAmount: number | null;
+  quotationCurrency: string;
   archivedAt: string;
 };
 
 const formatDate = (value: string) =>
   new Intl.DateTimeFormat("es-AR", { dateStyle: "short", timeStyle: "short" }).format(new Date(value));
 
-const formatAmount = (value: number | null) =>
-  value == null ? "—" : new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 0 }).format(value);
+
 
 /**
  * Lista + restaurar, sin el envoltorio de diálogo. Ninguna otra pantalla
@@ -72,7 +73,7 @@ function ArchivedQuotationsBody() {
           <span className="min-w-0 flex-1 truncate font-medium">{quote.projectName}</span>
           <span className="hidden truncate text-xs text-muted-foreground sm:inline">{quote.clientName || "Sin cliente"}</span>
           <Badge variant="outline" className="shrink-0 text-[10px]">{statusLabel(quote.status)}</Badge>
-          <span className="shrink-0 text-xs text-muted-foreground">{formatAmount(quote.totalAmount)}</span>
+          <span className="shrink-0 text-xs text-muted-foreground">{formatQuotationAmount(quote.totalAmount, quote.quotationCurrency)}</span>
           <span className="shrink-0 text-xs text-muted-foreground">archivada {formatDate(quote.archivedAt)}</span>
           <Button
             size="sm"

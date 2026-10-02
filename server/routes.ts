@@ -163,7 +163,7 @@ import { fetchValorHora2026, fetchValorHoraForYear, getHistoricalRateFields, HIS
 import { applyCanonicalPersonnelRateRows } from "./services/personnel-cost-sync";
 import { ActiveProjectsAggregator } from "./domain/projectsActive";import { resolveTimeFilter } from "./services/time";
 import { CoverageCalculator } from "./domain/coverage";
-import { eq, and, or, isNull, isNotNull, desc, sql, asc, gte, lte, lt, inArray } from "drizzle-orm";
+import { eq, and, or, isNull, isNotNull, desc, sql, asc, gte, lte, lt, inArray, notInArray } from "drizzle-orm";
 import { reinitializeDatabase } from "./reinit-data";
 import { upload, uploadDocument, deleteOldFile } from "./upload";
 import { personalMonthlyInvoices, personalInvoiceProjectAllocations, personalFxOverrides, personnelMonthlySettlements, externalProviders as externalProvidersTable, providerProjectAccess as providerProjectAccessTable, exchangeRates, financialClosePeriods, pasivoEntries, financialDocumentApplications } from "@shared/schema";
@@ -321,6 +321,7 @@ import { PRODUCT_DEFINITIONS_MANIFEST } from "./content/product-definitions-mani
 import { calculateQuotationPricing } from "@shared/utils/quotation-pricing";
 import { calculateCanonicalComplexityFactor } from "@shared/utils/quotation-complexity";
 import { calculateMarginDrift } from "@shared/utils/quotation-margin-drift";
+import { quotedOperationalCost, quotationProfitability } from "@shared/utils/quotation-profitability";
 import {
   assertQuotationTransition,
   isQuotationStatus,
@@ -6329,7 +6330,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // para no multiplicar consultas cuando hay muchas cuentas activas.
   app.get("/api/quotations/margin-drift-summary", requireAuth, requirePermission("quotations"), async (_req, res) => {
     try {
-      const activeQuotations = await db.select().from(quotations).where(eq(quotations.status, "approved"));
+      const activeQuotations = await db.select().from(quotations).where(and(eq(quotations.status, "approved"), isNull(quotations.archivedAt)));
       const eligible = activeQuotations.filter((quotation) =>
         quotation.quotationType !== "one-time" && Number(quotation.exchangeRateAtQuote) > 0);
       if (eligible.length === 0) {
@@ -6376,7 +6377,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const currentRate = quotationCurrency === "USD" ? arsRate / currentExchangeRate : arsRate;
           return { personnelId: member.personnelId, hours, originalRate, currentRate };
         });
-        const drift = calculateMarginDrift({ lockedTotal: Number(quotation.totalAmount) || 0, team });
+        const drift = calculateMarginDrift({ lockedTotal: Number(quotation.totalAmount) || 0, quotedCost: quotedOperationalCost(quotation), team });
         return {
           quotationId: quotation.id,
           quotationNumber: quotation.quotationNumber,
@@ -6413,6 +6414,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         clientId: quotations.clientId,
         status: quotations.status,
         totalAmount: quotations.totalAmount,
+        quotationCurrency: quotations.quotationCurrency,
         archivedAt: quotations.archivedAt,
         updatedBy: quotations.updatedBy,
       }).from(quotations)
@@ -6468,7 +6470,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (quotation.quotationType === "one-time") {
         return res.json({ applicable: false, reason: "one-time" });
       }
-      if (quotation.status !== "approved") {
+      if (quotation.status !== "approved" || quotation.archivedAt) {
         return res.json({ applicable: false, reason: "not-active" });
       }
 
@@ -6517,7 +6519,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return { personnelId: member.personnelId, hours: Number(member.hours) || 0, originalRate, currentRate };
       }));
 
-      const drift = calculateMarginDrift({ lockedTotal: Number(quotation.totalAmount) || 0, team });
+      const drift = calculateMarginDrift({ lockedTotal: Number(quotation.totalAmount) || 0, quotedCost: quotedOperationalCost(quotation), team });
       return res.json({
         applicable: true,
         quotationCurrency,
@@ -8409,51 +8411,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const quotation = await storage.getQuotation(id);
       if (!quotation) return res.status(404).json({ message: "No se encontró la cotización" });
 
-      // Buscar proyecto asociado
-      const [project] = await db.select().from(activeProjects).where(eq(activeProjects.quotationId, id));
-      if (!project) return res.json({ quotation, project: null, profitability: null });
+      // One contract can cover several operational projects (Weekly/Monthly).
+      // Voided imports must not contribute to the contract's actuals.
+      const projects = await db.select().from(activeProjects).where(and(
+        eq(activeProjects.quotationId, id),
+        notInArray(activeProjects.status, ["voided", "cancelled"]),
+      )).orderBy(asc(activeProjects.id));
+      if (!projects.length) return res.json({ quotation, project: null, projects: [], profitability: null });
 
-      // Sumar horas y costos reales del proyecto
       const entries = await db.select({
-        hours: timeEntries.hours,
-        totalCost: timeEntries.totalCost,
-      }).from(timeEntries).where(eq(timeEntries.projectId, project.id));
-
-      const realHours = entries.reduce((s, e) => s + (e.hours || 0), 0);
-      const realCostARS = entries.reduce((s, e) => s + (e.totalCost || 0), 0);
-
-      // Horas cotizadas
-      const quotedTeam = await storage.getQuotationTeamMembers(id);
-      const quotedHours = quotedTeam.reduce((s, m) => s + (m.hours || 0), 0);
-      const quotedCost = Number(quotation.baseCost || 0)
-        + Number(quotation.toolsCost || 0)
-        + Number(quotation.platformCost || 0)
-        + Number(quotation.additionalDeliverableCost || 0);
-      const exchangeRate = Number(quotation.exchangeRateAtQuote) || Number(quotation.usdExchangeRate) || 1;
-      const realCost = quotation.quotationCurrency === "USD" && exchangeRate > 0
-        ? realCostARS / exchangeRate
-        : realCostARS;
+        hours: timeEntries.hours, totalCost: timeEntries.totalCost,
+      }).from(timeEntries).where(inArray(timeEntries.projectId, projects.map(project => project.id)));
+      const quotedTeam = quotation.acceptedVariantId
+        ? await storage.getQuotationTeamMembersByVariant(quotation.acceptedVariantId)
+        : await storage.getQuotationTeamMembers(id);
+      const quotedHours = quotedTeam.reduce((sum, member) => sum + (member.hours || 0), 0);
+      const quotedCost = quotedOperationalCost(quotation);
       const revenue = quotation.pricesIncludeTax
         ? calculateTaxBreakdown(quotation.totalAmount, quotation.taxRate, true).netAmount
         : quotation.totalAmount;
-      const plannedMargin = calculateGrossMarginPercentage(revenue, quotedCost);
-      const actualMargin = calculateGrossMarginPercentage(revenue, realCost);
-      const marginDelta = Math.round((actualMargin - plannedMargin) * 10) / 10;
-
+      const projectHeaders = projects.map(project => ({ id: project.id, name: project.subprojectName || project.name || String(project.id) }));
       res.json({
         quotation: { totalAmount: quotation.totalAmount, baseCost: quotedCost, quotedHours },
-        project: { id: project.id, name: project.subprojectName || project.id },
-        profitability: {
-          realHours,
-          realCost,
-          quotedHours,
-          quotedCost,
-          revenue,
-          plannedGrossMargin: plannedMargin,
-          actualGrossMargin: actualMargin,
-          marginDelta,
+        project: projectHeaders[0], projects: projectHeaders,
+        profitability: quotationProfitability({
+          entries, quotedHours, quotedCost, revenue,
           currency: quotation.quotationCurrency,
-        },
+          exchangeRate: Number(quotation.exchangeRateAtQuote) || Number(quotation.usdExchangeRate),
+        }),
       });
     } catch (e) {
       res.status(500).json({ message: "No se pudo traer la rentabilidad", error: String(e) });

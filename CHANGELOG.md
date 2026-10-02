@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.10.2 — 2026-10-02
+
+- Corrige horas desconocidas, tipos de servicio y moneda en el resumen de cotización de los proyectos; conserva el presupuesto en la moneda de la vista elegida.
+- Muestra los fees mensuales con su modalidad correcta y conserva la moneda y los centavos de las cotizaciones archivadas.
+- Excluye contratos archivados de las alertas de margen y compara con el costo contractual, conservando los costos adicionales cotizados.
+- Agrega los proyectos operativos vinculados a un mismo contrato para calcular rentabilidad y excluye proyectos anulados o cancelados.
+- Evita informar 100% de margen real cuando faltan costos o un tipo de cambio válido, y conserva los nombres de personas históricas en los equipos cotizados.
+- Agrega cobertura de regresión para los contratos importados del Excel.
+
 ## 1.10.1 — 2026-10-01
 
 - Permite elegir la hoja de un Excel al importar la cartera y procesa la estructura de proyectos Asana con secciones, tareas, responsables y subtareas.
