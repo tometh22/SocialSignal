@@ -19,4 +19,6 @@ La operación usa el mismo bloqueo de migración, una transacción y un respaldo
 
 La versión 1.10.9 excluye proyectos anulados/cancelados de Mis tareas, calendario general y consultas globales. Operaciones puede inspeccionar explícitamente un proyecto archivado; los permisos habituales siguen aplicándose.
 
-Verificaciones: cero tareas/horas de origen Asana en proyectos activos; nueve proyectos activos del Excel; conservación exacta de tareas nativas supervivientes y tablas financieras durante la corrección; 23 comprobaciones API locales de visibilidad/permisos, tres regresiones unitarias, typecheck y CI de checkout limpio.
+Verificaciones: cero tareas/horas de origen Asana en proyectos activos; nueve proyectos activos del Excel; conservación exacta de tareas nativas supervivientes y tablas financieras durante la corrección; 28 comprobaciones API locales de visibilidad/permisos e historial de horas reales, cuatro regresiones unitarias, typecheck y CI de checkout limpio.
+
+Comprobación posterior: 155 verificaciones de producción aprobadas, nueve proyectos activos y 129 tareas vigentes tras conservar ediciones posteriores. Las 39 conexiones de nombres creadas por la importación histórica se desactivaron de forma recuperable para evitar reasignaciones futuras. 1.10.10 también filtra los recordatorios de tareas sin horas; los totales de horas reales conservan el historial nativo.

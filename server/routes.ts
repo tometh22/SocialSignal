@@ -23838,6 +23838,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         LEFT JOIN active_projects ap ON ap.id = t.project_id
         LEFT JOIN quotations q ON q.id = ap.quotation_id
         WHERE t.status NOT IN ('done', 'cancelled')
+          AND ap.status NOT IN ('voided', 'cancelled')
           AND (t.assignee_id = ${person.id} OR t.collaborator_ids @> jsonb_build_array(${person.id}::int))
           AND NOT EXISTS (
             SELECT 1

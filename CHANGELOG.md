@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.10.10 — 2026-10-02
+
+- Excluye las tareas de proyectos anulados o cancelados de los recordatorios de tareas sin horas. Conserva las horas reales registradas en el historial.
+
 ## 1.10.9 — 2026-10-02
 
 - Excluye las tareas de proyectos anulados o cancelados de Mis tareas, el calendario general y el listado global. Operaciones conserva la consulta explícita del historial recuperable.
