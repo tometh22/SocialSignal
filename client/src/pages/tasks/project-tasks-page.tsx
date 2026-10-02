@@ -2,7 +2,7 @@ import type { TaskOrigin } from "@shared/utils/task-origin";
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { queryClient, apiRequest, authFetch } from "@/lib/queryClient";
+import { queryClient, apiRequest, authFetch, authFetchJson } from "@/lib/queryClient";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -28,6 +28,7 @@ const PROJECT_STATUS_CONFIG: Record<string, { label: string; className: string }
   "on-hold":   { label: "En pausa",   className: "text-amber-700 border-amber-300 bg-amber-50 hover:bg-amber-100" },
   "delivered": { label: "Entregado",  className: "text-sky-700 border-sky-300 bg-sky-50 hover:bg-sky-100" },
   "completed": { label: "Completado", className: "text-slate-700 border-slate-300 bg-slate-50 hover:bg-slate-100" },
+  "voided":    { label: "Archivado",  className: "text-slate-700 border-slate-300 bg-slate-50 hover:bg-slate-100" },
   "cancelled": { label: "Cancelado",  className: "text-red-600 border-red-300 bg-red-50 hover:bg-red-100" },
 };
 import ProjectOverviewPanel from "@/components/tasks/ProjectOverviewPanel";
@@ -91,6 +92,12 @@ export default function ProjectTasksPage({ params }: Props) {
   const { data: project, isLoading } = useQuery<TaskProject>({
     queryKey: ["/api/tasks/projects", projectId],
     queryFn: () => authFetch(`/api/tasks/projects/${projectId}`).then(r => r.json()),
+    enabled: !!projectId,
+  });
+
+  const { data: migration } = useQuery<{ detailedHoursAvailable: boolean; time: { minutes: number } } | null>({
+    queryKey: ["/api/tasks/projects", projectId, "migration"],
+    queryFn: () => authFetchJson(`/api/tasks/projects/${projectId}/migration`),
     enabled: !!projectId,
   });
 
@@ -292,10 +299,14 @@ export default function ProjectTasksPage({ params }: Props) {
                 <div className="hidden lg:flex items-center gap-3 text-xs text-muted-foreground pl-2 border-l">
                   <span><strong className="text-foreground">{project.pendingCount}</strong> pendientes</span>
                   <span><strong className="text-foreground">{project.taskCount}</strong> total</span>
-                  <span><strong className="text-foreground">{project.totalHours.toFixed(1)}h</strong> registradas</span>
+                  <span><strong className="text-foreground">{project.totalHours.toFixed(1)}h</strong> en Mind</span>
                 </div>
               </div>
             </div>
+
+            {migration?.detailedHoursAvailable && <p className="mt-2 text-xs text-muted-foreground">
+              <strong className="text-foreground">{(migration.time.minutes / 60).toLocaleString("es-AR", { maximumFractionDigits: 2 })} h</strong> originales de Asana · {project.totalHours.toLocaleString("es-AR", { maximumFractionDigits: 2 })} h cargadas en Mind. Ver detalle en Gestión.
+            </p>}
 
             {/* Progress bar */}
             {project.taskCount > 0 && (

@@ -1078,7 +1078,7 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
 
                   {task.asanaTaskGid && <div className="rounded-md border p-3 text-xs space-y-1">
                     <a className="text-primary underline" href={`https://app.asana.com/0/0/${task.asanaTaskGid}/f`} target="_blank" rel="noopener noreferrer">Ver tarea original en Asana</a>
-                    {task.asanaSource?.actualMinutes != null && <p>Total exportado de Asana: {(task.asanaSource.actualMinutes / 60).toLocaleString("es-AR", { maximumFractionDigits: 2 })} h. El desglose por fecha y persona se importa por separado.</p>}
+                    {task.asanaSource?.actualMinutes != null && <p>Total exportado de Asana: {(task.asanaSource.actualMinutes / 60).toLocaleString("es-AR", { maximumFractionDigits: 2 })} h. El desglose original por fecha y persona se consulta a continuación.</p>}
                     {!task.assigneeId && task.asanaSource?.assigneeName && <p className="text-amber-700">Responsable original: {task.asanaSource.assigneeName}. Pendiente de vincular a Personal.</p>}
                     {task.projectId && <AsanaSourceHours projectId={task.projectId} taskId={task.id} />}
                     {["ambiguous", "missing", "preserved_native", "retired_parent"].includes(task.asanaSource?.parentResolution || "") && <p className="text-amber-700">La tarea madre requiere cotejo con Asana.</p>}
