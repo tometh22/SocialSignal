@@ -24,7 +24,7 @@ Fecha: 2026-10-02. Fuentes: ambas rondas PDF, Excel «Proyectos y cotizaciones a
 | Freelancers directos | Selección directa; exclusión de promedios estándar y advertencia sin tarifa. Carolina confirmada: 3 Senior · A · Operaciones, sin horas fijas, excluida de costos. |
 | Costos cotizados vs reales | Origen separado. 1.10.2 corrige costo contractual, moneda, horas desconocidas y margen real sin información. |
 | Gestión/grupos de cotizaciones | Monedas y agrupación por cliente. Cotizaciones perdidas ya no aparecen como borradores para continuar. |
-| Cartera desde Excel | Nueve proyectos y 132 tareas importadas. Seis cotizaciones; cinco enlaces de proyectos a cotizaciones, cuatro proyectos internos sin cotización y 24 archivados recuperables. |
+| Cartera desde Excel | Nueve proyectos y 132 tareas importadas, incluidas secciones vacías persistidas sin tareas ficticias. Seis cotizaciones; cinco enlaces de proyectos a cotizaciones, cuatro proyectos internos sin cotización y 24 archivados recuperables. |
 | Plantillas de proyectos | Bases semanal/mensual/one-shot y copia de estructura de un proyecto accesible, incluidas secciones y subtareas del Excel. Reinicia fechas, horas y estados; conserva asignación sólo para miembros elegidos. |
 | PM/miembros | Selección al crear y validación de personas activas; PM como propietario operativo. |
 | Kanban | Sólo activos, filtro PM, bloqueo con motivo/fecha y salida al cerrar. Implementado previamente. |

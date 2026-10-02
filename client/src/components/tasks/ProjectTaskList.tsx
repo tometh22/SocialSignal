@@ -1468,7 +1468,8 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
   };
 
   const createSectionTask = useMutation({
-    mutationFn: (data: any) => apiRequest("/api/tasks", "POST", data),
+    mutationFn: (data: any) => apiRequest("/api/tasks/section", "POST", { projectId: data.projectId, sectionName: data.sectionName }),
+    onError: (error: Error) => toast({ title: "No se pudo crear la sección", description: error.message, variant: "destructive" }),
     onSuccess: () => { refetch(); invalidateRelated(); setShowAddSection(false); setNewSectionName(""); },
   });
 

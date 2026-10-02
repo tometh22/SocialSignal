@@ -11348,7 +11348,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         let tasksCreated = 0;
         let membersAdded = 0;
         for (const item of mapped) {
-          const [project] = await tx.insert(activeProjects).values(item.project).returning({ id: activeProjects.id, name: activeProjects.name, clientId: activeProjects.clientId });
+          const [project] = await tx.insert(activeProjects).values({ ...item.project, taskSectionNames: [...new Set(item.sections.map(section => section.name))] }).returning({ id: activeProjects.id, name: activeProjects.name, clientId: activeProjects.clientId });
           if (item.memberIds.length) {
             await tx.insert(taskProjectMembers).values(item.memberIds.map((personnelId) => ({ projectId: project.id, personnelId, role: "member" }))).onConflictDoNothing();
             membersAdded += item.memberIds.length;
@@ -11483,7 +11483,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         };
         if (templateProjectId) {
           const source = await tx.select().from(tasks).where(eq(tasks.projectId, templateProjectId)).orderBy(asc(tasks.position), asc(tasks.id)).for("share");
-          if (!source.length) throw Object.assign(new Error("El proyecto elegido como plantilla no tiene tareas"), { statusCode: 422 });
+          const [sourceProject] = await tx.select({ taskSectionNames: activeProjects.taskSectionNames }).from(activeProjects).where(eq(activeProjects.id, templateProjectId));
+          await tx.update(activeProjects).set({ taskSectionNames: [...new Set([...(sourceProject?.taskSectionNames ?? []), ...source.map(task => task.sectionName)])] }).where(eq(activeProjects.id, created.id));
           await duplicateTaskStructure(tx, source, created.id, Number(req.user?.id), new Set(projectMemberships));
         } else if (projectTemplate) await tx.insert(tasks).values(templateSections[projectTemplate].map((task, index) => ({
           ...task, projectId: created.id, status: "todo", priority: "medium", position: index, createdBy: req.user?.id ?? null,
@@ -23357,7 +23358,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }));
       
       // Agrupar por sección
-      const sections: Record<string, any[]> = {};
+      const [project] = await db.select({ names: activeProjects.taskSectionNames }).from(activeProjects).where(eq(activeProjects.id, parsedProjectId));
+      const sections: Record<string, any[]> = Object.create(null);
+      for (const name of project?.names ?? []) sections[name] = [];
       for (const task of enrichedTasks) {
         const section = task.sectionName || "General";
         if (!sections[section]) sections[section] = [];
@@ -23370,36 +23373,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // PUT /api/tasks/section/rename — renombrar sección
-  app.put("/api/tasks/section/rename", requireAuth, async (req: Request, res: Response) => {
+  async function lockProjectSectionNames(tx: any, projectId: number): Promise<string[]> {
+    const [project] = await tx.select({ names: activeProjects.taskSectionNames }).from(activeProjects).where(eq(activeProjects.id, projectId)).for("update");
+    if (!project) throw Object.assign(new Error("Proyecto no encontrado"), { status: 404 });
+    return project.names ?? [];
+  }
+
+  app.post("/api/tasks/section", requireAuth, async (req, res) => {
     try {
-      const { projectId, oldName, newName } = req.body;
-      if (!projectId || !oldName || !newName) return res.status(400).json({ message: "Faltan datos" });
-      if (!(await canManageTaskProject(req, Number(projectId)))) {
-        return res.status(403).json({ message: "Solo responsables del proyecto u Operaciones pueden administrar secciones" });
-      }
-      const trimmedNew = newName.trim();
-      if (trimmedNew === oldName) return res.json({ message: "Sin cambios" });
+      const { projectId, sectionName } = z.object({ projectId: z.number().int().positive(), sectionName: z.string().trim().min(1).max(250) }).strict().parse(req.body);
+      if (!(await canManageTaskProject(req, projectId))) return res.status(403).json({ message: "Solo responsables u Operaciones pueden administrar secciones" });
+      await db.transaction(async tx => {
+        const names = await lockProjectSectionNames(tx, projectId);
+        const [conflict] = await tx.select({ id: tasks.id }).from(tasks).where(and(eq(tasks.projectId, projectId), eq(tasks.sectionName, sectionName))).limit(1);
+        if (names.includes(sectionName) || conflict) throw Object.assign(new Error("La sección ya existe"), { status: 409 });
+        await tx.update(activeProjects).set({ taskSectionNames: [...names, sectionName] }).where(eq(activeProjects.id, projectId));
+      });
+      res.status(201).json({ sectionName });
+    } catch (error: any) { res.status(error instanceof z.ZodError ? 400 : error.status || 500).json({ message: error instanceof z.ZodError ? "Datos inválidos" : error.message }); }
+  });
 
-      // Warn if target section already exists (tasks would merge)
-      const [conflict] = await db
-        .select({ id: tasks.id })
-        .from(tasks)
-        .where(and(eq(tasks.projectId, parseInt(projectId)), eq(tasks.sectionName, trimmedNew)))
-        .limit(1);
-      if (conflict) {
-        return res.status(409).json({
-          message: `Ya existe una sección llamada "${trimmedNew}". Renombrá a un nombre distinto para evitar fusionar las tareas.`,
-        });
-      }
-
-      await db.update(tasks)
-        .set({ sectionName: trimmedNew })
-        .where(and(eq(tasks.projectId, parseInt(projectId)), eq(tasks.sectionName, oldName)));
+  app.put("/api/tasks/section/rename", requireAuth, async (req, res) => {
+    try {
+      const { projectId, oldName, newName } = z.object({ projectId: z.coerce.number().int().positive(), oldName: z.string().trim().min(1).max(250), newName: z.string().trim().min(1).max(250) }).strict().parse(req.body);
+      if (!(await canManageTaskProject(req, projectId))) return res.status(403).json({ message: "Solo responsables u Operaciones pueden administrar secciones" });
+      if (oldName === newName) return res.json({ message: "Sin cambios" });
+      await db.transaction(async tx => {
+        const names = await lockProjectSectionNames(tx, projectId);
+        const [conflict] = await tx.select({ id: tasks.id }).from(tasks).where(and(eq(tasks.projectId, projectId), eq(tasks.sectionName, newName))).limit(1);
+        if (names.includes(newName) || conflict) throw Object.assign(new Error("Ya existe una sección con ese nombre"), { status: 409 });
+        const changed = await tx.update(tasks).set({ sectionName: newName }).where(and(eq(tasks.projectId, projectId), eq(tasks.sectionName, oldName))).returning({ id: tasks.id });
+        if (!names.includes(oldName) && !changed.length) throw Object.assign(new Error("Sección no encontrada"), { status: 404 });
+        await tx.update(activeProjects).set({ taskSectionNames: [...new Set(names.includes(oldName) ? names.map(name => name === oldName ? newName : name) : [...names, newName])] }).where(eq(activeProjects.id, projectId));
+      });
       res.json({ message: "Sección renombrada" });
-    } catch (error) {
-      res.status(500).json({ message: "Error al renombrar sección" });
-    }
+    } catch (error: any) { res.status(error instanceof z.ZodError ? 400 : error.status || 500).json({ message: error instanceof z.ZodError ? "Datos inválidos" : error.message }); }
   });
 
   app.post("/api/tasks/section/duplicate", requireAuth, async (req, res) => {
@@ -23408,10 +23416,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!(await canManageTaskProject(req, input.projectId))) return res.status(403).json({ message: "Solo responsables del proyecto u Operaciones pueden administrar secciones" });
       const created = await db.transaction(async (tx) => {
         await tx.execute(sql`SELECT pg_advisory_xact_lock(293, ${input.projectId})`);
+        const names = await lockProjectSectionNames(tx, input.projectId);
         const [conflict] = await tx.select({ id: tasks.id }).from(tasks).where(and(eq(tasks.projectId, input.projectId), eq(tasks.sectionName, input.newName))).limit(1);
-        if (conflict) throw Object.assign(new Error("Ya existe una sección con ese nombre"), { status: 409 });
+        if (conflict || names.includes(input.newName)) throw Object.assign(new Error("Ya existe una sección con ese nombre"), { status: 409 });
         const source = await tx.select().from(tasks).where(and(eq(tasks.projectId, input.projectId), eq(tasks.sectionName, input.sectionName))).orderBy(asc(tasks.position), asc(tasks.id)).for("share");
-        if (!source.length) throw Object.assign(new Error("La sección no existe o está vacía"), { status: 404 });
+        if (!source.length && !names.includes(input.sectionName)) throw Object.assign(new Error("La sección no existe"), { status: 404 });
+        await tx.update(activeProjects).set({ taskSectionNames: [...names, input.newName] }).where(eq(activeProjects.id, input.projectId));
         const memberships = await tx.select({ personnelId: taskProjectMembers.personnelId }).from(taskProjectMembers).where(eq(taskProjectMembers.projectId, input.projectId));
         const memberIds = new Set(memberships.map(row => row.personnelId));
         return duplicateTaskStructure(tx, source, input.projectId, Number(req.user?.id), memberIds, input.newName);
@@ -23452,9 +23462,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!(await canManageTaskProject(req, Number(projectId)))) {
         return res.status(403).json({ message: "Solo responsables del proyecto u Operaciones pueden administrar secciones" });
       }
-      await db.update(tasks)
-        .set({ sectionName: "General" })
-        .where(and(eq(tasks.projectId, parseInt(projectId)), eq(tasks.sectionName, sectionName)));
+      await db.transaction(async tx => {
+        const names = await lockProjectSectionNames(tx, Number(projectId));
+        await tx.update(tasks).set({ sectionName: "General" }).where(and(eq(tasks.projectId, Number(projectId)), eq(tasks.sectionName, sectionName)));
+        await tx.update(activeProjects).set({ taskSectionNames: names.filter(name => name !== sectionName) }).where(eq(activeProjects.id, Number(projectId)));
+      });
       res.json({ message: "Sección eliminada" });
     } catch (error) {
       res.status(500).json({ message: "Error al eliminar sección" });

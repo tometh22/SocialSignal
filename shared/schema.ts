@@ -1581,6 +1581,7 @@ export const monthlySettlementEvents = pgTable("monthly_settlement_events", {
 // ==================== PROYECTOS ACTIVOS ====================
 // Proyectos Activos
 export const activeProjects = pgTable("active_projects", {
+  taskSectionNames: jsonb("task_section_names").$type<string[]>().notNull().default([]),
   id: serial("id").primaryKey(),
   quotationId: integer("quotation_id").references(() => quotations.id), // nullable — projects can be created without a quotation
   clientId: integer("client_id").notNull().references(() => clients.id),
