@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.10.9 — 2026-10-02
+
+- Excluye las tareas de proyectos anulados o cancelados de Mis tareas, el calendario general y el listado global. Operaciones conserva la consulta explícita del historial recuperable.
+- Corrige el alcance de la migración: el módulo operativo conserva los proyectos del Excel y se archiva de forma recuperable la importación histórica de Asana, preservando las cargas realizadas en Mind.
+
 ## 1.10.8 — 2026-10-02
 
 - Corrige la consulta de horas para tareas trasladadas al historial recuperable, conservando el proyecto atribuido original y sin duplicar registros.
