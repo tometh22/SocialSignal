@@ -9,6 +9,7 @@ import { type LucideIcon, Loader2, AlertCircle, CheckCircle2, Clock, ListTodo, U
 import { cn } from "@/lib/utils";
 import { isAfter, parseISO, startOfDay } from "date-fns";
 import { projectRoleLabel } from "@/constants/project-roles";
+import AsanaMigrationSummary from "./AsanaMigrationSummary";
 
 type Task = {
   id: number;
@@ -150,6 +151,7 @@ export default function ProjectOverviewPanel({ projectId, members, projectColor,
 
   return (
     <div className="space-y-6 py-4">
+      <AsanaMigrationSummary projectId={projectId} />
       {/* Filtro por sección: por defecto el panel muestra todo el proyecto */}
       {allSectionNames.length > 1 && (
         <div className="flex items-center gap-2">

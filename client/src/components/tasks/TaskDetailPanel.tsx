@@ -31,6 +31,8 @@ import { roundToQuarterHour } from "@shared/utils/num";
 import { useAuth } from "@/hooks/use-auth";
 
 type Task = {
+  asanaTaskGid?: string | null;
+  asanaSource?: { actualMinutes?: number | null; parentResolution?: string } | null;
   isMilestone?: boolean;
   recurrenceRule?: TaskRecurrence | null;
   id: number;
@@ -1073,6 +1075,11 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
                     </div>
                   </div>
 
+                  {task.asanaTaskGid && <div className="rounded-md border p-3 text-xs space-y-1">
+                    <a className="text-primary underline" href={`https://app.asana.com/0/0/${task.asanaTaskGid}/f`} target="_blank" rel="noopener noreferrer">Ver tarea original en Asana</a>
+                    {task.asanaSource?.actualMinutes != null && <p>Total exportado de Asana: {(task.asanaSource.actualMinutes / 60).toLocaleString("es-AR", { maximumFractionDigits: 2 })} h. El desglose por fecha y persona se importa por separado.</p>}
+                    {["ambiguous", "missing"].includes(task.asanaSource?.parentResolution || "") && <p className="text-amber-700">La tarea madre requiere cotejo con Asana.</p>}
+                  </div>}
                   {/* ── Horas estimadas por semana ── */}
                   <div className="border border-border rounded-xl overflow-hidden">
                     <div className="flex items-center justify-between px-3 py-2 bg-muted/20 border-b border-border">
