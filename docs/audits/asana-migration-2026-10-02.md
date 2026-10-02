@@ -49,6 +49,12 @@ Esta migración es una instantánea autorizada, no una sincronización continua:
 - PostgreSQL local independiente: 32 comprobaciones de primera etapa y 42 de segunda etapa. Permisos, filtros, paginación, fechas, hitos, padres exactos, idempotencia, retiros recuperables, conservación de ediciones y ausencia de duplicación financiera.
 - Liberación con CI en checkout limpio antes del merge; después, salud/commit, cantidades/GID, identidades, contratos y conservación de los registros previos en producción.
 
+## Resultado de producción
+
+1.10.6 publicada por PR #283: 49 proyectos, 12.081 relaciones de tarea, 11.818 entradas de tiempo y 1.370.233 minutos cotejados por identificador. Se conservan 11.960 tareas de origen en proyectos activos y 121 en historial recuperable. Las seis cotizaciones del Excel siguen vinculadas. 27.247 comprobaciones de datos aprobadas; una edición concurrente de horas nativas y la normalización de una sección fueron identificadas y cotejadas con sus registros, sin revertirlas.
+
+1.10.7 reduce la carga de la API de listados: evita repetir documentos originales completos dentro de cada tarea; la fuente íntegra permanece disponible en el detalle individual y en la base.
+
 ## Referencias técnicas de Asana
 
 - [Tareas de un proyecto](https://developers.asana.com/reference/gettasksforproject)

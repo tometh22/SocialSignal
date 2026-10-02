@@ -41,7 +41,7 @@ export default function TaskCalendarView({ projectId, tasks: tasksProp }: Props)
 
   const { data } = useQuery<{ tasks: CalTask[] }>({
     queryKey: ["/api/tasks/project", projectId],
-    queryFn: () => authFetch(`/api/tasks/project/${projectId}`).then(r => r.json()),
+    queryFn: () => authFetch(`/api/tasks/project/${projectId}?layout=flat`).then(r => r.json()),
     staleTime: 30_000,
     enabled: tasksProp === undefined && projectId !== undefined,
   });

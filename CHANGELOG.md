@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.10.7 — 2026-10-02
+
+- Corrige el panel de gestión para incluir subtareas y sus horas, y respetar el filtro de sección en las estimaciones del equipo.
+
+- Reduce el peso de los listados grandes de tareas de Asana al consultar una procedencia resumida, conservando la exportación íntegra en almacenamiento y en el detalle individual.
+- Las vistas de lista, calendario y gestión comparten una respuesta plana que transfiere cada tarea una sola vez y conserva secciones vacías. La representación agrupada continúa disponible para otros consumidores.
+
 ## 1.10.6 — 2026-10-02
 
 - Completa la extracción de los 49 proyectos de Asana por su exportación JSON oficial, incluidas subtareas con identificadores exactos, hitos, secciones vacías, miembros y PM.

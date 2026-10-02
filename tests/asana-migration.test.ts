@@ -95,3 +95,19 @@ describe("Full Asana source reconciliation", () => {
     expect(asanaSourceTimeSql).toContain("CREATE TABLE IF NOT EXISTS asana_time_entries"); expect(asanaSourceTimeSql).not.toContain("fact_labor_month"); expect(asanaSourceTimeSql).toContain("ON DELETE SET NULL");
   });
 });
+
+import { groupTasksBySection } from "../shared/utils/task-sections";
+describe("flat project task responses", () => {
+  it("retains empty sections and task order", () => {
+    const tasks = [{ id: 1, sectionName: "Work" }, { id: 2, sectionName: "Work" }];
+    const grouped = groupTasksBySection(tasks, ["Empty", "Work"]);
+    expect(Object.keys(grouped)).toEqual(["Empty", "Work"]); expect(grouped.Empty).toEqual([]); expect(grouped.Work).toEqual(tasks);
+  });
+  it("includes unlisted sections and null section names", () => {
+    expect(Object.keys(groupTasksBySection([{ sectionName: null }, { sectionName: "New" }], []))).toEqual(["General", "New"]);
+  });
+  it("treats prototype-like section names as ordinary section names", () => {
+    const task = { sectionName: "__proto__" };const grouped = groupTasksBySection([task], ["constructor"]);
+    expect(grouped.__proto__).toEqual([task]);expect(grouped.constructor).toEqual([]);expect(Object.getPrototypeOf(grouped)).toBeNull();
+  });
+});

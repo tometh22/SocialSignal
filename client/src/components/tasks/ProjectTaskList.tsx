@@ -1,5 +1,6 @@
+import { groupTasksBySection } from "@shared/utils/task-sections";
 import { filterTasksByOrigin, type TaskOrigin } from "@shared/utils/task-origin";
-import { useState, useEffect, useRef } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest, authFetch } from "@/lib/queryClient";
 import { format } from "date-fns";
@@ -1337,9 +1338,9 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
     }
   }, [onQuickAddTrigger]);
 
-  const { data, isLoading, refetch } = useQuery<{ tasks: Task[]; sections: Record<string, Task[]> }>({
+  const { data, isLoading, refetch } = useQuery<{ tasks: Task[]; sections: Record<string, Task[]>; layout?: string }>({
     queryKey: ["/api/tasks/project", projectId],
-    queryFn: () => authFetch(`/api/tasks/project/${projectId}`).then(r => r.json()),
+    queryFn: () => authFetch(`/api/tasks/project/${projectId}?layout=flat`).then(r => r.json()),
     staleTime: 30 * 1000,
   });
 
@@ -1484,7 +1485,7 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
   });
 
   const allTasksRaw = filterTasksByOrigin(data?.tasks || [], sourceFilter);
-  const sectionsRaw = data?.sections || {};
+  const sectionsRaw = useMemo(() => data?.layout === "flat" ? groupTasksBySection(data.tasks, Object.keys(data.sections)) : data?.sections || {}, [data]);
 
   // Apply filter
   const allTasks = filterText.trim()
