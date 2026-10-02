@@ -31,6 +31,7 @@ import { roundToQuarterHour } from "@shared/utils/num";
 import { useAuth } from "@/hooks/use-auth";
 
 type Task = {
+  isMilestone?: boolean;
   recurrenceRule?: TaskRecurrence | null;
   id: number;
   title: string;
@@ -719,6 +720,10 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
                     )}
                   </nav>
 
+                  <label className="mb-3 flex items-center gap-2 text-xs text-muted-foreground">
+                    <input type="checkbox" checked={Boolean(task.isMilestone)} disabled={updateMutation.isPending} onChange={event => updateMutation.mutate({ isMilestone: event.target.checked })} />
+                    ◆ Hito del proyecto
+                  </label>
                   {/* Title */}
                   {editingTitle ? (
                     <Input

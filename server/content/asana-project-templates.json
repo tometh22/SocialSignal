@@ -1,0 +1,331 @@
+[
+  {
+    "key": "recurring",
+    "label": "Semanal / mensual / ejecutivo · Asana",
+    "sourceProjectId": "1209514037888454",
+    "sourceProjectName": "Epical - Template Proyecto Mensual, Ejecutivo, Semanal, Alertas",
+    "sourceUrl": "https://app.asana.com/1/1208150060409719/project/1209514037888454/list",
+    "capturedOn": "2026-10-02",
+    "sourceSha256": "1288e332c253edda58fb586041a4fc987d3fe6ed2e88bf67774a3990de91e100",
+    "sections": [
+      {
+        "sourceSectionId": "1209526044636359",
+        "name": "Sección sin nombre",
+        "tasks": [
+          {
+            "sourceTaskId": "1209526044636357",
+            "title": "🚨 LEER ANTES DE EMPEZAR CON EL PROYECTO 🚨",
+            "description": "Hola! Este es un template general para los proyectos que responden a INFORMES EJECUTIVOS, INFORME MENSUAL, ALERTAS. \n    Es importante que cada PM pueda ver si el formato se adapta dependiendo del proyecto. \n    Es importante que cada PM complete en el Resumen—Descripción información clave como link al brief interno con toda la información necesaria y una breve descripción del proyecto. Además, es importante completar para los proyectos semanales/mensuales que son con FEE la fecha de entrega de cuando se termina el fee.\n    Cada sección corresponde a una etapa puntual del proceso.\n    Las tareas que en vez de un círculo de check tienen un \"rombo\" son tareas que son hitos, es decir que son muy importantes. En caso que se agreguen subtareas también se deben poner como hitos. Esto se hace presionando boton derecho sobre la tarea/subtarea — marcas como— Hito \n    Hay tareas que poseen un emoji 🚨 porque están los accesos a los templates para poder completar (por ejemplo brief cliente, brief interno, etc.)\n    Si en alguna tarea participan más de un responsable (por ejemplo reuniones, análisis, armado de queries, tags, limpieza, sentimiento, etc.) se deben agregar subtareas que contengan el mismo nombre de la tarea genérica + el nombre del responsable.\n    Es muy importante en todas las tareas/subtareas que el PM asigne Responsables, Fecha de entrega, Estado, Cliente y Número de Proyecto (si existe).\n    Es muy importante que los analistas actualicen el Tiempo Real trabajado en cada tarea, actualice el estado y presione check en la tarea una vez finalizada.\n",
+            "isMilestone": false,
+            "subtasks": []
+          }
+        ]
+      },
+      {
+        "sourceSectionId": "1209514037888455",
+        "name": "Kick off incial",
+        "tasks": [
+          {
+            "sourceTaskId": "1209514037888456",
+            "title": "Armado  brief para cliente 🚨",
+            "description": "https://docs.google.com/document/d/1QAeT2zWJUJ42rZeBv2g1yDUYWCqxgeji1itxmy8VySE/edit?usp=drive_link\nhttps://docs.google.com/document/d/1wPqUrFQFcrsZVfom_nGKzloHYnXH0yY-4RTyLceDPrU/edit?usp=drive_link",
+            "isMilestone": false,
+            "subtasks": []
+          },
+          {
+            "sourceTaskId": "1209514037888458",
+            "title": "Enviar brief cliente",
+            "description": null,
+            "isMilestone": false,
+            "subtasks": []
+          },
+          {
+            "sourceTaskId": "1209514037888460",
+            "title": "Armado de brief interno Epical 🚨",
+            "description": "https://docs.google.com/spreadsheets/d/1939BPmIQLAXPYsPVmnokGI3OBMsce3IGeiUHqES4ivo/edit?usp=drive_link",
+            "isMilestone": false,
+            "subtasks": []
+          },
+          {
+            "sourceTaskId": "1218403334269524",
+            "title": "Estructura presentación y sheet inicial",
+            "description": null,
+            "isMilestone": false,
+            "subtasks": []
+          },
+          {
+            "sourceTaskId": "1209514037888464",
+            "title": "Compartir brief con equipo",
+            "description": null,
+            "isMilestone": false,
+            "subtasks": []
+          },
+          {
+            "sourceTaskId": "1209526044636354",
+            "title": "Ajuste diseño tempalte",
+            "description": null,
+            "isMilestone": false,
+            "subtasks": []
+          },
+          {
+            "sourceTaskId": "1209514037888467",
+            "title": "Set Up Query ",
+            "description": null,
+            "isMilestone": false,
+            "subtasks": []
+          },
+          {
+            "sourceTaskId": "1209514037888469",
+            "title": "Set Up Tags",
+            "description": null,
+            "isMilestone": false,
+            "subtasks": []
+          },
+          {
+            "sourceTaskId": "1209517284863499",
+            "title": "Set Up alertas",
+            "description": null,
+            "isMilestone": false,
+            "subtasks": []
+          },
+          {
+            "sourceTaskId": "1209517284863509",
+            "title": "Pedido Autorizaciones (Meta, Linkedin) Cliente",
+            "description": null,
+            "isMilestone": true,
+            "subtasks": []
+          },
+          {
+            "sourceTaskId": "1209514037888473",
+            "title": "Limpieza y Ajuste Sentimiento",
+            "description": null,
+            "isMilestone": false,
+            "subtasks": []
+          }
+        ]
+      },
+      {
+        "sourceSectionId": "1209514037888477",
+        "name": "Informes tareas generales y mejoras",
+        "tasks": [
+          {
+            "sourceTaskId": "1209514037888478",
+            "title": "Template Estructura informe y excel para información",
+            "description": null,
+            "isMilestone": false,
+            "subtasks": []
+          }
+        ]
+      },
+      {
+        "sourceSectionId": "1209514037888516",
+        "name": "Informe MesXXXX",
+        "tasks": [
+          {
+            "sourceTaskId": "1218403334269527",
+            "title": "Set Up Mes XXXX",
+            "description": null,
+            "isMilestone": false,
+            "subtasks": []
+          },
+          {
+            "sourceTaskId": "1218403334269522",
+            "title": "Estructura presentación y sheet Mes XXXX",
+            "description": null,
+            "isMilestone": false,
+            "subtasks": []
+          },
+          {
+            "sourceTaskId": "1209517466789494",
+            "title": "Limpieza y ajuste sentimiento Mes XXXX",
+            "description": null,
+            "isMilestone": false,
+            "subtasks": []
+          },
+          {
+            "sourceTaskId": "1209517466789504",
+            "title": "Análisis Mes XXXX",
+            "description": null,
+            "isMilestone": false,
+            "subtasks": []
+          },
+          {
+            "sourceTaskId": "1209517466841156",
+            "title": "Envio a cliente Mes XXXX",
+            "description": null,
+            "isMilestone": true,
+            "subtasks": []
+          },
+          {
+            "sourceTaskId": "1218403334269518",
+            "title": "Ajuste Mes XXXX",
+            "description": null,
+            "isMilestone": false,
+            "subtasks": []
+          },
+          {
+            "sourceTaskId": "1218403334269528",
+            "title": "Seguimiento Mes XXXX",
+            "description": null,
+            "isMilestone": false,
+            "subtasks": []
+          },
+          {
+            "sourceTaskId": "1218403334269530",
+            "title": "Reunión interna y cliente Mes XXXX",
+            "description": null,
+            "isMilestone": false,
+            "subtasks": []
+          }
+        ]
+      },
+      {
+        "sourceSectionId": "1209517400176397",
+        "name": "Alertas",
+        "tasks": [
+          {
+            "sourceTaskId": "1209517404444260",
+            "title": "Alerta Tema XXXX",
+            "description": null,
+            "isMilestone": false,
+            "subtasks": []
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "key": "one_shot",
+    "label": "One-shot · Asana",
+    "sourceProjectId": "1209514033286527",
+    "sourceProjectName": "Epical - Template Proyecto One Shot",
+    "sourceUrl": "https://app.asana.com/1/1208150060409719/project/1209514033286527/list",
+    "capturedOn": "2026-10-02",
+    "sourceSha256": "aa6c57eb7a79239935f99febbdfe232b9e5f6a52af623f9c2416091aee343814",
+    "sections": [
+      {
+        "sourceSectionId": "1209514033286528",
+        "name": "Kick off",
+        "tasks": [
+          {
+            "sourceTaskId": "1209514033286531",
+            "title": "Armado  brief para cliente 🚨",
+            "description": "https://docs.google.com/document/d/1QAeT2zWJUJ42rZeBv2g1yDUYWCqxgeji1itxmy8VySE/edit?usp=drive_link\nhttps://docs.google.com/document/d/1wPqUrFQFcrsZVfom_nGKzloHYnXH0yY-4RTyLceDPrU/edit?usp=drive_link",
+            "isMilestone": false,
+            "subtasks": []
+          },
+          {
+            "sourceTaskId": "1209514033286535",
+            "title": "Enviar brief a cliente",
+            "description": null,
+            "isMilestone": false,
+            "subtasks": []
+          },
+          {
+            "sourceTaskId": "1209517315019896",
+            "title": "Armado de brief interno Epical 🚨",
+            "description": "https://docs.google.com/spreadsheets/d/1939BPmIQLAXPYsPVmnokGI3OBMsce3IGeiUHqES4ivo/edit?usp=drive_link",
+            "isMilestone": false,
+            "subtasks": []
+          },
+          {
+            "sourceTaskId": "1209517315019905",
+            "title": "Compartir brief equipo",
+            "description": null,
+            "isMilestone": false,
+            "subtasks": []
+          },
+          {
+            "sourceTaskId": "1209514033286549",
+            "title": "Estructura presentación y sheet",
+            "description": null,
+            "isMilestone": false,
+            "subtasks": []
+          }
+        ]
+      },
+      {
+        "sourceSectionId": "1209514033286539",
+        "name": "Armado de Proyecto Youscan",
+        "tasks": [
+          {
+            "sourceTaskId": "1209514033286540",
+            "title": "Set Up Query ",
+            "description": null,
+            "isMilestone": false,
+            "subtasks": []
+          },
+          {
+            "sourceTaskId": "1209514033286542",
+            "title": "Set Up Tags ",
+            "description": null,
+            "isMilestone": false,
+            "subtasks": []
+          },
+          {
+            "sourceTaskId": "1209514033286544",
+            "title": "Limpieza y Sentimiento",
+            "description": null,
+            "isMilestone": false,
+            "subtasks": []
+          }
+        ]
+      },
+      {
+        "sourceSectionId": "1209514033286548",
+        "name": "Informe Digital Intelligence",
+        "tasks": [
+          {
+            "sourceTaskId": "1209514037888423",
+            "title": "Análisis",
+            "description": null,
+            "isMilestone": false,
+            "subtasks": []
+          },
+          {
+            "sourceTaskId": "1209514037888430",
+            "title": "Diseño ",
+            "description": null,
+            "isMilestone": false,
+            "subtasks": []
+          },
+          {
+            "sourceTaskId": "1209514037888433",
+            "title": "Enviar a cliente",
+            "description": null,
+            "isMilestone": true,
+            "subtasks": []
+          },
+          {
+            "sourceTaskId": "1209535781283129",
+            "title": "Setear reunión presentación cliente",
+            "description": null,
+            "isMilestone": false,
+            "subtasks": []
+          },
+          {
+            "sourceTaskId": "1218403334269514",
+            "title": "Ajustes",
+            "description": null,
+            "isMilestone": false,
+            "subtasks": []
+          },
+          {
+            "sourceTaskId": "1218403334269534",
+            "title": "Seguimiento",
+            "description": null,
+            "isMilestone": false,
+            "subtasks": []
+          },
+          {
+            "sourceTaskId": "1218403334269536",
+            "title": "Reuniones internas y externas",
+            "description": null,
+            "isMilestone": false,
+            "subtasks": []
+          }
+        ]
+      }
+    ]
+  }
+]

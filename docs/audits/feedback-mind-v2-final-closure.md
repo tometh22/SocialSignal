@@ -1,5 +1,7 @@
 # Cierre de Feedback Mind V2 — 1.10.3
 
+Actualización 1.10.4: las dos listas originales de Asana ya están accesibles y cotejadas, con 37 tareas, ocho secciones y tres hitos conservados.
+
 Fecha: 2026-10-02. Fuentes: ambas rondas PDF, Excel «Proyectos y cotizaciones a pasar», código de main y lectura del Máster «Info Tipo de Cambio y REM».
 
 ## Cotejo y cierre
@@ -25,7 +27,7 @@ Fecha: 2026-10-02. Fuentes: ambas rondas PDF, Excel «Proyectos y cotizaciones a
 | Costos cotizados vs reales | Origen separado. 1.10.2 corrige costo contractual, moneda, horas desconocidas y margen real sin información. |
 | Gestión/grupos de cotizaciones | Monedas y agrupación por cliente. Cotizaciones perdidas ya no aparecen como borradores para continuar. |
 | Cartera desde Excel | Nueve proyectos y 132 tareas importadas, incluidas secciones vacías persistidas sin tareas ficticias. Seis cotizaciones; cinco enlaces de proyectos a cotizaciones, cuatro proyectos internos sin cotización y 24 archivados recuperables. |
-| Plantillas de proyectos | Bases semanal/mensual/one-shot y copia de estructura de un proyecto accesible, incluidas secciones y subtareas del Excel. Reinicia fechas, horas y estados; conserva asignación sólo para miembros elegidos. |
+| Plantillas de proyectos | Originales de Asana cotejadas: semanal/mensual/ejecutivo de cinco secciones y 22 tareas; one-shot de tres secciones y 15 tareas. Conserva los tres hitos, orden, instrucciones y enlaces. También copia estructuras del Excel. Reinicia fechas, horas y estados; conserva asignación de proyectos existentes sólo para miembros elegidos. |
 | PM/miembros | Selección al crear y validación de personas activas; PM como propietario operativo. |
 | Kanban | Sólo activos, filtro PM, bloqueo con motivo/fecha y salida al cerrar. Implementado previamente. |
 | Tareas por fechas | Home y Tareas usan la misma regla y día de Buenos Aires: Próximas/En curso/Con retraso/Sin fecha. Finalizadas sólo de la semana vigente. |
@@ -40,6 +42,8 @@ Fecha: 2026-10-02. Fuentes: ambas rondas PDF, Excel «Proyectos y cotizaciones a
 
 ## Validación
 
+Actualización 1.10.4: 659 pruebas unitarias/regresión aprobadas, 49 validaciones API de regresión y 38 validaciones API de plantillas en PostgreSQL local independiente. Cotejo automatizado de cada nombre, descripción, sección, posición e hito contra ambas exportaciones originales.
+
 - Suite de pruebas, typecheck y compilación de producción locales.
 - Base PostgreSQL local independiente: permisos, guardado de cumpleaños, advertencias OOO sin bloquear, concurrencia de recurrencias, jerarquías, plantillas, declaración/rechazo/reenvío/aprobación y conservación del cierre.
 - FX en base local: reales y REM separados, protección del observado, rechazo de futuros como observados e importación repetible.
@@ -48,5 +52,5 @@ Fecha: 2026-10-02. Fuentes: ambas rondas PDF, Excel «Proyectos y cotizaciones a
 ## Datos externos y alcance exacto
 
 - La tarifa de Carolina sigue pendiente de que el usuario la informe. No se inventa ni se incluye un costo cero como tarifa acordada.
-- Los enlaces originales de Asana no ofrecieron sus listas a la auditoría. Las estructuras reutilizables se toman de los proyectos del Excel y las bases editables; no se certifica igualdad con listas privadas de Asana que no se pudieron leer.
+- Plantillas originales de Asana cotejadas el 2026-10-02 tras el acceso autorizado: cinco secciones/22 tareas para semanal-mensual-ejecutivo y tres secciones/15 tareas para one-shot. Se conservan los nombres y orden originales, instrucciones, enlaces y tres hitos. La fuente reducida y sus huellas SHA-256 quedan en `server/content/asana-project-templates.json`. Responsables, fechas y horas se configuran para el proyecto nuevo.
 - No se informa ausencia absoluta de bugs: se registran los flujos y datos efectivamente comprobados.

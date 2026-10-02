@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.10.4 — 2026-10-02
+
+- Reemplaza las estructuras genéricas por las dos plantillas originales de Asana: 22 tareas y cinco secciones para informes recurrentes; 15 tareas y tres secciones para one-shot.
+- Conserva nombres, orden, instrucciones y enlaces a briefs del origen; muestra una vista previa antes de crear.
+- Agrega hitos de tareas, conserva los tres originales y mantiene la marca al duplicar tareas, secciones o proyectos.
+- Crea las estructuras en una transacción, sin arrastrar responsables, fechas ni horas realizadas de las plantillas.
+
 ## 1.10.3 — 2026-10-02
 
 - Corrige el guardado y la validación de cumpleaños en Personal.

@@ -2275,6 +2275,7 @@ export const tasks = pgTable("tasks", {
   loggedHours: doublePrecision("logged_hours").default(0),
   status: text("status").notNull().default("todo"),
   priority: text("priority").notNull().default("medium"),
+  isMilestone: boolean("is_milestone").notNull().default(false),
   parentTaskId: integer("parent_task_id").references((): AnyPgColumn => tasks.id, { onDelete: "cascade" }),
   recurrenceRule: jsonb("recurrence_rule").$type<TaskRecurrence>(),
   recurrenceSourceTaskId: integer("recurrence_source_task_id").references((): AnyPgColumn => tasks.id, { onDelete: "set null" }),

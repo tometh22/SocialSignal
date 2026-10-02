@@ -1,3 +1,5 @@
+import { projectTemplateKeySchema, projectTaskTemplates, findProjectTaskTemplate, templateTaskValues } from "./services/project-task-templates";
+import type { ProjectTemplateTask } from "../shared/project-task-template";
 import { taskRecurrenceSchema, recurrenceFromDescription, nextRecurringTaskDate } from "../shared/utils/task-recurrence";
 import { isValidAbsenceDate } from "../shared/utils/absence";
 import { calculateSettlementDifference } from "../shared/utils/monthly-settlement-declaration";
@@ -486,6 +488,7 @@ async function accessibleTaskProjectIds(req: Request): Promise<number[] | null> 
 }
 
 const taskUpdatePayloadSchema = z.object({
+  isMilestone: z.boolean().optional(),
   recurrenceRule: taskRecurrenceSchema.nullable().optional(),
   title: z.string().trim().min(1).max(500).optional(),
   description: z.string().max(20_000).nullable().optional(),
@@ -11378,6 +11381,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/task-project-templates", requireAuth, requirePermission("operations"), (_req, res) => {
+    res.json(projectTaskTemplates);
+  });
+
   app.post("/api/active-projects", requireAuth, requirePermission("operations"), async (req, res) => {
     try {
       // Adaptar fechas si vienen como strings ISO
@@ -11443,7 +11450,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      const projectTemplateKey = projectTemplateKeySchema.default("none").parse(req.body.projectTemplate);
+      const selectedProjectTemplate = findProjectTaskTemplate(projectTemplateKey);
       const templateProjectId = req.body.templateProjectId == null ? null : z.number().int().positive().parse(req.body.templateProjectId);
+      if (templateProjectId && selectedProjectTemplate) return res.status(400).json({ message: "Elegí una plantilla de Asana o una estructura de proyecto" });
       if (templateProjectId && !(await canAccessTaskProject(req, templateProjectId))) return res.status(403).json({ message: "No tenés acceso al proyecto usado como plantilla" });
       const requestedMemberIds = z.array(z.number().int().positive()).default([]).parse(req.body.memberIds);
       const projectManagerId = z.number().int().positive().nullable().optional().parse(req.body.projectManagerId) ?? null;
@@ -11463,32 +11473,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         const [created] = await tx.insert(activeProjects).values(validatedData).returning();
         if (projectMemberships.length) await tx.insert(taskProjectMembers).values(projectMemberships.map((personnelId: number) => ({ projectId: created.id, personnelId, role: personnelId === projectManagerId ? "owner" : "member" }))).onConflictDoUpdate({ target: [taskProjectMembers.projectId, taskProjectMembers.personnelId], set: { role: sql`EXCLUDED.role` } });
-        const projectTemplate = ["weekly", "monthly", "one_shot"].includes(req.body.projectTemplate) ? req.body.projectTemplate : null;
-        const templateSections: Record<string, Array<{ sectionName: string; title: string }>> = {
-          weekly: [
-            { sectionName: "Planificación semanal", title: "Revisar prioridades y pendientes" },
-            { sectionName: "Producción", title: "Ejecutar entregables de la semana" },
-            { sectionName: "Seguimiento", title: "Compartir avance con el cliente" },
-          ],
-          monthly: [
-            { sectionName: "Planificación mensual", title: "Definir objetivos y calendario" },
-            { sectionName: "Producción", title: "Ejecutar entregables del mes" },
-            { sectionName: "Cierre mensual", title: "Revisar resultados y próximos pasos" },
-          ],
-          one_shot: [
-            { sectionName: "Preparación", title: "Alinear brief, alcance y responsables" },
-            { sectionName: "Ejecución", title: "Completar el entregable" },
-            { sectionName: "Entrega", title: "Revisar y entregar al cliente" },
-          ],
-        };
         if (templateProjectId) {
           const source = await tx.select().from(tasks).where(eq(tasks.projectId, templateProjectId)).orderBy(asc(tasks.position), asc(tasks.id)).for("share");
           const [sourceProject] = await tx.select({ taskSectionNames: activeProjects.taskSectionNames }).from(activeProjects).where(eq(activeProjects.id, templateProjectId));
           await tx.update(activeProjects).set({ taskSectionNames: [...new Set([...(sourceProject?.taskSectionNames ?? []), ...source.map(task => task.sectionName)])] }).where(eq(activeProjects.id, created.id));
           await duplicateTaskStructure(tx, source, created.id, Number(req.user?.id), new Set(projectMemberships));
-        } else if (projectTemplate) await tx.insert(tasks).values(templateSections[projectTemplate].map((task, index) => ({
-          ...task, projectId: created.id, status: "todo", priority: "medium", position: index, createdBy: req.user?.id ?? null,
-        })));
+        } else if (selectedProjectTemplate) {
+          const sectionNames = selectedProjectTemplate.sections.map(section => section.name);
+          await tx.update(activeProjects).set({ taskSectionNames: sectionNames }).where(eq(activeProjects.id, created.id));
+          created.taskSectionNames = sectionNames;
+          async function insertTemplateTask(task: ProjectTemplateTask, sectionName: string, position: number, parentTaskId: number | null = null): Promise<void> {
+            const [inserted] = await tx.insert(tasks).values(templateTaskValues(task, created.id, sectionName, position, req.user?.id ?? null, parentTaskId)).returning({ id: tasks.id });
+            for (const [childPosition, child] of task.subtasks.entries()) await insertTemplateTask(child, sectionName, childPosition, inserted.id);
+          }
+          for (const section of selectedProjectTemplate.sections) {
+            for (const [position, task] of section.tasks.entries()) await insertTemplateTask(task, section.name, position);
+          }
+        }
         if (!quotation) return created;
 
         const selectedVariant = selectedVariantId
@@ -11581,6 +11582,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return (milestone.taskNames.length ? milestone.taskNames : [milestone.name]).map((title, taskIndex) => ({
             title,
             description: milestone.description || `Hito vendido: ${milestone.name}`,
+            isMilestone: true,
             projectId: created.id,
             sectionName: "Hitos",
             startDate: projectStart,
@@ -11590,7 +11592,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             createdBy: req.user?.id ?? null,
           }));
         });
-        await tx.insert(tasks).values([...operationalTasks, ...milestoneTasks]);
+        // Explicit Asana/project structures replace the generic task scaffold.
+        // Sold deliverables, team and billing cycles are still materialized.
+        if (!templateProjectId && !selectedProjectTemplate) await tx.insert(tasks).values([...operationalTasks, ...milestoneTasks]);
 
         if (["monthly_fee", "annual_program", "renewal"].includes(definition.modality)) {
           const cycles = Math.max(1, Math.ceil(definition.durationMonths));
@@ -23444,7 +23448,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const [copy] = await tx.insert(tasks).values({ title: task.title, description: task.description, projectId, sectionName: sectionName ?? task.sectionName,
           assigneeId: task.assigneeId && memberIds.has(task.assigneeId) ? task.assigneeId : null,
           collaboratorIds: (task.collaboratorIds ?? []).filter(id => memberIds.has(id)),
-          status: "todo", priority: task.priority, position: task.position, parentTaskId: task.parentTaskId ? idMap.get(task.parentTaskId) : null,
+          status: "todo", priority: task.priority, isMilestone: task.isMilestone, position: task.position, parentTaskId: task.parentTaskId ? idMap.get(task.parentTaskId) : null,
           createdBy: actorId, startDate: null, dueDate: null, loggedHours: 0, completedAt: null, recurrenceRule: task.recurrenceRule,
         }).returning();
         idMap.set(task.id, copy.id); created.push(copy);

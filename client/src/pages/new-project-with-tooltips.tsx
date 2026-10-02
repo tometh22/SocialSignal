@@ -1,3 +1,4 @@
+import { countTemplateTasks, type ProjectTaskTemplate } from "@shared/project-task-template";
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -94,6 +95,16 @@ export default function NewProjectWithTooltips() {
     if (!response.ok) throw new Error("No se pudieron cargar las estructuras de proyectos");
     return response.json();
   } });
+
+  const { data: projectTemplateCatalog = [], isError: templatesError, isLoading: templatesLoading, refetch: reloadTemplates } = useQuery<ProjectTaskTemplate[]>({
+    queryKey: ["/api/task-project-templates"],
+    queryFn: async () => {
+      const response = await fetch("/api/task-project-templates", { credentials: "include", headers: getAuthHeader() });
+      if (!response.ok) throw new Error("No se pudieron cargar las plantillas de Asana");
+      return response.json();
+    },
+  });
+  const selectedTemplate = projectTemplateCatalog.find(template => template.key === projectTemplate);
 
   // Procesamiento seguro de datos
   const quotations = Array.isArray(quotationsData) ? quotationsData : [];
@@ -237,7 +248,32 @@ export default function NewProjectWithTooltips() {
             <form onSubmit={form.handleSubmit(onSubmit)}>
               <CardContent className="space-y-6">
                 <div className="grid gap-4 rounded-lg border p-4 md:grid-cols-2">
-                  <div><FormLabel>Plantilla de proyecto</FormLabel><Select value={projectTemplate} onValueChange={setProjectTemplate}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">Sin plantilla</SelectItem><SelectItem value="weekly">Semanal</SelectItem><SelectItem value="monthly">Mensual</SelectItem><SelectItem value="one_shot">One-shot inicial</SelectItem>{templateProjects.map(project => <SelectItem key={project.id} value={`project:${project.id}`}>Estructura: {project.name}</SelectItem>)}</SelectContent></Select><p className="mt-1 text-xs text-muted-foreground">Podés usar una estructura inicial o copiar las secciones y tareas de un proyecto existente, incluidos los cargados desde el Excel. Seleccioná sus miembros para conservar las asignaciones. La copia comienza con tareas pendientes y fechas/horas vacías.</p></div>
+                  <div className="min-w-0">
+                    <FormLabel>Plantilla de proyecto</FormLabel>
+                    <Select value={projectTemplate} onValueChange={setProjectTemplate}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Sin plantilla</SelectItem>
+                        {projectTemplateCatalog.map(template => <SelectItem key={template.key} value={template.key}>{template.label}</SelectItem>)}
+                        {templateProjects.map(project => <SelectItem key={project.id} value={`project:${project.id}`}>Estructura: {project.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    <p className="mt-1 text-xs text-muted-foreground">Las plantillas originales de Asana conservan secciones, tareas, hitos e instrucciones. También podés copiar un proyecto del Excel: seleccioná sus miembros para conservar asignaciones. La copia comienza pendiente, sin fechas ni horas realizadas.</p>
+                    {templatesLoading && <p className="mt-2 text-xs text-muted-foreground">Cargando plantillas de Asana…</p>}
+                    {templatesError && <div className="mt-2 text-xs text-destructive">No se pudieron cargar las plantillas. <Button type="button" variant="link" size="sm" onClick={() => reloadTemplates()}>Reintentar</Button></div>}
+                    {selectedTemplate && <details className="mt-3 rounded-md border p-3 text-sm">
+                      <summary className="cursor-pointer font-medium">Ver estructura · {selectedTemplate.sections.length} secciones · {countTemplateTasks(selectedTemplate)} tareas</summary>
+                      <a className="mt-2 inline-block text-xs text-primary underline" href={selectedTemplate.sourceUrl} target="_blank" rel="noopener noreferrer">Ver plantilla original en Asana</a>
+                      <div className="mt-3 max-h-72 space-y-3 overflow-y-auto">
+                        {selectedTemplate.sections.map(section => <div key={section.name}>
+                          <p className="font-medium">{section.name}</p>
+                          <ul className="mt-1 space-y-1 pl-4 text-xs text-muted-foreground">
+                            {section.tasks.map(task => <li key={task.sourceTaskId}>{task.title}{task.isMilestone && <span className="ml-1 text-primary">· Hito</span>}</li>)}
+                          </ul>
+                        </div>)}
+                      </div>
+                    </details>}
+                  </div>
                   <div><FormLabel>Project manager</FormLabel><Select value={projectManagerId || "none"} onValueChange={(value) => setProjectManagerId(value === "none" ? "" : value)}><SelectTrigger><SelectValue placeholder="Sin responsable" /></SelectTrigger><SelectContent><SelectItem value="none">Sin responsable</SelectItem>{(Array.isArray(personnelData) ? personnelData : []).map((person: any) => <SelectItem key={person.id} value={String(person.id)}>{person.name}</SelectItem>)}</SelectContent></Select></div>
                   <div><FormLabel>Miembros del proyecto</FormLabel><div className="mt-2 max-h-36 space-y-1 overflow-y-auto">{(Array.isArray(personnelData) ? personnelData : []).map((person: any) => <label key={person.id} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={memberIds.includes(person.id)} onChange={(event) => setMemberIds(event.target.checked ? [...memberIds, person.id] : memberIds.filter((id) => id !== person.id))} />{person.name}{person.currentRole ? <span className="text-xs text-muted-foreground">· {person.currentRole}</span> : null}</label>)}</div></div>
                 </div>
