@@ -1,5 +1,5 @@
 import { taskRecurrenceSchema, type TaskRecurrence } from "./utils/task-recurrence";
-import { pgTable, text, serial, integer, boolean, timestamp, date, doublePrecision, json, numeric, varchar, unique, uniqueIndex, pgEnum, jsonb, index, primaryKey, type AnyPgColumn } from "drizzle-orm/pg-core";
+import { pgTable, check, text, serial, integer, boolean, timestamp, date, doublePrecision, json, numeric, varchar, unique, uniqueIndex, pgEnum, jsonb, index, primaryKey, type AnyPgColumn } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations, sql } from "drizzle-orm";
@@ -2328,6 +2328,24 @@ export const insertTaskSchema = createInsertSchema(tasks).omit({
 
 export type Task = typeof tasks.$inferSelect;
 export type InsertTask = z.infer<typeof insertTaskSchema>;
+
+// Original Asana time is an operational ledger. It is not posted again to
+// financial facts or payroll; historical costs remain in their source ledger.
+export const asanaPersonIdentities = pgTable("asana_person_identities", {
+  gid: text("gid").primaryKey(), name: text("name").notNull(), email: text("email"),
+  personnelId: integer("personnel_id").references(() => personnel.id),
+  source: jsonb("source").notNull(), importedAt: timestamp("imported_at").notNull().defaultNow(),
+});
+export const asanaTimeEntries = pgTable("asana_time_entries", {
+  gid: text("gid").primaryKey(), projectId: integer("project_id").notNull().references(() => activeProjects.id),
+  taskId: integer("task_id").references(() => tasks.id, { onDelete: "set null" }),
+  personnelId: integer("personnel_id").references(() => personnel.id),
+  sourceTaskGid: text("source_task_gid"), sourceTaskName: text("source_task_name"),
+  authorGid: text("author_gid").references(() => asanaPersonIdentities.gid), authorName: text("author_name"),
+  date: timestamp("date").notNull(), minutes: integer("minutes").notNull(), description: text("description"),
+  source: jsonb("source").notNull(), sourceCreatedAt: timestamp("source_created_at"),
+  importedAt: timestamp("imported_at").notNull().defaultNow(),
+}, table => ({ nonnegativeMinutes: check("asana_time_entries_minutes_check", sql`${table.minutes} >= 0`), projectDate: index("asana_time_entries_project_date").on(table.projectId, table.date), task: index("asana_time_entries_task").on(table.taskId) }));
 
 // Registro de horas contra tareas específicas
 export const taskTimeEntries = pgTable("task_time_entries", {

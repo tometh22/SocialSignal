@@ -54,3 +54,44 @@ describe("Asana data migration", () => {
     expect(asanaMigrationProvenanceSql).toContain("REFERENCES active_projects(id)");
   });
 });
+
+// @ts-ignore Release tooling is deliberately executable in plain Node.
+import { parseAsanaTaskJson, parseAsanaTimeJson } from "../scripts/lib/asana-task-json.mjs";
+import { filterTasksByOrigin } from "../shared/utils/task-origin";
+import { asanaSourceTimeSql } from "../server/migrations/asana-source-time";
+const sourceTask = (gid: string, extra = {}) => ({ gid, name: `Task ${gid}`, completed: false, created_at: "2026-09-01T15:30:00Z", actual_time_minutes: 0, ...extra });
+describe("Full Asana source reconciliation", () => {
+  it("keeps exact parent IDs even when several parents have the same name", () => {
+    const child = sourceTask("3", { parent: { gid: "2", name: "Same" } });
+    const parsed = parseAsanaTaskJson({ data: [sourceTask("1", { name: "Same" }), sourceTask("2", { name: "Same", memberships: [{ project: { gid: "90" }, section: { name: "Reports" } }], subtasks: [child] })] }, "90");
+    expect(parsed.tasks).toHaveLength(3); expect(parsed.tasks[2].parentGid).toBe("2"); expect(parsed.tasks[2].section).toBe("Reports"); expect(parsed.tasks[2].raw).not.toHaveProperty("subtasks");
+  });
+  it("deduplicates tasks present both in a project and under another task", () => {
+    const child = sourceTask("2", { parent: { gid: "1" } });
+    expect(parseAsanaTaskJson({ data: [sourceTask("1", { subtasks: [child] }), child] }, "90").tasks).toHaveLength(2);
+  });
+  it("preserves milestone and exact completion timestamps", () => {
+    const task = parseAsanaTaskJson({ data: [sourceTask("1", { completed: true, completed_at: "2026-09-02T00:01:23Z", resource_subtype: "milestone" })] }, "90").tasks[0];
+    expect(task.isMilestone).toBe(true); expect(task.completedAt).toBe("2026-09-02T00:01:23.000Z"); expect(task.status).toBe("done");
+  });
+  it("rejects missing nested fields, cycles and unfinished pagination", () => {
+    expect(() => parseAsanaTaskJson({ data: [sourceTask("1", { subtasks: [{ gid: "2" }] })] }, "90")).toThrow();
+    expect(() => parseAsanaTaskJson({ data: [sourceTask("1", { parent: { gid: "2" } }), sourceTask("2", { parent: { gid: "1" } })] }, "90")).toThrow();
+    expect(() => parseAsanaTaskJson({ data: [], next_page: { offset: "next" } }, "90")).toThrow();
+  });
+  it("retains source time when its task or author has been deleted", () => {
+    const entry = parseAsanaTimeJson({ data: [{ gid: "10", attributable_to: { gid: "90" }, entered_on: "2025-09-01", duration_minutes: 37, task: null, created_by: null }] }, "90")[0];
+    expect(entry.taskGid).toBeNull(); expect(entry.authorGid).toBeNull(); expect(entry.minutes).toBe(37); expect(entry.date).toBe("2025-09-01T12:00:00Z");
+  });
+  it("rejects duplicate time IDs, wrong project attribution and invalid minutes", () => {
+    const entry = { gid: "10", attributable_to: { gid: "90" }, entered_on: "2025-09-01", duration_minutes: 1 };
+    expect(() => parseAsanaTimeJson({ data: [entry, entry] }, "90")).toThrow(); expect(() => parseAsanaTimeJson({ data: [entry] }, "91")).toThrow(); expect(() => parseAsanaTimeJson({ data: [{ ...entry, duration_minutes: -1 }] }, "90")).toThrow();
+  });
+  it("keeps native task context when filtering imported tasks", () => {
+    const tasks = [{ id: 1, asanaTaskGid: "source" }, { id: 2, parentTaskId: 1 }, { id: 3 }];
+    expect(filterTasksByOrigin(tasks, "native").map(t => t.id)).toEqual([1, 2, 3]); expect(filterTasksByOrigin(tasks, "asana").map(t => t.id)).toEqual([1]); expect(filterTasksByOrigin(tasks, "all")).toBe(tasks);
+  });
+  it("stores original time independently of financial posting", () => {
+    expect(asanaSourceTimeSql).toContain("CREATE TABLE IF NOT EXISTS asana_time_entries"); expect(asanaSourceTimeSql).not.toContain("fact_labor_month"); expect(asanaSourceTimeSql).toContain("ON DELETE SET NULL");
+  });
+});

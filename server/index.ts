@@ -45,6 +45,7 @@ import { objectivesRescheduledDateMigrationSql } from "./migrations/objectives-r
 import { objectivesUserEditsMigrationSql } from "./migrations/objectives-user-edits";
 import { feedbackClosure0069MigrationSql } from "./migrations/feedback-closure-0069";
 import { taskMilestonesMigrationSql } from "./migrations/task-milestones";
+import { asanaSourceTimeSql } from "./migrations/asana-source-time";
 import { asanaMigrationProvenanceSql } from "./migrations/asana-migration-provenance";
 import { projectTaskSectionsMigrationSql } from "./migrations/project-task-sections";
 import { taskRecurrenceMigrationSql } from "./migrations/task-recurrence";
@@ -884,6 +885,7 @@ async function applyPendingMigrations() {
     await run('0072 persistent project task sections', projectTaskSectionsMigrationSql);
     await run('0073 task milestones', taskMilestonesMigrationSql);
     await run('0074 Asana migration provenance', asanaMigrationProvenanceSql);
+    await run('0075 Asana source time', asanaSourceTimeSql);
 
     // 0033: feriados duplicados (mismo date+name insertado más de una vez desde el
     // formulario) — borra duplicados conservando la fila más antigua y agrega la

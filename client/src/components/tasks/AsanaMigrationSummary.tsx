@@ -1,7 +1,12 @@
+import AsanaSourceHours from "./AsanaSourceHours";
 import { useQuery } from "@tanstack/react-query";
 import { authFetchJson } from "@/lib/queryClient";
 
 type Migration = {
+  time: { records: number; minutes: number; unresolved_people: number; unavailable_tasks: number };
+  priorNativeTasks: number;
+  retiredTasks: number;
+  retiredTaskArchiveProjectId: number | null;
   gid: string;
   tasksAvailable: boolean;
   detailedHoursAvailable: boolean;
@@ -26,6 +31,10 @@ export default function AsanaMigrationSummary({ projectId }: { projectId: number
       <a className="text-primary underline" href={`https://app.asana.com/0/${data.gid}/list`} target="_blank" rel="noopener noreferrer">Abrir original</a>
     </div>
     <p>{data.tasksAvailable ? `${data.counts.imported_tasks} tareas importadas · ${data.counts.assigned_tasks} con responsable` : "Exportación de tareas pendiente. Se conserva la estructura cargada desde el Excel."}</p>
+    {data.retiredTasks > 0 && <p className="text-amber-700">{data.retiredTasks} tareas ya retiradas de Mind se conservan en <a className="underline" href={`/tasks/projects/${data.retiredTaskArchiveProjectId}`}>historial recuperable</a>.</p>}
+    {data.priorNativeTasks > 0 && <p className="text-muted-foreground">Se conservan {data.priorNativeTasks} tareas anteriores de Excel/Mind.</p>}
+    {data.detailedHoursAvailable && <p>{data.time.records} entradas de tiempo originales · {(data.time.minutes / 60).toLocaleString("es-AR", { maximumFractionDigits: 2 })} h. Conciliación financiera pendiente.</p>}
+    {data.detailedHoursAvailable && <AsanaSourceHours projectId={projectId} />}
     {!data.clientConfirmed && <p className="text-amber-700">Cliente y cotización pendientes de confirmar. La importación conserva el nombre de Asana.</p>}
     {data.counts.unresolved_parents > 0 && <p className="text-amber-700">{data.counts.unresolved_parents} relaciones de subtareas necesitan cotejo con el original.</p>}
     {!data.detailedHoursAvailable && <p className="text-amber-700">Pendiente: importar las entradas de tiempo con su fecha y autor. Los totales del CSV se muestran en cada tarea por separado.</p>}

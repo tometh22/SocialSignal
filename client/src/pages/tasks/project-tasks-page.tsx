@@ -1,3 +1,4 @@
+import type { TaskOrigin } from "@shared/utils/task-origin";
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
@@ -83,6 +84,7 @@ export default function ProjectTasksPage({ params }: Props) {
   const [showFilter, setShowFilter] = useState(false);
   const [filterText, setFilterText] = useState("");
   const [localMembers, setLocalMembers] = useState<ProjectMember[] | null>(null);
+  const [sourceFilter, setSourceFilter] = useState<TaskOrigin>("all");
   const [sortBy, setSortBy] = useState("default");
   const [groupBy, setGroupBy] = useState("section");
 
@@ -547,6 +549,11 @@ export default function ProjectTasksPage({ params }: Props) {
         {/* Task list / board */}
         {view !== "panel" && view !== "calendar" && (
           <div className="pt-4">
+            <label className="mb-3 flex items-center gap-2 text-sm">Origen
+              <select className="rounded border bg-background px-2 py-1" value={sourceFilter} onChange={event => setSourceFilter(event.target.value as TaskOrigin)}>
+                <option value="all">Todas las tareas</option><option value="asana">Importadas de Asana</option><option value="native">Excel / creadas en Mind</option>
+              </select>
+            </label>
             <ProjectTaskList
               projectId={projectId}
               projectMembers={members}
@@ -554,6 +561,7 @@ export default function ProjectTasksPage({ params }: Props) {
               clientName={project.clientName}
               onQuickAddTrigger={quickAddTrigger}
               filterText={filterText}
+              sourceFilter={sourceFilter}
               sortBy={sortBy}
               groupBy={groupBy}
             />
