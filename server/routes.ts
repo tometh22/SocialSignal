@@ -24725,6 +24725,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Original source hours remain separate from financial posting and payroll.
+  app.get("/api/tasks/projects/:id/asana-time", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const id = Number(req.params.id);
+      if (!Number.isSafeInteger(id) || id <= 0) return res.status(400).json({ message: "ID inválido" });
+      if (!(await canAccessTaskProject(req, id))) return res.status(403).json({ message: "No tenés acceso a este proyecto" });
+      const page = Number(req.query.page ?? 0);
+      const task = req.query.taskId === undefined ? null : Number(req.query.taskId);
+      const month = typeof req.query.month === "string" ? req.query.month : null;
+      if (!Number.isSafeInteger(page) || page < 0 || page > 100000 || task !== null && (!Number.isSafeInteger(task) || task <= 0) || month && !/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) return res.status(400).json({ message: "Filtro inválido" });
+      const filter = sql`e.project_id=${id} ${task === null ? sql`` : sql`AND e.task_id IN (WITH RECURSIVE tree AS (SELECT id FROM tasks WHERE id=${task} AND project_id=${id} UNION SELECT child.id FROM tasks child JOIN tree parent ON child.parent_task_id=parent.id WHERE child.project_id=${id}) SELECT id FROM tree)`} ${month ? sql`AND to_char(e.date,'YYYY-MM')=${month}` : sql``}`;
+      const summary = await db.execute(sql`SELECT COUNT(*)::int AS records,COALESCE(SUM(e.minutes),0)::int AS minutes,COUNT(*) FILTER (WHERE e.personnel_id IS NULL)::int AS unresolved_people,COUNT(*) FILTER (WHERE e.task_id IS NULL)::int AS unavailable_tasks,MIN(to_char(e.date,'YYYY-MM-DD')) AS first_date,MAX(to_char(e.date,'YYYY-MM-DD')) AS last_date FROM asana_time_entries e WHERE ${filter}`);
+      const entries = await db.execute(sql`SELECT e.gid,e.task_id,e.source_task_gid,e.source_task_name,e.author_name,e.personnel_id,p.name AS personnel_name,to_char(e.date,'YYYY-MM-DD') AS date,e.minutes,e.description FROM asana_time_entries e LEFT JOIN personnel p ON p.id=e.personnel_id WHERE ${filter} ORDER BY e.date DESC,e.gid LIMIT 25 OFFSET ${page * 25}`);
+      res.json({ summary: summary.rows[0], entries: entries.rows, page, pageSize: 25, financialReconciled: false });
+    } catch (error) {
+      console.error("Error leyendo horas originales Asana", error);
+      res.status(500).json({ message: "No se pudieron consultar las horas originales" });
+    }
+  });
+
   // GET /api/tasks/projects/:id — detalle de proyecto con members y stats
   app.get("/api/tasks/projects/:id/migration", requireAuth, async (req: Request, res: Response) => {
     try {
@@ -24735,10 +24755,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!project) return res.status(404).json({ message: "Proyecto no encontrado" });
       if (!project.gid) return res.json(null);
       const counts = await db.execute(sql`SELECT COUNT(*)::int AS imported_tasks, COUNT(*) FILTER (WHERE assignee_id IS NOT NULL)::int AS assigned_tasks, COUNT(*) FILTER (WHERE asana_source->>'parentResolution' IN ('ambiguous','missing'))::int AS unresolved_parents FROM tasks WHERE project_id=${projectId} AND asana_task_gid IS NOT NULL`);
+      const time = await db.execute(sql`SELECT COUNT(*)::int AS records,COALESCE(SUM(minutes),0)::int AS minutes,COUNT(*) FILTER (WHERE personnel_id IS NULL)::int AS unresolved_people,COUNT(*) FILTER (WHERE task_id IS NULL)::int AS unavailable_tasks FROM asana_time_entries WHERE project_id=${projectId}`);
+      const native = await db.execute(sql`SELECT COUNT(*)::int AS records FROM tasks WHERE project_id=${projectId} AND asana_task_gid IS NULL`);
       const operations = isOperationsRequest(req);
       const quotations = operations ? (await db.execute(sql`SELECT q.id,q.project_name AS name,q.quotation_currency AS currency,q.total_amount AS amount,l.relation FROM project_quotation_links l JOIN quotations q ON q.id=l.quotation_id WHERE l.project_id=${projectId} ORDER BY q.id`)).rows : [];
       const history = operations ? (await db.execute(sql`SELECT l.legacy_project_id,l.relation,COUNT(f.id)::int AS records,COALESCE(SUM(f.asana_hours),0)::double precision AS hours,MIN(f.period_key) AS first_period,MAX(f.period_key) AS last_period FROM project_history_links l LEFT JOIN fact_labor_month f ON f.project_id=l.legacy_project_id WHERE l.project_id=${projectId} GROUP BY l.legacy_project_id,l.relation ORDER BY l.legacy_project_id`)).rows : [];
-      res.json({ gid: project.gid, counts: counts.rows[0], tasksAvailable: project.source?.tasksAvailable === true, detailedHoursAvailable: project.source?.detailedHoursAvailable === true, clientConfirmed: project.source?.clientConfirmed !== false, quotations, history, reportedConsumedCost: operations ? project.source?.reportedConsumedCost ?? null : null });
+      res.json({ retiredTasks: project.source?.retiredTaskGids instanceof Array ? project.source.retiredTaskGids.length : 0, retiredTaskArchiveProjectId: project.source?.retiredTaskArchiveProjectId ?? null, time: time.rows[0], priorNativeTasks: native.rows[0]?.records ?? 0, gid: project.gid, counts: counts.rows[0], tasksAvailable: project.source?.tasksAvailable === true, detailedHoursAvailable: project.source?.detailedHoursAvailable === true, clientConfirmed: project.source?.clientConfirmed !== false, quotations, history, reportedConsumedCost: operations ? project.source?.reportedConsumedCost ?? null : null });
     } catch (error) {
       console.error("Error leyendo conciliación Asana:", error);
       res.status(500).json({ message: "No se pudo leer la conciliación con Asana" });

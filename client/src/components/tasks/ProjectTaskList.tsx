@@ -1,3 +1,4 @@
+import { filterTasksByOrigin, type TaskOrigin } from "@shared/utils/task-origin";
 import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest, authFetch } from "@/lib/queryClient";
@@ -41,6 +42,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 
 type Task = {
+  asanaTaskGid?: string | null;
   isMilestone?: boolean;
   id: number;
   title: string;
@@ -1290,11 +1292,12 @@ interface Props {
   clientName?: string | null;
   onQuickAddTrigger?: number;
   filterText?: string;
+  sourceFilter?: TaskOrigin;
   sortBy?: string;
   groupBy?: string;
 }
 
-export default function ProjectTaskList({ projectId, projectMembers = [], view = "list", clientName, onQuickAddTrigger = 0, filterText = "", sortBy = 'default', groupBy = 'section' }: Props) {
+export default function ProjectTaskList({ projectId, projectMembers = [], view = "list", clientName, onQuickAddTrigger = 0, filterText = "", sourceFilter = "all", sortBy = 'default', groupBy = 'section' }: Props) {
   const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
   const [focusTime, setFocusTime] = useState(false);
   const [sectionFilter, setSectionFilter] = useState<string>("all");
@@ -1480,7 +1483,7 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
     onSuccess: () => { refetch(); invalidateRelated(); setShowAddSection(false); setNewSectionName(""); },
   });
 
-  const allTasksRaw = data?.tasks || [];
+  const allTasksRaw = filterTasksByOrigin(data?.tasks || [], sourceFilter);
   const sectionsRaw = data?.sections || {};
 
   // Apply filter
@@ -1489,7 +1492,7 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
     : allTasksRaw;
 
   // When filtering, rebuild sections from filtered tasks
-  const baseSections: Record<string, Task[]> = filterText.trim()
+  const baseSections: Record<string, Task[]> = filterText.trim() || sourceFilter !== "all"
     ? allTasks.reduce((acc: Record<string, Task[]>, t) => {
         const sec = t.sectionName || "General";
         if (!acc[sec]) acc[sec] = [];

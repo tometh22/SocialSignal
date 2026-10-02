@@ -1,39 +1,56 @@
 # Migración de Asana — 2026-10-02
 
-## Alcance y evidencia
+## Alcance verificado
 
-El inventario visible en la sesión de Asana contiene 51 proyectos: dos plantillas originales ya publicadas en 1.10.4 y 49 proyectos/boards de trabajo. Este inventario no acredita proyectos inaccesibles para esa cuenta.
+El inventario de la cuenta autorizada contiene 51 proyectos no archivados: dos plantillas ya publicadas en 1.10.4 y 49 proyectos/boards de trabajo. Se verificaron por separado `archived=false` y `completed=false` de los 49. No se acredita contenido inaccesible para esa cuenta.
 
-Se recuperaron 44 exportaciones oficiales de tareas, con 2.255 identificadores de tarea únicos dentro de su proyecto. Cinco exportaciones grandes y las exportaciones de entradas de tiempo siguen bloqueadas por Chrome (`ERR_BLOCKED_BY_CLIENT`) en el servidor de archivos de Asana. No se elude esa protección.
+La primera etapa 1.10.5 recuperó 44 CSV y 2.255 filas de tareas. Chrome bloqueó cinco CSV grandes y los archivos de horas del servidor de descargas. La exportación JSON oficial visible en Asana resolvió esa dependencia en la segunda etapa: se recorrieron todas las páginas de Warner Weekly y todas las páginas de los registros de tiempo, sin eludir la protección de Chrome ni extraer credenciales del navegador.
 
-El Excel suministrado contiene nueve estructuras operativas, seis cotizaciones, responsables, horas presupuestadas para dos contratos y un costo consumido informado para Insights. No contiene todas las tareas reales ni las entradas de tiempo con fecha y autor de Asana.
+La extracción completa contiene:
 
-## Implementación
+- 12.071 identificadores únicos de tarea, representados en 12.081 relaciones con proyectos: diez tareas están compartidas.
+- 11.818 entradas de tiempo únicas, con fecha civil, minutos, autor y proyecto atribuido por Asana.
+- 378 secciones, incluidas vacías, propietarios y miembros originales de los 49 proyectos.
+- 25 identidades originales; 23 vinculadas a Personal por correo único o alias explícito.
 
-- Importador CLI con vista previa por defecto, validación completa previa, transacción única y bloqueo consultivo. La aplicación exige `--apply` explícito.
-- Identificadores de origen únicos por proyecto y por tarea dentro de su proyecto; preservación de cada fila original y de duplicados del CSV en metadatos.
-- Responsables resueltos a personas existentes mediante coincidencias únicas o aliases explícitos; nunca se crean personas por similitud.
-- Secciones, descripciones, fechas civiles y finalización del CSV. Los CSV sólo distinguen completadas/no completadas: no se infiere avance intermedio.
-- Jerarquías por orden de exportación y nombres únicos. Doce referencias externas/ambiguas quedan identificadas sin inventar relaciones.
-- Reutilización de una tarea nativa sólo con título, responsable y sección coincidentes y únicos. Se preservan notas, jerarquía y trabajo nativo; los scaffolds sin fechas/horas pueden adoptar fechas y finalización del origen.
-- Repetir el mismo archivo no duplica tareas ni sobrescribe modificaciones posteriores. Un archivo distinto requiere conciliación explícita.
-- Relaciones FK entre proyecto y contratos adicionales, incluidos ambos contratos Insights, y vínculos al historial mensual existente. No se trasladan ni duplican costos/horas del historial.
-- Cuatro clientes comerciales sin correspondencia confirmada quedan bajo un contenedor explícito «Asana · cliente pendiente de confirmar», sin cotización ni alias financiero automático.
-- Totales de tiempo del CSV mostrados como instantánea de origen; no se convierten en horas facturables sin fecha y autor.
-- Costo informado de Insights: USD 10.981,58, identificado como saldo pendiente de conciliación, no como gasto nuevo con fecha inventada.
-- Detalle visible de migración por proyecto; los datos financieros requieren acceso de Operaciones.
+El Excel suministrado aporta nueve estructuras, seis cotizaciones, responsables, horas presupuestadas para dos contratos y un costo consumido de Insights. Su contenido no sustituye las tareas/horas reales de Asana.
 
-## Pendientes reales
+## Implementación 1.10.6
 
-1. CSV de tareas de Epical Operaciones, Epical General, Kimberly Clark, Warner Weekly y Epical Prospección.
-2. CSV de entradas de tiempo de los proyectos, con sus autores y fechas. No hay sincronización continua autorizada/configurada con un token Asana.
-3. Cotejo de doce referencias de subtareas (mayormente boards de personas históricas y padres externos al archivo).
-4. Confirmar clientes/cotizaciones de EM Turismo de Lujo, KBN Automatización, Netflix y Natura. No se inventan contratos para los demás proyectos sin cotización en las fuentes.
-5. Conciliar el saldo consumido de Insights con el detalle de horas/costos y el reparto Weekly/Monthly del historial compartido; los registros originales se conservan.
-6. Tarifa de Carolina Moreno, freelance sin horas fijas y excluida de costos hasta que el usuario la suministre.
+- CLI con vista previa por defecto, validación previa de fuentes, transacción única y bloqueo consultivo. La aplicación exige `--apply`.
+- GID único por tarea dentro de su proyecto; GID global único por entrada de tiempo, respetando su proyecto atribuido para evitar contabilizar una tarea compartida dos veces.
+- Subtareas recursivas con identificadores exactos de padres, notas, fechas civiles, finalización, hitos y responsables. Se rechazan ciclos y exportaciones/paginaciones incompletas.
+- Las tareas existentes conservan sus ediciones de Mind; sólo se concilia una jerarquía que siga coincidiendo con la exportación previa. Repetir la carga no duplica registros ni reemplaza ediciones posteriores.
+- Miembros conocidos y propietario original como PM cuando Mind no tenga un propietario elegido. Identidades desconocidas conservadas sin inventar roles, contratos o tarifas.
+- Horas originales en `asana_time_entries`, relacionadas con proyecto, tarea y Personal cuando existen. No se insertan nuevamente como gastos, hechos financieros ni liquidaciones. Las diferencias de un registro de tiempo ya importado requieren conciliación explícita.
+- Entradas de tiempo de tareas eliminadas o movidas fuera del proyecto conservadas con sus identificadores/nombres originales; no se inventan tareas activas para esas horas. Hay 99 entradas de este tipo en el inventario extraído.
+- Consulta paginada por proyecto, tarea/subtareas y mes. Historial de fuente separado de la carga nativa; costos históricos pendientes de conciliación claramente indicados.
+- Filtro por origen para distinguir estructuras Excel/Mind de trabajo real importado, conservando el contexto de los padres.
+- Ambos contratos Insights vinculados mediante relaciones FK; las seis cotizaciones del Excel permanecen asociadas. Historial mensual existente enlazado sin mover ni duplicar los registros financieros.
+
+## Conservación de cambios concurrentes
+
+En el segundo cotejo, 121 identificadores de la primera carga ya no estaban en Mind: 49 en Automatizaciones y 72 en Animal Proyectos Cortos. Se conserva ese retiro de la superficie activa y se guarda la instantánea original de Asana en proyectos inactivos recuperables. No se atribuye quién retiró los registros sin una evidencia de auditoría. El manifiesto conserva los identificadores importados para respetar retiros posteriores y evitar recreaciones silenciosas.
+
+## Pendientes de datos/conciliación
+
+1. Vincular las identidades históricas «Sil» y Alicia Crosa a Personal o mantenerlas como autores históricos externos.
+2. Confirmar clientes y contratos de EM Turismo de Lujo, KBN Automatización, Netflix y Natura. Permanecen identificados bajo «Asana · cliente pendiente de confirmar»; no se inventan cotizaciones para los proyectos sin contrato en las fuentes.
+3. Conciliar USD 10.981,58 informados como costo consumido de Insights y el reparto Weekly/Monthly del historial compartido. Los registros originales permanecen separados de su nueva contabilización.
+4. Tarifa de Carolina Moreno, freelance sin horas fijas y excluida de costos hasta que el usuario la suministre.
+5. Once padres externos al proyecto se conservan por GID, sin crear jerarquías cruzadas artificiales.
+6. El histórico financiero contiene referencias antiguas sin proyecto recuperable (por ejemplo, proyecto 50/Colapinto). No se adjudican a proyectos actuales por similitud.
+
+Esta migración es una instantánea autorizada, no una sincronización continua: no se crea un token nuevo ni se amplían permisos para sincronizar.
 
 ## Verificación
 
-- Suite existente más ocho casos de regresión del parser/proveniencia.
-- PostgreSQL local: 32 comprobaciones CLI/API de vista previa, importación, idempotencia, preservación nativa/financiera, fechas, jerarquía, contratos, clientes pendientes y permisos.
-- La liberación exige CI en checkout limpio antes del merge, seguido de verificación de salud y conciliación de cantidades/identificadores en producción.
+- 675 pruebas unitarias/regresión aprobadas; 11 pruebas opcionales existentes omitidas.
+- PostgreSQL local independiente: 32 comprobaciones de primera etapa y 42 de segunda etapa. Permisos, filtros, paginación, fechas, hitos, padres exactos, idempotencia, retiros recuperables, conservación de ediciones y ausencia de duplicación financiera.
+- Liberación con CI en checkout limpio antes del merge; después, salud/commit, cantidades/GID, identidades, contratos y conservación de los registros previos en producción.
+
+## Referencias técnicas de Asana
+
+- [Tareas de un proyecto](https://developers.asana.com/reference/gettasksforproject)
+- [Secciones de un proyecto](https://developers.asana.com/reference/getsectionsforproject)
+- [Entradas de tiempo y proyecto atribuido](https://developers.asana.com/reference/gettimetrackingentries)

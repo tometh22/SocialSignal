@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.10.6 — 2026-10-02
+
+- Completa la extracción de los 49 proyectos de Asana por su exportación JSON oficial, incluidas subtareas con identificadores exactos, hitos, secciones vacías, miembros y PM.
+- Agrega historial original de tiempo con fecha, autor, tarea y proyecto atribuido, consultable y paginado por proyecto/tarea y mes.
+- Conserva las horas históricas separadas de su contabilización financiera para evitar duplicar costos existentes o inventar tarifas.
+- Vincula identidades por correo o aliases explícitos y conserva autores históricos sin inventar perfiles de Personal.
+- Permite filtrar tareas por origen para conservar las estructuras Excel/Mind junto con las tareas reales de Asana.
+
 ## 1.10.5 — 2026-10-02
 
 - Agrega importación controlada de proyectos y tareas desde los CSV oficiales de Asana, con vista previa, transacción e identificadores únicos de origen.
