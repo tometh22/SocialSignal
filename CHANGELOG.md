@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.10.5 — 2026-10-02
+
+- Agrega importación controlada de proyectos y tareas desde los CSV oficiales de Asana, con vista previa, transacción e identificadores únicos de origen.
+- Conserva responsables, fechas civiles, notas, estado y jerarquías resolubles; repetir una importación conserva cambios posteriores de Mind.
+- Vincula contratos adicionales y registros históricos sin duplicar horas ni modificar precios.
+- Muestra por proyecto y tarea los datos importados y los pendientes, separando los totales de tiempo del CSV de las entradas de horas con fecha y autor.
+- Identifica clientes sin confirmar y el costo consumido informado por Excel como pendientes de conciliación.
+
 ## 1.10.4 — 2026-10-02
 
 - Reemplaza las estructuras genéricas por las dos plantillas originales de Asana: 22 tareas y cinco secciones para informes recurrentes; 15 tareas y tres secciones para one-shot.

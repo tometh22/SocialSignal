@@ -24726,6 +24726,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // GET /api/tasks/projects/:id — detalle de proyecto con members y stats
+  app.get("/api/tasks/projects/:id/migration", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const projectId = Number(req.params.id);
+      if (!Number.isSafeInteger(projectId) || projectId <= 0) return res.status(400).json({ message: "ID de proyecto inválido" });
+      if (!(await canAccessTaskProject(req, projectId))) return res.status(403).json({ message: "No tenés acceso a este proyecto" });
+      const [project] = await db.select({ gid: activeProjects.asanaProjectGid, source: activeProjects.asanaSource, quotationId: activeProjects.quotationId }).from(activeProjects).where(eq(activeProjects.id, projectId));
+      if (!project) return res.status(404).json({ message: "Proyecto no encontrado" });
+      if (!project.gid) return res.json(null);
+      const counts = await db.execute(sql`SELECT COUNT(*)::int AS imported_tasks, COUNT(*) FILTER (WHERE assignee_id IS NOT NULL)::int AS assigned_tasks, COUNT(*) FILTER (WHERE asana_source->>'parentResolution' IN ('ambiguous','missing'))::int AS unresolved_parents FROM tasks WHERE project_id=${projectId} AND asana_task_gid IS NOT NULL`);
+      const operations = isOperationsRequest(req);
+      const quotations = operations ? (await db.execute(sql`SELECT q.id,q.project_name AS name,q.quotation_currency AS currency,q.total_amount AS amount,l.relation FROM project_quotation_links l JOIN quotations q ON q.id=l.quotation_id WHERE l.project_id=${projectId} ORDER BY q.id`)).rows : [];
+      const history = operations ? (await db.execute(sql`SELECT l.legacy_project_id,l.relation,COUNT(f.id)::int AS records,COALESCE(SUM(f.asana_hours),0)::double precision AS hours,MIN(f.period_key) AS first_period,MAX(f.period_key) AS last_period FROM project_history_links l LEFT JOIN fact_labor_month f ON f.project_id=l.legacy_project_id WHERE l.project_id=${projectId} GROUP BY l.legacy_project_id,l.relation ORDER BY l.legacy_project_id`)).rows : [];
+      res.json({ gid: project.gid, counts: counts.rows[0], tasksAvailable: project.source?.tasksAvailable === true, detailedHoursAvailable: project.source?.detailedHoursAvailable === true, clientConfirmed: project.source?.clientConfirmed !== false, quotations, history, reportedConsumedCost: operations ? project.source?.reportedConsumedCost ?? null : null });
+    } catch (error) {
+      console.error("Error leyendo conciliación Asana:", error);
+      res.status(500).json({ message: "No se pudo leer la conciliación con Asana" });
+    }
+  });
+
   app.get("/api/tasks/projects/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const projectId = parseInt(req.params.id);

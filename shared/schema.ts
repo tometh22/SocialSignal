@@ -1581,6 +1581,8 @@ export const monthlySettlementEvents = pgTable("monthly_settlement_events", {
 // ==================== PROYECTOS ACTIVOS ====================
 // Proyectos Activos
 export const activeProjects = pgTable("active_projects", {
+  asanaProjectGid: text("asana_project_gid"),
+  asanaSource: jsonb("asana_source").$type<Record<string, unknown> | null>(),
   taskSectionNames: jsonb("task_section_names").$type<string[]>().notNull().default([]),
   id: serial("id").primaryKey(),
   quotationId: integer("quotation_id").references(() => quotations.id), // nullable — projects can be created without a quotation
@@ -1642,7 +1644,23 @@ export const activeProjects = pgTable("active_projects", {
   invoicedAt: timestamp("invoiced_at"), // fecha en que se facturó
   closedAt: timestamp("closed_at"), // fecha en que se cerró formalmente (bloquea costos/horas)
   closedBy: integer("closed_by").references(() => users.id, { onDelete: 'set null' }), // quién cerró
-});
+}, table => ({ asanaGidUnique: uniqueIndex("active_projects_asana_gid_unique").on(table.asanaProjectGid).where(sql`${table.asanaProjectGid} IS NOT NULL`) }));
+
+export const projectQuotationLinks = pgTable("project_quotation_links", {
+  projectId: integer("project_id").notNull().references(() => activeProjects.id),
+  quotationId: integer("quotation_id").notNull().references(() => quotations.id),
+  relation: text("relation").notNull().default("supplemental"),
+  source: text("source").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, table => ({ pk: primaryKey({ columns: [table.projectId, table.quotationId] }) }));
+
+export const projectHistoryLinks = pgTable("project_history_links", {
+  projectId: integer("project_id").notNull().references(() => activeProjects.id),
+  legacyProjectId: integer("legacy_project_id").notNull().references(() => activeProjects.id),
+  relation: text("relation").notNull(),
+  source: text("source").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, table => ({ pk: primaryKey({ columns: [table.projectId, table.legacyProjectId] }) }));
 
 export const PROJECT_STATUSES = [
   "active",
@@ -1666,6 +1684,8 @@ export type ProjectWorkflowStage = typeof PROJECT_WORKFLOW_STAGES[number];
 
 // Esquema base generado por drizzle-zod
 const baseInsertActiveProjectSchema = createInsertSchema(activeProjects).omit({
+  asanaProjectGid: true,
+  asanaSource: true,
   id: true,
   createdAt: true,
   updatedAt: true,
@@ -2262,6 +2282,8 @@ export const insertChatParticipantSchema = createInsertSchema(chatConversationPa
 // ==================== MÓDULO DE GESTIÓN DE TAREAS ====================
 // Tabla principal de tareas (similar a Asana)
 export const tasks = pgTable("tasks", {
+  asanaTaskGid: text("asana_task_gid"),
+  asanaSource: jsonb("asana_source").$type<Record<string, unknown> | null>(),
   id: serial("id").primaryKey(),
   title: text("title").notNull(),
   description: text("description"),
@@ -2284,9 +2306,11 @@ export const tasks = pgTable("tasks", {
   createdBy: integer("created_by").references(() => users.id, { onDelete: 'set null' }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
+}, table => ({ asanaProjectGidUnique: uniqueIndex("tasks_asana_project_gid_unique").on(table.projectId, table.asanaTaskGid).where(sql`${table.asanaTaskGid} IS NOT NULL`) }));
 
 export const insertTaskSchema = createInsertSchema(tasks).omit({
+  asanaTaskGid: true,
+  asanaSource: true,
   id: true,
   createdAt: true,
   updatedAt: true,
