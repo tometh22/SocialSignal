@@ -11,6 +11,7 @@ import { eq, and } from 'drizzle-orm';
 import { ActiveProjectsAggregator } from '../domain/projectsActive';
 import { storage } from '../storage';
 import { DEFAULT_FX_RATE, getCanonicalFxForMonth } from '../services/fx';
+import { projectQuotationSummary } from '../../shared/utils/project-quotation-summary';
 
 
 /**
@@ -349,14 +350,7 @@ export async function completeDataHandler(req: Request, res: Response) {
             revenueDisplay, costDisplay, cotizacion, currencyNative, budgetUtilization,
             name: quotationData?.projectName || null
           },
-          quotation: quotationData ? {
-            id: quotationData.id,
-            projectName: quotationData.projectName,
-            baseCost: quotationData.baseCost,
-            totalAmount: cotizacion,
-            totalAmountNative: cotizacion,
-            estimatedHours: lifetimeHoursTarget || -1
-          } : null,
+          quotation: projectQuotationSummary(quotationData, lifetimeHoursTarget),
           actuals: {
             totalWorkedHours: lifetimeHoursAsana,
             totalAsanaHours: lifetimeHoursAsana,
@@ -493,12 +487,7 @@ export async function completeDataHandler(req: Request, res: Response) {
             budgetUtilization: viewData.budgetUtilization,
             name: quotationData?.projectName || null
           },
-          quotation: quotationData ? {
-            id: quotationData.id, projectName: quotationData.projectName, baseCost: quotationData.baseCost,
-            totalAmount: viewData.cotizacion || quotationData.totalAmount,
-            totalAmountNative: viewData.cotizacion || quotationData.totalAmount,
-            estimatedHours: viewData.estimatedHours || -1
-          } : null,
+          quotation: projectQuotationSummary(quotationData, viewData.estimatedHours),
           actuals: {
             totalWorkedHours: viewData.totalWorkedHours,
             totalAsanaHours: viewData.totalAsanaHours,
@@ -793,9 +782,7 @@ export async function completeDataHandler(req: Request, res: Response) {
         isOneShot, hasRevenueInPeriod, periodWithRevenue
       },
       quotation: quotationData ? {
-        id: quotationData.id, projectName: quotationData.projectName, baseCost: quotationData.baseCost,
-        totalAmount: quotationData.totalAmount, totalAmountNative,
-        estimatedHours: legacy.estimatedHours || -1,
+        ...projectQuotationSummary(quotationData, legacy.estimatedHours),
         markupAmount: quotationData.markupAmount, marginFactor: quotationData.marginFactor
       } : null,
       actuals: actualsData,

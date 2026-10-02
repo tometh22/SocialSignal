@@ -28,6 +28,8 @@ export type MarginDriftTeamMember = {
 export type MarginDriftInput = {
   /** quotations.totalAmount — el precio ya fijado, en la moneda de la cotización. */
   lockedTotal: number;
+  /** Contractual operating cost, when available; may differ from the quoted team estimate. */
+  quotedCost?: number;
   team: MarginDriftTeamMember[];
 };
 
@@ -73,6 +75,13 @@ export function calculateMarginDrift(input: MarginDriftInput): MarginDriftResult
     } else {
       currentCost += hours * Math.max(0, Number(member.currentRate) || 0);
     }
+  }
+
+  if (input.quotedCost != null && Number.isFinite(input.quotedCost) && input.quotedCost >= 0) {
+    // Keep non-team costs fixed; never replace the contract baseline with a
+    // reconstructed historical team cost (imported estimates can differ).
+    currentCost += Math.max(0, input.quotedCost - originalCost);
+    originalCost = input.quotedCost;
   }
 
   const costDeltaPercentage = originalCost > 0

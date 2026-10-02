@@ -1,3 +1,4 @@
+import { quotationPersonnelName } from "@shared/utils/quotation-display";
 import React, { useState, useEffect } from 'react';
 import { authFetch } from '@/lib/queryClient';
 import { useRoute, useLocation } from 'wouter';
@@ -24,6 +25,7 @@ interface TeamMember {
   id: number;
   quotationId: number;
   personnelId: number | null;
+  personnelName?: string | null;
   roleId: number | null;
   hours: number;
   rate: number;
@@ -257,8 +259,7 @@ const QuotationDetail: React.FC = () => {
   // Obtener nombre de personal por ID
   const getPersonnelName = (id: number | null) => {
     if (!id) return 'Sin persona asignada';
-    const person = personnel.find(p => p.id === id);
-    return person ? person.name : `Personal ID: ${id}`;
+    return quotationPersonnelName(teamMembers.find(member => member.personnelId === id) || { personnelId: id }, personnel);
   };
 
   // Obtener nombre de rol por ID
@@ -873,14 +874,14 @@ const QuotationDetail: React.FC = () => {
                 </div>
                 <div className="px-4 text-center">
                   <p className="text-xs text-slate-400 mb-1">Margen real</p>
-                  <p className={`text-xl font-bold ${profitability.profitability.actualGrossMargin >= 30 ? 'text-emerald-600' : 'text-red-600'}`}>
-                    {profitability.profitability.actualGrossMargin}%
+                  <p className={`text-xl font-bold ${profitability.profitability.actualGrossMargin == null ? 'text-slate-400' : profitability.profitability.actualGrossMargin >= 30 ? 'text-emerald-600' : 'text-red-600'}`}>
+                    {profitability.profitability.actualGrossMargin == null ? 'Sin costos cargados' : `${profitability.profitability.actualGrossMargin}%`}
                   </p>
                 </div>
                 <div className="px-4 text-center">
                   <p className="text-xs text-slate-400 mb-1">Delta margen</p>
-                  <p className={`text-xl font-bold ${profitability.profitability.marginDelta >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                    {profitability.profitability.marginDelta > 0 ? '+' : ''}{profitability.profitability.marginDelta}%
+                  <p className={`text-xl font-bold ${profitability.profitability.marginDelta == null ? 'text-slate-400' : profitability.profitability.marginDelta >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                    {profitability.profitability.marginDelta == null ? '—' : `${profitability.profitability.marginDelta > 0 ? '+' : ''}${profitability.profitability.marginDelta}%`}
                   </p>
                 </div>
               </div>
@@ -919,11 +920,11 @@ function MarginDriftCard({ drift, formatCurrency }: { drift: MarginDrift; format
       </div>
       <div className={cn('px-4 py-3 space-y-2.5', styles.bg)}>
         <div className="flex justify-between items-center">
-          <span className="text-slate-600 text-sm">Costo del equipo al cotizar:</span>
+          <span className="text-slate-600 text-sm">Costo estimado cotizado:</span>
           <span className="font-medium text-slate-800 text-sm">{formatCurrency(drift.originalCost)}</span>
         </div>
         <div className="flex justify-between items-center">
-          <span className="text-slate-600 text-sm">Costo del equipo hoy:</span>
+          <span className="text-slate-600 text-sm">Costo estimado hoy:</span>
           <span className="font-medium text-slate-800 text-sm">
             {formatCurrency(drift.currentCost)}
             <span className={cn('ml-1.5 text-xs', drift.costDeltaPercentage > 0 ? 'text-red-600' : 'text-emerald-600')}>
@@ -936,7 +937,7 @@ function MarginDriftCard({ drift, formatCurrency }: { drift: MarginDrift; format
           <span className="font-medium text-slate-800 text-sm">{drift.originalMarginPercentage.toFixed(1)}%</span>
         </div>
         <div className="flex justify-between items-center">
-          <span className="text-slate-600 text-sm">Margen real hoy:</span>
+          <span className="text-slate-600 text-sm">Margen estimado hoy:</span>
           <span className={cn('font-bold text-sm', drift.severity === 'critical' ? 'text-red-700' : drift.severity === 'watch' ? 'text-amber-700' : 'text-emerald-700')}>
             {drift.currentMarginPercentage.toFixed(1)}%
           </span>
