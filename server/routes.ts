@@ -1,3 +1,6 @@
+import { taskRecurrenceSchema, recurrenceFromDescription, nextRecurringTaskDate } from "../shared/utils/task-recurrence";
+import { isValidAbsenceDate } from "../shared/utils/absence";
+import { calculateSettlementDifference } from "../shared/utils/monthly-settlement-declaration";
 import express, { type Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
@@ -163,7 +166,7 @@ import { fetchValorHora2026, fetchValorHoraForYear, getHistoricalRateFields, HIS
 import { applyCanonicalPersonnelRateRows } from "./services/personnel-cost-sync";
 import { ActiveProjectsAggregator } from "./domain/projectsActive";import { resolveTimeFilter } from "./services/time";
 import { CoverageCalculator } from "./domain/coverage";
-import { eq, and, or, isNull, isNotNull, desc, sql, asc, gte, lte, lt, inArray, notInArray } from "drizzle-orm";
+import { getTableColumns, eq, and, or, isNull, isNotNull, desc, sql, asc, gte, lte, lt, inArray, notInArray } from "drizzle-orm";
 import { reinitializeDatabase } from "./reinit-data";
 import { upload, uploadDocument, deleteOldFile } from "./upload";
 import { personalMonthlyInvoices, personalInvoiceProjectAllocations, personalFxOverrides, personnelMonthlySettlements, externalProviders as externalProvidersTable, providerProjectAccess as providerProjectAccessTable, exchangeRates, financialClosePeriods, pasivoEntries, financialDocumentApplications } from "@shared/schema";
@@ -483,6 +486,7 @@ async function accessibleTaskProjectIds(req: Request): Promise<number[] | null> 
 }
 
 const taskUpdatePayloadSchema = z.object({
+  recurrenceRule: taskRecurrenceSchema.nullable().optional(),
   title: z.string().trim().min(1).max(500).optional(),
   description: z.string().max(20_000).nullable().optional(),
   status: z.enum(["todo", "in_progress", "blocked"]).optional(),
@@ -11332,7 +11336,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return { ...task, assigneeId: person.id };
         }) }));
         const memberIds = [...new Set(sections.flatMap((section) => section.tasks.flatMap((task) => task.assigneeId ? [task.assigneeId] : [])))];
-        return { project: { name: row.name.trim(), clientId: client.id, startDate: row.startDate ? new Date(`${row.startDate}T12:00:00`) : new Date(), expectedEndDate: row.expectedEndDate ? new Date(`${row.expectedEndDate}T12:00:00`) : null, trackingFrequency: frequency, notes: row.notes || null, status: "active", projectCategory: client.name.toLowerCase() === "epical" ? "internal" : "billable", internalType: client.name.toLowerCase() === "epical" ? "general" : null, workflowStage: "aprobado", createdBy: req.user?.id ?? null }, sections, memberIds };
+        return { project: { name: row.name.trim(), clientId: client.id, startDate: row.startDate ? new Date(`${row.startDate}T12:00:00`) : null, expectedEndDate: row.expectedEndDate ? new Date(`${row.expectedEndDate}T12:00:00`) : null, trackingFrequency: frequency, notes: row.notes || null, status: "active", projectCategory: client.name.toLowerCase() === "epical" ? "internal" : "billable", internalType: client.name.toLowerCase() === "epical" ? "general" : null, workflowStage: "aprobado", createdBy: req.user?.id ?? null }, sections, memberIds };
       });
       const result = await db.transaction(async (tx) => {
         let archived = 0;
@@ -11354,7 +11358,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             for (let position = 0; position < section.tasks.length; position += 1) {
               const task = section.tasks[position];
               const insertedTaskRows: Array<{ id: number }> = await tx.insert(tasks).values({
-                title: task.title, description: task.description || null, projectId: project.id, sectionName: section.name,
+                title: task.title, description: task.description || null, recurrenceRule: recurrenceFromDescription(task.description), projectId: project.id, sectionName: section.name,
                 assigneeId: task.assigneeId, collaboratorIds: [], startDate: null, dueDate: null, estimatedHours: null, loggedHours: 0,
                 status: "todo", priority: "medium", parentTaskId: task.parent ? null : (task.parentTitle && parentTaskId ? parentTaskId : null),
                 position, createdBy: req.user?.id ?? null,
@@ -11439,6 +11443,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      const templateProjectId = req.body.templateProjectId == null ? null : z.number().int().positive().parse(req.body.templateProjectId);
+      if (templateProjectId && !(await canAccessTaskProject(req, templateProjectId))) return res.status(403).json({ message: "No tenés acceso al proyecto usado como plantilla" });
+      const requestedMemberIds = z.array(z.number().int().positive()).default([]).parse(req.body.memberIds);
+      const projectManagerId = z.number().int().positive().nullable().optional().parse(req.body.projectManagerId) ?? null;
+      const projectMemberships = [...new Set([...requestedMemberIds, ...(projectManagerId ? [projectManagerId] : [])])];
+      if (projectMemberships.length) {
+        const existingMembers = await db.select({ id: personnel.id }).from(personnel).where(and(inArray(personnel.id, projectMemberships), or(isNull(personnel.activeUntil), gte(personnel.activeUntil, new Date().toISOString().slice(0, 10)))));
+        if (existingMembers.length !== projectMemberships.length) return res.status(400).json({ message: "Los miembros y el PM deben ser personas activas de Personal" });
+      }
+
       const project = await db.transaction(async (tx) => {
         if (validatedData.quotationId) {
           await tx.execute(sql`SELECT id FROM quotations WHERE id = ${Number(validatedData.quotationId)} FOR UPDATE`);
@@ -11448,10 +11462,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         const [created] = await tx.insert(activeProjects).values(validatedData).returning();
-        const requestedMemberIds: unknown[] = Array.isArray(req.body.memberIds) ? req.body.memberIds : [];
-        const selectedMemberIds: number[] = [...new Set(requestedMemberIds.map((id: unknown) => Number(id)).filter((id: number) => Number.isInteger(id) && id > 0))];
-        const projectManagerId = Number(req.body.projectManagerId) || null;
-        const projectMemberships = [...new Set([...selectedMemberIds, ...(projectManagerId ? [projectManagerId] : [])])];
         if (projectMemberships.length) await tx.insert(taskProjectMembers).values(projectMemberships.map((personnelId: number) => ({ projectId: created.id, personnelId, role: personnelId === projectManagerId ? "owner" : "member" }))).onConflictDoUpdate({ target: [taskProjectMembers.projectId, taskProjectMembers.personnelId], set: { role: sql`EXCLUDED.role` } });
         const projectTemplate = ["weekly", "monthly", "one_shot"].includes(req.body.projectTemplate) ? req.body.projectTemplate : null;
         const templateSections: Record<string, Array<{ sectionName: string; title: string }>> = {
@@ -11471,7 +11481,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             { sectionName: "Entrega", title: "Revisar y entregar al cliente" },
           ],
         };
-        if (projectTemplate) await tx.insert(tasks).values(templateSections[projectTemplate].map((task, index) => ({
+        if (templateProjectId) {
+          const source = await tx.select().from(tasks).where(eq(tasks.projectId, templateProjectId)).orderBy(asc(tasks.position), asc(tasks.id)).for("share");
+          if (!source.length) throw Object.assign(new Error("El proyecto elegido como plantilla no tiene tareas"), { statusCode: 422 });
+          await duplicateTaskStructure(tx, source, created.id, Number(req.user?.id), new Set(projectMemberships));
+        } else if (projectTemplate) await tx.insert(tasks).values(templateSections[projectTemplate].map((task, index) => ({
           ...task, projectId: created.id, status: "todo", priority: "medium", position: index, createdBy: req.user?.id ?? null,
         })));
         if (!quotation) return created;
@@ -11597,8 +11611,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.error("Error de validación:", error.errors);
         return res.status(400).json({ message: "Datos de proyecto inválidos", errors: error.errors });
       }
-      if ((error as any)?.statusCode === 409) {
-        return res.status(409).json({ message: (error as Error).message, projectId: (error as any).projectId });
+      if ([409, 422].includes((error as any)?.statusCode ?? (error as any)?.status)) {
+        return res.status((error as any).statusCode ?? (error as any).status).json({ message: (error as Error).message, projectId: (error as any).projectId });
       }
       console.error("Error creating active project:", error);
       res.status(500).json({ message: "Error al crear el proyecto activo" });
@@ -12825,7 +12839,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const lastDayOfMonth = new Date(year, month + 1, 0);
 
           filteredSubprojects = subprojects.filter(subproject => {
-            const startDate = new Date(subproject.startDate);
+            const startDate = subproject.startDate ? new Date(subproject.startDate) : new Date(subproject.createdAt);
             const endDate = subproject.expectedEndDate ? new Date(subproject.expectedEndDate) : new Date();
 
             return (startDate <= lastDayOfMonth && endDate >= firstDayOfMonth);
@@ -12844,7 +12858,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const endDate = new Date(year, startMonth + 3, 0);
 
           filteredSubprojects = subprojects.filter(subproject => {
-            const projectStartDate = new Date(subproject.startDate);
+            const projectStartDate = subproject.startDate ? new Date(subproject.startDate) : new Date(subproject.createdAt);
             const projectEndDate = subproject.expectedEndDate ? new Date(subproject.expectedEndDate) : new Date();
 
             return (projectStartDate <= endDate && projectEndDate >= startDate);
@@ -12874,7 +12888,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             return {
               id: subproject.id,
               name: quotation?.projectName || 'Unnamed Project',
-              startDate: new Date(subproject.startDate),
+              startDate: subproject.startDate ? new Date(subproject.startDate) : new Date(subproject.createdAt),
               endDate: subproject.expectedEndDate ? new Date(subproject.expectedEndDate) : null,
               costs: {
                 estimatedCost: quotation?.totalAmount || 0,
@@ -12962,7 +12976,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Si hay más proyectos usando la misma cotización, crear una copia para este proyecto
 
         // Crear una copia de la cotización con el nuevo nombre
-        const { id, createdAt, updatedAt, ...quotationWithoutId } = quotation;
+        const { id: quotationRecordId, createdAt, updatedAt, ...quotationWithoutId } = quotation;
         const newQuotation = nullToUndefined({ ...quotationWithoutId, projectName: name.trim() });
 
         const createdQuotation = await storage.createQuotation(newQuotation);
@@ -20201,41 +20215,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const result = await executeSoTETL(costosRows, rcRows, options);
 
       // Fire-and-forget: persist FX rates from Info Tipo de Cambio y REM → exchange_rates
-      const SPANISH_MONTH_NUM: Record<string, number> = {
-        ene:1,feb:2,mar:3,abr:4,may:5,jun:6,jul:7,ago:8,sep:9,oct:10,nov:11,dic:12
-      };
-      const _fxSyncUserId = (req as any).user?.id ?? null;
-      if (!options.dryRun) {
+      const fxSyncUserId = Number((req as any).user?.id);
+      if (!options.dryRun && fxSyncUserId) {
         googleSheetsWorkingService.getTiposCambio().then(async (rates) => {
-          const { exchangeRates } = await import('../shared/schema');
-          let synced = 0;
-          for (const r of rates) {
-            const month = SPANISH_MONTH_NUM[r.mes?.toLowerCase()?.substring(0,3) ?? ''];
-            if (!month || !r.año || !r.tipoCambio) continue;
-            try {
-              const existing = await db.select({ id: exchangeRates.id })
-                .from(exchangeRates)
-                .where(and(
-                  eq(exchangeRates.year, r.año),
-                  eq(exchangeRates.month, month),
-                  eq(exchangeRates.isActive, true),
-                ))
-                .limit(1);
-              if (existing.length > 0) {
-                await db.update(exchangeRates)
-                  .set({ rate: r.tipoCambio.toString(), source: 'auto_sync_maestro', updatedAt: new Date() })
-                  .where(eq(exchangeRates.id, existing[0].id));
-              } else if (_fxSyncUserId) {
-                await db.insert(exchangeRates).values({
-                  year: r.año, month, rate: r.tipoCambio.toString(),
-                  source: 'auto_sync_maestro', isActive: true, createdBy: _fxSyncUserId,
-                });
-              }
-              synced++;
-            } catch (_) {}
-          }
-          console.log(`[fx-sync] Synced ${synced} exchange rates from Info Tipo de Cambio y REM`);
-        }).catch((e) => console.warn('[fx-sync] FX sync failed:', e));
+          const { syncMasterFxRates } = await import('./services/fxSync');
+          const result = await syncMasterFxRates(rates.filter(r => r.month && r.año && r.rateType) as any, fxSyncUserId);
+          console.log(`[fx-sync] ${result.observed} reales + ${result.projected} REM`);
+        }).catch((e) => console.warn('[fx-sync] FX sync failed:', e.message));
       }
 
       // 4. Auto-sync personnel rates from "Valor Hora Real y Estimada" (fire-and-forget)
@@ -22140,7 +22126,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { importRemEstimates } = await import('./services/fxSync');
       const saved = await importRemEstimates(estimates, userId);
-      return res.json({ success: true, count: saved.length, records: saved });
+      return res.json({ success: true, count: saved.length, skipped: estimates.length - saved.length, records: saved });
     } catch (error) {
       console.error("Error importing REM estimates:", error);
       return res.status(500).json({
@@ -23416,6 +23402,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/tasks/section/duplicate", requireAuth, async (req, res) => {
+    try {
+      const input = z.object({ projectId: z.number().int().positive(), sectionName: z.string().trim().min(1).max(250), newName: z.string().trim().min(1).max(250) }).strict().parse(req.body);
+      if (!(await canManageTaskProject(req, input.projectId))) return res.status(403).json({ message: "Solo responsables del proyecto u Operaciones pueden administrar secciones" });
+      const created = await db.transaction(async (tx) => {
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(293, ${input.projectId})`);
+        const [conflict] = await tx.select({ id: tasks.id }).from(tasks).where(and(eq(tasks.projectId, input.projectId), eq(tasks.sectionName, input.newName))).limit(1);
+        if (conflict) throw Object.assign(new Error("Ya existe una sección con ese nombre"), { status: 409 });
+        const source = await tx.select().from(tasks).where(and(eq(tasks.projectId, input.projectId), eq(tasks.sectionName, input.sectionName))).orderBy(asc(tasks.position), asc(tasks.id)).for("share");
+        if (!source.length) throw Object.assign(new Error("La sección no existe o está vacía"), { status: 404 });
+        const memberships = await tx.select({ personnelId: taskProjectMembers.personnelId }).from(taskProjectMembers).where(eq(taskProjectMembers.projectId, input.projectId));
+        const memberIds = new Set(memberships.map(row => row.personnelId));
+        return duplicateTaskStructure(tx, source, input.projectId, Number(req.user?.id), memberIds, input.newName);
+      });
+      res.status(201).json({ sectionName: input.newName, tasksCreated: created.length });
+    } catch (error: any) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: "Datos inválidos", errors: error.errors });
+      res.status(error?.status || 500).json({ message: error?.status ? error.message : "No se pudo duplicar la sección" });
+    }
+  });
+
+  async function duplicateTaskStructure(tx: any, source: Array<typeof tasks.$inferSelect>, projectId: number, actorId: number, memberIds: Set<number>, sectionName?: string) {
+    const idMap = new Map<number, number>();
+    const created: Array<typeof tasks.$inferSelect> = [];
+    let remaining = [...source];
+    while (remaining.length) {
+      const ready = remaining.filter(task => task.parentTaskId == null || idMap.has(task.parentTaskId));
+      if (!ready.length) throw Object.assign(new Error("La estructura de tareas contiene una jerarquía inválida"), { status: 409 });
+      for (const task of ready) {
+        const [copy] = await tx.insert(tasks).values({ title: task.title, description: task.description, projectId, sectionName: sectionName ?? task.sectionName,
+          assigneeId: task.assigneeId && memberIds.has(task.assigneeId) ? task.assigneeId : null,
+          collaboratorIds: (task.collaboratorIds ?? []).filter(id => memberIds.has(id)),
+          status: "todo", priority: task.priority, position: task.position, parentTaskId: task.parentTaskId ? idMap.get(task.parentTaskId) : null,
+          createdBy: actorId, startDate: null, dueDate: null, loggedHours: 0, completedAt: null, recurrenceRule: task.recurrenceRule,
+        }).returning();
+        idMap.set(task.id, copy.id); created.push(copy);
+      }
+      remaining = remaining.filter(task => !idMap.has(task.id));
+    }
+    return created;
+  }
+
   // DELETE /api/tasks/section — eliminar sección (mueve tareas a General)
   app.delete("/api/tasks/section", requireAuth, async (req: Request, res: Response) => {
     try {
@@ -23871,6 +23899,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /api/tasks — crear tarea
+  const taskAssignmentAdvisory = async (task: { assigneeId?: number | null; collaboratorIds?: number[] | null; startDate?: Date | null; dueDate?: Date | null }) => {
+    const ids = [...new Set([task.assigneeId, ...(task.collaboratorIds ?? [])].filter((id): id is number => typeof id === "number"))];
+    const start = task.startDate ?? task.dueDate;
+    const end = task.dueDate ?? task.startDate;
+    if (!ids.length || !start || !end) return { assignmentWarnings: [] };
+    try {
+      const from = start.toISOString().slice(0, 10);
+      const to = end.toISOString().slice(0, 10);
+      const rows = await db.select({ personnelId: personnelAbsences.personnelId, personName: personnel.name, startDate: personnelAbsences.startDate, endDate: personnelAbsences.endDate, status: personnelAbsences.status, planningStatus: personnelAbsences.planningStatus })
+        .from(personnelAbsences).innerJoin(personnel, eq(personnel.id, personnelAbsences.personnelId))
+        .where(and(inArray(personnelAbsences.personnelId, ids), inArray(personnelAbsences.status, ["pending", "approved", "cancellation_requested"]), lte(personnelAbsences.startDate, to), gte(personnelAbsences.endDate, from)));
+      return { assignmentWarnings: rows };
+    } catch (error) {
+      console.error("No se pudo consultar la disponibilidad al asignar", error instanceof Error ? error.message : "error");
+      // An advisory failure must never make a successfully saved task appear to fail.
+      return { assignmentWarnings: [], availabilityCheckFailed: true };
+    }
+  };
+
   app.post("/api/tasks", requireAuth, async (req: Request, res: Response) => {
     try {
       const user = (req as any).user;
@@ -23899,6 +23946,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (data.startDate && data.dueDate && data.startDate > data.dueDate) {
         return res.status(400).json({ message: "La fecha de inicio no puede ser posterior a la fecha de fin" });
       }
+      if (data.parentTaskId && data.recurrenceRule) return res.status(400).json({ message: "La repetición se configura en la tarea principal" });
       const assignmentIds = [data.assigneeId, ...(data.collaboratorIds ?? [])].filter(
         (id): id is number => typeof id === "number",
       );
@@ -23924,7 +23972,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         data.position = (maxRow?.maxPos ?? -1) + 1;
       }
       const [created] = await db.insert(tasks).values(data).returning();
-      res.json(created);
+      res.json({ ...created, ...await taskAssignmentAdvisory(created) });
     } catch (error: any) {
       if (error.name === "ZodError") return res.status(400).json({ message: "Datos inválidos", errors: error.errors });
       console.error("Error al crear tarea:", error?.message || error);
@@ -23972,13 +24020,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!(await canAccessTaskProject(req, existing.projectId))) {
         return res.status(403).json({ message: "No tenés acceso a esta tarea" });
       }
-      const now = new Date();
-      const [updated] = await db.update(tasks).set({
-        status: parsed.data.completed ? "done" : "todo",
-        completedAt: parsed.data.completed ? now : null,
-        updatedAt: now,
-      }).where(eq(tasks.id, taskId)).returning();
-      res.json(updated);
+      const result = await db.transaction(async (tx) => {
+        const [current] = await tx.select().from(tasks).where(eq(tasks.id, taskId)).for("update");
+        if (!current) throw new Error("La tarea ya no existe");
+        const completing = parsed.data.completed;
+        if ((current.status === "done") === completing) return current;
+        const now = new Date();
+        const [updated] = await tx.update(tasks).set({ status: completing ? "done" : "todo", completedAt: parsed.data.completed ? now : null, updatedAt: now }).where(eq(tasks.id, taskId)).returning();
+        let nextTask: typeof tasks.$inferSelect | undefined;
+        if (completing && current.recurrenceRule && !current.parentTaskId) {
+          const [project] = await tx.select({ status: activeProjects.status }).from(activeProjects).where(eq(activeProjects.id, current.projectId));
+          const [existingNext] = await tx.select().from(tasks).where(eq(tasks.recurrenceSourceTaskId, taskId));
+          if (existingNext) nextTask = existingNext;
+          else if (project?.status === "active") {
+            const nextDate = nextRecurringTaskDate(taskRecurrenceSchema.parse(current.recurrenceRule), current.dueDate, now);
+            const all = await tx.select().from(tasks).where(eq(tasks.projectId, current.projectId));
+            const sourceIds = new Set([taskId]);
+            let expanded = true;
+            while (expanded) { expanded = false; for (const row of all) if (row.parentTaskId && sourceIds.has(row.parentTaskId) && !sourceIds.has(row.id)) { sourceIds.add(row.id); expanded = true; } }
+            const members = await tx.select({ personnelId: taskProjectMembers.personnelId }).from(taskProjectMembers).where(eq(taskProjectMembers.projectId, current.projectId));
+            const copies = await duplicateTaskStructure(tx, all.filter(row => sourceIds.has(row.id)), current.projectId, Number(req.user?.id), new Set(members.map(member => member.personnelId)));
+            const root = copies.find(row => row.parentTaskId == null)!;
+            [nextTask] = await tx.update(tasks).set({ startDate: new Date(`${nextDate}T12:00:00Z`), dueDate: new Date(`${nextDate}T12:00:00Z`), recurrenceSourceTaskId: taskId }).where(eq(tasks.id, root.id)).returning();
+          }
+        }
+        return { ...updated, ...(nextTask ? { recurringTaskId: nextTask.id, recurringTaskDate: nextTask.dueDate?.toISOString().slice(0, 10) } : {}) };
+      });
+      res.json(result);
     } catch (error) {
       res.status(500).json({ message: "Error al finalizar la tarea" });
     }
@@ -24068,6 +24136,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         updates.sectionName = updates.sectionName?.trim() || "General";
       }
 
+      if (effectiveParentId && updates.recurrenceRule) return res.status(400).json({ message: "La repetición se configura en la tarea principal" });
+      if (effectiveParentId) updates.recurrenceRule = null;
       const effectiveStart = updates.startDate === undefined ? existingTask?.startDate : updates.startDate;
       const effectiveDue = updates.dueDate === undefined ? existingTask?.dueDate : updates.dueDate;
       if (effectiveStart && effectiveDue && effectiveStart > effectiveDue) {
@@ -24098,7 +24168,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (existingTask.parentTaskId) await recalculateTaskLoggedHours(existingTask.parentTaskId);
         if (updated.parentTaskId) await recalculateTaskLoggedHours(updated.parentTaskId);
       }
-      res.json(updated);
+      const needsAvailabilityCheck = ["assigneeId", "collaboratorIds", "startDate", "dueDate"].some(key => key in parsedUpdate.data);
+      res.json({ ...updated, ...(needsAvailabilityCheck ? await taskAssignmentAdvisory(updated) : {}) });
     } catch (error) {
       res.status(500).json({ message: "Error al actualizar tarea" });
     }
@@ -26022,23 +26093,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const access = await getAbsenceAccessContext(req);
       if (!access.personnelId) return res.status(409).json({ message: "Tu usuario no está vinculado con Personal" });
       const { closingId, bankFxRate } = z.object({ closingId: z.number().int().positive(), bankFxRate: z.number().finite().positive() }).strict().parse(req.body);
-      const [closing] = await db.select().from(monthlyClosings).where(and(eq(monthlyClosings.id, closingId), eq(monthlyClosings.personnelId, access.personnelId)));
-      if (!closing) return res.status(404).json({ message: "No existe un cierre mensual para ese período" });
-      const usdAmount = Number(closing.totalCostUSD ?? 0);
-      const closingFxRate = Number(closing.exchangeRateAtClose ?? 0);
-      if (usdAmount <= 0 || closingFxRate <= 0) return res.status(422).json({ message: "Este cierre no tiene un tramo USD y tipo de cambio de referencia válidos" });
-      const differenceARS = Math.round(usdAmount * (bankFxRate - closingFxRate) * 100) / 100;
-      const [declaration] = await db.transaction(async (tx) => {
+      const declaration = await db.transaction(async (tx) => {
+        const [closing] = await tx.select().from(monthlyClosings).where(and(eq(monthlyClosings.id, closingId), eq(monthlyClosings.personnelId, access.personnelId!))).for("update");
+        if (!closing) throw Object.assign(new Error("No existe un cierre mensual para ese período"), { status: 404 });
+        const usdAmount = Number(closing.totalCostUSD ?? 0);
+        const closingFxRate = Number(closing.exchangeRateAtClose ?? 0);
+        if (usdAmount <= 0 || closingFxRate <= 0) throw Object.assign(new Error("Este cierre no tiene un tramo USD y tipo de cambio de referencia válidos"), { status: 422 });
+        const differenceARS = calculateSettlementDifference(usdAmount, bankFxRate, closingFxRate);
+        const [previous] = await tx.select().from(monthlySettlementDeclarations).where(eq(monthlySettlementDeclarations.closingId, closingId));
+        if (previous?.status === "approved") throw Object.assign(new Error("La declaración ya está aprobada y conserva sus valores. Contactá a Operaciones si necesitás corregirla."), { status: 409 });
         const [row] = await tx.insert(monthlySettlementDeclarations).values({ closingId, personnelId: access.personnelId!, bankFxRate, usdAmount, closingFxRate, differenceARS, status: "pending", submittedAt: new Date(), reviewedBy: null, reviewedAt: null, reviewReason: null, updatedAt: new Date() })
-          .onConflictDoUpdate({ target: monthlySettlementDeclarations.closingId, set: { bankFxRate, usdAmount, closingFxRate, differenceARS, status: "pending", submittedAt: new Date(), reviewedBy: null, reviewedAt: null, reviewReason: null, updatedAt: new Date() } }).returning();
-        await tx.insert(monthlySettlementEvents).values({ declarationId: row.id, action: "submitted", actorUserId: access.userId, metadata: { bankFxRate, differenceARS } });
-        return [row];
+          .onConflictDoUpdate({ target: monthlySettlementDeclarations.closingId, set: { bankFxRate, usdAmount, closingFxRate, differenceARS, status: "pending", submittedAt: new Date(), reviewedBy: null, reviewedAt: null, reviewReason: null, updatedAt: new Date() }, setWhere: sql`${monthlySettlementDeclarations.status} <> 'approved'` }).returning();
+        if (!row) throw Object.assign(new Error("La declaración fue aprobada mientras la editabas. Actualizá la pantalla."), { status: 409 });
+        await tx.insert(monthlySettlementEvents).values({ declarationId: row.id, action: previous ? "resubmitted" : "submitted", actorUserId: access.userId, metadata: { closingId, usdAmount, closingFxRate, bankFxRate, differenceARS, previous: previous ?? null } });
+        return { ...row, closingYear: closing.year, closingMonth: closing.month };
       });
-      await createUserNotifications(await operationsNotificationUserIds(), { eventKey: `monthly-settlement:${declaration.id}:${declaration.updatedAt.toISOString()}`, type: "monthly_settlement", title: "Diferencia cambiaria para revisar", message: `Una persona declaró su tipo de cambio bancario para ${closing.year}-${String(closing.month).padStart(2, "0")}.`, entityId: declaration.id });
+      await createUserNotifications(await operationsNotificationUserIds(), { eventKey: `monthly-settlement:${declaration.id}:${declaration.updatedAt.toISOString()}`, type: "monthly_settlement", title: "Diferencia cambiaria para revisar", message: `Una persona declaró su tipo de cambio bancario para ${declaration.closingYear}-${String(declaration.closingMonth).padStart(2, "0")}.`, entityId: declaration.id });
       res.status(201).json(declaration);
     } catch (error: any) {
       if (error instanceof z.ZodError) return res.status(400).json({ message: "Datos inválidos", errors: error.errors });
-      res.status(500).json({ message: "No se pudo enviar la declaración" });
+      res.status(error?.status || 500).json({ message: error?.status ? error.message : "No se pudo enviar la declaración" });
     }
   });
 
@@ -26053,18 +26127,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/monthly-settlement-declarations/:id", requireAuth, requirePermission("operations"), async (req, res) => {
     try {
       const id = Number(req.params.id);
-      const input = z.object({ action: z.enum(["approve", "reject"]), reason: z.string().trim().max(4000).optional() }).strict().parse(req.body);
+      const input = z.object({ action: z.enum(["approve", "reject"]), reason: z.string().trim().max(4000).optional(), submittedAt: z.string().datetime() }).strict().parse(req.body);
       if (input.action === "reject" && !input.reason) return res.status(400).json({ message: "Indicá qué debe corregir la persona" });
-      const [declaration] = await db.update(monthlySettlementDeclarations).set({ status: input.action === "approve" ? "approved" : "rejected", reviewedBy: Number((req.user as any)?.id), reviewedAt: new Date(), reviewReason: input.reason ?? null, updatedAt: new Date() }).where(and(eq(monthlySettlementDeclarations.id, id), eq(monthlySettlementDeclarations.status, "pending"))).returning();
-      if (!declaration) return res.status(404).json({ message: "La declaración no existe o ya fue revisada" });
-      await db.insert(monthlySettlementEvents).values({ declarationId: id, action: input.action, actorUserId: Number((req.user as any)?.id), metadata: { reason: input.reason } });
+      const declaration = await db.transaction(async (tx) => {
+      const [declaration] = await tx.update(monthlySettlementDeclarations).set({ status: input.action === "approve" ? "approved" : "rejected", reviewedBy: Number((req.user as any)?.id), reviewedAt: new Date(), reviewReason: input.reason ?? null, updatedAt: new Date() }).where(and(eq(monthlySettlementDeclarations.id, id), eq(monthlySettlementDeclarations.status, "pending"), eq(monthlySettlementDeclarations.submittedAt, new Date(input.submittedAt)))).returning();
+      if (!declaration) throw Object.assign(new Error("La declaración cambió o ya fue revisada. Actualizá la pantalla antes de decidir."), { status: 409 });
+      await tx.insert(monthlySettlementEvents).values({ declarationId: id, action: input.action, actorUserId: Number((req.user as any)?.id), metadata: { reason: input.reason, submittedAt: declaration.submittedAt, bankFxRate: declaration.bankFxRate, usdAmount: declaration.usdAmount, closingFxRate: declaration.closingFxRate, differenceARS: declaration.differenceARS } });
+      return declaration;
+      });
       const [person] = await db.select({ email: personnel.email }).from(personnel).where(eq(personnel.id, declaration.personnelId));
       const [owner] = person?.email ? await db.select({ id: users.id }).from(users).where(sql`LOWER(TRIM(${users.email})) = LOWER(TRIM(${person.email}))`).limit(1) : [];
       if (owner) await createUserNotifications([owner.id], { eventKey: `monthly-settlement-reviewed:${declaration.id}:${declaration.updatedAt.toISOString()}`, type: "monthly_settlement", title: input.action === "approve" ? "Conciliación aprobada" : "La conciliación requiere cambios", message: input.reason || (input.action === "approve" ? "Operaciones aprobó tu diferencia cambiaria." : "Revisá la declaración y volvé a enviarla."), entityId: declaration.id, actionUrl: "/my-invoices" });
       res.json(declaration);
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) return res.status(400).json({ message: "Acción inválida", errors: error.errors });
-      res.status(500).json({ message: "No se pudo revisar la declaración" });
+      res.status(error?.status || 500).json({ message: error?.status ? error.message : "No se pudo revisar la declaración" });
     }
   });
 
@@ -26215,7 +26292,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         grandTotalUSD,
         totalCost: grandTotalARS,
       };
-      const [closing] = await db.insert(monthlyClosings).values(data)
+      const closing = await db.transaction(async (tx) => {
+        const [original] = await tx.select().from(monthlyClosings).where(and(eq(monthlyClosings.personnelId, data.personnelId), eq(monthlyClosings.year, data.year), eq(monthlyClosings.month, data.month))).for("update");
+        if (original) {
+          const [declaration] = await tx.select({ id: monthlySettlementDeclarations.id }).from(monthlySettlementDeclarations).where(eq(monthlySettlementDeclarations.closingId, original.id));
+          if (declaration) throw Object.assign(new Error("Este cierre tiene una conciliación bancaria. Se conserva el cierre original; revisá su declaración en Operaciones."), { status: 409 });
+        }
+        const [row] = await tx.insert(monthlyClosings).values(data)
         .onConflictDoUpdate({
           target: [monthlyClosings.personnelId, monthlyClosings.year, monthlyClosings.month],
           set: {
@@ -26236,10 +26319,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         })
         .returning();
+        return row;
+      });
       res.status(201).json(closing);
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) return res.status(400).json({ message: "Datos inválidos", errors: error.errors });
-      res.status(500).json({ message: "Error creating monthly closing" });
+      res.status(error?.status || 500).json({ message: error?.status ? error.message : "Error creating monthly closing" });
     }
   });
 
@@ -26259,7 +26344,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         estimatedRateARS: rate.hourlyRateARS == null ? null : Number(rate.hourlyRateARS),
         source: "personnel_historical_costs",
       })));
-    } catch (error) { res.status(500).json({ message: "No se pudieron traer las tarifas estimadas" }); }
+    } catch (error: any) { res.status(500).json({ message: "No se pudieron traer las tarifas estimadas" }); }
   });
 
   app.post("/api/estimated-rates", requireAuth, requirePermission("operations"), async (req, res) => {
@@ -26271,8 +26356,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ==================== ABSENCE REQUEST WORKFLOW ====================
   const absenceRequestSchema = z.object({
-    startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-    endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    startDate: z.string().refine(isValidAbsenceDate, "Fecha de inicio inválida"),
+    endDate: z.string().refine(isValidAbsenceDate, "Fecha de fin inválida"),
     type: z.enum(ABSENCE_TYPES),
     notes: z.string().max(4000).nullable().optional(),
     planningStatus: z.enum(["tentative", "confirmed"]).optional().default("tentative"),
@@ -26332,7 +26417,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const personnelId = Number(req.query.personnelId);
     const from = String(req.query.from || "");
     const to = String(req.query.to || "");
-    if (!Number.isInteger(personnelId) || !/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) return res.status(400).json({ message: "Persona o fechas inválidas" });
+    if (!Number.isInteger(personnelId) || !isValidAbsenceDate(from) || !isValidAbsenceDate(to) || from > to) return res.status(400).json({ message: "Persona o fechas inválidas" });
     if (!access.isOperations && access.personnelId !== personnelId) return res.status(403).json({ message: "Sin permiso" });
     const rows = await db.select({ startDate: personnelAbsences.startDate, endDate: personnelAbsences.endDate, status: personnelAbsences.status, planningStatus: personnelAbsences.planningStatus })
       .from(personnelAbsences).where(and(eq(personnelAbsences.personnelId, personnelId), inArray(personnelAbsences.status, ["pending", "approved", "cancellation_requested"]), lte(personnelAbsences.startDate, to), gte(personnelAbsences.endDate, from)));
@@ -26344,8 +26429,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const access = await getAbsenceAccessContext(req);
       if (!access.personnelId && !access.isOperations) return res.status(409).json({ message: "Tu usuario no está vinculado con Personal" });
       const data = absenceRequestSchema.parse(req.body);
+      if (!access.isOperations && data.personnelId != null && data.personnelId !== access.personnelId) return res.status(403).json({ message: "Solo Operaciones puede solicitar ausencias para otra persona" });
       const personnelId = access.isOperations ? (data.personnelId ?? access.personnelId) : access.personnelId;
       if (!personnelId) return res.status(400).json({ message: "Seleccioná una persona" });
+      const [personExists] = await db.select({ id: personnel.id }).from(personnel).where(eq(personnel.id, personnelId));
+      if (!personExists) return res.status(404).json({ message: "Persona no encontrada" });
       const holidayDates = await holidaysForRange(data.startDate, data.endDate);
       const businessDays = enumerateBusinessDays(data.startDate, data.endDate, holidayDates);
       if (businessDays.length === 0) return res.status(400).json({ message: "La solicitud no contiene días hábiles" });
@@ -26392,7 +26480,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const absenceId = Number(req.params.id);
       const access = await getAbsenceAccessContext(req);
       const input = absenceRequestSchema.omit({ personnelId: true }).partial().strict().parse(req.body);
-      const [current] = await db.select().from(personnelAbsences).where(eq(personnelAbsences.id, absenceId));
+      const [current] = await db.select({ ...getTableColumns(personnelAbsences), rowVersion: sql<string>`xmin::text` }).from(personnelAbsences).where(eq(personnelAbsences.id, absenceId));
       if (!current) return res.status(404).json({ message: "Solicitud no encontrada" });
       const owner = access.personnelId === current.personnelId;
       if (!access.isOperations && !owner) return res.status(403).json({ message: "Sin permiso" });
@@ -26414,6 +26502,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         updates.reviewReason = null;
       }
       const [updated] = await db.transaction(async (tx) => {
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(291, ${current.personnelId})`);
         const [overlap] = await tx.select({ id: personnelAbsences.id }).from(personnelAbsences).where(and(
           eq(personnelAbsences.personnelId, current.personnelId),
           inArray(personnelAbsences.status, ["pending", "approved", "cancellation_requested"]),
@@ -26421,11 +26510,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           sql`${personnelAbsences.id} <> ${absenceId}`,
         )).limit(1);
         if (overlap) throw Object.assign(new Error("Ya existe otra ausencia para esas fechas"), { status: 409 });
-        const [row] = await tx.update(personnelAbsences).set(updates).where(eq(personnelAbsences.id, absenceId)).returning();
-        await tx.insert(absenceEvents).values({ absenceId, eventKey: `edited:${absenceId}:${Date.now()}`, action: "edited", fromStatus: current.status, toStatus: updates.status ?? current.status, actorUserId: access.userId, metadata: { daysByYear: businessDaysByYear(startDate, endDate, holidayDates), planningStatus: updates.planningStatus ?? current.planningStatus } });
+        const [row] = await tx.update(personnelAbsences).set(updates).where(and(eq(personnelAbsences.id, absenceId), sql`xmin::text = ${current.rowVersion}`)).returning();
+        if (!row) throw Object.assign(new Error("La solicitud cambió; actualizá la pantalla"), { status: 409 });
+        await tx.insert(absenceEvents).values({ absenceId, eventKey: `edited:${absenceId}:${Date.now()}`, action: "edited", fromStatus: current.status, toStatus: updates.status ?? current.status, actorUserId: access.userId, metadata: { previous: current, daysByYear: businessDaysByYear(startDate, endDate, holidayDates), planningStatus: updates.planningStatus ?? current.planningStatus } });
         return [row];
       });
-      if (updates.status === "pending" && current.requestedBy) await createUserNotifications(await operationsNotificationUserIds(), { eventKey: `absence-resubmitted:${absenceId}:${Date.now()}`, type: "absence_request", title: "Ausencia modificada", message: "Una solicitud aprobada fue modificada y requiere nueva aprobación.", entityId: absenceId });
+      if (updates.status === "pending") await createUserNotifications(await operationsNotificationUserIds(), { eventKey: `absence-resubmitted:${absenceId}:${Date.now()}`, type: "absence_request", title: "Ausencia modificada", message: "Una solicitud aprobada fue modificada y requiere nueva aprobación.", entityId: absenceId });
       res.json(updated);
     } catch (error: any) {
       if (error instanceof z.ZodError) return res.status(400).json({ message: "Datos inválidos", errors: error.errors });
@@ -26438,7 +26528,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const absenceId = Number(req.params.id);
       const input = absenceActionSchema.parse(req.body);
       const access = await getAbsenceAccessContext(req);
-      const [current] = await db.select().from(personnelAbsences).where(eq(personnelAbsences.id, absenceId));
+      const [current] = await db.select({ ...getTableColumns(personnelAbsences), rowVersion: sql<string>`xmin::text` }).from(personnelAbsences).where(eq(personnelAbsences.id, absenceId));
       if (!current) return res.status(404).json({ message: "Solicitud no encontrada" });
       const isOwner = access.personnelId === current.personnelId;
       const ownerActions: AbsenceAction[] = ["cancel_pending", "request_cancellation"];
@@ -26498,7 +26588,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (input.action === "request_cancellation") Object.assign(changes, { cancellationRequestedAt: now, cancellationReason: input.reason || null });
         if (input.action === "approve_cancellation" || input.action === "cancel_pending") Object.assign(changes, { cancelledBy: access.userId, cancelledAt: now, cancellationReason: input.reason || current.cancellationReason });
         const [row] = await tx.update(personnelAbsences).set(changes).where(and(
-          eq(personnelAbsences.id, absenceId), eq(personnelAbsences.status, current.status),
+          eq(personnelAbsences.id, absenceId), eq(personnelAbsences.status, current.status), sql`xmin::text = ${current.rowVersion}`,
         )).returning();
         if (!row) throw Object.assign(new Error("La solicitud cambió; actualizá la pantalla"), { status: 409 });
         await tx.insert(absenceEvents).values({
@@ -26542,6 +26632,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const access = await getAbsenceAccessContext(req);
     const personnelId = Number(req.params.personnelId);
     const year = Number(req.params.year);
+    if (!Number.isInteger(personnelId) || personnelId <= 0 || !Number.isInteger(year) || year < 2000 || year > 2200) return res.status(400).json({ message: "Persona o año inválidos" });
     if (!access.isOperations && access.personnelId !== personnelId) return res.status(403).json({ message: "Sin permiso" });
     const [allowance] = await db.select().from(absenceAllowances).where(and(
       eq(absenceAllowances.personnelId, personnelId), eq(absenceAllowances.year, year),
@@ -26566,9 +26657,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (!access.isOperations) return res.status(403).json({ message: "Se requiere Operaciones" });
     const personnelId = Number(req.params.personnelId);
     const year = Number(req.params.year);
-    const payload = z.object({ vacationDays: z.number().int().nonnegative(), vacationCarryoverDays: z.number().int().nonnegative().default(0), epicalDays: z.number().int().nonnegative() }).strict().parse(req.body);
-    const [row] = await db.insert(absenceAllowances).values({ personnelId, year, ...payload, updatedBy: access.userId })
+    if (!Number.isInteger(personnelId) || personnelId <= 0 || !Number.isInteger(year) || year < 2000 || year > 2200) return res.status(400).json({ message: "Persona o año inválidos" });
+    const parsed = z.object({ vacationDays: z.number().int().nonnegative(), vacationCarryoverDays: z.number().int().nonnegative().default(0), epicalDays: z.number().int().nonnegative() }).strict().safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ message: "Cupo inválido", errors: parsed.error.errors });
+    const payload = parsed.data;
+    const [person] = await db.select({ id: personnel.id }).from(personnel).where(eq(personnel.id, personnelId));
+    if (!person) return res.status(404).json({ message: "Persona no encontrada" });
+    const row = await db.transaction(async (tx) => {
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(291, ${personnelId})`);
+    const [saved] = await tx.insert(absenceAllowances).values({ personnelId, year, ...payload, updatedBy: access.userId })
       .onConflictDoUpdate({ target: [absenceAllowances.personnelId, absenceAllowances.year], set: { ...payload, updatedBy: access.userId, updatedAt: new Date() } }).returning();
+    return saved;
+    });
     res.json(row);
   });
 

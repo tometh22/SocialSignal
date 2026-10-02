@@ -131,7 +131,7 @@ export function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
           subtitle: client?.name,
           description: `Estado: ${project.status}`,
           status: project.status,
-          date: new Date(project.startDate),
+          date: project.startDate ? new Date(project.startDate) : new Date(project.createdAt),
           url: `/project-details/${project.id}`,
           metadata: {
             isAlwaysOn: project.isAlwaysOnMacro,

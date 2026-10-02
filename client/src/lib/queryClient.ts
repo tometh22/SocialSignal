@@ -1,4 +1,5 @@
 import { QueryClient } from "@tanstack/react-query";
+import { toast } from "@/hooks/use-toast";
 import { parseApiError } from "./api-error";
 
 type FetcherOptions = {
@@ -235,7 +236,13 @@ export async function apiRequest(
     }
     
     try {
-      return JSON.parse(responseText);
+      const result = JSON.parse(responseText);
+      if (result.recurringTaskId) toast({ title: "Próxima tarea creada", description: `Se programó para ${result.recurringTaskDate}.` });
+      if (method !== "GET" && /^\/api\/tasks(?:\/\d+)?$/.test(url)) {
+        if (result.assignmentWarnings?.length) toast({ title: "Asignación guardada: hay ausencias en el período", description: result.assignmentWarnings.map((row: any) => `${row.personName}: ${row.startDate} → ${row.endDate} (${row.planningStatus === "confirmed" ? "confirmada" : "tentativa"})`).join("; ") });
+        else if (result.availabilityCheckFailed) toast({ title: "Tarea guardada", description: "No se pudo consultar la disponibilidad del equipo. Revisá las ausencias para coordinar la cobertura." });
+      }
+      return result;
     } catch (error) {
       console.error("Error al analizar respuesta JSON:", error);
       throw new Error("Error al analizar la respuesta del servidor");

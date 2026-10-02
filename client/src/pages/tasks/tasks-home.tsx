@@ -10,7 +10,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { FolderOpen, Clock, ChevronRight, ChevronDown, CalendarIcon, Check, ListTodo, List, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { isCompletedInCurrentBuenosAiresWeek } from "@shared/utils/buenos-aires-week";
+import { taskDateBucket as taskBucket, taskCompletedThisWeek as completedThisWeek } from "@shared/utils/task-date-bucket";
 import { useAuth } from "@/hooks/use-auth";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -85,26 +85,10 @@ function capitalize(str: string) {
 }
 
 function isOverdue(task: Task) {
-  return task.status !== "done" && task.status !== "cancelled" && Boolean(task.dueDate && task.dueDate.slice(0, 10) < format(new Date(), "yyyy-MM-dd"));
+  return taskBucket(task) === "overdue";
 }
 
-type ActiveTaskBucket = "upcoming" | "in_progress" | "overdue" | "no_date";
-function taskBucket(task: Task): ActiveTaskBucket | null {
-  if (task.status === "done" || task.status === "cancelled") return null;
-  const today = format(new Date(), "yyyy-MM-dd");
-  const start = task.startDate?.slice(0, 10) || null;
-  const due = task.dueDate?.slice(0, 10) || null;
-  if (!start && !due) return "no_date";
-  if (due && due < today) return "overdue";
-  if (start && start > today) return "upcoming";
-  if (!start && due && due > today) return "upcoming";
-  return "in_progress";
-}
 
-function completedThisWeek(task: Task) {
-  if (task.status !== "done" || !task.completedAt) return false;
-  return isCompletedInCurrentBuenosAiresWeek(task.completedAt);
-}
 
 // ── Animated circle checkbox ──────────────────────────────────────────
 function CircleCheck({
@@ -450,7 +434,7 @@ export default function TasksHomePage() {
     in_progress: myTasks.filter(t => taskBucket(t) === "in_progress").length,
     overdue: myTasks.filter(t => taskBucket(t) === "overdue").length,
     no_date: myTasks.filter(t => taskBucket(t) === "no_date").length,
-    done: myTasks.filter(completedThisWeek).length,
+    done: myTasks.filter(task => completedThisWeek(task)).length,
   };
 
   const filteredMyTasks = myTasks.filter(t => {

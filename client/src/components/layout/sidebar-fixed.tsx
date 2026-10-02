@@ -307,7 +307,7 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
   return (
     <TooltipProvider>
       <div className={cn(
-        "relative flex flex-col overflow-hidden bg-[#0b0f17] shadow-[12px_0_40px_-30px_rgba(15,23,42,0.65)]",
+        "relative flex shrink-0 flex-col overflow-hidden bg-[#0b0f17] shadow-[12px_0_40px_-30px_rgba(15,23,42,0.65)]",
         mobileMode
           ? "h-full w-full"
           : "h-screen border-r border-white/[0.07] transition-[width] duration-300 ease-out",

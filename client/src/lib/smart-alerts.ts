@@ -189,8 +189,11 @@ function generateInsights(projects: ProjectData[], alerts: Alert[]): string[] {
   if (activeProjects.length === 0) return ['No hay proyectos activos para analizar.'];
 
   // Portfolio health
-  const avgMarkup = activeProjects.reduce((s, p) => s + (p.cost > 0 ? p.markup : 0), 0) / activeProjects.filter(p => p.cost > 0).length || 0;
-  if (avgMarkup >= THRESHOLDS.MARKUP_GOOD) {
+  const projectsWithCosts = activeProjects.filter(p => p.cost > 0 && Number.isFinite(p.markup));
+  const avgMarkup = projectsWithCosts.length ? projectsWithCosts.reduce((sum, p) => sum + p.markup, 0) / projectsWithCosts.length : null;
+  if (avgMarkup == null) {
+    insights.push("Todavía no hay costos reales suficientes para evaluar el markup del portfolio.");
+  } else if (avgMarkup >= THRESHOLDS.MARKUP_GOOD) {
     insights.push(`El portfolio tiene un markup promedio de ${avgMarkup.toFixed(1)}x, por encima del estándar.`);
   } else if (avgMarkup >= THRESHOLDS.MARKUP_WARNING) {
     insights.push(`Markup promedio del portfolio: ${avgMarkup.toFixed(1)}x. Cerca del límite de ${THRESHOLDS.MARKUP_WARNING}x.`);

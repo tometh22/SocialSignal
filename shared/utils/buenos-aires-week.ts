@@ -1,6 +1,6 @@
 const BUENOS_AIRES_TIME_ZONE = "America/Argentina/Buenos_Aires";
 
-function civilDateInBuenosAires(value: Date): string {
+export function civilDateInBuenosAires(value: Date): string {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: BUENOS_AIRES_TIME_ZONE,
     year: "numeric",

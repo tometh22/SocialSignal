@@ -1,3 +1,4 @@
+import { taskRecurrenceSchema, type TaskRecurrence } from "./utils/task-recurrence";
 import { pgTable, text, serial, integer, boolean, timestamp, date, doublePrecision, json, numeric, varchar, unique, uniqueIndex, pgEnum, jsonb, index, primaryKey, type AnyPgColumn } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -473,6 +474,7 @@ export const personnel = pgTable("personnel", {
 
 export const insertPersonnelSchema = createInsertSchema(personnel).pick({
   name: true,
+  birthday: true,
   email: true,
   roleId: true,
   currentRole: true,
@@ -604,6 +606,11 @@ export const insertPersonnelSchema = createInsertSchema(personnel).pick({
   dec2027MonthlySalaryARS: true,
 }).extend({
   name: z.string().min(2, "El nombre debe tener al menos 2 caracteres").max(100, "El nombre no puede exceder 100 caracteres"),
+  birthday: z.string().refine(value => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+    const date = new Date(`${value}T12:00:00Z`);
+    return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
+  }, "Fecha de cumpleaños inválida").nullable().optional(),
   email: z.string().email("Email inválido").optional().or(z.literal("")),
   hourlyRate: z.number().min(0, "La tarifa por hora debe ser positiva"),
   monthlyFixedSalary: z.number().min(0, "El salario mensual debe ser positivo").nullable().optional(),
@@ -1586,7 +1593,7 @@ export const activeProjects = pgTable("active_projects", {
   workflowStage: text("workflow_stage").notNull().default("aprobado"),
   workflowBlockedReason: text("workflow_blocked_reason"),
   workflowBlockedAt: timestamp("workflow_blocked_at"),
-  startDate: timestamp("start_date").notNull(),
+  startDate: timestamp("start_date"),
   expectedEndDate: timestamp("expected_end_date"),
   actualEndDate: timestamp("actual_end_date"),
   trackingFrequency: text("tracking_frequency").notNull().default("weekly"), // daily, weekly, biweekly, monthly
@@ -2268,6 +2275,8 @@ export const tasks = pgTable("tasks", {
   status: text("status").notNull().default("todo"),
   priority: text("priority").notNull().default("medium"),
   parentTaskId: integer("parent_task_id").references((): AnyPgColumn => tasks.id, { onDelete: "cascade" }),
+  recurrenceRule: jsonb("recurrence_rule").$type<TaskRecurrence>(),
+  recurrenceSourceTaskId: integer("recurrence_source_task_id").references((): AnyPgColumn => tasks.id, { onDelete: "set null" }),
   position: integer("position").default(0),
   completedAt: timestamp("completed_at"),
   createdBy: integer("created_by").references(() => users.id, { onDelete: 'set null' }),
@@ -2280,10 +2289,12 @@ export const insertTaskSchema = createInsertSchema(tasks).omit({
   createdAt: true,
   updatedAt: true,
   loggedHours: true,
+  recurrenceSourceTaskId: true,
 }).extend({
-  startDate: z.union([z.date(), z.string().transform((str) => new Date(str))]).optional().nullable(),
-  dueDate: z.union([z.date(), z.string().transform((str) => new Date(str))]).optional().nullable(),
-  completedAt: z.union([z.date(), z.string().transform((str) => new Date(str))]).optional().nullable(),
+  recurrenceRule: taskRecurrenceSchema.nullable().optional(),
+  startDate: z.union([z.date(), z.string().transform((str) => new Date(str)).refine(date => Number.isFinite(date.getTime()), "Fecha inválida")]).optional().nullable(),
+  dueDate: z.union([z.date(), z.string().transform((str) => new Date(str)).refine(date => Number.isFinite(date.getTime()), "Fecha inválida")]).optional().nullable(),
+  completedAt: z.union([z.date(), z.string().transform((str) => new Date(str)).refine(date => Number.isFinite(date.getTime()), "Fecha inválida")]).optional().nullable(),
   collaboratorIds: z.array(z.number()).optional().default([]),
   status: z.enum(["todo", "in_progress", "blocked"]).default("todo"),
   priority: z.enum(["low", "medium", "high", "urgent"]).default("medium"),

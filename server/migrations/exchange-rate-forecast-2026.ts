@@ -22,13 +22,13 @@ INSERT INTO exchange_rates (
 SELECT 2026, forecast.month, forecast.rate, 'estimated', 'Manual', TRUE, forecast.notes, actor.id
 FROM forecast
 CROSS JOIN actor
-WHERE NOT EXISTS (
+WHERE (2026 * 100 + forecast.month) >= (EXTRACT(YEAR FROM (NOW() AT TIME ZONE 'America/Argentina/Buenos_Aires'))::integer * 100 + EXTRACT(MONTH FROM (NOW() AT TIME ZONE 'America/Argentina/Buenos_Aires'))::integer)
+AND NOT EXISTS (
   SELECT 1
   FROM exchange_rates existing
   WHERE existing.year = 2026
     AND existing.month = forecast.month
     AND existing.rate_type = 'estimated'
     AND existing.source = 'Manual'
-    AND existing.is_active = TRUE
 );
 `;

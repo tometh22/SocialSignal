@@ -1379,7 +1379,7 @@ export default function Admin() {
               <div className="flex justify-between items-center">
                 <div>
                   <CardTitle className="heading-card">Plantillas de Reportes</CardTitle>
-                  <CardDescription>Gestiona las plantillas y sus asignaciones de roles</CardDescription>
+                  <CardDescription>Plantillas de reportes y sus asignaciones de roles. Las recetas definen alcance y esfuerzo de servicios; estas plantillas conservan la configuración específica de los reportes.</CardDescription>
                 </div>
                 <Button onClick={openNewTemplateDialog}>
                   <PlusCircle className="mr-2 h-4 w-4" />

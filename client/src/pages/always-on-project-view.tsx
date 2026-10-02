@@ -261,7 +261,7 @@ const AlwaysOnProjectView = () => {
           </div>
           <h1 className="text-3xl font-bold">{project.name}</h1>
           <p className="text-muted-foreground">
-            Cliente: {project.client?.name} • Inicio: {new Date(project.startDate).toLocaleDateString()}
+            Cliente: {project.client?.name} • Inicio: {project.startDate ? new Date(project.startDate).toLocaleDateString() : "Sin fecha"}
           </p>
         </div>
         <div className="space-x-2">
@@ -365,7 +365,7 @@ const AlwaysOnProjectView = () => {
             <AlwaysOnProjectSummary
               cliente={project.client?.name || 'Cliente'}
               proyecto={project.name}
-              fechaInicio={new Date(project.startDate).toLocaleDateString()}
+              fechaInicio={project.startDate ? new Date(project.startDate).toLocaleDateString() : "Sin fecha"}
               presupuestoMensual={project.budget || 0}
               entregables={projectDeliverables ? mapToEntregables(deliverables) : []}
               equipo={projectTeam ? mapToEquipo(projectTeam) : []}

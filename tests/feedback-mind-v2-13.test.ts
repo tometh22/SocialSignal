@@ -73,8 +73,11 @@ describe("Feedback Mind V2-13 · ronda 27-8", () => {
     expect(fxSync).toContain("if (isClosedPeriod(est.year, est.month)) continue;");
 
     const job = source("server/jobs/daily-sot-sync.ts");
-    expect(job).toContain("recordObservedRate, demoteStaleProjections");
-    expect(job).toContain("source: 'auto_sync_maestro'");
+    expect(job).toContain("syncMasterFxRates");
+    expect(fxSync).toContain("await recordObservedRate({");
+    expect(fxSync).toContain("await demoteStaleProjections(actorId)");
+    expect(fxSync).toContain("await importRemEstimates([");
+    expect(fxSync).toContain('source: "auto_sync_maestro"');
     // El job ya no escribe la tabla salteando la degradación de la estimación.
     expect(job).not.toContain("await db.update(exchangeRates)");
   });

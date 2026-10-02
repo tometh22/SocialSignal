@@ -1,3 +1,4 @@
+import { parseRemRows } from "@shared/utils/rem-import";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, Edit, Trash2, Calendar, TrendingUp, DollarSign, RefreshCw, Upload } from "lucide-react";
@@ -170,9 +171,9 @@ export function ExchangeRateManager() {
     mutationFn: () => apiRequest("/api/exchange-rates/sync-blue", "POST"),
     onSuccess: (result: any) => {
       toast({
-        title: "Blue sincronizado",
+        title: "Blue de hoy sincronizado",
         description: result?.rate
-          ? `Dólar blue de hoy: ${formatCurrency(Number(result.rate))} · ${result?.verification?.status === "matched" ? "fuentes coincidentes" : "revisá la verificación de fuentes"}`
+          ? `Dólar blue de ${String(result?.fetchedAt || "").slice(0, 10)}: ${formatCurrency(Number(result.rate))} · ${result?.verification?.status === "matched" ? "fuentes coincidentes" : "revisá la verificación de fuentes"}`
           : "Tipo de cambio blue actualizado.",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/exchange-rates"] });
@@ -182,7 +183,7 @@ export function ExchangeRateManager() {
     onError: (error: any) => {
       toast({
         title: "Error al sincronizar Blue",
-        description: error.message || "No se pudo obtener el dólar blue",
+        description: `${error.message || "No se pudo obtener el dólar blue"}. Probá otra vez o cargá un valor observado manualmente. Para 2027 usá Importar REM.`,
         variant: "destructive",
       });
     },
@@ -195,7 +196,7 @@ export function ExchangeRateManager() {
     onSuccess: (result: any) => {
       toast({
         title: "REM importado",
-        description: `Se importaron ${result?.count ?? 0} estimaciones del REM.`,
+        description: `Se importaron ${result?.count ?? 0} proyecciones; ${result?.skipped ?? 0} períodos se omitieron por tener valor observado o estar cerrados.`,
       });
       queryClient.invalidateQueries({ queryKey: ["/api/exchange-rates"] });
       setIsRemDialogOpen(false);
@@ -212,36 +213,8 @@ export function ExchangeRateManager() {
 
   // Parsea filas "año,mes,tasa" o "año-mes,tasa" (una por línea, separadores , ; o tab)
   const handleImportRem = () => {
-    const estimates: { year: number; month: number; rate: number }[] = [];
-    const lines = remText.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-    for (const line of lines) {
-      const parts = line.split(/[,;\t]+/).map((p) => p.trim());
-      let year: number, month: number, rate: number;
-      if (parts.length >= 3) {
-        year = parseInt(parts[0], 10);
-        month = parseInt(parts[1], 10);
-        rate = parseFloat(parts[2].replace(/\./g, "").replace(",", "."));
-      } else if (parts.length === 2 && parts[0].includes("-")) {
-        const [y, m] = parts[0].split("-");
-        year = parseInt(y, 10);
-        month = parseInt(m, 10);
-        rate = parseFloat(parts[1].replace(/\./g, "").replace(",", "."));
-      } else {
-        continue;
-      }
-      if (Number.isFinite(year) && month >= 1 && month <= 12 && Number.isFinite(rate) && rate > 0) {
-        estimates.push({ year, month, rate });
-      }
-    }
-    if (estimates.length === 0) {
-      toast({
-        title: "Sin datos válidos",
-        description: "Usá el formato: año, mes, tasa (una fila por línea).",
-        variant: "destructive",
-      });
-      return;
-    }
-    importRemMutation.mutate(estimates);
+    try { importRemMutation.mutate(parseRemRows(remText)); }
+    catch (error) { toast({ title: "Revisá las proyecciones", description: error instanceof Error ? error.message : "Formato inválido", variant: "destructive" }); }
   };
 
   const handleSubmit = (data: ExchangeRateFormData) => {
@@ -302,10 +275,10 @@ export function ExchangeRateManager() {
         <div>
           <h2 className="text-2xl font-bold tracking-tight">Tipos de Cambio USD/ARS</h2>
           <p className="text-muted-foreground">
-            Gestiona los tipos de cambio históricos para cálculos de costos y rentabilidad
+            Blue hoy registra un valor observado del día actual. Importar REM carga proyecciones futuras, incluido 2027. Un mes cerrado conserva su valor real cuando existe evidencia observada.
           </p>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-3">
           <Select
             value={selectedYear.toString()}
             onValueChange={(value) => setSelectedYear(parseInt(value))}
@@ -531,7 +504,7 @@ export function ExchangeRateManager() {
                 <DialogTitle>Importar estimaciones REM (BCRA)</DialogTitle>
                 <DialogDescription>
                   Pegá las estimaciones del REM, una por línea, con el formato{" "}
-                  <span className="font-mono">año, mes, tasa</span>. Se guardan como tipo "estimated", fuente REM.
+                  <span className="font-mono">año;mes;tasa</span>. Se guardan como tipo "estimated", fuente REM.
                 </DialogDescription>
               </DialogHeader>
               <textarea
