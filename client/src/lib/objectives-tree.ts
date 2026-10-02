@@ -452,3 +452,28 @@ export function objectivePickerGroups(map: ObjectivesMap): ObjectivePickerGroup[
   ];
   return groups.filter((group) => group.options.length > 0);
 }
+
+/** Entradas que se pueden filtrar por tipo: sin retirados ni puntos de control del calendario. */
+export function filterableObjectives(objectives: Objective[]): Objective[] {
+  const checkpoints = new Set(MONTH_CHECKPOINT_SLUGS);
+  return objectives.filter((objective) => !objective.retiredAt && !(objective.slug && checkpoints.has(objective.slug)));
+}
+
+/**
+ * Una lista de un solo tipo se lee por urgencia: lo vencido sin respuesta,
+ * lo que vence en dos semanas, lo que viene después y lo ya cerrado.
+ */
+export function urgencyGroups(objectives: Objective[], today = todayISO()) {
+  const groups = { overdue: [] as Objective[], soon: [] as Objective[], later: [] as Objective[], closed: [] as Objective[] };
+  for (const objective of objectives) {
+    if (isClosedObjective(objective)) { groups.closed.push(objective); continue; }
+    const deadline = deadlineOf(objective, today);
+    if (deadline?.overdue) groups.overdue.push(objective);
+    else if (deadline?.soon) groups.soon.push(objective);
+    else groups.later.push(objective);
+  }
+  const byDate = (a: Objective, b: Objective) =>
+    String(a.targetDate ?? "9999").localeCompare(String(b.targetDate ?? "9999")) || a.title.localeCompare(b.title, "es");
+  for (const list of Object.values(groups)) list.sort(byDate);
+  return groups;
+}
