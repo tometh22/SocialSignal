@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.10.8 — 2026-10-02
+
+- Corrige la consulta de horas para tareas trasladadas al historial recuperable, conservando el proyecto atribuido original y sin duplicar registros.
+- Muestra la procedencia y el acceso al proyecto activo desde los archivos de recuperación.
+
 ## 1.10.7 — 2026-10-02
 
 - Corrige el panel de gestión para incluir subtareas y sus horas, y respetar el filtro de sección en las estimaciones del equipo.

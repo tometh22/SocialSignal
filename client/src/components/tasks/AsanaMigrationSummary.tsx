@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { authFetchJson } from "@/lib/queryClient";
 
 type Migration = {
+  recoverySourceProjectId: number | null;
   time: { records: number; minutes: number; unresolved_people: number; unavailable_tasks: number };
   priorNativeTasks: number;
   retiredTasks: number;
@@ -27,9 +28,10 @@ export default function AsanaMigrationSummary({ projectId }: { projectId: number
   if (!data) return null;
   return <section className="rounded-xl border p-4 space-y-2 text-sm">
     <div className="flex flex-wrap items-center justify-between gap-2">
-      <h3 className="font-semibold">Migración desde Asana</h3>
+      <h3 className="font-semibold">{data.recoverySourceProjectId ? "Historial recuperable de Asana" : "Migración desde Asana"}</h3>
       <a className="text-primary underline" href={`https://app.asana.com/0/${data.gid}/list`} target="_blank" rel="noopener noreferrer">Abrir original</a>
     </div>
+    {data.recoverySourceProjectId && <p>Se conserva la instantánea retirada de la vista activa, incluidas sus horas originales. <a className="underline text-primary" href={`/tasks/projects/${data.recoverySourceProjectId}`}>Abrir proyecto de origen</a>.</p>}
     <p>{data.tasksAvailable ? `${data.counts.imported_tasks} tareas importadas · ${data.counts.assigned_tasks} con responsable` : "Exportación de tareas pendiente. Se conserva la estructura cargada desde el Excel."}</p>
     {data.retiredTasks > 0 && <p className="text-amber-700">{data.retiredTasks} tareas ya retiradas de Mind se conservan en <a className="underline" href={`/tasks/projects/${data.retiredTaskArchiveProjectId}`}>historial recuperable</a>.</p>}
     {data.priorNativeTasks > 0 && <p className="text-muted-foreground">Se conservan {data.priorNativeTasks} tareas anteriores de Excel/Mind.</p>}
