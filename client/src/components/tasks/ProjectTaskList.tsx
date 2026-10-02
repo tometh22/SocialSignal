@@ -41,6 +41,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 
 type Task = {
+  isMilestone?: boolean;
   id: number;
   title: string;
   description?: string | null;
@@ -564,6 +565,7 @@ function TaskRow({ task, allPersonnel, projectMembers = [], onOpen, onToggle, on
               <TooltipContent side="bottom" className="max-w-xs">Click para renombrar · {task.title}</TooltipContent>
             </Tooltip>
           )}
+          {task.isMilestone && <Badge variant="outline" className="shrink-0 text-[10px]">◆ Hito</Badge>}
           {hasSubtasks && !isSubtask && (
             <button
               onClick={e => { e.stopPropagation(); onToggleSubtasks?.(task.id); }}
@@ -1172,6 +1174,7 @@ function BoardCard({ task, allPersonnel, onOpen }: { task: Task; allPersonnel: P
       </div>
       <div className="flex items-center justify-between gap-1">
         <div className="flex items-center gap-1.5 flex-wrap">
+          {task.isMilestone && <Badge variant="outline" className="text-[10px]">◆ Hito</Badge>}
           {task.priority && task.priority !== "medium" && (
             <span className={cn("text-[10px] px-1.5 py-0.5 rounded-full border font-medium", PRIORITY_BADGE[task.priority])}>
               {PRIORITY_LABELS[task.priority]}
@@ -1422,6 +1425,8 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
     const allRaw = data?.tasks || [];
     const newTask = await apiRequest("/api/tasks", "POST", {
       title: `${task.title} (copia)`,
+      description: task.description,
+      isMilestone: task.isMilestone,
       projectId: task.projectId,
       sectionName: task.sectionName,
       assigneeId: task.assigneeId,
@@ -1437,6 +1442,8 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
       for (const sub of subtasks) {
         const newSubtask = await apiRequest("/api/tasks", "POST", {
           title: sub.title,
+          description: sub.description,
+          isMilestone: sub.isMilestone,
           projectId: sub.projectId,
           sectionName: sub.sectionName,
           assigneeId: sub.assigneeId,
