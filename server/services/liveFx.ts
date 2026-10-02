@@ -41,6 +41,7 @@ export function parseDolarHoyBlueHtml(html: string, fetchedAt = new Date()): Liv
 async function fetchDolarApiBlue(): Promise<LiveBlueRate> {
   const response = await fetch("https://dolarapi.com/v1/dolares/blue", {
     headers: { accept: "application/json" },
+    signal: AbortSignal.timeout(10_000),
   });
   if (!response.ok) throw new Error(`DolarAPI respondió ${response.status}`);
   const payload = (await response.json()) as {
@@ -64,6 +65,7 @@ async function fetchDolarApiBlue(): Promise<LiveBlueRate> {
 
 async function fetchDolarHoyBlue(): Promise<LiveBlueRate> {
   const response = await fetch("https://dolarhoy.com/cotizaciondolarblue", {
+    signal: AbortSignal.timeout(10_000),
     headers: {
       accept: "text/html",
       "user-agent": "SocialSignal-FX-Verification/1.0",

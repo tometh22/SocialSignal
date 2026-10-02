@@ -1,3 +1,4 @@
+import { calculateSettlementDifference } from "@shared/utils/monthly-settlement-declaration";
 import { useEffect, useMemo, useRef, useState, type ClipboardEvent, type DragEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertCircle, Calculator, Check, CheckCircle2, FileText, Loader2, ShieldCheck, UploadCloud, X } from "lucide-react";
@@ -187,18 +188,18 @@ function MonthlyClosingDeclarations() {
     onSuccess: () => { client.invalidateQueries({ queryKey: ["my-monthly-settlement-declarations"] }); toast({ title: "Declaración enviada a Operaciones" }); },
     onError: (error: Error) => toast({ title: "No se pudo enviar", description: error.message, variant: "destructive" }),
   });
-  return <Card><CardHeader><CardTitle className="text-base">Declaración de tipo de cambio bancario</CardTitle><p className="text-sm text-muted-foreground">El cierre original permanece fijo. Informá el tipo de cambio bancario para calcular la diferencia de tu tramo USD; Operaciones revisará la declaración.</p></CardHeader><CardContent className="space-y-3">{query.data?.filter((row) => row.amountUSD > 0).map((row) => {
+  return <Card><CardHeader><CardTitle className="text-base">Conciliación del cierre operativo</CardTitle><p className="text-sm text-muted-foreground">El cierre original permanece fijo. Informá el tipo de cambio bancario para calcular la diferencia de tu tramo USD; Operaciones revisará la declaración.</p></CardHeader><CardContent className="space-y-3">{query.isLoading && <p className="text-sm text-muted-foreground">Cargando cierres…</p>}{query.isError && <p className="text-sm text-destructive">{query.error.message}</p>}{query.data?.filter((row) => row.amountUSD > 0).map((row) => {
     const rate = Number(rates[row.closingId] ?? row.declaration?.bankFxRate ?? "");
-    const difference = Number.isFinite(rate) && row.closingFxRate ? row.amountUSD * (rate - row.closingFxRate) : null;
-    return <div key={row.closingId} className="grid gap-3 rounded-lg border p-3 sm:grid-cols-[1fr_1fr_1fr_1.2fr_auto] sm:items-end">
+    const difference = (() => { try { return calculateSettlementDifference(row.amountUSD, rate, Number(row.closingFxRate)); } catch { return null; } })();
+    return <div key={row.closingId} className="grid gap-3 rounded-lg border p-3 sm:grid-cols-2 xl:grid-cols-[1fr_1fr_1fr_1.2fr_auto] sm:items-end">
       <div><p className="text-xs text-muted-foreground">Período</p><p className="font-medium">{periodLabel(`${row.year}-${String(row.month).padStart(2, "0")}`)}</p></div>
       <Summary label="Tramo USD" value={money(row.amountUSD, "USD")} detail={`${Math.round(row.usdBillingFraction * 100)}% de la configuración`} />
       <Summary label="FX de cierre" value={row.closingFxRate ? row.closingFxRate.toLocaleString("es-AR") : "—"} detail="Referencia congelada" />
-      <div><Label>FX recibido por banco</Label><Input type="number" min="0.01" step="0.01" value={rates[row.closingId] ?? (row.declaration?.bankFxRate ? String(row.declaration.bankFxRate) : "")} onChange={(event) => setRates({ ...rates, [row.closingId]: event.target.value })} /><p className="mt-1 text-xs text-muted-foreground">Diferencia: {difference == null ? "—" : money(difference, "ARS")}</p></div>
+      <div><Label>FX recibido por banco</Label><Input disabled={row.declaration?.status === "approved"} type="number" min="0.01" step="0.01" value={rates[row.closingId] ?? (row.declaration?.bankFxRate ? String(row.declaration.bankFxRate) : "")} onChange={(event) => setRates({ ...rates, [row.closingId]: event.target.value })} /><p className="mt-1 text-xs text-muted-foreground">Diferencia: {difference == null ? "—" : money(difference, "ARS")}</p></div>
       {row.declaration && <Badge variant="outline">{row.declaration.status === "approved" ? "Aprobada" : row.declaration.status === "rejected" ? "Requiere corrección" : "Pendiente"}</Badge>}
-      <Button disabled={!rate || mutation.isPending || row.declaration?.status === "approved"} onClick={() => mutation.mutate({ closingId: row.closingId, bankFxRate: rate })}>{row.declaration?.status === "rejected" ? "Corregir y reenviar" : "Enviar"}</Button>
-      {row.declaration?.reviewReason && <p className="text-xs text-rose-700 sm:col-span-5">Respuesta de Operaciones: {row.declaration.reviewReason}</p>}
-      {!!row.declaration?.events?.length && <p className="text-[11px] text-muted-foreground sm:col-span-5">Historial: {row.declaration.events.map((event) => `${event.action} · ${new Date(event.createdAt).toLocaleDateString("es-AR")}`).join(" → ")}</p>}
+      <Button disabled={difference == null || mutation.isPending || row.declaration?.status === "approved"} onClick={() => mutation.mutate({ closingId: row.closingId, bankFxRate: rate })}>{row.declaration?.status === "rejected" ? "Corregir y reenviar" : "Enviar"}</Button>
+      {row.declaration?.reviewReason && <p className="text-xs text-rose-700 sm:col-span-2 xl:col-span-5">Respuesta de Operaciones: {row.declaration.reviewReason}</p>}
+      {!!row.declaration?.events?.length && <p className="text-[11px] text-muted-foreground sm:col-span-2 xl:col-span-5">Historial: {row.declaration.events.map((event) => `${({ submitted: "Enviada", resubmitted: "Reenviada", approve: "Aprobada", reject: "Rechazada" } as Record<string, string>)[event.action] ?? event.action} · ${new Date(event.createdAt).toLocaleDateString("es-AR")}`).join(" → ")}</p>}
     </div>;
   })}{query.data?.filter((row) => row.amountUSD > 0).length === 0 && <p className="text-sm text-muted-foreground">Todavía no hay cierres con tramo USD para declarar.</p>}</CardContent></Card>;
 }

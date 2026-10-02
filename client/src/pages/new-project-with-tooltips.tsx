@@ -89,6 +89,12 @@ export default function NewProjectWithTooltips() {
   });
   const { data: personnelData } = useQuery({ queryKey: ["/api/personnel"], queryFn: async () => { const r = await fetch("/api/personnel", { credentials: "include" }); return r.ok ? r.json() : []; } });
 
+  const { data: templateProjects = [] } = useQuery<Array<{ id: number; name: string; clientName?: string }>>({ queryKey: ["/api/tasks/projects", "templates"], queryFn: async () => {
+    const response = await fetch("/api/tasks/projects?status=active&scope=mine", { credentials: "include" });
+    if (!response.ok) throw new Error("No se pudieron cargar las estructuras de proyectos");
+    return response.json();
+  } });
+
   // Procesamiento seguro de datos
   const quotations = Array.isArray(quotationsData) ? quotationsData : [];
   const clients = Array.isArray(clientsData) ? clientsData : [];
@@ -139,7 +145,7 @@ export default function NewProjectWithTooltips() {
   ];
 
   const createProjectMutation = useMutation({
-    mutationFn: async (data: FormData & { projectTemplate?: string; memberIds?: number[] }) => {
+    mutationFn: async (data: FormData & { projectTemplate?: string; templateProjectId?: number; memberIds?: number[] }) => {
       const response = await fetch("/api/active-projects", {
         method: "POST",
         credentials: "include",
@@ -192,7 +198,7 @@ export default function NewProjectWithTooltips() {
       : { ...data, internalType: undefined };
     // Con cotización el nombre canónico sale de la cotización; no mandar `name` para
     // no pisar quotations.project_name vía COALESCE(name, project_name).
-    const payload = { ...cleaned, name: cleaned.quotationId ? undefined : (cleaned.name?.trim() || undefined), projectTemplate, memberIds, projectManagerId: projectManagerId ? Number(projectManagerId) : null };
+    const payload = { ...cleaned, name: cleaned.quotationId ? undefined : (cleaned.name?.trim() || undefined), projectTemplate: projectTemplate.startsWith("project:") ? "none" : projectTemplate, templateProjectId: projectTemplate.startsWith("project:") ? Number(projectTemplate.slice(8)) : undefined, memberIds, projectManagerId: projectManagerId ? Number(projectManagerId) : null };
     createProjectMutation.mutate(payload);
   };
 
@@ -231,7 +237,7 @@ export default function NewProjectWithTooltips() {
             <form onSubmit={form.handleSubmit(onSubmit)}>
               <CardContent className="space-y-6">
                 <div className="grid gap-4 rounded-lg border p-4 md:grid-cols-2">
-                  <div><FormLabel>Plantilla de proyecto</FormLabel><Select value={projectTemplate} onValueChange={setProjectTemplate}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">Sin plantilla</SelectItem><SelectItem value="weekly">Semanal</SelectItem><SelectItem value="monthly">Mensual</SelectItem><SelectItem value="one_shot">One-shot</SelectItem></SelectContent></Select><p className="mt-1 text-xs text-muted-foreground">Crea secciones y tareas iniciales; podés editarlas después.</p></div>
+                  <div><FormLabel>Plantilla de proyecto</FormLabel><Select value={projectTemplate} onValueChange={setProjectTemplate}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">Sin plantilla</SelectItem><SelectItem value="weekly">Semanal</SelectItem><SelectItem value="monthly">Mensual</SelectItem><SelectItem value="one_shot">One-shot inicial</SelectItem>{templateProjects.map(project => <SelectItem key={project.id} value={`project:${project.id}`}>Estructura: {project.name}</SelectItem>)}</SelectContent></Select><p className="mt-1 text-xs text-muted-foreground">Podés usar una estructura inicial o copiar las secciones y tareas de un proyecto existente, incluidos los cargados desde el Excel. Seleccioná sus miembros para conservar las asignaciones. La copia comienza con tareas pendientes y fechas/horas vacías.</p></div>
                   <div><FormLabel>Project manager</FormLabel><Select value={projectManagerId || "none"} onValueChange={(value) => setProjectManagerId(value === "none" ? "" : value)}><SelectTrigger><SelectValue placeholder="Sin responsable" /></SelectTrigger><SelectContent><SelectItem value="none">Sin responsable</SelectItem>{(Array.isArray(personnelData) ? personnelData : []).map((person: any) => <SelectItem key={person.id} value={String(person.id)}>{person.name}</SelectItem>)}</SelectContent></Select></div>
                   <div><FormLabel>Miembros del proyecto</FormLabel><div className="mt-2 max-h-36 space-y-1 overflow-y-auto">{(Array.isArray(personnelData) ? personnelData : []).map((person: any) => <label key={person.id} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={memberIds.includes(person.id)} onChange={(event) => setMemberIds(event.target.checked ? [...memberIds, person.id] : memberIds.filter((id) => id !== person.id))} />{person.name}{person.currentRole ? <span className="text-xs text-muted-foreground">· {person.currentRole}</span> : null}</label>)}</div></div>
                 </div>

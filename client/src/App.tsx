@@ -223,7 +223,7 @@ function AppRoutes() {
       <Route path="*">
         <div className="app-shell flex h-[100dvh] overflow-hidden bg-background">
           {/* Sidebar permanente en desktop */}
-          <div className="hidden lg:flex">
+          <div className="hidden shrink-0 lg:flex">
             <SidebarFixed />
           </div>
 

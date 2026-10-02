@@ -2,6 +2,8 @@ import { db } from "../db";
 import { exchangeRates, systemConfig } from "../../shared/schema";
 import { and, eq, sql } from "drizzle-orm";
 import { fetchLiveBlueRates } from "./liveFx";
+import type { MasterFxRate } from "../../shared/utils/master-fx";
+import { getBuenosAiresPeriod } from "../../shared/utils/fx-periods";
 import { isClosedPeriod } from "../../shared/utils/fx-periods";
 
 export { isClosedPeriod };
@@ -11,15 +13,22 @@ type UpsertInput = {
   month: number;
   rate: number;
   rateType: "end_of_month" | "daily" | "average" | "estimated";
-  source: "Blue" | "REM" | "BCRA" | "MEP" | "CCL" | "Manual";
+  source: string;
   specificDate?: Date | null;
   notes?: string | null;
   createdBy: number;
 };
 
 async function upsertRate(input: UpsertInput) {
+  return db.transaction(async (tx) => {
+  await tx.execute(sql`SELECT pg_advisory_xact_lock(294, ${input.year * 100 + input.month})`);
+  if (input.rateType === "estimated") {
+    const [observed] = await tx.select({ id: exchangeRates.id }).from(exchangeRates).where(and(eq(exchangeRates.year, input.year), eq(exchangeRates.month, input.month), eq(exchangeRates.isActive, true), sql`${exchangeRates.rateType} <> 'estimated'`)).limit(1);
+    if (observed || isClosedPeriod(input.year, input.month)) return null;
+    await tx.update(exchangeRates).set({ isActive: false, updatedAt: new Date(), updatedBy: input.createdBy }).where(and(eq(exchangeRates.year, input.year), eq(exchangeRates.month, input.month), eq(exchangeRates.rateType, "estimated"), eq(exchangeRates.isActive, true), sql`${exchangeRates.source} <> ${input.source}`));
+  }
   if (input.rateType !== "estimated") {
-    await db.update(exchangeRates).set({
+    await tx.update(exchangeRates).set({
       isActive: false,
       updatedAt: new Date(),
       updatedBy: input.createdBy,
@@ -30,7 +39,7 @@ async function upsertRate(input: UpsertInput) {
       eq(exchangeRates.isActive, true),
     ));
   }
-  const existing = await db
+  const existing = await tx
     .select()
     .from(exchangeRates)
     .where(
@@ -39,14 +48,16 @@ async function upsertRate(input: UpsertInput) {
         eq(exchangeRates.month, input.month),
         eq(exchangeRates.rateType, input.rateType),
         eq(exchangeRates.source as any, input.source),
+        input.rateType === "daily" ? (input.specificDate ? sql`(${exchangeRates.specificDate} AT TIME ZONE 'UTC' AT TIME ZONE 'America/Argentina/Buenos_Aires')::date = ${input.specificDate.toLocaleDateString("en-CA", { timeZone: "America/Argentina/Buenos_Aires" })}::date` : sql`${exchangeRates.specificDate} IS NULL`) : undefined,
       ),
     )
     .limit(1);
 
   if (existing.length > 0) {
-    const [updated] = await db
+    const [updated] = await tx
       .update(exchangeRates)
       .set({
+        isActive: true,
         rate: String(input.rate),
         specificDate: input.specificDate ?? null,
         notes: input.notes ?? null,
@@ -58,7 +69,7 @@ async function upsertRate(input: UpsertInput) {
     return updated;
   }
 
-  const [created] = await db
+  const [created] = await tx
     .insert(exchangeRates)
     .values({
       year: input.year,
@@ -73,6 +84,7 @@ async function upsertRate(input: UpsertInput) {
     })
     .returning();
   return created;
+  });
 }
 
 /**
@@ -115,6 +127,7 @@ export async function syncBlueToday(createdBy: number) {
         updatedBy: createdBy,
       },
     });
+  await demoteStaleProjections(createdBy);
   return { rate, fetchedAt, saved, verification };
 }
 
@@ -134,72 +147,14 @@ export async function recordObservedRate(input: {
   if (!Number.isFinite(input.rate) || input.rate <= 0) {
     throw new Error(`Tipo de cambio inválido para ${input.month}/${input.year}: ${input.rate}`);
   }
+  const current = getBuenosAiresPeriod();
+  if (input.year * 100 + input.month > current.year * 100 + current.month) throw new Error("Un período futuro debe importarse como proyección REM");
   const rateType = isClosedPeriod(input.year, input.month) ? "end_of_month" : "daily";
-  await db.update(exchangeRates).set({
-    isActive: false,
-    updatedAt: new Date(),
-    updatedBy: input.createdBy,
-  }).where(and(
-    eq(exchangeRates.year, input.year),
-    eq(exchangeRates.month, input.month),
-    eq(exchangeRates.rateType, "estimated"),
-    eq(exchangeRates.isActive, true),
-  ));
-
-  const [existing] = await db.select().from(exchangeRates).where(and(
-    eq(exchangeRates.year, input.year),
-    eq(exchangeRates.month, input.month),
-    eq(exchangeRates.source as any, input.source),
-    sql`${exchangeRates.rateType} <> 'estimated'`,
-  )).limit(1);
-
-  // El tipo de cambio "vigente" que usa el resto de la app (useCurrency, la
-  // confirmación de cotizaciones nuevas) vive aparte, en system_config, y
-  // sólo lo actualizaba el botón manual de "Sincronizar dólar blue". Si nadie
-  // lo clickeaba, esa referencia quedaba vieja o vacía aunque la sync
-  // automática del Máster sí estuviera trayendo datos al día. Se actualiza acá
-  // también, sólo para el mes en curso (rateType "daily"): un mes ya cerrado
-  // que se está registrando en el histórico no debe pisar la referencia de hoy.
+  const saved = await upsertRate({ ...input, rateType });
   if (rateType === "daily") {
-    await db.insert(systemConfig).values({
-      configKey: "usd_exchange_rate",
-      configValue: input.rate,
-      description: `${input.source} · sincronización automática del Máster`,
-      updatedBy: input.createdBy,
-    }).onConflictDoUpdate({
-      target: systemConfig.configKey,
-      set: {
-        configValue: input.rate,
-        description: `${input.source} · sincronización automática del Máster`,
-        updatedAt: new Date(),
-        updatedBy: input.createdBy,
-      },
-    });
+    await db.insert(systemConfig).values({ configKey: "usd_exchange_rate", configValue: input.rate, description: `${input.source} · observado`, updatedBy: input.createdBy }).onConflictDoUpdate({ target: systemConfig.configKey, set: { configValue: input.rate, description: `${input.source} · observado`, updatedAt: new Date(), updatedBy: input.createdBy } });
   }
-
-  if (existing) {
-    const [updated] = await db.update(exchangeRates).set({
-      rate: String(input.rate),
-      rateType,
-      isActive: true,
-      notes: input.notes ?? existing.notes,
-      updatedAt: new Date(),
-      updatedBy: input.createdBy,
-    }).where(eq(exchangeRates.id, existing.id)).returning();
-    return updated;
-  }
-
-  const [created] = await db.insert(exchangeRates).values({
-    year: input.year,
-    month: input.month,
-    rate: String(input.rate),
-    rateType,
-    source: input.source,
-    notes: input.notes ?? null,
-    isActive: true,
-    createdBy: input.createdBy,
-  }).returning();
-  return created;
+  return saved;
 }
 
 /**
@@ -267,7 +222,22 @@ export async function importRemEstimates(estimates: RemEstimate[], createdBy: nu
       notes: "REM BCRA · importado",
       createdBy,
     });
-    saved.push(row);
+    if (row) saved.push(row);
   }
   return saved;
+}
+
+export async function syncMasterFxRates(rates: Array<Pick<MasterFxRate, "año" | "month" | "tipoCambio" | "rateType" | "notes">>, actorId: number) {
+  let observed = 0; let projected = 0;
+  for (const rate of rates) {
+    if (rate.rateType === "estimated") {
+      const saved = await importRemEstimates([{ year: rate.año, month: rate.month, rate: rate.tipoCambio }], actorId);
+      projected += saved.length;
+    } else {
+      await recordObservedRate({ year: rate.año, month: rate.month, rate: rate.tipoCambio, source: "auto_sync_maestro", notes: "Blue · cierre observado del Máster", createdBy: actorId });
+      observed++;
+    }
+  }
+  const demoted = await demoteStaleProjections(actorId);
+  return { observed, projected, demoted };
 }

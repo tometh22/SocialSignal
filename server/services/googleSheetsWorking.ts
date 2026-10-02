@@ -1,3 +1,4 @@
+import { parseMasterFxRows } from "../../shared/utils/master-fx";
 import { google } from 'googleapis';
 import { resolveIncomeAmountColumns, isProjectionRow } from '../etl/proyectos-confirmados-spec';
 import fs from 'fs';
@@ -61,6 +62,9 @@ interface TipoCambio {
   tipoCambio: number;
   fuente: string;
   periodKey?: string;
+  month?: number;
+  rateType?: "end_of_month" | "estimated";
+  notes?: string;
 }
 
 interface VentaTomi {
@@ -1135,7 +1139,7 @@ class GoogleSheetsWorkingService {
     if (!finalRange) {
       console.log('❌ No se encontró ninguna pestaña válida para tipos de cambio');
       console.log('🔄 Utilizando datos históricos del BCRA como fallback...');
-      return this.getMockTiposCambioData();
+      throw new Error("No se encontró la fuente de tipos de cambio. Revisá el acceso y la pestaña Info Tipo de Cambio y REM.");
     }
     console.log(`📋 Range: ${finalRange}`);
     
@@ -1167,66 +1171,8 @@ class GoogleSheetsWorkingService {
       return [];
     }
     
-    const tiposCambio: TipoCambio[] = [];
-    
-    // Procesar desde la fila encontrada
-    for (let i = startRowIndex; i < rows.length; i++) {
-      const row = rows[i];
-      if (!row || row.length < 2) continue;
-      
-      const mes = row[0]?.toString().trim();
-      const tipoCambioStr = row[1]?.toString().trim();
-      
-      if (!mes || !tipoCambioStr) continue;
-      
-      // Parar si encontramos filas de proyección (pero NO años válidos)
-      if (mes.includes('próx') || mes.includes('proyecc')) {
-        break;
-      }
-
-      // Determinar año desde el mes si contiene año (dinámico, no hardcoded)
-      let currentYear = new Date().getFullYear();
-      const yearMatch = mes.match(/(20\d{2})/);
-      if (yearMatch) {
-        currentYear = parseInt(yearMatch[1]);
-      }
-      
-      // Convertir el tipo de cambio a número
-      const tipoCambio = parseDec(tipoCambioStr.replace(/[.,]/g, (match: string, offset: number, string: string) => {
-        // Reemplazar la última coma/punto por punto decimal
-        const lastDotIndex = string.lastIndexOf('.');
-        const lastCommaIndex = string.lastIndexOf(',');
-        const lastSeparatorIndex = Math.max(lastDotIndex, lastCommaIndex);
-        return offset === lastSeparatorIndex ? '.' : '';
-      }));
-      
-      if (isNaN(tipoCambio)) continue;
-      
-      const monthMapTc: Record<string, number> = {
-        enero: 1, febrero: 2, marzo: 3, abril: 4, mayo: 5, junio: 6,
-        julio: 7, agosto: 8, septiembre: 9, octubre: 10, noviembre: 11, diciembre: 12,
-        jan: 1, feb: 2, mar: 3, apr: 4, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12
-      };
-      const mesLower = mes.toLowerCase().replace(/[^a-záéíóú]/g, '').substring(0, 10);
-      const mesNum = Object.entries(monthMapTc).find(([k]) => mesLower.startsWith(k))?.[1];
-      const periodKey = mesNum && currentYear
-        ? `${currentYear}-${String(mesNum).padStart(2, '0')}`
-        : undefined;
-
-      tiposCambio.push({
-        mes: mes,
-        año: currentYear, // Usar año detectado dinámicamente
-        tipoCambio: tipoCambio,
-        fuente: 'BCRA',
-        periodKey,
-      });
-      
-      if (tiposCambio.length <= 5) {
-        console.log(`🔍 Tipo cambio debug: ${mes} = ${tipoCambio}`);
-      }
-    }
-    
-    console.log(`✅ Procesados ${tiposCambio.length} tipos de cambio`);
+    const tiposCambio = parseMasterFxRows(rows.slice(startRowIndex));
+    console.log(`✅ Procesados ${tiposCambio.length} tipos de cambio: reales y REM separados`);
     return tiposCambio;
   }
 

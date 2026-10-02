@@ -14,6 +14,7 @@ import { computeAlerts, type Alert } from "@/lib/smart-alerts";
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import { taskDateBucket, taskCompletedThisWeek, type TaskDateBucket } from "@shared/utils/task-date-bucket";
 import { TASK_STATUS_CONFIG, type TaskStatus } from "@/constants/task-statuses";
 import TaskCalendarView from "@/components/tasks/TaskCalendarView";
 import {
@@ -58,6 +59,16 @@ export default function HomeDashboard() {
     const days = Math.round((next.getTime() - new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime()) / 86400000);
     return { date: next.toLocaleDateString("es-AR", { day: "numeric", month: "long" }), days };
   })() : null;
+
+  const { data: absenceBalance } = useQuery<{ configured: boolean; vacationDays: number | null; vacationCarryoverDays: number; used: { vacation: number } }>({
+    queryKey: ["/api/absence-allowances", myPersonnel?.id, new Date().getFullYear()],
+    queryFn: async () => {
+      const response = await authFetch(`/api/absence-allowances/${myPersonnel.id}/${new Date().getFullYear()}`);
+      if (!response.ok) throw new Error("No se pudo cargar el saldo de vacaciones");
+      return response.json();
+    },
+    enabled: Boolean(myPersonnel),
+  });
 
   const { data: quotationStats } = useQuery<{ total: number; pending: number; draft: number }>({
     queryKey: ["/api/quotations/stats"],
@@ -105,13 +116,12 @@ export default function HomeDashboard() {
   const monthEnd = endOfMonth(now);
 
   const { data: myTasksData } = useQuery<{ tasks: any[]; personnelId: number | null }>({
-    queryKey: ["/api/tasks/my-tasks", "active"],
-    queryFn: () => authFetch("/api/tasks/my-tasks?status=in_progress").then(r => r.json()),
-    enabled: canAccessTasks,
-  });
-  const { data: myTodoData } = useQuery<{ tasks: any[]; personnelId: number | null }>({
-    queryKey: ["/api/tasks/my-tasks", "todo"],
-    queryFn: () => authFetch("/api/tasks/my-tasks?status=todo").then(r => r.json()),
+    queryKey: ["/api/tasks/my-tasks", "home"],
+    queryFn: async () => {
+      const response = await authFetch("/api/tasks/my-tasks");
+      if (!response.ok) throw new Error("No se pudieron cargar las tareas");
+      return response.json();
+    },
     enabled: canAccessTasks,
   });
 
@@ -179,23 +189,23 @@ export default function HomeDashboard() {
     return Array.from(map.values()).sort((a, b) => b.pending - a.pending);
   })();
 
-  const myActiveTasks = (myTasksData?.tasks || []).filter(t => !t.parentTaskId);
-  const myTodoTasks = (myTodoData?.tasks || []).filter(t => !t.parentTaskId);
-
+  const myTasks = (myTasksData?.tasks || []).filter(t => !t.parentTaskId);
+  const taskGroups = {
+    in_progress: myTasks.filter(t => taskDateBucket(t) === "in_progress"),
+    upcoming: myTasks.filter(t => taskDateBucket(t) === "upcoming"),
+    overdue: myTasks.filter(t => taskDateBucket(t) === "overdue"),
+    no_date: myTasks.filter(t => taskDateBucket(t) === "no_date"),
+    done: myTasks.filter(t => taskCompletedThisWeek(t)),
+  };
+  const taskLabels = { in_progress: "En curso", upcoming: "Próximas", overdue: "Con retraso", no_date: "Sin fecha", done: "Finalizadas esta semana" };
+  const myActiveTasks = taskGroups.in_progress;
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const myOverdueTasks = [...myActiveTasks, ...myTodoTasks].filter(t =>
-    t.dueDate && new Date(t.dueDate.slice(0, 10) + 'T00:00:00') < today
-  );
-  const myPendingTasks = [...myActiveTasks, ...myTodoTasks].filter(t =>
-    !t.dueDate || new Date(t.dueDate.slice(0, 10) + 'T00:00:00') >= today
-  );
-
-  const [taskTab, setTaskTab] = useState<'active' | 'overdue'>('active');
+  const [taskTab, setTaskTab] = useState<TaskDateBucket | "done">("in_progress");
   const [showAllMyTasks, setShowAllMyTasks] = useState(false);
   const [homeProjectView, setHomeProjectView] = useState<'folders' | 'list'>('folders');
   const [collapsedHomeClients, setCollapsedHomeClients] = useState<Set<string>>(new Set());
-  const tabTasks = taskTab === 'overdue' ? myOverdueTasks : myPendingTasks;
+  const tabTasks = taskGroups[taskTab];
   const displayedMyTasks = showAllMyTasks ? tabTasks : tabTasks.slice(0, 5);
 
   const greeting = () => {
@@ -244,6 +254,11 @@ export default function HomeDashboard() {
         ) : undefined}
       />
       {birthday && <Card className="border-pink-200 bg-pink-50/60"><CardContent className="flex items-center gap-3 p-3 text-sm text-pink-950"><span aria-hidden="true">🎂</span><span><strong>Tu cumpleaños:</strong> {birthday.date}{birthday.days === 0 ? " · ¡hoy!" : birthday.days === 1 ? " · mañana" : ` · en ${birthday.days} días`}</span></CardContent></Card>}
+
+      {absenceBalance?.configured && <Card><CardContent className="flex flex-wrap items-center justify-between gap-2 p-3 text-sm">
+        <span><strong>Vacaciones disponibles: {(absenceBalance.vacationDays ?? 0) + absenceBalance.vacationCarryoverDays - absenceBalance.used.vacation} días</strong><span className="ml-2 text-xs text-muted-foreground">Año actual: {absenceBalance.vacationDays ?? 0} · Traslado: {absenceBalance.vacationCarryoverDays} · Usados: {absenceBalance.used.vacation}</span></span>
+        <Link href="/absences" className="text-primary hover:underline">Mis ausencias</Link>
+      </CardContent></Card>}
 
       {/* Resumen operativo */}
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
@@ -406,29 +421,15 @@ export default function HomeDashboard() {
               </div>
             </div>
           </div>
-          {(myPendingTasks.length > 0 || myOverdueTasks.length > 0) && (
+          {myTasks.length > 0 && (
             <div className="bg-card rounded-xl border overflow-hidden">
-              <div className="px-4 py-3 border-b bg-muted/20 flex items-center justify-between">
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => { setTaskTab('active'); setShowAllMyTasks(false); }}
-                    className={cn(
-                      "text-xs px-2.5 py-1 rounded-md font-medium transition-colors",
-                      taskTab === 'active' ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
-                    )}
-                  >
-                    Activas {myPendingTasks.length > 0 && <span className="ml-1 opacity-70">({myPendingTasks.length})</span>}
-                  </button>
-                  <button
-                    onClick={() => { setTaskTab('overdue'); setShowAllMyTasks(false); }}
-                    className={cn(
-                      "text-xs px-2.5 py-1 rounded-md font-medium transition-colors",
-                      taskTab === 'overdue' ? "bg-red-600 text-white" : "text-muted-foreground hover:text-foreground",
-                      myOverdueTasks.length > 0 && taskTab !== 'overdue' && "text-red-600"
-                    )}
-                  >
-                    Vencidas {myOverdueTasks.length > 0 && <span className="ml-1 opacity-80">({myOverdueTasks.length})</span>}
-                  </button>
+              <div className="px-4 py-3 border-b bg-muted/20 flex flex-wrap items-center justify-between gap-2">
+                <div className="flex flex-wrap items-center gap-1">
+                  {(Object.keys(taskLabels) as Array<TaskDateBucket | "done">).map(bucket => (
+                    <button key={bucket} onClick={() => { setTaskTab(bucket); setShowAllMyTasks(false); }}
+                      className={cn("rounded-md px-2.5 py-1 text-xs font-medium", taskTab === bucket ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
+                    >{taskLabels[bucket]} <span className="opacity-70">({taskGroups[bucket].length})</span></button>
+                  ))}
                 </div>
                 <Link href="/tasks">
                   <span className="text-xs text-primary hover:underline cursor-pointer flex items-center gap-0.5">
@@ -438,7 +439,7 @@ export default function HomeDashboard() {
               </div>
               {displayedMyTasks.length === 0 ? (
                 <div className="px-4 py-6 text-center text-xs text-muted-foreground">
-                  {taskTab === 'overdue' ? "Sin tareas vencidas" : "Sin tareas activas"}
+                  No hay tareas en este grupo
                 </div>
               ) : (
                 <div className="divide-y divide-border">
@@ -452,9 +453,9 @@ export default function HomeDashboard() {
                         {t.estimatedHours > 0 && (
                           <span className="text-xs text-muted-foreground flex-shrink-0">{t.estimatedHours}h est.</span>
                         )}
-                        {t.dueDate && (
+                        {(t.startDate || t.dueDate) && (
                           <span className={cn("text-xs flex-shrink-0", isOverdue ? "text-red-600 font-medium" : "text-muted-foreground")}>
-                            {format(new Date(t.dueDate.slice(0, 10) + 'T00:00:00'), "d MMM", { locale: es })}
+                            {t.startDate ? format(new Date(t.startDate.slice(0, 10) + 'T12:00:00'), "d MMM", { locale: es }) : "Sin inicio"} → {t.dueDate ? format(new Date(t.dueDate.slice(0, 10) + 'T12:00:00'), "d MMM", { locale: es }) : "Sin fin"}
                           </span>
                         )}
                       </div>
@@ -478,7 +479,7 @@ export default function HomeDashboard() {
           {/* Proyectos activos del miembro: carpetas Cliente → Proyecto o lista */}
           {homeProjects.length > 0 && (
             <div className="bg-card rounded-xl border overflow-hidden">
-              <div className="px-4 py-3 border-b bg-muted/20 flex items-center justify-between gap-2">
+              <div className="px-4 py-3 border-b bg-muted/20 flex flex-wrap items-center justify-between gap-2 gap-2">
                 <div className="flex items-center gap-2">
                 <Briefcase className="h-4 w-4 text-slate-500" />
                 <span className="text-sm font-medium text-foreground">Proyectos activos</span>

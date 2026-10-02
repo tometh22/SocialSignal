@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.10.3 — 2026-10-02
+
+- Corrige el guardado y la validación de cumpleaños en Personal.
+- Evita alertar markup cero como urgente cuando todavía no hay costos reales del portfolio.
+- Unifica Home y Tareas por fechas y semana de Buenos Aires; separa las solicitudes personales de la gestión de ausencias de Operaciones y representa días exactos en el Gantt.
+- Guarda asignaciones durante ausencias con una advertencia, también para colaboradores del proyecto.
+- Conserva secciones vacías del Excel y permite crearlas, renombrarlas, eliminarlas y copiarlas sin tareas ficticias.
+- Duplica secciones y jerarquías en una transacción; permite crear proyectos con la estructura de un proyecto existente, miembros y PM seleccionados.
+- Agrega recurrencias semanales, quincenales y mensuales con una sola próxima tarea y sin copiar horas realizadas.
+- Conserva cierres y declaraciones aprobadas, protege revisiones concurrentes y registra cada reenvío y decisión de conciliación.
+- Corrige el formato y las fechas del Máster FX, separa valores observados de REM 2027 y evita recrear estimaciones históricas en cada reinicio.
+- Conserva las fechas vacías del Excel, mejora el diseño adaptable y evita mostrar cotizaciones perdidas como pendientes de configuración.
+- Corrige la referencia al proyecto al renombrar uno de varios proyectos vinculados a la misma cotización.
+
 ## 1.10.2 — 2026-10-02
 
 - Corrige horas desconocidas, tipos de servicio y moneda en el resumen de cotización de los proyectos; conserva el presupuesto en la moneda de la vista elegida.

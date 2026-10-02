@@ -1,3 +1,4 @@
+import { recurrenceLabel, type TaskRecurrence } from "@shared/utils/task-recurrence";
 import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest, authFetch, authFetchJson } from "@/lib/queryClient";
@@ -30,6 +31,7 @@ import { roundToQuarterHour } from "@shared/utils/num";
 import { useAuth } from "@/hooks/use-auth";
 
 type Task = {
+  recurrenceRule?: TaskRecurrence | null;
   id: number;
   title: string;
   description?: string | null;
@@ -451,6 +453,9 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
       }));
       // Update the project list in background (doesn't affect this panel's query)
       queryClient.invalidateQueries({ queryKey: ["/api/tasks/project"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks/my-tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks/team-calendar"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks/projects"] });
     },
     onError: (_err, _updates, context: any) => {
       if (context?.previous) {
@@ -653,18 +658,8 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
     updateMutation.mutate({ description: value || null });
   };
 
-  const handleAssigneeChange = async (value: string) => {
-    const assigneeId = value === "none" ? null : Number(value);
-    if (assigneeId && task?.startDate && task?.dueDate) {
-      try {
-        const response = await authFetch(`/api/absence-requests/availability?personnelId=${assigneeId}&from=${task.startDate.slice(0, 10)}&to=${task.dueDate.slice(0, 10)}`);
-        if (response.ok) {
-          const availability = await response.json();
-          if (availability.unavailable) toast({ title: "Aviso: ausencia durante la tarea", description: "La persona seleccionada tiene una ausencia en este rango. Podés guardar la asignación y coordinar la cobertura.", variant: "destructive" });
-        }
-      } catch { /* Assignment remains available if the advisory lookup is unreachable. */ }
-    }
-    updateMutation.mutate({ assigneeId });
+  const handleAssigneeChange = (value: string) => {
+    updateMutation.mutate({ assigneeId: value === "none" ? null : Number(value) });
   };
 
   if (!taskId) return null;
@@ -875,6 +870,14 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
                       </p>
                     </div>
                   )}
+
+                  {!task.parentTaskId && <div className="flex flex-wrap items-center gap-3">
+                    <p className="w-28 shrink-0 text-[11px] text-muted-foreground">Repetición</p>
+                    <Select value={!task.recurrenceRule ? "none" : task.recurrenceRule.frequency === "monthly" ? "monthly" : task.recurrenceRule.interval === 2 ? "fortnightly" : task.recurrenceRule.weekdays?.length === 2 ? "mon_wed" : "weekly"} onValueChange={value => updateMutation.mutate({ recurrenceRule: value === "none" ? null : value === "monthly" ? { frequency: "monthly", interval: 1 } : value === "fortnightly" ? { frequency: "weekly", interval: 2, weekdays: [1] } : value === "mon_wed" ? { frequency: "weekly", interval: 1, weekdays: [1, 3] } : { frequency: "weekly", interval: 1 } })}>
+                      <SelectTrigger className="h-8 flex-1 text-xs" aria-label="Repetición de la tarea"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">Sin repetición</SelectItem><SelectItem value="mon_wed">Lunes y miércoles</SelectItem><SelectItem value="fortnightly">Lunes cada dos semanas</SelectItem><SelectItem value="weekly">Semanal</SelectItem><SelectItem value="monthly">Mensual</SelectItem></SelectContent>
+                    </Select>
+                    {task.recurrenceRule && <p className="text-xs text-muted-foreground">{recurrenceLabel(task.recurrenceRule)}: al finalizar se crea la próxima tarea pendiente, con su nueva fecha.</p>}
+                  </div>}
 
                   {/* Prioridad */}
                   <div className="flex items-center gap-3">

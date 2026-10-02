@@ -1452,42 +1452,24 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
     toast({ title: `Tarea duplicada: "${task.title} (copia)"` });
   };
 
+  const [duplicatingSection, setDuplicatingSection] = useState(false);
   const handleDuplicateSection = async (sectionName: string) => {
-    const allRaw = data?.tasks || [];
-    const sectionTasks = allRaw.filter((t: Task) => t.sectionName === sectionName && !t.parentTaskId);
-    for (const task of sectionTasks) {
-      const newTask = await apiRequest("/api/tasks", "POST", {
-        title: task.title,
-        projectId: task.projectId,
-        sectionName: `${sectionName} (copia)`,
-        assigneeId: task.assigneeId,
-        priority: task.priority,
-        status: "todo",
-        dueDate: task.dueDate,
-        startDate: task.startDate,
-      });
-      await copyWeeklyEstimates(task.id, newTask.id);
-      const subtasks = allRaw.filter((t: Task) => t.parentTaskId === task.id);
-      for (const sub of subtasks) {
-        const newSubtask = await apiRequest("/api/tasks", "POST", {
-          title: sub.title,
-          projectId: sub.projectId,
-          sectionName: `${sectionName} (copia)`,
-          assigneeId: sub.assigneeId,
-          priority: sub.priority,
-          status: "todo",
-          parentTaskId: newTask.id,
-        });
-        await copyWeeklyEstimates(sub.id, newSubtask.id);
-      }
-    }
-    refetch();
-    invalidateRelated();
-    toast({ title: `Sección "${sectionName}" duplicada` });
+    if (duplicatingSection) return;
+    const newName = window.prompt("Nombre de la nueva sección. Se copian las tareas y responsables, con fechas y horas vacías.", `${sectionName} (copia)`);
+    if (!newName?.trim()) return;
+    setDuplicatingSection(true);
+    try {
+      await apiRequest("/api/tasks/section/duplicate", "POST", { projectId, sectionName, newName: newName.trim() });
+      refetch(); invalidateRelated();
+      toast({ title: `Sección "${newName.trim()}" creada` });
+    } catch (error) {
+      toast({ title: "No se pudo duplicar la sección", description: error instanceof Error ? error.message : "Volvé a intentar", variant: "destructive" });
+    } finally { setDuplicatingSection(false); }
   };
 
   const createSectionTask = useMutation({
-    mutationFn: (data: any) => apiRequest("/api/tasks", "POST", data),
+    mutationFn: (data: any) => apiRequest("/api/tasks/section", "POST", { projectId: data.projectId, sectionName: data.sectionName }),
+    onError: (error: Error) => toast({ title: "No se pudo crear la sección", description: error.message, variant: "destructive" }),
     onSuccess: () => { refetch(); invalidateRelated(); setShowAddSection(false); setNewSectionName(""); },
   });
 
