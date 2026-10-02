@@ -2,7 +2,7 @@
 
 Actualización 1.10.4: las dos listas originales de Asana ya están accesibles y cotejadas, con 37 tareas, ocho secciones y tres hitos conservados.
 
-Actualización 1.10.6: se recuperó la extracción completa de los 49 proyectos activos visibles, incluidas subtareas y horas originales. El detalle de cobertura, retiros recuperables y conciliaciones de datos pendientes queda en [la auditoría de migración](asana-migration-2026-10-02.md).
+Actualización 1.10.9: la posterior importación de proyectos e historia de Asana amplió el alcance por error. El usuario confirmó que el módulo operativo debía recibir solo el Excel. Se conserva el trabajo de plantillas de 1.10.4 y se retira recuperablemente la importación adicional; ver [corrección de alcance](asana-excel-scope-correction-2026-10-02.md).
 
 Fecha: 2026-10-02. Fuentes: ambas rondas PDF, Excel «Proyectos y cotizaciones a pasar», código de main y lectura del Máster «Info Tipo de Cambio y REM».
 

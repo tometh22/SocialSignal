@@ -1,5 +1,7 @@
 # Migración de Asana — 2026-10-02
 
+> Corrección posterior: el usuario aclaró que solo correspondía migrar el Excel. Esta importación amplió el alcance por error y fue retirada de la superficie activa de forma recuperable. El resultado vigente está en [la corrección de alcance](asana-excel-scope-correction-2026-10-02.md). Lo siguiente conserva el registro técnico anterior, no describe el alcance activo autorizado.
+
 ## Alcance verificado
 
 El inventario de la cuenta autorizada contiene 51 proyectos no archivados: dos plantillas ya publicadas en 1.10.4 y 49 proyectos/boards de trabajo. Se verificaron por separado `archived=false` y `completed=false` de los 49. No se acredita contenido inaccesible para esa cuenta.

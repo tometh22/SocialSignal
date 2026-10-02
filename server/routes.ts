@@ -23095,8 +23095,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { assigneeId, projectId, status, dateFrom, dateTo } = req.query;
       let conditions: any[] = [];
+      const archivedProjectFilter = sql`${tasks.projectId} IN (SELECT id FROM active_projects WHERE status NOT IN ('voided', 'cancelled'))`;
       const allowedProjectIds = await accessibleTaskProjectIds(req);
       if (allowedProjectIds && allowedProjectIds.length === 0) return res.json([]);
+      if (!projectId) conditions.push(archivedProjectFilter);
       if (allowedProjectIds) conditions.push(inArray(tasks.projectId, allowedProjectIds));
       if (projectId && !(await canAccessTaskProject(req, parseInt(projectId as string)))) {
         return res.status(403).json({ message: "No tenés acceso a este proyecto" });
@@ -23170,11 +23172,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
               createdUnassigned,
             )
           : createdUnassigned;
+        const archivedProjectFilter = sql`${tasks.projectId} IN (SELECT id FROM active_projects WHERE status NOT IN ('voided', 'cancelled'))`;
         const allowedProjectIds = await accessibleTaskProjectIds(req);
         if (allowedProjectIds && allowedProjectIds.length === 0) {
           return res.json({ tasks: [], personnelId: pid || null });
         }
-        let conditions: any[] = [assignmentConditions];
+        let conditions: any[] = [assignmentConditions, archivedProjectFilter];
         if (allowedProjectIds) conditions.push(inArray(tasks.projectId, allowedProjectIds));
         if (status && status !== 'all') conditions.push(eq(tasks.status, status as string));
         if (dateFrom || dateTo) {
@@ -23219,8 +23222,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { dateFrom, dateTo, assigneeId, projectId } = req.query;
       let conditions: any[] = [];
+      const archivedProjectFilter = sql`${tasks.projectId} IN (SELECT id FROM active_projects WHERE status NOT IN ('voided', 'cancelled'))`;
       const allowedProjectIds = await accessibleTaskProjectIds(req);
       if (allowedProjectIds && allowedProjectIds.length === 0) return res.json([]);
+      if (!projectId) conditions.push(archivedProjectFilter);
       if (allowedProjectIds) conditions.push(inArray(tasks.projectId, allowedProjectIds));
       if (dateFrom || dateTo) {
         const from = dateFrom ? new Date(dateFrom as string) : new Date(0);
