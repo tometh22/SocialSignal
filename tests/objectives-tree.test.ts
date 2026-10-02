@@ -4,7 +4,9 @@ import {
   buildObjectiveTree,
   buildObjectivesMap,
   deadlineOf,
+  filterableObjectives,
   isClosedObjective,
+  urgencyGroups,
   flattenTree,
   formatDeadline,
   priorityRank,
@@ -135,5 +137,30 @@ describe("lo que necesita una respuesta", () => {
     ], HOY);
     const cerrar = map.fronts.find((front) => front.id === "front-close");
     expect(cerrar?.overdue).toBe(1);
+  });
+});
+
+describe("filtrar por tipo", () => {
+  it("ordena una lista por urgencia y deja lo cerrado aparte", () => {
+    const groups = urgencyGroups([
+      obj({ id: "lejos", targetDate: "2026-12-31" }),
+      obj({ id: "vencido", targetDate: "2026-09-01" }),
+      obj({ id: "pronto", targetDate: "2026-09-20" }),
+      obj({ id: "sinfecha" }),
+      obj({ id: "hecho", targetDate: "2026-09-01", status: "done" }),
+    ], HOY);
+    expect(groups.overdue.map((o) => o.id)).toEqual(["vencido"]);
+    expect(groups.soon.map((o) => o.id)).toEqual(["pronto"]);
+    expect(groups.later.map((o) => o.id)).toEqual(["lejos", "sinfecha"]);
+    expect(groups.closed.map((o) => o.id)).toEqual(["hecho"]);
+  });
+
+  it("no cuenta retirados ni los puntos de control del calendario", () => {
+    const listed = filterableObjectives([
+      obj({ id: 1, slug: "company-month-oct-advance", targetKind: "milestone" }),
+      obj({ id: 2, slug: "x", retiredAt: "2026-09-17T00:00:00Z" }),
+      obj({ id: 3, slug: "company-bcra-decision", targetKind: "milestone" }),
+    ]);
+    expect(listed.map((o) => o.id)).toEqual([3]);
   });
 });
