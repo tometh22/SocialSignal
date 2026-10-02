@@ -18,7 +18,7 @@ import { Button } from "@/components/ui/button";
 import { ToastAction } from "@/components/ui/toast";
 import { EditActionDialog, EditObjectiveDialog, ObjectiveSelect, type PersonOption } from "@/components/objectives/objective-editors";
 import { ActionDetailSheet, ObjectiveDetailSheet } from "@/components/objectives/objective-detail";
-import { KIND_HELP, KindBadge, MeasureText, ProgressControl, formatAmount as formatTarget, kindOf } from "@/components/objectives/objective-kind";
+import { KIND_HELP, KindBadge, MeasureText, ProgressControl, formatAmount as formatTarget, kindOf, type ObjectiveKind } from "@/components/objectives/objective-kind";
 import { useToast } from "@/hooks/use-toast";
 import { CompactPageHeader } from "@/components/ui/compact-page-header";
 import { Input } from "@/components/ui/input";
@@ -55,6 +55,8 @@ import {
   isGroup,
   ObjectiveNode,
   objectivePickerGroups,
+  filterableObjectives,
+  urgencyGroups,
   type ObjectivePickerGroup,
   tierOf,
   todayISO,
@@ -781,6 +783,67 @@ function BulkProgressView({ objectives, onSaved }: { objectives: Objective[]; on
   );
 }
 
+type KindFilter = "all" | ObjectiveKind | "accion";
+
+// Un solo tipo a la vez —sólo hitos, sólo objetivos— ordenado por urgencia.
+function KindListView({ kind, objectives, onlyMine, isMine, breadcrumbOf, onUpdate, updatingId }: { kind: "objetivo" | "hito"; objectives: Objective[]; onlyMine: boolean; isMine: IsMineFn; breadcrumbOf: (objective: Objective) => string; onUpdate: UpdateObjectiveFn; updatingId: string | number | null }) {
+  const [showClosed, setShowClosed] = useState(false);
+  const list = filterableObjectives(objectives).filter((objective) => kindOf(objective) === kind && (!onlyMine || isMine(objective.owner)));
+  const groups = urgencyGroups(list);
+  const sections: Array<{ key: string; title: string; items: Objective[]; tone?: string }> = [
+    { key: "overdue", title: "Vencidos sin respuesta", items: groups.overdue, tone: "text-red-600" },
+    { key: "soon", title: "Vencen en las próximas dos semanas", items: groups.soon, tone: "text-amber-700" },
+    { key: "later", title: "Más adelante", items: groups.later },
+  ];
+  if (list.length === 0) return <EmptyState title={onlyMine ? "Nada a tu cargo" : "No hay nada de este tipo"} description={onlyMine ? "Probá sacar \"Sólo lo mío\"." : "El plan no tiene entradas de este tipo."} />;
+  return (
+    <div className="space-y-4">
+      {sections.filter((section) => section.items.length > 0).map((section) => (
+        <section key={section.key} className="rounded-2xl border border-border/75 bg-card p-5">
+          <h2 className={cn("text-sm font-bold", section.tone ?? "text-foreground")}>{section.title} <span className="font-normal text-muted-foreground">· {section.items.length}</span></h2>
+          <ul className="mt-2 divide-y divide-border/60">
+            {section.items.map((objective) => (
+              <li key={String(objective.id)} className="flex items-start gap-3 py-3">
+                <div className="min-w-0 flex-1">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{breadcrumbOf(objective)}</p>
+                  <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
+                    <PriorityStar objective={objective} />
+                    <ObjectiveTitle objective={objective} className="text-sm font-semibold leading-5 text-foreground" />
+                    <DeadlineBadge objective={objective} />
+                  </div>
+                  <p className="mt-0.5 text-[11px] text-muted-foreground">{ownerLabel(objective.owner)} · <MeasureText objective={objective} /></p>
+                  <ProgressControl key={`${objective.id}-${objective.status}-${objective.progressPercent}`} objective={objective} onUpdate={onUpdate} isUpdating={updatingId === objective.id} />
+                </div>
+                <EditObjectiveButton objective={objective} />
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))}
+      {groups.closed.length > 0 && (
+        <section className="rounded-2xl border border-border/75 bg-card p-5">
+          <button type="button" onClick={() => setShowClosed((value) => !value)} aria-expanded={showClosed} className="flex w-full items-center gap-2 text-left text-sm font-bold text-muted-foreground">
+            {showClosed ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}Cerrados · {groups.closed.length}
+          </button>
+          {showClosed && (
+            <ul className="mt-2 divide-y divide-border/60">
+              {groups.closed.map((objective) => (
+                <li key={String(objective.id)} className="flex items-start gap-3 py-2">
+                  <div className="min-w-0 flex-1">
+                    <ObjectiveTitle objective={objective} className="text-sm font-semibold leading-5 text-muted-foreground" />
+                    <p className="text-[11px] text-muted-foreground">{ownerLabel(objective.owner)} · <MeasureText objective={objective} /></p>
+                  </div>
+                  <ProgressControl key={`${objective.id}-${objective.status}`} objective={objective} onUpdate={onUpdate} isUpdating={updatingId === objective.id} />
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
+    </div>
+  );
+}
+
 function ActionsView({ actions, owners, onToggle, pendingId }: { actions: ObjectiveAction[]; owners: ObjectiveRef[]; onToggle: (action: ObjectiveAction) => void; pendingId: string | number | null }) {
   const [ownerFilter, setOwnerFilter] = useState("Todos");
   const shown = ownerFilter === "Todos" ? actions : actions.filter((action) => ownerKey(action.accountableOwner) === ownerFilter);
@@ -824,6 +887,8 @@ export default function StatusObjectivesPage() {
   const { user: authUser } = useAuth();
   const queryClient = useQueryClient();
   const [view, setView] = useState<ViewId>("focus");
+  const [kindFilter, setKindFilter] = useState<KindFilter>("all");
+  const [onlyMineFilter, setOnlyMineFilter] = useState(false);
   const [planView, setPlanView] = useState<PlanViewId>("fronts");
   const [openFront, setOpenFront] = useState<FrontId | null>(null);
   const [objectiveSearch, setObjectiveSearch] = useState("");
@@ -855,6 +920,15 @@ export default function StatusObjectivesPage() {
   }, [myPersonnelId]);
   const objectivesMap = useMemo(() => buildObjectivesMap(objectives), [objectives]);
   const objectiveGroups = useMemo(() => objectivePickerGroups(objectivesMap), [objectivesMap]);
+  const kindCounts = useMemo(() => {
+    const listed = filterableObjectives(objectives);
+    return {
+      objetivo: listed.filter((objective) => kindOf(objective) === "objetivo").length,
+      hito: listed.filter((objective) => kindOf(objective) === "hito").length,
+      habito: objectivesMap.standards.length,
+      accion: actions.length,
+    };
+  }, [objectives, objectivesMap, actions]);
   const overdue = useMemo(() => awaitingAnswer(objectives), [objectives]);
   const upcoming = useMemo(() => objectivesMap.dueSoon.filter((objective) => !deadlineOf(objective)?.overdue), [objectivesMap]);
   const nextCheckpoint = useMemo(() => {
@@ -980,13 +1054,32 @@ export default function StatusObjectivesPage() {
     {showActionForm && <ActionFormPanel form={form} setForm={setForm} objectiveGroups={objectiveGroups} owners={people.length > 0 ? people : ownerOptions} accounts={accounts} onSubmit={submitAction} onClose={() => setShowActionForm(false)} isPending={createActionMutation.isPending} error={formError} />}
     {mutationError && <div role="alert" className="flex items-center gap-2 rounded-xl border border-destructive/20 bg-destructive/[0.03] px-3 py-2 text-xs text-destructive"><AlertCircle className="h-4 w-4 shrink-0" />{mutationError instanceof Error ? mutationError.message : "No se pudo guardar el cambio."}</div>}
     <div role="tablist" aria-label="Vista de objetivos" className="flex items-center gap-1 border-b border-border/80 pb-px">
-      {([{ id: "focus", label: "Foco" }, { id: "plan", label: "Plan completo" }] as Array<{ id: ViewId; label: string }>).map((tab) => <button key={tab.id} id={`objectives-tab-${tab.id}`} type="button" role="tab" aria-selected={view === tab.id} aria-controls={`objectives-panel-${tab.id}`} tabIndex={view === tab.id ? 0 : -1} onClick={() => setView(tab.id)} className={cn("whitespace-nowrap border-b-2 px-3 py-2 text-sm font-semibold transition-colors", view === tab.id ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground")}>{tab.label}</button>)}
+      {([{ id: "focus", label: "Foco" }, { id: "plan", label: "Plan completo" }] as Array<{ id: ViewId; label: string }>).map((tab) => <button key={tab.id} id={`objectives-tab-${tab.id}`} type="button" role="tab" aria-selected={view === tab.id} aria-controls={`objectives-panel-${tab.id}`} tabIndex={view === tab.id ? 0 : -1} onClick={() => { setView(tab.id); setKindFilter("all"); }} className={cn("whitespace-nowrap border-b-2 px-3 py-2 text-sm font-semibold transition-colors", view === tab.id && kindFilter === "all" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground")}>{tab.label}</button>)}
     </div>
 
-    <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted-foreground" aria-label="Qué es cada cosa">
-      {(["objetivo", "hito", "habito", "accion"] as const).map((kind) => <span key={kind} className="inline-flex items-center gap-1.5"><KindBadge kind={kind} />{KIND_HELP[kind]}</span>)}
-    </p>
-    {view === "focus" && <div id="objectives-panel-focus" role="tabpanel" aria-labelledby="objectives-tab-focus" className="space-y-4">
+    {/* La leyenda es también el filtro: tocar un tipo muestra sólo ese tipo. */}
+    <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Ver por tipo">
+      <button type="button" aria-pressed={kindFilter === "all"} onClick={() => setKindFilter("all")} className={cn("rounded-full border px-3 py-1 text-xs font-semibold transition-colors", kindFilter === "all" ? "border-slate-900 bg-slate-900 text-white" : "border-border text-muted-foreground hover:bg-muted")}>Todo</button>
+      {(["objetivo", "hito", "habito", "accion"] as const).map((kind) => (
+        <button key={kind} type="button" aria-pressed={kindFilter === kind} onClick={() => setKindFilter(kindFilter === kind ? "all" : kind)} title={KIND_HELP[kind]} className={cn("inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-[11px] transition-colors", kindFilter === kind ? "border-slate-900 bg-slate-900/[0.06] ring-1 ring-slate-900" : "border-border hover:bg-muted")}>
+          <KindBadge kind={kind} />
+          <span className="text-muted-foreground">{KIND_HELP[kind]}</span>
+          <span className="font-semibold text-foreground">{kindCounts[kind]}</span>
+        </button>
+      ))}
+      {kindFilter !== "all" && myPersonnelId != null && (
+        <label className="ml-1 flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+          <input type="checkbox" checked={onlyMineFilter} onChange={(event) => setOnlyMineFilter(event.target.checked)} />
+          Sólo lo mío
+        </label>
+      )}
+    </div>
+    {kindFilter !== "all" && <div className="space-y-4">
+      {(kindFilter === "objetivo" || kindFilter === "hito") && <KindListView kind={kindFilter} objectives={objectives} onlyMine={onlyMineFilter} isMine={isMine} breadcrumbOf={breadcrumbOf} onUpdate={updateObjectiveFields} updatingId={updatingObjectiveId} />}
+      {kindFilter === "habito" && <HabitsView map={onlyMineFilter ? { ...objectivesMap, standards: objectivesMap.standards.filter((objective) => isMine(objective.owner)), standardsBreached: objectivesMap.standardsBreached.filter((objective) => isMine(objective.owner)), standardsUnmeasured: objectivesMap.standardsUnmeasured.filter((objective) => isMine(objective.owner)) } : objectivesMap} onUpdate={updateObjectiveFields} updatingId={updatingObjectiveId} />}
+      {kindFilter === "accion" && <ActionsView actions={onlyMineFilter ? actions.filter((action) => isMine(action.accountableOwner)) : actions} owners={ownerOptions} onToggle={toggleAction} pendingId={pendingActionId} />}
+    </div>}
+    {kindFilter === "all" && view === "focus" && <div id="objectives-panel-focus" role="tabpanel" aria-labelledby="objectives-tab-focus" className="space-y-4">
       <GoalPanel northStar={objectivesMap.northStar} support={objectivesMap.northSupport} onUpdate={updateObjectiveFields} updatingId={updatingObjectiveId} />
       <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
         <WeekFocus actions={currentWeekActions} weekLabel={formatWeek(currentWeekStart)} onToggle={toggleAction} pendingId={pendingActionId} isMine={isMine} hasIdentity={myPersonnelId != null} />
@@ -995,7 +1088,7 @@ export default function StatusObjectivesPage() {
       <FrontsSummary fronts={objectivesMap.fronts} onOpen={openFrontInPlan} />
     </div>}
 
-    {view === "plan" && <div id="objectives-panel-plan" role="tabpanel" aria-labelledby="objectives-tab-plan" className="space-y-4">
+    {kindFilter === "all" && view === "plan" && <div id="objectives-panel-plan" role="tabpanel" aria-labelledby="objectives-tab-plan" className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-1">
           {planTabs.map((tab) => <button key={tab.id} type="button" aria-pressed={!searching && planView === tab.id} onClick={() => { setPlanView(tab.id); setObjectiveSearch(""); }} className={cn("rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors", !searching && planView === tab.id ? "bg-slate-900 text-white" : "text-muted-foreground hover:bg-muted")}>{tab.label}</button>)}
