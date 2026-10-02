@@ -11,8 +11,7 @@ const normal=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').to
 const db=new pg.Client({connectionString:process.env.DATABASE_URL,ssl:process.env.PGSSLMODE==='disable'?false:{rejectUnauthorized:false}});await db.connect();
 try{
  await db.query(apply?'BEGIN':'BEGIN READ ONLY');if(apply)await db.query("SELECT pg_advisory_xact_lock(hashtext('mind-asana-project-migration'))");
- const projects=(await db.query('SELECT * FROM active_projects')).rows,people=(await db.query('SELECT id,name,email FROM personnel')).rows;
- const owners=(await db.query("SELECT project_id,personnel_id FROM task_project_members WHERE role='owner'")).rows;
+ const projects=(await db.query('SELECT * FROM active_projects WHERE asana_project_gid=ANY($1::text[])'+(apply?' FOR UPDATE':''),[manifest.projects.map(p=>p.gid)])).rows,people=(await db.query('SELECT id,name,email FROM personnel')).rows;
  const identities=read(manifest.usersFile).data.map(raw=>{const alias=manifest.personAliases?.[normal(raw.name)];const matches=people.filter(p=>alias?p.id===alias:(raw.email&&p.email?.toLowerCase()===raw.email.toLowerCase())||normal(p.name)===normal(raw.name));return{gid:raw.gid,name:raw.name,email:raw.email||null,personnelId:matches.length===1?matches[0].id:null,raw};});
  if(new Set(identities.map(u=>u.gid)).size!==identities.length)throw new Error('Duplicate identity GID');
  const users=new Map(identities.map(u=>[u.gid,u]));
@@ -34,7 +33,7 @@ try{
   await db.query(`INSERT INTO asana_person_identities(gid,name,email,personnel_id,source) SELECT gid,name,email,"personnelId",raw FROM jsonb_to_recordset($1::jsonb) AS x(gid text,name text,email text,"personnelId" int,raw jsonb) ON CONFLICT(gid) DO UPDATE SET name=EXCLUDED.name,email=EXCLUDED.email,personnel_id=COALESCE(asana_person_identities.personnel_id,EXCLUDED.personnel_id)`,[JSON.stringify(identities)]);
  }
  for(const p of prepared){
-  const projectId=p.current.id,existing=(await db.query('SELECT * FROM tasks WHERE project_id=$1 ORDER BY id',[projectId])).rows,ids=new Map(existing.filter(t=>t.asana_task_gid).map(t=>[t.asana_task_gid,t.id]));
+  const projectId=p.current.id,existing=(await db.query('SELECT * FROM tasks WHERE project_id=$1 ORDER BY id'+(apply?' FOR UPDATE':''),[projectId])).rows,ids=new Map(existing.filter(t=>t.asana_task_gid).map(t=>[t.asana_task_gid,t.id]));
   const priorGids=new Set(p.current.asana_source?.importedTaskGids||(p.csv?.tasks||[]).map(t=>t.gid));
   const retiredGids=new Set([...(p.current.asana_source?.retiredTaskGids||[]).filter(gid=>!ids.has(gid)),...p.parsed.tasks.filter(t=>priorGids.has(t.gid)&&!ids.has(t.gid)).map(t=>t.gid)]);
   const retiredTasks=p.parsed.tasks.filter(t=>retiredGids.has(t.gid));
@@ -45,7 +44,7 @@ try{
   if(apply){
    if(retiredTasks.length){
     if(!archiveId){const archive=(await db.query("INSERT INTO active_projects(name,client_id,status,project_category,internal_type,notes,task_section_names) VALUES($1,$2,'voided','internal','general',$3,$4) RETURNING id",[p.project.name+' · historial recuperable',p.current.client_id,'Resguardo de tareas importadas anteriormente que ya no estaban en Mind al conciliar Asana. Se conserva el retiro de la vista activa.',JSON.stringify([...new Set(retiredTasks.map(t=>t.section))])])).rows[0];archiveId=archive.id;}
-    const archived=(await db.query('SELECT * FROM tasks WHERE project_id=$1',[archiveId])).rows;
+    const archived=(await db.query('SELECT * FROM tasks WHERE project_id=$1 ORDER BY id FOR UPDATE',[archiveId])).rows;
     for(const t of archived)if(t.asana_task_gid){ids.set(t.asana_task_gid,t.id);byGid.set(t.asana_task_gid,t);destinations.set(t.asana_task_gid,archiveId);}
    }
    async function insertTasks(rows,destination){if(!rows.length)return 0;
@@ -64,7 +63,7 @@ try{
    if(memberIds.length)await db.query("INSERT INTO task_project_members(project_id,personnel_id,role) SELECT $1,unnest($2::int[]),'member' ON CONFLICT DO NOTHING",[projectId,memberIds]);
    if(archiveId&&memberIds.length)await db.query("INSERT INTO task_project_members(project_id,personnel_id,role) SELECT $1,unnest($2::int[]),'member' ON CONFLICT DO NOTHING",[archiveId,memberIds]);
    const owner=users.get(p.project.owner?.gid)?.personnelId||null;
-   if(owner&&!owners.some(m=>m.project_id===projectId)){await db.query("INSERT INTO task_project_members(project_id,personnel_id,role) VALUES($1,$2,'owner') ON CONFLICT(project_id,personnel_id) DO UPDATE SET role='owner'",[projectId,owner]);}
+   if(owner){await db.query("INSERT INTO task_project_members(project_id,personnel_id,role) SELECT $1,$2,'owner' WHERE NOT EXISTS(SELECT 1 FROM task_project_members WHERE project_id=$1 AND role='owner') ON CONFLICT(project_id,personnel_id) DO UPDATE SET role='owner'",[projectId,owner]);}
    const sections=[...new Set([...p.sections.map(s=>s.name||'General'),...(p.current.task_section_names||[]),...p.parsed.tasks.map(t=>t.section)])];
    await db.query('UPDATE active_projects SET task_section_names=$2,asana_source=$3 WHERE id=$1',[projectId,JSON.stringify(sections),{...p.current.asana_source,format:'asana-json',tasksAvailable:true,detailedHoursAvailable:true,sourceHash:p.hash,capturedAt:manifest.capturedAt,originalProject:p.project,originalSections:p.sections,importedTaskGids:[...new Set([...priorGids,...p.parsed.tasks.map(t=>t.gid)])],retiredTaskGids:[...retiredGids],retiredTaskArchiveProjectId:archiveId,unresolvedPeople:p.project.members.filter(u=>!users.get(u.gid)?.personnelId).map(u=>({gid:u.gid,name:u.name}))}]);
    const rows=p.time.map(t=>({...t,taskId:ids.get(t.taskGid)||null,personnelId:users.get(t.authorGid)?.personnelId||null}));
