@@ -95,7 +95,7 @@ export default function ProjectOverviewPanel({ projectId, members, projectColor,
 
   const { data, isLoading } = useQuery<{ tasks: Task[]; sections: Record<string, Task[]> }>({
     queryKey: ["/api/tasks/project", projectId],
-    queryFn: () => authFetch(`/api/tasks/project/${projectId}`).then((r) => r.json()),
+    queryFn: () => authFetch(`/api/tasks/project/${projectId}?layout=flat`).then((r) => r.json()),
     enabled: !!projectId,
   });
 
@@ -110,7 +110,6 @@ export default function ProjectOverviewPanel({ projectId, members, projectColor,
   const allSectionNames = Object.keys(data?.sections || {});
   const allProjectTasks: Task[] = data?.tasks || [];
   const allTasks: Task[] = allProjectTasks
-    .filter((t) => !t.parentTaskId)
     .filter((t) => selectedSection === "all" || (t.sectionName || "General") === selectedSection);
   const today = startOfDay(new Date());
 
@@ -123,7 +122,7 @@ export default function ProjectOverviewPanel({ projectId, members, projectColor,
   ).length;
   const unassigned = allTasks.filter((t) => !t.assigneeId && t.status !== "done").length;
   const totalLogged = allTasks.reduce((s, t) => s + (t.loggedHours || 0), 0);
-  const totalEstimated = allProjectTasks.reduce(
+  const totalEstimated = allTasks.reduce(
     (sum, task) => sum + Number(task.estimatedHoursTotal ?? 0),
     0,
   );
@@ -143,7 +142,7 @@ export default function ProjectOverviewPanel({ projectId, members, projectColor,
     const mDone = mTasks.filter((t) => t.status === "done").length;
     const mPending = mTasks.filter((t) => t.status !== "done" && t.status !== "cancelled").length;
     const mLogged = mTasks.reduce((s, t) => s + (t.loggedHours || 0), 0);
-    const mEstimated = allProjectTasks
+    const mEstimated = allTasks
       .filter((task) => task.assigneeId === m.personnelId)
       .reduce((sum, task) => sum + Number(task.estimatedHoursTotal ?? 0), 0);
     return { ...m, total: mTasks.length, done: mDone, pending: mPending, logged: mLogged, estimated: mEstimated };
@@ -170,6 +169,7 @@ export default function ProjectOverviewPanel({ projectId, members, projectColor,
         </div>
       )}
 
+      <p className="text-xs text-muted-foreground">Indicadores de tareas y subtareas de la sección seleccionada. Las horas registradas corresponden a cargas en Mind.</p>
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
         <StatCard icon={ListTodo} label="Total tareas" value={total} />

@@ -23327,7 +23327,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!(await canAccessTaskProject(req, parsedProjectId))) {
         return res.status(403).json({ message: "No tenés acceso a este proyecto" });
       }
-      const result = await db.select().from(tasks)
+      // Keep operational provenance in the list; the full original documents
+      // stay in storage and the individual task detail. Large exports otherwise
+      // repeat raw notes/CSV records in both tasks and sections responses.
+      const result = await db.select({
+        ...getTableColumns(tasks),
+        asanaSource: sql<Record<string, unknown> | null>`${tasks.asanaSource} - 'raw' - 'csvRaw' - 'sourceDuplicates'`,
+      }).from(tasks)
         .where(eq(tasks.projectId, parsedProjectId))
         .orderBy(asc(tasks.sectionName), asc(tasks.position), asc(tasks.createdAt));
 
@@ -23371,7 +23377,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         sections[section].push(task);
       }
       
-      res.json({ tasks: enrichedTasks, sections });
+      // Browser views share a flat response so every task is transferred once.
+      // Existing consumers keep the original grouped response by default.
+      const flat = req.query.layout === "flat";
+      res.json({ tasks: enrichedTasks, sections: flat ? Object.fromEntries(Object.keys(sections).map(name => [name, []])) : sections, ...(flat ? { layout: "flat" } : {}) });
     } catch (error) {
       res.status(500).json({ message: "Error al obtener tareas del proyecto" });
     }
