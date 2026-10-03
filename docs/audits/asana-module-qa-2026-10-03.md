@@ -1,4 +1,4 @@
-# Auditoría de Mind V2 y QA del módulo de tareas — 1.10.12
+# Auditoría de Mind V2 y QA del módulo de tareas — 1.10.13
 
 Fecha: 3 de octubre de 2026. Cotejo de las 24 páginas originales contra frontend, backend, contratos de API y pruebas. Se conservan las 67 observaciones: 66 funcionales/visuales y una remisión a otro punto.
 
@@ -32,7 +32,6 @@ Fecha: 3 de octubre de 2026. Cotejo de las 24 páginas originales contra fronten
 | Cierre | Las cargas de Tareas no aplicaban la protección de cierre de las cargas legacy. | Mismo middleware para crear, editar y eliminar horas; conserva excepción administrativa existente. |
 | Errores de UI | Respuestas 403/500 podían tratarse como datos y ocultar el error. | Queries que rechazan errores, reintento visible y avisos de fallo en movimientos. |
 | Comentarios | Papelera ofrecida sobre comentarios que el usuario no podía borrar; datos inválidos daban 500. | Capacidad de borrado entregada por backend y validación de contenido. |
-
 | Primera tarea | Agregar tarea en un proyecto vacío o desde Tablero no abría el formulario. | Alta inline en el estado vacío y cambio a Lista desde el botón. |
 | Controles por rol | Se ofrecían gestión de secciones y borrado de tarea a miembros sin permiso. | Capacidades del backend condicionan esos controles. |
 
@@ -116,7 +115,7 @@ Fecha: 3 de octubre de 2026. Cotejo de las 24 páginas originales contra fronten
 
 ## Verificación
 
-- Suite automatizada: **752 aprobadas y 11 omitidas por condiciones preexistentes**. Typecheck y build de producción aprobados. Incluye 52 regresiones nuevas y las pruebas existentes de todos los feedbacks.
+- Suite automatizada: **759 aprobadas y 11 omitidas por condiciones preexistentes**. Typecheck y build de producción aprobados. Incluye 59 regresiones nuevas y las pruebas existentes de todos los feedbacks.
 - API local: **115 comprobaciones aprobadas**, con archivo de resultados por caso; creación con ambas plantillas originales, PM/miembros, OOO sin bloqueo, calendario, permisos, comentarios, estimaciones, horas, duplicación y cierre/reapertura.
 - QA visual: lista y búsqueda de tercer nivel, edición de un minuto, duplicación desde móvil, calendario de proyecto, timer global al cambiar de vista, Kanban, filtro de PM, calendario del equipo y primera tarea de un proyecto vacío; anchos normal y 390 px.
 - Integridad productiva: 9 proyectos, 6 cotizaciones, precios y vínculos del Excel. Las cotizaciones 342 y 343 no se vinculan a un proyecto inventado. Sin tareas históricas de Asana en proyectos activos.
@@ -127,3 +126,10 @@ Fecha: 3 de octubre de 2026. Cotejo de las 24 páginas originales contra fronten
 - El flujo de cupo por persona/año y el tratamiento Blue/REM están implementados y cubiertos por código/pruebas; esta auditoría no reconstruye el dato histórico de Aylu ni la respuesta externa exacta del error FX original.
 - Las seis observaciones visuales comerciales/Status conservan la comprobación de 1.10.11; esta ronda concentra la QA visual nueva en el módulo operativo.
 - No se hicieron pruebas de carga masiva ni un pentest. Los recorridos y regresiones descritos pasaron; eso no garantiza ausencia absoluta de errores.
+
+## Hallazgos de la verificación productiva
+
+- Se corrigió la etiqueta semanal que interpretaba la fecha civil en UTC y podía mostrar domingo en Argentina. Las fechas de las entradas también usan el parser civil.
+- Las entradas ahora muestran minutos/horas legibles (19m, 1h 9m), sin decimales de coma flotante ni etiquetas de 60 minutos.
+- La matriz incluye todos los proyectos del período mediante desplazamiento horizontal; anteriormente sólo mostraba cinco aunque el total incluía los restantes.
+- 1.10.12 fue desplegada y verificada en Railway; estas correcciones de presentación se publican como 1.10.13, conservando los datos productivos.
