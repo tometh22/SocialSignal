@@ -1,3 +1,4 @@
+import type { QuotationVariantPreview } from "@shared/utils/quotation-variant-preview";
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useRoute } from 'wouter';
 import { OptimizedQuoteProvider, useOptimizedQuote } from '@/context/optimized-quote-context';
@@ -98,6 +99,7 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
 
   const [leadOrigin, setLeadOrigin] = useState<{ leadId: number; leadName?: string } | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [variantPreview, setVariantPreview] = useState<QuotationVariantPreview | null>(null);
   const [highestVisitedPhase, setHighestVisitedPhase] = useState(1);
   const [validationIssues, setValidationIssues] = useState<QuotationValidationIssue[]>([]);
   const [exitDialogOpen, setExitDialogOpen] = useState(false);
@@ -475,7 +477,7 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
 
        {/* Resumen (mobile, colapsable) — siempre visible, también en el paso 1: el
            hidratador headless ya deja equipo/scope/precio reales en la carga. */}
-       <div className="mt-6 xl:hidden"><QuotationWorkspaceSummary currentPhase={currentStepNumber} totalSteps={6} compact /></div>
+       <div className="mt-6 xl:hidden"><QuotationWorkspaceSummary currentPhase={currentStepNumber} totalSteps={6} preview={currentStepNumber === 6 && variantPreview?.quotationId === (quotationData.id || 0) ? variantPreview : null} compact /></div>
 
        {/* Contenido: siempre 2 columnas (contenido + resumen fijo) desde xl, para que
            el layout no salte de 1 a 2 columnas entre pasos. */}
@@ -520,7 +522,7 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
                     updateQuotationData({
                       project: { ...quotationData.project, name: proposal.projectName || quotationData.project.name, type: projectType, duration: durationValueFromMonths(proposal.durationMonths, projectType, quotationData.project.duration) },
                       commercialMotion: motion,
-                      decisionContext: { ...(quotationData.decisionContext || {}), source: 'brief_or_meeting_minute', summary: proposal.summary, context: proposal.summary, objective: proposal.objective, decision: proposal.decision, markets: proposal.markets, brands: proposal.brands, competitors: proposal.competitors, sources: proposal.sources, modules: proposal.modules, languages: proposal.languages, mentionVolume: proposal.mentionVolume, slaLevel: proposal.slaLevel, designLevel: proposal.designLevel, missingQuestions: proposal.missingQuestions, recommendationReason: proposal.recommendationReason, recommendedBlueprintId: proposal.recommendedBlueprint?.id || null, recommendedBlueprintSlug: proposal.recommendationSlug, recommendationConfidence: proposal.confidence, detectedProposalCount: analysis.proposals.length, selectedProposalId: proposal.id },
+                      decisionContext: { ...(quotationData.decisionContext || {}), source: 'brief_or_meeting_minute', summary: proposal.summary, context: proposal.summary, objective: proposal.objective, decision: proposal.decision, markets: proposal.markets, brands: proposal.brands, competitors: proposal.competitors, sources: proposal.sources, modules: proposal.modules, languages: proposal.languages, mentionVolume: proposal.mentionVolume, slaLevel: proposal.slaLevel, designLevel: proposal.designLevel, outputLevel: proposal.outputLevel, visualIdentity: proposal.visualIdentity, missingQuestions: proposal.missingQuestions, recommendationReason: proposal.recommendationReason, recommendedBlueprintId: proposal.recommendedBlueprint?.id || null, recommendedBlueprintSlug: proposal.recommendationSlug, recommendationConfidence: proposal.confidence, detectedProposalCount: analysis.proposals.length, selectedProposalId: proposal.id },
                     });
                     toast({ title: 'Propuesta seleccionada', description: proposal.recommendedBlueprint ? `${proposal.projectName}. La receta ${proposal.recommendedBlueprint.name} quedará destacada en Servicio.` : `${proposal.projectName}. Completá los datos esenciales para continuar.` });
                   }} />
@@ -587,6 +589,7 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
                 <div className="space-y-6">
                   <SectionHeading title="Revisá la inversión" description="Confirmá moneda, tipo de cambio, precio y condiciones comerciales antes de preparar el envío." />
                   <OptimizedBasicInfo mode="financial" errors={fieldErrors} />
+                  {quotationData.scopeSnapshot && <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-indigo-100 bg-indigo-50 p-4 text-sm text-indigo-950"><span>Volumen, cobertura, SLA y presentación determinan las horas y el costo del equipo.</span><Button type="button" variant="outline" size="sm" onClick={() => handlePhaseNavigation(3)}>Editar alcance y factores</Button></div>}
                   <OptimizedFinancialReview revealAdvanced={validationIssues.length > 0} validationMessage={validationIssues[0]?.message} />
                 </div>
               )}
@@ -602,6 +605,7 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
                     complexityAdjustment={complexityAdjustment}
                     markupAmount={markupAmount}
                     totalAmount={totalAmount}
+                    onPreviewChange={setVariantPreview}
                   />
                    {/* La vista previa del cliente (ExecutiveSummary) es enorme y apilarla
                        debajo de la comparación de variantes hacía que este paso fuera el
@@ -638,7 +642,7 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
         </main>
 
         {/* Resumen fijo (desktop) — siempre, también en el paso 1 (datos ya hidratados en la carga). */}
-        <QuotationWorkspaceSummary currentPhase={currentStepNumber} totalSteps={6} />
+        <QuotationWorkspaceSummary currentPhase={currentStepNumber} totalSteps={6} preview={currentStepNumber === 6 && variantPreview?.quotationId === (quotationData.id || 0) ? variantPreview : null} />
       </div>
 
       <AlertDialog open={exitDialogOpen} onOpenChange={setExitDialogOpen}>

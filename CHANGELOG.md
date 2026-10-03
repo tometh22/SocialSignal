@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.10.11 — 2026-10-02
+
+- Cierra las ocho brechas de los feedbacks Mind V2: criterios de esfuerzo, salida ejecutiva e identidad independientes, explicación del ajuste operativo y volumen editable desde Alcance con acceso desde Inversión.
+- Conecta el resumen a la variante efectiva, conservando horas cuando varias funciones usan un mismo rol y evitando aumentos por redondeo.
+- Gestión muestra totales ARS/USD con conversión por cotización. La rentabilidad incorpora horas y costos de Tareas, sin duplicar cargas espejadas ni inventar tarifas.
+- Corrige la alineación de Señales del portfolio, el formulario de Status y los controles del equipo según el ancho disponible.
+- Conserva snapshots anteriores y los proyectos, vínculos e importes del Excel; no importa proyectos históricos de Asana.
+
 ## 1.10.10 — 2026-10-02
 
 - Excluye las tareas de proyectos anulados o cancelados de los recordatorios de tareas sin horas. Conserva las horas reales registradas en el historial.

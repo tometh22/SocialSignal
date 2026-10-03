@@ -1,3 +1,4 @@
+import type { QuotationVariantPreview } from "@shared/utils/quotation-variant-preview";
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { useOptimizedQuote } from '@/context/optimized-quote-context';
@@ -7,19 +8,20 @@ type QuotationWorkspaceSummaryProps = {
   currentPhase: number;
   totalSteps?: number;
   compact?: boolean;
+  preview?: QuotationVariantPreview | null;
 };
 
-export function QuotationWorkspaceSummary({ currentPhase, totalSteps = 4, compact = false }: QuotationWorkspaceSummaryProps) {
+export function QuotationWorkspaceSummary({ currentPhase, totalSteps = 4, compact = false, preview = null }: QuotationWorkspaceSummaryProps) {
   const { quotationData, pricingResult } = useOptimizedQuote();
   const currency = quotationData.quotationCurrency === 'USD' ? 'USD' : 'ARS';
   const locale = currency === 'USD' ? 'en-US' : 'es-AR';
   const formatAmount = (amount: number) => new Intl.NumberFormat(locale, {
     style: 'currency', currency, minimumFractionDigits: currency === 'USD' ? 2 : 0, maximumFractionDigits: currency === 'USD' ? 2 : 0,
   }).format(amount || 0);
-  const totalHours = quotationData.teamMembers.reduce((sum, member) => sum + Number(member.hours || 0), 0);
+  const totalHours = preview?.hours ?? quotationData.teamMembers.reduce((sum, member) => sum + Number(member.hours || 0), 0);
   const recurring = ['fee-mensual', 'always-on'].includes(quotationData.project.type);
-  const total = pricingResult.display.total || 0;
-  const margin = pricingResult.display.markupAmount || 0;
+  const total = preview?.total ?? pricingResult.display.total ?? 0;
+  const margin = preview?.markupAmount ?? pricingResult.display.markupAmount ?? 0;
   const marginPercent = total > 0 ? Math.max(0, (margin / total) * 100) : 0;
   const projectTypeLabel = {
     'on-demand': 'Proyecto puntual', 'fee-mensual': 'Fee mensual', 'always-on': 'Servicio recurrente', monitoring: 'Monitoreo', demo: 'Demo', 'credit-pack': 'Bolsa de créditos',
@@ -28,11 +30,12 @@ export function QuotationWorkspaceSummary({ currentPhase, totalSteps = 4, compac
     new_business: 'Nuevo negocio', renewal: 'Renovación', expansion: 'Expansión', demo: 'Demo',
   }[quotationData.commercialMotion || 'new_business'] || 'Nuevo negocio';
   const hasScope = Boolean(quotationData.scopeSnapshot);
-  const workloadReference = Number((quotationData.operationalPlan as any)?.workload?.totalHours || 0);
+  const workloadReference = preview?.referenceHours ?? Number((quotationData.operationalPlan as any)?.workload?.totalHours || 0);
   const effortDelta = workloadReference > 0 ? ((totalHours - workloadReference) / workloadReference) * 100 : 0;
 
   const content = (
     <div className="space-y-4">
+      {preview && <p className="rounded-lg bg-indigo-50 px-3 py-2 text-xs font-medium text-indigo-900">Escenario: {preview.name}</p>}
       <div>
         <div className="flex items-center justify-between text-xs text-slate-500"><span>Avance</span><span>Paso {currentPhase} de {totalSteps}</span></div>
         <Progress value={(currentPhase / totalSteps) * 100} className="mt-2 h-1.5" />
@@ -41,7 +44,7 @@ export function QuotationWorkspaceSummary({ currentPhase, totalSteps = 4, compac
       <div className="divide-y divide-slate-100 rounded-xl border border-slate-200">
         <SummaryRow icon={BriefcaseBusiness} label="Cliente" value={quotationData.client?.name || 'Pendiente'} />
         <SummaryRow icon={Clock3} label="Modalidad" value={`${motionLabel} · ${projectTypeLabel}`} />
-        <SummaryRow icon={Users} label="Equipo" value={totalHours > 0 ? `${quotationData.teamMembers.length} integrantes · ${totalHours.toFixed(1)} h${recurring ? '/mes' : ''}` : 'Pendiente'} />
+        <SummaryRow icon={Users} label="Equipo" value={totalHours > 0 ? `${preview?.memberCount ?? quotationData.teamMembers.length} integrantes · ${totalHours.toFixed(1)} h${recurring ? '/mes' : ''}` : 'Pendiente'} />
       </div>
 
       <div className="space-y-2">
@@ -54,8 +57,8 @@ export function QuotationWorkspaceSummary({ currentPhase, totalSteps = 4, compac
       {total > 0 && (
         <div className="rounded-xl bg-slate-950 p-4 text-white">
           <div className="mb-1 flex items-center gap-2 text-xs font-medium text-slate-300"><CircleDollarSign className="h-4 w-4" /> Precio estimado</div>
-          <p aria-live="polite" className="text-2xl font-semibold tabular-nums">{formatAmount(total)}</p>
-          <details className="mt-2 text-xs text-slate-300"><summary className="cursor-pointer">Ver desglose interno</summary><div className="mt-2 flex items-center justify-between"><span>Costo {formatAmount(pricingResult.display.baseCost)}</span><span>Rentabilidad {marginPercent.toFixed(0)}%</span></div></details>
+          <p aria-live="polite" className="break-words text-2xl font-semibold tabular-nums">{formatAmount(total)}</p>
+          <details className="mt-2 text-xs text-slate-300"><summary className="cursor-pointer">Ver desglose interno</summary><div className="mt-2 flex items-center justify-between"><span>Costo {formatAmount(preview?.baseCost ?? pricingResult.display.baseCost)}</span><span>Rentabilidad {marginPercent.toFixed(0)}%</span></div></details>
         </div>
       )}
     </div>

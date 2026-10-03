@@ -14,6 +14,7 @@ import type { ServiceBlueprint } from "@shared/schema";
 import {
   applyHistoricalEffortBenchmark,
   blueprintEffortFactorBreakdown,
+  resolveScopePresentation,
   blueprintDefinitionSchema,
   canonicalProjectTypeForModality,
   estimateBlueprintWorkload,
@@ -23,7 +24,7 @@ import {
   type EffortBenchmark,
 } from "@shared/quotation-professional";
 import { isBlueprintCompatibleWithProjectType } from "@/utils/quotation-ux";
-import { formatCanonicalRoleName, resolveCanonicalRoleForBlueprintKey } from "@shared/utils/personnel-classification";
+import { formatCanonicalRoleName, resolveQuotationBlueprintRole } from "@shared/utils/personnel-classification";
 
 type BlueprintWithWorkload = ServiceBlueprint & { workload: ReturnType<typeof estimateBlueprintWorkload> };
 type WeeklyCapacity = { personnel: Array<{ personnelId: number; name: string; maxCapacity: number; actualHours: number; estimatedTaskHours: number; isOverloaded: boolean }> };
@@ -113,6 +114,8 @@ export function ProfessionalScopeBuilder({ mode = "all", headless = false }: { m
         mentionVolume: mentionVolumeFromBrief,
         slaLevel: slaFromBrief,
         designLevel: designFromBrief,
+        outputLevel: ["standard", "executive"].includes(String(briefContext.outputLevel)) ? briefContext.outputLevel as "standard" | "executive" : ["standard", "branded", "executive"].includes(String(briefContext.designLevel)) ? undefined : baseDefinition.coverage.outputLevel,
+        visualIdentity: ["standard", "branded"].includes(String(briefContext.visualIdentity)) ? briefContext.visualIdentity as "standard" | "branded" : ["standard", "branded", "executive"].includes(String(briefContext.designLevel)) ? undefined : baseDefinition.coverage.visualIdentity,
         impactLevel: impactFromBrief,
         analysisModules: listFromBrief("modules").filter((item): item is BlueprintDefinition["coverage"]["analysisModules"][number] => MODULES.some(([value]) => value === item)).length
           ? listFromBrief("modules") as BlueprintDefinition["coverage"]["analysisModules"]
@@ -133,7 +136,7 @@ export function ProfessionalScopeBuilder({ mode = "all", headless = false }: { m
     const missing: string[] = [];
     // Distintas funciones de la receta (pm, analyst, data…) pueden resolver al
     // mismo rol canónico cuando el nivel exacto no existe en esa área y se cae
-    // al primer rol disponible (resolveCanonicalRoleForBlueprintKey). Antes eso
+    // al primer rol disponible (resolveQuotationBlueprintRole). Antes eso
     // creaba una fila por función igual, duplicando literalmente el mismo rol
     // —y la misma persona ya asignada— con las horas repartidas entre ambas.
     // Agrupar por role.id y sumar las horas deja una única fila por rol real.
@@ -375,27 +378,31 @@ export function ProfessionalScopeBuilder({ mode = "all", headless = false }: { m
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 <div className="space-y-2"><Label>Nivel de impacto</Label><Select value={scope.coverage.impactLevel} onValueChange={(value: any) => updateScope({ ...scope, coverage: { ...scope.coverage, impactLevel: value } })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="low">Bajo</SelectItem><SelectItem value="medium">Medio</SelectItem><SelectItem value="high">Alto</SelectItem><SelectItem value="critical">Crítico</SelectItem></SelectContent></Select></div>
                 <div className="space-y-2"><Label>Tiempo de respuesta</Label><Select value={scope.coverage.slaLevel} onValueChange={(value: any) => updateScope({ ...scope, coverage: { ...scope.coverage, slaLevel: value } })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="standard">Estándar</SelectItem><SelectItem value="priority">Prioritario</SelectItem><SelectItem value="real_time">Tiempo real</SelectItem></SelectContent></Select></div>
-                <div className="space-y-2"><Label>Diseño e identidad visual</Label><Select value={scope.coverage.designLevel} onValueChange={(value: any) => updateScope({ ...scope, coverage: { ...scope.coverage, designLevel: value } })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="standard">Estándar</SelectItem><SelectItem value="branded">Con identidad de marca</SelectItem><SelectItem value="executive">Ejecutivo</SelectItem></SelectContent></Select></div>
+                <div className="space-y-2"><Label>Volumen de menciones</Label><Select value={scope.coverage.mentionVolume} onValueChange={(value: BlueprintDefinition["coverage"]["mentionVolume"]) => updateScope({ ...scope, coverage: { ...scope.coverage, mentionVolume: value } })}><SelectTrigger aria-label="Volumen de menciones"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="small">Bajo</SelectItem><SelectItem value="medium">Medio</SelectItem><SelectItem value="large">Alto</SelectItem><SelectItem value="xlarge">Muy alto</SelectItem></SelectContent></Select></div>
+                <div className="space-y-2"><Label>Nivel de salida</Label><Select value={resolveScopePresentation(scope.coverage).outputLevel} onValueChange={(value: "standard" | "executive") => updateScope({ ...scope, coverage: { ...scope.coverage, ...resolveScopePresentation(scope.coverage), outputLevel: value } })}><SelectTrigger aria-label="Nivel de salida"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="standard">Estándar</SelectItem><SelectItem value="executive">Síntesis ejecutiva</SelectItem></SelectContent></Select></div>
+                <div className="space-y-2"><Label>Identidad visual</Label><Select value={resolveScopePresentation(scope.coverage).visualIdentity} onValueChange={(value: "standard" | "branded") => updateScope({ ...scope, coverage: { ...scope.coverage, ...resolveScopePresentation(scope.coverage), visualIdentity: value } })}><SelectTrigger aria-label="Identidad visual"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="standard">Diseño estándar</SelectItem><SelectItem value="branded">Identidad de marca</SelectItem></SelectContent></Select></div>
                 <div className="space-y-2"><Label>Idiomas</Label><Select value={scope.coverage.languages.join("+")} onValueChange={(value) => updateScope({ ...scope, coverage: { ...scope.coverage, languages: value === "es+en" ? ["es", "en"] : [value as "es" | "en"] } })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="es">Español</SelectItem><SelectItem value="en">Inglés</SelectItem><SelectItem value="es+en">Español + inglés</SelectItem></SelectContent></Select></div>
               </div>
               <div className="rounded-lg border border-indigo-100 bg-indigo-50/60 p-3">
                 <p className="text-xs font-semibold text-indigo-950">Cómo se calculan las horas</p>
                 <p className="mt-1 text-xs text-indigo-900">Entregables: horas base por rol × cantidad × producto de los factores. El setup conserva sus horas base (factor ×1). Cada factor es un multiplicador; 1,00 no cambia las horas.</p>
                 <div className="mt-2 flex flex-wrap gap-1.5">{blueprintEffortFactorBreakdown(scope).map((item) => <Badge key={item.label} variant="outline" className="bg-white">{item.label}: ×{item.value.toLocaleString("es-AR", { maximumFractionDigits: 2 })}</Badge>)}<Badge className="bg-indigo-700">Factor combinado: ×{estimateBlueprintWorkload(scope).factor.toLocaleString("es-AR", { maximumFractionDigits: 2 })}</Badge></div>
+                <details className="mt-3 text-xs text-indigo-950"><summary className="cursor-pointer font-medium">Ver criterios de cada factor</summary><ul className="mt-2 space-y-2">{blueprintEffortFactorBreakdown(scope).map(item => <li key={item.label}><strong>{item.label} (×{item.value.toLocaleString("es-AR")}): </strong>{item.rule}</li>)}</ul><p className="mt-2">El porcentaje de cada factor se aplica sobre la base; los factores se multiplican entre sí. Las horas de cada línea se redondean a media hora. Cambiar cobertura actualiza el equipo sugerido: revisá las asignaciones y ajustes manuales.</p></details>
               </div>
             </CardContent>
           </Card>
           </div>
           <div className="space-y-5">
           <Card>
-            <CardHeader><CardTitle className="text-base">Formato de entrega y frecuencia</CardTitle><p className="text-sm text-slate-500">Elegí el tipo y la cantidad de piezas; el diseño e identidad visual se configura por separado en Cobertura.</p></CardHeader>
+            <CardHeader><CardTitle className="text-base">Formato de entrega y frecuencia</CardTitle><p className="text-sm text-slate-500">Elegí el tipo y la cantidad de piezas; el nivel ejecutivo y la identidad visual se configuran por separado en Cobertura. El formato del archivo no cambia las horas por sí solo.</p></CardHeader>
             <CardContent className="space-y-3">
               {/* La cadencia pasó de badge a selector: necesita algo más de
                   ancho que la columna original de 7rem. */}
               {scope.deliverables.map((deliverable) => (
-                <div key={deliverable.id} className="grid gap-3 rounded-xl border border-slate-200 p-4 md:grid-cols-[minmax(0,1fr)_6rem_9.5rem] md:items-center">
-                  <label className="flex items-start gap-3"><Checkbox className="mt-1" checked={deliverable.included} onCheckedChange={(checked) => updateScope({ ...scope, deliverables: scope.deliverables.map((item) => item.id === deliverable.id ? { ...item, included: checked === true } : item) })} /><span><strong className="block text-sm">{deliverable.name}</strong><span className="mt-1 block text-xs leading-5 text-slate-500">{deliverable.description}</span></span></label>
+                <div key={deliverable.id} className="grid gap-3 rounded-xl border border-slate-200 p-4 sm:grid-cols-2 md:items-center">
+                  <label className="flex items-start gap-3 sm:col-span-2"><Checkbox className="mt-1" checked={deliverable.included} onCheckedChange={(checked) => updateScope({ ...scope, deliverables: scope.deliverables.map((item) => item.id === deliverable.id ? { ...item, included: checked === true } : item) })} /><span><strong className="block text-sm">{deliverable.name}</strong><span className="mt-1 block text-xs leading-5 text-slate-500">{deliverable.description}</span></span></label>
                   <div className="space-y-1"><Label className="text-xs">Cantidad</Label><Input type="number" min={0} value={deliverable.quantity} onChange={(event) => updateScope({ ...scope, deliverables: scope.deliverables.map((item) => item.id === deliverable.id ? { ...item, quantity: Math.max(0, Math.trunc(Number(event.target.value) || 0)) } : item) })} /></div>
+                  <div className="space-y-1"><Label className="text-xs">Formato del archivo</Label><Select value={deliverable.format} onValueChange={(format: BlueprintDefinition["deliverables"][number]["format"]) => updateQuotationData({ scopeSnapshot: { ...scope, deliverables: scope.deliverables.map(item => item.id === deliverable.id ? { ...item, format } : item) }, deliverables: quotationData.deliverables.map(item => item.id === deliverable.id ? { ...item, format } : item) })}><SelectTrigger aria-label={`Formato de ${deliverable.name}`}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="pdf">PDF</SelectItem><SelectItem value="pptx">Presentación PPTX</SelectItem><SelectItem value="xlsx">Excel</SelectItem><SelectItem value="dashboard">Dashboard</SelectItem><SelectItem value="email">Email</SelectItem><SelectItem value="whatsapp">WhatsApp</SelectItem><SelectItem value="meeting">Reunión</SelectItem><SelectItem value="mixed">Mixto</SelectItem></SelectContent></Select></div>
                   <div className="space-y-1"><Label className="text-xs">Cadencia</Label>
                     <Select value={deliverable.cadence} onValueChange={(cadence: any) => updateScope({ ...scope, deliverables: scope.deliverables.map((item) => item.id === deliverable.id ? { ...item, cadence } : item) })}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
@@ -411,6 +418,7 @@ export function ProfessionalScopeBuilder({ mode = "all", headless = false }: { m
             <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Calculator className="h-4 w-4 text-indigo-600" /> Cómo se calcula el esfuerzo</CardTitle><p className="text-sm text-slate-500">La receta se contrasta con la mediana de proyectos cerrados comparables cuando hay datos suficientes.</p></CardHeader>
             <CardContent className="space-y-4">
               <div className="grid gap-3 sm:grid-cols-3"><Metric label={isRecurringBlueprintModality(scope.modality) ? "Referencia mensual" : "Referencia"} value={`${referenceEstimate?.totalHours || 0} h${isRecurringBlueprintModality(scope.modality) ? "/mes" : ""}`} /><Metric label={isRecurringBlueprintModality(scope.modality) ? "Configuradas / mes" : "Configuradas"} value={`${currentHours.toFixed(1)} h${isRecurringBlueprintModality(scope.modality) ? "/mes" : ""}`} /><Metric label="Ajuste operativo" value={`${deviation >= 0 ? "+" : ""}${deviation.toFixed(1)}%`} /></div>
+              <p className="text-xs leading-5 text-slate-600">Ajuste operativo = (horas configuradas ÷ horas de referencia − 1) × 100. Un valor negativo indica menos horas que la referencia; no es un descuento comercial. El SLA aumenta el esfuerzo de la receta; el ajuste histórico compara esa estimación con horas reales y se aplica por separado.</p>
               {activeBenchmark && <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">Referencia ajustada con {activeBenchmark.sampleSize} proyectos cerrados: mediana de {activeBenchmark.medianActualHours.toFixed(1)} h reales.</div>}
               {!activeBenchmark && <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">Todavía no hay dos proyectos comparables cerrados. Se usa la receta profesional sin ajuste histórico.</div>}
               <div className="overflow-x-auto rounded-lg border border-slate-200"><table className="w-full text-sm"><thead className="bg-slate-50 text-left text-xs text-slate-500"><tr><th className="px-3 py-2">Trabajo</th><th className="px-3 py-2">Rol</th><th className="px-3 py-2 text-right">Horas</th></tr></thead><tbody>{referenceEstimate?.lines.map((line, index) => <tr key={`${line.sourceId}-${line.roleKey}-${index}`} className="border-t"><td className="px-3 py-2">{line.sourceName}</td><td className="px-3 py-2 capitalize">{line.roleKey}</td><td className="px-3 py-2 text-right tabular-nums">{line.estimatedHours}</td></tr>)}</tbody></table></div>
@@ -468,15 +476,7 @@ function resolveRole(
   roles: Array<{ id: number; name: string; defaultRate: number; defaultRateUsd?: number | null; roleLevel?: string | null; sublevel?: string | null; area?: string | null; isActive?: boolean }>,
   configuredProfile?: BlueprintDefinition["roleProfiles"][string],
 ) {
-  // Catálogo canónico: la función de la receta se traduce a área + nivel.
-  const canonical = resolveCanonicalRoleForBlueprintKey(roleKey, roles, configuredProfile);
-  if (canonical) return canonical as (typeof roles)[number];
-  // Catálogo viejo (o una base todavía sin migrar): se cae al match por nombre.
-  const aliases: Record<string, string[]> = {
-    director: ["director", "cuentas"], pm: ["project manager", "pm", "proyecto"], analyst: ["analista", "analyst"],
-    data: ["data", "datos"], tech: ["tech", "tecnología", "tecnologia"], design: ["diseñ", "design"],
-  };
-  return roles.find((role) => (aliases[roleKey] || [roleKey]).some((alias) => role.name.toLocaleLowerCase("es").includes(alias)));
+  return resolveQuotationBlueprintRole(roleKey, roles, configuredProfile);
 }
 
 function projectTypeFor(modality: BlueprintDefinition["modality"]) {

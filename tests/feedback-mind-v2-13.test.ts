@@ -506,7 +506,8 @@ describe("Feedback Mind V2-13 · ronda 27-8", () => {
     const manageQuotes = source("client/src/pages/manage-quotes.tsx");
     expect(manageQuotes).toContain("topValueContributor: statsSource.reduce<{ name: string; ars: number } | null>((top, q) => {");
     expect(manageQuotes).toContain("return !top || ars > top.ars ? { name: q.projectName, ars } : top;");
-    expect(manageQuotes).toContain("detail={stats.topValueContributor ? `Mayor: ${stats.topValueContributor.name}");
+    expect(manageQuotes).toContain('detail={stats.topValueContributor ? <span');
+    expect(manageQuotes).toContain('title={`Mayor: ${stats.topValueContributor.name}');
   });
   // ── GEN-18 · Deshacer una receta elegida por error ───────────────────────
   it("permite quitar la receta seleccionada, simétrico a lo que applyDefinition escribe", () => {

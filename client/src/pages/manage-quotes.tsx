@@ -1,3 +1,4 @@
+import { quotationPortfolioTotals } from "@shared/utils/quotation-portfolio-totals";
 import { quotationProjectTypeLabel, quotationPriceLabel } from "@shared/utils/quotation-display";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
@@ -435,6 +436,7 @@ export default function ManageQuotes() {
     && ['sent', 'viewed', 'in-negotiation'].includes(quote.status);
 
   const statsSource = quotations || [];
+  const portfolioTotals = quotationPortfolioTotals(statsSource, exchangeRate);
   const stats = {
     total: statsSource.length,
     approved: statsSource.filter(q => q.status === 'approved').length,
@@ -442,10 +444,8 @@ export default function ManageQuotes() {
     rejected: statsSource.filter(q => q.status === 'rejected').length,
     expired: statsSource.filter(isExpired).length,
     inNegotiation: statsSource.filter(q => q.status === 'in-negotiation').length,
-    totalValueARS: statsSource.reduce((sum, q) => {
-      const fx = Number(q.exchangeRateAtQuote) || Number(q.usdExchangeRate) || exchangeRate;
-      return sum + (q.quotationCurrency === 'USD' ? q.totalAmount * fx : q.totalAmount);
-    }, 0),
+    totalValueARS: portfolioTotals.ars,
+    totalValueUSD: portfolioTotals.usd,
     conversionRate: funnel?.winRate ?? 0,
     // La suma incluye borradores, rechazadas y vencidas -- no sólo vigentes --
     // así que un total que se ve raro casi siempre es UNA cotización con un
@@ -453,8 +453,7 @@ export default function ManageQuotes() {
     // contribuyente para poder señalarla en la tarjeta sin tener que salir a
     // buscarla a mano.
     topValueContributor: statsSource.reduce<{ name: string; ars: number } | null>((top, q) => {
-      const fx = Number(q.exchangeRateAtQuote) || Number(q.usdExchangeRate) || exchangeRate;
-      const ars = q.quotationCurrency === 'USD' ? q.totalAmount * fx : q.totalAmount;
+      const ars = quotationPortfolioTotals([q], exchangeRate).ars;
       return !top || ars > top.ars ? { name: q.projectName, ars } : top;
     }, null),
     rejectionRate: (funnel?.sent || 0) > 0
@@ -543,7 +542,7 @@ export default function ManageQuotes() {
     >
 
         <div className="relative z-10 min-w-0">
-          <MetricGrid className="mb-6" minColumnWidth="11rem">
+          <MetricGrid className="mb-6" minColumnWidth="18rem">
             <MetricCard
               label="Total"
               value={stats.total.toLocaleString("es-AR")}
@@ -567,12 +566,13 @@ export default function ManageQuotes() {
             />
             <MetricCard
               label="Valor total"
-              value={`ARS ${stats.totalValueARS.toLocaleString("es-AR", { maximumFractionDigits: 0 })}`}
+              value={<div className="space-y-2 whitespace-normal break-words text-lg leading-tight"><div>ARS {stats.totalValueARS.toLocaleString("es-AR", { maximumFractionDigits: 0 })}</div><div>USD {stats.totalValueUSD.toLocaleString("es-AR", { maximumFractionDigits: 2 })}</div></div>}
               icon={<DollarSign className="h-5 w-5" />}
               tone="info"
               valueSize="compact"
-              valueLabel={`Valor total en pesos: ${stats.totalValueARS.toLocaleString("es-AR", { maximumFractionDigits: 0 })}`}
-              detail={stats.topValueContributor ? `Mayor: ${stats.topValueContributor.name} · ARS ${stats.topValueContributor.ars.toLocaleString("es-AR", { maximumFractionDigits: 0 })}` : undefined}
+              valueLabel={`Valor total: ARS ${stats.totalValueARS.toLocaleString("es-AR")} y USD ${stats.totalValueUSD.toLocaleString("es-AR")}`}
+              footer={<details className="text-xs"><summary className="cursor-pointer">Criterio de conversión{portfolioTotals.missingFx > 0 ? " · total parcial" : ""}</summary><p className="mt-2">Incluye todos los estados. Se convierte cada cotización con su tipo de cambio guardado; si falta, se usa el actual.{portfolioTotals.missingFx > 0 && ` ${portfolioTotals.missingFx} cotizaciones sin conversión disponible.`}</p></details>}
+              detail={stats.topValueContributor ? <span className="line-clamp-2 text-xs" title={`Mayor: ${stats.topValueContributor.name} · ARS ${stats.topValueContributor.ars.toLocaleString("es-AR", { maximumFractionDigits: 0 })}`}>Mayor: {stats.topValueContributor.name}</span> : undefined}
             />
             <MetricCard
               label="Conversión"

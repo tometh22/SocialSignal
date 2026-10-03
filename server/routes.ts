@@ -326,6 +326,7 @@ import { PRODUCT_DEFINITIONS_MANIFEST } from "./content/product-definitions-mani
 import { calculateQuotationPricing } from "@shared/utils/quotation-pricing";
 import { calculateCanonicalComplexityFactor } from "@shared/utils/quotation-complexity";
 import { calculateMarginDrift } from "@shared/utils/quotation-margin-drift";
+import { mergeQuotationActualEntries } from "@shared/utils/quotation-actual-entries";
 import { quotedOperationalCost, quotationProfitability } from "@shared/utils/quotation-profitability";
 import {
   assertQuotationTransition,
@@ -8426,9 +8427,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       )).orderBy(asc(activeProjects.id));
       if (!projects.length) return res.json({ quotation, project: null, projects: [], profitability: null });
 
-      const entries = await db.select({
-        hours: timeEntries.hours, totalCost: timeEntries.totalCost,
-      }).from(timeEntries).where(inArray(timeEntries.projectId, projects.map(project => project.id)));
+      const projectIds = projects.map(project => project.id);
+      const [legacyEntries, taskEntries] = await Promise.all([
+        db.select({ projectId: timeEntries.projectId, personnelId: timeEntries.personnelId,
+          entryDate: timeEntries.date, description: timeEntries.description,
+          hours: timeEntries.hours, totalCost: timeEntries.totalCost,
+        }).from(timeEntries).where(inArray(timeEntries.projectId, projectIds)),
+        db.select({ projectId: tasks.projectId, personnelId: taskTimeEntries.personnelId,
+          entryDate: taskTimeEntries.date, description: taskTimeEntries.description,
+          hours: taskTimeEntries.hours, totalCost: taskTimeEntries.totalCost,
+        }).from(taskTimeEntries).innerJoin(tasks, eq(tasks.id, taskTimeEntries.taskId))
+          .where(inArray(tasks.projectId, projectIds)),
+      ]);
+      const entries = mergeQuotationActualEntries(legacyEntries, taskEntries.map(entry => ({ ...entry, projectId: entry.projectId! })));
       const quotedTeam = quotation.acceptedVariantId
         ? await storage.getQuotationTeamMembersByVariant(quotation.acceptedVariantId)
         : await storage.getQuotationTeamMembers(id);

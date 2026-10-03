@@ -99,7 +99,9 @@ describe('imported quotation regressions', () => {
     expect(summary).toContain('isNull(quotations.archivedAt)');
     const profitability = source.slice(source.indexOf('app.get("/api/quotations/:id/profitability"'), source.indexOf('// ─── Quotation Templates CRUD'));
     expect(profitability).toContain('notInArray(activeProjects.status, ["voided", "cancelled"])');
-    expect(profitability).toContain('inArray(timeEntries.projectId, projects.map(project => project.id))');
+    expect(profitability).toContain('inArray(timeEntries.projectId, projectIds)');
     expect(profitability).toContain('getQuotationTeamMembersByVariant');
+    expect(profitability).toContain('inArray(tasks.projectId, projectIds)');
+    expect(profitability).toContain('mergeQuotationActualEntries(legacyEntries, taskEntries');
   });
 });

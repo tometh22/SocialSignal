@@ -56,7 +56,10 @@ export const scopeCoverageSchema = z.object({
   // sí la profundidad de análisis y por lo tanto el esfuerzo operativo.
   impactLevel: z.enum(["low", "medium", "high", "critical"]).default("medium"),
   slaLevel: z.enum(["standard", "priority", "real_time"]).default("standard"),
+  // Legacy snapshots retain their original multiplier until explicitly edited.
   designLevel: z.enum(["standard", "branded", "executive"]).default("branded"),
+  outputLevel: z.enum(["standard", "executive"]).optional(),
+  visualIdentity: z.enum(["standard", "branded"]).optional(),
 });
 export type ScopeCoverage = z.infer<typeof scopeCoverageSchema>;
 
@@ -173,19 +176,29 @@ const impactFactor: Record<ScopeCoverage["impactLevel"], number> = {
   critical: 1.4,
 };
 
+/** Resolve old snapshots without changing their effort or stored commercial price. */
+export function resolveScopePresentation(coverage: ScopeCoverage) {
+  return {
+    outputLevel: coverage.outputLevel ?? (coverage.designLevel === "executive" ? "executive" : "standard"),
+    visualIdentity: coverage.visualIdentity ?? (coverage.designLevel === "branded" ? "branded" : "standard"),
+  };
+}
+
 export function blueprintEffortFactorBreakdown(definition: BlueprintDefinition) {
   const coverage = definition.coverage;
+  const presentation = resolveScopePresentation(coverage);
   return [
-    { label: "Mercados", value: 1 + Math.max(0, coverage.markets.length - 1) * 0.12 },
-    { label: "Marcas", value: 1 + Math.max(0, coverage.brands.length - 1) * 0.1 },
-    { label: "Competidores", value: 1 + Math.max(0, coverage.competitors.length - 1) * 0.05 },
-    { label: "Fuentes", value: 1 + Math.max(0, coverage.sources.length - 1) * 0.04 },
-    { label: "Idiomas", value: 1 + Math.max(0, coverage.languages.length - 1) * 0.12 },
-    { label: "Módulos adicionales", value: 1 + Math.max(0, coverage.analysisModules.length - 3) * 0.05 },
-    { label: "Volumen", value: volumeFactor[coverage.mentionVolume] },
-    { label: "Impacto", value: impactFactor[coverage.impactLevel] },
-    { label: "SLA", value: coverage.slaLevel === "real_time" ? 1.25 : coverage.slaLevel === "priority" ? 1.12 : 1 },
-    { label: "Presentación visual", value: coverage.designLevel === "executive" ? 1.18 : coverage.designLevel === "branded" ? 1.1 : 1 },
+    { label: "Mercados", value: 1 + Math.max(0, coverage.markets.length - 1) * 0.12, rule: "Primer mercado incluido; +12% por mercado adicional." },
+    { label: "Marcas", value: 1 + Math.max(0, coverage.brands.length - 1) * 0.1, rule: "Primera marca incluida; +10% por marca adicional." },
+    { label: "Competidores", value: 1 + Math.max(0, coverage.competitors.length - 1) * 0.05, rule: "Primer competidor incluido; +5% por competidor adicional." },
+    { label: "Fuentes", value: 1 + Math.max(0, coverage.sources.length - 1) * 0.04, rule: "Primera fuente incluida; +4% por fuente adicional." },
+    { label: "Idiomas", value: 1 + Math.max(0, coverage.languages.length - 1) * 0.12, rule: "Primer idioma incluido; +12% por idioma adicional." },
+    { label: "Módulos adicionales", value: 1 + Math.max(0, coverage.analysisModules.length - 3) * 0.05, rule: "Hasta 3 preguntas incluidas; +5% por cada pregunta adicional, independientemente de su tema (Marca, Campaña, Crisis, etc.)." },
+    { label: "Volumen", value: volumeFactor[coverage.mentionVolume], rule: "Bajo ×0,90; medio ×1; alto ×1,18; muy alto ×1,35. Son categorías de esfuerzo; la receta no define umbrales numéricos de menciones." },
+    { label: "Impacto", value: impactFactor[coverage.impactLevel], rule: "Bajo ×0,90; medio ×1; alto ×1,18; crítico ×1,40. Refleja la profundidad necesaria para la decisión." },
+    { label: "SLA", value: coverage.slaLevel === "real_time" ? 1.25 : coverage.slaLevel === "priority" ? 1.12 : 1, rule: "Estándar ×1; prioritario ×1,12; tiempo real ×1,25 por la disponibilidad requerida." },
+    { label: "Nivel de salida", value: presentation.outputLevel === "executive" ? 1.18 : 1, rule: "Estándar ×1; síntesis ejecutiva ×1,18." },
+    { label: "Identidad visual", value: presentation.visualIdentity === "branded" ? 1.1 : 1, rule: "Diseño estándar ×1; adaptación a identidad de marca ×1,10." },
   ].map((item) => ({ ...item, value: Number(item.value.toFixed(4)) }));
 }
 
