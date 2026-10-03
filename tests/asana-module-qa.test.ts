@@ -5,6 +5,7 @@ import { taskIsOnCivilDay, taskDateSchema, taskDateWindowSchema, taskDateWindowE
 import { filterTaskTree } from "../shared/utils/task-tree-filter";
 import { taskDateBucket } from "../shared/utils/task-date-bucket";
 import { sumTaskLoggedHours } from "../shared/utils/task-hours-total";
+import { formatTaskHoursLabel } from "../shared/utils/task-hours-label";
 import { isTaskRelatedQuery } from "../shared/utils/task-cache-key";
 import { isTaskProjectManager, TASK_PROJECT_ROLES } from "../shared/task-project-roles";
 import { insertTaskSchema, insertTaskTimeEntrySchema, insertTaskWeeklyEstimateSchema } from "../shared/schema";
@@ -13,6 +14,19 @@ import { calcElapsed, getStoredTimer, writeStoredTimer, TIMER_CHANGE_EVENT, time
 
 const source = (path: string) => readFileSync(path, "utf8");
 afterEach(() => vi.unstubAllGlobals());
+
+describe("Asana module QA: production hours presentation", () => {
+  it.each([[1 / 60, "1m"], [19 / 60, "19m"], [32 / 60, "32m"], [1.999, "2h"], [1.15, "1h 9m"], [0, "0h"]])("formats %s hours as %s", (hours, label) => {
+    expect(formatTaskHoursLabel(Number(hours))).toBe(label);
+  });
+  it("renders civil week and entry dates and includes every matrix project", () => {
+    const page = source("client/src/pages/hours-dashboard.tsx");
+    expect(page).toContain("parseTaskCivilDate(w.week)");
+    expect(page).toContain("parseTaskCivilDate(entry.date)");
+    expect(page).not.toContain("byProject.slice(0, 5)");
+    expect(page).not.toContain("{entry.hours}h");
+  });
+});
 
 describe("Asana module QA: civil dates and boundary validation", () => {
   it.each(["2026-02-30", "2026-04-31", "2026-13-01", "2026-00-01", "2026-01-00", "not-a-date", "3", "02/30/2026", "2026-2-3"])("rejects impossible day %s", day => {

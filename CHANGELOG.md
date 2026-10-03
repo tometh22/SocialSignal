@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.10.13 — 2026-10-03
+
+- Cierra los hallazgos de la verificación productiva del panel de horas: fechas civiles en etiquetas semanales y cargas, duración legible en minutos y matriz completa por proyecto sin truncar a cinco columnas.
+- Conserva todas las cargas, precios y vínculos existentes; sólo cambia la presentación.
+
 ## 1.10.12 — 2026-10-03
 
 - Audita nuevamente los 67 puntos de Mind V2 contra frontend y backend, y amplía la QA del módulo operativo.

@@ -21,6 +21,8 @@ import {
 } from "recharts";
 import { cn } from "@/lib/utils";
 import { usePermissions } from "@/hooks/use-permissions";
+import { parseTaskCivilDate } from "@shared/utils/task-civil-date";
+import { formatTaskHoursLabel } from "@shared/utils/task-hours-label";
 
 type Personnel = { id: number; name: string };
 type Project = { id: number; name: string; client_name: string };
@@ -72,10 +74,7 @@ function getDateRange(filter: string): { dateFrom: string; dateTo: string } {
 
 function formatHoursLabel(hours: number) {
   if (hours === 0) return "";
-  const h = Math.floor(hours);
-  const m = Math.round((hours - h) * 60);
-  if (m === 0) return `${h}h`;
-  return `${h}h${m}m`;
+  return formatTaskHoursLabel(hours);
 }
 
 const PAGE_SIZE = 20;
@@ -128,7 +127,7 @@ export default function HoursDashboardPage() {
   const estTotalReal = estByProject.reduce((acc, p) => acc + (p.realHours || 0), 0);
 
   const weeklyData = (summary?.byWeek || []).map(w => ({
-    week: format(new Date(w.week), "dd/MM", { locale: es }),
+    week: format(parseTaskCivilDate(w.week), "dd/MM", { locale: es }),
     horas: parseFloat(w.hours.toFixed(2)),
     label: formatHoursLabel(w.hours),
   }));
@@ -484,7 +483,7 @@ export default function HoursDashboardPage() {
                 <thead>
                   <tr className="border-b bg-muted/10">
                     <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">Colaborador</th>
-                    {summary.byProject.slice(0, 5).map(p => (
+                    {summary.byProject.map(p => (
                       <th key={p.projectId ?? "unassigned"} className="text-center px-3 py-2.5 text-xs font-semibold text-muted-foreground max-w-[90px]">
                         <span className="block truncate" title={p.name}>{p.name}</span>
                       </th>
@@ -499,7 +498,7 @@ export default function HoursDashboardPage() {
                     return (
                       <tr key={person.personnelId} className="hover:bg-accent/30 transition-colors">
                         <td className="px-4 py-2.5 font-medium text-foreground text-xs">{person.name}</td>
-                        {summary.byProject.slice(0, 5).map(proj => {
+                        {summary.byProject.map(proj => {
                           const ph = personEntries.filter((e: any) => e.projectId === proj.projectId).reduce((acc: number, e: any) => acc + e.hours, 0);
                           return (
                             <td key={proj.projectId ?? "unassigned"} className="text-center px-3 py-2.5 text-xs text-muted-foreground">
@@ -513,7 +512,7 @@ export default function HoursDashboardPage() {
                   })}
                   <tr className="bg-muted/20 font-semibold">
                     <td className="px-4 py-2.5 text-xs text-foreground">Total</td>
-                    {summary.byProject.slice(0, 5).map(proj => (
+                    {summary.byProject.map(proj => (
                       <td key={proj.projectId ?? "unassigned"} className="text-center px-3 py-2.5 text-xs text-foreground">{proj.hours.toFixed(1)}h</td>
                     ))}
                     <td className="text-right px-4 py-2.5 text-xs text-foreground">{totalHours.toFixed(1)}h</td>
@@ -553,10 +552,10 @@ export default function HoursDashboardPage() {
                         <span className="truncate block" title={entry.taskTitle}>{entry.taskTitle}</span>
                       </td>
                       <td className="px-3 py-2.5 text-center text-muted-foreground">
-                        {format(new Date(entry.date), "dd/MM/yy")}
+                        {format(parseTaskCivilDate(entry.date), "dd/MM/yy")}
                       </td>
                       <td className="px-4 py-2.5 text-right font-semibold text-primary">
-                        {entry.hours}h
+                        {formatTaskHoursLabel(entry.hours)}
                       </td>
                       <td className="px-3 py-2.5 text-muted-foreground/70 hidden md:table-cell max-w-[180px]">
                         {entry.description ? (
