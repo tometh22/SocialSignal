@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { getApiErrorMessage } from "@/lib/api-error";
 import { usePermissions } from "@/hooks/use-permissions";
+import { useActiveTimer } from "@/hooks/useActiveTimer";
 import { formatHours, parseHoursInput, roundToMinute } from "@/lib/task-hours";
 
 type TimeEntrySummary = {
@@ -23,6 +24,7 @@ type TimeEntrySummary = {
 };
 
 type TaskHoursSummary = {
+  title?: string;
   projectId?: number | null;
   assigneeId?: number | null;
   loggedHours?: number;
@@ -37,8 +39,8 @@ export default function QuickTaskHours({ taskId, className }: { taskId: number; 
   const [open, setOpen] = useState(false);
   const [manual, setManual] = useState("");
   const [personnelId, setPersonnelId] = useState("");
-  const [timerStartedAt, setTimerStartedAt] = useState<number | null>(null);
-  const [timerSeconds, setTimerSeconds] = useState(0);
+  const { isRunning, activeTaskId, elapsedSeconds: timerSeconds, startTimer, stopTimer: stopSharedTimer } = useActiveTimer({ trackElapsed: open });
+  const timerStartedAt = isRunning && activeTaskId === taskId;
   const [editingEntryId, setEditingEntryId] = useState<number | null>(null);
   const [editingHours, setEditingHours] = useState("");
 
@@ -140,15 +142,6 @@ export default function QuickTaskHours({ taskId, className }: { taskId: number; 
     onError: describeError("No se pudo eliminar la carga"),
   });
 
-  useEffect(() => {
-    if (!timerStartedAt) return;
-    const interval = window.setInterval(
-      () => setTimerSeconds(Math.floor((Date.now() - timerStartedAt) / 1000)),
-      1000,
-    );
-    return () => window.clearInterval(interval);
-  }, [timerStartedAt]);
-
   const saveManual = () => {
     const hours = parseHoursInput(manual);
     if (hours == null || hours <= 0) {
@@ -176,10 +169,11 @@ export default function QuickTaskHours({ taskId, className }: { taskId: number; 
   };
 
   const stopTimer = () => {
-    const hours = roundToMinute(Math.max(1 / 60, timerSeconds / 3600));
-    setTimerStartedAt(null);
-    setTimerSeconds(0);
-    logMutation.mutate(hours);
+    const result = stopSharedTimer();
+    if (!result) return;
+    setManual(result.hours > 0 ? `${Math.round(result.hours * 60)}m` : "");
+    if (result.personnelId) setPersonnelId(String(result.personnelId));
+    toast({ title: "Temporizador detenido", description: "Revisá la duración y guardá la carga; el mínimo es un minuto." });
   };
 
   const entries = taskSummary?.timeEntries ?? [];
@@ -248,8 +242,8 @@ export default function QuickTaskHours({ taskId, className }: { taskId: number; 
             <Square className="mr-1 h-3 w-3" />Detener ({Math.floor(timerSeconds / 60)}m)
           </Button>
         ) : (
-          <Button size="sm" variant="secondary" className="h-8 w-full text-xs" onClick={() => setTimerStartedAt(Date.now())}>
-            <Play className="mr-1 h-3 w-3" />Iniciar temporizador
+          <Button size="sm" variant="secondary" className="h-8 w-full text-xs" disabled={isRunning} onClick={() => startTimer(taskId, taskSummary?.title ?? `Tarea #${taskId}`, isOperations && personnelId ? Number(personnelId) : null)}>
+            <Play className="mr-1 h-3 w-3" />{isRunning ? "Hay un temporizador activo" : "Iniciar temporizador"}
           </Button>
         )}
 

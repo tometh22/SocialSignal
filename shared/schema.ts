@@ -1,3 +1,4 @@
+import { taskDateSchema, isValidCivilDate } from "./utils/task-civil-date";
 import { taskRecurrenceSchema, type TaskRecurrence } from "./utils/task-recurrence";
 import { pgTable, check, text, serial, integer, boolean, timestamp, date, doublePrecision, json, numeric, varchar, unique, uniqueIndex, pgEnum, jsonb, index, primaryKey, type AnyPgColumn } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
@@ -2318,10 +2319,12 @@ export const insertTaskSchema = createInsertSchema(tasks).omit({
   recurrenceSourceTaskId: true,
 }).extend({
   recurrenceRule: taskRecurrenceSchema.nullable().optional(),
-  startDate: z.union([z.date(), z.string().transform((str) => new Date(str)).refine(date => Number.isFinite(date.getTime()), "Fecha inválida")]).optional().nullable(),
-  dueDate: z.union([z.date(), z.string().transform((str) => new Date(str)).refine(date => Number.isFinite(date.getTime()), "Fecha inválida")]).optional().nullable(),
-  completedAt: z.union([z.date(), z.string().transform((str) => new Date(str)).refine(date => Number.isFinite(date.getTime()), "Fecha inválida")]).optional().nullable(),
-  collaboratorIds: z.array(z.number()).optional().default([]),
+  startDate: taskDateSchema.optional().nullable(),
+  dueDate: taskDateSchema.optional().nullable(),
+  completedAt: taskDateSchema.optional().nullable(),
+  collaboratorIds: z.array(z.number().int().positive()).max(100).optional().default([]),
+  title: z.string().trim().min(1).max(500),
+  sectionName: z.string().trim().min(1).max(250).default("General"),
   status: z.enum(["todo", "in_progress", "blocked"]).default("todo"),
   priority: z.enum(["low", "medium", "high", "urgent"]).default("medium"),
 });
@@ -2373,7 +2376,7 @@ export const insertTaskTimeEntrySchema = createInsertSchema(taskTimeEntries).omi
   billable: true,
   exchangeRateId: true,
 }).extend({
-  date: z.union([z.date(), z.string().transform((str) => new Date(str))]),
+  date: taskDateSchema,
   // Un minuto es la unidad mínima: el equipo carga duraciones reales (2:15),
   // no múltiplos de cuarto de hora.
   hours: z.number().min(1 / 60, "El mínimo es un minuto"),
@@ -2397,7 +2400,7 @@ export const taskWeeklyEstimates = pgTable("task_weekly_estimates", {
 export const insertTaskWeeklyEstimateSchema = createInsertSchema(taskWeeklyEstimates)
   .omit({ id: true, createdAt: true })
   .extend({
-    weekStart: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "La semana debe usar YYYY-MM-DD"),
+    weekStart: z.string().refine(isValidCivilDate, "La semana debe usar un día válido YYYY-MM-DD"),
     estimatedHours: z.number().positive("Las horas estimadas deben ser mayores a cero"),
   });
 export type TaskWeeklyEstimate = typeof taskWeeklyEstimates.$inferSelect;

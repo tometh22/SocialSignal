@@ -1,6 +1,7 @@
+import { taskIsOnCivilDay } from "@shared/utils/task-civil-date";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { authFetch } from "@/lib/queryClient";
+import { authFetch, authFetchJson } from "@/lib/queryClient";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, startOfWeek, endOfWeek, isSameMonth, isToday, addMonths, subMonths, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
@@ -55,11 +56,7 @@ function getInitials(name: string) {
 }
 
 function taskIsOnDay(task: Task, day: Date): boolean {
-  const dayKey = format(day, "yyyy-MM-dd");
-  const startKey = task.startDate ? format(parseISO(task.startDate), "yyyy-MM-dd") : null;
-  const dueKey = task.dueDate ? format(parseISO(task.dueDate), "yyyy-MM-dd") : null;
-  if (!startKey && !dueKey) return false;
-  return (!startKey || startKey <= dayKey) && (!dueKey || dueKey >= dayKey);
+  return taskIsOnCivilDay(task, format(day, "yyyy-MM-dd"));
 }
 
 export default function TeamCalendarPage() {
@@ -75,27 +72,27 @@ export default function TeamCalendarPage() {
   const calEnd = endOfWeek(monthEnd, { weekStartsOn: 1 });
   const allCalDays = eachDayOfInterval({ start: calStart, end: calEnd });
 
-  const { data: tasks = [], isLoading, refetch } = useQuery<Task[]>({
+  const { data: tasks = [], isLoading, isError, refetch } = useQuery<Task[]>({
     queryKey: ["/api/tasks/team-calendar", format(currentMonth, "yyyy-MM"), selectedAssigneeId, selectedProjectId],
     queryFn: () => {
       const params = new URLSearchParams({
-        dateFrom: calStart.toISOString(),
-        dateTo: calEnd.toISOString(),
+        dateFrom: format(calStart, "yyyy-MM-dd"),
+        dateTo: format(calEnd, "yyyy-MM-dd"),
       });
       if (selectedAssigneeId !== "all") params.set("assigneeId", selectedAssigneeId);
       if (selectedProjectId !== "all") params.set("projectId", selectedProjectId);
-      return authFetch(`/api/tasks/team-calendar?${params}`).then(r => r.json());
+      return authFetchJson<Task[]>(`/api/tasks/team-calendar?${params}`);
     },
   });
 
   const { data: allPersonnel = [] } = useQuery<Personnel[]>({
     queryKey: ["/api/tasks-personnel"],
-    queryFn: () => authFetch("/api/tasks-personnel").then(r => r.json()),
+    queryFn: () => authFetchJson("/api/tasks-personnel"),
   });
 
   const { data: allProjects = [] } = useQuery<Project[]>({
     queryKey: ["/api/tasks-projects"],
-    queryFn: () => authFetch("/api/tasks-projects").then(r => r.json()),
+    queryFn: () => authFetchJson("/api/tasks-projects"),
   });
 
   const tasksByDay = (day: Date) => tasks.filter(t => taskIsOnDay(t, day));
@@ -217,7 +214,7 @@ export default function TeamCalendarPage() {
             <div className="flex items-center justify-center py-20">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
-          ) : (
+          ) : isError ? (<div className="p-6 text-sm text-destructive">No se pudo cargar el calendario. <Button variant="outline" size="sm" onClick={() => refetch()}>Reintentar</Button></div>) : (
             <div className="grid grid-cols-7 divide-x divide-y divide-border">
               {allCalDays.map(day => {
                 const dayTasks = tasksByDay(day);

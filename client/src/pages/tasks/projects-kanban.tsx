@@ -1,3 +1,5 @@
+import { toast } from "@/hooks/use-toast";
+import { isTaskProjectManager } from "@shared/task-project-roles";
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
@@ -34,7 +36,7 @@ export default function ProjectsKanbanPage() {
   const [draggedId, setDraggedId] = useState<number | null>(null);
   const [managerFilter, setManagerFilter] = useState("all");
   const [blockReasonDrafts, setBlockReasonDrafts] = useState<Record<number, string>>({});
-  const { data: projects = [], isLoading } = useQuery<Project[]>({
+  const { data: projects = [], isLoading, isError, error, refetch } = useQuery<Project[]>({
     queryKey: ["/api/tasks/projects", "kanban", isOperations],
     queryFn: async () => {
       const response = await authFetch(`/api/tasks/projects?status=active&scope=${isOperations ? "all" : "mine"}`);
@@ -49,13 +51,13 @@ export default function ProjectsKanbanPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/tasks/projects"] });
     },
+    onError: (error: Error) => toast({ title: "No se pudo cambiar la etapa", description: error.message, variant: "destructive" }),
   });
   const grouped = useMemo(() => {
     const map = new Map<WorkflowStage, Project[]>();
     for (const stage of STAGES) map.set(stage.value, []);
     for (const project of projects) {
-      const manager = project.members.find((member) => member.role === "owner");
-      if (managerFilter !== "all" && String(manager?.personnelId ?? "") !== managerFilter) continue;
+      if (managerFilter !== "all" && !project.members.some(member => isTaskProjectManager(member.role) && String(member.personnelId) === managerFilter)) continue;
       (map.get(project.workflowStage ?? "aprobado") ?? map.get("aprobado")!).push(project);
     }
     return map;
@@ -64,13 +66,14 @@ export default function ProjectsKanbanPage() {
   const managers = useMemo(() => {
     const unique = new Map<number, string>();
     for (const project of projects) {
-      const manager = project.members.find((member) => member.role === "owner");
-      if (manager) unique.set(manager.personnelId, manager.name);
+      for (const manager of project.members.filter(member => isTaskProjectManager(member.role))) unique.set(manager.personnelId, manager.name);
     }
     return [...unique.entries()].sort((a, b) => a[1].localeCompare(b[1], "es"));
   }, [projects]);
 
   if (isLoading) return <div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin" /></div>;
+
+  if (isError) return <div className="p-6 text-sm text-destructive">{(error as Error).message} <Button variant="outline" onClick={() => refetch()}>Reintentar</Button></div>;
 
   return (
     <div className="mx-auto max-w-[1600px] space-y-5">
@@ -133,7 +136,7 @@ export default function ProjectsKanbanPage() {
                       {project.clientName && <p className="mt-0.5 truncate text-[11px] text-muted-foreground">{project.clientName}</p>}
                       <div className="mt-3 flex items-center justify-between text-[11px] text-muted-foreground">
                         <span>{project.pendingCount}/{project.taskCount} tareas pendientes</span>
-                        <span>{project.members.find((member) => member.role === "owner")?.name || `${project.members.length} miembros`}</span>
+                        <span>{project.members.find((member) => isTaskProjectManager(member.role))?.name || `${project.members.length} miembros`}</span>
                       </div>
                       <label className="mt-3 block text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
                         Estado operativo

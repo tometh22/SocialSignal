@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.10.12 — 2026-10-03
+
+- Audita nuevamente los 67 puntos de Mind V2 contra frontend y backend, y amplía la QA del módulo operativo.
+- Corrige fechas civiles y límites del calendario, la atribución del domingo, la precisión de un minuto y los totales de horas sin doble conteo.
+- Protege el alcance del resumen personal; distingue proyectos y personas por ID y aplica las reglas de cierre a las horas de Tareas.
+- Duplica jerarquías completas de forma atómica, mueve todas las subtareas con su sección y valida cambios concurrentes de fechas y padres.
+- Conserva los padres de resultados al buscar subtareas y permite desplegar niveles profundos; sincroniza la carga rápida con el temporizador global persistido.
+- Unifica roles de equipo y permisos de PM, evita quitar miembros aún asignados y alinea controles de comentarios con los permisos del servidor.
+- Actualiza todas las vistas tras cambios, cierre y anulación; excluye canceladas del conteo de completadas y muestra errores recuperables de consulta/movimiento.
+- Conserva los 9 proyectos, las 6 cotizaciones, los vínculos y precios del Excel; no importa proyectos históricos de Asana ni inventa tarifas freelance.
+
 ## 1.10.11 — 2026-10-02
 
 - Cierra las ocho brechas de los feedbacks Mind V2: criterios de esfuerzo, salida ejecutiva e identidad independientes, explicación del ajuste operativo y volumen editable desde Alcance con acceso desde Inversión.

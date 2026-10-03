@@ -1,6 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
 import { db } from "../db";
-import { activeProjects, timeEntries } from "@shared/schema";
+import { activeProjects, timeEntries, tasks } from "@shared/schema";
 import { eq } from "drizzle-orm";
 
 type ProjectIdSource = (req: Request) => number | null | Promise<number | null>;
@@ -23,6 +23,14 @@ export const projectIdFromTimeEntry: ProjectIdSource = async (req) => {
     .from(timeEntries)
     .where(eq(timeEntries.id, id));
   return row?.projectId ?? null;
+};
+
+/** Resolves a task's project for the same closing rules used by legacy hours. */
+export const projectIdFromTask: ProjectIdSource = async (req) => {
+  const id = Number(req.params?.taskId ?? req.params?.id);
+  if (!Number.isInteger(id) || id <= 0) return null;
+  const [task] = await db.select({ projectId: tasks.projectId }).from(tasks).where(eq(tasks.id, id));
+  return task?.projectId ?? null;
 };
 
 /**

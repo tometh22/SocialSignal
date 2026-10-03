@@ -30,10 +30,10 @@ const CHART_COLORS = ["#6366f1", "#8b5cf6", "#ec4899", "#f59e0b", "#10b981", "#3
 type HoursSummary = {
   entries: any[];
   byWeek: { week: string; hours: number }[];
-  byProject: { name: string; hours: number; estimatedHours: number }[];
-  byPerson: { name: string; hours: number; estimatedHours: number }[];
+  byProject: { projectId: number | null; name: string; hours: number; estimatedHours: number }[];
+  byPerson: { personnelId: number; name: string; hours: number; estimatedHours: number }[];
   activeTeam?: { id: number; name: string; contractType: string; dailyHours: number }[];
-  estimationByProject?: { name: string; realHours: number; estimatedHours: number; delta: number }[];
+  estimationByProject?: { projectId: number | null; name: string; realHours: number; estimatedHours: number; delta: number }[];
 };
 
 const QUICK_FILTERS = [
@@ -415,7 +415,7 @@ export default function HoursDashboardPage() {
                   </ResponsiveContainer>
                   <div className="flex-1 space-y-1.5 overflow-y-auto max-h-[200px]">
                     {summary.byProject.map((p, i) => (
-                      <div key={p.name} className="flex items-center gap-2 text-xs">
+                      <div key={p.projectId ?? "unassigned"} className="flex items-center gap-2 text-xs">
                         <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: CHART_COLORS[i % CHART_COLORS.length] }} />
                         <span className="flex-1 truncate text-muted-foreground" title={p.name}>{p.name}</span>
                         <span className="font-semibold text-foreground flex-shrink-0 tabular-nums">{p.hours.toFixed(1)}h</span>
@@ -453,7 +453,7 @@ export default function HoursDashboardPage() {
                     {estByProject.map((p) => {
                       const pct = p.estimatedHours > 0 ? Math.round((p.realHours / p.estimatedHours) * 100) : null;
                       return (
-                        <tr key={p.name} className="hover:bg-accent/20 transition-colors">
+                        <tr key={p.projectId ?? "unassigned"} className="hover:bg-accent/20 transition-colors">
                           <td className="px-3 py-2 text-xs font-medium text-foreground max-w-[220px]"><span className="truncate block" title={p.name}>{p.name}</span></td>
                           <td className="px-3 py-2 text-xs text-right text-muted-foreground tabular-nums">{p.estimatedHours > 0 ? `${p.estimatedHours.toFixed(1)}h` : "—"}</td>
                           <td className="px-3 py-2 text-xs text-right font-semibold text-foreground tabular-nums">{p.realHours.toFixed(1)}h</td>
@@ -485,7 +485,7 @@ export default function HoursDashboardPage() {
                   <tr className="border-b bg-muted/10">
                     <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">Colaborador</th>
                     {summary.byProject.slice(0, 5).map(p => (
-                      <th key={p.name} className="text-center px-3 py-2.5 text-xs font-semibold text-muted-foreground max-w-[90px]">
+                      <th key={p.projectId ?? "unassigned"} className="text-center px-3 py-2.5 text-xs font-semibold text-muted-foreground max-w-[90px]">
                         <span className="block truncate" title={p.name}>{p.name}</span>
                       </th>
                     ))}
@@ -494,15 +494,15 @@ export default function HoursDashboardPage() {
                 </thead>
                 <tbody className="divide-y divide-border">
                   {summary.byPerson.map((person) => {
-                    const personEntries = summary.entries.filter((e: any) => e.personnelName === person.name);
+                    const personEntries = summary.entries.filter((e: any) => e.personnelId === person.personnelId);
                     const real = person.hours;
                     return (
-                      <tr key={person.name} className="hover:bg-accent/30 transition-colors">
+                      <tr key={person.personnelId} className="hover:bg-accent/30 transition-colors">
                         <td className="px-4 py-2.5 font-medium text-foreground text-xs">{person.name}</td>
                         {summary.byProject.slice(0, 5).map(proj => {
-                          const ph = personEntries.filter((e: any) => e.projectName === proj.name).reduce((acc: number, e: any) => acc + e.hours, 0);
+                          const ph = personEntries.filter((e: any) => e.projectId === proj.projectId).reduce((acc: number, e: any) => acc + e.hours, 0);
                           return (
-                            <td key={proj.name} className="text-center px-3 py-2.5 text-xs text-muted-foreground">
+                            <td key={proj.projectId ?? "unassigned"} className="text-center px-3 py-2.5 text-xs text-muted-foreground">
                               {ph > 0 ? <span className="font-medium text-foreground">{ph.toFixed(1)}h</span> : <span className="text-muted-foreground/40">—</span>}
                             </td>
                           );
@@ -514,7 +514,7 @@ export default function HoursDashboardPage() {
                   <tr className="bg-muted/20 font-semibold">
                     <td className="px-4 py-2.5 text-xs text-foreground">Total</td>
                     {summary.byProject.slice(0, 5).map(proj => (
-                      <td key={proj.name} className="text-center px-3 py-2.5 text-xs text-foreground">{proj.hours.toFixed(1)}h</td>
+                      <td key={proj.projectId ?? "unassigned"} className="text-center px-3 py-2.5 text-xs text-foreground">{proj.hours.toFixed(1)}h</td>
                     ))}
                     <td className="text-right px-4 py-2.5 text-xs text-foreground">{totalHours.toFixed(1)}h</td>
                   </tr>

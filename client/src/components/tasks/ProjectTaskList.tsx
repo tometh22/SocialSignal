@@ -1,8 +1,10 @@
+import { filterTaskTree } from "@shared/utils/task-tree-filter";
+import { sumTaskLoggedHours } from "@shared/utils/task-hours-total";
 import { groupTasksBySection } from "@shared/utils/task-sections";
 import { filterTasksByOrigin, type TaskOrigin } from "@shared/utils/task-origin";
 import { useMemo, useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient, apiRequest, authFetch } from "@/lib/queryClient";
+import { queryClient, apiRequest, authFetch, authFetchJson } from "@/lib/queryClient";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
@@ -402,7 +404,8 @@ interface TaskRowProps {
   isDragging?: boolean;
 }
 
-function TaskRow({ task, allPersonnel, projectMembers = [], onOpen, onToggle, onDateSet, onAssignee, onRename, onStatusChange, onDuplicate, isSubtask = false, clientName, subtaskMap, expandedSubtasks, onToggleSubtasks, dragHandleProps, isDragging }: TaskRowProps) {
+function TaskRow(props: TaskRowProps) {
+  const { task, allPersonnel, projectMembers = [], onOpen, onToggle, onDateSet, onAssignee, onRename, onStatusChange, onDuplicate, isSubtask = false, clientName, subtaskMap, expandedSubtasks, onToggleSubtasks, dragHandleProps, isDragging } = props;
   const [assigneeOpen, setAssigneeOpen] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState("");
@@ -720,11 +723,15 @@ function TaskRow({ task, allPersonnel, projectMembers = [], onOpen, onToggle, on
           </div>
         )}
       </div>
+      {isExpanded && (subtaskMap?.[task.id] ?? []).map(child => (
+        <TaskRow {...props} key={child.id} task={child} isSubtask dragHandleProps={undefined} isDragging={false} />
+      ))}
     </TooltipProvider>
   );
 }
 
 interface SectionBlockProps {
+  canManageSections?: boolean;
   sectionName: string;
   tasks: Task[];
   projectId: number;
@@ -750,7 +757,7 @@ interface SectionBlockProps {
   taskOrderOverride?: number[];
 }
 
-function SectionBlock({ sectionName, tasks, projectId, allPersonnel, projectMembers = [], onOpenTask, onToggleTask, onDateSet, onAssignee, onRename, onStatusChange, onDuplicate, onDuplicateSection, onRefresh, clientName, autoOpenAdd = 0, forceExpand = false, dragHandleProps, isDragging, sortBy = 'default', allPersonnelForSort = [], isFirst = false, taskOrderOverride }: SectionBlockProps) {
+function SectionBlock({ canManageSections = false, sectionName, tasks, projectId, allPersonnel, projectMembers = [], onOpenTask, onToggleTask, onDateSet, onAssignee, onRename, onStatusChange, onDuplicate, onDuplicateSection, onRefresh, clientName, autoOpenAdd = 0, forceExpand = false, dragHandleProps, isDragging, sortBy = 'default', allPersonnelForSort = [], isFirst = false, taskOrderOverride }: SectionBlockProps) {
   const [collapsed, setCollapsed] = useState(false);
   const effectiveCollapsed = forceExpand ? false : collapsed;
   const [showAdd, setShowAdd] = useState(false);
@@ -764,7 +771,8 @@ function SectionBlock({ sectionName, tasks, projectId, allPersonnel, projectMemb
     if (autoOpenAdd > 0) setShowAdd(true);
   }, [autoOpenAdd]);
 
-  const rootTasks = tasks.filter(t => !t.parentTaskId);
+  const sectionTaskIds = new Set(tasks.map(task => task.id));
+  const rootTasks = tasks.filter(t => !t.parentTaskId || !sectionTaskIds.has(t.parentTaskId));
   const subtaskMap: Record<number, Task[]> = {};
   tasks.filter(t => t.parentTaskId).forEach(sub => {
     if (!subtaskMap[sub.parentTaskId!]) subtaskMap[sub.parentTaskId!] = [];
@@ -772,7 +780,7 @@ function SectionBlock({ sectionName, tasks, projectId, allPersonnel, projectMemb
   });
 
   const done = rootTasks.filter(t => t.status === "done").length;
-  const totalLogged = tasks.reduce((acc, t) => acc + (t.loggedHours || 0), 0);
+  const totalLogged = sumTaskLoggedHours(tasks);
 
   const renameMutation = useMutation({
     mutationFn: (newName: string) => apiRequest("/api/tasks/section/rename", "PUT", { projectId, oldName: sectionName, newName }),
@@ -808,7 +816,7 @@ function SectionBlock({ sectionName, tasks, projectId, allPersonnel, projectMemb
     });
   };
 
-  const rawRootTasks = tasks.filter(t => !t.parentTaskId);
+  const rawRootTasks = rootTasks;
   const orderedRootTasks = taskOrderOverride
     ? [
         ...taskOrderOverride.map(id => rawRootTasks.find(t => t.id === id)).filter(Boolean) as Task[],
@@ -861,7 +869,7 @@ function SectionBlock({ sectionName, tasks, projectId, allPersonnel, projectMemb
           ) : (
             <span
               className="font-semibold text-xs text-foreground uppercase tracking-wider cursor-text rounded px-0.5 hover:bg-accent/60"
-              onClick={e => { e.stopPropagation(); setNewSectionName(sectionName); setRenamingSection(true); }}
+              onClick={e => { e.stopPropagation(); if (canManageSections) { setNewSectionName(sectionName); setRenamingSection(true); } }}
             >
               {sectionName}
             </span>
@@ -877,7 +885,7 @@ function SectionBlock({ sectionName, tasks, projectId, allPersonnel, projectMemb
               </div>
             </div>
           )}
-          {!effectiveCollapsed && (
+          {!effectiveCollapsed && canManageSections && (
             <div className="flex items-center gap-0.5 opacity-100 ml-1 transition-opacity sm:opacity-0 sm:group-hover:opacity-100">
               <Button
                 variant="ghost"
@@ -950,7 +958,7 @@ function SectionBlock({ sectionName, tasks, projectId, allPersonnel, projectMemb
               onDuplicate={onDuplicate}
               clientName={clientName}
               subtaskMap={subtaskMap}
-              expandedSubtasks={expandedSubtasks}
+              expandedSubtasks={forceExpand ? new Set(tasks.map(task => task.id)) : expandedSubtasks}
               onToggleSubtasks={toggleSubtasks}
             />
           ))}
@@ -966,7 +974,7 @@ function SectionBlock({ sectionName, tasks, projectId, allPersonnel, projectMemb
                 <span>{completedTasks.length} completada{completedTasks.length !== 1 ? "s" : ""}</span>
                 <ChevronDown className={cn("h-3 w-3 ml-auto transition-transform", showCompleted && "rotate-180")} />
               </div>
-              {showCompleted && completedTasks.map(task => (
+              {(showCompleted || forceExpand) && completedTasks.map(task => (
                 <TaskRow
                   key={task.id}
                   task={task}
@@ -981,7 +989,7 @@ function SectionBlock({ sectionName, tasks, projectId, allPersonnel, projectMemb
                   onDuplicate={onDuplicate}
                   clientName={clientName}
                   subtaskMap={subtaskMap}
-                  expandedSubtasks={expandedSubtasks}
+                  expandedSubtasks={forceExpand ? new Set(tasks.map(task => task.id)) : expandedSubtasks}
                   onToggleSubtasks={toggleSubtasks}
                 />
               ))}
@@ -1078,22 +1086,6 @@ function SortableTaskRow({ taskId, task, allPersonnel, projectMembers, onOpenTas
         dragHandleProps={{ ...attributes, ...listeners }}
         isDragging={isDragging}
       />
-      {expandedSubtasks?.has(taskId) && (subtaskMap?.[taskId] || []).map(sub => (
-        <TaskRow
-          key={sub.id}
-          task={sub}
-          allPersonnel={allPersonnel}
-          projectMembers={projectMembers}
-          onOpen={onOpenTask}
-          onToggle={onToggleTask}
-          onDateSet={onDateSet}
-          onAssignee={onAssignee}
-          onRename={onRename}
-          onStatusChange={onStatusChange}
-          onDuplicate={onDuplicate}
-          isSubtask
-        />
-      ))}
     </div>
   );
 }
@@ -1226,7 +1218,7 @@ function BoardColumn({ label, dot, ring, empty, status, tasks, allPersonnel, pro
         <div className="flex items-center gap-1.5">
           {(() => {
             const estH = tasks.reduce((sum, task) => sum + Number(task.estimatedHoursTotal ?? 0), 0);
-            const logH = tasks.reduce((s, t) => s + (t.loggedHours || 0), 0);
+            const logH = sumTaskLoggedHours(tasks);
             if (estH > 0 || logH > 0) {
               return (
                 <span className="text-[10px] text-muted-foreground">
@@ -1338,16 +1330,16 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
     }
   }, [onQuickAddTrigger]);
 
-  const { data, isLoading, refetch } = useQuery<{ tasks: Task[]; sections: Record<string, Task[]>; layout?: string }>({
+  const { data, isLoading, isError, error, refetch } = useQuery<{ canManageSections?: boolean; tasks: Task[]; sections: Record<string, Task[]>; layout?: string }>({
     queryKey: ["/api/tasks/project", projectId],
-    queryFn: () => authFetch(`/api/tasks/project/${projectId}?layout=flat`).then(r => r.json()),
+    queryFn: () => authFetchJson(`/api/tasks/project/${projectId}?layout=flat`),
     staleTime: 30 * 1000,
   });
 
 
   const { data: allPersonnel = [] } = useQuery<Personnel[]>({
     queryKey: ["/api/tasks-personnel"],
-    queryFn: () => authFetch("/api/tasks-personnel").then(r => r.json()),
+    queryFn: () => authFetchJson("/api/tasks-personnel"),
   });
 
   const invalidateRelated = () => {
@@ -1411,56 +1403,12 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
   };
 
   const duplicateTaskMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("/api/tasks", "POST", data),
-    onSuccess: () => { refetch(); invalidateRelated(); },
+    mutationFn: (task: Task) => apiRequest(`/api/tasks/${task.id}/duplicate`, "POST", {}),
+    onSuccess: () => { refetch(); invalidateRelated(); toast({ title: "Tarea duplicada con sus subtareas" }); },
+    onError: (error: Error) => toast({ title: "No se pudo duplicar la tarea", description: error.message, variant: "destructive" }),
   });
-
-  const copyWeeklyEstimates = async (sourceTaskId: number, targetTaskId: number) => {
-    const estimates = await apiRequest(`/api/tasks/${sourceTaskId}/weekly-estimates`, "GET");
-    for (const estimate of estimates || []) {
-      await apiRequest(`/api/tasks/${targetTaskId}/weekly-estimates`, "POST", {
-        weekStart: estimate.weekStart,
-        estimatedHours: estimate.estimatedHours,
-      });
-    }
-  };
-
-  const handleDuplicateTask = async (task: Task) => {
-    const allRaw = data?.tasks || [];
-    const newTask = await apiRequest("/api/tasks", "POST", {
-      title: `${task.title} (copia)`,
-      description: task.description,
-      isMilestone: task.isMilestone,
-      projectId: task.projectId,
-      sectionName: task.sectionName,
-      assigneeId: task.assigneeId,
-      priority: task.priority,
-      status: "todo",
-      dueDate: task.dueDate,
-      startDate: task.startDate,
-      parentTaskId: task.parentTaskId,
-    });
-    await copyWeeklyEstimates(task.id, newTask.id);
-    if (!task.parentTaskId) {
-      const subtasks = allRaw.filter((t: Task) => t.parentTaskId === task.id);
-      for (const sub of subtasks) {
-        const newSubtask = await apiRequest("/api/tasks", "POST", {
-          title: sub.title,
-          description: sub.description,
-          isMilestone: sub.isMilestone,
-          projectId: sub.projectId,
-          sectionName: sub.sectionName,
-          assigneeId: sub.assigneeId,
-          priority: sub.priority,
-          status: "todo",
-          parentTaskId: newTask.id,
-        });
-        await copyWeeklyEstimates(sub.id, newSubtask.id);
-      }
-    }
-    refetch();
-    invalidateRelated();
-    toast({ title: `Tarea duplicada: "${task.title} (copia)"` });
+  const handleDuplicateTask = (task: Task) => {
+    if (!duplicateTaskMutation.isPending) duplicateTaskMutation.mutate(task);
   };
 
   const [duplicatingSection, setDuplicatingSection] = useState(false);
@@ -1488,9 +1436,8 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
   const sectionsRaw = useMemo(() => data?.layout === "flat" ? groupTasksBySection(data.tasks, Object.keys(data.sections)) : data?.sections || {}, [data]);
 
   // Apply filter
-  const allTasks = filterText.trim()
-    ? allTasksRaw.filter(t => t.title.toLowerCase().includes(filterText.toLowerCase()))
-    : allTasksRaw;
+  const allTasks = filterTaskTree(allTasksRaw, filterText);
+  const matchingTaskCount = allTasksRaw.filter(task => task.title.toLocaleLowerCase().includes(filterText.trim().toLocaleLowerCase())).length;
 
   // When filtering, rebuild sections from filtered tasks
   const baseSections: Record<string, Task[]> = filterText.trim() || sourceFilter !== "all"
@@ -1606,7 +1553,7 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
             console.log('[DnD] Reorder saved successfully');
             queryClient.invalidateQueries({ queryKey: ["/api/tasks/project", projectId] });
           })
-          .catch((e: any) => console.error('[DnD] reorder failed:', e?.message));
+          .catch((e: any) => { setTaskOrderMap(previous => { const next = { ...previous, [fromSection]: fromIds }; persistTaskOrder(projectId, next); return next; }); refetch(); toast({ title: "No se pudo reordenar", description: e.message, variant: "destructive" }); });
       } else {
         // Cross-section move
         const newFromIds = fromIds.filter(id => id !== taskId);
@@ -1625,7 +1572,7 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
             console.log('[DnD] Cross-section reorder saved successfully');
             queryClient.invalidateQueries({ queryKey: ["/api/tasks/project", projectId] });
           })
-          .catch((e: any) => console.error('[DnD] cross-section reorder failed:', e?.message));
+          .catch((e: any) => { setTaskOrderMap(previous => { const next = { ...previous, [fromSection]: fromIds, [targetSection]: toIds }; persistTaskOrder(projectId, next); return next; }); refetch(); toast({ title: "No se pudo mover la tarea", description: e.message, variant: "destructive" }); });
       }
     }
   };
@@ -1638,11 +1585,13 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
     );
   }
 
+  if (isError) return <div className="p-6 text-sm text-destructive">{(error as Error).message || "No se pudieron cargar las tareas"} <Button variant="outline" size="sm" onClick={() => refetch()}>Reintentar</Button></div>;
+
   return (
     <div>
       {filterText.trim() && (
         <div className="mb-2 text-xs text-muted-foreground px-1">
-          {allTasks.length} resultado{allTasks.length !== 1 ? "s" : ""} para "{filterText}"
+          {matchingTaskCount} resultado{matchingTaskCount !== 1 ? "s" : ""} para "{filterText}"
         </div>
       )}
 
@@ -1712,9 +1661,9 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
                 </SelectContent>
               </Select>
             ) : <div />}
-            <Button size="sm" className="h-7 text-xs" onClick={() => setShowAddSection(true)}>
+            {data?.canManageSections && <Button size="sm" className="h-7 text-xs" onClick={() => setShowAddSection(true)}>
               <Plus className="h-3 w-3 mr-1" />Nueva sección
-            </Button>
+            </Button>}
           </div>
 
           {orderedSectionNames.length === 0 ? (
@@ -1723,13 +1672,14 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
               <p className="text-base font-medium text-foreground mb-1">Este proyecto no tiene tareas aún</p>
               <p className="text-sm text-muted-foreground mb-5">Creá una sección para empezar a organizar el trabajo</p>
               <div className="flex items-center justify-center gap-2">
-                <Button size="sm" onClick={() => setShowAddSection(true)}>
+                {data?.canManageSections && <Button size="sm" onClick={() => setShowAddSection(true)}>
                   <Plus className="h-3.5 w-3.5 mr-1" />Nueva sección
-                </Button>
+                </Button>}
                 <Button size="sm" variant="outline" onClick={() => setFirstSectionAutoAdd(v => v + 1)}>
                   Agregar tarea directamente
                 </Button>
               </div>
+              {firstSectionAutoAdd > 0 && <NewTaskRow projectId={projectId} sectionName="General" allPersonnel={allPersonnel} projectMembers={projectMembers} onCreated={() => { setFirstSectionAutoAdd(0); refetch(); }} onCancel={() => setFirstSectionAutoAdd(0)} />}
             </div>
           ) : (
             <DndContext
@@ -1757,6 +1707,7 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
                 >
                   {visibleSectionNames.map((section, idx) => (
                     <SortableSectionBlock
+                      canManageSections={data?.canManageSections}
                       key={section}
                       sectionName={section}
                       tasks={sections[section] || []}

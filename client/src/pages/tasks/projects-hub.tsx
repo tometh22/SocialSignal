@@ -19,6 +19,7 @@ type TaskProject = {
   status: string;
   taskCount: number;
   pendingCount: number;
+  completedCount: number;
   lastActivity?: string;
   members: ProjectMember[];
   source?: string;
@@ -48,12 +49,12 @@ function getProjectLabel(project: TaskProject) {
   return null;
 }
 
-function ProgressBar({ pending, total }: { pending: number; total: number }) {
-  const completedPct = total === 0 ? 0 : Math.round(((total - pending) / total) * 100);
+function ProgressBar({ completed, total }: { completed: number; total: number }) {
+  const completedPct = total === 0 ? 0 : Math.round((completed / total) * 100);
   return (
     <div className="space-y-1">
       <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-        <span>{total - pending} completadas</span>
+        <span>{completed} completadas</span>
         <span className="font-medium">{completedPct}%</span>
       </div>
       <div className="h-1 rounded-full bg-muted overflow-hidden">
@@ -80,7 +81,7 @@ function ProjectCard({ project, myPersonnelId, onJoin, onLeave, joining, leaving
   const isMember = myPersonnelId ? project.members.some(m => m.personnelId === myPersonnelId) : false;
   const visibleMembers = project.members.slice(0, 4);
   const overflow = project.members.length - 4;
-  const doneCount = project.taskCount - project.pendingCount;
+  const doneCount = project.completedCount;
   const clientLabel = getProjectLabel(project);
 
   return (
@@ -123,7 +124,7 @@ function ProjectCard({ project, myPersonnelId, onJoin, onLeave, joining, leaving
         </div>
 
         {project.taskCount > 0 && (
-          <ProgressBar pending={project.pendingCount} total={project.taskCount} />
+          <ProgressBar completed={project.completedCount} total={project.taskCount} />
         )}
 
         <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
@@ -189,8 +190,8 @@ function GeneralPanel({ projects }: { projects: TaskProject[] }) {
   const byCompletion = [...projects]
     .filter(p => p.taskCount > 0)
     .sort((a, b) => {
-      const pctA = (a.taskCount - a.pendingCount) / a.taskCount;
-      const pctB = (b.taskCount - b.pendingCount) / b.taskCount;
+      const pctA = (a.completedCount) / a.taskCount;
+      const pctB = (b.completedCount) / b.taskCount;
       return pctB - pctA;
     });
 
@@ -268,7 +269,7 @@ function GeneralPanel({ projects }: { projects: TaskProject[] }) {
           </div>
           <div className="divide-y divide-border max-h-80 overflow-y-auto">
             {byCompletion.map(p => {
-              const done = p.taskCount - p.pendingCount;
+              const done = p.completedCount;
               const pct = Math.round((done / p.taskCount) * 100);
               const bg = getPaletteBg(p.id);
               return (
@@ -405,7 +406,7 @@ function GeneralPanel({ projects }: { projects: TaskProject[] }) {
             </thead>
             <tbody>
               {[...projects].sort((a, b) => b.pendingCount - a.pendingCount).map((p, i) => {
-                const done = p.taskCount - p.pendingCount;
+                const done = p.completedCount;
                 const pct = p.taskCount > 0 ? Math.round((done / p.taskCount) * 100) : 0;
                 const bg = getPaletteBg(p.id);
                 return (
@@ -530,6 +531,7 @@ export default function ProjectsHubPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/tasks/projects"] });
       toast({ title: "Saliste del proyecto" });
     },
+    onError: (error: Error) => toast({ title: "No se pudo salir del proyecto", description: error.message, variant: "destructive" }),
   });
 
   // Prefer the server-resolved canonical link. The fallback keeps older
@@ -692,7 +694,7 @@ export default function ProjectsHubPage() {
                   <ProjectCard
                     key={project.id}
                     project={project}
-                    myPersonnelId={myPersonnelId}
+                    myPersonnelId={isOperations ? myPersonnelId : undefined}
                     onJoin={() => myPersonnelId && joinMutation.mutate({ projectId: project.id, personnelId: myPersonnelId })}
                     onLeave={() => myPersonnelId && leaveMutation.mutate({ projectId: project.id, personnelId: myPersonnelId })}
                     joining={joinMutation.isPending}
@@ -708,7 +710,7 @@ export default function ProjectsHubPage() {
               <ProjectCard
                 key={project.id}
                 project={project}
-                myPersonnelId={myPersonnelId}
+                myPersonnelId={isOperations ? myPersonnelId : undefined}
                 onJoin={() => myPersonnelId && joinMutation.mutate({ projectId: project.id, personnelId: myPersonnelId })}
                 onLeave={() => myPersonnelId && leaveMutation.mutate({ projectId: project.id, personnelId: myPersonnelId })}
                 joining={joinMutation.isPending}

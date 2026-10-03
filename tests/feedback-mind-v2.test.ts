@@ -401,7 +401,7 @@ test("calendar date windows overlap task ranges and include collaborators", () =
     routes.indexOf('// GET /api/tasks/project/:projectId'),
   );
   expect(calendar).toContain("isNotNull(tasks.startDate)");
-  expect(calendar).toContain("isNull(tasks.dueDate)");
+  expect(calendar).toContain("COALESCE(${tasks.dueDate}, ${tasks.startDate}) >= ${from}");
   expect(calendar).toContain("collaboratorIds");
   expect(calendar).toContain("jsonb_build_array");
   expect(calendar).toContain("COALESCE(${tasks.startDate}, ${tasks.dueDate})");

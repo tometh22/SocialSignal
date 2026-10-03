@@ -1,13 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 
-const STORAGE_KEY = "epical_active_timer";
-
-interface TimerData {
-  taskId: number;
-  taskTitle: string;
-  personnelId: number | null;
-  startTime: string;
-}
+import { TIMER_STORAGE_KEY as STORAGE_KEY, TIMER_CHANGE_EVENT, getStoredTimer, writeStoredTimer, calcElapsed, timerHours, type TimerData } from "@/lib/task-timer";
 
 interface UseActiveTimerReturn {
   isRunning: boolean;
@@ -19,20 +12,7 @@ interface UseActiveTimerReturn {
   cancelTimer: () => void;
 }
 
-function getStoredTimer(): TimerData | null {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
-}
-
-function calcElapsed(startTime: string): number {
-  return Math.floor((Date.now() - new Date(startTime).getTime()) / 1000);
-}
-
-export function useActiveTimer(): UseActiveTimerReturn {
+export function useActiveTimer({ trackElapsed = true }: { trackElapsed?: boolean } = {}): UseActiveTimerReturn {
   const [timerData, setTimerData] = useState<TimerData | null>(() => getStoredTimer());
   const [elapsedSeconds, setElapsedSeconds] = useState<number>(() => {
     const stored = getStoredTimer();
@@ -44,11 +24,12 @@ export function useActiveTimer(): UseActiveTimerReturn {
       setElapsedSeconds(0);
       return;
     }
+    if (!trackElapsed) return;
     const id = setInterval(() => {
       setElapsedSeconds(calcElapsed(timerData.startTime));
     }, 1000);
     return () => clearInterval(id);
-  }, [timerData]);
+  }, [timerData, trackElapsed]);
 
   useEffect(() => {
     const onStorage = (e: StorageEvent) => {
@@ -58,8 +39,10 @@ export function useActiveTimer(): UseActiveTimerReturn {
         setElapsedSeconds(next ? calcElapsed(next.startTime) : 0);
       }
     };
+    const onLocalChange = () => { const next = getStoredTimer(); setTimerData(next); setElapsedSeconds(next ? calcElapsed(next.startTime) : 0); };
     window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
+    window.addEventListener(TIMER_CHANGE_EVENT, onLocalChange);
+    return () => { window.removeEventListener("storage", onStorage); window.removeEventListener(TIMER_CHANGE_EVENT, onLocalChange); };
   }, []);
 
   const startTimer = useCallback((taskId: number, taskTitle: string, personnelId: number | null) => {
@@ -69,7 +52,7 @@ export function useActiveTimer(): UseActiveTimerReturn {
       personnelId,
       startTime: new Date().toISOString(),
     };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    writeStoredTimer(data);
     setTimerData(data);
     setElapsedSeconds(0);
   }, []);
@@ -78,15 +61,15 @@ export function useActiveTimer(): UseActiveTimerReturn {
     const stored = getStoredTimer();
     if (!stored) return null;
     const elapsed = calcElapsed(stored.startTime);
-    const hours = Math.round((elapsed / 3600) * 100) / 100;
-    localStorage.removeItem(STORAGE_KEY);
+    const hours = timerHours(elapsed);
+    writeStoredTimer(null);
     setTimerData(null);
     setElapsedSeconds(0);
     return { hours, taskId: stored.taskId, personnelId: stored.personnelId, taskTitle: stored.taskTitle };
   }, []);
 
   const cancelTimer = useCallback(() => {
-    localStorage.removeItem(STORAGE_KEY);
+    writeStoredTimer(null);
     setTimerData(null);
     setElapsedSeconds(0);
   }, []);
