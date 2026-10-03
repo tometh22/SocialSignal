@@ -1,3 +1,5 @@
+import { taskDateSchema, taskDateWindowSchema, taskDateWindowEnd } from "@shared/utils/task-civil-date";
+import { TASK_PROJECT_ROLES } from "@shared/task-project-roles";
 import { projectTemplateKeySchema, projectTaskTemplates, findProjectTaskTemplate, templateTaskValues } from "./services/project-task-templates";
 import type { ProjectTemplateTask } from "../shared/project-task-template";
 import { taskRecurrenceSchema, recurrenceFromDescription, nextRecurringTaskDate } from "../shared/utils/task-recurrence";
@@ -174,7 +176,7 @@ import { upload, uploadDocument, deleteOldFile } from "./upload";
 import { personalMonthlyInvoices, personalInvoiceProjectAllocations, personalFxOverrides, personnelMonthlySettlements, externalProviders as externalProvidersTable, providerProjectAccess as providerProjectAccessTable, exchangeRates, financialClosePeriods, pasivoEntries, financialDocumentApplications } from "@shared/schema";
 import { sanitizeInput } from "./input-sanitization";
 import { setupAuth, hashPassword } from "./auth";
-import { requireProjectUnlocked, projectIdFromTimeEntry } from "./middleware/projectLocked";
+import { requireProjectUnlocked, projectIdFromTimeEntry, projectIdFromTask } from "./middleware/projectLocked";
 import { requireRole, requireProvider, requireProviderCanAccessProject } from "./middleware/requireRole";
 import { requirePermission } from "./middleware/requirePermission";
 import { createReviewRoomsRouter } from "./routes-review-rooms";
@@ -441,6 +443,7 @@ async function canAccessTaskProject(req: Request, projectId: number): Promise<bo
 
 async function canManageTaskProject(req: Request, projectId: number): Promise<boolean> {
   if (isOperationsRequest(req)) return true;
+  if (!(await canAccessTaskProject(req, projectId))) return false;
   const accessContext = await getTaskAccessContext(req);
   if (!accessContext.personnelId) return false;
   const [owner] = await db.select({ projectId: taskProjectMembers.projectId })
@@ -448,7 +451,7 @@ async function canManageTaskProject(req: Request, projectId: number): Promise<bo
     .where(and(
       eq(taskProjectMembers.projectId, projectId),
       eq(taskProjectMembers.personnelId, accessContext.personnelId),
-      eq(taskProjectMembers.role, "owner"),
+      inArray(taskProjectMembers.role, ["owner", "pm"]),
     ))
     .limit(1);
   return Boolean(owner);
@@ -497,8 +500,8 @@ const taskUpdatePayloadSchema = z.object({
   priority: z.enum(["low", "medium", "high", "urgent"]).optional(),
   assigneeId: z.number().int().positive().nullable().optional(),
   collaboratorIds: z.array(z.number().int().positive()).max(100).optional(),
-  startDate: z.union([z.string(), z.date(), z.null()]).optional(),
-  dueDate: z.union([z.string(), z.date(), z.null()]).optional(),
+  startDate: taskDateSchema.nullable().optional(),
+  dueDate: taskDateSchema.nullable().optional(),
   sectionName: z.string().trim().min(1).max(200).optional(),
   parentTaskId: z.number().int().positive().nullable().optional(),
   position: z.number().int().nonnegative().optional(),
@@ -23105,6 +23108,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/tasks", requireAuth, async (req: Request, res: Response) => {
     try {
       const { assigneeId, projectId, status, dateFrom, dateTo } = req.query;
+      taskDateWindowSchema.parse({ dateFrom, dateTo });
+      if ([assigneeId, projectId].some(id => id !== undefined && (!Number.isSafeInteger(Number(id)) || Number(id) <= 0))) return res.status(400).json({ message: "Filtro inválido" });
       let conditions: any[] = [];
       const archivedProjectFilter = sql`${tasks.projectId} IN (SELECT id FROM active_projects WHERE status NOT IN ('voided', 'cancelled'))`;
       const allowedProjectIds = await accessibleTaskProjectIds(req);
@@ -23119,14 +23124,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (status) conditions.push(eq(tasks.status, status as string));
       if (dateFrom || dateTo) {
         const from = dateFrom ? new Date(dateFrom as string) : new Date(0);
-        const to = dateTo ? new Date(dateTo as string) : new Date(8640000000000000);
+        const to = dateTo ? taskDateWindowEnd(dateTo as string) : new Date(8640000000000000);
         if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) {
           return res.status(400).json({ message: "Rango de fechas inválido" });
         }
         conditions.push(and(
           or(isNotNull(tasks.startDate), isNotNull(tasks.dueDate)),
-          or(isNull(tasks.startDate), lte(tasks.startDate, to)),
-          or(isNull(tasks.dueDate), gte(tasks.dueDate, from)),
+          sql`COALESCE(${tasks.startDate}, ${tasks.dueDate}) <= ${to}`,
+          sql`COALESCE(${tasks.dueDate}, ${tasks.startDate}) >= ${from}`,
         ));
       }
 
@@ -23149,6 +23154,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         estimatedHoursForWeek: estimatesForCurrentWeek.get(task.id) ?? 0,
       })));
     } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: "Filtros inválidos", errors: error.errors });
       res.status(500).json({ message: "Error al obtener tareas" });
     }
   });
@@ -23167,6 +23173,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       {
         const pid = personnelRecord[0]?.id;
         const { status, dateFrom, dateTo } = req.query;
+        taskDateWindowSchema.parse({ dateFrom, dateTo });
         // A task created by the current user without assignee/collaborators is
         // still part of their personal workload. This closes the gap where a
         // freshly-created task disappeared from Mis tareas until someone was
@@ -23193,14 +23200,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (status && status !== 'all') conditions.push(eq(tasks.status, status as string));
         if (dateFrom || dateTo) {
           const from = dateFrom ? new Date(dateFrom as string) : new Date(0);
-          const to = dateTo ? new Date(dateTo as string) : new Date(8640000000000000);
+          const to = dateTo ? taskDateWindowEnd(dateTo as string) : new Date(8640000000000000);
           if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) {
             return res.status(400).json({ message: "Rango de fechas inválido" });
           }
           conditions.push(and(
             or(isNotNull(tasks.startDate), isNotNull(tasks.dueDate)),
-            or(isNull(tasks.startDate), lte(tasks.startDate, to)),
-            or(isNull(tasks.dueDate), gte(tasks.dueDate, from)),
+            sql`COALESCE(${tasks.startDate}, ${tasks.dueDate}) <= ${to}`,
+            sql`COALESCE(${tasks.dueDate}, ${tasks.startDate}) >= ${from}`,
           ));
         }
         myTasks = await db.select().from(tasks).where(and(...conditions)).orderBy(asc(tasks.dueDate), asc(tasks.position));
@@ -23224,6 +23231,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json({ tasks: myTasks, personnelId: personnelRecord[0]?.id || null });
     } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: "Filtros inválidos", errors: error.errors });
       res.status(500).json({ message: "Error al obtener mis tareas" });
     }
   });
@@ -23232,6 +23240,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/tasks/team-calendar", requireAuth, async (req: Request, res: Response) => {
     try {
       const { dateFrom, dateTo, assigneeId, projectId } = req.query;
+      taskDateWindowSchema.parse({ dateFrom, dateTo });
+      if ([assigneeId, projectId].some(id => id !== undefined && (!Number.isSafeInteger(Number(id)) || Number(id) <= 0))) return res.status(400).json({ message: "Filtro inválido" });
       let conditions: any[] = [];
       const archivedProjectFilter = sql`${tasks.projectId} IN (SELECT id FROM active_projects WHERE status NOT IN ('voided', 'cancelled'))`;
       const allowedProjectIds = await accessibleTaskProjectIds(req);
@@ -23240,19 +23250,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (allowedProjectIds) conditions.push(inArray(tasks.projectId, allowedProjectIds));
       if (dateFrom || dateTo) {
         const from = dateFrom ? new Date(dateFrom as string) : new Date(0);
-        const to = dateTo ? new Date(dateTo as string) : new Date(8640000000000000);
+        const to = dateTo ? taskDateWindowEnd(dateTo as string) : new Date(8640000000000000);
         if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) {
           return res.status(400).json({ message: "Rango de fechas inválido" });
         }
 
         // A task occupies the whole civil range from startDate through dueDate.
-        // A task with only one endpoint is still visible on that endpoint and
-        // remains visible for open-ended overlap queries. Undated tasks are not
+        // A task with only one endpoint occupies that day. Undated tasks are not
         // calendar events when a date window is explicitly requested.
         conditions.push(and(
           or(isNotNull(tasks.startDate), isNotNull(tasks.dueDate)),
-          or(isNull(tasks.startDate), lte(tasks.startDate, to)),
-          or(isNull(tasks.dueDate), gte(tasks.dueDate, from)),
+          sql`COALESCE(${tasks.startDate}, ${tasks.dueDate}) <= ${to}`,
+          sql`COALESCE(${tasks.dueDate}, ${tasks.startDate}) >= ${from}`,
         ));
       }
       if (assigneeId) {
@@ -23330,6 +23339,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json(enriched);
     } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: "Filtros inválidos", errors: error.errors });
       res.status(500).json({ message: "Error al obtener calendario del equipo" });
     }
   });
@@ -23396,7 +23406,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Browser views share a flat response so every task is transferred once.
       // Existing consumers keep the original grouped response by default.
       const flat = req.query.layout === "flat";
-      res.json({ tasks: enrichedTasks, sections: flat ? Object.fromEntries(Object.keys(sections).map(name => [name, []])) : sections, ...(flat ? { layout: "flat" } : {}) });
+      res.json({ canManageSections: await canManageTaskProject(req, parsedProjectId), tasks: enrichedTasks, sections: flat ? Object.fromEntries(Object.keys(sections).map(name => [name, []])) : sections, ...(flat ? { layout: "flat" } : {}) });
     } catch (error) {
       res.status(500).json({ message: "Error al obtener tareas del proyecto" });
     }
@@ -23462,20 +23472,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  async function duplicateTaskStructure(tx: any, source: Array<typeof tasks.$inferSelect>, projectId: number, actorId: number, memberIds: Set<number>, sectionName?: string) {
+  async function duplicateTaskStructure(tx: any, source: Array<typeof tasks.$inferSelect>, projectId: number, actorId: number, memberIds: Set<number>, sectionName?: string, options: { rootId?: number; keepDates?: boolean; copyEstimates?: boolean } = {}) {
     const idMap = new Map<number, number>();
     const created: Array<typeof tasks.$inferSelect> = [];
     let remaining = [...source];
     while (remaining.length) {
-      const ready = remaining.filter(task => task.parentTaskId == null || idMap.has(task.parentTaskId));
+      const ready = remaining.filter(task => task.parentTaskId == null || task.id === options.rootId || idMap.has(task.parentTaskId));
       if (!ready.length) throw Object.assign(new Error("La estructura de tareas contiene una jerarquía inválida"), { status: 409 });
       for (const task of ready) {
-        const [copy] = await tx.insert(tasks).values({ title: task.title, description: task.description, projectId, sectionName: sectionName ?? task.sectionName,
+        const [copy] = await tx.insert(tasks).values({ title: task.id === options.rootId ? `${task.title} (copia)` : task.title, description: task.description, projectId, sectionName: sectionName ?? task.sectionName,
           assigneeId: task.assigneeId && memberIds.has(task.assigneeId) ? task.assigneeId : null,
           collaboratorIds: (task.collaboratorIds ?? []).filter(id => memberIds.has(id)),
-          status: "todo", priority: task.priority, isMilestone: task.isMilestone, position: task.position, parentTaskId: task.parentTaskId ? idMap.get(task.parentTaskId) : null,
-          createdBy: actorId, startDate: null, dueDate: null, loggedHours: 0, completedAt: null, recurrenceRule: task.recurrenceRule,
+          status: "todo", priority: task.priority, isMilestone: task.isMilestone, position: task.position, parentTaskId: task.id === options.rootId ? task.parentTaskId : task.parentTaskId ? idMap.get(task.parentTaskId) : null,
+          createdBy: actorId, startDate: options.keepDates ? task.startDate : null, dueDate: options.keepDates ? task.dueDate : null, loggedHours: 0, completedAt: null, recurrenceRule: task.recurrenceRule,
         }).returning();
+        if (options.copyEstimates) {
+          const estimates = await tx.select().from(taskWeeklyEstimates).where(eq(taskWeeklyEstimates.taskId, task.id));
+          if (estimates.length) await tx.insert(taskWeeklyEstimates).values(estimates.map((estimate: any) => ({ taskId: copy.id, weekStart: estimate.weekStart, estimatedHours: estimate.estimatedHours, createdBy: actorId })));
+        }
+        if (task.id === options.rootId) {
+          const [last] = await tx.select({ position: sql<number>`COALESCE(MAX(${tasks.position}), -1)` }).from(tasks).where(and(eq(tasks.projectId, projectId), eq(tasks.sectionName, task.sectionName), task.parentTaskId ? eq(tasks.parentTaskId, task.parentTaskId) : isNull(tasks.parentTaskId)));
+          await tx.update(tasks).set({ position: Number(last.position) + 1 }).where(eq(tasks.id, copy.id));
+        }
         idMap.set(task.id, copy.id); created.push(copy);
       }
       remaining = remaining.filter(task => !idMap.has(task.id));
@@ -23505,6 +23523,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // GET /api/tasks/hours-cost — costo de horas internas por proyecto (ops/admin only para totalCostUSD)
   app.get("/api/tasks/hours-cost", requireAuth, async (req: Request, res: Response) => {
     try {
+      taskDateWindowSchema.parse({ dateFrom: req.query.dateFrom, dateTo: req.query.dateTo });
       const { getTaskHoursCost } = await import("./domain/taskHoursCost");
       const { period, projectId } = req.query;
 
@@ -23532,6 +23551,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json({ period: period || null, ...result });
     } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: "Rango de fechas inválido" });
       console.error("Error en GET /api/tasks/hours-cost:", error);
       res.status(500).json({ error: "Error calculando costo de horas" });
     }
@@ -23541,6 +23561,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/tasks/hours-summary", requireAuth, async (req: Request, res: Response) => {
     try {
       const { personnelId, projectId, dateFrom, dateTo } = req.query;
+      taskDateWindowSchema.parse({ dateFrom, dateTo });
+      if ([personnelId, projectId].some(id => id !== undefined && (!Number.isSafeInteger(Number(id)) || Number(id) <= 0))) return res.status(400).json({ message: "Filtro inválido" });
       const taskConditions: any[] = [];
       const legacyConditions: any[] = [];
       const accessContext = await getTaskAccessContext(req);
@@ -23552,6 +23574,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         taskConditions.push(eq(taskTimeEntries.personnelId, accessContext.personnelId));
         legacyConditions.push(eq(timeEntries.personnelId, accessContext.personnelId));
       }
+      const effectivePersonnelId = accessContext.isOperations ? (personnelId ? Number(personnelId) : null) : accessContext.personnelId;
       if (personnelId) {
         const parsedPersonnelId = parseInt(personnelId as string);
         taskConditions.push(eq(taskTimeEntries.personnelId, parsedPersonnelId));
@@ -23563,7 +23586,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         legacyConditions.push(gte(timeEntries.date, from));
       }
       if (dateTo) {
-        const to = new Date(dateTo as string);
+        const to = taskDateWindowEnd(dateTo as string);
         taskConditions.push(lte(taskTimeEntries.date, to));
         legacyConditions.push(lte(timeEntries.date, to));
       }
@@ -23653,17 +23676,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       for (const e of enriched) {
         const d = new Date(e.date);
         const weekStart = new Date(d);
-        weekStart.setDate(d.getDate() - d.getDay() + 1);
+        weekStart.setDate(d.getDate() - (d.getDay() + 6) % 7);
         const key = weekStart.toISOString().slice(0, 10);
         byWeekMap[key] = (byWeekMap[key] || 0) + e.hours;
       }
       const byWeek = Object.entries(byWeekMap).map(([week, hours]) => ({ week, hours })).sort((a, b) => a.week.localeCompare(b.week));
 
       // By project (real hours + estimated hours para comparar estimado vs real)
-      const byProjectMap: Record<string, { name: string; hours: number; estimatedHours: number }> = {};
+      const byProjectMap: Record<string, { projectId: number | null; name: string; hours: number; estimatedHours: number }> = {};
       for (const e of enriched) {
-        const key = e.projectName;
-        if (!byProjectMap[key]) byProjectMap[key] = { name: key, hours: 0, estimatedHours: 0 };
+        const key = String(e.projectId ?? "unassigned");
+        if (!byProjectMap[key]) byProjectMap[key] = { projectId: e.projectId, name: e.projectName, hours: 0, estimatedHours: 0 };
         byProjectMap[key].hours += e.hours;
       }
       // Scope de proyectos: el proyecto filtrado, o todos los que tienen tareas.
@@ -23680,18 +23703,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const estimatedHours = weeklyEstimatesByTask.get(t.id) ?? 0;
         if (estimatedHours <= 0) continue;
         if (t.projectId && !scopeProjectIds.includes(t.projectId)) continue;
-        if (personnelId && t.assigneeId !== parseInt(personnelId as string)) continue;
+        if (effectivePersonnelId && t.assigneeId !== effectivePersonnelId) continue;
         const proj = t.projectId ? projectMap.get(t.projectId) : null;
-        const key = proj?.name || "Sin proyecto";
-        if (!byProjectMap[key]) byProjectMap[key] = { name: key, hours: 0, estimatedHours: 0 };
+        const key = String(t.projectId ?? "unassigned");
+        if (!byProjectMap[key]) byProjectMap[key] = { projectId: t.projectId, name: proj?.name || "Sin proyecto", hours: 0, estimatedHours: 0 };
         byProjectMap[key].estimatedHours += estimatedHours;
       }
       const byProject = Object.values(byProjectMap).sort((a, b) => b.hours - a.hours);
 
       // By person (real hours)
-      const byPersonMap: Record<number, { name: string; hours: number; estimatedHours: number }> = {};
+      const byPersonMap: Record<number, { personnelId: number; name: string; hours: number; estimatedHours: number }> = {};
       for (const e of enriched) {
-        if (!byPersonMap[e.personnelId]) byPersonMap[e.personnelId] = { name: e.personnelName, hours: 0, estimatedHours: 0 };
+        if (!byPersonMap[e.personnelId]) byPersonMap[e.personnelId] = { personnelId: e.personnelId, name: e.personnelName, hours: 0, estimatedHours: 0 };
         byPersonMap[e.personnelId].hours += e.hours;
       }
 
@@ -23700,11 +23723,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const estimatedHours = weeklyEstimatesByTask.get(t.id) ?? 0;
         if (!t.assigneeId || estimatedHours <= 0) continue;
         if (t.projectId && !scopeProjectIds.includes(t.projectId)) continue;
-        if (personnelId && t.assigneeId !== parseInt(personnelId as string)) continue;
+        if (effectivePersonnelId && t.assigneeId !== effectivePersonnelId) continue;
         if (!byPersonMap[t.assigneeId]) {
           const p = allPersonnel.find(p => p.id === t.assigneeId);
           if (!p) continue;
-          byPersonMap[t.assigneeId] = { name: p.name, hours: 0, estimatedHours: 0 };
+          byPersonMap[t.assigneeId] = { personnelId: t.assigneeId, name: p.name, hours: 0, estimatedHours: 0 };
         }
         byPersonMap[t.assigneeId].estimatedHours += estimatedHours;
       }
@@ -23714,7 +23737,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Estimation quality anchors planned and real time to the same tasks and
       // requested period. Real entries are summed directly to avoid parent
       // roll-up double counting.
-      const estMap: Record<string, { name: string; realHours: number; estimatedHours: number }> = {};
+      const estMap: Record<string, { projectId: number | null; name: string; realHours: number; estimatedHours: number }> = {};
       const realByTask = new Map<number, number>();
       const legacyRealByProject = new Map<number, number>();
       for (const entry of entries) {
@@ -23726,21 +23749,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       for (const t of allTasks) {
         if (t.projectId && !scopeProjectIds.includes(t.projectId)) continue;
-        if (personnelId && t.assigneeId !== parseInt(personnelId as string)) continue;
-        const est = weeklyEstimatesByTask.get(t.id) ?? 0;
+        const est = effectivePersonnelId && t.assigneeId !== effectivePersonnelId ? 0 : weeklyEstimatesByTask.get(t.id) ?? 0;
         const real = realByTask.get(t.id) ?? 0;
         if (est <= 0 && real <= 0) continue;
         const proj = t.projectId ? projectMap.get(t.projectId) : null;
-        const key = proj?.name || "Sin proyecto";
-        if (!estMap[key]) estMap[key] = { name: key, realHours: 0, estimatedHours: 0 };
+        const key = String(t.projectId ?? "unassigned");
+        if (!estMap[key]) estMap[key] = { projectId: t.projectId, name: proj?.name || "Sin proyecto", realHours: 0, estimatedHours: 0 };
         estMap[key].estimatedHours += est;
         estMap[key].realHours += real;
       }
       for (const [legacyProjectId, realHours] of legacyRealByProject) {
         if (!scopeProjectIds.includes(legacyProjectId)) continue;
         const proj = projectMap.get(legacyProjectId);
-        const key = proj?.name || "Sin proyecto";
-        if (!estMap[key]) estMap[key] = { name: key, realHours: 0, estimatedHours: 0 };
+        const key = String(legacyProjectId);
+        if (!estMap[key]) estMap[key] = { projectId: legacyProjectId, name: proj?.name || "Sin proyecto", realHours: 0, estimatedHours: 0 };
         estMap[key].realHours += realHours;
       }
       const estimationByProject = Object.values(estMap)
@@ -23757,6 +23779,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         activeUntil: personnel.activeUntil,
       }).from(personnel);
       const activeTeam = teamRows
+        .filter(p => accessContext.isOperations || p.id === effectivePersonnelId)
         .filter(p => (p.contractType ?? 'full-time') !== 'freelance')
         .filter(p => !p.activeUntil || p.activeUntil > today)
         // Excluir a quien tenga 0 horas base (licencia/pausa): no aporta capacidad
@@ -23770,6 +23793,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json({ entries: enriched, byWeek, byProject, byPerson, activeTeam, estimationByProject });
     } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: "Rango de fechas inválido" });
       console.error("Error hours-summary:", error);
       res.status(500).json({ message: "Error al obtener resumen de horas" });
     }
@@ -23925,6 +23949,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json({
         ...task,
+        canDelete: await canManageTaskProject(req, task.projectId),
         estimatedHoursTotal: estimatesByTask.get(task.id) ?? 0,
         estimatedHoursForWeek: estimatesForCurrentWeek.get(task.id) ?? 0,
         timeEntries: timeLog,
@@ -24027,24 +24052,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { taskIds, sectionName } = req.body as { taskIds: number[]; sectionName?: string };
       if (!Array.isArray(taskIds) || taskIds.length === 0) return res.status(400).json({ message: "taskIds requeridos" });
-      if (taskIds.length > 500 || !taskIds.every((id) => Number.isInteger(id) && id > 0)) {
+      if (new Set(taskIds).size !== taskIds.length || taskIds.length > 500 || !taskIds.every((id) => Number.isInteger(id) && id > 0)) {
         return res.status(400).json({ message: "Lista de tareas inválida" });
       }
-      const reorderTasks = await db.select({ id: tasks.id, projectId: tasks.projectId }).from(tasks)
+      if (sectionName !== undefined && (typeof sectionName !== "string" || !sectionName.trim() || sectionName.length > 250)) return res.status(400).json({ message: "Sección inválida" });
+      const reorderTasks = await db.select({ id: tasks.id, projectId: tasks.projectId, parentTaskId: tasks.parentTaskId }).from(tasks)
         .where(inArray(tasks.id, taskIds));
       if (reorderTasks.length !== new Set(taskIds).size) return res.status(404).json({ message: "Una o más tareas no existen" });
+      if (reorderTasks.some(task => task.parentTaskId != null)) return res.status(400).json({ message: "Reordená la tarea principal para mover sus subtareas" });
       const projectIds = [...new Set(reorderTasks.map((task) => task.projectId))];
       if (projectIds.length !== 1 || !(await canAccessTaskProject(req, projectIds[0]))) {
         return res.status(403).json({ message: "No se pueden reordenar tareas de proyectos distintos o inaccesibles" });
       }
-      await Promise.all(taskIds.map((id, idx) => {
-        const updates: any = { position: idx, updatedAt: new Date() };
-        if (sectionName !== undefined) updates.sectionName = sectionName;
-        return db.update(tasks).set(updates).where(eq(tasks.id, id));
-      }));
+      await db.transaction(async tx => {
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(293, ${projectIds[0]})`);
+        const current = await tx.select({ parentTaskId: tasks.parentTaskId }).from(tasks).where(inArray(tasks.id, taskIds));
+        if (current.some(task => task.parentTaskId != null)) throw Object.assign(new Error("La jerarquía cambió; volvé a intentar"), { status: 409 });
+        for (const [position, id] of taskIds.entries()) await tx.update(tasks).set({ position, ...(sectionName === undefined ? {} : { sectionName: sectionName.trim() }), updatedAt: new Date() }).where(eq(tasks.id, id));
+        if (sectionName !== undefined) await tx.execute(sql`WITH RECURSIVE tree AS (SELECT id FROM tasks WHERE id IN (${sql.join(taskIds.map(id => sql`${id}`), sql`, `)}) UNION SELECT child.id FROM tasks child JOIN tree parent ON child.parent_task_id=parent.id) UPDATE tasks SET section_name=${sectionName.trim()}, updated_at=NOW() WHERE id IN (SELECT id FROM tree)`);
+      });
       res.json({ ok: true });
-    } catch (error) {
-      res.status(500).json({ message: "Error al reordenar tareas" });
+    } catch (error: any) {
+      res.status(error.status || 500).json({ message: "Error al reordenar tareas" });
     }
   });
 
@@ -24154,6 +24183,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           sectionName: tasks.sectionName,
         }).from(tasks).where(eq(tasks.id, Number(effectiveParentId)));
         if (!parent) return res.status(400).json({ message: "La tarea padre no existe" });
+        if (parent.projectId !== existingTask.projectId) return res.status(400).json({ message: "La tarea padre debe pertenecer al mismo proyecto" });
         if (!(await canAccessTaskProject(req, parent.projectId))) {
           return res.status(403).json({ message: "No tenés acceso al proyecto de la tarea padre" });
         }
@@ -24204,7 +24234,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      const [updated] = await db.update(tasks).set(updates).where(eq(tasks.id, parseInt(id))).returning();
+      const updated = await db.transaction(async tx => {
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(293, ${existingTask.projectId})`);
+        const [currentTask] = await tx.select().from(tasks).where(eq(tasks.id, taskId)).for("update");
+        if (!currentTask) return undefined;
+        if (currentTask.status === "done" && parsedUpdate.data.status !== undefined) throw Object.assign(new Error("Las tareas finalizadas sólo pueden reabrirse desde el checklist"), { status: 400 });
+        const currentParentId = parsedUpdate.data.parentTaskId === undefined ? currentTask.parentTaskId : parsedUpdate.data.parentTaskId;
+        const currentStart = parsedUpdate.data.startDate === undefined ? currentTask.startDate : parsedUpdate.data.startDate;
+        const currentDue = parsedUpdate.data.dueDate === undefined ? currentTask.dueDate : parsedUpdate.data.dueDate;
+        if (currentStart && currentDue && currentStart > currentDue) throw Object.assign(new Error("La fecha de inicio no puede ser posterior a la fecha de fin"), { status: 400 });
+        if (currentParentId != null) {
+          const [parent] = await tx.select({ sectionName: tasks.sectionName, projectId: tasks.projectId }).from(tasks).where(eq(tasks.id, currentParentId));
+          if (!parent || parent.projectId !== currentTask.projectId) throw Object.assign(new Error("La tarea padre debe pertenecer al mismo proyecto"), { status: 400 });
+          updates.sectionName = parent.sectionName;
+          const cycle = await tx.execute(sql`WITH RECURSIVE tree AS (SELECT id FROM tasks WHERE parent_task_id=${taskId} UNION SELECT child.id FROM tasks child JOIN tree parent ON child.parent_task_id=parent.id) SELECT 1 FROM tree WHERE id=${currentParentId} LIMIT 1`);
+          if (cycle.rows.length) throw Object.assign(new Error("La jerarquía solicitada crearía un ciclo"), { status: 409 });
+        }
+        if (currentParentId == null && parsedUpdate.data.sectionName === undefined) delete updates.sectionName;
+        const [saved] = await tx.update(tasks).set(updates).where(eq(tasks.id, taskId)).returning();
+        if (saved && (updates.sectionName !== undefined || updates.parentTaskId !== undefined)) {
+          await tx.execute(sql`WITH RECURSIVE tree AS (SELECT id FROM tasks WHERE parent_task_id=${taskId} UNION SELECT child.id FROM tasks child JOIN tree parent ON child.parent_task_id=parent.id) UPDATE tasks SET section_name=${saved.sectionName}, updated_at=NOW() WHERE id IN (SELECT id FROM tree)`);
+        }
+        return saved;
+      });
       if (!updated) return res.status(404).json({ message: "Tarea no encontrada" });
       if (existingTask.parentTaskId !== updated.parentTaskId) {
         if (existingTask.parentTaskId) await recalculateTaskLoggedHours(existingTask.parentTaskId);
@@ -24212,8 +24264,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const needsAvailabilityCheck = ["assigneeId", "collaboratorIds", "startDate", "dueDate"].some(key => key in parsedUpdate.data);
       res.json({ ...updated, ...(needsAvailabilityCheck ? await taskAssignmentAdvisory(updated) : {}) });
-    } catch (error) {
-      res.status(500).json({ message: "Error al actualizar tarea" });
+    } catch (error: any) {
+      res.status(error.status || 500).json({ message: error.status ? error.message : "Error al actualizar tarea" });
+    }
+  });
+
+  // Duplicate the complete subtree in one transaction; no partial copies.
+  app.post("/api/tasks/:id(\\d+)/duplicate", requireAuth, async (req, res) => {
+    try {
+      const taskId = Number(req.params.id);
+      const [task] = await db.select().from(tasks).where(eq(tasks.id, taskId));
+      if (!task) return res.status(404).json({ message: "Tarea no encontrada" });
+      if (!(await canAccessTaskProject(req, task.projectId))) return res.status(403).json({ message: "No tenés acceso a esta tarea" });
+      const created = await db.transaction(async tx => {
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(293, ${task.projectId})`);
+        const tree = await tx.execute(sql`WITH RECURSIVE tree AS (SELECT id FROM tasks WHERE id=${taskId} UNION SELECT child.id FROM tasks child JOIN tree parent ON child.parent_task_id=parent.id) SELECT id FROM tree`);
+        const ids = (tree.rows as any[]).map(row => Number(row.id));
+        const source = await tx.select().from(tasks).where(inArray(tasks.id, ids)).orderBy(asc(tasks.position), asc(tasks.id)).for("share");
+        const members = await tx.select({ personnelId: taskProjectMembers.personnelId }).from(taskProjectMembers).where(eq(taskProjectMembers.projectId, task.projectId));
+        return duplicateTaskStructure(tx, source, task.projectId, Number(req.user?.id), new Set(members.map(row => row.personnelId)), undefined, { rootId: taskId, keepDates: true, copyEstimates: true });
+      });
+      res.status(201).json({ id: created[0].id, tasksCreated: created.length });
+    } catch (error: any) {
+      res.status(error.status || 500).json({ message: error.status ? error.message : "No se pudo duplicar la tarea" });
     }
   });
 
@@ -24264,7 +24337,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /api/tasks/:id/time — registrar horas contra una tarea
-  app.post("/api/tasks/:id/time", requireAuth, async (req: Request, res: Response) => {
+  app.post("/api/tasks/:id/time", requireAuth, requireProjectUnlocked(projectIdFromTask), async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
       const user = (req as any).user;
@@ -24301,6 +24374,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // the application timezone so a Buenos Aires entry cannot move to the
       // previous day when it is stored or rebuilt for monthly rentabilidad.
       const rawDate = req.body?.date;
+      taskDateSchema.parse(rawDate);
       const entryDate = typeof rawDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(rawDate)
         ? parseCivilDate(rawDate)
         : rawDate;
@@ -24348,7 +24422,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // PATCH /api/tasks/:taskId/time/:entryId — corregir horas, fecha o descripción
-  app.patch("/api/tasks/:taskId/time/:entryId", requireAuth, async (req: Request, res: Response) => {
+  app.patch("/api/tasks/:taskId/time/:entryId", requireAuth, requireProjectUnlocked(projectIdFromTask), async (req: Request, res: Response) => {
     try {
       const taskId = Number(req.params.taskId);
       const entryId = Number(req.params.entryId);
@@ -24380,6 +24454,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Las horas deben ser al menos un minuto" });
       }
       const rawDate = req.body?.date;
+      if (rawDate !== undefined) taskDateSchema.parse(rawDate);
       const date = rawDate === undefined
         ? entry.date
         : typeof rawDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(rawDate)
@@ -24408,13 +24483,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       res.json(updated);
     } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: "Fecha inválida" });
       console.error("Error al editar carga de tarea:", error);
       res.status(500).json({ message: "Error al editar la carga de tiempo" });
     }
   });
 
   // DELETE /api/tasks/:taskId/time/:entryId — eliminar entrada de horas
-  app.delete("/api/tasks/:taskId/time/:entryId", requireAuth, async (req: Request, res: Response) => {
+  app.delete("/api/tasks/:taskId/time/:entryId", requireAuth, requireProjectUnlocked(projectIdFromTask), async (req: Request, res: Response) => {
     try {
       const { taskId, entryId } = req.params;
       const tid = parseInt(taskId);
@@ -24455,7 +24531,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // GET /api/tasks-personnel — lista de personnel para el módulo de tareas (no requiere admin)
   app.get("/api/tasks-personnel", requireAuth, async (req: Request, res: Response) => {
     try {
-      const result = await db.select({ id: personnel.id, name: personnel.name }).from(personnel).orderBy(asc(personnel.name));
+      const result = await db.select({ id: personnel.id, name: personnel.name }).from(personnel).where(or(isNull(personnel.activeUntil), gte(personnel.activeUntil, new Date().toISOString().slice(0, 10)))).orderBy(asc(personnel.name));
       res.json(result);
     } catch (error) {
       res.status(500).json({ message: "Error al obtener personal" });
@@ -24477,7 +24553,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         WHERE tc.task_id = ${taskId}
         ORDER BY tc.created_at ASC
       `);
-      res.json(rows.rows);
+      const canManage = await canManageTaskProject(req, projectId);
+      res.json((rows.rows as any[]).map(comment => ({ ...comment, canDelete: canManage || comment.author_id === Number(req.user?.id) })));
     } catch (error) {
       res.status(500).json({ message: "Error al obtener comentarios" });
     }
@@ -24487,8 +24564,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/tasks/:id/comments", requireAuth, async (req: Request, res: Response) => {
     try {
       const taskId = parseInt(req.params.id);
-      const { content } = req.body;
-      if (!content?.trim()) return res.status(400).json({ message: "El contenido es requerido" });
+      const input = z.object({ content: z.string().trim().min(1).max(10000) }).safeParse(req.body);
+      if (!input.success) return res.status(400).json({ message: "Ingresá un comentario de hasta 10000 caracteres" });
+      const { content } = input.data;
       const projectId = await getTaskProjectId(taskId);
       if (!projectId) return res.status(404).json({ message: "Tarea no encontrada" });
       if (!(await canAccessTaskProject(req, projectId))) return res.status(403).json({ message: "No tenés acceso a esta tarea" });
@@ -24666,6 +24744,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ap.workflow_blocked_at,
           COUNT(DISTINCT t.id) as task_count,
           COUNT(DISTINCT CASE WHEN t.status NOT IN ('done', 'cancelled') THEN t.id END) as pending_count,
+          COUNT(DISTINCT CASE WHEN t.status = 'done' THEN t.id END) as completed_count,
           MAX(t.updated_at) as last_activity,
           'active_project' as source
         FROM active_projects ap
@@ -24705,6 +24784,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         workflowBlockedAt: p.workflow_blocked_at,
         taskCount: parseInt(p.task_count) || 0,
         pendingCount: parseInt(p.pending_count) || 0,
+        completedCount: parseInt(p.completed_count) || 0,
         lastActivity: p.last_activity,
         members: membersByProject[p.id] || [],
         source: 'active_project',
@@ -24841,7 +24921,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         SELECT 
           COUNT(*) as task_count,
           COUNT(CASE WHEN status NOT IN ('done', 'cancelled') THEN 1 END) as pending_count,
-          COALESCE(SUM(logged_hours), 0) as total_hours
+          COUNT(CASE WHEN status = 'done' THEN 1 END) as completed_count,
+          COALESCE((SELECT SUM(entry.hours) FROM task_time_entries entry JOIN tasks logged_task ON logged_task.id = entry.task_id WHERE logged_task.project_id = ${projectId}), 0) as total_hours
         FROM tasks WHERE project_id = ${projectId}
       `);
 
@@ -24851,6 +24932,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...projectRow,
         taskCount: parseInt(stats.task_count) || 0,
         pendingCount: parseInt(stats.pending_count) || 0,
+        completedCount: parseInt(stats.completed_count) || 0,
         totalHours: parseFloat(stats.total_hours) || 0,
         members: (membersResult.rows as any[]).map(m => ({
           personnelId: m.personnel_id,
@@ -24943,10 +25025,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/tasks/projects/:id/members", requireAuth, async (req: Request, res: Response) => {
     try {
       const projectId = parseInt(req.params.id);
-      const { personnelId, role = "member" } = req.body;
-      if (!personnelId) return res.status(400).json({ message: "personnelId requerido" });
+      const parsed = z.object({ personnelId: z.number().int().positive(), role: z.enum(TASK_PROJECT_ROLES).default("member") }).strict().safeParse(req.body);
+      if (!Number.isSafeInteger(Number(req.params.id)) || projectId <= 0 || !parsed.success) return res.status(400).json({ message: "Miembro inválido" });
+      const { personnelId, role } = parsed.data;
       if (!isOperationsRequest(req)) return res.status(403).json({ message: "Sólo Operaciones puede administrar miembros" });
-      if (!['owner', 'member'].includes(role)) return res.status(400).json({ message: "Rol de miembro inválido" });
+      const [target] = await db.select({ id: personnel.id }).from(personnel).where(and(eq(personnel.id, personnelId), or(isNull(personnel.activeUntil), gte(personnel.activeUntil, new Date().toISOString().slice(0, 10)))));
+      if (!target) return res.status(400).json({ message: "Seleccioná una persona activa de Personal" });
+      const [project] = await db.select({ id: activeProjects.id }).from(activeProjects).where(eq(activeProjects.id, projectId));
+      if (!project) return res.status(404).json({ message: "Proyecto no encontrado" });
 
       await db.execute(sql`
         INSERT INTO task_project_members (project_id, personnel_id, role)
@@ -24970,6 +25056,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(and(eq(taskProjectMembers.projectId, projectId), eq(taskProjectMembers.personnelId, personnelId))).limit(1);
       if (!targetMember) return res.status(404).json({ message: "Miembro no encontrado" });
       if (!isOperationsRequest(req)) return res.status(403).json({ message: "Sólo Operaciones puede administrar miembros" });
+      const [assigned] = await db.select({ id: tasks.id }).from(tasks).where(and(eq(tasks.projectId, projectId), or(eq(tasks.assigneeId, personnelId), sql`COALESCE(${tasks.collaboratorIds}, '[]'::jsonb) @> jsonb_build_array(${personnelId}::int)`))).limit(1);
+      if (assigned) return res.status(409).json({ message: "Reasigná primero las tareas y colaboraciones de esta persona antes de quitarla del proyecto" });
       await db.execute(sql`
         DELETE FROM task_project_members
         WHERE project_id = ${projectId} AND personnel_id = ${personnelId}

@@ -6,7 +6,8 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter
 } from "@/components/ui/dialog";
 import { toast } from "@/hooks/use-toast";
-import { authFetch, queryClient } from "@/lib/queryClient";
+import { apiRequest } from "@/lib/queryClient";
+import { parseHoursInput, roundToMinute } from "@/lib/task-hours";
 import { useActiveTimer, formatElapsed } from "@/hooks/useActiveTimer";
 
 export default function GlobalTimerWidget() {
@@ -26,7 +27,7 @@ export default function GlobalTimerWidget() {
     const snapshotTitle = timerData?.taskTitle ?? "";
     const result = stopTimer();
     if (!result) return;
-    setPendingHours(String(result.hours));
+    setPendingHours(`${Math.round(result.hours * 60)}m`);
     setPendingDesc("");
     setPendingTaskId(result.taskId);
     setPendingPersonnelId(result.personnelId);
@@ -40,30 +41,18 @@ export default function GlobalTimerWidget() {
 
   const handleSave = async () => {
     if (!pendingTaskId) return;
-    const hours = parseFloat(pendingHours);
-    if (!hours || hours <= 0) {
-      toast({ title: "Horas inválidas", description: "Ingresá un valor mayor a 0", variant: "destructive" });
+    const parsed = parseHoursInput(pendingHours);
+    const hours = parsed == null ? 0 : roundToMinute(parsed);
+    if (!hours || hours < 1 / 60) {
+      toast({ title: "Horas inválidas", description: "Ingresá al menos un minuto (1m)", variant: "destructive" });
       return;
     }
     setIsSaving(true);
     try {
-      const res = await authFetch(`/api/tasks/${pendingTaskId}/time`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          personnelId: pendingPersonnelId,
-          date: new Date().toISOString(),
-          hours,
-          description: pendingDesc.trim() || null,
-        }),
+      const created = await apiRequest(`/api/tasks/${pendingTaskId}/time`, "POST", {
+        personnelId: pendingPersonnelId, date: new Date().toISOString(), hours, description: pendingDesc.trim() || null,
       });
-      if (!res.ok) throw new Error("Error al registrar");
-      queryClient.invalidateQueries({ queryKey: ["/api/tasks", pendingTaskId] });
-      queryClient.invalidateQueries({ queryKey: ["/api/tasks/hours-summary"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/tasks/my-tasks"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/capacity/weekly"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/tasks/hours-dashboard"] });
-      toast({ title: `${hours}h registradas`, description: "Tiempo guardado correctamente" });
+      toast({ title: `${hours.toFixed(2)}h registradas`, description: created.costingWarning || "Tiempo guardado correctamente" });
       setConfirmOpen(false);
     } catch {
       toast({ title: "Error al guardar", description: "No se pudo registrar el tiempo", variant: "destructive" });
@@ -114,9 +103,8 @@ export default function GlobalTimerWidget() {
               <label className="text-xs text-muted-foreground mb-1 block">Horas</label>
               <Input
                 autoFocus
-                type="number"
-                step="0.01"
-                min="0.01"
+                type="text"
+                placeholder="1m, 1:30 o 1.5"
                 value={pendingHours}
                 onChange={e => setPendingHours(e.target.value)}
                 className="h-9"

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { authFetch } from "@/lib/queryClient";
+import { authFetchJson } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ChevronLeft, ChevronRight } from "lucide-react";
@@ -10,6 +10,7 @@ import {
 } from "date-fns";
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import { taskDateBucket } from "@shared/utils/task-date-bucket";
 import { TASK_STATUS_CONFIG, TaskStatus } from "@/constants/task-statuses";
 
 interface CalTask {
@@ -41,7 +42,7 @@ export default function TaskCalendarView({ projectId, tasks: tasksProp }: Props)
 
   const { data } = useQuery<{ tasks: CalTask[] }>({
     queryKey: ["/api/tasks/project", projectId],
-    queryFn: () => authFetch(`/api/tasks/project/${projectId}?layout=flat`).then(r => r.json()),
+    queryFn: () => authFetchJson(`/api/tasks/project/${projectId}?layout=flat`),
     staleTime: 30_000,
     enabled: tasksProp === undefined && projectId !== undefined,
   });
@@ -79,8 +80,7 @@ export default function TaskCalendarView({ projectId, tasks: tasksProp }: Props)
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  const isTaskOverdue = (t: CalTask, d: Date) =>
-    d < today && t.status !== "done" && t.status !== "cancelled";
+  const isTaskOverdue = (t: CalTask, _d: Date) => taskDateBucket(t) === "overdue";
 
   const parseLocalDate = (s: string) => new Date(s.slice(0, 10) + "T00:00:00");
 

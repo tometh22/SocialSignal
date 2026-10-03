@@ -1,7 +1,7 @@
 import { useState, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { queryClient, apiRequest, authFetch } from "@/lib/queryClient";
+import { queryClient, apiRequest, authFetch, authFetchJson } from "@/lib/queryClient";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -358,12 +358,12 @@ export default function TasksHomePage() {
 
   const { data: myTasksResponse, refetch: refetchMyTasks } = useQuery({
     queryKey: ["/api/tasks/my-tasks"],
-    queryFn: () => authFetch("/api/tasks/my-tasks").then(r => r.json()),
+    queryFn: () => authFetchJson("/api/tasks/my-tasks"),
   });
 
   const { data: rawProjects } = useQuery({
     queryKey: ["/api/tasks/projects"],
-    queryFn: () => authFetch("/api/tasks/projects").then(r => r.json()),
+    queryFn: () => authFetchJson("/api/tasks/projects"),
   });
 
   const { data: myHours = { weekHours: 0, monthHours: 0, byProject: [], tasksWithoutHours: [] } } = useQuery<{
@@ -373,7 +373,7 @@ export default function TasksHomePage() {
     tasksWithoutHours: { id: number; title: string; projectName: string | null }[];
   }>({
     queryKey: ["/api/tasks/my-hours"],
-    queryFn: () => authFetch("/api/tasks/my-hours").then(r => r.json()),
+    queryFn: () => authFetchJson("/api/tasks/my-hours"),
   });
 
   const invalidateRelated = () => {

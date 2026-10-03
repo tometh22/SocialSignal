@@ -1,3 +1,4 @@
+import { invalidateTaskQueries } from "@/lib/task-cache";
 "use client";
 
 import React, { useMemo, useState, useEffect, useCallback } from "react";
@@ -588,6 +589,7 @@ function ProjectStatusToggle({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["projects"] });
+      void invalidateTaskQueries();
     },
   });
 
@@ -625,7 +627,7 @@ function ProjectVoidButton({ projectId }: { projectId: number }) {
       if (!res.ok) throw new Error(`API ${res.status}`);
       return res.json();
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["projects"] }),
+    onSuccess: () => { void queryClient.invalidateQueries({ queryKey: ["projects"] }); void invalidateTaskQueries(); },
   });
 
   return (

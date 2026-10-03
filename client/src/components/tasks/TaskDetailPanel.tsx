@@ -28,10 +28,11 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useActiveTimer, formatElapsed } from "@/hooks/useActiveTimer";
-import { roundToQuarterHour } from "@shared/utils/num";
+import { roundToMinute, parseHoursInput, formatHours } from "@/lib/task-hours";
 import { useAuth } from "@/hooks/use-auth";
 
 type Task = {
+  canDelete?: boolean;
   asanaTaskGid?: string | null;
   asanaSource?: { actualMinutes?: number | null; parentResolution?: string; assigneeName?: string | null } | null;
   isMilestone?: boolean;
@@ -100,26 +101,6 @@ function ProjectColorDot({ projectId }: { projectId?: number | null }) {
   return <span className={cn("inline-block w-2.5 h-2.5 rounded-full mr-1.5 flex-shrink-0", colors[projectId % colors.length])} />;
 }
 
-function parseHoursInput(value: string): number | null {
-  value = value.trim().toLowerCase();
-  if (!value) return null;
-  const hm1 = value.match(/^(\d+)h(\d+)m?$/);
-  if (hm1) return parseInt(hm1[1]) + parseInt(hm1[2]) / 60;
-  const hOnly = value.match(/^(\d+(?:\.\d+)?)h$/);
-  if (hOnly) return parseFloat(hOnly[1]);
-  const colon = value.match(/^(\d+):(\d+)$/);
-  if (colon) return parseInt(colon[1]) + parseInt(colon[2]) / 60;
-  const minOnly = value.match(/^(\d+)m(?:in)?$/);
-  if (minOnly) return parseInt(minOnly[1]) / 60;
-  const num = parseFloat(value);
-  if (!isNaN(num)) return num;
-  return null;
-}
-
-function formatHours(hours: number) {
-  return `${(Math.round(hours * 100) / 100).toFixed(2)} h`;
-}
-
 function getMondayOf(d: Date): string {
   const day = d.getDay();
   const diff = day === 0 ? -6 : 1 - day;
@@ -163,6 +144,7 @@ function CommentsSection({ taskId, allPersonnel }: { taskId: number; allPersonne
   const deleteMutation = useMutation({
     mutationFn: (commentId: number) => apiRequest(`/api/tasks/${taskId}/comments/${commentId}`, "DELETE"),
     onSuccess: () => refetch(),
+    onError: (error: Error) => toast({ title: "No se pudo eliminar el comentario", description: error.message, variant: "destructive" }),
   });
 
   const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -238,10 +220,10 @@ function CommentsSection({ taskId, allPersonnel }: { taskId: number; allPersonne
               <span className="text-muted-foreground/50 text-[10px]">
                 {format(new Date(c.created_at), "d/M HH:mm")}
               </span>
-              <Button variant="ghost" size="sm" className="h-4 w-4 p-0 text-red-500"
+              {c.canDelete && <Button variant="ghost" size="sm" className="h-4 w-4 p-0 text-red-500" aria-label="Eliminar comentario"
                 onClick={() => deleteMutation.mutate(c.id)}>
                 <Trash2 className="h-3 w-3" />
-              </Button>
+              </Button>}
             </div>
           </div>
         ))}
@@ -558,9 +540,9 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
       toast({ variant: "destructive", title: "Error", description: "Ingresá un valor válido: ej. 1.5, 1h30" });
       return;
     }
-    const hours = roundToQuarterHour(parsed);
-    if (hours <= 0) {
-      toast({ variant: "destructive", title: "Mínimo 15 min", description: "El registro mínimo es 0.25h (15 min)." });
+    const hours = roundToMinute(parsed);
+    if (hours < 1 / 60) {
+      toast({ variant: "destructive", title: "Mínimo un minuto", description: "El registro mínimo es un minuto." });
       return;
     }
     logSubtaskTimeMutation.mutate({ subtaskId, data: { date: subLogDate, hours, description: subLogDesc } });
@@ -619,9 +601,9 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
       toast({ variant: "destructive", title: "Error", description: "Ingresá un valor válido: ej. 1.5, 1h30, 1:15" });
       return;
     }
-    const hours = roundToQuarterHour(parsed);
-    if (hours <= 0) {
-      toast({ variant: "destructive", title: "Mínimo 15 min", description: "El registro mínimo es 0.25h (15 min)." });
+    const hours = roundToMinute(parsed);
+    if (hours < 1 / 60) {
+      toast({ variant: "destructive", title: "Mínimo un minuto", description: "El registro mínimo es un minuto." });
       return;
     }
     logTimeMutation.mutate({
@@ -642,14 +624,14 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
   const saveEditedTime = () => {
     if (!editingTimeEntryId) return;
     const parsed = parseHoursInput(editTimeHours);
-    if (!parsed || parsed <= 0 || !editTimeDate) {
+    if (!parsed || roundToMinute(parsed) < 1 / 60 || !editTimeDate) {
       toast({ title: "Carga inválida", description: "Ingresá horas y fecha válidas.", variant: "destructive" });
       return;
     }
     editTimeMutation.mutate({
       entryId: editingTimeEntryId,
       data: {
-        hours: Math.max(0.25, roundToQuarterHour(parsed)),
+        hours: roundToMinute(parsed),
         date: editTimeDate,
         description: editTimeDescription.trim() || null,
       },
@@ -1170,7 +1152,7 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
                             onClick={() => {
                               const result = stopTimer();
                               if (result) {
-                                setLogHours(String(result.hours));
+                                setLogHours(`${Math.round(result.hours * 60)}m`);
                                 setShowTimeLog(true);
                               }
                             }}
@@ -1294,7 +1276,7 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
                   <CommentsSection taskId={taskId!} allPersonnel={allPersonnel} />
 
                   {/* ── Footer: eliminar tarea ── */}
-                  <div className="pt-2 pb-6">
+                  {task.canDelete && <div className="pt-2 pb-6">
                     <Button
                       variant="ghost"
                       size="sm"
@@ -1304,7 +1286,7 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
                       <Trash2 className="h-3.5 w-3.5" />
                       Eliminar tarea
                     </Button>
-                  </div>
+                  </div>}
                 </div>
               </div>
             </TooltipProvider>

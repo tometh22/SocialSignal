@@ -1,6 +1,7 @@
+import { parseTaskCivilDate } from "@shared/utils/task-civil-date";
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { authFetch } from "@/lib/queryClient";
+import { authFetch, authFetchJson } from "@/lib/queryClient";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -95,7 +96,7 @@ export default function ProjectOverviewPanel({ projectId, members, projectColor,
 
   const { data, isLoading } = useQuery<{ tasks: Task[]; sections: Record<string, Task[]> }>({
     queryKey: ["/api/tasks/project", projectId],
-    queryFn: () => authFetch(`/api/tasks/project/${projectId}?layout=flat`).then((r) => r.json()),
+    queryFn: () => authFetchJson(`/api/tasks/project/${projectId}?layout=flat`),
     enabled: !!projectId,
   });
 
@@ -118,7 +119,7 @@ export default function ProjectOverviewPanel({ projectId, members, projectColor,
   const inProgress = allTasks.filter((t) => t.status === "in_progress").length;
   const pending = allTasks.filter((t) => t.status === "todo").length;
   const overdue = allTasks.filter(
-    (t) => t.status !== "done" && t.status !== "cancelled" && t.dueDate && isAfter(today, startOfDay(parseISO(t.dueDate)))
+    (t) => t.status !== "done" && t.status !== "cancelled" && t.dueDate && isAfter(today, startOfDay(parseTaskCivilDate(t.dueDate)))
   ).length;
   const unassigned = allTasks.filter((t) => !t.assigneeId && t.status !== "done").length;
   const totalLogged = allTasks.reduce((s, t) => s + (t.loggedHours || 0), 0);

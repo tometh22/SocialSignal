@@ -42,6 +42,7 @@ type TaskProject = {
   status: string;
   taskCount: number;
   pendingCount: number;
+  completedCount: number;
   totalHours: number;
   briefUrl?: string | null;
   source?: string;
@@ -89,9 +90,9 @@ export default function ProjectTasksPage({ params }: Props) {
   const [sortBy, setSortBy] = useState("default");
   const [groupBy, setGroupBy] = useState("section");
 
-  const { data: project, isLoading } = useQuery<TaskProject>({
+  const { data: project, isLoading, error: projectError } = useQuery<TaskProject>({
     queryKey: ["/api/tasks/projects", projectId],
-    queryFn: () => authFetch(`/api/tasks/projects/${projectId}`).then(r => r.json()),
+    queryFn: () => authFetchJson(`/api/tasks/projects/${projectId}`),
     enabled: !!projectId,
   });
 
@@ -103,7 +104,7 @@ export default function ProjectTasksPage({ params }: Props) {
 
   const { data: allPersonnel = [] } = useQuery<Personnel[]>({
     queryKey: ["/api/tasks-personnel"],
-    queryFn: () => authFetch("/api/tasks-personnel").then(r => r.json()),
+    queryFn: () => authFetchJson("/api/tasks-personnel"),
   });
 
   // Sync local members from server data (after refetch, reset override)
@@ -154,9 +155,9 @@ export default function ProjectTasksPage({ params }: Props) {
     onSuccess: () => {
       toast({ title: "Miembro quitado" });
     },
-    onError: () => {
+    onError: (error: Error) => {
       setLocalMembers(null);
-      toast({ title: "Error al quitar miembro", variant: "destructive" });
+      toast({ title: "No se pudo quitar el miembro", description: error.message, variant: "destructive" });
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/tasks/projects", projectId] });
@@ -192,9 +193,9 @@ export default function ProjectTasksPage({ params }: Props) {
     );
   }
 
-  if (!project) {
+  if (projectError || !project) {
     return (
-      <div className="text-center py-20 text-muted-foreground">Proyecto no encontrado</div>
+      <div className="text-center py-20 text-muted-foreground">{projectError instanceof Error ? projectError.message : "Proyecto no encontrado"}</div>
     );
   }
 
@@ -313,16 +314,16 @@ export default function ProjectTasksPage({ params }: Props) {
               <div className="mt-3 mb-1">
                 <div className="flex items-center justify-between text-[11px] text-muted-foreground mb-1">
                   <span>
-                    {project.taskCount - project.pendingCount} de {project.taskCount} completadas
+                    {project.completedCount} de {project.taskCount} completadas
                   </span>
                   <span className="font-medium">
-                    {Math.round(((project.taskCount - project.pendingCount) / project.taskCount) * 100)}%
+                    {Math.round(((project.completedCount) / project.taskCount) * 100)}%
                   </span>
                 </div>
                 <div className="h-1 rounded-full bg-muted overflow-hidden">
                   <div
                     className="h-full rounded-full bg-primary transition-all duration-700"
-                    style={{ width: `${Math.round(((project.taskCount - project.pendingCount) / project.taskCount) * 100)}%` }}
+                    style={{ width: `${Math.round(((project.completedCount) / project.taskCount) * 100)}%` }}
                   />
                 </div>
               </div>
@@ -390,7 +391,7 @@ export default function ProjectTasksPage({ params }: Props) {
               variant="outline"
               size="sm"
               className="h-8 text-sm text-primary border-primary/40 hover:bg-primary/5 font-medium gap-1.5 flex-shrink-0"
-              onClick={() => setQuickAddTrigger(v => v + 1)}
+              onClick={() => { setView("list"); setQuickAddTrigger(v => v + 1); }}
             >
               <Plus className="h-4 w-4" />
               Agregar tarea
