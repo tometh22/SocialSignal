@@ -1,3 +1,4 @@
+import { quotationTeamForScope as teamForScope } from "@shared/utils/quotation-scope-team";
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
@@ -25,6 +26,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useOptimizedQuote } from '@/context/optimized-quote-context';
 import { useLocation } from 'wouter';
 import { useCurrency } from '@/hooks/use-currency';
+import { selectPreviewVariant, type QuotationVariantPreview } from "@shared/utils/quotation-variant-preview";
 import { calculateQuotationPricing } from '@shared/utils/quotation-pricing';
 import { blueprintDefinitionSchema, estimateBlueprintWorkload, isDeliverableSold, workloadForBillingPeriod, type BlueprintDefinition } from '@shared/quotation-professional';
 
@@ -68,6 +70,7 @@ interface QuotationVariantsProps {
   markupAmount: number;
   totalAmount: number;
   onVariantSelected?: (variant: QuotationVariant) => void;
+  onPreviewChange?: (preview: QuotationVariantPreview | null) => void;
 }
 
 export function QuotationVariants({ 
@@ -78,11 +81,13 @@ export function QuotationVariants({
   complexityAdjustment,
   markupAmount,
   totalAmount,
-  onVariantSelected 
+  onVariantSelected,
+  onPreviewChange,
 }: QuotationVariantsProps) {
   const [variants, setVariants] = useState<QuotationVariant[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedVariantIds, setSelectedVariantIds] = useState<number[]>([]);
+  const [previewVariantId, setPreviewVariantId] = useState<number | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [newVariant, setNewVariant] = useState({
     name: '',
@@ -475,6 +480,7 @@ export function QuotationVariants({
         : [...selectedVariantIds, variantId];
 
       setSelectedVariantIds(newSelectedIds);
+      setPreviewVariantId(isCurrentlySelected ? null : variantId);
       
       // Notify about all selected variants
       const selectedVariants = variants.filter(v => newSelectedIds.includes(v.id));
@@ -689,6 +695,23 @@ export function QuotationVariants({
     return reference > 0 ? Math.round(((computeVariantTotal(variant) / reference) - 1) * 100) : 0;
   };
 
+  const previewVariant = selectPreviewVariant(variants, selectedVariantIds, previewVariantId);
+  const previewResult = previewVariant && baseTeamMembers.length ? calculateVariantResult(baseTeamMembers.map(member => ({
+    ...member, hours: getEffectiveMemberHours(previewVariant, member),
+    cost: getEffectiveMemberHours(previewVariant, member) * (member.rate || 0),
+  }))).display : null;
+  const previewPayload = JSON.stringify(!loading && previewVariant ? {
+    quotationId, name: previewVariant.variantName,
+    total: previewResult?.total ?? previewVariant.totalAmount,
+    baseCost: previewResult?.baseCost ?? previewVariant.baseCost,
+    markupAmount: previewResult?.markupAmount ?? previewVariant.markupAmount,
+    hours: getVariantTotalHours(previewVariant), memberCount: baseTeamMembers.length,
+    referenceHours: previewVariant.scopeSnapshot
+      ? workloadForBillingPeriod(blueprintDefinitionSchema.parse(previewVariant.scopeSnapshot), estimateBlueprintWorkload(blueprintDefinitionSchema.parse(previewVariant.scopeSnapshot))).totalHours
+      : Number(quotationData.operationalPlan?.workload?.totalHours || 0),
+  } satisfies QuotationVariantPreview : null);
+  useEffect(() => { onPreviewChange?.(JSON.parse(previewPayload)); }, [previewPayload, onPreviewChange]);
+
   if (loading) {
     return (
       <div className="p-4 sm:p-6">
@@ -720,6 +743,7 @@ export function QuotationVariants({
             Compará alternativas reales de cobertura, entregables y precio antes de elegir qué mostrarle al cliente.
           </p>
           <Badge variant="outline" className="mt-2 border-slate-200 bg-slate-50 text-slate-600">Los costos internos no se muestran al cliente</Badge>
+          <div className="mt-3 max-w-sm space-y-1"><label htmlFor="variant-preview" className="text-xs font-medium text-slate-600">Escenario del resumen</label><select id="variant-preview" className="w-full min-w-0 rounded-md border border-slate-200 bg-white p-2 text-sm" value={previewVariant?.id ?? ""} onChange={event => setPreviewVariantId(Number(event.target.value))}><option value="">Cotización base</option>{variants.map(variant => <option key={variant.id} value={variant.id}>{variant.variantName}{selectedVariantIds.includes(variant.id) ? " · incluida" : " · vista previa"}</option>)}</select><p className="text-xs text-slate-500">El resumen muestra este escenario. Podés incluir varias alternativas en la propuesta.</p></div>
         </div>
         
         <div className="flex flex-col gap-2 sm:flex-row">
@@ -883,6 +907,7 @@ export function QuotationVariants({
                             <input
                               type="number" min={0} step={1}
                               aria-label={`Horas de ${memberLabel} en ${variant.variantName}`}
+                              onFocus={() => setPreviewVariantId(variant.id)}
                               value={variantInputText[inputKey] ?? String(getEffectiveMemberHours(variant, m))}
                               onChange={e => { e.stopPropagation(); setVariantInputText(prev => ({ ...prev, [inputKey]: e.target.value })); }}
                               onBlur={e => {
@@ -1127,6 +1152,8 @@ export function QuotationVariants({
 function professionalVariantDefinitions(base: BlueprintDefinition) {
   const essential = structuredClone(base);
   essential.coverage.designLevel = "standard";
+  essential.coverage.outputLevel = "standard";
+  essential.coverage.visualIdentity = "standard";
   essential.coverage.slaLevel = "standard";
   essential.deliverables = essential.deliverables.map((item) => ({
     ...item,
@@ -1136,43 +1163,16 @@ function professionalVariantDefinitions(base: BlueprintDefinition) {
   const recommended = structuredClone(base);
   const expanded = structuredClone(base);
   expanded.coverage.designLevel = "executive";
+  expanded.coverage.outputLevel = "executive";
+  expanded.coverage.visualIdentity = base.coverage.visualIdentity ?? "standard";
   if (expanded.coverage.slaLevel === "standard") expanded.coverage.slaLevel = "priority";
   expanded.deliverables = expanded.deliverables.map((item) => ({ ...item, included: true }));
 
   return [
     { name: "Esencial", description: "Foco en los entregables imprescindibles y SLA estándar.", scope: essential, assumptions: ["Sin workshops ni dashboard", "Diseño estándar"], recommended: false },
     { name: "Recomendada", description: "Alcance equilibrado para convertir evidencia en decisiones.", scope: recommended, assumptions: ["Alcance y cadencia de la receta seleccionada"], recommended: true },
-    { name: "Expandida", description: "Máxima profundidad, diseño ejecutivo y todos los módulos previstos.", scope: expanded, assumptions: ["Todos los entregables incluidos", "Diseño ejecutivo", "SLA prioritario"], recommended: false },
+    { name: "Expandida", description: "Máxima profundidad, síntesis ejecutiva y todos los módulos previstos.", scope: expanded, assumptions: ["Todos los entregables incluidos", "Síntesis ejecutiva", "SLA prioritario"], recommended: false },
   ];
-}
-
-function teamForScope(scope: BlueprintDefinition, team: TeamMember[], roles: Array<{ id: number; name: string }>) {
-  const workload = workloadForBillingPeriod(scope, estimateBlueprintWorkload(scope));
-  const grouped = new Map<string, TeamMember[]>();
-  for (const member of team) {
-    const key = roleKeyForName(member.roleName || roles.find((role) => role.id === member.roleId)?.name || "");
-    grouped.set(key, [...(grouped.get(key) || []), member]);
-  }
-  return team.map((member) => {
-    const key = roleKeyForName(member.roleName || roles.find((role) => role.id === member.roleId)?.name || "");
-    const peers = grouped.get(key) || [member];
-    const target = workload.byRole[key];
-    if (target == null) return { ...member, hours: 0, cost: 0 };
-    const peerBase = peers.reduce((sum, item) => sum + Number(item.hours || 0), 0);
-    const share = peerBase > 0 ? Number(member.hours || 0) / peerBase : 1 / peers.length;
-    const hours = Math.round(target * share * 2) / 2;
-    return { ...member, hours, cost: hours * Number(member.rate || 0) };
-  });
-}
-
-function roleKeyForName(name: string) {
-  const normalized = name.toLocaleLowerCase("es");
-  if (normalized.includes("director") || normalized.includes("cuentas")) return "director";
-  if (normalized.includes("project") || normalized.includes(" pm") || normalized === "pm" || normalized.includes("proyecto")) return "pm";
-  if (normalized.includes("data") || normalized.includes("datos")) return "data";
-  if (normalized.includes("tech") || normalized.includes("tecnolog")) return "tech";
-  if (normalized.includes("diseñ") || normalized.includes("design")) return "design";
-  return "analyst";
 }
 
 function unitMetricsFor(scope: BlueprintDefinition, total: number) {

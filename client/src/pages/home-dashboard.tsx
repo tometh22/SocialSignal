@@ -363,8 +363,8 @@ export default function HomeDashboard() {
             <ul className="space-y-1.5">
               {insights.slice(0, 3).map((insight, i) => (
                 <li key={i} className="text-sm text-slate-700 flex items-start gap-2">
-                  <span className="text-indigo-400 mt-1">·</span>
-                  {insight}
+                  <span className="shrink-0 text-indigo-400" aria-hidden="true">•</span>
+                  <span className="min-w-0 flex-1 leading-5">{insight}</span>
                 </li>
               ))}
             </ul>

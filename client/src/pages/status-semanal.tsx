@@ -1764,7 +1764,7 @@ function AddItemButton({ onAdd, variant = 'header', users = [], currentUserId = 
           </Button>
         )}
       </PopoverTrigger>
-      <PopoverContent className="w-80 p-3" align={variant === 'inline' ? 'start' : 'end'}>
+      <PopoverContent className="w-80 max-w-[calc(100vw-2rem)] p-3" align={variant === 'inline' ? 'start' : 'end'}>
         <p className="text-sm font-semibold mb-2">Nuevo ítem</p>
         <div className="space-y-2.5">
           <input value={title} onChange={e => setTitle(e.target.value)} onKeyDown={onKey}
@@ -1773,20 +1773,20 @@ function AddItemButton({ onAdd, variant = 'header', users = [], currentUserId = 
           <textarea value={firstUpdate} onChange={e => setFirstUpdate(e.target.value)} onKeyDown={onKey} rows={2}
             placeholder="Qué está pasando (queda como primer update)"
             className="w-full text-sm border border-input rounded px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-400 resize-none" />
-          <div className="flex items-center gap-2">
-            <select value={ownerId?.toString() ?? ''} onChange={e => setOwnerId(e.target.value ? parseInt(e.target.value) : null)}
-              className="flex-1 text-xs border border-input rounded px-2 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-indigo-400">
+          <div className="grid min-w-0 grid-cols-2 items-center gap-2">
+            <select aria-label="Responsable del ítem" value={ownerId?.toString() ?? ''} onChange={e => setOwnerId(e.target.value ? parseInt(e.target.value) : null)}
+              className="col-span-2 min-w-0 w-full text-xs border border-input rounded px-2 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-indigo-400">
               <option value="">Sin owner</option>
               {users.map(u => <option key={u.id} value={u.id}>{u.name}{u.id === currentUserId ? ' (yo)' : ''}</option>)}
             </select>
             <div className="flex items-center gap-1 px-1.5" title="Semáforo inicial">
               {(['verde', 'amarillo', 'rojo'] as const).map(h => (
-                <button key={h} onClick={() => setHealth(h)} title={HEALTH[h].label}
+                <button key={h} onClick={() => setHealth(h)} title={HEALTH[h].label} aria-label={HEALTH[h].label} aria-pressed={health === h}
                   className={cn("w-4 h-4 rounded-full border-2 transition-transform hover:scale-110", HEALTH[h].dot, health === h ? "border-slate-700 scale-110" : "border-white")} />
               ))}
             </div>
-            <input type="date" value={deadline} onChange={e => setDeadline(e.target.value)} title="Deadline (opcional)"
-              className="text-xs border border-input rounded px-1.5 py-1.5 w-[118px] focus:outline-none focus:ring-1 focus:ring-indigo-400 text-slate-500" />
+            <input type="date" aria-label="Fecha límite opcional" value={deadline} onChange={e => setDeadline(e.target.value)} title="Deadline (opcional)"
+              className="text-xs border border-input rounded px-1.5 py-1.5 min-w-0 w-full focus:outline-none focus:ring-1 focus:ring-indigo-400 text-slate-500" />
           </div>
         </div>
         <div className="flex gap-2 mt-3">

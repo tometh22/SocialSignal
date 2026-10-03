@@ -153,3 +153,16 @@ export function resolveCanonicalRoleForBlueprintKey<T extends { roleLevel?: stri
   const sameArea = usable.filter((role) => normalizePersonnelArea(role.area) === profile.area);
   return sameArea.find((role) => normalizePersonnelRole(role.roleLevel) === profile.level) ?? sameArea[0];
 }
+
+/** Canonical mapping with the same legacy name fallback in Scope and variants. */
+export function resolveQuotationBlueprintRole<T extends { name: string; roleLevel?: string | null; area?: string | null; isActive?: boolean }>(
+  key: string, roles: T[], profile?: { area?: string | null; level?: string | null },
+): T | undefined {
+  const canonical = resolveCanonicalRoleForBlueprintKey(key, roles, profile);
+  if (canonical) return canonical;
+  const aliases: Record<string, string[]> = {
+    director: ["director", "cuentas"], pm: ["project manager", "pm", "proyecto"], analyst: ["analista", "analyst"],
+    data: ["data", "datos"], tech: ["tech", "tecnología", "tecnologia"], design: ["diseñ", "design"],
+  };
+  return roles.find(role => role.isActive !== false && (aliases[key] ?? [key]).some(alias => role.name.toLocaleLowerCase("es").includes(alias)));
+}

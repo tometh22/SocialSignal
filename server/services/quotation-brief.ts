@@ -23,6 +23,8 @@ const proposalCandidateSchema = z.object({
   mentionVolume: z.enum(["small", "medium", "large", "xlarge"]).default("medium"),
   slaLevel: z.enum(["standard", "priority", "real_time"]).default("standard"),
   designLevel: z.enum(["standard", "branded", "executive"]).default("branded"),
+  outputLevel: z.enum(["standard", "executive"]).optional(),
+  visualIdentity: z.enum(["standard", "branded"]).optional(),
   recommendationSlug: z.string().trim().max(120).nullable().default(null),
   recommendationReason: z.string().trim().max(1_000).default(""),
   confidence: z.number().min(0).max(1).default(0.5),
@@ -169,6 +171,8 @@ function buildHeuristicProposal(
     mentionVolume: includesAny(text, ["masivo", "masiva", "alto volumen", "millones"]) ? "large" : "medium",
     slaLevel: includesAny(text, ["urgente", "alerta", "tiempo real", "inmediato"]) ? "priority" : "standard",
     designLevel: includesAny(text, ["director", "c-level", "board", "comité", "comite", "ejecutivo", "playbook"]) ? "executive" : "branded",
+    outputLevel: includesAny(text, ["director", "c-level", "board", "comité", "comite", "ejecutivo", "playbook"]) ? "executive" : "standard",
+    visualIdentity: includesAny(text, ["identidad", "branding", "brandeado", "marca visual"]) ? "branded" : "standard",
     recommendationSlug: recommendation.blueprint?.slug || null,
     recommendationReason: recommendation.blueprint
       ? `La receta “${recommendation.blueprint.name}” coincide con el alcance y aporta una referencia inicial de ${recommendation.blueprint.workloadHours} horas.`
@@ -263,13 +267,14 @@ export function analyzeQuotationBriefHeuristically(rawBrief: string, candidates:
 const proposalJsonSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["id", "projectName", "summary", "objective", "decision", "modality", "durationMonths", "markets", "brands", "competitors", "sources", "languages", "modules", "mentionVolume", "slaLevel", "designLevel", "recommendationSlug", "recommendationReason", "confidence", "missingQuestions"],
+  required: ["id", "projectName", "summary", "objective", "decision", "modality", "durationMonths", "markets", "brands", "competitors", "sources", "languages", "modules", "mentionVolume", "slaLevel", "designLevel", "outputLevel", "visualIdentity", "recommendationSlug", "recommendationReason", "confidence", "missingQuestions"],
   properties: {
     id: { type: "string" }, projectName: { type: "string" }, summary: { type: "string" }, objective: { type: "string" }, decision: { type: "string" },
     modality: { type: ["string", "null"], enum: [...MODALITIES, null] },
     durationMonths: { type: ["number", "null"] }, markets: { type: "array", items: { type: "string" } }, brands: { type: "array", items: { type: "string" } }, competitors: { type: "array", items: { type: "string" } }, sources: { type: "array", items: { type: "string" } },
     languages: { type: "array", items: { type: "string", enum: ["es", "en"] } }, modules: { type: "array", items: { type: "string", enum: MODULES } },
     mentionVolume: { type: "string", enum: ["small", "medium", "large", "xlarge"] }, slaLevel: { type: "string", enum: ["standard", "priority", "real_time"] }, designLevel: { type: "string", enum: ["standard", "branded", "executive"] },
+    outputLevel: { type: "string", enum: ["standard", "executive"] }, visualIdentity: { type: "string", enum: ["standard", "branded"] },
     recommendationSlug: { type: ["string", "null"] }, recommendationReason: { type: "string" }, confidence: { type: "number" }, missingQuestions: { type: "array", items: { type: "string" } },
   },
 } as const;

@@ -27,6 +27,8 @@ export type BriefProposalCandidate = {
   mentionVolume: string;
   slaLevel: string;
   designLevel: string;
+  outputLevel?: "standard" | "executive";
+  visualIdentity?: "standard" | "branded";
   recommendationSlug: string | null;
   recommendationReason: string;
   confidence: number;

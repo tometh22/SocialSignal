@@ -807,8 +807,8 @@ const EnhancedTeamConfig: React.FC<EnhancedTeamConfigProps> = ({ validationMessa
                       exit={{ opacity: 0, y: -20 }}
                     >
                       <Card className={`shadow-none transition-colors ${isEditing ? 'border-indigo-300 ring-2 ring-indigo-100' : 'border-slate-200 hover:border-indigo-200'}`}>
-                        <CardContent className="p-4">
-                          <div className="grid grid-cols-1 items-center gap-4 md:grid-cols-[auto_minmax(12rem,1fr)_minmax(18rem,auto)_auto]">
+                        <CardContent className="quotation-team-card p-4">
+                          <div className="quotation-team-row grid items-center gap-3">
                             {/* Drag handle */}
                             <div className="flex-shrink-0">
                               <GripVertical aria-hidden="true" className="h-5 w-5 text-slate-400" />
@@ -838,7 +838,7 @@ const EnhancedTeamConfig: React.FC<EnhancedTeamConfigProps> = ({ validationMessa
                                 {!member.personnelId ? (
                                   <Select onValueChange={(value) => assignPersonnel(member, value)}>
                                     <SelectTrigger
-                                      className="h-8 w-[190px] border-amber-300 bg-amber-50 text-xs text-amber-900"
+                                      className="h-8 w-full max-w-[190px] border-amber-300 bg-amber-50 text-xs text-amber-900"
                                       aria-label={`Asignar persona al rol ${role?.name || member.roleId}`}
                                     >
                                       <SelectValue placeholder="Asignar persona" />
@@ -905,7 +905,7 @@ const EnhancedTeamConfig: React.FC<EnhancedTeamConfigProps> = ({ validationMessa
                             </div>
 
                             {/* Hours and rate - editable */}
-                            <div className="flex items-center space-x-4">
+                            <div className="flex min-w-0 flex-wrap items-center justify-center gap-3">
                               {isEditing ? (
                                 <>
                                   <div className="flex items-center space-x-2">
