@@ -319,4 +319,28 @@ describe("Feedback 5-10 · correcciones de la auditoría", () => {
     expect(source("client/src/pages/personnel-absences.tsx")).toContain("after(person.epical.quota - person.epical.used)");
   });
 
+  it("el script de archivado exige manifiesto completo y bloquea cotizaciones vinculadas a un lead", () => {
+    const script = source("scripts/archive-legacy-quotations.mjs");
+    expect(script).toContain("Number.isFinite(Number(item.totalAmount))");
+    expect(script).toContain("allowLead");
+    expect(script).toContain("FOR UPDATE OF q");
+  });
+});
+
+describe("Feedback 5-10 · limpieza", () => {
+  it("oculta la pestaña Plantillas sin romper la lectura histórica", () => {
+    const admin = source("client/src/pages/admin-fixed.tsx");
+    expect(admin).toContain("const showLegacyTemplatesTab = false;");
+    expect(admin).toContain("{showLegacyTemplatesTab && <TabsContent value=\"templates\">");
+    expect(source("server/routes.ts")).toContain('app.get("/api/templates/:id"');
+  });
+
+  it("el script de archivado es dry-run por defecto, reversible y valida contra el manifiesto", () => {
+    const script = source("scripts/archive-legacy-quotations.mjs");
+    expect(script).toContain("const apply = args.includes('--apply');");
+    expect(script).toContain("BEGIN READ ONLY");
+    expect(script).toContain("pg_advisory_xact_lock");
+    expect(script).toContain("quotation_archive_rollback_backups");
+    expect(script).not.toMatch(/DELETE\s+FROM\s+quotations/i);
+  });
 });

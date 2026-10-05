@@ -542,7 +542,7 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
                   )}
                   {isEditing && !quotationData.scopeSnapshot && (
                     <details className="rounded-xl border border-amber-200 bg-amber-50/60 p-4">
-                      <summary className="cursor-pointer text-sm font-semibold text-amber-900">Abrir compatibilidad con una cotización histórica</summary>
+                      <summary className="cursor-pointer text-sm font-semibold text-amber-900">Abrir compatibilidad con una cotización histórica (en desuso: las nuevas se crean con recetas)</summary>
                       <p className="mt-2 text-xs leading-5 text-amber-800">Usá este camino sólo para editar una cotización que todavía no tiene receta profesional. Las nuevas cotizaciones se crean con el flujo guiado.</p>
                       <div className="mt-4 space-y-5">
                         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">

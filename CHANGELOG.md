@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.11.1 — 2026-10-05
+
+- Configuración: se oculta la pestaña Plantillas (las recetas del cotizador la reemplazan); los datos y la lectura para cotizaciones históricas se conservan.
+- Agrega `scripts/archive-legacy-quotations.mjs` (vista previa por defecto, reversible, con respaldo, manifiesto completo obligatorio, bloqueo de filas y de cotizaciones vinculadas a un lead) y la guía de verificaciones de producción de Feedback 5-10.
+- Definiciones de producto 2.30.0.
+
 ## 1.11.0 — 2026-10-05
 
 - Home: widget de cumpleaños del equipo (nombre y día/mes de personal activo, alimentado desde Configuración > Personal; una baja desaparece sola; el 29/02 se celebra el 28/02 en años no bisiestos y los días inexistentes se descartan).
