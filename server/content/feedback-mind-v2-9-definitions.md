@@ -1,5 +1,5 @@
 ---
-version: 2.29.0
+version: 2.30.0
 updatedAt: 2026-10-05
 feedbackCount: 70
 ---
@@ -452,3 +452,4 @@ histórica que todavía necesitan cotizaciones y registros anteriores.
 - **Lista de cotizaciones:** costo y markup se derivan de los montos (`total neto de IVA / costo operativo cotizado`). Con una variante aceptada no se muestra markup, porque el total es de la variante y los costos son los de la cotización base. Precio igual al costo se muestra como "Sin markup". Las cotizaciones archivadas no aparecen en grupos ni por oportunidad; las propuestas agrupadas se gestionan desde su grupo y no se repiten en la lista.
 - **Cuentas en riesgo:** compara el costo del mismo equipo cotizado a tarifas actuales contra el costo cotizado; no usa horas cargadas. Una cuenta puede desestimarse para todo el equipo con motivo obligatorio y plazo opcional. La línea base (erosión y severidad) la fija el servidor al desestimar y el evento queda auditado. El descarte se levanta solo si vence el plazo, si la erosión empeora 5 puntos o más sobre la desestimada, o si la severidad empeora (de vigilancia a crítica).
 - **Carga de horas:** el destino por defecto es el responsable de la tarea (no quien la carga) en el popover, el detalle, el temporizador y las subtareas. Quien gestiona tareas puede cargar al responsable aunque su usuario no esté vinculado a Personal.
+- **Plantillas de reportes:** las recetas del cotizador reemplazan a las plantillas. La pestaña se oculta en Configuración; los datos y la lectura que usan las cotizaciones históricas se conservan. Las cotizaciones legacy sin trasladar al Excel se archivan (reversible) con `scripts/archive-legacy-quotations.mjs`, nunca con borrado físico.

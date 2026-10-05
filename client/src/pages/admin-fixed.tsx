@@ -194,6 +194,9 @@ export default function Admin() {
   const { isAdmin } = usePermissions();
   // Estado para manejar tabs 
   const [activeTab, setActiveTab] = useState("roles");
+  // Las recetas del cotizador reemplazan a las plantillas de reportes: la pestaña se oculta
+  // (sin borrar datos ni la lectura que usan las cotizaciones históricas). Ver CHANGELOG 1.11.1 y la spec de Feedback 5-10.
+  const showLegacyTemplatesTab = false;
 
   // Estados para manejar diálogos
   const [roleDialogOpen, setRoleDialogOpen] = useState(false);
@@ -1077,7 +1080,7 @@ export default function Admin() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className={cn("grid w-full", isAdmin ? "grid-cols-6" : "grid-cols-5")}>
+        <TabsList className={cn("grid w-full", (isAdmin ? 6 : 5) - (showLegacyTemplatesTab ? 0 : 1) === 5 ? "grid-cols-5" : "grid-cols-4")}>
           <TabsTrigger value="roles" className="flex items-center gap-2">
             <Users className="h-4 w-4" />
             Roles
@@ -1086,10 +1089,12 @@ export default function Admin() {
             <UserPlus className="h-4 w-4" />
             Personal
           </TabsTrigger>
-          <TabsTrigger value="templates" className="flex items-center gap-2">
-            <FileText className="h-4 w-4" />
-            Plantillas
-          </TabsTrigger>
+          {showLegacyTemplatesTab && (
+            <TabsTrigger value="templates" className="flex items-center gap-2">
+              <FileText className="h-4 w-4" />
+              Plantillas
+            </TabsTrigger>
+          )}
           <TabsTrigger value="multipliers" className="flex items-center gap-2">
             <Calculator className="h-4 w-4" />
             Multiplicadores
@@ -1380,7 +1385,7 @@ export default function Admin() {
           )}
         </TabsContent>
 
-        <TabsContent value="templates">
+        {showLegacyTemplatesTab && <TabsContent value="templates">
           <Card className="standard-card mt-6">
             <CardHeader>
               <div className="flex justify-between items-center">
@@ -1491,7 +1496,7 @@ export default function Admin() {
               </div>
             )}
           </Card>
-        </TabsContent>
+        </TabsContent>}
 
         <TabsContent value="multipliers">
           <Card className="standard-card mt-6">
