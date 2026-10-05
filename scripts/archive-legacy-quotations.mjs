@@ -89,7 +89,24 @@ try {
       dependencies.push({ quotationId, table, n, blocking: blocking.has(table.replace(/^public\./, '')) });
     }
   }
-  for (const dep of dependencies.filter((item) => item.blocking)) problems.push(`#${dep.quotationId}: tiene ${dep.n} fila(s) en ${dep.table}`);
+  // Un proyecto anulado (voided), terminado y sin horas, tareas ni costos no tiene datos que se pierdan
+  // al archivar su cotización: no bloquea, pero se informa. Cualquier otro proyecto sí bloquea.
+  const emptyVoidedProjects = (await db.query(
+    `SELECT ap.id, ap.quotation_id FROM active_projects ap
+     WHERE ap.quotation_id = ANY($1) AND ap.status = 'voided' AND COALESCE(ap.is_finished, false) = true
+       AND NOT EXISTS (SELECT 1 FROM time_entries x WHERE x.project_id = ap.id)
+       AND NOT EXISTS (SELECT 1 FROM tasks x WHERE x.project_id = ap.id)
+       AND NOT EXISTS (SELECT 1 FROM task_time_entries x JOIN tasks t ON t.id = x.task_id WHERE t.project_id = ap.id)
+       AND NOT EXISTS (SELECT 1 FROM direct_costs x WHERE x.project_id = ap.id)`, [ids])).rows;
+  const toleratedProjectsByQuotation = new Map();
+  for (const { quotation_id: quotationId } of emptyVoidedProjects) toleratedProjectsByQuotation.set(quotationId, (toleratedProjectsByQuotation.get(quotationId) ?? 0) + 1);
+  for (const dep of dependencies.filter((item) => item.blocking)) {
+    if (dep.table.replace(/^public\./, '') === 'active_projects' && dep.n === (toleratedProjectsByQuotation.get(dep.quotationId) ?? 0)) {
+      dep.blocking = false; dep.tolerated = 'proyecto(s) anulado(s), terminado(s) y vacío(s)';
+      continue;
+    }
+    problems.push(`#${dep.quotationId}: tiene ${dep.n} fila(s) en ${dep.table}`);
+  }
 
   console.log(JSON.stringify({ at: new Date().toISOString(), label, applied: apply, quotations: rows.map((row) => ({ id: row.id, client: row.client_name, project: row.project_name, status: row.status, total: row.total_amount })), dependencies, problems }, null, 2));
   if (problems.length) throw new Error(`Abortado: ${problems.length} problema(s). No se modificó nada.`);
