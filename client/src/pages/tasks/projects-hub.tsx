@@ -497,11 +497,11 @@ export default function ProjectsHubPage() {
   const [statusFilter, setStatusFilter] = useState<"active" | "inactive" | "all">("active");
   const [expandedClients, setExpandedClients] = useState<Set<string>>(new Set());
   const { user } = useAuth();
-  const { isOperations } = usePermissions();
+  const { isTeamManager } = usePermissions();
 
   const { data: projects = [], isLoading, isError, refetch } = useQuery<TaskProject[], Error, TaskProject[]>({
-    queryKey: ["/api/tasks/projects", statusFilter, view, isOperations],
-    queryFn: () => fetchProjects(`/api/tasks/projects?status=${statusFilter}&scope=${isOperations ? "all" : "mine"}`),
+    queryKey: ["/api/tasks/projects", statusFilter, view, isTeamManager],
+    queryFn: () => fetchProjects(`/api/tasks/projects?status=${statusFilter}&scope=${isTeamManager ? "all" : "mine"}`),
     retry: 2,
     staleTime: 0,
     select: (data) => Array.isArray(data) ? data : [],
@@ -582,7 +582,7 @@ export default function ProjectsHubPage() {
             {projects.length} proyectos · {projects.reduce((a, p) => a + p.pendingCount, 0)} tareas pendientes
           </p>
         </div>
-        {isOperations && (
+        {isTeamManager && (
           <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as any)} className="h-9 rounded-md border bg-background px-3 text-sm">
             <option value="active">Activos</option>
             <option value="inactive">Inactivos</option>
@@ -651,7 +651,7 @@ export default function ProjectsHubPage() {
           <LayoutGrid className="h-3.5 w-3.5" />
           Proyectos
         </button>
-        {isOperations && <button
+        {isTeamManager && <button
           className={cn(
             "flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 transition-colors",
             view === "panel"
@@ -694,7 +694,7 @@ export default function ProjectsHubPage() {
                   <ProjectCard
                     key={project.id}
                     project={project}
-                    myPersonnelId={isOperations ? myPersonnelId : undefined}
+                    myPersonnelId={isTeamManager ? myPersonnelId : undefined}
                     onJoin={() => myPersonnelId && joinMutation.mutate({ projectId: project.id, personnelId: myPersonnelId })}
                     onLeave={() => myPersonnelId && leaveMutation.mutate({ projectId: project.id, personnelId: myPersonnelId })}
                     joining={joinMutation.isPending}
@@ -710,7 +710,7 @@ export default function ProjectsHubPage() {
               <ProjectCard
                 key={project.id}
                 project={project}
-                myPersonnelId={isOperations ? myPersonnelId : undefined}
+                myPersonnelId={isTeamManager ? myPersonnelId : undefined}
                 onJoin={() => myPersonnelId && joinMutation.mutate({ projectId: project.id, personnelId: myPersonnelId })}
                 onLeave={() => myPersonnelId && leaveMutation.mutate({ projectId: project.id, personnelId: myPersonnelId })}
                 joining={joinMutation.isPending}

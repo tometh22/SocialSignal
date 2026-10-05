@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.10.15 — 2026-10-05
+
+- Agrega el permiso independiente Tareas y horas para asignar trabajo, consultar horas del equipo y gestionarlas sin abrir Costos, Cotizaciones ni Finanzas.
+- Omite datos financieros en las respuestas de API para el perfil sin costos y bloquea liquidaciones e importes personales.
+
 ## 1.10.14 — 2026-10-05
 
 - Descuenta automáticamente de los cupos de vacaciones de años siguientes los adelantos aprobados con override, conserva la deuda hasta cubrirla y muestra el detalle en el saldo.

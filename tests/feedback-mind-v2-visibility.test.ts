@@ -11,7 +11,7 @@ describe("Feedback Mind V2 visibility for Victoria Achabal", () => {
     expect(sidebar).toContain('href: "/tasks/projects/kanban", title: "Kanban de proyectos"');
     expect(sidebar).toContain('href: "/tasks/team-calendar", title: "Calendario"');
     expect(sidebar).toContain('href: "/operations/absences", title: "Gestión de ausencias"');
-    expect(sidebar).toContain('title: isOperations ? "Cartera de proyectos" : "Mis proyectos"');
+    expect(sidebar).toContain('title: isOperations ? "Cartera de proyectos" : isTaskManager ? "Proyectos de tareas" : "Mis proyectos"');
 
     const absences = source("client/src/pages/personnel-absences.tsx");
     expect(absences).toContain("Gestión de Operaciones: aprobá solicitudes, administrá cupos");

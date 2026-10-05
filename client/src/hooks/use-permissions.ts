@@ -1,9 +1,9 @@
 import { useAuth } from "@/hooks/use-auth";
 import { getFirstAllowedRouteForUser } from "@/lib/first-allowed-route";
 
-export type AppSection = 'crm' | 'quotations' | 'projects' | 'status' | 'dashboard' | 'finance' | 'admin' | 'operations';
+export type AppSection = 'crm' | 'quotations' | 'projects' | 'status' | 'dashboard' | 'finance' | 'admin' | 'operations' | 'task_manager';
 
-export const ALL_SECTIONS: AppSection[] = ['crm', 'quotations', 'projects', 'status', 'dashboard', 'finance', 'admin', 'operations'];
+export const ALL_SECTIONS: AppSection[] = ['crm', 'quotations', 'projects', 'status', 'dashboard', 'finance', 'admin', 'operations', 'task_manager'];
 
 /**
  * Route access groups.
@@ -18,7 +18,8 @@ export const ALL_SECTIONS: AppSection[] = ['crm', 'quotations', 'projects', 'sta
  */
 export const HOME_ACCESS_SECTIONS: readonly AppSection[] = ALL_SECTIONS;
 export const FINANCE_SUMMARY_ACCESS_SECTIONS = ['dashboard', 'finance'] as const satisfies readonly AppSection[];
-export const HOURS_DASHBOARD_ACCESS_SECTIONS = ['projects', 'operations'] as const satisfies readonly AppSection[];
+export const HOURS_DASHBOARD_ACCESS_SECTIONS = ['projects', 'operations', 'task_manager'] as const satisfies readonly AppSection[];
+export const TASK_ACCESS_SECTIONS = ['projects', 'operations', 'task_manager'] as const satisfies readonly AppSection[];
 
 export const SECTION_LABELS: Record<AppSection, string> = {
   crm: 'CRM',
@@ -29,6 +30,7 @@ export const SECTION_LABELS: Record<AppSection, string> = {
   finance: 'Finanzas',
   admin: 'Administración',
   operations: 'Operaciones',
+  task_manager: 'Tareas y horas (sin costos)',
 };
 
 export function usePermissions() {
@@ -50,12 +52,14 @@ export function usePermissions() {
 
   // Role helpers: operations team sees capacity, closings, rates
   const isOperations = hasPermission('operations') || (user as any)?.isAdmin;
+  const isTaskManager = hasPermission('task_manager');
   // Team members see their own hours only (no capacity/idle metrics)
   const isTeamMember = !!user && !isOperations;
 
   // Admin es un escalón por encima de Operaciones: acciones destructivas o de
   // configuración global se gatean con esto, no con isOperations.
   const isAdmin = Boolean((user as any)?.isAdmin);
+  const isTaskManagerOnly = isTaskManager && !isAdmin && !hasAnyPermission(['projects', 'quotations', 'dashboard', 'finance', 'operations']);
 
-  return { hasPermission, hasAnyPermission, getFirstAllowedRoute, allowedSections, isOperations, isTeamMember, isAdmin };
+  return { hasPermission, hasAnyPermission, getFirstAllowedRoute, allowedSections, isOperations, isTeamManager: isOperations || isTaskManager, isTaskManager, isTaskManagerOnly, isTeamMember, isAdmin };
 }

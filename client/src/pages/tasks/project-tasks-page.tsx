@@ -69,7 +69,7 @@ interface Props {
 
 export default function ProjectTasksPage({ params }: Props) {
   const projectId = parseInt(params.id);
-  const { isOperations } = usePermissions();
+  const { isTeamManager } = usePermissions();
   const [membersOpen, setMembersOpen] = useState(false);
   const [addPersonnelId, setAddPersonnelId] = useState<string>("none");
   const [addRole, setAddRole] = useState("member");
@@ -115,7 +115,7 @@ export default function ProjectTasksPage({ params }: Props) {
   }, [project?.members]);
 
   const members: ProjectMember[] = localMembers ?? (project?.members ?? []);
-  const canManageProject = isOperations;
+  const canManageProject = isTeamManager;
 
   const addMemberMutation = useMutation({
     mutationFn: ({ personnelId, role }: { personnelId: number; role: string }) =>
@@ -623,7 +623,7 @@ export default function ProjectTasksPage({ params }: Props) {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {PROJECT_ROLE_OPTIONS.filter(r => isOperations || r.value !== "owner").map(r => (
+                    {PROJECT_ROLE_OPTIONS.filter(r => isTeamManager || r.value !== "owner").map(r => (
                       <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
                     ))}
                   </SelectContent>
@@ -668,7 +668,7 @@ export default function ProjectTasksPage({ params }: Props) {
                       {projectRoleLabel(m.role)}
                     </Badge>
                   </div>
-                  {(isOperations || m.role !== "owner") && (
+                  {(isTeamManager || m.role !== "owner") && (
                     <Button
                       variant="ghost"
                       size="sm"

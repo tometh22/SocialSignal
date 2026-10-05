@@ -97,6 +97,7 @@ import {
   FINANCE_SUMMARY_ACCESS_SECTIONS,
   HOME_ACCESS_SECTIONS,
   HOURS_DASHBOARD_ACCESS_SECTIONS,
+  TASK_ACCESS_SECTIONS,
   usePermissions,
 } from "@/hooks/use-permissions";
 
@@ -113,6 +114,11 @@ function OperationsOnlyProjectCreate() {
 function OperationsOnlyProjectDetail() {
   const { isOperations } = usePermissions();
   return isOperations ? <ProjectDetail /> : <Redirect to="/tasks/projects" />;
+}
+
+function MyInvoicesRoute() {
+  const { isTaskManagerOnly } = usePermissions();
+  return isTaskManagerOnly ? <UnauthorizedPage /> : <MyInvoices />;
 }
 
 function OperationsOnlyProjectEdit() {
@@ -288,7 +294,7 @@ function AppRoutes() {
                   <ProtectedRoute path="/time-entries/project/:projectId" component={OperationsOnlyProjectTimeEntries} requiredPermission="projects" />
 
                   {/* Facturación personal (acceso para todo usuario autenticado) */}
-                  <ProtectedRoute path="/my-invoices" component={MyInvoices} />
+                  <ProtectedRoute path="/my-invoices" component={MyInvoicesRoute} />
 
                   {/* Admin: gestión de proveedores externos */}
                   <ProtectedRoute path="/admin/providers" component={AdminProviders} requiredPermission="admin" />
@@ -304,14 +310,14 @@ function AppRoutes() {
                   <ProtectedRoute path="/quarterly-nps/:clientId" component={QuarterlyNpsSurvey} requiredPermission="projects" />
                   
                   {/* Gestión de Tareas */}
-                  <ProtectedRoute path="/tasks" component={TasksHomePage} requiredPermission="projects" />
-                  <ProtectedRoute path="/tasks/my-tasks" component={MyTasksPage} requiredPermission="projects" />
-                  <ProtectedRoute path="/tasks/team-calendar" component={TeamCalendarPage} requiredPermission="projects" />
+                  <ProtectedRoute path="/tasks" component={TasksHomePage} requiredAnyPermission={TASK_ACCESS_SECTIONS} />
+                  <ProtectedRoute path="/tasks/my-tasks" component={MyTasksPage} requiredAnyPermission={TASK_ACCESS_SECTIONS} />
+                  <ProtectedRoute path="/tasks/team-calendar" component={TeamCalendarPage} requiredAnyPermission={TASK_ACCESS_SECTIONS} />
                   <ProtectedRoute path="/tasks/hours-dashboard" component={HoursDashboardPage} requiredAnyPermission={HOURS_DASHBOARD_ACCESS_SECTIONS} />
                   <ProtectedRoute path="/absences" component={PersonnelAbsences} requiredAnyPermission={HOME_ACCESS_SECTIONS} />
-                  <ProtectedRoute path="/tasks/projects" component={ProjectsHubPage} requiredPermission="projects" />
-                  <ProtectedRoute path="/tasks/projects/kanban" component={ProjectsKanbanPage} requiredPermission="projects" />
-                  <ProtectedRoute path="/tasks/projects/:id" component={ProjectTasksPage} requiredPermission="projects" />
+                  <ProtectedRoute path="/tasks/projects" component={ProjectsHubPage} requiredAnyPermission={TASK_ACCESS_SECTIONS} />
+                  <ProtectedRoute path="/tasks/projects/kanban" component={ProjectsKanbanPage} requiredAnyPermission={TASK_ACCESS_SECTIONS} />
+                  <ProtectedRoute path="/tasks/projects/:id" component={ProjectTasksPage} requiredAnyPermission={TASK_ACCESS_SECTIONS} />
 
                   {/* CRM Ventas */}
                   <ProtectedRoute path="/crm" component={CRMPage} requiredPermission="crm" />
