@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.11.5 — 2026-10-05
+
+- Seguridad: la vista previa, la aplicación manual y la automática del sync de valor hora desde el Máster ahora exigen permiso de administración en el servidor, igual que el Panel de Administración que las usa. Antes cualquier usuario autenticado podía sobrescribir o ver las tarifas de todo el personal llamando a la API.
+
 ## 1.11.4 — 2026-10-05
 
 - Mind: nuevo centro de notificaciones con historial paginado, filtros, agrupación, lectura por elemento y preferencias por categoría; las notificaciones por email se procesan desde una cola con reintentos.
