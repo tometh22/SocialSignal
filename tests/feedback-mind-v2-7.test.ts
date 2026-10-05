@@ -66,7 +66,7 @@ describe("Feedback Mind V2.7 — proyectos y tareas", () => {
     expect(activeProjects).toContain("defaultOpen={false}");
     expect(projectsHub).toContain("const [expandedClients, setExpandedClients] = useState<Set<string>>(new Set())");
     expect(projectsHub).toContain("expandedClients.has(clientName) &&");
-    expect(projectsHub).toContain('scope=${isOperations ? "all" : "mine"}');
+    expect(projectsHub).toContain('scope=${isTeamManager ? "all" : "mine"}');
     expect(projectsHub).not.toContain('isOperations && view === "panel"');
   });
 

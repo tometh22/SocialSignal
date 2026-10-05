@@ -7,6 +7,7 @@ const INTERNAL_SECTIONS = [
   "finance",
   "admin",
   "operations",
+  "task_manager",
 ] as const;
 
 type RouteUser = {

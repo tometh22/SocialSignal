@@ -10,6 +10,7 @@ import {
   FINANCE_SUMMARY_ACCESS_SECTIONS,
   HOME_ACCESS_SECTIONS,
   HOURS_DASHBOARD_ACCESS_SECTIONS,
+  TASK_ACCESS_SECTIONS,
   usePermissions,
   AppSection,
 } from "@/hooks/use-permissions";
@@ -60,6 +61,7 @@ type NavItem = {
   description?: string;
   permission?: AppSection;
   anyPermissions?: readonly AppSection[];
+  hideWhenTaskManagerOnly?: boolean;
 };
 
 interface SidebarFixedProps {
@@ -68,7 +70,7 @@ interface SidebarFixedProps {
 
 export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps = {}) {
   const { user } = useAuth();
-  const { hasPermission, hasAnyPermission, isOperations } = usePermissions();
+  const { hasPermission, hasAnyPermission, isOperations, isTaskManagerOnly, isTaskManager } = usePermissions();
   const [currentPath] = useLocation();
   // En mobile (dentro del drawer) nunca está colapsado - el cierre se hace cerrando el drawer
   const [isCollapsedState, setIsCollapsed] = useState(false);
@@ -154,7 +156,7 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
     {
       title: "Mi gestión",
       items: [
-        { href: "/my-invoices", title: "Mis facturas", icon: Receipt, description: "Comprobantes y proyectos" },
+        { href: "/my-invoices", title: "Mis facturas", icon: Receipt, description: "Comprobantes y proyectos", hideWhenTaskManagerOnly: true },
       ]
     },
     {
@@ -168,10 +170,10 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
     {
       title: "Proyectos",
       items: [
-        { href: isOperations ? "/active-projects" : "/tasks/projects", title: isOperations ? "Cartera de proyectos" : "Mis proyectos", icon: Briefcase, badge: projectCount > 0 ? projectCount.toString() : undefined, description: isOperations ? "Gestión y rentabilidad" : "Proyectos activos asignados", permission: 'projects' as AppSection },
-        { href: "/tasks/projects/kanban", title: "Kanban de proyectos", icon: LayoutGrid, description: "Estado operativo de cada proyecto", permission: 'projects' as AppSection },
-        { href: "/tasks", title: "Tareas", icon: CheckSquare, description: "Gestión de tareas", permission: 'projects' as AppSection },
-        { href: "/tasks/team-calendar", title: "Calendario", icon: Calendar, description: "Fechas y responsables de tareas", permission: 'projects' as AppSection },
+        { href: isOperations ? "/active-projects" : "/tasks/projects", title: isOperations ? "Cartera de proyectos" : isTaskManager ? "Proyectos de tareas" : "Mis proyectos", icon: Briefcase, badge: projectCount > 0 ? projectCount.toString() : undefined, description: isOperations ? "Gestión y rentabilidad" : "Proyectos activos asignados", anyPermissions: TASK_ACCESS_SECTIONS },
+        { href: "/tasks/projects/kanban", title: "Kanban de proyectos", icon: LayoutGrid, description: "Estado operativo de cada proyecto", anyPermissions: TASK_ACCESS_SECTIONS },
+        { href: "/tasks", title: "Tareas", icon: CheckSquare, description: "Gestión de tareas", anyPermissions: TASK_ACCESS_SECTIONS },
+        { href: "/tasks/team-calendar", title: "Calendario", icon: Calendar, description: "Fechas y responsables de tareas", anyPermissions: TASK_ACCESS_SECTIONS },
         { href: "/review", title: "Status", icon: ClipboardList, badge: totalReviewPending > 0 ? totalReviewPending.toString() : undefined, description: "Seguimiento y decisiones", permission: 'status' as AppSection },
       ]
     },
@@ -230,6 +232,7 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
     items: section.items.filter((item: NavItem) =>
       (!item.permission || hasPermission(item.permission))
       && (!item.anyPermissions || hasAnyPermission(item.anyPermissions))
+      && !(item.hideWhenTaskManagerOnly && isTaskManagerOnly)
     )
   })).filter(section => section.items.length > 0);
   const visibleNavItems = filteredNavSections.flatMap(section => section.items);

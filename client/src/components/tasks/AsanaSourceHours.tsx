@@ -18,7 +18,7 @@ export default function AsanaSourceHours({ projectId, taskId }: { projectId: num
       {isFetching && <p className="text-sm text-muted-foreground">Cargando horas…</p>}
       {data && <>
         <p className="text-sm">{data.summary.records} registros · {(data.summary.minutes / 60).toLocaleString("es-AR", { maximumFractionDigits: 2 })} h</p>
-        <p className="text-xs text-muted-foreground">Historial original con fecha y autor{taskId ? ", incluidas las subtareas" : ""}. Sus costos requieren conciliación con el historial financiero existente.</p>
+        <p className="text-xs text-muted-foreground">Historial original con fecha y autor{taskId ? ", incluidas las subtareas" : ""}.</p>
         {data.summary.unresolved_people > 0 && <p className="text-xs text-amber-700">{data.summary.unresolved_people} registros conservan el autor original pendiente de vincular a Personal.</p>}
         {data.summary.unavailable_tasks > 0 && <p className="text-xs text-amber-700">{data.summary.unavailable_tasks} registros corresponden a tareas eliminadas o fuera de este proyecto en Asana.</p>}
         <div className="max-h-80 overflow-auto rounded border"><table className="w-full text-xs"><thead><tr className="border-b text-left"><th className="p-2">Fecha</th><th className="p-2">Persona</th><th className="p-2">Tarea original</th><th className="p-2 text-right">Tiempo</th></tr></thead><tbody>{data.entries.map(entry => <tr key={entry.gid} className="border-b align-top">

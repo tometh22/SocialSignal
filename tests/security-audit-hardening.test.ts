@@ -94,10 +94,22 @@ describe("audit hardening — authorization and hierarchy", () => {
     const page = source("client/src/pages/tasks/project-tasks-page.tsx");
     const routes = source("server/routes.ts");
 
-    expect(page).toContain("const canManageProject = isOperations;");
+    expect(page).toContain("const canManageProject = isTeamManager;");
     expect(page).toContain("{canManageProject && (");
-    expect(page).toContain('PROJECT_ROLE_OPTIONS.filter(r => isOperations || r.value !== "owner")');
-    expect(routes).toContain('return res.status(403).json({ message: "Sólo Operaciones puede administrar miembros" })');
+    expect(page).toContain('PROJECT_ROLE_OPTIONS.filter(r => isTeamManager || r.value !== "owner")');
+    expect(routes).toContain('return res.status(403).json({ message: "Sólo Operaciones o gestión de tareas puede administrar miembros" })');
+  });
+
+  test("task managers can manage tasks while financial response fields and invoice APIs are blocked", () => {
+    const routes = source("server/routes.ts");
+    const permissions = source("client/src/hooks/use-permissions.ts");
+
+    expect(permissions).toContain("hasPermission('task_manager')");
+    expect(routes).toContain("function isTaskManagerWithoutFinancialAccess");
+    expect(routes).toContain("stripTaskManagerFinancialData(body)");
+    expect(routes).toContain('"/api/me/invoices"');
+    expect(routes).toContain('"/api/me/monthly-settlement-declarations"');
+    expect(routes).toContain('app.get("/api/tasks/hours-cost"');
   });
 });
 

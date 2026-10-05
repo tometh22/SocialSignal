@@ -35,7 +35,7 @@ type PersonnelOption = { id: number; name: string };
 
 export default function QuickTaskHours({ taskId, className }: { taskId: number; className?: string }) {
   const { toast } = useToast();
-  const { isOperations } = usePermissions();
+  const { isTeamManager } = usePermissions();
   const [open, setOpen] = useState(false);
   const [manual, setManual] = useState("");
   const [personnelId, setPersonnelId] = useState("");
@@ -52,8 +52,9 @@ export default function QuickTaskHours({ taskId, className }: { taskId: number; 
   });
 
   const { data: personnel = [] } = useQuery<PersonnelOption[]>({
-    queryKey: ["/api/personnel"],
-    enabled: open && isOperations,
+    queryKey: ["/api/tasks-personnel"],
+    queryFn: () => authFetchJson<PersonnelOption[]>("/api/tasks-personnel"),
+    enabled: open && isTeamManager,
   });
 
   // El servidor sólo deja corregir o borrar la carga propia, salvo Operaciones.
@@ -65,15 +66,15 @@ export default function QuickTaskHours({ taskId, className }: { taskId: number; 
     enabled: open,
   });
   const canModify = (entry: TimeEntrySummary) =>
-    isOperations || (myIdentity?.personnelId != null && entry.personnelId === myIdentity.personnelId);
+    isTeamManager || (myIdentity?.personnelId != null && entry.personnelId === myIdentity.personnelId);
 
   // Lo que rige es el dueño de la tarea, no quien la carga: si Operaciones abre
   // el reloj de una tarea ajena, la atribución arranca apuntando al responsable
   // en vez de obligar a elegirlo en un paso extra.
   useEffect(() => {
-    if (!open || !isOperations || personnelId) return;
+    if (!open || !isTeamManager || personnelId) return;
     if (taskSummary?.assigneeId) setPersonnelId(String(taskSummary.assigneeId));
-  }, [open, isOperations, personnelId, taskSummary?.assigneeId]);
+  }, [open, isTeamManager, personnelId, taskSummary?.assigneeId]);
 
   useEffect(() => {
     if (!open) {
@@ -112,7 +113,7 @@ export default function QuickTaskHours({ taskId, className }: { taskId: number; 
       date: format(new Date(), "yyyy-MM-dd"),
       hours,
       description: "Carga rápida",
-      ...(isOperations && personnelId ? { personnelId: Number(personnelId) } : {}),
+      ...(isTeamManager && personnelId ? { personnelId: Number(personnelId) } : {}),
     }),
     onSuccess: () => {
       invalidateHoursConsumers();
@@ -207,7 +208,7 @@ export default function QuickTaskHours({ taskId, className }: { taskId: number; 
             </Button>
           ))}
         </div>
-        {isOperations && (
+        {isTeamManager && (
           <label className="mb-2 block text-[10px] text-muted-foreground">
             Cargar para
             <select
@@ -242,7 +243,7 @@ export default function QuickTaskHours({ taskId, className }: { taskId: number; 
             <Square className="mr-1 h-3 w-3" />Detener ({Math.floor(timerSeconds / 60)}m)
           </Button>
         ) : (
-          <Button size="sm" variant="secondary" className="h-8 w-full text-xs" disabled={isRunning} onClick={() => startTimer(taskId, taskSummary?.title ?? `Tarea #${taskId}`, isOperations && personnelId ? Number(personnelId) : null)}>
+          <Button size="sm" variant="secondary" className="h-8 w-full text-xs" disabled={isRunning} onClick={() => startTimer(taskId, taskSummary?.title ?? `Tarea #${taskId}`, isTeamManager && personnelId ? Number(personnelId) : null)}>
             <Play className="mr-1 h-3 w-3" />{isRunning ? "Hay un temporizador activo" : "Iniciar temporizador"}
           </Button>
         )}

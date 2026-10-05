@@ -31,15 +31,15 @@ const STAGES: Array<{ value: WorkflowStage; label: string; color: string }> = [
 ];
 
 export default function ProjectsKanbanPage() {
-  const { isOperations } = usePermissions();
+  const { isTeamManager } = usePermissions();
   const queryClient = useQueryClient();
   const [draggedId, setDraggedId] = useState<number | null>(null);
   const [managerFilter, setManagerFilter] = useState("all");
   const [blockReasonDrafts, setBlockReasonDrafts] = useState<Record<number, string>>({});
   const { data: projects = [], isLoading, isError, error, refetch } = useQuery<Project[]>({
-    queryKey: ["/api/tasks/projects", "kanban", isOperations],
+    queryKey: ["/api/tasks/projects", "kanban", isTeamManager],
     queryFn: async () => {
-      const response = await authFetch(`/api/tasks/projects?status=active&scope=${isOperations ? "all" : "mine"}`);
+      const response = await authFetch(`/api/tasks/projects?status=active&scope=${isTeamManager ? "all" : "mine"}`);
       if (!response.ok) throw new Error("No se pudieron cargar los proyectos");
       return response.json();
     },

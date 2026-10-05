@@ -43,6 +43,7 @@ const SECTION_COLORS: Record<AppSection, string> = {
   finance: "bg-rose-100 text-rose-700",
   admin: "bg-gray-100 text-gray-700",
   operations: "bg-indigo-100 text-indigo-700",
+  task_manager: "bg-cyan-100 text-cyan-700",
 };
 
 type FormData = {

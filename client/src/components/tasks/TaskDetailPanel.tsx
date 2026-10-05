@@ -278,7 +278,7 @@ interface Props {
 
 export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initialFocusTime = false, onNavigateToTask }: Props) {
   const { user } = useAuth();
-  const canLogForOthers = !!(user as any)?.isAdmin || ((user as any)?.permissions || []).includes("operations");
+  const canLogForOthers = !!(user as any)?.isAdmin || ((user as any)?.permissions || []).some((permission: string) => ["operations", "task_manager"].includes(permission));
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleValue, setTitleValue] = useState("");
   const [showAddSubtask, setShowAddSubtask] = useState(false);

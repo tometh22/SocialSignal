@@ -80,7 +80,7 @@ function formatHoursLabel(hours: number) {
 const PAGE_SIZE = 20;
 
 export default function HoursDashboardPage() {
-  const { isOperations } = usePermissions();
+  const { isTeamManager } = usePermissions();
   const [selectedPersonnelId, setSelectedPersonnelId] = useState<string>("all");
   const [selectedProjectId, setSelectedProjectId] = useState<string>("all");
   const [quickFilter, setQuickFilter] = useState<string>("this_month");
@@ -320,7 +320,7 @@ export default function HoursDashboardPage() {
       ) : (
         <>
           {/* KPI cards */}
-          <MetricGrid className={cn(isOperations && "xl:grid-cols-3")}>
+          <MetricGrid className={cn(isTeamManager && "xl:grid-cols-3")}>
             <MetricCard
               label="Total de horas reales"
               value={`${totalHours.toFixed(1)}h`}
@@ -341,7 +341,7 @@ export default function HoursDashboardPage() {
               tone="info"
             />
 
-            {isOperations && (
+            {isTeamManager && (
               <MetricCard
                 label="Horas disponibles"
                 value={`${availableHours}h`}
