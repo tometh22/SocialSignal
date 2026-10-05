@@ -1,3 +1,4 @@
+import { quotedOperationalCost } from "@shared/utils/quotation-profitability";
 import { quotationPersonnelName } from "@shared/utils/quotation-display";
 import React, { useState, useEffect } from 'react';
 import { authFetch } from '@/lib/queryClient';
@@ -255,6 +256,9 @@ const QuotationDetail: React.FC = () => {
     if (!quotation) return 0;
     return quotation.baseCost + quotation.complexityAdjustment;
   };
+  // Costo operativo completo (suma herramientas, plataforma y entregables): el mismo que muestra la lista
+  // de cotizaciones y usa la rentabilidad, para que los tres lugares no cuenten distinto.
+  const operationalCostTotal = quotation ? quotedOperationalCost(quotation) : 0;
 
   // Obtener nombre de personal por ID
   const getPersonnelName = (id: number | null) => {
@@ -721,7 +725,7 @@ const QuotationDetail: React.FC = () => {
               
               <div className="px-4 py-3 bg-slate-50">
                 <div className="flex justify-between items-center">
-                  <span className="font-medium text-slate-700 text-sm">Subtotal operacional:</span>
+                  <span className="font-medium text-slate-700 text-sm">Subtotal (costo base + complejidad):</span>
                   <span className="font-bold text-slate-800 text-base">
                     {formatCurrency(calculateOperationalSubtotal())}
                   </span>
@@ -751,6 +755,12 @@ const QuotationDetail: React.FC = () => {
                 <div className="px-4 py-3 flex justify-between text-sm">
                   <span className="text-slate-600">Entregables adicionales:</span>
                   <span className="font-medium">{formatCurrency(quotation.additionalDeliverableCost || 0)}</span>
+                </div>
+              )}
+              {Math.abs(operationalCostTotal - calculateOperationalSubtotal()) > 0.005 && (
+                <div className="px-4 py-3 flex justify-between text-sm bg-slate-50" data-testid="detail-operational-cost-total">
+                  <span className="font-medium text-slate-700">Costo operativo total:</span>
+                  <span className="font-semibold text-slate-800">{formatCurrency(operationalCostTotal)}</span>
                 </div>
               )}
               {(quotation.deviationPercentage || 0) > 0 && (

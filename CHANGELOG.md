@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.11.6 — 2026-10-05
+
+- Cotizaciones: la lista, el detalle, la rentabilidad y la alerta de margen cuentan el costo y el precio igual. El detalle muestra además el «Costo operativo total» (con herramientas, plataforma y entregables adicionales) cuando difiere del subtotal base + complejidad.
+- La deriva de margen y la rentabilidad miden sobre el precio neto de IVA (antes la deriva usaba el total con IVA y subestimaba la erosión) y, con una variante aceptada, usan el costo de esa variante en vez del de la cotización base.
+
 ## 1.11.5 — 2026-10-05
 
 - Seguridad: la vista previa, la aplicación manual y la automática del sync de valor hora desde el Máster ahora exigen permiso de administración en el servidor, igual que el Panel de Administración que las usa. Antes cualquier usuario autenticado podía sobrescribir o ver las tarifas de todo el personal llamando a la API.

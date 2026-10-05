@@ -8,6 +8,27 @@ export function quotedOperationalCost(quotation: {
     .reduce((sum, key) => sum + (Number(quotation[key as keyof typeof quotation]) || 0), 0);
 }
 
+type CostParts = Parameters<typeof quotedOperationalCost>[0];
+type PricedQuotation = CostParts & { totalAmount?: number | null; taxRate?: number | null; pricesIncludeTax?: boolean | null };
+
+/**
+ * Costo operativo y precio NETO de IVA de lo que el cliente realmente aceptó. Con una variante aceptada,
+ * `quotation.totalAmount` ya es el total de esa variante, así que el costo tiene que ser el de la variante
+ * (su costo base y ajuste de complejidad) más los costos a nivel cotización (herramientas, plataforma,
+ * entregables). Mezclar el total de la variante con el costo de la cotización base daba márgenes arbitrarios.
+ */
+export function acceptedScopeCostAndNet(
+  quotation: PricedQuotation,
+  acceptedVariant?: { baseCost?: number | null; complexityAdjustment?: number | null } | null,
+) {
+  const cost = quotedOperationalCost({
+    ...quotation,
+    ...(acceptedVariant ? { baseCost: acceptedVariant.baseCost, complexityAdjustment: acceptedVariant.complexityAdjustment } : {}),
+  });
+  const net = calculateTaxBreakdown(Number(quotation.totalAmount) || 0, quotation.taxRate ?? 0, Boolean(quotation.pricesIncludeTax)).netAmount;
+  return { cost, net };
+}
+
 /**
  * Costo y markup tal como los muestra la lista de cotizaciones. Se derivan de los
  * montos (total / costo operativo cotizado), igual que el resumen del detalle, y no

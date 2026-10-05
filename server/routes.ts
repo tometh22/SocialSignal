@@ -338,7 +338,7 @@ import { calculateCanonicalComplexityFactor } from "@shared/utils/quotation-comp
 import { calculateMarginDrift, isMarginDriftDismissalActive } from "@shared/utils/quotation-margin-drift";
 import { findArsRatesInUsdQuotation } from "@shared/utils/role-rate";
 import { mergeQuotationActualEntries } from "@shared/utils/quotation-actual-entries";
-import { quotedOperationalCost, quotationProfitability } from "@shared/utils/quotation-profitability";
+import { quotedOperationalCost, quotationProfitability, acceptedScopeCostAndNet } from "@shared/utils/quotation-profitability";
 import {
   assertQuotationTransition,
   isQuotationStatus,
@@ -6437,6 +6437,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const quotationIds = eligible.map((quotation) => quotation.id);
       const allMembers = await db.select().from(quotationTeamMembers).where(inArray(quotationTeamMembers.quotationId, quotationIds));
+      const acceptedVariantIds = eligible.flatMap((quotation) => quotation.acceptedVariantId ? [quotation.acceptedVariantId] : []);
+      const acceptedVariantRows = acceptedVariantIds.length
+        ? await db.select().from(quotationVariants).where(inArray(quotationVariants.id, acceptedVariantIds))
+        : [];
+      const acceptedVariantById = new Map(acceptedVariantRows.map((variant) => [variant.id, variant]));
 
       const distinctPersonnelIds = Array.from(new Set(
         allMembers.map((member) => member.personnelId).filter((personnelId): personnelId is number => personnelId != null),
@@ -6469,7 +6474,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const currentRate = quotationCurrency === "USD" ? arsRate / currentExchangeRate : arsRate;
           return { personnelId: member.personnelId, hours, originalRate, currentRate };
         });
-        const drift = calculateMarginDrift({ lockedTotal: Number(quotation.totalAmount) || 0, quotedCost: quotedOperationalCost(quotation), team });
+        const scope = acceptedScopeCostAndNet(quotation, quotation.acceptedVariantId ? acceptedVariantById.get(quotation.acceptedVariantId) : null);
+        const drift = calculateMarginDrift({ lockedTotal: scope.net, quotedCost: scope.cost, team });
         return {
           quotationId: quotation.id,
           quotationNumber: quotation.quotationNumber,
@@ -6610,7 +6616,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return { personnelId: member.personnelId, hours: Number(member.hours) || 0, originalRate, currentRate };
     }));
 
-    const drift = calculateMarginDrift({ lockedTotal: Number(quotation.totalAmount) || 0, quotedCost: quotedOperationalCost(quotation), team });
+    const [acceptedVariant] = quotation.acceptedVariantId
+      ? await db.select().from(quotationVariants).where(eq(quotationVariants.id, quotation.acceptedVariantId))
+      : [];
+    const scope = acceptedScopeCostAndNet(quotation, acceptedVariant);
+    const drift = calculateMarginDrift({ lockedTotal: scope.net, quotedCost: scope.cost, team });
     return {
       applicable: true as const,
       quotationCurrency,
@@ -8651,10 +8661,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ? await storage.getQuotationTeamMembersByVariant(quotation.acceptedVariantId)
         : await storage.getQuotationTeamMembers(id);
       const quotedHours = quotedTeam.reduce((sum, member) => sum + (member.hours || 0), 0);
-      const quotedCost = quotedOperationalCost(quotation);
-      const revenue = quotation.pricesIncludeTax
-        ? calculateTaxBreakdown(quotation.totalAmount, quotation.taxRate, true).netAmount
-        : quotation.totalAmount;
+      const [acceptedVariant] = quotation.acceptedVariantId
+        ? await db.select().from(quotationVariants).where(eq(quotationVariants.id, quotation.acceptedVariantId))
+        : [];
+      const { cost: quotedCost, net: revenue } = acceptedScopeCostAndNet(quotation, acceptedVariant);
       const projectHeaders = projects.map(project => ({ id: project.id, name: project.subprojectName || project.name || String(project.id) }));
       res.json({
         quotation: { totalAmount: quotation.totalAmount, baseCost: quotedCost, quotedHours },
