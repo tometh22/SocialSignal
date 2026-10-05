@@ -344,3 +344,14 @@ describe("Feedback 5-10 · limpieza", () => {
     expect(script).not.toMatch(/DELETE\s+FROM\s+quotations/i);
   });
 });
+
+describe("Feedback 5-10 · script de archivado con proyectos anulados", () => {
+  it("tolera sólo proyectos anulados, terminados y vacíos; cualquier otro proyecto sigue bloqueando", () => {
+    const script = readFileSync(join(process.cwd(), "scripts/archive-legacy-quotations.mjs"), "utf8");
+    expect(script).toContain("ap.status = 'voided' AND COALESCE(ap.is_finished, false) = true");
+    for (const table of ["time_entries", "tasks", "task_time_entries", "direct_costs"]) {
+      expect(script).toContain(`NOT EXISTS (SELECT 1 FROM ${table} x`);
+    }
+    expect(script).toContain("dep.n === (toleratedProjectsByQuotation.get(dep.quotationId) ?? 0)");
+  });
+});

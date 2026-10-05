@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.11.2 — 2026-10-05
+
+- `archive-legacy-quotations.mjs`: un proyecto vinculado que está anulado, terminado y sin horas, tareas ni costos ya no bloquea el archivado de su cotización (se informa en la vista previa); cualquier otro proyecto sigue bloqueando.
+
 ## 1.11.1 — 2026-10-05
 
 - Configuración: se oculta la pestaña Plantillas (las recetas del cotizador la reemplazan); los datos y la lectura para cotizaciones históricas se conservan.

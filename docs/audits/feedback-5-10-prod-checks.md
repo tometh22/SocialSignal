@@ -36,3 +36,10 @@ WHERE i.group_id = (SELECT id FROM quotation_groups WHERE group_number='GRP-2026
 ```
 Si `quotation_currency='USD'` y `team_cost` está en millones con tarifas de cientos de dólares, hay un
 error de unidades al aplicar la receta en USD (abrir fix aparte).
+
+## Resultado de la corrida en producción (2026-10-05)
+
+- **Migración 0076:** `quotation_alert_dismissals` existe con todas sus columnas (incluida `baseline_severity`) y su constraint única.
+- **Cotizaciones legacy:** se archivaron las 4 (ids 257 Dashboard, 258 Estudio Atributos, 267 Diego Perez, 268 Referentes Obesidad) con `scripts/archive-legacy-quotations.mjs`, etiqueta `feedback-5-10-legacy-1000usd`: 4 respaldos en `quotation_archive_rollback_backups` y 4 eventos `archived`. Sus proyectos (37, 38, 47, 48) ya estaban anulados y vacíos y no se tocaron. Reversible con `POST /api/quotations/:id/restore`.
+- **Sync 2027:** la pestaña "Valor Hora Real y Estimada" del Máster no tiene una sección 2027 (`SECTION_NOT_FOUND`); 2025 y 2026 se leen bien. No es de permisos ni de código: falta cargar el año en el Máster.
+- **Grupo PepsiCo (GRP-2026-000001):** confirmado el error de unidades. Las cotizaciones 325 y 326 (USD, fx 1540) mezclan tarifas en pesos (roles 18, 12, 20 y 21: 22.466, 17.500, 17.500 y 13.686 por hora) con tarifas en dólares (roles 9 y 10: 15 y 12,5), lo que infla el total a USD 4.432.102 en lugar de ~USD 3.900.
