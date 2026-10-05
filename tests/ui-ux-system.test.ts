@@ -15,7 +15,9 @@ describe("Mind product UI system", () => {
     expect(topbar).toContain('event.key.toLowerCase() === "k"');
     expect(topbar).not.toContain("Warner Bros. - 80% del presupuesto consumido");
     expect(topbar).not.toContain("uberchil");
-    expect(topbar).not.toContain('href="/notifications"');
+    // El enlace «Ver toda la actividad» sólo es válido si la ruta existe (antes la página no existía).
+    expect(topbar).toContain('href="/notifications"');
+    expect(source("client/src/App.tsx")).toContain('path="/notifications"');
   });
 
   test("shared overlays and motion respect small screens and accessibility preferences", () => {
