@@ -1,5 +1,5 @@
 ---
-version: 2.31.0
+version: 2.32.0
 updatedAt: 2026-10-05
 feedbackCount: 70
 ---
@@ -182,6 +182,7 @@ cancellation_requested -> cancelled | approved
 - Sólo `approved` y `cancellation_requested` descuentan saldo y capacidad.
 - Se cuentan lunes a viernes, excluidos feriados configurados. Un rango interanual se reparte por año.
 - No puede haber superposición con otra solicitud activa de la misma persona.
+- Editar una ausencia aprobada que cambia sus fechas o su tipo se valida contra el saldo igual que una aprobación; sólo se exige lo que empeora respecto de lo ya aprobado.
 - Operaciones no puede aprobar sin saldo. Admin puede aprobar un adelanto de vacaciones sólo con override y motivo obligatorio; la deuda se aplica automáticamente a los cupos anuales siguientes y el evento queda auditado.
 - La aprobación bloquea los cupos anuales dentro de una transacción para evitar doble gasto concurrente.
 - Una pendiente puede ser cancelada por su persona. Una aprobada pasa a solicitud de cancelación y continúa descontando hasta la confirmación.

@@ -186,7 +186,7 @@ describe("Feedback 5-10 · saldos de ausencias", () => {
   it("el endpoint de resumen es sólo para Operaciones y el Home usa el mismo cálculo", () => {
     const routes = source("server/routes.ts");
     expect(routes).toContain('app.get("/api/absence-allowances/summary"');
-    expect(routes).toContain('import { calculateVacationLedger, summarizeAbsenceBalance } from "@shared/utils/absence-balance"');
+    expect(routes).toContain('import { calculateVacationLedger, summarizeAbsenceBalance, findAllowanceShortfalls } from "@shared/utils/absence-balance"');
     const page = source("client/src/pages/personnel-absences.tsx");
     expect(page).toContain("absence-balance-strip");
     expect(page).toContain("Si aprobás: quedan");

@@ -103,3 +103,49 @@ export function summarizeAbsenceBalance(input: AbsenceBalanceInput): AbsenceBala
     notCounted: { sick: sum(input.takenAbsences, "sick"), other: sum(input.takenAbsences, "other") },
   };
 }
+
+export type AllowanceShortfall = { year: number; kind: "not_configured" | "insufficient"; available: number; requested: number };
+
+/**
+ * ¿Cabe una ausencia (nueva o editada) en los cupos? Misma regla que la aprobación: vacaciones contra el
+ * saldo del libro del año (con traslado y adelantos) y días Epical contra cupo − usados. Recibe las demás
+ * ausencias que ya descuentan (SIN la que se está evaluando) para no contarla dos veces al editarla.
+ */
+export function findAllowanceShortfalls(input: {
+  type: "vacation" | "epical_day";
+  requestedByYear: Record<number, number>;
+  allowances: Array<VacationAllowanceLedgerRow & { epicalDays: number | null }>;
+  otherActiveAbsences: Array<{ type: string; startDate: string; endDate: string }>;
+  holidayDates: ReadonlySet<string>;
+}): AllowanceShortfall[] {
+  const years = Object.keys(input.requestedByYear).map(Number);
+  if (years.length === 0) return [];
+  const shortfalls: AllowanceShortfall[] = [];
+  const ledger = input.type === "vacation"
+    ? calculateVacationLedger(
+      Math.max(...years),
+      input.allowances,
+      input.otherActiveAbsences.filter((row) => row.type === "vacation"),
+      input.holidayDates,
+    )
+    : {};
+  for (const year of years) {
+    const requested = input.requestedByYear[year];
+    const allowance = input.allowances.find((row) => row.year === year);
+    if (!allowance) {
+      shortfalls.push({ year, kind: "not_configured", available: 0, requested });
+      continue;
+    }
+    if (input.type === "vacation") {
+      const balance = ledger[year]?.balanceDays ?? 0;
+      if (balance < requested) shortfalls.push({ year, kind: "insufficient", available: balance, requested });
+    } else {
+      const used = input.otherActiveAbsences
+        .filter((row) => row.type === "epical_day")
+        .reduce((total, row) => total + (businessDaysByYear(row.startDate, row.endDate, input.holidayDates)[year] ?? 0), 0);
+      const available = (allowance.epicalDays ?? 0) - used;
+      if (available < requested) shortfalls.push({ year, kind: "insufficient", available, requested });
+    }
+  }
+  return shortfalls;
+}
