@@ -1,5 +1,5 @@
 ---
-version: 2.30.0
+version: 2.31.0
 updatedAt: 2026-10-05
 feedbackCount: 70
 ---
@@ -137,6 +137,8 @@ monthlySalaryUSD = hourlyRateUSD × monthlyHoursSnapshot
 ## Pricing de cotizaciones
 
 `exchangeRateAtQuote` es un snapshot positivo y obligatorio para pricing versión 2, también en cotizaciones ARS. Acepta coma o punto al ingresarse. Las cotizaciones legacy sin snapshot conservan sus totales hasta que una edición confirme el tipo de cambio.
+
+La tarifa de un rol sin persona se resuelve siempre en la moneda de la cotización: en USD usa la tarifa USD del rol y, si no la tiene, convierte la tarifa en pesos con el tipo de cambio de la cotización; en ARS usa la tarifa en pesos y, si no la tiene, convierte la de dólares. Nunca se guarda una tarifa en pesos como si fuera dólares, y el servidor rechaza una cotización USD cuyo equipo por rol contiene la tarifa en pesos del rol.
 
 La unidad interna es ARS. Cada costo extranjero se convierte exactamente una vez y el orden es:
 

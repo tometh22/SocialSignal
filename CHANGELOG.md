@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.11.3 — 2026-10-05
+
+- Corrige el error de unidades en cotizaciones en USD armadas por rol: los roles canónicos nuevos no tienen tarifa USD y se guardaba su tarifa en pesos como si fueran dólares (un grupo de PepsiCo llegó a USD 4,4 millones en vez de ~3.900). La tarifa del rol ahora se resuelve en la moneda de la cotización (convirtiendo con el tipo de cambio) en el aplicar receta, el cambio de moneda y el alta rápida de roles, y se eliminan los valores de respaldo fijos (50 USD / 5000 ARS).
+- El servidor rechaza al crear o editar una cotización USD cuyo equipo por rol contiene la tarifa en pesos del rol.
+- Definiciones de producto 2.31.0.
+
 ## 1.11.2 — 2026-10-05
 
 - `archive-legacy-quotations.mjs`: un proyecto vinculado que está anulado, terminado y sin horas, tareas ni costos ya no bloquea el archivado de su cotización (se informa en la vista previa); cualquier otro proyecto sigue bloqueando.

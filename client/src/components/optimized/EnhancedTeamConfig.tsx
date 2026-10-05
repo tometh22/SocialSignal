@@ -11,6 +11,7 @@ import { Separator } from '@/components/ui/separator';
 import { Personnel, Role } from '@shared/schema';
 import { parseDecimalInput } from '@/lib/number-utils';
 import { useCurrency } from '@/hooks/use-currency';
+import { resolveRoleRate } from '@shared/utils/role-rate';
 import {
   Clock,
   UserPlus,
@@ -235,9 +236,7 @@ const EnhancedTeamConfig: React.FC<EnhancedTeamConfigProps> = ({ validationMessa
       const role = getRoleInfo(roleId);
       if (role) {
         const hours = 40;
-        const rate = currency === 'USD'
-          ? ((role as any).defaultRateUsd || 50)
-          : (role.defaultRate || 5000);
+        const rate = resolveRoleRate(role as any, currency === 'USD' ? 'USD' : 'ARS', Number(quotationData.exchangeRateSnapshot) > 0 ? Number(quotationData.exchangeRateSnapshot) : exchangeRate);
         addTeamMember({
           roleId,
           personnelId: null,

@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useMemo, useCall
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Client, ReportTemplate, Role, Personnel, Quotation } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
+import { resolveRoleRate } from "@shared/utils/role-rate";
 import { useCurrency } from "@/hooks/use-currency";
 import { resolveQuotationPersonnelRate } from "@shared/utils/quotation-personnel-rate";
 import {
@@ -727,9 +728,7 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
         } else if (member.roleId) {
           const role = roles?.find(r => r.id === member.roleId);
           if (role) {
-            newRate = newCurrency === 'USD'
-              ? ((role as any).defaultRateUsd || 50)
-              : (role.defaultRate || 5000);
+            newRate = resolveRoleRate(role as any, newCurrency === 'USD' ? 'USD' : 'ARS', rateSnapshot);
           }
         }
         return { ...member, rate: newRate, cost: member.hours * newRate };
@@ -856,16 +855,9 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
       defaultRate = getPersonnelRate(member.personnelId, currency);
     }
     
+    // Rol sin persona: tarifa del rol en la moneda de la cotización (convertida si sólo existe en la otra).
     if (!defaultRate && !member.personnelId) {
-      if (currency === 'USD') {
-        defaultRate = (role as any)?.defaultRateUsd || 50;
-      } else {
-        defaultRate = role?.defaultRate || 5000;
-      }
-    }
-
-    if (!defaultRate && !member.personnelId) {
-      defaultRate = currency === 'USD' ? 50 : 5000;
+      defaultRate = resolveRoleRate(role as any, currency === 'USD' ? 'USD' : 'ARS', effectiveExchangeRate);
     }
 
     const newMember: OptimizedTeamMember = {

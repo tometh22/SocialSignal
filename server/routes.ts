@@ -332,6 +332,7 @@ import { PRODUCT_DEFINITIONS_MANIFEST } from "./content/product-definitions-mani
 import { calculateQuotationPricing } from "@shared/utils/quotation-pricing";
 import { calculateCanonicalComplexityFactor } from "@shared/utils/quotation-complexity";
 import { calculateMarginDrift, isMarginDriftDismissalActive } from "@shared/utils/quotation-margin-drift";
+import { findArsRatesInUsdQuotation } from "@shared/utils/role-rate";
 import { mergeQuotationActualEntries } from "@shared/utils/quotation-actual-entries";
 import { quotedOperationalCost, quotationProfitability } from "@shared/utils/quotation-profitability";
 import {
@@ -7115,6 +7116,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return normalizedTeam;
   }
 
+  // Red de seguridad: una cotización en USD no puede guardar como tarifa de un rol (sin persona) la tarifa
+  // en PESOS del rol. El cliente ya convierte (resolveRoleRate); esto frena clientes viejos o un bug futuro,
+  // porque cliente y servidor calculan con la misma suposición y el total "cierra" aunque esté inflado ×1500.
+  async function assertRoleRatesMatchCurrency(
+    quotation: { quotationCurrency?: string | null; exchangeRateAtQuote?: number | string | null },
+    teamMembers: z.infer<typeof quotationTeamPayloadSchema>[],
+  ) {
+    if (quotation.quotationCurrency !== "USD") return;
+    const roleIds = [...new Set(teamMembers.flatMap((member) => member.roleId && !member.personnelId ? [member.roleId] : []))];
+    if (roleIds.length === 0) return;
+    const roleRows = await db.select({ id: roles.id, name: roles.name, defaultRate: roles.defaultRate, defaultRateUsd: roles.defaultRateUsd })
+      .from(roles).where(inArray(roles.id, roleIds));
+    const byId = new Map(roleRows.map((role) => [role.id, role]));
+    const mismatches = findArsRatesInUsdQuotation({
+      currency: "USD",
+      exchangeRate: Number(quotation.exchangeRateAtQuote) || 0,
+      members: teamMembers,
+      roles: byId,
+    });
+    if (mismatches.length === 0) return;
+    throw new z.ZodError(mismatches.map((item) => ({
+      code: z.ZodIssueCode.custom,
+      path: ["teamMembers", item.index, "rate"],
+      message: `La tarifa de ${byId.get(item.roleId)?.name ?? `rol #${item.roleId}`} (${item.rate}) está en pesos y la cotización es en USD (esperado ≈ ${item.expectedUsdRate}). Recalculá el equipo en la moneda de la cotización.`,
+    })));
+  }
+
   async function validateQuotationTeamReferences(teamMembers: z.infer<typeof quotationTeamPayloadSchema>[]) {
     const personnelIds = [...new Set(teamMembers.flatMap((member) => member.personnelId ? [member.personnelId] : []))];
     const roleIds = [...new Set(teamMembers.flatMap((member) => member.roleId ? [member.roleId] : []))];
@@ -7793,6 +7821,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ...validatedTeam,
           ...normalizedVariants.flatMap((variant) => variant.teamMembers),
         ]);
+        await assertRoleRatesMatchCurrency(validatedData, [
+          ...validatedTeam,
+          ...normalizedVariants.flatMap((variant) => variant.teamMembers),
+        ]);
         await validateQuotationCommercialReferences(validatedData);
 
         // Crear cotización — expiresAt default = ahora + 30 días si no viene en payload
@@ -7933,6 +7965,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return { ...variant, isSelected: false, teamMembers: variantTeam };
         });
         await validateQuotationTeamReferences([
+          ...validatedTeam,
+          ...(normalizedVariants?.flatMap((variant) => variant.teamMembers) ?? []),
+        ]);
+        await assertRoleRatesMatchCurrency(validatedData, [
           ...validatedTeam,
           ...(normalizedVariants?.flatMap((variant) => variant.teamMembers) ?? []),
         ]);
