@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useCurrency } from "@/hooks/use-currency";
+import { resolveRoleRate } from "@shared/utils/role-rate";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -51,6 +53,7 @@ const ROLE_KEY_LABELS: Record<string, string> = {
 };
 
 export function ProfessionalScopeBuilder({ mode = "all", headless = false }: { mode?: ScopeBuilderMode; headless?: boolean }) {
+  const { exchangeRate: liveExchangeRate } = useCurrency();
   const { quotationData, updateQuotationData, updateTeamMembers, availableRoles } = useOptimizedQuote();
   const { data: blueprints = [], isLoading } = useQuery<BlueprintWithWorkload[]>({ queryKey: ["/api/service-blueprints?status=published"] });
   const { data: effortBenchmarks = [] } = useQuery<EffortBenchmark[]>({ queryKey: ["/api/quotation-effort-benchmarks"] });
@@ -92,6 +95,24 @@ export function ProfessionalScopeBuilder({ mode = "all", headless = false }: { m
         : [];
     });
   }, [capacity, quotationData.teamMembers, scope]);
+
+  // Tipo de cambio de la cotización (el congelado si existe) para convertir tarifas de rol en pesos a dólares.
+  const roleRateExchangeRate = Number(quotationData.exchangeRateSnapshot) > 0 ? Number(quotationData.exchangeRateSnapshot) : Number(liveExchangeRate) || 0;
+
+  // Si la receta se aplicó antes de que el tipo de cambio cargara, los roles sin tarifa USD quedaron en 0
+  // (mejor que guardar pesos como dólares): se completan solos apenas hay tipo de cambio.
+  useEffect(() => {
+    if (quotationData.quotationCurrency !== "USD" || !(roleRateExchangeRate > 0)) return;
+    let changed = false;
+    const filled = quotationData.teamMembers.map((member) => {
+      if (!member.roleId || member.personnelId || Number(member.rate) > 0) return member;
+      const rate = resolveRoleRate(availableRoles.find((role) => role.id === member.roleId), "USD", roleRateExchangeRate);
+      if (!(rate > 0)) return member;
+      changed = true;
+      return { ...member, rate, cost: Number(member.hours || 0) * rate };
+    });
+    if (changed) updateTeamMembers(filled);
+  }, [availableRoles, quotationData.quotationCurrency, quotationData.teamMembers, roleRateExchangeRate, updateTeamMembers]);
 
   const applyBlueprint = (blueprint: BlueprintWithWorkload) => {
     const baseDefinition = blueprintDefinitionSchema.parse(structuredClone(blueprint.definition));
@@ -153,7 +174,7 @@ export function ProfessionalScopeBuilder({ mode = "all", headless = false }: { m
     }
     const nextMembers = [...hoursByRoleId.values()].map(({ role, hours }) => {
       const existing = quotationData.teamMembers.find((member) => member.roleId === role.id);
-      const rate = existing?.rate || (quotationData.quotationCurrency === "USD" ? Number(role.defaultRateUsd || role.defaultRate || 0) : Number(role.defaultRate || 0));
+      const rate = existing?.rate || resolveRoleRate(role, quotationData.quotationCurrency === "USD" ? "USD" : "ARS", roleRateExchangeRate);
       return {
         id: existing?.id || crypto.randomUUID(),
         roleId: role.id,
