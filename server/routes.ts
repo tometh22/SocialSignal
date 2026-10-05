@@ -4803,7 +4803,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(canonicalizePersonnelDisplay(normalizedPerson));
   });
 
-  app.post("/api/personnel", requireAuth, async (req, res) => {
+  app.post("/api/personnel", requireAuth, requirePermission("admin"), async (req, res) => {
     try {
       const incoming = { ...req.body, hourlyRate: 0 };
       canonicalizePersonnelClassification(incoming);
@@ -4859,7 +4859,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/personnel/:id", requireAuth, async (req, res) => {
+  app.patch("/api/personnel/:id", requireAuth, requirePermission("admin"), async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "ID de personal inválido" });
 
@@ -5281,7 +5281,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/personnel/:id", requireAuth, async (req, res) => {
+  app.delete("/api/personnel/:id", requireAuth, requirePermission("admin"), async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "ID de personal inválido" });
 
