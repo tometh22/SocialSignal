@@ -158,6 +158,9 @@ import {
   absenceAllowances,
   absenceEvents,
   userNotifications,
+  userNotificationEmailDeliveries,
+  userNotificationPushSubscriptions,
+  userNotificationPreferences,
   quotationTeamMembers,
   quotationPriceAdjustments,
   quotationAlertDismissals,
@@ -192,6 +195,7 @@ import { registerProposalStudioRoutes } from "./routes-proposal-studio";
 import { runDocumentQa } from "./routes-proposal-studio";
 import { blueprintDefinitionSchema, estimateBlueprintWorkload, isDeliverableSold, proposalDocumentSchema } from "@shared/quotation-professional";
 import { renderProposalPdf } from "./services/proposal-studio";
+import { createUserNotifications as persistUserNotifications, getWebPushPublicKey, retryUserNotificationEmailDelivery, sendUserWebPushTest } from "./services/user-notifications";
 import { reviewRooms, reviewRoomMembers, capacityOverrides } from "@shared/schema";
 import path from 'path';
 import PDFDocument from "pdfkit";
@@ -435,17 +439,7 @@ async function createUserNotifications(
   userIds: number[],
   notification: { eventKey: string; type: string; title: string; message: string; entityId?: number; actionUrl?: string },
 ) {
-  if (userIds.length === 0) return;
-  await db.insert(userNotifications).values(userIds.map((userId) => ({
-    userId,
-    eventKey: notification.eventKey,
-    type: notification.type,
-    title: notification.title,
-    message: notification.message,
-    entityType: "absence",
-    entityId: notification.entityId,
-    actionUrl: notification.actionUrl ?? "/absences",
-  }))).onConflictDoNothing();
+  await persistUserNotifications(userIds, { ...notification, entityType: "absence", actionUrl: notification.actionUrl ?? "/absences" });
 }
 
 async function canAccessTaskProject(req: Request, projectId: number): Promise<boolean> {
@@ -22837,6 +22831,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json({
         totalActive: leadsResult.filter(l => !['won', 'lost'].includes(l.stage)).length,
+        unassignedActive: leadsResult.filter(l => l.assignedTo == null && !['won', 'lost'].includes(l.stage)).length,
         totalPipelineUsd,
         wonThisMonth,
         overdueReminders: overdueReminders.length,
@@ -22848,6 +22843,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // GET /api/crm/leads — lista de leads
+  app.get("/api/crm/assignees", requireAuth, requirePermission("crm"), async (_req: Request, res: Response) => {
+    try {
+      const candidates = await db.select({ id: users.id, firstName: users.firstName, lastName: users.lastName, isAdmin: users.isAdmin, permissions: users.permissions })
+        .from(users).where(eq(users.isActive, true)).orderBy(asc(users.firstName), asc(users.lastName));
+      res.json(candidates.filter((user) => user.isAdmin || (user.permissions || []).includes("crm"))
+        .map(({ id, firstName, lastName }) => ({ id, firstName, lastName })));
+    } catch (error) {
+      res.status(500).json({ message: error instanceof Error ? error.message : "No se pudieron cargar responsables" });
+    }
+  });
+
   app.get("/api/crm/leads", requireAuth, async (req: Request, res: Response) => {
     try {
       const { stage, search } = req.query;
@@ -23087,6 +23093,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // GET /api/crm/reminders/due — recordatorios vencidos o próximos (24hs) + alertas automáticas de inactividad
   app.get("/api/crm/reminders/due", requireAuth, async (req: Request, res: Response) => {
     try {
+      const userId = Number((req.user as any)?.id);
       const now = new Date();
       const in24h = new Date(now.getTime() + 24 * 60 * 60 * 1000);
 
@@ -23104,7 +23111,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(
           and(
             eq(crmReminders.completed, false),
-            lte(crmReminders.dueDate, in24h)
+            lte(crmReminders.dueDate, in24h),
+            or(eq(crmReminders.createdBy, userId), eq(crmLeads.assignedTo, userId))
           )
         )
         .orderBy(asc(crmReminders.dueDate));
@@ -23116,7 +23124,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }));
 
       // Automatic inactivity alerts: leads where last activity > stage.followUpDays ago
-      const stages = await db.select().from(crmStages).where(isNotNull(crmStages.followUpDays));
+      const stages = await db.select().from(crmStages).where(and(
+        eq(crmStages.isActive, true),
+        isNotNull(crmStages.followUpDays),
+        notInArray(crmStages.key, ['won', 'lost']),
+      ));
       const stageMap = new Map(stages.map(s => [s.key, s]));
 
       // Get all active leads with a stage that has followUpDays
@@ -23125,7 +23137,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.json(manualAlerts);
       }
 
-      const leads = await db.select().from(crmLeads).where(inArray(crmLeads.stage, activeStageKeys));
+      const leads = await db.select().from(crmLeads).where(and(
+        inArray(crmLeads.stage, activeStageKeys),
+        eq(crmLeads.assignedTo, userId),
+      ));
 
       // Get latest activity per lead
       const leadIds = leads.map(l => l.id);
@@ -24210,6 +24225,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   };
 
+  const notifyTaskAssignment = async (task: { id: number; projectId: number; title: string; assigneeId?: number | null; collaboratorIds?: number[] | null }, actorId: number) => {
+    const personnelIds = [...new Set([task.assigneeId, ...(task.collaboratorIds ?? [])].filter((id): id is number => typeof id === "number"))];
+    if (!personnelIds.length) return;
+    const recipients = await db.select({ userId: users.id }).from(users).innerJoin(personnel,
+      sql`LOWER(TRIM(${users.email})) = LOWER(TRIM(${personnel.email}))`)
+      .where(and(inArray(personnel.id, personnelIds), eq(users.isActive, true)));
+    const [project] = await db.select({ name: activeProjects.name }).from(activeProjects).where(eq(activeProjects.id, task.projectId)).limit(1);
+    await persistUserNotifications(recipients.map((row) => row.userId).filter((id) => id !== actorId), {
+      eventKey: `task-assigned:${task.id}:${Date.now()}`,
+      type: "task_assigned",
+      title: "Te asignaron una tarea",
+      message: `${task.title}${project?.name ? ` · ${project.name}` : ""}`,
+      entityType: "task",
+      entityId: task.id,
+      actionUrl: `/tasks/projects/${task.projectId}?taskId=${task.id}`,
+    });
+  };
+
   app.post("/api/tasks", requireAuth, async (req: Request, res: Response) => {
     try {
       const user = (req as any).user;
@@ -24264,6 +24297,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         data.position = (maxRow?.maxPos ?? -1) + 1;
       }
       const [created] = await db.insert(tasks).values(data).returning();
+      await notifyTaskAssignment(created, Number(user.id));
       res.json({ ...created, ...await taskAssignmentAdvisory(created) });
     } catch (error: any) {
       if (error.name === "ZodError") return res.status(400).json({ message: "Datos inválidos", errors: error.errors });
@@ -24483,6 +24517,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return saved;
       });
       if (!updated) return res.status(404).json({ message: "Tarea no encontrada" });
+      const previouslyAssigned = new Set([existingTask.assigneeId, ...(existingTask.collaboratorIds ?? [])].filter((id): id is number => typeof id === "number"));
+      const newlyAssigned = [updated.assigneeId, ...(updated.collaboratorIds ?? [])].filter((id): id is number => typeof id === "number" && !previouslyAssigned.has(id));
+      if (newlyAssigned.length) await notifyTaskAssignment({ ...updated, assigneeId: null, collaboratorIds: newlyAssigned }, Number((req.user as any)?.id));
       if (existingTask.parentTaskId !== updated.parentTaskId) {
         if (existingTask.parentTaskId) await recalculateTaskLoggedHours(existingTask.parentTaskId);
         if (updated.parentTaskId) await recalculateTaskLoggedHours(updated.parentTaskId);
@@ -24808,6 +24845,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!(await canAccessTaskProject(req, projectId))) return res.status(403).json({ message: "No tenés acceso a esta tarea" });
       const authorId = (req as any).user?.id ?? null;
       const [comment] = await db.insert(taskComments).values({ taskId, authorId, content: content.trim() }).returning();
+      const [task] = await db.select({ id: tasks.id, title: tasks.title, projectId: tasks.projectId, assigneeId: tasks.assigneeId })
+        .from(tasks).where(eq(tasks.id, taskId)).limit(1);
+      const priorAuthors = await db.select({ userId: taskComments.authorId }).from(taskComments)
+        .where(and(eq(taskComments.taskId, taskId), sql`${taskComments.id} <> ${comment.id}`, isNotNull(taskComments.authorId)));
+      const recipientIds = priorAuthors.map((row) => row.userId!).filter((id) => id !== authorId);
+      if (task?.assigneeId) {
+        const assigneeUsers = await db.select({ userId: users.id }).from(users).innerJoin(personnel,
+          sql`LOWER(TRIM(${users.email})) = LOWER(TRIM(${personnel.email}))`)
+          .where(and(eq(personnel.id, task.assigneeId), eq(users.isActive, true)));
+        recipientIds.push(...assigneeUsers.map((row) => row.userId));
+      }
+      const [project] = task ? await db.select({ name: activeProjects.name }).from(activeProjects).where(eq(activeProjects.id, task.projectId)).limit(1) : [];
+      const [author] = authorId ? await db.select({ firstName: users.firstName, lastName: users.lastName }).from(users).where(eq(users.id, authorId)).limit(1) : [];
+      await persistUserNotifications(recipientIds.filter((id) => id !== authorId), {
+        eventKey: `task-comment:${comment.id}`,
+        type: "task_reply",
+        title: "Nueva respuesta en una tarea",
+        message: `${author ? `${author.firstName} ${author.lastName}` : "Alguien"} comentó en “${task?.title || "Tarea"}”${project?.name ? ` · ${project.name}` : ""}.`,
+        entityType: "task",
+        entityId: taskId,
+        actionUrl: `/tasks/projects/${task?.projectId}?taskId=${taskId}`,
+      });
       res.status(201).json(comment);
     } catch (error) {
       res.status(500).json({ message: "Error al crear comentario" });
@@ -27190,9 +27249,104 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/notifications", requireAuth, async (req, res) => {
     const userId = Number((req.user as any)?.id);
-    const rows = await db.select().from(userNotifications).where(eq(userNotifications.userId, userId))
-      .orderBy(sql`${userNotifications.readAt} NULLS FIRST`, desc(userNotifications.createdAt)).limit(100);
-    res.json(rows);
+    const requestedLimit = Number(req.query.limit ?? 20);
+    const limit = Number.isInteger(requestedLimit) ? Math.min(50, Math.max(1, requestedLimit)) : 20;
+    const beforeId = Number(req.query.beforeId);
+    const conditions = [eq(userNotifications.userId, userId)];
+    if (req.query.unreadOnly === "true") conditions.push(isNull(userNotifications.readAt));
+    if (Number.isInteger(beforeId) && beforeId > 0) conditions.push(lt(userNotifications.id, beforeId));
+    const [rows, unreadResult] = await Promise.all([
+      db.select().from(userNotifications).where(and(...conditions)).orderBy(desc(userNotifications.id)).limit(limit + 1),
+      db.select({ count: sql<number>`count(*)::int` }).from(userNotifications)
+        .where(and(eq(userNotifications.userId, userId), isNull(userNotifications.readAt))),
+    ]);
+    const hasMore = rows.length > limit;
+    const items = hasMore ? rows.slice(0, limit) : rows;
+    res.json({ items, unreadCount: unreadResult[0]?.count ?? 0, hasMore, nextCursor: hasMore ? items.at(-1)?.id ?? null : null });
+  });
+  app.get("/api/notifications/preferences", requireAuth, async (req, res) => {
+    const userId = Number((req.user as any)?.id);
+    const [preferences] = await db.select().from(userNotificationPreferences).where(eq(userNotificationPreferences.userId, userId)).limit(1);
+    res.json(preferences ?? { userId, desktopEnabled: false, emailEnabled: false, setupCompletedAt: null });
+  });
+  app.get("/api/notifications/push/public-key", requireAuth, async (_req, res) => {
+    res.setHeader("Cache-Control", "no-store");
+    res.json({ publicKey: getWebPushPublicKey() });
+  });
+  app.post("/api/notifications/push/subscribe", requireAuth, async (req, res) => {
+    const parsed = z.object({
+      endpoint: z.string().url().refine((value) => new URL(value).protocol === "https:", "El endpoint debe usar HTTPS"),
+      expirationTime: z.number().nullable().optional(),
+      keys: z.object({ p256dh: z.string().min(16).max(256), auth: z.string().min(8).max(256) }).strict(),
+    }).strict().safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ message: "Suscripción Web Push inválida" });
+    if (!getWebPushPublicKey()) return res.status(503).json({ message: "Web Push no está configurado en el servidor" });
+    const userId = Number((req.user as any)?.id);
+    const now = new Date();
+    await db.insert(userNotificationPushSubscriptions).values({
+      userId,
+      endpoint: parsed.data.endpoint,
+      p256dh: parsed.data.keys.p256dh,
+      auth: parsed.data.keys.auth,
+      userAgent: req.get("user-agent")?.slice(0, 500) ?? null,
+      updatedAt: now,
+    }).onConflictDoUpdate({
+      target: userNotificationPushSubscriptions.endpoint,
+      set: {
+        userId,
+        p256dh: parsed.data.keys.p256dh,
+        auth: parsed.data.keys.auth,
+        userAgent: req.get("user-agent")?.slice(0, 500) ?? null,
+        updatedAt: now,
+      },
+    });
+    res.json({ success: true });
+  });
+  app.delete("/api/notifications/push/subscribe", requireAuth, async (req, res) => {
+    const parsed = z.object({ endpoint: z.string().url() }).strict().safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ message: "Suscripción Web Push inválida" });
+    const userId = Number((req.user as any)?.id);
+    await db.delete(userNotificationPushSubscriptions).where(and(
+      eq(userNotificationPushSubscriptions.userId, userId),
+      eq(userNotificationPushSubscriptions.endpoint, parsed.data.endpoint),
+    ));
+    res.json({ success: true });
+  });
+  app.post("/api/notifications/push/test", requireAuth, async (req, res) => {
+    const parsed = z.object({
+      endpoint: z.string().url().max(2048).refine((value) => new URL(value).protocol === "https:", "El endpoint debe usar HTTPS"),
+    }).strict().safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ message: "Suscripción Web Push inválida" });
+    const result = await sendUserWebPushTest(Number((req.user as any)?.id), parsed.data.endpoint);
+    if (!result.ok) return res.status(result.status).json({ message: result.message });
+    res.json({ success: true });
+  });
+  app.put("/api/notifications/preferences", requireAuth, async (req, res) => {
+    const parsed = z.object({
+      desktopEnabled: z.boolean(),
+      emailEnabled: z.boolean(),
+      discreetMode: z.boolean().optional(),
+      categoryPreferences: z.record(z.enum(["mind", "daily", "tasks", "crm", "team"]), z.object({ desktop: z.boolean().optional(), email: z.boolean().optional() }).strict()).optional(),
+      setupCompleted: z.boolean().optional(),
+    }).strict().safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ message: "Preferencias inválidas" });
+    const { setupCompleted, ...channels } = parsed.data;
+    if (setupCompleted && !channels.desktopEnabled && !channels.emailEnabled) {
+      return res.status(400).json({ message: "Activá al menos un canal de notificaciones para continuar" });
+    }
+    const userId = Number((req.user as any)?.id);
+    const now = new Date();
+    const [preferences] = await db.insert(userNotificationPreferences).values({
+      userId,
+      ...channels,
+      ...(setupCompleted ? { setupCompletedAt: now } : {}),
+      updatedAt: now,
+    }).onConflictDoUpdate({ target: userNotificationPreferences.userId, set: {
+      ...channels,
+      ...(setupCompleted ? { setupCompletedAt: now } : {}),
+      updatedAt: now,
+    } }).returning();
+    res.json(preferences);
   });
   app.patch("/api/notifications/read-all", requireAuth, async (req, res) => {
     const userId = Number((req.user as any)?.id);
@@ -27206,6 +27360,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     )).returning();
     if (!row) return res.status(404).json({ message: "Notificación no encontrada" });
     res.json(row);
+  });
+  app.patch("/api/notifications/read-many", requireAuth, async (req, res) => {
+    const parsed = z.object({ ids: z.array(z.number().int().positive()).min(1).max(100) }).strict().safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ message: "Lista de notificaciones inválida" });
+    const userId = Number((req.user as any)?.id);
+    const rows = await db.update(userNotifications).set({ readAt: new Date() }).where(and(
+      eq(userNotifications.userId, userId), inArray(userNotifications.id, [...new Set(parsed.data.ids)]), isNull(userNotifications.readAt),
+    )).returning({ id: userNotifications.id });
+    res.json({ updated: rows.length });
+  });
+
+  app.get("/api/admin/notification-email-deliveries", requireAuth, async (req, res) => {
+    if (!(req.user as any)?.isAdmin) return res.status(403).json({ message: "Se requiere acceso de administrador" });
+    const counts = await db.select({ status: userNotificationEmailDeliveries.status, count: sql<number>`count(*)::int` })
+      .from(userNotificationEmailDeliveries).groupBy(userNotificationEmailDeliveries.status);
+    const recent = await db.select({
+      id: userNotificationEmailDeliveries.id,
+      status: userNotificationEmailDeliveries.status,
+      attempts: userNotificationEmailDeliveries.attempts,
+      lastError: userNotificationEmailDeliveries.lastError,
+      updatedAt: userNotificationEmailDeliveries.updatedAt,
+      type: userNotifications.type,
+      title: userNotifications.title,
+    }).from(userNotificationEmailDeliveries)
+      .innerJoin(userNotifications, eq(userNotifications.id, userNotificationEmailDeliveries.notificationId))
+      .where(inArray(userNotificationEmailDeliveries.status, ["pending", "failed"]))
+      .orderBy(desc(userNotificationEmailDeliveries.updatedAt)).limit(50);
+    res.json({ counts: Object.fromEntries(counts.map((row) => [row.status, row.count])), attention: recent });
+  });
+  app.post("/api/admin/notification-email-deliveries/:id/retry", requireAuth, async (req, res) => {
+    if (!(req.user as any)?.isAdmin) return res.status(403).json({ message: "Se requiere acceso de administrador" });
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ message: "ID inválido" });
+    const queued = await retryUserNotificationEmailDelivery(id);
+    if (!queued) return res.status(409).json({ message: "El email no existe o no está en estado de fallo" });
+    res.json({ success: true });
   });
 
   // Legacy read remains scoped; unsafe direct mutations are retired.

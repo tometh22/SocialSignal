@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.11.4 — 2026-10-05
+
+- Mind: nuevo centro de notificaciones con historial paginado, filtros, agrupación, lectura por elemento y preferencias por categoría; las notificaciones por email se procesan desde una cola con reintentos.
+- Avisos en Mind por respuestas y dailies, asignaciones y respuestas en tareas, y recordatorios CRM asignados. El modo privado oculta el contenido en correos y notificaciones de escritorio.
+- Web Push envía avisos del navegador aunque Mind esté cerrado, con registro y baja de cada dispositivo mediante un service worker y claves VAPID.
+- Preferencias permite enviar un aviso de prueba solo al dispositivo conectado, para comprobar la recepción sin crear actividad ficticia.
+- CRM: cola de oportunidades activas sin responsable y selector de responsable dentro del detalle.
+
 ## 1.11.3 — 2026-10-05
 
 - Corrige el error de unidades en cotizaciones en USD armadas por rol: los roles canónicos nuevos no tienen tarifa USD y se guardaba su tarifa en pesos como si fueran dólares (un grupo de PepsiCo llegó a USD 4,4 millones en vez de ~3.900). La tarifa del rol ahora se resuelve en la moneda de la cotización (convirtiendo con el tipo de cambio) en el aplicar receta, el cambio de moneda y el alta rápida de roles, y se eliminan los valores de respaldo fijos (50 USD / 5000 ARS).
