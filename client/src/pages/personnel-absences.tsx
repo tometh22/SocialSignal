@@ -38,6 +38,47 @@ type Balance = {
   used: { vacation: number; epical: number };
 };
 
+type TeamBalance = {
+  personnelId: number; name: string; configured: boolean; dataError?: boolean;
+  vacation: { quota: number | null; carryover: number; advanceDebt: number; available: number; used: number; balance: number; pending: number };
+  epical: { quota: number | null; used: number; balance: number | null; pending: number };
+  notCounted: { sick: number; other: number };
+};
+
+/** Saldo de la persona al decidir: qué consume la solicitud y cuánto queda si se aprueba. */
+function BalanceStrip({ person, absence }: { person?: TeamBalance; absence: Absence }) {
+  if (!person) return null;
+  if (person.dataError) return <p className="mt-2 text-xs text-destructive">Hay una ausencia de esta persona con fechas inválidas: no se pudo calcular el saldo.</p>;
+  // Enfermedad y Otros no descuentan cupo: el aviso de cupo sólo aplica a vacaciones y días Epical.
+  if (!["vacation", "epical_day"].includes(absence.type)) return null;
+  if (!person.configured) return <p className="mt-2 text-xs text-amber-700">Sin cupo configurado para este año.</p>;
+  const sameYear = absence.startDate.slice(0, 4) === absence.endDate.slice(0, 4);
+  const deciding = ["pending"].includes(absence.status) && sameYear;
+  const after = (balance: number) => balance - absence.businessDays;
+  const vacationLeft = absence.type === "vacation" && deciding ? after(person.vacation.balance) : null;
+  // Sin clamp: si ya se pasó del cupo (override previo), el saldo restante tiene que verse negativo.
+  const epicalLeft = absence.type === "epical_day" && deciding && person.epical.quota != null ? after(person.epical.quota - person.epical.used) : null;
+  const tone = (left: number | null) => (left != null && left < 0 ? "font-semibold text-destructive" : "font-medium");
+  return (
+    <div className="mt-2 grid gap-x-4 gap-y-1 rounded-md bg-muted/40 px-3 py-2 text-xs text-muted-foreground sm:grid-cols-3" data-testid="absence-balance-strip">
+      <div>
+        <span className="font-medium text-foreground">Vacaciones:</span> {person.vacation.balance} disp.
+        <span className="block">Cupo {person.vacation.quota ?? 0} + traslado {person.vacation.carryover}{person.vacation.advanceDebt ? ` − adelanto ${person.vacation.advanceDebt}` : ""} − usados {person.vacation.used}{person.vacation.pending ? ` · pendientes ${person.vacation.pending}` : ""}</span>
+        {vacationLeft != null && <span className={`block ${tone(vacationLeft)}`}>Si aprobás: quedan {vacationLeft}{vacationLeft < 0 ? " (excede el cupo)" : ""}</span>}
+      </div>
+      <div>
+        <span className="font-medium text-foreground">Días Epical:</span> {person.epical.balance ?? "sin cupo"} disp.
+        <span className="block">Cupo {person.epical.quota ?? 0} − usados {person.epical.used}{person.epical.pending ? ` · pendientes ${person.epical.pending}` : ""}</span>
+        {epicalLeft != null && <span className={`block ${tone(epicalLeft)}`}>Si aprobás: quedan {epicalLeft}{epicalLeft < 0 ? " (excede el cupo)" : ""}</span>}
+      </div>
+      <div>
+        <span className="font-medium text-foreground">Sin cupo (no descuentan):</span>
+        <span className="block">Enfermedad {person.notCounted.sick} · Otros {person.notCounted.other}</span>
+      </div>
+    </div>
+  );
+}
+
 export default function PersonnelAbsencesPage({ defaultTab = "mine" }: { defaultTab?: "mine" | "team" }) {
   const { user } = useAuth();
   const { isOperations } = usePermissions();
@@ -73,6 +114,13 @@ export default function PersonnelAbsencesPage({ defaultTab = "mine" }: { default
     queryFn: () => apiRequest(`/api/absence-allowances/${balancePersonId}/${year}`, "GET"),
     enabled: Boolean(balancePersonId),
   });
+
+  const { data: teamBalances } = useQuery<{ year: number; people: TeamBalance[] }>({
+    queryKey: ["/api/absence-allowances", "summary", year],
+    queryFn: () => apiRequest(`/api/absence-allowances/summary?year=${year}`, "GET"),
+    enabled: isManagement,
+  });
+  const balanceByPerson = useMemo(() => new Map((teamBalances?.people ?? []).map((person) => [person.personnelId, person])), [teamBalances]);
 
   useEffect(() => { setAllowanceDraft({ vacationDays: "", vacationCarryoverDays: "", epicalDays: "" }); setEditingAbsence(null); }, [year, teamPersonId]);
 
@@ -133,6 +181,7 @@ export default function PersonnelAbsencesPage({ defaultTab = "mine" }: { default
                   <p className="mt-1 text-xs text-muted-foreground">{absence.startDate} → {absence.endDate} · {absence.businessDays} día(s) hábil(es)</p>
                   {absence.notes && <p className="mt-1 text-xs text-slate-600">{absence.notes}</p>}
                   {absence.reviewReason && <p className="mt-1 text-xs text-muted-foreground">Respuesta: {absence.reviewReason}</p>}
+                  {teamMode && ["pending", "cancellation_requested"].includes(absence.status) && <BalanceStrip person={balanceByPerson.get(absence.personnelId)} absence={absence} />}
                   {editingAbsence?.id === absence.id && <div className="mt-3 grid gap-2 sm:grid-cols-2">
                     <Input type="date" value={editDraft.startDate} onChange={(e) => setEditDraft({ ...editDraft, startDate: e.target.value })} />
                     <Input type="date" value={editDraft.endDate} onChange={(e) => setEditDraft({ ...editDraft, endDate: e.target.value })} />
@@ -202,7 +251,28 @@ export default function PersonnelAbsencesPage({ defaultTab = "mine" }: { default
           <AbsenceTimeline rows={visibleTeam} year={year} />
           {renderAbsenceList({ rows: visibleTeam, loading: teamLoading, teamMode: true })}
         </TabsContent>}
-        {isManagement && <TabsContent value="allowances"><Card><CardHeader><CardTitle className="text-sm">Cupo anual por persona</CardTitle></CardHeader><CardContent className="grid gap-4 sm:grid-cols-4">
+        {isManagement && <TabsContent value="allowances" className="space-y-4">
+          <Card><CardHeader><CardTitle className="text-sm">Saldos del equipo · {year}</CardTitle></CardHeader><CardContent className="overflow-x-auto p-0">
+            <table className="w-full text-xs" data-testid="team-balances-table">
+              <thead><tr className="border-b text-left text-muted-foreground"><th className="px-4 py-2 font-medium">Persona</th><th className="px-2 py-2 font-medium">Vac. cupo</th><th className="px-2 py-2 font-medium">Traslado</th><th className="px-2 py-2 font-medium">Adelanto</th><th className="px-2 py-2 font-medium">Usados</th><th className="px-2 py-2 font-medium">Disponible</th><th className="px-2 py-2 font-medium">Epical disp.</th><th className="px-2 py-2 font-medium">Enferm.</th><th className="px-2 py-2 font-medium">Otros</th></tr></thead>
+              <tbody>{(teamBalances?.people ?? []).map((person) => (
+                <tr key={person.personnelId} className="border-b last:border-0">
+                  <td className="px-4 py-2 font-medium">{person.name}</td>
+                  {person.dataError ? <td colSpan={6} className="px-2 py-2 text-destructive">Revisar ausencias (fechas inválidas)</td> : person.configured ? <>
+                    <td className="px-2 py-2 tabular-nums">{person.vacation.quota ?? 0}</td>
+                    <td className="px-2 py-2 tabular-nums">{person.vacation.carryover}</td>
+                    <td className="px-2 py-2 tabular-nums">{person.vacation.advanceDebt}</td>
+                    <td className="px-2 py-2 tabular-nums">{person.vacation.used}</td>
+                    <td className={`px-2 py-2 font-semibold tabular-nums ${person.vacation.balance < 0 ? "text-destructive" : ""}`}>{person.vacation.balance}</td>
+                    <td className="px-2 py-2 tabular-nums">{person.epical.balance ?? "—"}</td>
+                  </> : <td colSpan={6} className="px-2 py-2 text-amber-700">Sin cupo configurado</td>}
+                  <td className="px-2 py-2 tabular-nums">{person.notCounted.sick}</td>
+                  <td className="px-2 py-2 tabular-nums">{person.notCounted.other}</td>
+                </tr>
+              ))}</tbody>
+            </table>
+          </CardContent></Card>
+          <Card><CardHeader><CardTitle className="text-sm">Cupo anual por persona</CardTitle></CardHeader><CardContent className="grid gap-4 sm:grid-cols-4">
           <div className="sm:col-span-2"><Label>Persona</Label><Select value={teamPersonId} onValueChange={(value) => { setTeamPersonId(value); setAllowanceDraft({ vacationDays: "", vacationCarryoverDays: "", epicalDays: "" }); }}><SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger><SelectContent>{personnel.map((person) => <SelectItem key={person.id} value={String(person.id)}>{person.name}</SelectItem>)}</SelectContent></Select></div>
           <div><Label>Vacaciones</Label><Input type="number" min={0} value={allowanceDraft.vacationDays} placeholder={balance?.vacationDays == null ? "Sin configurar" : String(balance.vacationDays)} onChange={(event) => setAllowanceDraft({ ...allowanceDraft, vacationDays: event.target.value })} /></div>
           <div><Label>Traslado</Label><Input type="number" min={0} value={allowanceDraft.vacationCarryoverDays} placeholder={String(balance?.vacationCarryoverDays ?? 0)} onChange={(event) => setAllowanceDraft({ ...allowanceDraft, vacationCarryoverDays: event.target.value })} /></div>

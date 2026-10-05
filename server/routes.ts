@@ -38,44 +38,9 @@ import {
   type AbsenceStatus,
   type AbsenceType,
 } from "@shared/utils/absence";
+import { parseBirthdayMonthDay } from "@shared/utils/birthdays";
+import { calculateVacationLedger, summarizeAbsenceBalance } from "@shared/utils/absence-balance";
 
-type VacationAllowanceLedgerRow = { year: number; vacationDays: number; vacationCarryoverDays: number };
-type VacationAbsenceLedgerRow = { startDate: string; endDate: string };
-
-function calculateVacationLedger(
-  throughYear: number,
-  allowances: VacationAllowanceLedgerRow[],
-  absences: VacationAbsenceLedgerRow[],
-  holidayDates: ReadonlySet<string>,
-) {
-  const allowanceByYear = new Map(allowances.map((row) => [row.year, row]));
-  const usedByYear = new Map<number, number>();
-  for (const absence of absences) {
-    for (const [year, days] of Object.entries(businessDaysByYear(absence.startDate, absence.endDate, holidayDates))) {
-      const numericYear = Number(year);
-      usedByYear.set(numericYear, (usedByYear.get(numericYear) ?? 0) + days);
-    }
-  }
-
-  const firstYear = allowances.reduce((min, row) => Math.min(min, row.year), throughYear);
-  const ledger: Record<number, { advanceDebtDays: number; usedDays: number; availableDays: number; balanceDays: number }> = {};
-  let debt = 0;
-  for (let year = firstYear; year <= throughYear; year++) {
-    const allowance = allowanceByYear.get(year);
-    const usedDays = usedByYear.get(year) ?? 0;
-    if (allowance) {
-      const availableDays = allowance.vacationDays + allowance.vacationCarryoverDays - debt;
-      debt = Math.max(0, -availableDays + usedDays);
-      ledger[year] = {
-        advanceDebtDays: Math.max(0, allowance.vacationDays + allowance.vacationCarryoverDays - availableDays),
-        usedDays,
-        availableDays,
-        balanceDays: availableDays - usedDays,
-      };
-    }
-  }
-  return ledger;
-}
 import {
   insertClientSchema,
   insertClientBillingEntitySchema,
@@ -195,6 +160,7 @@ import {
   userNotifications,
   quotationTeamMembers,
   quotationPriceAdjustments,
+  quotationAlertDismissals,
   quotationTemplates,
   quotationRevisions,
   quotationEvents,
@@ -365,7 +331,7 @@ import { productDefinitionsMarkdown } from "./content/product-definitions.genera
 import { PRODUCT_DEFINITIONS_MANIFEST } from "./content/product-definitions-manifest";
 import { calculateQuotationPricing } from "@shared/utils/quotation-pricing";
 import { calculateCanonicalComplexityFactor } from "@shared/utils/quotation-complexity";
-import { calculateMarginDrift } from "@shared/utils/quotation-margin-drift";
+import { calculateMarginDrift, isMarginDriftDismissalActive } from "@shared/utils/quotation-margin-drift";
 import { mergeQuotationActualEntries } from "@shared/utils/quotation-actual-entries";
 import { quotedOperationalCost, quotationProfitability } from "@shared/utils/quotation-profitability";
 import {
@@ -4514,6 +4480,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Personnel historical costs routes
   // Personnel routes
+  // Cumpleaños del equipo para el Home. Endpoint propio y mínimo: /api/personnel
+  // oculta `birthday` a quien no es de Operaciones porque también expone tarifas.
+  // Sólo se devuelve nombre + mes/día (nunca el año ni datos de costo) de personal activo;
+  // la fuente es Configuración > Personal, así una baja desaparece sola.
+  app.get("/api/birthdays", requireAuth, async (_req, res) => {
+    try {
+      const rows = await db.select({ name: personnel.name, birthday: personnel.birthday, activeUntil: personnel.activeUntil })
+        .from(personnel)
+        .where(isNotNull(personnel.birthday));
+      // Fecha civil en Buenos Aires: toISOString() adelanta el día a partir de las 21:00 locales.
+      const today = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Argentina/Buenos_Aires" }).format(new Date());
+      const birthdays = rows
+        .filter((row) => !row.activeUntil || row.activeUntil >= today)
+        .flatMap((row) => {
+          const parsed = parseBirthdayMonthDay(row.birthday);
+          return parsed ? [{ name: row.name, ...parsed }] : [];
+        });
+      res.setHeader("Cache-Control", "private, max-age=300");
+      res.json(birthdays);
+    } catch (error) {
+      console.error("Error fetching birthdays:", error);
+      res.status(500).json({ message: "No se pudieron traer los cumpleaños" });
+    }
+  });
+
   app.get("/api/personnel", requireAuth, async (req, res) => {
     try {
       const personnelData = await db.select({
@@ -6438,13 +6429,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const eligible = activeQuotations.filter((quotation) =>
         quotation.quotationType !== "one-time" && Number(quotation.exchangeRateAtQuote) > 0);
       if (eligible.length === 0) {
-        return res.json({ evaluated: 0, applicable: 0, atRisk: [] });
+        return res.json({ evaluated: 0, applicable: 0, atRisk: [], dismissed: [], dismissedCount: 0 });
       }
 
       const [currentFxConfig] = await db.select().from(systemConfig).where(eq(systemConfig.configKey, "usd_exchange_rate"));
       const currentExchangeRate = Number(currentFxConfig?.configValue);
       if (!(currentExchangeRate > 0)) {
-        return res.json({ evaluated: eligible.length, applicable: 0, atRisk: [] });
+        return res.json({ evaluated: eligible.length, applicable: 0, atRisk: [], dismissed: [], dismissedCount: 0 });
       }
 
       const quotationIds = eligible.map((quotation) => quotation.id);
@@ -6492,11 +6483,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
         };
       }).filter((item): item is NonNullable<typeof item> => item != null);
 
-      const atRisk = results
+      // Cuentas descartadas por una decisión comercial: se ocultan mientras el descarte siga
+      // vigente (ver isMarginDriftDismissalActive) y se listan aparte para poder reactivarlas.
+      // Si la tabla de descartes todavía no existe (migración pendiente) el panel sigue funcionando sin descartes.
+      const dismissals = await db.select({ dismissal: quotationAlertDismissals, createdByFirst: users.firstName, createdByLast: users.lastName })
+        .from(quotationAlertDismissals)
+        .leftJoin(users, eq(users.id, quotationAlertDismissals.createdBy))
+        .where(and(eq(quotationAlertDismissals.alertType, "margin_drift"), inArray(quotationAlertDismissals.quotationId, quotationIds)))
+        .catch((error) => {
+          console.warn("margin-drift-summary: descartes no disponibles", error);
+          return [] as Array<{ dismissal: typeof quotationAlertDismissals.$inferSelect; createdByFirst: string | null; createdByLast: string | null }>;
+        });
+      const dismissalByQuotation = new Map(dismissals.map((row) => [row.dismissal.quotationId, row]));
+      const flagged = results
         .filter((item) => item.severity !== "ok")
         .sort((a, b) => b.marginErosionPoints - a.marginErosionPoints);
+      const atRisk: typeof flagged = [];
+      const dismissed: Array<(typeof flagged)[number] & { reason: string; snoozedUntil: Date | null; dismissedAt: Date; dismissedBy: string | null }> = [];
+      for (const item of flagged) {
+        const row = dismissalByQuotation.get(item.quotationId);
+        if (row && isMarginDriftDismissalActive(row.dismissal, item, now)) {
+          dismissed.push({ ...item, reason: row.dismissal.reason, snoozedUntil: row.dismissal.snoozedUntil, dismissedAt: row.dismissal.createdAt, dismissedBy: [row.createdByFirst, row.createdByLast].filter(Boolean).join(" ") || null });
+        } else {
+          atRisk.push(item);
+        }
+      }
 
-      res.json({ evaluated: eligible.length, applicable: results.length, atRisk });
+      res.json({ evaluated: eligible.length, applicable: results.length, atRisk, dismissed, dismissedCount: dismissed.length });
     } catch (error) {
       console.error("GET /api/quotations/margin-drift-summary error:", error);
       res.status(500).json({ message: "No se pudo calcular el resumen de deriva de margen" });
@@ -6558,6 +6571,133 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
 
+  // Deriva de margen de UNA cotización (equipo cotizado re-valuado a tarifas de hoy). La usan el
+  // detalle y el descarte de la alerta: así la línea base del descarte la fija el servidor.
+  async function computeQuotationMarginDrift(quotation: typeof quotations.$inferSelect) {
+    if (quotation.quotationType === "one-time") return { applicable: false as const, reason: "one-time" };
+    if (quotation.status !== "approved" || quotation.archivedAt) return { applicable: false as const, reason: "not-active" };
+
+    const exchangeRateAtQuote = Number(quotation.exchangeRateAtQuote);
+    if (!(exchangeRateAtQuote > 0)) return { applicable: false as const, reason: "missing-quote-fx" };
+
+    const [currentFxConfig] = await db.select().from(systemConfig).where(eq(systemConfig.configKey, "usd_exchange_rate"));
+    const currentExchangeRate = Number(currentFxConfig?.configValue);
+    if (!(currentExchangeRate > 0)) return { applicable: false as const, reason: "missing-current-fx" };
+
+    // Si el cliente aceptó una variante puntual, su equipo (y por lo tanto su costo) vive en filas
+    // con ese variantId — no en las de la base — y totalAmount ya se actualizó al precio de esa
+    // variante al aceptar. Usar el equipo equivocado compararía manzanas con naranjas.
+    const teamFilter = quotation.acceptedVariantId
+      ? eq(quotationTeamMembers.variantId, quotation.acceptedVariantId)
+      : isNull(quotationTeamMembers.variantId);
+    const members = await db.select().from(quotationTeamMembers).where(and(
+      eq(quotationTeamMembers.quotationId, quotation.id),
+      teamFilter,
+    ));
+    if (members.length === 0) return { applicable: false as const, reason: "no-team" };
+
+    const quotationCurrency = quotation.quotationCurrency === "USD" ? "USD" : "ARS";
+    const now = new Date();
+    const team = await Promise.all(members.map(async (member) => {
+      const originalRate = Number(member.rate) || 0;
+      if (!member.personnelId) {
+        return { personnelId: null, hours: Number(member.hours) || 0, originalRate, currentRate: null };
+      }
+      const resolved = await resolveCanonicalPersonnelRate(member.personnelId, now);
+      if (resolved.error || resolved.hourlyRateARS == null) {
+        return { personnelId: member.personnelId, hours: Number(member.hours) || 0, originalRate, currentRate: null };
+      }
+      const currentRate = quotationCurrency === "USD"
+        ? resolved.hourlyRateARS / currentExchangeRate
+        : resolved.hourlyRateARS;
+      return { personnelId: member.personnelId, hours: Number(member.hours) || 0, originalRate, currentRate };
+    }));
+
+    const drift = calculateMarginDrift({ lockedTotal: Number(quotation.totalAmount) || 0, quotedCost: quotedOperationalCost(quotation), team });
+    return {
+      applicable: true as const,
+      quotationCurrency,
+      exchangeRateAtQuote,
+      currentExchangeRate,
+      exchangeRateDriftPercentage: Number((((currentExchangeRate - exchangeRateAtQuote) / exchangeRateAtQuote) * 100).toFixed(2)),
+      ...drift,
+    };
+  }
+
+  // Desestimar la alerta de margen de una cuenta. Global (no por usuario): mantener el
+  // markup es una decisión comercial. Exige motivo y deja quién lo hizo; vuelve a aparecer
+  // si vence el plazo o si la erosión empeora (ver isMarginDriftDismissalActive).
+  app.post("/api/quotations/:id/margin-drift/dismiss", requireAuth, requirePermission("quotations"), async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "ID de cotización inválido" });
+      const input = z.object({
+        reason: z.string().trim().min(5, "Contá brevemente el motivo (mínimo 5 caracteres)").max(500),
+        snoozeDays: z.number().int().min(1).max(365).nullable().optional(),
+      }).strict().parse(req.body);
+      const [quotation] = await db.select().from(quotations).where(eq(quotations.id, id));
+      if (!quotation) return res.status(404).json({ message: "No se encontró la cotización" });
+      // La línea base (erosión y severidad vigentes) la fija el servidor, nunca el cliente.
+      const drift = await computeQuotationMarginDrift(quotation);
+      if (!drift.applicable || drift.severity === "ok") {
+        return res.status(409).json({ message: "Esta cuenta no tiene una alerta de margen vigente para desestimar" });
+      }
+      const snoozedUntil = input.snoozeDays ? new Date(Date.now() + input.snoozeDays * 86_400_000) : null;
+      const values = {
+        reason: input.reason, snoozedUntil,
+        baselineErosionPoints: drift.marginErosionPoints, baselineSeverity: drift.severity,
+        createdBy: (req as any).user?.id ?? null, createdAt: new Date(),
+      };
+      const row = await db.transaction(async (tx) => {
+        const [saved] = await tx.insert(quotationAlertDismissals)
+          .values({ quotationId: id, alertType: "margin_drift", ...values })
+          .onConflictDoUpdate({ target: [quotationAlertDismissals.quotationId, quotationAlertDismissals.alertType], set: values })
+          .returning();
+        await recordQuotationEvent(tx, {
+          quotationId: id,
+          eventType: "margin_alert_dismissed",
+          eventKey: `margin_alert_dismissed:${id}:${values.createdAt.toISOString()}`,
+          actorUserId: values.createdBy,
+          // El motivo vive en quotation_alert_dismissals (permiso Cotizaciones): commercial-history
+          // lo lee cualquier usuario autenticado, así que no se copia a los metadatos del evento.
+          metadata: { alertType: "margin_drift" },
+        });
+        return saved;
+      });
+      res.status(201).json(row);
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: error.errors[0]?.message ?? "Datos inválidos" });
+      console.error("POST /api/quotations/:id/margin-drift/dismiss error:", error);
+      res.status(500).json({ message: "No se pudo desestimar la alerta" });
+    }
+  });
+
+  app.delete("/api/quotations/:id/margin-drift/dismiss", requireAuth, requirePermission("quotations"), async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "ID de cotización inválido" });
+      await db.transaction(async (tx) => {
+        const removed = await tx.delete(quotationAlertDismissals)
+          .where(and(eq(quotationAlertDismissals.quotationId, id), eq(quotationAlertDismissals.alertType, "margin_drift")))
+          .returning({ id: quotationAlertDismissals.id });
+        if (removed.length > 0) {
+          const at = new Date();
+          await recordQuotationEvent(tx, {
+            quotationId: id,
+            eventType: "margin_alert_reactivated",
+            eventKey: `margin_alert_reactivated:${id}:${at.toISOString()}`,
+            actorUserId: (req as any).user?.id ?? null,
+            metadata: { alertType: "margin_drift" },
+          });
+        }
+      });
+      res.json({ success: true });
+    } catch (error) {
+      console.error("DELETE /api/quotations/:id/margin-drift/dismiss error:", error);
+      res.status(500).json({ message: "No se pudo reactivar la alerta" });
+    }
+  });
+
   // Alerta de margen para contratos activos (fee mensual / programa anual):
   // el precio quedó fijo en dólares al cotizar, pero el costo se sigue
   // pagando en pesos y cambia mes a mes. Compara el costo del mismo equipo
@@ -6570,68 +6710,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const [quotation] = await db.select().from(quotations).where(eq(quotations.id, id));
       if (!quotation) return res.status(404).json({ message: "No se encontró la cotización" });
-
-      if (quotation.quotationType === "one-time") {
-        return res.json({ applicable: false, reason: "one-time" });
-      }
-      if (quotation.status !== "approved" || quotation.archivedAt) {
-        return res.json({ applicable: false, reason: "not-active" });
-      }
-
-      const exchangeRateAtQuote = Number(quotation.exchangeRateAtQuote);
-      if (!(exchangeRateAtQuote > 0)) {
-        return res.json({ applicable: false, reason: "missing-quote-fx" });
-      }
-
-      const [currentFxConfig] = await db.select()
-        .from(systemConfig)
-        .where(eq(systemConfig.configKey, "usd_exchange_rate"));
-      const currentExchangeRate = Number(currentFxConfig?.configValue);
-      if (!(currentExchangeRate > 0)) {
-        return res.json({ applicable: false, reason: "missing-current-fx" });
-      }
-
-      // Si el cliente aceptó una variante puntual, su equipo (y por lo tanto
-      // su costo) vive en filas con ese variantId — no en las de la base —
-      // y totalAmount ya se actualizó al precio de esa variante al aceptar.
-      // Usar el equipo equivocado compararía manzanas con naranjas.
-      const teamFilter = quotation.acceptedVariantId
-        ? eq(quotationTeamMembers.variantId, quotation.acceptedVariantId)
-        : isNull(quotationTeamMembers.variantId);
-      const members = await db.select().from(quotationTeamMembers).where(and(
-        eq(quotationTeamMembers.quotationId, id),
-        teamFilter,
-      ));
-      if (members.length === 0) {
-        return res.json({ applicable: false, reason: "no-team" });
-      }
-
-      const quotationCurrency = quotation.quotationCurrency === "USD" ? "USD" : "ARS";
-      const now = new Date();
-      const team = await Promise.all(members.map(async (member) => {
-        const originalRate = Number(member.rate) || 0;
-        if (!member.personnelId) {
-          return { personnelId: null, hours: Number(member.hours) || 0, originalRate, currentRate: null };
-        }
-        const resolved = await resolveCanonicalPersonnelRate(member.personnelId, now);
-        if (resolved.error || resolved.hourlyRateARS == null) {
-          return { personnelId: member.personnelId, hours: Number(member.hours) || 0, originalRate, currentRate: null };
-        }
-        const currentRate = quotationCurrency === "USD"
-          ? resolved.hourlyRateARS / currentExchangeRate
-          : resolved.hourlyRateARS;
-        return { personnelId: member.personnelId, hours: Number(member.hours) || 0, originalRate, currentRate };
-      }));
-
-      const drift = calculateMarginDrift({ lockedTotal: Number(quotation.totalAmount) || 0, quotedCost: quotedOperationalCost(quotation), team });
-      return res.json({
-        applicable: true,
-        quotationCurrency,
-        exchangeRateAtQuote,
-        currentExchangeRate,
-        exchangeRateDriftPercentage: Number((((currentExchangeRate - exchangeRateAtQuote) / exchangeRateAtQuote) * 100).toFixed(2)),
-        ...drift,
-      });
+      return res.json(await computeQuotationMarginDrift(quotation));
     } catch (error) {
       console.error("GET /api/quotations/:id/margin-drift error:", error);
       res.status(500).json({ message: "No se pudo calcular la deriva de margen" });
@@ -26958,6 +27037,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       if (error instanceof z.ZodError) return res.status(400).json({ message: "Acción inválida", errors: error.errors });
       res.status(error?.status || 500).json({ message: error?.message || "Error al procesar la ausencia" });
+    }
+  });
+
+  // Saldos de todo el equipo para quien aprueba (Operaciones): vacaciones (con traslado y
+  // adelanto), días Epical y los días que no descuentan cupo (enfermedad / otros).
+  app.get("/api/absence-allowances/summary", requireAuth, async (req, res) => {
+    try {
+      const access = await getAbsenceAccessContext(req);
+      if (!access.isOperations) return res.status(403).json({ message: "Se requiere Operaciones" });
+      const year = req.query.year ? Number(req.query.year) : new Date().getFullYear();
+      if (!Number.isInteger(year) || year < 2000 || year > 2200) return res.status(400).json({ message: "Año inválido" });
+      const today = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Argentina/Buenos_Aires" }).format(new Date());
+      const [people, allowanceRows] = await Promise.all([
+        db.select({ id: personnel.id, name: personnel.name, activeUntil: personnel.activeUntil }).from(personnel).orderBy(personnel.name),
+        db.select().from(absenceAllowances).where(lte(absenceAllowances.year, year)),
+      ]);
+      const firstYear = allowanceRows.reduce((min, row) => Math.min(min, row.year), year);
+      const absenceRows = await db.select({
+        personnelId: personnelAbsences.personnelId, type: personnelAbsences.type, status: personnelAbsences.status,
+        startDate: personnelAbsences.startDate, endDate: personnelAbsences.endDate,
+      }).from(personnelAbsences).where(and(
+        inArray(personnelAbsences.status, ["pending", "approved", "cancellation_requested"]),
+        lte(personnelAbsences.startDate, `${year}-12-31`), gte(personnelAbsences.endDate, `${firstYear}-01-01`),
+      ));
+      const holidayDates = await holidaysForRange(`${firstYear}-01-01`, `${year}-12-31`);
+      const result = people
+        .filter((person) => !person.activeUntil || person.activeUntil >= today)
+        .map((person) => {
+          const mine = absenceRows.filter((row) => row.personnelId === person.id);
+          try {
+            return {
+              personnelId: person.id,
+              name: person.name,
+              dataError: false,
+              ...summarizeAbsenceBalance({
+                year,
+                allowances: allowanceRows.filter((row) => row.personnelId === person.id),
+                takenAbsences: mine.filter((row) => row.status !== "pending"),
+                pendingAbsences: mine.filter((row) => row.status === "pending"),
+                holidayDates,
+              }),
+            };
+          } catch (error) {
+            // Una ausencia con fechas inválidas no debe tumbar el resumen de todo el equipo.
+            console.error(`absence-allowances/summary: datos inválidos de personnel ${person.id}`, error);
+            return {
+              personnelId: person.id, name: person.name, dataError: true,
+              ...summarizeAbsenceBalance({ year, allowances: [], takenAbsences: [], holidayDates }),
+            };
+          }
+        });
+      res.json({ year, people: result });
+    } catch (error: any) {
+      console.error("Error fetching absence balances summary:", error);
+      res.status(error?.status || 500).json({ message: error?.message || "No se pudieron calcular los saldos" });
     }
   });
 

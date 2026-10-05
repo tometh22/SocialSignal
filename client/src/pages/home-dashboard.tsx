@@ -9,6 +9,7 @@ import { SectionHeading } from "@/components/layout/page-heading";
 import { CompactPageHeader } from "@/components/ui/compact-page-header";
 import { PageShell } from "@/components/ui/page-shell";
 import { usePermissions } from "@/hooks/use-permissions";
+import { parseBirthdayMonthDay, nextBirthday, upcomingBirthdays, type BirthdayEntry } from "@shared/utils/birthdays";
 import { useAuth } from "@/hooks/use-auth";
 import { computeAlerts, type Alert } from "@/lib/smart-alerts";
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
@@ -51,14 +52,18 @@ export default function HomeDashboard() {
   });
   const myPersonnel = personnel.find((person) => person.id === (user as any)?.personnelId)
     ?? personnel.find((person) => person.email?.trim().toLowerCase() === user?.email?.trim().toLowerCase());
-  const birthday = myPersonnel?.birthday ? (() => {
-    const [month, day] = String(myPersonnel.birthday).slice(5, 10).split("-").map(Number);
-    const today = new Date();
-    const next = new Date(today.getFullYear(), month - 1, day);
-    if (next < new Date(today.getFullYear(), today.getMonth(), today.getDate())) next.setFullYear(next.getFullYear() + 1);
-    const days = Math.round((next.getTime() - new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime()) / 86400000);
-    return { date: next.toLocaleDateString("es-AR", { day: "numeric", month: "long" }), days };
+  const myBirthdayParts = parseBirthdayMonthDay(myPersonnel?.birthday);
+  const birthday = myBirthdayParts ? (() => {
+    const { date, daysUntil } = nextBirthday(myBirthdayParts, new Date());
+    return { date: date.toLocaleDateString("es-AR", { day: "numeric", month: "long" }), days: daysUntil };
   })() : null;
+
+  const { data: teamBirthdays = [] } = useQuery<BirthdayEntry[]>({
+    queryKey: ["/api/birthdays"],
+    queryFn: () => authFetch("/api/birthdays").then(r => r.ok ? r.json() : []).catch(() => []),
+    staleTime: 5 * 60_000,
+  });
+  const upcoming = upcomingBirthdays(teamBirthdays, new Date(), 30).slice(0, 6);
 
   const { data: absenceBalance } = useQuery<{ configured: boolean; vacationDays: number | null; vacationCarryoverDays: number; vacationAdvanceDebtDays: number; vacationBalanceDays: number; epicalDays: number | null; used: { vacation: number; epical: number } }>({
     queryKey: ["/api/absence-allowances", myPersonnel?.id, new Date().getFullYear()],
@@ -253,6 +258,24 @@ export default function HomeDashboard() {
           </>
         ) : undefined}
       />
+      {upcoming.length > 0 && (
+        <Card className="border-pink-200 bg-pink-50/60" data-testid="home-team-birthdays">
+          <CardContent className="p-4 text-sm text-pink-950 sm:p-4 sm:pt-4">
+            <div className="mb-2 flex items-center gap-2 font-semibold"><span aria-hidden="true">🎂</span>Cumpleaños del equipo</div>
+            <ul className="grid gap-x-6 gap-y-1 sm:grid-cols-2 lg:grid-cols-3">
+              {upcoming.map((entry, index) => (
+                <li key={`${entry.name}-${entry.month}-${entry.day}-${index}`} className="flex items-baseline justify-between gap-3">
+                  <span className="min-w-0 truncate">{entry.name}</span>
+                  <span className="shrink-0 text-xs text-pink-900/80">
+                    {entry.daysUntil === 0 ? "¡hoy!" : entry.daysUntil === 1 ? "mañana" : entry.date.toLocaleDateString("es-AR", { day: "numeric", month: "short" })}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
+
       {(birthday || absenceBalance?.configured) && (
         <div className="grid gap-3 lg:grid-cols-2">
           {birthday && <Card className="border-pink-200 bg-pink-50/60"><CardContent className="flex items-center gap-3 p-4 text-sm text-pink-950 sm:p-4 sm:pt-4"><span aria-hidden="true">🎂</span><span><strong>Tu cumpleaños:</strong> {birthday.date}{birthday.days === 0 ? " · ¡hoy!" : birthday.days === 1 ? " · mañana" : ` · en ${birthday.days} días`}</span></CardContent></Card>}
