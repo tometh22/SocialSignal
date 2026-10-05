@@ -47,6 +47,12 @@ import { feedbackClosure0069MigrationSql } from "./migrations/feedback-closure-0
 import { taskMilestonesMigrationSql } from "./migrations/task-milestones";
 import { asanaSourceTimeSql } from "./migrations/asana-source-time";
 import { quotationAlertDismissalsMigrationSql } from "./migrations/quotation-alert-dismissals";
+import { userNotificationPreferencesMigrationSql } from "./migrations/user-notification-preferences";
+import { userNotificationEmailDeliveriesMigrationSql } from "./migrations/user-notification-email-deliveries";
+import { userNotificationSetupRequiredMigrationSql } from "./migrations/user-notification-setup-required";
+import { userNotificationSetupExistingOptInMigrationSql } from "./migrations/user-notification-setup-existing-opt-in";
+import { userNotificationCategoryPreferencesMigrationSql } from "./migrations/user-notification-category-preferences";
+import { userNotificationPushSubscriptionsMigrationSql } from "./migrations/user-notification-push-subscriptions";
 import { asanaMigrationProvenanceSql } from "./migrations/asana-migration-provenance";
 import { projectTaskSectionsMigrationSql } from "./migrations/project-task-sections";
 import { taskRecurrenceMigrationSql } from "./migrations/task-recurrence";
@@ -888,6 +894,12 @@ async function applyPendingMigrations() {
     await run('0074 Asana migration provenance', asanaMigrationProvenanceSql);
     await run('0075 Asana source time', asanaSourceTimeSql);
     await run('0076 quotation alert dismissals', quotationAlertDismissalsMigrationSql);
+    await run('0077 user notification preferences', userNotificationPreferencesMigrationSql);
+    await run('0078 user notification email deliveries', userNotificationEmailDeliveriesMigrationSql);
+    await run('0079 require new users to configure notifications', userNotificationSetupRequiredMigrationSql);
+    await run('0080 prompt existing users without notification channels', userNotificationSetupExistingOptInMigrationSql);
+    await run('0081 notification category preferences', userNotificationCategoryPreferencesMigrationSql);
+    await run('0082 notification push subscriptions', userNotificationPushSubscriptionsMigrationSql);
 
     // 0033: feriados duplicados (mismo date+name insertado más de una vez desde el
     // formulario) — borra duplicados conservando la fila más antigua y agrega la
@@ -1104,6 +1116,9 @@ const port = Number(process.env.PORT || 5000);
     await ensureServiceBlueprintSeeds();
     await ensureObjectivesPlanSeed();
     console.log("💾 Database initialized successfully");
+
+    const { startUserNotificationEmailWorker } = await import("./services/user-notifications");
+    startUserNotificationEmailWorker();
 
     await backfillNativeLaborOnce();
 

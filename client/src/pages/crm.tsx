@@ -106,6 +106,7 @@ interface Lead {
   stage: Stage;
   source: string | null;
   estimatedValueUsd: number | null;
+  assignedTo?: number | null;
   notes: string | null;
   updatedAt: string;
   createdAt: string;
@@ -119,6 +120,7 @@ interface Stats {
   totalPipelineUsd: number;
   wonThisMonth: number;
   overdueReminders: number;
+  unassignedActive?: number;
   byStage: Record<string, number>;
 }
 
@@ -808,6 +810,7 @@ export default function CRMPage() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const [search, setSearch] = useState('');
+  const [showUnassignedOnly, setShowUnassignedOnly] = useState(false);
   const [stageFilter, setStageFilter] = useState('all');
   const [viewMode, setViewMode] = useState<'kanban' | 'list'>('kanban');
   const [localLeads, setLocalLeads] = useState<Lead[] | null>(null);
@@ -1033,7 +1036,8 @@ export default function CRMPage() {
   };
 
   const leads = localLeads ?? fetchedLeads;
-  const leadsForStage = (stage: Stage) => leads.filter(l => l.stage === stage);
+  const visibleLeads = showUnassignedOnly ? leads.filter((lead) => lead.assignedTo == null && !['won', 'lost'].includes(lead.stage)) : leads;
+  const leadsForStage = (stage: Stage) => visibleLeads.filter(l => l.stage === stage);
 
   return (
     <PageShell width="full" spacing="compact">
@@ -1088,15 +1092,39 @@ export default function CRMPage() {
         />
       </MetricGrid>
 
+      {(stats?.unassignedActive ?? 0) > 0 && (
+        <section className="overflow-hidden rounded-2xl border border-amber-200 bg-gradient-to-r from-amber-50 via-white to-orange-50 shadow-sm" aria-label="Oportunidades sin responsable">
+          <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+            <div className="flex items-start gap-3">
+              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-amber-100 text-amber-700"><AlertCircle className="h-5 w-5" /></div>
+              <div>
+                <div className="flex flex-wrap items-center gap-2"><h2 className="text-sm font-semibold text-slate-900">Oportunidades sin responsable</h2><span className="rounded-full bg-amber-200/70 px-2 py-0.5 text-[10px] font-bold tabular-nums text-amber-900">{stats?.unassignedActive}</span></div>
+                <p className="mt-1 max-w-xl text-xs leading-5 text-slate-600">Esta cola ayuda a que ningún lead quede olvidado. Asigná cada oportunidad a alguien del equipo para que los próximos avisos lleguen a la persona indicada.</p>
+              </div>
+            </div>
+            <div className="flex shrink-0 gap-2 sm:pl-4">
+              {showUnassignedOnly ? (
+                <Button variant="outline" className="rounded-xl border-amber-300 bg-white" onClick={() => setShowUnassignedOnly(false)}>Volver al pipeline</Button>
+              ) : (
+                <Button className="rounded-xl bg-slate-900 text-white shadow-sm hover:bg-slate-700" onClick={() => {
+                  setSearch(''); setStageFilter('all'); setViewMode('list'); setShowUnassignedOnly(true);
+                }}>Revisar oportunidades <ChevronRight className="ml-1 h-4 w-4" /></Button>
+              )}
+            </div>
+          </div>
+          {showUnassignedOnly && <div className="border-t border-amber-100 bg-white/70 px-4 py-2.5 text-xs text-amber-900 sm:px-5"><span className="font-semibold">Vista filtrada:</span> oportunidades activas que todavía no tienen responsable.</div>}
+        </section>
+      )}
+
       {/* Toolbar */}
       <ToolbarPanel title="Pipeline" description="Buscá oportunidades, filtrá etapas o cambiá la visualización.">
         <div className="relative min-w-0 flex-1 sm:min-w-64">
           <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <Input aria-label="Buscar empresa" placeholder="Buscar empresa..." value={search}
-            onChange={e => setSearch(e.target.value)}
+            onChange={e => { setSearch(e.target.value); setShowUnassignedOnly(false); }}
             className="h-11 pl-9 border-slate-200" />
         </div>
-        <Select value={stageFilter} onValueChange={setStageFilter}>
+        <Select value={stageFilter} onValueChange={(value) => { setStageFilter(value); setShowUnassignedOnly(false); }}>
           <SelectTrigger aria-label="Filtrar por etapa" className="h-11 w-full border-slate-200 sm:w-52">
             <SelectValue placeholder="Todas las etapas" />
           </SelectTrigger>
@@ -1183,7 +1211,7 @@ export default function CRMPage() {
           </DragOverlay>
         </DndContext>
       ) : (
-        <ListView leads={leads} stages={stages} onLeadClick={handleLeadClick} />
+        <ListView leads={visibleLeads} stages={stages} onLeadClick={handleLeadClick} />
       )}
 
       <AlertDialog open={!!stageToDelete} onOpenChange={(open) => { if (!open) setStageToDelete(null); }}>

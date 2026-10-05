@@ -1532,6 +1532,45 @@ export const userNotifications = pgTable("user_notifications", {
   unreadByUser: index("user_notifications_unread_idx").on(table.userId, table.readAt, table.createdAt),
 }));
 
+export const userNotificationPreferences = pgTable("user_notification_preferences", {
+  userId: integer("user_id").primaryKey().references(() => users.id, { onDelete: 'cascade' }),
+  desktopEnabled: boolean("desktop_enabled").notNull().default(false),
+  emailEnabled: boolean("email_enabled").notNull().default(false),
+  categoryPreferences: jsonb("category_preferences").$type<Record<string, { desktop?: boolean; email?: boolean }>>().notNull().default({}),
+  discreetMode: boolean("discreet_mode").notNull().default(true),
+  setupCompletedAt: timestamp("setup_completed_at"),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const userNotificationPushSubscriptions = pgTable("user_notification_push_subscriptions", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  endpoint: text("endpoint").notNull().unique(),
+  p256dh: text("p256dh").notNull(),
+  auth: text("auth").notNull(),
+  userAgent: text("user_agent"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({ byUser: index("user_notification_push_subscriptions_user_idx").on(table.userId) }));
+
+export const userNotificationEmailDeliveries = pgTable("user_notification_email_deliveries", {
+  id: serial("id").primaryKey(),
+  notificationId: integer("notification_id").notNull().unique().references(() => userNotifications.id, { onDelete: "cascade" }),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  status: text("status").notNull().default("pending"),
+  attempts: integer("attempts").notNull().default(0),
+  nextAttemptAt: timestamp("next_attempt_at").notNull().defaultNow(),
+  lockedAt: timestamp("locked_at"),
+  sentAt: timestamp("sent_at"),
+  resendEmailId: text("resend_email_id"),
+  lastError: text("last_error"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  dueEmails: index("user_notification_email_due_idx").on(table.status, table.nextAttemptAt),
+}));
+export type UserNotificationPreferences = typeof userNotificationPreferences.$inferSelect;
+
 export type AbsenceAllowance = typeof absenceAllowances.$inferSelect;
 export type AbsenceEvent = typeof absenceEvents.$inferSelect;
 export type UserNotification = typeof userNotifications.$inferSelect;

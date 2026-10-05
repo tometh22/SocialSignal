@@ -104,6 +104,7 @@ interface Lead {
   id: number; companyName: string; stage: Stage; source: string | null;
   opportunityName?: string | null; quotationGroupId?: number | null;
   estimatedValueUsd: number | null; notes: string | null; clientId: number | null;
+  assignedTo: number | null;
   createdAt: string; updatedAt: string; lostReason: string | null;
   contacts: Contact[]; activities: Activity[]; reminders: Reminder[];
   quotations: LinkedQuotation[];
@@ -153,6 +154,15 @@ export default function CRMLeadPage({ params }: { params: { id: string } }) {
     queryKey: ['/api/clients'],
   });
 
+  const { data: crmAssignees = [] } = useQuery<{ id: number; firstName: string; lastName: string }[]>({
+    queryKey: ["/api/crm/assignees"],
+    queryFn: async () => {
+      const response = await authFetch("/api/crm/assignees");
+      if (!response.ok) throw new Error("No se pudieron cargar los responsables");
+      return response.json();
+    },
+  });
+
   const { data: fetchedStages = [] } = useQuery<CrmStage[]>({
     queryKey: ['/api/crm/stages'],
     staleTime: Infinity,
@@ -167,7 +177,7 @@ export default function CRMLeadPage({ params }: { params: { id: string } }) {
 
   const updateLead = useMutation({
     mutationFn: (data: any) => apiRequest(`/api/crm/leads/${leadId}`, 'PATCH', data),
-    onSuccess: () => { invalidate(); queryClient.invalidateQueries({ queryKey: ['/api/crm/leads'] }); },
+    onSuccess: () => { invalidate(); queryClient.invalidateQueries({ queryKey: ['/api/crm/leads'] }); queryClient.invalidateQueries({ queryKey: ['/api/crm/stats'] }); },
   });
 
   const addActivity = useMutation({
@@ -322,6 +332,19 @@ export default function CRMLeadPage({ params }: { params: { id: string } }) {
                   </SelectContent>
                 </Select>
               )}
+            </div>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <span className="text-[11px] font-medium text-slate-500">Responsable</span>
+              <Select value={lead.assignedTo?.toString() ?? "unassigned"} onValueChange={(value) => updateLead.mutate({ assignedTo: value === "unassigned" ? null : Number(value) })}>
+                <SelectTrigger aria-label="Asignar responsable del lead" className="h-8 w-52 rounded-lg border-slate-200 bg-white text-xs">
+                  <SelectValue placeholder="Elegir responsable" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="unassigned">Sin responsable</SelectItem>
+                  {crmAssignees.map((assignee) => <SelectItem key={assignee.id} value={String(assignee.id)}>{assignee.firstName} {assignee.lastName}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              {lead.assignedTo == null && <span className="rounded-full bg-amber-50 px-2 py-1 text-[10px] font-medium text-amber-800">Necesita asignación</span>}
             </div>
             <p className="text-xs text-slate-400 mt-0.5">
               {lead.opportunityName && <><span className="font-medium text-slate-500">{lead.companyName}</span>{lead.quotationGroupId && <> · <a className="text-indigo-600 hover:underline" href={`/quotation-groups/${lead.quotationGroupId}`}>Grupo de propuestas</a></>} · </>}

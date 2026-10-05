@@ -45,6 +45,7 @@ const ExecutiveOperativo = lazy(() => import("@/pages/Executive/Operativo"));
 const ExecutiveFinanciero = lazy(() => import("@/pages/Executive/Financiero"));
 const CRMPage = lazy(() => import("@/pages/crm"));
 const CRMLeadPage = lazy(() => import("@/pages/crm-lead"));
+const NotificationsPage = lazy(() => import("@/pages/notifications"));
 const ReviewHubPage = lazy(() => import("@/pages/review/hub"));
 const ReviewRoomPage = lazy(() => import("@/pages/review/room"));
 const StatusObjectivesPage = lazy(() => import("@/pages/status-objectives"));
@@ -257,6 +258,7 @@ function AppRoutes() {
                   <Route path="/unauthorized" component={UnauthorizedPage} />
 
                   {/* Core Application Routes */}
+                  <ProtectedRoute path="/notifications" component={NotificationsPage} />
                   <ProtectedRoute path="/" component={HomeDashboard} requiredAnyPermission={HOME_ACCESS_SECTIONS} />
                   <ProtectedRoute path="/dashboard" component={ExecutiveDashboardV2} requiredAnyPermission={FINANCE_SUMMARY_ACCESS_SECTIONS} />
                   <ProtectedRoute path="/dashboard-legacy" component={() => <Redirect to="/dashboard" />} />

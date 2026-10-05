@@ -22,6 +22,7 @@ import {
 import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { requireRoomMember } from "./middleware/requireRoomMember";
 import { uploadPostProposal, deleteOldFile } from "./upload";
+import { createUserNotifications } from "./services/user-notifications";
 
 type RequireAuth = (req: Request, res: Response, next: NextFunction) => any;
 
@@ -351,6 +352,19 @@ export function createReviewRoomsRouter(requireAuth: RequireAuth): Router {
       // Hacer la daily cuenta como visita al room.
       await db.update(reviewRoomMembers).set({ lastVisitedAt: finished })
         .where(and(eq(reviewRoomMembers.roomId, roomId), eq(reviewRoomMembers.userId, userId)));
+
+      const members = await db.select({ userId: reviewRoomMembers.userId }).from(reviewRoomMembers)
+        .where(eq(reviewRoomMembers.roomId, roomId));
+      const [room] = await db.select({ name: reviewRooms.name }).from(reviewRooms).where(eq(reviewRooms.id, roomId)).limit(1);
+      await createUserNotifications(members.map((member) => member.userId).filter((id) => id !== userId), {
+        eventKey: `mind-daily:${row.id}`,
+        type: "mind_daily",
+        title: "Daily completada",
+        message: `${(req.user as any)?.firstName || "Alguien"} completó la daily de ${room?.name || "Mind"}.`,
+        entityType: "review_room",
+        entityId: roomId,
+        actionUrl: `/review/${roomId}`,
+      });
 
       res.status(201).json(row);
     } catch (error) {
@@ -1076,6 +1090,16 @@ export function createReviewRoomsRouter(requireAuth: RequireAuth): Router {
       const [note] = await db.insert(projectReviewNotes)
         .values({ roomId, projectId, content: content.trim(), authorId, noteDate: new Date() })
         .returning();
+      const previous = await db.select({ authorId: projectReviewNotes.authorId }).from(projectReviewNotes)
+        .where(and(eq(projectReviewNotes.roomId, roomId), eq(projectReviewNotes.projectId, projectId), sql`${projectReviewNotes.id} <> ${note.id}`));
+      const [project] = await db.select({ name: sql<string>`COALESCE(${activeProjects.name}, ${quotations.projectName})` })
+        .from(activeProjects).leftJoin(quotations, eq(quotations.id, activeProjects.quotationId)).where(eq(activeProjects.id, projectId)).limit(1);
+      const [author] = await db.select({ firstName: users.firstName, lastName: users.lastName }).from(users).where(eq(users.id, authorId)).limit(1);
+      await createUserNotifications(previous.map((row) => row.authorId).filter((id): id is number => id != null && id !== authorId), {
+        eventKey: `mind-reply:${note.id}`, type: "mind_reply", title: "Nueva respuesta en Mind",
+        message: `${author ? `${author.firstName} ${author.lastName}` : "Alguien"} respondió en ${project?.name || "un proyecto"}.`,
+        entityType: "review_room", entityId: roomId, actionUrl: `/review/${roomId}`,
+      });
       res.status(201).json(note);
     } catch (error) {
       console.error('POST project notes error:', error);
@@ -1118,6 +1142,15 @@ export function createReviewRoomsRouter(requireAuth: RequireAuth): Router {
       const [note] = await db.insert(projectReviewNotes)
         .values({ roomId, weeklyStatusItemId: itemId, content: content.trim(), authorId, noteDate: new Date() })
         .returning();
+      const previous = await db.select({ authorId: projectReviewNotes.authorId }).from(projectReviewNotes)
+        .where(and(eq(projectReviewNotes.roomId, roomId), eq(projectReviewNotes.weeklyStatusItemId, itemId), sql`${projectReviewNotes.id} <> ${note.id}`));
+      const [item] = await db.select({ title: weeklyStatusItems.title }).from(weeklyStatusItems).where(eq(weeklyStatusItems.id, itemId)).limit(1);
+      const [author] = await db.select({ firstName: users.firstName, lastName: users.lastName }).from(users).where(eq(users.id, authorId)).limit(1);
+      await createUserNotifications(previous.map((row) => row.authorId).filter((id): id is number => id != null && id !== authorId), {
+        eventKey: `mind-reply:${note.id}`, type: "mind_reply", title: "Nueva respuesta en Mind",
+        message: `${author ? `${author.firstName} ${author.lastName}` : "Alguien"} respondió en “${item?.title || "un ítem"}”.`,
+        entityType: "review_room", entityId: roomId, actionUrl: `/review/${roomId}`,
+      });
       res.status(201).json(note);
     } catch (error) {
       console.error('POST custom notes error:', error);
