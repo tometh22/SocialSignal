@@ -5,10 +5,13 @@ const source = (relativePath: string) =>
   readFileSync(new URL(`../${relativePath}`, import.meta.url), "utf8");
 
 describe("Mind product UI system", () => {
-  test("topbar uses real CRM reminders and does not ship demo alerts", () => {
+  test("topbar uses real persisted notifications (CRM reminders arrive through them) and does not ship demo alerts", () => {
     const topbar = source("client/src/components/layout/topbar.tsx");
 
-    expect(topbar).toContain('/api/crm/reminders/due');
+    // Los recordatorios de CRM ya no se consultan desde la barra: el job reminder-notifications los
+    // convierte en notificaciones persistentes (y push), que la barra lee de /api/notifications.
+    expect(topbar).toContain('/api/notifications');
+    expect(source("server/jobs/reminder-notifications.ts")).toContain("createUserNotifications");
     expect(topbar).toContain('event.key.toLowerCase() === "k"');
     expect(topbar).not.toContain("Warner Bros. - 80% del presupuesto consumido");
     expect(topbar).not.toContain("uberchil");
