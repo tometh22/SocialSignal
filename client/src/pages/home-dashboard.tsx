@@ -60,7 +60,7 @@ export default function HomeDashboard() {
     return { date: next.toLocaleDateString("es-AR", { day: "numeric", month: "long" }), days };
   })() : null;
 
-  const { data: absenceBalance } = useQuery<{ configured: boolean; vacationDays: number | null; vacationCarryoverDays: number; used: { vacation: number } }>({
+  const { data: absenceBalance } = useQuery<{ configured: boolean; vacationDays: number | null; vacationCarryoverDays: number; vacationAdvanceDebtDays: number; vacationBalanceDays: number; used: { vacation: number } }>({
     queryKey: ["/api/absence-allowances", myPersonnel?.id, new Date().getFullYear()],
     queryFn: async () => {
       const response = await authFetch(`/api/absence-allowances/${myPersonnel.id}/${new Date().getFullYear()}`);
@@ -256,7 +256,7 @@ export default function HomeDashboard() {
       {birthday && <Card className="border-pink-200 bg-pink-50/60"><CardContent className="flex items-center gap-3 p-3 text-sm text-pink-950"><span aria-hidden="true">🎂</span><span><strong>Tu cumpleaños:</strong> {birthday.date}{birthday.days === 0 ? " · ¡hoy!" : birthday.days === 1 ? " · mañana" : ` · en ${birthday.days} días`}</span></CardContent></Card>}
 
       {absenceBalance?.configured && <Card><CardContent className="flex flex-wrap items-center justify-between gap-2 p-3 text-sm">
-        <span><strong>Vacaciones disponibles: {(absenceBalance.vacationDays ?? 0) + absenceBalance.vacationCarryoverDays - absenceBalance.used.vacation} días</strong><span className="ml-2 text-xs text-muted-foreground">Año actual: {absenceBalance.vacationDays ?? 0} · Traslado: {absenceBalance.vacationCarryoverDays} · Usados: {absenceBalance.used.vacation}</span></span>
+        <span><strong>Vacaciones disponibles: {absenceBalance.vacationBalanceDays} días</strong><span className="ml-2 text-xs text-muted-foreground">Año actual: {absenceBalance.vacationDays ?? 0} · Traslado: {absenceBalance.vacationCarryoverDays} · Adelanto anterior: {absenceBalance.vacationAdvanceDebtDays} · Usados: {absenceBalance.used.vacation}</span></span>
         <Link href="/absences" className="text-primary hover:underline">Mis ausencias</Link>
       </CardContent></Card>}
 

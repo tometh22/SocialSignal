@@ -1,6 +1,6 @@
 ---
-version: 2.26.0
-updatedAt: 2026-09-11
+version: 2.27.0
+updatedAt: 2026-10-05
 feedbackCount: 70
 ---
 
@@ -173,12 +173,12 @@ approved -> cancellation_requested
 cancellation_requested -> cancelled | approved
 ```
 
-- Vacaciones y Día Epical tienen cupos únicos e independientes por persona/año.
+- Vacaciones y Día Epical tienen cupos únicos e independientes por persona/año. Un adelanto de vacaciones aprobado por Admin con override genera deuda automáticamente: se descuenta del cupo del año siguiente y sigue trasladándose hasta quedar cubierto.
 - Enfermedad y Otros no consumen cupo, pero afectan capacidad cuando están aprobados.
 - Sólo `approved` y `cancellation_requested` descuentan saldo y capacidad.
 - Se cuentan lunes a viernes, excluidos feriados configurados. Un rango interanual se reparte por año.
 - No puede haber superposición con otra solicitud activa de la misma persona.
-- Operaciones no puede aprobar sin saldo. Admin puede hacerlo sólo con override y motivo obligatorio; el evento es auditado.
+- Operaciones no puede aprobar sin saldo. Admin puede aprobar un adelanto de vacaciones sólo con override y motivo obligatorio; la deuda se aplica automáticamente a los cupos anuales siguientes y el evento queda auditado.
 - La aprobación bloquea los cupos anuales dentro de una transacción para evitar doble gasto concurrente.
 - Una pendiente puede ser cancelada por su persona. Una aprobada pasa a solicitud de cancelación y continúa descontando hasta la confirmación.
 - Notas: visibles sólo para la persona y Operaciones/Admin. Otros consumidores reciben persona, fechas, tipo e indisponibilidad.
