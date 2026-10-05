@@ -38,6 +38,44 @@ import {
   type AbsenceStatus,
   type AbsenceType,
 } from "@shared/utils/absence";
+
+type VacationAllowanceLedgerRow = { year: number; vacationDays: number; vacationCarryoverDays: number };
+type VacationAbsenceLedgerRow = { startDate: string; endDate: string };
+
+function calculateVacationLedger(
+  throughYear: number,
+  allowances: VacationAllowanceLedgerRow[],
+  absences: VacationAbsenceLedgerRow[],
+  holidayDates: ReadonlySet<string>,
+) {
+  const allowanceByYear = new Map(allowances.map((row) => [row.year, row]));
+  const usedByYear = new Map<number, number>();
+  for (const absence of absences) {
+    for (const [year, days] of Object.entries(businessDaysByYear(absence.startDate, absence.endDate, holidayDates))) {
+      const numericYear = Number(year);
+      usedByYear.set(numericYear, (usedByYear.get(numericYear) ?? 0) + days);
+    }
+  }
+
+  const firstYear = allowances.reduce((min, row) => Math.min(min, row.year), throughYear);
+  const ledger: Record<number, { advanceDebtDays: number; usedDays: number; availableDays: number; balanceDays: number }> = {};
+  let debt = 0;
+  for (let year = firstYear; year <= throughYear; year++) {
+    const allowance = allowanceByYear.get(year);
+    const usedDays = usedByYear.get(year) ?? 0;
+    if (allowance) {
+      const availableDays = allowance.vacationDays + allowance.vacationCarryoverDays - debt;
+      debt = Math.max(0, -availableDays + usedDays);
+      ledger[year] = {
+        advanceDebtDays: Math.max(0, allowance.vacationDays + allowance.vacationCarryoverDays - availableDays),
+        usedDays,
+        availableDays,
+        balanceDays: availableDays - usedDays,
+      };
+    }
+  }
+  return ledger;
+}
 import {
   insertClientSchema,
   insertClientBillingEntitySchema,
@@ -26733,13 +26771,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         if (input.action === "approve" && allowanceType) {
           const years = Object.keys(requestedByYear).map(Number);
+          let vacationLedger: ReturnType<typeof calculateVacationLedger> | undefined;
+          if (allowanceType === "vacation") {
+            const throughYear = Math.max(...years);
+            // Lock the person's configured years in order so concurrent approvals cannot
+            // spend the same current quota or change debt while a later year is approved.
+            await tx.execute(sql`SELECT id FROM absence_allowances WHERE personnel_id = ${current.personnelId} AND year <= ${throughYear} ORDER BY year FOR UPDATE`);
+            const allowanceRows = await tx.select({ year: absenceAllowances.year, vacationDays: absenceAllowances.vacationDays, vacationCarryoverDays: absenceAllowances.vacationCarryoverDays })
+              .from(absenceAllowances).where(and(eq(absenceAllowances.personnelId, current.personnelId), lte(absenceAllowances.year, throughYear)));
+            for (const year of years) {
+              if (!allowanceRows.some((row) => row.year === year)) throw Object.assign(new Error(`Cupo ${year} no configurado`), { status: 409 });
+            }
+            const firstYear = allowanceRows.reduce((min, row) => Math.min(min, row.year), throughYear);
+            const activeVacationRows = await tx.select({ startDate: personnelAbsences.startDate, endDate: personnelAbsences.endDate })
+              .from(personnelAbsences).where(and(
+                eq(personnelAbsences.personnelId, current.personnelId), eq(personnelAbsences.type, "vacation"),
+                inArray(personnelAbsences.status, ["approved", "cancellation_requested"]),
+                lte(personnelAbsences.startDate, `${throughYear}-12-31`), gte(personnelAbsences.endDate, `${firstYear}-01-01`),
+                sql`${personnelAbsences.id} <> ${current.id}`,
+              ));
+            const ledgerHolidays = await holidaysForRange(`${firstYear}-01-01`, `${throughYear}-12-31`);
+            vacationLedger = calculateVacationLedger(throughYear, allowanceRows, activeVacationRows, ledgerHolidays);
+          }
           for (const year of years) {
-            await tx.execute(sql`SELECT id FROM absence_allowances WHERE personnel_id = ${current.personnelId} AND year = ${year} FOR UPDATE`);
+            if (allowanceType === "epical") {
+              await tx.execute(sql`SELECT id FROM absence_allowances WHERE personnel_id = ${current.personnelId} AND year = ${year} FOR UPDATE`);
+            }
             const allowanceRows = await tx.select().from(absenceAllowances).where(and(
               eq(absenceAllowances.personnelId, current.personnelId), eq(absenceAllowances.year, year),
             ));
             const allowance = allowanceRows[0];
             if (!allowance) throw Object.assign(new Error(`Cupo ${year} no configurado`), { status: 409 });
+            if (allowanceType === "vacation") {
+              const yearLedger = vacationLedger?.[year];
+              const balance = yearLedger?.balanceDays ?? 0;
+              if (balance < requestedByYear[year] && !input.allowNegativeBalance) {
+                const debtNote = yearLedger?.advanceDebtDays ? ` (incluye ${yearLedger.advanceDebtDays} día(s) adelantado(s) de años anteriores)` : "";
+                throw Object.assign(new Error(`Saldo ${year} insuficiente${debtNote}`), { status: 409 });
+              }
+              continue;
+            }
             const usedResult = await tx.execute(sql`
               SELECT COUNT(*)::integer AS used
               FROM personnel_absences absence
@@ -26753,7 +26824,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 AND NOT EXISTS (SELECT 1 FROM holidays holiday WHERE holiday.date = day::date)
             `);
             const used = Number((usedResult.rows[0] as any)?.used || 0);
-            const configured = allowanceType === "vacation" ? (allowance?.vacationDays ?? 0) + (allowance?.vacationCarryoverDays ?? 0) : allowance?.epicalDays;
+            const configured = allowance?.epicalDays;
             if ((configured ?? 0) - used < requestedByYear[year] && !input.allowNegativeBalance) {
               throw Object.assign(new Error(`Saldo ${year} insuficiente`), { status: 409 });
             }
@@ -26815,19 +26886,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const [allowance] = await db.select().from(absenceAllowances).where(and(
       eq(absenceAllowances.personnelId, personnelId), eq(absenceAllowances.year, year),
     ));
+    const allowanceHistory = await db.select({ year: absenceAllowances.year, vacationDays: absenceAllowances.vacationDays, vacationCarryoverDays: absenceAllowances.vacationCarryoverDays }).from(absenceAllowances).where(and(
+      eq(absenceAllowances.personnelId, personnelId), lte(absenceAllowances.year, year),
+    ));
+    const firstYear = allowanceHistory.reduce((min, row) => Math.min(min, row.year), year);
     const rows = await db.select().from(personnelAbsences).where(and(
       eq(personnelAbsences.personnelId, personnelId),
       inArray(personnelAbsences.status, ["approved", "cancellation_requested"]),
-      lte(personnelAbsences.startDate, `${year}-12-31`), gte(personnelAbsences.endDate, `${year}-01-01`),
+      lte(personnelAbsences.startDate, `${year}-12-31`), gte(personnelAbsences.endDate, `${firstYear}-01-01`),
     ));
-    const holidayDates = await holidaysForRange(`${year}-01-01`, `${year}-12-31`);
+    const holidayDates = await holidaysForRange(`${firstYear}-01-01`, `${year}-12-31`);
     const used = { vacation: 0, epical: 0 };
     for (const row of rows) {
       const days = businessDaysByYear(row.startDate, row.endDate, holidayDates)[year] || 0;
       if (row.type === "vacation") used.vacation += days;
       if (row.type === "epical_day") used.epical += days;
     }
-    res.json({ configured: Boolean(allowance), personnelId, year, vacationDays: allowance?.vacationDays ?? null, vacationCarryoverDays: allowance?.vacationCarryoverDays ?? 0, epicalDays: allowance?.epicalDays ?? null, used });
+    const vacationLedger = calculateVacationLedger(year, allowanceHistory, rows.filter((row) => row.type === "vacation"), holidayDates);
+    const yearVacation = vacationLedger[year];
+    res.json({
+      configured: Boolean(allowance), personnelId, year,
+      vacationDays: allowance?.vacationDays ?? null, vacationCarryoverDays: allowance?.vacationCarryoverDays ?? 0,
+      vacationAdvanceDebtDays: yearVacation?.advanceDebtDays ?? 0,
+      vacationAvailableDays: yearVacation?.availableDays ?? 0,
+      vacationBalanceDays: yearVacation?.balanceDays ?? 0,
+      epicalDays: allowance?.epicalDays ?? null, used,
+    });
   });
 
   app.put("/api/absence-allowances/:personnelId/:year", requireAuth, async (req, res) => {

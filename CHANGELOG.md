@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.10.14 — 2026-10-05
+
+- Descuenta automáticamente de los cupos de vacaciones de años siguientes los adelantos aprobados con override, conserva la deuda hasta cubrirla y muestra el detalle en el saldo.
+
 ## 1.10.13 — 2026-10-03
 
 - Cierra los hallazgos de la verificación productiva del panel de horas: fechas civiles en etiquetas semanales y cargas, duración legible en minutos y matriz completa por proyecto sin truncar a cinco columnas.
