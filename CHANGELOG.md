@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.10.16 — 2026-10-05
+
+- Home: las tarjetas de cumpleaños y vacaciones comparten padding y estructura, y se muestran los días Epical disponibles junto a las vacaciones.
+- Corrige la falsa alerta "Markup promedio 0.0x · Acción urgente": un proyecto con costo pero sin presupuesto ni cotización ya no cuenta como markup medible (y mantiene una señal informativa «Costo sin presupuesto asociado»).
+- Refrescar Datos lee el Máster una sola vez, informa cada año por separado (un año futuro todavía no cargado es un aviso, no un error) y registra el detalle del fallo. "Valor Hora Estimada" sólo se usa de respaldo para el año vigente y los futuros, nunca en años cerrados.
+- Gestión de cotizaciones: la tarjeta calcula costo y markup desde los montos y sobre el neto de IVA, igual que el resumen ("Sin markup" cuando precio = costo; sin markup si hay variante aceptada); las archivadas dejan de aparecer en grupos, por oportunidad y en el portal público; las propuestas agrupadas se marcan como Borrador y el estado vacío es correcto cuando todo está agrupado.
+- Cargar horas toma como destino al dueño de la tarea sin pasos extra (popover, detalle, temporizador y subtareas), se bloquea hasta conocerlo, muestra a quién se carga y deja cargarle horas a quien gestiona tareas aunque no esté vinculado a Personal.
+- Definiciones de producto 2.28.0.
+
 ## 1.10.15 — 2026-10-05
 
 - Agrega el permiso independiente Tareas y horas para asignar trabajo, consultar horas del equipo y gestionarlas sin abrir Costos, Cotizaciones ni Finanzas.

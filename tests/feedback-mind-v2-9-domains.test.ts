@@ -195,7 +195,7 @@ describe("Feedback Mind V2-9 integration contracts", () => {
     const sync = source("server/services/personnelSheetsSync.ts");
     expect(sync).toContain("parsePersonnelMetadataGrid");
     expect(sync).toContain('fields: "sheets.properties.title"');
-    expect(sync).toContain("mergePersonnelMetadata(rateRows, metadataRows)");
+    expect(sync).toContain("mergePersonnelMetadata(rateRows, snapshot.metadataRows)");
   });
 
   it("formats USD with cents and keeps quotation variants visibly comparable", () => {

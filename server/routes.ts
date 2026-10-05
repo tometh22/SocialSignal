@@ -204,7 +204,7 @@ import {
   proposalDocuments,
   sheetPersonnelAliases,
 } from "@shared/schema";
-import { fetchValorHora2026, fetchValorHoraForYear, getHistoricalRateFields, HISTORICAL_RATE_FIELDS_2026, findPersonnelIdFuzzy, describeSheetsSyncError } from "./services/personnelSheetsSync";
+import { fetchValorHora2026, fetchValorHoraForYear, fetchValorHoraForYears, getHistoricalRateFields, HISTORICAL_RATE_FIELDS_2026, findPersonnelIdFuzzy, describeSheetsSyncError } from "./services/personnelSheetsSync";
 import { applyCanonicalPersonnelRateRows } from "./services/personnel-cost-sync";
 import { ActiveProjectsAggregator } from "./domain/projectsActive";import { resolveTimeFilter } from "./services/time";
 import { CoverageCalculator } from "./domain/coverage";
@@ -5236,6 +5236,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ? req.body.years.map(Number).filter((y: number) => y >= 2024 && y <= 2030)
         : [currentYear - 1, currentYear, currentYear + 1];
 
+      if (rawYears.length === 0) return res.status(400).json({ message: "Indicá al menos un año entre 2024 y 2030" });
       const [aliasRows, allPersonnel] = await Promise.all([
         db.select().from(sheetPersonnelAliases),
         db.select().from(personnel),
@@ -5245,19 +5246,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const personnelByName = new Map<string, number>();
       for (const p of allPersonnel) personnelByName.set(p.name.trim().toLowerCase(), p.id);
 
-      const summary: Record<number, { updatedPersonnel: number; cellsUpdated: number; skipped: string[]; error?: string }> = {};
+      const summary: Record<number, { updatedPersonnel: number; cellsUpdated: number; skipped: string[]; error?: string; code?: string; severity?: "info" | "error"; detail?: string }> = {};
+      const sheetsByYear = await fetchValorHoraForYears(rawYears);
       for (const year of rawYears) {
+        const fetched = sheetsByYear.get(year);
         try {
-          const sheetRows = await fetchValorHoraForYear(year);
-          const r = await applyCanonicalPersonnelRateRows(sheetRows, null, year, aliasBySheetName, personnelByName, allPersonnel, "google-master-auto");
+          if (!fetched || "error" in fetched) throw fetched ? fetched.error : new Error(`Sin datos para ${year}`);
+          const r = await applyCanonicalPersonnelRateRows(fetched.rows, null, year, aliasBySheetName, personnelByName, allPersonnel, "google-master-auto");
           summary[year] = r;
         } catch (err) {
-          const syncError = describeSheetsSyncError(err);
+          const syncError = describeSheetsSyncError(err, currentYear);
+          console.error(`[sheets-sync/auto-apply] ${year}: ${syncError.code} — ${syncError.detail}`);
           summary[year] = {
             updatedPersonnel: 0,
             cellsUpdated: 0,
             skipped: [],
             error: `${syncError.message} ${syncError.action}`,
+            code: syncError.code,
+            severity: syncError.severity,
+            detail: syncError.detail,
           };
         }
       }
@@ -5846,7 +5853,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }).from(quotationGroupItems)
       .innerJoin(quotations, eq(quotationGroupItems.quotationId, quotations.id))
       .leftJoin(crmLeads, eq(quotations.leadId, crmLeads.id))
-      .where(eq(quotationGroupItems.groupId, groupId))
+      .where(and(eq(quotationGroupItems.groupId, groupId), isNull(quotations.archivedAt)))
       .orderBy(asc(quotationGroupItems.position));
     const allowedSet = allowedQuotationIds ? new Set(allowedQuotationIds) : null;
     const items = allowedSet ? allItems.filter(({ quotation }) => allowedSet.has(quotation.id)) : allItems;
@@ -5991,7 +5998,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       eq(quotationGroupDeliveries.groupId, group.id), eq(quotationGroupDeliveries.status, "sent"),
     )).orderBy(desc(quotationGroupDeliveries.sentAt)).limit(1);
     if (!delivery) return null;
-    const allowedQuotationIds = Array.isArray(delivery.includedQuotationIds) ? delivery.includedQuotationIds.map(Number) : [];
+    const deliveredIds = Array.isArray(delivery.includedQuotationIds) ? delivery.includedQuotationIds.map(Number) : [];
+    // Una propuesta archivada después del envío deja de ser accesible por el portal público
+    // (listado, PDF, zip y decisión del cliente) aunque la pestaña del cliente siga abierta.
+    const liveRows = deliveredIds.length
+      ? await db.select({ id: quotations.id }).from(quotations).where(and(inArray(quotations.id, deliveredIds), isNull(quotations.archivedAt)))
+      : [];
+    const liveIds = new Set(liveRows.map((row) => row.id));
+    const allowedQuotationIds = deliveredIds.filter((id) => liveIds.has(id));
     if (group.publicTokenExpiresAt && group.publicTokenExpiresAt < new Date()) return { expired: true as const, group, allowedQuotationIds };
     return { expired: false as const, group, allowedQuotationIds };
   }
@@ -6359,7 +6373,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (leadIdParam) {
         const leadId = parseInt(leadIdParam as string);
         if (isNaN(leadId)) return res.status(400).json({ message: "leadId inválido" });
-        const result = await db.select().from(quotations).where(eq(quotations.leadId, leadId)).orderBy(desc(quotations.createdAt));
+        const result = await db.select().from(quotations).where(and(eq(quotations.leadId, leadId), isNull(quotations.archivedAt))).orderBy(desc(quotations.createdAt));
         return res.json(result);
       }
       const result = await storage.getQuotations();
@@ -9378,7 +9392,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ...row,
           revenue,
           cost,
-          markup: cost > 0 ? revenue / cost : 0,
+          // Sin ingreso (presupuesto/cotización) el markup no es medible: null, no 0.
+          markup: cost > 0 && revenue > 0 ? revenue / cost : null,
           margin: revenue > 0 ? ((revenue - cost) / revenue) * 100 : 0,
           budget: revenue,
           budgetUsed: revenue > 0 ? (cost / revenue) * 100 : 0,
@@ -24038,8 +24053,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         currentCivilWeekRange(),
       );
 
+      const [assignee] = task.assigneeId
+        ? await db.select({ name: personnel.name }).from(personnel).where(eq(personnel.id, task.assigneeId)).limit(1)
+        : [];
       res.json({
         ...task,
+        assigneeName: assignee?.name ?? null,
         canDelete: await canManageTaskProject(req, task.projectId),
         estimatedHoursTotal: estimatesByTask.get(task.id) ?? 0,
         estimatedHoursForWeek: estimatesForCurrentWeek.get(task.id) ?? 0,
@@ -24445,19 +24464,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
             .where(sql`LOWER(TRIM(${personnel.email})) = LOWER(TRIM(${user.email}))`)
             .limit(1)
         : [];
-      if (!authenticatedPerson) {
+      const requestedPersonnelId = Number(req.body?.personnelId);
+      const canLogForOthers = hasTaskManagementAccess(req);
+      // Quien gestiona tareas puede cargar horas al dueño aunque su propio usuario
+      // no esté vinculado a Personal; el vínculo sólo es obligatorio para cargar a uno mismo.
+      const loggingForOther = canLogForOthers && requestedPersonnelId > 0;
+      if (!authenticatedPerson && !loggingForOther) {
         return res.status(400).json({
           message: "Tu usuario no está vinculado a Personal. Operaciones debe configurar el mismo email antes de cargar horas.",
         });
       }
-      const requestedPersonnelId = Number(req.body?.personnelId);
-      const canLogForOthers = hasTaskManagementAccess(req);
-      if (requestedPersonnelId > 0 && requestedPersonnelId !== authenticatedPerson.id && !canLogForOthers) {
+      if (requestedPersonnelId > 0 && requestedPersonnelId !== authenticatedPerson?.id && !canLogForOthers) {
         return res.status(403).json({ message: "Solo Operaciones puede cargar horas para otra persona" });
       }
-      const effectivePersonnelId = requestedPersonnelId > 0 && canLogForOthers
+      const effectivePersonnelId = loggingForOther
         ? requestedPersonnelId
-        : authenticatedPerson.id;
+        : authenticatedPerson!.id;
       const [targetPerson] = await db.select({ id: personnel.id }).from(personnel)
         .where(eq(personnel.id, effectivePersonnelId)).limit(1);
       if (!targetPerson) return res.status(400).json({ message: "La persona seleccionada no existe" });
