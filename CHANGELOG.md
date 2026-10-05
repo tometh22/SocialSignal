@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.11.0 — 2026-10-05
+
+- Home: widget de cumpleaños del equipo (nombre y día/mes de personal activo, alimentado desde Configuración > Personal; una baja desaparece sola; el 29/02 se celebra el 28/02 en años no bisiestos y los días inexistentes se descartan).
+- Operaciones > Ausencias: saldo por persona junto a cada solicitud pendiente (vacaciones con traslado y adelanto, días Epical sin recortar a cero, enfermedad y otros) con el saldo resultante si se aprueba, y tabla de saldos del equipo en Cupos. Un dato inválido no tumba el resumen y los cortes de baja usan fecha de Buenos Aires.
+- Cuentas en riesgo: se puede desestimar una alerta de margen para todo el equipo con motivo y plazo. La línea base y la severidad las fija el servidor, se audita el evento (sin copiar el motivo al historial comercial), se reactiva sola si vence el plazo, la erosión empeora 5 puntos o la severidad sube, y el panel sigue funcionando si la tabla aún no existe. El texto aclara que usa tarifas actuales y no horas cargadas.
+- Definiciones de producto 2.29.0.
+
 ## 1.10.16 — 2026-10-05
 
 - Home: las tarjetas de cumpleaños y vacaciones comparten padding y estructura, y se muestran los días Epical disponibles junto a las vacaciones.

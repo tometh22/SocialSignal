@@ -101,22 +101,30 @@ export default function ManageQuotes() {
     byPriceBand: Array<{ key: string; count: number; won: number; value: number }>;
     byLossReason: Array<{ key: string | null; count: number }>;
   }>({ queryKey: ['/api/quotation-analytics/professional'] });
+  type MarginRiskItem = {
+    quotationId: number;
+    quotationNumber: string | null;
+    projectName: string;
+    clientName: string | null;
+    quotationCurrency: string;
+    currentMarginPercentage: number;
+    originalMarginPercentage: number;
+    marginErosionPoints: number;
+    severity: 'watch' | 'critical';
+  };
+  type DismissedMarginRiskItem = MarginRiskItem & { reason: string; snoozedUntil: string | null; dismissedAt: string; dismissedBy: string | null };
   const { data: marginRisk } = useQuery<{
     evaluated: number;
     applicable: number;
-    atRisk: Array<{
-      quotationId: number;
-      quotationNumber: string | null;
-      projectName: string;
-      clientName: string | null;
-      quotationCurrency: string;
-      currentMarginPercentage: number;
-      originalMarginPercentage: number;
-      marginErosionPoints: number;
-      severity: 'watch' | 'critical';
-    }>;
+    atRisk: MarginRiskItem[];
+    dismissed?: DismissedMarginRiskItem[];
+    dismissedCount?: number;
   }>({ queryKey: ['/api/quotations/margin-drift-summary'] });
   const queryClient = useQueryClient();
+  const [dismissTarget, setDismissTarget] = useState<MarginRiskItem | null>(null);
+  const [dismissReason, setDismissReason] = useState("");
+  const [dismissSnooze, setDismissSnooze] = useState("none");
+  const [showDismissed, setShowDismissed] = useState(false);
   const { data: pendingIpcAdjustments = [] } = useQuery<PendingIpcAdjustment[]>({ queryKey: ['/api/quotation-price-adjustments/pending'] });
 
 
@@ -132,6 +140,29 @@ export default function ManageQuotes() {
   const [expandedQuoteClients, setExpandedQuoteClients] = useState<Set<string>>(new Set());
   const [quoteView, setQuoteView] = useState<"folders" | "list">("folders");
   const { toast } = useToast();
+  const refreshMarginRisk = () => queryClient.invalidateQueries({ queryKey: ['/api/quotations/margin-drift-summary'] });
+  const dismissMarginRiskMutation = useMutation({
+    mutationFn: (item: MarginRiskItem) => apiRequest(`/api/quotations/${item.quotationId}/margin-drift/dismiss`, "POST", {
+      reason: dismissReason.trim(),
+      snoozeDays: dismissSnooze === "none" ? null : Number(dismissSnooze),
+    }),
+    onSuccess: () => {
+      refreshMarginRisk();
+      setDismissTarget(null);
+      setDismissReason("");
+      setDismissSnooze("none");
+      toast({ title: "Alerta desestimada", description: "Vuelve a aparecer si vence el plazo o si la erosión empeora." });
+    },
+    onError: (error: Error) => {
+      refreshMarginRisk(); // la alerta pudo cambiar o desaparecer desde que se cargó el panel
+      toast({ title: "No se pudo desestimar", description: error.message, variant: "destructive" });
+    },
+  });
+  const reactivateMarginRiskMutation = useMutation({
+    mutationFn: (quotationId: number) => apiRequest(`/api/quotations/${quotationId}/margin-drift/dismiss`, "DELETE"),
+    onSuccess: () => { refreshMarginRisk(); toast({ title: "Alerta reactivada" }); },
+    onError: (error: Error) => toast({ title: "No se pudo reactivar", description: error.message, variant: "destructive" }),
+  });
   const { user } = useAuth();
   const { isOperations } = usePermissions();
   // El servidor exige requirePermission("quotations_approve", "operations")
@@ -599,33 +630,86 @@ export default function ManageQuotes() {
               (con tarifas vigentes hoy) se alejó del margen cotizado. El
               costo se paga en pesos y el precio quedó fijo en dólares — ver
               shared/utils/quotation-margin-drift.ts. Sólo diagnóstico. */}
-          {marginRisk && marginRisk.atRisk.length > 0 && (
+          {marginRisk && (marginRisk.atRisk.length > 0 || (marginRisk.dismissedCount ?? 0) > 0) && (
             <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50/60 px-4 py-3">
-              <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-amber-700">
+              <div className="mb-2 flex flex-wrap items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-amber-700">
                 <TrendingDown className="h-3.5 w-3.5" /> Cuentas en riesgo
-                <span className="font-normal normal-case text-slate-500">· margen erosionado vs. lo cotizado, {marginRisk.applicable} cuentas recurrentes evaluadas</span>
+                <span className="font-normal normal-case text-slate-500">· costos recalculados a tarifas actuales vs. lo cotizado, {marginRisk.applicable} cuentas recurrentes evaluadas. No usa horas cargadas.</span>
               </div>
               <div className="space-y-1.5">
                 {marginRisk.atRisk.map((item) => (
-                  <button
-                    key={item.quotationId}
-                    type="button"
-                    onClick={() => navigate(`/quotations/${item.quotationId}`)}
-                    className="flex w-full items-center justify-between gap-3 rounded-lg border border-amber-100 bg-white px-3 py-2 text-left transition hover:border-amber-300"
-                  >
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium text-slate-900">{item.clientName || 'Sin cliente'} · {item.projectName}</p>
-                      <p className="text-xs text-slate-500">Margen cotizado {item.originalMarginPercentage.toFixed(1)}% → hoy {item.currentMarginPercentage.toFixed(1)}%</p>
-                    </div>
-                    <Badge className={cn('shrink-0', item.severity === 'critical' ? 'bg-red-100 text-red-800 hover:bg-red-100' : 'bg-amber-100 text-amber-800 hover:bg-amber-100')}>
-                      <AlertOctagon className="mr-1 h-3 w-3" />
-                      -{item.marginErosionPoints.toFixed(1)}pts
-                    </Badge>
-                  </button>
+                  <div key={item.quotationId} className="flex w-full items-center gap-2 rounded-lg border border-amber-100 bg-white px-3 py-2 transition hover:border-amber-300">
+                    <button type="button" onClick={() => navigate(`/quotations/${item.quotationId}`)} className="flex min-w-0 flex-1 items-center justify-between gap-3 text-left">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-slate-900">{item.clientName || 'Sin cliente'} · {item.projectName}</p>
+                        <p className="text-xs text-slate-500">Margen cotizado {item.originalMarginPercentage.toFixed(1)}% → con tarifas de hoy {item.currentMarginPercentage.toFixed(1)}%</p>
+                      </div>
+                      <Badge className={cn('shrink-0', item.severity === 'critical' ? 'bg-red-100 text-red-800 hover:bg-red-100' : 'bg-amber-100 text-amber-800 hover:bg-amber-100')}>
+                        <AlertOctagon className="mr-1 h-3 w-3" />
+                        -{item.marginErosionPoints.toFixed(1)}pts
+                      </Badge>
+                    </button>
+                    <Button type="button" variant="ghost" size="sm" className="h-7 shrink-0 px-2 text-xs text-slate-500" onClick={() => setDismissTarget(item)}>Desestimar</Button>
+                  </div>
                 ))}
+                {marginRisk.atRisk.length === 0 && <p className="text-xs text-slate-500">No hay cuentas activas en riesgo; las desestimadas quedan abajo.</p>}
               </div>
+              {(marginRisk.dismissedCount ?? 0) > 0 && (
+                <div className="mt-2 border-t border-amber-100 pt-2">
+                  <button type="button" className="text-xs font-medium text-slate-500 hover:text-slate-700" onClick={() => setShowDismissed((value) => !value)}>
+                    {showDismissed ? 'Ocultar' : 'Ver'} {marginRisk.dismissedCount} desestimada{marginRisk.dismissedCount === 1 ? '' : 's'}
+                  </button>
+                  {showDismissed && (
+                    <div className="mt-2 space-y-1.5" data-testid="dismissed-margin-risk">
+                      {marginRisk.dismissed?.map((item) => (
+                        <div key={item.quotationId} className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white/70 px-3 py-2">
+                          <div className="min-w-0">
+                            <p className="truncate text-sm text-slate-700">{item.clientName || 'Sin cliente'} · {item.projectName} <span className="text-xs text-slate-400">(-{item.marginErosionPoints.toFixed(1)}pts)</span></p>
+                            <p className="text-xs text-slate-500">“{item.reason}”{item.dismissedBy ? ` · ${item.dismissedBy}` : ''}{item.snoozedUntil ? ` · hasta ${new Date(item.snoozedUntil).toLocaleDateString('es-AR')}` : ' · sin vencimiento'}</p>
+                          </div>
+                          <Button type="button" variant="outline" size="sm" className="h-7 shrink-0 text-xs" disabled={reactivateMarginRiskMutation.isPending} onClick={() => reactivateMarginRiskMutation.mutate(item.quotationId)}>Reactivar</Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
+
+          <Dialog open={dismissTarget != null} onOpenChange={(open) => { if (!open) { setDismissTarget(null); setDismissReason(""); setDismissSnooze("none"); } }}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Desestimar alerta de margen</DialogTitle>
+                <DialogDescription>
+                  {dismissTarget ? `${dismissTarget.clientName || 'Sin cliente'} · ${dismissTarget.projectName}. ` : ''}
+                  Se oculta para todo el equipo. Vuelve a aparecer si vence el plazo o si la erosión empeora 5 puntos o más.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-3">
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-slate-600" htmlFor="dismiss-reason">Motivo (decisión comercial)</label>
+                  <Input id="dismiss-reason" value={dismissReason} onChange={(event) => setDismissReason(event.target.value)} placeholder="Ej.: se mantiene el markup acordado con el cliente" maxLength={500} />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-slate-600">Silenciar por</label>
+                  <Select value={dismissSnooze} onValueChange={setDismissSnooze}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Sin vencimiento</SelectItem>
+                      <SelectItem value="30">30 días</SelectItem>
+                      <SelectItem value="90">90 días</SelectItem>
+                      <SelectItem value="180">180 días</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => { setDismissTarget(null); setDismissReason(""); setDismissSnooze("none"); }}>Cancelar</Button>
+                <Button disabled={dismissReason.trim().length < 5 || dismissMarginRiskMutation.isPending} onClick={() => dismissTarget && dismissMarginRiskMutation.mutate(dismissTarget)}>Desestimar</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
 
           {/* Ajustes de precio por IPC pendientes de aprobación (fee mensual/
               programa anual en ARS con la cláusula desde que se cotizaron).

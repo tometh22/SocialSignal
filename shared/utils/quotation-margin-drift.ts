@@ -113,3 +113,35 @@ export function calculateMarginDrift(input: MarginDriftInput): MarginDriftResult
     severity,
   };
 }
+
+/** Puntos de erosión adicionales sobre la línea base descartada que reactivan la alerta. */
+export const MARGIN_DRIFT_REACTIVATION_POINTS = 5;
+
+export type MarginDriftDismissalState = {
+  snoozedUntil: Date | string | null;
+  baselineErosionPoints: number;
+  /** Severidad vigente al descartar. */
+  baselineSeverity: Exclude<MarginDriftSeverity, "ok">;
+};
+
+const SEVERITY_RANK: Record<MarginDriftSeverity, number> = { ok: 0, watch: 1, critical: 2 };
+
+/**
+ * ¿Sigue vigente el descarte? Se levanta solo cuando (a) venció el plazo, (b) la erosión
+ * empeoró `MARGIN_DRIFT_REACTIVATION_POINTS` o más sobre lo que se había descartado, o
+ * (c) la severidad empeoró respecto de la que había al descartar (p. ej. watch → critical).
+ * Comparar contra la severidad guardada —y no contra un umbral absoluto— evita reactivar de
+ * inmediato una cuenta ya crítica por margen ≤ 0 con poca erosión. Así una decisión comercial
+ * sobre el markup no se re-notifica por ruido, pero un deterioro posterior sí.
+ */
+export function isMarginDriftDismissalActive(
+  dismissal: MarginDriftDismissalState,
+  current: Pick<MarginDriftResult, "marginErosionPoints" | "severity">,
+  now: Date,
+): boolean {
+  if (dismissal.snoozedUntil && new Date(dismissal.snoozedUntil).getTime() <= now.getTime()) return false;
+  const baseline = Number(dismissal.baselineErosionPoints) || 0;
+  if (current.marginErosionPoints >= baseline + MARGIN_DRIFT_REACTIVATION_POINTS) return false;
+  if (SEVERITY_RANK[current.severity] > SEVERITY_RANK[dismissal.baselineSeverity]) return false;
+  return true;
+}

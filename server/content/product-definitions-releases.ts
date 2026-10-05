@@ -26,4 +26,5 @@ export const PRODUCT_DEFINITIONS_RELEASES = {
   "2.26.0": "9528e7ab54faf8f2ad5b29e3fc1ca6a956323569867cf5b9b069c862becec8a1",
   "2.27.0": "1e43ac372182c0ed9f0b098c89b0607c9bfaace1a5c01f87d3a2237aa5d4bc2f",
   "2.28.0": "a4076e4b3e41a819b6322cac86a276ad09bfd26c73eec7c6f2bcb22b9e96be0d",
+  "2.29.0": "6c458e34cfa21680c10b24d6cea7c2a6b70b6760ec90ca0ccc087a155f7e2b3e",
 } as const;

@@ -1,5 +1,5 @@
 ---
-version: 2.28.0
+version: 2.29.0
 updatedAt: 2026-10-05
 feedbackCount: 70
 ---
@@ -174,6 +174,8 @@ cancellation_requested -> cancelled | approved
 ```
 
 - Vacaciones y Día Epical tienen cupos únicos e independientes por persona/año. Un adelanto de vacaciones aprobado por Admin con override genera deuda automáticamente: se descuenta del cupo del año siguiente y sigue trasladándose hasta quedar cubierto.
+- Los días trasladados se suman al mismo pool que el cupo anual de vacaciones: `disponible = cupo + traslado − adelanto entrante`, `saldo = disponible − usados`. No hay orden de consumo ni vencimiento; el traslado lo carga Operaciones. Los días Epical son un cupo aparte, sin traslado ni deuda, y el Home los muestra por separado de las vacaciones.
+- Quien aprueba ve, por persona y junto a cada solicitud pendiente, el saldo de vacaciones y de días Epical, lo que consume la solicitud y cuánto queda si se aprueba, más los días de enfermedad y otros (que no descuentan cupo). Fuente: `GET /api/absence-allowances/summary` (Operaciones).
 - Enfermedad y Otros no consumen cupo, pero afectan capacidad cuando están aprobados.
 - Sólo `approved` y `cancellation_requested` descuentan saldo y capacidad.
 - Se cuentan lunes a viernes, excluidos feriados configurados. Un rango interanual se reparte por año.
@@ -445,7 +447,8 @@ histórica que todavía necesitan cotizaciones y registros anteriores.
 
 ## Addendum — Feedback 5-10
 
+- **Cumpleaños:** el Home muestra los próximos cumpleaños (30 días) de todo el personal activo, con nombre y día/mes únicamente. La fuente es el campo de Configuración > Personal: quien se da de baja (`activeUntil` vencido) desaparece solo. El 29/02 se celebra el 28/02 en años no bisiestos.
 - **Señales del portfolio:** un proyecto sin ingreso (presupuesto o cotización) no tiene markup medible; no entra en el promedio ni genera alertas de markup. Si tiene costos cargados, se muestra una señal informativa «Costo sin presupuesto asociado».
-- **Días Epical en el Home:** la tarjeta de ausencias muestra los días Epical disponibles por separado de las vacaciones (cupo, usados y disponibles); son cupos independientes.
 - **Lista de cotizaciones:** costo y markup se derivan de los montos (`total neto de IVA / costo operativo cotizado`). Con una variante aceptada no se muestra markup, porque el total es de la variante y los costos son los de la cotización base. Precio igual al costo se muestra como "Sin markup". Las cotizaciones archivadas no aparecen en grupos ni por oportunidad; las propuestas agrupadas se gestionan desde su grupo y no se repiten en la lista.
+- **Cuentas en riesgo:** compara el costo del mismo equipo cotizado a tarifas actuales contra el costo cotizado; no usa horas cargadas. Una cuenta puede desestimarse para todo el equipo con motivo obligatorio y plazo opcional. La línea base (erosión y severidad) la fija el servidor al desestimar y el evento queda auditado. El descarte se levanta solo si vence el plazo, si la erosión empeora 5 puntos o más sobre la desestimada, o si la severidad empeora (de vigilancia a crítica).
 - **Carga de horas:** el destino por defecto es el responsable de la tarea (no quien la carga) en el popover, el detalle, el temporizador y las subtareas. Quien gestiona tareas puede cargar al responsable aunque su usuario no esté vinculado a Personal.

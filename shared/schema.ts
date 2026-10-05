@@ -1414,6 +1414,25 @@ export const quotationPriceAdjustments = pgTable("quotation_price_adjustments", 
 
 export type QuotationPriceAdjustment = typeof quotationPriceAdjustments.$inferSelect;
 
+// Descarte (global, con motivo) de una alerta calculada sobre una cotización, p. ej. la
+// deriva de margen: la decisión de mantener el markup es comercial. La alerta se reactiva
+// sola al vencer `snoozedUntil` o si el deterioro supera la línea base descartada.
+export const quotationAlertDismissals = pgTable("quotation_alert_dismissals", {
+  id: serial("id").primaryKey(),
+  quotationId: integer("quotation_id").notNull().references(() => quotations.id, { onDelete: "cascade" }),
+  alertType: varchar("alert_type", { length: 40 }).notNull(), // 'margin_drift'
+  reason: text("reason").notNull(),
+  snoozedUntil: timestamp("snoozed_until"),
+  baselineErosionPoints: doublePrecision("baseline_erosion_points").notNull().default(0),
+  baselineSeverity: varchar("baseline_severity", { length: 20 }).$type<"watch" | "critical">().notNull().default("watch"), // 'watch' | 'critical'
+  createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  uniqueQuotationAlert: unique("quotation_alert_dismissals_quotation_alert_unique").on(table.quotationId, table.alertType),
+}));
+
+export type QuotationAlertDismissal = typeof quotationAlertDismissals.$inferSelect;
+
 // ==================== FERIADOS Y DISPONIBILIDAD ====================
 export const holidays = pgTable("holidays", {
   id: serial("id").primaryKey(),
