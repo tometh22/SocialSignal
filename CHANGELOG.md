@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.11.8 — 2026-10-05
+
+- Seguridad: alta, edición y baja de personal (`POST`, `PATCH` y `DELETE /api/personnel`) ahora exigen permiso de administración en el servidor, igual que el Panel de Administración que las usa. Antes cualquier usuario autenticado podía crear, modificar o borrar personal (con sus tarifas) llamando a la API. La lectura no cambia.
+
 ## 1.11.7 — 2026-10-05
 
 - Ausencias: editar una ausencia que ya descuenta cupo (aprobada o con cancelación pendiente) ahora exige el mismo saldo que la aprobación (vacaciones con traslado y adelantos, y días Epical), bloquea los cupos de la persona para evitar doble gasto y sólo valida lo que empeora, de modo que acortar una ausencia que ya excedía el cupo por un override sigue permitido.
