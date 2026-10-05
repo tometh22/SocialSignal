@@ -139,7 +139,7 @@ it("quick timers persist and share state with the global timer", () => {
   const quick = source("client/src/components/tasks/QuickTaskHours.tsx");
   expect(quick).toContain("useActiveTimer({ trackElapsed: open })");
   expect(quick).not.toContain("setTimerStartedAt");
-  expect(quick).toContain("disabled={isRunning}");
+  expect(quick).toContain("disabled={isRunning || ownerPending}");
 });
 
 it("single-date calendar tasks appear only on that day", () => {

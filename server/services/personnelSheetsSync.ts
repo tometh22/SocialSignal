@@ -46,14 +46,40 @@ export interface ParsedPersonnelMetadata {
   area?: string | null;
 }
 
+export type SheetsLayoutErrorCode = "SECTION_NOT_FOUND" | "HEADERS_NOT_FOUND";
+
+/** El Sheet se leyó bien pero la sección de ese año no existe o tiene otro layout. */
+export class SheetsLayoutError extends Error {
+  constructor(public readonly code: SheetsLayoutErrorCode, public readonly year: number, message: string) {
+    super(message);
+    this.name = "SheetsLayoutError";
+  }
+}
+
 /**
  * Convierte los errores de Google en una respuesta segura y accionable para la
  * interfaz. En particular, invalid_grant suele significar que Railway tiene
  * una clave vencida/malformada: reintentar sin corregir la variable sólo
  * confunde al usuario y puede dar la impresión de que el sync se aplicó.
  */
-export function describeSheetsSyncError(error: unknown) {
+export function describeSheetsSyncError(error: unknown, currentYear = Number(new Intl.DateTimeFormat("en-CA", { timeZone: "America/Argentina/Buenos_Aires", year: "numeric" }).format(new Date()))) {
   const detail = error instanceof Error ? error.message : String(error ?? "");
+  if (error instanceof SheetsLayoutError) {
+    // Un año futuro todavía sin cargar en el Máster es esperable: no es un fallo.
+    const pendingFutureYear = error.year > currentYear;
+    return {
+      code: error.code as string,
+      message: error.code === "SECTION_NOT_FOUND"
+        ? `La pestaña del Máster todavía no tiene la sección ${error.year}.`
+        : `La sección ${error.year} del Máster no tiene columnas de valor hora reconocibles.`,
+      action: pendingFutureYear
+        ? "Se sincronizará cuando Finanzas cargue ese año en el Máster."
+        : "Revisá el layout de esa sección en el Máster y volvé a intentar.",
+      detail,
+      retryable: false,
+      severity: (pendingFutureYear && error.code === "SECTION_NOT_FOUND" ? "info" : "error") as "info" | "error",
+    };
+  }
   const normalized = detail.toLowerCase();
   if (normalized.includes("invalid_grant") || normalized.includes("invalid jwt") || normalized.includes("jwt signature")) {
     return {
@@ -62,6 +88,7 @@ export function describeSheetsSyncError(error: unknown) {
       action: "Corregí las variables en Railway y volvé a intentar. No se aplicaron cambios.",
       detail,
       retryable: false,
+      severity: "error" as "info" | "error",
     };
   }
 
@@ -71,6 +98,7 @@ export function describeSheetsSyncError(error: unknown) {
     action: "Revisá el acceso al Sheet y volvé a intentar.",
     detail,
     retryable: true,
+    severity: "error" as "info" | "error",
   };
 }
 
@@ -227,7 +255,11 @@ export function mergePersonnelMetadata(
   });
 }
 
-export function parseValorHoraSection(rows: string[][], year: number): ParsedSheetRow[] {
+export function parseValorHoraSection(
+  rows: string[][],
+  year: number,
+  options: { allowEstimatedFallback?: boolean } = {},
+): ParsedSheetRow[] {
   const yearStr = String(year);
   // Buscar la celda que contiene el label del año en cualquiera de las primeras
   // dos columnas. La columna donde aparece "2026" es la misma donde luego
@@ -244,7 +276,7 @@ export function parseValorHoraSection(rows: string[][], year: number): ParsedShe
     }
   }
   if (yearRowIdx < 0) {
-    throw new Error(`No se encontró la sección "${yearStr}" en la pestaña.`);
+    throw new SheetsLayoutError("SECTION_NOT_FOUND", year, `No se encontró la sección "${yearStr}" en la pestaña.`);
   }
 
   const subHeader = rows[yearRowIdx] ?? [];
@@ -268,6 +300,12 @@ export function parseValorHoraSection(rows: string[][], year: number): ParsedShe
   // Mapear índice de columna → campo {mmm}{yyyy}
   const monthByCol = new Map<number, string>();
   const salaryMonthByCol = new Map<number, string>();
+  // Años futuros (y el vigente, mientras el Máster aún no cargó ninguna "Ajustada") suelen venir con
+  // "Valor Hora Estimada". Sólo se usa de respaldo, y sólo cuando el llamador lo habilita y la sección no tiene ninguna columna
+  // "Valor Hora Ajustada": en años cerrados un layout inesperado debe fallar a la vista, nunca
+  // reescribir tarifas con otra columna.
+  const normalizeLabel = (value: string) => value.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, " ").trim().toLowerCase();
+  const fallbackMonthByCol = new Map<number, string>();
   for (let c = 0; c < subHeader.length; c++) {
     const label = String(subHeader[c] ?? "").trim().toLowerCase();
     const date = String(dateRow[c] ?? "").trim().toLowerCase();
@@ -278,13 +316,19 @@ export function parseValorHoraSection(rows: string[][], year: number): ParsedShe
     if (yr !== year) continue;
     if (label === "valor hora ajustada") {
       monthByCol.set(c, `${monthKey}${yr}`);
+    } else if (options.allowEstimatedFallback && /^valor hora estimad[ao]$/.test(normalizeLabel(label))) {
+      fallbackMonthByCol.set(c, `${monthKey}${yr}`);
     } else if (label.includes("sueldo") && label.includes("mensual")) {
       salaryMonthByCol.set(c, `${monthKey}${yr}`);
     }
   }
+  if (monthByCol.size === 0 && fallbackMonthByCol.size > 0) {
+    console.warn(`[personnel-sheets-sync] ${yearStr}: sin "Valor Hora Ajustada"; se usa "Valor Hora Estimada" (año futuro).`);
+    for (const [c, field] of fallbackMonthByCol) monthByCol.set(c, field);
+  }
 
   if (monthByCol.size === 0) {
-    throw new Error(`No se encontraron columnas "Valor Hora Ajustada" para ${yearStr}.`);
+    throw new SheetsLayoutError("HEADERS_NOT_FOUND", year, `No se encontraron columnas "Valor Hora Ajustada" para ${yearStr}.`);
   }
 
   // Los nombres viven en la misma columna donde se encontró el label del año.
@@ -349,14 +393,20 @@ export function parseValorHoraSection(rows: string[][], year: number): ParsedShe
   return result;
 }
 
-export async function fetchValorHoraForYear(year: number): Promise<ParsedSheetRow[]> {
+/** Año civil en Buenos Aires (el servidor puede correr en UTC). */
+function currentCivilYear(): number {
+  return Number(new Intl.DateTimeFormat("en-CA", { timeZone: "America/Argentina/Buenos_Aires", year: "numeric" }).format(new Date()));
+}
+
+type MasterSnapshot = { rows: string[][]; metadataRows: ParsedPersonnelMetadata[] };
+
+async function readMasterSnapshot(): Promise<MasterSnapshot> {
   const sheets = buildSheetsClient();
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId: SPREADSHEET_ID,
     range: READ_RANGE,
   });
   const rows = (response.data.values || []) as string[][];
-  const rateRows = parseValorHoraSection(rows, year);
 
   try {
     const workbook = await sheets.spreadsheets.get({
@@ -370,7 +420,7 @@ export async function fetchValorHoraForYear(year: number): Promise<ParsedSheetRo
         const priority = (title: string) => /personal|equipo|team|staff|rrhh/i.test(title) ? 0 : 1;
         return priority(left) - priority(right);
       });
-    if (tabTitles.length === 0) return rateRows;
+    if (tabTitles.length === 0) return { rows, metadataRows: [] };
 
     const metadataResponse = await sheets.spreadsheets.values.batchGet({
       spreadsheetId: SPREADSHEET_ID,
@@ -381,13 +431,42 @@ export async function fetchValorHoraForYear(year: number): Promise<ParsedSheetRo
     const metadataRows = (metadataResponse.data.valueRanges ?? []).flatMap((range) =>
       parsePersonnelMetadataGrid((range.values ?? []) as string[][]),
     );
-    return mergePersonnelMetadata(rateRows, metadataRows);
+    return { rows, metadataRows };
   } catch (error) {
     // Rates remain usable if an unrelated catalogue tab is temporarily
     // unreadable; auth failures still surface from the primary reads above.
     console.warn("[personnel-sheets-sync] No se pudo leer metadata de Personal; se sincronizarán sólo tarifas.", error);
-    return rateRows;
+    return { rows, metadataRows: [] };
   }
+}
+
+function rateRowsFromSnapshot(snapshot: MasterSnapshot, year: number): ParsedSheetRow[] {
+  const rateRows = parseValorHoraSection(snapshot.rows, year, { allowEstimatedFallback: year >= currentCivilYear() });
+  return snapshot.metadataRows.length === 0 ? rateRows : mergePersonnelMetadata(rateRows, snapshot.metadataRows);
+}
+
+export async function fetchValorHoraForYear(year: number): Promise<ParsedSheetRow[]> {
+  return rateRowsFromSnapshot(await readMasterSnapshot(), year);
+}
+
+/**
+ * Lee el Máster una sola vez y parsea cada año por separado. Un año con layout
+ * inválido no impide aplicar los demás: se devuelve su error tipado. Los errores
+ * de Google (auth/red) siguen lanzándose porque afectan a todos los años.
+ */
+export async function fetchValorHoraForYears(
+  years: number[],
+): Promise<Map<number, { rows: ParsedSheetRow[] } | { error: unknown }>> {
+  const snapshot = await readMasterSnapshot();
+  const result = new Map<number, { rows: ParsedSheetRow[] } | { error: unknown }>();
+  for (const year of years) {
+    try {
+      result.set(year, { rows: rateRowsFromSnapshot(snapshot, year) });
+    } catch (error) {
+      result.set(year, { error });
+    }
+  }
+  return result;
 }
 
 /** @deprecated Use fetchValorHoraForYear(2026) */

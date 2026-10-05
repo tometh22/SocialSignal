@@ -59,7 +59,7 @@ describe("Feedback Mind V2-10 contracts", () => {
   it("keeps third-party attribution and project refresh contracts", () => {
     const quickHours = source("client/src/components/tasks/QuickTaskHours.tsx");
     const detail = source("client/src/components/tasks/TaskDetailPanel.tsx");
-    expect(quickHours).toContain("personnelId: Number(personnelId)");
+    expect(quickHours).toContain("personnelId: targetPersonnelId");
     expect(detail).toContain('["projects", task.projectId, "complete-data"]');
   });
 

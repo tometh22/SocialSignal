@@ -43,6 +43,7 @@ type Task = {
   projectId?: number | null;
   sectionName?: string | null;
   assigneeId?: number | null;
+  assigneeName?: string | null;
   collaboratorIds?: number[];
   startDate?: string | null;
   dueDate?: string | null;
@@ -345,11 +346,11 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
     queryFn: () => authFetchJson("/api/tasks/my-hours"),
   });
 
-  useEffect(() => {
-    if (!logPersonnelId && myHoursIdentity?.personnelId) {
-      setLogPersonnelId(String(myHoursIdentity.personnelId));
-    }
-  }, [logPersonnelId, myHoursIdentity?.personnelId]);
+  // Lo que rige es el dueño de la tarea, no quien la carga: quien gestiona tareas
+  // arranca cargando al responsable; el resto, a su propia persona. "" = sin elegir.
+  const effectiveLogPersonnelId = logPersonnelId
+    || (canLogForOthers && task?.assigneeId ? String(task.assigneeId) : "")
+    || (myHoursIdentity?.personnelId ? String(myHoursIdentity.personnelId) : "");
 
   const { data: allProjects = [] } = useQuery<Project[]>({
     queryKey: ["/api/tasks-projects"],
@@ -425,6 +426,8 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
       queryClient.setQueryData(["/api/tasks", taskId], (old: any) => ({
         ...(old ?? {}),
         ...updates,
+        // Si cambia el responsable, el nombre anterior queda obsoleto desde el primer momento.
+        ...("assigneeId" in updates ? { assigneeName: allPersonnel.find((person) => person.id === updates.assigneeId)?.name ?? null } : {}),
       }));
       return { previous };
     },
@@ -434,6 +437,8 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
       queryClient.setQueryData(["/api/tasks", taskId], (old: any) => ({
         ...(old ?? {}),
         ...updated,
+        // La respuesta del PUT no trae el nombre; onMutate ya lo dejó coherente con el responsable.
+        assigneeName: old?.assigneeName ?? null,
         timeEntries: old?.timeEntries ?? [],
         subtasks: old?.subtasks ?? [],
       }));
@@ -534,6 +539,10 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
     setRenamingSubtaskId(null);
   };
 
+  // El dueño de la subtarea; si no tiene, el de la tarea padre. Sólo para quien gestiona tareas.
+  const subtaskHoursTargetId = (subtaskId: number): number | null =>
+    task?.subtasks?.find((subtask) => subtask.id === subtaskId)?.assigneeId ?? task?.assigneeId ?? null;
+
   const handleLogSubtaskTime = (subtaskId: number) => {
     const parsed = parseHoursInput(subLogHours);
     if (!parsed || parsed <= 0) {
@@ -545,7 +554,9 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
       toast({ variant: "destructive", title: "Mínimo un minuto", description: "El registro mínimo es un minuto." });
       return;
     }
-    logSubtaskTimeMutation.mutate({ subtaskId, data: { date: subLogDate, hours, description: subLogDesc } });
+    // La subtarea también tiene dueño: si lo hay y quien carga gestiona tareas, las horas van a esa persona.
+    const subtaskOwnerId = canLogForOthers ? subtaskHoursTargetId(subtaskId) : null;
+    logSubtaskTimeMutation.mutate({ subtaskId, data: { date: subLogDate, hours, description: subLogDesc, ...(subtaskOwnerId ? { personnelId: subtaskOwnerId } : {}) } });
   };
 
   const deleteTimeMutation = useMutation({
@@ -610,7 +621,7 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
       date: logDate,
       hours,
       description: logDesc,
-      ...(canLogForOthers && logPersonnelId ? { personnelId: Number(logPersonnelId) } : {}),
+      ...(canLogForOthers && effectiveLogPersonnelId ? { personnelId: Number(effectiveLogPersonnelId) } : {}),
     });
   };
 
@@ -1001,7 +1012,7 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
                           </div>
                           {subtaskTimePanelId === sub.id && (
                             <div className="px-3 py-2.5 bg-accent/10 border-t border-border space-y-2">
-                              <p className="text-[10px] text-muted-foreground font-medium">Registrar horas en: <span className="text-foreground">{sub.title}</span> <span className="text-muted-foreground">(múltiplos de 15 min)</span></p>
+                              <p className="text-[10px] text-muted-foreground font-medium">Registrar horas en: <span className="text-foreground">{sub.title}</span>{canLogForOthers && subtaskHoursTargetId(sub.id) ? <span className="text-muted-foreground"> · se cargan a {allPersonnel.find((person) => person.id === subtaskHoursTargetId(sub.id))?.name ?? (sub.assigneeId ? "su responsable" : task?.assigneeName) ?? "su responsable"}</span> : null} <span className="text-muted-foreground">(ej. 45m · 1h30 · 2,5)</span></p>
                               <div className="grid grid-cols-2 gap-2">
                                 <Input
                                   autoFocus
@@ -1176,7 +1187,7 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
                             size="sm"
                             variant="ghost"
                             className="h-6 text-xs text-muted-foreground hover:text-foreground px-2"
-                            onClick={() => startTimer(task.id, task.title, myHoursIdentity?.personnelId ?? null)}
+                            onClick={() => startTimer(task.id, task.title, (canLogForOthers ? Number(effectiveLogPersonnelId) : myHoursIdentity?.personnelId) || null)}
                           >
                             <Timer className="h-3 w-3 mr-1" />Iniciar
                           </Button>
@@ -1192,17 +1203,20 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
                         {canLogForOthers && (
                           <div>
                             <p className="mb-1 text-[10px] text-muted-foreground">Cargar para</p>
-                            <Select value={logPersonnelId} onValueChange={setLogPersonnelId}>
+                            <Select value={effectiveLogPersonnelId} onValueChange={setLogPersonnelId}>
                               <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Seleccioná una persona" /></SelectTrigger>
                               <SelectContent>
-                                {allPersonnel.map((person) => <SelectItem key={person.id} value={String(person.id)}>{person.name}</SelectItem>)}
+                                {task?.assigneeId && !allPersonnel.some((person) => person.id === task.assigneeId) && (
+                                  <SelectItem value={String(task.assigneeId)}>{task.assigneeName ?? `Persona #${task.assigneeId}`} · dueño/a de la tarea</SelectItem>
+                                )}
+                                {allPersonnel.map((person) => <SelectItem key={person.id} value={String(person.id)}>{person.name}{person.id === task?.assigneeId ? " · dueño/a de la tarea" : ""}</SelectItem>)}
                               </SelectContent>
                             </Select>
                           </div>
                         )}
                         <div className="grid grid-cols-2 gap-2">
                           <div>
-                            <p className="text-[10px] text-muted-foreground mb-1">Horas * <span className="text-muted-foreground/70">(múltiplos de 15 min)</span></p>
+                            <p className="text-[10px] text-muted-foreground mb-1">Horas * <span className="text-muted-foreground/70">(ej. 45m · 1h30 · 2,5)</span></p>
                             <Input
                               autoFocus
                               value={logHours}

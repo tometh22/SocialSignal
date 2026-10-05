@@ -24,7 +24,7 @@ interface ProjectData {
   clientName: string;
   revenue: number;
   cost: number;
-  markup: number;
+  markup: number | null;
   margin: number;
   budget: number;
   budgetUsed: number;
@@ -55,6 +55,15 @@ const THRESHOLDS = {
   HOURS_OVERRUN: 120,        // >120% of estimated hours
 };
 
+/**
+ * Un markup solo es medible cuando hay costo real E ingreso (presupuesto o
+ * cotización). Proyectos internos o importados sin precio tienen revenue = 0 y
+ * no deben contar como "markup 0.0x".
+ */
+function hasMeasurableMarkup(p: ProjectData): p is ProjectData & { markup: number } {
+  return p.cost > 0 && p.revenue > 0 && p.markup != null && Number.isFinite(p.markup);
+}
+
 // ─── Alert Generators ───────────────────────────────────────────────────────
 
 function generateProjectAlerts(projects: ProjectData[]): Alert[] {
@@ -64,7 +73,7 @@ function generateProjectAlerts(projects: ProjectData[]): Alert[] {
     if (p.status !== 'active') continue;
 
     // Markup alerts (Epical core metric)
-    if (p.cost > 0 && p.markup < THRESHOLDS.MARKUP_CRITICAL) {
+    if (hasMeasurableMarkup(p) && p.markup < THRESHOLDS.MARKUP_CRITICAL) {
       alerts.push({
         id: `markup-crit-${p.projectId}`,
         type: 'critical',
@@ -78,7 +87,7 @@ function generateProjectAlerts(projects: ProjectData[]): Alert[] {
         threshold: THRESHOLDS.MARKUP_WARNING,
         action: 'Revisar costos del equipo o renegociar precio con el cliente',
       });
-    } else if (p.cost > 0 && p.markup < THRESHOLDS.MARKUP_WARNING) {
+    } else if (hasMeasurableMarkup(p) && p.markup < THRESHOLDS.MARKUP_WARNING) {
       alerts.push({
         id: `markup-warn-${p.projectId}`,
         type: 'warning',
@@ -91,6 +100,21 @@ function generateProjectAlerts(projects: ProjectData[]): Alert[] {
         metric: p.markup,
         threshold: THRESHOLDS.MARKUP_WARNING,
         action: 'Optimizar asignación de equipo o reducir horas senior',
+      });
+    }
+
+    // Costo real sin ingreso asociado: no hay markup medible, pero tampoco hay que perder la señal.
+    if (p.cost > 0 && !(p.revenue > 0)) {
+      alerts.push({
+        id: `no-revenue-${p.projectId}`,
+        type: 'info',
+        category: 'budget',
+        title: 'Costo sin presupuesto asociado',
+        description: `${p.projectName} tiene costos cargados pero ningún presupuesto ni cotización vinculada, así que no se puede medir su markup.`,
+        projectId: p.projectId,
+        projectName: p.projectName,
+        clientName: p.clientName,
+        action: 'Vincular una cotización o cargar el presupuesto del proyecto',
       });
     }
 
@@ -189,7 +213,7 @@ function generateInsights(projects: ProjectData[], alerts: Alert[]): string[] {
   if (activeProjects.length === 0) return ['No hay proyectos activos para analizar.'];
 
   // Portfolio health
-  const projectsWithCosts = activeProjects.filter(p => p.cost > 0 && Number.isFinite(p.markup));
+  const projectsWithCosts = activeProjects.filter(hasMeasurableMarkup);
   const avgMarkup = projectsWithCosts.length ? projectsWithCosts.reduce((sum, p) => sum + p.markup, 0) / projectsWithCosts.length : null;
   if (avgMarkup == null) {
     insights.push("Todavía no hay costos reales suficientes para evaluar el markup del portfolio.");
@@ -208,7 +232,7 @@ function generateInsights(projects: ProjectData[], alerts: Alert[]): string[] {
   }
 
   // Best performer
-  const best = activeProjects.filter(p => p.cost > 0).sort((a, b) => b.markup - a.markup)[0];
+  const best = activeProjects.filter(hasMeasurableMarkup).sort((a, b) => b.markup - a.markup)[0];
   if (best && best.markup > 0) {
     insights.push(`Mejor proyecto: ${best.projectName} (${best.clientName}) con markup ${best.markup.toFixed(1)}x.`);
   }

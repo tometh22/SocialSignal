@@ -1,4 +1,5 @@
 import { quotationPortfolioTotals } from "@shared/utils/quotation-portfolio-totals";
+import { quotationListPricing } from "@shared/utils/quotation-profitability";
 import { quotationProjectTypeLabel, quotationPriceLabel } from "@shared/utils/quotation-display";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
@@ -710,12 +711,12 @@ export default function ManageQuotes() {
           {/* Main Content Card */}
           {commercialGroups.length > 0 && (
             <Card className="mind-panel mb-6 overflow-hidden">
-              <CardHeader className="border-b border-slate-200 bg-slate-950 py-4 text-white"><CardTitle className="flex items-center gap-2 text-base"><Layers3 className="h-5 w-5 text-indigo-300" />Cliente → grupos de propuestas → cotizaciones</CardTitle></CardHeader>
+              <CardHeader className="border-b border-slate-200 bg-slate-950 py-4 text-white"><CardTitle className="flex items-center gap-2 text-base"><Layers3 className="h-5 w-5 text-indigo-300" />Cliente → grupos de propuestas → cotizaciones</CardTitle><p className="mt-1 text-xs font-normal text-slate-300">Las propuestas de un grupo se gestionan desde el grupo y no se repiten en la lista de cotizaciones de abajo.</p></CardHeader>
               <CardContent className="grid gap-3 p-4 sm:p-5 lg:grid-cols-2">
                 {commercialGroups.filter((entry) => entry.items.some((item) => item.projectName.toLowerCase().includes(searchTerm.toLowerCase()) && (statusFilter === 'all' || item.status === statusFilter))).map((entry) => (
                   <button key={entry.group.id} type="button" onClick={() => navigate(`/quotation-groups/${entry.group.id}`)} className="rounded-xl border border-slate-200 bg-white p-4 text-left transition hover:border-indigo-300 hover:shadow-sm">
                     <div className="flex items-start justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{entry.client?.name || 'Cliente'}</p><h3 className="mt-1 font-semibold text-slate-950">{entry.group.name}</h3><p className="mt-1 text-xs text-slate-500">{entry.group.groupNumber} · {entry.items.length} propuestas</p></div><Badge variant="outline">{statusLabel(entry.status)}</Badge></div>
-                    <div className="mt-4 space-y-2 border-t border-slate-100 pt-3">{entry.items.map((item) => <div key={item.quotationId} className="flex items-center justify-between gap-3 text-xs"><span className="truncate text-slate-700">{item.projectName}</span><span className="shrink-0 font-medium text-slate-900">{formatCurrency(item.totalAmount, item.currency)}</span></div>)}</div>
+                    <div className="mt-4 space-y-2 border-t border-slate-100 pt-3">{entry.items.map((item) => <div key={item.quotationId} className="flex items-center justify-between gap-3 text-xs"><span className="flex min-w-0 items-center gap-2"><span className="truncate text-slate-700">{item.projectName}</span>{item.status === 'draft' && <Badge variant="outline" className="shrink-0 px-1.5 py-0 text-[10px]">Borrador</Badge>}</span><span className="shrink-0 font-medium text-slate-900">{formatCurrency(item.totalAmount, item.currency)}</span></div>)}</div>
                   </button>
                 ))}
               </CardContent>
@@ -744,7 +745,7 @@ export default function ManageQuotes() {
                 <div className="flex justify-center py-16">
                   <Loader variant="dots" size="lg" text="Cargando cotizaciones..." />
                 </div>
-              ) : filteredQuotations.length > 0 ? (
+              ) : standaloneQuotations.length > 0 ? (
 
                 <div className="space-y-7 p-3 sm:p-6">
                   {(quoteView === "folders" ? quotationGroups : [["__all__", standaloneQuotations] as [string, Quotation[]]]).map(([clientName, clientQuotes]) => (
@@ -919,33 +920,29 @@ export default function ManageQuotes() {
                                   
                                   {/* Cost and Markup info with better styling */}
                                   <div className="space-y-2 border-t pt-2">
-                                    <div className="flex items-center justify-between gap-8 text-xs">
-                                      <span className="text-gray-500">Costo:</span>
-                                      <span className="font-medium text-gray-700">
-                                        {(() => {
-                                          const currency = quote.quotationCurrency || 'ARS';
-                                          return formatCurrencyWithConversion(quote.baseCost, currency);
-                                        })()}
-                                      </span>
-                                    </div>
-                                    <div className="flex items-center justify-between gap-8 text-xs">
-                                      <span className="text-gray-500">Markup:</span>
-                                      <span className={`font-bold ${
-                                        (() => {
-                                          const realFactor = Number(quote.marginFactor) || 1;
-                                          return realFactor >= 2.5 ? 'text-emerald-600' :
-                                                 realFactor >= 2.0 ? 'text-blue-600' :
-                                                 realFactor >= 1.5 ? 'text-amber-600' :
-                                                 'text-red-600';
-                                        })()
-                                      }`}>
-                                        {(() => {
-                                          const realFactor = Number(quote.marginFactor) || 1;
-                                          const markupPercentage = ((realFactor - 1) * 100).toFixed(0);
-                                          return `${markupPercentage}% (${realFactor.toFixed(1)}x)`;
-                                        })()}
-                                      </span>
-                                    </div>
+                                    {(() => {
+                                      const currency = quote.quotationCurrency || 'ARS';
+                                      const pricing = quotationListPricing(quote);
+                                      const factor = pricing.factor;
+                                      const tone = factor == null || !pricing.hasMarkup ? 'text-gray-500' :
+                                        factor >= 2.5 ? 'text-emerald-600' :
+                                        factor >= 2.0 ? 'text-blue-600' :
+                                        factor >= 1.5 ? 'text-amber-600' : 'text-red-600';
+                                      return (
+                                        <>
+                                          <div className="flex items-center justify-between gap-8 text-xs">
+                                            <span className="text-gray-500">Costo:</span>
+                                            <span className="font-medium text-gray-700">{formatCurrencyWithConversion(pricing.cost, currency)}</span>
+                                          </div>
+                                          <div className="flex items-center justify-between gap-8 text-xs">
+                                            <span className="text-gray-500">Markup:</span>
+                                            <span className={`font-bold ${tone}`} data-testid="quote-card-markup">
+                                              {factor == null ? '—' : !pricing.hasMarkup ? 'Sin markup' : `${((factor - 1) * 100).toFixed(0)}% (${factor.toFixed(1)}x)`}
+                                            </span>
+                                          </div>
+                                        </>
+                                      );
+                                    })()}
                                   </div>
                                 </div>
 
@@ -1037,7 +1034,16 @@ export default function ManageQuotes() {
                   <div className="mx-auto w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mb-4">
                     <FileText className="h-10 w-10 text-slate-400" />
                   </div>
-                  {searchTerm || statusFilter !== "all" ? (
+                  {filteredQuotations.length > 0 ? (
+                    <>
+                      <h3 className="text-lg font-semibold text-slate-900 mb-2">
+                        Todas las cotizaciones están agrupadas
+                      </h3>
+                      <p className="text-slate-600">
+                        Las propuestas de un grupo se gestionan desde el panel de grupos de arriba y no se repiten en esta lista.
+                      </p>
+                    </>
+                  ) : searchTerm || statusFilter !== "all" ? (
                     <>
                       <h3 className="text-lg font-semibold text-slate-900 mb-2">
                         No se encontraron cotizaciones con los filtros aplicados

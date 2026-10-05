@@ -1,4 +1,4 @@
-import { calculateGrossMarginPercentage } from './quotation-commercial';
+import { calculateGrossMarginPercentage, calculateTaxBreakdown } from './quotation-commercial';
 
 export function quotedOperationalCost(quotation: {
   baseCost?: number | null; complexityAdjustment?: number | null;
@@ -6,6 +6,25 @@ export function quotedOperationalCost(quotation: {
 }): number {
   return ['baseCost', 'complexityAdjustment', 'toolsCost', 'platformCost', 'additionalDeliverableCost']
     .reduce((sum, key) => sum + (Number(quotation[key as keyof typeof quotation]) || 0), 0);
+}
+
+/**
+ * Costo y markup tal como los muestra la lista de cotizaciones. Se derivan de los
+ * montos (total / costo operativo cotizado), igual que el resumen del detalle, y no
+ * de la columna `marginFactor`, que conserva su default 2.0 en cotizaciones legacy
+ * cuyo total es igual al costo.
+ */
+export function quotationListPricing(quotation: Parameters<typeof quotedOperationalCost>[0] & {
+  totalAmount?: number | null; taxRate?: number | null; pricesIncludeTax?: boolean | null; acceptedVariantId?: number | null;
+}) {
+  const cost = quotedOperationalCost(quotation);
+  // El markup se mide sobre el precio NETO (sin IVA), como la rentabilidad del detalle.
+  const total = calculateTaxBreakdown(Number(quotation.totalAmount) || 0, quotation.taxRate ?? 0, Boolean(quotation.pricesIncludeTax)).netAmount;
+  // Con una variante aceptada, totalAmount es el de la variante pero los costos son los de la
+  // cotización base: dividirlos daría un factor arbitrario, así que no se muestra markup.
+  if (quotation.acceptedVariantId != null || cost <= 0 || total <= 0) return { cost, total, factor: null as number | null, hasMarkup: false };
+  const factor = total / cost;
+  return { cost, total, factor, hasMarkup: Math.abs(factor - 1) >= 0.005 };
 }
 
 /** An empty ledger is missing evidence, not a realized 100% gross margin. */

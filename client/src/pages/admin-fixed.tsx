@@ -252,20 +252,27 @@ export default function Admin() {
         queryClient.invalidateQueries({ queryKey: ["/api/capacity"] }),
       ]);
       await refetchPersonnel();
-      const errors = Object.entries(result?.summary ?? {}).filter(([, value]: any) => value?.error);
-      if (errors.length > 0) {
-        const describeSyncError = (error: unknown) => String(error).includes("invalid_grant")
-          ? "Google rechazó las credenciales; renová la cuenta de servicio antes de sincronizar."
-          : String(error);
+      const entries = Object.entries(result?.summary ?? {}) as [string, any][];
+      const failed = entries.filter(([, value]) => value?.error && value.severity !== "info");
+      const pending = entries.filter(([, value]) => value?.error && value.severity === "info");
+      const applied = entries.filter(([, value]) => !value?.error).map(([year]) => year);
+      const describeSyncError = (error: unknown) => String(error).includes("invalid_grant")
+        ? "Google rechazó las credenciales; renová la cuenta de servicio antes de sincronizar."
+        : String(error);
+      const appliedText = applied.length > 0 ? `${applied.join(" y ")} actualizado${applied.length > 1 ? "s" : ""} (${result?.totalUpdated ?? 0} personas, ${result?.totalCells ?? 0} tarifas)` : "";
+      if (failed.length > 0) {
         toast({
           title: "Sincronización incompleta",
-          description: errors.map(([year, value]: any) => `${year}: ${describeSyncError(value.error)}`).join(" · "),
+          description: [appliedText, ...failed.map(([year, value]) => `${year}: ${describeSyncError(value.error)}`)].filter(Boolean).join(" · "),
           variant: "destructive",
         });
       } else {
         toast({
-          title: "Datos actualizados",
-          description: `${result?.totalUpdated ?? 0} personas y ${result?.totalCells ?? 0} tarifas actualizadas.`,
+          title: "Valor hora actualizado",
+          description: [
+            `${result?.totalUpdated ?? 0} personas y ${result?.totalCells ?? 0} tarifas actualizadas.`,
+            ...pending.map(([year]) => `${year}: todavía no está cargado en el Máster.`),
+          ].join(" "),
         });
       }
     },

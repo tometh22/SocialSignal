@@ -1,5 +1,5 @@
 ---
-version: 2.27.0
+version: 2.28.0
 updatedAt: 2026-10-05
 feedbackCount: 70
 ---
@@ -117,7 +117,7 @@ Este addendum registra las diez capturas recibidas el 14 de agosto de 2026. No a
 | F14-22 | Implementado | Ausencias dispone de autoservicio, aprobación/rechazo, cancelación, cupos separados y notificaciones. |
 | F14-23 | Implementado | Todo enlace de proyecto originado en Home o Tareas abre `/tasks/projects/:id`; `/active-projects` queda reservado a la intención financiera de Ops/Admin. |
 
-La verificación de datos del Máster requiere credenciales Google válidas en el entorno desplegado. Un fallo de autenticación nunca se presenta como sincronización exitosa y no aplica cambios parciales.
+La verificación de datos del Máster requiere credenciales Google válidas en el entorno desplegado. Un fallo de autenticación nunca se presenta como sincronización exitosa y no aplica cambios. Si el Máster se lee bien pero un año no tiene sección o columnas reconocibles, ese año se informa por separado (un año futuro todavía no cargado es un aviso informativo, no un error) y los demás años sí se aplican.
 
 ## Costos de Personal
 
@@ -442,3 +442,10 @@ histórica que todavía necesitan cotizaciones y registros anteriores.
 | GEN-26 | Implementado | La administración de Roles lista únicamente clasificaciones activas de la taxonomía vigente. Los roles históricos continúan en base de datos para trazabilidad, pero no vuelven a ofrecerse como opciones operativas. |
 | GEN-27 | Implementado | La edición rápida de Personal usa exclusivamente Nivel, Subnivel y Área. Ya no muestra ni envía `roleId` o Rol viejo; el servidor deriva el rol canónico y las personas pendientes quedan señaladas para completar su clasificación. |
 | GEN-28 | Implementado | Cada proyecto del Kanban permite actualizar su Estado operativo tanto con un selector visible como mediante arrastre. La grilla mensual de costos etiqueta cada columna como Real cerrado, Mes actual o Proyección para evitar confundir históricos con estimaciones. |
+
+## Addendum — Feedback 5-10
+
+- **Señales del portfolio:** un proyecto sin ingreso (presupuesto o cotización) no tiene markup medible; no entra en el promedio ni genera alertas de markup. Si tiene costos cargados, se muestra una señal informativa «Costo sin presupuesto asociado».
+- **Días Epical en el Home:** la tarjeta de ausencias muestra los días Epical disponibles por separado de las vacaciones (cupo, usados y disponibles); son cupos independientes.
+- **Lista de cotizaciones:** costo y markup se derivan de los montos (`total neto de IVA / costo operativo cotizado`). Con una variante aceptada no se muestra markup, porque el total es de la variante y los costos son los de la cotización base. Precio igual al costo se muestra como "Sin markup". Las cotizaciones archivadas no aparecen en grupos ni por oportunidad; las propuestas agrupadas se gestionan desde su grupo y no se repiten en la lista.
+- **Carga de horas:** el destino por defecto es el responsable de la tarea (no quien la carga) en el popover, el detalle, el temporizador y las subtareas. Quien gestiona tareas puede cargar al responsable aunque su usuario no esté vinculado a Personal.

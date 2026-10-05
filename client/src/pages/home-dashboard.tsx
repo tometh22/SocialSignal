@@ -60,7 +60,7 @@ export default function HomeDashboard() {
     return { date: next.toLocaleDateString("es-AR", { day: "numeric", month: "long" }), days };
   })() : null;
 
-  const { data: absenceBalance } = useQuery<{ configured: boolean; vacationDays: number | null; vacationCarryoverDays: number; vacationAdvanceDebtDays: number; vacationBalanceDays: number; used: { vacation: number } }>({
+  const { data: absenceBalance } = useQuery<{ configured: boolean; vacationDays: number | null; vacationCarryoverDays: number; vacationAdvanceDebtDays: number; vacationBalanceDays: number; epicalDays: number | null; used: { vacation: number; epical: number } }>({
     queryKey: ["/api/absence-allowances", myPersonnel?.id, new Date().getFullYear()],
     queryFn: async () => {
       const response = await authFetch(`/api/absence-allowances/${myPersonnel.id}/${new Date().getFullYear()}`);
@@ -96,7 +96,7 @@ export default function HomeDashboard() {
     clientName: p.clientName || '',
     revenue: p.revenue || 0,
     cost: p.cost || 0,
-    markup: p.markup || 0,
+    markup: typeof p.markup === 'number' && Number.isFinite(p.markup) ? p.markup : null,
     margin: p.margin || 0,
     budget: p.budget || 0,
     budgetUsed: p.budgetUsed || 0,
@@ -253,12 +253,19 @@ export default function HomeDashboard() {
           </>
         ) : undefined}
       />
-      {birthday && <Card className="border-pink-200 bg-pink-50/60"><CardContent className="flex items-center gap-3 p-3 text-sm text-pink-950"><span aria-hidden="true">🎂</span><span><strong>Tu cumpleaños:</strong> {birthday.date}{birthday.days === 0 ? " · ¡hoy!" : birthday.days === 1 ? " · mañana" : ` · en ${birthday.days} días`}</span></CardContent></Card>}
-
-      {absenceBalance?.configured && <Card><CardContent className="flex flex-wrap items-center justify-between gap-2 p-3 text-sm">
-        <span><strong>Vacaciones disponibles: {absenceBalance.vacationBalanceDays} días</strong><span className="ml-2 text-xs text-muted-foreground">Año actual: {absenceBalance.vacationDays ?? 0} · Traslado: {absenceBalance.vacationCarryoverDays} · Adelanto anterior: {absenceBalance.vacationAdvanceDebtDays} · Usados: {absenceBalance.used.vacation}</span></span>
-        <Link href="/absences" className="text-primary hover:underline">Mis ausencias</Link>
-      </CardContent></Card>}
+      {(birthday || absenceBalance?.configured) && (
+        <div className="grid gap-3 lg:grid-cols-2">
+          {birthday && <Card className="border-pink-200 bg-pink-50/60"><CardContent className="flex items-center gap-3 p-4 text-sm text-pink-950 sm:p-4 sm:pt-4"><span aria-hidden="true">🎂</span><span><strong>Tu cumpleaños:</strong> {birthday.date}{birthday.days === 0 ? " · ¡hoy!" : birthday.days === 1 ? " · mañana" : ` · en ${birthday.days} días`}</span></CardContent></Card>}
+          {absenceBalance?.configured && <Card><CardContent className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2 p-4 text-sm sm:p-4 sm:pt-4">
+            <div className="min-w-0 flex-1 space-y-1">
+              <div><strong>Vacaciones disponibles: {absenceBalance.vacationBalanceDays} días</strong></div>
+              <div className="text-xs leading-5 text-muted-foreground">Año actual: {absenceBalance.vacationDays ?? 0} · Traslado: {absenceBalance.vacationCarryoverDays} · Adelanto anterior: {absenceBalance.vacationAdvanceDebtDays} · Usados: {absenceBalance.used.vacation}</div>
+              {absenceBalance.epicalDays != null && <div data-testid="home-epical-balance"><strong>Días Epical disponibles: {Math.max(0, absenceBalance.epicalDays - absenceBalance.used.epical)} días</strong><span className="ml-2 text-xs text-muted-foreground">Cupo: {absenceBalance.epicalDays} · Usados: {absenceBalance.used.epical}</span></div>}
+            </div>
+            <Link href="/absences" className="shrink-0 text-primary hover:underline">Mis ausencias</Link>
+          </CardContent></Card>}
+        </div>
+      )}
 
       {/* Resumen operativo */}
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
@@ -353,7 +360,7 @@ export default function HomeDashboard() {
       {/* AI Insights */}
       {projectsForAlerts.length > 0 && insights.length > 0 && hasPermission('projects') && (
         <Card className="border-indigo-100 bg-gradient-to-r from-indigo-50/30 to-purple-50/30">
-          <CardContent className="p-4">
+          <CardContent className="p-4 sm:p-4 sm:pt-4">
             <div className="flex items-center gap-2 mb-2">
               <div className="p-1.5 rounded-lg bg-indigo-100">
                 <Lightbulb className="h-4 w-4 text-indigo-600" />
