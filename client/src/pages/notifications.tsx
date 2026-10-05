@@ -3,7 +3,7 @@ import { Link } from "wouter";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowUpRight, Bell, BellOff, Check, CheckCheck, ChevronDown, Circle, ClipboardList,
-  Inbox, Mail, MessageCircle, Monitor, Settings2, Sparkles, Users,
+  Inbox, Mail, MessageCircle, Monitor, Send, Settings2, Sparkles, Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -150,6 +150,23 @@ export default function NotificationsPage() {
       discreetMode: next.discreetMode ?? true,
     }),
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["/api/notifications/preferences"] }),
+  });
+  const testPushMutation = useMutation({
+    mutationFn: async () => {
+      const registration = await navigator.serviceWorker.getRegistration("/");
+      const subscription = await registration?.pushManager.getSubscription();
+      if (!subscription) throw new Error("Este navegador todavía no está conectado a Mind.");
+      const response = await authFetch("/api/notifications/push/test", {
+        method: "POST",
+        body: JSON.stringify({ endpoint: subscription.endpoint }),
+      });
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({})) as { message?: string };
+        throw new Error(body.message || "No pudimos enviar el aviso de prueba.");
+      }
+    },
+    onSuccess: () => setDesktopStatus("Enviamos un aviso de prueba a este dispositivo."),
+    onError: (error) => setDesktopStatus(error instanceof Error ? error.message : "No pudimos enviar el aviso de prueba."),
   });
   const updateCategory = (category: Category, channel: "desktop" | "email", enabled: boolean) => {
     if (!preferences) return;
@@ -320,6 +337,14 @@ export default function NotificationsPage() {
                     void request();
                   }} />
                 </div>
+                {preferences.desktopEnabled && (
+                  <div className="flex items-center justify-between gap-3 rounded-2xl border border-indigo-100 bg-indigo-50/50 px-3.5 py-3">
+                    <div className="min-w-0"><p className="text-xs font-medium text-slate-800">Comprobá este dispositivo</p><p className="text-[10px] text-slate-500">Te enviamos un aviso de prueba.</p></div>
+                    <Button size="sm" variant="outline" className="shrink-0 rounded-lg bg-white" disabled={testPushMutation.isPending} onClick={() => testPushMutation.mutate()}>
+                      <Send className="mr-1.5 h-3.5 w-3.5" />{testPushMutation.isPending ? "Enviando…" : "Probar"}
+                    </Button>
+                  </div>
+                )}
                 <div className="flex items-center justify-between rounded-2xl bg-slate-50 px-3.5 py-3">
                   <div className="flex items-center gap-2.5"><Mail className="h-4 w-4 text-slate-500" /><div><p className="text-sm font-medium text-slate-800">Email</p><p className="text-[10px] text-slate-500">A tu correo de Mind</p></div></div>
                   <Switch checked={preferences.emailEnabled} aria-label="Activar notificaciones por email" onCheckedChange={(checked) => void savePreferencesMutation.mutate({ ...preferences, emailEnabled: checked })} />

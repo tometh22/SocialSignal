@@ -5,6 +5,7 @@
 - Mind: nuevo centro de notificaciones con historial paginado, filtros, agrupación, lectura por elemento y preferencias por categoría; las notificaciones por email se procesan desde una cola con reintentos.
 - Avisos en Mind por respuestas y dailies, asignaciones y respuestas en tareas, y recordatorios CRM asignados. El modo privado oculta el contenido en correos y notificaciones de escritorio.
 - Web Push envía avisos del navegador aunque Mind esté cerrado, con registro y baja de cada dispositivo mediante un service worker y claves VAPID.
+- Preferencias permite enviar un aviso de prueba solo al dispositivo conectado, para comprobar la recepción sin crear actividad ficticia.
 - CRM: cola de oportunidades activas sin responsable y selector de responsable dentro del detalle.
 
 ## 1.11.3 — 2026-10-05

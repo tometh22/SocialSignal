@@ -195,7 +195,7 @@ import { registerProposalStudioRoutes } from "./routes-proposal-studio";
 import { runDocumentQa } from "./routes-proposal-studio";
 import { blueprintDefinitionSchema, estimateBlueprintWorkload, isDeliverableSold, proposalDocumentSchema } from "@shared/quotation-professional";
 import { renderProposalPdf } from "./services/proposal-studio";
-import { createUserNotifications as persistUserNotifications, getWebPushPublicKey, retryUserNotificationEmailDelivery } from "./services/user-notifications";
+import { createUserNotifications as persistUserNotifications, getWebPushPublicKey, retryUserNotificationEmailDelivery, sendUserWebPushTest } from "./services/user-notifications";
 import { reviewRooms, reviewRoomMembers, capacityOverrides } from "@shared/schema";
 import path from 'path';
 import PDFDocument from "pdfkit";
@@ -27310,6 +27310,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       eq(userNotificationPushSubscriptions.userId, userId),
       eq(userNotificationPushSubscriptions.endpoint, parsed.data.endpoint),
     ));
+    res.json({ success: true });
+  });
+  app.post("/api/notifications/push/test", requireAuth, async (req, res) => {
+    const parsed = z.object({
+      endpoint: z.string().url().max(2048).refine((value) => new URL(value).protocol === "https:", "El endpoint debe usar HTTPS"),
+    }).strict().safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ message: "Suscripción Web Push inválida" });
+    const result = await sendUserWebPushTest(Number((req.user as any)?.id), parsed.data.endpoint);
+    if (!result.ok) return res.status(result.status).json({ message: result.message });
     res.json({ success: true });
   });
   app.put("/api/notifications/preferences", requireAuth, async (req, res) => {

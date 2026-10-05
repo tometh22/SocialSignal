@@ -127,6 +127,53 @@ export function getWebPushPublicKey() {
   return getPushConfig()?.publicKey ?? null;
 }
 
+const pushTestLastSentAt = new Map<string, number>();
+
+export async function sendUserWebPushTest(userId: number, endpoint: string) {
+  if (!getPushConfig()) return { ok: false as const, status: 503, message: "Web Push no está configurado en el servidor." };
+  const rateLimitKey = `${userId}:${endpoint}`;
+  const now = Date.now();
+  if (now - (pushTestLastSentAt.get(rateLimitKey) ?? 0) < 30_000) {
+    return { ok: false as const, status: 429, message: "Esperá unos segundos antes de volver a probar." };
+  }
+
+  const [row] = await db.select({
+    id: userNotificationPushSubscriptions.id,
+    endpoint: userNotificationPushSubscriptions.endpoint,
+    p256dh: userNotificationPushSubscriptions.p256dh,
+    auth: userNotificationPushSubscriptions.auth,
+  }).from(userNotificationPushSubscriptions)
+    .innerJoin(users, eq(users.id, userNotificationPushSubscriptions.userId))
+    .innerJoin(userNotificationPreferences, eq(userNotificationPreferences.userId, users.id))
+    .where(and(
+      eq(userNotificationPushSubscriptions.userId, userId),
+      eq(userNotificationPushSubscriptions.endpoint, endpoint),
+      eq(userNotificationPreferences.desktopEnabled, true),
+      eq(users.isActive, true),
+    )).limit(1);
+  if (!row) return { ok: false as const, status: 404, message: "Este dispositivo todavía no está conectado a Mind." };
+
+  pushTestLastSentAt.set(rateLimitKey, now);
+  try {
+    const origin = process.env.PUBLIC_APP_URL || process.env.APP_URL || process.env.BASE_URL || "";
+    await webpush.sendNotification({ endpoint: row.endpoint, keys: { p256dh: row.p256dh, auth: row.auth } }, JSON.stringify({
+      title: "Prueba de notificaciones de Mind",
+      body: "Tu navegador recibió correctamente este aviso.",
+      url: getActionUrl(origin, "/notifications") || "/notifications",
+      tag: `mind-push-test-${userId}`,
+    }), { TTL: 60 });
+    return { ok: true as const };
+  } catch (error: any) {
+    pushTestLastSentAt.delete(rateLimitKey);
+    if (error?.statusCode === 404 || error?.statusCode === 410) {
+      await db.delete(userNotificationPushSubscriptions).where(eq(userNotificationPushSubscriptions.id, row.id));
+      return { ok: false as const, status: 410, message: "El navegador venció esta suscripción. Volvé a activar las notificaciones." };
+    }
+    console.error("No se pudo entregar el aviso de prueba Web Push:", error instanceof Error ? error.message : error);
+    return { ok: false as const, status: 502, message: "El servicio de notificaciones no aceptó el aviso de prueba." };
+  }
+}
+
 async function dispatchUserNotificationPushes(inserted: InsertedNotification[], input: UserNotificationInput) {
   const config = getPushConfig();
   if (!config) return;
