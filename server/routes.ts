@@ -5042,9 +5042,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ==================== SYNC TARIFAS DESDE GOOGLE SHEETS ====================
+  // Los tres endpoints exigen permiso "admin", igual que el Panel de Administración que los usa:
+  // sobrescriben (o exponen) tarifas de todo el personal y antes sólo pedían estar autenticado.
   // Lee la pestaña "Valor Hora Real y Estimada" del master para el año indicado (default 2026),
   // devuelve un preview con las filas que matchean (por nombre exacto o alias) y las que no.
-  app.get("/api/personnel/sheets-sync/preview", requireAuth, async (req, res) => {
+  app.get("/api/personnel/sheets-sync/preview", requireAuth, requirePermission("admin"), async (req, res) => {
     try {
       const year = parseInt(String(req.query.year || 2026));
       if (isNaN(year) || year < 2024 || year > 2030) {
@@ -5174,7 +5176,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // - aliases: nuevos mapeos a persistir (number = personnel id; null = ignorar para siempre).
   // - applyTo: lista de sheetNames cuyas tarifas se van a escribir en personnel.
   // - year: año a sincronizar (default 2026).
-  app.post("/api/personnel/sheets-sync/apply", requireAuth, async (req, res) => {
+  app.post("/api/personnel/sheets-sync/apply", requireAuth, requirePermission("admin"), async (req, res) => {
     try {
       const year = parseInt(String(req.body?.year || 2026));
       if (isNaN(year) || year < 2024 || year > 2030) {
@@ -5214,7 +5216,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Auto-apply: sync all matched personnel rates for one or more years without requiring user confirmation.
   // Body: { years?: number[] }  — default [currentYear - 1, currentYear, currentYear + 1]
-  app.post("/api/personnel/sheets-sync/auto-apply", requireAuth, async (req, res) => {
+  app.post("/api/personnel/sheets-sync/auto-apply", requireAuth, requirePermission("admin"), async (req, res) => {
     try {
       const now = new Date();
       const currentYear = now.getFullYear();
