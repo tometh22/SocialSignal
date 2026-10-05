@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.11.7 — 2026-10-05
+
+- Ausencias: editar una ausencia que ya descuenta cupo (aprobada o con cancelación pendiente) ahora exige el mismo saldo que la aprobación (vacaciones con traslado y adelantos, y días Epical), bloquea los cupos de la persona para evitar doble gasto y sólo valida lo que empeora, de modo que acortar una ausencia que ya excedía el cupo por un override sigue permitido.
+
 ## 1.11.6 — 2026-10-05
 
 - Cotizaciones: la lista, el detalle, la rentabilidad y la alerta de margen cuentan el costo y el precio igual. El detalle muestra además el «Costo operativo total» (con herramientas, plataforma y entregables adicionales) cuando difiere del subtotal base + complejidad.

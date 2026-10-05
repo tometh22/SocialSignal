@@ -39,7 +39,7 @@ import {
   type AbsenceType,
 } from "@shared/utils/absence";
 import { parseBirthdayMonthDay } from "@shared/utils/birthdays";
-import { calculateVacationLedger, summarizeAbsenceBalance } from "@shared/utils/absence-balance";
+import { calculateVacationLedger, summarizeAbsenceBalance, findAllowanceShortfalls } from "@shared/utils/absence-balance";
 
 import {
   insertClientSchema,
@@ -26996,6 +26996,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
           sql`${personnelAbsences.id} <> ${absenceId}`,
         )).limit(1);
         if (overlap) throw Object.assign(new Error("Ya existe otra ausencia para esas fechas"), { status: 409 });
+
+        // Editar una ausencia que ya descuenta cupo (aprobada o con cancelación pendiente) no puede
+        // saltarse el saldo que sí se exige al aprobarla: antes Operaciones podía alargar o cambiar el tipo
+        // de una ausencia aprobada y pasarse del cupo sin que nadie lo viera.
+        const staysActive = !updates.status && ["approved", "cancellation_requested"].includes(current.status);
+        const newAllowanceType = absenceConsumesAllowance((updates.type ?? current.type) as AbsenceType);
+        const changesConsumption = Boolean(updates.type && updates.type !== current.type) || startDate !== current.startDate || endDate !== current.endDate;
+        if (staysActive && newAllowanceType && changesConsumption) {
+          const oldAllowanceType = absenceConsumesAllowance(current.type as AbsenceType);
+          const years = Object.keys(businessDaysByYear(startDate, endDate, holidayDates)).map(Number);
+          const throughYear = Math.max(...years);
+          const allowanceRows = await tx.select().from(absenceAllowances).where(and(
+            eq(absenceAllowances.personnelId, current.personnelId), lte(absenceAllowances.year, throughYear),
+          ));
+          const firstYear = Math.min(throughYear, current.startDate ? Number(current.startDate.slice(0, 4)) : throughYear, ...allowanceRows.map((row) => row.year));
+          // Bloquea los cupos en orden para que dos aprobaciones/ediciones simultáneas no gasten el mismo saldo.
+          await tx.execute(sql`SELECT id FROM absence_allowances WHERE personnel_id = ${current.personnelId} AND year <= ${throughYear} ORDER BY year FOR UPDATE`);
+          const ledgerHolidays = await holidaysForRange(`${firstYear}-01-01`, `${throughYear}-12-31`);
+          const newByYear = businessDaysByYear(startDate, endDate, ledgerHolidays);
+          // Si el tipo no cambia, sólo se valida lo que EMPEORA: acortar una ausencia que ya excedía el cupo
+          // (override de Admin) no debe quedar bloqueado.
+          const previousByYear = oldAllowanceType === newAllowanceType ? businessDaysByYear(current.startDate, current.endDate, ledgerHolidays) : {};
+          const requestedByYear: Record<number, number> = {};
+          for (const [year, days] of Object.entries(newByYear)) {
+            if (days > (previousByYear[Number(year)] ?? 0)) requestedByYear[Number(year)] = days;
+          }
+          if (Object.keys(requestedByYear).length > 0) {
+            const others = await tx.select({ type: personnelAbsences.type, startDate: personnelAbsences.startDate, endDate: personnelAbsences.endDate })
+              .from(personnelAbsences).where(and(
+                eq(personnelAbsences.personnelId, current.personnelId),
+                inArray(personnelAbsences.status, ["approved", "cancellation_requested"]),
+                lte(personnelAbsences.startDate, `${throughYear}-12-31`), gte(personnelAbsences.endDate, `${firstYear}-01-01`),
+                sql`${personnelAbsences.id} <> ${absenceId}`,
+              ));
+            const shortfalls = findAllowanceShortfalls({
+              type: newAllowanceType === "epical" ? "epical_day" : "vacation",
+              requestedByYear,
+              allowances: allowanceRows,
+              otherActiveAbsences: others,
+              holidayDates: ledgerHolidays,
+            });
+            if (shortfalls.length > 0) {
+              const first = shortfalls[0];
+              throw Object.assign(new Error(first.kind === "not_configured"
+                ? `Cupo ${first.year} no configurado`
+                : `Saldo ${first.year} insuficiente para esta edición: disponible ${first.available}, necesita ${first.requested}. Para excederlo, cancelá la ausencia y pedí que un Admin la apruebe con override.`), { status: 409 });
+            }
+          }
+        }
+
         const [row] = await tx.update(personnelAbsences).set(updates).where(and(eq(personnelAbsences.id, absenceId), sql`xmin::text = ${current.rowVersion}`)).returning();
         if (!row) throw Object.assign(new Error("La solicitud cambió; actualizá la pantalla"), { status: 409 });
         await tx.insert(absenceEvents).values({ absenceId, eventKey: `edited:${absenceId}:${Date.now()}`, action: "edited", fromStatus: current.status, toStatus: updates.status ?? current.status, actorUserId: access.userId, metadata: { previous: current, daysByYear: businessDaysByYear(startDate, endDate, holidayDates), planningStatus: updates.planningStatus ?? current.planningStatus } });
