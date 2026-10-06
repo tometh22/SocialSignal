@@ -15,7 +15,22 @@ self.addEventListener("push", (event) => {
     data: { url: typeof payload.url === "string" ? payload.url : "/notifications" },
     renotify: payload.renotify === true,
   };
-  event.waitUntil(self.registration.showNotification(title, options));
+  const testId = typeof payload.testId === "string" ? payload.testId : null;
+  event.waitUntil((async () => {
+    try {
+      await self.registration.showNotification(title, options);
+      if (testId) {
+        const clients = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+        for (const client of clients) client.postMessage({ type: "mind-push-test-result", testId, shown: true });
+      }
+    } catch (error) {
+      if (testId) {
+        const clients = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+        for (const client of clients) client.postMessage({ type: "mind-push-test-result", testId, shown: false });
+      }
+      throw error;
+    }
+  })());
 });
 
 self.addEventListener("notificationclick", (event) => {

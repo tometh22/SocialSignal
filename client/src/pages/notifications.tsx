@@ -33,7 +33,7 @@ type NotificationPreferences = {
 };
 type NotificationPage = { items: ProductNotification[]; unreadCount: number; hasMore: boolean; nextCursor: number | null };
 type NotificationGroup = { key: string; items: ProductNotification[]; latest: ProductNotification; unreadIds: number[] };
-type PushTestStatus = { kind: "success" | "error"; message: string };
+type PushTestStatus = { kind: "success" | "warning" | "error"; message: string };
 
 const categories: { key: Category; label: string; detail: string }[] = [
   { key: "mind", label: "Conversaciones en Mind", detail: "Respuestas en los espacios que seguís" },
@@ -165,23 +165,51 @@ export default function NotificationsPage() {
       const registration = await navigator.serviceWorker.getRegistration("/");
       const subscription = await registration?.pushManager.getSubscription();
       if (!subscription) throw new Error("Este navegador todavía no está conectado a Mind.");
-      const response = await authFetch("/api/notifications/push/test", {
-        method: "POST",
-        body: JSON.stringify({ endpoint: subscription.endpoint }),
+      const testId = crypto.randomUUID();
+      let cancelPushWait = () => {};
+      const pushReceived = new Promise<boolean>((resolve) => {
+        const timeout = window.setTimeout(() => {
+          navigator.serviceWorker.removeEventListener("message", onMessage);
+          resolve(false);
+        }, 12_000);
+        const onMessage = (event: MessageEvent) => {
+          if (event.data?.type !== "mind-push-test-result" || event.data.testId !== testId) return;
+          window.clearTimeout(timeout);
+          navigator.serviceWorker.removeEventListener("message", onMessage);
+          resolve(event.data.shown === true);
+        };
+        cancelPushWait = () => {
+          window.clearTimeout(timeout);
+          navigator.serviceWorker.removeEventListener("message", onMessage);
+          resolve(false);
+        };
+        navigator.serviceWorker.addEventListener("message", onMessage);
       });
+      let response: Response;
+      try {
+        response = await authFetch("/api/notifications/push/test", {
+          method: "POST",
+          body: JSON.stringify({ endpoint: subscription.endpoint, testId }),
+        });
+      } catch (error) {
+        cancelPushWait();
+        throw error;
+      }
       if (!response.ok) {
+        cancelPushWait();
         const body = await response.json().catch(() => ({})) as { message?: string };
         const error = new Error(body.message || "No pudimos enviar el aviso de prueba.");
         Object.assign(error, { status: response.status });
         throw error;
       }
+      const shown = await pushReceived;
+      return { shown };
     },
-    onSuccess: () => {
+    onSuccess: ({ shown }) => {
       setPushTestCooldown(30);
-      setPushTestStatus({
-        kind: "success",
-        message: "Solicitud enviada al servicio de notificaciones. Si no aparece en pantalla, revisá los permisos de Chrome en macOS y que No molestar esté apagado.",
-      });
+      setPushTestStatus(shown
+        ? { kind: "success", message: "Chrome recibió la prueba y creó la notificación. Si no viste el aviso en pantalla, revisá el Centro de notificaciones de macOS." }
+        : { kind: "warning", message: "El servicio aceptó el envío, pero Chrome no confirmó que lo haya recibido. Revisá que Mind esté abierto en este mismo perfil de Chrome y volvé a activar las notificaciones." });
     },
     onError: (error) => {
       const message = error instanceof Error ? error.message : "No pudimos enviar el aviso de prueba.";
@@ -370,14 +398,16 @@ export default function NotificationsPage() {
                       setPushTestStatus(null);
                       testPushMutation.mutate();
                     }}>
-                      <Send className="mr-1.5 h-3.5 w-3.5" />{testPushMutation.isPending ? "Enviando…" : pushTestCooldown > 0 ? `Probar en ${pushTestCooldown}s` : "Probar"}
+                      <Send className="mr-1.5 h-3.5 w-3.5" />{testPushMutation.isPending ? "Comprobando…" : pushTestCooldown > 0 ? `Probar en ${pushTestCooldown}s` : "Probar"}
                     </Button>
                   </div>
                   {pushTestStatus && (
                     <p role={pushTestStatus.kind === "error" ? "alert" : "status"} aria-live={pushTestStatus.kind === "error" ? "assertive" : "polite"}
                       className={cn("rounded-xl border px-3.5 py-3 text-xs leading-5", pushTestStatus.kind === "success"
                         ? "border-emerald-200 bg-emerald-50 text-emerald-900"
-                        : "border-rose-200 bg-rose-50 text-rose-900")}>
+                        : pushTestStatus.kind === "warning"
+                          ? "border-amber-200 bg-amber-50 text-amber-950"
+                          : "border-rose-200 bg-rose-50 text-rose-900")}>
                       {pushTestStatus.message}
                     </p>
                   )}
