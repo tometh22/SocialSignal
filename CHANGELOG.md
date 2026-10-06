@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.11.9 — 2026-10-05
+
+- Notificaciones: el resultado de «Probar» ahora se muestra de forma visible y accesible; el botón indica los 30 segundos de espera y evita envíos repetidos. Cada aviso de prueba usa una etiqueta única para que las pruebas sucesivas vuelvan a mostrarse como notificación del sistema.
+
 ## 1.11.8 — 2026-10-05
 
 - Seguridad: alta, edición y baja de personal (`POST`, `PATCH` y `DELETE /api/personnel`) ahora exigen permiso de administración en el servidor, igual que el Panel de Administración que las usa. Antes cualquier usuario autenticado podía crear, modificar o borrar personal (con sus tarifas) llamando a la API. La lectura no cambia.

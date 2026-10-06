@@ -13,7 +13,7 @@ self.addEventListener("push", (event) => {
     badge: "/epical-logo.svg",
     tag: typeof payload.tag === "string" ? payload.tag : "mind-notification",
     data: { url: typeof payload.url === "string" ? payload.url : "/notifications" },
-    renotify: false,
+    renotify: payload.renotify === true,
   };
   event.waitUntil(self.registration.showNotification(title, options));
 });

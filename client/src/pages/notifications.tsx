@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "wouter";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -33,6 +33,7 @@ type NotificationPreferences = {
 };
 type NotificationPage = { items: ProductNotification[]; unreadCount: number; hasMore: boolean; nextCursor: number | null };
 type NotificationGroup = { key: string; items: ProductNotification[]; latest: ProductNotification; unreadIds: number[] };
+type PushTestStatus = { kind: "success" | "error"; message: string };
 
 const categories: { key: Category; label: string; detail: string }[] = [
   { key: "mind", label: "Conversaciones en Mind", detail: "Respuestas en los espacios que seguís" },
@@ -129,6 +130,14 @@ export default function NotificationsPage() {
   const groups = useMemo(() => groupNotifications(items), [items]);
   const unreadCount = notificationQuery.data?.pages[0]?.unreadCount ?? 0;
   const preferences = preferencesQuery.data;
+  const [pushTestStatus, setPushTestStatus] = useState<PushTestStatus | null>(null);
+  const [pushTestCooldown, setPushTestCooldown] = useState(0);
+
+  useEffect(() => {
+    if (pushTestCooldown <= 0) return;
+    const timer = window.setTimeout(() => setPushTestCooldown((seconds) => Math.max(0, seconds - 1)), 1000);
+    return () => window.clearTimeout(timer);
+  }, [pushTestCooldown]);
 
   const markOneMutation = useMutation({
     mutationFn: (ids: number[]) => ids.length === 1
@@ -162,11 +171,27 @@ export default function NotificationsPage() {
       });
       if (!response.ok) {
         const body = await response.json().catch(() => ({})) as { message?: string };
-        throw new Error(body.message || "No pudimos enviar el aviso de prueba.");
+        const error = new Error(body.message || "No pudimos enviar el aviso de prueba.");
+        Object.assign(error, { status: response.status });
+        throw error;
       }
     },
-    onSuccess: () => setDesktopStatus("Enviamos un aviso de prueba a este dispositivo."),
-    onError: (error) => setDesktopStatus(error instanceof Error ? error.message : "No pudimos enviar el aviso de prueba."),
+    onSuccess: () => {
+      setPushTestCooldown(30);
+      setPushTestStatus({
+        kind: "success",
+        message: "Solicitud enviada al servicio de notificaciones. Si no aparece en pantalla, revisá los permisos de Chrome en macOS y que No molestar esté apagado.",
+      });
+    },
+    onError: (error) => {
+      const message = error instanceof Error ? error.message : "No pudimos enviar el aviso de prueba.";
+      if ((error as Error & { status?: number })?.status === 429) {
+        setPushTestCooldown(30);
+        setPushTestStatus({ kind: "error", message: "Ya enviamos una prueba hace poco. Esperá a que termine el contador para volver a probar." });
+        return;
+      }
+      setPushTestStatus({ kind: "error", message });
+    },
   });
   const updateCategory = (category: Category, channel: "desktop" | "email", enabled: boolean) => {
     if (!preferences) return;
@@ -338,12 +363,25 @@ export default function NotificationsPage() {
                   }} />
                 </div>
                 {preferences.desktopEnabled && (
+                  <>
                   <div className="flex items-center justify-between gap-3 rounded-2xl border border-indigo-100 bg-indigo-50/50 px-3.5 py-3">
                     <div className="min-w-0"><p className="text-xs font-medium text-slate-800">Comprobá este dispositivo</p><p className="text-[10px] text-slate-500">Te enviamos un aviso de prueba.</p></div>
-                    <Button size="sm" variant="outline" className="shrink-0 rounded-lg bg-white" disabled={testPushMutation.isPending} onClick={() => testPushMutation.mutate()}>
-                      <Send className="mr-1.5 h-3.5 w-3.5" />{testPushMutation.isPending ? "Enviando…" : "Probar"}
+                    <Button size="sm" variant="outline" className="shrink-0 rounded-lg bg-white" disabled={testPushMutation.isPending || pushTestCooldown > 0} onClick={() => {
+                      setPushTestStatus(null);
+                      testPushMutation.mutate();
+                    }}>
+                      <Send className="mr-1.5 h-3.5 w-3.5" />{testPushMutation.isPending ? "Enviando…" : pushTestCooldown > 0 ? `Probar en ${pushTestCooldown}s` : "Probar"}
                     </Button>
                   </div>
+                  {pushTestStatus && (
+                    <p role={pushTestStatus.kind === "error" ? "alert" : "status"} aria-live={pushTestStatus.kind === "error" ? "assertive" : "polite"}
+                      className={cn("rounded-xl border px-3.5 py-3 text-xs leading-5", pushTestStatus.kind === "success"
+                        ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+                        : "border-rose-200 bg-rose-50 text-rose-900")}>
+                      {pushTestStatus.message}
+                    </p>
+                  )}
+                  </>
                 )}
                 <div className="flex items-center justify-between rounded-2xl bg-slate-50 px-3.5 py-3">
                   <div className="flex items-center gap-2.5"><Mail className="h-4 w-4 text-slate-500" /><div><p className="text-sm font-medium text-slate-800">Email</p><p className="text-[10px] text-slate-500">A tu correo de Mind</p></div></div>

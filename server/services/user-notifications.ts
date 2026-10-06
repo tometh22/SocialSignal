@@ -160,7 +160,8 @@ export async function sendUserWebPushTest(userId: number, endpoint: string) {
       title: "Prueba de notificaciones de Mind",
       body: "Tu navegador recibió correctamente este aviso.",
       url: getActionUrl(origin, "/notifications") || "/notifications",
-      tag: `mind-push-test-${userId}`,
+      tag: `mind-push-test-${userId}-${now}`,
+      renotify: true,
     }), { TTL: 60 });
     return { ok: true as const };
   } catch (error: any) {
