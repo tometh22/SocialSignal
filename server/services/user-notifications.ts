@@ -129,7 +129,7 @@ export function getWebPushPublicKey() {
 
 const pushTestLastSentAt = new Map<string, number>();
 
-export async function sendUserWebPushTest(userId: number, endpoint: string) {
+export async function sendUserWebPushTest(userId: number, endpoint: string, testId: string) {
   if (!getPushConfig()) return { ok: false as const, status: 503, message: "Web Push no está configurado en el servidor." };
   const rateLimitKey = `${userId}:${endpoint}`;
   const now = Date.now();
@@ -162,6 +162,7 @@ export async function sendUserWebPushTest(userId: number, endpoint: string) {
       url: getActionUrl(origin, "/notifications") || "/notifications",
       tag: `mind-push-test-${userId}-${now}`,
       renotify: true,
+      testId,
     }), { TTL: 60 });
     return { ok: true as const };
   } catch (error: any) {

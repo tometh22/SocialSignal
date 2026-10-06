@@ -27377,9 +27377,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/notifications/push/test", requireAuth, async (req, res) => {
     const parsed = z.object({
       endpoint: z.string().url().max(2048).refine((value) => new URL(value).protocol === "https:", "El endpoint debe usar HTTPS"),
+      testId: z.string().uuid(),
     }).strict().safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: "Suscripción Web Push inválida" });
-    const result = await sendUserWebPushTest(Number((req.user as any)?.id), parsed.data.endpoint);
+    const result = await sendUserWebPushTest(Number((req.user as any)?.id), parsed.data.endpoint, parsed.data.testId);
     if (!result.ok) return res.status(result.status).json({ message: result.message });
     res.json({ success: true });
   });

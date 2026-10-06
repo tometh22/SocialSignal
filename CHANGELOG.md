@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.11.10 — 2026-10-06
+
+- Notificaciones: «Probar» espera confirmación del service worker y diferencia entre el envío aceptado por el proveedor y la recepción en Chrome. Si Chrome no confirma el aviso, la interfaz lo informa sin presentar el envío como recibido.
+
 ## 1.11.9 — 2026-10-05
 
 - Notificaciones: el resultado de «Probar» ahora se muestra de forma visible y accesible; el botón indica los 30 segundos de espera y evita envíos repetidos. Cada aviso de prueba usa una etiqueta única para que las pruebas sucesivas vuelvan a mostrarse como notificación del sistema.
