@@ -22875,16 +22875,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (stage && typeof stage === 'string' && stage !== 'all') {
         allLeads = allLeads.filter(l => l.stage === stage);
       }
+
+      const allContacts = allLeads.length
+        ? await db.select().from(crmContacts)
+          .where(inArray(crmContacts.leadId, allLeads.map(lead => lead.id)))
+          .orderBy(desc(crmContacts.isPrimary))
+        : [];
+      const contactsByLead = new Map<number, typeof allContacts>();
+      for (const contact of allContacts) {
+        const contacts = contactsByLead.get(contact.leadId) ?? [];
+        contacts.push(contact);
+        contactsByLead.set(contact.leadId, contacts);
+      }
+
       if (search && typeof search === 'string') {
-        const q = search.toLowerCase();
-        allLeads = allLeads.filter(l => l.companyName.toLowerCase().includes(q) || l.opportunityName?.toLowerCase().includes(q));
+        const q = search.trim().toLowerCase();
+        allLeads = allLeads.filter(l =>
+          l.companyName.toLowerCase().includes(q) ||
+          l.opportunityName?.toLowerCase().includes(q) ||
+          contactsByLead.get(l.id)?.some(contact => contact.name.toLowerCase().includes(q))
+        );
       }
 
       // Enrich with primary contact and last activity
       const enriched = await Promise.all(allLeads.map(async (lead) => {
-        const contacts = await db.select().from(crmContacts)
-          .where(eq(crmContacts.leadId, lead.id))
-          .orderBy(desc(crmContacts.isPrimary));
+        const contacts = contactsByLead.get(lead.id) ?? [];
         const activities = await db.select().from(crmActivities)
           .where(eq(crmActivities.leadId, lead.id))
           .orderBy(desc(crmActivities.activityDate))

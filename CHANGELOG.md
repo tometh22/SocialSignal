@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.11.11 — 2026-10-06
+
+- CRM: el buscador del pipeline encuentra oportunidades por nombre de cualquier contacto asociado, además de empresa y oportunidad. El campo ahora indica «Buscar empresa o contacto» y conserva el filtro por etapa.
+
 ## 1.11.10 — 2026-10-06
 
 - Notificaciones: «Probar» espera confirmación del service worker y diferencia entre el envío aceptado por el proveedor y la recepción en Chrome. Si Chrome no confirma el aviso, la interfaz lo informa sin presentar el envío como recibido.

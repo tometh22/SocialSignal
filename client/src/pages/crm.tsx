@@ -1120,7 +1120,7 @@ export default function CRMPage() {
       <ToolbarPanel title="Pipeline" description="Buscá oportunidades, filtrá etapas o cambiá la visualización.">
         <div className="relative min-w-0 flex-1 sm:min-w-64">
           <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <Input aria-label="Buscar empresa" placeholder="Buscar empresa..." value={search}
+          <Input aria-label="Buscar empresa o contacto" placeholder="Buscar empresa o contacto..." value={search}
             onChange={e => { setSearch(e.target.value); setShowUnassignedOnly(false); }}
             className="h-11 pl-9 border-slate-200" />
         </div>
