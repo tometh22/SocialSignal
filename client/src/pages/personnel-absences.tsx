@@ -72,7 +72,7 @@ function BalanceStrip({ person, absence }: { person?: TeamBalance; absence: Abse
         {epicalLeft != null && <span className={`block ${tone(epicalLeft)}`}>Si aprobás: quedan {epicalLeft}{epicalLeft < 0 ? " (excede el cupo)" : ""}</span>}
       </div>
       <div>
-        <span className="font-medium text-foreground">Sin cupo (no descuentan):</span>
+        <span className="font-medium text-foreground">No descuentan cupo:</span>
         <span className="block">Enfermedad {person.notCounted.sick} · Otros {person.notCounted.other}</span>
       </div>
     </div>

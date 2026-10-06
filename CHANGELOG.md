@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.11.12 — 2026-10-06
+
+- Home: la tarjeta de vacaciones y días Epical (o la de tu cumpleaños) ocupa todo el ancho cuando va sola; antes quedaba a media fila y desalineada respecto de los indicadores y de Señales del portfolio. Detectado al ver la pantalla con datos simulados en producción.
+- Ausencias: el panel de saldo rotula «No descuentan cupo» (antes «Sin cupo», que se leía como cupo sin configurar).
+
 ## 1.11.11 — 2026-10-06
 
 - CRM: el buscador del pipeline encuentra oportunidades por nombre de cualquier contacto asociado, además de empresa y oportunidad. El campo ahora indica «Buscar empresa o contacto» y conserva el filtro por etapa.

@@ -276,8 +276,10 @@ export default function HomeDashboard() {
         </Card>
       )}
 
+      {/* Dos tarjetas comparten fila; una sola ocupa todo el ancho, como el resto de las tarjetas del Home
+          (con media fila quedaba desalineada respecto de los indicadores y de Señales del portfolio). */}
       {(birthday || absenceBalance?.configured) && (
-        <div className="grid gap-3 lg:grid-cols-2">
+        <div className={cn("grid gap-3", birthday && absenceBalance?.configured && "lg:grid-cols-2")} data-testid="home-personal-cards">
           {birthday && <Card className="border-pink-200 bg-pink-50/60"><CardContent className="flex items-center gap-3 p-4 text-sm text-pink-950 sm:p-4 sm:pt-4"><span aria-hidden="true">🎂</span><span><strong>Tu cumpleaños:</strong> {birthday.date}{birthday.days === 0 ? " · ¡hoy!" : birthday.days === 1 ? " · mañana" : ` · en ${birthday.days} días`}</span></CardContent></Card>}
           {absenceBalance?.configured && <Card><CardContent className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2 p-4 text-sm sm:p-4 sm:pt-4">
             <div className="min-w-0 flex-1 space-y-1">
