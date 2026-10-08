@@ -1,3 +1,4 @@
+import { useSearch } from "wouter";
 import { taskDateBucket } from "@shared/utils/task-date-bucket";
 import { TaskSelectionCheckbox, TaskSelectionProvider } from "./TaskSelection";
 import { taskWorkflowBucket } from "@shared/utils/task-workflow";
@@ -489,7 +490,8 @@ function TaskRow(props: TaskRowProps) {
         </div>
 
         {/* Title */}
-        <div className="flex-1 min-w-0 px-2 py-3 flex items-center gap-1.5">
+        <div className="flex-1 min-w-0 px-2 py-3 flex flex-col gap-1.5">
+          <div className="flex min-w-0 items-center gap-1.5">
           <Popover>
             <PopoverTrigger asChild>
               <button
@@ -550,7 +552,6 @@ function TaskRow(props: TaskRowProps) {
               <TooltipContent side="bottom" className="max-w-xs">Click para abrir el detalle · {task.title}</TooltipContent>
             </Tooltip>
           )}
-          <TaskWorkflowControl task={task} />
           {task.isMilestone && <Badge variant="outline" className="shrink-0 text-[10px]">◆ Hito</Badge>}
           {hasSubtasks && !isSubtask && (
             <button
@@ -566,6 +567,12 @@ function TaskRow(props: TaskRowProps) {
               <ChevronDown className={cn("h-2.5 w-2.5 transition-transform", isExpanded && "rotate-180")} />
             </button>
           )}
+        </div>
+
+          <div className="sm:hidden"><TaskWorkflowControl task={task} compact /></div>
+        </div>
+        <div className="hidden w-36 shrink-0 px-2 py-2 sm:block">
+          <TaskWorkflowControl task={task} compact />
         </div>
 
         {/* Responsable — inline editable */}
@@ -1278,6 +1285,11 @@ interface Props {
 
 export default function ProjectTaskList({ projectId, projectMembers = [], view = "list", clientName, onQuickAddTrigger = 0, filterText = "", sourceFilter = "all", sortBy = 'default', groupBy = 'section' }: Props) {
   const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
+  const search = useSearch();
+  useEffect(() => {
+    const taskId = Number(new URLSearchParams(search).get("taskId"));
+    setSelectedTaskId(Number.isSafeInteger(taskId) && taskId > 0 ? taskId : null);
+  }, [search, projectId]);
   const [focusTime, setFocusTime] = useState(false);
   const [sectionFilter, setSectionFilter] = useState<string>("all");
   const [showAddSection, setShowAddSection] = useState(false);
@@ -1671,9 +1683,11 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
               <div className="rounded-xl border border-border overflow-hidden">
                 {/* Column headers */}
                 <div className="flex items-center bg-muted/30 border-b border-border text-xs font-semibold text-muted-foreground">
-                  <div className="hidden w-8 flex-shrink-0 sm:block" />
+                  <div className="w-3 flex-shrink-0 sm:w-8" />
+                  {data?.canManageSections && <div className="w-6 flex-shrink-0" />}
                   <div className="w-5 flex-shrink-0" />
-                  <div className="flex-1 px-2 py-2.5">Nombre de tarea</div>
+                  <div className="min-w-0 flex-1 py-2.5 pl-10 pr-2">Nombre de tarea</div>
+                  <div className="hidden w-36 shrink-0 px-2 py-2.5 sm:block">Estado</div>
                   <div className="w-12 px-1 flex-shrink-0 py-2.5 text-center sm:w-28 sm:px-2 sm:text-left"><span className="sr-only sm:not-sr-only">Responsable</span></div>
                   <div className="hidden w-32 px-2 flex-shrink-0 py-2.5 md:block">Fechas</div>
                   <div className="hidden w-24 px-2 flex-shrink-0 py-2.5 lg:block">Tiempo real</div>

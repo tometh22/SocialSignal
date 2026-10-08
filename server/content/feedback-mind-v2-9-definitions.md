@@ -1,5 +1,5 @@
 ---
-version: 2.33.0
+version: 2.34.0
 updatedAt: 2026-10-08
 feedbackCount: 70
 ---
@@ -47,7 +47,7 @@ Este documento es la fuente canónica y versionada de las reglas funcionales cer
 | PRO-10 | Implementado | Reflejar costo y horas del proyecto después de altas, ediciones y bajas de tiempo. |
 | PRO-11 | Implementado | Reflejar la actividad del módulo Tareas dentro del proyecto. |
 | PRO-12 | Implementado | Evaluar retirar la actividad duplicada quedó resuelto: la actividad operativa vive en Tareas; Vista de proyectos conserva la cartera financiera y enlaza al proyecto operativo. |
-| TAR-01 | Implementado | Retirar “Tareas que asigné” de la Home. |
+| TAR-01 | Implementado | “Tareas que asigné” vuelve como “Asignadas por mí” por pedido del usuario: Inicio, Home de Tareas y Mis tareas muestran seguimiento separado, responsable, estado, vencimiento y enlace al detalle. Se registra el autor de la última asignación; no se infiere a partir del creador histórico. |
 | TAR-02 | Implementado | Mostrar las horas propias de la semana y del mes. |
 | TAR-03 | Implementado | Impedir tareas raíz sueltas: toda tarea pertenece a un proyecto y una sección. |
 | TAR-04 | Implementado | Una tarea asignada aparece en Home, Mis tareas y Calendario. |
