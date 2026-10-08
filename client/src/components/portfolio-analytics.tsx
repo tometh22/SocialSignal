@@ -1,3 +1,4 @@
+import { measurableProjectMarkup, portfolioProjectHealth } from "@shared/utils/portfolio-health";
 /**
  * Portfolio Analytics — Health Dashboard & AI Insights
  * Shown above the project table for Ops/Admin users.
@@ -27,13 +28,15 @@ interface ProjectData {
   projectName?: string;
   clientName?: string;
   status?: string;
+  projectCategory?: string | null;
+  costCoverage?: { pendingHours?: number; syncPending?: boolean } | null;
   metrics?: {
     revenueDisplay?: number;
     costDisplay?: number;
     revenueUSDNormalized?: number;
     costUSDNormalized?: number;
-    markup?: number;
-    markupRatio?: number;
+    markup?: number | null;
+    markupRatio?: number | null;
     margin?: number;
     totalHours?: number;
   };
@@ -66,12 +69,7 @@ function getCost(p: ProjectData): number {
   return p.metrics?.costUSDNormalized ?? p.metrics?.costDisplay ?? 0;
 }
 
-function classifyProject(p: ProjectData): "healthy" | "warning" | "critical" {
-  const markup = getMarkup(p);
-  if (markup >= MARKUP_TARGET) return "healthy";
-  if (markup >= MARKUP_CRITICAL) return "warning";
-  return "critical";
-}
+const classifyProject = portfolioProjectHealth;
 
 function fmt(n: number): string {
   const abs = Math.abs(n);
@@ -110,11 +108,11 @@ export default function PortfolioAnalytics({
     [projects]
   );
 
-  if (active.length === 0) return null;
+  const evaluable = useMemo(() => active.filter(p => measurableProjectMarkup(p) != null), [active]);
 
   // ── Health distribution ──────────────────────────────────────────────────
   const health = useMemo(() => {
-    const counts = { healthy: 0, warning: 0, critical: 0 };
+    const counts = { healthy: 0, warning: 0, critical: 0, neutral: 0 };
     active.forEach(p => counts[classifyProject(p)]++);
     return counts;
   }, [active]);
@@ -123,6 +121,7 @@ export default function PortfolioAnalytics({
     { name: "Saludable", value: health.healthy, color: COLORS.healthy },
     { name: "Atención", value: health.warning, color: COLORS.warning },
     { name: "Crítico", value: health.critical, color: COLORS.critical },
+    { name: "Sin datos / no aplica", value: health.neutral, color: COLORS.neutral },
   ].filter(d => d.value > 0);
 
   // ── Revenue vs Cost chart (top 8 by revenue) ─────────────────────────────
@@ -142,9 +141,9 @@ export default function PortfolioAnalytics({
 
   // ── Portfolio aggregates (for comparative analysis) ──────────────────────
   const portfolioStats = useMemo(() => {
-    const totalRevenue = active.reduce((s, p) => s + getRevenue(p), 0);
-    const totalCost = active.reduce((s, p) => s + getCost(p), 0);
-    const withCost = active.filter(p => getCost(p) > 0);
+    const totalRevenue = evaluable.reduce((s, p) => s + getRevenue(p), 0);
+    const totalCost = evaluable.reduce((s, p) => s + getCost(p), 0);
+    const withCost = evaluable.filter(p => getCost(p) > 0);
     const avgMarkup =
       withCost.length > 0
         ? withCost.reduce((s, p) => s + getMarkup(p), 0) / withCost.length
@@ -153,7 +152,7 @@ export default function PortfolioAnalytics({
     const portfolioMargin = totalRevenue > 0 ? ((totalRevenue - totalCost) / totalRevenue) * 100 : 0;
     const portfolioMarkup = totalCost > 0 ? totalRevenue / totalCost : 0;
     return { totalRevenue, totalCost, avgMarkup, avgCost, portfolioMargin, portfolioMarkup };
-  }, [active]);
+  }, [evaluable]);
 
   // ── AI Insights (comparative + predictive + actionable) ──────────────────
   const aiAnalysis = useMemo(() => {
@@ -168,6 +167,8 @@ export default function PortfolioAnalytics({
 
     const { totalRevenue, totalCost, avgMarkup, avgCost, portfolioMargin, portfolioMarkup } =
       portfolioStats;
+
+    if (!evaluable.length) insights.push({ icon: Shield, iconColor: "text-slate-500", title: "Sin métricas evaluables", text: "Los proyectos internos y los costos pendientes no se evalúan por markup." });
 
     // ── 1. Portfolio health summary ────────────────────────────────────────
     if (avgMarkup >= MARKUP_GOOD) {
@@ -198,7 +199,7 @@ export default function PortfolioAnalytics({
     }
 
     // ── 2. Critical projects (comparative) ────────────────────────────────
-    const criticals = active.filter(p => classifyProject(p) === "critical");
+    const criticals = evaluable.filter(p => classifyProject(p) === "critical");
     if (criticals.length > 0) {
       criticals.forEach(p => {
         const markup = getMarkup(p);
@@ -236,7 +237,7 @@ export default function PortfolioAnalytics({
 
     // ── 3. Comparative: projects with cost outliers ────────────────────────
     if (avgCost > 0) {
-      const highCostProjects = active.filter(p => {
+      const highCostProjects = evaluable.filter(p => {
         const cost = getCost(p);
         const markup = getMarkup(p);
         return cost > avgCost * 1.5 && markup < MARKUP_TARGET && classifyProject(p) !== "critical";
@@ -268,8 +269,8 @@ export default function PortfolioAnalytics({
     }
 
     // ── 4. Revenue concentration ───────────────────────────────────────────
-    if (totalRevenue > 0 && active.length > 1) {
-      const top = [...active].sort((a, b) => getRevenue(b) - getRevenue(a))[0];
+    if (totalRevenue > 0 && evaluable.length > 1) {
+      const top = [...evaluable].sort((a, b) => getRevenue(b) - getRevenue(a))[0];
       const concentration = (getRevenue(top) / totalRevenue) * 100;
       if (concentration > 35) {
         insights.push({
@@ -294,7 +295,7 @@ export default function PortfolioAnalytics({
         icon: TrendingUp,
         iconColor: "text-emerald-600",
         title: `Margen del portfolio: ${portfolioMargin.toFixed(1)}%`,
-        text: `Operación muy rentable. Markup ponderado ${portfolioMarkup.toFixed(1)}x sobre ${active.length} proyecto${active.length !== 1 ? "s" : ""} activos.`,
+        text: `Operación muy rentable. Markup ponderado ${portfolioMarkup.toFixed(1)}x sobre ${evaluable.length} proyecto${evaluable.length !== 1 ? "s" : ""} activos.`,
       });
     } else if (portfolioMargin > 15) {
       insights.push({
@@ -313,7 +314,7 @@ export default function PortfolioAnalytics({
     }
 
     // ── 6. Best performer (comparative) ───────────────────────────────────
-    const bestProject = [...active]
+    const bestProject = [...evaluable]
       .filter(p => getCost(p) > 0)
       .sort((a, b) => getMarkup(b) - getMarkup(a))[0];
     if (bestProject && getMarkup(bestProject) > MARKUP_GOOD) {
@@ -329,7 +330,7 @@ export default function PortfolioAnalytics({
     }
 
     // ── 7. Actionable: if warning projects reached target ─────────────────
-    const warnings = active.filter(p => classifyProject(p) === "warning");
+    const warnings = evaluable.filter(p => classifyProject(p) === "warning");
     if (warnings.length > 0 && totalCost > 0) {
       const totalCurrentProfit = totalRevenue - totalCost;
       const potentialAddedProfit = warnings.reduce((s, p) => {
@@ -353,12 +354,14 @@ export default function PortfolioAnalytics({
     if (recommendations.length === 0) {
       recommendations.push({
         priority: "low",
-        text: `Portfolio en buena forma. ${health.healthy} proyecto${health.healthy !== 1 ? "s" : ""} saludable${health.healthy !== 1 ? "s" : ""}, markup promedio ${avgMarkup.toFixed(1)}x.`,
+        text: !evaluable.length ? "No hay métricas comerciales suficientes para recomendar cambios de precio." : `Portfolio en buena forma. ${health.healthy} proyecto${health.healthy !== 1 ? "s" : ""} saludable${health.healthy !== 1 ? "s" : ""}, markup promedio ${avgMarkup.toFixed(1)}x.`,
       });
     }
 
     return { insights, recommendations };
-  }, [active, health, portfolioStats]);
+  }, [evaluable, health, portfolioStats]);
+
+  if (active.length === 0) return null;
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -399,6 +402,7 @@ export default function PortfolioAnalytics({
                 <div className="text-[10px] text-muted-foreground uppercase tracking-wide">Crítico</div>
               </div>
             </div>
+            {health.neutral > 0 && <div className="mt-2 text-center text-xs text-slate-500">{health.neutral} · Sin datos / No aplica</div>}
             {healthPieData.length > 0 && (
               <div className="mt-2">
                 <ResponsiveContainer width="100%" height={110}>
@@ -425,7 +429,7 @@ export default function PortfolioAnalytics({
               <span>Markup avg</span>
               <span
                 className={`font-semibold text-right ${
-                  portfolioStats.avgMarkup >= MARKUP_TARGET
+                  !evaluable.length ? "text-slate-500" : portfolioStats.avgMarkup >= MARKUP_TARGET
                     ? "text-emerald-600"
                     : portfolioStats.avgMarkup >= MARKUP_CRITICAL
                     ? "text-amber-600"
@@ -436,7 +440,7 @@ export default function PortfolioAnalytics({
               </span>
               <span>Margen</span>
               <span className="font-semibold text-right">
-                {portfolioStats.portfolioMargin.toFixed(1)}%
+                {evaluable.length ? `${portfolioStats.portfolioMargin.toFixed(1)}%` : "Sin datos"}
               </span>
             </div>
           </CardContent>

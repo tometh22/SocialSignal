@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.12.2 — 2026-10-08
+
+- Cartera: el análisis, los promedios y las recomendaciones excluyen markup no aplicable, ingresos ausentes y costos pendientes. Los internos y las métricas sin datos se muestran como neutrales, conservando sus costos en gráficos y filas.
+- El encabezado de Cartera y AI Copilot muestran salud neutral sin métricas evaluables; se evita convertir markup ausente en alertas de renegociación.
+
 ## 1.12.1 — 2026-10-08
 
 - Cartera: sincroniza los aliases financieros y los valores USD normalizados al aplicar el cálculo del período. Corrige filas que mostraban costo cero mientras el detalle mostraba el costo real; conserva la moneda nativa de presentación y las métricas sin datos. Detectado durante la verificación de producción de 1.12.0.
