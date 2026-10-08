@@ -1,5 +1,5 @@
 export const PRODUCT_DEFINITIONS_MANIFEST = {
-  version: "2.32.0",
-  updatedAt: "2026-10-05",
-  sha256: "8721be8961842bbd310aacf652d04c581d4ea06c1c1bdc7c0c2eb95b0b4d2358",
+  version: "2.33.0",
+  updatedAt: "2026-10-08",
+  sha256: "329e5494d9aa2f5d51de002d3c041f37f6e9cf4162d2209fa6b7df5e8c6fc8eb",
 } as const;
