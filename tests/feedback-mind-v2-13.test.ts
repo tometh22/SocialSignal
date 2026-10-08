@@ -311,11 +311,12 @@ describe("Feedback Mind V2-13 · ronda 27-8", () => {
     expect(home).toContain("<TaskRowTarget projectId={task.projectId}");
   });
 
-  it("permite cambiar el estado de una tarea desde Home", () => {
+  it("permite bloquear una tarea con motivo desde Tareas", () => {
     const home = source("client/src/pages/tasks/tasks-home.tsx");
-    expect(home).toContain("aria-label={`Cambiar estado de ${task.title}`}");
-    expect(home).toContain('apiRequest(`/api/tasks/${taskId}`, "PUT", { status })');
-    expect(home).toContain('<option value="blocked">Bloqueada</option>');
+    expect(home).toContain("<TaskWorkflowControl");
+    const workflow = source("client/src/components/tasks/TaskWorkflowControl.tsx");
+    expect(workflow).toContain("blockedReason: blocked ? reason.trim() : null");
+    expect(workflow).toContain("disabled={!reason.trim() || mutation.isPending}");
   });
 
   // ── F27-09 a F27-13 · Reloj rápido ──────────────────────────────────────

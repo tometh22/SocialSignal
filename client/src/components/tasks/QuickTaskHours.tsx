@@ -1,3 +1,5 @@
+import { civilDateInBuenosAires } from "@shared/utils/buenos-aires-week";
+import { invalidateTaskQueries } from "@/lib/task-cache";
 import { useEffect, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
@@ -39,6 +41,8 @@ export default function QuickTaskHours({ taskId, className }: { taskId: number; 
   const { isTeamManager } = usePermissions();
   const [open, setOpen] = useState(false);
   const [manual, setManual] = useState("");
+  const [date, setDate] = useState(() => civilDateInBuenosAires(new Date()));
+  const [editingDate, setEditingDate] = useState("");
   const [personnelId, setPersonnelId] = useState("");
   const { isRunning, activeTaskId, elapsedSeconds: timerSeconds, startTimer, stopTimer: stopSharedTimer } = useActiveTimer({ trackElapsed: open });
   const timerStartedAt = isRunning && activeTaskId === taskId;
@@ -96,6 +100,7 @@ export default function QuickTaskHours({ taskId, className }: { taskId: number; 
   /** La fila de la tarea lee `/api/tasks/project`: sin invalidarla, las horas
    *  recién cargadas no aparecían hasta refrescar la página a mano. */
   const invalidateHoursConsumers = () => {
+    void invalidateTaskQueries();
     queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
     queryClient.invalidateQueries({ queryKey: ["/api/tasks", taskId] });
     queryClient.invalidateQueries({ queryKey: ["/api/tasks/my-tasks"] });
@@ -118,25 +123,26 @@ export default function QuickTaskHours({ taskId, className }: { taskId: number; 
 
   const logMutation = useMutation({
     mutationFn: (hours: number) => apiRequest(`/api/tasks/${taskId}/time`, "POST", {
-      date: format(new Date(), "yyyy-MM-dd"),
+      date,
       hours,
       description: "Carga rápida",
       ...(targetPersonnelId ? { personnelId: targetPersonnelId } : {}),
     }),
-    onSuccess: () => {
+    onSuccess: (created: any) => {
       invalidateHoursConsumers();
       setManual("");
+      if ((created?.costingWarning || created?.warning)) toast({ title: "Horas guardadas", description: created.costingWarning || created.warning });
     },
     onError: describeError("No se pudieron registrar las horas"),
   });
 
   const editMutation = useMutation({
     mutationFn: ({ entryId, hours }: { entryId: number; hours: number }) =>
-      apiRequest(`/api/tasks/${taskId}/time/${entryId}`, "PATCH", { hours }),
-    onSuccess: () => {
+      apiRequest(`/api/tasks/${taskId}/time/${entryId}`, "PATCH", { hours, date: editingDate }),
+    onSuccess: (updated: any) => {
       invalidateHoursConsumers();
       setEditingEntryId(null);
-      toast({ title: "Carga corregida" });
+      toast({ title: "Carga corregida", description: updated?.costingWarning || updated?.warning });
     },
     onError: describeError("No se pudo corregir la carga"),
   });
@@ -209,9 +215,10 @@ export default function QuickTaskHours({ taskId, className }: { taskId: number; 
           </div>
           <span className="text-xs font-medium text-primary">{formatHours(total)} total</span>
         </div>
+        <label className="mb-2 block text-xs">Fecha<Input aria-label="Fecha de carga" type="date" value={date} onChange={e => setDate(e.target.value)} className="h-8" /></label>
         <div className="mb-2 grid grid-cols-4 gap-1">
           {[0.25, 0.5, 0.75, 1].map((hours) => (
-            <Button key={hours} size="sm" variant="outline" className="h-8 px-1 text-[10px]" onClick={() => logMutation.mutate(hours)} disabled={logMutation.isPending || ownerPending}>
+            <Button key={hours} size="sm" variant="outline" className="h-8 px-1 text-[10px]" onClick={() => logMutation.mutate(hours)} disabled={!date || logMutation.isPending || ownerPending}>
               {hours * 60}m
             </Button>
           ))}
@@ -247,7 +254,7 @@ export default function QuickTaskHours({ taskId, className }: { taskId: number; 
             className="h-8 text-xs"
             onKeyDown={(event) => event.key === "Enter" && saveManual()}
           />
-          <Button size="sm" className="h-8 text-xs" onClick={saveManual} disabled={logMutation.isPending || ownerPending || !manual.trim()}>
+          <Button size="sm" className="h-8 text-xs" onClick={saveManual} disabled={!date || logMutation.isPending || ownerPending || !manual.trim()}>
             {logMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "Guardar"}
           </Button>
         </div>
@@ -269,6 +276,7 @@ export default function QuickTaskHours({ taskId, className }: { taskId: number; 
             <div key={entry.id} className="flex items-center gap-1.5 border-b border-border/50 py-1.5 text-xs last:border-0">
               {editingEntryId === entry.id && canModify(entry) ? (
                 <>
+                  <Input type="date" aria-label="Corregir fecha" value={editingDate} onChange={e => setEditingDate(e.target.value)} className="h-7 w-32 text-xs" />
                   <Input
                     autoFocus
                     value={editingHours}
@@ -280,7 +288,7 @@ export default function QuickTaskHours({ taskId, className }: { taskId: number; 
                     aria-label="Corregir duración"
                     className="h-7 flex-1 text-xs"
                   />
-                  <Button size="sm" variant="ghost" className="h-7 w-7 p-0" disabled={busy} onClick={() => commitEdit(entry.id)} aria-label="Guardar corrección">
+                  <Button size="sm" variant="ghost" className="h-7 w-7 p-0" disabled={busy || !editingDate} onClick={() => commitEdit(entry.id)} aria-label="Guardar corrección">
                     <Check className="h-3.5 w-3.5 text-emerald-600" />
                   </Button>
                   <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => setEditingEntryId(null)} aria-label="Cancelar">
@@ -300,7 +308,7 @@ export default function QuickTaskHours({ taskId, className }: { taskId: number; 
                         className="h-7 w-7 shrink-0 p-0"
                         disabled={busy}
                         aria-label={`Corregir la carga de ${formatHours(Number(entry.hours))}`}
-                        onClick={() => { setEditingEntryId(entry.id); setEditingHours(String(Math.round(Number(entry.hours) * 100) / 100)); }}
+                        onClick={() => { setEditingEntryId(entry.id); setEditingHours(String(Math.round(Number(entry.hours) * 100) / 100)); setEditingDate(entry.date.slice(0, 10)); }}
                       >
                         <Pencil className="h-3 w-3" />
                       </Button>

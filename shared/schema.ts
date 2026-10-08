@@ -2355,6 +2355,8 @@ export const tasks = pgTable("tasks", {
   estimatedHours: doublePrecision("estimated_hours"),
   loggedHours: doublePrecision("logged_hours").default(0),
   status: text("status").notNull().default("todo"),
+  blockedReason: text("blocked_reason"),
+  blockedAt: timestamp("blocked_at"),
   priority: text("priority").notNull().default("medium"),
   isMilestone: boolean("is_milestone").notNull().default(false),
   parentTaskId: integer("parent_task_id").references((): AnyPgColumn => tasks.id, { onDelete: "cascade" }),
@@ -2374,6 +2376,7 @@ export const insertTaskSchema = createInsertSchema(tasks).omit({
   createdAt: true,
   updatedAt: true,
   loggedHours: true,
+  blockedAt: true,
   recurrenceSourceTaskId: true,
 }).extend({
   recurrenceRule: taskRecurrenceSchema.nullable().optional(),
@@ -2384,6 +2387,7 @@ export const insertTaskSchema = createInsertSchema(tasks).omit({
   title: z.string().trim().min(1).max(500),
   sectionName: z.string().trim().min(1).max(250).default("General"),
   status: z.enum(["todo", "in_progress", "blocked"]).default("todo"),
+  blockedReason: z.string().trim().max(2000).nullable().optional(),
   priority: z.enum(["low", "medium", "high", "urgent"]).default("medium"),
 });
 
@@ -2420,6 +2424,7 @@ export const taskTimeEntries = pgTable("task_time_entries", {
   // (fact_labor_month) just like time_entries do.
   hourlyRateAtTime: doublePrecision("hourly_rate_at_time"), // ARS per hour at log time
   totalCost: doublePrecision("total_cost"), // hours * hourlyRateAtTime (ARS)
+  costSyncPending: boolean("cost_sync_pending").notNull().default(false),
   billable: boolean("billable").notNull().default(true), // false for internal/own-project tasks
   exchangeRateId: integer("exchange_rate_id").references(() => exchangeRates.id),
   createdBy: integer("created_by").references(() => users.id, { onDelete: 'set null' }),
@@ -2431,6 +2436,7 @@ export const insertTaskTimeEntrySchema = createInsertSchema(taskTimeEntries).omi
   createdAt: true,
   hourlyRateAtTime: true,
   totalCost: true,
+  costSyncPending: true,
   billable: true,
   exchangeRateId: true,
 }).extend({

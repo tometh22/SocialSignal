@@ -27,7 +27,7 @@ export interface ProjectHeroProps {
   period?: string;
   revenue: number;
   cost: number;
-  markup: number;
+  markup: number | null;
   margin: number;
   totalHours: number;
   estimatedHours: number;
@@ -36,6 +36,7 @@ export interface ProjectHeroProps {
   hoursDeviation: number;
   canSeeCosts: boolean;
   prevMarkup?: number;
+  isInternal?: boolean;
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -156,10 +157,10 @@ function BudgetStrip({ cost, budget, utilization }: { cost: number; budget: numb
 function StickyHeader({
   visible, projectName, score, markup, canSeeCosts,
 }: {
-  visible: boolean; projectName: string; score: number; markup: number; canSeeCosts: boolean;
+  visible: boolean; projectName: string; score: number | null; markup: number | null; canSeeCosts: boolean;
 }) {
   const dotColor =
-    score >= 70 ? "bg-emerald-500" : score >= 50 ? "bg-amber-400" : score >= 30 ? "bg-orange-500" : "bg-red-500";
+    score == null ? "bg-slate-400" : score >= 70 ? "bg-emerald-500" : score != null && score >= 50 ? "bg-amber-400" : score != null && score >= 30 ? "bg-orange-500" : "bg-red-500";
 
   return (
     <div className="sticky top-0 z-20 h-0 overflow-visible">
@@ -176,10 +177,10 @@ function StickyHeader({
             <h2 className="text-sm font-bold text-slate-800 truncate max-w-[300px]">{projectName}</h2>
             <div className="flex items-center gap-1.5">
               <span className={`w-2 h-2 rounded-full ${dotColor}`} />
-              <span className="text-xs text-slate-500 font-medium">{score}/100</span>
+              <span className="text-xs text-slate-500 font-medium">{score == null ? "Sin datos" : `${score}/100`}</span>
             </div>
           </div>
-          {canSeeCosts && markup > 0 && (
+          {canSeeCosts && markup != null && markup > 0 && (
             <span className={`text-xs font-semibold rounded-md px-2 py-0.5 border ${
               markup >= 2.5 ? "bg-emerald-50 text-emerald-700 border-emerald-200"
               : markup >= 2.0 ? "bg-amber-50 text-amber-700 border-amber-200"
@@ -223,13 +224,13 @@ export default function ProjectHero(props: ProjectHeroProps) {
     hasHoursEstimate: estimatedHours > 0,
   });
 
-  const leftBorder =
+  const leftBorder = score == null ? "border-l-slate-300" :
     score >= 70 ? "border-l-emerald-500"
-    : score >= 50 ? "border-l-amber-400"
-    : score >= 30 ? "border-l-orange-500"
+    : score != null && score >= 50 ? "border-l-amber-400"
+    : score != null && score >= 30 ? "border-l-orange-500"
     : "border-l-red-500";
 
-  const markupTrend = prevMarkup != null && prevMarkup > 0 ? markup - prevMarkup : null;
+  const markupTrend = markup != null && prevMarkup != null && prevMarkup > 0 ? markup - prevMarkup : null;
 
   const periodLabel = (() => {
     if (!period) return "";
@@ -285,8 +286,9 @@ export default function ProjectHero(props: ProjectHeroProps) {
           {/* RIGHT — KPIs */}
           {canSeeCosts && (
             <div className="flex flex-wrap gap-2 items-stretch shrink-0 lg:justify-end">
-              <HeroMetric score={score} label={healthLabel(score).text} grade={healthGrade(score)} />
-              {markup > 0 && (
+              {score == null ? <div className="rounded-xl border bg-slate-50 p-4 text-sm text-slate-500">Sin datos de salud</div> : <HeroMetric score={score} label={healthLabel(score).text} grade={healthGrade(score)} />}
+              {markup == null && <KPICard label="Markup" value={props.isInternal ? "No aplica" : "Sin datos"} highlight="neutral" />}
+              {markup != null && markup > 0 && (
                 <KPICard
                   label="Markup"
                   value={`${markup.toFixed(2)}x`}

@@ -1,3 +1,4 @@
+import GlobalTimerWidget from "@/components/tasks/GlobalTimerWidget";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
@@ -286,7 +287,7 @@ export default function Topbar({ onMenuClick }: TopbarProps = {}) {
 
   return (
     <>
-      <header className="topbar sticky top-0 z-30 flex h-[72px] w-full items-center gap-2 border-b border-slate-200/70 bg-white/80 px-3 shadow-[0_1px_0_rgba(255,255,255,0.8)] backdrop-blur-xl sm:px-5">
+      <header className="topbar sticky top-0 z-30 flex min-h-[72px] flex-wrap py-2 sm:h-[72px] sm:flex-nowrap sm:py-0 w-full items-center gap-2 border-b border-slate-200/70 bg-white/80 px-3 shadow-[0_1px_0_rgba(255,255,255,0.8)] backdrop-blur-xl sm:px-5">
         <Button
           variant="ghost"
           size="icon"
@@ -504,6 +505,7 @@ export default function Topbar({ onMenuClick }: TopbarProps = {}) {
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
+        <GlobalTimerWidget />
       </header>
 
       <GlobalSearch isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />

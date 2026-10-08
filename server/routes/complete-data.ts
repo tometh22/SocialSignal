@@ -1,3 +1,4 @@
+import { taskCostCoverage } from "../domain/task-cost-coverage";
 // routes/complete-data.ts - Single Source of Truth integration
 import type { Request, Response } from 'express';
 import { resolveTimeFilter } from '../services/time';
@@ -274,6 +275,8 @@ export async function completeDataHandler(req: Request, res: Response) {
       ? await db.query.quotations.findFirst({ where: eq(quotations.id, projectData.quotationId) })
       : null;
 
+    const coverage = (await taskCostCoverage(lifetimeMode ? "all" : periods.length ? periods : period, projectData.id)).get(projectData.id) ?? null;
+    const clientData = await db.query.clients.findFirst({ where: eq(clients.id, projectData.clientId) });
     // 🎯 ONE-SHOT LIFETIME AGGREGATION
     if (lifetimeMode) {
       try {
@@ -306,7 +309,7 @@ export async function completeDataHandler(req: Request, res: Response) {
         const revenueDisplay = currencyNative === 'USD' ? lifetimeRevenueUSD : lifetimeRevenueARS;
         const costDisplay = currencyNative === 'USD' ? lifetimeCostUSD : lifetimeCostARS;
         const cotizacion = quotationData?.totalAmount || 0;
-        const markup = lifetimeCostUSD > 0 ? lifetimeRevenueUSD / lifetimeCostUSD : 0;
+        const markup = projectData.projectCategory === "internal" || (coverage?.pendingHours || coverage?.syncPending) ? null : lifetimeCostUSD > 0 && lifetimeRevenueUSD > 0 ? lifetimeRevenueUSD / lifetimeCostUSD : null;
         const margin = lifetimeRevenueUSD > 0 ? (lifetimeRevenueUSD - lifetimeCostUSD) / lifetimeRevenueUSD : 0;
         const budgetUtilization = cotizacion > 0 ? costDisplay / cotizacion : 0;
 
@@ -348,7 +351,8 @@ export async function completeDataHandler(req: Request, res: Response) {
             clientId: projectData.clientId,
             status: projectData.status,
             revenueDisplay, costDisplay, cotizacion, currencyNative, budgetUtilization,
-            name: quotationData?.projectName || null
+            name: projectData.name?.trim() || quotationData?.projectName || projectData.subprojectName || `Proyecto #${projectData.id}`,
+            projectCategory: projectData.projectCategory, clientName: clientData?.name ?? null, costCoverage: canSeeFinancials ? coverage : undefined
           },
           quotation: projectQuotationSummary(quotationData, lifetimeHoursTarget),
           actuals: {
@@ -485,7 +489,8 @@ export async function completeDataHandler(req: Request, res: Response) {
             revenueDisplay: viewData.revenueDisplay, costDisplay: viewData.costDisplay,
             cotizacion: viewData.cotizacion, currencyNative: viewData.currencyNative,
             budgetUtilization: viewData.budgetUtilization,
-            name: quotationData?.projectName || null
+            name: projectData.name?.trim() || quotationData?.projectName || projectData.subprojectName || `Proyecto #${projectData.id}`,
+            projectCategory: projectData.projectCategory, clientName: clientData?.name ?? null, costCoverage: canSeeFinancials ? coverage : undefined
           },
           quotation: projectQuotationSummary(quotationData, viewData.estimatedHours),
           actuals: {
@@ -497,14 +502,14 @@ export async function completeDataHandler(req: Request, res: Response) {
             teamBreakdown: viewData.teamBreakdown
           },
           metrics: {
-            efficiency: 0, markup: viewData.markup || 0, margin: viewData.margin || 0,
+            efficiency: 0, markup: projectData.projectCategory === "internal" || (coverage?.pendingHours || coverage?.syncPending) ? null : viewData.markup ?? null, margin: viewData.margin || 0,
             budgetUtilization: viewData.budgetUtilization || 0, hoursDeviation: 0, costDeviation: 0
           },
           summary: {
             teamCostUSD: viewData.costDisplay, revenueUSD: viewData.revenueDisplay,
             markupUSD: viewData.markup || 0, costDisplay: viewData.costDisplay,
             revenueDisplay: viewData.revenueDisplay, currencyNative: viewData.currencyNative,
-            markup: viewData.markup, margin: viewData.margin, flags: aggregatorFlags
+            markup: projectData.projectCategory === "internal" || (coverage?.pendingHours || coverage?.syncPending) ? null : viewData.markup, margin: viewData.margin, flags: aggregatorFlags
           },
           estimatedHours: viewData.estimatedHours,
           workedHours: viewData.totalWorkedHours,
@@ -681,7 +686,7 @@ export async function completeDataHandler(req: Request, res: Response) {
       teamBreakdown
     };
 
-    const correctMarkupRatio = sotSummary?.markup ?? (summary.teamCostUSD > 0 ? (summary.revenueUSD / summary.teamCostUSD) : 0);
+    const correctMarkupRatio = projectData.projectCategory === "internal" || (coverage?.pendingHours || coverage?.syncPending) ? null : sotSummary?.markup ?? (summary.teamCostUSD > 0 && summary.revenueUSD > 0 ? (summary.revenueUSD / summary.teamCostUSD) : null);
     const correctMarginRatio = sotSummary?.margin ?? (summary.revenueUSD > 0 ? ((summary.revenueUSD - summary.teamCostUSD) / summary.revenueUSD) : 0);
 
     const currencyNative = summary.currencyNative || 'ARS';
@@ -778,7 +783,8 @@ export async function completeDataHandler(req: Request, res: Response) {
         revenueDisplay: summary.revenueDisplay || summary.revenueUSD,
         costDisplay: summary.costDisplay || summary.teamCostUSD,
         cotizacion, currencyNative, budgetUtilization,
-        name: quotationData?.projectName || null,
+        name: projectData.name?.trim() || quotationData?.projectName || projectData.subprojectName || `Proyecto #${projectData.id}`,
+            projectCategory: projectData.projectCategory, clientName: clientData?.name ?? null, costCoverage: canSeeFinancials ? coverage : undefined,
         isOneShot, hasRevenueInPeriod, periodWithRevenue
       },
       quotation: quotationData ? {
@@ -790,7 +796,7 @@ export async function completeDataHandler(req: Request, res: Response) {
         efficiency: summary.efficiencyPct, markup: correctMarkupRatio, margin: correctMarginRatio,
         budgetUtilization, hoursDeviation: 0, costDeviation: 0
       },
-      summary: { ...summary, flags: legacyFlags },
+      summary: { ...summary, markup: correctMarkupRatio, flags: legacyFlags },
       teamBreakdown,
       ingresos: pm.ingresos ?? [],
       costos: pm.costos ?? [],

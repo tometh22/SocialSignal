@@ -1,3 +1,4 @@
+import CostCoverageNotice, { type CostCoverage } from "@/components/tasks/CostCoverageNotice";
 import { invalidateTaskQueries } from "@/lib/task-cache";
 "use client";
 
@@ -35,6 +36,7 @@ export type ProjectItem = {
   projectId?: number;
   clientName: string;
   projectName: string;
+  costCoverage?: CostCoverage | null;
   projectKey?: string;
   status?: "Active" | "Inactive";
   lifecycleStatus?: LifecycleStatus;
@@ -224,7 +226,7 @@ function transformBackendResponse(backendData: any): ProjectsApi {
     const costDisplay = p.metrics?.costDisplay?.amount ?? p.metrics?.costUSD ?? 0;
     const revenueUSDNormalized = p.metrics?.revenueUSDNormalized ?? p.metrics?.revenueUSD ?? 0;
     const costUSDNormalized = p.metrics?.costUSDNormalized ?? p.metrics?.costUSD ?? 0;
-    const markup = p.metrics?.markupRatio ?? p.metrics?.markup;
+    const markup = p.projectCategory === "internal" || p.costCoverage?.pendingHours || p.costCoverage?.syncPending ? undefined : p.metrics?.markupRatio ?? p.metrics?.markup;
     const margin = p.metrics?.marginFrac ?? p.metrics?.margin;
 
     const anomaly: string[] = [];
@@ -235,6 +237,7 @@ function transformBackendResponse(backendData: any): ProjectsApi {
       projectId: p.projectId,
       clientName,
       projectName: p.name || p.projectName || "",
+      costCoverage: p.costCoverage ?? null,
       projectKey: `${clientName.toLowerCase()}|${(p.name || "").toLowerCase()}`,
       status,
       lifecycleStatus,
@@ -740,10 +743,11 @@ function ProjectRow({
             {formatUSD(revenue)}
           </td>
           <td className="py-2.5 px-3 text-right tabular-nums text-sm text-slate-500">
-            {formatUSD(cost)}
+            {(p.costCoverage?.pendingHours || p.costCoverage?.syncPending) && !cost ? "Pendiente" : formatUSD(cost)}
+            <CostCoverageNotice coverage={p.costCoverage} knownCost={cost} />
           </td>
           <td className={`py-2.5 px-3 text-right tabular-nums text-sm ${markupCls[health]}`}>
-            {isFinite(p.metrics.markup ?? NaN) ? `${p.metrics.markup!.toFixed(1)}x` : "—"}
+            {isFinite(p.metrics.markup ?? NaN) ? `${p.metrics.markup!.toFixed(1)}x` : p.projectCategory === "internal" ? "No aplica" : "Sin datos"}
           </td>
           <td className="py-2.5 px-3 text-right tabular-nums text-sm text-slate-600">
             {isFinite(p.metrics.margin ?? NaN)

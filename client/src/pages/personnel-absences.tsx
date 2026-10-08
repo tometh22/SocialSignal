@@ -29,16 +29,18 @@ const STATUS_VARIANTS: Record<string, "default" | "secondary" | "destructive" | 
 
 type Person = { id: number; name: string; email?: string | null };
 type Absence = {
-  id: number; personnelId: number; personName: string; startDate: string; endDate: string;
+  allowanceExempt?: boolean; id: number; personnelId: number; personName: string; startDate: string; endDate: string;
   type: string; status: string; planningStatus?: "tentative" | "confirmed"; businessDays: number; notes?: string | null; reviewReason?: string | null;
 };
 type Balance = {
+  allowanceExempt?: boolean;
   configured: boolean; vacationDays: number | null; vacationCarryoverDays?: number; vacationAdvanceDebtDays?: number;
   vacationAvailableDays?: number; vacationBalanceDays?: number; epicalDays: number | null;
   used: { vacation: number; epical: number };
 };
 
 type TeamBalance = {
+  allowanceExempt?: boolean;
   personnelId: number; name: string; configured: boolean; dataError?: boolean;
   vacation: { quota: number | null; carryover: number; advanceDebt: number; available: number; used: number; balance: number; pending: number };
   epical: { quota: number | null; used: number; balance: number | null; pending: number };
@@ -48,6 +50,7 @@ type TeamBalance = {
 /** Saldo de la persona al decidir: qué consume la solicitud y cuánto queda si se aprueba. */
 function BalanceStrip({ person, absence }: { person?: TeamBalance; absence: Absence }) {
   if (!person) return null;
+  if (person.allowanceExempt) return <p className="mt-2 text-xs text-muted-foreground">Sin cupo — freelance</p>;
   if (person.dataError) return <p className="mt-2 text-xs text-destructive">Hay una ausencia de esta persona con fechas inválidas: no se pudo calcular el saldo.</p>;
   // Enfermedad y Otros no descuentan cupo: el aviso de cupo sólo aplica a vacaciones y días Epical.
   if (!["vacation", "epical_day"].includes(absence.type)) return null;
@@ -175,6 +178,7 @@ export default function PersonnelAbsencesPage({ defaultTab = "mine" }: { default
                   <div className="flex flex-wrap items-center gap-2">
                     {teamMode && <span className="font-medium">{absence.personName}</span>}
                     <span className="text-sm">{TYPE_LABELS[absence.type] || absence.type}</span>
+                    {absence.allowanceExempt && <span className="text-xs text-muted-foreground">Sin cupo — freelance</span>}
                     <Badge variant={STATUS_VARIANTS[absence.status] || "outline"}>{STATUS_LABELS[absence.status] || absence.status}</Badge>
                     <Badge variant="outline">{absence.planningStatus === "confirmed" ? "Confirmada" : "Tentativa"}</Badge>
                   </div>
@@ -238,8 +242,8 @@ export default function PersonnelAbsencesPage({ defaultTab = "mine" }: { default
         <TabsList>{isManagement ? <><TabsTrigger value="team">Equipo {pendingTeam.length > 0 && `(${pendingTeam.length})`}</TabsTrigger><TabsTrigger value="allowances">Cupos</TabsTrigger></> : <TabsTrigger value="mine">Mis solicitudes</TabsTrigger>}</TabsList>
         {!isManagement && <TabsContent value="mine" className="space-y-5">
           <div className="grid gap-3 sm:grid-cols-2">
-            <Card><CardHeader className="pb-2"><CardTitle className="text-sm">Vacaciones</CardTitle></CardHeader><CardContent><p className="text-2xl font-semibold">{balance?.configured ? `${balance.vacationBalanceDays ?? 0} días` : "Sin cupo configurado"}</p><p className="text-xs text-muted-foreground">Cupo: {balance?.vacationDays ?? 0} · Trasladados: {balance?.vacationCarryoverDays ?? 0} · Adelanto de años anteriores: {balance?.vacationAdvanceDebtDays ?? 0} · Usados: {balance?.used.vacation ?? 0}</p></CardContent></Card>
-            <Card><CardHeader className="pb-2"><CardTitle className="text-sm">Días Epical</CardTitle></CardHeader><CardContent><p className="text-2xl font-semibold">{balance?.configured ? `${Math.max(0, (balance.epicalDays || 0) - balance.used.epical)} días` : "Sin cupo configurado"}</p><p className="text-xs text-muted-foreground">Usados: {balance?.used.epical ?? 0}</p></CardContent></Card>
+            <Card><CardHeader className="pb-2"><CardTitle className="text-sm">Vacaciones</CardTitle></CardHeader><CardContent><p className="text-2xl font-semibold">{balance?.allowanceExempt ? "Sin cupo — freelance" : balance?.configured ? `${balance.vacationBalanceDays ?? 0} días` : "Sin cupo configurado"}</p><p className="text-xs text-muted-foreground">Cupo: {balance?.vacationDays ?? 0} · Trasladados: {balance?.vacationCarryoverDays ?? 0} · Adelanto de años anteriores: {balance?.vacationAdvanceDebtDays ?? 0} · Usados: {balance?.used.vacation ?? 0}</p></CardContent></Card>
+            <Card><CardHeader className="pb-2"><CardTitle className="text-sm">Días Epical</CardTitle></CardHeader><CardContent><p className="text-2xl font-semibold">{balance?.allowanceExempt ? "Sin cupo — freelance" : balance?.configured ? `${Math.max(0, (balance.epicalDays || 0) - balance.used.epical)} días` : "Sin cupo configurado"}</p><p className="text-xs text-muted-foreground">Usados: {balance?.used.epical ?? 0}</p></CardContent></Card>
           </div>
           {requestForm}
 
@@ -258,7 +262,7 @@ export default function PersonnelAbsencesPage({ defaultTab = "mine" }: { default
               <tbody>{(teamBalances?.people ?? []).map((person) => (
                 <tr key={person.personnelId} className="border-b last:border-0">
                   <td className="px-4 py-2 font-medium">{person.name}</td>
-                  {person.dataError ? <td colSpan={6} className="px-2 py-2 text-destructive">Revisar ausencias (fechas inválidas)</td> : person.configured ? <>
+                  {person.dataError ? <td colSpan={6} className="px-2 py-2 text-destructive">Revisar ausencias (fechas inválidas)</td> : person.allowanceExempt ? <td colSpan={6} className="px-2 py-2 text-muted-foreground">Sin cupo — freelance</td> : person.configured ? <>
                     <td className="px-2 py-2 tabular-nums">{person.vacation.quota ?? 0}</td>
                     <td className="px-2 py-2 tabular-nums">{person.vacation.carryover}</td>
                     <td className="px-2 py-2 tabular-nums">{person.vacation.advanceDebt}</td>
@@ -277,7 +281,7 @@ export default function PersonnelAbsencesPage({ defaultTab = "mine" }: { default
           <div><Label>Vacaciones</Label><Input type="number" min={0} value={allowanceDraft.vacationDays} placeholder={balance?.vacationDays == null ? "Sin configurar" : String(balance.vacationDays)} onChange={(event) => setAllowanceDraft({ ...allowanceDraft, vacationDays: event.target.value })} /></div>
           <div><Label>Traslado</Label><Input type="number" min={0} value={allowanceDraft.vacationCarryoverDays} placeholder={String(balance?.vacationCarryoverDays ?? 0)} onChange={(event) => setAllowanceDraft({ ...allowanceDraft, vacationCarryoverDays: event.target.value })} /></div>
           <div><Label>Días Epical</Label><Input type="number" min={0} value={allowanceDraft.epicalDays} placeholder={balance?.epicalDays == null ? "Sin configurar" : String(balance.epicalDays)} onChange={(event) => setAllowanceDraft({ ...allowanceDraft, epicalDays: event.target.value })} /></div>
-          <div className="sm:col-span-4"><p className="mb-2 text-xs text-muted-foreground">{teamPersonId ? `Cupo de ${personnel.find(person => String(person.id) === teamPersonId)?.name ?? "la persona seleccionada"} · ${year}${balance?.vacationAdvanceDebtDays ? ` · Adelantos anteriores: ${balance.vacationAdvanceDebtDays} día(s), descontados automáticamente del cupo` : ""}` : "Seleccioná una persona para consultar y editar su cupo."}</p><Button disabled={!teamPersonId || balanceLoading || (!balance?.configured && (allowanceDraft.vacationDays === "" || allowanceDraft.epicalDays === "")) || allowanceMutation.isPending} onClick={() => allowanceMutation.mutate()}>Guardar cupo {year}</Button></div>
+          <div className="sm:col-span-4"><p className="mb-2 text-xs text-muted-foreground">{teamPersonId ? `${balance?.allowanceExempt ? "Sin cupo — freelance" : "Cupo de"} ${personnel.find(person => String(person.id) === teamPersonId)?.name ?? "la persona seleccionada"} · ${year}${balance?.vacationAdvanceDebtDays ? ` · Adelantos anteriores: ${balance.vacationAdvanceDebtDays} día(s), descontados automáticamente del cupo` : ""}` : "Seleccioná una persona para consultar y editar su cupo."}</p><Button disabled={balance?.allowanceExempt || !teamPersonId || balanceLoading || (!balance?.configured && (allowanceDraft.vacationDays === "" || allowanceDraft.epicalDays === "")) || allowanceMutation.isPending} onClick={() => allowanceMutation.mutate()}>Guardar cupo {year}</Button></div>
         </CardContent></Card></TabsContent>}
       </Tabs>
     </div>

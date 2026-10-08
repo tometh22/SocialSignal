@@ -1,3 +1,7 @@
+import { civilDateInBuenosAires } from "@shared/utils/buenos-aires-week";
+import { taskDateBucket } from "@shared/utils/task-date-bucket";
+import { clientCalendarColor } from "@/lib/client-calendar-color";
+import { taskPersonalBucket, TASK_DATE_LABELS } from "@shared/utils/task-workflow";
 import { useState } from "react";
 import { Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -27,6 +31,10 @@ type Task = {
   estimatedHours?: number | null;
   loggedHours?: number;
   status: string;
+  clientId?: number | null;
+  clientName?: string | null;
+  blockedReason?: string | null;
+  projectName?: string | null;
   priority: string;
 };
 
@@ -58,22 +66,6 @@ function CircleCheck({ checked, onClick, pending }: { checked: boolean; onClick:
   );
 }
 
-const PROJECT_PALETTE = [
-  { bg: "bg-blue-100 dark:bg-blue-950/50", border: "border-l-blue-500", text: "text-blue-800 dark:text-blue-200" },
-  { bg: "bg-purple-100 dark:bg-purple-950/50", border: "border-l-purple-500", text: "text-purple-800 dark:text-purple-200" },
-  { bg: "bg-green-100 dark:bg-green-950/50", border: "border-l-green-500", text: "text-green-800 dark:text-green-200" },
-  { bg: "bg-orange-100 dark:bg-orange-950/50", border: "border-l-orange-500", text: "text-orange-800 dark:text-orange-200" },
-  { bg: "bg-pink-100 dark:bg-pink-950/50", border: "border-l-pink-500", text: "text-pink-800 dark:text-pink-200" },
-  { bg: "bg-teal-100 dark:bg-teal-950/50", border: "border-l-teal-500", text: "text-teal-800 dark:text-teal-200" },
-  { bg: "bg-indigo-100 dark:bg-indigo-950/50", border: "border-l-indigo-500", text: "text-indigo-800 dark:text-indigo-200" },
-  { bg: "bg-amber-100 dark:bg-amber-950/50", border: "border-l-amber-500", text: "text-amber-800 dark:text-amber-200" },
-];
-
-function getProjectStyle(projectId?: number | null) {
-  if (!projectId) return PROJECT_PALETTE[0];
-  return PROJECT_PALETTE[projectId % PROJECT_PALETTE.length];
-}
-
 function parseLocalDate(s: string): Date {
   return new Date(s.slice(0, 10) + 'T00:00:00');
 }
@@ -96,7 +88,7 @@ function taskIsOnDay(task: Task, day: Date): boolean {
 
 export default function MyTasksPage() {
   const [view, setView] = useState<"calendar" | "list">("calendar");
-  const [currentWeek, setCurrentWeek] = useState(new Date());
+  const [currentWeek, setCurrentWeek] = useState(parseLocalDate(civilDateInBuenosAires(new Date())));
   const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
   const [statusFilter, setStatusFilter] = useState("active");
   const [overflowDay, setOverflowDay] = useState<string | null>(null);
@@ -106,8 +98,8 @@ export default function MyTasksPage() {
   const weekDays = eachDayOfInterval({ start: weekStart, end: weekEnd });
 
   const { data: myData, isLoading, refetch } = useQuery<{ tasks: Task[]; personnelId: number | null }>({
-    queryKey: ["/api/tasks/my-tasks", statusFilter],
-    queryFn: () => authFetch(`/api/tasks/my-tasks${statusFilter !== "all" && statusFilter !== "active" ? `?status=${statusFilter}` : ""}`).then(r => r.json()),
+    queryKey: ["/api/tasks/my-tasks"],
+    queryFn: () => authFetch("/api/tasks/my-tasks").then(r => r.json()),
   });
 
   const { data: allProjects = [] } = useQuery<Project[]>({
@@ -125,7 +117,7 @@ export default function MyTasksPage() {
   const tasks = myData?.tasks || [];
   const activeTasks = statusFilter === "active"
     ? tasks.filter(t => t.status !== "done" && t.status !== "cancelled")
-    : tasks;
+    : tasks.filter(t => t.status !== "cancelled" && (statusFilter === "all" || taskPersonalBucket(t) === statusFilter));
 
   const tasksByDay = (day: Date) => activeTasks.filter(t => taskIsOnDay(t, day));
 
@@ -135,7 +127,7 @@ export default function MyTasksPage() {
   const tasksByProject: Record<string, Task[]> = {};
   for (const task of activeTasks) {
     const proj = allProjects.find(p => p.id === task.projectId);
-    const key = proj ? `${proj.clientName} · ${proj.name}` : "Sin proyecto";
+    const key = task.projectName ? `${task.clientName ?? "Sin cliente"} · ${task.projectName}` : proj ? `${proj.clientName ?? "Sin cliente"} · ${proj.name}` : "Sin proyecto";
     if (!tasksByProject[key]) tasksByProject[key] = [];
     tasksByProject[key].push(task);
   }
@@ -159,9 +151,11 @@ export default function MyTasksPage() {
               <SelectContent>
                 <SelectItem value="active">Activas</SelectItem>
                 <SelectItem value="all">Todas</SelectItem>
-                <SelectItem value="todo">Pendientes</SelectItem>
+                <SelectItem value="upcoming">Próximas</SelectItem>
                 <SelectItem value="in_progress">En curso</SelectItem>
-                <SelectItem value="done">Completadas</SelectItem>
+                <SelectItem value="overdue">Con retraso</SelectItem>
+                <SelectItem value="no_date">Sin fecha</SelectItem>
+                <SelectItem value="done">Finalizadas</SelectItem>
               </SelectContent>
             </Select>
 
@@ -177,6 +171,9 @@ export default function MyTasksPage() {
           </div>
         </div>
 
+        <div className="flex flex-wrap gap-2 text-xs" aria-label="Clientes">
+          {[...new Map(tasks.map(t => [t.clientId ?? null, t.clientName ?? "Sin cliente"])).entries()].map(([id, name]) => <span key={id ?? "none"} className={cn("rounded border px-2 py-1", clientCalendarColor(id))}>{name}</span>)}
+        </div>
         {isLoading ? (
           <div className="flex items-center justify-center py-20">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -194,7 +191,7 @@ export default function MyTasksPage() {
                     <span className="font-semibold text-sm text-foreground capitalize">
                       {format(weekStart, "dd MMM", { locale: es })} – {format(weekEnd, "dd MMM yyyy", { locale: es })}
                     </span>
-                    <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setCurrentWeek(new Date())}>
+                    <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setCurrentWeek(parseLocalDate(civilDateInBuenosAires(new Date())))}>
                       Hoy
                     </Button>
                   </div>
@@ -207,7 +204,7 @@ export default function MyTasksPage() {
                 <div className="grid grid-cols-7 divide-x divide-border">
                   {weekDays.map(day => {
                     const dayTasks = tasksByDay(day);
-                    const isCurrentDay = isToday(day);
+                    const isCurrentDay = isSameDay(day, parseLocalDate(civilDateInBuenosAires(new Date())));
                     const dayKey = day.toISOString();
                     const visibleTasks = dayTasks.slice(0, MAX_VISIBLE);
                     const overflow = dayTasks.length - MAX_VISIBLE;
@@ -230,7 +227,7 @@ export default function MyTasksPage() {
                         <div className="p-1 space-y-0.5">
                           {visibleTasks.map(task => {
                             const proj = allProjects.find(p => p.id === task.projectId);
-                            const style = getProjectStyle(task.projectId);
+                            const style = { bg: clientCalendarColor(task.clientId), border: "", text: "text-inherit" };
                             const isStart = task.startDate && isSameDay(parseISO(task.startDate), day);
                             const isEnd = task.dueDate && isSameDay(parseISO(task.dueDate), day);
                             const isSpanning = task.startDate && task.dueDate &&
@@ -256,7 +253,7 @@ export default function MyTasksPage() {
                                       style.text,
                                       task.status === "done" && "line-through"
                                     )}>
-                                      {task.title}
+                                      {task.status === "blocked" && <span title={task.blockedReason || "Motivo pendiente"} aria-label="Bloqueada">⊘ </span>}{task.title}
                                     </p>
                                     {proj && <p className="text-[10px] opacity-70 truncate">{proj.clientName}</p>}
                                   </div>
@@ -264,7 +261,7 @@ export default function MyTasksPage() {
                                 <TooltipContent side="top" className="max-w-[200px]">
                                   <p className="font-medium">{task.title}</p>
                                   {proj && <p className="text-xs opacity-80">{proj.clientName} · {proj.name}</p>}
-                                  {task.dueDate && <p className="text-xs opacity-70">Vence: {format(parseISO(task.dueDate), "dd/MM/yyyy")}</p>}
+                                  {task.dueDate && <p className="text-xs opacity-70">Vence: {format(parseLocalDate(task.dueDate), "dd/MM/yyyy")}</p>}
                                 </TooltipContent>
                               </Tooltip>
                             );
@@ -284,7 +281,7 @@ export default function MyTasksPage() {
                                 <div className="space-y-0.5">
                                   {dayTasks.map(task => {
                                     const proj = allProjects.find(p => p.id === task.projectId);
-                                    const style = getProjectStyle(task.projectId);
+                                    const style = { bg: clientCalendarColor(task.clientId), border: "", text: "text-inherit" };
                                     return (
                                       <div
                                         key={task.id}
@@ -315,7 +312,7 @@ export default function MyTasksPage() {
                     <div className="flex flex-wrap gap-1.5">
                       {datelessTasks.map(task => {
                         const proj = allProjects.find(p => p.id === task.projectId);
-                        const style = getProjectStyle(task.projectId);
+                        const style = { bg: clientCalendarColor(task.clientId), border: "", text: "text-inherit" };
                         return (
                           <button
                             key={task.id}
@@ -347,7 +344,7 @@ export default function MyTasksPage() {
                   Object.entries(tasksByProject).map(([projectLabel, projectTasks]) => {
                     const firstTask = projectTasks[0];
                     const proj = allProjects.find(p => p.id === firstTask.projectId);
-                    const style = getProjectStyle(firstTask.projectId);
+                    const style = { bg: clientCalendarColor(firstTask.clientId), border: "", text: "text-inherit" };
                     return (
                       <div key={projectLabel} className="bg-card rounded-xl border overflow-hidden">
                         {/* Project header */}
@@ -393,10 +390,10 @@ export default function MyTasksPage() {
                                   {proj?.clientName || "—"}
                                 </span>
                                 <span
-                                  className={cn("text-xs text-center", task.dueDate && new Date(task.dueDate) < new Date() && task.status !== "done" ? "text-red-500 font-medium" : "text-muted-foreground")}
+                                  className={cn("text-xs text-center", task.dueDate && taskDateBucket(task) === "overdue" ? "text-red-500 font-medium" : "text-muted-foreground")}
                                   onClick={() => setSelectedTaskId(task.id)}
                                 >
-                                  {task.dueDate ? format(new Date(task.dueDate), "dd/MM", { locale: es }) : "—"}
+                                  {task.dueDate ? format(parseLocalDate(task.dueDate), "dd/MM", { locale: es }) : "—"}
                                 </span>
                                 <span className="text-xs text-right text-muted-foreground flex items-center justify-end gap-0.5" onClick={() => setSelectedTaskId(task.id)}>
                                   {task.loggedHours ? (

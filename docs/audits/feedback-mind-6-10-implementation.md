@@ -1,0 +1,58 @@
+# Feedback Mind 6-10 — implementación
+
+Fuente: `Feedback Mind V2-4.pdf`, recibido el 8 de octubre de 2026. Cambios preparados sobre 1.11.12. No se publicó una versión.
+
+## Cambios
+
+| Punto | Implementación |
+| --- | --- |
+| T1 | Calendario de rango con borrador local: primer clic conserva inicio, segundo guarda. Permite un día y conserva extremos parciales; cerrar el popover descarta el borrador. |
+| T2–T3 | Selección independiente del check: casillas, modificadores, rangos por orden visible, Shift+flechas, Escape y Delete/Backspace. Confirmación común. API de borrado por proyecto, transacción y protección de horas nativas/importadas en todos los descendientes. El borrado individual usa el mismo servicio. |
+| T4 | Paleta compartida por cliente, color neutral sin cliente y leyendas en calendarios. Estado mediante check, tachado y referencia de bloqueo. |
+| T5 | API personal enriquecida con cliente/proyecto; referencias visibles en móvil. |
+| T6–T9 | Fecha editable en carga rápida, corrección y diálogo del cronómetro. Presentación de fechas civiles sin conversión al día anterior. Hoy, semana y mes parten de Buenos Aires; fechas guardadas conservan su día civil, incluidas cargas legacy a medianoche. |
+| T7 | Clasificación compartida por fechas; seis columnas en tablero, bloqueo prioritario en tablero y referencia en la clasificación personal. Motivo obligatorio en cliente y servidor. Finalización y recurrencias continúan por completion. |
+| T8 | Cronómetro persistente en Topbar. En móvil ocupa una segunda fila del encabezado, con duración, título abreviado y Detener. |
+| T10 | Alcance personal por responsable/colaboradores, sin inclusión por autor de tareas sin asignación. |
+| C1 | Deduplicación entre fuentes uno a uno, conservando repeticiones legítimas. Reconstrucción mensual transaccional. Snapshots válidos conservados, incluidos FX referenciados. Costos pendientes/parciales visibles. Fallos de sincronización devuelven la carga guardada y un aviso; marca persistente incluso si se elimina la última entrada del mes. |
+| C2 | Markup nullable; internos muestran No aplica y comerciales sin métricas muestran Sin datos. Salud neutral sin factores evaluables. Copilot no recomienda renegociar por un markup ausente. |
+| C3 | Identidad operativa del proyecto antes de cotización/subproyecto; cliente y categoría en las variantes de complete-data. |
+| I1 | Inicio y Tareas consumen my-hours. hours-summary y reconstrucción mensual comparten fuentes, fechas civiles y deduplicación. |
+| I2 | Mi semana muestra horas semanales/mensuales, lunes a domingo actuales y enlace a Tareas; mantiene las demás tarjetas de Inicio. |
+| A1 | Freelancers exentos de validación de cupos en aprobación/edición. Solicitudes y saldos muestran Sin cupo — freelance; la API rechaza configurarles un cupo. Workflow, auditoría, superposiciones y disponibilidad se conservan. |
+
+## Migración y conciliación
+
+Migración aditiva e idempotente: `migrations/0081_task_block_details.sql`. Agrega `tasks.blocked_reason`, `tasks.blocked_at` y `task_time_entries.cost_sync_pending`. El arranque del servidor ejecuta su equivalente en `server/migrations/task-block-details.ts`. Bloqueos históricos sin motivo muestran Motivo pendiente.
+
+Con `DATABASE_URL` configurada, consultar primero la vista previa del período afectado:
+
+```sh
+npm run reconcile:task-costs -- 2026-10
+```
+
+La respuesta muestra bloqueos, snapshots propuestos y costos mensuales propuestos. No modifica snapshots ni contabilidad en esta modalidad. Para aplicar luego de revisar:
+
+```sh
+npm run reconcile:task-costs -- 2026-10 --apply
+```
+
+Sólo aplica en origen app, después del corte histórico configurado y con período financiero abierto. Origen Excel y períodos cerrados/en revisión quedan bloqueados. Las tarifas y FX faltantes permanecen pendientes. La conciliación reconstruye **todo el período** con deduplicación entre fuentes y conserva snapshots válidos. Snapshots y hechos mensuales se guardan en una misma transacción; un error revierte la operación. Las mutaciones de horas y los cierres financieros se coordinan por período.
+
+Las marcas `task_cost_sync:YYYY-MM:projectId` en system_config señalan reconstrucciones pendientes, incluidas eliminaciones. Una reconstrucción exitosa las limpia dentro de la misma transacción. No son tarifas ni cupos.
+
+## Validación local
+
+- `npm test`: 853 tests aprobados, 11 omitidos; 73 archivos aprobados y uno omitido.
+- `npm run check`: TypeScript sin errores.
+- `npm run build`: cliente y servidor compilados. Advertencia de tamaño de bundles; no bloquea el build.
+- `git diff --check`: sin errores.
+- Nuevas regresiones: fechas civiles UTC/BA, domingo/lunes/cambio de mes, rangos de calendario, clasificación/bloqueo, deduplicación, salud sin métricas, protección de borrado nativa/importada y conciliación (vista previa, snapshots, Excel, corte, cierre y error de reconstrucción).
+- QA en navegador con datos simulados: desktop y 390×844; rango en dos clics, selección por Shift+clic y Shift+flecha, Escape, Backspace, motivo obligatorio, reclasificación al bloquear, seis columnas y diálogo de cronómetro con fecha. Se corrigió un desbordamiento del cronómetro móvil.
+- Capturas locales: `.context/feedback-desktop.png` y `.context/feedback-mobile.png`. El harness de QA temporal se retiró.
+
+## Pendiente para cerrar la entrega
+
+Este workspace no tiene DATABASE_URL ni archivos de entorno con conexión. No se aplicó la migración, no se ejecutó conciliación contra una base y no se verificaron los importes reales del feedback. Las pruebas transaccionales usan mocks; no sustituyen una prueba de concurrencia en PostgreSQL.
+
+Antes de publicar: aplicar la migración en una base de prueba, revisar la vista previa de los períodos/proyectos afectados, comprobar tarifas históricas ARS/USD y FX, probar guardado/edición/eliminación y fallos de reconstrucción, verificar períodos cerrados y origen Excel, y validar borrado concurrente y ausencias freelance/empleado con datos reales. La publicación debe actualizar VERSION, package.json y CHANGELOG.md juntos y pasar CI desde un checkout limpio.

@@ -1,6 +1,5 @@
 import { Switch, Route, Redirect, useLocation, useSearch } from "wouter";
 import { Toaster } from "@/components/ui/toaster";
-import GlobalTimerWidget from "@/components/tasks/GlobalTimerWidget";
 import ErrorBoundary from "@/components/error-boundary";
 import NotFound from "@/pages/not-found";
 import { lazy, Suspense, useEffect, useState } from "react";
@@ -392,7 +391,7 @@ function App() {
         <ChatProvider>
           <ImageRefreshProvider>
             <AppRoutes />
-            <GlobalTimerWidget />
+
             <Toaster />
           </ImageRefreshProvider>
         </ChatProvider>

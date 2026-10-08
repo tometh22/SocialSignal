@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.12.0 — 2026-10-08
+
+- Tareas: rangos de fechas con selección provisional, fechas civiles coherentes y fecha editable al cargar o corregir horas. Mis tareas muestra cliente/proyecto e incluye sólo responsables y colaboradores.
+- Estados derivados de fechas y tablero de seis columnas, con bloqueo que exige motivo y finalización manual. Selección múltiple por mouse/teclado y borrado transaccional protegido cuando una tarea o sus descendientes tienen horas nativas o importadas.
+- Calendarios con colores estables por cliente, Inicio centrado en la semana actual y cronómetro persistente integrado en el encabezado, también en móvil.
+- Horas personales: fuentes, límites y deduplicación compartidos. Costos pendientes/parciales visibles, snapshots históricos conservados y conciliación con vista previa; los fallos de reconstrucción informan sincronización pendiente sin duplicar una carga ya guardada.
+- Proyectos: identidad operativa prioritaria, markup nullable, No aplica para internos y salud neutral cuando faltan métricas evaluables.
+- Ausencias freelance sin validación ni descuento de cupos, conservando aprobación, auditoría y disponibilidad.
+- Migración aditiva 0081: motivos/fecha de bloqueo y estado de sincronización de costos. Conciliación restringida a origen app y períodos abiertos posteriores al corte histórico.
+
 ## 1.11.12 — 2026-10-06
 
 - Home: la tarjeta de vacaciones y días Epical (o la de tu cumpleaños) ocupa todo el ancho cuando va sola; antes quedaba a media fila y desalineada respecto de los indicadores y de Señales del portfolio. Detectado al ver la pantalla con datos simulados en producción.

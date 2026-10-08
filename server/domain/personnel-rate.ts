@@ -1,4 +1,5 @@
 import { and, desc, eq, sql } from "drizzle-orm";
+import { hoursCivilDate } from "@shared/utils/hours-reconciliation";
 import { db } from "../db";
 import { exchangeRates, personnelHistoricalCosts, systemConfig } from "@shared/schema";
 
@@ -23,7 +24,8 @@ export async function resolveCanonicalPersonnelRate(
   personnelId: number,
   date: Date,
 ): Promise<CanonicalPersonnelRate> {
-  const entryPeriod = date.getFullYear() * 100 + (date.getMonth() + 1);
+  const [year, month] = hoursCivilDate(date).slice(0, 7).split("-").map(Number);
+  const entryPeriod = year * 100 + month;
   const [historicalRate] = await db
     .select({
       year: personnelHistoricalCosts.year,
@@ -78,8 +80,8 @@ export async function resolveCanonicalPersonnelRate(
       .select({ id: exchangeRates.id, rate: exchangeRates.rate })
       .from(exchangeRates)
       .where(and(
-        eq(exchangeRates.year, date.getFullYear()),
-        eq(exchangeRates.month, date.getMonth() + 1),
+        eq(exchangeRates.year, year),
+        eq(exchangeRates.month, month),
         eq(exchangeRates.isActive, true),
       ))
       .limit(1);
@@ -127,7 +129,7 @@ export function canonicalRateErrorMessage(
   date: Date,
 ): string | null {
   if (result.error === "missing_fx") {
-    return `No hay cotización activa para ${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}.`;
+    return `No hay cotización activa para ${hoursCivilDate(date).slice(0, 7)}.`;
   }
   if (result.error === "missing_rate") {
     return "No hay una tarifa histórica vigente para la persona y fecha seleccionadas.";

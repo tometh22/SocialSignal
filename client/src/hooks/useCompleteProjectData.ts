@@ -31,6 +31,9 @@ interface CompleteProjectData {
     expectedEndDate: string;
     clientId: number;
     quotationId: number;
+    projectCategory?: string;
+    costCoverage?: import("@/components/tasks/CostCoverageNotice").CostCoverage | null;
+    clientName?: string | null;
   };
   quotation: {
     id: number;
@@ -93,7 +96,7 @@ interface CompleteProjectData {
   };
   metrics: {
     efficiency: number;
-    markup: number;
+    markup: number | null;
     budgetUtilization: number;
     hoursDeviation: number;
     costDeviation: number;
@@ -105,7 +108,7 @@ interface CompleteProjectData {
     costDisplay?: number;
     revenueDisplay?: number;
     currencyNative?: string;
-    markup?: number;
+    markup?: number | null;
     margin?: number;
     flags?: string[];
     emptyStates?: {
@@ -208,7 +211,7 @@ interface CompleteProjectData {
       revenue: number;       // Normalized revenue
       costs: number;         // Normalized costs  
       margin: number;        // Revenue - costs
-      markup: number;        // Revenue / costs ratio
+      markup: number | null;        // Revenue / costs ratio
       roi: number;           // ROI percentage
     };
     metadata: {
@@ -248,7 +251,7 @@ interface CompleteProjectData {
       totalHours: number;
       efficiencyPct: number;
       teamMembers: number;
-      markup: number;
+      markup: number | null;
       margin: number;
     } | null;
   };

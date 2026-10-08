@@ -1,8 +1,10 @@
+import { civilDateInBuenosAires } from "@shared/utils/buenos-aires-week";
+import { clientCalendarColor } from "@/lib/client-calendar-color";
 import { taskIsOnCivilDay } from "@shared/utils/task-civil-date";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { authFetch, authFetchJson } from "@/lib/queryClient";
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, startOfWeek, endOfWeek, isSameMonth, isToday, addMonths, subMonths, parseISO } from "date-fns";
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, startOfWeek, endOfWeek, isSameMonth, isToday, isSameDay, addMonths, subMonths, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -23,6 +25,8 @@ type Task = {
   assigneeName?: string | null;
   projectName?: string | null;
   clientName?: string | null;
+  clientId?: number | null;
+  blockedReason?: string | null;
   dueDate?: string | null;
   startDate?: string | null;
   status: string;
@@ -60,7 +64,7 @@ function taskIsOnDay(task: Task, day: Date): boolean {
 }
 
 export default function TeamCalendarPage() {
-  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [currentMonth, setCurrentMonth] = useState(new Date(`${civilDateInBuenosAires(new Date())}T00:00:00`));
   const [selectedAssigneeId, setSelectedAssigneeId] = useState<string>("all");
   const [selectedProjectId, setSelectedProjectId] = useState<string>("all");
   const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
@@ -95,7 +99,7 @@ export default function TeamCalendarPage() {
     queryFn: () => authFetchJson("/api/tasks-projects"),
   });
 
-  const tasksByDay = (day: Date) => tasks.filter(t => taskIsOnDay(t, day));
+  const tasksByDay = (day: Date) => tasks.filter(t => t.status !== "cancelled" && taskIsOnDay(t, day));
 
   const totalTasks = tasks.length;
   const doneTasks = tasks.filter(t => t.status === "done").length;
@@ -188,7 +192,7 @@ export default function TeamCalendarPage() {
             </Button>
             <div className="flex items-center gap-3">
               <span className="font-semibold capitalize text-sm">{format(currentMonth, "MMMM yyyy", { locale: es })}</span>
-              <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setCurrentMonth(new Date())}>
+              <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setCurrentMonth(new Date(`${civilDateInBuenosAires(new Date())}T00:00:00`))}>
                 Hoy
               </Button>
               {totalTasks > 0 && (
@@ -218,7 +222,7 @@ export default function TeamCalendarPage() {
             <div className="grid grid-cols-7 divide-x divide-y divide-border">
               {allCalDays.map(day => {
                 const dayTasks = tasksByDay(day);
-                const isCurrentDay = isToday(day);
+                const isCurrentDay = isSameDay(day, new Date(`${civilDateInBuenosAires(new Date())}T00:00:00`));
                 const isCurrentMonth = isSameMonth(day, currentMonth);
                 const dayKey = day.toISOString();
                 const visibleTasks = dayTasks.slice(0, MAX_VISIBLE);
@@ -251,7 +255,7 @@ export default function TeamCalendarPage() {
                               <div
                                 className={cn(
                                   "text-[10px] leading-tight px-1 py-0.5 rounded cursor-pointer border-l-2 hover:brightness-95 transition-all flex items-center gap-1",
-                                  style.bg, style.border,
+                                  clientCalendarColor(task.clientId),
                                   task.status === "done" && "opacity-50"
                                 )}
                                 onClick={() => setSelectedTaskId(task.id)}
@@ -264,11 +268,11 @@ export default function TeamCalendarPage() {
                                   </Avatar>
                                 )}
                                 <div className="min-w-0">
-                                  <p className={cn("truncate font-medium", style.text, task.status === "done" && "line-through")}>
-                                    {task.title}
+                                  <p className={cn("truncate font-medium", task.status === "done" && "line-through")}>
+                                    {task.status === "blocked" && <span title={task.blockedReason || "Motivo pendiente"} aria-label="Bloqueada">⊘ </span>}{task.title}
                                   </p>
                                   {task.projectName && (
-                                    <p className={cn("truncate opacity-60", style.text)}>{task.clientName}</p>
+                                    <p className={cn("truncate opacity-60", "text-inherit")}>{task.clientName}</p>
                                   )}
                                 </div>
                               </div>
@@ -300,7 +304,7 @@ export default function TeamCalendarPage() {
                                 return (
                                   <div
                                     key={task.id}
-                                    className={cn("text-xs px-2 py-1 rounded cursor-pointer border-l-2 flex items-center gap-1.5", style.bg, style.border)}
+                                    className={cn("text-xs px-2 py-1 rounded cursor-pointer border-l-2 flex items-center gap-1.5", clientCalendarColor(task.clientId))}
                                     onClick={() => { setSelectedTaskId(task.id); setOverflowDay(null); }}
                                   >
                                     {person && (
@@ -311,8 +315,8 @@ export default function TeamCalendarPage() {
                                       </Avatar>
                                     )}
                                     <div className="min-w-0">
-                                      <p className={cn("font-medium truncate", style.text)}>{task.title}</p>
-                                      {person && <p className={cn("text-[10px] opacity-70", style.text)}>{person.name}</p>}
+                                      <p className={cn("font-medium truncate", "text-inherit")}>{task.title}</p>
+                                      {person && <p className={cn("text-[10px] opacity-70", "text-inherit")}>{person.name}</p>}
                                     </div>
                                   </div>
                                 );
@@ -329,22 +333,7 @@ export default function TeamCalendarPage() {
           )}
         </div>
 
-        {/* Person legend */}
-        {activeAssigneeIds.length > 0 && (
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-xs text-muted-foreground">Color por persona:</span>
-            {activeAssigneeIds.map(aid => {
-              const person = allPersonnel.find(p => p.id === aid);
-              if (!person) return null;
-              const style = getPersonStyle(aid);
-              return (
-                <div key={aid} className={cn("flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] border-l-2", style.bg, style.border, style.text)}>
-                  <span className="font-medium">{(person.name || '').split(" ")[0]}</span>
-                </div>
-              );
-            })}
-          </div>
-        )}
+        <div className="flex flex-wrap gap-2 text-xs"><span>Color por cliente:</span>{[...new Map(tasks.map(t => [t.clientId, t.clientName || "Sin cliente"]))].map(([id, name]) => <span key={id ?? "none"} className={cn("rounded border px-2 py-1", clientCalendarColor(id))}>{name}</span>)}</div>
 
         <TaskDetailPanel
           taskId={selectedTaskId}

@@ -1,3 +1,4 @@
+import CostCoverageNotice from "@/components/tasks/CostCoverageNotice";
 /**
  * Project Detail — V4: Hero + Tabs.
  * Optimized for "5-second diagnosis" by Management/CEO and Ops/PMs.
@@ -50,7 +51,7 @@ function PLBreakdown({
   revenue, cost, budget, budgetUtilization, totalHours, markup,
 }: {
   revenue: number; cost: number; budget: number; budgetUtilization: number;
-  totalHours: number; markup: number;
+  totalHours: number; markup: number | null;
 }) {
   const profit    = revenue - cost;
   const burnRate  = totalHours > 0 ? cost / totalHours : 0;
@@ -367,7 +368,7 @@ export default function ProjectDetail() {
 
   const revenue          = vm.revenueDisplay ?? 0;
   const cost             = vm.costDisplay ?? 0;
-  const markup           = vm.markup ?? 0;
+  const markup           = vm.markup;
   const margin           = vm.margin ?? 0;
   const totalHours       = vm.totalHours ?? 0;
   const estimatedHours   = vm.estimatedHours ?? q?.estimatedHours ?? 0;
@@ -376,8 +377,8 @@ export default function ProjectDetail() {
   const hoursDeviation   = m?.hoursDeviation ?? (estimatedHours > 0 ? ((totalHours - estimatedHours) / estimatedHours) * 100 : 0);
   const costDeviation    = m?.costDeviation ?? 0;
 
-  const projectName  = q?.projectName ?? unifiedData.project?.name ?? "Proyecto";
-  const clientName   = (unifiedData as any).client?.name ?? "—";
+  const projectName  = unifiedData.project?.name || q?.projectName || "Proyecto";
+  const clientName   = unifiedData.project?.clientName ?? (unifiedData as any).client?.name ?? "—";
   const projectStatus = unifiedData.project?.status ?? "active";
 
   const rankingMap = new Map(
@@ -394,8 +395,8 @@ export default function ProjectDetail() {
   const teamTotalHours = enrichedTeam.reduce((s: number, m: any) => s + (m.hoursAsana ?? m.hours ?? 0), 0);
   const effectiveCost  = cost  > 0 ? cost  : teamTotalCost;
   const effectiveHours = totalHours > 0 ? totalHours : teamTotalHours;
-  const effectiveMarkup = markup > 0 ? markup : (revenue > 0 && effectiveCost > 0 ? revenue / effectiveCost : 0);
-  const effectiveMargin = effectiveMarkup > 0 ? ((revenue - effectiveCost) / revenue) * 100 : margin;
+  const effectiveMarkup = unifiedData.project?.projectCategory === "internal" || (unifiedData.project?.costCoverage?.pendingHours || unifiedData.project?.costCoverage?.syncPending) ? null : markup ?? (revenue > 0 && effectiveCost > 0 ? revenue / effectiveCost : null);
+  const effectiveMargin = effectiveMarkup != null && effectiveMarkup > 0 ? ((revenue - effectiveCost) / revenue) * 100 : margin;
   const effectiveBudgetUtil = budget > 0 && effectiveCost > 0 ? (effectiveCost / budget) * 100 : budgetUtil;
 
   const teamAvgDeviation = enrichedTeam.length > 0
@@ -428,6 +429,7 @@ export default function ProjectDetail() {
           budgetUtilization={effectiveBudgetUtil}
           hoursDeviation={hoursDeviation}
           canSeeCosts={canSeeCosts}
+          isInternal={unifiedData.project?.projectCategory === "internal"}
           prevMarkup={unifiedData.previousPeriod?.metrics?.markup ?? undefined}
         />
       </div>
@@ -445,6 +447,7 @@ export default function ProjectDetail() {
         </Link>
       )}
 
+      {canSeeCosts && <CostCoverageNotice coverage={unifiedData.project?.costCoverage} knownCost={effectiveCost} />}
       {/* ── Acceso a Analytics (desvíos de costo y tiempo) ────────── */}
       {canSeeAnalytics && (
         <Link href={`/project-analytics/${pid}`}>
