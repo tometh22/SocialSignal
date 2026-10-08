@@ -1,6 +1,6 @@
 # Feedback Mind 6-10 — implementación
 
-Fuente: `Feedback Mind V2-4.pdf`, recibido el 8 de octubre de 2026. Desarrollo sobre 1.11.12. Release 1.12.0 desplegado el 8 de octubre de 2026; parches 1.12.1 y 1.12.2 preparados durante la verificación productiva.
+Fuente: `Feedback Mind V2-4.pdf`, recibido el 8 de octubre de 2026. Desarrollo sobre 1.11.12. Releases 1.12.0–1.12.2 desplegados el 8 de octubre de 2026; parche 1.12.3 preparado durante el repaso final.
 
 ## Cambios
 
@@ -67,3 +67,11 @@ Las pruebas transaccionales de concurrencia, períodos cerrados, origen Excel y 
 Al mostrar los costos reales, el componente de análisis de Cartera reveló otro fallback de markup ausente a cero, que generaba recomendaciones de renegociación para internos. El análisis ahora comparte la elegibilidad de markup con la tabla: excluye internos, ingresos ausentes y costos pendientes, preservando sus importes en gráficos y filas. Encabezados, distribución y AI Copilot muestran salud neutral sin métricas evaluables. Se preservan los umbrales para comerciales con datos válidos y se evita un retorno antes de hooks cuando cambia un período sin actividad.
 
 Validación local: 860 tests aprobados, 11 omitidos, TypeScript y build correctos. QA en navegador con los componentes reales y datos simulados: dos proyectos con costo visible y sin markup evaluable muestran cero críticos, dos neutrales y ninguna recomendación de renegociación. Harness temporal retirado; captura en .context/neutral-qa.png. Verificación final del parche productivo registrada en .context.
+
+### Cobertura de costos con filtros compatibles — 1.12.3
+
+El repaso final detectó que `/api/projects` y `/api/active-projects/v2` adjuntaban cobertura de costos del mes actual cuando el agregador recibía un `timeFilter` antiguo para otro período. Ahora la cobertura usa los límites civiles exactos devueltos por el agregador, incluidas las horas del último día y las marcas mensuales de sincronización que intersectan el rango. El flujo moderno `period=YYYY-MM` conserva los mismos límites. Los filtros relativos se normalizan al mes de Buenos Aires antes de agregar; el mes anterior se calcula desde el día 1 para evitar el desborde del día 31.
+
+Doce regresiones verifican fuentes nativas/legacy, deduplicación de espejos, pendientes en meses distintos, trimestre, rangos de días, último día inclusivo, marcas persistentes de sincronización, rangos inválidos y cambio de mes/año en Buenos Aires. No requiere migración ni reconstruir contabilidad.
+
+Validación local del parche: 872 tests aprobados, 11 omitidos; TypeScript y build correctos. Los casos productivos destructivos siguen sin ensayarse; este parche sólo cambia consultas y no modifica horas, snapshots ni hechos mensuales.
