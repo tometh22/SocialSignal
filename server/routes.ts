@@ -1,3 +1,4 @@
+import { withProjectPeriodMetrics } from "./domain/metrics/project-period-overlay";
 import { markTaskCostSyncPending } from "./domain/task-cost-sync";
 import { civilDateInBuenosAires, currentBuenosAiresWeek } from "@shared/utils/buenos-aires-week";
 import { taskCostCoverage } from "./domain/task-cost-coverage";
@@ -1249,23 +1250,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (finData && project.metrics) {
             console.log(`🔄 STAR SCHEMA: Project ${project.projectId} - Replacing ${project.metrics.revenueDisplay?.currency} ${project.metrics.revenueDisplay?.amount} with ${finData.currencyNative} ${finData.metrics.revenueDisplay}`);
             
-            project.metrics.revenueDisplay = {
-              amount: finData.metrics.revenueDisplay,
-              currency: finData.currencyNative as "ARS" | "USD"
-            };
-            project.metrics.costDisplay = {
-              amount: finData.metrics.costDisplay,
-              currency: finData.currencyNative as "ARS" | "USD"
-            };
-            
-            // Also update USD values
-            project.metrics.revenueUSD = finData.metrics.revenueUSDNormalized;
-            project.metrics.costUSD = finData.metrics.costUSDNormalized;
-            project.metrics.profitUSD = finData.metrics.profitUSD;
-            project.metrics.markupRatio = finData.metrics.markup;
-            project.metrics.marginFrac = finData.metrics.margin;
-            project.metrics.workedHours = finData.metrics.totalHours;
-            (project.metrics as any).totalHours = finData.metrics.totalHours;
+            project.metrics = withProjectPeriodMetrics(project.metrics, finData);
           }
         }
         
