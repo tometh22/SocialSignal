@@ -1,6 +1,6 @@
 ---
-version: 2.32.0
-updatedAt: 2026-10-05
+version: 2.33.0
+updatedAt: 2026-10-08
 feedbackCount: 70
 ---
 
@@ -456,3 +456,14 @@ histórica que todavía necesitan cotizaciones y registros anteriores.
 - **Cuentas en riesgo:** compara el costo del mismo equipo cotizado a tarifas actuales contra el costo cotizado; no usa horas cargadas. Una cuenta puede desestimarse para todo el equipo con motivo obligatorio y plazo opcional. La línea base (erosión y severidad) la fija el servidor al desestimar y el evento queda auditado. El descarte se levanta solo si vence el plazo, si la erosión empeora 5 puntos o más sobre la desestimada, o si la severidad empeora (de vigilancia a crítica).
 - **Carga de horas:** el destino por defecto es el responsable de la tarea (no quien la carga) en el popover, el detalle, el temporizador y las subtareas. Quien gestiona tareas puede cargar al responsable aunque su usuario no esté vinculado a Personal.
 - **Plantillas de reportes:** las recetas del cotizador reemplazan a las plantillas. La pestaña se oculta en Configuración; los datos y la lectura que usan las cotizaciones históricas se conservan. Las cotizaciones legacy sin trasladar al Excel se archivan (reversible) con `scripts/archive-legacy-quotations.mjs`, nunca con borrado físico.
+
+## Addendum — Feedback Mind 6-10
+
+- **Fechas y horas personales:** las fechas de tareas y cargas son días civiles; hoy, semana y mes se calculan en Buenos Aires. Un rango se guarda sólo al completar la selección (o elegir un día). La carga rápida, la edición y el cronómetro permiten elegir la fecha. Inicio y Tareas comparten fuentes, límites y deduplicación uno a uno entre fuentes, conservando repeticiones legítimas dentro de cada fuente.
+- **Mis tareas:** incluye responsabilidades y colaboraciones; crear una tarea sin asignación no la convierte en una tarea personal. Se muestra Cliente · Proyecto, también en móvil.
+- **Estados de tareas:** Próximas, En curso, Con retraso y Sin fecha se derivan de fechas; Finalizadas requiere el check manual. Las canceladas quedan fuera del trabajo. El tablero agrega Bloqueadas con prioridad y motivo obligatorio; Mis tareas conserva el grupo temporal y muestra la referencia del bloqueo. Los estados históricos todo/in_progress no deciden la columna; completion conserva la lógica de recurrencias. El Kanban de proyectos mantiene su workflow.
+- **Borrado de tareas:** selección independiente de la finalización, por casillas o teclado/mouse. El servidor valida permisos y todos los descendientes dentro de una transacción. Cualquier hora nativa o importada bloquea todo el lote; el borrado individual tiene la misma protección. Las secciones vacías se conservan.
+- **Calendarios e Inicio:** colores deterministas por cliente, con leyenda y color neutral sin cliente. Estados visibles mediante iconos, etiquetas y tachado. Mi semana muestra únicamente la semana actual, horas semanales/mensuales y enlace a Tareas; el cronómetro persistente vive en el encabezado.
+- **Costos:** una hora sin tarifa o FX válido se conserva con costo pendiente. Los importes calculados parcialmente se identifican. Un error de reconstrucción no convierte una carga guardada en un fallo total; se informa sincronización pendiente. La conciliación ofrece vista previa por defecto, conserva snapshots válidos y sólo reconstruye origen app posterior al corte histórico en períodos abiertos; Excel y períodos cerrados/en revisión no se sobrescriben automáticamente.
+- **Identidad y métricas:** el nombre operativo del proyecto prevalece sobre cotización y subproyecto. Markup es nullable: internos muestran No aplica y comerciales sin datos muestran Sin datos. Las métricas no aplicables no afectan salud ni generan recomendaciones de renegociación; sin factores evaluables la salud es neutral.
+- **Freelancers:** solicitudes y saldos muestran Sin cupo — freelance. No se validan ni descuentan cupos en aprobación o edición, sin crear cupos ficticios. Se conservan aprobación, auditoría, superposiciones, timeline y advertencias de disponibilidad para responsables y colaboradores.

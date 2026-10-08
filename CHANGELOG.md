@@ -8,6 +8,7 @@
 - Horas personales: fuentes, límites y deduplicación compartidos. Costos pendientes/parciales visibles, snapshots históricos conservados y conciliación con vista previa; los fallos de reconstrucción informan sincronización pendiente sin duplicar una carga ya guardada.
 - Proyectos: identidad operativa prioritaria, markup nullable, No aplica para internos y salud neutral cuando faltan métricas evaluables.
 - Ausencias freelance sin validación ni descuento de cupos, conservando aprobación, auditoría y disponibilidad.
+- Definiciones de producto 2.33.0.
 - Migración aditiva 0081: motivos/fecha de bloqueo y estado de sincronización de costos. Conciliación restringida a origen app y períodos abiertos posteriores al corte histórico.
 
 ## 1.11.12 — 2026-10-06
