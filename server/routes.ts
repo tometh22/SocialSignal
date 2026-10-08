@@ -2,6 +2,7 @@ import { withProjectPeriodMetrics } from "./domain/metrics/project-period-overla
 import { markTaskCostSyncPending } from "./domain/task-cost-sync";
 import { civilDateInBuenosAires, currentBuenosAiresWeek } from "@shared/utils/buenos-aires-week";
 import { taskCostCoverage } from "./domain/task-cost-coverage";
+import { normalizeProjectTimeFilter } from "./domain/project-request-period";
 import { getPersonalHours, hoursCivilBoundary } from "./domain/personal-hours";
 import { reconcileHourSources, hoursCivilDate } from "@shared/utils/hours-reconciliation";
 import { deleteEmptyTaskTrees } from "./domain/task-delete";
@@ -1209,7 +1210,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`🎯 SoT MODE: Using period=${periodQuery} (YYYY-MM format)`);
       } else {
         // Fall back to legacy timeFilter
-        timeFilter = timeFilterQuery || 'this_month';
+        timeFilter = normalizeProjectTimeFilter(timeFilterQuery || 'this_month');
         console.log(`📅 LEGACY MODE: Using timeFilter=${timeFilter}`);
       }
       
@@ -1367,7 +1368,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.warn('⚠️ No se pudo adjuntar projectCategory/internalType:', (e as Error)?.message);
       }
 
-      const coverage = await taskCostCoverage(usingSoT ? periodQuery : new Date().toISOString().slice(0, 7));
+      // Use the aggregator's exact civil boundaries for both modern and legacy filters.
+      const coverage = await taskCostCoverage(aggregatorResponse.period);
       for (const project of aggregatorResponse.projects ?? []) {
         (project as any).costCoverage = coverage.get(project.projectId) ?? null;
         if (((project as any).costCoverage?.pendingHours || (project as any).costCoverage?.syncPending) || (project as any).projectCategory === "internal") { project.metrics.markupRatio = null; project.metrics.marginFrac = null; (project.metrics as any).markup = null; (project.metrics as any).margin = null; }

@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.12.3 — 2026-10-08
+
+- Costos pendientes: la Cartera y su API compatible consultan el mismo rango civil que los importes financieros, también con filtros antiguos de mes, trimestre y rangos personalizados. Evita mezclar pendientes del mes actual con otro período y anular su markup/margen por error.
+- Los filtros relativos de proyectos usan el mes de Buenos Aires; «mes anterior» también funciona desde un día 31 y al cambiar de año.
+
 ## 1.12.2 — 2026-10-08
 
 - Cartera: el análisis, los promedios y las recomendaciones excluyen markup no aplicable, ingresos ausentes y costos pendientes. Los internos y las métricas sin datos se muestran como neutrales, conservando sus costos en gráficos y filas.
