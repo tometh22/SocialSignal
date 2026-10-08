@@ -36,7 +36,7 @@ type HomeProject = {
 export default function HomeDashboard() {
   const { user } = useAuth();
   const { hasPermission } = usePermissions();
-  const canAccessTasks = hasPermission("projects");
+  const canAccessTasks = hasPermission("projects") || hasPermission("operations") || hasPermission("task_manager");
   const canCreateQuotation = hasPermission("quotations");
 
   const { data: projectCount } = useQuery<number>({
@@ -114,47 +114,14 @@ export default function HomeDashboard() {
   const { alerts, insights, summary } = computeAlerts(projectsForAlerts);
 
   // Personal data for "Mi semana"
-  const now = new Date();
-  const weekStart = startOfWeek(now, { weekStartsOn: 1 });
-  const weekEnd = endOfWeek(now, { weekStartsOn: 1 });
-  const monthStart = startOfMonth(now);
-  const monthEnd = endOfMonth(now);
-
-  const { data: myTasksData } = useQuery<{ tasks: any[]; personnelId: number | null }>({
-    queryKey: ["/api/tasks/my-tasks", "home"],
-    queryFn: async () => {
-      const response = await authFetch("/api/tasks/my-tasks");
-      if (!response.ok) throw new Error("No se pudieron cargar las tareas");
-      return response.json();
-    },
+  const { data: personalHours } = useQuery<{ personnelId: number | null; weekHours: number; monthHours: number }>({
+    queryKey: ["/api/tasks/my-hours"],
+    queryFn: () => authFetch("/api/tasks/my-hours").then(r => { if (!r.ok) throw new Error("No se pudieron consultar tus horas"); return r.json(); }),
     enabled: canAccessTasks,
   });
-
-  const myPersonnelId = myTasksData?.personnelId;
-
-  const weekParams = new URLSearchParams({
-    dateFrom: weekStart.toISOString(), dateTo: weekEnd.toISOString(),
-    ...(myPersonnelId ? { personnelId: String(myPersonnelId) } : {}),
-  });
-  const monthParams = new URLSearchParams({
-    dateFrom: monthStart.toISOString(), dateTo: monthEnd.toISOString(),
-    ...(myPersonnelId ? { personnelId: String(myPersonnelId) } : {}),
-  });
-
-  const { data: weekHours } = useQuery<{ byPerson: { hours: number }[] }>({
-    queryKey: ["/api/tasks/hours-summary", "week", myPersonnelId],
-    queryFn: () => authFetch(`/api/tasks/hours-summary?${weekParams}`).then(r => r.json()),
-    enabled: !!myPersonnelId,
-  });
-  const { data: monthHours } = useQuery<{ byPerson: { hours: number }[] }>({
-    queryKey: ["/api/tasks/hours-summary", "month", myPersonnelId],
-    queryFn: () => authFetch(`/api/tasks/hours-summary?${monthParams}`).then(r => r.json()),
-    enabled: !!myPersonnelId,
-  });
-
-  const myWeekHours = weekHours?.byPerson?.reduce((s, p) => s + p.hours, 0) ?? 0;
-  const myMonthHours = monthHours?.byPerson?.reduce((s, p) => s + p.hours, 0) ?? 0;
-
+  const myPersonnelId = personalHours?.personnelId;
+  const myWeekHours = personalHours?.weekHours ?? 0;
+  const myMonthHours = personalHours?.monthHours ?? 0;
   // Enriched tasks (with project/client names) for the member's active projects + calendar
   const { data: myCalendarTasks = [] } = useQuery<any[]>({
     queryKey: ["/api/tasks/team-calendar", "me", myPersonnelId],
@@ -166,52 +133,6 @@ export default function HomeDashboard() {
     },
     enabled: !!myPersonnelId,
   });
-
-  // Use the same membership-scoped project source as the Projects hub. The
-  // legacy Home implementation derived projects only from calendar tasks,
-  // hiding projects where the user was a member but had no dated task yet.
-  const { data: homeProjects = [] } = useQuery<HomeProject[]>({
-    queryKey: ["/api/tasks/projects", "home"],
-    queryFn: async () => {
-      const response = await authFetch("/api/tasks/projects?status=active&scope=mine");
-      if (!response.ok) throw new Error("No se pudieron cargar los proyectos");
-      return response.json();
-    },
-    enabled: canAccessTasks,
-  });
-
-  // Distinct active projects from the member's non-done tasks
-  const myActiveProjects = (() => {
-    const map = new Map<string, { name: string; clientName: string | null; pending: number }>();
-    for (const t of myCalendarTasks) {
-      if (t.status === "done" || t.parentTaskId) continue;
-      const name = t.projectName || "Sin proyecto";
-      const key = `${t.projectId}:${name}`;
-      const entry = map.get(key) || { name, clientName: t.clientName ?? null, pending: 0 };
-      entry.pending += 1;
-      map.set(key, entry);
-    }
-    return Array.from(map.values()).sort((a, b) => b.pending - a.pending);
-  })();
-
-  const myTasks = (myTasksData?.tasks || []).filter(t => !t.parentTaskId);
-  const taskGroups = {
-    in_progress: myTasks.filter(t => taskDateBucket(t) === "in_progress"),
-    upcoming: myTasks.filter(t => taskDateBucket(t) === "upcoming"),
-    overdue: myTasks.filter(t => taskDateBucket(t) === "overdue"),
-    no_date: myTasks.filter(t => taskDateBucket(t) === "no_date"),
-    done: myTasks.filter(t => taskCompletedThisWeek(t)),
-  };
-  const taskLabels = { in_progress: "En curso", upcoming: "Próximas", overdue: "Con retraso", no_date: "Sin fecha", done: "Finalizadas esta semana" };
-  const myActiveTasks = taskGroups.in_progress;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const [taskTab, setTaskTab] = useState<TaskDateBucket | "done">("in_progress");
-  const [showAllMyTasks, setShowAllMyTasks] = useState(false);
-  const [homeProjectView, setHomeProjectView] = useState<'folders' | 'list'>('folders');
-  const [collapsedHomeClients, setCollapsedHomeClients] = useState<Set<string>>(new Set());
-  const tabTasks = taskGroups[taskTab];
-  const displayedMyTasks = showAllMyTasks ? tabTasks : tabTasks.slice(0, 5);
 
   const greeting = () => {
     const hour = new Date().getHours();
@@ -423,8 +344,8 @@ export default function HomeDashboard() {
       )}
       {myPersonnelId && (
         <div className="space-y-3">
-          <SectionHeading icon={<ListTodo className="h-4 w-4" />} title="Mi semana" description="Horas, foco y entregas de tu agenda actual." />
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <SectionHeading icon={<ListTodo className="h-4 w-4" />} title="Mi semana" description="Horas y calendario de la semana actual." />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="bg-card rounded-xl border p-4 flex items-center gap-3">
               <div className="bg-primary/10 p-2.5 rounded-lg">
                 <Clock className="h-5 w-5 text-primary" />
@@ -443,113 +364,15 @@ export default function HomeDashboard() {
                 <p className="text-2xl font-semibold tabular-nums text-foreground">{myMonthHours.toFixed(1)}h</p>
               </div>
             </div>
-            <div className="bg-card rounded-xl border p-4 flex items-center gap-3">
-              <div className="bg-indigo-500/10 p-2.5 rounded-lg">
-                <CheckSquare className="h-5 w-5 text-indigo-500" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Tareas en curso</p>
-                <p className="text-2xl font-semibold tabular-nums text-foreground">{myActiveTasks.length}</p>
-              </div>
-            </div>
           </div>
-          {myTasks.length > 0 && (
-            <div className="bg-card rounded-xl border overflow-hidden">
-              <div className="px-4 py-3 border-b bg-muted/20 flex flex-wrap items-center justify-between gap-2">
-                <div className="flex flex-wrap items-center gap-1">
-                  {(Object.keys(taskLabels) as Array<TaskDateBucket | "done">).map(bucket => (
-                    <button key={bucket} onClick={() => { setTaskTab(bucket); setShowAllMyTasks(false); }}
-                      className={cn("rounded-md px-2.5 py-1 text-xs font-medium", taskTab === bucket ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
-                    >{taskLabels[bucket]} <span className="opacity-70">({taskGroups[bucket].length})</span></button>
-                  ))}
-                </div>
-                <Link href="/tasks">
-                  <span className="text-xs text-primary hover:underline cursor-pointer flex items-center gap-0.5">
-                    Ver todas <ChevronRight className="h-3 w-3" />
-                  </span>
-                </Link>
-              </div>
-              {displayedMyTasks.length === 0 ? (
-                <div className="px-4 py-6 text-center text-xs text-muted-foreground">
-                  No hay tareas en este grupo
-                </div>
-              ) : (
-                <div className="divide-y divide-border">
-                  {displayedMyTasks.map((t: any) => {
-                    const cfg = TASK_STATUS_CONFIG[t.status as TaskStatus];
-                    const isOverdue = t.dueDate && new Date(t.dueDate.slice(0, 10) + 'T00:00:00') < today && t.status !== 'done';
-                    return (
-                      <div key={t.id} className="px-4 py-2.5 flex items-center gap-3 hover:bg-accent/20 transition-colors">
-                        <span className={cn("w-2 h-2 rounded-full flex-shrink-0", cfg?.dot || "bg-gray-400")} />
-                        <span className="flex-1 text-sm text-foreground truncate">{t.title}</span>
-                        {t.estimatedHours > 0 && (
-                          <span className="text-xs text-muted-foreground flex-shrink-0">{t.estimatedHours}h est.</span>
-                        )}
-                        {(t.startDate || t.dueDate) && (
-                          <span className={cn("text-xs flex-shrink-0", isOverdue ? "text-red-600 font-medium" : "text-muted-foreground")}>
-                            {t.startDate ? format(new Date(t.startDate.slice(0, 10) + 'T12:00:00'), "d MMM", { locale: es }) : "Sin inicio"} → {t.dueDate ? format(new Date(t.dueDate.slice(0, 10) + 'T12:00:00'), "d MMM", { locale: es }) : "Sin fin"}
-                          </span>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-              {tabTasks.length > 5 && (
-                <div className="px-4 py-2 border-t bg-muted/10">
-                  <button
-                    className="text-xs text-primary hover:underline"
-                    onClick={() => setShowAllMyTasks(v => !v)}
-                  >
-                    {showAllMyTasks ? "Ver menos" : `+${tabTasks.length - 5} más`}
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Proyectos activos del miembro: carpetas Cliente → Proyecto o lista */}
-          {homeProjects.length > 0 && (
-            <div className="bg-card rounded-xl border overflow-hidden">
-              <div className="px-4 py-3 border-b bg-muted/20 flex flex-wrap items-center justify-between gap-2 gap-2">
-                <div className="flex items-center gap-2">
-                <Briefcase className="h-4 w-4 text-slate-500" />
-                <span className="text-sm font-medium text-foreground">Proyectos activos</span>
-                <span className="text-xs text-muted-foreground">({homeProjects.length})</span>
-                </div>
-                <div className="flex items-center gap-1 rounded-md border bg-background p-0.5">
-                  <button aria-label="Ver proyectos por carpetas" onClick={() => setHomeProjectView('folders')} className={cn("rounded p-1", homeProjectView === 'folders' ? "bg-primary/10 text-primary" : "text-muted-foreground")}><FolderOpen className="h-3.5 w-3.5" /></button>
-                  <button aria-label="Ver proyectos en lista" onClick={() => setHomeProjectView('list')} className={cn("rounded p-1", homeProjectView === 'list' ? "bg-primary/10 text-primary" : "text-muted-foreground")}><List className="h-3.5 w-3.5" /></button>
-                </div>
-              </div>
-              {homeProjectView === 'list' ? (
-                <div className="divide-y divide-border">{homeProjects.map((p) => (
-                  <Link key={p.id} href={`/tasks/projects/${p.id}`} className="flex items-center gap-3 px-4 py-2.5 hover:bg-accent/20 transition-colors">
-                    <span className="flex-1 truncate text-sm text-foreground">{p.clientName ? <span className="text-muted-foreground">{p.clientName} · </span> : null}{p.name}</span>
-                    <span className="flex-shrink-0 text-xs text-muted-foreground">{p.pendingCount} pendiente{p.pendingCount !== 1 ? "s" : ""}</span>
-                  </Link>
-                ))}</div>
-              ) : (
-                <div className="divide-y divide-border">{Object.entries(homeProjects.reduce<Record<string, HomeProject[]>>((groups, project) => { const client = project.clientName || "Epical"; (groups[client] ??= []).push(project); return groups; }, {})).sort(([a], [b]) => a.localeCompare(b, 'es')).map(([client, projects]) => {
-                  const collapsed = collapsedHomeClients.has(client);
-                  return <div key={client}>
-                    <button className="flex w-full items-center gap-2 px-4 py-2 text-left text-xs font-semibold text-muted-foreground hover:bg-accent/20" onClick={() => setCollapsedHomeClients((current) => { const next = new Set(current); if (next.has(client)) next.delete(client); else next.add(client); return next; })}>
-                      <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", collapsed && "-rotate-90")} /> <span className="flex-1">{client}</span><span>{projects.length}</span>
-                    </button>
-                    {!collapsed && projects.map((p) => <Link key={p.id} href={`/tasks/projects/${p.id}`} className="flex items-center gap-3 border-t px-7 py-2.5 hover:bg-accent/20"><span className="flex-1 truncate text-sm">{p.name}</span><span className="text-xs text-muted-foreground">{p.pendingCount} pendiente{p.pendingCount !== 1 ? "s" : ""}</span></Link>)}
-                  </div>;
-                })}</div>
-              )}
-            </div>
-          )}
-
           {/* Calendario de mis tareas */}
           <div className="bg-card rounded-xl border p-4">
             <div className="flex items-center gap-2 mb-3">
               <Calendar className="h-4 w-4 text-indigo-500" />
               <span className="text-sm font-medium text-foreground">Mi calendario</span>
+              <Link href="/tasks" className="ml-auto text-xs text-primary hover:underline">Ir a Tareas</Link>
             </div>
-            <TaskCalendarView tasks={myCalendarTasks} />
+            <TaskCalendarView tasks={myCalendarTasks} view="current-week" showUndated={false} />
           </div>
         </div>
       )}

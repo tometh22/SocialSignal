@@ -115,9 +115,10 @@ describe("Feedback Mind V2-9 product definitions contract", () => {
     }
   });
 
-  it("leaves only the explicitly deferred task-classification decision", () => {
+  it("resolves the previously deferred task-classification decision with Feedback 6-10", () => {
     const deferredRows = Array.from(productDefinitionsMarkdown.matchAll(/^\| ([A-Z]+-\d{2}) \| Diferido \|/gm), match => match[1]);
-    expect(deferredRows).toEqual(["TAR-16"]);
+    expect(deferredRows).toEqual([]);
+    expect(productDefinitionsMarkdown).toMatch(/TAR-16 \| Implementado \|.*grupos por fechas.*finalización manual/);
   });
 
   it("maps every Feedback 14-8 follow-up without silently implementing new product proposals", () => {

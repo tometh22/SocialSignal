@@ -6,28 +6,29 @@
 // ─── Score computation (exported for use in hero) ─────────────────────────────
 
 export interface HealthInput {
-  markup: number;
+  markup: number | null;
   budgetUtilization: number; // 0-100, 0 if no budget set
   hoursDeviation: number;    // % over estimate, 0 if no estimate
   hasBudget: boolean;
   hasHoursEstimate: boolean;
 }
 
-export function computeHealthScore(h: HealthInput): number {
+export function computeHealthScore(h: HealthInput): number | null {
   const { markup, budgetUtilization, hoursDeviation, hasBudget, hasHoursEstimate } = h;
 
-  // Dynamic weights based on available data
-  const wMarkup  = hasBudget && hasHoursEstimate ? 40 : hasBudget || hasHoursEstimate ? 55 : 100;
-  const wBudget  = hasBudget ? (hasHoursEstimate ? 35 : 45) : 0;
-  const wHours   = hasHoursEstimate ? (hasBudget ? 25 : 45) : 0;
-
+  const hasMarkup = markup != null && Number.isFinite(markup);
+  const totalWeight = (hasMarkup ? 40 : 0) + (hasBudget ? 35 : 0) + (hasHoursEstimate ? 25 : 0);
+  if (!totalWeight) return null;
+  const wMarkup = hasMarkup ? 40 * 100 / totalWeight : 0;
+  const wBudget = hasBudget ? 35 * 100 / totalWeight : 0;
+  const wHours = hasHoursEstimate ? 25 * 100 / totalWeight : 0;
   // Markup score
   let markupScore = 0;
-  if      (markup >= 3.5) markupScore = wMarkup;
-  else if (markup >= 3.0) markupScore = wMarkup * 0.92;
-  else if (markup >= 2.5) markupScore = wMarkup * 0.80;
-  else if (markup >= 2.0) markupScore = wMarkup * 0.52;
-  else if (markup >= 1.5) markupScore = wMarkup * 0.25;
+  if      (markup != null && markup >= 3.5) markupScore = wMarkup;
+  else if (markup != null && markup >= 3.0) markupScore = wMarkup * 0.92;
+  else if (markup != null && markup >= 2.5) markupScore = wMarkup * 0.80;
+  else if (markup != null && markup >= 2.0) markupScore = wMarkup * 0.52;
+  else if (markup != null && markup >= 1.5) markupScore = wMarkup * 0.25;
   else                    markupScore = 0;
 
   // Budget score

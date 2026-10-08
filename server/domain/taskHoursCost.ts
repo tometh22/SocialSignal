@@ -1,5 +1,6 @@
+import { hoursCivilDate } from "@shared/utils/hours-reconciliation";
 import { db } from "../db";
-import { tasks, taskTimeEntries, taskWeeklyEstimates, personnel, exchangeRates } from "@shared/schema";
+import { tasks, taskTimeEntries, taskWeeklyEstimates, personnel, exchangeRates, systemConfig } from "@shared/schema";
 import { eq, and, gte, lte, inArray, sql } from "drizzle-orm";
 import { resolveCanonicalPersonnelRate } from "./personnel-rate";
 
@@ -68,8 +69,7 @@ export async function getTaskHoursCost(options: {
 
   const yearMonthSet = new Set<string>();
   filteredEntries.forEach(e => {
-    const d = new Date(e.date);
-    yearMonthSet.add(`${d.getFullYear()}-${d.getMonth() + 1}`);
+    yearMonthSet.add(hoursCivilDate(e.date).slice(0, 7));
   });
 
   const fxMap: Record<string, number> = {};
@@ -101,6 +101,9 @@ export async function getTaskHoursCost(options: {
     referencedExchangeRates.map((rate) => [rate.id, Number(rate.rate)]),
   );
 
+  const [configuredFx] = await db.select({ value: systemConfig.configValue }).from(systemConfig).where(eq(systemConfig.configKey, "usd_exchange_rate"));
+  const globalFx = configuredFx?.value && configuredFx.value > 0 ? configuredFx.value : null;
+
   const projectMap: Record<number, { byPerson: Record<number, PersonHoursCost>; totalHours: number; totalCostUSD: number }> = {};
 
   for (const entry of filteredEntries) {
@@ -108,12 +111,10 @@ export async function getTaskHoursCost(options: {
     if (pid === null || pid === undefined) continue;
     const person = entry.personnelId ? personnelMap[entry.personnelId] : null;
     const d = new Date(entry.date);
-    const year = d.getFullYear();
-    const month = d.getMonth() + 1;
-    const fxKey = `${year}-${month}`;
+    const fxKey = hoursCivilDate(d).slice(0, 7);
     const fx = (entry.exchangeRateId ? fxById.get(entry.exchangeRateId) : null)
       ?? fxMap[fxKey]
-      ?? null;
+      ?? globalFx;
 
     let costUSD = 0;
     let rateLabel = "sin tarifa";

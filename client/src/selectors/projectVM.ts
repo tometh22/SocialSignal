@@ -31,7 +31,7 @@ type ProjectStateLegacy = {
     costDisplay?: number;
     revenueDisplay?: number;
     currencyNative?: Currency;
-    markup?: number;
+    markup?: number | null;
     margin?: number;
     flags?: string[];
   };
@@ -51,7 +51,7 @@ type ProjectStateLegacy = {
   metrics?: {
     budgetUtilization?: number;
     efficiency?: number;
-    markup?: number;
+    markup?: number | null;
     margin?: number;
   };
   fx?: {
@@ -90,7 +90,7 @@ export function toProjectVM(state: ProjectState, viewOverride?: ViewType) {
       currencyNative: state.currencyNative || 'USD',
       costDisplay: state.costDisplay || 0,
       revenueDisplay: state.revenueDisplay || 0,
-      markup: state.markup || 0,
+      markup: state.markup ?? null,
       margin: state.margin || 0,
       budgetUtilization: state.budgetUtilization || 0,
       cotizacion: state.cotizacion || null,
@@ -122,7 +122,7 @@ export function toProjectVM(state: ProjectState, viewOverride?: ViewType) {
     legacyState.quotation?.totalAmount ?? 0;
 
   // Usar markup/margin del summary si está disponible, sino del metrics
-  const markup = legacyState.summary?.markup ?? legacyState.metrics?.markup ?? 0;
+  const markup = legacyState.summary?.markup ?? legacyState.metrics?.markup ?? null;
   const margin = legacyState.summary?.margin ?? legacyState.metrics?.margin ?? 0;
 
   const totalAsanaHours = legacyState.actuals?.totalAsanaHours ?? legacyState.actuals?.totalWorkedHours ?? 0;

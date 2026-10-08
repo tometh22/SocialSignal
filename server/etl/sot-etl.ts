@@ -173,11 +173,11 @@ export function clearProjectCache(): void {
 /**
  * Asegura que un período exista en dim_period
  */
-export async function ensurePeriod(periodKey: string): Promise<void> {
+export async function ensurePeriod(periodKey: string, runner: Pick<typeof db, "insert"> = db): Promise<void> {
   const [year, month] = periodKey.split('-').map(Number);
   const firstDay = new Date(year, month - 1, 1);
   
-  await db.insert(dimPeriod)
+  await runner.insert(dimPeriod)
     .values({
       periodKey,
       year,

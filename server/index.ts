@@ -55,6 +55,7 @@ import { userNotificationCategoryPreferencesMigrationSql } from "./migrations/us
 import { userNotificationPushSubscriptionsMigrationSql } from "./migrations/user-notification-push-subscriptions";
 import { asanaMigrationProvenanceSql } from "./migrations/asana-migration-provenance";
 import { projectTaskSectionsMigrationSql } from "./migrations/project-task-sections";
+import { taskBlockDetailsMigrationSql } from "./migrations/task-block-details";
 import { taskRecurrenceMigrationSql } from "./migrations/task-recurrence";
 import { optionalActiveProjectStartDateMigrationSql } from "./migrations/optional-active-project-start-date";
 import { ensureServiceBlueprintSeeds } from "./services/service-blueprints";
@@ -889,6 +890,7 @@ async function applyPendingMigrations() {
     await run('0069 feedback closure', feedbackClosure0069MigrationSql);
     await run('0070 optional active project start date', optionalActiveProjectStartDateMigrationSql);
     await run('0071 task recurrence', taskRecurrenceMigrationSql);
+    await run('0081 task block details', taskBlockDetailsMigrationSql);
     await run('0072 persistent project task sections', projectTaskSectionsMigrationSql);
     await run('0073 task milestones', taskMilestonesMigrationSql);
     await run('0074 Asana migration provenance', asanaMigrationProvenanceSql);

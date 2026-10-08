@@ -183,9 +183,10 @@ describe("Feedback Mind V2.7 — atribución, costos y capacidad", () => {
     expect(canonicalSync).toContain("deriveMonthlySalariesFromHourlyRates");
     expect(factBuilder).toContain("staleFactIds");
     expect(factBuilder).toContain(".delete(factLaborMonth)");
-    expect(routes).toContain("triggerLaborRebuildForDates([existingEntry.date, updatedEntry.date])");
+    expect(routes).toContain("syncSavedTaskHours(existingEntry.date, undefined, existingEntry.projectId)");
     expect(routes).toContain("Solo podés modificar tus propios registros de horas");
-    expect(routes).toContain("WITH RECURSIVE task_tree");
+    expect(source("server/domain/task-delete.ts")).toContain("WITH RECURSIVE tree");
+    expect(source("server/domain/task-delete.ts")).toContain("historial importado");
     expect(migration).toContain("contractual_usd_rate_repaired");
     expect(migration).toContain("member.rate / mixed.fx");
   });
@@ -208,7 +209,8 @@ describe("Feedback Mind V2.7 — atribución, costos y capacidad", () => {
 
     expect(routes).toContain("async function triggerLaborRebuild");
     expect(routes).toContain("await buildFactLaborFromTimeEntries(periodKey)");
-    expect(routes).toContain("await triggerLaborRebuild(data.date)");
+    expect(routes).toContain("await syncSavedTaskHours(data.date, created.id)");
+    expect(routes).toContain("Las horas se guardaron; la sincronización de costos quedó pendiente");
   });
 
   test("feriados y ausencias no descuentan dos veces la capacidad", () => {

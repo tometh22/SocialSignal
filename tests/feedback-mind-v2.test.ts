@@ -185,7 +185,7 @@ describe("structured API errors", () => {
   });
 });
 
-test("task status has one list editor while board status changes only through drag and drop", () => {
+test("task views derive status from dates and expose explicit blocking", () => {
   const source = readFileSync(
     new URL("../client/src/components/tasks/ProjectTaskList.tsx", import.meta.url),
     "utf8",
@@ -200,11 +200,12 @@ test("task status has one list editor while board status changes only through dr
   );
 
   expect(taskRow).toContain("<PopoverTrigger asChild>");
-  expect(taskRow).toContain("onStatusChange?.(task.id, s)");
+  expect(taskRow).toContain("<TaskWorkflowControl");
   expect(boardCard).toContain("useDraggable");
   expect(boardCard).not.toContain("onStatusChange");
   expect(boardCard).not.toContain(">Estado</DropdownMenuLabel>");
-  expect(source).toContain("handleBoardStatusChange(taskId, toStatus)");
+  expect(source).toContain("taskWorkflowBucket(t) === col.status");
+  expect(source).toContain('toStatus !== "blocked"');
 });
 
 test("task hours remain loadable when historical costing is unavailable", () => {
@@ -218,9 +219,9 @@ test("task hours remain loadable when historical costing is unavailable", () => 
   );
 
   expect(endpoint).toContain("let costingWarning");
-  expect(endpoint).toContain("res.json({ ...created, costingWarning })");
+  expect(endpoint).toContain("res.json({ ...created, costingWarning, costSyncPending:");
   expect(endpoint).not.toContain("return res.status(422)");
-  expect(endpoint).toContain("parseCivilDate(rawDate)");
+  expect(endpoint).toContain("hoursCivilBoundary(rawDate)");
 });
 
 test("task detail does not depend on optional estimate columns", () => {
@@ -434,11 +435,13 @@ test("home hours include task and legacy time entries", () => {
     routes.indexOf('// GET /api/tasks/:id — obtener tarea individual'),
   );
   expect(myHours).toContain("FROM task_time_entries");
-  expect(myHours).toContain("FROM time_entries");
-  expect(myHours).toContain("UNION ALL");
+  expect(myHours).toContain("getPersonalHours(person.id)");
+  const personal = readFileSync(new URL("../server/domain/personal-hours.ts", import.meta.url), "utf8");
+  expect(personal).toContain(".from(timeEntries)");
+  expect(personal).toContain("reconcileHourSources(taskRows, legacyRows)");
 });
 
-test("creator-owned unassigned tasks stay visible in personal surfaces", () => {
+test("personal surfaces include assigned work and exclude creator-only tasks", () => {
   const routes = readFileSync(new URL("../server/routes.ts", import.meta.url), "utf8");
   const myTasks = routes.slice(
     routes.indexOf('app.get("/api/tasks/my-tasks"'),
@@ -449,17 +452,18 @@ test("creator-owned unassigned tasks stay visible in personal surfaces", () => {
     routes.indexOf('// GET /api/tasks/project/:projectId'),
   );
   for (const endpoint of [myTasks, calendar]) {
-    expect(endpoint).toContain("tasks.createdBy");
-    expect(endpoint).toContain("isNull(tasks.assigneeId)");
-    expect(endpoint).toContain("jsonb_array_length");
+    expect(endpoint).not.toContain("tasks.createdBy");
+    expect(endpoint).toContain("tasks.assigneeId");
+    expect(endpoint).toContain("tasks.collaboratorIds");
   }
 });
 
-test("Home uses the membership-scoped project hierarchy and exposes link problems", () => {
+test("Home shows current week and exposes personnel link problems", () => {
   const home = readFileSync(new URL("../client/src/pages/home-dashboard.tsx", import.meta.url), "utf8");
   const auth = readFileSync(new URL("../server/auth.ts", import.meta.url), "utf8");
   expect(home).toContain("/api/tasks/projects?status=active&scope=mine");
-  expect(home).toContain("homeProjectView");
+  expect(home).not.toContain("homeProjectView");
+  expect(home).toContain('view="current-week" showUndated={false}');
   expect(home).toContain("personnelLinked === false");
   expect(auth).toContain("personnelLinked: Boolean(linkedPersonnel)");
   expect(auth).toContain("trim().toLowerCase()");

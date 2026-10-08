@@ -1,3 +1,6 @@
+import TaskRangeCalendar from "@/components/tasks/TaskRangeCalendar";
+import TaskWorkflowControl from "@/components/tasks/TaskWorkflowControl";
+import { civilDateInBuenosAires } from "@shared/utils/buenos-aires-week";
 import { useState, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
@@ -10,7 +13,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { FolderOpen, Clock, ChevronRight, ChevronDown, CalendarIcon, Check, ListTodo, List, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { taskDateBucket as taskBucket, taskCompletedThisWeek as completedThisWeek } from "@shared/utils/task-date-bucket";
+import { taskPersonalBucket as taskBucket } from "@shared/utils/task-workflow";
 import { useAuth } from "@/hooks/use-auth";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -175,7 +178,7 @@ function DateButton({
         </button>
       </PopoverTrigger>
       <PopoverContent className="w-auto p-0 shadow-lg" onClick={e => e.stopPropagation()}>
-        <Calendar
+        <TaskRangeCalendar
           mode="range"
           selected={{ from: start, to: due }}
           onSelect={range => {
@@ -205,7 +208,7 @@ function DateButton({
 /** Envuelve el título en un enlace al proyecto cuando la tarea tiene uno.
  *  Sin proyecto asociado degrada a texto plano en vez de a un enlace muerto. */
 function TaskRowTarget({ projectId, title, children }: { projectId?: number | null; title: string; children: React.ReactNode }) {
-  const className = "flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden";
+  const className = "flex min-w-0 flex-1 flex-col items-start gap-0.5 overflow-hidden sm:flex-row sm:items-center sm:gap-1.5";
   if (!projectId) return <div className={className}>{children}</div>;
   return (
     <Link
@@ -223,14 +226,12 @@ function HomeTaskRow({
   task,
   onToggle,
   onDateSet,
-  onStatusChange,
   toggling,
   hidingId,
 }: {
   task: Task;
   onToggle: (task: Task) => void;
   onDateSet: (taskId: number, range: DateRange | undefined) => void;
-  onStatusChange: (taskId: number, status: "todo" | "in_progress" | "blocked") => void;
   toggling: boolean;
   hidingId: number | null;
 }) {
@@ -262,28 +263,13 @@ function HomeTaskRow({
           {task.title}
         </span>
         {task.projectName && (
-          <span className="hidden max-w-40 flex-shrink-0 truncate rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground sm:inline">
-            {task.projectName}
+          <span className="max-w-full sm:max-w-64 flex-shrink-0 truncate rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground sm:inline">
+            {[task.clientName, task.projectName].filter(Boolean).join(" · ")}
           </span>
         )}
       </TaskRowTarget>
 
-      <select
-        aria-label={`Cambiar estado de ${task.title}`}
-        value={task.status === "in_review" ? "in_progress" : task.status}
-        onChange={(event) => {
-          event.stopPropagation();
-          onStatusChange(task.id, event.target.value as "todo" | "in_progress" | "blocked");
-        }}
-        onClick={(event) => event.stopPropagation()}
-        disabled={isDone}
-        className="h-7 max-w-28 rounded-md border border-input bg-background px-1.5 text-[11px] text-muted-foreground outline-none hover:bg-accent focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-      >
-        <option value="todo">Próxima</option>
-        <option value="in_progress">En curso</option>
-        <option value="blocked">Bloqueada</option>
-        {isDone && <option value="done">Finalizada</option>}
-      </select>
+      <TaskWorkflowControl task={task} />
 
       <DateButton
         startDate={task.startDate}
@@ -404,12 +390,6 @@ export default function TasksHomePage() {
     onSuccess: () => { refetchMyTasks(); invalidateRelated(); },
   });
 
-  const statusMutation = useMutation({
-    mutationFn: ({ taskId, status }: { taskId: number; status: "todo" | "in_progress" | "blocked" }) =>
-      apiRequest(`/api/tasks/${taskId}`, "PUT", { status }),
-    onSuccess: () => { refetchMyTasks(); invalidateRelated(); },
-  });
-
   const handleToggle = useCallback((task: Task) => {
     if (task.status !== "done") {
       setHidingTaskId(task.id);
@@ -421,10 +401,6 @@ export default function TasksHomePage() {
     dateMutation.mutate({ taskId, range });
   }, [dateMutation]);
 
-  const handleStatusChange = useCallback((taskId: number, status: "todo" | "in_progress" | "blocked") => {
-    statusMutation.mutate({ taskId, status });
-  }, [statusMutation]);
-
   const raw = myTasksResponse as any;
   const myTasks: Task[] = Array.isArray(raw) ? raw : Array.isArray(raw?.tasks) ? raw.tasks : [];
   const projects: TaskProject[] = Array.isArray(rawProjects) ? rawProjects : [];
@@ -434,11 +410,10 @@ export default function TasksHomePage() {
     in_progress: myTasks.filter(t => taskBucket(t) === "in_progress").length,
     overdue: myTasks.filter(t => taskBucket(t) === "overdue").length,
     no_date: myTasks.filter(t => taskBucket(t) === "no_date").length,
-    done: myTasks.filter(task => completedThisWeek(task)).length,
+    done: myTasks.filter(task => taskBucket(task) === "done").length,
   };
 
   const filteredMyTasks = myTasks.filter(t => {
-    if (myTab === "done") return completedThisWeek(t);
     return taskBucket(t) === myTab;
   });
 
@@ -609,7 +584,7 @@ export default function TasksHomePage() {
                     task={task}
                     onToggle={handleToggle}
                     onDateSet={handleDateSet}
-                    onStatusChange={handleStatusChange}
+
                     toggling={toggleMutation.isPending && hidingTaskId === task.id}
                     hidingId={hidingTaskId}
                   />

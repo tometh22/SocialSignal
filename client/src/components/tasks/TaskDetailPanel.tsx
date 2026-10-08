@@ -1,3 +1,8 @@
+import { taskDateBucket } from "@shared/utils/task-date-bucket";
+import { invalidateTaskQueries } from "@/lib/task-cache";
+import TaskRangeCalendar from "@/components/tasks/TaskRangeCalendar";
+import TaskWorkflowControl from "@/components/tasks/TaskWorkflowControl";
+import { civilDateInBuenosAires } from "@shared/utils/buenos-aires-week";
 import AsanaSourceHours from "./AsanaSourceHours";
 import { recurrenceLabel, type TaskRecurrence } from "@shared/utils/task-recurrence";
 import { useState, useEffect, useRef } from "react";
@@ -52,6 +57,7 @@ type Task = {
   estimatedHoursForWeek?: number;
   loggedHours?: number;
   status: string;
+  blockedReason?: string | null;
   priority: string;
   parentTaskId?: number | null;
   completedAt?: string | null;
@@ -285,7 +291,7 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
   const [showAddSubtask, setShowAddSubtask] = useState(false);
   const [subtaskTitle, setSubtaskTitle] = useState("");
   const [logHours, setLogHours] = useState("");
-  const [logDate, setLogDate] = useState(new Date().toISOString().slice(0, 10));
+  const [logDate, setLogDate] = useState(civilDateInBuenosAires(new Date()));
   const [logDesc, setLogDesc] = useState("");
   const [logPersonnelId, setLogPersonnelId] = useState("");
   const [editingTimeEntryId, setEditingTimeEntryId] = useState<number | null>(null);
@@ -298,7 +304,7 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
   const [renamingSubtaskId, setRenamingSubtaskId] = useState<number | null>(null);
   const [subtaskNameValue, setSubtaskNameValue] = useState("");
   const [subLogHours, setSubLogHours] = useState("");
-  const [subLogDate, setSubLogDate] = useState(new Date().toISOString().slice(0, 10));
+  const [subLogDate, setSubLogDate] = useState(civilDateInBuenosAires(new Date()));
   const [subLogDesc, setSubLogDesc] = useState("");
   const [showAddEstimate, setShowAddEstimate] = useState(false);
   const [newEstWeek, setNewEstWeek] = useState(() => getMondayOf(new Date()));
@@ -460,6 +466,7 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
     mutationFn: (data: any) => apiRequest("/api/tasks", "POST", data),
     onSuccess: () => {
       refetchTask();
+      void invalidateTaskQueries();
       onUpdate?.();
       setSubtaskTitle("");
       setShowAddSubtask(false);
@@ -470,6 +477,7 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
     mutationFn: (data: any) => apiRequest(`/api/tasks/${taskId}/time`, "POST", data),
     onSuccess: (created: any) => {
       refetchTask();
+      void invalidateTaskQueries();
       onUpdate?.();
       queryClient.invalidateQueries({ queryKey: ["/api/tasks/hours-summary"] });
       queryClient.invalidateQueries({ queryKey: ["/api/tasks/my-hours"] });
@@ -481,9 +489,7 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
       setLogHours(""); setLogDesc(""); setShowTimeLog(false);
       toast({
         title: "Horas registradas",
-        description: created?.costingWarning
-          ? `${created.costingWarning} Podés completar la tarifa histórica desde Configuración > Personal.`
-          : undefined,
+        description: created?.costingWarning || created?.warning,
       });
     },
     onError: (error) => {
@@ -498,8 +504,9 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
   const logSubtaskTimeMutation = useMutation({
     mutationFn: ({ subtaskId, data }: { subtaskId: number; data: any }) =>
       apiRequest(`/api/tasks/${subtaskId}/time`, "POST", data),
-    onSuccess: () => {
+    onSuccess: (created: any) => {
       refetchTask();
+      void invalidateTaskQueries();
       onUpdate?.();
       if (task?.projectId) {
         queryClient.invalidateQueries({ queryKey: ["/api/tasks/project", task.projectId] });
@@ -510,7 +517,7 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
       queryClient.invalidateQueries({ queryKey: ["/api/monthly-closings/real-hours"] });
       setSubtaskTimePanelId(null);
       setSubLogHours(""); setSubLogDesc("");
-      toast({ title: "Horas registradas en subtarea" });
+      toast({ title: "Horas registradas en subtarea", description: created?.costingWarning || created?.warning });
     },
     onError: (error) => {
       toast({
@@ -561,7 +568,9 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
 
   const deleteTimeMutation = useMutation({
     mutationFn: (entryId: number) => apiRequest(`/api/tasks/${taskId}/time/${entryId}`, "DELETE"),
-    onSuccess: () => {
+    onSuccess: (result: any) => {
+      void invalidateTaskQueries();
+      if (result?.costingWarning || result?.warning) toast({ title: "Carga eliminada", description: result.costingWarning || result.warning });
       refetchTask();
       if (task?.projectId) {
         queryClient.invalidateQueries({ queryKey: ["/api/tasks/project", task.projectId] });
@@ -573,15 +582,16 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
   const editTimeMutation = useMutation({
     mutationFn: ({ entryId, data }: { entryId: number; data: { hours: number; date: string; description: string | null } }) =>
       apiRequest(`/api/tasks/${taskId}/time/${entryId}`, "PATCH", data),
-    onSuccess: () => {
+    onSuccess: (updated: any) => {
       refetchTask();
+      void invalidateTaskQueries();
       onUpdate?.();
       queryClient.invalidateQueries({ queryKey: ["/api/tasks/hours-summary"] });
       queryClient.invalidateQueries({ queryKey: ["/api/tasks/my-hours"] });
       queryClient.invalidateQueries({ queryKey: ["/api/monthly-closings/real-hours"] });
       if (task?.projectId) queryClient.invalidateQueries({ queryKey: ["projects", task.projectId, "complete-data"] });
       setEditingTimeEntryId(null);
-      toast({ title: "Carga de tiempo actualizada" });
+      toast({ title: "Carga de tiempo actualizada", description: updated?.costingWarning || updated?.warning });
     },
     onError: (error) => toast({
       title: "No se pudo editar la carga",
@@ -594,6 +604,7 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
     mutationFn: () => apiRequest(`/api/tasks/${taskId}`, "DELETE"),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
+      void invalidateTaskQueries();
       onUpdate?.(); onClose();
       toast({ title: "Tarea eliminada" });
     },
@@ -742,10 +753,7 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
                   {/* El estado se edita desde el control izquierdo de la lista. */}
                   <div className="flex items-center gap-1.5 mt-3 flex-wrap">
                     <span className="text-[10px] text-muted-foreground uppercase tracking-wide mr-1">Estado</span>
-                    {(() => {
-                      const status = STATUS_OPTIONS.find((option) => option.value === task.status) ?? STATUS_OPTIONS[0];
-                      return <span className={cn("px-2.5 py-0.5 rounded-full text-xs font-medium", status.active)}>{status.label}</span>;
-                    })()}
+                    <TaskWorkflowControl task={task} onUpdate={onUpdate} />
                   </div>
                   {task.updatedAt && (
                     <p className="text-[10px] text-muted-foreground mt-1">
@@ -814,7 +822,7 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
                             className={cn(
                               "h-7 text-xs justify-start font-normal border-dashed",
                               "min-w-[150px]",
-                              task.dueDate && parseCivilTaskDate(task.dueDate)! < new Date() && task.status !== "done"
+                              taskDateBucket(task) === "overdue"
                                 ? "border-red-300 text-red-600"
                                 : ""
                             )}
@@ -826,7 +834,7 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
                           </Button>
                         </PopoverTrigger>
                         <PopoverContent className="w-auto p-0" side="bottom" align="start">
-                          <Calendar
+                          <TaskRangeCalendar
                             mode="range"
                             selected={{
                               from: parseCivilTaskDate(task.startDate),
@@ -1003,7 +1011,7 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
                                 e.stopPropagation();
                                 setSubtaskTimePanelId(subtaskTimePanelId === sub.id ? null : sub.id);
                                 setSubLogHours(""); setSubLogDesc("");
-                                setSubLogDate(new Date().toISOString().slice(0, 10));
+                                setSubLogDate(civilDateInBuenosAires(new Date()));
                               }}
                             >
                               <Clock className="h-3 w-3" />
@@ -1269,7 +1277,7 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
                         <div key={entry.id} className="group flex items-center gap-2 px-3 py-2 text-xs hover:bg-accent/20">
                           <Clock className="h-3 w-3 flex-shrink-0 text-muted-foreground" />
                           <span className="w-10 flex-shrink-0 font-semibold text-primary">{formatHours(entry.hours)}</span>
-                          <span className="flex-shrink-0 text-muted-foreground">{format(new Date(entry.date), "dd/MM/yy")}</span>
+                          <span className="flex-shrink-0 text-muted-foreground">{format(parseCivilTaskDate(entry.date)!, "dd/MM/yy")}</span>
                           <span className="min-w-0 flex-1 truncate text-muted-foreground">
                             {entry.personnelName ? `${entry.personnelName}${entry.description ? ` · ${entry.description}` : ""}` : entry.description ? `— ${entry.description}` : ""}
                           </span>

@@ -30,4 +30,5 @@ export const PRODUCT_DEFINITIONS_RELEASES = {
   "2.30.0": "ad3d585ff9a21cc8512bc2a22f9afbdfa9cb19b92836c0c0d06e8d192ddb1a16",
   "2.31.0": "7279e08e96bcd98aecace23553779772ea07b7487e9278c710e0881df16921b3",
   "2.32.0": "8721be8961842bbd310aacf652d04c581d4ea06c1c1bdc7c0c2eb95b0b4d2358",
+  "2.33.0": "1ed8eb8beaee03a2ac4f2ffed0fdc9d16865f3be82c5a3e1f07d3944382dab43",
 } as const;

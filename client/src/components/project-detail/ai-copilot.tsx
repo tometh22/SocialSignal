@@ -10,7 +10,7 @@ import { Zap, TrendingUp, TrendingDown, AlertTriangle, CheckCircle, ChevronDown,
 export interface AICopilotProps {
   revenue: number;
   cost: number;
-  markup: number;
+  markup: number | null;
   margin: number;
   budget: number;
   budgetUtilization: number;
@@ -31,7 +31,7 @@ export interface AICopilotProps {
   previousPeriod?: {
     hasData: boolean;
     metrics?: {
-      markup: number;
+      markup: number | null;
       margin: number;
       revenueUSD: number;
       teamCostUSD: number;
@@ -81,11 +81,12 @@ function pct(n: number, sign = true) {
 function useProjectIntelligence(props: AICopilotProps) {
   return useMemo(() => {
     const {
-      revenue, cost, markup, margin, budget, budgetUtilization,
+      revenue, cost, markup: availableMarkup, margin, budget, budgetUtilization,
       totalHours, estimatedHours, hoursDeviation, costDeviation,
       teamBreakdown, previousPeriod,
     } = props;
 
+    const markup = availableMarkup ?? 0;
     const signals: Signal[] = [];
     const recommendations: Recommendation[] = [];
     let recRank = 1;
@@ -97,7 +98,7 @@ function useProjectIntelligence(props: AICopilotProps) {
     const hoursPlanReached = estimatedHours > 0 && totalHours >= estimatedHours;
     const marginDataMature = budgetAtRisk || hoursPlanReached || estimatedHours <= 0;
 
-    if (cost > 0) {
+    if (cost > 0 && revenue > 0 && availableMarkup != null) {
       const gapTo25x = cost * 2.5 - revenue;
       const costCutNeeded = cost > 0 ? ((cost - revenue / 2.5) / cost) * 100 : 0;
       if (markup < 2.0 && marginDataMature) {
@@ -140,8 +141,8 @@ function useProjectIntelligence(props: AICopilotProps) {
       if (overruners.length > 0) {
         const top = overruners[0];
         const newMarkup = (cost - top.excessCost) > 0 ? revenue / (cost - top.excessCost) : 0;
-        signals.push({ level: top.excessPct > 30 ? "warning" : "info", headline: `${top.name}: +${top.excess.toFixed(0)}h sobre estimación (${pct(top.excessPct)})`, detail: `Lleva ${top.actual.toFixed(0)}h vs ${top.target.toFixed(0)}h planeadas. El exceso equivale a ${usd(top.excessCost)} de costo adicional.${newMarkup > 0 && newMarkup > markup ? ` Si vuelve a target, el markup subiría de ${markup.toFixed(1)}x a ${newMarkup.toFixed(1)}x.` : ""}` });
-        if (top.excessCost > 500) recommendations.push({ rank: recRank++, impact: top.excessPct > 30 ? "high" : "medium", text: `Revisar carga de ${top.name}: ${top.excess.toFixed(0)}h de exceso = ${usd(top.excessCost)}. ${newMarkup > 0 ? `Reducir a target subiría markup a ${newMarkup.toFixed(1)}x.` : ""}` });
+        signals.push({ level: top.excessPct > 30 ? "warning" : "info", headline: `${top.name}: +${top.excess.toFixed(0)}h sobre estimación (${pct(top.excessPct)})`, detail: `Lleva ${top.actual.toFixed(0)}h vs ${top.target.toFixed(0)}h planeadas. El exceso equivale a ${usd(top.excessCost)} de costo adicional.${availableMarkup != null && newMarkup > 0 && newMarkup > markup ? ` Si vuelve a target, el markup subiría de ${markup.toFixed(1)}x a ${newMarkup.toFixed(1)}x.` : ""}` });
+        if (top.excessCost > 500) recommendations.push({ rank: recRank++, impact: top.excessPct > 30 ? "high" : "medium", text: `Revisar carga de ${top.name}: ${top.excess.toFixed(0)}h de exceso = ${usd(top.excessCost)}. ${availableMarkup != null && newMarkup > 0 ? `Reducir a target subiría markup a ${newMarkup.toFixed(1)}x.` : ""}` });
       }
       if (Math.abs(hoursDeviation) > 10) {
         const avgRate = totalHours > 0 ? cost / totalHours : 0;
@@ -157,11 +158,12 @@ function useProjectIntelligence(props: AICopilotProps) {
       }
     }
 
-    if (previousPeriod?.hasData && previousPeriod.metrics && markup > 0) {
+    if (previousPeriod?.hasData && previousPeriod.metrics && previousPeriod.metrics.markup != null && markup > 0) {
       const prev = previousPeriod.metrics;
-      const markupDelta = markup - prev.markup;
+      const prevMarkup = prev.markup!;
+      const markupDelta = markup - prevMarkup;
       const revDelta = revenue - prev.revenueUSD;
-      if (Math.abs(markupDelta) >= 0.2) signals.push({ level: markupDelta > 0 ? "good" : "info", headline: `Markup ${markupDelta > 0 ? "mejoró" : "bajó"} ${Math.abs(markupDelta).toFixed(1)}x vs período anterior`, detail: `Pasó de ${prev.markup.toFixed(1)}x a ${markup.toFixed(1)}x. ${revDelta !== 0 ? `Revenue ${revDelta > 0 ? "subió" : "bajó"} ${usd(Math.abs(revDelta))} vs mes anterior.` : ""}` });
+      if (Math.abs(markupDelta) >= 0.2) signals.push({ level: markupDelta > 0 ? "good" : "info", headline: `Markup ${markupDelta > 0 ? "mejoró" : "bajó"} ${Math.abs(markupDelta).toFixed(1)}x vs período anterior`, detail: `Pasó de ${prevMarkup.toFixed(1)}x a ${markup.toFixed(1)}x. ${revDelta !== 0 ? `Revenue ${revDelta > 0 ? "subió" : "bajó"} ${usd(Math.abs(revDelta))} vs mes anterior.` : ""}` });
     }
 
     const hasCritical = signals.some(s => s.level === "critical");

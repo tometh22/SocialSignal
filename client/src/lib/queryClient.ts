@@ -238,7 +238,7 @@ export async function apiRequest(
     
     try {
       const result = JSON.parse(responseText);
-      if (method !== "GET" && /^\/api\/(?:tasks|active-projects)(?:\/|$)/.test(url)) void queryClient.invalidateQueries({ predicate: query => isTaskRelatedQuery(query.queryKey) });
+      if (method !== "GET" && /^\/api\/(?:tasks|active-projects|time-entries)(?:\/|$)/.test(url)) void queryClient.invalidateQueries({ predicate: query => isTaskRelatedQuery(query.queryKey) });
       if (result.recurringTaskId) toast({ title: "Próxima tarea creada", description: `Se programó para ${result.recurringTaskDate}.` });
       if (method !== "GET" && /^\/api\/tasks(?:\/\d+)?$/.test(url)) {
         if (result.assignmentWarnings?.length) toast({ title: "Asignación guardada: hay ausencias en el período", description: result.assignmentWarnings.map((row: any) => `${row.personName}: ${row.startDate} → ${row.endDate} (${row.planningStatus === "confirmed" ? "confirmada" : "tentativa"})`).join("; ") });

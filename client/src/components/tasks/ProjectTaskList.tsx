@@ -1,3 +1,10 @@
+import { taskDateBucket } from "@shared/utils/task-date-bucket";
+import { TaskSelectionCheckbox, TaskSelectionProvider } from "./TaskSelection";
+import { taskWorkflowBucket } from "@shared/utils/task-workflow";
+import { invalidateTaskQueries } from "@/lib/task-cache";
+import TaskRangeCalendar from "@/components/tasks/TaskRangeCalendar";
+import TaskWorkflowControl from "@/components/tasks/TaskWorkflowControl";
+import { civilDateInBuenosAires } from "@shared/utils/buenos-aires-week";
 import { filterTaskTree } from "@shared/utils/task-tree-filter";
 import { sumTaskLoggedHours } from "@shared/utils/task-hours-total";
 import { groupTasksBySection } from "@shared/utils/task-sections";
@@ -139,8 +146,7 @@ function parseCivilTaskDate(value?: string | null) {
 }
 
 function isOverdue(task: Task) {
-  const dueDate = parseCivilTaskDate(task.dueDate);
-  return dueDate && dueDate < new Date() && task.status !== "done";
+  return taskDateBucket(task) === "overdue";
 }
 
 function isDueSoon(task: Task) {
@@ -248,7 +254,7 @@ function InlineDateButton({ startDate, dueDate, taskId, onSet, overdue, dueSoon,
         </button>
       </PopoverTrigger>
       <PopoverContent className="w-auto p-0 shadow-lg" onClick={e => e.stopPropagation()}>
-        <Calendar
+        <TaskRangeCalendar
           mode="range"
           selected={{ from: parseCivilTaskDate(startDate), to: parseCivilTaskDate(dueDate) }}
           onSelect={(range) => { onSet(taskId, range); if (range?.from && range?.to) setOpen(false); }}
@@ -354,7 +360,7 @@ function NewTaskRow({ projectId, sectionName, onCreated, onCancel, allPersonnel,
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-auto p-0">
-            <Calendar
+            <TaskRangeCalendar
               mode="range"
               selected={{ from: startDate, to: dueDate }}
               onSelect={(range) => {
@@ -455,6 +461,7 @@ function TaskRow(props: TaskRowProps) {
           isSubtask && "bg-muted/5",
           isDragging && "opacity-40 bg-accent/20"
         )}
+        data-task-row={task.id}
         onClick={() => onOpen(task.id)}
       >
         {/* Drag handle */}
@@ -472,6 +479,7 @@ function TaskRow(props: TaskRowProps) {
           {isSubtask && <span className="text-muted-foreground/50 text-xs mr-1">↳</span>}
         </div>
 
+        <TaskSelectionCheckbox taskId={task.id} />
         {/* Circle Checkbox */}
         <div className="w-5 flex-shrink-0 flex items-center justify-center py-3">
           <CircleCheck
@@ -507,35 +515,6 @@ function TaskRow(props: TaskRowProps) {
               ))}
             </PopoverContent>
           </Popover>
-          {!isDone && (
-            <Popover>
-              <PopoverTrigger asChild>
-                <button
-                  onClick={e => e.stopPropagation()}
-                  className="flex-shrink-0"
-                >
-                  {task.status === "todo"
-                    ? <span className="text-[9px] text-muted-foreground/50 hover:text-muted-foreground border border-dashed border-muted-foreground/30 hover:border-muted-foreground/60 rounded px-1 py-0.5 transition-colors">estado</span>
-                    : <TaskStatusBadge status={task.status} size="xs" />}
-                </button>
-              </PopoverTrigger>
-              <PopoverContent className="w-36 p-1 shadow-lg" align="start" onClick={e => e.stopPropagation()}>
-                {(["todo","in_progress","blocked"] as const).map(s => (
-                  <button
-                    key={s}
-                    className={cn(
-                      "w-full text-left text-xs px-2 py-1.5 rounded hover:bg-accent flex items-center gap-2 transition-colors",
-                      task.status === s && "bg-primary/10 font-medium"
-                    )}
-                    onClick={() => onStatusChange?.(task.id, s)}
-                  >
-                    <span className={cn("w-2 h-2 rounded-full flex-shrink-0", TASK_STATUS_CONFIG[s].dot)} />
-                    {TASK_STATUS_CONFIG[s].label}
-                  </button>
-                ))}
-              </PopoverContent>
-            </Popover>
-          )}
           {renaming ? (
             <Input
               value={renameValue}
@@ -563,14 +542,15 @@ function TaskRow(props: TaskRowProps) {
               <TooltipTrigger asChild>
                 <span
                   className={cn("text-sm truncate transition-all duration-150 cursor-text rounded px-0.5 hover:bg-accent/60", isDone && "line-through text-muted-foreground")}
-                  onClick={e => { e.stopPropagation(); setRenameValue(task.title); setRenaming(true); }}
+                  onClick={e => { e.stopPropagation(); onOpen(task.id); }}
                 >
                   {task.title}
                 </span>
               </TooltipTrigger>
-              <TooltipContent side="bottom" className="max-w-xs">Click para renombrar · {task.title}</TooltipContent>
+              <TooltipContent side="bottom" className="max-w-xs">Click para abrir el detalle · {task.title}</TooltipContent>
             </Tooltip>
           )}
+          <TaskWorkflowControl task={task} />
           {task.isMilestone && <Badge variant="outline" className="shrink-0 text-[10px]">◆ Hito</Badge>}
           {hasSubtasks && !isSubtask && (
             <button
@@ -1110,10 +1090,12 @@ function SortableSectionBlock(props: SectionBlockProps & { sectionName: string; 
 // ─── Board / Kanban view ────────────────────────────────────────────────────
 
 const BOARD_COLUMNS = [
-  { status: "todo",        label: "Por hacer",   dot: "bg-gray-400",    ring: "border-t-gray-300",    empty: "Acá aparecerán las tareas nuevas" },
-  { status: "in_progress", label: "En curso",    dot: "bg-blue-500",    ring: "border-t-blue-400",    empty: "Mové una tarea aquí para comenzar" },
-  { status: "blocked",     label: "Bloqueado",   dot: "bg-orange-500",  ring: "border-t-orange-400",  empty: "Tareas que necesitan desbloquearse" },
-  { status: "done",        label: "Completado",  dot: "bg-green-500",   ring: "border-t-green-400",   empty: "Las tareas finalizadas aparecen aquí" },
+  { status: "upcoming", label: "Próximas", dot: "bg-gray-400", ring: "border-t-gray-300", empty: "Tareas con inicio futuro" },
+  { status: "in_progress", label: "En curso", dot: "bg-blue-500", ring: "border-t-blue-400", empty: "Trabajo en fechas actuales" },
+  { status: "overdue", label: "Con retraso", dot: "bg-red-500", ring: "border-t-red-400", empty: "Tareas pendientes vencidas" },
+  { status: "no_date", label: "Sin fecha", dot: "bg-slate-400", ring: "border-t-slate-300", empty: "Tareas por planificar" },
+  { status: "blocked", label: "Bloqueadas", dot: "bg-orange-500", ring: "border-t-orange-400", empty: "Tareas que necesitan desbloquearse" },
+  { status: "done", label: "Finalizadas", dot: "bg-green-500", ring: "border-t-green-400", empty: "Cerradas mediante el check" },
 ];
 
 interface BoardColumnProps {
@@ -1128,7 +1110,6 @@ interface BoardColumnProps {
   projectMembers: { personnelId: number; name: string; role: string }[];
   onOpen: (id: number) => void;
   onRefresh: () => void;
-  onStatusChange: (taskId: number, status: string) => void;
 }
 
 const PRIORITY_LEFT_BORDER: Record<string, string> = {
@@ -1153,20 +1134,25 @@ function BoardCard({ task, allPersonnel, onOpen }: { task: Task; allPersonnel: P
       ref={setNodeRef}
       {...listeners}
       {...attributes}
+      aria-disabled={undefined}
       className={cn(
-        "bg-card rounded-lg border border-border border-l-2 p-2.5 cursor-grab active:cursor-grabbing",
+        "has-[:checked]:bg-primary/5 bg-card rounded-lg border border-border border-l-2 p-2.5 cursor-grab active:cursor-grabbing",
         "hover:shadow-md hover:border-primary/20 transition-all duration-150",
         isDone && "opacity-50",
         isDragging && "opacity-40 ring-2 ring-primary/40 shadow-lg",
         leftBorder
       )}
+      data-task-row={task.id}
       onClick={() => !isDragging && onOpen(task.id)}
     >
       <div className="flex items-start gap-2 mb-2">
+        <TaskSelectionCheckbox taskId={task.id} />
+        <CircleCheck checked={isDone} onClick={e => { e.stopPropagation(); apiRequest(`/api/tasks/${task.id}/completion`, "POST", { completed: !isDone }).then(() => invalidateTaskQueries()).catch((error: Error) => toast({ title: "No se pudo finalizar", description: error.message, variant: "destructive" })); }} />
         <p className={cn("text-sm font-medium leading-snug flex-1 min-w-0", isDone && "line-through text-muted-foreground")} title={task.title}>
           {task.title}
         </p>
       </div>
+      <TaskWorkflowControl task={task} />
       <div className="flex items-center justify-between gap-1">
         <div className="flex items-center gap-1.5 flex-wrap">
           {task.isMilestone && <Badge variant="outline" className="text-[10px]">◆ Hito</Badge>}
@@ -1204,12 +1190,12 @@ function BoardCard({ task, allPersonnel, onOpen }: { task: Task; allPersonnel: P
   );
 }
 
-function BoardColumn({ label, dot, ring, empty, status, tasks, allPersonnel, projectId, projectMembers, onOpen, onRefresh, onStatusChange }: BoardColumnProps) {
+function BoardColumn({ label, dot, ring, empty, status, tasks, allPersonnel, projectId, projectMembers, onOpen, onRefresh }: BoardColumnProps) {
   const [showAdd, setShowAdd] = useState(false);
-  const { setNodeRef, isOver } = useDroppable({ id: `board-col:${status}`, disabled: status === "done" });
+  const { setNodeRef, isOver } = useDroppable({ id: `board-col:${status}`, disabled: status !== "blocked" });
 
   return (
-    <div className={cn("flex-1 min-w-0 flex flex-col rounded-xl border-t-2 border border-border bg-muted/5 transition-colors", ring, isOver && "bg-primary/5 ring-2 ring-primary/20")}>
+    <div className={cn("flex-1 min-w-[220px] flex flex-col rounded-xl border-t-2 border border-border bg-muted/5 transition-colors", ring, isOver && "bg-primary/5 ring-2 ring-primary/20")}>
       <div className="flex items-center justify-between px-3 py-2.5 border-b border-border/60">
         <div className="flex items-center gap-2">
           <span className={cn("w-2 h-2 rounded-full flex-shrink-0", dot)} />
@@ -1250,12 +1236,12 @@ function BoardColumn({ label, dot, ring, empty, status, tasks, allPersonnel, pro
           </div>
         ))}
 
-        {status !== "done" && (showAdd ? (
+        {status !== "done" && status !== "blocked" && (showAdd ? (
           <div className="bg-card rounded-lg border border-primary/30 p-2">
             <NewTaskRow
               projectId={projectId}
               sectionName="General"
-              defaultStatus={status}
+              defaultStatus="todo"
               onCreated={() => { setShowAdd(false); onRefresh(); }}
               onCancel={() => setShowAdd(false)}
               allPersonnel={allPersonnel}
@@ -1318,7 +1304,6 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
   }, [projectId]);
   const [activeId, setActiveId] = useState<UniqueIdentifier | null>(null);
   const [activeDragData, setActiveDragData] = useState<any>(null);
-  const [boardStatusOverrides, setBoardStatusOverrides] = useState<Record<number, string>>({});
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
@@ -1384,22 +1369,18 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
     inlineUpdateMutation.mutate({ taskId, updates: { title: newTitle } });
   };
 
-  const handleBoardStatusChange = (taskId: number, status: string) => {
-    setBoardStatusOverrides(prev => ({ ...prev, [taskId]: status }));
-    inlineUpdateMutation.mutate(
-      { taskId, updates: { status } },
-      { onError: () => setBoardStatusOverrides(prev => { const n = { ...prev }; delete n[taskId]; return n; }) }
-    );
-  };
-
   const boardDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     if (!over) return;
     const taskId = active.data.current?.taskId as number;
     const fromStatus = active.data.current?.fromStatus as string;
     const toStatus = over.id.toString().replace("board-col:", "");
-    if (!taskId || fromStatus === toStatus || fromStatus === "done" || toStatus === "done") return;
-    handleBoardStatusChange(taskId, toStatus);
+    if (!taskId || fromStatus === "done" || toStatus !== "blocked") return;
+    const blockedReason = window.prompt("Motivo obligatorio del bloqueo:");
+    if (!blockedReason?.trim()) return;
+    apiRequest(`/api/tasks/${taskId}`, "PUT", { status: "blocked", blockedReason: blockedReason.trim() })
+      .then(() => { refetch(); void invalidateTaskQueries(); })
+      .catch((error: Error) => toast({ title: "No se pudo bloquear", description: error.message, variant: "destructive" }));
   };
 
   const duplicateTaskMutation = useMutation({
@@ -1588,6 +1569,7 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
   if (isError) return <div className="p-6 text-sm text-destructive">{(error as Error).message || "No se pudieron cargar las tareas"} <Button variant="outline" size="sm" onClick={() => refetch()}>Reintentar</Button></div>;
 
   return (
+    <TaskSelectionProvider projectId={projectId} canDelete={Boolean(data?.canManageSections)} onDeleted={() => { setSelectedTaskId(null); refetch(); }}>
     <div>
       {filterText.trim() && (
         <div className="mb-2 text-xs text-muted-foreground px-1">
@@ -1621,8 +1603,7 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
                 const colTasks = allTasks
                   .filter(t => !t.parentTaskId)
                   .filter(t => sectionFilter === 'all' || (t.sectionName || 'General') === sectionFilter)
-                  .map(t => boardStatusOverrides[t.id] ? { ...t, status: boardStatusOverrides[t.id] } : t)
-                  .filter(t => t.status === col.status);
+                  .filter(t => taskWorkflowBucket(t) === col.status);
                 return (
                   <BoardColumn
                     key={col.status}
@@ -1637,7 +1618,6 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
                     projectMembers={projectMembers}
                     onOpen={id => handleOpen(id)}
                     onRefresh={refetch}
-                    onStatusChange={handleBoardStatusChange}
                   />
                 );
               })}
@@ -1793,5 +1773,6 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
         />
       </ErrorBoundary>
     </div>
+    </TaskSelectionProvider>
   );
 }

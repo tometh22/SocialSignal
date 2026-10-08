@@ -1,3 +1,5 @@
+import { clientCalendarColor } from "@/lib/client-calendar-color";
+import { civilDateInBuenosAires, currentBuenosAiresWeek } from "@shared/utils/buenos-aires-week";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { authFetchJson } from "@/lib/queryClient";
@@ -20,10 +22,15 @@ interface CalTask {
   startDate?: string | null;
   status: string;
   parentTaskId?: number | null;
+  clientId?: number | null;
+  clientName?: string | null;
+  projectName?: string | null;
 }
 
 interface Props {
   projectId?: number;
+  view?: "month" | "current-week";
+  showUndated?: boolean;
   // When provided, render these tasks directly instead of fetching by project.
   tasks?: CalTask[];
 }
@@ -37,8 +44,8 @@ const STATUS_CHIP: Record<string, string> = {
 
 const WEEK_DAYS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 
-export default function TaskCalendarView({ projectId, tasks: tasksProp }: Props) {
-  const [currentMonth, setCurrentMonth] = useState(new Date());
+export default function TaskCalendarView({ projectId, tasks: tasksProp, view = "month", showUndated = true }: Props) {
+  const [currentMonth, setCurrentMonth] = useState(new Date(`${civilDateInBuenosAires(new Date())}T00:00:00`));
 
   const { data } = useQuery<{ tasks: CalTask[] }>({
     queryKey: ["/api/tasks/project", projectId],
@@ -58,13 +65,14 @@ export default function TaskCalendarView({ projectId, tasks: tasksProp }: Props)
   // El calendario representa trabajo asignado, no sólo tareas raíz. Las
   // subtareas también pueden tener fechas propias y antes desaparecían de la
   // Home por este filtro.
-  const tasksWithDate = sourceTasks.filter(t => t.dueDate || t.startDate);
+  const tasksWithDate = sourceTasks.filter(t => t.status !== "cancelled" && (t.dueDate || t.startDate));
   const tasksWithoutDate = sourceTasks.filter(t => !t.dueDate && !t.startDate && t.status !== "cancelled" && t.status !== "done");
 
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(currentMonth);
-  const calStart = startOfWeek(monthStart, { weekStartsOn: 1 });
-  const calEnd = endOfWeek(monthEnd, { weekStartsOn: 1 });
+  const week = currentBuenosAiresWeek();
+  const calStart = view === "current-week" ? new Date(`${week.from}T00:00:00`) : startOfWeek(monthStart, { weekStartsOn: 1 });
+  const calEnd = view === "current-week" ? new Date(`${week.to}T23:59:59`) : endOfWeek(monthEnd, { weekStartsOn: 1 });
 
   const weeks: Date[][] = [];
   let day = calStart;
@@ -77,7 +85,7 @@ export default function TaskCalendarView({ projectId, tasks: tasksProp }: Props)
     weeks.push(week);
   }
 
-  const today = new Date();
+  const today = new Date(`${civilDateInBuenosAires(new Date())}T00:00:00`);
   today.setHours(0, 0, 0, 0);
 
   const isTaskOverdue = (t: CalTask, _d: Date) => taskDateBucket(t) === "overdue";
@@ -110,12 +118,13 @@ export default function TaskCalendarView({ projectId, tasks: tasksProp }: Props)
 
   return (
     <div className="pt-4 pb-8">
+      <div className="mb-2 flex flex-wrap gap-2 text-[10px]">{Array.from(new Map(sourceTasks.map(t => [t.clientId, t.clientName || "Sin cliente"]))).map(([id, name]) => <span key={id ?? "none"} className={cn("rounded border px-2 py-0.5", clientCalendarColor(id))}>{name}</span>)}</div>
       {/* Month navigation */}
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-sm font-semibold capitalize">
-          {format(currentMonth, "MMMM yyyy", { locale: es })}
+          {view === "current-week" ? `${format(calStart, "d MMM", { locale: es })} – ${format(calEnd, "d MMM", { locale: es })}` : format(currentMonth, "MMMM yyyy", { locale: es })}
         </h3>
-        <div className="flex items-center gap-1">
+        {view === "month" && <div className="flex items-center gap-1">
           <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}>
             <ChevronLeft className="h-4 w-4" />
           </Button>
@@ -125,7 +134,7 @@ export default function TaskCalendarView({ projectId, tasks: tasksProp }: Props)
           <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}>
             <ChevronRight className="h-4 w-4" />
           </Button>
-        </div>
+        </div>}
       </div>
 
       {/* Day-of-week headers */}
@@ -175,11 +184,11 @@ export default function TaskCalendarView({ projectId, tasks: tasksProp }: Props)
                             key={t.id}
                             className={cn(
                               "text-[9px] py-0.5 leading-tight cursor-default h-4 flex items-center",
-                              overdue ? "bg-red-200 text-red-800" : "bg-indigo-200 text-indigo-900",
+                              clientCalendarColor(t.clientId), t.status === "done" && "line-through opacity-60", overdue && "underline decoration-red-500", t.status === "blocked" && "border-dashed border",
                               rangeInfo.roundLeft ? "rounded-l pl-1" : "-ml-1.5 pl-0",
                               rangeInfo.roundRight ? "rounded-r pr-1" : "-mr-1.5 pr-0",
                             )}
-                            title={t.title}
+                            title={[t.title, t.clientName, t.projectName, t.status === "blocked" ? "Bloqueada" : ""].filter(Boolean).join(" · ")}
                           >
                             {(rangeInfo.atStart || rangeInfo.roundLeft) && (
                               <span className="truncate px-0.5">{t.title}</span>
@@ -192,11 +201,9 @@ export default function TaskCalendarView({ projectId, tasks: tasksProp }: Props)
                           key={t.id}
                           className={cn(
                             "text-[9px] px-1 py-0.5 rounded border leading-tight cursor-default flex items-center gap-0.5",
-                            overdue
-                              ? "border-red-400 bg-red-50 text-red-700"
-                              : STATUS_CHIP[t.status] || "bg-gray-100 text-gray-700 border-gray-200"
+                            clientCalendarColor(t.clientId), t.status === "done" && "line-through opacity-60", overdue && "underline decoration-red-500"
                           )}
-                          title={t.title}
+                          title={[t.title, t.clientName, t.projectName, t.status === "blocked" ? "Bloqueada" : ""].filter(Boolean).join(" · ")}
                         >
                           {dot && (
                             <span className={cn("inline-block w-1.5 h-1.5 rounded-full flex-shrink-0", dot)} />
@@ -225,11 +232,9 @@ export default function TaskCalendarView({ projectId, tasks: tasksProp }: Props)
                                   key={t.id}
                                   className={cn(
                                     "text-[10px] px-1.5 py-1 rounded border leading-tight flex items-center gap-1",
-                                    overdue
-                                      ? "border-red-400 bg-red-50 text-red-700"
-                                      : STATUS_CHIP[t.status] || "bg-gray-100 text-gray-700 border-gray-200"
+                                    clientCalendarColor(t.clientId), t.status === "done" && "line-through opacity-60"
                                   )}
-                                  title={t.title}
+                                  title={[t.title, t.clientName, t.projectName, t.status === "blocked" ? "Bloqueada" : ""].filter(Boolean).join(" · ")}
                                 >
                                   {dot && (
                                     <span className={cn("inline-block w-1.5 h-1.5 rounded-full flex-shrink-0", dot)} />
@@ -251,7 +256,7 @@ export default function TaskCalendarView({ projectId, tasks: tasksProp }: Props)
       </div>
 
       {/* Tasks without a due date */}
-      {tasksWithoutDate.length > 0 && (
+      {showUndated && tasksWithoutDate.length > 0 && (
         <div className="mt-4 border border-border rounded-xl p-3">
           <p className="text-xs text-muted-foreground font-medium mb-2">
             Sin fecha de vencimiento ({tasksWithoutDate.length})
@@ -263,7 +268,7 @@ export default function TaskCalendarView({ projectId, tasks: tasksProp }: Props)
                 <div
                   key={t.id}
                   className="text-[10px] px-2 py-0.5 rounded-full border bg-muted/50 text-muted-foreground truncate max-w-[180px] flex items-center gap-1"
-                  title={t.title}
+                  title={[t.title, t.clientName, t.projectName, t.status === "blocked" ? "Bloqueada" : ""].filter(Boolean).join(" · ")}
                 >
                   {dot && <span className={cn("inline-block w-1.5 h-1.5 rounded-full flex-shrink-0", dot)} />}
                   {t.title}

@@ -1,3 +1,4 @@
+import { civilDateInBuenosAires } from "@shared/utils/buenos-aires-week";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
@@ -47,28 +48,28 @@ const QUICK_FILTERS = [
 ];
 
 function getDateRange(filter: string): { dateFrom: string; dateTo: string } {
-  const now = new Date();
+  const now = parseTaskCivilDate(civilDateInBuenosAires(new Date()));
   switch (filter) {
     case "this_week": {
       const s = startOfWeek(now, { weekStartsOn: 1 });
       const e = endOfWeek(now, { weekStartsOn: 1 });
-      return { dateFrom: s.toISOString(), dateTo: e.toISOString() };
+      return { dateFrom: format(s, "yyyy-MM-dd"), dateTo: format(e, "yyyy-MM-dd") };
     }
     case "last_week": {
       const s = startOfWeek(subWeeks(now, 1), { weekStartsOn: 1 });
       const e = endOfWeek(subWeeks(now, 1), { weekStartsOn: 1 });
-      return { dateFrom: s.toISOString(), dateTo: e.toISOString() };
+      return { dateFrom: format(s, "yyyy-MM-dd"), dateTo: format(e, "yyyy-MM-dd") };
     }
     case "this_month":
-      return { dateFrom: startOfMonth(now).toISOString(), dateTo: endOfMonth(now).toISOString() };
+      return { dateFrom: format(startOfMonth(now), "yyyy-MM-dd"), dateTo: format(endOfMonth(now), "yyyy-MM-dd") };
     case "last_month": {
       const prev = subMonths(now, 1);
-      return { dateFrom: startOfMonth(prev).toISOString(), dateTo: endOfMonth(prev).toISOString() };
+      return { dateFrom: format(startOfMonth(prev), "yyyy-MM-dd"), dateTo: format(endOfMonth(prev), "yyyy-MM-dd") };
     }
     case "last_3_months":
-      return { dateFrom: subMonths(startOfMonth(now), 3).toISOString(), dateTo: endOfMonth(now).toISOString() };
+      return { dateFrom: format(subMonths(startOfMonth(now), 3), "yyyy-MM-dd"), dateTo: format(endOfMonth(now), "yyyy-MM-dd") };
     default:
-      return { dateFrom: startOfMonth(now).toISOString(), dateTo: endOfMonth(now).toISOString() };
+      return { dateFrom: format(startOfMonth(now), "yyyy-MM-dd"), dateTo: format(endOfMonth(now), "yyyy-MM-dd") };
   }
 }
 
@@ -92,8 +93,8 @@ export default function HoursDashboardPage() {
     // Parsear el input date-only como fecha LOCAL (agregar "T00:00:00"), no como UTC,
     // para que la ventana de días hábiles no se corra un día (timezone).
     ? {
-        dateFrom: customFrom ? new Date(customFrom + "T00:00:00").toISOString() : "",
-        dateTo: customTo ? new Date(customTo + "T23:59:59.999").toISOString() : "",
+        dateFrom: customFrom || "",
+        dateTo: customTo || "",
       }
     : getDateRange(quickFilter);
 
@@ -134,8 +135,8 @@ export default function HoursDashboardPage() {
 
   // Holidays for the relevant years to compute available hours (sin feriados)
   const rangeYears = Array.from(new Set([
-    dateFrom ? new Date(dateFrom).getFullYear() : new Date().getFullYear(),
-    dateTo ? new Date(dateTo).getFullYear() : new Date().getFullYear(),
+    dateFrom ? parseTaskCivilDate(dateFrom).getFullYear() : new Date().getFullYear(),
+    dateTo ? parseTaskCivilDate(dateTo).getFullYear() : new Date().getFullYear(),
   ]));
   const { data: holidaysData = [] } = useQuery<any[]>({
     queryKey: ["/api/holidays", rangeYears.join(",")],
@@ -175,8 +176,8 @@ export default function HoursDashboardPage() {
     const isAbsent = (dateKey: string) => absenceRanges.some(r => dateKey >= r.start && dateKey <= r.end);
     let workdays = 0;
     let absentWorkdays = 0;
-    const d = new Date(new Date(dateFrom).getFullYear(), new Date(dateFrom).getMonth(), new Date(dateFrom).getDate());
-    const end = new Date(dateTo);
+    const d = parseTaskCivilDate(dateFrom);
+    const end = parseTaskCivilDate(dateTo);
     while (d <= end) {
       const dow = d.getDay();
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;

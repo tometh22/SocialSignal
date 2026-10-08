@@ -257,7 +257,7 @@ export const CostDashboard: React.FC<CostDashboardProps> = ({ projectId, timeFil
                   {analysisMetrics && (
                     <div className="text-xs mt-1">
                       ROI: {analysisMetrics.roi.toFixed(1)}% • 
-                      Markup: {analysisMetrics.markup.toFixed(1)}x
+                      Markup: {analysisMetrics.markup == null ? "Sin datos" : `${analysisMetrics.markup.toFixed(1)}x`}
                     </div>
                   )}
                 </div>

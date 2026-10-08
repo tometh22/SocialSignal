@@ -1,6 +1,6 @@
 ---
-version: 2.32.0
-updatedAt: 2026-10-05
+version: 2.33.0
+updatedAt: 2026-10-08
 feedbackCount: 70
 ---
 
@@ -62,7 +62,7 @@ Este documento es la fuente canónica y versionada de las reglas funcionales cer
 | TAR-13 | Implementado | Cargar horas desde la fila con presets, ingreso manual y temporizador. |
 | TAR-14 | Implementado | Home muestra gráfico mensual por proyecto y lista de tareas sin horas. |
 | TAR-15 | Implementado | Mostrar el proyecto en cada fila de tarea. |
-| TAR-16 | Diferido | No cambiar todavía la clasificación Próxima/En curso/Vencida; el feedback pidió expresamente no aplicar cambios. |
+| TAR-16 | Implementado | La clasificación Próxima/En curso/Vencida inicialmente diferida queda resuelta por Feedback 6-10: grupos por fechas, bloqueo con motivo y finalización manual; estados históricos no deciden la columna. |
 | TAR-17 | Implementado | Operaciones puede cargar horas para un tercero y toda atribución recae en esa persona. |
 | TAR-18 | Implementado | Dejar un solo reloj por tarea y mostrar el resumen de cargas. |
 | TAR-19 | Implementado | Permitir editar horas, fecha y descripción de una carga. |
@@ -85,7 +85,7 @@ Este documento es la fuente canónica y versionada de las reglas funcionales cer
 
 ## Las 21 correcciones cerradas
 
-Se consideran parte indivisible de esta versión: CFG-03, CFG-04, COT-05, COT-06, COT-07, COT-08, COT-11, COT-12, COT-13, COT-14, COT-15, COT-16, PRO-09, TAR-20, TAR-21, TAR-22, TAR-23, TAR-24, TAR-25, TAR-26 y OPS-08 (workflow transversal de Ausencias/Notificaciones). TAR-16 conserva expresamente la clasificación vigente porque el feedback pidió no modificarla todavía.
+Se consideran parte indivisible de esta versión: CFG-03, CFG-04, COT-05, COT-06, COT-07, COT-08, COT-11, COT-12, COT-13, COT-14, COT-15, COT-16, PRO-09, TAR-20, TAR-21, TAR-22, TAR-23, TAR-24, TAR-25, TAR-26 y OPS-08 (workflow transversal de Ausencias/Notificaciones). TAR-16, inicialmente diferido, se implementa con las decisiones confirmadas de Feedback 6-10.
 
 ## Addendum — revisión visual Feedback 14-8
 
@@ -225,7 +225,7 @@ cancellation_requested -> cancelled | approved
 
 ## Decisiones diferidas
 
-TAR-16 permanece diferido por instrucción expresa del feedback. No representa un gap de implementación.
+TAR-16 estuvo diferido por instrucción de aquella ronda; Feedback 6-10 confirma e implementa la clasificación por fechas.
 ## Addendum — Feedback Mind V2-13 (ronda 27-8)
 
 Las rondas 23-7 a 20-8 quedaron cerradas en las versiones 2.9.x a 2.11.x. Esta versión
@@ -248,7 +248,7 @@ identidad ni el conteo de las 70 entradas originales.
 | F27-12 | Implementado | La carga rápida atribuye por defecto al responsable de la tarea: lo que rige es el dueño, no quien carga. |
 | F27-13 | Implementado | La duración admite minutos reales (`45m`, `1h30`, `1:30`, `2,5`) con un mínimo de un minuto, y se redondea al minuto en vez de al cuarto de hora. La razón social puede crearse desde el propio cotizador. |
 
-La única decisión todavía diferida de esta ronda es TAR-16, por pedido explícito de no cambiar la clasificación de tareas.
+La decisión TAR-16 estuvo diferida en esta ronda y queda resuelta por Feedback 6-10.
 
 ### Revisión 2.13.1 — cruce de la auditoría contra el código desplegado
 
@@ -456,3 +456,14 @@ histórica que todavía necesitan cotizaciones y registros anteriores.
 - **Cuentas en riesgo:** compara el costo del mismo equipo cotizado a tarifas actuales contra el costo cotizado; no usa horas cargadas. Una cuenta puede desestimarse para todo el equipo con motivo obligatorio y plazo opcional. La línea base (erosión y severidad) la fija el servidor al desestimar y el evento queda auditado. El descarte se levanta solo si vence el plazo, si la erosión empeora 5 puntos o más sobre la desestimada, o si la severidad empeora (de vigilancia a crítica).
 - **Carga de horas:** el destino por defecto es el responsable de la tarea (no quien la carga) en el popover, el detalle, el temporizador y las subtareas. Quien gestiona tareas puede cargar al responsable aunque su usuario no esté vinculado a Personal.
 - **Plantillas de reportes:** las recetas del cotizador reemplazan a las plantillas. La pestaña se oculta en Configuración; los datos y la lectura que usan las cotizaciones históricas se conservan. Las cotizaciones legacy sin trasladar al Excel se archivan (reversible) con `scripts/archive-legacy-quotations.mjs`, nunca con borrado físico.
+
+## Addendum — Feedback Mind 6-10
+
+- **Fechas y horas personales:** las fechas de tareas y cargas son días civiles; hoy, semana y mes se calculan en Buenos Aires. Un rango se guarda sólo al completar la selección (o elegir un día). La carga rápida, la edición y el cronómetro permiten elegir la fecha. Inicio y Tareas comparten fuentes, límites y deduplicación uno a uno entre fuentes, conservando repeticiones legítimas dentro de cada fuente.
+- **Mis tareas:** incluye responsabilidades y colaboraciones; crear una tarea sin asignación no la convierte en una tarea personal. Se muestra Cliente · Proyecto, también en móvil.
+- **Estados de tareas:** Próximas, En curso, Con retraso y Sin fecha se derivan de fechas; Finalizadas requiere el check manual. Las canceladas quedan fuera del trabajo. El tablero agrega Bloqueadas con prioridad y motivo obligatorio; Mis tareas conserva el grupo temporal y muestra la referencia del bloqueo. Los estados históricos todo/in_progress no deciden la columna; completion conserva la lógica de recurrencias. El Kanban de proyectos mantiene su workflow.
+- **Borrado de tareas:** selección independiente de la finalización, por casillas o teclado/mouse. El servidor valida permisos y todos los descendientes dentro de una transacción. Cualquier hora nativa o importada bloquea todo el lote; el borrado individual tiene la misma protección. Las secciones vacías se conservan.
+- **Calendarios e Inicio:** colores deterministas por cliente, con leyenda y color neutral sin cliente. Estados visibles mediante iconos, etiquetas y tachado. Mi semana muestra únicamente la semana actual, horas semanales/mensuales y enlace a Tareas; el cronómetro persistente vive en el encabezado.
+- **Costos:** una hora sin tarifa o FX válido se conserva con costo pendiente. Los importes calculados parcialmente se identifican. Un error de reconstrucción no convierte una carga guardada en un fallo total; se informa sincronización pendiente. La conciliación ofrece vista previa por defecto, conserva snapshots válidos y sólo reconstruye origen app posterior al corte histórico en períodos abiertos; Excel y períodos cerrados/en revisión no se sobrescriben automáticamente.
+- **Identidad y métricas:** el nombre operativo del proyecto prevalece sobre cotización y subproyecto. Markup es nullable: internos muestran No aplica y comerciales sin datos muestran Sin datos. Las métricas no aplicables no afectan salud ni generan recomendaciones de renegociación; sin factores evaluables la salud es neutral.
+- **Freelancers:** solicitudes y saldos muestran Sin cupo — freelance. No se validan ni descuentan cupos en aprobación o edición, sin crear cupos ficticios. Se conservan aprobación, auditoría, superposiciones, timeline y advertencias de disponibilidad para responsables y colaboradores.
