@@ -1,3 +1,4 @@
+import { hasEvaluableProjectHealth } from "@shared/utils/portfolio-health";
 /**
  * AI Copilot — Project Intelligence Engine (Redesigned)
  * Smart collapse for signals, action buttons, improved visual hierarchy.
@@ -181,7 +182,7 @@ function useProjectIntelligence(props: AICopilotProps) {
       whatIfScenarios.push({ label: "-5% costos generales", change: `Costo ${usd(cost)} → ${usd(costMinus5)}`, newMarkup: markupMinus5, newCost: costMinus5, delta: markupMinus5 - markup, positive: markupMinus5 > markup });
     }
 
-    const diagnosis = hasCritical ? "critical" : hasWarning ? "warning" : "healthy";
+    const diagnosis = !hasEvaluableProjectHealth({ markup: availableMarkup, revenue, cost, budget, estimatedHours }) ? "neutral" : hasCritical ? "critical" : hasWarning ? "warning" : "healthy";
     return { signals, recommendations, whatIfScenarios, diagnosis };
   }, [props]);
 }
@@ -224,10 +225,11 @@ export default function AICopilot(props: AICopilotProps) {
   // so collapsing it by default left the page looking empty.
   const [isExpanded, setIsExpanded] = useState(true);
 
-  const headerBorder = diagnosis === "critical" ? "border-l-red-500" : diagnosis === "warning" ? "border-l-amber-400" : "border-l-emerald-500";
+  const headerBorder = diagnosis === "neutral" ? "border-l-slate-300" : diagnosis === "critical" ? "border-l-red-500" : diagnosis === "warning" ? "border-l-amber-400" : "border-l-emerald-500";
   const diagnosisMeta = {
     critical: { label: "Proyecto en Riesgo", dot: "bg-red-500", text: "text-red-700", bg: "bg-red-50 border-red-100" },
     warning:  { label: "Requiere Atención",  dot: "bg-amber-400", text: "text-amber-700", bg: "bg-amber-50 border-amber-100" },
+    neutral: { label: "Sin datos de salud", dot: "bg-slate-400", text: "text-slate-600", bg: "bg-slate-50 border-slate-200" },
     healthy:  { label: "Proyecto Saludable", dot: "bg-emerald-500", text: "text-emerald-700", bg: "bg-emerald-50 border-emerald-100" },
   }[diagnosis]!;
 
@@ -258,7 +260,7 @@ export default function AICopilot(props: AICopilotProps) {
           {criticalCount > 0 && <span className="text-[11px] font-semibold bg-red-50 text-red-700 border border-red-200 rounded-full px-2.5 py-0.5">{criticalCount} crítico{criticalCount > 1 ? "s" : ""}</span>}
           {warningCount > 0 && <span className="text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 rounded-full px-2.5 py-0.5">{warningCount} atención</span>}
           <span className={`flex items-center gap-1.5 text-[11px] font-semibold rounded-full px-2.5 py-0.5 border ${diagnosisMeta.bg} ${diagnosisMeta.text}`}>
-            <span className={`w-1.5 h-1.5 rounded-full ${diagnosisMeta.dot} ${diagnosis !== "healthy" ? "animate-pulse" : ""}`} />
+            <span className={`w-1.5 h-1.5 rounded-full ${diagnosisMeta.dot} ${diagnosis === "critical" || diagnosis === "warning" ? "animate-pulse" : ""}`} />
             {diagnosisMeta.label}
           </span>
           <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform ${isExpanded ? "rotate-180" : ""}`} />

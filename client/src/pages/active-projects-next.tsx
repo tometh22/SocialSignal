@@ -1,3 +1,4 @@
+import { measurableProjectMarkup } from "@shared/utils/portfolio-health";
 import CostCoverageNotice, { type CostCoverage } from "@/components/tasks/CostCoverageNotice";
 import { invalidateTaskQueries } from "@/lib/task-cache";
 "use client";
@@ -226,7 +227,7 @@ function transformBackendResponse(backendData: any): ProjectsApi {
     const costDisplay = p.metrics?.costDisplay?.amount ?? p.metrics?.costUSD ?? 0;
     const revenueUSDNormalized = p.metrics?.revenueUSDNormalized ?? p.metrics?.revenueUSD ?? 0;
     const costUSDNormalized = p.metrics?.costUSDNormalized ?? p.metrics?.costUSD ?? 0;
-    const markup = p.projectCategory === "internal" || p.costCoverage?.pendingHours || p.costCoverage?.syncPending ? undefined : p.metrics?.markupRatio ?? p.metrics?.markup;
+    const markup = measurableProjectMarkup({ projectCategory: p.projectCategory, costCoverage: p.costCoverage, metrics: { markup: p.metrics?.markupRatio ?? p.metrics?.markup, revenueUSDNormalized, costUSDNormalized } }) ?? undefined;
     const margin = p.metrics?.marginFrac ?? p.metrics?.margin;
 
     const anomaly: string[] = [];
@@ -964,6 +965,7 @@ export default function ActiveProjectsNext() {
     });
   }, [filtered]);
 
+  const hasMeasurable = filtered.some(p => measurableProjectMarkup(p) != null);
   const hasCritical = filtered.some(p => getHealth(p.metrics.markup) === "red");
 
   return (
@@ -975,7 +977,7 @@ export default function ActiveProjectsNext() {
           description={
             <>
               {filtered.length} proyecto{filtered.length !== 1 ? "s" : ""} en {periodToLabel(period)}
-              {typeof data?.summary?.periodAvgMarginPercent === "number" && filtered.length > 0
+              {typeof data?.summary?.periodAvgMarginPercent === "number" && hasMeasurable
                 ? ` · Margen promedio ${data.summary.periodAvgMarginPercent.toFixed(1)}%`
                 : ""}
             </>
@@ -989,23 +991,23 @@ export default function ActiveProjectsNext() {
           aside={
             <div className={cn(
               "flex h-full min-w-48 flex-col justify-center rounded-2xl border p-4",
-              hasCritical ? "border-red-100 bg-red-50/70" : "border-emerald-100 bg-emerald-50/70",
+              !hasMeasurable ? "border-slate-200 bg-slate-50" : hasCritical ? "border-red-100 bg-red-50/70" : "border-emerald-100 bg-emerald-50/70",
             )}>
               <div className={cn(
                 "flex items-center gap-2 text-xs font-semibold",
-                hasCritical ? "text-red-700" : "text-emerald-700",
+                !hasMeasurable ? "text-slate-600" : hasCritical ? "text-red-700" : "text-emerald-700",
               )}>
                 <span className={cn(
                   "h-2 w-2 rounded-full",
-                  hasCritical ? "bg-red-500 shadow-[0_0_0_4px_rgba(239,68,68,0.10)]" : "bg-emerald-500",
+                  !hasMeasurable ? "bg-slate-400" : hasCritical ? "bg-red-500 shadow-[0_0_0_4px_rgba(239,68,68,0.10)]" : "bg-emerald-500",
                 )} />
-                {hasCritical ? "Atención requerida" : "Portfolio saludable"}
+                {!hasMeasurable ? "Sin datos de salud" : hasCritical ? "Atención requerida" : "Portfolio saludable"}
               </div>
               <p className={cn(
                 "mt-2 text-sm font-semibold",
-                hasCritical ? "text-red-900" : "text-emerald-900",
+                !hasMeasurable ? "text-slate-700" : hasCritical ? "text-red-900" : "text-emerald-900",
               )}>
-                {hasCritical ? "Hay proyectos críticos" : "Sin desvíos críticos"}
+                {!hasMeasurable ? "Sin métricas evaluables" : hasCritical ? "Hay proyectos críticos" : "Sin desvíos críticos"}
               </p>
               {data?.summary?.dataFreshness && (
                 <p className="mt-1 text-[10px] text-slate-500">

@@ -1,6 +1,6 @@
 # Feedback Mind 6-10 — implementación
 
-Fuente: `Feedback Mind V2-4.pdf`, recibido el 8 de octubre de 2026. Desarrollo sobre 1.11.12. Release 1.12.0 desplegado el 8 de octubre de 2026; parche 1.12.1 preparado durante la verificación productiva.
+Fuente: `Feedback Mind V2-4.pdf`, recibido el 8 de octubre de 2026. Desarrollo sobre 1.11.12. Release 1.12.0 desplegado el 8 de octubre de 2026; parches 1.12.1 y 1.12.2 preparados durante la verificación productiva.
 
 ## Cambios
 
@@ -60,3 +60,10 @@ La conexión productiva se obtuvo en memoria desde Railway; no se guardaron cred
 Se comprobó con sesión autenticada: Inicio muestra 5–11 de octubre; Inicio y Tareas coinciden en horas personales; Cartera muestra 74 h; Epical General conserva su identidad, muestra No aplica para markup y salud neutral en su encabezado. La comprobación detectó que algunas filas de Cartera mostraban costo cero mientras el detalle mostraba el costo real: se actualizaba costUSD, pero quedaba costUSDNormalized anterior. El parche 1.12.1 reemplaza juntos los aliases financieros y agrega dos regresiones de comportamiento (moneda nativa/USD y ceros reales). Validación local del parche: 855 tests aprobados, 11 omitidos, TypeScript y build correctos.
 
 Las pruebas transaccionales de concurrencia, períodos cerrados, origen Excel y fallos de reconstrucción usan mocks; no se alteraron tareas, horas ni solicitudes de ausencia para ensayar esas mutaciones en producción. La verificación de despliegue no sustituye ese conjunto de pruebas reales. Cada release actualiza VERSION, package.json y CHANGELOG.md juntos y pasa CI de checkout limpio antes del merge.
+
+
+### Parche de salud de Cartera — 1.12.2
+
+Al mostrar los costos reales, el componente de análisis de Cartera reveló otro fallback de markup ausente a cero, que generaba recomendaciones de renegociación para internos. El análisis ahora comparte la elegibilidad de markup con la tabla: excluye internos, ingresos ausentes y costos pendientes, preservando sus importes en gráficos y filas. Encabezados, distribución y AI Copilot muestran salud neutral sin métricas evaluables. Se preservan los umbrales para comerciales con datos válidos y se evita un retorno antes de hooks cuando cambia un período sin actividad.
+
+Validación local: 860 tests aprobados, 11 omitidos, TypeScript y build correctos. QA en navegador con los componentes reales y datos simulados: dos proyectos con costo visible y sin markup evaluable muestran cero críticos, dos neutrales y ninguna recomendación de renegociación. Harness temporal retirado; captura en .context/neutral-qa.png. Verificación final del parche productivo registrada en .context.
