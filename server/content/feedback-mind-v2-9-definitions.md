@@ -62,7 +62,7 @@ Este documento es la fuente canónica y versionada de las reglas funcionales cer
 | TAR-13 | Implementado | Cargar horas desde la fila con presets, ingreso manual y temporizador. |
 | TAR-14 | Implementado | Home muestra gráfico mensual por proyecto y lista de tareas sin horas. |
 | TAR-15 | Implementado | Mostrar el proyecto en cada fila de tarea. |
-| TAR-16 | Diferido | No cambiar todavía la clasificación Próxima/En curso/Vencida; el feedback pidió expresamente no aplicar cambios. |
+| TAR-16 | Implementado | La clasificación Próxima/En curso/Vencida inicialmente diferida queda resuelta por Feedback 6-10: grupos por fechas, bloqueo con motivo y finalización manual; estados históricos no deciden la columna. |
 | TAR-17 | Implementado | Operaciones puede cargar horas para un tercero y toda atribución recae en esa persona. |
 | TAR-18 | Implementado | Dejar un solo reloj por tarea y mostrar el resumen de cargas. |
 | TAR-19 | Implementado | Permitir editar horas, fecha y descripción de una carga. |
@@ -85,7 +85,7 @@ Este documento es la fuente canónica y versionada de las reglas funcionales cer
 
 ## Las 21 correcciones cerradas
 
-Se consideran parte indivisible de esta versión: CFG-03, CFG-04, COT-05, COT-06, COT-07, COT-08, COT-11, COT-12, COT-13, COT-14, COT-15, COT-16, PRO-09, TAR-20, TAR-21, TAR-22, TAR-23, TAR-24, TAR-25, TAR-26 y OPS-08 (workflow transversal de Ausencias/Notificaciones). TAR-16 conserva expresamente la clasificación vigente porque el feedback pidió no modificarla todavía.
+Se consideran parte indivisible de esta versión: CFG-03, CFG-04, COT-05, COT-06, COT-07, COT-08, COT-11, COT-12, COT-13, COT-14, COT-15, COT-16, PRO-09, TAR-20, TAR-21, TAR-22, TAR-23, TAR-24, TAR-25, TAR-26 y OPS-08 (workflow transversal de Ausencias/Notificaciones). TAR-16, inicialmente diferido, se implementa con las decisiones confirmadas de Feedback 6-10.
 
 ## Addendum — revisión visual Feedback 14-8
 
@@ -225,7 +225,7 @@ cancellation_requested -> cancelled | approved
 
 ## Decisiones diferidas
 
-TAR-16 permanece diferido por instrucción expresa del feedback. No representa un gap de implementación.
+TAR-16 estuvo diferido por instrucción de aquella ronda; Feedback 6-10 confirma e implementa la clasificación por fechas.
 ## Addendum — Feedback Mind V2-13 (ronda 27-8)
 
 Las rondas 23-7 a 20-8 quedaron cerradas en las versiones 2.9.x a 2.11.x. Esta versión
@@ -248,7 +248,7 @@ identidad ni el conteo de las 70 entradas originales.
 | F27-12 | Implementado | La carga rápida atribuye por defecto al responsable de la tarea: lo que rige es el dueño, no quien carga. |
 | F27-13 | Implementado | La duración admite minutos reales (`45m`, `1h30`, `1:30`, `2,5`) con un mínimo de un minuto, y se redondea al minuto en vez de al cuarto de hora. La razón social puede crearse desde el propio cotizador. |
 
-La única decisión todavía diferida de esta ronda es TAR-16, por pedido explícito de no cambiar la clasificación de tareas.
+La decisión TAR-16 estuvo diferida en esta ronda y queda resuelta por Feedback 6-10.
 
 ### Revisión 2.13.1 — cruce de la auditoría contra el código desplegado
 
