@@ -1,6 +1,6 @@
 # Feedback Mind 6-10 — implementación
 
-Fuente: `Feedback Mind V2-4.pdf`, recibido el 8 de octubre de 2026. Cambios preparados sobre 1.11.12. No se publicó una versión.
+Fuente: `Feedback Mind V2-4.pdf`, recibido el 8 de octubre de 2026. Desarrollo sobre 1.11.12. Release 1.12.0 desplegado el 8 de octubre de 2026; parche 1.12.1 preparado durante la verificación productiva.
 
 ## Cambios
 
@@ -51,8 +51,12 @@ Las marcas `task_cost_sync:YYYY-MM:projectId` en system_config señalan reconstr
 - QA en navegador con datos simulados: desktop y 390×844; rango en dos clics, selección por Shift+clic y Shift+flecha, Escape, Backspace, motivo obligatorio, reclasificación al bloquear, seis columnas y diálogo de cronómetro con fecha. Se corrigió un desbordamiento del cronómetro móvil.
 - Capturas locales: `.context/feedback-desktop.png` y `.context/feedback-mobile.png`. El harness de QA temporal se retiró.
 
-## Pendiente para cerrar la entrega
+## Verificación productiva — 8 de octubre de 2026
 
-Este workspace no tiene DATABASE_URL ni archivos de entorno con conexión. No se aplicó la migración, no se ejecutó conciliación contra una base y no se verificaron los importes reales del feedback. Las pruebas transaccionales usan mocks; no sustituyen una prueba de concurrencia en PostgreSQL.
+El usuario autorizó el despliegue después de cerrar la validación local. La versión 1.12.0 pasó CI de checkout limpio y se mergeó en PR #307, commit `9970090f297932bbb9666d3c964cfa3a6710aaec`. Railway `mind-epical-web` marcó SUCCESS, deployment `ba216c87-7a8c-4716-ac12-795025407a86`; health respondió con ese commit. Migración 0081 comprobada por logs y columnas reales.
 
-Antes de publicar: aplicar la migración en una base de prueba, revisar la vista previa de los períodos/proyectos afectados, comprobar tarifas históricas ARS/USD y FX, probar guardado/edición/eliminación y fallos de reconstrucción, verificar períodos cerrados y origen Excel, y validar borrado concurrente y ausencias freelance/empleado con datos reales. La publicación debe actualizar VERSION, package.json y CHANGELOG.md juntos y pasar CI desde un checkout limpio.
+La conexión productiva se obtuvo en memoria desde Railway; no se guardaron credenciales en el workspace. El origen real es app y el corte histórico es 2026-08. Octubre no tiene cierre registrado. La vista previa mostró 12 registros mensuales, ninguna carga pendiente de tarifa/FX y dos acumulados discrepantes (proyectos 85 y 90). Se respaldaron los hechos del mes en .context y se aplicó la conciliación de octubre: 12 actualizados, cero insertados/eliminados y ningún error. La comparación posterior coincide en horas/costos con la vista previa; el hash de los snapshots y las cantidades de tareas/cargas permanecieron iguales.
+
+Se comprobó con sesión autenticada: Inicio muestra 5–11 de octubre; Inicio y Tareas coinciden en horas personales; Cartera muestra 74 h; Epical General conserva su identidad, muestra No aplica para markup y salud neutral en su encabezado. La comprobación detectó que algunas filas de Cartera mostraban costo cero mientras el detalle mostraba el costo real: se actualizaba costUSD, pero quedaba costUSDNormalized anterior. El parche 1.12.1 reemplaza juntos los aliases financieros y agrega dos regresiones de comportamiento (moneda nativa/USD y ceros reales). Validación local del parche: 855 tests aprobados, 11 omitidos, TypeScript y build correctos.
+
+Las pruebas transaccionales de concurrencia, períodos cerrados, origen Excel y fallos de reconstrucción usan mocks; no se alteraron tareas, horas ni solicitudes de ausencia para ensayar esas mutaciones en producción. La verificación de despliegue no sustituye ese conjunto de pruebas reales. Cada release actualiza VERSION, package.json y CHANGELOG.md juntos y pasa CI de checkout limpio antes del merge.

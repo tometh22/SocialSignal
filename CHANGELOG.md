@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.12.1 — 2026-10-08
+
+- Cartera: sincroniza los aliases financieros y los valores USD normalizados al aplicar el cálculo del período. Corrige filas que mostraban costo cero mientras el detalle mostraba el costo real; conserva la moneda nativa de presentación y las métricas sin datos. Detectado durante la verificación de producción de 1.12.0.
+
 ## 1.12.0 — 2026-10-08
 
 - Tareas: rangos de fechas con selección provisional, fechas civiles coherentes y fecha editable al cargar o corregir horas. Mis tareas muestra cliente/proyecto e incluye sólo responsables y colaboradores.

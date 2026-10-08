@@ -187,7 +187,7 @@ describe("Feedback Mind V2-9 integration contracts", () => {
     expect(aggregator).toContain("...laborProjectsInPeriod.map((project) => project.projectId)");
     expect(aggregator).toContain("project.quotationProjectName || project.activeProjectName || project.subprojectName");
     expect(aggregator).toContain("totalHours: viewData.totalWorkedHours");
-    expect(routes).toContain("project.metrics.workedHours = finData.metrics.totalHours");
+    expect(routes).toContain("project.metrics = withProjectPeriodMetrics(project.metrics, finData)");
     expect(portfolio).toContain("p.metrics?.totalHours ?? p.metrics?.workedHours");
   });
 
