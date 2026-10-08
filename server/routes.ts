@@ -1,3 +1,4 @@
+import { assignmentActor, isDelegatedToOthers } from "../shared/utils/task-assignment";
 import { withProjectPeriodMetrics } from "./domain/metrics/project-period-overlay";
 import { markTaskCostSyncPending } from "./domain/task-cost-sync";
 import { civilDateInBuenosAires, currentBuenosAiresWeek } from "@shared/utils/buenos-aires-week";
@@ -23449,6 +23450,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         : [];
       
       let myTasks: any[] = [];
+      let delegatedTasks: any[] = [];
       {
         const pid = personnelRecord[0]?.id;
         const { status, dateFrom, dateTo } = req.query;
@@ -23460,7 +23462,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const archivedProjectFilter = sql`${tasks.projectId} IN (SELECT id FROM active_projects WHERE status NOT IN ('voided', 'cancelled'))`;
         const allowedProjectIds = await accessibleTaskProjectIds(req);
         if (allowedProjectIds && allowedProjectIds.length === 0) {
-          return res.json({ tasks: [], personnelId: pid || null });
+          return res.json({ tasks: [], delegatedTasks: [], personnelId: pid || null });
         }
         let conditions: any[] = [assignmentConditions, archivedProjectFilter];
         if (allowedProjectIds) conditions.push(inArray(tasks.projectId, allowedProjectIds));
@@ -23478,11 +23480,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ));
         }
         myTasks = await db.select().from(tasks).where(and(...conditions)).orderBy(asc(tasks.dueDate), asc(tasks.position));
+        // Same visibility/date/status scope, with the authenticated assignment actor.
+        delegatedTasks = (await db.select().from(tasks)
+          .where(and(eq(tasks.assignedBy, Number(user.id)), ...conditions.slice(1)))
+          .orderBy(asc(tasks.dueDate), asc(tasks.position)))
+          .filter(task => isDelegatedToOthers(task, pid ?? null));
       }
 
       const projectMetadata = await db.select({ id: activeProjects.id, name: activeProjects.name, quotationName: quotations.projectName, clientId: activeProjects.clientId, clientName: clients.name })
         .from(activeProjects).leftJoin(quotations, eq(activeProjects.quotationId, quotations.id)).leftJoin(clients, eq(activeProjects.clientId, clients.id));
       const metadata = new Map(projectMetadata.map(p => [p.id, p]));
+      const delegateIds = [...new Set(delegatedTasks.flatMap(task => [task.assigneeId, ...(task.collaboratorIds ?? [])]).filter((id): id is number => typeof id === "number"))];
+      const delegateNames = delegateIds.length ? await db.select({ id: personnel.id, name: personnel.name }).from(personnel).where(inArray(personnel.id, delegateIds)) : [];
+      const names = new Map(delegateNames.map(person => [person.id, person.name]));
+      delegatedTasks = delegatedTasks.map(task => {
+        const project = metadata.get(task.projectId);
+        return { ...task, projectName: project?.name || project?.quotationName || null, clientName: project?.clientName ?? null,
+          assigneeName: names.get(task.assigneeId) ?? null,
+          collaboratorNames: (task.collaboratorIds ?? []).map((id: number) => names.get(id)).filter(Boolean) };
+      });
       myTasks = myTasks.map(task => { const p = metadata.get(task.projectId); return { ...task, projectName: p?.name || p?.quotationName || null, clientId: p?.clientId ?? null, clientName: p?.clientName ?? null }; });
       const myTaskIds = myTasks.map((task) => task.id);
       const myEstimateRows = myTaskIds.length > 0
@@ -23500,7 +23516,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         estimatedHoursForWeek: myEstimatesForCurrentWeek.get(task.id) ?? 0,
       }));
 
-      res.json({ tasks: myTasks, personnelId: personnelRecord[0]?.id || null });
+      res.json({ tasks: myTasks, delegatedTasks, personnelId: personnelRecord[0]?.id || null });
     } catch (error) {
       if (error instanceof z.ZodError) return res.status(400).json({ message: "Filtros inválidos", errors: error.errors });
       res.status(500).json({ message: "Error al obtener mis tareas" });
@@ -23727,7 +23743,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  async function duplicateTaskStructure(tx: any, source: Array<typeof tasks.$inferSelect>, projectId: number, actorId: number, memberIds: Set<number>, sectionName?: string, options: { rootId?: number; keepDates?: boolean; copyEstimates?: boolean } = {}) {
+  async function duplicateTaskStructure(tx: any, source: Array<typeof tasks.$inferSelect>, projectId: number, actorId: number, memberIds: Set<number>, sectionName?: string, options: { rootId?: number; keepDates?: boolean; copyEstimates?: boolean; preserveAssignmentActor?: boolean } = {}) {
     const idMap = new Map<number, number>();
     const created: Array<typeof tasks.$inferSelect> = [];
     let remaining = [...source];
@@ -23735,10 +23751,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const ready = remaining.filter(task => task.parentTaskId == null || task.id === options.rootId || idMap.has(task.parentTaskId));
       if (!ready.length) throw Object.assign(new Error("La estructura de tareas contiene una jerarquía inválida"), { status: 409 });
       for (const task of ready) {
-        const [copy] = await tx.insert(tasks).values({ title: task.id === options.rootId ? `${task.title} (copia)` : task.title, description: task.description, projectId, sectionName: sectionName ?? task.sectionName,
+        const assignment = {
           assigneeId: task.assigneeId && memberIds.has(task.assigneeId) ? task.assigneeId : null,
           collaboratorIds: (task.collaboratorIds ?? []).filter(id => memberIds.has(id)),
+        };
+        const [copy] = await tx.insert(tasks).values({ title: task.id === options.rootId ? `${task.title} (copia)` : task.title, description: task.description, projectId, sectionName: sectionName ?? task.sectionName,
+          ...assignment,
           status: "todo", priority: task.priority, isMilestone: task.isMilestone, position: task.position, parentTaskId: task.id === options.rootId ? task.parentTaskId : task.parentTaskId ? idMap.get(task.parentTaskId) : null,
+          assignedBy: options.preserveAssignmentActor ? task.assignedBy : assignmentActor({}, assignment, actorId),
           createdBy: actorId, startDate: options.keepDates ? task.startDate : null, dueDate: options.keepDates ? task.dueDate : null, loggedHours: 0, completedAt: null, recurrenceRule: task.recurrenceRule,
         }).returning();
         if (options.copyEstimates) {
@@ -24268,7 +24288,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const [created] = await db.transaction(async tx => {
         await tx.execute(sql`SELECT pg_advisory_xact_lock(293, ${data.projectId})`);
-        return tx.insert(tasks).values({ ...data, blockedAt: data.status === "blocked" ? new Date() : null }).returning();
+        return tx.insert(tasks).values({ ...data, assignedBy: assignmentActor({}, data, Number(user.id)), blockedAt: data.status === "blocked" ? new Date() : null }).returning();
       });
       await notifyTaskAssignment(created, Number(user.id));
       res.json({ ...created, ...await taskAssignmentAdvisory(created) });
@@ -24342,7 +24362,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             let expanded = true;
             while (expanded) { expanded = false; for (const row of all) if (row.parentTaskId && sourceIds.has(row.parentTaskId) && !sourceIds.has(row.id)) { sourceIds.add(row.id); expanded = true; } }
             const members = await tx.select({ personnelId: taskProjectMembers.personnelId }).from(taskProjectMembers).where(eq(taskProjectMembers.projectId, current.projectId));
-            const copies = await duplicateTaskStructure(tx, all.filter(row => sourceIds.has(row.id)), current.projectId, Number(req.user?.id), new Set(members.map(member => member.personnelId)));
+            const copies = await duplicateTaskStructure(tx, all.filter(row => sourceIds.has(row.id)), current.projectId, Number(req.user?.id), new Set(members.map(member => member.personnelId)), undefined, { preserveAssignmentActor: true });
             const root = copies.find(row => row.parentTaskId == null)!;
             [nextTask] = await tx.update(tasks).set({ startDate: new Date(`${nextDate}T12:00:00Z`), dueDate: new Date(`${nextDate}T12:00:00Z`), recurrenceSourceTaskId: taskId }).where(eq(tasks.id, root.id)).returning();
           }
@@ -24493,6 +24513,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         } else if (updates.blockedReason !== undefined && currentTask.status !== "blocked") {
           throw Object.assign(new Error("El motivo sólo corresponde a una tarea bloqueada"), { status: 400 });
         }
+        updates.assignedBy = assignmentActor(currentTask, updates, Number(req.user!.id));
         const [saved] = await tx.update(tasks).set(updates).where(eq(tasks.id, taskId)).returning();
         if (saved && (updates.sectionName !== undefined || updates.parentTaskId !== undefined)) {
           await tx.execute(sql`WITH RECURSIVE tree AS (SELECT id FROM tasks WHERE parent_task_id=${taskId} UNION SELECT child.id FROM tasks child JOIN tree parent ON child.parent_task_id=parent.id) UPDATE tasks SET section_name=${saved.sectionName}, updated_at=NOW() WHERE id IN (SELECT id FROM tree)`);

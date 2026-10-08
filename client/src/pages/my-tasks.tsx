@@ -1,9 +1,10 @@
+import DelegatedTasks from "@/components/tasks/DelegatedTasks";
 import { civilDateInBuenosAires } from "@shared/utils/buenos-aires-week";
 import { taskDateBucket } from "@shared/utils/task-date-bucket";
 import { clientCalendarColor } from "@/lib/client-calendar-color";
 import { taskPersonalBucket, TASK_DATE_LABELS } from "@shared/utils/task-workflow";
 import { useState } from "react";
-import { Link } from "wouter";
+import { Link, useSearch } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest, authFetch } from "@/lib/queryClient";
 import { format, startOfWeek, endOfWeek, addWeeks, subWeeks, eachDayOfInterval, isSameDay, isToday, isWithinInterval, parseISO } from "date-fns";
@@ -87,6 +88,8 @@ function taskIsOnDay(task: Task, day: Date): boolean {
 }
 
 export default function MyTasksPage() {
+  const search = useSearch();
+  const delegated = new URLSearchParams(search).get("scope") === "delegated";
   const [view, setView] = useState<"calendar" | "list">("calendar");
   const [currentWeek, setCurrentWeek] = useState(parseLocalDate(civilDateInBuenosAires(new Date())));
   const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
@@ -138,12 +141,12 @@ export default function MyTasksPage() {
     <TooltipProvider>
       <div className="space-y-4">
         {/* Page header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="text-xl font-bold text-foreground">Mis Tareas</h1>
-            <p className="text-sm text-muted-foreground">Tus tareas asignadas</p>
+            <p className="text-sm text-muted-foreground">{delegated ? "Seguimiento de las tareas que delegaste" : "Tus tareas asignadas"}</p>
           </div>
-          <div className="flex items-center gap-2">
+          {!delegated && <div className="flex flex-wrap items-center gap-2">
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="h-8 w-32 text-xs">
                 <SelectValue />
@@ -168,9 +171,14 @@ export default function MyTasksPage() {
               </Button>
             </div>
 
-          </div>
+          </div>}
         </div>
 
+        <nav className="flex flex-wrap gap-2" aria-label="Relación con las tareas">
+          <Button asChild variant={!delegated ? "secondary" : "ghost"}><Link href="/tasks/my-tasks" aria-current={!delegated ? "page" : undefined}>Asignadas a mí</Link></Button>
+          <Button asChild variant={delegated ? "secondary" : "ghost"}><Link href="/tasks/my-tasks?scope=delegated" aria-current={delegated ? "page" : undefined}>Asignadas por mí</Link></Button>
+        </nav>
+        {delegated ? <DelegatedTasks full /> : <>
         <div className="flex flex-wrap gap-2 text-xs" aria-label="Clientes">
           {[...new Map(tasks.map(t => [t.clientId ?? null, t.clientName ?? "Sin cliente"])).entries()].map(([id, name]) => <span key={id ?? "none"} className={cn("rounded border px-2 py-1", clientCalendarColor(id))}>{name}</span>)}
         </div>
@@ -412,6 +420,8 @@ export default function MyTasksPage() {
             )}
           </>
         )}
+
+        </>}
 
         <TaskDetailPanel
           taskId={selectedTaskId}

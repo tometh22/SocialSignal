@@ -1,3 +1,4 @@
+import DelegatedTasks from "@/components/tasks/DelegatedTasks";
 import TaskRangeCalendar from "@/components/tasks/TaskRangeCalendar";
 import TaskWorkflowControl from "@/components/tasks/TaskWorkflowControl";
 import { civilDateInBuenosAires } from "@shared/utils/buenos-aires-week";
@@ -539,6 +540,8 @@ export default function TasksHomePage() {
           )}
         </div>
       </div>
+
+      <DelegatedTasks />
 
       {/* Top two-column widgets */}
       <SectionHeading title="Tu espacio de trabajo" description="Tareas asignadas y proyectos recientes, en contexto." />

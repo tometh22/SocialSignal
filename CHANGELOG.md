@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.13.0 — 2026-10-08
+
+- Tareas: estado y bloqueo tienen una columna estable en escritorio y se acomodan debajo del título en móvil, sin desplazar responsables ni fechas.
+- Inicio, Tareas y Mis tareas incorporan «Asignadas por mí», con responsables, vencimientos, filtros por estado y acceso directo al detalle.
+- Se registra el autor de cada nueva asignación; las ediciones de texto/fechas conservan esa atribución y las recurrencias conservan al asignador original. Las asignaciones históricas no se atribuyen por inferencia al creador.
+- Los enlaces a un proyecto con `taskId` abren la tarea indicada.
+- Migración aditiva 0083 para el autor de la asignación y definiciones de producto 2.34.0.
+
 ## 1.12.3 — 2026-10-08
 
 - Costos pendientes: la Cartera y su API compatible consultan el mismo rango civil que los importes financieros, también con filtros antiguos de mes, trimestre y rangos personalizados. Evita mezclar pendientes del mes actual con otro período y anular su markup/margen por error.
