@@ -32,6 +32,28 @@ La configuración productiva es `hours_data_source=1` y `app_mode_cutover_date=2
 7. Los adaptadores de costos y FX dejaron de leer Sheets durante la operación nativa. Las cuentas y agregados importados quedan como referencia; los cálculos nativos excluyen filas de origen Excel. El agregado de costos conserva su origen hasta reconstruirse desde Mind, evitando que un total importado se presente como costo nativo. La migración `0085` limita el P&L de BI a historia anterior al corte y cierres nativos, y alimenta Cashflow con el ledger nativo, excluyendo anulaciones y transferencias propias.
 8. Ambas migraciones se instalan en una transacción antes de servir solicitudes; si fallan, el servidor no arranca sin esas protecciones.
 
+## Revisión de integración entre áreas
+
+La revisión posterior encontró y corrigió recorridos que no estaban cubiertos por la primera validación:
+
+- Un período en revisión no tenía vuelta a corrección. Ahora Finanzas puede devolverlo a abierto con motivo auditado; requiere un nuevo pre-cierre. No permite reabrir por esta vía un mes cerrado.
+- Las horas originales podían guardarse aunque su recálculo posterior fuera rechazado por cierre. La protección en PostgreSQL alcanza ahora `task_time_entries` y `time_entries`, comprobando fechas anteriores/nuevas en el mes civil de Buenos Aires.
+- El costo laboral y el checklist se calculaban en transacciones separadas. Ahora se ejecutan bajo el mismo bloqueo transaccional; tarifas/FX incompletos o sincronizaciones pendientes bloquean el cierre.
+- El cierre vuelve a consultar controles críticos para detectar nuevas cargas pendientes; los extractos también se identifican por las fechas de sus líneas. Los controles de documentos operativos excluyen referencias importadas.
+- La aceptación previa de una advertencia deja de reutilizarse si cambian sus valores o evidencia.
+- La liberación de una provisión puede reducir su saldo en un período posterior abierto, sin cambiar el importe reconocido ni el snapshot original.
+
+| Conexión | Evidencia disponible |
+| --- | --- |
+| Horas de tarea → costo laboral → pre-cierre → corrección → cierre | Circuito ejecutado con servicios reales y PostgreSQL local; tarifa faltante bloquea, corrección actualiza costos y el cierre impide editar/borrar horas. |
+| Factura de cliente → cuenta a cobrar → cobro posterior | Circuito ejecutado con servicios reales; documento importado duplicado no se aplica y el snapshot anterior no cambia. |
+| Factura de proveedor → Pasivo/costos → pago posterior | Circuito ejecutado con servicios reales; la factura alimenta costo indirecto y el pago cancela el saldo sin reescribir el cierre anterior. |
+| Provisión → cierre → liberación posterior | HTTP con router real: rechazo sobre mes cerrado y liberación en el siguiente mes con saldo/gasto actualizados. |
+| Presupuesto → proyección; cierre → BI | HTTP/SQL local: importes pendientes sin FX/presupuesto y exclusión de snapshots reabiertos de BI. |
+| Facturas del equipo aprobadas → Pasivo | Conexión verificada por lectura de código (`syncPersonalInvoicePayable`); esta revisión no ejecutó su aprobación completa por HTTP. El tratamiento `balance_only` evita duplicar el costo laboral. |
+
+La automatización hace cálculos, propagaciones y controles; no reemplaza la carga/confirmación de documentos, la conciliación de excepciones ni la aprobación de Finanzas y Admin. No se certificó una conexión bancaria automática ni un circuito productivo de punta a punta. Estas pruebas no son una garantía de ausencia de bugs.
+
 ## Validación
 
 - Migraciones aplicadas sobre una base PostgreSQL 16 local con copia de la estructura productiva, sin filas productivas; comprobación de idempotencia.
@@ -39,6 +61,7 @@ La configuración productiva es `hours_data_source=1` y `app_mode_cutover_date=2
 - HTTP local con rutas reales: permisos financieros, alta y edición, rechazo de moneda inválida, conflicto por versión desactualizada, proyección y reporte de transición.
 - Cierre completo con datos sintéticos: pre-cierre → revisión → snapshot, rechazo de modificación del snapshot, reapertura y evento de auditoría. El saldo de caja se conservó. También se verifica el cierre con ingresos registrados y la aplicación de pagos posteriores sobre facturas de meses cerrados, sin permitir cambiar sus importes económicos.
 - Revisión en Chrome de alta/edición del presupuesto y panel de transición. Evidencia local en `.context/financial-budget-qa.jpg` y `.context/financial-transition-qa.jpg`.
+- Pruebas adicionales PostgreSQL sobre estados, concurrencia, controles de costos, extractos sin período general y excepciones cuya evidencia cambia. Devolución verificada en Chrome, con evidencia en `.context/financial-correction-qa.jpg`.
 - Los resultados finales de tests, TypeScript y build se detallan en el PR. Ninguna prueba implica conciliación ni aprobación financiera productiva.
 
 ## Secuencia para completar la transición
@@ -55,6 +78,7 @@ La configuración productiva es `hours_data_source=1` y `app_mode_cutover_date=2
 
 ## Reapertura y recuperación
 
+- Si el período está en revisión, usar «Devolver a corrección» con motivo. Queda abierto y exige repetir el pre-cierre antes de una nueva revisión.
 - Usar Cierre financiero → Reabrir con motivo y permiso Admin. Corregir el origen en Mind, volver a ejecutar el pre-cierre, enviar a revisión y cerrar. El cierre produce una nueva versión y auditoría.
 - No deshabilitar triggers ni cambiar el corte para corregir importes. Las importaciones técnicas anteriores al corte siguen sujetas a cierres.
 - Si el despliegue falla antes de instalar las dos migraciones, la transacción revierte y el servidor no inicia. No reactivar los jobs del maestro como recuperación automática.

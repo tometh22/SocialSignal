@@ -831,12 +831,14 @@ export function createLedgerRouter(requireAuth: any) {
         const remaining = Number(existing.remainingAmount ?? existing.montoProvision ?? 0);
         if (input.amount > remaining) throw Object.assign(new Error("La liberación supera el saldo de la provisión."), { statusCode: 400 });
         const next = remaining - input.amount;
+        await tx.execute(sql`SELECT set_config('mind.financial_provision_period', ${input.periodKey}, true)`);
         const [updated] = await tx.update(provisionEntries).set({ remainingAmount: String(next), unwoundAmount: String(Number(existing.unwoundAmount ?? 0) + input.amount), status: next === 0 ? "RELEASED" : "ACTIVE", updatedAt: new Date() }).where(eq(provisionEntries.id, id)).returning();
         const [movement] = await tx.insert(provisionMovements).values({ provisionId: id, periodKey: input.periodKey, movementType: "release", amount: String(-input.amount), currency: existing.currency, note: input.note, createdBy: req.user!.id }).returning();
         await tx.insert(financialAuditEvents).values({ periodKey: input.periodKey, entityType: "provision_entry", entityId: id, action: "released", beforeData: existing, afterData: { provision: updated, movement }, actorUserId: req.user!.id, reason: input.note });
         return { existing, updated, movement };
       });
-      if (existing.periodKey !== input.periodKey) await refreshNativeFacts(existing.periodKey);
+      // The release is an expense movement of its own period; the original
+      // provision amount and any closed snapshot stay unchanged.
       await refreshNativeFacts(input.periodKey);
       res.json({ provision: updated, movement });
     } catch (error: any) { res.status(error.statusCode ?? ((error.code ?? error.cause?.code) === "23514" ? 409 : 400)).json({ message: error.message }); }

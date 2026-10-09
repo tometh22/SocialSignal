@@ -2,6 +2,9 @@
 
 ## 1.14.0 — 2026-10-09
 
+- Cierre: devolución de revisión a corrección con motivo y auditoría; los controles críticos deben resolverse antes de enviar a revisión.
+- Operaciones/Finanzas: horas protegidas por mes civil, recálculo y pre-cierre atómicos, bloqueo de costos laborales incompletos y nueva validación antes de congelar. Las provisiones pueden liberarse en un mes posterior sin reescribir el cierre original.
+
 - Finanzas: las importaciones operativas del maestro se bloquean desde el corte, incluidos tarifas, FX/REM, costos estimados y procesos legacy. El histórico conserva backfill explícito anterior al corte.
 - Presupuesto mensual de costos nativo con moneda, vigencia, auditoría y protección contra ediciones concurrentes.
 - Proyección y BI consumen fuentes nativas; presupuesto o FX ausente se muestra pendiente. Se preservan los snapshots históricos anteriores al corte.

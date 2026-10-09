@@ -24685,6 +24685,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       res.json({ ...created, costingWarning, costSyncPending: Boolean(syncWarning) });
     } catch (error: any) {
+      const dbError = error?.cause ?? error;
+      if (dbError?.code === "23514") return res.status(409).json({ message: dbError.message });
       if (error instanceof z.ZodError) return res.status(400).json({ message: "Datos inválidos", errors: error.errors });
       console.error("Error al registrar horas:", error);
       res.status(500).json({ message: "Error al registrar horas" });
@@ -24763,6 +24765,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const costingWarning = costing.totalCost == null ? "La hora quedó registrada; su tarifa o FX están pendientes." : null;
       res.json({ ...updated, costingWarning: [costingWarning, syncWarning].filter(Boolean).join(" ") || null, costSyncPending: Boolean(syncWarning) });
     } catch (error) {
+      const dbError = (error as any)?.cause ?? error;
+      if (dbError?.code === "23514") return res.status(409).json({ message: dbError.message });
       if (error instanceof z.ZodError) return res.status(400).json({ message: "Fecha inválida" });
       console.error("Error al editar carga de tarea:", error);
       res.status(500).json({ message: "Error al editar la carga de tiempo" });
@@ -24808,6 +24812,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json({ message: "Entrada eliminada", costingWarning: syncWarning, warning: syncWarning });
     } catch (error) {
+      const dbError = (error as any)?.cause ?? error;
+      if (dbError?.code === "23514") return res.status(409).json({ message: dbError.message });
       res.status(500).json({ message: "Error al eliminar entrada" });
     }
   });

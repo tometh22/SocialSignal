@@ -24,6 +24,7 @@ import {
   assertPeriodKey,
   closeFinancialPeriod,
   reopenFinancialPeriod,
+  returnFinancialCloseForCorrection,
   requestFinancialCloseReview,
   runFinancialPreClose,
 } from "./services/financial-close";
@@ -287,6 +288,14 @@ export function createFinancialNativeRouter(requireAuth: any) {
   router.post("/close/:period/request-review", ...finance, async (req, res) => {
     try { const input = notesSchema.parse(req.body); await requestFinancialCloseReview(req.params.period, req.user!.id, input.notes); res.json(await closeDetail(req.params.period)); }
     catch (error) { routeError(res, error); }
+  });
+
+  router.post("/close/:period/return-for-correction", ...finance, async (req, res) => {
+    try {
+      const { reason } = reasonSchema.parse(req.body);
+      await returnFinancialCloseForCorrection(req.params.period, req.user!.id, reason);
+      res.json(await closeDetail(req.params.period));
+    } catch (error) { routeError(res, error); }
   });
 
   router.post("/close/:period/close", requireAuth, requirePermission("admin"), async (req, res) => {

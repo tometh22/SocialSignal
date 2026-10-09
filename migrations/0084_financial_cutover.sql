@@ -80,10 +80,21 @@ BEGIN
       periods := array_append(periods,new_row->>'collection_period_actual');
     END IF;
   END IF;
+  -- Releasing a provision changes its remaining balance in the release month,
+  -- not the economic amount recognized in the original closed month.
+  IF TG_TABLE_NAME='provision_entries' AND TG_OP='UPDATE' THEN
+    payment_period := current_setting('mind.financial_provision_period',true);
+    IF payment_period ~ '^[0-9]{4}-(0[1-9]|1[0-2])$'
+      AND payment_period >= old_row->>'period_key'
+      AND old_row - ARRAY['remaining_amount','unwound_amount','status','updated_at']
+        = new_row - ARRAY['remaining_amount','unwound_amount','status','updated_at'] THEN settlement := true; END IF;
+  END IF;
   IF settlement THEN periods := array_append(periods,payment_period); END IF;
   FOREACH row_data IN ARRAY ARRAY[old_row,new_row] LOOP
     IF row_data IS NULL OR settlement THEN CONTINUE; END IF;
-    IF TG_ARGV[0]='year_month' THEN
+    IF TG_ARGV[0]='civil_date' THEN
+      periods := array_append(periods, to_char((row_data->>'date')::timestamp AT TIME ZONE 'UTC' AT TIME ZONE 'America/Argentina/Buenos_Aires', 'YYYY-MM'));
+    ELSIF TG_ARGV[0]='year_month' THEN
       periods := array_append(periods, (row_data->>'year') || '-' || lpad(row_data->>'month',2,'0'));
     ELSIF TG_ARGV[0]='range' THEN
       FOR p IN SELECT to_char(m,'YYYY-MM') FROM generate_series(((row_data->>'start_period')||'-01')::date,((row_data->>'end_period')||'-01')::date,interval '1 month') m LOOP
@@ -133,6 +144,7 @@ DECLARE r record;
 BEGIN
   FOR r IN SELECT * FROM (VALUES
     ('monthly_financial_summary','period_key','native'),
+    ('task_time_entries','civil_date','native'),('time_entries','civil_date','native'),
     ('fact_labor_month','period_key','native'),('fact_cost_month','period_key','native'),('fact_rc_month','period_key','native'),
     ('activo_entries','period_key','source'),('pasivo_entries','period_key','source'),('cashflow_transactions','period_key','source'),
     ('provision_entries','period_key','source'),('provision_movements','period_key','native'),('pl_adjustments','period_key','native'),

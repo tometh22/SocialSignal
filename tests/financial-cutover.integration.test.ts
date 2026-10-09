@@ -13,6 +13,8 @@ describe.skipIf(!url)("financial cutover in PostgreSQL",()=>{
     c=new Client({connectionString:url});await c.connect();
     await query(`CREATE SCHEMA ${schema}; SET search_path TO ${schema};
       CREATE TABLE users(id integer PRIMARY KEY);
+      CREATE TABLE task_time_entries(id serial PRIMARY KEY,date timestamp,hours numeric);
+      CREATE TABLE time_entries(id serial PRIMARY KEY,date timestamp,hours numeric);
       CREATE TABLE system_config(config_key text PRIMARY KEY,description text);
       CREATE TABLE financial_close_periods(period_key text PRIMARY KEY,status text,updated_at timestamp);
       CREATE TABLE exchange_rates(id serial PRIMARY KEY,year int,month int,rate numeric,rate_type text,is_active boolean,updated_at timestamp);
@@ -26,6 +28,7 @@ describe.skipIf(!url)("financial cutover in PostgreSQL",()=>{
     for(const table of ["fact_labor_month","fact_cost_month","fact_rc_month","activo_entries","pasivo_entries","cashflow_transactions","provision_entries","provision_movements","pl_adjustments","cash_movements"]){
       await query(`CREATE TABLE ${table}(id serial PRIMARY KEY,period_key text,source text,amount numeric,outstanding_amount numeric,status text)`);
     }
+    await query("ALTER TABLE provision_entries ADD COLUMN remaining_amount numeric, ADD COLUMN unwound_amount numeric, ADD COLUMN monto_provision numeric");
     for(const table of ["income_sot","financial_sot"])await query(`CREATE TABLE ${table}(id serial PRIMARY KEY,month_key text,amount numeric)`);
     await query("INSERT INTO fact_cost_month(period_key,amount) VALUES('2026-07',7),('2026-08',8)");
     const migration=readFileSync("migrations/0084_financial_cutover.sql","utf8");
@@ -58,6 +61,19 @@ describe.skipIf(!url)("financial cutover in PostgreSQL",()=>{
   it("moving a native row cannot bypass a closed source month",async()=>{
     await rejected("UPDATE activo_entries SET period_key='2026-11' WHERE period_key='2026-10'");
   });
+  it("freezes source hours using the Buenos Aires civil month",async()=>{
+    // 02:30 UTC on November 1 is still October in Buenos Aires.
+    await rejected("INSERT INTO task_time_entries(date,hours) VALUES('2026-11-01 02:30:00',2)");
+    await rejected("INSERT INTO time_entries(date,hours) VALUES('2026-10-15 12:00:00',2)");
+    await query("INSERT INTO task_time_entries(date,hours) VALUES('2026-11-01 03:00:00',2)");
+    await rejected("UPDATE task_time_entries SET date='2026-10-15 12:00:00'");
+    await query("INSERT INTO financial_close_periods VALUES('2027-02','PRE_CLOSE',now())");
+    await query("INSERT INTO time_entries(date,hours) VALUES('2027-02-01 12:00:00',2)");
+    expect((await query("SELECT status FROM financial_close_periods WHERE period_key='2027-02'")).rows[0].status).toBe('OPEN');
+    await query("UPDATE financial_close_periods SET status='IN_REVIEW' WHERE period_key='2027-02'");
+    await rejected("UPDATE time_entries SET date='2027-03-01 12:00:00'");
+    await rejected("DELETE FROM time_entries");
+  });
   it("locks tariff, FX and revenue delivery months",async()=>{
     await rejected("INSERT INTO exchange_rates(year,month,rate) VALUES(2026,10,1500)");
     await rejected("INSERT INTO personnel_historical_costs(year,month,amount) VALUES(2026,10,10)");
@@ -82,6 +98,20 @@ describe.skipIf(!url)("financial cutover in PostgreSQL",()=>{
     await query("ROLLBACK");
     await query("BEGIN; SELECT set_config('mind.financial_payment_period','2026-10',true)");
     await rejected("UPDATE activo_entries SET outstanding_amount=0 WHERE period_key='2026-10'");
+    await query("ROLLBACK");
+  });
+  it("releases a provision in an open later month while preserving its original amount",async()=>{
+    await query("INSERT INTO provision_entries(period_key,status,monto_provision,remaining_amount) VALUES('2027-03','ACTIVE',100,100)");
+    await query("INSERT INTO financial_close_periods VALUES('2027-03','CLOSED',now())");
+    await query("BEGIN; SELECT set_config('mind.financial_provision_period','2027-04',true)");
+    await query("UPDATE provision_entries SET remaining_amount=60,unwound_amount=40 WHERE period_key='2027-03'");
+    await query("COMMIT");
+    expect((await query("SELECT monto_provision,remaining_amount FROM provision_entries WHERE period_key='2027-03'")).rows[0]).toEqual({monto_provision:'100',remaining_amount:'60'});
+    await query("BEGIN; SELECT set_config('mind.financial_provision_period','2027-04',true)");
+    await rejected("UPDATE provision_entries SET monto_provision=200 WHERE period_key='2027-03'");
+    await query("ROLLBACK");
+    await query("BEGIN; SELECT set_config('mind.financial_provision_period','2027-03',true)");
+    await rejected("UPDATE provision_entries SET remaining_amount=0 WHERE period_key='2027-03'");
     await query("ROLLBACK");
   });
   it("invalidates a pre-close when financial inputs change",async()=>{
