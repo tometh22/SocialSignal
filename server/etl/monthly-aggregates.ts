@@ -1,3 +1,4 @@
+import { assertExcelFinancialImportAllowed } from "../services/financial-source-policy";
 /**
  * ETL CONSOLIDADO - Sistema de 3 Vistas (Original, Operativa, USD)
  * 
@@ -190,6 +191,7 @@ function computeUSDView(data: RawPeriodData): ViewData {
  * Procesa un proyecto-período y genera las 3 vistas
  */
 export async function processProjectPeriod(periodKey: string) {
+  await assertExcelFinancialImportAllowed(periodKey);
   console.log(`📊 Procesando período ${periodKey}...`);
   
   const [year, month] = periodKey.split('-').map(Number);

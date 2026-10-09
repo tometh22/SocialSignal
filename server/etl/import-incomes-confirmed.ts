@@ -1,3 +1,4 @@
+import { assertExcelFinancialImportAllowed } from "../services/financial-source-policy";
 /**
  * 📊 Income ETL from "Proyectos confirmados y estimados"
  * Reemplaza "Ventas Tomi" como fuente de ingresos
@@ -95,6 +96,7 @@ export interface ImportIncomesResult {
  * 🔄 Importar ingresos desde "Proyectos confirmados y estimados"
  */
 export async function importIncomesFromConfirmed(rows: any[]): Promise<ImportIncomesResult> {
+  await assertExcelFinancialImportAllowed();
   const result: ImportIncomesResult = {
     inserted: 0,
     updated: 0,

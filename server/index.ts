@@ -1,3 +1,5 @@
+import { financialNativeBiMigrationSql } from "./migrations/financial-native-bi";
+import { financialCutoverMigrationSql } from "./migrations/financial-cutover";
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
@@ -904,6 +906,16 @@ async function applyPendingMigrations() {
     await run('0080 prompt existing users without notification channels', userNotificationSetupExistingOptInMigrationSql);
     await run('0081 notification category preferences', userNotificationCategoryPreferencesMigrationSql);
     await run('0082 notification push subscriptions', userNotificationPushSubscriptionsMigrationSql);
+    // Financial safety must be installed before serving requests or starting jobs.
+    await client.query("BEGIN");
+    try {
+      await client.query(financialCutoverMigrationSql);
+      await client.query(financialNativeBiMigrationSql);
+      await client.query("COMMIT");
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    }
 
     // 0033: feriados duplicados (mismo date+name insertado más de una vez desde el
     // formulario) — borra duplicados conservando la fila más antigua y agrega la

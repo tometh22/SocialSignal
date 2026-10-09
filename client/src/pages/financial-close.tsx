@@ -1,3 +1,4 @@
+import { FinancialTransitionPanel } from "@/components/financial-transition-panel";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { authFetchJson } from "@/lib/queryClient";
@@ -24,7 +25,7 @@ export default function FinancialClosePage() {
   const query = useQuery<CloseDetail>({ queryKey: ["financial-close", period], queryFn: () => authFetchJson(`/api/financial-native/close/${period}`) });
   const mutation = useMutation({
     mutationFn: ({ action, body }: { action: string; body?: unknown }) => authFetchJson(`/api/financial-native/close/${period}/${action}`, { method: "POST", body: body ? JSON.stringify(body) : undefined }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["financial-close"] }); toast({ title: "Cierre actualizado" }); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["financial-close"] }); qc.invalidateQueries({ queryKey: ["financial-transition"] }); toast({ title: "Cierre actualizado" }); },
     onError: (e: Error) => toast({ title: "No se pudo avanzar", description: e.message, variant: "destructive" }),
   });
   const resolveMutation = useMutation({
@@ -49,6 +50,7 @@ export default function FinancialClosePage() {
     <Card><CardHeader><div className="flex flex-wrap items-center justify-between gap-3"><CardTitle>Checklist de {period}</CardTitle><div className="flex flex-wrap gap-2"><Button variant="outline" disabled={busy || state === "CLOSED"} onClick={() => mutation.mutate({ action: "pre-close" })}><RefreshCw className="mr-2 h-4 w-4" />Ejecutar pre-cierre</Button>{state === "PRE_CLOSE" && <Button disabled={busy} onClick={() => mutation.mutate({ action: "request-review", body: {} })}><ShieldCheck className="mr-2 h-4 w-4" />Enviar a revisión</Button>}{state === "IN_REVIEW" && isAdmin && <Button disabled={busy || failedCritical > 0} onClick={() => mutation.mutate({ action: "close" })}><LockKeyhole className="mr-2 h-4 w-4" />Cerrar período</Button>}{state === "CLOSED" && isAdmin && <Button variant="destructive" disabled={busy} onClick={reopen}><RotateCcw className="mr-2 h-4 w-4" />Reabrir</Button>}</div></div></CardHeader>
       <CardContent className="space-y-3">{query.isLoading && <p className="text-sm text-muted-foreground">Ejecutando controles…</p>}{!query.isLoading && checks.length === 0 && <div className="rounded-xl border border-dashed p-10 text-center text-sm text-muted-foreground">Todavía no se ejecutó el pre-cierre de este período.</div>}{checks.map((check) => <div key={check.id} className="flex flex-col gap-3 rounded-xl border p-4 md:flex-row md:items-center"><div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-50">{check.status === "passed" || check.status === "resolved" || check.status === "accepted" ? <CheckCircle2 className="h-5 w-5 text-emerald-600" /> : <AlertTriangle className={`h-5 w-5 ${check.severity === "critical" ? "text-red-600" : "text-amber-600"}`} />}</div><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><p className="font-medium">{check.title}</p><Badge variant={check.severity === "critical" ? "destructive" : "secondary"}>{statusLabel(check.severity)}</Badge><Badge variant="outline">{statusLabel(check.status)}</Badge></div><p className="mt-1 text-sm text-muted-foreground">{check.detail}</p>{check.resolution && <p className="mt-1 text-xs text-emerald-700">Resolución: {check.resolution}</p>}{check.severity === "critical" && check.status === "failed" && <p className="mt-1 text-xs text-red-700">Corregí el origen y volvé a ejecutar el pre-cierre.</p>}</div>{check.status === "failed" && check.severity !== "critical" && state !== "CLOSED" && <Button size="sm" variant="outline" onClick={() => resolve(check)}>Aceptar excepción</Button>}</div>)}</CardContent>
     </Card>
+    <FinancialTransitionPanel period={period} />
     {state === "CLOSED" && <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900"><LockKeyhole className="h-4 w-4" />El período está congelado. Los tableros leen el snapshot versión {query.data?.period?.snapshotVersion}.</div>}
   </div>;
 }

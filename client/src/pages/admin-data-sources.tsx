@@ -145,7 +145,7 @@ export default function AdminDataSources() {
             )}
           </div>
           <CardDescription>
-            El toggle cambia qué proceso escribe en <code className="text-xs">fact_labor_month</code>. Los analytics siempre leen de ahí.
+            El cambio de fuente queda bloqueado después de establecer el corte financiero. Desde ese mes, las horas se mantienen en Mind.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -162,7 +162,7 @@ export default function AdminDataSources() {
             <Switch
               checked={isAppMode}
               onCheckedChange={handleToggle}
-              disabled={toggleMutation.isPending || isLoading}
+              disabled={toggleMutation.isPending || isLoading || Boolean(currentCutover)}
             />
             <div className="flex items-center gap-3">
               <div className="text-right">

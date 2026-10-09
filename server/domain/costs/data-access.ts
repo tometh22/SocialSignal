@@ -1,3 +1,5 @@
+import { getFinancialCutover } from "../../services/financial-source-policy";
+import { pool } from "../../db";
 /**
  * 🚀 COSTS DATA ACCESS - LECTURA STAGING/DB/SHEETS + CACHING
  * 
@@ -118,6 +120,32 @@ async function fetchCostsFromDatabase(): Promise<RawCostRecord[]> {
 // ==================== UNIFIED DATA ACCESS ====================
 
 export async function getCostData(source: 'sheets' | 'database' | 'auto' | 'fresh' = 'auto'): Promise<ParsedCostRecord[]> {
+  const cutover = await getFinancialCutover();
+  if (cutover) {
+    const history = parseCostRecords(await fetchCostsFromDatabase()).filter(row => row.period < cutover);
+    const { rows } = await pool.query(`
+      WITH costs AS (
+        SELECT project_id,period_key,'Directo'::text kind,cost_ars ars,cost_usd usd
+        FROM fact_labor_month WHERE period_key >= $1 AND left(source_row_id,4)='app_'
+        UNION ALL
+        SELECT project_id,period_key,CASE WHEN cost_treatment='direct' THEN 'Directo' ELSE 'Indirecto' END,
+          CASE WHEN currency='ARS' THEN COALESCE(net_amount,monto_ars) ELSE NULL END,
+          COALESCE(CASE WHEN currency='ARS' THEN net_amount/NULLIF(cotizacion,0) ELSE net_amount END,monto_total_usd,monto_usd,monto_ars/NULLIF(cotizacion,0))
+        FROM pasivo_entries WHERE period_key >= $1 AND source<>'excel' AND voided_at IS NULL AND cost_treatment IN ('direct','indirect','unclassified')
+      )
+      SELECT COALESCE(c.name,'Epical') client_name,COALESCE(ap.name,q.project_name,'Overhead') project_name,
+        f.period_key,f.kind,sum(f.ars)::float ars,sum(f.usd)::float usd
+      FROM costs f LEFT JOIN active_projects ap ON ap.id=f.project_id
+      LEFT JOIN quotations q ON q.id=ap.quotation_id LEFT JOIN clients c ON c.id=ap.client_id
+      GROUP BY c.name,ap.name,q.project_name,f.period_key,f.kind
+    `,[cutover]);
+    const native: ParsedCostRecord[] = rows.map((row,index) => ({
+      clientName:row.client_name,projectName:row.project_name,period:row.period_key,
+      arsAmount:row.ars,usdAmount:row.usd,kind:row.kind,sourceRow:index,
+      rawRecord:{cliente:row.client_name,proyecto:row.project_name,month_key:row.period_key,sheetName:'Mind'},
+    }));
+    return [...history,...native];
+  }
   console.log(`🚀 COSTS DATA ACCESS: Fetching from source "${source}"`);
   
   // 🗑️ FRESH: Invalidate cache if fresh requested

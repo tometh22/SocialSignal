@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.14.0 — 2026-10-09
+
+- Finanzas: las importaciones operativas del maestro se bloquean desde el corte, incluidos tarifas, FX/REM, costos estimados y procesos legacy. El histórico conserva backfill explícito anterior al corte.
+- Presupuesto mensual de costos nativo con moneda, vigencia, auditoría y protección contra ediciones concurrentes.
+- Proyección y BI consumen fuentes nativas; presupuesto o FX ausente se muestra pendiente. Se preservan los snapshots históricos anteriores al corte.
+- El cierre incorpora un panel de transición y controles sobre saldos iniciales e ingresos nativos faltantes. No declara conciliación aprobada por tener datos cargados.
+- Migraciones 0084/0085: protecciones transaccionales de períodos cerrados y vistas BI; pruebas PostgreSQL incorporadas a CI.
+- Auditoría de producción de solo lectura documenta los datos y cierres que Finanzas aún debe completar antes de retirar el maestro.
+
 ## 1.13.0 — 2026-10-08
 
 - Tareas: estado y bloqueo tienen una columna estable en escritorio y se acomodan debajo del título en móvil, sin desplazar responsables ni fechas.

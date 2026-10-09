@@ -266,6 +266,7 @@ async function applyReceivablePayment(tx: any, input: { data: FinancialExtractio
   const appliedUSD = input.amountUSD * (appliedOriginal / paymentInDocumentCurrency);
   const next = Math.max(0, current - appliedOriginal);
   const status = next === 0 ? "PAID" : "PARTIAL";
+  await tx.execute(sql`SELECT set_config('mind.financial_payment_period', (SELECT period_key FROM cashflow_transactions WHERE id=${input.cashflowId}), true)`);
   await tx.update(activoEntries).set({ outstandingAmount: String(next), status, cobradoAlCierre: next === 0, fechaPago: input.data.paymentDate ? asDate(input.data.paymentDate) : new Date(), updatedBy: input.userId, updatedAt: new Date() }).where(eq(activoEntries.id, document.id));
   const [application] = await tx.insert(financialDocumentApplications).values({
     direction: "receivable", activoEntryId: document.id, cashflowTransactionId: input.cashflowId,
@@ -307,6 +308,7 @@ async function applyPayablePayment(tx: any, input: { data: FinancialExtraction; 
   const appliedUSD = input.amountUSD * (appliedOriginal / paymentInDocumentCurrency);
   const next = Math.max(0, current - appliedOriginal);
   const status = next === 0 ? "PAID" : "PARTIAL";
+  await tx.execute(sql`SELECT set_config('mind.financial_payment_period', (SELECT period_key FROM cashflow_transactions WHERE id=${input.cashflowId}), true)`);
   await tx.update(pasivoEntries).set({ outstandingAmount: String(next), status, pagadoAlCierre: next === 0, fechaPago: input.data.paymentDate ? asDate(input.data.paymentDate) : new Date(), updatedBy: input.userId, updatedAt: new Date() }).where(eq(pasivoEntries.id, document.id));
   const [application] = await tx.insert(financialDocumentApplications).values({
     direction: "payable", pasivoEntryId: document.id, cashflowTransactionId: input.cashflowId,

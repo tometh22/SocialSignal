@@ -88,10 +88,9 @@ export async function getCostBreakdown(year: number): Promise<CostBreakdown> {
        SELECT concepto, SUM(monto)::float AS monto
          FROM (
            SELECT detalle AS concepto, monto_total_usd::numeric AS monto
-             FROM fact_estimated_cost_month
+             FROM financial_cost_forecast_month
             WHERE month_key LIKE $1 AND detalle IS NOT NULL AND monto_total_usd IS NOT NULL
               AND NOT EXISTS (SELECT 1 FROM native_periods n WHERE n.period_key=month_key)
-              AND (NOT EXISTS (SELECT 1 FROM cutover) OR month_key < (SELECT period_key FROM cutover))
            UNION ALL
            SELECT COALESCE(vendor_name, detalle, subtipo_costo, 'Sin clasificar') AS concepto,
                   COALESCE(CASE WHEN currency='ARS' THEN net_amount/NULLIF(cotizacion,0) ELSE net_amount END,monto_total_usd,monto_usd,monto_ars/NULLIF(cotizacion,0),0)::numeric AS monto
@@ -112,7 +111,7 @@ export async function getCostBreakdown(year: number): Promise<CostBreakdown> {
               COALESCE(direct_usd, 0)::float AS directo,
               COALESCE(indirect_usd, 0)::float AS indirecto,
               COALESCE(provisions_usd, 0)::float AS provisiones
-         FROM fact_cost_month
+         FROM financial_native_cost_month
         WHERE period_key LIKE $1
         ORDER BY period_key`,
       [`${year}%`],

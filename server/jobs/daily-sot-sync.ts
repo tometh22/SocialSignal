@@ -57,6 +57,8 @@ async function runFullPipeline() {
   const syncFailures: string[] = [];
 
   try {
+      const { getFinancialCutover } = await import("../services/financial-source-policy");
+      if (await getFinancialCutover()) { return; }
     const { googleSheetsWorkingService } = await import('../services/googleSheetsWorking');
     const { executeSoTETL } = await import('../etl/sot-etl');
 

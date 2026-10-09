@@ -1,3 +1,4 @@
+import { assertExcelFinancialImportAllowed } from "../services/financial-source-policy";
 /**
  * 📊 ETL from "Rendimiento Cliente" - Financial Source of Truth
  * Fuente unificada de ingresos y costos por proyecto
@@ -144,6 +145,7 @@ async function getFXForMonth(year: number, monthNum: number): Promise<number> {
  * Importar datos de "Rendimiento Cliente" a financial_sot
  */
 export async function importRendimientoCliente(): Promise<ImportRendimientoClienteResult> {
+  await assertExcelFinancialImportAllowed();
   const result: ImportRendimientoClienteResult = {
     inserted: 0,
     updated: 0,
