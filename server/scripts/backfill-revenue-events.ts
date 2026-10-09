@@ -1,4 +1,5 @@
 import { pool } from "../db";
+import { assertExcelFinancialImportAllowed, getFinancialCutover } from "../services/financial-source-policy";
 
 /**
  * Backfill de revenue_events desde google_sheets_sales.
@@ -57,7 +58,10 @@ export async function backfillRevenueEvents(): Promise<BackfillResult> {
         AND s.amount_usd IS NOT NULL`,
   );
 
+  const cutover = await getFinancialCutover();
   for (const row of rows) {
+    if (cutover && row.month_key >= cutover) { result.skipped++; continue; }
+    await assertExcelFinancialImportAllowed(row.month_key);
     const amountUsd = Number(row.amount_usd);
     if (!Number.isFinite(amountUsd) || amountUsd === 0) {
       result.skipped++;

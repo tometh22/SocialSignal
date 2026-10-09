@@ -1,3 +1,5 @@
+import { financialTransitionReport } from "./services/financial-transition";
+import { listFinancialCostPlans, saveFinancialCostPlan } from "./services/financial-cost-plans";
 import { Router, type NextFunction, type Request, type Response } from "express";
 import { and, desc, eq, notInArray, sql } from "drizzle-orm";
 import { createHash } from "crypto";
@@ -22,6 +24,7 @@ import {
   assertPeriodKey,
   closeFinancialPeriod,
   reopenFinancialPeriod,
+  returnFinancialCloseForCorrection,
   requestFinancialCloseReview,
   runFinancialPreClose,
 } from "./services/financial-close";
@@ -34,7 +37,9 @@ const notesSchema = z.object({ notes: z.string().max(2_000).nullable().optional(
 function routeError(res: Response, error: unknown) {
   if (error instanceof z.ZodError) return res.status(400).json({ message: "Revisá los datos ingresados.", issues: error.issues });
   const typed = error as Error & { statusCode?: number; code?: string };
-  if (typed.code === "23505") return res.status(409).json({ message: "La operación ya fue contabilizada." });
+  const databaseError = (error as { cause?: Error & { code?: string } }).cause ?? typed;
+  if (databaseError.code === "23505") return res.status(409).json({ message: "La operación ya fue contabilizada." });
+  if (databaseError.code === "23514") return res.status(409).json({ message: databaseError.message });
   console.error("Financial native route error:", typed);
   return res.status(typed.statusCode ?? 500).json({ message: typed.message || "No se pudo completar la operación." });
 }
@@ -77,6 +82,22 @@ export function createFinancialNativeRouter(requireAuth: any) {
       next();
     });
   };
+
+  router.get("/transition/:period", ...finance, async (req,res) => {
+    try { res.json(await financialTransitionReport(req.params.period)); } catch(e) { routeError(res,e); }
+  });
+  router.get("/cost-plans", ...finance, async (_req, res) => {
+    try { res.json(await listFinancialCostPlans()); } catch (e) { routeError(res,e); }
+  });
+  router.post("/cost-plans", ...finance, async (req, res) => {
+    try { res.status(201).json(await saveFinancialCostPlan(req.body,req.user!.id)); } catch (e) { routeError(res,e); }
+  });
+  router.put("/cost-plans/:id", ...finance, async (req, res) => {
+    try {
+      const id=z.coerce.number().int().positive().parse(req.params.id);
+      res.json(await saveFinancialCostPlan(req.body,req.user!.id,id));
+    } catch (e) { routeError(res,e); }
+  });
 
   router.get("/intake", ...finance, async (req, res) => {
     try {
@@ -267,6 +288,14 @@ export function createFinancialNativeRouter(requireAuth: any) {
   router.post("/close/:period/request-review", ...finance, async (req, res) => {
     try { const input = notesSchema.parse(req.body); await requestFinancialCloseReview(req.params.period, req.user!.id, input.notes); res.json(await closeDetail(req.params.period)); }
     catch (error) { routeError(res, error); }
+  });
+
+  router.post("/close/:period/return-for-correction", ...finance, async (req, res) => {
+    try {
+      const { reason } = reasonSchema.parse(req.body);
+      await returnFinancialCloseForCorrection(req.params.period, req.user!.id, reason);
+      res.json(await closeDetail(req.params.period));
+    } catch (error) { routeError(res, error); }
   });
 
   router.post("/close/:period/close", requireAuth, requirePermission("admin"), async (req, res) => {

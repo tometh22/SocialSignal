@@ -1,3 +1,4 @@
+import { assertExcelFinancialImportAllowed } from "./financial-source-policy";
 import { parseMasterFxRows } from "../../shared/utils/master-fx";
 import { google } from 'googleapis';
 import { resolveIncomeAmountColumns, isProjectionRow } from '../etl/proyectos-confirmados-spec';
@@ -1400,6 +1401,7 @@ class GoogleSheetsWorkingService {
    * Importar costos directos desde "Costos directos e indirectos"
    */
   async importDirectCosts(storage: any): Promise<{ success: boolean; costsImported: number; costsUpdated: number; errors: string[] }> {
+    await assertExcelFinancialImportAllowed();
     console.log('📊 Importando costos directos desde Excel...');
     
     try {
@@ -4168,6 +4170,7 @@ class GoogleSheetsWorkingService {
   }
 
   async importActivoEntries(_storage: any, periodKey: string): Promise<{ inserted: number; updated: number; errors: string[] }> {
+    await assertExcelFinancialImportAllowed(periodKey);
     const errors: string[] = [];
     let inserted = 0;
     let updated = 0;
@@ -4272,6 +4275,7 @@ class GoogleSheetsWorkingService {
   }
 
   async importPasivoEntries(_storage: any, periodKey: string): Promise<{ inserted: number; updated: number; errors: string[] }> {
+    await assertExcelFinancialImportAllowed(periodKey);
     const errors: string[] = [];
     let inserted = 0;
     let updated = 0;
@@ -4376,6 +4380,7 @@ class GoogleSheetsWorkingService {
   }
 
   async importProvisionEntries(storage: any, periodKey: string): Promise<{ inserted: number; errors: string[] }> {
+    await assertExcelFinancialImportAllowed(periodKey);
     const errors: string[] = [];
     let inserted = 0;
     try {
@@ -4434,6 +4439,7 @@ class GoogleSheetsWorkingService {
   }
 
   async importCashflowTransactions(storage: any, periodKey: string): Promise<{ inserted: number; errors: string[] }> {
+    await assertExcelFinancialImportAllowed(periodKey);
     const errors: string[] = [];
     let inserted = 0;
     let skipped = 0;

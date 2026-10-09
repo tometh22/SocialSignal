@@ -1,3 +1,4 @@
+import { assertExcelFinancialImportAllowed } from "../services/financial-source-policy";
 /**
  * MÓDULO DEDICADO DE PROVISIONES CONTABLES
  * 
@@ -291,6 +292,7 @@ export async function getProvisionSummaryByPeriod(): Promise<Map<string, Provisi
  * - Esto asegura que octubre 2025 vea las facturas de diciembre como provisiones
  */
 export async function updateProvisionsinFactCostMonth(): Promise<void> {
+  await assertExcelFinancialImportAllowed();
   console.log('📊 [Provisiones] Actualizando provisiones en fact_cost_month...');
   console.log('📊 [Provisiones] NOTA: Calculando provisiones POR PERÍODO para capturar facturas futuras correctamente');
   

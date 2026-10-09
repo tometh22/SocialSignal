@@ -58,6 +58,8 @@ export class AutoSyncService {
     const startTime = Date.now();
     
     try {
+      const { getFinancialCutover } = await import("./financial-source-policy");
+      if (await getFinancialCutover()) { return { success: true, message: 'La fuente financiera es Mind; sincronización Excel omitida.' }; }
       console.log('📊 Iniciando sincronización con Excel MAESTRO...');
 
       // 1. UNIFICADO: Sincronizar TODO desde Excel MAESTRO (ventas + costos)

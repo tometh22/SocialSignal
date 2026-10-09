@@ -198,6 +198,7 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
     {
       title: "Gestión financiera",
       items: [
+        { href: "/finance/presupuesto", title: "Presupuesto de costos", icon: Calculator, description: "Costos futuros y vigencia", permission: 'finance' as AppSection },
         { href: "/finance/cierre", title: "Cierre financiero", icon: LockKeyhole, description: "Checklist y cierre mensual", permission: 'finance' as AppSection },
         { href: "/finance/cashflow", title: "Cashflow", icon: Wallet, description: "Movimientos y saldos bancarios", permission: 'finance' as AppSection },
         { href: "/finance/activo", title: "Activo", icon: CircleArrowUp, description: "Cuentas a cobrar y activos líquidos", permission: 'finance' as AppSection },

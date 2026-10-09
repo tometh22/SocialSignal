@@ -1,3 +1,4 @@
+import { assertExcelFinancialImportAllowed } from "../services/financial-source-policy";
 /**
  * 💰 Costs ETL Process
  * Leer sheets → normalizar → guardar en costs_norm
@@ -20,6 +21,7 @@ export interface CostsETLResult {
  * 🔄 Procesa costos desde sheets a tabla normalizada
  */
 export async function processCosts(): Promise<CostsETLResult> {
+  await assertExcelFinancialImportAllowed();
   const result: CostsETLResult = {
     processed: 0,
     normalized: 0,

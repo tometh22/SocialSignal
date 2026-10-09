@@ -1,3 +1,4 @@
+import { isDeepStrictEqual } from "node:util";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "../db";
 import {
@@ -9,7 +10,7 @@ import {
   revenueEvents,
 } from "@shared/schema";
 import { rebuildNativeFinancialFacts } from "./financial-native-builders";
-import { buildFactLaborFromTimeEntries, getCutoverDate } from "../etl/time-entries-to-fact-labor";
+import { buildFactLaborInTransaction, getCutoverDate } from "../etl/time-entries-to-fact-labor";
 
 export type CloseCheckDefinition = {
   code: string;
@@ -47,34 +48,43 @@ async function collectCloseChecks(periodKey: string, runner: any = db): Promise<
   const [year, month] = periodKey.split("-").map(Number);
   const [officialFx] = await runner.select({ id: exchangeRates.id, rate: exchangeRates.rate })
     .from(exchangeRates)
-    .where(and(eq(exchangeRates.year, year), eq(exchangeRates.month, month), eq(exchangeRates.isActive, true), sql`${exchangeRates.rateType} <> 'estimated'`))
+    .where(and(eq(exchangeRates.year, year), eq(exchangeRates.month, month), eq(exchangeRates.isActive, true), sql`${exchangeRates.rateType} <> 'estimated'`, sql`${exchangeRates.rate} > 0`))
     .orderBy(sql`CASE WHEN ${exchangeRates.rateType} = 'end_of_month' THEN 0 WHEN ${exchangeRates.rateType} = 'average' THEN 1 ELSE 2 END`, desc(exchangeRates.updatedAt), desc(exchangeRates.id))
     .limit(1);
 
   const statsResult = await runner.execute(sql`
     SELECT
+      (SELECT count(*) FROM financial_accounts WHERE is_active=true AND opening_balance_date < (${periodKey} || '-01')::date + interval '1 month')::int AS opening_accounts,
+      (SELECT count(*) FROM fact_labor_month
+        WHERE period_key=${periodKey} AND left(source_row_id,4)='app_' AND COALESCE(asana_hours,0)>0
+          AND (cost_usd IS NULL OR flags ?| ARRAY['missing_rate','missing_fx','partial_cost']))::int AS incomplete_labor,
+      (SELECT count(*) FROM system_config
+        WHERE config_key LIKE ${`task_cost_sync:${periodKey}:%`} AND config_value=1)::int AS pending_labor_sync,
+      (SELECT count(*) FROM income_sot WHERE month_key=${periodKey})::int AS legacy_income_rows,
+      (SELECT count(*) FROM revenue_events WHERE invoice_period=${periodKey} AND status<>'cancelled')::int AS native_income_rows,
       (SELECT count(*) FROM financial_intake_items
         WHERE status IN ('received','processing','needs_review','approved','failed')
-          AND COALESCE(extracted_data->>'periodKey', left(original_text, 7)) = ${periodKey})::int AS pending_intake,
+          AND (COALESCE(extracted_data->>'periodKey', left(original_text, 7)) = ${periodKey}
+            OR EXISTS (SELECT 1 FROM jsonb_array_elements(CASE WHEN jsonb_typeof(extracted_data->'lineItems')='array' THEN extracted_data->'lineItems' ELSE '[]'::jsonb END) line WHERE left(line->>'date',7)=${periodKey})))::int AS pending_intake,
       (SELECT count(*) FROM activo_entries
-        WHERE period_key = ${periodKey} AND voided_at IS NULL
+        WHERE source<>'excel' AND period_key = ${periodKey} AND voided_at IS NULL
           AND COALESCE(monto_total_usd, monto_usd, monto_ars / NULLIF(cotizacion, 0)) IS NULL)::int AS invalid_activo,
       (SELECT count(*) FROM pasivo_entries
-        WHERE period_key = ${periodKey} AND voided_at IS NULL
+        WHERE source<>'excel' AND period_key = ${periodKey} AND voided_at IS NULL
           AND COALESCE(monto_total_usd, monto_usd, monto_ars / NULLIF(cotizacion, 0)) IS NULL)::int AS invalid_pasivo,
       (SELECT count(*) FROM cashflow_transactions
-        WHERE period_key = ${periodKey} AND voided_at IS NULL
+        WHERE source<>'excel' AND period_key = ${periodKey} AND voided_at IS NULL
           AND COALESCE(monto_usd, monto_ars / NULLIF(cotizacion, 0)) IS NULL)::int AS invalid_cashflow,
       (SELECT count(*) FROM cashflow_transactions
-        WHERE period_key = ${periodKey} AND voided_at IS NULL
+        WHERE source<>'excel' AND period_key = ${periodKey} AND voided_at IS NULL
           AND reconciliation_status = 'unmatched')::int AS unmatched_cashflow,
       (SELECT count(*) FROM provision_entries
-        WHERE period_key = ${periodKey} AND status = 'PROPOSED')::int AS proposed_provisions,
+        WHERE import_batch IS NULL AND period_key = ${periodKey} AND status = 'PROPOSED')::int AS proposed_provisions,
       (SELECT COALESCE(sum(CASE WHEN settlement.billing_currency_snapshot='MIXED' THEN 2 ELSE 1 END),0)
         FROM (
           SELECT DISTINCT fl.person_id
           FROM fact_labor_month fl
-          WHERE fl.period_key=${periodKey} AND COALESCE(fl.asana_hours,0)>0
+          WHERE fl.period_key=${periodKey} AND left(fl.source_row_id,4)='app_' AND COALESCE(fl.asana_hours,0)>0
             AND EXISTS (SELECT 1 FROM system_config sc WHERE sc.config_key='app_mode_cutover_date' AND sc.description<=${periodKey})
         ) expected
         LEFT JOIN personnel_monthly_settlements settlement
@@ -86,7 +96,7 @@ async function collectCloseChecks(periodKey: string, runner: any = db): Promise<
       (SELECT count(*) FROM (
         SELECT transfer_group_id
         FROM cashflow_transactions
-        WHERE period_key = ${periodKey} AND voided_at IS NULL AND transfer_group_id IS NOT NULL
+        WHERE source<>'excel' AND period_key = ${periodKey} AND voided_at IS NULL AND transfer_group_id IS NOT NULL
         GROUP BY transfer_group_id
         HAVING count(*) <> 2 OR abs(sum(CASE WHEN tipo_movimiento='Ingreso' THEN COALESCE(monto_usd, monto_ars/NULLIF(cotizacion,0),0) ELSE -COALESCE(monto_usd, monto_ars/NULLIF(cotizacion,0),0) END)) > 0.01
       ) unbalanced)::int AS unbalanced_transfers
@@ -101,7 +111,27 @@ async function collectCloseChecks(periodKey: string, runner: any = db): Promise<
   const fixedInvoiceMissing = Math.max(0, fixedInvoiceExpected - fixedInvoiceApproved);
   const unbalancedTransfers = numeric(stats.unbalanced_transfers);
 
+  const incompleteLabor = numeric(stats.incomplete_labor) + numeric(stats.pending_labor_sync);
   const checks: CloseCheckDefinition[] = [
+    {
+      code: "labor_costs_complete", severity: "critical", status: incompleteLabor === 0 ? "passed" : "failed",
+      title: "Costos de Operaciones completos",
+      detail: "Resolver tarifas, cotizaciones y sincronizaciones pendientes de horas antes de cerrar; luego ejecutar nuevamente el pre-cierre.",
+      actualValue: incompleteLabor, expectedValue: 0,
+      evidence: { incompleteRows: numeric(stats.incomplete_labor), pendingSync: numeric(stats.pending_labor_sync) },
+    },
+    {
+      code: "opening_accounts", severity: "critical", status: numeric(stats.opening_accounts)>0 ? "passed" : "failed",
+      title: "Cuentas con saldo inicial", detail: "Registrar cuentas y saldos iniciales respaldados por extractos antes del primer cierre.",
+      actualValue: numeric(stats.opening_accounts), expectedValue: 1,
+    },
+    {
+      code: "native_income_coverage", severity: "critical",
+      status: numeric(stats.legacy_income_rows)>0 && numeric(stats.native_income_rows)===0 ? "failed" : "passed",
+      title: "Ingresos nativos del período",
+      detail: "Si existen ingresos importados de referencia, el cierre no puede aprobar facturación cero por falta de carga en Mind. Conciliar facturas y contratos.",
+      actualValue: numeric(stats.native_income_rows), evidence: { referenceRows: numeric(stats.legacy_income_rows) },
+    },
     {
       code: "internal_transfers_balanced",
       severity: "critical",
@@ -192,10 +222,11 @@ async function collectCloseChecks(periodKey: string, runner: any = db): Promise<
 
 export async function runFinancialPreClose(periodKey: string, actorUserId: number) {
   assertPeriodKey(periodKey);
-  const cutoverDate = await getCutoverDate();
-  if (cutoverDate && periodKey >= cutoverDate) await buildFactLaborFromTimeEntries(periodKey);
   return db.transaction(async (tx) => {
     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${'financial-period:' + periodKey}))`);
+    const cutoverDate = await getCutoverDate(tx);
+    if (cutoverDate && periodKey >= cutoverDate) await buildFactLaborInTransaction(periodKey, tx);
+    await rebuildNativeFinancialFacts(periodKey, tx);
     const { checks, officialFxRateId } = await collectCloseChecks(periodKey, tx);
     const [existing] = await tx.select().from(financialClosePeriods)
       .where(eq(financialClosePeriods.periodKey, periodKey)).limit(1);
@@ -209,14 +240,15 @@ export async function runFinancialPreClose(periodKey: string, actorUserId: numbe
         }).where(eq(financialClosePeriods.id, existing.id)).returning()
       : await tx.insert(financialClosePeriods).values({ periodKey, status: "PRE_CLOSE", officialFxRateId }).returning();
 
-    await rebuildNativeFinancialFacts(periodKey, tx);
-
     for (const check of checks) {
       const [old] = await tx.select().from(financialCloseChecks).where(and(
         eq(financialCloseChecks.closePeriodId, period.id),
         eq(financialCloseChecks.code, check.code),
       )).limit(1);
-      const keepHumanResolution = old && check.severity !== "critical" && ["accepted", "resolved"].includes(old.status) && check.status === "failed";
+      const keepHumanResolution = old && check.severity !== "critical" && ["accepted", "resolved"].includes(old.status) && check.status === "failed"
+        && numeric(old.actualValue) === numeric(check.actualValue)
+        && numeric(old.expectedValue) === numeric(check.expectedValue)
+        && isDeepStrictEqual(old.evidence, check.evidence ?? {});
       const payload = {
         severity: check.severity,
         status: keepHumanResolution ? old.status : check.status,
@@ -260,20 +292,20 @@ type Snapshot = {
 async function calculateSnapshot(tx: any, periodKey: string, officialRate: number): Promise<Snapshot> {
   const result = await tx.execute(sql`
     SELECT
-      COALESCE((SELECT sum(CASE WHEN tipo_movimiento='Ingreso' THEN COALESCE(monto_usd, monto_ars/NULLIF(cotizacion,0)) ELSE 0 END) FROM cashflow_transactions WHERE period_key=${periodKey} AND voided_at IS NULL AND transfer_group_id IS NULL),0) AS ingresos,
-      COALESCE((SELECT sum(CASE WHEN tipo_movimiento='Egreso' THEN COALESCE(monto_usd, monto_ars/NULLIF(cotizacion,0)) ELSE 0 END) FROM cashflow_transactions WHERE period_key=${periodKey} AND voided_at IS NULL AND transfer_group_id IS NULL),0) AS egresos,
+      COALESCE((SELECT sum(CASE WHEN tipo_movimiento='Ingreso' THEN COALESCE(monto_usd, monto_ars/NULLIF(cotizacion,0)) ELSE 0 END) FROM cashflow_transactions WHERE source<>'excel' AND period_key=${periodKey} AND voided_at IS NULL AND transfer_group_id IS NULL),0) AS ingresos,
+      COALESCE((SELECT sum(CASE WHEN tipo_movimiento='Egreso' THEN COALESCE(monto_usd, monto_ars/NULLIF(cotizacion,0)) ELSE 0 END) FROM cashflow_transactions WHERE source<>'excel' AND period_key=${periodKey} AND voided_at IS NULL AND transfer_group_id IS NULL),0) AS egresos,
       COALESCE((SELECT sum(CASE WHEN currency='ARS' THEN opening_balance/${officialRate} ELSE opening_balance END) FROM financial_accounts WHERE is_active=true AND (opening_balance_date IS NULL OR opening_balance_date < (${periodKey} || '-01')::date + interval '1 month')),0) AS opening_cash,
-      COALESCE((SELECT sum(CASE WHEN tipo_movimiento='Ingreso' AND transfer_group_id IS NULL THEN COALESCE(monto_usd,monto_ars/NULLIF(cotizacion,0),0) WHEN tipo_movimiento='Egreso' AND transfer_group_id IS NULL THEN -COALESCE(monto_usd,monto_ars/NULLIF(cotizacion,0),0) ELSE 0 END) FROM cashflow_transactions WHERE period_key<=${periodKey} AND source<>'excel' AND voided_at IS NULL),0) AS cumulative_cashflow,
-      COALESCE((SELECT sum(CASE WHEN COALESCE(currency, CASE WHEN monto_usd IS NOT NULL THEN 'USD' ELSE 'ARS' END)='ARS' THEN COALESCE(outstanding_amount,0)/NULLIF(cotizacion,0) ELSE COALESCE(outstanding_amount,0) END) FROM activo_entries WHERE period_key<=${periodKey} AND voided_at IS NULL),0) AS cobrar,
-      COALESCE((SELECT sum(CASE WHEN COALESCE(currency, CASE WHEN monto_usd IS NOT NULL THEN 'USD' ELSE 'ARS' END)='ARS' THEN COALESCE(outstanding_amount,0)/NULLIF(cotizacion,0) ELSE COALESCE(outstanding_amount,0) END) FROM pasivo_entries WHERE period_key<=${periodKey} AND voided_at IS NULL),0) AS pagar,
+      COALESCE((SELECT sum(CASE WHEN tipo_movimiento='Ingreso' AND transfer_group_id IS NULL THEN COALESCE(monto_usd,monto_ars/NULLIF(cotizacion,0),0) WHEN tipo_movimiento='Egreso' AND transfer_group_id IS NULL THEN -COALESCE(monto_usd,monto_ars/NULLIF(cotizacion,0),0) ELSE 0 END) FROM cashflow_transactions WHERE source<>'excel' AND period_key<=${periodKey} AND voided_at IS NULL),0) AS cumulative_cashflow,
+      COALESCE((SELECT sum(CASE WHEN COALESCE(currency, CASE WHEN monto_usd IS NOT NULL THEN 'USD' ELSE 'ARS' END)='ARS' THEN COALESCE(outstanding_amount,0)/NULLIF(cotizacion,0) ELSE COALESCE(outstanding_amount,0) END) FROM activo_entries WHERE source<>'excel' AND period_key<=${periodKey} AND voided_at IS NULL),0) AS cobrar,
+      COALESCE((SELECT sum(CASE WHEN COALESCE(currency, CASE WHEN monto_usd IS NOT NULL THEN 'USD' ELSE 'ARS' END)='ARS' THEN COALESCE(outstanding_amount,0)/NULLIF(cotizacion,0) ELSE COALESCE(outstanding_amount,0) END) FROM pasivo_entries WHERE source<>'excel' AND period_key<=${periodKey} AND voided_at IS NULL),0) AS pagar,
       COALESCE((SELECT sum(amount_usd) FROM revenue_events WHERE invoice_period=${periodKey} AND status <> 'cancelled'),0) AS facturacion,
-      COALESCE((SELECT direct_usd FROM fact_cost_month WHERE period_key=${periodKey}),0) AS costos_directos,
-      COALESCE((SELECT sum(cost_usd) FROM fact_labor_month WHERE period_key=${periodKey}),0) AS costos_directos_operativos,
-      COALESCE((SELECT indirect_usd FROM fact_cost_month WHERE period_key=${periodKey}),0) AS costos_indirectos,
-      COALESCE((SELECT sum(COALESCE(tax_amount,0)/CASE WHEN currency='ARS' THEN NULLIF(cotizacion,0) ELSE 1 END) FROM pasivo_entries WHERE period_key=${periodKey} AND voided_at IS NULL),0) AS iva_compras,
+      COALESCE((SELECT direct_usd FROM financial_native_cost_month WHERE period_key=${periodKey}),0) AS costos_directos,
+      COALESCE((SELECT sum(cost_usd) FROM fact_labor_month WHERE left(source_row_id,4)='app_' AND period_key=${periodKey}),0) AS costos_directos_operativos,
+      COALESCE((SELECT indirect_usd FROM financial_native_cost_month WHERE period_key=${periodKey}),0) AS costos_indirectos,
+      COALESCE((SELECT sum(COALESCE(tax_amount,0)/CASE WHEN currency='ARS' THEN NULLIF(cotizacion,0) ELSE 1 END) FROM pasivo_entries WHERE source<>'excel' AND period_key=${periodKey} AND voided_at IS NULL),0) AS iva_compras,
       COALESCE((SELECT sum(amount_usd) FROM pl_adjustments WHERE period_key=${periodKey} AND type='impuesto'),0) AS impuestos,
-      COALESCE((SELECT sum(CASE WHEN currency='ARS' THEN COALESCE(remaining_amount,monto_provision,0)/${officialRate} ELSE COALESCE(remaining_amount,monto_provision,0) END) FROM provision_entries WHERE period_key<=${periodKey} AND status IN ('APPROVED','ACTIVE')),0) AS provisiones,
-      COALESCE((SELECT provisions_usd FROM fact_cost_month WHERE period_key=${periodKey}),0) AS provision_expense
+      COALESCE((SELECT sum(CASE WHEN currency='ARS' THEN COALESCE(remaining_amount,monto_provision,0)/${officialRate} ELSE COALESCE(remaining_amount,monto_provision,0) END) FROM provision_entries WHERE import_batch IS NULL AND period_key<=${periodKey} AND status IN ('APPROVED','ACTIVE')),0) AS provisiones,
+      COALESCE((SELECT provisions_usd FROM financial_native_cost_month WHERE period_key=${periodKey}),0) AS provision_expense
   `);
   const row = rowsOf<Record<string, unknown>>(result)[0] ?? {};
   const ingresos = numeric(row.ingresos);
@@ -302,8 +334,35 @@ export async function requestFinancialCloseReview(periodKey: string, actorUserId
     if (!period) throw closeError("Ejecutá el pre-cierre antes de enviar a revisión.", 409);
     if (period.status === "CLOSED") throw closeError("El período ya está cerrado.", 409);
     if (period.status !== "PRE_CLOSE") throw closeError("Ejecutá nuevamente el pre-cierre antes de enviar a revisión.", 409);
+    const blocking = await tx.select({ id: financialCloseChecks.id }).from(financialCloseChecks).where(and(
+      eq(financialCloseChecks.closePeriodId, period.id),
+      eq(financialCloseChecks.severity, "critical"),
+      eq(financialCloseChecks.status, "failed"),
+    ));
+    if (blocking.length) throw closeError("Corregí los controles críticos y ejecutá nuevamente el pre-cierre antes de enviar a revisión.", 409);
     const [updated] = await tx.update(financialClosePeriods).set({ status: "IN_REVIEW", requestedBy: actorUserId, requestedAt: new Date(), notes: notes ?? period.notes, updatedAt: new Date() }).where(eq(financialClosePeriods.id, period.id)).returning();
     await tx.insert(financialAuditEvents).values({ periodKey, entityType: "financial_close_period", entityId: period.id, action: "review_requested", actorUserId, afterData: { notes: notes ?? null } });
+    return updated;
+  });
+}
+
+/** Return to editable inputs; an entirely new pre-close is required. */
+export async function returnFinancialCloseForCorrection(periodKey: string, actorUserId: number, reason: string) {
+  assertPeriodKey(periodKey);
+  if (reason.trim().length < 5) throw closeError("Indicá el motivo de devolución (mínimo 5 caracteres).");
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${'financial-period:' + periodKey}))`);
+    const [period] = await tx.select().from(financialClosePeriods).where(eq(financialClosePeriods.periodKey, periodKey)).limit(1);
+    if (!period) throw closeError("El período no existe.", 404);
+    if (period.status !== "IN_REVIEW") throw closeError("Sólo se puede devolver un período en revisión.", 409);
+    const [updated] = await tx.update(financialClosePeriods).set({
+      status: "OPEN", officialFxRateId: null, requestedBy: null, requestedAt: null, updatedAt: new Date(),
+    }).where(eq(financialClosePeriods.id, period.id)).returning();
+    await tx.insert(financialAuditEvents).values({
+      periodKey, entityType: "financial_close_period", entityId: period.id,
+      action: "returned_for_correction", actorUserId, reason: reason.trim(),
+      beforeData: { status: period.status }, afterData: { status: updated.status },
+    });
     return updated;
   });
 }
@@ -325,6 +384,10 @@ export async function closeFinancialPeriod(periodKey: string, actorUserId: numbe
     if (!period.officialFxRateId) throw closeError("Falta fijar la cotización oficial.", 409);
     const [fx] = await tx.select({ rate: exchangeRates.rate }).from(exchangeRates).where(eq(exchangeRates.id, period.officialFxRateId)).limit(1);
     if (!fx) throw closeError("La cotización oficial seleccionada ya no existe.", 409);
+    // Intake can arrive after review started. Recheck live inputs before freezing.
+    const { checks: currentChecks } = await collectCloseChecks(periodKey, tx);
+    const failedNow = currentChecks.filter(check => check.severity === "critical" && check.status === "failed");
+    if (failedNow.length) throw closeError(`El período tiene nuevos pendientes: ${failedNow.map(check => check.title).join(", ")}. Devolvelo a corrección y ejecutá el pre-cierre.`, 409);
     const snapshot = await calculateSnapshot(tx, periodKey, numeric(fx.rate));
     const [year, monthNumber] = periodKey.split("-").map(Number);
     const balanceNeto = snapshot.totalActivo - snapshot.totalPasivo;
@@ -345,6 +408,7 @@ export async function closeFinancialPeriod(periodKey: string, actorUserId: numbe
       margenNeto: snapshot.facturacionTotal ? String((beneficio / snapshot.facturacionTotal) * 100) : null,
       updatedAt: new Date(),
     };
+    await tx.execute(sql`SELECT set_config('mind.financial_writer', 'close', true)`);
     await tx.insert(monthlyFinancialSummary).values({ periodKey, ...payload }).onConflictDoUpdate({ target: monthlyFinancialSummary.periodKey, set: payload });
     await tx.update(revenueEvents).set({ periodClosed: true, updatedAt: new Date() }).where(eq(revenueEvents.invoicePeriod, periodKey));
     const [closed] = await tx.update(financialClosePeriods).set({ status: "CLOSED", closedBy: actorUserId, closedAt: new Date(), snapshotVersion: period.snapshotVersion + 1, updatedAt: new Date() }).where(eq(financialClosePeriods.id, period.id)).returning();
@@ -362,6 +426,7 @@ export async function reopenFinancialPeriod(periodKey: string, actorUserId: numb
     if (!period) throw closeError("El período no existe.", 404);
     if (period.status !== "CLOSED") throw closeError("Sólo se puede reabrir un período cerrado.", 409);
     const [updated] = await tx.update(financialClosePeriods).set({ status: "REOPENED", reopenedBy: actorUserId, reopenedAt: new Date(), reopenReason: reason.trim(), updatedAt: new Date() }).where(eq(financialClosePeriods.id, period.id)).returning();
+    await tx.execute(sql`SELECT set_config('mind.financial_writer', 'reopen', true)`);
     await tx.update(revenueEvents).set({ periodClosed: false, updatedAt: new Date() }).where(eq(revenueEvents.invoicePeriod, periodKey));
     await tx.insert(financialAuditEvents).values({ periodKey, entityType: "financial_close_period", entityId: period.id, action: "reopened", actorUserId, reason: reason.trim() });
     return updated;

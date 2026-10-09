@@ -1,3 +1,4 @@
+import { FinancialTransitionPanel } from "@/components/financial-transition-panel";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { authFetchJson } from "@/lib/queryClient";
@@ -7,6 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertTriangle, CheckCircle2, LockKeyhole, RefreshCw, RotateCcw, ShieldCheck } from "lucide-react";
 import { statusLabel } from "@/lib/status-labels";
 
@@ -17,6 +20,8 @@ type CloseDetail = { period: ClosePeriod | null; checks: CloseCheck[] };
 export default function FinancialClosePage() {
   const now = new Date();
   const [period, setPeriod] = useState(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`);
+  const [correctionOpen, setCorrectionOpen] = useState(false);
+  const [correctionReason, setCorrectionReason] = useState("");
   const { toast } = useToast();
   const { user } = useAuth();
   const qc = useQueryClient();
@@ -24,7 +29,7 @@ export default function FinancialClosePage() {
   const query = useQuery<CloseDetail>({ queryKey: ["financial-close", period], queryFn: () => authFetchJson(`/api/financial-native/close/${period}`) });
   const mutation = useMutation({
     mutationFn: ({ action, body }: { action: string; body?: unknown }) => authFetchJson(`/api/financial-native/close/${period}/${action}`, { method: "POST", body: body ? JSON.stringify(body) : undefined }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["financial-close"] }); toast({ title: "Cierre actualizado" }); },
+    onSuccess: () => { setCorrectionOpen(false); setCorrectionReason(""); qc.invalidateQueries({ queryKey: ["financial-close"] }); qc.invalidateQueries({ queryKey: ["financial-transition"] }); toast({ title: "Cierre actualizado" }); },
     onError: (e: Error) => toast({ title: "No se pudo avanzar", description: e.message, variant: "destructive" }),
   });
   const resolveMutation = useMutation({
@@ -41,14 +46,25 @@ export default function FinancialClosePage() {
     const resolution = window.prompt("Motivo para aceptar la observación:");
     if (resolution) resolveMutation.mutate({ id: check.id, status: "accepted", resolution });
   };
+  const returnForCorrection = () => { setCorrectionReason(""); setCorrectionOpen(true); };
   const reopen = () => { const reason = window.prompt("Motivo de reapertura (quedará auditado):"); if (reason) mutation.mutate({ action: "reopen", body: { reason } }); };
 
   return <div className="space-y-6">
     <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between"><div><p className="text-sm font-medium text-rose-600">Finanzas · control mensual</p><h1 className="text-3xl font-semibold tracking-tight">Cierre financiero</h1><p className="text-sm text-muted-foreground">Valida la integridad, fija el snapshot y bloquea cambios retroactivos.</p></div><Input className="w-48" type="month" value={period} onChange={(e) => setPeriod(e.target.value)} /></div>
     <div className="grid gap-4 md:grid-cols-4"><Metric title="Estado" value={statusLabel(state)} /><Metric title="Controles" value={String(checks.length)} /><Metric title="Críticos" value={String(failedCritical)} alert={failedCritical > 0} /><Metric title="Advertencias" value={String(failedWarning)} alert={failedWarning > 0} /></div>
-    <Card><CardHeader><div className="flex flex-wrap items-center justify-between gap-3"><CardTitle>Checklist de {period}</CardTitle><div className="flex flex-wrap gap-2"><Button variant="outline" disabled={busy || state === "CLOSED"} onClick={() => mutation.mutate({ action: "pre-close" })}><RefreshCw className="mr-2 h-4 w-4" />Ejecutar pre-cierre</Button>{state === "PRE_CLOSE" && <Button disabled={busy} onClick={() => mutation.mutate({ action: "request-review", body: {} })}><ShieldCheck className="mr-2 h-4 w-4" />Enviar a revisión</Button>}{state === "IN_REVIEW" && isAdmin && <Button disabled={busy || failedCritical > 0} onClick={() => mutation.mutate({ action: "close" })}><LockKeyhole className="mr-2 h-4 w-4" />Cerrar período</Button>}{state === "CLOSED" && isAdmin && <Button variant="destructive" disabled={busy} onClick={reopen}><RotateCcw className="mr-2 h-4 w-4" />Reabrir</Button>}</div></div></CardHeader>
+    <Card><CardHeader><div className="flex flex-wrap items-center justify-between gap-3"><CardTitle>Checklist de {period}</CardTitle><div className="flex flex-wrap gap-2"><Button variant="outline" disabled={busy || state === "CLOSED" || state === "IN_REVIEW"} onClick={() => mutation.mutate({ action: "pre-close" })}><RefreshCw className="mr-2 h-4 w-4" />Ejecutar pre-cierre</Button>{state === "PRE_CLOSE" && <Button disabled={busy || failedCritical > 0} onClick={() => mutation.mutate({ action: "request-review", body: {} })}><ShieldCheck className="mr-2 h-4 w-4" />Enviar a revisión</Button>}{state === "IN_REVIEW" && <Button variant="outline" disabled={busy} onClick={returnForCorrection}>Devolver a corrección</Button>}{state === "IN_REVIEW" && isAdmin && <Button disabled={busy || failedCritical > 0} onClick={() => mutation.mutate({ action: "close" })}><LockKeyhole className="mr-2 h-4 w-4" />Cerrar período</Button>}{state === "CLOSED" && isAdmin && <Button variant="destructive" disabled={busy} onClick={reopen}><RotateCcw className="mr-2 h-4 w-4" />Reabrir</Button>}</div></div></CardHeader>
       <CardContent className="space-y-3">{query.isLoading && <p className="text-sm text-muted-foreground">Ejecutando controles…</p>}{!query.isLoading && checks.length === 0 && <div className="rounded-xl border border-dashed p-10 text-center text-sm text-muted-foreground">Todavía no se ejecutó el pre-cierre de este período.</div>}{checks.map((check) => <div key={check.id} className="flex flex-col gap-3 rounded-xl border p-4 md:flex-row md:items-center"><div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-50">{check.status === "passed" || check.status === "resolved" || check.status === "accepted" ? <CheckCircle2 className="h-5 w-5 text-emerald-600" /> : <AlertTriangle className={`h-5 w-5 ${check.severity === "critical" ? "text-red-600" : "text-amber-600"}`} />}</div><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><p className="font-medium">{check.title}</p><Badge variant={check.severity === "critical" ? "destructive" : "secondary"}>{statusLabel(check.severity)}</Badge><Badge variant="outline">{statusLabel(check.status)}</Badge></div><p className="mt-1 text-sm text-muted-foreground">{check.detail}</p>{check.resolution && <p className="mt-1 text-xs text-emerald-700">Resolución: {check.resolution}</p>}{check.severity === "critical" && check.status === "failed" && <p className="mt-1 text-xs text-red-700">Corregí el origen y volvé a ejecutar el pre-cierre.</p>}</div>{check.status === "failed" && check.severity !== "critical" && state !== "CLOSED" && <Button size="sm" variant="outline" onClick={() => resolve(check)}>Aceptar excepción</Button>}</div>)}</CardContent>
     </Card>
+    <Dialog open={correctionOpen} onOpenChange={setCorrectionOpen}>
+      <DialogContent>
+        <form onSubmit={event => { event.preventDefault(); mutation.mutate({ action: "return-for-correction", body: { reason: correctionReason.trim() } }); }} className="space-y-4">
+          <DialogHeader><DialogTitle>Devolver {period} a corrección</DialogTitle><DialogDescription>El período volverá a estar abierto. Después de corregir los datos, será necesario ejecutar un nuevo pre-cierre. El motivo quedará registrado.</DialogDescription></DialogHeader>
+          <div className="space-y-2"><Label htmlFor="close-correction-reason">Motivo de devolución</Label><Input id="close-correction-reason" value={correctionReason} onChange={event => setCorrectionReason(event.target.value)} required minLength={5} maxLength={2000} /></div>
+          <DialogFooter><Button type="button" variant="outline" onClick={() => setCorrectionOpen(false)}>Cancelar</Button><Button type="submit" disabled={busy || correctionReason.trim().length < 5}>Confirmar devolución</Button></DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+    <FinancialTransitionPanel period={period} />
     {state === "CLOSED" && <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900"><LockKeyhole className="h-4 w-4" />El período está congelado. Los tableros leen el snapshot versión {query.data?.period?.snapshotVersion}.</div>}
   </div>;
 }

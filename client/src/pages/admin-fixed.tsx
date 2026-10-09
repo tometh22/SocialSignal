@@ -242,6 +242,7 @@ export default function Admin() {
     refetchOnWindowFocus: true,
   });
 
+  const { data: financeCutover } = useQuery<{description?: string}>({queryKey:["/api/admin/system-config/cutover-date"], enabled:isAdmin});
   const forceSyncMutation = useMutation({
     mutationFn: () => apiRequest("/api/personnel/sheets-sync/auto-apply", {
       method: "POST",
@@ -1071,10 +1072,10 @@ export default function Admin() {
           </div>
           <button 
             onClick={handleForceRefresh}
-            disabled={forceSyncMutation.isPending}
+            disabled={forceSyncMutation.isPending || Boolean(financeCutover?.description)}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
           >
-            {forceSyncMutation.isPending ? "⏳ Sincronizando…" : "🔄 Refrescar Datos"}
+            {forceSyncMutation.isPending ? "⏳ Sincronizando…" : financeCutover?.description ? "Tarifas administradas en Mind" : "🔄 Refrescar Datos"}
           </button>
         </div>
       </div>
@@ -1180,7 +1181,7 @@ export default function Admin() {
                   <a href="#personal-cost-history-grid" className="rounded-md border px-3 py-2 text-sm text-muted-foreground hover:bg-muted">
                     Ver tabla mensual
                   </a>
-                  <SheetsSyncDialog />
+                  {!financeCutover?.description && <SheetsSyncDialog />}
                   <Button onClick={openNewPersonnelDialog} disabled={!roles || roles.length === 0}>
                     <PlusCircle className="mr-2 h-4 w-4" />
                     Añadir Personal

@@ -1,3 +1,4 @@
+import { assertExcelFinancialImportAllowed } from "./services/financial-source-policy";
 import { assignmentActor, isDelegatedToOthers } from "../shared/utils/task-assignment";
 import { withProjectPeriodMetrics } from "./domain/metrics/project-period-overlay";
 import { markTaskCostSyncPending } from "./domain/task-cost-sync";
@@ -1080,6 +1081,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use('/api', createLedgerRouter(requireAuth));
   app.use('/api/financial-intelligence', createFinancialIntelligenceRouter(requireAuth));
   app.use('/api/financial-native', createFinancialNativeRouter(requireAuth));
+  app.use([
+    '/api/personnel/sheets-sync', '/api/etl/sot/run', '/api/etl/run',
+    '/api/trigger-resumen-ejecutivo-sync', '/api/trigger-activo-sync',
+    '/api/debug/provisions/sync',
+  ], requireAuth, requirePermission("admin"), async (_req, res, next) => {
+    try { await assertExcelFinancialImportAllowed(); next(); }
+    catch (e) { res.status((e as any).statusCode ?? 500).json({message:(e as Error).message}); }
+  });
+
   app.use('/api', createObjectivesRouter(requireAuth));
 
   // Legacy aliases: resuelven /api/status-semanal/* → /api/reviews/:miReviewId/*
@@ -3553,25 +3563,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           totalRealRevenue += usdAmount;
         } else if (isARS && localAmount > 0) {
           try {
-            const tiposCambio = await googleSheetsWorkingService.getTiposCambio();
             const normalizedSaleMonth = normalizeMonth(sale.month);
-            const monthExchangeRate = tiposCambio.find(tc => {
-              const normalizedTcMonth = normalizeMonth(tc.mes);
-              return normalizedTcMonth === normalizedSaleMonth && tc.año === sale.year;
-            });
-
-            let realExchangeRate = monthExchangeRate?.tipoCambio;
-
-            if (!realExchangeRate) {
-              const fallbackRate = tiposCambio
-                .filter(tc => normalizeMonth(tc.mes) === normalizedSaleMonth)
-                .sort((a, b) => b.año - a.año)[0];
-              const monthNumber = monthNumberByShort[normalizedSaleMonth];
-              realExchangeRate = fallbackRate?.tipoCambio || await getCanonicalFxForMonth(
-                `${sale.year}-${String(monthNumber || 1).padStart(2, '0')}`,
-              );
-              console.log(`⚠️ Using fallback exchange rate for ${sale.month}/${sale.year}: ${realExchangeRate} (from ${fallbackRate?.año || 'default'})`);
-            }
+            const monthNumber = monthNumberByShort[normalizedSaleMonth];
+            const realExchangeRate = await getCanonicalFxForMonth(`${sale.year}-${String(monthNumber || 1).padStart(2, '0')}`);
 
             const convertedUsd = localAmount / realExchangeRate;
             console.log(`💱 ARS Sale: ARS $${localAmount} → USD $${convertedUsd.toFixed(2)} (rate: ${realExchangeRate}) for ${sale.clientName}-${sale.projectName} (${sale.month}/${sale.year})`);
@@ -13367,6 +13361,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const result = await db.insert(personnelHistoricalCosts).values(validatedData).returning();
       res.status(201).json(result[0]);
     } catch (error) {
+      if (((error as any)?.code ?? (error as any)?.cause?.code) === "23514") return res.status(409).json({message:(error as Error).message});
       console.error("Error creating personnel historical cost:", error);
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Datos inválidos", errors: error.errors });
@@ -13436,6 +13431,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json(result[0]);
     } catch (error) {
+      if (((error as any)?.code ?? (error as any)?.cause?.code) === "23514") return res.status(409).json({message:(error as Error).message});
       console.error("Error updating personnel historical cost:", error);
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Datos inválidos", errors: error.errors });
@@ -13467,6 +13463,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json({ success: true, message: "Personnel historical cost deleted successfully" });
     } catch (error) {
+      if (((error as any)?.code ?? (error as any)?.cause?.code) === "23514") return res.status(409).json({message:(error as Error).message});
       console.error("Error deleting personnel historical cost:", error);
       res.status(500).json({ message: "No se pudo borrar el costo histórico del personal" });
     }
@@ -15437,9 +15434,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Crear/actualizar configuración del sistema
-  app.post("/api/admin/system-config", requireAuth, async (req, res) => {
+  app.post("/api/admin/system-config", requireAuth, requirePermission("admin"), async (req, res) => {
     try {
       const validatedData = insertSystemConfigSchema.parse(req.body);
+      if (validatedData.configKey === 'app_mode_cutover_date') return res.status(400).json({message:'Usá el control de fecha de corte para cambiar la fuente financiera.'});
+      if (validatedData.configKey === 'hours_data_source' && validatedData.configValue !== 1 && await getCutoverDate()) return res.status(409).json({message:'Desde el corte financiero las horas se mantienen en Mind.'});
       
       // Verificar si ya existe la configuración
       const existing = await db.select()
@@ -15489,9 +15488,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/admin/system-config/cutover-date", requireAuth, requirePermission("admin"), async (req, res) => {
     try {
       const cutoverDate = String(req.body?.cutoverDate || '').trim();
-      if (!/^\d{4}-\d{2}$/.test(cutoverDate)) {
+      if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(cutoverDate)) {
         return res.status(400).json({ message: 'cutoverDate debe tener formato YYYY-MM' });
       }
+      const previousCutover = await getCutoverDate();
+      if (previousCutover && previousCutover !== cutoverDate) return res.status(409).json({message:'El corte ya está establecido. Cambiarlo requiere una migración conciliada del histórico.'});
       await db.insert(systemConfig)
         .values({ configKey: 'app_mode_cutover_date', configValue: 1, description: cutoverDate })
         .onConflictDoUpdate({
@@ -24684,6 +24685,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       res.json({ ...created, costingWarning, costSyncPending: Boolean(syncWarning) });
     } catch (error: any) {
+      const dbError = error?.cause ?? error;
+      if (dbError?.code === "23514") return res.status(409).json({ message: dbError.message });
       if (error instanceof z.ZodError) return res.status(400).json({ message: "Datos inválidos", errors: error.errors });
       console.error("Error al registrar horas:", error);
       res.status(500).json({ message: "Error al registrar horas" });
@@ -24762,6 +24765,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const costingWarning = costing.totalCost == null ? "La hora quedó registrada; su tarifa o FX están pendientes." : null;
       res.json({ ...updated, costingWarning: [costingWarning, syncWarning].filter(Boolean).join(" ") || null, costSyncPending: Boolean(syncWarning) });
     } catch (error) {
+      const dbError = (error as any)?.cause ?? error;
+      if (dbError?.code === "23514") return res.status(409).json({ message: dbError.message });
       if (error instanceof z.ZodError) return res.status(400).json({ message: "Fecha inválida" });
       console.error("Error al editar carga de tarea:", error);
       res.status(500).json({ message: "Error al editar la carga de tiempo" });
@@ -24807,6 +24812,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json({ message: "Entrada eliminada", costingWarning: syncWarning, warning: syncWarning });
     } catch (error) {
+      const dbError = (error as any)?.cause ?? error;
+      if (dbError?.code === "23514") return res.status(409).json({ message: dbError.message });
       res.status(500).json({ message: "Error al eliminar entrada" });
     }
   });

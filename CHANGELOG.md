@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.14.0 — 2026-10-09
+
+- Cierre: devolución de revisión a corrección con motivo y auditoría; los controles críticos deben resolverse antes de enviar a revisión.
+- Operaciones/Finanzas: horas protegidas por mes civil, recálculo y pre-cierre atómicos, bloqueo de costos laborales incompletos y nueva validación antes de congelar. Las provisiones pueden liberarse en un mes posterior sin reescribir el cierre original.
+
+- Finanzas: las importaciones operativas del maestro se bloquean desde el corte, incluidos tarifas, FX/REM, costos estimados y procesos legacy. El histórico conserva backfill explícito anterior al corte.
+- Presupuesto mensual de costos nativo con moneda, vigencia, auditoría y protección contra ediciones concurrentes.
+- Proyección y BI consumen fuentes nativas; presupuesto o FX ausente se muestra pendiente. Se preservan los snapshots históricos anteriores al corte.
+- El cierre incorpora un panel de transición y controles sobre saldos iniciales e ingresos nativos faltantes. No declara conciliación aprobada por tener datos cargados.
+- Migraciones 0084/0085: protecciones transaccionales de períodos cerrados y vistas BI; pruebas PostgreSQL incorporadas a CI.
+- Auditoría de producción de solo lectura documenta los datos y cierres que Finanzas aún debe completar antes de retirar el maestro.
+
 ## 1.13.1 — 2026-10-09
 
 - «Asignadas por mí» queda oculto por defecto en Inicio y Home de Tareas. Cada usuario puede mostrarlo u ocultarlo, recordando la elección entre ambas pantallas en ese navegador; la consulta explícita sigue disponible en Mis tareas.

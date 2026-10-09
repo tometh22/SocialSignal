@@ -35,6 +35,8 @@ async function runSync() {
   const start = Date.now();
 
   try {
+      const { getFinancialCutover } = await import("../services/financial-source-policy");
+      if (await getFinancialCutover()) { return; }
     console.log('🔄 [Resumen Ejecutivo Sync] Iniciando...');
 
     const {

@@ -1,3 +1,4 @@
+import { assertExcelFinancialImportAllowed } from "./financial-source-policy";
 /**
  * 🔄 ETL Service - Idempotent data normalization from Excel MAESTRO
  * Transforms raw sheet data into normalized tables per source
@@ -21,6 +22,7 @@ export class ETLService {
    * Procesa datos de ventas con detección de anomalías x100/x10000
    */
   async processVentasToNorm(ventasData: any[]): Promise<{ processed: number; errors: string[] }> {
+  await assertExcelFinancialImportAllowed();
     console.log('🔄 ETL VENTAS: Starting normalization process...');
     
     let processed = 0;
@@ -94,6 +96,7 @@ export class ETLService {
    * Procesa datos de costos con horas trabajadas y detección de anomalías
    */
   async processCostosToNorm(costosData: any[]): Promise<{ processed: number; errors: string[] }> {
+  await assertExcelFinancialImportAllowed();
     console.log('🔄 ETL COSTOS: Starting normalization process...');
     
     let processed = 0;
@@ -171,6 +174,7 @@ export class ETLService {
    * Procesa objetivos de horas por proyecto/mes
    */
   async processTargetsToNorm(targetsData: any[]): Promise<{ processed: number; errors: string[] }> {
+  await assertExcelFinancialImportAllowed();
     console.log('🔄 ETL TARGETS: Starting normalization process...');
     
     let processed = 0;
@@ -249,6 +253,7 @@ export class ETLService {
     targets: { processed: number; errors: string[] };
     success: boolean;
   }> {
+  await assertExcelFinancialImportAllowed();
     console.log('🚀 ETL FULL PIPELINE: Starting complete data normalization...');
     
     try {
@@ -293,6 +298,7 @@ export class ETLService {
    * Marks records as stale if they don't appear in latest ETL run
    */
   async cleanupStaleRecords(latestSourceRowIds: { ventas: string[]; costos: string[]; targets: string[] }): Promise<void> {
+  await assertExcelFinancialImportAllowed();
     console.log('🧹 ETL CLEANUP: Removing stale records...');
     
     // TODO: Implement cleanup logic if needed

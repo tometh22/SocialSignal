@@ -4223,6 +4223,7 @@ export type InsertFactLaborMonth = z.infer<typeof insertFactLaborMonthSchema>;
 
 // Hechos: Costos totales por período (suma directa Col R del Excel, separado por tipo)
 export const factCostMonth = pgTable("fact_cost_month", {
+  dataSource: text("data_source").notNull().default("excel"),
   id: serial("id").primaryKey(),
   periodKey: varchar("period_key", { length: 7 }).notNull().references(() => dimPeriod.periodKey),
   
@@ -5603,3 +5604,22 @@ export const financialAuditEvents = pgTable("financial_audit_events", {
 }));
 
 export type FinancialAuditEvent = typeof financialAuditEvents.$inferSelect;
+
+/** Canonical monthly cost budget; expanded into financial_cost_forecast_month. */
+export const financialCostPlans = pgTable("financial_cost_plans", {
+  id: serial("id").primaryKey(),
+  concept: text("concept").notNull(),
+  category: text("category").notNull(),
+  costType: text("cost_type").notNull(),
+  currency: text("currency").notNull(),
+  monthlyAmount: numeric("monthly_amount", { precision: 16, scale: 4 }).notNull(),
+  startPeriod: varchar("start_period", { length: 7 }).notNull(),
+  endPeriod: varchar("end_period", { length: 7 }).notNull(),
+  notes: text("notes"),
+  active: boolean("active").notNull().default(true),
+  version: integer("version").notNull().default(1),
+  createdBy: integer("created_by").notNull().references(() => users.id),
+  updatedBy: integer("updated_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
