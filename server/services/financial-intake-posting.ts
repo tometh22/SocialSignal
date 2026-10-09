@@ -243,6 +243,7 @@ async function applyReceivablePayment(tx: any, input: { data: FinancialExtractio
   if (!input.data.documentNumber) return null;
   const receivableConditions: any[] = [
     eq(activoEntries.nroFactura, input.data.documentNumber),
+    sql`${activoEntries.source} <> 'excel'`,
     isNull(activoEntries.voidedAt),
   ];
   const receivableParty = input.data.counterparty ?? input.data.clientName;
@@ -286,6 +287,7 @@ async function applyPayablePayment(tx: any, input: { data: FinancialExtraction; 
   if (!input.data.documentNumber) return null;
   const payableConditions: any[] = [
     eq(pasivoEntries.documentNumber, input.data.documentNumber),
+    sql`${pasivoEntries.source} <> 'excel'`,
     isNull(pasivoEntries.voidedAt),
   ];
   if (input.data.counterparty) payableConditions.push(or(ilike(pasivoEntries.vendorName, input.data.counterparty), ilike(pasivoEntries.detalle, input.data.counterparty)));
