@@ -11,7 +11,15 @@ La configuración productiva es `hours_data_source=1` y `app_mode_cutover_date=2
 - No hay períodos en `financial_close_periods`, eventos en `revenue_events`, cuentas en `financial_accounts` ni elementos en la bandeja financiera.
 - Los registros posteriores al corte que existen en Activo, Pasivo y Cashflow tienen origen `excel`: agosto contiene 13 activos, 179 pasivos y 80 movimientos; septiembre contiene 1 activo y 2 pasivos.
 - Hay ingresos de referencia en `income_sot` desde agosto de 2026 hasta mayo de 2027 y presupuestos importados hasta diciembre de 2026. Su presencia no acredita que existan facturas, cuentas o presupuestos aprobados en el circuito nativo.
-- No se copiaron totales a los libros nativos, no se inventaron fechas de emisión/cobranza ni se aprobaron cierres. Falta confirmar el último cierre del maestro validado por Finanzas.
+- No se copiaron totales a los libros nativos, no se inventaron fechas de emisión/cobranza ni se aprobaron cierres. El usuario confirmó en esta conversación que agosto de 2026 es el último cierre del maestro validado por Finanzas. Esa confirmación identifica el período de referencia; no acredita que las filas importadas correspondan a la versión aprobada ni aprueba un cierre nativo.
+
+## Base de conciliación confirmada
+
+- Último cierre del maestro validado por Finanzas: **agosto de 2026**, confirmado por el usuario el 9 de octubre de 2026.
+- Agosto será el primer período a reconstruir y comparar en Mind. Se mantiene `app_mode_cutover_date=2026-08`: también gobierna horas y costos operativos. La confirmación del cierre del maestro no desplaza ese corte ni crea un cierre nativo automáticamente.
+- Para reconstruir agosto, respaldar los saldos de apertura al inicio de agosto (cierre del 31 de julio) y los movimientos/documentos de agosto. Comparar el resultado con la versión aprobada del cierre al 31 de agosto. No usar los saldos finales de agosto como apertura de agosto: duplicaría los movimientos del mes.
+- Septiembre es el siguiente período a conciliar, con continuidad desde los saldos de agosto conciliados. Todavía no se considera un cierre aprobado por Finanzas.
+- Conservar la versión o exportación exacta del maestro aprobada y sus extractos/comprobantes. Hasta verificar esa evidencia, los importes existentes en la base siguen siendo referencias importadas.
 
 ## Cambios implementados
 
@@ -35,14 +43,14 @@ La configuración productiva es `hours_data_source=1` y `app_mode_cutover_date=2
 
 ## Secuencia para completar la transición
 
-1. Finanzas confirma el último mes del maestro cerrado y validado. El corte actual es agosto; no cambiarlo para esconder diferencias.
+1. Último cierre del maestro confirmado: agosto de 2026. Identificar y conservar su versión aprobada y los respaldos. Conciliar agosto en Mind manteniendo el corte vigente; no cambiarlo para esconder diferencias.
 2. Conservar backup de base y evidencia documental. Restaurarlo en una instancia aislada y verificar conteos/saldos antes del corte operativo definitivo. La prueba local de estructura y datos sintéticos no reemplaza esa restauración de producción. Después de CI, desplegar el cambio y revisar configuración, migraciones y logs. Los presupuestos abiertos figurarán pendientes hasta completar su carga nativa.
-3. Registrar cuentas, moneda, fecha y saldo inicial respaldado por extracto. No sumar cada snapshot histórico del Excel como si fuera una nueva cuenta por cobrar/pagar.
+3. Registrar cuentas, moneda, fecha y saldo inicial de apertura de agosto respaldado por extracto (cierre del 31 de julio). No sumar cada snapshot histórico del Excel como si fuera una nueva cuenta por cobrar/pagar.
 4. Revisar las facturas pendientes al corte y cargarlas con saldo residual; aplicar luego cobros/pagos reales. Conservar número, contraparte, monto original, impuestos, FX y evidencia.
 5. Completar eventos de ingreso y ventanas de prestación desde contratos/facturas. No inferir el día de factura o cobro a partir del mes de un agregado del maestro.
 6. Aprobar y cargar presupuesto mensual, tarifas y FX/REM en Mind. La migración no convierte los importes históricos en decisiones aprobadas.
 7. Conciliar por documento, proyecto, cuenta y período: facturación/devengado/cobranza, costo directo/indirecto, impuestos, provisiones, cuentas a cobrar/pagar y saldo de caja. Documentar cada diferencia por redondeo, moneda, timing, regla o dato faltante.
-8. Ejecutar dos cierres completos de validación y aprobar las diferencias con Finanzas. Los contadores del panel no son un certificado de aprobación.
+8. Ejecutar agosto como primer cierre de validación contra el maestro aprobado y septiembre como segundo período. Aprobar las diferencias de ambos con Finanzas; septiembre sigue pendiente de validación. Los contadores del panel no son un certificado de aprobación.
 9. Verificar los reportes productivos y retirar el maestro como operación mensual sólo cuando la conciliación esté aprobada. Conservar el archivo histórico.
 
 ## Reapertura y recuperación
