@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.13.1 — 2026-10-09
+
+- «Asignadas por mí» queda oculto por defecto en Inicio y Home de Tareas. Cada usuario puede mostrarlo u ocultarlo, recordando la elección entre ambas pantallas en ese navegador; la consulta explícita sigue disponible en Mis tareas.
+- Las consultas habituales de tareas personales no cargan las delegadas. Se solicitan sólo cuando se abre su bloque o pestaña, manteniendo el resumen limitado a cinco filas.
+- Definiciones de producto 2.35.0.
+
 ## 1.13.0 — 2026-10-08
 
 - Tareas: estado y bloqueo tienen una columna estable en escritorio y se acomodan debajo del título en móvil, sin desplazar responsables ni fechas.

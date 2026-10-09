@@ -23,8 +23,8 @@ const FILTERS: { value: Filter; label: string }[] = [
 export default function DelegatedTasks({ full = false }: { full?: boolean }) {
   const [filter, setFilter] = useState<Filter>("active");
   const { data, isLoading, isError, refetch } = useQuery<{ delegatedTasks: DelegatedTask[] }>({
-    queryKey: ["/api/tasks/my-tasks"],
-    queryFn: () => authFetchJson("/api/tasks/my-tasks"),
+    queryKey: ["/api/tasks/my-tasks", "delegated"],
+    queryFn: () => authFetchJson("/api/tasks/my-tasks?includeDelegated=true"),
   });
   const tasks = data?.delegatedTasks ?? [];
   const matches = (task: DelegatedTask, value: Filter) => value === "active"

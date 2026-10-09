@@ -23480,11 +23480,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ));
         }
         myTasks = await db.select().from(tasks).where(and(...conditions)).orderBy(asc(tasks.dueDate), asc(tasks.position));
-        // Same visibility/date/status scope, with the authenticated assignment actor.
-        delegatedTasks = (await db.select().from(tasks)
-          .where(and(eq(tasks.assignedBy, Number(user.id)), ...conditions.slice(1)))
-          .orderBy(asc(tasks.dueDate), asc(tasks.position)))
-          .filter(task => isDelegatedToOthers(task, pid ?? null));
+        // Delegation tracking is opt-in; ordinary personal-task requests do not load it.
+        if (req.query.includeDelegated === "true") {
+          delegatedTasks = (await db.select().from(tasks)
+            .where(and(eq(tasks.assignedBy, Number(user.id)), ...conditions.slice(1)))
+            .orderBy(asc(tasks.dueDate), asc(tasks.position)))
+            .filter(task => isDelegatedToOthers(task, pid ?? null));
+        }
       }
 
       const projectMetadata = await db.select({ id: activeProjects.id, name: activeProjects.name, quotationName: quotations.projectName, clientId: activeProjects.clientId, clientName: clients.name })
