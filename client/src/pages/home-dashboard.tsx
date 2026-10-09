@@ -1,4 +1,4 @@
-import DelegatedTasks from "@/components/tasks/DelegatedTasks";
+import OptionalDelegatedTasks from "@/components/tasks/OptionalDelegatedTasks";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { authFetch } from "@/lib/queryClient";
@@ -331,7 +331,7 @@ export default function HomeDashboard() {
         </Card>
       )}
 
-      {canAccessTasks && <DelegatedTasks />}
+      {canAccessTasks && <OptionalDelegatedTasks />}
 
       {/* Mi semana */}
       {canAccessTasks && user?.personnelLinked === false && (
