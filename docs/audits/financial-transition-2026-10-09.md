@@ -66,6 +66,33 @@ La automatización hace cálculos, propagaciones y controles; no reemplaza la ca
 
 ## Secuencia para completar la transición
 
+### Requisito operativo confirmado: liquidación y facturación del equipo
+
+La descripción posterior del usuario precisa un circuito que **todavía no está implementado completo**. La validación técnica anterior no certifica estos requisitos de negocio. Esta revisión agrega hallazgos; no cambia fórmulas, permisos ni datos productivos.
+
+| Paso solicitado | Estado comprobado y trabajo pendiente |
+| --- | --- |
+| Corte el último día hábil | El cierre de horas se guarda manualmente por persona. No se encontró un job que haga el corte, prepare liquidaciones y avise a responsables. Hace falta un corte operativo independiente del cierre financiero, calendario/horario explícitos y correcciones auditadas. |
+| Freelance por horas; fijo por horas contractuales × tarifa | La pantalla distingue ambos contratos, pero descuenta Día Epical automáticamente a fijos y permite otros descuentos. El servidor recibe las horas ajustadas del cliente. Debe resolver y congelar la base contractual por período en el servidor; separar capacidad/horas trabajadas de importe a pagar. |
+| Operaciones asigna % USD | Disponible, con sugerencia del mes anterior y preparación masiva de borradores. Publicación individual. |
+| TC bancario al facturar → autorización USD → factura | El cálculo existe. Hoy guardar TC habilita subir factura inmediatamente; falta la aprobación del importe por Operaciones antes de emitir. La revisión de factura posterior usa permiso Finanzas y es una acción distinta. |
+| Cobro USD → segundo TC + extras → autorización ARS → factura | El cálculo con dos TC existe. No exige factura USD aprobada ni recepción confirmada para ingresar el segundo TC. El colaborador sólo carga comisión en USD; extras ARS los carga Operaciones. Faltan extras por concepto/moneda/respaldo, autorización previa y congelamiento por tramo. |
+| Bono en USD o ARS | Hay bono USD y extra ARS sólo en modalidad mixta. Falta concepto explícito de bono con moneda elegible, separado de reintegros. |
+| Sólo ARS con extras y aprobación previa | Hoy muestra total base y permite adjuntar; la API descarta extras para modalidad ARS. Falta ingreso de extras por el colaborador, cálculo sin pedir FX y autorización de Operaciones. |
+| Costo real del equipo → reportes financieros | Hallazgo crítico: `financial-native-builders.ts` agrega `fact_labor_month`, construido desde horas cargadas, y las facturas del equipo son `balance_only`. No se encontró propagación de la diferencia contra horas fijas, bonos y reintegros desde la liquidación. Hace falta reconciliar costo operativo, liquidación y costo financiero sin duplicar importes. |
+
+La pantalla personal muestra además una declaración cambiaria del cierre operativo y el circuito de dos TC de liquidación. Son registros y cálculos diferentes. Para un recorrido intuitivo hace falta una sola ficha del mes con el siguiente paso, responsable, importe y estado; conservar las declaraciones anteriores como histórico identificado.
+
+Riesgos adicionales: se pueden recalcular TC o actualizar una publicación sin una versión aprobada por tramo; el resumen visual puede marcar avance por presencia de documentos y no por finalización de todas las etapas. Deben existir controles de secuencia en servidor, invalidación de autorizaciones cuando cambian datos, protección de tramos ya facturados y manejo explícito de saldo ARS cero/negativo, redondeos y pagos parciales. No emitir automáticamente una factura negativa.
+
+**Fórmula pendiente de aclaración:** para total ARS 10.000, 90%, TC inicial 1.500, TC al recibir 1.505 y extras ARS 5.000, el calculador actual devuelve USD 6 y ARS 5.970 (`10.000 - 6 × 1.505 + 5.000`). El ejemplo del usuario da ARS 4.970 porque resta desde 9.000: queda fuera el 10% restante. Se pidió aclaración; no se modificó esa regla. La ejecución aislada también confirmó que el calculador devuelve importes finales nulos en sólo ARS sin TC; la interfaz actual evita ese cálculo mostrando el total base, pero así no incorpora extras. Pasaron las tres pruebas existentes de `tests/personnel-settlement.test.ts`; sólo cubren cálculo mixto, no el flujo nuevo completo.
+
+Recorrido propuesto: preparar automáticamente el corte y borradores → Operaciones publica condiciones → colaborador declara TC/extras → Operaciones autoriza el importe del tramo → colaborador emite y adjunta → Administración verifica y registra Pasivo → confirmar recepción USD y repetir autorización para ARS → conciliar cierre financiero. En sólo ARS se omiten los pasos USD/FX. Los avisos se disparan por cambio de estado y los recordatorios sólo por pendientes, con deduplicación. No hay integración bancaria ni emisión fiscal automática certificadas en esta revisión.
+
+Antes de automatizar el corte hay que fijar calendario, zona horaria y hora límite, además del tratamiento de horas excepcionales del fin de semana. La regla de fijos indicada por el usuario es que la base no cambia por la cantidad de días hábiles ni por las horas registradas; cualquier ajuste contractual excepcional debe ser explícito y auditable.
+
+### Preparación de datos y puesta en marcha
+
 1. Último cierre del maestro confirmado: agosto de 2026. Identificar y conservar su versión aprobada y los respaldos. Conciliar agosto en Mind manteniendo el corte vigente; no cambiarlo para esconder diferencias.
 2. Conservar backup de base y evidencia documental. Restaurarlo en una instancia aislada y verificar conteos/saldos antes del corte operativo definitivo. La prueba local de estructura y datos sintéticos no reemplaza esa restauración de producción. Después de CI, desplegar el cambio y revisar configuración, migraciones y logs. Los presupuestos abiertos figurarán pendientes hasta completar su carga nativa.
 3. Registrar cuentas, moneda, fecha y saldo inicial de apertura de agosto respaldado por extracto (cierre del 31 de julio). No sumar cada snapshot histórico del Excel como si fuera una nueva cuenta por cobrar/pagar.
