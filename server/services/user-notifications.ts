@@ -24,14 +24,29 @@ const htmlEntities: Record<string, string> = {
 const escapeHtml = (value: string) => value.replace(/[&<>"']/g, (char) => htmlEntities[char]);
 
 const notificationCategory: Record<string, string> = {
-  mind_reply: "Conversación en Mind",
+  mind_reply: "Conversación",
   mind_daily: "Daily de Mind",
   task_assigned: "Tarea asignada",
+  task_reply: "Conversación de tarea",
   crm_reminder: "Recordatorio CRM",
   absence: "Novedad de equipo",
   absence_request: "Solicitud de ausencia",
   absence_cancellation: "Cancelación de ausencia",
   absence_decision: "Decisión de ausencia",
+  monthly_settlement: "Conciliación mensual",
+};
+
+const discreetEmailCopy: Record<string, { subject: string; message: string }> = {
+  mind_reply: { subject: "Nueva respuesta en una conversación", message: "Alguien respondió en una conversación de Mind. Abrí Mind para leer el mensaje." },
+  mind_daily: { subject: "Hay novedades en tu Daily", message: "Hay una actualización en el Daily de Mind. Abrí Mind para verla." },
+  task_assigned: { subject: "Te asignaron una tarea", message: "Tenés una nueva tarea asignada. Abrí Mind para consultar los detalles." },
+  task_reply: { subject: "Nueva respuesta en una tarea", message: "Hay una nueva respuesta en una conversación de tarea. Abrí Mind para leerla." },
+  crm_reminder: { subject: "Tenés un recordatorio de CRM", message: "Hay una actividad de CRM que requiere tu atención. Abrí Mind para ver el recordatorio." },
+  absence: { subject: "Novedad de equipo", message: "Hay una novedad relacionada con una ausencia del equipo. Abrí Mind para ver los detalles." },
+  absence_request: { subject: "Hay una solicitud de ausencia", message: "Se registró o actualizó una solicitud de ausencia. Abrí Mind para revisarla." },
+  absence_cancellation: { subject: "Se canceló una ausencia", message: "Hay una cancelación de ausencia para revisar. Abrí Mind para ver los detalles." },
+  absence_decision: { subject: "Se tomó una decisión sobre una ausencia", message: "Se actualizó el estado de una solicitud de ausencia. Abrí Mind para ver la decisión." },
+  monthly_settlement: { subject: "Hay una conciliación mensual para revisar", message: "Hay una actualización sobre una conciliación mensual. Abrí Mind para revisarla." },
 };
 
 export function getNotificationPreferenceCategory(type: string) {
@@ -53,15 +68,16 @@ function getActionUrl(origin: string, actionUrl?: string) {
   }
 }
 
-function buildNotificationEmail(input: UserNotificationInput, url: string) {
+function buildNotificationEmail(input: UserNotificationInput, url: string, brandUrl: string) {
   const safeTitle = escapeHtml(input.title);
   const safeMessage = escapeHtml(input.message);
   const safeUrl = escapeHtml(url);
+  const safeBrandUrl = escapeHtml(brandUrl);
   const category = escapeHtml(notificationCategory[input.type] ?? "Notificación");
   const action = url
     ? `<tr><td align="center" style="padding:24px 0 8px"><a href="${safeUrl}" style="background:#1d4ed8;border-radius:10px;color:#ffffff;display:inline-block;font-family:Arial,sans-serif;font-size:15px;font-weight:700;line-height:20px;padding:14px 24px;text-decoration:none">Abrir en Mind</a></td></tr><tr><td align="center" style="color:#64748b;font-family:Arial,sans-serif;font-size:12px;line-height:18px;padding:8px 20px 0">Si el botón no funciona, <a href="${safeUrl}" style="color:#1d4ed8;text-decoration:underline">abrí este enlace</a>.</td></tr>`
     : "";
-  const html = `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><title>${safeTitle}</title></head><body style="background:#f1f5f9;margin:0;padding:0"><div style="display:none;font-size:1px;color:#f1f5f9;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden">${safeMessage}</div><table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#f1f5f9"><tr><td align="center" style="padding:36px 16px"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:600px"><tr><td style="background:#0f172a;border-radius:16px 16px 0 0;padding:22px 30px"><span style="color:#ffffff;font-family:Arial,sans-serif;font-size:19px;font-weight:700;letter-spacing:.2px">mind</span><span style="color:#94a3b8;font-family:Arial,sans-serif;font-size:12px;padding-left:9px">by Epical</span></td></tr><tr><td style="background:#ffffff;padding:34px 30px 28px"><div style="background:#eff6ff;border-radius:999px;color:#1d4ed8;display:inline-block;font-family:Arial,sans-serif;font-size:11px;font-weight:700;letter-spacing:.5px;padding:7px 11px;text-transform:uppercase">${category}</div><h1 style="color:#0f172a;font-family:Arial,sans-serif;font-size:24px;line-height:32px;margin:20px 0 10px">${safeTitle}</h1><p style="color:#475569;font-family:Arial,sans-serif;font-size:16px;line-height:25px;margin:0">${safeMessage}</p><table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">${action}</table></td></tr><tr><td style="background:#f8fafc;border-radius:0 0 16px 16px;border-top:1px solid #e2e8f0;padding:20px 30px"><p style="color:#64748b;font-family:Arial,sans-serif;font-size:12px;line-height:19px;margin:0">Recibiste este correo porque tenés activadas las notificaciones por email de Mind. Podés cambiarlas desde las preferencias en la campana de notificaciones.</p><p style="color:#94a3b8;font-family:Arial,sans-serif;font-size:11px;line-height:17px;margin:12px 0 0">Epical · Notificaciones automáticas</p></td></tr></table></td></tr></table></body></html>`;
+  const html = `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><title>${safeTitle}</title></head><body style="background:#f1f5f9;margin:0;padding:0"><div style="display:none;font-size:1px;color:#f1f5f9;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden">${safeMessage}</div><table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#f1f5f9"><tr><td align="center" style="padding:36px 16px"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:600px"><tr><td style="background:#0f172a;border-radius:16px 16px 0 0;padding:22px 30px"><table role="presentation" cellspacing="0" cellpadding="0" border="0"><tr><td valign="middle" style="padding-right:11px"><img src="${safeBrandUrl}" width="38" height="38" alt="" style="display:block;border:0;border-radius:9px"></td><td valign="middle"><div style="color:#ffffff;font-family:Arial,sans-serif;font-size:19px;font-weight:700;letter-spacing:-.5px">mind <span style="border:1px solid #ffffff33;border-radius:99px;background:#ffffff12;color:#ffffff85;font-size:9px;letter-spacing:1px;padding:3px 6px;vertical-align:middle">OS</span></div><div style="color:#94a3b8;font-family:Arial,sans-serif;font-size:9px;font-weight:600;letter-spacing:.7px;margin-top:5px">EPICAL INTELLIGENCE</div></td></tr></table></td></tr><tr><td style="background:#ffffff;padding:34px 30px 28px"><div style="background:#eff6ff;border-radius:999px;color:#1d4ed8;display:inline-block;font-family:Arial,sans-serif;font-size:11px;font-weight:700;letter-spacing:.5px;padding:7px 11px;text-transform:uppercase">${category}</div><h1 style="color:#0f172a;font-family:Arial,sans-serif;font-size:24px;line-height:32px;margin:20px 0 10px">${safeTitle}</h1><p style="color:#475569;font-family:Arial,sans-serif;font-size:16px;line-height:25px;margin:0">${safeMessage}</p><table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">${action}</table></td></tr><tr><td style="background:#f8fafc;border-radius:0 0 16px 16px;border-top:1px solid #e2e8f0;padding:20px 30px"><p style="color:#64748b;font-family:Arial,sans-serif;font-size:12px;line-height:19px;margin:0">Recibiste este correo porque tenés activadas las notificaciones por email de Mind. Podés cambiarlas desde las preferencias en la campana de notificaciones.</p><p style="color:#94a3b8;font-family:Arial,sans-serif;font-size:11px;line-height:17px;margin:12px 0 0">Mind OS · Epical Intelligence</p></td></tr></table></td></tr></table></body></html>`;
   const text = `${input.title}\n\n${input.message}${url ? `\n\nAbrir en Mind: ${url}` : ""}\n\nRecibiste este correo porque tenés activadas las notificaciones por email de Mind. Podés cambiarlas desde las preferencias en la campana de notificaciones.`;
   return { html, text };
 }
@@ -292,15 +308,20 @@ export async function dispatchUserNotificationEmails() {
         continue;
       }
       const url = getActionUrl(origin, payload.actionUrl ?? undefined);
-      const messageTitle = payload.discreetMode ? "Tenés una nueva notificación en Mind" : payload.title;
-      const messageBody = payload.discreetMode ? "Ingresá a Mind para ver los detalles." : payload.message;
+      const discreetCopy = discreetEmailCopy[payload.type];
+      const messageTitle = payload.discreetMode
+        ? discreetCopy?.subject ?? `Nueva notificación: ${notificationCategory[payload.type] ?? "Mind"}`
+        : payload.title;
+      const messageBody = payload.discreetMode
+        ? discreetCopy?.message ?? `Hay una novedad en ${notificationCategory[payload.type] ?? "Mind"}. Abrí Mind para ver los detalles.`
+        : payload.message;
       const { html, text } = buildNotificationEmail({
         eventKey: payload.eventKey,
         type: payload.type,
         title: messageTitle,
         message: messageBody,
         actionUrl: payload.actionUrl ?? undefined,
-      }, url);
+      }, url, getActionUrl(origin, "/mind-email-brand.png"));
       const idempotencyKey = createHash("sha256").update(`${payload.eventKey}:${payload.userId}`).digest("hex");
       try {
         const response = await fetch("https://api.resend.com/emails", {
