@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.13.2 — 2026-10-13
+
+- Los emails de notificación explican el tipo de novedad aun con el modo discreto activado, sin incluir el contenido privado.
+- La cabecera y el pie usan la identidad actual de Mind OS · Epical Intelligence.
+
 ## 1.13.1 — 2026-10-09
 
 - «Asignadas por mí» queda oculto por defecto en Inicio y Home de Tareas. Cada usuario puede mostrarlo u ocultarlo, recordando la elección entre ambas pantallas en ese navegador; la consulta explícita sigue disponible en Mis tareas.
