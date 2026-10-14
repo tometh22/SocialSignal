@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.13.3 — 2026-10-14
+
+- Evita enviar integrantes del equipo con cero horas al guardar variantes de cotización, eliminando el rechazo de validación para roles que no participan del alcance.
+- Corrige la referencia de horas recomendadas: prioriza proyectos cerrados de la misma receta, exige al menos dos casos y expone la mediana junto con el tamaño de muestra.
+- Permite a Operaciones crear y calibrar una nueva versión borrador de una receta con horas reales, ver el total recalculado y publicarla sin alterar recetas ni cotizaciones anteriores.
+
 ## 1.13.2 — 2026-10-13
 
 - Los emails de notificación explican el tipo de novedad aun con el modo discreto activado, sin incluir el contenido privado.

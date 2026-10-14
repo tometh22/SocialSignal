@@ -68,13 +68,21 @@ export function ProfessionalScopeBuilder({ mode = "all", headless = false }: { m
   const orderedBlueprints = useMemo(() => [...compatibleBlueprints].sort((a, b) => Number(b.id === recommendedBlueprintId) - Number(a.id === recommendedBlueprintId)), [compatibleBlueprints, recommendedBlueprintId]);
   const scope = quotationData.scopeSnapshot ? blueprintDefinitionSchema.parse(quotationData.scopeSnapshot) : null;
   const estimate = useMemo(() => scope ? estimateBlueprintWorkload(scope) : null, [scope]);
-  const benchmarkFor = (serviceBlueprintId: number | null | undefined, projectType: string) => {
+  const benchmarkFor = (serviceBlueprintId: number | null | undefined, projectType: string, serviceBlueprintSlug?: string | null) => {
     const exact = effortBenchmarks
       .filter((item) => item.serviceBlueprintId === serviceBlueprintId && item.projectType === projectType && item.sampleSize >= 2)
       .sort((left, right) => right.sampleSize - left.sampleSize)[0];
-    return exact || effortBenchmarks.find((item) => item.serviceBlueprintId == null && item.projectType === projectType && item.sampleSize >= 2) || null;
+    const sameRecipe = serviceBlueprintSlug
+      ? effortBenchmarks
+        .filter((item) => item.serviceBlueprintSlug === serviceBlueprintSlug && item.projectType === projectType && item.sampleSize >= 2)
+        .sort((left, right) => right.sampleSize - left.sampleSize)[0]
+      : null;
+    const projectTypeFallback = effortBenchmarks
+      .filter((item) => item.serviceBlueprintId == null && !item.serviceBlueprintSlug && item.projectType === projectType && item.sampleSize >= 2)
+      .sort((left, right) => right.sampleSize - left.sampleSize)[0];
+    return exact || sameRecipe || projectTypeFallback || null;
   };
-  const activeBenchmark = benchmarkFor(quotationData.serviceBlueprintId, quotationData.project.type);
+  const activeBenchmark = benchmarkFor(quotationData.serviceBlueprintId, quotationData.project.type, selected?.slug);
   const referenceEstimate = useMemo(
     () => estimate && scope ? workloadForBillingPeriod(scope, applyHistoricalEffortBenchmark(estimate, activeBenchmark)) : null,
     [activeBenchmark, estimate, scope],
@@ -151,7 +159,7 @@ export function ProfessionalScopeBuilder({ mode = "all", headless = false }: { m
     const nextProjectType = isBlueprintCompatibleWithProjectType(quotationData.project.type, definition.modality)
       ? quotationData.project.type
       : projectTypeFor(definition.modality);
-    const benchmark = benchmarkFor(blueprint?.id ?? quotationData.serviceBlueprintId, nextProjectType);
+    const benchmark = benchmarkFor(blueprint?.id ?? quotationData.serviceBlueprintId, nextProjectType, blueprint?.slug ?? selected?.slug);
     const contractWorkload = applyHistoricalEffortBenchmark(recipeWorkload, benchmark);
     const workload = workloadForBillingPeriod(definition, contractWorkload);
     const missing: string[] = [];
@@ -322,7 +330,7 @@ export function ProfessionalScopeBuilder({ mode = "all", headless = false }: { m
               const blueprintProjectType = isBlueprintCompatibleWithProjectType(quotationData.project.type, definition.modality)
                 ? quotationData.project.type
                 : projectTypeFor(definition.modality);
-              const benchmark = benchmarkFor(blueprint.id, blueprintProjectType);
+              const benchmark = benchmarkFor(blueprint.id, blueprintProjectType, blueprint.slug);
               const historicalWorkload = applyHistoricalEffortBenchmark(blueprint.workload, benchmark);
               const recommended = blueprint.id === recommendedBlueprintId;
               return (

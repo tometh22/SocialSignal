@@ -81,10 +81,12 @@ export function registerProposalStudioRoutes(app: Express, requireAuth: AuthMidd
           SELECT
             project.id AS project_id,
             quote.service_blueprint_id,
+            blueprint.slug AS service_blueprint_slug,
             quote.project_type,
             hours.actual_hours
           FROM active_projects project
           INNER JOIN quotations quote ON quote.id = project.quotation_id
+          LEFT JOIN service_blueprints blueprint ON blueprint.id = quote.service_blueprint_id
           INNER JOIN logged_hours hours ON hours.project_id = project.id
           WHERE hours.actual_hours > 0
             AND (
@@ -96,17 +98,23 @@ export function registerProposalStudioRoutes(app: Express, requireAuth: AuthMidd
         )
         SELECT
           service_blueprint_id,
+          service_blueprint_slug,
           project_type,
           COUNT(*)::integer AS sample_size,
           AVG(actual_hours)::double precision AS average_actual_hours,
           percentile_cont(0.5) WITHIN GROUP (ORDER BY actual_hours)::double precision AS median_actual_hours
         FROM completed_projects
-        GROUP BY GROUPING SETS ((service_blueprint_id, project_type), (project_type))
-        HAVING GROUPING(service_blueprint_id) = 1 OR service_blueprint_id IS NOT NULL
+        GROUP BY GROUPING SETS (
+          (service_blueprint_id, service_blueprint_slug, project_type),
+          (service_blueprint_slug, project_type),
+          (project_type)
+        )
+        HAVING GROUPING(service_blueprint_slug) = 1 OR service_blueprint_slug IS NOT NULL
         ORDER BY project_type, service_blueprint_id NULLS LAST
       `);
       res.json(result.rows.map((row) => ({
         serviceBlueprintId: row.service_blueprint_id == null ? null : Number(row.service_blueprint_id),
+        serviceBlueprintSlug: row.service_blueprint_slug == null ? null : String(row.service_blueprint_slug),
         projectType: String(row.project_type),
         sampleSize: Number(row.sample_size),
         averageActualHours: Number(row.average_actual_hours),
@@ -141,6 +149,30 @@ export function registerProposalStudioRoutes(app: Express, requireAuth: AuthMidd
     }
   });
 
+  app.post("/api/service-blueprints/:id/draft", requireAuth, requirePermission("operations"), async (req, res) => {
+    const id = Number(req.params.id);
+    try {
+      const [source] = await db.select().from(serviceBlueprints).where(eq(serviceBlueprints.id, id));
+      if (!source) return res.status(404).json({ message: "Receta no encontrada" });
+      if (source.status !== "published") return res.status(409).json({ message: "Sólo se puede crear una versión desde una receta publicada" });
+      const version = await nextBlueprintVersion(source.slug);
+      const [created] = await db.insert(serviceBlueprints).values({
+        slug: source.slug,
+        name: source.name,
+        description: source.description,
+        version,
+        status: "draft",
+        definition: blueprintDefinitionSchema.parse(source.definition),
+        sourceLabel: `Calibración de ${source.name} v${source.version}`,
+        createdBy: req.user?.id ?? null,
+      }).returning();
+      res.status(201).json({ ...created, workload: estimateBlueprintWorkload(blueprintDefinitionSchema.parse(created.definition)) });
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: "La receta de origen no es válida", errors: error.errors });
+      res.status(500).json({ message: "No se pudo crear la nueva versión" });
+    }
+  });
+
   app.post("/api/service-blueprints/from-quotation/:quotationId", requireAuth, requirePermission("quotations"), async (req, res) => {
     const quotationId = Number(req.params.quotationId);
     try {
@@ -170,6 +202,25 @@ export function registerProposalStudioRoutes(app: Express, requireAuth: AuthMidd
     if (current.status !== "draft") return res.status(409).json({ message: "Sólo una receta en borrador puede publicarse" });
     const [published] = await db.update(serviceBlueprints).set({ status: "published", publishedBy: req.user?.id ?? null, publishedAt: new Date(), updatedAt: new Date() }).where(and(eq(serviceBlueprints.id, id), eq(serviceBlueprints.status, "draft"))).returning();
     res.json(published);
+  });
+
+  app.put("/api/service-blueprints/:id", requireAuth, requirePermission("operations"), async (req, res) => {
+    const id = Number(req.params.id);
+    try {
+      const { definition } = z.object({ definition: blueprintDefinitionSchema }).parse(req.body);
+      const [current] = await db.select().from(serviceBlueprints).where(eq(serviceBlueprints.id, id));
+      if (!current) return res.status(404).json({ message: "Receta no encontrada" });
+      if (current.status !== "draft") return res.status(409).json({ message: "Sólo se pueden editar recetas en borrador" });
+      const [updated] = await db.update(serviceBlueprints)
+        .set({ definition, updatedAt: new Date() })
+        .where(and(eq(serviceBlueprints.id, id), eq(serviceBlueprints.status, "draft")))
+        .returning();
+      if (!updated) return res.status(409).json({ message: "La receta dejó de estar en borrador" });
+      res.json({ ...updated, workload: estimateBlueprintWorkload(definition) });
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: "La receta no es válida", errors: error.errors });
+      res.status(500).json({ message: "No se pudo guardar la receta" });
+    }
   });
 
   app.post("/api/service-blueprints/:id/archive", requireAuth, requirePermission("operations"), async (req, res) => {
