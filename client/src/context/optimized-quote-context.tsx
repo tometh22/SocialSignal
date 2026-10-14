@@ -186,6 +186,7 @@ interface OptimizedQuoteContextType {
   saveQuotation: (
     status?: 'draft' | 'pending' | 'approved' | 'rejected' | 'in-negotiation',
     variants?: QuotationVariantPayload[],
+    teamMembersOverride?: OptimizedTeamMember[],
   ) => Promise<any>;
   calculateBaseCost: () => void;
   calculateTotalCost: () => void;
@@ -1053,6 +1054,7 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
   const saveQuotation = useCallback(async (
     status: 'draft' | 'pending' | 'approved' | 'rejected' | 'in-negotiation' = 'draft',
     variants?: QuotationVariantPayload[],
+    teamMembersOverride?: OptimizedTeamMember[],
   ) => {
     try {
       // Validaciones básicas para todos los estados
@@ -1070,7 +1072,8 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
 
       // Para borradores, permitir cotizaciones sin equipo
       // Logging para debug
-      if (status !== 'draft' && (!quotationData.teamMembers || quotationData.teamMembers.length === 0)) {
+      const teamMembersToSave = teamMembersOverride ?? quotationData.teamMembers;
+      if (status !== 'draft' && (!teamMembersToSave || teamMembersToSave.length === 0)) {
         throw new Error("Debe agregar al menos un miembro al equipo antes de finalizar la cotización");
       }
 
@@ -1147,7 +1150,7 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
         // directly by person. The API contract uses null for an absent role;
         // sending 0 made otherwise valid quotations fail with "Invalid
         // quotation data" before the transaction started.
-        teamMembers: quotationData.teamMembers.map((member) => {
+        teamMembers: teamMembersToSave.map((member) => {
           const hours = Number(member.hours);
           const rate = Number(member.rate);
           const roleId = Number(member.roleId);

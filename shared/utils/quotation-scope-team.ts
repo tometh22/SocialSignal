@@ -20,5 +20,8 @@ export function quotationTeamForScope<T extends ScopeMember>(scope: BlueprintDef
       hoursByIndex.set(index, hours); remaining -= hours;
     });
   }
-  return team.map((member, index) => ({ ...member, hours: hoursByIndex.get(index) ?? 0, cost: (hoursByIndex.get(index) ?? 0) * member.rate }));
+  return team.flatMap((member, index) => {
+    const hours = hoursByIndex.get(index) ?? 0;
+    return hours > 0 ? [{ ...member, hours, cost: hours * member.rate }] : [];
+  });
 }

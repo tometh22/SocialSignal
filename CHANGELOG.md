@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.13.3 — 2026-10-14
+
+- Las recetas ya no agregan integrantes con 0 horas al equipo de una cotización.
+- Las variantes excluyen roles que no participan del alcance; las filas vacías de borradores existentes se filtran al solicitar aprobación.
+
 ## 1.13.2 — 2026-10-13
 
 - Los emails de notificación explican el tipo de novedad aun con el modo discreto activado, sin incluir el contenido privado.

@@ -163,6 +163,9 @@ export function ProfessionalScopeBuilder({ mode = "all", headless = false }: { m
     // Agrupar por role.id y sumar las horas deja una única fila por rol real.
     const hoursByRoleId = new Map<number, { role: NonNullable<ReturnType<typeof resolveRole>>; hours: number }>();
     for (const [roleKey, hours] of Object.entries(workload.byRole)) {
+      // Las recetas pueden dejar roles con 0 h cuando una función no aplica al
+      // alcance elegido. No deben convertirse en integrantes de la cotización.
+      if (!Number.isFinite(hours) || hours <= 0) continue;
       const role = resolveRole(roleKey, availableRoles, definition.roleProfiles[roleKey]);
       if (!role) {
         missing.push(roleKey);

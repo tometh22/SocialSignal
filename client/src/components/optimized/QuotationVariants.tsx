@@ -579,13 +579,26 @@ export function QuotationVariants({
       if (selectedVariantIds.length === 0) {
         throw new Error("Debe seleccionar al menos una variante para incluir en la cotización");
       }
+
+      const teamMembersForApproval = baseTeamMembers.filter((member) => Number(member.hours) > 0);
+      if (teamMembersForApproval.length === 0) {
+        throw new Error("El equipo no tiene integrantes con horas positivas. Revisá el paso Equipo antes de finalizar.");
+      }
+      const quotationTeamForApproval = teamMembersForApproval.map((member) => ({
+        id: String(member.id),
+        roleId: Number(member.roleId) > 0 ? Number(member.roleId) : 0,
+        personnelId: Number(member.personnelId) > 0 ? Number(member.personnelId) : null,
+        hours: Number(member.hours),
+        rate: Number(member.rate),
+        cost: Number(member.hours) * Number(member.rate),
+      }));
       
       const persistedVariants = variants.filter((variant) => selectedVariantIds.includes(variant.id)).map((variant) => {
-        const effectiveTeam = baseTeamMembers.map((member) => ({
+        const effectiveTeam = teamMembersForApproval.map((member) => ({
           ...member,
           hours: getEffectiveMemberHours(variant, member),
           cost: getEffectiveMemberHours(variant, member) * (member.rate || 0),
-        }));
+        })).filter((member) => Number(member.hours) > 0);
         const result = calculateVariantResult(effectiveTeam).display;
         return {
           variantName: variant.variantName,
@@ -611,7 +624,7 @@ export function QuotationVariants({
           })),
         };
       });
-      await saveQuotation('pending', persistedVariants);
+      await saveQuotation('pending', persistedVariants, quotationTeamForApproval);
       
       toast({
         title: "Enviada a aprobación interna",
@@ -635,7 +648,7 @@ export function QuotationVariants({
   const getDefaultMemberHours = (variant: QuotationVariant, member: TeamMember): number => {
     if (variant.scopeSnapshot) {
       const effective = teamForScope(blueprintDefinitionSchema.parse(variant.scopeSnapshot), baseTeamMembers, availableRoles).find((item) => item.id === member.id);
-      if (effective) return effective.hours;
+      return effective?.hours ?? 0;
     }
     if (!baseCost || baseCost === 0 || !member.hours) return member.hours || 0;
     // variant.baseCost está en la moneda de visualización; baseCost (prop) está
