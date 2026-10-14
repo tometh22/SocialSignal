@@ -602,7 +602,11 @@ export function QuotationVariants({
           unitMetrics: variant.unitMetrics || {},
           isLegacy: Boolean(variant.isLegacy),
           isSelected: false,
-          teamMembers: effectiveTeam.map((member) => ({
+          // Las variantes con alcance propio asignan 0 horas a integrantes que
+          // no participan de ese escenario. No los persistimos como parte del
+          // equipo de la variante: el servidor exige horas positivas para cada
+          // integrante incluido en una cotización enviada.
+          teamMembers: effectiveTeam.filter((member) => member.hours > 0).map((member) => ({
             roleId: Number(member.roleId) > 0 ? Number(member.roleId) : null,
             personnelId: Number(member.personnelId) > 0 ? Number(member.personnelId) : null,
             hours: member.hours,
