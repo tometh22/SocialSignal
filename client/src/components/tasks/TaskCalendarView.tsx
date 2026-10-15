@@ -13,6 +13,7 @@ import {
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { taskDateBucket } from "@shared/utils/task-date-bucket";
+import { assignCalendarLanes } from "@shared/utils/calendar-lanes";
 import { TASK_STATUS_CONFIG, TaskStatus } from "@/constants/task-statuses";
 
 interface CalTask {
@@ -134,10 +135,18 @@ export default function TaskCalendarView({ projectId, tasks: tasksProp, view = "
 
       {/* Calendar grid */}
       <div className="border border-border rounded-xl overflow-hidden">
-        {weeks.map((week, wi) => (
+        {weeks.map((week, wi) => {
+          // Cada tarea conserva su fila durante toda la semana (no salta de posición entre días).
+          const lanes = assignCalendarLanes(tasksWithDate, week.map(d => format(d, "yyyy-MM-dd")));
+          return (
           <div key={wi} className={cn("grid grid-cols-7", wi > 0 && "border-t border-border")}>
             {week.map((d, di) => {
               const dayTasks = getTasksForDay(d);
+              const visibleLanes = 3;
+              const byLane = new Map<number, CalTask>();
+              dayTasks.forEach(t => { const lane = lanes.get(t.id); if (lane !== undefined && lane < visibleLanes) byLane.set(lane, t); });
+              const lastLane = byLane.size ? Math.max(...byLane.keys()) : -1;
+              const hiddenCount = dayTasks.length - byLane.size;
               const isToday = isSameDay(d, today);
               const inMonth = isSameMonth(d, currentMonth);
               return (
@@ -160,14 +169,15 @@ export default function TaskCalendarView({ projectId, tasks: tasksProp, view = "
                     {format(d, "d")}
                   </div>
                   <div className="space-y-0.5">
-                    {dayTasks.slice(0, 3).map(t => {
+                    {Array.from({ length: lastLane + 1 }, (_, lane) => byLane.get(lane) ?? null).map((t, lane) => {
+                      if (!t) return <div key={`gap-${lane}`} className="h-[18px]" aria-hidden="true" />;
                       const overdue = isTaskOverdue(t, d);
                       const dot = overdue ? undefined : TASK_STATUS_CONFIG[t.status as TaskStatus]?.dot;
                       return (
                         <div
                           key={t.id}
                           className={cn(
-                            "text-[9px] px-1 py-0.5 rounded border leading-tight cursor-default flex items-center gap-0.5",
+                            "text-[9px] px-1 h-[18px] rounded border leading-tight cursor-default flex items-center gap-0.5",
                             clientCalendarColor(t.clientId), t.status === "done" && "line-through opacity-60", overdue && "underline decoration-red-500"
                           )}
                           title={[t.title, t.clientName, t.projectName, t.status === "blocked" ? "Bloqueada" : ""].filter(Boolean).join(" · ")}
@@ -179,11 +189,11 @@ export default function TaskCalendarView({ projectId, tasks: tasksProp, view = "
                         </div>
                       );
                     })}
-                    {dayTasks.length > 3 && (
+                    {hiddenCount > 0 && (
                       <Popover>
                         <PopoverTrigger asChild>
                           <button className="text-[9px] text-muted-foreground hover:text-foreground px-1 w-full text-left transition-colors">
-                            +{dayTasks.length - 3} más
+                            +{hiddenCount} más
                           </button>
                         </PopoverTrigger>
                         <PopoverContent className="w-52 p-2" align="start">
@@ -219,7 +229,8 @@ export default function TaskCalendarView({ projectId, tasks: tasksProp, view = "
               );
             })}
           </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Tasks without a due date */}

@@ -1,6 +1,6 @@
 ---
-version: 2.36.0
-updatedAt: 2026-10-14
+version: 2.37.0
+updatedAt: 2026-10-15
 feedbackCount: 70
 ---
 
@@ -472,7 +472,7 @@ histórica que todavía necesitan cotizaciones y registros anteriores.
 
 - **Horas disponibles:** el Panel de horas resta sólo las ausencias **aprobadas** de la persona filtrada, nunca las de otras personas ni las pendientes, rechazadas o canceladas. `GET /api/personnel-absences?personnelId=` filtra por persona.
 - **Cumpleaños:** Inicio muestra los próximos 3 cumpleaños del personal activo, sin límite de días; la tarjeta «Tu cumpleaños» queda sólo como respaldo si no hay lista. Las personas que no son personal (por ejemplo Togna y Michelle) se cargan en Configuración > Personal > «Solo cumpleaños» (tabla `birthday_entries`: sólo nombre y fecha; sin costos, capacidad ni ausencias) y se suman a la lista.
-- **Calendarios:** cada día muestra la tarea con su título y el color del cliente; no se dibujan barras continuas que oculten el nombre.
+- **Calendarios:** cada día muestra la tarea con su título y el color del cliente; no se dibujan barras continuas que oculten el nombre. Cada tarea conserva la misma fila durante toda la semana.
 - **Tareas:** el «+» de asignación y el ícono de fecha son siempre visibles con contraste suficiente. Las tareas completadas también se pueden arrastrar entre secciones.
 - **Capacidad:** cada proyecto del desglose por persona se contrae y muestra su estimación semanal; la estimación de cada tarea queda junto a su título.
 - **Ausencias:** la solicitud permite elegir Tentativa o Confirmada al crearla (la aprobación sigue siendo independiente). La tabla de saldos del equipo muestra cupo, traslado, adelanto, cupo Epical, usados de cada tipo y disponibles total, de vacaciones y Epical, más Enfermedad y Otros.
