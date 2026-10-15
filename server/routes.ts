@@ -197,6 +197,8 @@ import { requireProjectUnlocked, projectIdFromTimeEntry, projectIdFromTask } fro
 import { requireRole, requireProvider, requireProviderCanAccessProject } from "./middleware/requireRole";
 import { requirePermission } from "./middleware/requirePermission";
 import { createReviewRoomsRouter } from "./routes-review-rooms";
+import { registerMindMcp } from "./mcp/routes";
+import { readMcpConfig } from "./mcp/config";
 import { createLedgerRouter } from "./routes-ledger";
 import { createFinancialIntelligenceRouter } from "./routes-financial-intelligence";
 import { createFinancialNativeRouter } from "./routes-financial-native";
@@ -1074,6 +1076,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Setup authentication with storage
   const { requireAuth, resolveUserFromSessionCookie } = setupAuth(app, storage);
+  registerMindMcp(app, pool, readMcpConfig(), (id) => storage.getUser(id));
   registerProposalStudioRoutes(app, requireAuth);
 
   // ═══ Review Rooms (multi-sala) ═══════════════════════════════════════════

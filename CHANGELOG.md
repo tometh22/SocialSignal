@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.13.7 — 2026-10-15
+
+- Conector MCP de solo lectura para consultar Status desde dots y otros agentes: búsqueda de salas por participante, proyectos, temas adicionales e historial.
+- Autorización OAuth con PKCE, identificación de emisor, tokens renovables y revocación desde Status → Agentes. El acceso respeta permisos y membresías de sala.
+- Migración aditiva 0086 para credenciales OAuth almacenadas como hashes y pruebas de integración con PostgreSQL en CI.
+
 ## 1.13.6 — 2026-10-15
 
 - Calendarios: una tarea que quedaba oculta tras «+N más» pese a haber huecos libres en el día ahora ocupa ese hueco; sólo se oculta si el día no tiene lugar.
