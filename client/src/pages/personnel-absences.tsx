@@ -225,7 +225,7 @@ export default function PersonnelAbsencesPage({ defaultTab = "mine" }: { default
             <div><Label>Desde</Label><Input type="date" required value={form.startDate} onChange={(event) => setForm({ ...form, startDate: event.target.value })} /></div>
             <div><Label>Hasta</Label><Input type="date" required value={form.endDate} onChange={(event) => setForm({ ...form, endDate: event.target.value })} /></div>
             <div><Label>Tipo</Label><Select value={form.type} onValueChange={(type) => setForm({ ...form, type })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{Object.entries(TYPE_LABELS).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectContent></Select></div>
-            <div className="flex items-end text-xs text-muted-foreground">Se registra como pendiente y tentativa; después podés confirmarla.</div>
+            <div><Label>Planificación</Label><Select value={form.planningStatus} onValueChange={(planningStatus) => setForm({ ...form, planningStatus })}><SelectTrigger data-testid="absence-planning-status"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="tentative">Tentativa</SelectItem><SelectItem value="confirmed">Confirmada</SelectItem></SelectContent></Select><p className="mt-1 text-xs text-muted-foreground">La solicitud queda pendiente de aprobación.</p></div>
             <div><Label>Notas privadas</Label><Input value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} placeholder="Opcional" /></div>
             <div className="sm:col-span-2"><Button disabled={createMutation.isPending || (!isManagement && !myPerson) || (isManagement && !form.personnelId)}><CalendarDays className="mr-2 h-4 w-4" />{isManagement ? "Registrar ausencia" : "Enviar solicitud"}</Button>{!isManagement && !myPerson && <p className="mt-2 text-xs text-destructive">Tu email no está vinculado con Personal.</p>}</div>
           </form></CardContent></Card>
@@ -258,18 +258,21 @@ export default function PersonnelAbsencesPage({ defaultTab = "mine" }: { default
         {isManagement && <TabsContent value="allowances" className="space-y-4">
           <Card><CardHeader><CardTitle className="text-sm">Saldos del equipo · {year}</CardTitle></CardHeader><CardContent className="overflow-x-auto p-0">
             <table className="w-full text-xs" data-testid="team-balances-table">
-              <thead><tr className="border-b text-left text-muted-foreground"><th className="px-4 py-2 font-medium">Persona</th><th className="px-2 py-2 font-medium">Vac. cupo</th><th className="px-2 py-2 font-medium">Traslado</th><th className="px-2 py-2 font-medium">Adelanto</th><th className="px-2 py-2 font-medium">Usados</th><th className="px-2 py-2 font-medium">Disponible</th><th className="px-2 py-2 font-medium">Epical disp.</th><th className="px-2 py-2 font-medium">Enferm.</th><th className="px-2 py-2 font-medium">Otros</th></tr></thead>
+              <thead><tr className="border-b text-left text-muted-foreground"><th className="px-4 py-2 font-medium">Persona</th><th className="px-2 py-2 font-medium">Vac. cupo/año</th><th className="px-2 py-2 font-medium">Vac. traslado</th><th className="px-2 py-2 font-medium">Vac. adelanto</th><th className="px-2 py-2 font-medium">Días Epical cupo</th><th className="px-2 py-2 font-medium">Usados vacaciones</th><th className="px-2 py-2 font-medium">Usados días Epical</th><th className="px-2 py-2 font-medium">Disponible total</th><th className="px-2 py-2 font-medium">Disponible vacaciones</th><th className="px-2 py-2 font-medium">Disponible Epical</th><th className="px-2 py-2 font-medium">Enfermedad</th><th className="px-2 py-2 font-medium">Otros</th></tr></thead>
               <tbody>{(teamBalances?.people ?? []).map((person) => (
                 <tr key={person.personnelId} className="border-b last:border-0">
                   <td className="px-4 py-2 font-medium">{person.name}</td>
-                  {person.dataError ? <td colSpan={6} className="px-2 py-2 text-destructive">Revisar ausencias (fechas inválidas)</td> : person.allowanceExempt ? <td colSpan={6} className="px-2 py-2 text-muted-foreground">Sin cupo — freelance</td> : person.configured ? <>
+                  {person.dataError ? <td colSpan={9} className="px-2 py-2 text-destructive">Revisar ausencias (fechas inválidas)</td> : person.allowanceExempt ? <td colSpan={9} className="px-2 py-2 text-muted-foreground">Sin cupo — freelance</td> : person.configured ? <>
                     <td className="px-2 py-2 tabular-nums">{person.vacation.quota ?? 0}</td>
                     <td className="px-2 py-2 tabular-nums">{person.vacation.carryover}</td>
                     <td className="px-2 py-2 tabular-nums">{person.vacation.advanceDebt}</td>
+                    <td className="px-2 py-2 tabular-nums">{person.epical.quota ?? "—"}</td>
                     <td className="px-2 py-2 tabular-nums">{person.vacation.used}</td>
-                    <td className={`px-2 py-2 font-semibold tabular-nums ${person.vacation.balance < 0 ? "text-destructive" : ""}`}>{person.vacation.balance}</td>
+                    <td className="px-2 py-2 tabular-nums">{person.epical.used}</td>
+                    <td className={`px-2 py-2 font-semibold tabular-nums ${person.vacation.balance + (person.epical.balance ?? 0) < 0 ? "text-destructive" : ""}`} data-testid="balance-total">{person.vacation.balance + (person.epical.balance ?? 0)}</td>
+                    <td className={`px-2 py-2 tabular-nums ${person.vacation.balance < 0 ? "text-destructive" : ""}`}>{person.vacation.balance}</td>
                     <td className="px-2 py-2 tabular-nums">{person.epical.balance ?? "—"}</td>
-                  </> : <td colSpan={6} className="px-2 py-2 text-amber-700">Sin cupo configurado</td>}
+                  </> : <td colSpan={9} className="px-2 py-2 text-amber-700">Sin cupo configurado</td>}
                   <td className="px-2 py-2 tabular-nums">{person.notCounted.sick}</td>
                   <td className="px-2 py-2 tabular-nums">{person.notCounted.other}</td>
                 </tr>

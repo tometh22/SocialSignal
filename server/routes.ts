@@ -163,6 +163,7 @@ import {
   insertMonthlyClosingSchema,
   PROJECT_WORKFLOW_STAGES,
   personnelAbsences,
+  birthdayEntries,
   insertPersonnelAbsenceSchema,
   absenceAllowances,
   absenceEvents,
@@ -4492,11 +4493,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const parsed = parseBirthdayMonthDay(row.birthday);
           return parsed ? [{ name: row.name, ...parsed }] : [];
         });
+      // Cumpleaños sueltos (personas que no son personal): sólo nombre y fecha, sin baja ni costos.
+      const extraRows = await db.select({ name: birthdayEntries.name, birthday: birthdayEntries.birthday }).from(birthdayEntries);
+      for (const row of extraRows) {
+        const parsed = parseBirthdayMonthDay(row.birthday);
+        if (parsed) birthdays.push({ name: row.name, ...parsed });
+      }
       res.setHeader("Cache-Control", "private, max-age=300");
       res.json(birthdays);
     } catch (error) {
       console.error("Error fetching birthdays:", error);
       res.status(500).json({ message: "No se pudieron traer los cumpleaños" });
+    }
+  });
+
+  // Cumpleaños de personas ajenas a Personal. Se administran desde Configuración > Personal.
+  const birthdayEntryInput = z.object({
+    name: z.string().trim().min(2, "El nombre debe tener al menos 2 caracteres").max(100),
+    birthday: z.string().refine((value) => parseBirthdayMonthDay(value) !== null, "Fecha de cumpleaños inválida"),
+  }).strict();
+  app.get("/api/birthday-entries", requireAuth, requirePermission("admin"), async (_req, res) => {
+    try {
+      res.json(await db.select().from(birthdayEntries).orderBy(birthdayEntries.name));
+    } catch (error) {
+      console.error("Error fetching birthday entries:", error);
+      res.status(500).json({ message: "No se pudieron traer los cumpleaños" });
+    }
+  });
+  app.post("/api/birthday-entries", requireAuth, requirePermission("admin"), async (req, res) => {
+    try {
+      const data = birthdayEntryInput.parse(req.body);
+      const [created] = await db.insert(birthdayEntries).values({ ...data, createdBy: (req as any).user?.id ?? null }).returning();
+      res.status(201).json(created);
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: error.errors[0]?.message || "Datos inválidos" });
+      console.error("Error creating birthday entry:", error);
+      res.status(500).json({ message: "No se pudo guardar el cumpleaños" });
+    }
+  });
+  app.delete("/api/birthday-entries/:id", requireAuth, requirePermission("admin"), async (req, res) => {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ message: "ID inválido" });
+    try {
+      await db.delete(birthdayEntries).where(eq(birthdayEntries.id, id));
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting birthday entry:", error);
+      res.status(500).json({ message: "No se pudo eliminar el cumpleaños" });
     }
   });
 
@@ -26934,7 +26977,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           personnelId, startDate: data.startDate, endDate: data.endDate,
           type: data.type, notes: data.notes || null, createdBy: access.userId,
           requestedBy: access.isOperations && personnelId !== access.personnelId ? null : access.userId,
-          status: "pending", planningStatus: "tentative", businessDays: businessDays.length,
+          status: "pending", planningStatus: data.planningStatus, businessDays: businessDays.length,
         }).returning();
         await tx.insert(absenceEvents).values({
           absenceId: absence.id, eventKey: `requested:${absence.id}`, action: "requested",
@@ -27467,7 +27510,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Legacy read remains scoped; unsafe direct mutations are retired.
   app.get("/api/personnel-absences", requireAuth, async (req, res) => {
-    try { res.json(await absenceList(req, isOperationsRequest(req) ? "team" : "mine")); }
+    try {
+      const rows = await absenceList(req, isOperationsRequest(req) ? "team" : "mine");
+      const personnelId = Number(req.query.personnelId);
+      res.json(Number.isInteger(personnelId) && personnelId > 0 ? rows.filter((row) => row.personnelId === personnelId) : rows);
+    }
     catch (error: any) { res.status(error?.status || 500).json({ message: error?.message || "Error al consultar ausencias" }); }
   });
   app.post("/api/personnel-absences", requireAuth, (_req, res) => res.status(410).json({ message: "Usá el flujo de solicitudes", manageUrl: "/absences" }));

@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.13.4 — 2026-10-14
+
+- Panel de horas: las horas disponibles restan sólo las ausencias aprobadas de la persona filtrada. Antes sumaban las de todo el equipo y de cualquier estado, por lo que una persona con pocas ausencias veía menos horas de las reales. El endpoint de ausencias respeta el filtro por persona.
+- Inicio muestra los próximos 3 cumpleaños del equipo sin límite de días. Configuración > Personal permite cargar «Solo cumpleaños» de personas que no son personal (nombre y fecha, sin costos ni capacidad). Migración aditiva 0084.
+- Calendarios: cada día muestra el título de la tarea con el color del cliente, sin barras que corten la continuidad.
+- Tareas: el «+» de asignación y el ícono de fecha son siempre visibles; las tareas completadas se pueden arrastrar entre secciones.
+- Capacidad: los proyectos del desglose por persona se contraen y la estimación queda junto a cada tarea.
+- Ausencias: se elige Tentativa o Confirmada al crear la solicitud (antes se ignoraba y siempre quedaba tentativa). La tabla de saldos suma Epical cupo, usados por tipo y disponibles total/vacaciones/Epical.
+- Definiciones de producto 2.36.0.
+
 ## 1.13.3 — 2026-10-14
 
 - Evita enviar integrantes del equipo con cero horas al guardar variantes de cotización, eliminando el rechazo de validación para roles que no participan del alcance.

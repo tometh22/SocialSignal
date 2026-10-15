@@ -55,6 +55,7 @@ import { userNotificationCategoryPreferencesMigrationSql } from "./migrations/us
 import { userNotificationPushSubscriptionsMigrationSql } from "./migrations/user-notification-push-subscriptions";
 import { asanaMigrationProvenanceSql } from "./migrations/asana-migration-provenance";
 import { projectTaskSectionsMigrationSql } from "./migrations/project-task-sections";
+import { birthdayEntriesMigrationSql } from "./migrations/birthday-entries";
 import { taskAssignmentActorMigrationSql } from "./migrations/task-assignment-actor";
 import { taskBlockDetailsMigrationSql } from "./migrations/task-block-details";
 import { taskRecurrenceMigrationSql } from "./migrations/task-recurrence";
@@ -893,6 +894,7 @@ async function applyPendingMigrations() {
     await run('0071 task recurrence', taskRecurrenceMigrationSql);
     await run('0081 task block details', taskBlockDetailsMigrationSql);
     await run('0083 task assignment actor', taskAssignmentActorMigrationSql);
+    await run('0084 birthday entries', birthdayEntriesMigrationSql);
     await run('0072 persistent project task sections', projectTaskSectionsMigrationSql);
     await run('0073 task milestones', taskMilestonesMigrationSql);
     await run('0074 Asana migration provenance', asanaMigrationProvenanceSql);

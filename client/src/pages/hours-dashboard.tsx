@@ -23,6 +23,7 @@ import {
 import { cn } from "@/lib/utils";
 import { usePermissions } from "@/hooks/use-permissions";
 import { parseTaskCivilDate } from "@shared/utils/task-civil-date";
+import { approvedAbsenceRanges, countWorkdays } from "@shared/utils/available-hours";
 import { formatTaskHoursLabel } from "@shared/utils/task-hours-label";
 
 type Personnel = { id: number; name: string };
@@ -168,25 +169,11 @@ export default function HoursDashboardPage() {
     const holidaySet = new Set(
       (holidaysData || []).map((h: any) => (h.date || "").slice(0, 10))
     );
-    // Comparación por string YYYY-MM-DD (igual que holidaySet), no por Date,
-    // para no perder el último día del rango por corrimiento de timezone.
+    // Sólo ausencias aprobadas de la persona filtrada; las de otros y las no aprobadas no restan.
     const absenceRanges = selectedPersonnelId !== "all"
-      ? absencesData.map((a: any) => ({ start: (a.startDate || "").slice(0, 10), end: (a.endDate || "").slice(0, 10) }))
+      ? approvedAbsenceRanges(absencesData, Number(selectedPersonnelId))
       : [];
-    const isAbsent = (dateKey: string) => absenceRanges.some(r => dateKey >= r.start && dateKey <= r.end);
-    let workdays = 0;
-    let absentWorkdays = 0;
-    const d = parseTaskCivilDate(dateFrom);
-    const end = parseTaskCivilDate(dateTo);
-    while (d <= end) {
-      const dow = d.getDay();
-      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-      if (dow !== 0 && dow !== 6 && !holidaySet.has(key)) {
-        workdays++;
-        if (isAbsent(key)) absentWorkdays++;
-      }
-      d.setDate(d.getDate() + 1);
-    }
+    const { workdays, absentWorkdays } = countWorkdays(dateFrom, dateTo, holidaySet, absenceRanges);
 
     if (selectedPersonnelId !== "all") {
       const me = activeTeam.find(p => String(p.id) === selectedPersonnelId);

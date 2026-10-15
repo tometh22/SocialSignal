@@ -92,20 +92,6 @@ export default function TaskCalendarView({ projectId, tasks: tasksProp, view = "
 
   const parseLocalDate = (s: string) => new Date(s.slice(0, 10) + "T00:00:00");
 
-  const getRangeInfo = (t: CalTask, d: Date) => {
-    if (!t.startDate || !t.dueDate) return null;
-    const s = parseLocalDate(t.startDate);
-    const e = parseLocalDate(t.dueDate);
-    if (isSameDay(s, e)) return null;
-    const atStart   = isSameDay(d, s);
-    const atEnd     = isSameDay(d, e);
-    const isMon     = d.getDay() === 1;
-    const isSun     = d.getDay() === 0;
-    const roundLeft  = atStart || isMon;
-    const roundRight = atEnd   || isSun;
-    return { atStart, atEnd, isMid: !atStart && !atEnd, roundLeft, roundRight };
-  };
-
   const getTasksForDay = (d: Date) =>
     tasksWithDate.filter(t => {
       const due   = t.dueDate   ? parseLocalDate(t.dueDate)   : null;
@@ -177,25 +163,6 @@ export default function TaskCalendarView({ projectId, tasks: tasksProp, view = "
                     {dayTasks.slice(0, 3).map(t => {
                       const overdue = isTaskOverdue(t, d);
                       const dot = overdue ? undefined : TASK_STATUS_CONFIG[t.status as TaskStatus]?.dot;
-                      const rangeInfo = getRangeInfo(t, d);
-                      if (rangeInfo) {
-                        return (
-                          <div
-                            key={t.id}
-                            className={cn(
-                              "text-[9px] py-0.5 leading-tight cursor-default h-4 flex items-center",
-                              clientCalendarColor(t.clientId), t.status === "done" && "line-through opacity-60", overdue && "underline decoration-red-500", t.status === "blocked" && "border-dashed border",
-                              rangeInfo.roundLeft ? "rounded-l pl-1" : "-ml-1.5 pl-0",
-                              rangeInfo.roundRight ? "rounded-r pr-1" : "-mr-1.5 pr-0",
-                            )}
-                            title={[t.title, t.clientName, t.projectName, t.status === "blocked" ? "Bloqueada" : ""].filter(Boolean).join(" · ")}
-                          >
-                            {(rangeInfo.atStart || rangeInfo.roundLeft) && (
-                              <span className="truncate px-0.5">{t.title}</span>
-                            )}
-                          </div>
-                        );
-                      }
                       return (
                         <div
                           key={t.id}
