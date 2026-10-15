@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { approvedAbsenceRanges, countWorkdays } from "../shared/utils/available-hours";
 import { upcomingBirthdays } from "../shared/utils/birthdays";
+import { assignCalendarLanes } from "../shared/utils/calendar-lanes";
 
 const source = (relativePath: string) => readFileSync(join(process.cwd(), relativePath), "utf8");
 
@@ -116,5 +117,46 @@ describe("Feedback 9-10 — solo cumpleaños", () => {
   it("Configuración > Personal ofrece la sección Solo cumpleaños", () => {
     expect(source("client/src/pages/admin-fixed.tsx")).toContain("<BirthdayOnlyEntries />");
     expect(source("client/src/components/admin/birthday-only-entries.tsx")).toContain("Solo cumpleaños");
+  });
+});
+
+describe("Feedback 9-10 — filas estables en calendarios", () => {
+  const week = ["2026-10-12", "2026-10-13", "2026-10-14", "2026-10-15", "2026-10-16", "2026-10-17", "2026-10-18"];
+
+  it("una tarea de varios días conserva la misma fila aunque otras empiecen o terminen", () => {
+    const lanes = assignCalendarLanes([
+      { id: 1, startDate: "2026-10-12", dueDate: "2026-10-16" },
+      { id: 2, startDate: "2026-10-13", dueDate: "2026-10-13" },
+      { id: 3, startDate: "2026-10-14", dueDate: "2026-10-18" },
+      { id: 4, startDate: "2026-10-15", dueDate: "2026-10-15" },
+    ], week);
+    expect(lanes.get(1)).toBe(0);
+    expect(lanes.get(2)).toBe(1);
+    expect(lanes.get(3)).toBe(1); // reutiliza la fila liberada por la tarea 2
+    expect(lanes.get(4)).toBe(2);
+  });
+
+  it("las tareas que vienen de la semana anterior toman primero las filas bajas", () => {
+    const lanes = assignCalendarLanes([
+      { id: 10, startDate: "2026-10-12", dueDate: "2026-10-12" },
+      { id: 11, startDate: "2026-10-05", dueDate: "2026-10-14" },
+    ], week);
+    expect(lanes.get(11)).toBe(0);
+    expect(lanes.get(10)).toBe(1);
+  });
+
+  it("ignora tareas fuera de la semana o sin fecha y usa la única fecha disponible", () => {
+    const lanes = assignCalendarLanes([
+      { id: 1, startDate: "2026-09-01", dueDate: "2026-09-02" },
+      { id: 2 },
+      { id: 3, dueDate: "2026-10-16" },
+    ], week);
+    expect([...lanes.keys()]).toEqual([3]);
+  });
+
+  it("el calendario usa los carriles y mantiene alto fijo por fila", () => {
+    const calendar = source("client/src/components/tasks/TaskCalendarView.tsx");
+    expect(calendar).toContain("assignCalendarLanes(tasksWithDate");
+    expect(calendar).toContain('className="h-[18px]"');
   });
 });

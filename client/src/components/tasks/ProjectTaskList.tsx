@@ -240,7 +240,7 @@ function InlineDateButton({ startDate, dueDate, taskId, onSet, overdue, dueSoon,
         : dueThisWeek
           ? "text-blue-500 hover:bg-blue-50"
           : "text-muted-foreground hover:bg-accent"
-    : "text-muted-foreground/80 hover:bg-primary/10 hover:text-primary";
+    : "text-slate-600 hover:bg-primary/10 hover:text-primary";
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -251,7 +251,7 @@ function InlineDateButton({ startDate, dueDate, taskId, onSet, overdue, dueSoon,
           {(overdue || dueSoon) && label && (
             <span className={cn("w-1.5 h-1.5 rounded-full flex-shrink-0", overdue ? "bg-red-500" : "bg-amber-500")} />
           )}
-          {label || <CalendarIcon className="h-3.5 w-3.5" data-testid="task-date-empty" />}
+          {label || <CalendarIcon className="h-4 w-4" strokeWidth={2} data-testid="task-date-empty" />}
         </button>
       </PopoverTrigger>
       <PopoverContent className="w-auto p-0 shadow-lg" onClick={e => e.stopPropagation()}>
@@ -595,8 +595,8 @@ function TaskRow(props: TaskRowProps) {
                     <TooltipContent side="top"><p>{assignee.name}</p></TooltipContent>
                   </Tooltip>
                 ) : (
-                  <div className="group/assign w-6 h-6 rounded-full border border-dashed border-muted-foreground/60 flex items-center justify-center hover:border-primary hover:bg-primary/10 transition-colors" data-testid="task-assign-empty">
-                    <Plus className="h-3 w-3 text-muted-foreground/80 group-hover/assign:text-primary" />
+                  <div className="group/assign w-6 h-6 rounded-full border-[1.5px] border-dashed border-slate-500 bg-slate-100 flex items-center justify-center hover:border-primary hover:bg-primary/10 transition-colors" data-testid="task-assign-empty">
+                    <Plus className="h-3.5 w-3.5 text-slate-700 group-hover/assign:text-primary" strokeWidth={2.5} />
                   </div>
                 )}
               </button>

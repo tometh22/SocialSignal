@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.13.5 — 2026-10-15
+
+- Calendarios: cada tarea conserva la misma fila durante toda la semana (antes saltaba de posición entre un día y otro), con alto fijo por fila y huecos donde otra tarea no está.
+- Tareas: el «+» de asignación y el ícono de fecha vacíos tienen más contraste (fondo, borde y trazo más marcados), sin depender del hover.
+- Definiciones de producto 2.37.0.
+
 ## 1.13.4 — 2026-10-14
 
 - Panel de horas: las horas disponibles restan sólo las ausencias aprobadas de la persona filtrada. Antes sumaban las de todo el equipo y de cualquier estado, por lo que una persona con pocas ausencias veía menos horas de las reales. El endpoint de ausencias respeta el filtro por persona.
