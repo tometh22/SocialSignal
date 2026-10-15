@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.13.8 — 2026-10-15
+
+- Corrige el rechazo de autorizaciones y revocaciones MCP desde el navegador: los formularios conservan el origen requerido por la validación CSRF, sin exponer rutas ni parámetros en el referrer.
+
 ## 1.13.7 — 2026-10-15
 
 - Conector MCP de solo lectura para consultar Status desde dots y otros agentes: búsqueda de salas por participante, proyectos, temas adicionales e historial.

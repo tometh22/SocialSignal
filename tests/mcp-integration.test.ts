@@ -96,12 +96,19 @@ describe.skipIf(!process.env.TEST_MCP_DATABASE_URL)("Mind MCP: PostgreSQL + OAut
     expect(anonymous.headers.get("location")).toBe("/auth?returnTo=%2Fmcp%2Fconsent");
     const cookie = await login(1, start.cookie);
     const consent = await request("/mcp/consent", { headers: { cookie } });
+    expect(consent.headers.get("referrer-policy")).toBe("strict-origin");
     expect(consent.headers.get("content-security-policy")).toContain("frame-ancestors 'none'");
     expect(consent.headers.get("content-security-policy")).toContain("form-action 'self' https://chatgpt.com");
     const html = await consent.text(); expect(html).toContain("Autorizar lectura");
     const csrf = html.match(/name="csrf" value="([^"]+)"/)![1];
     const rejected = await request("/mcp/consent", { method: "POST", headers: { cookie, Origin: config.origin }, body: new URLSearchParams({ csrf: "wrong", decision: "allow" }) });
     expect(rejected.status).toBe(403);
+    for (const origin of [undefined, "null", "https://evil.example"]) {
+      const headers: Record<string, string> = { cookie };
+      if (origin !== undefined) headers.Origin = origin;
+      const forged = await request("/mcp/consent", { method: "POST", headers, body: new URLSearchParams({ csrf, decision: "allow" }) });
+      expect(forged.status).toBe(403);
+    }
     const accepted = await request("/mcp/consent", { method: "POST", headers: { cookie, Origin: config.origin }, body: new URLSearchParams({ csrf, decision: "allow" }) });
     const redirect = new URL(accepted.headers.get("location")!);
     expect(redirect.searchParams.get("state")).toBe("preserved-state");
@@ -221,13 +228,16 @@ describe.skipIf(!process.env.TEST_MCP_DATABASE_URL)("Mind MCP: PostgreSQL + OAut
   it("revokes access through the user's connections page, enforces CSRF and ownership", async () => {
     const one = await issue(1), two = await issue(2);
     const cookie = await login(1);
-    const html = await (await request("/mcp/connections", { headers: { cookie } })).text();
+    const connections = await request("/mcp/connections", { headers: { cookie } });
+    expect(connections.headers.get("referrer-policy")).toBe("strict-origin");
+    const html = await connections.text();
     const csrf = html.match(/name="csrf" value="([^"]+)"/)![1];
     const id = html.match(/name="id" value="([^"]+)"/)![1];
     const foreignId = (await pool.query("SELECT id FROM mcp_oauth_grants WHERE user_id=2")).rows[0].id;
     expect(html).not.toContain(foreignId);
     const revoke = (id: string, origin = config.origin) => request("/mcp/connections", { method: "POST", headers: { cookie, Origin: origin }, body: new URLSearchParams({ csrf, id }) });
     expect((await revoke(id,"https://evil.example")).status).toBe(403);
+    expect((await revoke(id,"null")).status).toBe(403);
     await revoke(foreignId); await expect(provider.verifyAccessToken(two.access_token)).resolves.toBeDefined();
     expect((await revoke(id)).status).toBe(303);
     await expect(provider.verifyAccessToken(one.access_token)).rejects.toThrow();

@@ -16,7 +16,9 @@ const escape = (value: unknown) => String(value ?? "").replace(/[&<>"']/g, c =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 
 function page(res: Response, title: string, body: string, callbackOrigin?: string) {
-  res.set({ "Cache-Control": "no-store", "Referrer-Policy": "no-referrer", "X-Content-Type-Options": "nosniff",
+  // no-referrer makes browsers send Origin: null on native form POSTs, failing CSRF validation.
+  // Keep the origin while excluding paths and query strings from the referrer.
+  res.set({ "Cache-Control": "no-store", "Referrer-Policy": "strict-origin", "X-Content-Type-Options": "nosniff",
     "Content-Security-Policy": `default-src 'none'; style-src 'unsafe-inline'; form-action 'self'${callbackOrigin ? ` ${callbackOrigin}` : ""}; frame-ancestors 'none'; base-uri 'none'` });
   res.type("html").send(`<!doctype html><html lang="es"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
     <title>${escape(title)} · Mind</title><style>body{font:16px/1.6 system-ui;background:#0b0f17;color:#eef2ff;margin:0;padding:40px 20px}
