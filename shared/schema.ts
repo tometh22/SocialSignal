@@ -1456,6 +1456,15 @@ export type Holiday = typeof holidays.$inferSelect;
 export type InsertHoliday = z.infer<typeof insertHolidaySchema>;
 
 // ==================== AUSENCIAS DE PERSONAL ====================
+// Cumpleaños de personas ajenas a Personal (sin costos, capacidad ni ausencias): sólo nombre y mes/día.
+export const birthdayEntries = pgTable("birthday_entries", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  birthday: text("birthday").notNull(), // YYYY-MM-DD; el año se ignora
+  createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 export const personnelAbsences = pgTable("personnel_absences", {
   id: serial("id").primaryKey(),
   personnelId: integer("personnel_id").notNull().references(() => personnel.id, { onDelete: 'cascade' }),

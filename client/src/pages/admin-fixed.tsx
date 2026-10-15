@@ -35,6 +35,7 @@ import {
   FormLabel, 
   FormMessage 
 } from "@/components/ui/form";
+import { BirthdayOnlyEntries } from "@/components/admin/birthday-only-entries";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { 
@@ -1383,6 +1384,7 @@ export default function Admin() {
               <HistoricalCostsTable personnel={personnel ?? []} />
             </div>
           )}
+          <BirthdayOnlyEntries />
         </TabsContent>
 
         {showLegacyTemplatesTab && <TabsContent value="templates">

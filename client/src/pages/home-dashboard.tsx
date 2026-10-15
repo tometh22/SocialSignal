@@ -64,7 +64,10 @@ export default function HomeDashboard() {
     queryFn: () => authFetch("/api/birthdays").then(r => r.ok ? r.json() : []).catch(() => []),
     staleTime: 5 * 60_000,
   });
-  const upcoming = upcomingBirthdays(teamBirthdays, new Date(), 30).slice(0, 6);
+  // Los próximos 3 cumpleaños, sin importar cuán lejos caigan (366 días cubre todo el ciclo anual).
+  const upcoming = upcomingBirthdays(teamBirthdays, new Date(), 366).slice(0, 3);
+  // El propio cumpleaños ya figura en la lista del equipo; la tarjeta personal sólo sirve de respaldo.
+  const showOwnBirthday = Boolean(birthday) && upcoming.length === 0;
 
   const { data: absenceBalance } = useQuery<{ configured: boolean; vacationDays: number | null; vacationCarryoverDays: number; vacationAdvanceDebtDays: number; vacationBalanceDays: number; epicalDays: number | null; used: { vacation: number; epical: number } }>({
     queryKey: ["/api/absence-allowances", myPersonnel?.id, new Date().getFullYear()],
@@ -184,12 +187,12 @@ export default function HomeDashboard() {
         <Card className="border-pink-200 bg-pink-50/60" data-testid="home-team-birthdays">
           <CardContent className="p-4 text-sm text-pink-950 sm:p-4 sm:pt-4">
             <div className="mb-2 flex items-center gap-2 font-semibold"><span aria-hidden="true">🎂</span>Cumpleaños del equipo</div>
-            <ul className="grid gap-x-6 gap-y-1 sm:grid-cols-2 lg:grid-cols-3">
+            <ul className="grid gap-x-6 gap-y-1 sm:grid-cols-3">
               {upcoming.map((entry, index) => (
                 <li key={`${entry.name}-${entry.month}-${entry.day}-${index}`} className="flex items-baseline justify-between gap-3">
                   <span className="min-w-0 truncate">{entry.name}</span>
                   <span className="shrink-0 text-xs text-pink-900/80">
-                    {entry.daysUntil === 0 ? "¡hoy!" : entry.daysUntil === 1 ? "mañana" : entry.date.toLocaleDateString("es-AR", { day: "numeric", month: "short" })}
+                    {entry.daysUntil === 0 ? "¡hoy!" : entry.daysUntil === 1 ? "mañana" : `${entry.date.toLocaleDateString("es-AR", { day: "numeric", month: "short" })} · en ${entry.daysUntil} días`}
                   </span>
                 </li>
               ))}
@@ -200,9 +203,9 @@ export default function HomeDashboard() {
 
       {/* Dos tarjetas comparten fila; una sola ocupa todo el ancho, como el resto de las tarjetas del Home
           (con media fila quedaba desalineada respecto de los indicadores y de Señales del portfolio). */}
-      {(birthday || absenceBalance?.configured) && (
-        <div className={cn("grid gap-3", birthday && absenceBalance?.configured && "lg:grid-cols-2")} data-testid="home-personal-cards">
-          {birthday && <Card className="border-pink-200 bg-pink-50/60"><CardContent className="flex items-center gap-3 p-4 text-sm text-pink-950 sm:p-4 sm:pt-4"><span aria-hidden="true">🎂</span><span><strong>Tu cumpleaños:</strong> {birthday.date}{birthday.days === 0 ? " · ¡hoy!" : birthday.days === 1 ? " · mañana" : ` · en ${birthday.days} días`}</span></CardContent></Card>}
+      {(showOwnBirthday || absenceBalance?.configured) && (
+        <div className={cn("grid gap-3", showOwnBirthday && absenceBalance?.configured && "lg:grid-cols-2")} data-testid="home-personal-cards">
+          {showOwnBirthday && birthday && <Card className="border-pink-200 bg-pink-50/60"><CardContent className="flex items-center gap-3 p-4 text-sm text-pink-950 sm:p-4 sm:pt-4"><span aria-hidden="true">🎂</span><span><strong>Tu cumpleaños:</strong> {birthday.date}{birthday.days === 0 ? " · ¡hoy!" : birthday.days === 1 ? " · mañana" : ` · en ${birthday.days} días`}</span></CardContent></Card>}
           {absenceBalance?.configured && <Card><CardContent className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2 p-4 text-sm sm:p-4 sm:pt-4">
             <div className="min-w-0 flex-1 space-y-1">
               <div><strong>Vacaciones disponibles: {absenceBalance.vacationBalanceDays} días</strong></div>
