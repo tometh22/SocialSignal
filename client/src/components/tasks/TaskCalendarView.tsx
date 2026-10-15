@@ -144,9 +144,13 @@ export default function TaskCalendarView({ projectId, tasks: tasksProp, view = "
               const dayTasks = getTasksForDay(d);
               const visibleLanes = 3;
               const byLane = new Map<number, CalTask>();
-              dayTasks.forEach(t => { const lane = lanes.get(t.id); if (lane !== undefined && lane < visibleLanes) byLane.set(lane, t); });
+              const overflow: CalTask[] = [];
+              dayTasks.forEach(t => { const lane = lanes.get(t.id) ?? visibleLanes; if (lane < visibleLanes) byLane.set(lane, t); else overflow.push(t); });
+              // Las tareas de carriles altos ocupan primero los huecos libres del día; sólo se ocultan si no entran.
+              overflow.sort((a, b) => (lanes.get(a.id) ?? 0) - (lanes.get(b.id) ?? 0));
+              for (let lane = 0; lane < visibleLanes && overflow.length; lane++) if (!byLane.has(lane)) byLane.set(lane, overflow.shift()!);
               const lastLane = byLane.size ? Math.max(...byLane.keys()) : -1;
-              const hiddenCount = dayTasks.length - byLane.size;
+              const hiddenCount = overflow.length;
               const isToday = isSameDay(d, today);
               const inMonth = isSameMonth(d, currentMonth);
               return (

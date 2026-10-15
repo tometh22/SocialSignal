@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.13.6 — 2026-10-15
+
+- Calendarios: una tarea que quedaba oculta tras «+N más» pese a haber huecos libres en el día ahora ocupa ese hueco; sólo se oculta si el día no tiene lugar.
+
 ## 1.13.5 — 2026-10-15
 
 - Calendarios: cada tarea conserva la misma fila durante toda la semana (antes saltaba de posición entre un día y otro), con alto fijo por fila y huecos donde otra tarea no está.
