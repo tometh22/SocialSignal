@@ -4856,6 +4856,25 @@ export const insertReviewRoomMemberSchema = createInsertSchema(reviewRoomMembers
   role: z.enum(['owner', 'editor']).default('editor'),
 });
 export type ReviewRoomMember = typeof reviewRoomMembers.$inferSelect;
+
+// OAuth grants for the read-only MCP connector. Only SHA-256 hashes of credentials are stored.
+export const mcpOauthGrants = pgTable("mcp_oauth_grants", {
+  id: text("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  clientId: text("client_id").notNull(),
+  resource: text("resource").notNull(),
+  scopes: text("scopes").array().notNull(),
+  redirectUri: text("redirect_uri").notNull(),
+  codeChallenge: text("code_challenge").notNull(),
+  codeHash: text("code_hash").unique(),
+  codeExpiresAt: timestamp("code_expires_at", { withTimezone: true }).notNull(),
+  accessTokenHash: text("access_token_hash").unique(),
+  accessExpiresAt: timestamp("access_expires_at", { withTimezone: true }),
+  refreshTokenHash: text("refresh_token_hash").unique(),
+  refreshExpiresAt: timestamp("refresh_expires_at", { withTimezone: true }),
+  revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => ({ userIdx: index("mcp_oauth_grants_user_idx").on(t.userId) }));
 export type InsertReviewRoomMember = z.infer<typeof insertReviewRoomMemberSchema>;
 
 // Cada recorrido del room en Modo Daily (ítem por ítem) queda registrado con su

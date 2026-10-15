@@ -8,6 +8,7 @@ import { User as UserType } from "@shared/schema";
 import { queryClient } from "../lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { getFirstAllowedRouteForUser } from "@/lib/first-allowed-route";
+import { getAuthReturnPath } from "@/lib/auth-return";
 
 type AuthContextType = {
   user: AuthUser | null;
@@ -105,6 +106,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return userData;
     },
     onSuccess: (userData) => {
+      const destination = getAuthReturnPath(window.location.search) ?? getFirstAllowedRouteForUser(userData as any);
       console.log('✅ Login mutation success, setting user data...');
 
       queryClient.setQueryData(["/api/current-user"], userData);
@@ -116,7 +118,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
 
       setTimeout(() => {
-        window.location.href = getFirstAllowedRouteForUser(userData as any);
+        window.location.href = destination;
       }, 100);
     },
     onError: (error) => {
