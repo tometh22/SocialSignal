@@ -1041,6 +1041,21 @@ body.dark::before {
     overflow: visible !important;
   }
 
+  /* La app autenticada es una ventana fija: sólo <main> y la navegación lateral
+     scrollean. Las reglas de arriba dejan scrollear el documento (en ambos ejes), lo
+     que producía el scroll horizontal infinito y la pantalla desplazada/en blanco.
+     Van en la misma capa y con !important porque en una capa gana la importante. */
+  html:has(.app-shell),
+  body:has(.app-shell) {
+    height: 100% !important;
+    overflow: hidden !important;
+  }
+
+  html:has(.app-shell) #root {
+    height: 100% !important;
+    overflow: hidden !important;
+  }
+
   /* Sistema de headings mejorado */
   h1, .h1 {
     font-size: var(--font-size-4xl);
@@ -1734,6 +1749,7 @@ body {
 
 .app-main {
   position: relative;
+  overscroll-behavior: contain;
   scroll-behavior: smooth;
   scrollbar-gutter: stable;
   background:

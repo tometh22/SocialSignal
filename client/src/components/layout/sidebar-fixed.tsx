@@ -310,10 +310,10 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
   return (
     <TooltipProvider>
       <div className={cn(
-        "relative flex shrink-0 flex-col overflow-hidden bg-[#0b0f17] shadow-[12px_0_40px_-30px_rgba(15,23,42,0.65)]",
+        "relative flex shrink-0 flex-col overflow-clip bg-[#0b0f17] shadow-[12px_0_40px_-30px_rgba(15,23,42,0.65)]",
         mobileMode
           ? "h-full w-full"
-          : "h-screen border-r border-white/[0.07] transition-[width] duration-300 ease-out",
+          : "h-full border-r border-white/[0.07] transition-[width] duration-300 ease-out",
         !mobileMode && (isCollapsed ? "w-[72px]" : "w-[264px]")
       )}>
         <div className="pointer-events-none absolute -left-20 -top-20 h-64 w-64 rounded-full bg-rose-500/[0.06] blur-3xl" />
@@ -346,7 +346,7 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
 
         {/* Navegación principal */}
         <div className="relative z-10 flex-1 min-h-0">
-        <div className="h-full px-2.5 py-4 overflow-y-auto">
+        <div className="h-full px-2.5 py-4 overflow-y-auto overscroll-contain">
           <nav className="space-y-5">
             {filteredNavSections.map((section) => (
               <div key={section.title || '__top__'}>
