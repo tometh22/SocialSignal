@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.14.0 — 2026-10-16
+
+- El conector MCP permite explorar 157 recursos de negocio de Mind: cotizaciones y propuestas, CRM, proyectos, tareas y horas, operaciones, personal, finanzas, objetivos, Status y conversaciones autorizadas.
+- Nuevas herramientas de catálogo, consultas filtradas, agregaciones sobre todos los resultados y lectura de campos largos; separación de monedas, proyecciones explícitas y consultas de solo lectura.
+- Nuevo alcance OAuth `mind:read`, con consentimiento ampliado y permisos de módulo, membresía y titularidad. Las conexiones previas siguen limitadas a Status hasta reconectarlas; URL y credenciales se mantienen.
+
 ## 1.13.8 — 2026-10-15
 
 - Corrige el rechazo de autorizaciones y revocaciones MCP desde el navegador: los formularios conservan el origen requerido por la validación CSRF, sin exponer rutas ni parámetros en el referrer.

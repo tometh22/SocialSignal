@@ -1,6 +1,6 @@
 -- Minimal existing Mind schema for isolated connector integration tests.
 CREATE TABLE users (id integer PRIMARY KEY, first_name text, last_name text, is_active boolean DEFAULT true,
-  is_admin boolean DEFAULT false, role text DEFAULT 'member', permissions text[] DEFAULT ARRAY['status']);
+  is_admin boolean DEFAULT false, role text DEFAULT 'member', permissions text[] DEFAULT ARRAY['status'], email text);
 CREATE TABLE review_rooms (id integer PRIMARY KEY, name text, description text, archived_at timestamp);
 CREATE TABLE review_room_members (room_id integer REFERENCES review_rooms, user_id integer REFERENCES users, PRIMARY KEY(room_id,user_id));
 CREATE TABLE clients (id integer PRIMARY KEY, name text);

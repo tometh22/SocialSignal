@@ -1,4 +1,4 @@
-# Mind Status para dots y otros clientes MCP
+# Mind para dots y otros clientes MCP
 
 El conector expone `https://mind.epical.digital/mcp` mediante MCP Streamable HTTP
 sin sesiones de transporte. Está deshabilitado hasta configurar las variables
@@ -9,15 +9,19 @@ instala automáticamente en ChatGPT.
 
 | Herramienta | Resultado |
 | --- | --- |
+| `list_mind_resources` | Catálogo de todos los módulos de negocio autorizados; campos, tipos, claves y relaciones de cada recurso. |
+| `query_mind` | Registros con filtros AND, búsqueda literal, selección de campos, orden y paginación. |
+| `aggregate_mind` | Conteos, sumas, promedios, mínimos y máximos sobre el conjunto completo autorizado, con agrupación y separación de monedas. |
+| `read_mind_field` | Lectura por fragmentos de contenido largo o JSON: propuestas, alcance, notas y snapshots. |
 | `list_status_rooms` | Salas activas del usuario, buscables por nombre, descripción o nombre de participante. Incluye participantes y enlace a Mind. |
 | `get_status` | Proyectos y temas adicionales visibles: semáforos, riesgos, acciones, responsables, hitos, fechas y decisiones pendientes. |
 | `get_status_activity` | Notas, actualizaciones y cambios de campos de ambos tipos de tema, con autor y fecha. |
 
-Todas son de lectura. No crean ni modifican Status, no marcan elementos como
+Todas son de lectura. No crean ni modifican datos, no marcan elementos como
 leídos y no llaman a un proveedor de IA: el dot interpreta los datos devueltos.
 No requieren `OPENAI_API_KEY` ni `ANTHROPIC_API_KEY`.
 
-Las respuestas contienen `retrievedAt` y el enlace de la sala. `updated_at`
+Las respuestas contienen `retrievedAt` y la URL de Mind (o de la sala para Status). `updated_at`
 indica cuándo se actualizó cada tema; consultar el conector no actualiza ese dato.
 Las páginas tienen hasta 50 elementos, por defecto 25. Hay que continuar con
 `nextOffset` hasta que sea `null` antes de presentar un resumen completo o un total.
@@ -26,9 +30,45 @@ una consulta larga. El historial usa `since` inclusivo y `until` exclusivo en IS
 8601 con zona horaria; por defecto cubre los últimos siete días, no la semana
 calendario. Para una semana argentina, enviar límites con `-03:00`.
 
-El historial no incluye propuestas, sus adjuntos, mensajes de chat ni datos
-financieros fuera de los campos de Status. No se busca en conversaciones externas
-con Vick. Si varias salas coinciden con ese nombre, el agente debe pedir precisión.
+El catálogo incluye 157 recursos: cotizaciones, grupos, variantes, equipos,
+revisiones, negociaciones, propuestas y recetas; CRM y clientes; proyectos,
+entregables y calidad; tareas y horas; personal, capacidad, ausencias y cierres;
+facturación, cobranzas, pagos, caja, costos, ingresos y fuentes analíticas;
+objetivos, Status, propuestas de sala, conversaciones de Mind y datos personales.
+`get_status_activity` sigue ofreciendo el historial resumido; el catálogo permite
+consultar los demás datos. No busca conversaciones fuera de Mind.
+
+Cada tabla de `shared/schema.ts` está clasificada explícitamente. Las proyecciones
+de `server/mcp/catalog.ts` son una lista permitida: agregar columnas al esquema no
+las publica automáticamente. No se exponen credenciales OAuth, recuperación de
+contraseñas, suscripciones push ni `system_config` (puede contener secretos).
+Las contraseñas, hashes de acceso y claves de almacenamiento quedan excluidas;
+los secretos dentro de objetos JSON se eliminan también. Los adjuntos se ofrecen
+como metadatos/enlaces existentes, no como descarga o extracción del contenido
+binario. No se añade acceso al filesystem del servidor.
+
+## Cómo explorar cotizaciones
+
+1. `list_mind_resources({"query":"cotizaciones"})` descubre los recursos disponibles.
+2. `list_mind_resources({"resource":"quotations"})` muestra campos y relaciones.
+3. `query_mind({"resource":"quotations","search":"cliente o proyecto"})`
+   busca registros. Para buscar por cliente, consultar primero `clients` y filtrar
+   `quotations.client_id` por el ID devuelto.
+4. Consultar `quotation_team_members`, `quotation_variants`, `quotation_revisions`,
+   `negotiation_history` y `proposal_documents` filtrando `quotation_id`.
+   `people_directory` y `user_directory` resuelven nombres sin exponer salarios ni credenciales.
+5. Para totales, usar `aggregate_mind` con filtros explícitos de estado, fechas y
+   `archived_at`. Agrupa monedas automáticamente cuando calcula métricas numéricas.
+   No sumar versiones ni variantes alternativas como si fueran ventas.
+
+Los recursos exponen datos persistidos, incluidos históricos/archivados cuando
+existen; los permisos de salas y tareas siguen filtrándolos. No reproducen cada
+fórmula de los dashboards. Las fuentes analíticas se identifican por separado:
+no sumar un consolidado con sus filas originales ni presentar un importe cotizado
+como ingreso reconocido. Los datos pueden cambiar entre páginas. Cada consulta
+se ejecuta en una transacción PostgreSQL de solo lectura, con timeout de 5 segundos.
+Los resultados largos señalan `truncated`; `read_mind_field` permite recuperar el
+campo completo después de aplicar redacción de secretos.
 
 ## Configuración del servidor
 
@@ -71,22 +111,26 @@ con Vick. Si varias salas coinciden con ese nombre, el agente debe pedir precisi
 ## Conectar ChatGPT y el dot
 
 1. En ChatGPT, abrir Plugins → agregar → **Add custom MCP server**.
-2. Usar nombre **Mind Status**, URL `https://mind.epical.digital/mcp` y OAuth.
+2. Usar nombre **Mind** (el nombre anterior **Mind Status** también sirve), URL `https://mind.epical.digital/mcp` y OAuth.
 3. Configurar el Client ID y Client Secret anteriores. El servidor admite un
    cliente registrado estáticamente y `client_secret_post`; no publica registro
    dinámico ni CIMD. Si la interfaz muestra el callback después de crear la
    conexión, copiarlo a `MIND_MCP_REDIRECT_URIS`, reiniciar y reconectar.
-4. Solicitar `status:read offline_access`. Si se ofrecen campos manuales, los
+4. Solicitar `mind:read offline_access`. Si se ofrecen campos manuales, los
    endpoints son `/authorize`, `/token` y `/revoke` en el origen de Mind; discovery
    los anuncia. Sin `offline_access`, el acceso vence en una hora y requiere
    reconexión.
 5. Iniciar sesión en Mind y pulsar **Autorizar lectura**. Las credenciales de Mind
-   se ingresan en Mind, no en la conversación. El permiso cubre las salas activas
-   de las que el usuario sea miembro, incluidas nuevas salas a las que se incorpore.
+   se ingresan en Mind, no en la conversación. El consentimiento describe el acceso
+   a todos los módulos autorizados, incluida información comercial y financiera.
 6. Instalar/habilitar el plugin para la cuenta que usa el dot. El acceso también
    depende de los permisos del workspace y del entorno del dot.
 
 Pedido sugerido:
+
+> Usá Mind para analizar las cotizaciones de este mes: importes por cliente y
+> moneda, estado, margen y equipo. Compará las versiones cuando haya cambios y
+> explicá qué filtros y fuentes usaste.
 
 > Usá Mind Status para buscar mi sala con Vick. Resumí el estado actual, los
 > riesgos, las decisiones pendientes y qué cambió en los últimos siete días.
@@ -100,7 +144,19 @@ Referencias oficiales:
 
 ## Permisos y revocación
 
-- Se requiere una cuenta activa con permiso `status` (o rol de administrador).
+- `mind:read` exige cuenta interna activa y permisos de módulo. `status:read`
+  conserva exclusivamente el acceso anterior a Status. Los tokens antiguos NO
+  adquieren acceso a los demás módulos, tampoco al renovarse: actualizar las
+  herramientas del plugin y **reconectar solicitando `mind:read offline_access`**.
+  La URL, Client ID y Client Secret no cambian. Si el cliente conserva scopes
+  antiguos, editar su configuración o recrear la conexión OAuth con el nuevo alcance.
+- Cotizaciones exige `quotations`, CRM exige `crm`, finanzas operativas exige
+  `finance`, resumen analítico `finance` o `dashboard`, personal/costos/cierres
+  exige `operations`, y administración exige rol admin o `isAdmin`.
+  Los módulos de proyectos/tareas siguen sus permisos y membresías; usuarios
+  `task_manager` sin permisos financieros no pueden seleccionar, filtrar ni
+  agregar costos. Las conversaciones exigen participación incluso para admins.
+  Facturas personales y ausencias se limitan al titular salvo permiso de revisión.
 - El conector exige membresía explícita de cada sala, incluso para administradores;
   no hereda el bypass de soporte de algunas rutas internas. Las salas archivadas y
   los temas ocultos quedan excluidos. El historial se filtra por sala y tema visible.
