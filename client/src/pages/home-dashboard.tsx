@@ -1,5 +1,5 @@
 import OptionalDelegatedTasks from "@/components/tasks/OptionalDelegatedTasks";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { authFetch } from "@/lib/queryClient";
 import { Link } from "wouter";
@@ -7,7 +7,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { SectionHeading } from "@/components/layout/page-heading";
-import { CompactPageHeader } from "@/components/ui/compact-page-header";
 import { PageShell } from "@/components/ui/page-shell";
 import { usePermissions } from "@/hooks/use-permissions";
 import { parseBirthdayMonthDay, nextBirthday, upcomingBirthdays, type BirthdayEntry } from "@shared/utils/birthdays";
@@ -22,7 +21,7 @@ import TaskCalendarView from "@/components/tasks/TaskCalendarView";
 import {
   Briefcase, BarChart2, Plus, CheckSquare, Calendar, AlertTriangle,
   AlertCircle, Info, Lightbulb, ChevronRight, Zap, Clock, ListTodo,
-  FolderOpen, List, ChevronDown
+  FolderOpen, List, ChevronDown, ArrowUpRight, FileText, FilePen, ShieldAlert, Sparkles
 } from "lucide-react";
 
 type HomeProject = {
@@ -33,6 +32,36 @@ type HomeProject = {
   taskCount: number;
   status: string;
 };
+
+type KpiTone = "rose" | "amber" | "slate" | "emerald" | "red";
+
+const KPI_TONES: Record<KpiTone, { chip: string; value: string; glow: string }> = {
+  rose: { chip: "bg-rose-50 text-rose-600 ring-rose-100", value: "text-rose-600", glow: "from-rose-500/[0.10]" },
+  amber: { chip: "bg-amber-50 text-amber-600 ring-amber-100", value: "text-amber-600", glow: "from-amber-500/[0.10]" },
+  slate: { chip: "bg-slate-100 text-slate-600 ring-slate-200", value: "text-slate-700", glow: "from-slate-500/[0.08]" },
+  emerald: { chip: "bg-emerald-50 text-emerald-600 ring-emerald-100", value: "text-emerald-600", glow: "from-emerald-500/[0.10]" },
+  red: { chip: "bg-red-50 text-red-600 ring-red-100", value: "text-red-600", glow: "from-red-500/[0.10]" },
+};
+
+function KpiTile({ label, value, icon, tone, href }: { label: string; value: number; icon: ReactNode; tone: KpiTone; href: string }) {
+  const t = KPI_TONES[tone];
+  return (
+    <Link
+      href={href}
+      className="group mind-kpi mind-interactive-card block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+    >
+      <div className={cn("pointer-events-none absolute inset-0 bg-gradient-to-br via-transparent to-transparent opacity-80", t.glow)} />
+      <div className="relative p-3.5 sm:p-4">
+        <div className="flex items-start justify-between gap-2">
+          <span className={cn("grid size-9 place-items-center rounded-xl ring-1", t.chip)} aria-hidden="true">{icon}</span>
+          <ArrowUpRight className="h-4 w-4 text-muted-foreground/40 transition-all group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-foreground" aria-hidden="true" />
+        </div>
+        <div className={cn("mt-3 text-3xl font-bold tracking-[-0.05em] tabular-nums sm:text-4xl", t.value)}>{value}</div>
+        <div className="mt-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">{label}</div>
+      </div>
+    </Link>
+  );
+}
 
 export default function HomeDashboard() {
   const { user } = useAuth();
@@ -145,6 +174,11 @@ export default function HomeDashboard() {
     return "Buenas noches";
   };
 
+  const todayLabel = (() => {
+    const label = format(new Date(), "EEEE d 'de' MMMM", { locale: es });
+    return label.charAt(0).toUpperCase() + label.slice(1);
+  })();
+
   const alertIcon = (type: Alert['type']) => {
     if (type === 'critical') return <AlertTriangle className="h-4 w-4 text-red-500 flex-shrink-0" />;
     if (type === 'warning') return <AlertCircle className="h-4 w-4 text-amber-500 flex-shrink-0" />;
@@ -159,30 +193,68 @@ export default function HomeDashboard() {
 
   return (
     <PageShell spacing="compact">
-      <CompactPageHeader
-        eyebrow="Workspace personal"
-        title={<>{greeting()}, {user?.firstName || "Usuario"}.</>}
-        description="Tus prioridades, tareas y señales importantes para avanzar hoy."
-        actions={(canAccessTasks || canCreateQuotation) ? (
-          <>
-            {canAccessTasks && (
-              <Button asChild>
-                <Link href="/tasks"><CheckSquare className="h-4 w-4" />Ver mis tareas</Link>
-              </Button>
+      <header
+        data-ui="home-hero"
+        aria-labelledby="home-hero-title"
+        className="relative overflow-hidden rounded-3xl border border-white/[0.07] bg-[#0b0f17] text-white shadow-[0_30px_70px_-40px_rgba(15,23,42,0.75)]"
+      >
+        <div className="pointer-events-none absolute -left-24 -top-32 h-80 w-80 rounded-full bg-rose-500/25 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-40 right-10 h-96 w-96 rounded-full bg-indigo-500/25 blur-3xl" />
+        <div className="pointer-events-none absolute right-1/3 top-0 h-40 w-40 rounded-full bg-fuchsia-500/10 blur-3xl" />
+        <div
+          className="pointer-events-none absolute inset-0 opacity-[0.35] [mask-image:linear-gradient(to_bottom_right,black,transparent_75%)]"
+          style={{ backgroundImage: "radial-gradient(rgba(255,255,255,0.22) 1px, transparent 1px)", backgroundSize: "22px 22px" }}
+        />
+        <div className="relative grid gap-6 p-6 sm:p-8 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end lg:p-10">
+          <div className="min-w-0">
+            <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.06] px-3 py-1 text-[0.6875rem] font-semibold uppercase tracking-[0.16em] text-white/70 backdrop-blur">
+              <Sparkles className="h-3 w-3 text-rose-300" aria-hidden="true" />
+              {todayLabel}
+            </div>
+            <h1 id="home-hero-title" className="mt-4 text-balance text-3xl font-bold leading-[1.08] tracking-[-0.04em] sm:text-4xl lg:text-5xl">
+              {greeting()},{" "}
+              <span className="bg-gradient-to-r from-rose-300 via-rose-400 to-fuchsia-300 bg-clip-text text-transparent">
+                {user?.firstName || "Usuario"}
+              </span>
+              .
+            </h1>
+            <p className="mt-3 max-w-xl text-sm leading-6 text-white/60 sm:text-base">
+              Tus prioridades, tareas y señales importantes para avanzar hoy.
+            </p>
+            {(canAccessTasks || canCreateQuotation) && (
+              <div className="mt-6 flex flex-wrap items-center gap-2.5">
+                {canAccessTasks && (
+                  <Button asChild size="lg" className="rounded-xl shadow-lg shadow-rose-500/20">
+                    <Link href="/tasks"><CheckSquare className="h-4 w-4" />Ver mis tareas</Link>
+                  </Button>
+                )}
+                {canCreateQuotation && (
+                  <Button
+                    asChild
+                    size="lg"
+                    variant={canAccessTasks ? "outline" : "default"}
+                    className={cn("rounded-xl", canAccessTasks && "border-white/15 bg-white/[0.06] text-white backdrop-blur hover:bg-white/[0.12] hover:text-white")}
+                  >
+                    <Link href="/optimized-quote"><Plus className="h-4 w-4" />Nueva cotización</Link>
+                  </Button>
+                )}
+              </div>
             )}
-            {canCreateQuotation && canAccessTasks && (
-              <Button asChild variant="outline">
-                <Link href="/optimized-quote"><Plus className="h-4 w-4" />Nueva cotización</Link>
-              </Button>
-            )}
-            {canCreateQuotation && !canAccessTasks && (
-              <Button asChild>
-                <Link href="/optimized-quote"><Plus className="h-4 w-4" />Nueva cotización</Link>
-              </Button>
-            )}
-          </>
-        ) : undefined}
-      />
+          </div>
+          {myPersonnelId ? (
+            <div className="grid grid-cols-2 gap-3 sm:min-w-[18rem]" data-testid="home-hero-hours">
+              <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-4 backdrop-blur">
+                <div className="flex items-center gap-1.5 text-[0.625rem] font-semibold uppercase tracking-[0.14em] text-white/50"><Clock className="h-3 w-3" aria-hidden="true" />Esta semana</div>
+                <div className="mt-1.5 text-3xl font-bold tracking-[-0.04em] tabular-nums">{myWeekHours.toFixed(1)}<span className="ml-0.5 text-base font-medium text-white/50">h</span></div>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-4 backdrop-blur">
+                <div className="flex items-center gap-1.5 text-[0.625rem] font-semibold uppercase tracking-[0.14em] text-white/50"><BarChart2 className="h-3 w-3" aria-hidden="true" />Este mes</div>
+                <div className="mt-1.5 text-3xl font-bold tracking-[-0.04em] tabular-nums">{myMonthHours.toFixed(1)}<span className="ml-0.5 text-base font-medium text-white/50">h</span></div>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      </header>
       {upcoming.length > 0 && (
         <Card className="border-pink-200 bg-pink-50/60" data-testid="home-team-birthdays">
           <CardContent className="p-4 text-sm text-pink-950 sm:p-4 sm:pt-4">
@@ -220,40 +292,16 @@ export default function HomeDashboard() {
       {/* Resumen operativo */}
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         {hasPermission('projects') && (
-          <Card className="mind-kpi">
-            <CardContent className="p-3.5 sm:p-4">
-              <div className="min-h-8 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Proyectos activos</div>
-              <div className="mt-1 text-2xl font-bold tracking-[-0.05em] tabular-nums text-primary sm:text-3xl">{projectCount || 0}</div>
-            </CardContent>
-          </Card>
+          <KpiTile label="Proyectos activos" value={projectCount || 0} tone="rose" href="/tasks/projects" icon={<Briefcase className="h-[18px] w-[18px]" />} />
         )}
         {hasPermission('quotations') && (
-          <Card className="mind-kpi">
-            <CardContent className="p-3.5 sm:p-4">
-              <div className="min-h-8 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Cotizaciones pendientes</div>
-              <div className="mt-1 text-2xl font-bold tracking-[-0.05em] tabular-nums text-amber-600 sm:text-3xl">{quotationStats?.pending || 0}</div>
-            </CardContent>
-          </Card>
+          <KpiTile label="Cotizaciones pendientes" value={quotationStats?.pending || 0} tone="amber" href="/quotations" icon={<FileText className="h-[18px] w-[18px]" />} />
         )}
         {hasPermission('quotations') && (
-          <Card className="mind-kpi">
-            <CardContent className="p-3.5 sm:p-4">
-              <div className="min-h-8 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Borradores</div>
-              <div className="mt-1 text-2xl font-bold tracking-[-0.05em] tabular-nums text-slate-700 sm:text-3xl">{quotationStats?.draft || 0}</div>
-            </CardContent>
-          </Card>
+          <KpiTile label="Borradores" value={quotationStats?.draft || 0} tone="slate" href="/quotations" icon={<FilePen className="h-[18px] w-[18px]" />} />
         )}
         {hasPermission('projects') && (
-          <Card className="mind-kpi">
-            <CardContent className="p-3.5 sm:p-4">
-              <div className="min-h-8 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Alertas críticas</div>
-              <div className="mt-1 text-2xl font-bold tracking-[-0.05em] tabular-nums sm:text-3xl">
-                <span className={summary.critical > 0 ? "text-red-600" : "text-emerald-600"}>
-                  {summary.critical}
-                </span>
-              </div>
-            </CardContent>
-          </Card>
+          <KpiTile label="Alertas críticas" value={summary.critical} tone={summary.critical > 0 ? "red" : "emerald"} href="/tasks/projects" icon={<ShieldAlert className="h-[18px] w-[18px]" />} />
         )}
       </div>
 
