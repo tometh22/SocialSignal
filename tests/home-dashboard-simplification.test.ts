@@ -34,3 +34,16 @@ describe("Home personal simplificada", () => {
     expect(home).not.toContain('authFetch("/api/active-projects")');
   });
 });
+
+describe("Shell de la app: el documento no scrollea", () => {
+  const css = readFileSync(new URL("../client/src/index.css", import.meta.url), "utf8");
+  const app = readFileSync(new URL("../client/src/App.tsx", import.meta.url), "utf8");
+
+  test("bloquea el scroll del documento dentro de la capa base (donde gana !important)", () => {
+    expect(css).toMatch(/html:has\(\.app-shell\),\s*body:has\(\.app-shell\)\s*\{[^}]*overflow: hidden !important/);
+  });
+
+  test("el shell recorta (clip) en vez de ocultar, así nada puede desplazarlo", () => {
+    expect(app).toContain('className="app-shell flex h-[100dvh] overflow-clip bg-background"');
+  });
+});
