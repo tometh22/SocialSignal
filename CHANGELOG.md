@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.14.1 — 2026-10-16
+
+- Inicio rediseñado como tablero por bloques que se compone según los permisos de cada persona: «Hoy» (tareas vencidas y en curso), horas, Cotizaciones, Portfolio, Equipo, Mis ausencias y Capacidad del equipo. Lo que la persona no puede ver no se muestra ni deja hueco.
+- Reemplaza la portada oscura con degradé de 1.13.9 por un diseño más sobrio con el rojo Epical como único acento.
+
 ## 1.14.0 — 2026-10-16
 
 - El conector MCP permite explorar 157 recursos de negocio de Mind: cotizaciones y propuestas, CRM, proyectos, tareas y horas, operaciones, personal, finanzas, objetivos, Status y conversaciones autorizadas.

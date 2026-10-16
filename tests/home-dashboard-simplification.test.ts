@@ -26,8 +26,17 @@ describe("Home personal simplificada", () => {
   });
 
   test("evita cuatro columnas prematuras junto al sidebar", () => {
-    expect(home).toContain("grid grid-cols-2 gap-3 xl:grid-cols-4");
-    expect(home).not.toContain("lg:grid-cols-4");
+    expect(home).toContain("lg:grid-cols-12");
+    expect(home).not.toContain("xl:grid-cols-4");
+  });
+
+  test("cada bloque depende del permiso: sin acceso no hay tarjeta ni hueco", () => {
+    expect(home).toContain("const showQuotations = hasPermission('quotations')");
+    expect(home).toContain("const showPortfolio = hasPermission('projects')");
+    expect(home).toContain('const canSeeCapacity = hasPermission("operations")');
+    expect(home).toContain("enabled: canSeeCapacity");
+    expect(home).toContain("{showQuotations && (");
+    expect(home).toContain("{showPortfolio && (");
   });
   test("usa el resumen liviano de alertas y no descarga el endpoint legacy", () => {
     expect(home).toContain('authFetch("/api/projects/alerts-summary")');
