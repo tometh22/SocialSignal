@@ -186,12 +186,14 @@ describe.skipIf(!process.env.TEST_MCP_DATABASE_URL)("Mind MCP: PostgreSQL + OAut
     expect((await token({ grant_type: "authorization_code", code, code_verifier: verifier, redirect_uri: config.redirectUris[0] })).status).toBe(400);
   });
 
-  it("uses the actual MCP SDK client to discover and query three read-only tools", async () => {
+  it("discovers read-only tools with the SDK and prevents old Status grants from accessing business data", async () => {
     const grant = await issue();
     const client = new Client({ name: "integration-test", version: "1" });
     await client.connect(new StreamableHTTPClientTransport(new URL(config.resource), { requestInit: { headers: { Authorization: `Bearer ${grant.access_token}` } } }));
     try {
-      const { tools } = await client.listTools(); expect(tools).toHaveLength(3);
+      const { tools } = await client.listTools(); expect(tools).toHaveLength(7);
+      const denied = await client.callTool({ name: "list_mind_resources", arguments: {} });
+      expect(denied.isError).toBe(true); expect(JSON.stringify(denied)).toContain("mind:read");
       expect(tools.every(t => t.annotations?.readOnlyHint === true && t.annotations?.destructiveHint === false)).toBe(true);
       const rooms = await client.callTool({ name: "list_status_rooms", arguments: { query: "Vick" } });
       expect((rooms.structuredContent as any).items.map((r: any) => r.id)).toEqual([10]);
@@ -207,6 +209,34 @@ describe.skipIf(!process.env.TEST_MCP_DATABASE_URL)("Mind MCP: PostgreSQL + OAut
       expect((await client.callTool({ name: "get_status_activity", arguments: { roomId: 10, itemId: 100 } })).isError).toBe(true);
       await pool.query("DELETE FROM review_room_members WHERE room_id=10 AND user_id=1");
       expect((await client.callTool({ name: "get_status", arguments: { roomId: 10 } })).isError).toBe(true);
+    } finally { await client.close(); }
+  });
+
+  it("requires fresh broad consent, supports users without Status and never widens grants on refresh", async () => {
+    const legacy = await issue();
+    expect((await token({ grant_type: "refresh_token", refresh_token: legacy.refresh_token, scope: "mind:read offline_access" })).status).toBe(400);
+    await pool.query("UPDATE users SET permissions=ARRAY['quotations'] WHERE id=1");
+    const start = await begin("mind:read offline_access");
+    const cookie = await login(1, start.cookie);
+    const consent = await request("/mcp/consent", { headers: { cookie } });
+    const html = await consent.text(); expect(html).toContain("cotizaciones y propuestas"); expect(html).toContain("financiera sensible");
+    const csrf = html.match(/name="csrf" value="([^"]+)"/)![1];
+    const accepted = await request("/mcp/consent", { method: "POST", headers: { cookie, Origin: config.origin }, body: new URLSearchParams({ csrf, decision: "allow" }) });
+    expect(accepted.status).toBe(303);
+    const code = new URL(accepted.headers.get("location")!).searchParams.get("code")!;
+    const exchanged = await token({ grant_type: "authorization_code", code, code_verifier: verifier, redirect_uri: config.redirectUris[0] });
+    expect(exchanged.status).toBe(200); const grant = await exchanged.json(); expect(grant.scope).toBe("mind:read offline_access");
+    const client = new Client({ name: "all-mind-test", version: "1" });
+    await client.connect(new StreamableHTTPClientTransport(new URL(config.resource), { requestInit: { headers: { Authorization: `Bearer ${grant.access_token}` } } }));
+    try {
+      const catalog = await client.callTool({ name: "list_mind_resources", arguments: { query: "cotizaciones" } });
+      expect(catalog.isError).not.toBe(true);
+      expect(JSON.stringify(catalog.structuredContent)).toContain("quotations");
+      const quotes = await client.callTool({ name: "query_mind", arguments: { resource: "quotations", fields: ["id", "project_name"] } });
+      expect((quotes.structuredContent as any).items[0].project_name).toBe("Nombre viejo");
+      expect((await client.callTool({ name: "query_mind", arguments: { resource: "financial_accounts" } })).isError).toBe(true);
+      await pool.query("UPDATE users SET permissions=ARRAY[]::text[] WHERE id=1");
+      await expect(provider.verifyAccessToken(grant.access_token)).rejects.toThrow();
     } finally { await client.close(); }
   });
 

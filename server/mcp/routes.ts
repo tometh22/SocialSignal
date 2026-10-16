@@ -5,10 +5,11 @@ import { rateLimit } from "express-rate-limit";
 import { createOAuthMetadata, mcpAuthRouter } from "@modelcontextprotocol/sdk/server/auth/router.js";
 import { requireBearerAuth } from "@modelcontextprotocol/sdk/server/auth/middleware/bearerAuth.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import { MCP_SCOPE, MCP_SCOPES, type MindMcpConfig } from "./config";
+import { MIND_SCOPE, MCP_SCOPES, type MindMcpConfig } from "./config";
 import { MindOAuthProvider, randomToken } from "./oauth";
 import { MindStatusReader } from "./status";
 import { createMindMcpServer } from "./tools";
+import { MindDataReader, MindDataError } from "./data";
 
 type BrowserUser = { id: number; firstName: string; lastName: string; isActive?: boolean | null;
   isAdmin?: boolean | null; role?: string; permissions?: string[] | null };
@@ -38,6 +39,7 @@ export function registerMindMcp(app: Express, pool: Pool, config: MindMcpConfig 
   }
   const provider = new MindOAuthProvider(pool, config);
   const reader = new MindStatusReader(pool, config.origin);
+  const dataReader = new MindDataReader(pool, config.origin);
   const issuer = new URL(config.origin).href;
   // RFC 9207 lets ChatGPT use its stable callback. The issuer must match exactly,
   // including the trailing slash, on both successful and error redirects.
@@ -62,7 +64,7 @@ export function registerMindMcp(app: Express, pool: Pool, config: MindMcpConfig 
   });
   // The SDK supplies discovery, exact redirect validation, PKCE S256, client authentication and rate limits.
   app.use(mcpAuthRouter({ provider, issuerUrl: new URL(config.origin), resourceServerUrl: new URL(config.resource),
-    scopesSupported: MCP_SCOPES, resourceName: "Mind Status" }));
+    scopesSupported: MCP_SCOPES, resourceName: "Mind" }));
 
   const safe = (fn: (req: Request, res: Response) => Promise<void>) =>
     (req: Request, res: Response, _next: NextFunction) => { void fn(req, res).catch(() => {
@@ -75,8 +77,10 @@ export function registerMindMcp(app: Express, pool: Pool, config: MindMcpConfig 
       res.redirect(303, `/auth?returnTo=${encodeURIComponent(req.path === "/mcp/connections" ? "/mcp/connections" : "/mcp/consent")}`);
       return;
     }
-    if (!(user.isAdmin || user.role === "admin" || user.permissions?.includes("status"))) {
-      page(res.status(403), "Acceso no disponible", "<p>Tu cuenta no tiene permiso para consultar Status.</p>");
+    const broad = req.path === "/mcp/connections" || req.session.mcpAuthorization?.scopes.includes(MIND_SCOPE);
+    const permissions = broad ? ["crm", "quotations", "projects", "operations", "status", "dashboard", "finance", "task_manager", "admin"] : ["status"];
+    if (user.role === "external_provider" || !(user.isAdmin || user.role === "admin" || permissions.some(p => user.permissions?.includes(p)))) {
+      page(res.status(403), "Acceso no disponible", "<p>Tu cuenta no tiene permiso para el acceso solicitado.</p>");
       return;
     }
     return user;
@@ -91,8 +95,9 @@ export function registerMindMcp(app: Express, pool: Pool, config: MindMcpConfig 
     }
     const user = await browserUser(req, res); if (!user) return;
     pending.csrf = randomToken(); pending.userId = user.id;
-    page(res, "Conectar Mind Status", `<p>Vas a autorizar a <strong>Mind Status</strong> con la cuenta de ${escape(user.firstName)} ${escape(user.lastName)}.</p>
-      <p>El agente podrá leer las salas activas de las que sos miembro, sus participantes, proyectos, temas, riesgos, decisiones, notas e historial. No podrá modificar datos.</p>
+    const broad = pending.scopes.includes(MIND_SCOPE);
+    page(res, broad ? "Conectar Mind" : "Conectar Mind Status", `<p>Vas a autorizar a <strong>${broad ? "Mind" : "Mind Status"}</strong> con la cuenta de ${escape(user.firstName)} ${escape(user.lastName)}.</p>
+      <p>${broad ? "El agente podrá consultar todos los módulos de negocio que permiten tus permisos: cotizaciones y propuestas, CRM y clientes, proyectos, tareas y horas, operaciones y personal, costos y finanzas, objetivos, Status, tus conversaciones y datos personales. Incluye información comercial y financiera sensible cuando tu cuenta tiene acceso. Las salas y conversaciones requieren membresía. No se comparten contraseñas, tokens ni configuración secreta." : "El agente podrá leer las salas activas de las que sos miembro, sus participantes, proyectos, temas, riesgos, decisiones, notas e historial."} No podrá modificar datos.</p>
       <p>${pending.scopes.includes("offline_access") ? "El acceso puede renovarse durante 30 días sin volver a iniciar sesión." : "El acceso vence en una hora."}
       Podés revocarlo desde <a href="/mcp/connections">Conexiones de agentes</a>.</p>
       <p>Al autorizar, volverás a <code>${escape(new URL(pending.redirectUri).host)}</code>.</p>
@@ -118,10 +123,10 @@ export function registerMindMcp(app: Express, pool: Pool, config: MindMcpConfig 
   app.get("/mcp/connections", safe(async (req, res) => {
     const user = await browserUser(req, res); if (!user) return;
     req.session.mcpConnectionsCsrf = randomToken();
-    const { rows } = await pool.query(`SELECT id,created_at FROM mcp_oauth_grants WHERE user_id=$1 AND revoked_at IS NULL
+    const { rows } = await pool.query(`SELECT id,created_at,scopes FROM mcp_oauth_grants WHERE user_id=$1 AND revoked_at IS NULL
       AND (access_expires_at>now() OR refresh_expires_at>now()) ORDER BY created_at DESC`, [user.id]);
     page(res, "Conexiones de agentes", `<p>Accesos de lectura autorizados por ${escape(user.firstName)} ${escape(user.lastName)}.</p>` +
-      (rows.length ? rows.map(row => `<hr><p>Mind Status · ${escape(new Date(row.created_at).toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires" }))}</p>
+      (rows.length ? rows.map(row => `<hr><p>${row.scopes.includes(MIND_SCOPE) ? "Mind · Todos tus módulos autorizados" : "Mind Status · Solo Status"} · ${escape(new Date(row.created_at).toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires" }))}</p>
         <form method="post" action="/mcp/connections"><input type="hidden" name="csrf" value="${escape(req.session.mcpConnectionsCsrf)}">
         <input type="hidden" name="id" value="${escape(row.id)}"><button>Revocar acceso</button></form>`).join("") : "<p>No tenés conexiones activas.</p>") +
       '<p><a href="/review">Volver a Status</a></p>');
@@ -145,11 +150,18 @@ export function registerMindMcp(app: Express, pool: Pool, config: MindMcpConfig 
   });
   app.options("/mcp", cors({ origin: [...allowedOrigins], allowedHeaders: ["Content-Type", "Authorization", "MCP-Protocol-Version"], methods: ["POST", "GET", "DELETE"] }));
   app.use("/mcp", cors({ origin: [...allowedOrigins], exposedHeaders: ["WWW-Authenticate"] }));
-  const bearer = requireBearerAuth({ verifier: provider, requiredScopes: [MCP_SCOPE], expectedResource: new URL(config.resource),
+  const bearer = requireBearerAuth({ verifier: provider, expectedResource: new URL(config.resource),
     resourceMetadataUrl: `${config.origin}/.well-known/oauth-protected-resource/mcp` });
   app.post("/mcp", rateLimit({ windowMs: 60_000, limit: 120, standardHeaders: true, legacyHeaders: false }), bearer, safe(async (req, res) => {
     const token = req.auth!.token;
-    const server = createMindMcpServer(reader, async () => Number((await provider.verifyAccessToken(token)).extra!.userId));
+    const server = createMindMcpServer(reader, async () => Number((await provider.verifyAccessToken(token)).extra!.userId), {
+      reader: dataReader,
+      authenticate: async () => {
+        const auth = await provider.verifyAccessToken(token);
+        if (!auth.scopes.includes(MIND_SCOPE)) throw new MindDataError("Esta conexión solo autorizó Status. Actualizá y reconectá el plugin solicitando mind:read offline_access para consultar los demás módulos.");
+        return Number(auth.extra!.userId);
+      },
+    });
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
     res.on("close", () => { void server.close(); });
     await server.connect(transport);

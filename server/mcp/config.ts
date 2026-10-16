@@ -1,5 +1,8 @@
 export const MCP_SCOPE = "status:read";
-export const MCP_SCOPES = [MCP_SCOPE, "offline_access"];
+export const MIND_SCOPE = "mind:read";
+export const MCP_SCOPES = [MIND_SCOPE, MCP_SCOPE, "offline_access"];
+export const validMcpScopes = (scopes: string[]) => scopes.some(s => s === MIND_SCOPE || s === MCP_SCOPE)
+  && scopes.every(s => MCP_SCOPES.includes(s));
 
 export interface MindMcpConfig {
   origin: string;
