@@ -885,7 +885,7 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
                     <Select value={!task.recurrenceRule ? "none" : task.recurrenceRule.frequency === "monthly" ? "monthly" : task.recurrenceRule.interval === 2 ? "fortnightly" : task.recurrenceRule.weekdays?.length === 2 ? "mon_wed" : "weekly"} onValueChange={value => updateMutation.mutate({ recurrenceRule: value === "none" ? null : value === "monthly" ? { frequency: "monthly", interval: 1 } : value === "fortnightly" ? { frequency: "weekly", interval: 2, weekdays: [1] } : value === "mon_wed" ? { frequency: "weekly", interval: 1, weekdays: [1, 3] } : { frequency: "weekly", interval: 1 } })}>
                       <SelectTrigger className="h-8 flex-1 text-xs" aria-label="Repetición de la tarea"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">Sin repetición</SelectItem><SelectItem value="mon_wed">Lunes y miércoles</SelectItem><SelectItem value="fortnightly">Lunes cada dos semanas</SelectItem><SelectItem value="weekly">Semanal</SelectItem><SelectItem value="monthly">Mensual</SelectItem></SelectContent>
                     </Select>
-                    {task.recurrenceRule && <p className="text-xs text-muted-foreground">{recurrenceLabel(task.recurrenceRule)}: al finalizar se crea la próxima tarea pendiente, con su nueva fecha.</p>}
+                    {task.recurrenceRule && <p className="text-xs text-muted-foreground">{recurrenceLabel(task.recurrenceRule)}: al finalizar se crea la próxima tarea pendiente. Si tiene un rango de fechas, se repite completo desde el inicio y conserva su duración.</p>}
                   </div>}
 
                   {/* Prioridad */}

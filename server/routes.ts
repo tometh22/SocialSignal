@@ -11,7 +11,7 @@ import { taskDateSchema, taskDateWindowSchema, taskDateWindowEnd } from "@shared
 import { TASK_PROJECT_ROLES } from "@shared/task-project-roles";
 import { projectTemplateKeySchema, projectTaskTemplates, findProjectTaskTemplate, templateTaskValues } from "./services/project-task-templates";
 import type { ProjectTemplateTask } from "../shared/project-task-template";
-import { taskRecurrenceSchema, recurrenceFromDescription, nextRecurringTaskDate } from "../shared/utils/task-recurrence";
+import { taskRecurrenceSchema, recurrenceFromDescription, nextRecurringTaskDates } from "../shared/utils/task-recurrence";
 import { isValidAbsenceDate } from "../shared/utils/absence";
 import { calculateSettlementDifference } from "../shared/utils/monthly-settlement-declaration";
 import express, { type Express, Request, Response, NextFunction } from "express";
@@ -24404,7 +24404,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const [existingNext] = await tx.select().from(tasks).where(eq(tasks.recurrenceSourceTaskId, taskId));
           if (existingNext) nextTask = existingNext;
           else if (project?.status === "active") {
-            const nextDate = nextRecurringTaskDate(taskRecurrenceSchema.parse(current.recurrenceRule), current.dueDate, now);
+            const nextDates = nextRecurringTaskDates(taskRecurrenceSchema.parse(current.recurrenceRule), current.startDate, current.dueDate, now);
             const all = await tx.select().from(tasks).where(eq(tasks.projectId, current.projectId));
             const sourceIds = new Set([taskId]);
             let expanded = true;
@@ -24412,10 +24412,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const members = await tx.select({ personnelId: taskProjectMembers.personnelId }).from(taskProjectMembers).where(eq(taskProjectMembers.projectId, current.projectId));
             const copies = await duplicateTaskStructure(tx, all.filter(row => sourceIds.has(row.id)), current.projectId, Number(req.user?.id), new Set(members.map(member => member.personnelId)), undefined, { preserveAssignmentActor: true });
             const root = copies.find(row => row.parentTaskId == null)!;
-            [nextTask] = await tx.update(tasks).set({ startDate: new Date(`${nextDate}T12:00:00Z`), dueDate: new Date(`${nextDate}T12:00:00Z`), recurrenceSourceTaskId: taskId }).where(eq(tasks.id, root.id)).returning();
+            [nextTask] = await tx.update(tasks).set({ startDate: new Date(`${nextDates.startDate}T12:00:00Z`), dueDate: new Date(`${nextDates.dueDate}T12:00:00Z`), recurrenceSourceTaskId: taskId }).where(eq(tasks.id, root.id)).returning();
           }
         }
-        return { ...updated, ...(nextTask ? { recurringTaskId: nextTask.id, recurringTaskDate: nextTask.dueDate?.toISOString().slice(0, 10) } : {}) };
+        return { ...updated, ...(nextTask ? { recurringTaskId: nextTask.id, recurringTaskStartDate: nextTask.startDate?.toISOString().slice(0, 10), recurringTaskDate: nextTask.dueDate?.toISOString().slice(0, 10) } : {}) };
       });
       res.json(result);
     } catch (error) {

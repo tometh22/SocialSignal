@@ -35,6 +35,32 @@ export function nextRecurringTaskDate(rule: TaskRecurrence, previousDue: string 
   }
   throw new Error("No se pudo calcular la próxima fecha recurrente");
 }
+
+/** Repeat a dated range from its start, keeping its duration in civil days. */
+export function nextRecurringTaskDates(
+  rule: TaskRecurrence,
+  previousStart: string | Date | null | undefined,
+  previousDue: string | Date | null | undefined,
+  now = new Date(),
+): { startDate: string; dueDate: string } {
+  const civilDay = (value: typeof previousStart) => value instanceof Date ? value.toISOString().slice(0, 10) : value?.slice(0, 10);
+  const start = civilDay(previousStart);
+  const due = civilDay(previousDue);
+  if (!start || !due || start >= due) {
+    const next = nextRecurringTaskDate(rule, due ?? start, now);
+    return { startDate: next, dueDate: next };
+  }
+
+  const anchor = new Date(`${start}T12:00:00Z`);
+  const duration = new Date(`${due}T12:00:00Z`).getTime() - anchor.getTime();
+  // A multi-day occurrence repeats as a whole (e.g. Monday–Wednesday).
+  // Weekday lists describe individual occurrences only for single-day tasks.
+  const rangeRule = rule.frequency === "weekly" ? { ...rule, weekdays: [anchor.getUTCDay()] } : rule;
+  const nextStart = nextRecurringTaskDate(rangeRule, start, now);
+  const nextDue = new Date(new Date(`${nextStart}T12:00:00Z`).getTime() + duration);
+  return { startDate: nextStart, dueDate: nextDue.toISOString().slice(0, 10) };
+}
+
 export function recurrenceLabel(rule: TaskRecurrence | null | undefined) {
   if (!rule) return "Sin repetición";
   if (rule.frequency === "monthly") return "Mensual";

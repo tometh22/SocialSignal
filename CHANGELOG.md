@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.14.2 — 2026-10-20
+
+- Las tareas recurrentes conservan el rango de inicio y entrega y su duración; una tarea semanal de lunes a miércoles vuelve a programarse de lunes a miércoles. El aviso de creación muestra ambas fechas.
+- El calendario del equipo incorpora vistas de mes y semana. Seleccionar un día o «+N más» expande todas las tareas de los siete días de esa semana, con responsables, colaboradores, proyecto y rango de fechas.
+
 ## 1.14.1 — 2026-10-16
 
 - Inicio rediseñado como tablero por bloques que se compone según los permisos de cada persona: «Hoy» (tareas vencidas y en curso), horas, Cotizaciones, Portfolio, Equipo, Mis ausencias y Capacidad del equipo. Lo que la persona no puede ver no se muestra ni deja hueco.
