@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.14.3 — 2026-10-20
+
+- Las tareas mensuales conservan el día de anclaje de su cadena recurrente al atravesar meses cortos: enero 31 → febrero 28 → marzo 31. También conservan el rango de fechas y su duración, sin reescribir tareas anteriores ni agregar campos a la API o a la base.
+
 ## 1.14.2 — 2026-10-20
 
 - Las tareas recurrentes conservan el rango de inicio y entrega y su duración; una tarea semanal de lunes a miércoles vuelve a programarse de lunes a miércoles. El aviso de creación muestra ambas fechas.
