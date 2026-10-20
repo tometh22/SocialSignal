@@ -11,7 +11,8 @@ import { taskDateSchema, taskDateWindowSchema, taskDateWindowEnd } from "@shared
 import { TASK_PROJECT_ROLES } from "@shared/task-project-roles";
 import { projectTemplateKeySchema, projectTaskTemplates, findProjectTaskTemplate, templateTaskValues } from "./services/project-task-templates";
 import type { ProjectTemplateTask } from "../shared/project-task-template";
-import { taskRecurrenceSchema, recurrenceFromDescription, nextRecurringTaskDates } from "../shared/utils/task-recurrence";
+import { taskRecurrenceSchema, recurrenceFromDescription } from "../shared/utils/task-recurrence";
+import { nextRecurringTaskDatesForTask } from "./services/task-recurrence";
 import { isValidAbsenceDate } from "../shared/utils/absence";
 import { calculateSettlementDifference } from "../shared/utils/monthly-settlement-declaration";
 import express, { type Express, Request, Response, NextFunction } from "express";
@@ -24404,8 +24405,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const [existingNext] = await tx.select().from(tasks).where(eq(tasks.recurrenceSourceTaskId, taskId));
           if (existingNext) nextTask = existingNext;
           else if (project?.status === "active") {
-            const nextDates = nextRecurringTaskDates(taskRecurrenceSchema.parse(current.recurrenceRule), current.startDate, current.dueDate, now);
             const all = await tx.select().from(tasks).where(eq(tasks.projectId, current.projectId));
+            const nextDates = nextRecurringTaskDatesForTask(current, all, now);
             const sourceIds = new Set([taskId]);
             let expanded = true;
             while (expanded) { expanded = false; for (const row of all) if (row.parentTaskId && sourceIds.has(row.parentTaskId) && !sourceIds.has(row.id)) { sourceIds.add(row.id); expanded = true; } }

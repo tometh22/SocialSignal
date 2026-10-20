@@ -11,12 +11,12 @@ export function recurrenceFromDescription(description?: string | null): TaskRecu
   if (/semanal/.test(text)) return { frequency: "weekly", interval: 1 };
   return null;
 }
-export function nextRecurringTaskDate(rule: TaskRecurrence, previousDue: string | Date | null | undefined, now = new Date()): string {
+export function nextRecurringTaskDate(rule: TaskRecurrence, previousDue: string | Date | null | undefined, now = new Date(), monthlyAnchorDay?: number): string {
   const today = civilDateInBuenosAires(now);
   const due = previousDue instanceof Date ? previousDue.toISOString().slice(0, 10) : previousDue?.slice(0, 10);
   const anchor = new Date(`${due || today}T12:00:00Z`);
   if (rule.frequency === "monthly") {
-    const anchorDay = anchor.getUTCDate();
+    const anchorDay = monthlyAnchorDay ?? anchor.getUTCDate();
     for (let n = 1; n < 2400; n++) {
       const month = anchor.getUTCMonth() + rule.interval * n;
       const last = new Date(Date.UTC(anchor.getUTCFullYear(), month + 1, 0)).getUTCDate();
@@ -42,12 +42,13 @@ export function nextRecurringTaskDates(
   previousStart: string | Date | null | undefined,
   previousDue: string | Date | null | undefined,
   now = new Date(),
+  monthlyAnchorDay?: number,
 ): { startDate: string; dueDate: string } {
   const civilDay = (value: typeof previousStart) => value instanceof Date ? value.toISOString().slice(0, 10) : value?.slice(0, 10);
   const start = civilDay(previousStart);
   const due = civilDay(previousDue);
   if (!start || !due || start >= due) {
-    const next = nextRecurringTaskDate(rule, due ?? start, now);
+    const next = nextRecurringTaskDate(rule, due ?? start, now, monthlyAnchorDay);
     return { startDate: next, dueDate: next };
   }
 
@@ -56,7 +57,7 @@ export function nextRecurringTaskDates(
   // A multi-day occurrence repeats as a whole (e.g. Monday–Wednesday).
   // Weekday lists describe individual occurrences only for single-day tasks.
   const rangeRule = rule.frequency === "weekly" ? { ...rule, weekdays: [anchor.getUTCDay()] } : rule;
-  const nextStart = nextRecurringTaskDate(rangeRule, start, now);
+  const nextStart = nextRecurringTaskDate(rangeRule, start, now, monthlyAnchorDay);
   const nextDue = new Date(new Date(`${nextStart}T12:00:00Z`).getTime() + duration);
   return { startDate: nextStart, dueDate: nextDue.toISOString().slice(0, 10) };
 }
