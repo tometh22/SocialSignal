@@ -1,3 +1,4 @@
+import { taskHourAttribution } from "@shared/utils/task-hour-owner";
 import { civilDateInBuenosAires } from "@shared/utils/buenos-aires-week";
 import { invalidateTaskQueries } from "@/lib/task-cache";
 import { useEffect, useState } from "react";
@@ -30,11 +31,12 @@ type TaskHoursSummary = {
   projectId?: number | null;
   assigneeId?: number | null;
   assigneeName?: string | null;
+  hoursOwnerId?: number | null;
+  hoursOwnerName?: string | null;
   loggedHours?: number;
   timeEntries?: TimeEntrySummary[];
 };
 
-type PersonnelOption = { id: number; name: string };
 
 export default function QuickTaskHours({ taskId, className }: { taskId: number; className?: string }) {
   const { toast } = useToast();
@@ -43,7 +45,7 @@ export default function QuickTaskHours({ taskId, className }: { taskId: number; 
   const [manual, setManual] = useState("");
   const [date, setDate] = useState(() => civilDateInBuenosAires(new Date()));
   const [editingDate, setEditingDate] = useState("");
-  const [personnelId, setPersonnelId] = useState("");
+  const [stoppedTimerPersonnelId, setStoppedTimerPersonnelId] = useState<number | null>(null);
   const { isRunning, activeTaskId, elapsedSeconds: timerSeconds, startTimer, stopTimer: stopSharedTimer } = useActiveTimer({ trackElapsed: open });
   const timerStartedAt = isRunning && activeTaskId === taskId;
   const [editingEntryId, setEditingEntryId] = useState<number | null>(null);
@@ -54,12 +56,6 @@ export default function QuickTaskHours({ taskId, className }: { taskId: number; 
     queryFn: () => authFetchJson<TaskHoursSummary>(`/api/tasks/${taskId}`),
     enabled: open,
     staleTime: 15_000,
-  });
-
-  const { data: personnel = [] } = useQuery<PersonnelOption[]>({
-    queryKey: ["/api/tasks-personnel"],
-    queryFn: () => authFetchJson<PersonnelOption[]>("/api/tasks-personnel"),
-    enabled: open && isTeamManager,
   });
 
   // El servidor sólo deja corregir o borrar la carga propia, salvo Operaciones.
@@ -73,24 +69,16 @@ export default function QuickTaskHours({ taskId, className }: { taskId: number; 
   const canModify = (entry: TimeEntrySummary) =>
     isTeamManager || (myIdentity?.personnelId != null && entry.personnelId === myIdentity.personnelId);
 
-  // Lo que rige es el dueño de la tarea, no quien la carga. El destino se DERIVA:
-  // lo elegido explícitamente ("self" = yo) o, si no se eligió nada, el responsable.
-  // Al no depender de un efecto, ningún clic rápido (15m/30m…) puede guardarse a
-  // nombre de quien carga antes de que llegue el detalle de la tarea.
-  const ownerId = isTeamManager && taskSummary?.assigneeId ? taskSummary.assigneeId : null;
-  const targetPersonnelId: number | null = !isTeamManager || personnelId === "self"
-    ? null
-    : personnelId ? Number(personnelId) : ownerId;
-  // Un manager no puede cargar hasta saber quién es el dueño: si no, la primera
-  // carga se imputaría a quien la hace.
-  const ownerPending = isTeamManager && open && !taskSummary;
-  // "Yo" explícito se guarda con el id propio: un null en el temporizador significaría "sin elección"
-  // y al reabrir el popover se interpretaría como "el responsable".
-  const timerPersonnelId = targetPersonnelId ?? (isTeamManager ? myIdentity?.personnelId ?? null : null);
+  const ownerId = taskSummary?.hoursOwnerId ?? taskSummary?.assigneeId ?? null;
+  const ownerPending = open && (!taskSummary || summaryFailed);
+  const attribution = taskHourAttribution(ownerId, myIdentity?.personnelId ?? null, isTeamManager, stoppedTimerPersonnelId);
+  const canRegisterHours = !ownerPending && "personnelId" in attribution;
+  const timerPersonnelId = ownerId;
+  const targetPersonnelId = stoppedTimerPersonnelId ?? ownerId;
 
   useEffect(() => {
     if (!open) {
-      setPersonnelId("");
+      setStoppedTimerPersonnelId(null);
       setEditingEntryId(null);
     }
   }, [open]);
@@ -122,18 +110,25 @@ export default function QuickTaskHours({ taskId, className }: { taskId: number; 
   });
 
   const logMutation = useMutation({
-    mutationFn: (hours: number) => apiRequest(`/api/tasks/${taskId}/time`, "POST", {
+    mutationFn: (hours: number) => {
+      if (!canRegisterHours) throw new Error("message" in attribution ? attribution.message : "Esperá a que termine de cargar la tarea.");
+      return apiRequest(`/api/tasks/${taskId}/time`, "POST", {
       date,
       hours,
       description: "Carga rápida",
-      ...(targetPersonnelId ? { personnelId: targetPersonnelId } : {}),
-    }),
+      personnelId: targetPersonnelId,
+    });
+    },
     onSuccess: (created: any) => {
       invalidateHoursConsumers();
       setManual("");
+      setStoppedTimerPersonnelId(null);
       if ((created?.costingWarning || created?.warning)) toast({ title: "Horas guardadas", description: created.costingWarning || created.warning });
     },
-    onError: describeError("No se pudieron registrar las horas"),
+    onError: error => {
+      void queryClient.invalidateQueries({ queryKey: ["/api/tasks", taskId] });
+      describeError("No se pudieron registrar las horas")(error);
+    },
   });
 
   const editMutation = useMutation({
@@ -187,7 +182,7 @@ export default function QuickTaskHours({ taskId, className }: { taskId: number; 
     const result = stopSharedTimer();
     if (!result) return;
     setManual(result.hours > 0 ? `${Math.round(result.hours * 60)}m` : "");
-    if (result.personnelId) setPersonnelId(String(result.personnelId));
+    setStoppedTimerPersonnelId(result.personnelId);
     toast({ title: "Temporizador detenido", description: "Revisá la duración y guardá la carga; el mínimo es un minuto." });
   };
 
@@ -218,33 +213,16 @@ export default function QuickTaskHours({ taskId, className }: { taskId: number; 
         <label className="mb-2 block text-xs">Fecha<Input aria-label="Fecha de carga" type="date" value={date} onChange={e => setDate(e.target.value)} className="h-8" /></label>
         <div className="mb-2 grid grid-cols-4 gap-1">
           {[0.25, 0.5, 0.75, 1].map((hours) => (
-            <Button key={hours} size="sm" variant="outline" className="h-8 px-1 text-[10px]" onClick={() => logMutation.mutate(hours)} disabled={!date || logMutation.isPending || ownerPending}>
+            <Button key={hours} size="sm" variant="outline" className="h-8 px-1 text-[10px]" onClick={() => logMutation.mutate(hours)} disabled={!date || logMutation.isPending || !canRegisterHours}>
               {hours * 60}m
             </Button>
           ))}
         </div>
-        {isTeamManager && (
-          <label className="mb-2 block text-[10px] text-muted-foreground">
-            Cargar para
-            <select
-              value={targetPersonnelId ? String(targetPersonnelId) : "self"}
-              onChange={(event) => setPersonnelId(event.target.value)}
-              className="mt-1 h-8 w-full rounded-md border border-input bg-background px-2 text-xs text-foreground"
-            >
-              <option value="self">{ownerId && ownerId !== myIdentity?.personnelId ? "Yo (no soy el responsable)" : "Yo / persona vinculada"}</option>
-              {ownerId && !personnel.some((person) => person.id === ownerId) && (
-                <option value={ownerId}>{taskSummary?.assigneeName ?? `Persona #${ownerId}`} · dueño/a de la tarea</option>
-              )}
-              {personnel.map((person) => (
-                <option key={person.id} value={person.id}>
-                  {person.name}{person.id === ownerId ? " · dueño/a de la tarea" : ""}
-                </option>
-              ))}
-            </select>
-            {ownerPending && summaryFailed && <span className="mt-1 block text-[10px] text-destructive">No se pudo cargar la tarea; cerrá y volvé a abrir para registrar horas.</span>}
-            {!ownerPending && !ownerId && <span className="mt-1 block text-[10px]">La tarea no tiene responsable: se carga a tu nombre.</span>}
-          </label>
-        )}
+        <div className="mb-2 text-xs text-muted-foreground">
+          <p>Las horas se registran a nombre de <strong className="text-foreground">{taskSummary?.hoursOwnerName || taskSummary?.assigneeName || "Sin responsable"}</strong>, responsable de la tarea.</p>
+          {stoppedTimerPersonnelId && stoppedTimerPersonnelId !== ownerId && ownerId && <Button variant="outline" size="sm" onClick={() => setStoppedTimerPersonnelId(null)}>Usar responsable actual</Button>}
+          {ownerPending ? <p role="status" className="mt-1">{summaryFailed ? "No se pudo cargar la tarea; cerrá y volvé a abrir para registrar horas." : "Cargando responsable…"}</p> : "message" in attribution && <p role="status" className="mt-1 text-amber-700">{attribution.message}</p>}
+        </div>
         <div className="mb-2 flex gap-1">
           <Input
             value={manual}
@@ -254,7 +232,7 @@ export default function QuickTaskHours({ taskId, className }: { taskId: number; 
             className="h-8 text-xs"
             onKeyDown={(event) => event.key === "Enter" && saveManual()}
           />
-          <Button size="sm" className="h-8 text-xs" onClick={saveManual} disabled={!date || logMutation.isPending || ownerPending || !manual.trim()}>
+          <Button size="sm" className="h-8 text-xs" onClick={saveManual} disabled={!date || logMutation.isPending || !canRegisterHours || !manual.trim()}>
             {logMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "Guardar"}
           </Button>
         </div>
@@ -263,7 +241,7 @@ export default function QuickTaskHours({ taskId, className }: { taskId: number; 
             <Square className="mr-1 h-3 w-3" />Detener ({Math.floor(timerSeconds / 60)}m)
           </Button>
         ) : (
-          <Button size="sm" variant="secondary" className="h-8 w-full text-xs" disabled={isRunning || ownerPending} onClick={() => startTimer(taskId, taskSummary?.title ?? `Tarea #${taskId}`, timerPersonnelId)}>
+          <Button size="sm" variant="secondary" className="h-8 w-full text-xs" disabled={isRunning || !canRegisterHours} onClick={() => startTimer(taskId, taskSummary?.title ?? `Tarea #${taskId}`, timerPersonnelId)}>
             <Play className="mr-1 h-3 w-3" />{isRunning ? "Hay un temporizador activo" : "Iniciar temporizador"}
           </Button>
         )}

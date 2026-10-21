@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { canDecideQuotationApproval, quotationApprovalGuidance } from "@shared/utils/quotation-approval";
+import { useAuth } from "@/hooks/use-auth";
+import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { CheckCircle2, FileDown, GitBranch, History, Mail, Send, ShieldCheck, XCircle } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { getApiErrorMessage } from "@/lib/api-error";
 import { useToast } from "@/hooks/use-toast";
-import { usePermissions } from "@/hooks/use-permissions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -30,8 +31,11 @@ type Props = {
 };
 
 export function CommercialWorkflowCard({ quotationId, status, recipientEmail, quotationNumber, onChanged }: Props) {
+  useEffect(() => {
+    if (window.location.hash === "#commercial-approval") document.getElementById("commercial-approval")?.scrollIntoView({ block: "start" });
+  }, [quotationId]);
   const { toast } = useToast();
-  const { isOperations } = usePermissions();
+  const { user } = useAuth();
   const queryClient = useQueryClient();
   const [decision, setDecision] = useState<{ approvalId: number; value: 'approved' | 'rejected' } | null>(null);
   const [decisionReason, setDecisionReason] = useState('');
@@ -41,7 +45,7 @@ export function CommercialWorkflowCard({ quotationId, status, recipientEmail, qu
   const [revisionOpen, setRevisionOpen] = useState(false);
   const [revisionReason, setRevisionReason] = useState('');
   const [busy, setBusy] = useState(false);
-  const { data } = useQuery<CommercialHistory>({ queryKey: [`/api/quotations/${quotationId}/commercial-history`] });
+  const { data, isLoading, isError, refetch } = useQuery<CommercialHistory>({ queryKey: [`/api/quotations/${quotationId}/commercial-history`] });
   const currentRevision = data?.revisions[0];
   const pendingApprovals = (data?.approvals || []).filter((approval) => approval.revisionId === currentRevision?.id && approval.status === 'pending');
   const refresh = async () => {
@@ -53,6 +57,16 @@ export function CommercialWorkflowCard({ quotationId, status, recipientEmail, qu
     ]);
     onChanged?.();
   };
+  const requestApproval = async () => {
+    setBusy(true);
+    try {
+      await apiRequest(`/api/quotations/${quotationId}/status`, "PATCH", { status: "pending" });
+      await refresh();
+      toast({ title: "Aprobación interna solicitada", description: "Otra persona autorizada puede resolver las reglas desde esta pantalla." });
+    } catch (error) {
+      toast({ title: "No se pudo solicitar la aprobación", description: getApiErrorMessage(error), variant: "destructive" });
+    } finally { setBusy(false); }
+  };
   const decide = async () => {
     if (!decision || decisionReason.trim().length < 3) return;
     setBusy(true);
@@ -61,6 +75,7 @@ export function CommercialWorkflowCard({ quotationId, status, recipientEmail, qu
       toast({ title: decision.value === 'approved' ? 'Aprobación registrada' : 'Devuelta a borrador' });
       setDecision(null); setDecisionReason(''); await refresh();
     } catch (error) {
+      await refresh();
       toast({ title: 'No se pudo registrar la decisión', description: getApiErrorMessage(error), variant: 'destructive' });
     } finally { setBusy(false); }
   };
@@ -91,10 +106,10 @@ export function CommercialWorkflowCard({ quotationId, status, recipientEmail, qu
   };
 
   return (
-    <Card className="overflow-hidden border-indigo-100">
+    <Card id="commercial-approval" className="scroll-mt-24 overflow-hidden border-indigo-100">
       <CardHeader className="border-b border-indigo-100 bg-indigo-50/40">
         <CardTitle className="flex flex-wrap items-center justify-between gap-3 text-base">
-          <span className="flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-indigo-600" /> Gobierno comercial</span>
+          <span className="flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-indigo-600" /> Aprobación y envío</span>
           <span className="flex items-center gap-2 text-xs font-normal text-slate-500">
             {quotationNumber || `#${quotationId}`} · Revisión {currentRevision?.revisionNumber || '—'}
             <Badge variant="outline">{statusLabel(status)}</Badge>
@@ -102,18 +117,23 @@ export function CommercialWorkflowCard({ quotationId, status, recipientEmail, qu
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4 p-5">
+        <p className="text-sm text-slate-600">{quotationApprovalGuidance(status)}</p>
+        {isError && <div role="alert" className="text-sm text-red-700">No se pudo cargar el historial de aprobación. <Button variant="link" onClick={() => refetch()}>Reintentar</Button></div>}
+        {isLoading && <p role="status" className="text-sm text-muted-foreground">Cargando aprobaciones…</p>}
         <div className="flex flex-wrap gap-2">
+          {status === "draft" && <Button type="button" size="sm" disabled={busy} onClick={requestApproval}><ShieldCheck className="mr-1.5 h-3.5 w-3.5" />Solicitar aprobación interna</Button>}
           <Button type="button" variant="outline" size="sm" onClick={() => window.open(`/api/quotations/${quotationId}/document.pdf`, '_blank')}><FileDown className="mr-1.5 h-3.5 w-3.5" /> PDF verificable</Button>
           {status === 'internally-approved' && <Button type="button" size="sm" onClick={() => setSendOpen(true)}><Send className="mr-1.5 h-3.5 w-3.5" /> Enviar al cliente</Button>}
           {['internally-approved', 'sent', 'viewed', 'in-negotiation', 'approved', 'rejected', 'expired', 'cancelled', 'superseded'].includes(status) && <Button type="button" variant="outline" size="sm" onClick={() => setRevisionOpen(true)}><GitBranch className="mr-1.5 h-3.5 w-3.5" /> Nueva revisión</Button>}
         </div>
-        {status === 'pending' && (
+        {status === 'pending' && !isLoading && !isError && (
           <div className="space-y-2 rounded-xl border border-amber-200 bg-amber-50 p-3">
             <div className="flex items-center gap-2 text-sm font-medium text-amber-900"><ShieldCheck className="h-4 w-4" /> Aprobaciones pendientes ({pendingApprovals.length})</div>
+            {pendingApprovals.length === 0 && <p className="text-sm text-amber-900">No hay reglas pendientes para la revisión vigente. Actualizá el historial; si el estado persiste, Operaciones debe revisar la solicitud antes de continuar.</p>}
             {pendingApprovals.map((approval) => (
               <div key={approval.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-white px-3 py-2 text-sm">
                 <span>{approval.ruleLabel}</span>
-                {isOperations ? <span className="flex gap-1"><Button size="sm" variant="ghost" onClick={() => setDecision({ approvalId: approval.id, value: 'rejected' })}><XCircle className="mr-1 h-3.5 w-3.5 text-red-500" /> Rechazar</Button><Button size="sm" onClick={() => setDecision({ approvalId: approval.id, value: 'approved' })}><CheckCircle2 className="mr-1 h-3.5 w-3.5" /> Aprobar</Button></span> : <Badge variant="outline">Requiere Operaciones</Badge>}
+                {canDecideQuotationApproval(user, approval.requestedBy) ? <span className="flex gap-1"><Button size="sm" variant="ghost" onClick={() => setDecision({ approvalId: approval.id, value: 'rejected' })}><XCircle className="mr-1 h-3.5 w-3.5 text-red-500" /> Rechazar</Button><Button size="sm" onClick={() => setDecision({ approvalId: approval.id, value: 'approved' })}><CheckCircle2 className="mr-1 h-3.5 w-3.5" /> Aprobar</Button></span> : <Badge variant="outline">{approval.requestedBy === user?.id ? "Debe decidir otra persona autorizada" : "Requiere permiso de aprobación"}</Badge>}
               </div>
             ))}
           </div>

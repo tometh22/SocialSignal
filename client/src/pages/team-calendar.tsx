@@ -156,12 +156,11 @@ export default function TeamCalendarPage() {
             </Avatar>}
             <div className="min-w-0 flex-1">
               <p className={cn("font-medium", expanded ? "break-words" : "truncate", task.status === "done" && "line-through")}>
-                {task.status === "blocked" && <span title={task.blockedReason || "Motivo pendiente"} aria-label="Bloqueada">⊘ </span>}{task.title}
+                {task.status === "blocked" && <span title={task.blockedReason || "Motivo pendiente"} aria-label="Bloqueada">⊘ </span>}{task.title}{expanded && <span className="ml-1 text-[10px] font-normal opacity-80">· {taskDateRange(task)}</span>}
               </p>
               <p className={cn("text-[10px] opacity-80", expanded ? "break-words" : "truncate")}>{expanded ? people : assigneeName}</p>
               {expanded && <>
                 {(task.clientName || task.projectName) && <p className="text-[10px] opacity-70 break-words mt-0.5">{[task.clientName, task.projectName].filter(Boolean).join(" · ")}</p>}
-                <p className="text-[10px] opacity-80 mt-1">{taskDateRange(task)}</p>
               </>}
             </div>
           </button>

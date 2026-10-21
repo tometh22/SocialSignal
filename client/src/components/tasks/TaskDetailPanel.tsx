@@ -1,3 +1,4 @@
+import { taskHourAttribution } from "@shared/utils/task-hour-owner";
 import { taskDateBucket } from "@shared/utils/task-date-bucket";
 import { invalidateTaskQueries } from "@/lib/task-cache";
 import TaskRangeCalendar from "@/components/tasks/TaskRangeCalendar";
@@ -49,6 +50,8 @@ type Task = {
   sectionName?: string | null;
   assigneeId?: number | null;
   assigneeName?: string | null;
+  hoursOwnerId?: number | null;
+  hoursOwnerName?: string | null;
   collaboratorIds?: number[];
   startDate?: string | null;
   dueDate?: string | null;
@@ -290,10 +293,10 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
   const [titleValue, setTitleValue] = useState("");
   const [showAddSubtask, setShowAddSubtask] = useState(false);
   const [subtaskTitle, setSubtaskTitle] = useState("");
+  const [stoppedTimerPersonnelId, setStoppedTimerPersonnelId] = useState<number | null>(null);
   const [logHours, setLogHours] = useState("");
   const [logDate, setLogDate] = useState(civilDateInBuenosAires(new Date()));
   const [logDesc, setLogDesc] = useState("");
-  const [logPersonnelId, setLogPersonnelId] = useState("");
   const [editingTimeEntryId, setEditingTimeEntryId] = useState<number | null>(null);
   const [editTimeHours, setEditTimeHours] = useState("");
   const [editTimeDate, setEditTimeDate] = useState("");
@@ -312,6 +315,12 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
   const [dateRangeOpen, setDateRangeOpen] = useState(false);
   const descTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { isRunning, activeTaskId, elapsedSeconds, startTimer, stopTimer } = useActiveTimer();
+
+  useEffect(() => {
+    setStoppedTimerPersonnelId(null);
+    setLogHours("");
+    setLogDesc("");
+  }, [taskId]);
 
   useEffect(() => {
     if (open && initialFocusTime) setShowTimeLog(true);
@@ -352,11 +361,10 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
     queryFn: () => authFetchJson("/api/tasks/my-hours"),
   });
 
-  // Lo que rige es el dueño de la tarea, no quien la carga: quien gestiona tareas
-  // arranca cargando al responsable; el resto, a su propia persona. "" = sin elegir.
-  const effectiveLogPersonnelId = logPersonnelId
-    || (canLogForOthers && task?.assigneeId ? String(task.assigneeId) : "")
-    || (myHoursIdentity?.personnelId ? String(myHoursIdentity.personnelId) : "");
+  const hoursOwnerId = task?.hoursOwnerId ?? task?.assigneeId ?? null;
+  const attribution = taskHourAttribution(hoursOwnerId, myHoursIdentity?.personnelId ?? null, canLogForOthers, stoppedTimerPersonnelId);
+  const canRegisterHours = "personnelId" in attribution;
+  const hoursAttributionMessage = "message" in attribution ? attribution.message : null;
 
   const { data: allProjects = [] } = useQuery<Project[]>({
     queryKey: ["/api/tasks-projects"],
@@ -486,13 +494,17 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
         queryClient.invalidateQueries({ queryKey: ["/api/tasks/project", task.projectId] });
         queryClient.invalidateQueries({ queryKey: ["projects", task.projectId, "complete-data"] });
       }
-      setLogHours(""); setLogDesc(""); setShowTimeLog(false);
+      setLogHours("");
+      setStoppedTimerPersonnelId(null);
+      setLogDesc("");
+      setShowTimeLog(false);
       toast({
         title: "Horas registradas",
         description: created?.costingWarning || created?.warning,
       });
     },
     onError: (error) => {
+      void refetchTask();
       toast({
         variant: "destructive",
         title: "No se pudieron registrar las horas",
@@ -546,9 +558,9 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
     setRenamingSubtaskId(null);
   };
 
-  // El dueño de la subtarea; si no tiene, el de la tarea padre. Sólo para quien gestiona tareas.
+  // Las subtareas sin responsable heredan el de su padre; los permisos se validan aparte.
   const subtaskHoursTargetId = (subtaskId: number): number | null =>
-    task?.subtasks?.find((subtask) => subtask.id === subtaskId)?.assigneeId ?? task?.assigneeId ?? null;
+    task?.subtasks?.find((subtask) => subtask.id === subtaskId)?.assigneeId ?? hoursOwnerId;
 
   const handleLogSubtaskTime = (subtaskId: number) => {
     const parsed = parseHoursInput(subLogHours);
@@ -562,7 +574,9 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
       return;
     }
     // La subtarea también tiene dueño: si lo hay y quien carga gestiona tareas, las horas van a esa persona.
-    const subtaskOwnerId = canLogForOthers ? subtaskHoursTargetId(subtaskId) : null;
+    const subtaskOwnerId = subtaskHoursTargetId(subtaskId);
+    const attribution = taskHourAttribution(subtaskOwnerId, myHoursIdentity?.personnelId ?? null, canLogForOthers);
+    if ("message" in attribution) { toast({ title: "No se pueden registrar horas", description: attribution.message, variant: "destructive" }); return; }
     logSubtaskTimeMutation.mutate({ subtaskId, data: { date: subLogDate, hours, description: subLogDesc, ...(subtaskOwnerId ? { personnelId: subtaskOwnerId } : {}) } });
   };
 
@@ -618,6 +632,7 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
   };
 
   const handleLogTime = () => {
+    if (!canRegisterHours) { toast({ title: "No se pueden registrar horas", description: hoursAttributionMessage || undefined, variant: "destructive" }); return; }
     const parsed = parseHoursInput(logHours);
     if (!parsed || parsed <= 0) {
       toast({ variant: "destructive", title: "Error", description: "Ingresá un valor válido: ej. 1.5, 1h30, 1:15" });
@@ -632,7 +647,7 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
       date: logDate,
       hours,
       description: logDesc,
-      ...(canLogForOthers && effectiveLogPersonnelId ? { personnelId: Number(effectiveLogPersonnelId) } : {}),
+      personnelId: stoppedTimerPersonnelId ?? hoursOwnerId,
     });
   };
 
@@ -1020,7 +1035,7 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
                           </div>
                           {subtaskTimePanelId === sub.id && (
                             <div className="px-3 py-2.5 bg-accent/10 border-t border-border space-y-2">
-                              <p className="text-[10px] text-muted-foreground font-medium">Registrar horas en: <span className="text-foreground">{sub.title}</span>{canLogForOthers && subtaskHoursTargetId(sub.id) ? <span className="text-muted-foreground"> · se cargan a {allPersonnel.find((person) => person.id === subtaskHoursTargetId(sub.id))?.name ?? (sub.assigneeId ? "su responsable" : task?.assigneeName) ?? "su responsable"}</span> : null} <span className="text-muted-foreground">(ej. 45m · 1h30 · 2,5)</span></p>
+                              <p className="text-[10px] text-muted-foreground font-medium">Registrar horas en: <span className="text-foreground">{sub.title}</span>{subtaskHoursTargetId(sub.id) ? <span className="text-muted-foreground"> · se cargan a {allPersonnel.find((person) => person.id === subtaskHoursTargetId(sub.id))?.name ?? (sub.assigneeId ? "su responsable" : task?.assigneeName) ?? "su responsable"}</span> : null} <span className="text-muted-foreground">(ej. 45m · 1h30 · 2,5)</span></p>
                               <div className="grid grid-cols-2 gap-2">
                                 <Input
                                   autoFocus
@@ -1172,6 +1187,7 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
                               const result = stopTimer();
                               if (result) {
                                 setLogHours(`${Math.round(result.hours * 60)}m`);
+                                setStoppedTimerPersonnelId(result.personnelId);
                                 setShowTimeLog(true);
                               }
                             }}
@@ -1195,7 +1211,9 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
                             size="sm"
                             variant="ghost"
                             className="h-6 text-xs text-muted-foreground hover:text-foreground px-2"
-                            onClick={() => startTimer(task.id, task.title, (canLogForOthers ? Number(effectiveLogPersonnelId) : myHoursIdentity?.personnelId) || null)}
+                            disabled={!canRegisterHours}
+                            title={hoursAttributionMessage || undefined}
+                            onClick={() => startTimer(task.id, task.title, hoursOwnerId)}
                           >
                             <Timer className="h-3 w-3 mr-1" />Iniciar
                           </Button>
@@ -1208,20 +1226,9 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
 
                     {showTimeLog && (
                       <div className="px-3 py-3 border-b border-border bg-accent/10 space-y-2.5">
-                        {canLogForOthers && (
-                          <div>
-                            <p className="mb-1 text-[10px] text-muted-foreground">Cargar para</p>
-                            <Select value={effectiveLogPersonnelId} onValueChange={setLogPersonnelId}>
-                              <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Seleccioná una persona" /></SelectTrigger>
-                              <SelectContent>
-                                {task?.assigneeId && !allPersonnel.some((person) => person.id === task.assigneeId) && (
-                                  <SelectItem value={String(task.assigneeId)}>{task.assigneeName ?? `Persona #${task.assigneeId}`} · dueño/a de la tarea</SelectItem>
-                                )}
-                                {allPersonnel.map((person) => <SelectItem key={person.id} value={String(person.id)}>{person.name}{person.id === task?.assigneeId ? " · dueño/a de la tarea" : ""}</SelectItem>)}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        )}
+                        <p className="text-xs text-muted-foreground">Las horas se registran a nombre de <strong className="text-foreground">{task.hoursOwnerName || task.assigneeName || "Sin responsable"}</strong>, responsable de la tarea.</p>
+                        {hoursAttributionMessage && <p role="status" className="text-xs text-amber-700">{hoursAttributionMessage}</p>}
+                        {stoppedTimerPersonnelId && stoppedTimerPersonnelId !== hoursOwnerId && hoursOwnerId && <Button variant="outline" size="sm" onClick={() => setStoppedTimerPersonnelId(null)}>Registrar esta duración para el responsable actual</Button>}
                         <div className="grid grid-cols-2 gap-2">
                           <div>
                             <p className="text-[10px] text-muted-foreground mb-1">Horas * <span className="text-muted-foreground/70">(ej. 45m · 1h30 · 2,5)</span></p>
@@ -1249,7 +1256,7 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
                           />
                         </div>
                         <div className="flex gap-2">
-                          <Button size="sm" className="h-7 text-xs bg-green-600 hover:bg-green-700 text-white" onClick={handleLogTime} disabled={logTimeMutation.isPending || !logHours.trim()}>
+                          <Button size="sm" className="h-7 text-xs bg-green-600 hover:bg-green-700 text-white" onClick={handleLogTime} disabled={!canRegisterHours || logTimeMutation.isPending || !logHours.trim()}>
                             {logTimeMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "Registrar"}
                           </Button>
                           <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setShowTimeLog(false)}>Cancelar</Button>
