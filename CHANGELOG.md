@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.14.4 — 2026-10-21
+
+- Las horas nuevas y los cronómetros se atribuyen al responsable de la tarea o de la subtarea, sin selector de terceros ni cambios en las cargas históricas. Se validan los permisos existentes y se detectan reasignaciones antes de guardar; el detalle actualiza el destinatario de horas al cambiar el responsable.
+- El panel de horas permite combinar sección, proyecto, persona y período para horas reales y estimadas, sin duplicar registros importados.
+- Los grupos de propuestas se archivan y restauran junto con sus cotizaciones de forma atómica y recuperable; también puede completarse el archivo de grupos antiguos con propuestas todavía activas. Las listas y métricas se actualizan juntas.
+- El lápiz y los grupos llevan a «Aprobación y envío», con pasos explícitos de revisión interna y aceptación del cliente. Las decisiones de revisión vencidas se rechazan y se respetan los permisos y la prohibición de autoaprobación.
+- El calendario semanal muestra el rango de fechas junto al título de cada tarea.
+
 ## 1.14.3 — 2026-10-20
 
 - Las tareas mensuales conservan el día de anclaje de su cadena recurrente al atravesar meses cortos: enero 31 → febrero 28 → marzo 31. También conservan el rango de fechas y su duración, sin reescribir tareas anteriores ni agregar campos a la API o a la base.

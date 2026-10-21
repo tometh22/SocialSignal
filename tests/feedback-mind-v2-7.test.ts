@@ -201,7 +201,8 @@ describe("Feedback Mind V2.7 — atribución, costos y capacidad", () => {
     expect(routes).toContain("processedData.personnelId = effectivePersonnelId");
     expect(routes).toContain("personnelId: effectivePersonnelId");
     expect(timeEntries).toContain("canLogForOthers");
-    expect(detail).toContain("Cargar para");
+    expect(detail).toContain("taskHourAttribution");
+    expect(detail).not.toContain("Cargar para");
   });
 
   test("los costos de proyecto se reconstruyen antes de responder", () => {

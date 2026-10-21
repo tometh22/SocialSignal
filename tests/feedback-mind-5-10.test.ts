@@ -113,28 +113,7 @@ describe("Feedback 5-10 · cotizaciones", () => {
   });
 });
 
-describe("Feedback 5-10 · horas al dueño de la tarea", () => {
-  it("el popover deriva el destino del responsable sin depender de un efecto", () => {
-    const quick = source("client/src/components/tasks/QuickTaskHours.tsx");
-    expect(quick).toContain("const ownerId = isTeamManager && taskSummary?.assigneeId ? taskSummary.assigneeId : null;");
-    expect(quick).toContain("ownerPending");
-    expect(quick).toContain("Yo (no soy el responsable)");
-    expect(quick).toContain("startTimer(taskId, taskSummary?.title ?? `Tarea #${taskId}`, timerPersonnelId)");
-  });
-
-  it("el detalle y las subtareas también cargan al dueño", () => {
-    const panel = source("client/src/components/tasks/TaskDetailPanel.tsx");
-    expect(panel).toContain("effectiveLogPersonnelId");
-    expect(panel).toContain("subtaskOwnerId");
-    expect(panel).not.toContain("múltiplos de 15 min");
-  });
-
-  it("el servidor deja cargar al dueño a quien gestiona tareas aunque no esté vinculado a Personal", () => {
-    const routes = source("server/routes.ts");
-    expect(routes).toContain("if (!authenticatedPerson && !loggingForOther)");
-    expect(routes).toContain("assigneeName: assignee?.name ?? null");
-  });
-});
+// La atribución al responsable se prueba por comportamiento en hours-feedback.test.ts.
 
 import { calculateVacationLedger, summarizeAbsenceBalance } from "../shared/utils/absence-balance";
 import { nextBirthday, parseBirthdayMonthDay, upcomingBirthdays } from "../shared/utils/birthdays";
@@ -299,13 +278,6 @@ describe("Feedback 5-10 · correcciones de la auditoría", () => {
 
   it("el portal público ignora propuestas archivadas tras el envío", () => {
     expect(source("server/routes.ts")).toContain("inArray(quotations.id, deliveredIds), isNull(quotations.archivedAt)");
-  });
-
-  it("el popover bloquea la carga de managers hasta conocer al dueño, también si falla la consulta", () => {
-    const quick = source("client/src/components/tasks/QuickTaskHours.tsx");
-    expect(quick).toContain("const ownerPending = isTeamManager && open && !taskSummary;");
-    expect(quick).toContain("timerPersonnelId");
-    expect(source("client/src/components/tasks/TaskDetailPanel.tsx")).toContain("dueño/a de la tarea</SelectItem>");
   });
 
   it("no copia el motivo del descarte a los metadatos del evento (commercial-history es legible por cualquier usuario)", () => {

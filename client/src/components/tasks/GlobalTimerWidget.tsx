@@ -1,3 +1,4 @@
+import { getApiErrorMessage } from "@/lib/api-error";
 import { invalidateTaskQueries } from "@/lib/task-cache";
 import { civilDateInBuenosAires } from "@shared/utils/buenos-aires-week";
 import { useState } from "react";
@@ -59,8 +60,8 @@ export default function GlobalTimerWidget() {
       toast({ title: `${hours.toFixed(2)}h registradas`, description: created.costingWarning || created.warning || "Tiempo guardado correctamente" });
       void invalidateTaskQueries();
       setConfirmOpen(false);
-    } catch {
-      toast({ title: "Error al guardar", description: "No se pudo registrar el tiempo", variant: "destructive" });
+    } catch (error) {
+      toast({ title: "Error al guardar", description: getApiErrorMessage(error, "No se pudo registrar el tiempo"), variant: "destructive" });
     } finally {
       setIsSaving(false);
     }

@@ -1,3 +1,6 @@
+import { ArchiveGroupButton } from "@/components/quotation/archive-group-button";
+import { invalidateQuotationPortfolio } from "@/lib/quotation-cache";
+import { quotationApprovalGuidance } from "@shared/utils/quotation-approval";
 import { quotationPortfolioTotals } from "@shared/utils/quotation-portfolio-totals";
 import { quotationListPricing } from "@shared/utils/quotation-profitability";
 import { quotationProjectTypeLabel, quotationPriceLabel } from "@shared/utils/quotation-display";
@@ -293,7 +296,7 @@ export default function ManageQuotes() {
             description: `La cotización "${selectedQuote.projectName}" se archivó sin borrar su historial comercial.`,
           });
 
-          refetch();
+          void invalidateQuotationPortfolio(queryClient);
           setDeleteDialogOpen(false);
           setDeletingQuoteId(null);
         }, 800);
@@ -798,10 +801,13 @@ export default function ManageQuotes() {
               <CardHeader className="border-b border-slate-200 bg-slate-950 py-4 text-white"><CardTitle className="flex items-center gap-2 text-base"><Layers3 className="h-5 w-5 text-indigo-300" />Cliente → grupos de propuestas → cotizaciones</CardTitle><p className="mt-1 text-xs font-normal text-slate-300">Las propuestas de un grupo se gestionan desde el grupo y no se repiten en la lista de cotizaciones de abajo.</p></CardHeader>
               <CardContent className="grid gap-3 p-4 sm:p-5 lg:grid-cols-2">
                 {commercialGroups.filter((entry) => entry.items.some((item) => item.projectName.toLowerCase().includes(searchTerm.toLowerCase()) && (statusFilter === 'all' || item.status === statusFilter))).map((entry) => (
-                  <button key={entry.group.id} type="button" onClick={() => navigate(`/quotation-groups/${entry.group.id}`)} className="rounded-xl border border-slate-200 bg-white p-4 text-left transition hover:border-indigo-300 hover:shadow-sm">
+                  <div key={entry.group.id} className="rounded-xl border border-slate-200 bg-white">
+                  <button type="button" onClick={() => navigate(`/quotation-groups/${entry.group.id}`)} className="w-full rounded-xl border border-slate-200 bg-white p-4 text-left transition hover:border-indigo-300 hover:shadow-sm">
                     <div className="flex items-start justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{entry.client?.name || 'Cliente'}</p><h3 className="mt-1 font-semibold text-slate-950">{entry.group.name}</h3><p className="mt-1 text-xs text-slate-500">{entry.group.groupNumber} · {entry.items.length} propuestas</p></div><Badge variant="outline">{statusLabel(entry.status)}</Badge></div>
                     <div className="mt-4 space-y-2 border-t border-slate-100 pt-3">{entry.items.map((item) => <div key={item.quotationId} className="flex items-center justify-between gap-3 text-xs"><span className="flex min-w-0 items-center gap-2"><span className="truncate text-slate-700">{item.projectName}</span>{item.status === 'draft' && <Badge variant="outline" className="shrink-0 px-1.5 py-0 text-[10px]">Borrador</Badge>}</span><span className="shrink-0 font-medium text-slate-900">{formatCurrency(item.totalAmount, item.currency)}</span></div>)}</div>
                   </button>
+                  <div className="flex justify-end border-t border-slate-100 px-2 py-1"><ArchiveGroupButton groupId={entry.group.id} name={entry.group.name} projects={entry.items.map(item => item.projectName)} /></div>
+                  </div>
                 ))}
               </CardContent>
             </Card>
@@ -1081,6 +1087,8 @@ export default function ManageQuotes() {
                                     <Button
                                       variant="ghost"
                                       size="sm"
+                                      title="Estado, aprobación y envío"
+                                      aria-label={`Estado y aprobación de ${quote.projectName}`}
                                       onClick={() => openStatusDialog(quote)}
                                       className="h-8 w-8 p-0 text-gray-400 hover:text-gray-600"
                                     >
@@ -1188,6 +1196,10 @@ export default function ManageQuotes() {
               )}
             </div>
 
+            {selectedQuote && <div className="space-y-3 rounded-xl border border-indigo-100 bg-indigo-50 p-4">
+              <p className="text-sm text-slate-700">{quotationApprovalGuidance(selectedQuote.status)}</p>
+              <Button variant="outline" onClick={() => { setDialogOpen(false); navigate(`/quotations/${selectedQuote.id}#commercial-approval`); }}>Ver aprobación y envío</Button>
+            </div>}
             {(() => {
               const VALID_TRANSITIONS: Record<string, Array<{ status: string; label: string; className: string }>> = {
                 "draft":          [
