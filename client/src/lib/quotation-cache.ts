@@ -4,6 +4,6 @@ import type { QueryClient } from "@tanstack/react-query";
 export function invalidateQuotationPortfolio(client: QueryClient) {
   return client.invalidateQueries({ predicate: query => {
     const path = query.queryKey[0];
-    return typeof path === "string" && (path.startsWith("/api/quotations") || path.startsWith("/api/quotation-groups") || path.startsWith("/api/quotation-analytics"));
+    return typeof path === "string" && (path.startsWith("/api/quotations") || path.startsWith("/api/quotation-"));
   } });
 }
