@@ -1,4 +1,5 @@
 import { taskHourAttribution } from "@shared/utils/task-hour-owner";
+import { mergeTaskAssignment } from "@/lib/task-detail-cache";
 import { taskDateBucket } from "@shared/utils/task-date-bucket";
 import { invalidateTaskQueries } from "@/lib/task-cache";
 import TaskRangeCalendar from "@/components/tasks/TaskRangeCalendar";
@@ -437,25 +438,24 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
     onMutate: async (updates) => {
       await queryClient.cancelQueries({ queryKey: ["/api/tasks", taskId] });
       const previous = queryClient.getQueryData(["/api/tasks", taskId]);
-      queryClient.setQueryData(["/api/tasks", taskId], (old: any) => ({
-        ...(old ?? {}),
-        ...updates,
-        // Si cambia el responsable, el nombre anterior queda obsoleto desde el primer momento.
-        ...("assigneeId" in updates ? { assigneeName: allPersonnel.find((person) => person.id === updates.assigneeId)?.name ?? null } : {}),
-      }));
+      queryClient.setQueryData(["/api/tasks", taskId], (old: any) => mergeTaskAssignment(old ?? {}, updates, allPersonnel));
       return { previous };
     },
-    onSuccess: (updated: any) => {
+    onSuccess: (updated: any, updates) => {
       // Confirm cache with server response — do NOT invalidate individual task
       // (invalidate would trigger a refetch that can race and revert the update)
-      queryClient.setQueryData(["/api/tasks", taskId], (old: any) => ({
-        ...(old ?? {}),
-        ...updated,
-        // La respuesta del PUT no trae el nombre; onMutate ya lo dejó coherente con el responsable.
-        assigneeName: old?.assigneeName ?? null,
-        timeEntries: old?.timeEntries ?? [],
-        subtasks: old?.subtasks ?? [],
-      }));
+      queryClient.setQueryData(["/api/tasks", taskId], (old: any) => {
+        const confirmed = {
+          ...(old ?? {}),
+          ...updated,
+          assigneeName: old?.assigneeName ?? null,
+          timeEntries: old?.timeEntries ?? [],
+          subtasks: old?.subtasks ?? [],
+        };
+        return updates.assigneeId === undefined ? confirmed : mergeTaskAssignment(confirmed, { assigneeId: updated.assigneeId }, allPersonnel);
+      });
+      // After removing a subtask's owner, only GET knows its inherited owner.
+      if (updates.assigneeId === null && updated.parentTaskId) void refetchTask();
       // Update the project list in background (doesn't affect this panel's query)
       queryClient.invalidateQueries({ queryKey: ["/api/tasks/project"] });
       queryClient.invalidateQueries({ queryKey: ["/api/tasks/my-tasks"] });
