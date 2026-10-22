@@ -215,7 +215,7 @@ async function getCosts(periodKeys: string[]) {
     `SELECT COALESCE(SUM(direct_usd), 0)::float AS directos,
             COALESCE(SUM(indirect_usd), 0)::float AS overhead,
             COALESCE(SUM(provisions_usd), 0)::float AS provisiones
-       FROM fact_cost_month
+       FROM financial_native_cost_month
       WHERE period_key = ANY($1::text[])`,
     [periodKeys],
   );

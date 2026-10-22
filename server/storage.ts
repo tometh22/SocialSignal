@@ -4582,6 +4582,8 @@ export class DatabaseStorage implements IStorage {
   }
 
   async importSalesFromGoogleSheets(salesData: any[]): Promise<{ imported: number; updated: number; errors: string[] }> {
+    const { assertExcelFinancialImportAllowed } = await import("./services/financial-source-policy");
+    await assertExcelFinancialImportAllowed();
     const result = { imported: 0, updated: 0, errors: [] as string[] };
     const importBatch = `batch_${Date.now()}`;
     

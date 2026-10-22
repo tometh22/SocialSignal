@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.15.0 — 2026-10-22
+
+- Espaciado responsive: los títulos y filtros del cierre mantienen separación respecto de los bordes en escritorio y móvil; se corrigen las reglas de padding que se anulaban desde 640 px.
+
+- UX del cierre: mes compartido, borradores conservados entre pestañas, aviso al cambiar de mes con cambios pendientes, tablas adaptadas a móvil, campos alineados y responsables del próximo paso explícitos. Mis facturas distingue ARS/USD y resume comprobantes enviados o aprobados.
+- Revisión de facturas: la fecha de versión se devuelve en UTC para evitar rechazos falsos de concurrencia en zonas horarias como Argentina, conservando la protección contra revisiones vencidas.
+- Cierre del equipo: recorrido unificado de base y facturación; vacaciones, feriados y días Epical pagos, con descuento excepcional sin goce y motivo.
+- Corte automático el último día hábil a las 23:59 de Buenos Aires, borradores y recordatorios. TC bancarios y extras en Mis facturas; autorización de Operaciones antes de cada comprobante USD/ARS, bonos en ambas monedas y protección de versiones.
+- Migración 0089: corte operativo de horas, estados de autorización y conciliación del costo contractual/bonos/reintegros con Finanzas, sin duplicar gasto al registrar Pasivo. El cierre financiero exige autorizaciones y comprobantes requeridos.
+
+- Cierre: devolución de revisión a corrección con motivo y auditoría; los controles críticos deben resolverse antes de enviar a revisión.
+- Operaciones/Finanzas: horas protegidas por mes civil, recálculo y pre-cierre atómicos, bloqueo de costos laborales incompletos y nueva validación antes de congelar. Las provisiones pueden liberarse en un mes posterior sin reescribir el cierre original.
+
+- Finanzas: las importaciones operativas del maestro se bloquean desde el corte, incluidos tarifas, FX/REM, costos estimados y procesos legacy. El histórico conserva backfill explícito anterior al corte.
+- Presupuesto mensual de costos nativo con moneda, vigencia, auditoría y protección contra ediciones concurrentes.
+- Proyección y BI consumen fuentes nativas; presupuesto o FX ausente se muestra pendiente. Se preservan los snapshots históricos anteriores al corte.
+- El cierre incorpora un panel de transición y controles sobre saldos iniciales e ingresos nativos faltantes. No declara conciliación aprobada por tener datos cargados.
+- Migraciones 0087/0088: protecciones transaccionales de períodos cerrados y vistas BI; pruebas PostgreSQL incorporadas a CI.
+- Auditoría de producción de solo lectura documenta los datos y cierres que Finanzas aún debe completar antes de retirar el maestro.
+
 ## 1.14.4 — 2026-10-21
 
 - Las horas nuevas y los cronómetros se atribuyen al responsable de la tarea o de la subtarea, sin selector de terceros ni cambios en las cargas históricas. Se validan los permisos existentes y se detectan reasignaciones antes de guardar; el detalle actualiza el destinatario de horas al cambiar el responsable.

@@ -58,8 +58,9 @@ const ProvisionsPage = lazy(() => import("@/pages/provisions"));
 const CashflowPage = lazy(() => import("@/pages/cashflow"));
 const ClientPnlPage = lazy(() => import("@/pages/client-pnl"));
 const FinancialIntakePage = lazy(() => import("@/pages/financial-intake"));
-const TeamSettlementsPage = lazy(() => import("@/pages/team-settlements"));
+const TeamSettlementsPage = lazy(() => import("@/pages/team-monthly-close"));
 const TeamInvoiceReviewPage = lazy(() => import("@/pages/team-invoice-review"));
+const FinancialCostPlansPage = lazy(() => import("@/pages/financial-cost-plans"));
 const FinancialClosePage = lazy(() => import("@/pages/financial-close"));
 
 // Task Management Module
@@ -80,7 +81,7 @@ const AlwaysOnProjectView = lazy(() => import("@/pages/always-on-project-view"))
 const RecurringTemplatesPage = lazy(() => import("@/pages/recurring-templates"));
 const AdminUsersPage = lazy(() => import("@/pages/admin-users"));
 const CapacityDashboard = lazy(() => import("@/pages/capacity-dashboard"));
-const MonthlyClosing = lazy(() => import("@/pages/monthly-closing"));
+const MonthlyClosing = lazy(() => import("@/pages/team-monthly-close"));
 const EstimatedRates = lazy(() => import("@/pages/estimated-rates"));
 const HolidaysManagement = lazy(() => import("@/pages/holidays-management"));
 const PersonnelAbsences = lazy(() => import("@/pages/personnel-absences"));
@@ -339,6 +340,7 @@ function AppRoutes() {
                   <ProtectedRoute path="/finance/cargar" component={FinancialIntakePage} requiredPermission="finance" />
                   <ProtectedRoute path="/finance/facturas-equipo" component={TeamInvoiceReviewPage} requiredPermission="finance" />
                   <Route path="/finance/liquidaciones-equipo">{() => <Redirect to="/operations/liquidaciones-equipo" />}</Route>
+                  <ProtectedRoute path="/finance/presupuesto" component={FinancialCostPlansPage} requiredPermission="finance" />
                   <ProtectedRoute path="/finance/cierre" component={FinancialClosePage} requiredPermission="finance" />
                   <ProtectedRoute path="/finance/proyeccion" component={ProyeccionPage} requiredAnyPermission={FINANCE_SUMMARY_ACCESS_SECTIONS} />
                   <ProtectedRoute path="/finance/arr" component={ArrPage} requiredAnyPermission={FINANCE_SUMMARY_ACCESS_SECTIONS} />

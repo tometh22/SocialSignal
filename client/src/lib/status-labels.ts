@@ -66,6 +66,9 @@ const STATUS_LABELS: Record<string, string> = {
   error: "Error",
   passed: "Pasó",
   open: "Abierto",
+  pre_close: "Pre-cierre",
+  in_review: "En revisión",
+  reopened: "Reabierto",
 };
 
 export function statusLabel(status: string | null | undefined, fallback = "Sin estado"): string {

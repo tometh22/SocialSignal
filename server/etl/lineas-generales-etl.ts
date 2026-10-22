@@ -1,3 +1,4 @@
+import { assertExcelFinancialImportAllowed } from "../services/financial-source-policy";
 /**
  * 🔧 ETL UNIVERSAL - FORMATO "LÍNEAS GENERALES"
  * Procesamiento genérico con reglas de preferencia ARS/USD
@@ -33,6 +34,7 @@ export async function processLineasGenerales(
   data: any[], 
   sourceType: 'sales' | 'costs' | 'auto' = 'auto'
 ): Promise<LineasGeneralesETLResult> {
+  await assertExcelFinancialImportAllowed();
   const result: LineasGeneralesETLResult = {
     processed: 0,
     normalized: 0,

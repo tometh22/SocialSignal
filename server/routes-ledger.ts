@@ -268,7 +268,7 @@ export function createLedgerRouter(requireAuth: any) {
       await db.insert(financialAuditEvents).values({ periodKey: existing.periodKey, entityType: "activo_entry", entityId: id, action: "historical_entry_edited", beforeData: existing, afterData: updated, actorUserId: req.user!.id });
       res.json(updated);
     } catch (error: any) {
-      res.status(error.statusCode ?? 500).json({ message: error.message });
+      res.status(error.statusCode ?? ((error.code ?? error.cause?.code) === "23514" ? 409 : 500)).json({ message: error.message });
     }
   });
 
@@ -423,7 +423,7 @@ export function createLedgerRouter(requireAuth: any) {
       if (updated.periodKey !== existing.periodKey) await refreshNativeFacts(updated.periodKey);
       res.json(updated);
     } catch (error: any) {
-      res.status(error.statusCode ?? 500).json({ message: error.message });
+      res.status(error.statusCode ?? ((error.code ?? error.cause?.code) === "23514" ? 409 : 500)).json({ message: error.message });
     }
   });
 
@@ -498,7 +498,7 @@ export function createLedgerRouter(requireAuth: any) {
         return created;
       });
       res.status(201).json(created);
-    } catch (error: any) { res.status(error?.code === "23505" ? 409 : error.statusCode ?? 500).json({ message: error?.code === "23505" ? "Ya existe una cuenta con ese nombre y moneda." : error.message }); }
+    } catch (error: any) { res.status(error?.code === "23505" ? 409 : error.statusCode ?? ((error.code ?? error.cause?.code) === "23514" ? 409 : 500)).json({ message: error?.code === "23505" ? "Ya existe una cuenta con ese nombre y moneda." : error.message }); }
   });
 
   router.patch("/financial-accounts/:id", ...finance, async (req, res) => {
@@ -518,7 +518,7 @@ export function createLedgerRouter(requireAuth: any) {
         return updated;
       });
       res.json(updated);
-    } catch (error: any) { res.status(error.statusCode ?? 500).json({ message: error.message }); }
+    } catch (error: any) { res.status(error.statusCode ?? ((error.code ?? error.cause?.code) === "23514" ? 409 : 500)).json({ message: error.message }); }
   });
 
   router.get("/cashflow", ...finance, async (req, res) => {
@@ -591,7 +591,7 @@ export function createLedgerRouter(requireAuth: any) {
         return updated;
       });
       res.json(updated);
-    } catch (error: any) { res.status(error.statusCode ?? 500).json({ message: error.message }); }
+    } catch (error: any) { res.status(error.statusCode ?? ((error.code ?? error.cause?.code) === "23514" ? 409 : 500)).json({ message: error.message }); }
   });
 
   router.get("/cashflow/balance", ...finance, async (req, res) => {
@@ -684,7 +684,7 @@ export function createLedgerRouter(requireAuth: any) {
       });
       await refreshNativeFacts(existing.periodKey);
       res.json(updated ?? existing);
-    } catch (error: any) { res.status(error.statusCode ?? 400).json({ message: error.message }); }
+    } catch (error: any) { res.status(error.statusCode ?? ((error.code ?? error.cause?.code) === "23514" ? 409 : 400)).json({ message: error.message }); }
   });
 
   router.post("/pasivo/:id/void", ...finance, async (req, res) => {
@@ -708,7 +708,7 @@ export function createLedgerRouter(requireAuth: any) {
       });
       await refreshNativeFacts(existing.periodKey);
       res.json(updated ?? existing);
-    } catch (error: any) { res.status(error.statusCode ?? 400).json({ message: error.message }); }
+    } catch (error: any) { res.status(error.statusCode ?? ((error.code ?? error.cause?.code) === "23514" ? 409 : 400)).json({ message: error.message }); }
   });
 
   router.post("/cashflow/:id/void", ...finance, async (req, res) => {
@@ -741,6 +741,7 @@ export function createLedgerRouter(requireAuth: any) {
         for (const documentId of receivableIds) await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${'financial-document:receivable:' + documentId}))`);
         for (const documentId of payableIds) await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${'financial-document:payable:' + documentId}))`);
 
+        await tx.execute(sql`SELECT set_config('mind.financial_payment_period', ${peek.periodKey}, true)`);
         const now = new Date();
         if (applications.length) {
           await tx.update(financialDocumentApplications).set({ voidedAt: now, voidedBy: req.user!.id }).where(inArray(financialDocumentApplications.id, applications.map((application) => application.id)));
@@ -789,7 +790,7 @@ export function createLedgerRouter(requireAuth: any) {
       });
       for (const periodKey of result.periods) await refreshNativeFacts(periodKey);
       res.json(result.primary);
-    } catch (error: any) { res.status(error.statusCode ?? 400).json({ message: error.message }); }
+    } catch (error: any) { res.status(error.statusCode ?? ((error.code ?? error.cause?.code) === "23514" ? 409 : 400)).json({ message: error.message }); }
   });
 
   router.post("/provisions/:id/approve", ...finance, async (req, res) => {
@@ -810,7 +811,7 @@ export function createLedgerRouter(requireAuth: any) {
       });
       await refreshNativeFacts(existing.periodKey);
       res.json(updated);
-    } catch (error: any) { res.status(error.statusCode ?? 500).json({ message: error.message }); }
+    } catch (error: any) { res.status(error.statusCode ?? ((error.code ?? error.cause?.code) === "23514" ? 409 : 500)).json({ message: error.message }); }
   });
 
   router.post("/provisions/:id/release", ...finance, async (req, res) => {
@@ -830,15 +831,17 @@ export function createLedgerRouter(requireAuth: any) {
         const remaining = Number(existing.remainingAmount ?? existing.montoProvision ?? 0);
         if (input.amount > remaining) throw Object.assign(new Error("La liberación supera el saldo de la provisión."), { statusCode: 400 });
         const next = remaining - input.amount;
+        await tx.execute(sql`SELECT set_config('mind.financial_provision_period', ${input.periodKey}, true)`);
         const [updated] = await tx.update(provisionEntries).set({ remainingAmount: String(next), unwoundAmount: String(Number(existing.unwoundAmount ?? 0) + input.amount), status: next === 0 ? "RELEASED" : "ACTIVE", updatedAt: new Date() }).where(eq(provisionEntries.id, id)).returning();
         const [movement] = await tx.insert(provisionMovements).values({ provisionId: id, periodKey: input.periodKey, movementType: "release", amount: String(-input.amount), currency: existing.currency, note: input.note, createdBy: req.user!.id }).returning();
         await tx.insert(financialAuditEvents).values({ periodKey: input.periodKey, entityType: "provision_entry", entityId: id, action: "released", beforeData: existing, afterData: { provision: updated, movement }, actorUserId: req.user!.id, reason: input.note });
         return { existing, updated, movement };
       });
-      if (existing.periodKey !== input.periodKey) await refreshNativeFacts(existing.periodKey);
+      // The release is an expense movement of its own period; the original
+      // provision amount and any closed snapshot stay unchanged.
       await refreshNativeFacts(input.periodKey);
       res.json({ provision: updated, movement });
-    } catch (error: any) { res.status(error.statusCode ?? 400).json({ message: error.message }); }
+    } catch (error: any) { res.status(error.statusCode ?? ((error.code ?? error.cause?.code) === "23514" ? 409 : 400)).json({ message: error.message }); }
   });
 
   // ==================== P&L POR CLIENTE ====================
