@@ -11,6 +11,7 @@ import { Eye, EyeOff, AlertCircle, Mail, Lock, ArrowRight, CheckCircle2, Sparkle
 import { motion } from 'framer-motion';
 import BrandMark from '@/components/layout/brand-mark';
 import { getFirstAllowedRouteForUser } from '@/lib/first-allowed-route';
+import { getAuthReturnPath } from '@/lib/auth-return';
 
 export default function AuthPage() {
   const [, setLocation] = useLocation();
@@ -23,6 +24,11 @@ export default function AuthPage() {
 
   useEffect(() => {
     if (user && !loading) {
+      const returnTo = getAuthReturnPath(window.location.search);
+      if (returnTo) {
+        window.location.assign(returnTo);
+        return;
+      }
       setLocation(getFirstAllowedRouteForUser(user as any));
     }
   }, [user, loading, setLocation]);

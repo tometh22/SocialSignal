@@ -1,6 +1,6 @@
 ---
-version: 2.35.0
-updatedAt: 2026-10-09
+version: 2.37.0
+updatedAt: 2026-10-15
 feedbackCount: 70
 ---
 
@@ -467,3 +467,12 @@ histórica que todavía necesitan cotizaciones y registros anteriores.
 - **Costos:** una hora sin tarifa o FX válido se conserva con costo pendiente. Los importes calculados parcialmente se identifican. Un error de reconstrucción no convierte una carga guardada en un fallo total; se informa sincronización pendiente. La conciliación ofrece vista previa por defecto, conserva snapshots válidos y sólo reconstruye origen app posterior al corte histórico en períodos abiertos; Excel y períodos cerrados/en revisión no se sobrescriben automáticamente.
 - **Identidad y métricas:** el nombre operativo del proyecto prevalece sobre cotización y subproyecto. Markup es nullable: internos muestran No aplica y comerciales sin datos muestran Sin datos. Las métricas no aplicables no afectan salud ni generan recomendaciones de renegociación; sin factores evaluables la salud es neutral.
 - **Freelancers:** solicitudes y saldos muestran Sin cupo — freelance. No se validan ni descuentan cupos en aprobación o edición, sin crear cupos ficticios. Se conservan aprobación, auditoría, superposiciones, timeline y advertencias de disponibilidad para responsables y colaboradores.
+
+## Addendum — Feedback 9-10
+
+- **Horas disponibles:** el Panel de horas resta sólo las ausencias **aprobadas** de la persona filtrada, nunca las de otras personas ni las pendientes, rechazadas o canceladas. `GET /api/personnel-absences?personnelId=` filtra por persona.
+- **Cumpleaños:** Inicio muestra los próximos 3 cumpleaños del personal activo, sin límite de días; la tarjeta «Tu cumpleaños» queda sólo como respaldo si no hay lista. Las personas que no son personal (por ejemplo Togna y Michelle) se cargan en Configuración > Personal > «Solo cumpleaños» (tabla `birthday_entries`: sólo nombre y fecha; sin costos, capacidad ni ausencias) y se suman a la lista.
+- **Calendarios:** cada día muestra la tarea con su título y el color del cliente; no se dibujan barras continuas que oculten el nombre. Cada tarea conserva la misma fila durante toda la semana.
+- **Tareas:** el «+» de asignación y el ícono de fecha son siempre visibles con contraste suficiente. Las tareas completadas también se pueden arrastrar entre secciones.
+- **Capacidad:** cada proyecto del desglose por persona se contrae y muestra su estimación semanal; la estimación de cada tarea queda junto a su título.
+- **Ausencias:** la solicitud permite elegir Tentativa o Confirmada al crearla (la aprobación sigue siendo independiente). La tabla de saldos del equipo muestra cupo, traslado, adelanto, cupo Epical, usados de cada tipo y disponibles total, de vacaciones y Epical, más Enfermedad y Otros.

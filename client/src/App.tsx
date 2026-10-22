@@ -228,7 +228,7 @@ function AppRoutes() {
       </Route>
 
       <Route path="*">
-        <div className="app-shell flex h-[100dvh] overflow-hidden bg-background">
+        <div className="app-shell flex h-[100dvh] overflow-clip bg-background">
           {/* Sidebar permanente en desktop */}
           <div className="hidden shrink-0 lg:flex">
             <SidebarFixed />
@@ -248,7 +248,7 @@ function AppRoutes() {
             </SheetContent>
           </Sheet>
 
-          <div className="flex flex-col flex-1 overflow-hidden min-w-0">
+          <div className="flex min-h-0 flex-col flex-1 overflow-clip min-w-0">
             <Topbar onMenuClick={() => setMobileSidebarOpen(true)} />
             <main className="app-main flex-1 overflow-y-auto overflow-x-hidden">
               <div className="app-content max-w-full p-3 sm:p-5 lg:p-6">

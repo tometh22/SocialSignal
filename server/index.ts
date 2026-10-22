@@ -58,10 +58,12 @@ import { userNotificationCategoryPreferencesMigrationSql } from "./migrations/us
 import { userNotificationPushSubscriptionsMigrationSql } from "./migrations/user-notification-push-subscriptions";
 import { asanaMigrationProvenanceSql } from "./migrations/asana-migration-provenance";
 import { projectTaskSectionsMigrationSql } from "./migrations/project-task-sections";
+import { birthdayEntriesMigrationSql } from "./migrations/birthday-entries";
 import { taskAssignmentActorMigrationSql } from "./migrations/task-assignment-actor";
 import { taskBlockDetailsMigrationSql } from "./migrations/task-block-details";
 import { taskRecurrenceMigrationSql } from "./migrations/task-recurrence";
 import { optionalActiveProjectStartDateMigrationSql } from "./migrations/optional-active-project-start-date";
+import { mcpOauthMigrationSql } from "./migrations/mcp-oauth";
 import { ensureServiceBlueprintSeeds } from "./services/service-blueprints";
 import { ensureObjectivesPlanSeed } from "./services/objectives-seed";
 import cors from 'cors';
@@ -84,6 +86,7 @@ async function applyPendingMigrations() {
   };
 
   try {
+    await run('0086 MCP OAuth grants', mcpOauthMigrationSql);
     // 0002_new_terrax: personnel extra columns (idempotent guard for Railway DB)
     // These were added via drizzle-kit migration in the repo but may not have been
     // applied if drizzle-kit push/migrate was never run on the production DB.
@@ -896,6 +899,7 @@ async function applyPendingMigrations() {
     await run('0071 task recurrence', taskRecurrenceMigrationSql);
     await run('0081 task block details', taskBlockDetailsMigrationSql);
     await run('0083 task assignment actor', taskAssignmentActorMigrationSql);
+    await run('0084 birthday entries', birthdayEntriesMigrationSql);
     await run('0072 persistent project task sections', projectTaskSectionsMigrationSql);
     await run('0073 task milestones', taskMilestonesMigrationSql);
     await run('0074 Asana migration provenance', asanaMigrationProvenanceSql);
@@ -1047,7 +1051,8 @@ app.set('trust proxy', 1);
 app.use((req, res, next) => {
   // Only log API requests and errors, not static files
   if (req.path.startsWith('/api') || req.method !== 'GET') {
-    console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
+    const oauthRequest = req.path.startsWith('/mcp') || ['/authorize', '/token', '/revoke'].includes(req.path);
+    console.log(`${new Date().toISOString()} - ${req.method} ${oauthRequest ? req.path : req.url}`);
     // Only record whether a request is authenticated. Session identifiers are
     // bearer credentials and must never be emitted to application logs.
     if (req.path.startsWith('/api') && req.session) {
@@ -1061,7 +1066,7 @@ app.use((req, res, next) => {
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 // CORS configuration
-app.use(cors({
+const appCors = cors({
   origin: process.env.NODE_ENV === 'production'
     ? (process.env.CORS_ORIGIN || false)
     : true,
@@ -1070,7 +1075,9 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'Cookie', 'Set-Cookie'],
   exposedHeaders: ['Set-Cookie'],
   optionsSuccessStatus: 200
-}));
+});
+// MCP handles its own preflight and protocol headers after authentication setup.
+app.use((req, res, next) => req.path === '/mcp' ? next() : appCors(req, res, next));
 
 const isProduction = process.env.NODE_ENV === 'production';
 

@@ -343,8 +343,9 @@ describe("Feedback Mind V2-13 · ronda 27-8", () => {
 
   it("atribuye la carga rápida al responsable de la tarea por defecto", () => {
     const quick = source("client/src/components/tasks/QuickTaskHours.tsx");
-    expect(quick).toContain("const ownerId = isTeamManager && taskSummary?.assigneeId ? taskSummary.assigneeId : null;");
-    expect(quick).toContain("· dueño/a de la tarea");
+    expect(quick).toContain("const ownerId = taskSummary?.hoursOwnerId ?? taskSummary?.assigneeId ?? null;");
+    expect(quick).toContain("responsable de la tarea.");
+    expect(quick).not.toContain("Yo (no soy el responsable)");
   });
 
   it("acepta minutos reales y redondea al minuto, no al cuarto de hora", () => {

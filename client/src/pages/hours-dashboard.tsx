@@ -23,6 +23,7 @@ import {
 import { cn } from "@/lib/utils";
 import { usePermissions } from "@/hooks/use-permissions";
 import { parseTaskCivilDate } from "@shared/utils/task-civil-date";
+import { approvedAbsenceRanges, countWorkdays } from "@shared/utils/available-hours";
 import { formatTaskHoursLabel } from "@shared/utils/task-hours-label";
 
 type Personnel = { id: number; name: string };
@@ -32,6 +33,7 @@ const CHART_COLORS = ["#6366f1", "#8b5cf6", "#ec4899", "#f59e0b", "#10b981", "#3
 
 type HoursSummary = {
   entries: any[];
+  availableSections?: { value: string; label: string }[];
   byWeek: { week: string; hours: number }[];
   byProject: { projectId: number | null; name: string; hours: number; estimatedHours: number }[];
   byPerson: { personnelId: number; name: string; hours: number; estimatedHours: number }[];
@@ -84,6 +86,7 @@ export default function HoursDashboardPage() {
   const { isTeamManager } = usePermissions();
   const [selectedPersonnelId, setSelectedPersonnelId] = useState<string>("all");
   const [selectedProjectId, setSelectedProjectId] = useState<string>("all");
+  const [selectedSection, setSelectedSection] = useState("all");
   const [quickFilter, setQuickFilter] = useState<string>("this_month");
   const [customFrom, setCustomFrom] = useState<string>("");
   const [customTo, setCustomTo] = useState<string>("");
@@ -111,18 +114,19 @@ export default function HoursDashboardPage() {
   const params = new URLSearchParams();
   if (selectedPersonnelId !== "all") params.set("personnelId", selectedPersonnelId);
   if (selectedProjectId !== "all") params.set("projectId", selectedProjectId);
+  if (selectedSection !== "all") params.set("section", selectedSection);
   if (dateFrom) params.set("dateFrom", dateFrom);
   if (dateTo) params.set("dateTo", dateTo);
 
-  const { data: summary, isLoading } = useQuery<HoursSummary>({
-    queryKey: ["/api/tasks/hours-summary", selectedPersonnelId, selectedProjectId, dateFrom, dateTo],
+  const { data: summary, isLoading, isError, refetch: refetchSummary } = useQuery<HoursSummary>({
+    queryKey: ["/api/tasks/hours-summary", selectedPersonnelId, selectedProjectId, selectedSection, dateFrom, dateTo],
     queryFn: () => apiRequest(`/api/tasks/hours-summary?${params}`, "GET"),
     enabled: !!(dateFrom && dateTo),
   });
 
   const totalHours = summary?.byPerson?.reduce((acc, p) => acc + p.hours, 0) || 0;
-  // Calidad de estimación: person-agnóstica y all-time (real acumulado de la tarea vs
-  // estimado de la tarea). Distinto de las horas reales del período (capacidad).
+  // Calidad de estimación: horas reales y planificadas de las mismas tareas,
+  // personas, secciones y período elegidos.
   const estByProject = summary?.estimationByProject || [];
   const estTotalEstimated = estByProject.reduce((acc, p) => acc + (p.estimatedHours || 0), 0);
   const estTotalReal = estByProject.reduce((acc, p) => acc + (p.realHours || 0), 0);
@@ -168,25 +172,11 @@ export default function HoursDashboardPage() {
     const holidaySet = new Set(
       (holidaysData || []).map((h: any) => (h.date || "").slice(0, 10))
     );
-    // Comparación por string YYYY-MM-DD (igual que holidaySet), no por Date,
-    // para no perder el último día del rango por corrimiento de timezone.
+    // Sólo ausencias aprobadas de la persona filtrada; las de otros y las no aprobadas no restan.
     const absenceRanges = selectedPersonnelId !== "all"
-      ? absencesData.map((a: any) => ({ start: (a.startDate || "").slice(0, 10), end: (a.endDate || "").slice(0, 10) }))
+      ? approvedAbsenceRanges(absencesData, Number(selectedPersonnelId))
       : [];
-    const isAbsent = (dateKey: string) => absenceRanges.some(r => dateKey >= r.start && dateKey <= r.end);
-    let workdays = 0;
-    let absentWorkdays = 0;
-    const d = parseTaskCivilDate(dateFrom);
-    const end = parseTaskCivilDate(dateTo);
-    while (d <= end) {
-      const dow = d.getDay();
-      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-      if (dow !== 0 && dow !== 6 && !holidaySet.has(key)) {
-        workdays++;
-        if (isAbsent(key)) absentWorkdays++;
-      }
-      d.setDate(d.getDate() + 1);
-    }
+    const { workdays, absentWorkdays } = countWorkdays(dateFrom, dateTo, holidaySet, absenceRanges);
 
     if (selectedPersonnelId !== "all") {
       const me = activeTeam.find(p => String(p.id) === selectedPersonnelId);
@@ -220,7 +210,7 @@ export default function HoursDashboardPage() {
       <CompactPageHeader
         eyebrow="Operaciones"
         title="Panel de horas"
-        description="Analizá las horas registradas por período, persona y proyecto."
+        description="Analizá las horas registradas por período, persona, proyecto y sección."
         icon={<Clock className="h-5 w-5" />}
       />
 
@@ -230,6 +220,7 @@ export default function HoursDashboardPage() {
         description="Elegí un período rápido o combiná filtros para profundizar el análisis."
         ariaLabel="Filtros del panel de horas"
       >
+        <div className="col-span-full space-y-3">
         <div className="flex min-w-0 flex-wrap items-center gap-2">
           <div className="flex items-center gap-1.5 flex-wrap">
             {QUICK_FILTERS.map(f => (
@@ -269,11 +260,11 @@ export default function HoursDashboardPage() {
           )}
         </div>
 
-        <div className="grid w-full min-w-0 gap-3 sm:grid-cols-2 lg:w-auto">
+        <div className="grid w-full min-w-0 gap-3 sm:grid-cols-3">
           <div className="min-w-0 space-y-1">
             <Label className="text-xs text-muted-foreground">Persona</Label>
-            <Select value={selectedPersonnelId} onValueChange={v => { setSelectedPersonnelId(v); handleFilterChange(); }}>
-              <SelectTrigger className="h-11 w-full text-sm lg:w-56" aria-label="Filtrar por persona">
+            <Select value={selectedPersonnelId} onValueChange={v => { setSelectedPersonnelId(v); setSelectedSection("all"); handleFilterChange(); }}>
+              <SelectTrigger className="h-11 w-full text-sm" aria-label="Filtrar por persona">
                 <SelectValue placeholder="Todas las personas" />
               </SelectTrigger>
               <SelectContent>
@@ -287,8 +278,8 @@ export default function HoursDashboardPage() {
 
           <div className="min-w-0 space-y-1">
             <Label className="text-xs text-muted-foreground">Proyecto</Label>
-            <Select value={selectedProjectId} onValueChange={v => { setSelectedProjectId(v); handleFilterChange(); }}>
-              <SelectTrigger className="h-11 w-full text-sm lg:w-72" aria-label="Filtrar por proyecto">
+            <Select value={selectedProjectId} onValueChange={v => { setSelectedProjectId(v); setSelectedSection("all"); handleFilterChange(); }}>
+              <SelectTrigger className="h-11 w-full text-sm" aria-label="Filtrar por proyecto">
                 <SelectValue placeholder="Todos los proyectos" />
               </SelectTrigger>
               <SelectContent>
@@ -299,10 +290,24 @@ export default function HoursDashboardPage() {
               </SelectContent>
             </Select>
           </div>
+          <div className="min-w-0 space-y-1">
+            <Label className="text-xs text-muted-foreground">Sección de tareas</Label>
+            <Select value={selectedSection} onValueChange={value => { setSelectedSection(value); handleFilterChange(); }}>
+              <SelectTrigger className="h-11 w-full text-sm" aria-label="Filtrar por sección"><SelectValue placeholder="Todas las secciones" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas las secciones</SelectItem>
+                {(summary?.availableSections || []).map(section => <SelectItem key={section.value} value={section.value}>{section.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        {selectedSection !== "all" && <p className="text-xs text-muted-foreground">Las horas reales y estimadas corresponden a la sección elegida. La capacidad disponible sigue siendo la de las personas del filtro.</p>}
         </div>
       </ToolbarPanel>
 
-      {isLoading ? (
+      {isError ? (
+        <div role="alert" className="space-y-2 p-6"><p>No pudimos cargar las horas. Los resultados anteriores no se muestran.</p><Button variant="outline" onClick={() => refetchSummary()}>Reintentar</Button></div>
+      ) : isLoading ? (
         <div className="flex items-center justify-center py-20">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
@@ -337,7 +342,7 @@ export default function HoursDashboardPage() {
               valueLabel={`${estTotalEstimated.toFixed(1)} horas estimadas`}
               icon={<TrendingUp className="h-5 w-5" />}
               detail={estTotalEstimated > 0
-                ? `${Math.round((estTotalReal / estTotalEstimated) * 100)}% consumido (real acumulado)`
+                ? `${Math.round((estTotalReal / estTotalEstimated) * 100)}% consumido en el período`
                 : "Sin estimación cargada"}
               tone="info"
             />
@@ -429,7 +434,7 @@ export default function HoursDashboardPage() {
             </div>
           </div>
 
-          {/* Calidad de estimación por proyecto — estimado vs real acumulado (all-time)
+          {/* Calidad de estimación por proyecto — estimado vs real del período
               anclado a la tarea, independiente de quién cargó las horas. */}
           {estByProject.length > 0 && (
             <div className="bg-card rounded-xl border p-4">
@@ -437,7 +442,7 @@ export default function HoursDashboardPage() {
                 <TrendingUp className="h-4 w-4 text-primary" />
                 Calidad de estimación por proyecto
               </h3>
-              <p className="text-xs text-muted-foreground mb-3">Estimado vs real acumulado de las tareas (all-time). Δ = real − estimado.</p>
+              <p className="text-xs text-muted-foreground mb-3">Estimado vs real de las tareas en el período y los filtros elegidos. Δ = real − estimado.</p>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>

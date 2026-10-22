@@ -1,10 +1,10 @@
 # Changelog
 
-## 1.14.0 — 2026-10-09
+## 1.15.0 — 2026-10-22
 
 - Cierre del equipo: recorrido unificado de base y facturación; vacaciones, feriados y días Epical pagos, con descuento excepcional sin goce y motivo.
 - Corte automático el último día hábil a las 23:59 de Buenos Aires, borradores y recordatorios. TC bancarios y extras en Mis facturas; autorización de Operaciones antes de cada comprobante USD/ARS, bonos en ambas monedas y protección de versiones.
-- Migración 0086: corte operativo de horas, estados de autorización y conciliación del costo contractual/bonos/reintegros con Finanzas, sin duplicar gasto al registrar Pasivo. El cierre financiero exige autorizaciones y comprobantes requeridos.
+- Migración 0089: corte operativo de horas, estados de autorización y conciliación del costo contractual/bonos/reintegros con Finanzas, sin duplicar gasto al registrar Pasivo. El cierre financiero exige autorizaciones y comprobantes requeridos.
 
 - Cierre: devolución de revisión a corrección con motivo y auditoría; los controles críticos deben resolverse antes de enviar a revisión.
 - Operaciones/Finanzas: horas protegidas por mes civil, recálculo y pre-cierre atómicos, bloqueo de costos laborales incompletos y nueva validación antes de congelar. Las provisiones pueden liberarse en un mes posterior sin reescribir el cierre original.
@@ -13,8 +13,82 @@
 - Presupuesto mensual de costos nativo con moneda, vigencia, auditoría y protección contra ediciones concurrentes.
 - Proyección y BI consumen fuentes nativas; presupuesto o FX ausente se muestra pendiente. Se preservan los snapshots históricos anteriores al corte.
 - El cierre incorpora un panel de transición y controles sobre saldos iniciales e ingresos nativos faltantes. No declara conciliación aprobada por tener datos cargados.
-- Migraciones 0084/0085: protecciones transaccionales de períodos cerrados y vistas BI; pruebas PostgreSQL incorporadas a CI.
+- Migraciones 0087/0088: protecciones transaccionales de períodos cerrados y vistas BI; pruebas PostgreSQL incorporadas a CI.
 - Auditoría de producción de solo lectura documenta los datos y cierres que Finanzas aún debe completar antes de retirar el maestro.
+
+## 1.14.4 — 2026-10-21
+
+- Las horas nuevas y los cronómetros se atribuyen al responsable de la tarea o de la subtarea, sin selector de terceros ni cambios en las cargas históricas. Se validan los permisos existentes y se detectan reasignaciones antes de guardar; el detalle actualiza el destinatario de horas al cambiar el responsable.
+- El panel de horas permite combinar sección, proyecto, persona y período para horas reales y estimadas, sin duplicar registros importados.
+- Los grupos de propuestas se archivan y restauran junto con sus cotizaciones de forma atómica y recuperable; también puede completarse el archivo de grupos antiguos con propuestas todavía activas. Las listas y métricas se actualizan juntas.
+- El lápiz y los grupos llevan a «Aprobación y envío», con pasos explícitos de revisión interna y aceptación del cliente. Las decisiones de revisión vencidas se rechazan y se respetan los permisos y la prohibición de autoaprobación.
+- El calendario semanal muestra el rango de fechas junto al título de cada tarea.
+
+## 1.14.3 — 2026-10-20
+
+- Las tareas mensuales conservan el día de anclaje de su cadena recurrente al atravesar meses cortos: enero 31 → febrero 28 → marzo 31. También conservan el rango de fechas y su duración, sin reescribir tareas anteriores ni agregar campos a la API o a la base.
+
+## 1.14.2 — 2026-10-20
+
+- Las tareas recurrentes conservan el rango de inicio y entrega y su duración; una tarea semanal de lunes a miércoles vuelve a programarse de lunes a miércoles. El aviso de creación muestra ambas fechas.
+- El calendario del equipo incorpora vistas de mes y semana. Seleccionar un día o «+N más» expande todas las tareas de los siete días de esa semana, con responsables, colaboradores, proyecto y rango de fechas.
+
+## 1.14.1 — 2026-10-16
+
+- Inicio rediseñado como tablero por bloques que se compone según los permisos de cada persona: «Hoy» (tareas vencidas y en curso), horas, Cotizaciones, Portfolio, Equipo, Mis ausencias y Capacidad del equipo. Lo que la persona no puede ver no se muestra ni deja hueco.
+- Reemplaza la portada oscura con degradé de 1.13.9 por un diseño más sobrio con el rojo Epical como único acento.
+
+## 1.14.0 — 2026-10-16
+
+- El conector MCP permite explorar 157 recursos de negocio de Mind: cotizaciones y propuestas, CRM, proyectos, tareas y horas, operaciones, personal, finanzas, objetivos, Status y conversaciones autorizadas.
+- Nuevas herramientas de catálogo, consultas filtradas, agregaciones sobre todos los resultados y lectura de campos largos; separación de monedas, proyecciones explícitas y consultas de solo lectura.
+- Nuevo alcance OAuth `mind:read`, con consentimiento ampliado y permisos de módulo, membresía y titularidad. Las conexiones previas siguen limitadas a Status hasta reconectarlas; URL y credenciales se mantienen.
+
+## 1.13.9 — 2026-10-16
+
+- Corrige el scroll del Inicio y del resto de la app: el documento ya no scrollea (había scroll horizontal interminable y, al bajar mucho, la barra lateral y el contenido quedaban desplazados con el área principal en blanco). Sólo scrollean el área principal y la navegación lateral.
+- Inicio rediseñado: portada oscura con saludo y fecha, horas de la semana y del mes a la vista y acciones rápidas; indicadores con ícono que llevan a Proyectos y Cotizaciones.
+
+## 1.13.8 — 2026-10-15
+
+- Corrige el rechazo de autorizaciones y revocaciones MCP desde el navegador: los formularios conservan el origen requerido por la validación CSRF, sin exponer rutas ni parámetros en el referrer.
+
+## 1.13.7 — 2026-10-15
+
+- Conector MCP de solo lectura para consultar Status desde dots y otros agentes: búsqueda de salas por participante, proyectos, temas adicionales e historial.
+- Autorización OAuth con PKCE, identificación de emisor, tokens renovables y revocación desde Status → Agentes. El acceso respeta permisos y membresías de sala.
+- Migración aditiva 0086 para credenciales OAuth almacenadas como hashes y pruebas de integración con PostgreSQL en CI.
+
+## 1.13.6 — 2026-10-15
+
+- Calendarios: una tarea que quedaba oculta tras «+N más» pese a haber huecos libres en el día ahora ocupa ese hueco; sólo se oculta si el día no tiene lugar.
+
+## 1.13.5 — 2026-10-15
+
+- Calendarios: cada tarea conserva la misma fila durante toda la semana (antes saltaba de posición entre un día y otro), con alto fijo por fila y huecos donde otra tarea no está.
+- Tareas: el «+» de asignación y el ícono de fecha vacíos tienen más contraste (fondo, borde y trazo más marcados), sin depender del hover.
+- Definiciones de producto 2.37.0.
+
+## 1.13.4 — 2026-10-14
+
+- Panel de horas: las horas disponibles restan sólo las ausencias aprobadas de la persona filtrada. Antes sumaban las de todo el equipo y de cualquier estado, por lo que una persona con pocas ausencias veía menos horas de las reales. El endpoint de ausencias respeta el filtro por persona.
+- Inicio muestra los próximos 3 cumpleaños del equipo sin límite de días. Configuración > Personal permite cargar «Solo cumpleaños» de personas que no son personal (nombre y fecha, sin costos ni capacidad). Migración aditiva 0084.
+- Calendarios: cada día muestra el título de la tarea con el color del cliente, sin barras que corten la continuidad.
+- Tareas: el «+» de asignación y el ícono de fecha son siempre visibles; las tareas completadas se pueden arrastrar entre secciones.
+- Capacidad: los proyectos del desglose por persona se contraen y la estimación queda junto a cada tarea.
+- Ausencias: se elige Tentativa o Confirmada al crear la solicitud (antes se ignoraba y siempre quedaba tentativa). La tabla de saldos suma Epical cupo, usados por tipo y disponibles total/vacaciones/Epical.
+- Definiciones de producto 2.36.0.
+
+## 1.13.3 — 2026-10-14
+
+- Evita enviar integrantes del equipo con cero horas al guardar variantes de cotización, eliminando el rechazo de validación para roles que no participan del alcance.
+- Corrige la referencia de horas recomendadas: prioriza proyectos cerrados de la misma receta, exige al menos dos casos y expone la mediana junto con el tamaño de muestra.
+- Permite a Operaciones crear y calibrar una nueva versión borrador de una receta con horas reales, ver el total recalculado y publicarla sin alterar recetas ni cotizaciones anteriores.
+
+## 1.13.2 — 2026-10-13
+
+- Los emails de notificación explican el tipo de novedad aun con el modo discreto activado, sin incluir el contenido privado.
+- La cabecera y el pie usan la identidad actual de Mind OS · Epical Intelligence.
 
 ## 1.13.1 — 2026-10-09
 

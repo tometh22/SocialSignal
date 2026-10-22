@@ -1,38 +1,58 @@
 import OptionalDelegatedTasks from "@/components/tasks/OptionalDelegatedTasks";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { authFetch } from "@/lib/queryClient";
 import { Link } from "wouter";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { SectionHeading } from "@/components/layout/page-heading";
-import { CompactPageHeader } from "@/components/ui/compact-page-header";
-import { PageShell } from "@/components/ui/page-shell";
+import { Badge } from "@/components/ui/badge";
 import { usePermissions } from "@/hooks/use-permissions";
 import { parseBirthdayMonthDay, nextBirthday, upcomingBirthdays, type BirthdayEntry } from "@shared/utils/birthdays";
 import { useAuth } from "@/hooks/use-auth";
 import { computeAlerts, type Alert } from "@/lib/smart-alerts";
-import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
+import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
-import { taskDateBucket, taskCompletedThisWeek, type TaskDateBucket } from "@shared/utils/task-date-bucket";
-import { TASK_STATUS_CONFIG, type TaskStatus } from "@/constants/task-statuses";
+import { civilDateInBuenosAires, currentBuenosAiresWeek } from "@shared/utils/buenos-aires-week";
+import { taskDateBucket } from "@shared/utils/task-date-bucket";
 import TaskCalendarView from "@/components/tasks/TaskCalendarView";
 import {
-  Briefcase, BarChart2, Plus, CheckSquare, Calendar, AlertTriangle,
-  AlertCircle, Info, Lightbulb, ChevronRight, Zap, Clock, ListTodo,
-  FolderOpen, List, ChevronDown
+  Plus, CheckSquare, Calendar, AlertTriangle, AlertCircle, Info, Lightbulb,
+  ChevronRight, Zap, ArrowUpRight,
 } from "lucide-react";
 
-type HomeProject = {
-  id: number;
-  name: string;
-  clientName: string | null;
-  pendingCount: number;
-  taskCount: number;
-  status: string;
+type CapacityWeekly = {
+  totals?: { avgUtilization: number };
+  personnel?: { isOverloaded: boolean; isAbsent: boolean }[];
 };
+
+/** Bloque del tablero: título en versalitas + contenido. Todas las tarjetas comparten este marco. */
+function Tile({ label, action, className, tone = "light", children, ...rest }: {
+  label: ReactNode; action?: ReactNode; className?: string; tone?: "light" | "dark" | "red"; children: ReactNode;
+} & React.HTMLAttributes<HTMLElement>) {
+  return (
+    <section
+      {...rest}
+      className={cn(
+        "relative flex min-w-0 flex-col overflow-hidden rounded-2xl border p-5",
+        tone === "light" && "border-slate-200/80 bg-white",
+        tone === "dark" && "border-transparent bg-[#14151a] text-white",
+        tone === "red" && "border-transparent bg-primary text-primary-foreground",
+        className,
+      )}
+    >
+      <div className="flex items-center justify-between gap-3">
+        <h2 className={cn(
+          "text-[0.6875rem] font-semibold uppercase tracking-[0.12em]",
+          tone === "light" && "text-slate-500", tone === "dark" && "text-slate-400", tone === "red" && "text-red-100",
+        )}>{label}</h2>
+        {action}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+const TILE_LINK = "inline-flex items-center gap-1 text-xs font-medium transition-colors";
 
 export default function HomeDashboard() {
   const { user } = useAuth();
@@ -64,7 +84,10 @@ export default function HomeDashboard() {
     queryFn: () => authFetch("/api/birthdays").then(r => r.ok ? r.json() : []).catch(() => []),
     staleTime: 5 * 60_000,
   });
-  const upcoming = upcomingBirthdays(teamBirthdays, new Date(), 30).slice(0, 6);
+  // Los próximos 3 cumpleaños, sin importar cuán lejos caigan (366 días cubre todo el ciclo anual).
+  const upcoming = upcomingBirthdays(teamBirthdays, new Date(), 366).slice(0, 3);
+  // El propio cumpleaños ya figura en la lista del equipo; la tarjeta personal sólo sirve de respaldo.
+  const showOwnBirthday = Boolean(birthday) && upcoming.length === 0;
 
   const { data: absenceBalance } = useQuery<{ configured: boolean; vacationDays: number | null; vacationCarryoverDays: number; vacationAdvanceDebtDays: number; vacationBalanceDays: number; epicalDays: number | null; used: { vacation: number; epical: number } }>({
     queryKey: ["/api/absence-allowances", myPersonnel?.id, new Date().getFullYear()],
@@ -135,12 +158,38 @@ export default function HomeDashboard() {
     enabled: !!myPersonnelId,
   });
 
+  const todayCivil = civilDateInBuenosAires(new Date());
+  // «Hoy»: lo vencido y lo que está en curso, primero lo más atrasado.
+  const todayTasks = myCalendarTasks
+    .map((task) => ({ task, bucket: taskDateBucket(task) }))
+    .filter(({ bucket }) => bucket === "overdue" || bucket === "in_progress")
+    .sort((a, b) => (a.task.dueDate?.slice(0, 10) ?? "9999").localeCompare(b.task.dueDate?.slice(0, 10) ?? "9999"))
+    .map(({ task }) => task);
+  const daysLate = (due: string) => Math.round((Date.parse(`${todayCivil}T00:00:00Z`) - Date.parse(`${due.slice(0, 10)}T00:00:00Z`)) / 86_400_000);
+
+  // Capacidad del equipo: sólo para quien ya accede a Operaciones.
+  const canSeeCapacity = hasPermission("operations");
+  const { data: capacity } = useQuery<CapacityWeekly>({
+    queryKey: ["/api/capacity/weekly", "home", currentBuenosAiresWeek().from],
+    queryFn: () => authFetch(`/api/capacity/weekly?weekStart=${currentBuenosAiresWeek().from}`).then(r => r.ok ? r.json() : {}).catch(() => ({})),
+    enabled: canSeeCapacity,
+    staleTime: 5 * 60_000,
+  });
+  const overloadedCount = capacity?.personnel?.filter((person) => person.isOverloaded && !person.isAbsent).length ?? 0;
+
   const greeting = () => {
     const hour = new Date().getHours();
     if (hour < 12) return "Buenos días";
     if (hour < 18) return "Buenas tardes";
     return "Buenas noches";
   };
+
+  const todayLabel = (() => {
+    const label = format(new Date(), "EEEE d 'de' MMMM", { locale: es });
+    return label.charAt(0).toUpperCase() + label.slice(1);
+  })();
+  // Día de la semana actual (0 = lunes) para marcar la tira de la tarjeta de horas.
+  const weekdayIndex = (new Date(`${todayCivil}T12:00:00Z`).getUTCDay() + 6) % 7;
 
   const alertIcon = (type: Alert['type']) => {
     if (type === 'critical') return <AlertTriangle className="h-4 w-4 text-red-500 flex-shrink-0" />;
@@ -154,119 +203,160 @@ export default function HomeDashboard() {
     return "border-blue-200 bg-blue-50/50";
   };
 
+  // Qué bloques existen depende de lo que la persona puede ver: los demás no dejan hueco.
+  const showToday = canAccessTasks && Boolean(myPersonnelId);
+  const showHours = Boolean(myPersonnelId);
+  const showQuotations = hasPermission('quotations');
+  const showPortfolio = hasPermission('projects');
+  const hasRightColumn = showHours || showQuotations || showPortfolio;
+  const shownToday = todayTasks.slice(0, 6);
+  const showOwnBirthdayCard = showOwnBirthday && birthday;
+  const hasFooterTiles = upcoming.length > 0 || showOwnBirthdayCard || absenceBalance?.configured || (canSeeCapacity && capacity?.totals);
+
   return (
-    <PageShell spacing="compact">
-      <CompactPageHeader
-        eyebrow="Workspace personal"
-        title={<>{greeting()}, {user?.firstName || "Usuario"}.</>}
-        description="Tus prioridades, tareas y señales importantes para avanzar hoy."
-        actions={(canAccessTasks || canCreateQuotation) ? (
-          <>
+    <div className="mx-auto w-full min-w-0 max-w-[1440px] space-y-4 sm:space-y-5" data-ui="home-board">
+      <header className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3" aria-labelledby="home-title">
+        <div className="min-w-0">
+          <h1 id="home-title" className="text-balance text-3xl font-bold leading-tight tracking-[-0.035em] text-foreground sm:text-[2rem]">
+            {greeting()}, <span className="text-primary">{user?.firstName || "Usuario"}</span>
+          </h1>
+          <p className="mt-0.5 text-sm text-muted-foreground">
+            {todayLabel}
+            {showToday && ` · ${todayTasks.length === 0 ? "sin tareas pendientes para hoy" : `${todayTasks.length} ${todayTasks.length === 1 ? "tarea" : "tareas"} para hoy`}`}
+          </p>
+        </div>
+        {(canAccessTasks || canCreateQuotation) && (
+          <div className="flex flex-wrap items-center gap-2">
             {canAccessTasks && (
-              <Button asChild>
+              <Button asChild variant={canCreateQuotation ? "outline" : "default"}>
                 <Link href="/tasks"><CheckSquare className="h-4 w-4" />Ver mis tareas</Link>
               </Button>
             )}
-            {canCreateQuotation && canAccessTasks && (
-              <Button asChild variant="outline">
-                <Link href="/optimized-quote"><Plus className="h-4 w-4" />Nueva cotización</Link>
-              </Button>
-            )}
-            {canCreateQuotation && !canAccessTasks && (
+            {canCreateQuotation && (
               <Button asChild>
                 <Link href="/optimized-quote"><Plus className="h-4 w-4" />Nueva cotización</Link>
               </Button>
             )}
-          </>
-        ) : undefined}
-      />
-      {upcoming.length > 0 && (
-        <Card className="border-pink-200 bg-pink-50/60" data-testid="home-team-birthdays">
-          <CardContent className="p-4 text-sm text-pink-950 sm:p-4 sm:pt-4">
-            <div className="mb-2 flex items-center gap-2 font-semibold"><span aria-hidden="true">🎂</span>Cumpleaños del equipo</div>
-            <ul className="grid gap-x-6 gap-y-1 sm:grid-cols-2 lg:grid-cols-3">
-              {upcoming.map((entry, index) => (
-                <li key={`${entry.name}-${entry.month}-${entry.day}-${index}`} className="flex items-baseline justify-between gap-3">
-                  <span className="min-w-0 truncate">{entry.name}</span>
-                  <span className="shrink-0 text-xs text-pink-900/80">
-                    {entry.daysUntil === 0 ? "¡hoy!" : entry.daysUntil === 1 ? "mañana" : entry.date.toLocaleDateString("es-AR", { day: "numeric", month: "short" })}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
-      )}
+          </div>
+        )}
+      </header>
 
-      {/* Dos tarjetas comparten fila; una sola ocupa todo el ancho, como el resto de las tarjetas del Home
-          (con media fila quedaba desalineada respecto de los indicadores y de Señales del portfolio). */}
-      {(birthday || absenceBalance?.configured) && (
-        <div className={cn("grid gap-3", birthday && absenceBalance?.configured && "lg:grid-cols-2")} data-testid="home-personal-cards">
-          {birthday && <Card className="border-pink-200 bg-pink-50/60"><CardContent className="flex items-center gap-3 p-4 text-sm text-pink-950 sm:p-4 sm:pt-4"><span aria-hidden="true">🎂</span><span><strong>Tu cumpleaños:</strong> {birthday.date}{birthday.days === 0 ? " · ¡hoy!" : birthday.days === 1 ? " · mañana" : ` · en ${birthday.days} días`}</span></CardContent></Card>}
-          {absenceBalance?.configured && <Card><CardContent className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2 p-4 text-sm sm:p-4 sm:pt-4">
-            <div className="min-w-0 flex-1 space-y-1">
-              <div><strong>Vacaciones disponibles: {absenceBalance.vacationBalanceDays} días</strong></div>
-              <div className="text-xs leading-5 text-muted-foreground">Año actual: {absenceBalance.vacationDays ?? 0} · Traslado: {absenceBalance.vacationCarryoverDays} · Adelanto anterior: {absenceBalance.vacationAdvanceDebtDays} · Usados: {absenceBalance.used.vacation}</div>
-              {absenceBalance.epicalDays != null && <div data-testid="home-epical-balance"><strong>Días Epical disponibles: {Math.max(0, absenceBalance.epicalDays - absenceBalance.used.epical)} días</strong><span className="ml-2 text-xs text-muted-foreground">Cupo: {absenceBalance.epicalDays} · Usados: {absenceBalance.used.epical}</span></div>}
+      {canAccessTasks && user?.personnelLinked === false && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-600" />
+            <div>
+              <p className="font-medium">Tu usuario todavía no está vinculado a Personal.</p>
+              <p className="mt-0.5 text-xs text-amber-800">Pedile a Operaciones que configure el mismo email en Personal para ver tareas y cargar horas.</p>
             </div>
-            <Link href="/absences" className="shrink-0 text-primary hover:underline">Mis ausencias</Link>
-          </CardContent></Card>}
+          </div>
         </div>
       )}
 
-      {/* Resumen operativo */}
-      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-        {hasPermission('projects') && (
-          <Card className="mind-kpi">
-            <CardContent className="p-3.5 sm:p-4">
-              <div className="min-h-8 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Proyectos activos</div>
-              <div className="mt-1 text-2xl font-bold tracking-[-0.05em] tabular-nums text-primary sm:text-3xl">{projectCount || 0}</div>
-            </CardContent>
-          </Card>
-        )}
-        {hasPermission('quotations') && (
-          <Card className="mind-kpi">
-            <CardContent className="p-3.5 sm:p-4">
-              <div className="min-h-8 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Cotizaciones pendientes</div>
-              <div className="mt-1 text-2xl font-bold tracking-[-0.05em] tabular-nums text-amber-600 sm:text-3xl">{quotationStats?.pending || 0}</div>
-            </CardContent>
-          </Card>
-        )}
-        {hasPermission('quotations') && (
-          <Card className="mind-kpi">
-            <CardContent className="p-3.5 sm:p-4">
-              <div className="min-h-8 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Borradores</div>
-              <div className="mt-1 text-2xl font-bold tracking-[-0.05em] tabular-nums text-slate-700 sm:text-3xl">{quotationStats?.draft || 0}</div>
-            </CardContent>
-          </Card>
-        )}
-        {hasPermission('projects') && (
-          <Card className="mind-kpi">
-            <CardContent className="p-3.5 sm:p-4">
-              <div className="min-h-8 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Alertas críticas</div>
-              <div className="mt-1 text-2xl font-bold tracking-[-0.05em] tabular-nums sm:text-3xl">
-                <span className={summary.critical > 0 ? "text-red-600" : "text-emerald-600"}>
-                  {summary.critical}
-                </span>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-      </div>
+      {(showToday || hasRightColumn) && (
+        <div className="grid gap-3 lg:grid-cols-12 sm:gap-4" data-testid="home-primary-tiles">
+          {showToday && (
+            <Tile
+              label="Hoy"
+              className={cn("lg:col-span-7", !hasRightColumn && "lg:col-span-12")}
+              action={<Link href="/tasks" className={cn(TILE_LINK, "text-primary hover:underline")}>Ver todas<ChevronRight className="h-3.5 w-3.5" /></Link>}
+              data-testid="home-today"
+            >
+              {shownToday.length === 0 ? (
+                <p className="mt-6 text-sm text-muted-foreground">Nada vencido ni en curso. Buen momento para planificar la semana.</p>
+              ) : (
+                <ul className="mt-3 divide-y divide-slate-100">
+                  {shownToday.map((task) => {
+                    const due = typeof task.dueDate === "string" ? task.dueDate.slice(0, 10) : null;
+                    const late = due && due < todayCivil ? daysLate(due) : 0;
+                    return (
+                      <li key={task.id} className="flex items-center gap-3 py-2.5">
+                        <span className="h-4 w-4 shrink-0 rounded-[5px] border-[1.5px] border-slate-300" aria-hidden="true" />
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate text-sm font-semibold text-foreground">{task.title}</div>
+                          {(task.clientName || task.projectName) && (
+                            <div className="truncate text-xs text-muted-foreground">{[task.clientName, task.projectName].filter(Boolean).join(" · ")}</div>
+                          )}
+                        </div>
+                        {late > 0 ? (
+                          <span className="shrink-0 rounded-md bg-red-50 px-2 py-0.5 text-[0.6875rem] font-bold uppercase tracking-wide text-red-700">Atrasada {late}d</span>
+                        ) : due === todayCivil ? (
+                          <span className="shrink-0 rounded-md bg-red-50 px-2 py-0.5 text-[0.6875rem] font-bold uppercase tracking-wide text-red-700">Vence hoy</span>
+                        ) : due ? (
+                          <span className="shrink-0 text-xs text-muted-foreground">{format(new Date(`${due}T12:00:00`), "d MMM", { locale: es })}</span>
+                        ) : (
+                          <span className="shrink-0 text-xs text-muted-foreground">sin fecha</span>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+              {todayTasks.length > shownToday.length && (
+                <Link href="/tasks" className="mt-2 text-xs font-medium text-muted-foreground hover:text-foreground">+{todayTasks.length - shownToday.length} más</Link>
+              )}
+            </Tile>
+          )}
+
+          {hasRightColumn && (
+            <div className={cn("grid min-w-0 gap-3 sm:gap-4 lg:grid-cols-2", showToday ? "lg:col-span-5" : "lg:col-span-12 lg:grid-cols-4")}>
+              {showHours && (
+                <Tile label="Horas" tone="dark" className={cn("min-h-[9rem]", showToday ? "lg:col-span-2" : "lg:col-span-2")} data-testid="home-hours">
+                  <div className="mt-3 flex items-end gap-6">
+                    <div>
+                      <div className="text-5xl font-bold leading-none tracking-[-0.05em] tabular-nums">{myWeekHours.toFixed(1)}<span className="ml-1 text-lg font-medium tracking-normal text-slate-400">h</span></div>
+                      <div className="mt-1.5 text-xs text-slate-400">esta semana</div>
+                    </div>
+                    <div className="pb-0.5">
+                      <div className="text-xl font-semibold tabular-nums text-slate-200">{myMonthHours.toFixed(1)}<span className="ml-0.5 text-sm font-normal text-slate-400">h</span></div>
+                      <div className="mt-0.5 text-xs text-slate-400">este mes</div>
+                    </div>
+                  </div>
+                  <div className="mt-auto flex gap-1.5 pt-5" aria-hidden="true">
+                    {["L", "M", "X", "J", "V"].map((day, index) => (
+                      <span key={day} className={cn("h-1 flex-1 rounded-full", index === weekdayIndex ? "bg-primary" : index < weekdayIndex ? "bg-slate-500" : "bg-slate-700")} />
+                    ))}
+                  </div>
+                </Tile>
+              )}
+              {showQuotations && (
+                <Link href="/quotations" className="group block min-w-0 rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
+                  <Tile label="Cotizaciones" tone="red" className="h-full min-h-[9.5rem]" action={<ArrowUpRight className="h-4 w-4 text-red-100 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />}>
+                    <div className="mt-3 text-5xl font-bold leading-none tracking-[-0.05em] tabular-nums">{quotationStats?.pending || 0}</div>
+                    <div className="mt-1.5 text-xs text-red-100">pendientes</div>
+                    <div className="mt-auto pt-4 text-xs text-red-100">{quotationStats?.draft || 0} {quotationStats?.draft === 1 ? "borrador" : "borradores"}</div>
+                  </Tile>
+                </Link>
+              )}
+              {showPortfolio && (
+                <Link href="/tasks/projects" className="group block min-w-0 rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
+                  <Tile label="Portfolio" className="h-full min-h-[9.5rem]" action={<ArrowUpRight className="h-4 w-4 text-slate-400 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />}>
+                    <div className="mt-3 flex items-baseline gap-2">
+                      <span className="text-5xl font-bold leading-none tracking-[-0.05em] tabular-nums text-foreground">{projectCount || 0}</span>
+                      <span className="text-xs text-muted-foreground">proyectos activos</span>
+                    </div>
+                    <div className={cn("mt-auto pt-4 text-xs font-semibold", summary.critical > 0 ? "text-red-600" : "text-emerald-600")}>
+                      ● {summary.critical > 0 ? `${summary.critical} ${summary.critical === 1 ? "alerta crítica" : "alertas críticas"}` : "Sin alertas críticas"}
+                    </div>
+                  </Tile>
+                </Link>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Smart Alerts */}
       {alerts.length > 0 && hasPermission('projects') && (
-        <div className="space-y-3">
-          <SectionHeading
-            icon={<Zap className="h-4 w-4" />}
-            title="Alertas inteligentes"
-            description="Señales que conviene revisar antes de que se conviertan en desvíos."
-            action={<Badge variant="secondary" className="text-xs">
-              {summary.critical > 0 && <span className="mr-1 text-red-600">{summary.critical} críticas</span>}
-              {summary.warning > 0 && <span className="text-amber-600">{summary.warning} preventivas</span>}
-            </Badge>}
-          />
-          <div className="grid gap-2 xl:grid-cols-2">
+        <Tile
+          label="Alertas inteligentes"
+          action={<Badge variant="secondary" className="text-xs">
+            {summary.critical > 0 && <span className="mr-1 text-red-600">{summary.critical} críticas</span>}
+            {summary.warning > 0 && <span className="text-amber-600">{summary.warning} preventivas</span>}
+          </Badge>}
+        >
+          <p className="mt-1 text-xs text-muted-foreground">Señales que conviene revisar antes de que se conviertan en desvíos.</p>
+          <div className="mt-3 grid gap-2 xl:grid-cols-2">
             {alerts.slice(0, 4).map(alert => (
               <div key={alert.id} className={`mind-interactive-card flex items-start gap-3 rounded-xl border p-3.5 ${alertBg(alert.type)}`}>
                 {alertIcon(alert.type)}
@@ -301,84 +391,88 @@ export default function HomeDashboard() {
               </p>
             )}
           </div>
-        </div>
+        </Tile>
       )}
 
       {/* AI Insights */}
       {projectsForAlerts.length > 0 && insights.length > 0 && hasPermission('projects') && (
-        <Card className="border-indigo-100 bg-gradient-to-r from-indigo-50/30 to-purple-50/30">
-          <CardContent className="p-4 sm:p-4 sm:pt-4">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="p-1.5 rounded-lg bg-indigo-100">
-                <Lightbulb className="h-4 w-4 text-indigo-600" />
+        <Tile label="Señales del portfolio">
+          <ul className="mt-3 space-y-1.5">
+            {insights.slice(0, 3).map((insight, i) => (
+              <li key={i} className="text-sm text-slate-700 flex items-start gap-2">
+                <span className="shrink-0 text-primary" aria-hidden="true">●</span>
+                <span className="min-w-0 flex-1 leading-5">{insight}</span>
+              </li>
+            ))}
+          </ul>
+          {insights.length > 3 && (
+            <p className="mt-2 text-xs font-medium text-muted-foreground">
+              +{insights.length - 3} señales adicionales
+            </p>
+          )}
+        </Tile>
+      )}
+
+      {hasFooterTiles && (
+        <div className="grid gap-3 sm:gap-4 [grid-template-columns:repeat(auto-fit,minmax(16rem,1fr))]" data-testid="home-personal-cards">
+          {upcoming.length > 0 && (
+            <Tile label="Equipo" data-testid="home-team-birthdays">
+              <ul className="mt-3 space-y-2 text-sm">
+                {upcoming.map((entry, index) => (
+                  <li key={`${entry.name}-${entry.month}-${entry.day}-${index}`} className="flex items-baseline justify-between gap-3">
+                    <span className="min-w-0 truncate"><span aria-hidden="true">🎂 </span>{entry.name}</span>
+                    <span className="shrink-0 text-xs text-muted-foreground">
+                      {entry.daysUntil === 0 ? "¡hoy!" : entry.daysUntil === 1 ? "mañana" : `${entry.date.toLocaleDateString("es-AR", { day: "numeric", month: "short" })} · en ${entry.daysUntil} días`}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </Tile>
+          )}
+          {showOwnBirthdayCard && birthday && (
+            <Tile label="Tu cumpleaños">
+              <p className="mt-3 text-sm"><span aria-hidden="true">🎂 </span>{birthday.date}{birthday.days === 0 ? " · ¡hoy!" : birthday.days === 1 ? " · mañana" : ` · en ${birthday.days} días`}</p>
+            </Tile>
+          )}
+          {absenceBalance?.configured && (
+            <Tile label="Mis ausencias" action={<Link href="/absences" className={cn(TILE_LINK, "text-primary hover:underline")}>Ver<ChevronRight className="h-3.5 w-3.5" /></Link>}>
+              <div className="mt-3 space-y-1.5 text-sm">
+                <div className="flex justify-between gap-3"><span>Vacaciones disponibles</span><strong className="tabular-nums">{absenceBalance.vacationBalanceDays} días</strong></div>
+                {absenceBalance.epicalDays != null && (
+                  <div className="flex justify-between gap-3" data-testid="home-epical-balance"><span>Días Epical disponibles</span><strong className="tabular-nums">{Math.max(0, absenceBalance.epicalDays - absenceBalance.used.epical)} días</strong></div>
+                )}
               </div>
-              <span className="text-sm font-semibold text-indigo-900">Señales del portfolio</span>
-            </div>
-            <ul className="space-y-1.5">
-              {insights.slice(0, 3).map((insight, i) => (
-                <li key={i} className="text-sm text-slate-700 flex items-start gap-2">
-                  <span className="shrink-0 text-indigo-400" aria-hidden="true">•</span>
-                  <span className="min-w-0 flex-1 leading-5">{insight}</span>
-                </li>
-              ))}
-            </ul>
-            {insights.length > 3 && (
-              <p className="mt-2 text-xs font-medium text-indigo-700/70">
-                +{insights.length - 3} señales adicionales
-              </p>
-            )}
-          </CardContent>
-        </Card>
+              <div className="mt-auto pt-3 text-xs leading-5 text-muted-foreground">
+                Año actual: {absenceBalance.vacationDays ?? 0} · Traslado: {absenceBalance.vacationCarryoverDays} · Adelanto anterior: {absenceBalance.vacationAdvanceDebtDays} · Usados: {absenceBalance.used.vacation}
+                {absenceBalance.epicalDays != null && <> · Cupo Epical: {absenceBalance.epicalDays} · Usados: {absenceBalance.used.epical}</>}
+              </div>
+            </Tile>
+          )}
+          {canSeeCapacity && capacity?.totals && (
+            <Link href="/operations/capacity" className="group block min-w-0 rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
+              <Tile label="Capacidad del equipo" className="h-full" action={<ArrowUpRight className="h-4 w-4 text-slate-400 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />}>
+                <div className="mt-3 text-4xl font-bold leading-none tracking-[-0.05em] tabular-nums">{capacity.totals.avgUtilization}%</div>
+                <div className="mt-1.5 text-xs text-muted-foreground">utilización promedio esta semana</div>
+                <div className={cn("mt-auto pt-3 text-xs font-semibold", overloadedCount > 0 ? "text-red-600" : "text-emerald-600")}>
+                  ● {overloadedCount > 0 ? `${overloadedCount} ${overloadedCount === 1 ? "persona" : "personas"} sobre su capacidad` : "Nadie sobre su capacidad"}
+                </div>
+              </Tile>
+            </Link>
+          )}
+        </div>
       )}
 
       {canAccessTasks && <OptionalDelegatedTasks />}
 
       {/* Mi semana */}
-      {canAccessTasks && user?.personnelLinked === false && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          <div className="flex items-start gap-2">
-            <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-600" />
-            <div>
-              <p className="font-medium">Tu usuario todavía no está vinculado a Personal.</p>
-              <p className="mt-0.5 text-xs text-amber-800">Pedile a Operaciones que configure el mismo email en Personal para ver tareas y cargar horas.</p>
-            </div>
-          </div>
-        </div>
-      )}
       {myPersonnelId && (
-        <div className="space-y-3">
-          <SectionHeading icon={<ListTodo className="h-4 w-4" />} title="Mi semana" description="Horas y calendario de la semana actual." />
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="bg-card rounded-xl border p-4 flex items-center gap-3">
-              <div className="bg-primary/10 p-2.5 rounded-lg">
-                <Clock className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Horas esta semana</p>
-                <p className="text-2xl font-semibold tabular-nums text-foreground">{myWeekHours.toFixed(1)}h</p>
-              </div>
-            </div>
-            <div className="bg-card rounded-xl border p-4 flex items-center gap-3">
-              <div className="bg-slate-500/10 p-2.5 rounded-lg">
-                <BarChart2 className="h-5 w-5 text-slate-500" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Horas este mes</p>
-                <p className="text-2xl font-semibold tabular-nums text-foreground">{myMonthHours.toFixed(1)}h</p>
-              </div>
-            </div>
-          </div>
-          {/* Calendario de mis tareas */}
-          <div className="bg-card rounded-xl border p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <Calendar className="h-4 w-4 text-indigo-500" />
-              <span className="text-sm font-medium text-foreground">Mi calendario</span>
-              <Link href="/tasks" className="ml-auto text-xs text-primary hover:underline">Ir a Tareas</Link>
-            </div>
+        <Tile label="Mi semana" action={<Link href="/tasks" className={cn(TILE_LINK, "text-primary hover:underline")}><Calendar className="h-3.5 w-3.5" />Ir a Tareas</Link>}>
+          <p className="mt-1 text-xs text-muted-foreground">Calendario de la semana actual.</p>
+          <div className="mt-3">
             <TaskCalendarView tasks={myCalendarTasks} view="current-week" showUndated={false} />
           </div>
-        </div>
+        </Tile>
       )}
-    </PageShell>
+    </div>
   );
 }

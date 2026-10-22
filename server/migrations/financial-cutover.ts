@@ -1,4 +1,4 @@
-// Keep in sync with migrations/0084_financial_cutover.sql.
+// Keep in sync with migrations/0087_financial_cutover.sql.
 export const financialCutoverMigrationSql = String.raw`-- Existing aggregate costs remain historical until rebuilt from native inputs.
 ALTER TABLE fact_cost_month ADD COLUMN IF NOT EXISTS data_source text NOT NULL DEFAULT 'excel';
 CREATE OR REPLACE VIEW financial_native_cost_month AS

@@ -3,6 +3,10 @@ import { changeSettlement, assertSettlementInvoiceAllowed, lockSettlementPeriod,
 import { settlementWorkflow } from "@shared/utils/settlement-workflow";
 import { payableMonthlyHours } from "@shared/utils/payroll-hours";
 import { assertExcelFinancialImportAllowed } from "./services/financial-source-policy";
+import { setQuotationGroupArchived } from "./domain/quotation-group-archive";
+import { approvalRevisionIsCurrent } from "@shared/utils/quotation-approval";
+import { taskHourOwner, taskHourAttribution } from "@shared/utils/task-hour-owner";
+import { filterHoursTasks, hoursSectionOptions, reconcileSectionHours, validHoursSection } from "@shared/utils/hours-section";
 import { assignmentActor, isDelegatedToOthers } from "../shared/utils/task-assignment";
 import { withProjectPeriodMetrics } from "./domain/metrics/project-period-overlay";
 import { markTaskCostSyncPending } from "./domain/task-cost-sync";
@@ -16,7 +20,8 @@ import { taskDateSchema, taskDateWindowSchema, taskDateWindowEnd } from "@shared
 import { TASK_PROJECT_ROLES } from "@shared/task-project-roles";
 import { projectTemplateKeySchema, projectTaskTemplates, findProjectTaskTemplate, templateTaskValues } from "./services/project-task-templates";
 import type { ProjectTemplateTask } from "../shared/project-task-template";
-import { taskRecurrenceSchema, recurrenceFromDescription, nextRecurringTaskDate } from "../shared/utils/task-recurrence";
+import { taskRecurrenceSchema, recurrenceFromDescription } from "../shared/utils/task-recurrence";
+import { nextRecurringTaskDatesForTask } from "./services/task-recurrence";
 import { isValidAbsenceDate } from "../shared/utils/absence";
 import { calculateSettlementDifference } from "../shared/utils/monthly-settlement-declaration";
 import express, { type Express, Request, Response, NextFunction } from "express";
@@ -168,6 +173,7 @@ import {
   insertMonthlyClosingSchema,
   PROJECT_WORKFLOW_STAGES,
   personnelAbsences,
+  birthdayEntries,
   insertPersonnelAbsenceSchema,
   absenceAllowances,
   absenceEvents,
@@ -201,6 +207,8 @@ import { requireProjectUnlocked, projectIdFromTimeEntry, projectIdFromTask } fro
 import { requireRole, requireProvider, requireProviderCanAccessProject } from "./middleware/requireRole";
 import { requirePermission } from "./middleware/requirePermission";
 import { createReviewRoomsRouter } from "./routes-review-rooms";
+import { registerMindMcp } from "./mcp/routes";
+import { readMcpConfig } from "./mcp/config";
 import { createLedgerRouter } from "./routes-ledger";
 import { createFinancialIntelligenceRouter } from "./routes-financial-intelligence";
 import { createFinancialNativeRouter } from "./routes-financial-native";
@@ -1078,6 +1086,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Setup authentication with storage
   const { requireAuth, resolveUserFromSessionCookie } = setupAuth(app, storage);
+  registerMindMcp(app, pool, readMcpConfig(), (id) => storage.getUser(id));
   registerProposalStudioRoutes(app, requireAuth);
 
   // ═══ Review Rooms (multi-sala) ═══════════════════════════════════════════
@@ -4490,11 +4499,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const parsed = parseBirthdayMonthDay(row.birthday);
           return parsed ? [{ name: row.name, ...parsed }] : [];
         });
+      // Cumpleaños sueltos (personas que no son personal): sólo nombre y fecha, sin baja ni costos.
+      const extraRows = await db.select({ name: birthdayEntries.name, birthday: birthdayEntries.birthday }).from(birthdayEntries);
+      for (const row of extraRows) {
+        const parsed = parseBirthdayMonthDay(row.birthday);
+        if (parsed) birthdays.push({ name: row.name, ...parsed });
+      }
       res.setHeader("Cache-Control", "private, max-age=300");
       res.json(birthdays);
     } catch (error) {
       console.error("Error fetching birthdays:", error);
       res.status(500).json({ message: "No se pudieron traer los cumpleaños" });
+    }
+  });
+
+  // Cumpleaños de personas ajenas a Personal. Se administran desde Configuración > Personal.
+  const birthdayEntryInput = z.object({
+    name: z.string().trim().min(2, "El nombre debe tener al menos 2 caracteres").max(100),
+    birthday: z.string().refine((value) => parseBirthdayMonthDay(value) !== null, "Fecha de cumpleaños inválida"),
+  }).strict();
+  app.get("/api/birthday-entries", requireAuth, requirePermission("admin"), async (_req, res) => {
+    try {
+      res.json(await db.select().from(birthdayEntries).orderBy(birthdayEntries.name));
+    } catch (error) {
+      console.error("Error fetching birthday entries:", error);
+      res.status(500).json({ message: "No se pudieron traer los cumpleaños" });
+    }
+  });
+  app.post("/api/birthday-entries", requireAuth, requirePermission("admin"), async (req, res) => {
+    try {
+      const data = birthdayEntryInput.parse(req.body);
+      const [created] = await db.insert(birthdayEntries).values({ ...data, createdBy: (req as any).user?.id ?? null }).returning();
+      res.status(201).json(created);
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: error.errors[0]?.message || "Datos inválidos" });
+      console.error("Error creating birthday entry:", error);
+      res.status(500).json({ message: "No se pudo guardar el cumpleaños" });
+    }
+  });
+  app.delete("/api/birthday-entries/:id", requireAuth, requirePermission("admin"), async (req, res) => {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ message: "ID inválido" });
+    try {
+      await db.delete(birthdayEntries).where(eq(birthdayEntries.id, id));
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting birthday entry:", error);
+      res.status(500).json({ message: "No se pudo eliminar el cumpleaños" });
     }
   });
 
@@ -7407,7 +7458,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
       isNull(quotationGroups.archivedAt),
       clientId && Number.isInteger(clientId) ? eq(quotationGroups.clientId, clientId) : undefined,
     )).orderBy(desc(quotationGroups.createdAt));
-    res.json(await Promise.all(rows.map((row) => loadQuotationGroupWorkspace(row.id))));
+    const workspaces = await Promise.all(rows.map((row) => loadQuotationGroupWorkspace(row.id)));
+    res.json(workspaces.filter(workspace => workspace && workspace.items.length > 0));
+  });
+
+  app.get("/api/quotation-groups/archived", requireAuth, requirePermission("quotations"), async (_req, res) => {
+    try {
+      const rows = await db.select({ id: quotationGroups.id, name: quotationGroups.name, groupNumber: quotationGroups.groupNumber, archivedAt: quotationGroups.archivedAt })
+        .from(quotationGroups).where(isNotNull(quotationGroups.archivedAt)).orderBy(desc(quotationGroups.archivedAt));
+      res.json(await Promise.all(rows.map(async group => ({ ...group, activeProjects: (await db.select({ name: quotations.projectName })
+        .from(quotationGroupItems).innerJoin(quotations, eq(quotationGroupItems.quotationId, quotations.id))
+        .where(and(eq(quotationGroupItems.groupId, group.id), isNull(quotations.archivedAt)))).map(row => row.name) }))));
+    } catch { res.status(500).json({ message: "No se pudieron cargar los grupos archivados" }); }
+  });
+
+  app.post("/api/quotation-groups/:id/archive", requireAuth, requirePermission("quotations"), async (req, res) => {
+    const id = Number(req.params.id);
+    if (!Number.isSafeInteger(id) || id <= 0) return res.status(400).json({ message: "ID de grupo inválido" });
+    try {
+      const input = z.object({ archived: z.boolean() }).parse(req.body);
+      const result = await db.transaction(async tx => {
+        const result = await setQuotationGroupArchived(tx, id, input.archived, req.user?.id ?? null);
+        for (const quotationId of result?.changedQuotationIds || []) await recordQuotationEvent(tx, {
+          quotationId,
+          eventType: input.archived ? "archived" : "restored",
+          eventKey: `group-${input.archived ? "archived" : "restored"}:${id}:${quotationId}:${Date.now()}`,
+          actorUserId: req.user?.id ?? null,
+          metadata: { groupId: id, source: "quotation-group" },
+        });
+        return result;
+      });
+      if (!result) return res.status(404).json({ message: "Grupo no encontrado" });
+      res.json(result);
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: "Indicá si querés archivar o restaurar el grupo" });
+      res.status(500).json({ message: "No se pudo actualizar el archivo del grupo; no se guardaron cambios parciales" });
+    }
   });
 
   app.get("/api/quotation-groups/:id", requireAuth, async (req, res) => {
@@ -8325,10 +8411,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const now = new Date();
         const result = await db.transaction(async (tx) => {
           await tx.execute(sql`SELECT id FROM quotations WHERE id = ${quotationId} FOR UPDATE`);
-          const [lockedQuotation] = await tx.select({ status: quotations.status }).from(quotations)
+          const [lockedQuotation] = await tx.select({ status: quotations.status, archivedAt: quotations.archivedAt }).from(quotations)
             .where(eq(quotations.id, quotationId));
-          if (lockedQuotation?.status !== "pending") {
+          if (lockedQuotation?.status !== "pending" || lockedQuotation.archivedAt) {
             throw Object.assign(new Error("La cotización ya recibió otra decisión"), { statusCode: 409 });
+          }
+          const [latestRevision] = await tx.select({ id: quotationRevisions.id }).from(quotationRevisions)
+            .where(eq(quotationRevisions.quotationId, quotationId)).orderBy(desc(quotationRevisions.revisionNumber)).limit(1);
+          if (!approvalRevisionIsCurrent(approval, latestRevision)) {
+            throw Object.assign(new Error("La solicitud pertenece a una revisión anterior. Actualizá el historial de aprobación."), { statusCode: 409 });
           }
           const [decidedApproval] = await tx.update(quotationApprovals).set({
             status: input.decision,
@@ -23836,7 +23927,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // GET /api/tasks/hours-summary — resumen de horas para el dashboard
   app.get("/api/tasks/hours-summary", requireAuth, async (req: Request, res: Response) => {
     try {
-      const { personnelId, projectId, dateFrom, dateTo } = req.query;
+      const { personnelId, projectId, dateFrom, dateTo, section } = req.query;
+      if (!validHoursSection(section)) return res.status(400).json({ message: "Sección inválida" });
       taskDateWindowSchema.parse({ dateFrom, dateTo });
       if ([personnelId, projectId].some(id => id !== undefined && (!Number.isSafeInteger(Number(id)) || Number(id) <= 0))) return res.status(400).json({ message: "Filtro inválido" });
       const taskConditions: any[] = [];
@@ -23907,12 +23999,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Enrich entries with task/personnel info
       const allPersonnel = await db.select({ id: personnel.id, name: personnel.name }).from(personnel);
-      const allTasks = await db.select({
+      const taskRows = await db.select({
         id: tasks.id,
         title: tasks.title,
+        sectionName: tasks.sectionName,
         projectId: tasks.projectId,
         assigneeId: tasks.assigneeId,
       }).from(tasks);
+      const allTasks = filterHoursTasks(taskRows, projectId ? Number(projectId) : null, section);
+      const recordedTaskIds = new Set(taskEntries.map(entry => entry.taskId));
+      const availableSections = hoursSectionOptions(filterHoursTasks(taskRows, projectId ? Number(projectId) : null)
+        .filter(task => accessContext.isOperations || task.assigneeId === effectivePersonnelId || recordedTaskIds.has(task.id)));
+      if (!availableSections.some(option => option.value === "unsectioned")) availableSections.push({ value: "unsectioned", label: "Sin sección (incluye registros históricos)" });
       const allTaskIds = allTasks.map((task) => task.id);
       const weeklyEstimateRows = allTaskIds.length > 0
         ? await db.select().from(taskWeeklyEstimates)
@@ -23931,7 +24029,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       `);
       const projectMap = new Map((projectsWithNames.rows as any[]).map(p => [p.id, { name: p.project_name, client: p.client_name }]));
       const personnelMap = new Map(allPersonnel.map(p => [p.id, p.name]));
-      const taskMap = new Map(allTasks.map(t => [t.id, t]));
+      const taskMap = new Map(taskRows.map(t => [t.id, t]));
 
       const enrichedRaw = entries.map(e => {
         const task = e.taskId ? taskMap.get(e.taskId) : undefined;
@@ -23939,6 +24037,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const proj = resolvedProjectId ? projectMap.get(resolvedProjectId) : null;
         return {
           ...e,
+          sectionName: task?.sectionName ?? null,
           personnelName: personnelMap.get(e.personnelId) || `ID ${e.personnelId}`,
           taskTitle: task?.title || (e.source === "legacy" ? "Registro de horas" : `Tarea #${e.taskId}`),
           projectId: resolvedProjectId || null,
@@ -23947,7 +24046,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         };
       });
 
-      const enriched = reconcileHourSources(enrichedRaw.filter(e => e.source === "task"), enrichedRaw.filter(e => e.source === "legacy"));
+      const enriched = reconcileSectionHours(enrichedRaw.filter(e => e.source === "task"), enrichedRaw.filter(e => e.source === "legacy"), section);
 
       // By week
       const byWeekMap: Record<string, number> = {};
@@ -24067,7 +24166,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           dailyHours: Math.round(((p.monthlyHours == null ? 0 : p.monthlyHours) / 20) * 100) / 100,
         }));
 
-      res.json({ entries: enriched, byWeek, byProject, byPerson, activeTeam, estimationByProject });
+      res.json({ entries: enriched, byWeek, byProject, byPerson, activeTeam, estimationByProject, availableSections });
     } catch (error) {
       if (error instanceof z.ZodError) return res.status(400).json({ message: "Rango de fechas inválido" });
       console.error("Error hours-summary:", error);
@@ -24171,8 +24270,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const [assignee] = task.assigneeId
         ? await db.select({ name: personnel.name }).from(personnel).where(eq(personnel.id, task.assigneeId)).limit(1)
         : [];
+      const [parentOwner] = !task.assigneeId && task.parentTaskId
+        ? await db.select({ assigneeId: tasks.assigneeId }).from(tasks).where(eq(tasks.id, task.parentTaskId)) : [];
+      const hoursOwnerId = taskHourOwner(task, parentOwner);
+      const [hoursOwner] = hoursOwnerId ? await db.select({ name: personnel.name }).from(personnel).where(eq(personnel.id, hoursOwnerId)) : [];
       res.json({
         ...task,
+        hoursOwnerId,
+        hoursOwnerName: hoursOwner?.name ?? null,
         assigneeName: assignee?.name ?? null,
         canDelete: await canManageTaskProject(req, task.projectId),
         estimatedHoursTotal: estimatesByTask.get(task.id) ?? 0,
@@ -24354,18 +24459,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const [existingNext] = await tx.select().from(tasks).where(eq(tasks.recurrenceSourceTaskId, taskId));
           if (existingNext) nextTask = existingNext;
           else if (project?.status === "active") {
-            const nextDate = nextRecurringTaskDate(taskRecurrenceSchema.parse(current.recurrenceRule), current.dueDate, now);
             const all = await tx.select().from(tasks).where(eq(tasks.projectId, current.projectId));
+            const nextDates = nextRecurringTaskDatesForTask(current, all, now);
             const sourceIds = new Set([taskId]);
             let expanded = true;
             while (expanded) { expanded = false; for (const row of all) if (row.parentTaskId && sourceIds.has(row.parentTaskId) && !sourceIds.has(row.id)) { sourceIds.add(row.id); expanded = true; } }
             const members = await tx.select({ personnelId: taskProjectMembers.personnelId }).from(taskProjectMembers).where(eq(taskProjectMembers.projectId, current.projectId));
             const copies = await duplicateTaskStructure(tx, all.filter(row => sourceIds.has(row.id)), current.projectId, Number(req.user?.id), new Set(members.map(member => member.personnelId)), undefined, { preserveAssignmentActor: true });
             const root = copies.find(row => row.parentTaskId == null)!;
-            [nextTask] = await tx.update(tasks).set({ startDate: new Date(`${nextDate}T12:00:00Z`), dueDate: new Date(`${nextDate}T12:00:00Z`), recurrenceSourceTaskId: taskId }).where(eq(tasks.id, root.id)).returning();
+            [nextTask] = await tx.update(tasks).set({ startDate: new Date(`${nextDates.startDate}T12:00:00Z`), dueDate: new Date(`${nextDates.dueDate}T12:00:00Z`), recurrenceSourceTaskId: taskId }).where(eq(tasks.id, root.id)).returning();
           }
         }
-        return { ...updated, ...(nextTask ? { recurringTaskId: nextTask.id, recurringTaskDate: nextTask.dueDate?.toISOString().slice(0, 10) } : {}) };
+        return { ...updated, ...(nextTask ? { recurringTaskId: nextTask.id, recurringTaskStartDate: nextTask.startDate?.toISOString().slice(0, 10), recurringTaskDate: nextTask.dueDate?.toISOString().slice(0, 10) } : {}) };
       });
       res.json(result);
     } catch (error) {
@@ -24607,22 +24712,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
             .where(sql`LOWER(TRIM(${personnel.email})) = LOWER(TRIM(${user.email}))`)
             .limit(1)
         : [];
-      const requestedPersonnelId = Number(req.body?.personnelId);
-      const canLogForOthers = hasTaskManagementAccess(req);
-      // Quien gestiona tareas puede cargar horas al dueño aunque su propio usuario
-      // no esté vinculado a Personal; el vínculo sólo es obligatorio para cargar a uno mismo.
-      const loggingForOther = canLogForOthers && requestedPersonnelId > 0;
-      if (!authenticatedPerson && !loggingForOther) {
-        return res.status(400).json({
-          message: "Tu usuario no está vinculado a Personal. Operaciones debe configurar el mismo email antes de cargar horas.",
-        });
-      }
-      if (requestedPersonnelId > 0 && requestedPersonnelId !== authenticatedPerson?.id && !canLogForOthers) {
-        return res.status(403).json({ message: "Solo Operaciones puede cargar horas para otra persona" });
-      }
-      const effectivePersonnelId = loggingForOther
-        ? requestedPersonnelId
-        : authenticatedPerson!.id;
+      const parent = !task.assigneeId && task.parentTaskId
+        ? (await db.select({ assigneeId: tasks.assigneeId }).from(tasks).where(eq(tasks.id, task.parentTaskId)))[0]
+        : null;
+      const attribution = taskHourAttribution(taskHourOwner(task, parent), authenticatedPerson?.id ?? null,
+        hasTaskManagementAccess(req), req.body?.personnelId);
+      if ("status" in attribution) return res.status(attribution.status).json({ message: attribution.message });
+      const effectivePersonnelId = attribution.personnelId;
       const [targetPerson] = await db.select({ id: personnel.id }).from(personnel)
         .where(eq(personnel.id, effectivePersonnelId)).limit(1);
       if (!targetPerson) return res.status(400).json({ message: "La persona seleccionada no existe" });
@@ -24663,6 +24759,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const [created] = await db.transaction(async tx => {
         await tx.execute(sql`SELECT pg_advisory_xact_lock(293, ${task.projectId})`);
+        await tx.execute(sql`SELECT id FROM tasks WHERE id = ${taskId} FOR UPDATE`);
+        const [currentTask] = await tx.select().from(tasks).where(eq(tasks.id, taskId));
+        const [currentParent] = currentTask?.parentTaskId && !currentTask.assigneeId
+          ? await tx.select().from(tasks).where(eq(tasks.id, currentTask.parentTaskId)).for("share") : [];
+        if (!currentTask || currentTask.projectId !== task.projectId || taskHourOwner(currentTask, currentParent) !== effectivePersonnelId) {
+          throw Object.assign(new Error("La tarea cambió de responsable o proyecto. Actualizala antes de guardar las horas."), { statusCode: 409 });
+        }
         await markTaskCostSyncPending(tx, task.projectId, data.date);
         return tx.insert(taskTimeEntries).values({ ...data, ...costing, costSyncPending: true }).returning();
       });
@@ -24682,6 +24785,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       const dbError = error?.cause ?? error;
       if (dbError?.code === "23514") return res.status(409).json({ message: dbError.message });
+      if (error?.statusCode === 409) return res.status(409).json({ message: error.message });
       if (error instanceof z.ZodError) return res.status(400).json({ message: "Datos inválidos", errors: error.errors });
       console.error("Error al registrar horas:", error);
       res.status(500).json({ message: "Error al registrar horas" });
@@ -26949,7 +27053,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           personnelId, startDate: data.startDate, endDate: data.endDate,
           type: data.type, notes: data.notes || null, createdBy: access.userId,
           requestedBy: access.isOperations && personnelId !== access.personnelId ? null : access.userId,
-          status: "pending", planningStatus: "tentative", businessDays: businessDays.length,
+          status: "pending", planningStatus: data.planningStatus, businessDays: businessDays.length,
         }).returning();
         await tx.insert(absenceEvents).values({
           absenceId: absence.id, eventKey: `requested:${absence.id}`, action: "requested",
@@ -27482,7 +27586,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Legacy read remains scoped; unsafe direct mutations are retired.
   app.get("/api/personnel-absences", requireAuth, async (req, res) => {
-    try { res.json(await absenceList(req, isOperationsRequest(req) ? "team" : "mine")); }
+    try {
+      const rows = await absenceList(req, isOperationsRequest(req) ? "team" : "mine");
+      const personnelId = Number(req.query.personnelId);
+      res.json(Number.isInteger(personnelId) && personnelId > 0 ? rows.filter((row) => row.personnelId === personnelId) : rows);
+    }
     catch (error: any) { res.status(error?.status || 500).json({ message: error?.message || "Error al consultar ausencias" }); }
   });
   app.post("/api/personnel-absences", requireAuth, (_req, res) => res.status(410).json({ message: "Usá el flujo de solicitudes", manageUrl: "/absences" }));

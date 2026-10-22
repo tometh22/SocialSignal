@@ -24,12 +24,12 @@ La configuración productiva es `hours_data_source=1` y `app_mode_cutover_date=2
 ## Cambios implementados
 
 1. Una política común bloquea importaciones operativas desde Excel cuando existe fecha de corte. Los jobs financieros salen antes de contactar Google; los importadores de tarifas, FX/REM, ventas, costos, provisiones, resúmenes y normalizaciones también validan el límite. El backfill explícito sólo acepta períodos anteriores al corte y abiertos.
-2. La migración `0084` instala protecciones en PostgreSQL. Verifica período anterior y nuevo, ventanas de devengamiento y presupuesto, y coordina escrituras con cierre mediante el mismo bloqueo transaccional. Un mes cerrado o en revisión no admite cambios; cambiar un dato de un pre-cierre lo invalida. Sólo el cierre nativo puede publicar el resumen posterior al corte.
+2. La migración `0087` instala protecciones en PostgreSQL. Verifica período anterior y nuevo, ventanas de devengamiento y presupuesto, y coordina escrituras con cierre mediante el mismo bloqueo transaccional. Un mes cerrado o en revisión no admite cambios; cambiar un dato de un pre-cierre lo invalida. Sólo el cierre nativo puede publicar el resumen posterior al corte.
 3. Presupuesto de costos en `/finance/presupuesto`: concepto, categoría, directo/indirecto, moneda, importe mensual y vigencia de hasta 60 meses. Tiene auditoría y control de versión para evitar que dos ediciones se pisen. Se puede desactivar; no se borra historia. Si la vigencia afecta un cierre, requiere reapertura.
 4. La proyección consume presupuesto nativo en períodos abiertos y snapshots en los cerrados. Conserva el histórico anterior al corte. Ausencia de presupuesto o FX produce importes pendientes y totales incompletos, no costo cero. Los importes del maestro posteriores al corte permanecen como referencia de conciliación y no se usan como presupuesto vigente.
 5. El cierre muestra controles de transición y comparación de ingresos/presupuesto importados contra Mind. Agrega controles críticos para saldos de apertura y para impedir cerrar con ingresos nativos vacíos cuando hay ingresos importados de referencia. Estos controles detectan faltantes; no certifican la integridad documental ni sustituyen la aprobación de Finanzas.
 6. Tarifas continúan editándose en Configuración → Personal; se ocultan/desactivan controles de sincronización con el maestro después del corte. FX y REM se cargan en Variables económicas o por la Bandeja; dólar e IPC mantienen sus fuentes externas independientes.
-7. Los adaptadores de costos y FX dejaron de leer Sheets durante la operación nativa. Las cuentas y agregados importados quedan como referencia; los cálculos nativos excluyen filas de origen Excel. El agregado de costos conserva su origen hasta reconstruirse desde Mind, evitando que un total importado se presente como costo nativo. La migración `0085` limita el P&L de BI a historia anterior al corte y cierres nativos, y alimenta Cashflow con el ledger nativo, excluyendo anulaciones y transferencias propias.
+7. Los adaptadores de costos y FX dejaron de leer Sheets durante la operación nativa. Las cuentas y agregados importados quedan como referencia; los cálculos nativos excluyen filas de origen Excel. El agregado de costos conserva su origen hasta reconstruirse desde Mind, evitando que un total importado se presente como costo nativo. La migración `0088` limita el P&L de BI a historia anterior al corte y cierres nativos, y alimenta Cashflow con el ledger nativo, excluyendo anulaciones y transferencias propias.
 8. Ambas migraciones se instalan en una transacción antes de servir solicitudes; si fallan, el servidor no arranca sin esas protecciones.
 
 ## Revisión de integración entre áreas
@@ -68,7 +68,7 @@ La automatización hace cálculos, propagaciones y controles; no reemplaza la ca
 
 ### Requisito operativo confirmado: liquidación y facturación del equipo
 
-Actualización del 22 de octubre: el circuito solicitado está implementado en esta rama, con pruebas locales y sin despliegue ni cambios productivos. Reemplaza los faltantes identificados en la revisión anterior.
+Actualización del 22 de octubre: el circuito solicitado está implementado en esta rama, con pruebas locales y sin despliegue ni cambios productivos. Reemplaza los faltantes identificados en la revisión anterior. Integrado con `main` (1.14.4) como versión 1.15.0; migraciones renumeradas 0087–0089 para conservar cumpleaños y OAuth. Pasaron 1.015 pruebas (11 omitidas), TypeScript y build, incluidas las suites PostgreSQL financiera y MCP. El presupuesto nativo se incorpora al catálogo MCP con permiso de Finanzas.
 
 | Paso | Comportamiento implementado |
 | --- | --- |
@@ -83,7 +83,7 @@ Actualización del 22 de octubre: el circuito solicitado está implementado en e
 
 **Ejemplo confirmado:** total ARS 10.000, 90%, TC al facturar 1.500, TC al recibir 1.505 y extras ARS 5.000 → USD 6 y ARS 5.970 (`10.000 − 6 × 1.505 + 5.000`). Se redondea el tramo USD antes de calcular el saldo ARS.
 
-Validación: pruebas PostgreSQL del corte, horas pagas, secuencia, concurrencia, permisos, estados financieros y costos sin FX; migración 0086 aplicada dos veces. HTTP real con cuentas sintéticas recorrió ambas monedas hasta Pasivo, comprobó rechazo de carga anticipada y de modificaciones a documentos aprobados. Chrome verificó el diálogo de descuento excepcional, 120 horas contractuales y la carga/envío del TC personal. Evidencia local: `.context/team-paid-leave-qa.png` y `.context/team-fx-qa.png`.
+Validación: pruebas PostgreSQL del corte, horas pagas, secuencia, concurrencia, permisos, estados financieros y costos sin FX; migración 0089 aplicada dos veces. HTTP real con cuentas sintéticas recorrió ambas monedas hasta Pasivo, comprobó rechazo de carga anticipada y de modificaciones a documentos aprobados. Chrome verificó el diálogo de descuento excepcional, 120 horas contractuales y la carga/envío del TC personal. Evidencia local: `.context/team-paid-leave-qa.png` y `.context/team-fx-qa.png`.
 
 Los avisos de publicación/autorización y recordatorios de pendientes utilizan el sistema de notificaciones existente. El corte depende del calendario de feriados configurado y del job habilitado (`DISABLE_TEAM_PAYROLL=true` permite desactivarlo). Las horas excepcionales posteriores al corte requieren reapertura previa a publicar. Preparar borradores no publica ni autoriza importes.
 

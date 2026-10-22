@@ -13,6 +13,7 @@ import {
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { taskDateBucket } from "@shared/utils/task-date-bucket";
+import { assignCalendarLanes } from "@shared/utils/calendar-lanes";
 import { TASK_STATUS_CONFIG, TaskStatus } from "@/constants/task-statuses";
 
 interface CalTask {
@@ -92,20 +93,6 @@ export default function TaskCalendarView({ projectId, tasks: tasksProp, view = "
 
   const parseLocalDate = (s: string) => new Date(s.slice(0, 10) + "T00:00:00");
 
-  const getRangeInfo = (t: CalTask, d: Date) => {
-    if (!t.startDate || !t.dueDate) return null;
-    const s = parseLocalDate(t.startDate);
-    const e = parseLocalDate(t.dueDate);
-    if (isSameDay(s, e)) return null;
-    const atStart   = isSameDay(d, s);
-    const atEnd     = isSameDay(d, e);
-    const isMon     = d.getDay() === 1;
-    const isSun     = d.getDay() === 0;
-    const roundLeft  = atStart || isMon;
-    const roundRight = atEnd   || isSun;
-    return { atStart, atEnd, isMid: !atStart && !atEnd, roundLeft, roundRight };
-  };
-
   const getTasksForDay = (d: Date) =>
     tasksWithDate.filter(t => {
       const due   = t.dueDate   ? parseLocalDate(t.dueDate)   : null;
@@ -148,10 +135,22 @@ export default function TaskCalendarView({ projectId, tasks: tasksProp, view = "
 
       {/* Calendar grid */}
       <div className="border border-border rounded-xl overflow-hidden">
-        {weeks.map((week, wi) => (
+        {weeks.map((week, wi) => {
+          // Cada tarea conserva su fila durante toda la semana (no salta de posición entre días).
+          const lanes = assignCalendarLanes(tasksWithDate, week.map(d => format(d, "yyyy-MM-dd")));
+          return (
           <div key={wi} className={cn("grid grid-cols-7", wi > 0 && "border-t border-border")}>
             {week.map((d, di) => {
               const dayTasks = getTasksForDay(d);
+              const visibleLanes = 3;
+              const byLane = new Map<number, CalTask>();
+              const overflow: CalTask[] = [];
+              dayTasks.forEach(t => { const lane = lanes.get(t.id) ?? visibleLanes; if (lane < visibleLanes) byLane.set(lane, t); else overflow.push(t); });
+              // Las tareas de carriles altos ocupan primero los huecos libres del día; sólo se ocultan si no entran.
+              overflow.sort((a, b) => (lanes.get(a.id) ?? 0) - (lanes.get(b.id) ?? 0));
+              for (let lane = 0; lane < visibleLanes && overflow.length; lane++) if (!byLane.has(lane)) byLane.set(lane, overflow.shift()!);
+              const lastLane = byLane.size ? Math.max(...byLane.keys()) : -1;
+              const hiddenCount = overflow.length;
               const isToday = isSameDay(d, today);
               const inMonth = isSameMonth(d, currentMonth);
               return (
@@ -174,33 +173,15 @@ export default function TaskCalendarView({ projectId, tasks: tasksProp, view = "
                     {format(d, "d")}
                   </div>
                   <div className="space-y-0.5">
-                    {dayTasks.slice(0, 3).map(t => {
+                    {Array.from({ length: lastLane + 1 }, (_, lane) => byLane.get(lane) ?? null).map((t, lane) => {
+                      if (!t) return <div key={`gap-${lane}`} className="h-[18px]" aria-hidden="true" />;
                       const overdue = isTaskOverdue(t, d);
                       const dot = overdue ? undefined : TASK_STATUS_CONFIG[t.status as TaskStatus]?.dot;
-                      const rangeInfo = getRangeInfo(t, d);
-                      if (rangeInfo) {
-                        return (
-                          <div
-                            key={t.id}
-                            className={cn(
-                              "text-[9px] py-0.5 leading-tight cursor-default h-4 flex items-center",
-                              clientCalendarColor(t.clientId), t.status === "done" && "line-through opacity-60", overdue && "underline decoration-red-500", t.status === "blocked" && "border-dashed border",
-                              rangeInfo.roundLeft ? "rounded-l pl-1" : "-ml-1.5 pl-0",
-                              rangeInfo.roundRight ? "rounded-r pr-1" : "-mr-1.5 pr-0",
-                            )}
-                            title={[t.title, t.clientName, t.projectName, t.status === "blocked" ? "Bloqueada" : ""].filter(Boolean).join(" · ")}
-                          >
-                            {(rangeInfo.atStart || rangeInfo.roundLeft) && (
-                              <span className="truncate px-0.5">{t.title}</span>
-                            )}
-                          </div>
-                        );
-                      }
                       return (
                         <div
                           key={t.id}
                           className={cn(
-                            "text-[9px] px-1 py-0.5 rounded border leading-tight cursor-default flex items-center gap-0.5",
+                            "text-[9px] px-1 h-[18px] rounded border leading-tight cursor-default flex items-center gap-0.5",
                             clientCalendarColor(t.clientId), t.status === "done" && "line-through opacity-60", overdue && "underline decoration-red-500"
                           )}
                           title={[t.title, t.clientName, t.projectName, t.status === "blocked" ? "Bloqueada" : ""].filter(Boolean).join(" · ")}
@@ -212,11 +193,11 @@ export default function TaskCalendarView({ projectId, tasks: tasksProp, view = "
                         </div>
                       );
                     })}
-                    {dayTasks.length > 3 && (
+                    {hiddenCount > 0 && (
                       <Popover>
                         <PopoverTrigger asChild>
                           <button className="text-[9px] text-muted-foreground hover:text-foreground px-1 w-full text-left transition-colors">
-                            +{dayTasks.length - 3} más
+                            +{hiddenCount} más
                           </button>
                         </PopoverTrigger>
                         <PopoverContent className="w-52 p-2" align="start">
@@ -252,7 +233,8 @@ export default function TaskCalendarView({ projectId, tasks: tasksProp, view = "
               );
             })}
           </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Tasks without a due date */}

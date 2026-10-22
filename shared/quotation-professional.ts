@@ -156,6 +156,7 @@ export type WorkloadLine = {
 
 export type EffortBenchmark = {
   serviceBlueprintId: number | null;
+  serviceBlueprintSlug?: string | null;
   projectType: string;
   sampleSize: number;
   averageActualHours: number;

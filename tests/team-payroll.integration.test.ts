@@ -36,7 +36,7 @@ describe.skipIf(!setup.url)("team payroll workflow with PostgreSQL",()=>{
       await query(`CREATE TABLE "${config.name}" (${columns.join(",")})`);
     }
     await query("ALTER TABLE system_config ADD UNIQUE(config_key); ALTER TABLE monthly_closings ADD UNIQUE(personnel_id,year,month); ALTER TABLE personnel_monthly_settlements ADD UNIQUE(personnel_id,period); ALTER TABLE fact_rc_month ADD UNIQUE(project_id,period_key); ALTER TABLE fact_cost_month ADD UNIQUE(period_key)");
-    const migration=readFileSync("migrations/0086_team_settlement_workflow.sql","utf8");
+    const migration=readFileSync("migrations/0089_team_settlement_workflow.sql","utf8");
     await query(migration);await query(migration);
   });
   beforeEach(async()=>{

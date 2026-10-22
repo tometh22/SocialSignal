@@ -26,11 +26,33 @@ describe("Home personal simplificada", () => {
   });
 
   test("evita cuatro columnas prematuras junto al sidebar", () => {
-    expect(home).toContain("grid grid-cols-2 gap-3 xl:grid-cols-4");
-    expect(home).not.toContain("lg:grid-cols-4");
+    expect(home).toContain("lg:grid-cols-12");
+    expect(home).not.toContain("xl:grid-cols-4");
+  });
+
+  test("cada bloque depende del permiso: sin acceso no hay tarjeta ni hueco", () => {
+    expect(home).toContain("const showQuotations = hasPermission('quotations')");
+    expect(home).toContain("const showPortfolio = hasPermission('projects')");
+    expect(home).toContain('const canSeeCapacity = hasPermission("operations")');
+    expect(home).toContain("enabled: canSeeCapacity");
+    expect(home).toContain("{showQuotations && (");
+    expect(home).toContain("{showPortfolio && (");
   });
   test("usa el resumen liviano de alertas y no descarga el endpoint legacy", () => {
     expect(home).toContain('authFetch("/api/projects/alerts-summary")');
     expect(home).not.toContain('authFetch("/api/active-projects")');
+  });
+});
+
+describe("Shell de la app: el documento no scrollea", () => {
+  const css = readFileSync(new URL("../client/src/index.css", import.meta.url), "utf8");
+  const app = readFileSync(new URL("../client/src/App.tsx", import.meta.url), "utf8");
+
+  test("bloquea el scroll del documento dentro de la capa base (donde gana !important)", () => {
+    expect(css).toMatch(/html:has\(\.app-shell\),\s*body:has\(\.app-shell\)\s*\{[^}]*overflow: hidden !important/);
+  });
+
+  test("el shell recorta (clip) en vez de ocultar, así nada puede desplazarlo", () => {
+    expect(app).toContain('className="app-shell flex h-[100dvh] overflow-clip bg-background"');
   });
 });

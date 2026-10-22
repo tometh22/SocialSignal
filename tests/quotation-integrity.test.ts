@@ -140,7 +140,7 @@ describe("quotation integration contracts", () => {
 
     expect(routes).toContain("teamMembers: z.array(quotationTeamPayloadSchema)");
     expect(routes).toContain("variantId: createdVariant.id");
-    expect(variants).toContain("teamMembers: effectiveTeam.map");
+    expect(variants).toContain("teamMembers: effectiveTeam.filter((member) => member.hours > 0).map");
     expect(storage).toContain("copyQuotationTeamToProject(quotationId: number, projectId: number, variantId?");
     expect(storage).toContain("eq(quotationTeamMembers.variantId, variantId)");
   });

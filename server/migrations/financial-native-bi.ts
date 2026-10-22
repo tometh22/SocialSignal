@@ -1,4 +1,4 @@
-// Keep in sync with migrations/0085_financial_native_bi.sql.
+// Keep in sync with migrations/0088_financial_native_bi.sql.
 export const financialNativeBiMigrationSql = String.raw`
 -- Preserve the existing BI column contract; no live master dependency.
 CREATE OR REPLACE VIEW vw_looker_pnl_mensual AS

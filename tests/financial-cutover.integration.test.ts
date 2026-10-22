@@ -31,7 +31,7 @@ describe.skipIf(!url)("financial cutover in PostgreSQL",()=>{
     await query("ALTER TABLE provision_entries ADD COLUMN remaining_amount numeric, ADD COLUMN unwound_amount numeric, ADD COLUMN monto_provision numeric");
     for(const table of ["income_sot","financial_sot"])await query(`CREATE TABLE ${table}(id serial PRIMARY KEY,month_key text,amount numeric)`);
     await query("INSERT INTO fact_cost_month(period_key,amount) VALUES('2026-07',7),('2026-08',8)");
-    const migration=readFileSync("migrations/0084_financial_cutover.sql","utf8");
+    const migration=readFileSync("migrations/0087_financial_cutover.sql","utf8");
     await query(migration);await query(migration); // idempotency
   });
   afterAll(async()=>{if(c){await query(`DROP SCHEMA ${schema} CASCADE`);await c.end();}});

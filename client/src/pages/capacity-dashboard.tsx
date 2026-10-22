@@ -32,6 +32,13 @@ export default function CapacityDashboard() {
 
   // Expandable per-person task breakdown (Proyecto > sección > tarea)
   const [expandedPersonId, setExpandedPersonId] = useState<number | null>(null);
+  // Proyectos contraídos dentro del desglose, por persona + proyecto.
+  const [collapsedProjects, setCollapsedProjects] = useState<Set<string>>(new Set());
+  const toggleProject = (key: string) => setCollapsedProjects(prev => {
+    const next = new Set(prev);
+    if (next.has(key)) next.delete(key); else next.add(key);
+    return next;
+  });
   const [editingEstTaskId, setEditingEstTaskId] = useState<number | null>(null);
   const [editingEstInput, setEditingEstInput] = useState<string>("");
 
@@ -362,19 +369,34 @@ export default function CapacityDashboard() {
                             </div>
                           ) : (
                             <div className="space-y-3 pl-6">
-                              {Array.from(grouped!.values()).map((proj, pi) => (
+                              {Array.from(grouped!.values()).map((proj, pi) => {
+                                const projectKey = `${p.personnelId}:${proj.clientName ?? ""}:${proj.projectName}`;
+                                const projectCollapsed = collapsedProjects.has(projectKey);
+                                const projectEstimate = Array.from(proj.sections.values()).flat()
+                                  .reduce((sum: number, t: any) => sum + (Number(t.estimatedHoursForWeek) || 0), 0);
+                                return (
                                 <div key={pi}>
-                                  <div className="text-xs font-semibold text-foreground">
-                                    {proj.clientName ? <span className="text-muted-foreground">{proj.clientName} · </span> : null}
-                                    {proj.projectName}
-                                  </div>
-                                  {Array.from(proj.sections.entries()).map(([sName, sTasks], si) => (
+                                  <button
+                                    type="button"
+                                    className="flex w-full items-center gap-1.5 text-left text-xs font-semibold text-foreground hover:text-primary"
+                                    onClick={() => toggleProject(projectKey)}
+                                    aria-expanded={!projectCollapsed}
+                                    data-testid="capacity-project-toggle"
+                                  >
+                                    {projectCollapsed ? <ChevronRight className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                                    <span>
+                                      {proj.clientName ? <span className="text-muted-foreground">{proj.clientName} · </span> : null}
+                                      {proj.projectName}
+                                    </span>
+                                    {projectEstimate > 0 && <span className="font-normal text-muted-foreground">· {projectEstimate}h est.</span>}
+                                  </button>
+                                  {!projectCollapsed && Array.from(proj.sections.entries()).map(([sName, sTasks], si) => (
                                     <div key={si} className="mt-1 pl-3">
                                       <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{sName}</div>
                                       <div className="mt-0.5">
                                         {sTasks.map((t: any) => (
-                                          <div key={t.id} className="flex items-center gap-2 py-0.5 pl-3 text-xs">
-                                            <span className="flex-1 truncate text-foreground">{t.title}</span>
+                                          <div key={t.id} className="flex items-center gap-3 py-0.5 pl-3 text-xs" data-testid="capacity-task-row">
+                                            <span className="min-w-0 max-w-[22rem] flex-1 truncate text-foreground sm:flex-none sm:basis-[22rem]">{t.title}</span>
                                             {editingEstTaskId === t.id ? (
                                               <div className="flex items-center gap-1">
                                                 <Input
@@ -425,7 +447,8 @@ export default function CapacityDashboard() {
                                     </div>
                                   ))}
                                 </div>
-                              ))}
+                                );
+                              })}
                             </div>
                           )}
                         </td>
