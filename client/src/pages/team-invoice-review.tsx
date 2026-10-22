@@ -116,7 +116,7 @@ export default function TeamInvoiceReview() {
       <Metric label="Aprobadas" value={approved} />
     </div>
 
-    <Card><CardContent className="flex flex-col gap-3 pt-6 sm:flex-row">
+    <Card><CardContent className="flex flex-col gap-3 pt-6 sm:pt-6 sm:flex-row">
       <div className="sm:w-56"><Label htmlFor="invoice-review-period">Período trabajado</Label><Input id="invoice-review-period" className="mt-1.5" type="month" value={period} onChange={(event) => { if (/^\d{4}-(0[1-9]|1[0-2])$/.test(event.target.value)) setPeriod(event.target.value); }} /></div>
       <div className="min-w-0 flex-1"><Label htmlFor="invoice-review-search">Buscar</Label><div className="relative mt-1.5"><Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" /><Input id="invoice-review-search" className="pl-9" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Persona o número de factura" /></div></div>
     </CardContent></Card>

@@ -207,7 +207,7 @@ export default function TeamSettlements({ period, onDirtyChange }: { period: str
         const flow = normalizeWorkflow(row.settlement?.workflow);
         const conditionsLocked = (row.invoices ?? []).length > 0 || [flow.usd.status, flow.ars.status].some(s => s === "pending" || s === "approved");
         return <Card key={row.person.id} className={state.group === "ops" ? "border-indigo-200" : state.group === "done" ? "border-emerald-200" : ""}>
-          <CardHeader className="p-0">
+          <CardHeader className="p-0 sm:p-0">
             <button type="button" className="flex w-full items-center gap-4 px-5 py-4 text-left" onClick={() => setOpenId(isOpen ? null : row.person.id)} aria-expanded={isOpen}>
               <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${state.group === "done" ? "bg-emerald-100 text-emerald-700" : state.group === "ops" ? "bg-indigo-100 text-indigo-700" : "bg-slate-100 text-slate-700"}`}>{state.step}</span>
               <span className="min-w-0 flex-1"><span className="block truncate font-semibold">{row.person.name}</span><span className="block truncate text-xs text-muted-foreground">{row.person.contractType} · {row.person.email || "Sin email vinculado"}</span><span className="mt-0.5 block text-xs font-medium text-indigo-700 md:hidden">{state.label}</span></span>
@@ -216,7 +216,7 @@ export default function TeamSettlements({ period, onDirtyChange }: { period: str
               <ChevronDown className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${isOpen ? "rotate-180" : ""}`} />
             </button>
           </CardHeader>
-          {isOpen && <CardContent className="space-y-4 border-t pt-5">
+          {isOpen && <CardContent className="space-y-4 border-t pt-5 sm:pt-6">
             {!row.closing ? <div className="flex gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /><span>Falta el cierre operativo. Cerrá primero sus horas en Cierre del equipo → Base a cobrar; recién entonces Mind congela el valor hora y el total.</span></div> : <>
               <div>
                 <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Mind completa automáticamente</p>

@@ -71,4 +71,4 @@ export default function FinancialClosePage() {
   </div>;
 }
 
-function Metric({ title, value, alert = false }: { title: string; value: string; alert?: boolean }) { return <Card><CardContent className="pt-5"><p className="text-xs uppercase tracking-wide text-muted-foreground">{title}</p><p className={`mt-1 text-2xl font-semibold ${alert ? "text-red-600" : ""}`}>{value}</p></CardContent></Card>; }
+function Metric({ title, value, alert = false }: { title: string; value: string; alert?: boolean }) { return <Card><CardContent className="pt-5 sm:pt-6"><p className="text-xs uppercase tracking-wide text-muted-foreground">{title}</p><p className={`mt-1 text-2xl font-semibold ${alert ? "text-red-600" : ""}`}>{value}</p></CardContent></Card>; }

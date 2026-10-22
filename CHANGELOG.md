@@ -2,6 +2,8 @@
 
 ## 1.15.0 — 2026-10-22
 
+- Espaciado responsive: los títulos y filtros del cierre mantienen separación respecto de los bordes en escritorio y móvil; se corrigen las reglas de padding que se anulaban desde 640 px.
+
 - UX del cierre: mes compartido, borradores conservados entre pestañas, aviso al cambiar de mes con cambios pendientes, tablas adaptadas a móvil, campos alineados y responsables del próximo paso explícitos. Mis facturas distingue ARS/USD y resume comprobantes enviados o aprobados.
 - Revisión de facturas: la fecha de versión se devuelve en UTC para evitar rechazos falsos de concurrencia en zonas horarias como Argentina, conservando la protección contra revisiones vencidas.
 - Cierre del equipo: recorrido unificado de base y facturación; vacaciones, feriados y días Epical pagos, con descuento excepcional sin goce y motivo.
