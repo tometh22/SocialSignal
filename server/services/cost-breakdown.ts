@@ -76,10 +76,11 @@ export async function getCostBreakdown(year: number): Promise<CostBreakdown> {
          SELECT DISTINCT invoice_period FROM revenue_events WHERE source_tab='mind_intake'
          UNION
          SELECT DISTINCT period FROM personal_monthly_invoices
+         UNION SELECT DISTINCT to_char(make_date(year,month,1),'YYYY-MM') FROM monthly_closings
        ), modeled_team AS (
          SELECT f.period_key,f.person_id,COALESCE(p.name,'Equipo sin asignar') AS concepto,
-                COALESCE(SUM(f.cost_usd),0)::numeric AS modeled_usd
-           FROM fact_labor_month f
+                COALESCE(SUM(f.direct_usd+f.indirect_usd),0)::numeric AS modeled_usd
+           FROM financial_team_cost_month f
            LEFT JOIN personnel p ON p.id=f.person_id
           WHERE f.period_key LIKE $1
             AND EXISTS (SELECT 1 FROM native_periods n WHERE n.period_key=f.period_key)

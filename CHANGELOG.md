@@ -2,6 +2,10 @@
 
 ## 1.14.0 — 2026-10-09
 
+- Cierre del equipo: recorrido unificado de base y facturación; vacaciones, feriados y días Epical pagos, con descuento excepcional sin goce y motivo.
+- Corte automático el último día hábil a las 23:59 de Buenos Aires, borradores y recordatorios. TC bancarios y extras en Mis facturas; autorización de Operaciones antes de cada comprobante USD/ARS, bonos en ambas monedas y protección de versiones.
+- Migración 0086: corte operativo de horas, estados de autorización y conciliación del costo contractual/bonos/reintegros con Finanzas, sin duplicar gasto al registrar Pasivo. El cierre financiero exige autorizaciones y comprobantes requeridos.
+
 - Cierre: devolución de revisión a corrección con motivo y auditoría; los controles críticos deben resolverse antes de enviar a revisión.
 - Operaciones/Finanzas: horas protegidas por mes civil, recálculo y pre-cierre atómicos, bloqueo de costos laborales incompletos y nueva validación antes de congelar. Las provisiones pueden liberarse en un mes posterior sin reescribir el cierre original.
 

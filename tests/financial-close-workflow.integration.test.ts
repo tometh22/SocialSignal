@@ -36,6 +36,7 @@ describe.skipIf(!setup.url)("financial close checklist and review in PostgreSQL"
     await admin.query(`CREATE SCHEMA ${setup.schema}`);
     await query(`
       CREATE TABLE users(id integer PRIMARY KEY);
+      CREATE TABLE financial_payroll_pending(period_key text);
       INSERT INTO users VALUES (1);
       CREATE TABLE exchange_rates(id serial PRIMARY KEY,year int,month int,rate numeric,rate_type text,is_active boolean,updated_at timestamp);
       CREATE TABLE financial_accounts(is_active boolean,opening_balance_date date);
@@ -47,7 +48,7 @@ describe.skipIf(!setup.url)("financial close checklist and review in PostgreSQL"
       CREATE TABLE pasivo_entries(LIKE activo_entries);
       CREATE TABLE cashflow_transactions(source text DEFAULT 'mind',period_key text,voided_at timestamp,monto_usd numeric,monto_ars numeric,cotizacion numeric,reconciliation_status text,transfer_group_id text,tipo_movimiento text);
       CREATE TABLE provision_entries(period_key text,status text,import_batch text);
-      CREATE TABLE personnel_monthly_settlements(personnel_id int,period text,status text,billing_currency_snapshot text);
+      CREATE TABLE personnel_monthly_settlements(personnel_id int,period text,status text,billing_currency_snapshot text,workflow jsonb);
       CREATE TABLE personal_monthly_invoices(period text,approval_status text,declared_invoice_amount numeric);
       INSERT INTO financial_accounts VALUES(true,'2026-08-01');
       INSERT INTO exchange_rates(year,month,rate,rate_type,is_active,updated_at) VALUES(2026,10,1500,'end_of_month',true,now());

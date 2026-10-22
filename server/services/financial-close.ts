@@ -54,6 +54,7 @@ async function collectCloseChecks(periodKey: string, runner: any = db): Promise<
 
   const statsResult = await runner.execute(sql`
     SELECT
+      (SELECT count(*) FROM financial_payroll_pending WHERE period_key=${periodKey})::int AS payroll_pending,
       (SELECT count(*) FROM financial_accounts WHERE is_active=true AND opening_balance_date < (${periodKey} || '-01')::date + interval '1 month')::int AS opening_accounts,
       (SELECT count(*) FROM fact_labor_month
         WHERE period_key=${periodKey} AND left(source_row_id,4)='app_' AND COALESCE(asana_hours,0)>0
@@ -80,7 +81,7 @@ async function collectCloseChecks(periodKey: string, runner: any = db): Promise<
           AND reconciliation_status = 'unmatched')::int AS unmatched_cashflow,
       (SELECT count(*) FROM provision_entries
         WHERE import_batch IS NULL AND period_key = ${periodKey} AND status = 'PROPOSED')::int AS proposed_provisions,
-      (SELECT COALESCE(sum(CASE WHEN settlement.billing_currency_snapshot='MIXED' THEN 2 ELSE 1 END),0)
+      (SELECT COALESCE(sum(CASE WHEN COALESCE((settlement.workflow->>'version')::int,0)>0 THEN (CASE WHEN COALESCE((settlement.workflow->'usd'->>'amount')::numeric,0)>0 THEN 1 ELSE 0 END)+(CASE WHEN COALESCE((settlement.workflow->'ars'->>'amount')::numeric,0)>0 THEN 1 ELSE 0 END) WHEN settlement.billing_currency_snapshot='MIXED' THEN 2 ELSE 1 END),0)
         FROM (
           SELECT DISTINCT fl.person_id
           FROM fact_labor_month fl
@@ -113,6 +114,7 @@ async function collectCloseChecks(periodKey: string, runner: any = db): Promise<
 
   const incompleteLabor = numeric(stats.incomplete_labor) + numeric(stats.pending_labor_sync);
   const checks: CloseCheckDefinition[] = [
+    { code: "payroll_authorized", severity: "critical", status: numeric(stats.payroll_pending) === 0 ? "passed" : "failed", title: "Liquidación del equipo autorizada", detail: "Completar bases, bonos, extras, autorizaciones y revisión de comprobantes de ambos tramos antes del cierre financiero.", actualValue: numeric(stats.payroll_pending), expectedValue: 0 },
     {
       code: "labor_costs_complete", severity: "critical", status: incompleteLabor === 0 ? "passed" : "failed",
       title: "Costos de Operaciones completos",
@@ -168,7 +170,7 @@ async function collectCloseChecks(periodKey: string, runner: any = db): Promise<
     },
     {
       code: "fixed_team_invoices_approved",
-      severity: "warning",
+      severity: "critical",
       status: fixedInvoiceMissing === 0 ? "passed" : "failed",
       title: "Pasivo del equipo documentado",
       detail: fixedInvoiceMissing === 0

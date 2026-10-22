@@ -1,3 +1,5 @@
+import { calculatePersonnelSettlement } from "@shared/utils/personnel-settlement";
+import { settlementWorkflow, type SettlementWorkflow, type SettlementPhase } from "@shared/utils/settlement-workflow";
 import { calculateSettlementDifference } from "@shared/utils/monthly-settlement-declaration";
 import { useEffect, useMemo, useRef, useState, type ClipboardEvent, type DragEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -40,6 +42,8 @@ type Settlement = {
   usdPercentage: number;
   plannedUSDARS: number;
   bonusUSD: number;
+  bonusARS: number;
+  workflow: SettlementWorkflow;
   extrasARS: number;
   invoiceFx: number | null;
   baseInvoiceUSD: number | null;
@@ -72,7 +76,7 @@ function currentPeriod() {
 }
 function money(value: number | null | undefined, currency: "ARS" | "USD") {
   if (value == null || !Number.isFinite(Number(value))) return "—";
-  return new Intl.NumberFormat(currency === "ARS" ? "es-AR" : "en-US", { style: "currency", currency, maximumFractionDigits: currency === "ARS" ? 0 : 2 }).format(Number(value));
+  return new Intl.NumberFormat(currency === "ARS" ? "es-AR" : "en-US", { style: "currency", currency, maximumFractionDigits: 2 }).format(Number(value));
 }
 function periodLabel(period: string) {
   const [year, month] = period.split("-").map(Number);
@@ -80,64 +84,87 @@ function periodLabel(period: string) {
 }
 
 export default function MyInvoices() {
-  const [period, setPeriod] = useState(currentPeriod());
+  const [period, setPeriod] = useState(() => new URLSearchParams(window.location.search).get("period") || currentPeriod());
   const [invoiceFx, setInvoiceFx] = useState("");
   const [receivedFx, setReceivedFx] = useState("");
   const [bankCommissionUSD, setBankCommissionUSD] = useState("0");
+  const [extrasARS, setExtrasARS] = useState("0");
+  const [extrasReason, setExtrasReason] = useState("");
+  const [receivedConfirmed, setReceivedConfirmed] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const invoicesQuery = useQuery<InvoiceRow[]>({ queryKey: ["personal-invoices"], queryFn: () => authFetchJson("/api/me/invoices") });
+  const invoicesQuery = useQuery<InvoiceRow[]>({ queryKey: ["personal-invoices"], refetchInterval: 30000, queryFn: () => authFetchJson("/api/me/invoices") });
   const summaryQuery = useQuery<MonthSummary | null>({ queryKey: ["personal-invoice-summary", period], queryFn: () => authFetchJson(`/api/me/invoices/summary?period=${period}`) });
-  const settlementQuery = useQuery<Settlement | null>({ queryKey: ["personal-settlement", period], queryFn: () => authFetchJson(`/api/me/invoices/settlement?period=${period}`) });
+  const settlementQuery = useQuery<Settlement | null>({ queryKey: ["personal-settlement", period], refetchInterval: 30000, queryFn: () => authFetchJson(`/api/me/invoices/settlement?period=${period}`) });
   const settlement = settlementQuery.data ?? null;
   const summary = summaryQuery.data ?? null;
   const periodInvoices = useMemo(() => (invoicesQuery.data ?? []).filter((item) => item.period === period), [invoicesQuery.data, period]);
   const invoiceFor = (component: InvoiceComponent) => periodInvoices.find((item) => (item.invoiceComponent ?? "single") === component) ?? null;
   const billing = settlement?.billingCurrencySnapshot?.toUpperCase() ?? "";
-  const isMixed = billing === "MIXED";
+  const isMixed = billing !== "ARS";
+  const usesUSD = Number(settlement?.usdPercentage ?? 0) > 0 || Number(settlement?.bonusUSD ?? 0) > 0;
+  const flow = settlementWorkflow(settlement?.workflow);
+  const complete = Boolean(settlement) && ([...(usesUSD ? ["usd"] : []), "ars"] as SettlementPhase[]).every(phase => flow[phase].status === "approved" && (flow[phase].amount === 0 || periodInvoices.some(i => i.invoiceCurrency === phase.toUpperCase() && i.approvalStatus === "approved")));
+  const usdDocumentApproved = periodInvoices.some(i => i.invoiceCurrency === "USD" && i.approvalStatus === "approved");
 
   useEffect(() => {
     setInvoiceFx(settlement?.invoiceFx == null ? "" : String(settlement.invoiceFx));
     setReceivedFx(settlement?.receivedFx == null ? "" : String(settlement.receivedFx));
     setBankCommissionUSD(String(settlement?.bankCommissionUSD ?? 0));
-  }, [settlement?.id, settlement?.invoiceFx, settlement?.receivedFx, settlement?.bankCommissionUSD]);
+    setExtrasARS(String(settlement?.workflow?.extrasARS ?? 0));
+    setExtrasReason(settlement?.workflow?.extrasReason ?? "");
+    setReceivedConfirmed(Boolean(settlement?.workflow?.receivedConfirmed));
+  }, [settlement?.id, settlement?.invoiceFx, settlement?.receivedFx, settlement?.bankCommissionUSD, settlement?.workflow?.version, period]);
 
   const settlementMutation = useMutation({
-    mutationFn: (phase: "invoice" | "receipt") => authFetchJson("/api/me/invoices/settlement", {
+    mutationFn: (phase: SettlementPhase) => authFetchJson("/api/me/invoices/settlement", {
       method: "PATCH", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(phase === "invoice" ? { period, invoiceFx } : { period, receivedFx, bankCommissionUSD }),
+      body: JSON.stringify({ id: settlement?.id, version: flow.version, phase, action: "submit", invoiceFx, receivedFx, receivedConfirmed, bankCommissionUSD, extrasARS, extrasReason }),
     }),
-    onSuccess: (_data, phase) => {
-      queryClient.invalidateQueries({ queryKey: ["personal-settlement", period] });
-      toast(phase === "invoice" ? { title: "Factura USD calculada", description: "Ya podés emitirla y enviarla sin esperar el segundo tramo." } : { title: "Diferencia ARS calculada", description: "Ya podés emitir y enviar la factura ARS." });
-    },
-    onError: (error: Error) => toast({ title: "No se pudo calcular", description: error.message, variant: "destructive" }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["personal-settlement", period] }); toast({ title: "Enviado a Operaciones", description: "Esperá la autorización antes de emitir la factura. El estado se actualiza acá." }); },
+    onError: (error: Error) => toast({ title: "Revisá los datos", description: error.message, variant: "destructive" }),
   });
-
-  const invoiceFxNumber = Number(invoiceFx) > 0 ? Number(invoiceFx) : null;
-  const receivedFxNumber = Number(receivedFx) > 0 ? Number(receivedFx) : null;
-  const previewBaseUSD = settlement && invoiceFxNumber ? settlement.plannedUSDARS / invoiceFxNumber : null;
-  const previewTotalUSD = previewBaseUSD == null ? null : previewBaseUSD + Number(settlement?.bonusUSD ?? 0);
-  const previewPesifiedARS = previewBaseUSD != null && receivedFxNumber ? previewBaseUSD * receivedFxNumber : null;
-  const previewFinalARS = settlement && previewPesifiedARS != null && receivedFxNumber
-    ? settlement.totalARS - previewPesifiedARS + settlement.extrasARS + (Number(bankCommissionUSD) || 0) * receivedFxNumber : null;
-  const invoiceFxSaved = Boolean(settlement?.invoiceFx && settlement?.totalInvoiceUSD != null);
-  const receivedFxSaved = Boolean(settlement?.receivedFx && settlement?.finalInvoiceARS != null);
+  const preview = settlement ? calculatePersonnelSettlement({ ...settlement, invoiceFx: Number(invoiceFx), receivedFx: Number(receivedFx), bankCommissionUSD: Number(bankCommissionUSD), extrasARS: settlement.extrasARS + Number(extrasARS) }) : null;
+  const phaseCard = (phase: SettlementPhase) => {
+    if (!settlement) return null;
+    const stage = flow[phase];
+    const isUSD = phase === "usd";
+    const canEdit = stage.status === "draft" || stage.status === "rejected";
+    const ready = isUSD || !usesUSD || usdDocumentApproved;
+    const amount = canEdit ? isUSD ? preview?.totalInvoiceUSD : preview?.finalInvoiceARS : stage.amount;
+    const component: InvoiceComponent = isMixed ? phase : isUSD ? "single" : "single";
+    const label = isUSD ? "1. Factura en dólares" : usesUSD ? "2. Después de recibir los USD" : "Tu factura en pesos";
+    return <Card key={phase} className={stage.status === "approved" ? "border-emerald-300" : ""}><CardHeader><CardTitle className="text-base">{label}</CardTitle><p className="text-sm text-muted-foreground">{isUSD ? "Ingresá el tipo de cambio comprador más bajo de tu banco del día en que vas a facturar." : usesUSD ? "Confirmá que recibiste el dinero e ingresá el TC comprador más bajo de tu banco de ese día." : "Tu importe base ya está calculado. Agregá extras sólo si corresponde."}</p></CardHeader><CardContent className="space-y-4">
+      {!ready && <Notice tone="info" title="Primero completá la factura USD" text="Este paso se habilita después de que Administración apruebe tu comprobante USD y recibas el dinero." />}
+      {stage.reason && <Notice tone="warning" title="Operaciones pidió una corrección" text={stage.reason} />}
+      {canEdit && ready && <>
+        {isUSD ? <div><Label htmlFor="invoice-fx">TC de mi banco al facturar (ARS por USD)</Label><Input id="invoice-fx" type="number" min="0.01" step="0.01" value={invoiceFx} onChange={e => setInvoiceFx(e.target.value)} placeholder="Ej. 1500" /></div> : <>
+          {usesUSD && <><label className="flex items-center gap-2"><input type="checkbox" checked={receivedConfirmed} onChange={e => setReceivedConfirmed(e.target.checked)} />Ya recibí los USD en mi cuenta</label><Label htmlFor="received-fx">TC de mi banco al recibir el dinero (ARS por USD)</Label><Input id="received-fx" type="number" min="0.01" step="0.01" value={receivedFx} onChange={e => setReceivedFx(e.target.value)} placeholder="Ej. 1505" /><Label htmlFor="bank-fee">Comisión bancaria en USD (opcional)</Label><Input id="bank-fee" type="number" min="0" step="0.01" value={bankCommissionUSD} onChange={e => setBankCommissionUSD(e.target.value)} /></>}
+          <Label htmlFor="extras-ars">Extras en ARS (comisiones, monotributo u otros reintegros)</Label><Input id="extras-ars" type="number" min="0" step="0.01" value={extrasARS} onChange={e => setExtrasARS(e.target.value)} /><Label htmlFor="extras-reason">Detalle de los extras</Label><Textarea id="extras-reason" value={extrasReason} onChange={e => setExtrasReason(e.target.value)} placeholder="Concepto e importe de cada reintegro" />
+        </>}
+      </>}
+      <Summary label={stage.status === "approved" ? "Importe autorizado" : "Importe calculado"} value={money(amount, isUSD ? "USD" : "ARS")} detail={isUSD ? "Tramo base ÷ TC + bono USD" : "Total base − USD base al TC del cobro + bono ARS + extras"} />
+      {canEdit && ready && <Button disabled={settlementMutation.isPending || amount == null || amount < 0 || (!isUSD && usesUSD && !receivedConfirmed)} onClick={() => settlementMutation.mutate(phase)}>Enviar importe a Operaciones</Button>}
+      {amount != null && amount < 0 && <Notice tone="warning" title="Saldo negativo: requiere revisión" text="El valor de los USD recibidos supera el saldo. Operaciones debe resolver la diferencia antes de emitir." />}
+      {stage.status === "pending" && <Notice tone="info" title="Esperando autorización de Operaciones" text="Todavía no emitas la factura. Cuando aprueben el importe vas a poder adjuntarla en este mismo lugar." />}
+      {stage.status === "approved" && (Number(stage.amount) === 0 ? <Notice tone="info" title="Tramo completo: no requiere factura" text="Operaciones autorizó un saldo de cero." /> : <InvoiceUpload period={period} component={component} currency={isUSD ? "USD" : "ARS"} expected={Number(stage.amount)} existing={invoiceFor(component)} enabled onSaved={() => { queryClient.invalidateQueries({ queryKey: ["personal-invoices"] }); queryClient.invalidateQueries({ queryKey: ["personal-settlement", period] }); }} />)}
+    </CardContent></Card>;
+  };
 
   return <div className="mx-auto max-w-6xl space-y-6">
     <div>
       <p className="text-sm font-medium text-indigo-600">Espacio personal</p>
       <h1 className="text-3xl font-semibold tracking-tight">Mis facturas</h1>
-      <p className="mt-1 max-w-3xl text-sm text-muted-foreground">Operaciones calcula tu liquidación. Vos emitís cada factura en su momento y Administración la compara con el importe esperado antes de registrarla en Pasivo.</p>
+      <p className="mt-1 max-w-3xl text-sm text-muted-foreground">Operaciones calcula tu liquidación. Completá el TC y los extras acá, esperá la autorización de Operaciones y luego emití y adjuntá cada factura. Administración la compara con el importe esperado antes de registrarla en Pasivo.</p>
     </div>
 
-    <MonthlyClosingDeclarations />
+    <details><summary className="cursor-pointer text-sm text-muted-foreground">Declaraciones anteriores del cierre operativo</summary><MonthlyClosingDeclarations /></details>
 
     <div className="grid gap-3 md:grid-cols-4">
       <Step number={1} label="Cierre operativo" detail="Costo del mes" done={Boolean(summary?.isClosed)} />
       <Step number={2} label="Liquidación" detail="Operaciones publica" done={Boolean(settlement)} />
       <Step number={3} label="Facturación" detail={isMixed ? "USD y luego ARS" : "Comprobante"} active={Boolean(settlement)} />
-      <Step number={4} label="Pasivo" detail="Administración aprueba" done={periodInvoices.length > 0 && periodInvoices.every((invoice) => invoice.approvalStatus === "approved")} />
+      <Step number={4} label="Pasivo" detail="Administración aprueba" done={complete} />
     </div>
 
     <Card><CardHeader className="pb-3"><CardTitle className="text-base">1. Período y referencia operativa</CardTitle></CardHeader><CardContent className="grid gap-4 sm:grid-cols-4">
@@ -150,23 +177,7 @@ export default function MyInvoices() {
     {!settlementQuery.isLoading && !settlement && <Notice tone="warning" title="Esperando a Operaciones" text={`Todavía no publicaron tu liquidación de ${periodLabel(period)}. El costo ya pertenece al cierre operativo, pero aún no hay una instrucción para facturar.`} />}
     {settlement?.adminNotes && <Notice tone="info" title="Indicación de Operaciones" text={settlement.adminNotes} />}
 
-    {settlement && !isMixed && <Card><CardHeader><CardTitle className="text-base">2. Factura mensual</CardTitle><p className="text-sm text-muted-foreground">La factura alimenta Pasivo según su fecha de emisión. No modifica el costo operativo.</p></CardHeader><CardContent>
-      <InvoiceUpload period={period} component="single" currency={billing === "USD" ? "USD" : "ARS"} expected={billing === "USD" ? Number(summary?.grandTotalUSD ?? 0) : settlement.totalARS} existing={invoiceFor("single")} enabled onSaved={() => queryClient.invalidateQueries({ queryKey: ["personal-invoices"] })} />
-    </CardContent></Card>}
-
-    {settlement && isMixed && <div className="space-y-4">
-      <Card className={invoiceFxSaved ? "border-emerald-200" : "border-indigo-200"}><CardHeader><div className="flex items-start justify-between gap-3"><div><CardTitle className="text-base">A. Fin de mes: factura USD</CardTitle><p className="mt-1 text-sm text-muted-foreground">Cargá el TC comprador más bajo del banco. Mind calcula el importe y habilita la factura USD inmediatamente.</p></div><Badge variant="outline">{invoiceFxSaved ? "Importe confirmado" : "Hacer ahora"}</Badge></div></CardHeader><CardContent className="space-y-4">
-        <div className="grid gap-3 sm:grid-cols-[minmax(0,280px)_1fr_1fr]"><div><Label htmlFor="invoice-fx">TC al facturar</Label><Input id="invoice-fx" className="mt-1.5" type="number" min="0" step="0.01" value={invoiceFx} onChange={(event) => setInvoiceFx(event.target.value)} /></div><Summary label="USD base" value={money(previewBaseUSD, "USD")} detail="Pesos del tramo ÷ TC" /><Summary label="Factura USD esperada" value={money(previewTotalUSD, "USD")} detail="Incluye extra USD informado" /></div>
-        <Button disabled={!invoiceFxNumber || settlementMutation.isPending} onClick={() => settlementMutation.mutate("invoice")}>{settlementMutation.isPending && settlementMutation.variables === "invoice" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Calculator className="mr-2 h-4 w-4" />}{invoiceFxSaved ? "Actualizar cálculo USD" : "Confirmar TC y calcular USD"}</Button>
-        {invoiceFxSaved && <div className="border-t pt-4"><InvoiceUpload period={period} component="usd" currency="USD" expected={Number(settlement.totalInvoiceUSD ?? 0)} existing={invoiceFor("usd")} enabled onSaved={() => queryClient.invalidateQueries({ queryKey: ["personal-invoices"] })} /></div>}
-      </CardContent></Card>
-
-      <Card className={!invoiceFxSaved ? "opacity-65" : receivedFxSaved ? "border-emerald-200" : "border-indigo-200"}><CardHeader><div className="flex items-start justify-between gap-3"><div><CardTitle className="text-base">B. Después del cobro: factura ARS</CardTitle><p className="mt-1 text-sm text-muted-foreground">Cuando recibas los USD, cargá el segundo TC y la comisión. Esta factura puede emitirse al comienzo del mes siguiente.</p></div><Badge variant="outline">{receivedFxSaved ? "Importe confirmado" : invoiceFxSaved ? "Siguiente paso" : "Esperá el paso A"}</Badge></div></CardHeader><CardContent className="space-y-4">
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><div><Label htmlFor="received-fx">TC al cobrar</Label><Input id="received-fx" className="mt-1.5" type="number" min="0" step="0.01" value={receivedFx} onChange={(event) => setReceivedFx(event.target.value)} disabled={!invoiceFxSaved} /></div><div><Label htmlFor="bank-fee">Comisión bancaria USD</Label><Input id="bank-fee" className="mt-1.5" type="number" min="0" step="0.01" value={bankCommissionUSD} onChange={(event) => setBankCommissionUSD(event.target.value)} disabled={!invoiceFxSaved} /></div><Summary label="USD base pesificados" value={money(previewPesifiedARS, "ARS")} detail="USD base × segundo TC" /><Summary label="Factura ARS esperada" value={money(previewFinalARS, "ARS")} detail="Diferencia final" /></div>
-        <Button disabled={!invoiceFxSaved || !receivedFxNumber || settlementMutation.isPending} onClick={() => settlementMutation.mutate("receipt")}>{settlementMutation.isPending && settlementMutation.variables === "receipt" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Calculator className="mr-2 h-4 w-4" />}{receivedFxSaved ? "Actualizar cálculo ARS" : "Confirmar cobro y calcular ARS"}</Button>
-        {receivedFxSaved && <div className="border-t pt-4"><InvoiceUpload period={period} component="ars" currency="ARS" expected={Number(settlement.finalInvoiceARS ?? 0)} existing={invoiceFor("ars")} enabled onSaved={() => queryClient.invalidateQueries({ queryKey: ["personal-invoices"] })} /></div>}
-      </CardContent></Card>
-    </div>}
+    {settlement && <div className="space-y-4">{usesUSD && phaseCard("usd")}{phaseCard("ars")}</div>}
 
     <Card><CardHeader className="pb-3"><CardTitle className="text-base">Historial del período</CardTitle></CardHeader><CardContent className="space-y-3">{!periodInvoices.length ? <p className="py-4 text-sm text-muted-foreground">Todavía no enviaste facturas para este período.</p> : periodInvoices.map((invoice) => <InvoiceStatus key={invoice.id} invoice={invoice} />)}</CardContent></Card>
   </div>;
@@ -188,7 +199,7 @@ function MonthlyClosingDeclarations() {
     onSuccess: () => { client.invalidateQueries({ queryKey: ["my-monthly-settlement-declarations"] }); toast({ title: "Declaración enviada a Operaciones" }); },
     onError: (error: Error) => toast({ title: "No se pudo enviar", description: error.message, variant: "destructive" }),
   });
-  return <Card><CardHeader><CardTitle className="text-base">Conciliación del cierre operativo</CardTitle><p className="text-sm text-muted-foreground">El cierre original permanece fijo. Informá el tipo de cambio bancario para calcular la diferencia de tu tramo USD; Operaciones revisará la declaración.</p></CardHeader><CardContent className="space-y-3">{query.isLoading && <p className="text-sm text-muted-foreground">Cargando cierres…</p>}{query.isError && <p className="text-sm text-destructive">{query.error.message}</p>}{query.data?.filter((row) => row.amountUSD > 0).map((row) => {
+  return <Card><CardHeader><CardTitle className="text-base">Conciliación del cierre operativo</CardTitle><p className="text-sm text-muted-foreground">El cierre original permanece fijo. Informá el tipo de cambio bancario para calcular la diferencia de tu tramo USD; Operaciones revisará la declaración.</p></CardHeader><CardContent className="space-y-3">{query.isLoading && <p className="text-sm text-muted-foreground">Cargando cierres…</p>}{query.isError && <p className="text-sm text-destructive">{query.error.message}</p>}{query.data?.filter((row) => row.amountUSD > 0 && row.declaration != null).map((row) => {
     const rate = Number(rates[row.closingId] ?? row.declaration?.bankFxRate ?? "");
     const difference = (() => { try { return calculateSettlementDifference(row.amountUSD, rate, Number(row.closingFxRate)); } catch { return null; } })();
     return <div key={row.closingId} className="grid gap-3 rounded-lg border p-3 sm:grid-cols-2 xl:grid-cols-[1fr_1fr_1fr_1.2fr_auto] sm:items-end">
@@ -201,7 +212,7 @@ function MonthlyClosingDeclarations() {
       {row.declaration?.reviewReason && <p className="text-xs text-rose-700 sm:col-span-2 xl:col-span-5">Respuesta de Operaciones: {row.declaration.reviewReason}</p>}
       {!!row.declaration?.events?.length && <p className="text-[11px] text-muted-foreground sm:col-span-2 xl:col-span-5">Historial: {row.declaration.events.map((event) => `${({ submitted: "Enviada", resubmitted: "Reenviada", approve: "Aprobada", reject: "Rechazada" } as Record<string, string>)[event.action] ?? event.action} · ${new Date(event.createdAt).toLocaleDateString("es-AR")}`).join(" → ")}</p>}
     </div>;
-  })}{query.data?.filter((row) => row.amountUSD > 0).length === 0 && <p className="text-sm text-muted-foreground">Todavía no hay cierres con tramo USD para declarar.</p>}</CardContent></Card>;
+  })}{query.data?.filter((row) => row.amountUSD > 0 && row.declaration != null).length === 0 && <p className="text-sm text-muted-foreground">Todavía no hay cierres con tramo USD para declarar.</p>}</CardContent></Card>;
 }
 
 function InvoiceUpload({ period, component, currency, expected, existing, enabled, onSaved }: { period: string; component: InvoiceComponent; currency: "ARS" | "USD"; expected: number; existing: InvoiceRow | null; enabled: boolean; onSaved: () => void }) {

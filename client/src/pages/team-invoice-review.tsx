@@ -13,6 +13,7 @@ import { authFetchJson } from "@/lib/queryClient";
 
 type ReviewInvoice = {
   id: number;
+  updated_at?: string;
   period: string;
   personnel_name?: string | null;
   user_name?: string | null;
@@ -39,14 +40,14 @@ function currentPeriod() {
 function money(value: number | null | undefined, currency: "ARS" | "USD") {
   if (value == null || !Number.isFinite(Number(value))) return "—";
   return new Intl.NumberFormat(currency === "ARS" ? "es-AR" : "en-US", {
-    style: "currency", currency, maximumFractionDigits: currency === "ARS" ? 0 : 2,
+    style: "currency", currency, maximumFractionDigits: 2,
   }).format(Number(value));
 }
 
 function expected(invoice: ReviewInvoice) {
   if (invoice.invoice_component === "usd") return { amount: Number(invoice.settlement_total_invoice_usd ?? 0), currency: "USD" as const };
   if (invoice.invoice_component === "ars") return { amount: Number(invoice.settlement_final_invoice_ars ?? 0), currency: "ARS" as const };
-  if (invoice.invoice_currency === "ARS") return { amount: Number(invoice.settlement_total_ars ?? 0), currency: "ARS" as const };
+  if (invoice.invoice_currency === "ARS") return { amount: Number(invoice.settlement_final_invoice_ars ?? invoice.settlement_total_ars ?? 0), currency: "ARS" as const };
   return { amount: Number(invoice.settlement_total_invoice_usd ?? 0), currency: "USD" as const };
 }
 
@@ -55,7 +56,7 @@ function componentLabel(component?: string) {
 }
 
 export default function TeamInvoiceReview() {
-  const [period, setPeriod] = useState(currentPeriod());
+  const [period, setPeriod] = useState(() => new URLSearchParams(window.location.search).get("period") || currentPeriod());
   const [search, setSearch] = useState("");
   const [correction, setCorrection] = useState<ReviewInvoice | null>(null);
   const [reason, setReason] = useState("");
@@ -70,7 +71,7 @@ export default function TeamInvoiceReview() {
       authFetchJson(`/api/operations/invoices/review/${invoice.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ approvalStatus: status, reviewReason }),
+        body: JSON.stringify({ approvalStatus: status, reviewReason, updatedAt: invoice.updated_at }),
       }),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["team-invoice-review", period] });

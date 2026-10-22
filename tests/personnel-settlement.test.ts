@@ -2,6 +2,24 @@ import { describe, expect, it } from "vitest";
 import { calculatePersonnelSettlement } from "../server/services/personnel-settlement";
 
 describe("personnel monthly settlement", () => {
+  it("completa el total contractual del ejemplo confirmado por Vicky", () => {
+    const result = calculatePersonnelSettlement({ totalARS: 10000, usdPercentage: 90, invoiceFx: 1500, receivedFx: 1505, extrasARS: 5000 });
+    expect(result.totalInvoiceUSD).toBe(6);
+    expect(result.finalInvoiceARS).toBe(5970);
+    expect(result.financialCostARS).toBe(15000);
+  });
+  it("suma bono ARS y extras sin pedir TC a quien factura sólo en pesos", () => {
+    const result = calculatePersonnelSettlement({ totalARS: 10000, usdPercentage: 0, bonusARS: 500, extrasARS: 1000 });
+    expect(result.finalInvoiceARS).toBe(11500);
+    expect(result.financialCostARS).toBe(11500);
+    expect(result.totalInvoiceUSD).toBe(0);
+    expect(result.financialCostUSD).toBeNull();
+  });
+  it("redondea los USD emitidos antes de calcular el saldo ARS", () => {
+    const result = calculatePersonnelSettlement({ totalARS: 10000, usdPercentage: 90, invoiceFx: 1499, receivedFx: 1505 });
+    expect(result.baseInvoiceUSD).toBe(6);
+    expect(result.finalInvoiceARS).toBe(970);
+  });
   it("calcula el tramo USD y la diferencia ARS con dos tipos de cambio", () => {
     expect(calculatePersonnelSettlement({
       totalARS: 2_000_000,

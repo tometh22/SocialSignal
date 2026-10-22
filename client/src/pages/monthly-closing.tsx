@@ -1,3 +1,5 @@
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { contractualMonthlyHours, payableMonthlyHours } from "@shared/utils/payroll-hours";
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -30,21 +32,18 @@ const MONTHS = [
 ];
 
 // Default contractual base hours by contract type
-function defaultBaseHours(person: any): number {
-  const type = (person.contractType || "full-time").toLowerCase();
-  if (type === "freelance") return person.monthlyHours || 0;
-  // Use configured monthlyHours when available; fall back to contract-type defaults
-  if (person.monthlyHours) return person.monthlyHours;
-  return type === "part-time" ? 120 : 160;
-}
+const defaultBaseHours = contractualMonthlyHours;
 
 export default function MonthlyClosing() {
-  const now = new Date();
+  const selectedPeriod = new URLSearchParams(window.location.search).get("period");
+  const now = selectedPeriod && /^\d{4}-(0[1-9]|1[0-2])$/.test(selectedPeriod) ? new Date(`${selectedPeriod}-01T12:00:00`) : new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth());
   const [contractFilter, setContractFilter] = useState<string>("all");
+  useEffect(() => { const url = new URL(window.location.href); url.searchParams.set("period", `${year}-${String(month + 1).padStart(2, "0")}`); window.history.replaceState(null, "", url); }, [year, month]);
   // Category-based hours adjustments per person
-  type HoursAdj = { vacaciones: number; feriados: number; epicalGeneral: number; discrecional: number };
+  type HoursAdj = { unpaidHours: number };
+  const [adjustmentReasons, setAdjustmentReasons] = useState<Record<number, string>>({});
   const [hoursAdjustments, setHoursAdjustments] = useState<Record<number, HoursAdj>>({});
   const [expandedAdj, setExpandedAdj] = useState<number | null>(null);
   // Per-row mutation tracking
@@ -54,6 +53,11 @@ export default function MonthlyClosing() {
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const period = `${year}-${String(month+1).padStart(2,"0")}`;
+  const [reopenReason, setReopenReason] = useState("");
+  const cutoff = useQuery<any>({ queryKey: ["payroll-period",period], queryFn: async () => { const r = await fetch(`/api/payroll-period/${period}`, {credentials:"include"}); if (!r.ok) throw new Error("No se pudo cargar el corte"); return r.json(); } });
+  const prepare = useMutation({ mutationFn: (action: string) => apiRequest(`/api/payroll-period/${period}/${action}`, "POST", {reason:reopenReason}), onSuccess: () => { queryClient.invalidateQueries({queryKey:["payroll-period"]}); queryClient.invalidateQueries({queryKey:["/api/monthly-closings"]}); queryClient.invalidateQueries({queryKey:["personnel-settlements"]}); toast({title:"Corte actualizado",description:"Revisá los pendientes y continuá al paso 2."}); }, onError:(error:Error)=>toast({title:"No se pudo actualizar",description:error.message,variant:"destructive"}) });
+
   const { exchangeRate } = useCurrency();
 
   const { data: personnel, isLoading: personnelLoading } = useQuery<any[]>({ queryKey: ["/api/personnel"] });
@@ -76,70 +80,17 @@ export default function MonthlyClosing() {
         headers: { "Content-Type": "application/json" },
       }).then((r) => r.json()),
   });
-  // Holidays for the year, to deduct from base hours
-  const { data: holidaysData = [] } = useQuery<any[]>({
-    queryKey: ["/api/holidays", year],
-    queryFn: () =>
-      fetch(`/api/holidays?year=${year}`, {
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-      }).then((r) => r.json()),
-  });
-  const { data: absencesData = [] } = useQuery<any[]>({
-    queryKey: ["/api/personnel-absences", "monthly-closing"],
-    queryFn: () => fetch("/api/personnel-absences", {
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-    }).then((r) => r.json()),
-  });
-
-  // Number of holidays falling on weekdays in the selected month
-  const monthHolidayCount = (holidaysData || []).filter((h: any) => {
-    const d = new Date(h.date + (h.date?.length === 10 ? "T00:00:00" : ""));
-    if (isNaN(d.getTime())) return false;
-    const dow = d.getDay();
-    return d.getFullYear() === year && d.getMonth() === month && dow !== 0 && dow !== 6;
-  }).length;
-
-  // Día Epical is a paid absence: it reduces contractual capacity but never
-  // removes real time already logged. Count civil weekdays only and de-dupe
-  // overlapping absence ranges before converting days to contractual hours.
-  const epicalDayHoursFor = (person: any): number => {
-    if ((person.contractType || "full-time").toLowerCase() === "freelance") return 0;
-    const monthStart = new Date(year, month, 1);
-    const monthEnd = new Date(year, month + 1, 0);
-    const days = new Set<string>();
-    for (const absence of absencesData || []) {
-      if (absence.type !== "epical_day" || absence.personnelId !== person.id) continue;
-      const start = new Date(`${String(absence.startDate).slice(0, 10)}T00:00:00`);
-      const end = new Date(`${String(absence.endDate).slice(0, 10)}T00:00:00`);
-      const from = new Date(Math.max(start.getTime(), monthStart.getTime()));
-      const to = new Date(Math.min(end.getTime(), monthEnd.getTime()));
-      for (const day = new Date(from); day <= to; day.setDate(day.getDate() + 1)) {
-        if (day.getDay() !== 0 && day.getDay() !== 6) days.add(format(day, "yyyy-MM-dd"));
-      }
-    }
-    const dailyHours = defaultBaseHours(person) / 20;
-    return Math.round(days.size * dailyHours * 100) / 100;
-  };
-
   // Rehydrate saved adjustments when closings load (so manual edits survive reload)
   useEffect(() => {
     if (!closings) return;
     const restored: Record<number, HoursAdj> = {};
     for (const c of closings) {
       if (c.adjustments && typeof c.adjustments === "object") {
-        restored[c.personnelId] = {
-          vacaciones: c.adjustments.vacaciones || 0,
-          feriados: c.adjustments.feriados || 0,
-          epicalGeneral: c.adjustments.epicalGeneral || 0,
-          discrecional: c.adjustments.discrecional || 0,
-        };
+        restored[c.personnelId] = { unpaidHours: c.adjustments.unpaidHours || 0 };
       }
     }
-    if (Object.keys(restored).length > 0) {
-      setHoursAdjustments((prev) => ({ ...restored, ...prev }));
-    }
+    setHoursAdjustments(restored);
+    setAdjustmentReasons(Object.fromEntries(closings.map((c: any) => [c.personnelId, c.notes || ""])));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [closings]);
 
@@ -147,7 +98,8 @@ export default function MonthlyClosing() {
     mutationFn: (data: any) => apiRequest("/api/monthly-closings", "POST", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/monthly-closings"] });
-      toast({ title: "Cierre guardado" });
+      queryClient.invalidateQueries({ queryKey: ["personnel-settlements"] });
+      toast({ title: "Base guardada", description: "Seguí en el paso 2: Facturación y seguimiento." });
     },
     onError: (error) => {
       toast({
@@ -180,7 +132,7 @@ export default function MonthlyClosing() {
   };
 
   const getAdj = (personnelId: number): HoursAdj =>
-    hoursAdjustments[personnelId] ?? { vacaciones: 0, feriados: 0, epicalGeneral: 0, discrecional: 0 };
+    hoursAdjustments[personnelId] ?? { unpaidHours: 0 };
 
   const setAdj = (personnelId: number, field: keyof HoursAdj, value: string) => {
     const parsed = parseFloat(value);
@@ -193,40 +145,9 @@ export default function MonthlyClosing() {
     setExpandedAdj(null);
   };
 
-  const hasAdjustment = (personnelId: number): boolean => {
-    const adj = hoursAdjustments[personnelId];
-    const person = personnel?.find((candidate: any) => candidate.id === personnelId);
-    return (!!adj && (adj.vacaciones > 0 || adj.feriados > 0 || adj.epicalGeneral > 0 || adj.discrecional !== 0))
-      || (!!person && epicalDayHoursFor(person) > 0);
-  };
-
-  // Effective base hours for a person: default adjusted by category deductions.
-  // No aplica a freelance — ver effectiveHours.
-  const effectiveBaseHours = (person: any): number => {
-    const base = defaultBaseHours(person);
-    const adj = hoursAdjustments[person.id];
-    const autoEpicalHours = epicalDayHoursFor(person);
-    if (!adj) return Math.max(0, base - autoEpicalHours);
-    return Math.max(0, base - (adj.vacaciones || 0) - (adj.feriados || 0) - (adj.epicalGeneral || 0) - autoEpicalHours + (adj.discrecional || 0));
-  };
-
-  // Horas a facturar: para full-time/part-time es la base ajustada (fija,
-  // independiente de cuánto trabajaron). Para freelance el cálculo debe ser
-  // lineal por horas reales trabajadas, sin piso/techo de horas base — no
-  // tiene sentido ajustar por feriados/vacaciones a alguien que factura
-  // exactamente lo que trabajó.
-  const effectiveHours = (person: any): number => {
-    if ((person.contractType || "full-time").toLowerCase() === "freelance") {
-      return realHoursMap[person.id] ?? 0;
-    }
-    return effectiveBaseHours(person);
-  };
-
-  // Suggested feriado hours for a person this month (holidays × daily hours)
-  const feriadoHoursFor = (person: any): number => {
-    const dailyHours = (defaultBaseHours(person) || 160) / 20;
-    return Math.round(monthHolidayCount * dailyHours);
-  };
+  const hasAdjustment = (id: number) => getAdj(id).unpaidHours > 0;
+  const effectiveBaseHours = (person: any): number => Math.max(0, defaultBaseHours(person) - getAdj(person.id).unpaidHours);
+  const effectiveHours = (person: any): number => person.contractType === "freelance" ? realHoursMap[person.id] ?? 0 : effectiveBaseHours(person);
 
   const doClose = (person: any) => {
     const hrs = effectiveHours(person);
@@ -242,10 +163,9 @@ export default function MonthlyClosing() {
     }
     const billing = existingClosing?.billingCurrency ?? getBillingCurrency(person);
     const manualAdjustments = hoursAdjustments[person.id];
-    const autoEpicalHours = epicalDayHoursFor(person);
-    const adjustments = manualAdjustments || autoEpicalHours > 0
-      ? { ...(manualAdjustments || { vacaciones: 0, feriados: 0, epicalGeneral: 0, discrecional: 0 }), epicalGeneral: (manualAdjustments?.epicalGeneral || 0) + autoEpicalHours }
-      : null;
+    const adjustments = manualAdjustments || { unpaidHours: 0 };
+    try { payableMonthlyHours(person, realHoursMap[person.id] ?? 0, adjustments.unpaidHours, adjustmentReasons[person.id] || ""); }
+    catch (error) { toast({ title: "Revisá el descuento", description: (error as Error).message, variant: "destructive" }); return; }
     let totalCost: number;
     if (billing === 'USD' || billing === 'mixed') {
       // rate is already in USD; totalCost stored in ARS equivalent for consistency
@@ -265,6 +185,7 @@ export default function MonthlyClosing() {
       totalCost,
       exchangeRateAtClose: exchangeRate || null,
       adjustments,
+      notes: adjustmentReasons[person.id] || null,
     });
   };
 
@@ -437,7 +358,7 @@ export default function MonthlyClosing() {
     const tsv = [EXPORT_HEADERS, ...rows].map((r) => r.join("\t")).join("\n");
     try {
       await navigator.clipboard.writeText(tsv);
-      toast({ title: "Copiado", description: `${rows.length} filas listas para pegar en el Excel de honorarios.` });
+      toast({ title: "Copiado", description: `${rows.length} filas copiadas para revisión.` });
     } catch {
       toast({ title: "No se pudo copiar", description: "Tu navegador bloqueó el portapapeles. Probá con Descargar CSV.", variant: "destructive" });
     }
@@ -480,6 +401,7 @@ export default function MonthlyClosing() {
 
   return (
     <div className="p-6 space-y-6">
+      <div className="space-y-3 rounded-xl border p-4"><p className="font-semibold">Corte de horas: {cutoff.data?.day ?? "cargando…"} a las 23:59 (Buenos Aires)</p><p className="text-sm text-muted-foreground">Se programa según los feriados de Mind. El corte congela las horas y prepara borradores; Operaciones revisa las condiciones antes de publicar. Vacaciones, feriados y días Epical son pagos.</p><p>Estado: {cutoff.data?.state === "cut" ? "Horas con corte" : "Horas abiertas"}</p>{cutoff.data?.issues?.map((issue:string)=><p key={issue} className="text-sm text-amber-800">{issue}</p>)}<div className="flex flex-wrap gap-2"><Button disabled={prepare.isPending} onClick={()=>prepare.mutate("prepare")}>Preparar bases y borradores</Button><Button variant="outline" disabled={prepare.isPending || !cutoff.data?.canCut || cutoff.data?.state === "cut"} onClick={()=>prepare.mutate("cut")}>Ejecutar corte pendiente</Button></div>{cutoff.data?.state === "cut" && <div className="flex gap-2"><Input value={reopenReason} onChange={e=>setReopenReason(e.target.value)} placeholder="Motivo para corregir horas antes de publicar"/><Button variant="outline" disabled={prepare.isPending || reopenReason.trim().length < 5} onClick={()=>prepare.mutate("reopen")}>Reabrir horas</Button></div>}</div>
       {/* Re-close confirmation dialog */}
       <AlertDialog open={reCloseTarget !== null} onOpenChange={(open) => { if (!open) setReCloseTarget(null); }}>
         <AlertDialogContent>
@@ -505,9 +427,9 @@ export default function MonthlyClosing() {
 
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h1 className="text-2xl font-bold">Cierre Mensual de Horas</h1>
+          <h1 className="text-2xl font-bold">1. Base a cobrar</h1>
           <p className="text-muted-foreground">
-            Reconciliación: ajustar horas reales a horas contractuales para facturación.{" "}
+            Fijos: horas contractuales × tarifa. Freelancers: horas trabajadas × tarifa. Las ausencias pagas no descuentan.{" "}
             <Link href="/admin" className="inline-flex items-center gap-1 text-primary hover:underline text-sm">
               Gestionar tarifas en Personal <ExternalLink className="h-3 w-3" />
             </Link>
@@ -519,9 +441,9 @@ export default function MonthlyClosing() {
             size="sm"
             onClick={handleCopyForExcel}
             disabled={filteredPersonnel.length === 0}
-            title="Copia la tabla en formato tabulado para pegar directo en el Excel de honorarios (Ctrl+V)"
+            title="Copia la tabla para revisión"
           >
-            <Copy className="h-4 w-4 mr-1" /> Copiar para Excel
+            <Copy className="h-4 w-4 mr-1" /> Copiar tabla
           </Button>
           <Button
             variant="outline"
@@ -636,53 +558,17 @@ export default function MonthlyClosing() {
                             <ChevronDown className={`h-3 w-3 text-muted-foreground transition-transform ${expandedAdj === p.id ? "rotate-180" : ""}`} />
                           </button>
                           {expandedAdj === p.id && (
-                            <div className="absolute z-10 mt-1 left-1/2 -translate-x-1/2 w-52 rounded-lg border bg-background shadow-lg p-3 text-xs space-y-2">
-                              <div className="flex items-center justify-between mb-1">
-                                <span className="font-semibold text-foreground">Ajustar horas base</span>
-                                <button onClick={() => setExpandedAdj(null)} className="text-muted-foreground hover:text-foreground">
-                                  <X className="h-3 w-3" />
-                                </button>
-                              </div>
-                              <div className="text-[10px] text-muted-foreground mb-1" title="Las horas base surgen de las Horas Mensuales configuradas en Admin → Personal (o 160 full-time / 120 part-time por defecto). Ajustá acá con las deducciones o el ajuste discrecional.">
+                            <Dialog open onOpenChange={open => { if (!open) setExpandedAdj(null); }}><DialogContent className="sm:max-w-md space-y-3"><DialogTitle>Descuento excepcional · {p.name}</DialogTitle><DialogDescription>La base sólo se reduce por una licencia sin goce de sueldo acordada.</DialogDescription>
+                              <div className="text-[10px] text-muted-foreground mb-1" title="Las horas base surgen de las Horas Mensuales configuradas en Admin → Personal (o 160 full-time / 120 part-time por defecto). Sólo se descuentan licencias sin goce explícitas.">
                                 Base contractual: {defaultBaseHours(p)}h <span className="underline decoration-dotted">(de Admin → Personal)</span>
                               </div>
-                              {monthHolidayCount > 0 && (
-                                <div className="flex items-center justify-between gap-2 rounded bg-muted/50 px-1.5 py-1">
-                                  <span className="text-[10px] text-muted-foreground">
-                                    {monthHolidayCount} feriado(s) este mes (≈{feriadoHoursFor(p)}h)
-                                  </span>
-                                  <button
-                                    className="text-[10px] text-primary hover:underline"
-                                    onClick={() => setAdj(p.id, "feriados", String(feriadoHoursFor(p)))}
-                                  >
-                                    Aplicar
-                                  </button>
-                                </div>
-                              )}
-                              {epicalDayHoursFor(p) > 0 && (
-                                <div className="rounded bg-emerald-50 px-1.5 py-1 text-[10px] text-emerald-700">
-                                  Día Epical registrado: −{epicalDayHoursFor(p)}h
-                                </div>
-                              )}
-                              {([
-                                { key: "vacaciones" as const, label: "Vacaciones −" },
-                                { key: "feriados" as const, label: "Feriados −" },
-                                { key: "epicalGeneral" as const, label: "Día Epical manual −" },
-                                { key: "discrecional" as const, label: "Ajuste discrecional ±" },
-                              ] as const).map(({ key, label }) => (
-                                <div key={key} className="flex items-center justify-between gap-2">
-                                  <span className="text-muted-foreground flex-1">{label}</span>
-                                  <Input
-                                    type="number"
-                                    min={key === "discrecional" ? undefined : 0}
-                                    step={1}
-                                    value={getAdj(p.id)[key] || ""}
-                                    onChange={(e) => setAdj(p.id, key, e.target.value)}
-                                    className="w-16 h-6 text-xs text-center"
-                                    placeholder="0"
-                                  />
-                                </div>
-                              ))}
+                              <p className="rounded bg-emerald-50 p-2 text-emerald-800">Vacaciones, feriados y días Epical son pagos. No reducen esta base.</p>
+                              <label className="block">Horas de licencia sin goce
+                                <Input type="number" min="0" max={defaultBaseHours(p)} step="0.5" value={getAdj(p.id).unpaidHours || ""} onChange={(e) => setAdj(p.id, "unpaidHours", e.target.value)} placeholder="0" />
+                              </label>
+                              <label className="block">Motivo del descuento
+                                <Input value={adjustmentReasons[p.id] || ""} onChange={(e) => setAdjustmentReasons(prev => ({ ...prev, [p.id]: e.target.value }))} placeholder="Licencia sin goce acordada…" />
+                              </label>
                               <div className="border-t pt-2 flex items-center justify-between">
                                 <span className="font-semibold text-foreground">{effectiveBaseHours(p)}h total</span>
                                 {hasAdjustment(p.id) && (
@@ -694,7 +580,7 @@ export default function MonthlyClosing() {
                                   </button>
                                 )}
                               </div>
-                            </div>
+                            </DialogContent></Dialog>
                           )}
                         </div>
                         )}
@@ -766,12 +652,12 @@ export default function MonthlyClosing() {
           )}
         </CardContent>
       </Card>
-      <Card>
-        <CardHeader><CardTitle>Conciliación de tipo de cambio bancario</CardTitle></CardHeader>
+      <details><summary className="cursor-pointer text-sm text-muted-foreground">Declaraciones anteriores del cierre operativo</summary><Card>
+        <CardHeader><CardTitle>Historial de conciliación bancaria</CardTitle></CardHeader>
         <CardContent className="overflow-x-auto">
           {!declarations.some((item: any) => item.closingYear === year && item.closingMonth === month + 1) ? <p className="text-sm text-muted-foreground">No hay declaraciones pendientes ni revisadas.</p> : <table className="w-full min-w-[760px] text-sm"><thead><tr className="border-b text-left"><th className="p-2">Persona / período</th><th className="p-2">Tramo USD</th><th className="p-2">FX cierre</th><th className="p-2">FX banco</th><th className="p-2">Diferencia ARS</th><th className="p-2">Estado</th><th className="p-2">Acción</th></tr></thead><tbody>{declarations.filter((item: any) => item.closingYear === year && item.closingMonth === month + 1).map((item: any) => { const row = item.declaration; return <tr key={row.id} className="border-b"><td className="p-2">{item.personName} · {MONTHS[(item.closingMonth ?? 1) - 1]} {item.closingYear}</td><td className="p-2">USD {Number(row.usdAmount).toLocaleString("en-US", { maximumFractionDigits: 2 })}</td><td className="p-2">{Number(row.closingFxRate).toLocaleString("es-AR")}</td><td className="p-2">{Number(row.bankFxRate).toLocaleString("es-AR")}</td><td className="p-2">ARS {Number(row.differenceARS).toLocaleString("es-AR", { maximumFractionDigits: 2 })}</td><td className="p-2"><Badge variant={row.status === "approved" ? "default" : row.status === "rejected" ? "destructive" : "secondary"}>{row.status === "approved" ? "Aprobada" : row.status === "rejected" ? "Rechazada" : "Pendiente"}</Badge>{row.reviewReason && <p className="mt-1 text-xs text-muted-foreground">{row.reviewReason}</p>}</td><td className="p-2">{row.status === "pending" && <div className="flex gap-1"><Button size="sm" disabled={declarationReview.isPending} onClick={() => declarationReview.mutate({ id: row.id, action: "approve", submittedAt: row.submittedAt })}>Aprobar</Button><Button size="sm" disabled={declarationReview.isPending} variant="outline" onClick={() => { const reason = window.prompt("Qué debe corregir la persona?"); if (reason?.trim()) declarationReview.mutate({ id: row.id, action: "reject", reason, submittedAt: row.submittedAt }); }}>Rechazar</Button></div>}</td></tr>; })}</tbody></table>}
         </CardContent>
-      </Card>
+      </Card></details>
     </div>
   );
 }

@@ -183,8 +183,7 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
         { href: "/operations/absences", title: "Gestión de ausencias", icon: UserX, description: "Aprobar solicitudes y administrar cupos", permission: 'operations' as AppSection },
         { href: "/tasks/hours-dashboard", title: "Panel de horas", icon: BarChart2, description: "Horas por persona y proyecto", anyPermissions: HOURS_DASHBOARD_ACCESS_SECTIONS },
         { href: "/operations/capacity", title: "Capacidad", icon: Gauge, description: "Capacidad semanal del equipo", permission: 'operations' as AppSection },
-        { href: "/operations/monthly-closing", title: "Cierre mensual", icon: CalendarCheck, description: "Cierre de horas del mes", permission: 'operations' as AppSection },
-        { href: "/operations/liquidaciones-equipo", title: "Liquidaciones equipo", icon: Calculator, description: "Definir cómo factura cada persona", permission: 'operations' as AppSection },
+        { href: "/operations/monthly-closing", title: "Cierre del equipo", icon: CalendarCheck, description: "Base a cobrar, autorizaciones y facturas", permission: 'operations' as AppSection },
         { href: "/operations/holidays", title: "Feriados", icon: Calendar, description: "Gestión de feriados", permission: 'operations' as AppSection },
       ]
     },

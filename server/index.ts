@@ -1,3 +1,4 @@
+import { teamSettlementWorkflowMigrationSql } from "./migrations/team-settlement-workflow";
 import { financialNativeBiMigrationSql } from "./migrations/financial-native-bi";
 import { financialCutoverMigrationSql } from "./migrations/financial-cutover";
 import express, { type Request, Response, NextFunction } from "express";
@@ -911,6 +912,7 @@ async function applyPendingMigrations() {
     try {
       await client.query(financialCutoverMigrationSql);
       await client.query(financialNativeBiMigrationSql);
+      await client.query(teamSettlementWorkflowMigrationSql);
       await client.query("COMMIT");
     } catch (error) {
       await client.query("ROLLBACK");
@@ -1174,6 +1176,12 @@ const port = Number(process.env.PORT || 5000);
       const { startIpcPriceAdjustmentsJob } = await import("./jobs/ipc-price-adjustments");
       startIpcPriceAdjustmentsJob();
       console.log("📈 Job de ajuste de precio por IPC iniciado (diario)");
+    }
+
+    // Native payroll is independent from the legacy Excel/Sheets sync switch.
+    if (process.env.DISABLE_TEAM_PAYROLL !== "true") {
+      const { startTeamPayroll } = await import("./jobs/team-payroll");
+      startTeamPayroll();
     }
 
     const { startQuotationExpirationJob } = await import("./jobs/quotation-expiration");

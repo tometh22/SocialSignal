@@ -21,18 +21,10 @@ export async function rebuildNativeFinancialFacts(periodKey: string, runner: Sql
   await runner.execute(sql`
     WITH fx AS (
       SELECT COALESCE((SELECT rate::numeric FROM exchange_rates WHERE year=${year} AND month=${month} AND is_active=true ORDER BY CASE WHEN rate_type='end_of_month' THEN 0 WHEN rate_type='average' THEN 1 ELSE 2 END, updated_at DESC, id DESC LIMIT 1), 1) AS rate
-    ), labor_by_person AS (
-      SELECT person_id, COALESCE(sum(cost_usd),0) model_usd, COALESCE(sum(cost_ars),0) model_ars, count(*)::int rows
-      FROM fact_labor_month WHERE period_key=${periodKey} AND left(source_row_id,4)='app_'
-      GROUP BY person_id
     ), labor AS (
-      -- El costo del equipo se devenga 100% desde el cierre de Operaciones.
-      -- La modalidad, fecha e importe de las facturas sólo alimentan Pasivo.
-      SELECT
-        COALESCE(sum(model_usd),0) direct_usd,
-        COALESCE(sum(model_ars),0) direct_ars,
-        COALESCE(sum(rows),0)::int rows
-      FROM labor_by_person
+      SELECT COALESCE(sum(direct_usd),0) direct_usd,COALESCE(sum(direct_ars),0) direct_ars,
+             COALESCE(sum(indirect_usd),0) indirect_usd,COALESCE(sum(indirect_ars),0) indirect_ars,count(*)::int rows
+      FROM financial_team_cost_month WHERE period_key=${periodKey}
     ), bills AS (
       SELECT
         COALESCE(sum(CASE WHEN cost_treatment='direct' THEN COALESCE(CASE WHEN currency='ARS' THEN net_amount/NULLIF(cotizacion,0) ELSE net_amount END,monto_total_usd,monto_usd,monto_ars/NULLIF(cotizacion,0),0) ELSE 0 END),0) direct_usd,
@@ -69,9 +61,9 @@ export async function rebuildNativeFinancialFacts(periodKey: string, runner: Sql
     )
     INSERT INTO fact_cost_month(data_source,period_key,direct_usd,direct_ars,indirect_usd,indirect_ars,provisions_usd,provisions_ars,amount_usd,amount_ars,source_rows_count,direct_rows_count,indirect_rows_count,provisions_rows_count,etl_timestamp)
     SELECT 'mind',${periodKey}, labor.direct_usd+bills.direct_usd, labor.direct_ars+bills.direct_ars,
-      bills.indirect_usd,bills.indirect_ars,bills.provision_usd+provisions.usd,provisions.ars,
-      labor.direct_usd+bills.direct_usd+bills.indirect_usd+bills.provision_usd+provisions.usd,
-      labor.direct_ars+bills.direct_ars+bills.indirect_ars+provisions.ars,
+      labor.indirect_usd+bills.indirect_usd,labor.indirect_ars+bills.indirect_ars,bills.provision_usd+provisions.usd,provisions.ars,
+      labor.direct_usd+labor.indirect_usd+bills.direct_usd+bills.indirect_usd+bills.provision_usd+provisions.usd,
+      labor.direct_ars+labor.indirect_ars+bills.direct_ars+bills.indirect_ars+provisions.ars,
       labor.rows+bills.rows+provisions.rows, labor.rows+bills.direct_rows,bills.indirect_rows,bills.provision_rows+provisions.rows,now()
     FROM labor,bills,provisions
     ON CONFLICT (period_key) DO UPDATE SET
@@ -106,9 +98,9 @@ export async function rebuildNativeFinancialFacts(periodKey: string, runner: Sql
     ), labor AS (
       -- La distribución proyecto/Epical es la del cierre operativo. No vuelve a
       -- repartirse ni cambia cuando llega una factura.
-      SELECT project_id, sum(model_usd) cost_usd, sum(model_ars) cost_ars
-      FROM modeled_labor
-      GROUP BY project_id
+      SELECT m.project_id, sum(m.model_usd*COALESCE(t.allocation_factor,1)) cost_usd, sum(m.model_ars*COALESCE(t.allocation_factor,1)) cost_ars
+      FROM modeled_labor m LEFT JOIN financial_team_cost_month t ON t.period_key=${periodKey} AND t.person_id=m.person_id
+      GROUP BY m.project_id
     ), bills AS (
       SELECT project_id,
         sum(COALESCE(CASE WHEN currency='ARS' THEN net_amount/NULLIF(cotizacion,0) ELSE net_amount END,monto_total_usd,monto_usd,monto_ars/NULLIF(cotizacion,0),0)) cost_usd,
