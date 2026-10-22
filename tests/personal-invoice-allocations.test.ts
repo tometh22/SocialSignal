@@ -10,7 +10,7 @@ describe("team cost and invoice integration contracts", () => {
     const routes = source("server/routes.ts");
     expect(sidebar).toContain('title: "Mi gestión"');
     expect(sidebar).toContain('href: "/my-invoices"');
-    expect(page).toContain("Operaciones calcula tu liquidación");
+    expect(page).toContain("esperá la autorización de Operaciones");
     expect(page).toContain("Enviar a Administración");
     expect(routes).toContain("storeFinancialIntakeFile(file)");
     expect(routes).toContain('Cache-Control", "private, no-store"');

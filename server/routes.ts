@@ -1,3 +1,4 @@
+import { personalInvoiceReviewQuery } from "./services/personal-invoice-review";
 import { preparePayroll, payrollCalendar, payrollActualHours } from "./services/monthly-payroll";
 import { changeSettlement, assertSettlementInvoiceAllowed, lockSettlementPeriod, notifySettlement } from "./services/personnel-settlement-workflow";
 import { settlementWorkflow } from "@shared/utils/settlement-workflow";
@@ -14787,24 +14788,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/operations/invoices/review", requireAuth, requirePermission("finance"), async (req, res) => {
     try {
       const period = req.query.period ? String(req.query.period) : null;
-      const result = await db.execute(sql`
-        SELECT i.*, u.email, CONCAT_WS(' ', u.first_name, u.last_name) AS user_name,
-               p.name AS personnel_name,
-               settlement.total_invoice_usd AS settlement_total_invoice_usd,
-               settlement.final_invoice_ars AS settlement_final_invoice_ars,
-               settlement.total_ars AS settlement_total_ars,
-               settlement.billing_currency_snapshot AS settlement_billing_currency,
-               settlement.bonus_usd AS settlement_bonus_usd,
-               settlement.extras_ars AS settlement_extras_ars,
-               settlement.invoice_fx AS settlement_invoice_fx,
-               settlement.received_fx AS settlement_received_fx
-        FROM personal_monthly_invoices i
-        LEFT JOIN users u ON u.id = i.user_id
-        LEFT JOIN personnel p ON p.id = i.personnel_id
-        LEFT JOIN personnel_monthly_settlements settlement ON settlement.id = i.settlement_id
-        WHERE ${period ? sql`i.period = ${period}` : sql`TRUE`}
-        ORDER BY i.period DESC, i.uploaded_at DESC
-      `);
+      const result = await db.execute(personalInvoiceReviewQuery(period));
       res.json((result.rows as any[]).map(publicPersonalInvoice));
     } catch (error) {
       console.error("Error obteniendo revisiones de facturas:", error);

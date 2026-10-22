@@ -2,6 +2,8 @@
 
 ## 1.15.0 — 2026-10-22
 
+- UX del cierre: mes compartido, borradores conservados entre pestañas, aviso al cambiar de mes con cambios pendientes, tablas adaptadas a móvil, campos alineados y responsables del próximo paso explícitos. Mis facturas distingue ARS/USD y resume comprobantes enviados o aprobados.
+- Revisión de facturas: la fecha de versión se devuelve en UTC para evitar rechazos falsos de concurrencia en zonas horarias como Argentina, conservando la protección contra revisiones vencidas.
 - Cierre del equipo: recorrido unificado de base y facturación; vacaciones, feriados y días Epical pagos, con descuento excepcional sin goce y motivo.
 - Corte automático el último día hábil a las 23:59 de Buenos Aires, borradores y recordatorios. TC bancarios y extras en Mis facturas; autorización de Operaciones antes de cada comprobante USD/ARS, bonos en ambas monedas y protección de versiones.
 - Migración 0089: corte operativo de horas, estados de autorización y conciliación del costo contractual/bonos/reintegros con Finanzas, sin duplicar gasto al registrar Pasivo. El cierre financiero exige autorizaciones y comprobantes requeridos.

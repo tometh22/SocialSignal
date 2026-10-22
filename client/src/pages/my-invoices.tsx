@@ -76,7 +76,7 @@ function currentPeriod() {
 }
 function money(value: number | null | undefined, currency: "ARS" | "USD") {
   if (value == null || !Number.isFinite(Number(value))) return "—";
-  return new Intl.NumberFormat(currency === "ARS" ? "es-AR" : "en-US", { style: "currency", currency, maximumFractionDigits: 2 }).format(Number(value));
+  return new Intl.NumberFormat(currency === "ARS" ? "es-AR" : "en-US", { style: "currency", currency, currencyDisplay: currency === "USD" ? "code" : "symbol", maximumFractionDigits: 2 }).format(Number(value));
 }
 function periodLabel(period: string) {
   const [year, month] = period.split("-").map(Number);
@@ -84,7 +84,8 @@ function periodLabel(period: string) {
 }
 
 export default function MyInvoices() {
-  const [period, setPeriod] = useState(() => new URLSearchParams(window.location.search).get("period") || currentPeriod());
+  const [period, setPeriod] = useState(() => { const saved = new URLSearchParams(window.location.search).get("period"); return saved && /^\d{4}-(0[1-9]|1[0-2])$/.test(saved) ? saved : currentPeriod(); });
+  useEffect(() => { const url = new URL(window.location.href); url.searchParams.set("period", period); window.history.replaceState(window.history.state, "", url); }, [period]);
   const [invoiceFx, setInvoiceFx] = useState("");
   const [receivedFx, setReceivedFx] = useState("");
   const [bankCommissionUSD, setBankCommissionUSD] = useState("0");
@@ -132,54 +133,57 @@ export default function MyInvoices() {
     const canEdit = stage.status === "draft" || stage.status === "rejected";
     const ready = isUSD || !usesUSD || usdDocumentApproved;
     const amount = canEdit ? isUSD ? preview?.totalInvoiceUSD : preview?.finalInvoiceARS : stage.amount;
-    const component: InvoiceComponent = isMixed ? phase : isUSD ? "single" : "single";
+    const component: InvoiceComponent = isMixed ? phase : "single";
     const label = isUSD ? "1. Factura en dólares" : usesUSD ? "2. Después de recibir los USD" : "Tu factura en pesos";
     return <Card key={phase} className={stage.status === "approved" ? "border-emerald-300" : ""}><CardHeader><CardTitle className="text-base">{label}</CardTitle><p className="text-sm text-muted-foreground">{isUSD ? "Ingresá el tipo de cambio comprador más bajo de tu banco del día en que vas a facturar." : usesUSD ? "Confirmá que recibiste el dinero e ingresá el TC comprador más bajo de tu banco de ese día." : "Tu importe base ya está calculado. Agregá extras sólo si corresponde."}</p></CardHeader><CardContent className="space-y-4">
       {!ready && <Notice tone="info" title="Primero completá la factura USD" text="Este paso se habilita después de que Administración apruebe tu comprobante USD y recibas el dinero." />}
       {stage.reason && <Notice tone="warning" title="Operaciones pidió una corrección" text={stage.reason} />}
-      {canEdit && ready && <>
-        {isUSD ? <div><Label htmlFor="invoice-fx">TC de mi banco al facturar (ARS por USD)</Label><Input id="invoice-fx" type="number" min="0.01" step="0.01" value={invoiceFx} onChange={e => setInvoiceFx(e.target.value)} placeholder="Ej. 1500" /></div> : <>
-          {usesUSD && <><label className="flex items-center gap-2"><input type="checkbox" checked={receivedConfirmed} onChange={e => setReceivedConfirmed(e.target.checked)} />Ya recibí los USD en mi cuenta</label><Label htmlFor="received-fx">TC de mi banco al recibir el dinero (ARS por USD)</Label><Input id="received-fx" type="number" min="0.01" step="0.01" value={receivedFx} onChange={e => setReceivedFx(e.target.value)} placeholder="Ej. 1505" /><Label htmlFor="bank-fee">Comisión bancaria en USD (opcional)</Label><Input id="bank-fee" type="number" min="0" step="0.01" value={bankCommissionUSD} onChange={e => setBankCommissionUSD(e.target.value)} /></>}
-          <Label htmlFor="extras-ars">Extras en ARS (comisiones, monotributo u otros reintegros)</Label><Input id="extras-ars" type="number" min="0" step="0.01" value={extrasARS} onChange={e => setExtrasARS(e.target.value)} /><Label htmlFor="extras-reason">Detalle de los extras</Label><Textarea id="extras-reason" value={extrasReason} onChange={e => setExtrasReason(e.target.value)} placeholder="Concepto e importe de cada reintegro" />
+      {canEdit && ready && (isUSD ? <div className="max-w-md space-y-1.5"><Label htmlFor="invoice-fx">TC de mi banco al facturar (ARS por USD)</Label><Input id="invoice-fx" type="number" min="0.01" step="0.01" value={invoiceFx} onChange={e => setInvoiceFx(e.target.value)} placeholder="Ej. 1500" /></div> : <div className="grid gap-4 sm:grid-cols-2">
+        {usesUSD && <>
+          <label className="flex items-start gap-2 rounded-lg border bg-muted/20 p-3 text-sm sm:col-span-2"><input className="mt-0.5 h-4 w-4 shrink-0" type="checkbox" checked={receivedConfirmed} onChange={e => setReceivedConfirmed(e.target.checked)} />Ya recibí los USD en mi cuenta</label>
+          <div className="space-y-1.5"><Label htmlFor="received-fx">TC de mi banco al recibir (ARS por USD)</Label><Input id="received-fx" type="number" min="0.01" step="0.01" value={receivedFx} onChange={e => setReceivedFx(e.target.value)} placeholder="Ej. 1505" /></div>
+          <div className="space-y-1.5"><Label htmlFor="bank-fee">Comisión en USD (opcional)</Label><Input id="bank-fee" type="number" min="0" step="0.01" value={bankCommissionUSD} onChange={e => setBankCommissionUSD(e.target.value)} /></div>
         </>}
-      </>}
-      <Summary label={stage.status === "approved" ? "Importe autorizado" : "Importe calculado"} value={money(amount, isUSD ? "USD" : "ARS")} detail={isUSD ? "Tramo base ÷ TC + bono USD" : "Total base − USD base al TC del cobro + bono ARS + extras"} />
-      {canEdit && ready && <Button disabled={settlementMutation.isPending || amount == null || amount < 0 || (!isUSD && usesUSD && !receivedConfirmed)} onClick={() => settlementMutation.mutate(phase)}>Enviar importe a Operaciones</Button>}
+        <div className="space-y-1.5"><Label htmlFor="extras-ars">Extras en ARS</Label><Input id="extras-ars" type="number" min="0" step="0.01" value={extrasARS} onChange={e => setExtrasARS(e.target.value)} /><p className="text-xs text-muted-foreground">Comisiones, monotributo u otros reintegros.</p></div>
+        <div className="space-y-1.5"><Label htmlFor="extras-reason">Detalle de los extras</Label><Textarea id="extras-reason" value={extrasReason} onChange={e => setExtrasReason(e.target.value)} placeholder="Concepto e importe de cada reintegro" /><p className="text-xs text-muted-foreground">Obligatorio cuando hay extras o comisión.</p></div>
+      </div>)}
+      <Summary label={stage.status === "approved" ? "Importe autorizado" : "Importe calculado"} value={money(amount, isUSD ? "USD" : "ARS")} detail={isUSD ? "Tramo base ÷ TC + bono USD" : usesUSD ? "Total base − USD base al TC del cobro + bono ARS + extras" : "Base + bono ARS + extras"} />
+      {canEdit && ready && <Button disabled={settlementMutation.isPending || amount == null || amount < 0 || (!isUSD && ((usesUSD && !receivedConfirmed) || Number(extrasARS) < 0 || Number(bankCommissionUSD) < 0 || ((Number(extrasARS) > 0 || Number(bankCommissionUSD) > 0) && extrasReason.trim().length < 5)))} onClick={() => settlementMutation.mutate(phase)}>Enviar importe a Operaciones</Button>}
       {amount != null && amount < 0 && <Notice tone="warning" title="Saldo negativo: requiere revisión" text="El valor de los USD recibidos supera el saldo. Operaciones debe resolver la diferencia antes de emitir." />}
       {stage.status === "pending" && <Notice tone="info" title="Esperando autorización de Operaciones" text="Todavía no emitas la factura. Cuando aprueben el importe vas a poder adjuntarla en este mismo lugar." />}
       {stage.status === "approved" && (Number(stage.amount) === 0 ? <Notice tone="info" title="Tramo completo: no requiere factura" text="Operaciones autorizó un saldo de cero." /> : <InvoiceUpload period={period} component={component} currency={isUSD ? "USD" : "ARS"} expected={Number(stage.amount)} existing={invoiceFor(component)} enabled onSaved={() => { queryClient.invalidateQueries({ queryKey: ["personal-invoices"] }); queryClient.invalidateQueries({ queryKey: ["personal-settlement", period] }); }} />)}
     </CardContent></Card>;
   };
 
-  return <div className="mx-auto max-w-6xl space-y-6">
-    <div>
+  return <div className="mx-auto max-w-6xl min-w-0 space-y-5">
+    <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div>
       <p className="text-sm font-medium text-indigo-600">Espacio personal</p>
       <h1 className="text-3xl font-semibold tracking-tight">Mis facturas</h1>
-      <p className="mt-1 max-w-3xl text-sm text-muted-foreground">Operaciones calcula tu liquidación. Completá el TC y los extras acá, esperá la autorización de Operaciones y luego emití y adjuntá cada factura. Administración la compara con el importe esperado antes de registrarla en Pasivo.</p>
+      <p className="mt-1 max-w-3xl text-sm text-muted-foreground">{settlement && !usesUSD ? "Revisá tu importe y agregá extras si corresponde, esperá la autorización de Operaciones y adjuntá tu factura en pesos." : "Completá el TC y los extras, esperá la autorización de Operaciones y adjuntá cada factura. Acá ves siempre el siguiente paso."}</p>
+    </div><div className="w-full shrink-0 sm:w-48"><Label htmlFor="invoice-period">Mes trabajado</Label><Input id="invoice-period" className="mt-1.5" type="month" value={period} onChange={event => { if (/^\d{4}-(0[1-9]|1[0-2])$/.test(event.target.value)) setPeriod(event.target.value); }} /></div></div>
+
+    <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+      <Step number={1} label="Base a cobrar" detail="Importe del mes" done={Boolean(summary?.isClosed)} />
+      <Step number={2} label="Condiciones" detail="Operaciones publica" done={Boolean(settlement)} />
+      <Step number={3} label="Facturación" detail={usesUSD ? "USD y luego ARS" : "Factura en pesos"} active={Boolean(settlement)} />
+      <Step number={4} label="Comprobantes" detail="Administración aprueba" done={complete} />
     </div>
 
-    <details><summary className="cursor-pointer text-sm text-muted-foreground">Declaraciones anteriores del cierre operativo</summary><MonthlyClosingDeclarations /></details>
+    <details className="rounded-xl border p-4"><summary className="cursor-pointer text-sm font-medium">Ver base del mes y horas contractuales</summary><div className="mt-3 grid gap-3 sm:grid-cols-3">
+      <Summary label="Horas de la base" value={`${Number(summary?.hours ?? 0).toFixed(1)} h`} detail="Las ausencias pagas no reducen las horas fijas" />
+      <Summary label="Base ARS" value={money(summary?.grandTotalARS, "ARS")} detail="Antes de bonos y extras" />
+      <Summary label="Referencia USD" value={money(summary?.grandTotalUSD, "USD")} detail="Cotización del cierre; tu TC bancario se carga abajo" />
+    </div></details>
+    {settlementQuery.isLoading && <p role="status" className="text-sm text-muted-foreground">Cargando tus condiciones…</p>}
+    {(settlementQuery.isError || invoicesQuery.isError) && <Notice tone="danger" title="No pudimos cargar la información" text="Actualizá la página antes de continuar. Tus datos guardados se conservan." />}
 
-    <div className="grid gap-3 md:grid-cols-4">
-      <Step number={1} label="Cierre operativo" detail="Costo del mes" done={Boolean(summary?.isClosed)} />
-      <Step number={2} label="Liquidación" detail="Operaciones publica" done={Boolean(settlement)} />
-      <Step number={3} label="Facturación" detail={isMixed ? "USD y luego ARS" : "Comprobante"} active={Boolean(settlement)} />
-      <Step number={4} label="Pasivo" detail="Administración aprueba" done={complete} />
-    </div>
-
-    <Card><CardHeader className="pb-3"><CardTitle className="text-base">1. Período y referencia operativa</CardTitle></CardHeader><CardContent className="grid gap-4 sm:grid-cols-4">
-      <div><Label htmlFor="invoice-period">Mes trabajado</Label><Input id="invoice-period" className="mt-1.5" type="month" value={period} onChange={(event) => setPeriod(event.target.value)} /></div>
-      <Summary label="Horas cerradas" value={`${Number(summary?.hours ?? 0).toFixed(1)} h`} detail={`${summary?.entryCount ?? 0} registros`} />
-      <Summary label="Costo operativo ARS" value={money(summary?.grandTotalARS, "ARS")} detail="Independiente de la factura" />
-      <Summary label="Costo operativo USD" value={money(summary?.grandTotalUSD, "USD")} detail="Para Costos y rentabilidad" />
-    </CardContent></Card>
-
-    {!settlementQuery.isLoading && !settlement && <Notice tone="warning" title="Esperando a Operaciones" text={`Todavía no publicaron tu liquidación de ${periodLabel(period)}. El costo ya pertenece al cierre operativo, pero aún no hay una instrucción para facturar.`} />}
+    {!settlementQuery.isLoading && !settlementQuery.isError && !settlement && <Notice tone="warning" title="Esperando a Operaciones" text={`Todavía no publicaron tus condiciones de ${periodLabel(period)}. Cuando Operaciones las publique, acá se habilitará tu siguiente paso.`} />}
     {settlement?.adminNotes && <Notice tone="info" title="Indicación de Operaciones" text={settlement.adminNotes} />}
 
     {settlement && <div className="space-y-4">{usesUSD && phaseCard("usd")}{phaseCard("ars")}</div>}
 
     <Card><CardHeader className="pb-3"><CardTitle className="text-base">Historial del período</CardTitle></CardHeader><CardContent className="space-y-3">{!periodInvoices.length ? <p className="py-4 text-sm text-muted-foreground">Todavía no enviaste facturas para este período.</p> : periodInvoices.map((invoice) => <InvoiceStatus key={invoice.id} invoice={invoice} />)}</CardContent></Card>
+    <details><summary className="cursor-pointer text-sm text-muted-foreground">Declaraciones anteriores del cierre operativo</summary><MonthlyClosingDeclarations /></details>
   </div>;
 }
 
@@ -259,22 +263,24 @@ function InvoiceUpload({ period, component, currency, expected, existing, enable
   }
   function drop(event: DragEvent<HTMLDivElement>) { event.preventDefault(); setDragging(false); accept(Array.from(event.dataTransfer.files)); }
   function paste(event: ClipboardEvent<HTMLDivElement>) { const file = Array.from(event.clipboardData.items).find((item) => item.kind === "file")?.getAsFile(); if (file) { event.preventDefault(); accept([file]); } }
-  return <div className="space-y-4" onPaste={paste}>
+  if (locked && existing) return <InvoiceStatus invoice={existing} />;
+  const uploadForm = <div className="space-y-4" onPaste={paste}>
     <div className="flex flex-wrap items-center justify-between gap-2"><div><p className="font-semibold">Adjuntar {component === "usd" ? "factura USD" : component === "ars" ? "factura ARS" : "factura"}</p><p className="text-xs text-muted-foreground">Importe esperado: {money(expected, currency)}. Mind intentará leer el importe real del archivo.</p></div>{existing?.approvalStatus && <Badge variant="outline" className={STATUS[existing.approvalStatus].className}>{STATUS[existing.approvalStatus].label}</Badge>}</div>
     {existing?.approvalStatus === "rejected" && <Notice tone="danger" title="Administración pidió una corrección" text={existing.reviewReason || "Revisá el comprobante y volvé a enviarlo."} />}
-    <div className="grid gap-3 sm:grid-cols-3"><div><Label>Número <span className="font-normal text-muted-foreground">(opcional)</span></Label><Input className="mt-1.5" value={invoiceNumber} onChange={(event) => setInvoiceNumber(event.target.value)} disabled={locked} /></div><div><Label>Fecha de emisión</Label><Input className="mt-1.5" type="date" value={issueDate} onChange={(event) => setIssueDate(event.target.value)} disabled={locked} /></div><div><Label>Importe real <span className="font-normal text-muted-foreground">(si Mind no lo lee)</span></Label><Input className="mt-1.5" type="number" min="0" step="0.01" value={amount} onChange={(event) => setAmount(event.target.value)} disabled={locked} placeholder={String(expected || "")} /></div></div>
-    <div className={`rounded-xl border-2 border-dashed p-6 text-center ${dragging ? "border-indigo-500 bg-indigo-50" : files.length ? "border-emerald-300 bg-emerald-50" : "border-slate-200"}`} onDragOver={(event) => { event.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)} onDrop={drop}>{files.length ? <><CheckCircle2 className="mx-auto h-7 w-7 text-emerald-600" /><p className="mt-1 text-sm font-medium">{files.length} archivo{files.length === 1 ? "" : "s"} listo{files.length === 1 ? "" : "s"}</p><div className="mt-2 space-y-1">{files.map((file, index) => <div key={`${file.name}-${index}`} className="mx-auto flex max-w-lg items-center justify-between rounded border bg-white px-3 py-1.5 text-xs"><span className="truncate">{file.name}</span><Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => setFiles((current) => current.filter((_, item) => item !== index))}><X className="h-3 w-3" /></Button></div>)}</div></> : <><UploadCloud className="mx-auto h-7 w-7 text-indigo-500" /><p className="mt-1 text-sm font-medium">Arrastrá el PDF o pegá una captura con ⌘V</p></>}<Button className="mt-3" size="sm" variant="outline" disabled={locked} onClick={() => input.current?.click()}>{files.length ? "Agregar archivo" : "Elegir comprobante"}</Button><input ref={input} className="hidden" type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.webp" onChange={(event) => { accept(Array.from(event.target.files ?? [])); event.currentTarget.value = ""; }} /></div>
-    <div><Label>Aclaración <span className="font-normal text-muted-foreground">(opcional)</span></Label><Textarea className="mt-1.5" rows={2} value={notes} onChange={(event) => setNotes(event.target.value)} disabled={locked} /></div>
+    <div className="grid items-end gap-3 sm:grid-cols-3"><div><Label htmlFor={`invoice-number-${component}`}>Número <span className="font-normal text-muted-foreground">(opcional)</span></Label><Input className="mt-1.5" id={`invoice-number-${component}`} value={invoiceNumber} onChange={(event) => setInvoiceNumber(event.target.value)} disabled={locked} /></div><div><Label htmlFor={`invoice-date-${component}`}>Fecha de emisión</Label><Input id={`invoice-date-${component}`} className="mt-1.5" type="date" value={issueDate} onChange={(event) => setIssueDate(event.target.value)} disabled={locked} /></div><div><Label htmlFor={`invoice-amount-${component}`}>Importe real <span className="font-normal text-muted-foreground">(si Mind no lo lee)</span></Label><Input className="mt-1.5" type="number" min="0" step="0.01" id={`invoice-amount-${component}`} value={amount} onChange={(event) => setAmount(event.target.value)} disabled={locked} placeholder={String(expected || "")} /></div></div>
+    <div className={`rounded-xl border-2 border-dashed p-6 text-center ${dragging ? "border-indigo-500 bg-indigo-50" : files.length ? "border-emerald-300 bg-emerald-50" : "border-slate-200"}`} onDragOver={(event) => { event.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)} onDrop={drop}>{files.length ? <><CheckCircle2 className="mx-auto h-7 w-7 text-emerald-600" /><p className="mt-1 text-sm font-medium">{files.length} archivo{files.length === 1 ? "" : "s"} listo{files.length === 1 ? "" : "s"}</p><div className="mt-2 space-y-1">{files.map((file, index) => <div key={`${file.name}-${index}`} className="mx-auto flex max-w-lg items-center justify-between rounded border bg-white px-3 py-1.5 text-xs"><span className="truncate">{file.name}</span><Button size="icon" variant="ghost" className="h-8 w-8 shrink-0" aria-label={`Quitar ${file.name}`} onClick={() => setFiles((current) => current.filter((_, item) => item !== index))}><X className="h-3 w-3" /></Button></div>)}</div></> : <><UploadCloud className="mx-auto h-7 w-7 text-indigo-500" /><p className="mt-1 text-sm font-medium">Arrastrá el PDF o pegá una captura con ⌘V</p></>}<Button className="mt-3" size="sm" variant="outline" disabled={locked} onClick={() => input.current?.click()}>{files.length ? "Agregar archivo" : "Elegir comprobante"}</Button><input ref={input} className="hidden" type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.webp" onChange={(event) => { accept(Array.from(event.target.files ?? [])); event.currentTarget.value = ""; }} /></div>
+    <div><Label htmlFor={`invoice-notes-${component}`}>Aclaración <span className="font-normal text-muted-foreground">(opcional)</span></Label><Textarea id={`invoice-notes-${component}`} className="mt-1.5" rows={2} value={notes} onChange={(event) => setNotes(event.target.value)} disabled={locked} /></div>
     <div className="flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between"><p className="flex max-w-2xl items-start gap-2 text-xs text-muted-foreground"><ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />Al aprobarla, Administración crea el Pasivo en el mes de emisión. El costo del equipo y los proyectos no cambian.</p><Button disabled={!enabled || !files.length || locked || mutation.isPending} onClick={() => mutation.mutate()}>{mutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UploadCloud className="mr-2 h-4 w-4" />}{existing ? "Reemplazar y reenviar" : "Enviar a Administración"}</Button></div>
   </div>;
+  return existing?.approvalStatus === "pending" ? <div className="space-y-3"><InvoiceStatus invoice={existing} /><p className="text-sm text-muted-foreground">Administración está revisando tu comprobante. Te avisaremos si necesitás corregirlo.</p><details><summary className="cursor-pointer text-sm font-medium">Reemplazar comprobante enviado</summary><div className="mt-4">{uploadForm}</div></details></div> : uploadForm;
 }
 
 function InvoiceStatus({ invoice }: { invoice: InvoiceRow }) {
   const status = STATUS[invoice.approvalStatus ?? "pending"];
-  return <div className="flex flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-center sm:justify-between"><div><div className="flex flex-wrap items-center gap-2"><p className="font-semibold">{invoice.invoiceComponent === "usd" ? "Factura USD" : invoice.invoiceComponent === "ars" ? "Factura ARS" : "Factura mensual"}</p><Badge variant="outline" className={status.className}>{status.label}</Badge></div><p className="mt-1 text-xs text-muted-foreground">{invoice.invoiceNumber || invoice.fileName} · {money(invoice.declaredInvoiceAmount, invoice.invoiceCurrency ?? "ARS")}{invoice.issueDate ? ` · emitida ${new Date(invoice.issueDate).toLocaleDateString("es-AR")}` : ""}</p></div><div className="flex flex-wrap gap-2">{(invoice.documents ?? []).map((document, index) => <Button key={document.fileUrl} asChild size="sm" variant="outline"><a href={document.fileUrl} target="_blank" rel="noreferrer"><FileText className="mr-2 h-4 w-4" />{invoice.documents!.length > 1 ? `Archivo ${index + 1}` : "Ver factura"}</a></Button>)}</div></div>;
+  return <div className="flex flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-center sm:justify-between"><div><div className="flex flex-wrap items-center gap-2"><p className="font-semibold">{invoice.invoiceComponent === "usd" ? "Factura USD" : invoice.invoiceComponent === "ars" ? "Factura ARS" : "Factura mensual"}</p><Badge variant="outline" className={status.className}>{status.label}</Badge></div><p className="mt-1 break-words text-xs text-muted-foreground">{invoice.invoiceNumber || invoice.fileName} · {money(invoice.declaredInvoiceAmount, invoice.invoiceCurrency ?? "ARS")}{invoice.issueDate ? ` · emitida ${new Date(invoice.issueDate).toLocaleDateString("es-AR")}` : ""}</p></div><div className="flex flex-wrap gap-2">{(invoice.documents ?? []).map((document, index) => <Button key={document.fileUrl} asChild size="sm" variant="outline"><a href={document.fileUrl} target="_blank" rel="noreferrer"><FileText className="mr-2 h-4 w-4" />{invoice.documents!.length > 1 ? `Archivo ${index + 1}` : "Ver factura"}</a></Button>)}</div></div>;
 }
 function Step({ number, label, detail, done = false, active = false }: { number: number; label: string; detail: string; done?: boolean; active?: boolean }) {
-  return <div className={`flex items-center gap-3 rounded-xl border p-4 ${done ? "border-emerald-200 bg-emerald-50/40" : active ? "border-indigo-200" : "bg-slate-50/50"}`}><span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${done ? "bg-emerald-600 text-white" : active ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-500"}`}>{done ? <Check className="h-4 w-4" /> : number}</span><span><span className="block text-sm font-semibold">{label}</span><span className="block text-xs text-muted-foreground">{detail}</span></span></div>;
+  return <div className={`flex min-w-0 flex-col items-start gap-2 rounded-xl border p-3 min-[380px]:flex-row min-[380px]:items-center sm:gap-3 sm:p-4 ${done ? "border-emerald-200 bg-emerald-50/40" : active ? "border-indigo-200" : "bg-slate-50/50"}`}><span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${done ? "bg-emerald-600 text-white" : active ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-500"}`}>{done ? <Check className="h-4 w-4" /> : number}</span><span className="min-w-0"><span className="block text-sm font-semibold">{label}</span><span className="block text-xs text-muted-foreground">{detail}</span></span></div>;
 }
-function Summary({ label, value, detail }: { label: string; value: string; detail: string }) { return <div className="rounded-xl border bg-slate-50/70 p-3"><p className="text-xs text-muted-foreground">{label}</p><p className="mt-1 text-lg font-semibold tabular-nums">{value}</p><p className="text-[11px] text-muted-foreground">{detail}</p></div>; }
+function Summary({ label, value, detail }: { label: string; value: string; detail: string }) { return <div className="rounded-xl border bg-slate-50/70 p-3"><p className="text-xs text-muted-foreground">{label}</p><p className="mt-1 break-words text-lg font-semibold tabular-nums">{value}</p><p className="text-[11px] text-muted-foreground">{detail}</p></div>; }
 function Notice({ tone, title, text }: { tone: "danger" | "warning" | "info"; title: string; text: string }) { const styles = tone === "danger" ? "border-rose-200 bg-rose-50 text-rose-900" : tone === "warning" ? "border-amber-200 bg-amber-50 text-amber-900" : "border-indigo-200 bg-indigo-50 text-indigo-950"; const Icon = tone === "info" ? ShieldCheck : AlertCircle; return <div className={`flex gap-3 rounded-xl border p-4 ${styles}`}><Icon className="mt-0.5 h-5 w-5 shrink-0" /><div><p className="text-sm font-semibold">{title}</p><p className="text-xs opacity-80">{text}</p></div></div>; }

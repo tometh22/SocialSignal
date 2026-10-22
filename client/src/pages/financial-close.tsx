@@ -1,5 +1,5 @@
 import { FinancialTransitionPanel } from "@/components/financial-transition-panel";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { authFetchJson } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -19,7 +19,8 @@ type CloseDetail = { period: ClosePeriod | null; checks: CloseCheck[] };
 
 export default function FinancialClosePage() {
   const now = new Date();
-  const [period, setPeriod] = useState(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`);
+  const [period, setPeriod] = useState(() => { const saved = new URLSearchParams(window.location.search).get("period"); return saved && /^\d{4}-(0[1-9]|1[0-2])$/.test(saved) ? saved : `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`; });
+  useEffect(() => { const url = new URL(window.location.href); url.searchParams.set("period",period); window.history.replaceState(window.history.state,"",url); }, [period]);
   const [correctionOpen, setCorrectionOpen] = useState(false);
   const [correctionReason, setCorrectionReason] = useState("");
   const { toast } = useToast();
@@ -35,12 +36,13 @@ export default function FinancialClosePage() {
   const resolveMutation = useMutation({
     mutationFn: ({ id, status, resolution }: { id: number; status: "accepted" | "resolved"; resolution: string }) => authFetchJson(`/api/financial-native/close/${period}/checks/${id}`, { method: "PATCH", body: JSON.stringify({ status, resolution }) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["financial-close", period] }),
+    onError: (e: Error) => toast({ title: "No se pudo guardar la excepción", description: e.message, variant: "destructive" }),
   });
   const state = query.data?.period?.status ?? "OPEN";
   const checks = query.data?.checks ?? [];
   const failedCritical = checks.filter((check) => check.severity === "critical" && check.status === "failed").length;
   const failedWarning = checks.filter((check) => check.severity === "warning" && check.status === "failed").length;
-  const busy = mutation.isPending || resolveMutation.isPending;
+  const busy = mutation.isPending || resolveMutation.isPending || query.isLoading || query.isError;
 
   const resolve = (check: CloseCheck) => {
     const resolution = window.prompt("Motivo para aceptar la observación:");
@@ -50,10 +52,10 @@ export default function FinancialClosePage() {
   const reopen = () => { const reason = window.prompt("Motivo de reapertura (quedará auditado):"); if (reason) mutation.mutate({ action: "reopen", body: { reason } }); };
 
   return <div className="space-y-6">
-    <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between"><div><p className="text-sm font-medium text-rose-600">Finanzas · control mensual</p><h1 className="text-3xl font-semibold tracking-tight">Cierre financiero</h1><p className="text-sm text-muted-foreground">Valida la integridad, fija el snapshot y bloquea cambios retroactivos.</p></div><Input className="w-48" type="month" value={period} onChange={(e) => setPeriod(e.target.value)} /></div>
-    <div className="grid gap-4 md:grid-cols-4"><Metric title="Estado" value={statusLabel(state)} /><Metric title="Controles" value={String(checks.length)} /><Metric title="Críticos" value={String(failedCritical)} alert={failedCritical > 0} /><Metric title="Advertencias" value={String(failedWarning)} alert={failedWarning > 0} /></div>
+    <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between"><div><p className="text-sm font-medium text-rose-600">Finanzas · control mensual</p><h1 className="text-3xl font-semibold tracking-tight">Cierre financiero</h1><p className="text-sm text-muted-foreground">Conciliá los datos de toda la empresa y aprobá el resultado del mes. Un período cerrado queda protegido contra cambios.</p></div><div className="w-full shrink-0 md:w-48"><Label htmlFor="financial-close-period">Mes del cierre financiero</Label><Input id="financial-close-period" className="mt-1.5" type="month" value={period} onChange={(e) => { if (/^\d{4}-(0[1-9]|1[0-2])$/.test(e.target.value)) setPeriod(e.target.value); }} /></div></div>
+    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4"><Metric title="Estado" value={query.isError ? "Sin datos" : query.isLoading ? "Cargando…" : statusLabel(state)} /><Metric title="Controles" value={String(checks.length)} /><Metric title="Críticos" value={String(failedCritical)} alert={failedCritical > 0} /><Metric title="Advertencias" value={String(failedWarning)} alert={failedWarning > 0} /></div>
     <Card><CardHeader><div className="flex flex-wrap items-center justify-between gap-3"><CardTitle>Checklist de {period}</CardTitle><div className="flex flex-wrap gap-2"><Button variant="outline" disabled={busy || state === "CLOSED" || state === "IN_REVIEW"} onClick={() => mutation.mutate({ action: "pre-close" })}><RefreshCw className="mr-2 h-4 w-4" />Ejecutar pre-cierre</Button>{state === "PRE_CLOSE" && <Button disabled={busy || failedCritical > 0} onClick={() => mutation.mutate({ action: "request-review", body: {} })}><ShieldCheck className="mr-2 h-4 w-4" />Enviar a revisión</Button>}{state === "IN_REVIEW" && <Button variant="outline" disabled={busy} onClick={returnForCorrection}>Devolver a corrección</Button>}{state === "IN_REVIEW" && isAdmin && <Button disabled={busy || failedCritical > 0} onClick={() => mutation.mutate({ action: "close" })}><LockKeyhole className="mr-2 h-4 w-4" />Cerrar período</Button>}{state === "CLOSED" && isAdmin && <Button variant="destructive" disabled={busy} onClick={reopen}><RotateCcw className="mr-2 h-4 w-4" />Reabrir</Button>}</div></div></CardHeader>
-      <CardContent className="space-y-3">{query.isLoading && <p className="text-sm text-muted-foreground">Ejecutando controles…</p>}{!query.isLoading && checks.length === 0 && <div className="rounded-xl border border-dashed p-10 text-center text-sm text-muted-foreground">Todavía no se ejecutó el pre-cierre de este período.</div>}{checks.map((check) => <div key={check.id} className="flex flex-col gap-3 rounded-xl border p-4 md:flex-row md:items-center"><div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-50">{check.status === "passed" || check.status === "resolved" || check.status === "accepted" ? <CheckCircle2 className="h-5 w-5 text-emerald-600" /> : <AlertTriangle className={`h-5 w-5 ${check.severity === "critical" ? "text-red-600" : "text-amber-600"}`} />}</div><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><p className="font-medium">{check.title}</p><Badge variant={check.severity === "critical" ? "destructive" : "secondary"}>{statusLabel(check.severity)}</Badge><Badge variant="outline">{statusLabel(check.status)}</Badge></div><p className="mt-1 text-sm text-muted-foreground">{check.detail}</p>{check.resolution && <p className="mt-1 text-xs text-emerald-700">Resolución: {check.resolution}</p>}{check.severity === "critical" && check.status === "failed" && <p className="mt-1 text-xs text-red-700">Corregí el origen y volvé a ejecutar el pre-cierre.</p>}</div>{check.status === "failed" && check.severity !== "critical" && state !== "CLOSED" && <Button size="sm" variant="outline" onClick={() => resolve(check)}>Aceptar excepción</Button>}</div>)}</CardContent>
+      <CardContent className="space-y-3">{query.isLoading && <p className="text-sm text-muted-foreground">Ejecutando controles…</p>}{query.isError && <p role="alert" className="text-sm text-destructive">No se pudo cargar el cierre. Actualizá la página para reintentar.</p>}{!query.isLoading && !query.isError && checks.length === 0 && <div className="rounded-xl border border-dashed p-10 text-center text-sm text-muted-foreground">Todavía no se ejecutó el pre-cierre de este período.</div>}{checks.map((check) => <div key={check.id} className="flex flex-col gap-3 rounded-xl border p-4 md:flex-row md:items-center"><div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-50">{check.status === "passed" || check.status === "resolved" || check.status === "accepted" ? <CheckCircle2 className="h-5 w-5 text-emerald-600" /> : <AlertTriangle className={`h-5 w-5 ${check.severity === "critical" ? "text-red-600" : "text-amber-600"}`} />}</div><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><p className="font-medium">{check.title}</p><Badge variant={check.severity === "critical" ? "destructive" : "secondary"}>{statusLabel(check.severity)}</Badge><Badge variant="outline">{statusLabel(check.status)}</Badge></div><p className="mt-1 text-sm text-muted-foreground">{check.detail}</p>{check.resolution && <p className="mt-1 text-xs text-emerald-700">Resolución: {check.resolution}</p>}{check.severity === "critical" && check.status === "failed" && <p className="mt-1 text-xs text-red-700">Corregí el origen y volvé a ejecutar el pre-cierre.</p>}</div>{check.status === "failed" && check.severity !== "critical" && state !== "CLOSED" && <Button size="sm" variant="outline" onClick={() => resolve(check)}>Aceptar excepción</Button>}</div>)}</CardContent>
     </Card>
     <Dialog open={correctionOpen} onOpenChange={setCorrectionOpen}>
       <DialogContent>
@@ -65,7 +67,7 @@ export default function FinancialClosePage() {
       </DialogContent>
     </Dialog>
     <FinancialTransitionPanel period={period} />
-    {state === "CLOSED" && <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900"><LockKeyhole className="h-4 w-4" />El período está congelado. Los tableros leen el snapshot versión {query.data?.period?.snapshotVersion}.</div>}
+    {state === "CLOSED" && <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900"><LockKeyhole className="h-4 w-4" />El período está protegido. Los reportes muestran el cierre aprobado, versión {query.data?.period?.snapshotVersion}.</div>}
   </div>;
 }
 

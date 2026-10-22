@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertCircle, Check, FileText, Loader2, Receipt, Search, X } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -40,7 +40,7 @@ function currentPeriod() {
 function money(value: number | null | undefined, currency: "ARS" | "USD") {
   if (value == null || !Number.isFinite(Number(value))) return "—";
   return new Intl.NumberFormat(currency === "ARS" ? "es-AR" : "en-US", {
-    style: "currency", currency, maximumFractionDigits: 2,
+    style: "currency", currency, currencyDisplay: currency === "USD" ? "code" : "symbol", maximumFractionDigits: 2,
   }).format(Number(value));
 }
 
@@ -56,7 +56,8 @@ function componentLabel(component?: string) {
 }
 
 export default function TeamInvoiceReview() {
-  const [period, setPeriod] = useState(() => new URLSearchParams(window.location.search).get("period") || currentPeriod());
+  const [period, setPeriod] = useState(() => { const saved = new URLSearchParams(window.location.search).get("period"); return saved && /^\d{4}-(0[1-9]|1[0-2])$/.test(saved) ? saved : currentPeriod(); });
+  useEffect(() => { const url = new URL(window.location.href); url.searchParams.set("period",period); window.history.replaceState(window.history.state,"",url); }, [period]);
   const [search, setSearch] = useState("");
   const [correction, setCorrection] = useState<ReviewInvoice | null>(null);
   const [reason, setReason] = useState("");
@@ -98,7 +99,7 @@ export default function TeamInvoiceReview() {
     <AlertDialog open={Boolean(correction)} onOpenChange={(open) => { if (!open) { setCorrection(null); setReason(""); } }}>
       <AlertDialogContent>
         <AlertDialogHeader><AlertDialogTitle>Pedir corrección</AlertDialogTitle><AlertDialogDescription>Indicá qué dato de la factura no coincide con la liquidación publicada por Operaciones.</AlertDialogDescription></AlertDialogHeader>
-        <Textarea autoFocus value={reason} onChange={(event) => setReason(event.target.value)} rows={4} placeholder="Ej. El total de la factura no coincide con el importe esperado." />
+        <Textarea aria-label="Motivo de corrección" autoFocus value={reason} onChange={(event) => setReason(event.target.value)} rows={4} placeholder="Ej. El total de la factura no coincide con el importe esperado." />
         <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction disabled={!reason.trim() || mutation.isPending} onClick={(event) => { event.preventDefault(); if (correction && reason.trim()) mutation.mutate({ invoice: correction, status: "rejected", reviewReason: reason.trim() }); }}>Enviar pedido</AlertDialogAction></AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
@@ -109,20 +110,20 @@ export default function TeamInvoiceReview() {
       <p className="mt-1 max-w-3xl text-sm text-muted-foreground">Compará cada factura con el número final publicado por Operaciones. Aprobarla crea el Pasivo en el mes de emisión; nunca modifica Costos ni la rentabilidad.</p>
     </div>
 
-    <div className="grid gap-3 sm:grid-cols-3">
+    <div className="grid grid-cols-3 gap-2 sm:gap-3">
       <Metric label="Esperando revisión" value={pending} />
       <Metric label="Con diferencia" value={mismatches} warning={mismatches > 0} />
       <Metric label="Aprobadas" value={approved} />
     </div>
 
     <Card><CardContent className="flex flex-col gap-3 pt-6 sm:flex-row">
-      <div className="sm:w-56"><Label htmlFor="invoice-review-period">Período trabajado</Label><Input id="invoice-review-period" className="mt-1.5" type="month" value={period} onChange={(event) => setPeriod(event.target.value)} /></div>
+      <div className="sm:w-56"><Label htmlFor="invoice-review-period">Período trabajado</Label><Input id="invoice-review-period" className="mt-1.5" type="month" value={period} onChange={(event) => { if (/^\d{4}-(0[1-9]|1[0-2])$/.test(event.target.value)) setPeriod(event.target.value); }} /></div>
       <div className="min-w-0 flex-1"><Label htmlFor="invoice-review-search">Buscar</Label><div className="relative mt-1.5"><Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" /><Input id="invoice-review-search" className="pl-9" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Persona o número de factura" /></div></div>
     </CardContent></Card>
 
     {query.isLoading && <div className="flex justify-center gap-2 py-12 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />Cargando facturas…</div>}
     {query.isError && <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900">No se pudieron cargar las facturas.</div>}
-    {!query.isLoading && !rows.length && <div className="rounded-xl border border-dashed p-10 text-center text-sm text-muted-foreground">No hay facturas enviadas para este período trabajado.</div>}
+    {!query.isLoading && !query.isError && !rows.length && <div className="rounded-xl border border-dashed p-10 text-center text-sm text-muted-foreground">{search.trim() ? "No hay facturas que coincidan con la búsqueda." : "No hay facturas enviadas para este período trabajado."}</div>}
 
     <div className="space-y-3">{rows.map((invoice) => {
       const target = expected(invoice);
@@ -134,7 +135,7 @@ export default function TeamInvoiceReview() {
         <CardContent className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-3"><Amount label="Operaciones indicó" value={money(target.amount || null, target.currency)} /><Amount label="Factura recibida" value={money(actual || null, invoice.invoice_currency ?? target.currency)} /><Amount label="Diferencia" value={money(actual - target.amount, target.currency)} /></div>
           {invoice.review_reason && <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-900">{invoice.review_reason}</div>}
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-4"><div className="flex flex-wrap gap-2">{(invoice.documents ?? []).map((document, index) => <Button key={document.fileUrl} asChild size="sm" variant="outline"><a href={document.fileUrl} target="_blank" rel="noreferrer"><FileText className="mr-2 h-4 w-4" />{invoice.documents!.length > 1 ? `Comprobante ${index + 1}` : "Ver factura"}</a></Button>)}</div><div className="flex gap-2">{invoice.approval_status === "pending" && <><Button variant="outline" size="sm" onClick={() => { setCorrection(invoice); setReason(""); }}><X className="mr-1 h-4 w-4" />Pedir corrección</Button><Button size="sm" disabled={mutation.isPending || !matches} title={!matches ? "El importe debe coincidir con la liquidación de Operaciones" : undefined} onClick={() => mutation.mutate({ invoice, status: "approved" })}><Check className="mr-1 h-4 w-4" />Aprobar y crear Pasivo</Button></>}{invoice.approval_status === "approved" && <Button variant="outline" size="sm" disabled={mutation.isPending} onClick={() => mutation.mutate({ invoice, status: "pending", reviewReason: "Reabierta por Finanzas." })}>Reabrir</Button>}</div></div>
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-4"><div className="flex flex-wrap gap-2">{(invoice.documents ?? []).map((document, index) => <Button key={document.fileUrl} asChild size="sm" variant="outline"><a href={document.fileUrl} target="_blank" rel="noreferrer"><FileText className="mr-2 h-4 w-4" />{invoice.documents!.length > 1 ? `Comprobante ${index + 1}` : "Ver factura"}</a></Button>)}</div><div className="flex flex-wrap gap-2">{invoice.approval_status === "pending" && <><Button variant="outline" size="sm" onClick={() => { setCorrection(invoice); setReason(""); }}><X className="mr-1 h-4 w-4" />Pedir corrección</Button><Button size="sm" disabled={mutation.isPending || !matches} title={!matches ? "El importe debe coincidir con la liquidación de Operaciones" : undefined} onClick={() => mutation.mutate({ invoice, status: "approved" })}><Check className="mr-1 h-4 w-4" />Aprobar y crear Pasivo</Button></>}{invoice.approval_status === "approved" && <Button variant="outline" size="sm" disabled={mutation.isPending} onClick={() => mutation.mutate({ invoice, status: "pending", reviewReason: "Reabierta por Finanzas." })}>Reabrir</Button>}</div></div>
         </CardContent>
       </Card>;
     })}</div>
@@ -142,11 +143,11 @@ export default function TeamInvoiceReview() {
 }
 
 function Metric({ label, value, warning = false }: { label: string; value: number; warning?: boolean }) {
-  return <Card><CardContent className="flex items-center gap-3 pt-6"><Receipt className={`h-5 w-5 ${warning ? "text-amber-600" : "text-indigo-600"}`} /><div><p className="text-xs text-muted-foreground">{label}</p><p className="text-2xl font-semibold">{value}</p></div></CardContent></Card>;
+  return <Card><CardContent className="flex flex-col items-start gap-2 p-3 sm:flex-row sm:items-center sm:gap-3 sm:p-6"><Receipt className={`h-5 w-5 ${warning ? "text-amber-600" : "text-indigo-600"}`} /><div className="min-w-0"><p className="min-h-8 text-xs text-muted-foreground sm:min-h-0">{label}</p><p className="text-2xl font-semibold">{value}</p></div></CardContent></Card>;
 }
 
 function Amount({ label, value }: { label: string; value: string }) {
-  return <div className="rounded-xl border bg-slate-50 p-3"><p className="text-xs text-muted-foreground">{label}</p><p className="mt-1 text-lg font-semibold tabular-nums">{value}</p></div>;
+  return <div className="rounded-xl border bg-slate-50 p-3"><p className="text-xs text-muted-foreground">{label}</p><p className="mt-1 break-words text-lg font-semibold tabular-nums">{value}</p></div>;
 }
 
 function Status({ value }: { value: ReviewInvoice["approval_status"] }) {

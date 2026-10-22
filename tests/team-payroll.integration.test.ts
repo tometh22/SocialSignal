@@ -13,7 +13,8 @@ vi.mock("../server/db", async () => {
   return { pool,db:drizzle(pool) };
 });
 vi.mock("../server/services/user-notifications",()=>({createUserNotifications:vi.fn(async()=>true)}));
-import { pool } from "../server/db";
+import { pool, db } from "../server/db";
+import { personalInvoiceReviewQuery } from "../server/services/personal-invoice-review";
 import { preparePayroll, payrollActualHours } from "../server/services/monthly-payroll";
 import { changeSettlement, assertSettlementInvoiceAllowed } from "../server/services/personnel-settlement-workflow";
 
@@ -50,6 +51,18 @@ describe.skipIf(!setup.url)("team payroll workflow with PostgreSQL",()=>{
     await preparePayroll(period,2,{cut:true,now:new Date("2026-10-31T03:00:00Z")});
     return (await query("UPDATE personnel_monthly_settlements SET status='published',billing_currency_snapshot=$1,usd_percentage=$2,planned_usd_ars=$3 WHERE personnel_id=1 RETURNING *",[mixed?"MIXED":"ARS",mixed?90:0,mixed?9000:0])).rows[0];
   }
+  it("returns the same review revision as Drizzle regardless of server or browser timezone", async () => {
+    await query("INSERT INTO personal_monthly_invoices(user_id,personnel_id,period,updated_at) VALUES(1,1,$1,'2026-10-22 16:06:10.119')", [period]);
+    const [invoice] = await db.select().from(schema.personalMonthlyInvoices);
+    const result = await db.execute(personalInvoiceReviewQuery(period));
+    const revision = result.rows[0].updated_at as string;
+    expect(revision).toBe("2026-10-22T16:06:10.119Z");
+    expect(new Date(revision).getTime()).toBe(invoice.updatedAt.getTime());
+    expect(new Intl.DateTimeFormat("en-GB", { timeZone: "America/Argentina/Buenos_Aires", hour: "2-digit", minute: "2-digit" }).format(new Date(revision))).toBe("13:06");
+    await query("UPDATE personal_monthly_invoices SET updated_at = updated_at + interval '1 millisecond'");
+    const [changed] = await db.select().from(schema.personalMonthlyInvoices);
+    expect(new Date(revision).getTime()).not.toBe(changed.updatedAt.getTime());
+  });
   it("prepares 120 contractual hours, freezes source hours, keeps paid leave out of deductions",async()=>{
     await query("INSERT INTO tasks(id,title) VALUES(1,'QA'); INSERT INTO task_time_entries(task_id,personnel_id,date,hours) VALUES(1,1,'2026-10-10',92.5)");
     const result=await preparePayroll(period,2,{cut:true,now:new Date("2026-10-31T03:00:00Z")});

@@ -68,7 +68,7 @@ La automatización hace cálculos, propagaciones y controles; no reemplaza la ca
 
 ### Requisito operativo confirmado: liquidación y facturación del equipo
 
-Actualización del 22 de octubre: el circuito solicitado está implementado en esta rama, con pruebas locales y sin despliegue ni cambios productivos. Reemplaza los faltantes identificados en la revisión anterior. Integrado con `main` (1.14.4) como versión 1.15.0; migraciones renumeradas 0087–0089 para conservar cumpleaños y OAuth. Pasaron 1.015 pruebas (11 omitidas), TypeScript y build, incluidas las suites PostgreSQL financiera y MCP. El presupuesto nativo se incorpora al catálogo MCP con permiso de Finanzas.
+Actualización del 22 de octubre: el circuito solicitado está implementado en esta rama, con pruebas locales y sin despliegue ni cambios productivos. Reemplaza los faltantes identificados en la revisión anterior. Integrado con `main` (1.14.4) como versión 1.15.0; migraciones renumeradas 0087–0089 para conservar cumpleaños y OAuth. Pasaron 1.024 pruebas (11 omitidas), TypeScript y build, incluidas las suites PostgreSQL financiera y MCP. El presupuesto nativo se incorpora al catálogo MCP con permiso de Finanzas.
 
 | Paso | Comportamiento implementado |
 | --- | --- |
@@ -84,6 +84,10 @@ Actualización del 22 de octubre: el circuito solicitado está implementado en e
 **Ejemplo confirmado:** total ARS 10.000, 90%, TC al facturar 1.500, TC al recibir 1.505 y extras ARS 5.000 → USD 6 y ARS 5.970 (`10.000 − 6 × 1.505 + 5.000`). Se redondea el tramo USD antes de calcular el saldo ARS.
 
 Validación: pruebas PostgreSQL del corte, horas pagas, secuencia, concurrencia, permisos, estados financieros y costos sin FX; migración 0089 aplicada dos veces. HTTP real con cuentas sintéticas recorrió ambas monedas hasta Pasivo, comprobó rechazo de carga anticipada y de modificaciones a documentos aprobados. Chrome verificó el diálogo de descuento excepcional, 120 horas contractuales y la carga/envío del TC personal. Evidencia local: `.context/team-paid-leave-qa.png` y `.context/team-fx-qa.png`.
+
+Revisión UX/UI adicional del 22 de octubre: selector de mes compartido, pestañas que conservan borradores y aviso de cambios sin guardar, responsables de cada pendiente corregidos, filtros por responsable, base en ARS y TC personales explícitos. Tablas con tarjetas móviles y desplazamiento contenido en escritorio; campos/etiquetas alineados y comprobantes aprobados resumidos para acceder al siguiente paso. ARS-only no muestra instrucciones ni fórmulas de TC.
+
+Chrome con datos sintéticos locales verificó anchos de 320, 390, 1280 y 1440 px, cambios de pestaña sin perder borradores, publicación ARS, primer TC, factura USD pendiente/aprobada, segundo TC con extras, revisión documental y cierre financiero. Se encontró y corrigió un rechazo falso de revisión por timestamp sin zona horaria: el listado devuelve UTC compatible con Drizzle; una regresión PostgreSQL conserva el rechazo de versiones realmente distintas. La aprobación desde la UI y el envío del segundo TC funcionaron después de corregirlo. Las pruebas de horas pagas cubren jornadas completas, parciales y bases contractuales personalizadas, no una excepción por persona. Evidencia: `.context/team-ux-desktop.png`, `.context/team-ux-mobile.png`, `.context/team-ux-paid-leave.png` y `.context/team-ux-approval.png`.
 
 Los avisos de publicación/autorización y recordatorios de pendientes utilizan el sistema de notificaciones existente. El corte depende del calendario de feriados configurado y del job habilitado (`DISABLE_TEAM_PAYROLL=true` permite desactivarlo). Las horas excepcionales posteriores al corte requieren reapertura previa a publicar. Preparar borradores no publica ni autoriza importes.
 
