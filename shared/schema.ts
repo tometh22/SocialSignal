@@ -4911,6 +4911,8 @@ export const personnelMonthlySettlements = pgTable("personnel_monthly_settlement
   usdPercentage: doublePrecision("usd_percentage").notNull().default(0),
   plannedUSDARS: doublePrecision("planned_usd_ars").notNull().default(0),
   bonusUSD: doublePrecision("bonus_usd").notNull().default(0),
+  bonusARS: doublePrecision("bonus_ars").notNull().default(0),
+  workflow: jsonb("workflow").$type<import("./utils/settlement-workflow").SettlementWorkflow>().notNull().default({ version: 0, usd: { status: "draft" }, ars: { status: "draft" }, extrasARS: 0 }),
   extrasARS: doublePrecision("extras_ars").notNull().default(0),
   invoiceFx: doublePrecision("invoice_fx"),
   baseInvoiceUSD: doublePrecision("base_invoice_usd"),

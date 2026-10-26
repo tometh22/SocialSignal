@@ -102,7 +102,7 @@ const routeLabels: Record<string, string> = {
   objectives: "Objetivos",
   operations: "Operaciones",
   capacity: "Capacidad semanal",
-  "monthly-closing": "Cierre mensual",
+  "monthly-closing": "Cierre del equipo",
   "estimated-rates": "Valor hora",
   holidays: "Feriados",
   absences: "Ausencias",
@@ -119,7 +119,7 @@ const routeLabels: Record<string, string> = {
   crm: "CRM",
   dashboard: "Resumen financiero",
   "my-invoices": "Mis facturas",
-  "liquidaciones-equipo": "Liquidaciones equipo",
+  "liquidaciones-equipo": "Cierre del equipo",
   "facturas-equipo": "Facturas equipo",
 };
 

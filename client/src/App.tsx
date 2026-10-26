@@ -58,7 +58,7 @@ const ProvisionsPage = lazy(() => import("@/pages/provisions"));
 const CashflowPage = lazy(() => import("@/pages/cashflow"));
 const ClientPnlPage = lazy(() => import("@/pages/client-pnl"));
 const FinancialIntakePage = lazy(() => import("@/pages/financial-intake"));
-const TeamSettlementsPage = lazy(() => import("@/pages/team-settlements"));
+const TeamSettlementsPage = lazy(() => import("@/pages/team-monthly-close"));
 const TeamInvoiceReviewPage = lazy(() => import("@/pages/team-invoice-review"));
 const FinancialClosePage = lazy(() => import("@/pages/financial-close"));
 
@@ -80,7 +80,7 @@ const AlwaysOnProjectView = lazy(() => import("@/pages/always-on-project-view"))
 const RecurringTemplatesPage = lazy(() => import("@/pages/recurring-templates"));
 const AdminUsersPage = lazy(() => import("@/pages/admin-users"));
 const CapacityDashboard = lazy(() => import("@/pages/capacity-dashboard"));
-const MonthlyClosing = lazy(() => import("@/pages/monthly-closing"));
+const MonthlyClosing = lazy(() => import("@/pages/team-monthly-close"));
 const EstimatedRates = lazy(() => import("@/pages/estimated-rates"));
 const HolidaysManagement = lazy(() => import("@/pages/holidays-management"));
 const PersonnelAbsences = lazy(() => import("@/pages/personnel-absences"));
