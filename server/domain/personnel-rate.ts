@@ -23,10 +23,11 @@ export type CanonicalPersonnelRate = {
 export async function resolveCanonicalPersonnelRate(
   personnelId: number,
   date: Date,
+  runner: Pick<typeof db, "select"> = db,
 ): Promise<CanonicalPersonnelRate> {
   const [year, month] = hoursCivilDate(date).slice(0, 7).split("-").map(Number);
   const entryPeriod = year * 100 + month;
-  const [historicalRate] = await db
+  const [historicalRate] = await runner
     .select({
       year: personnelHistoricalCosts.year,
       month: personnelHistoricalCosts.month,
@@ -76,7 +77,7 @@ export async function resolveCanonicalPersonnelRate(
   }
 
   if (hourlyRateUSD != null && hourlyRateUSD > 0) {
-    const [fx] = await db
+    const [fx] = await runner
       .select({ id: exchangeRates.id, rate: exchangeRates.rate })
       .from(exchangeRates)
       .where(and(
@@ -87,7 +88,7 @@ export async function resolveCanonicalPersonnelRate(
       .limit(1);
     let exchangeRate = fx ? Number(fx.rate) : null;
     if (!(exchangeRate && exchangeRate > 0)) {
-      const [globalFx] = await db
+      const [globalFx] = await runner
         .select({ rate: systemConfig.configValue })
         .from(systemConfig)
         .where(eq(systemConfig.configKey, "usd_exchange_rate"))

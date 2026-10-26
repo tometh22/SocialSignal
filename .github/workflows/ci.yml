@@ -38,6 +38,7 @@ jobs:
           --health-retries 10
 
     env:
+      FINANCIAL_TEST_DATABASE_URL: postgres://mind_test:mind_test@localhost:5432/mind_test
       TEST_MCP_DATABASE_URL: postgres://mind_test:mind_test@localhost:5432/mind_test
 
     steps:

@@ -1,3 +1,8 @@
+import { personalInvoiceReviewQuery } from "./services/personal-invoice-review";
+import { preparePayroll, payrollCalendar, payrollActualHours } from "./services/monthly-payroll";
+import { changeSettlement, assertSettlementInvoiceAllowed, lockSettlementPeriod, notifySettlement } from "./services/personnel-settlement-workflow";
+import { settlementWorkflow } from "@shared/utils/settlement-workflow";
+import { payableMonthlyHours } from "@shared/utils/payroll-hours";
 import { authenticatedJsonProjection } from "./services/authenticated-json-projection";
 import { externalStageSchema, assertExternalQuotationStage } from "@shared/utils/quotation-external-stage";
 import { personalTaskHours } from "./services/task-hour-privacy";
@@ -14042,7 +14047,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         )).limit(1),
       ]);
       if (!person) return res.status(404).json({ message: "Persona no encontrada" });
-      if (!closing) return res.status(409).json({ message: "Primero cerrá las horas de esta persona en Operaciones → Cierre mensual" });
+      if (!closing) return res.status(409).json({ message: "Primero prepará la base de esta persona en Cierre del equipo → Base a cobrar" });
       const publish = req.body?.publish === true;
       if (existing?.status === "published" && !publish) {
         return res.status(409).json({ message: "La liquidación ya está publicada. Para cambiarla, revisá los datos y elegí Actualizar publicación." });
@@ -14058,8 +14063,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const requestedPercentage = parseNonNegative(req.body?.usdPercentage, "Porcentaje USD");
       const usdPercentage = billingCurrency === "USD" ? 100 : billingCurrency === "ARS" ? 0 : requestedPercentage;
       if (usdPercentage > 100) return res.status(400).json({ message: "El porcentaje USD debe estar entre 0 y 100" });
-      const bonusUSD = billingCurrency === "MIXED" ? parseNonNegative(req.body?.bonusUSD, "Extra USD") : 0;
-      const extrasARS = billingCurrency === "MIXED" ? parseNonNegative(req.body?.extrasARS, "Extra ARS") : 0;
+      const bonusUSD = billingCurrency !== "ARS" ? parseNonNegative(req.body?.bonusUSD, "Bono USD") : 0;
+      const bonusARS = parseNonNegative(req.body?.bonusARS, "Bono ARS");
+      const extrasARS = parseNonNegative(req.body?.extrasARS, "Extra ARS");
       const totalARS = Number(closing.grandTotalARS ?? closing.totalCost ?? 0);
       const hoursSnapshot = Number(closing.adjustedHours ?? 0);
       const hourlyRateARSSnapshot = hoursSnapshot > 0 ? totalARS / hoursSnapshot : 0;
@@ -14067,10 +14073,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalARS,
         usdPercentage,
         bonusUSD,
+        bonusARS,
         extrasARS,
-        invoiceFx: existing?.invoiceFx,
-        receivedFx: existing?.receivedFx,
-        bankCommissionUSD: existing?.bankCommissionUSD,
+        invoiceFx: null,
+        receivedFx: null,
+        bankCommissionUSD: 0,
       });
       const status = publish ? "published" : existing?.status === "published" ? "published" : "draft";
       const values = {
@@ -14082,6 +14089,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         usdPercentage,
         plannedUSDARS: calculated.plannedUSDARS,
         bonusUSD,
+        bonusARS,
         extrasARS,
         baseInvoiceUSD: calculated.baseInvoiceUSD,
         totalInvoiceUSD: calculated.totalInvoiceUSD,
@@ -14093,13 +14101,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         publishedAt: publish ? new Date() : existing?.publishedAt ?? null,
         updatedAt: new Date(),
       };
-      const [saved] = await db.insert(personnelMonthlySettlements)
-        .values({ personnelId, period, createdBy: req.user!.id, ...values })
-        .onConflictDoUpdate({
-          target: [personnelMonthlySettlements.personnelId, personnelMonthlySettlements.period],
-          set: values,
-        })
-        .returning();
+      const saved = await db.transaction(async tx => {
+        await lockSettlementPeriod(tx, period);
+        if (publish && !(await tx.execute(sql`SELECT 1 FROM payroll_periods WHERE period=${period} AND state='cut'`)).rows.length) throw Object.assign(new Error("Primero completá el corte de horas del paso 1."), { statusCode: 409 });
+        const [current] = await tx.select().from(personnelMonthlySettlements).where(and(eq(personnelMonthlySettlements.personnelId, personnelId), eq(personnelMonthlySettlements.period, period))).for("update");
+        const flow = settlementWorkflow(current?.workflow);
+        if (Number(req.body?.version ?? 0) !== flow.version) throw Object.assign(new Error("La liquidación cambió. Actualizá antes de publicar."), { statusCode: 409 });
+        const [document] = current ? await tx.select({ id: personalMonthlyInvoices.id }).from(personalMonthlyInvoices).where(eq(personalMonthlyInvoices.settlementId, current.id)).limit(1) : [];
+        if (document || [flow.usd.status, flow.ars.status].some(status => status === "pending" || status === "approved")) throw Object.assign(new Error("Ya hay importes enviados o facturas. Resolvé los tramos antes de cambiar las condiciones."), { statusCode: 409 });
+        const [currentClose] = await tx.select().from(monthlyClosings).where(eq(monthlyClosings.id, closing.id));
+        if (Number(currentClose?.grandTotalARS ?? currentClose?.totalCost) !== totalARS || currentClose?.adjustedHours !== closing.adjustedHours) throw Object.assign(new Error("La base cambió. Actualizá antes de publicar."), { statusCode: 409 });
+        const [result] = await tx.insert(personnelMonthlySettlements)
+          .values({ personnelId, period, createdBy: req.user!.id, ...values, workflow: { ...settlementWorkflow(), version: flow.version + 1 } })
+          .onConflictDoUpdate({ target: [personnelMonthlySettlements.personnelId, personnelMonthlySettlements.period], set: { ...values, invoiceFx: null, receivedFx: null, bankCommissionUSD: 0, workflow: { ...settlementWorkflow(), version: flow.version + 1 } } }).returning();
+        return result;
+      });
+      if (publish) await notifySettlement(saved, "person", "Tu cierre está listo: completá el siguiente paso").catch(console.error);
       res.json(saved);
     } catch (error: any) {
       console.error("Error guardando liquidación mensual:", error);
@@ -14132,53 +14149,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.patch("/api/me/invoices/settlement", requireAuth, async (req, res) => {
-    try {
-      const period = String(req.body?.period ?? "");
-      if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(period)) return res.status(400).json({ message: "Período inválido" });
-      const person = await personnelForUser(req.user!.id);
-      if (!person) return res.status(409).json({ message: "Tu usuario no está vinculado a una persona del equipo" });
-      const [row] = await db.select().from(personnelMonthlySettlements).where(and(
-        eq(personnelMonthlySettlements.personnelId, person.id),
-        eq(personnelMonthlySettlements.period, period),
-        eq(personnelMonthlySettlements.status, "published"),
-      )).limit(1);
-      if (!row) return res.status(409).json({ message: "Administración todavía no publicó tu liquidación de este mes" });
-      const parseOptionalRate = (value: unknown, label: string): number | null => {
-        if (value === undefined || value === null || value === "") return null;
-        const parsed = Number(value);
-        if (!Number.isFinite(parsed) || parsed <= 0) throw Object.assign(new Error(`${label} inválido`), { statusCode: 400 });
-        return parsed;
-      };
-      const invoiceFx = req.body?.invoiceFx === undefined ? row.invoiceFx : parseOptionalRate(req.body.invoiceFx, "TC al facturar");
-      const receivedFx = req.body?.receivedFx === undefined ? row.receivedFx : parseOptionalRate(req.body.receivedFx, "TC al cobrar");
-      const bankCommissionUSD = req.body?.bankCommissionUSD === undefined
-        ? Number(row.bankCommissionUSD ?? 0)
-        : Number(req.body.bankCommissionUSD ?? 0);
-      if (!Number.isFinite(bankCommissionUSD) || bankCommissionUSD < 0) return res.status(400).json({ message: "Comisión bancaria inválida" });
-      const calculated = calculatePersonnelSettlement({
-        totalARS: row.totalARS,
-        usdPercentage: row.usdPercentage,
-        bonusUSD: row.bonusUSD,
-        extrasARS: row.extrasARS,
-        invoiceFx,
-        receivedFx,
-        bankCommissionUSD,
-      });
-      const [saved] = await db.update(personnelMonthlySettlements).set({
-        invoiceFx,
-        receivedFx,
-        bankCommissionUSD,
-        baseInvoiceUSD: calculated.baseInvoiceUSD,
-        totalInvoiceUSD: calculated.totalInvoiceUSD,
-        pesifiedBaseARS: calculated.pesifiedBaseARS,
-        finalInvoiceARS: calculated.finalInvoiceARS,
-        updatedAt: new Date(),
-      }).where(eq(personnelMonthlySettlements.id, row.id)).returning();
-      res.json(saved);
-    } catch (error: any) {
-      console.error("Error actualizando liquidación personal:", error);
-      res.status(error?.statusCode ?? 500).json({ message: error?.message ?? "No se pudo actualizar tu liquidación" });
-    }
+    try { res.json(await changeSettlement(Number(req.body.id), req.user!.id, false, req.body)); }
+    catch (error: any) { res.status(error.statusCode ?? 500).json({ message: error.message }); }
+  });
+  app.patch("/api/finance/personnel-settlements/:id/authorization", requireAuth, requirePermission("operations"), async (req, res) => {
+    try { res.json(await changeSettlement(Number(req.params.id), req.user!.id, true, req.body)); }
+    catch (error: any) { res.status(error.statusCode ?? 500).json({ message: error.message }); }
   });
 
   // =========== FACTURA MENSUAL PERSONAL ===========
@@ -14571,7 +14547,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!publishedSettlement) {
         return res.status(409).json({ message: "Operaciones todavía no publicó tu liquidación de este mes" });
       }
-      const usesPublishedMixedSettlement = publishedSettlement?.billingCurrencySnapshot === "MIXED";
+      const usesPublishedMixedSettlement = publishedSettlement?.billingCurrencySnapshot !== "ARS";
       const requestedComponent = String(req.body?.invoiceComponent ?? "single").toLowerCase();
       const invoiceComponent = usesPublishedMixedSettlement
         ? requestedComponent === "usd" || requestedComponent === "ars" ? requestedComponent : null
@@ -14591,7 +14567,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalARS: publishedSettlement.totalARS,
         usdPercentage: publishedSettlement.usdPercentage,
         bonusUSD: publishedSettlement.bonusUSD,
-        extrasARS: publishedSettlement.extrasARS,
+        extrasARS: publishedSettlement.extrasARS + settlementWorkflow(publishedSettlement.workflow).extrasARS,
+        bonusARS: publishedSettlement.bonusARS,
         invoiceFx: publishedSettlement.invoiceFx,
         receivedFx: publishedSettlement.receivedFx,
         bankCommissionUSD: publishedSettlement.bankCommissionUSD,
@@ -14603,6 +14580,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(409).json({ message: "Completá el tipo de cambio al cobrar antes de enviar la factura ARS" });
       }
 
+      assertSettlementInvoiceAllowed(publishedSettlement, invoiceComponent, invoiceComponent === "usd" ? "USD" : "ARS");
       const storedFiles: Awaited<ReturnType<typeof storeFinancialIntakeFile>>[] = [];
       for (const file of uploadedFiles) {
         const storedFile = await storeFinancialIntakeFile(file);
@@ -14632,8 +14610,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         : invoiceComponent === "ars"
           ? Number(settlementCalculation?.finalInvoiceARS ?? 0)
           : invoiceCurrency === "ARS"
-            ? Number(publishedSettlement.totalARS ?? 0)
-            : Number(summary.grandTotalUSD ?? 0);
+            ? Number(publishedSettlement.finalInvoiceARS ?? 0)
+            : Number(publishedSettlement.totalInvoiceUSD ?? 0);
       const declaredInvoiceAmount = Number.isFinite(requestedAmount) && requestedAmount > 0
         ? requestedAmount
         : Number.isFinite(extractedAmount) && extractedAmount > 0
@@ -14684,6 +14662,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const invoiceNumber = String(req.body?.invoiceNumber || extractedData?.documentNumber || "").trim().slice(0, 120) || null;
 
       const saved = await db.transaction(async (tx) => {
+        await lockSettlementPeriod(tx, period);
+        const [authorized] = await tx.select().from(personnelMonthlySettlements).where(eq(personnelMonthlySettlements.id, publishedSettlement.id)).for("update");
+        const authorizedAmount = assertSettlementInvoiceAllowed(authorized, invoiceComponent, invoiceCurrency);
+        if (Math.abs(authorizedAmount - declaredInvoiceAmount) > (invoiceCurrency === "ARS" ? 1 : 0.01)) throw Object.assign(new Error("El importe del comprobante no coincide con lo autorizado por Operaciones"), { statusCode: 409 });
+        const [currentInvoice] = await tx.select().from(personalMonthlyInvoices).where(and(eq(personalMonthlyInvoices.userId, req.user!.id), eq(personalMonthlyInvoices.period, period), eq(personalMonthlyInvoices.invoiceComponent, invoiceComponent)));
+        if (currentInvoice?.approvalStatus === "approved" || (currentInvoice?.id ?? null) !== (existing?.id ?? null) || (existing && currentInvoice?.updatedAt.getTime() !== existing.updatedAt.getTime())) throw Object.assign(new Error("La factura cambió. Actualizá la pantalla."), { statusCode: 409 });
         const values = {
           personnelId: summary.personnelId,
           settlementId: publishedSettlement?.id ?? null,
@@ -14836,8 +14820,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ? Math.round((declaredInvoiceUSD - suggestedInvoiceUSD) * 100) / 100
         : null;
       const updated = await db.transaction(async (tx) => {
-        await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${'personal-invoice:' + row.period}))`);
-        await assertPersonalInvoicePeriodMutable(row.period, tx);
+        await lockSettlementPeriod(tx, row.period);
+        const [current] = await tx.select().from(personalMonthlyInvoices).where(eq(personalMonthlyInvoices.id, id)).for("update");
+        if (!current || current.approvalStatus === "approved" || current.updatedAt.getTime() !== row.updatedAt.getTime()) throw Object.assign(new Error("La factura cambió o fue aprobada. Actualizá antes de continuar."), { statusCode: 409 });
+        if (current.settlementId) {
+          const [settlement] = await tx.select().from(personnelMonthlySettlements).where(eq(personnelMonthlySettlements.id,current.settlementId));
+          if (settlementWorkflow(settlement?.workflow).version > 0) throw Object.assign(new Error("Esta factura usa el nuevo circuito. Revisá el importe en Mis facturas y su autorización en Cierre del equipo."), { statusCode:409 });
+        }
         const [saved] = await tx.update(personalMonthlyInvoices).set({
           suggestedInvoiceUSD,
           declaredInvoiceUSD,
@@ -14862,24 +14851,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/operations/invoices/review", requireAuth, requirePermission("finance"), async (req, res) => {
     try {
       const period = req.query.period ? String(req.query.period) : null;
-      const result = await db.execute(sql`
-        SELECT i.*, u.email, CONCAT_WS(' ', u.first_name, u.last_name) AS user_name,
-               p.name AS personnel_name,
-               settlement.total_invoice_usd AS settlement_total_invoice_usd,
-               settlement.final_invoice_ars AS settlement_final_invoice_ars,
-               settlement.total_ars AS settlement_total_ars,
-               settlement.billing_currency_snapshot AS settlement_billing_currency,
-               settlement.bonus_usd AS settlement_bonus_usd,
-               settlement.extras_ars AS settlement_extras_ars,
-               settlement.invoice_fx AS settlement_invoice_fx,
-               settlement.received_fx AS settlement_received_fx
-        FROM personal_monthly_invoices i
-        LEFT JOIN users u ON u.id = i.user_id
-        LEFT JOIN personnel p ON p.id = i.personnel_id
-        LEFT JOIN personnel_monthly_settlements settlement ON settlement.id = i.settlement_id
-        WHERE ${period ? sql`i.period = ${period}` : sql`TRUE`}
-        ORDER BY i.period DESC, i.uploaded_at DESC
-      `);
+      const result = await db.execute(personalInvoiceReviewQuery(period));
       res.json((result.rows as any[]).map(publicPersonalInvoice));
     } catch (error) {
       console.error("Error obteniendo revisiones de facturas:", error);
@@ -14977,18 +14949,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Indicá qué debe corregir la persona" });
       }
       const updated = await db.transaction(async (tx) => {
-        await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${'personal-invoice:' + existing.period}))`);
+        await lockSettlementPeriod(tx, existing.period);
+        const [current] = await tx.select().from(personalMonthlyInvoices).where(eq(personalMonthlyInvoices.id,id)).for("update");
+        if (!current || current.updatedAt.getTime() !== existing.updatedAt.getTime() || (req.body.updatedAt && new Date(req.body.updatedAt).getTime() !== current.updatedAt.getTime())) throw Object.assign(new Error("La factura cambió. Actualizá la pantalla antes de revisarla."),{statusCode:409});
         if (approvalStatus === "approved") {
-          if (!(Number(existing.declaredInvoiceAmount) > 0)) throw Object.assign(new Error("La factura no tiene un importe válido"), { statusCode: 409 });
-          const [settlement] = existing.settlementId ? await tx.select().from(personnelMonthlySettlements)
-            .where(eq(personnelMonthlySettlements.id, existing.settlementId)).limit(1) : [];
-          const expectedAmount = existing.invoiceComponent === "usd"
+          if (!(Number(current.declaredInvoiceAmount) > 0)) throw Object.assign(new Error("La factura no tiene un importe válido"), { statusCode: 409 });
+          const [settlement] = current.settlementId ? await tx.select().from(personnelMonthlySettlements)
+            .where(eq(personnelMonthlySettlements.id, current.settlementId)).limit(1) : [];
+          const expectedAmount = current.invoiceComponent === "usd"
             ? Number(settlement?.totalInvoiceUSD ?? 0)
-            : existing.invoiceComponent === "ars"
+            : current.invoiceComponent === "ars"
               ? Number(settlement?.finalInvoiceARS ?? 0)
-              : existing.invoiceCurrency === "ARS" ? Number(settlement?.totalARS ?? 0) : 0;
-          const tolerance = existing.invoiceCurrency === "ARS" ? 1 : 0.01;
-          if (expectedAmount > 0 && Math.abs(Number(existing.declaredInvoiceAmount) - expectedAmount) > tolerance) {
+              : current.invoiceCurrency === "ARS" ? Number(settlement?.finalInvoiceARS ?? 0) : Number(settlement?.totalInvoiceUSD ?? 0);
+          const tolerance = current.invoiceCurrency === "ARS" ? 1 : 0.01;
+          if (expectedAmount > 0 && Math.abs(Number(current.declaredInvoiceAmount) - expectedAmount) > tolerance) {
             throw Object.assign(new Error("El importe de la factura no coincide con la liquidación publicada por Operaciones"), { statusCode: 409 });
           }
         }
@@ -15025,8 +14999,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (row.approvalStatus === "approved") {
         return res.status(409).json({ message: "Una factura aprobada no se puede borrar. Pedile a Finanzas que la reabra." });
       }
-      await assertPersonalInvoicePeriodMutable(row.period);
-      await db.delete(personalMonthlyInvoices).where(eq(personalMonthlyInvoices.id, id));
+      await db.transaction(async tx => {
+        await lockSettlementPeriod(tx, row.period);
+        const [current] = await tx.select().from(personalMonthlyInvoices).where(eq(personalMonthlyInvoices.id, id)).for("update");
+        if (!current || current.approvalStatus === "approved" || current.updatedAt.getTime() !== row.updatedAt.getTime()) throw Object.assign(new Error("La factura cambió o fue aprobada. Actualizá antes de continuar."), { statusCode: 409 });
+        await tx.delete(personalMonthlyInvoices).where(eq(personalMonthlyInvoices.id, id));
+      });
       try {
         const storedKeys = Array.isArray(row.supportingFiles)
           ? row.supportingFiles.map((item: any) => item?.storageKey).filter(Boolean)
@@ -15037,9 +15015,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.warn("No se pudo limpiar el archivo de la factura eliminada:", cleanupError);
       }
       res.json({ ok: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error borrando factura personal:", error);
-      res.status(500).json({ message: "Error al borrar factura" });
+      res.status(error.statusCode ?? 500).json({ message: error.statusCode ? error.message : "Error al borrar factura" });
     }
   });
 
@@ -24850,6 +24828,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       res.json({ ...created, costingWarning, costSyncPending: Boolean(syncWarning) });
     } catch (error: any) {
+      const dbError = error?.cause ?? error;
+      if (dbError?.code === "23514") return res.status(409).json({ message: dbError.message });
       if (error?.statusCode === 409) return res.status(409).json({ message: error.message });
       if (error instanceof z.ZodError) return res.status(400).json({ message: "Datos inválidos", errors: error.errors });
       console.error("Error al registrar horas:", error);
@@ -24929,6 +24909,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const costingWarning = costing.totalCost == null ? "La hora quedó registrada; su tarifa o FX están pendientes." : null;
       res.json({ ...updated, costingWarning: [costingWarning, syncWarning].filter(Boolean).join(" ") || null, costSyncPending: Boolean(syncWarning) });
     } catch (error) {
+      const dbError = (error as any)?.cause ?? error;
+      if (dbError?.code === "23514") return res.status(409).json({ message: dbError.message });
       if (error instanceof z.ZodError) return res.status(400).json({ message: "Fecha inválida" });
       console.error("Error al editar carga de tarea:", error);
       res.status(500).json({ message: "Error al editar la carga de tiempo" });
@@ -24974,6 +24956,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json({ message: "Entrada eliminada", costingWarning: syncWarning, warning: syncWarning });
     } catch (error) {
+      const dbError = (error as any)?.cause ?? error;
+      if (dbError?.code === "23514") return res.status(409).json({ message: dbError.message });
       res.status(500).json({ message: "Error al eliminar entrada" });
     }
   });
@@ -26752,6 +26736,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const declaration = await db.transaction(async (tx) => {
         const [closing] = await tx.select().from(monthlyClosings).where(and(eq(monthlyClosings.id, closingId), eq(monthlyClosings.personnelId, access.personnelId!))).for("update");
         if (!closing) throw Object.assign(new Error("No existe un cierre mensual para ese período"), { status: 404 });
+        const period = `${closing.year}-${String(closing.month).padStart(2,"0")}`;
+        const [settlement] = await tx.select({id:personnelMonthlySettlements.id}).from(personnelMonthlySettlements).where(and(eq(personnelMonthlySettlements.personnelId,closing.personnelId),eq(personnelMonthlySettlements.period,period)));
+        if (settlement) throw Object.assign(new Error("Este mes usa el nuevo circuito. Cargá los TC en los pasos de Mis facturas."), {status:409});
         const usdAmount = Number(closing.totalCostUSD ?? 0);
         const closingFxRate = Number(closing.exchangeRateAtClose ?? 0);
         if (usdAmount <= 0 || closingFxRate <= 0) throw Object.assign(new Error("Este cierre no tiene un tramo USD y tipo de cambio de referencia válidos"), { status: 422 });
@@ -26801,6 +26788,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/payroll-period/:period", requireAuth, requirePermission("operations"), async (req, res) => {
+    try {
+      const period = req.params.period;
+      const calendar = await payrollCalendar(period);
+      const state = (await db.execute(sql`SELECT * FROM payroll_periods WHERE period=${period}`)).rows[0] ?? { state: "open", issues: [] };
+      res.json({ ...state, ...calendar, canCut: new Date() >= calendar.cutoffAt });
+    } catch (error: any) { res.status(400).json({ message: error.message }); }
+  });
+  app.post("/api/payroll-period/:period/:action", requireAuth, requirePermission("operations"), async (req, res) => {
+    try {
+      const { period, action } = req.params;
+      await payrollCalendar(period);
+      if (action === "prepare" || action === "cut") return res.json(await preparePayroll(period, req.user!.id, { cut: action === "cut" }));
+      if (action !== "reopen") return res.status(400).json({ message: "Acción inválida" });
+      const reason = String(req.body.reason ?? "").trim();
+      if (reason.length < 5) return res.status(400).json({ message: "Indicá el motivo para reabrir las horas" });
+      await db.transaction(async tx => {
+        await lockSettlementPeriod(tx, period);
+        const [published] = await tx.select().from(personnelMonthlySettlements).where(and(eq(personnelMonthlySettlements.period, period), eq(personnelMonthlySettlements.status, "published"))).limit(1);
+        if (published) throw Object.assign(new Error("Hay liquidaciones publicadas. Resolvé la facturación antes de reabrir las horas."), { statusCode: 409 });
+        await tx.execute(sql`UPDATE payroll_periods SET state='open',updated_at=now() WHERE period=${period}`);
+        await tx.execute(sql`INSERT INTO financial_audit_events(period_key,entity_type,action,actor_user_id,reason) VALUES(${period},'payroll','hours_reopened',${req.user!.id},${reason})`);
+      });
+      res.json({ state: "open" });
+    } catch (error: any) { res.status(error.statusCode ?? 500).json({ message: error.message }); }
+  });
+
   app.get("/api/monthly-closings", requireAuth, requirePermission("operations"), async (req, res) => {
     try {
       const year = req.query.year ? parseInt(req.query.year as string) : new Date().getFullYear();
@@ -26821,37 +26835,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const year = req.query.year ? parseInt(req.query.year as string) : new Date().getFullYear();
       const month = req.query.month ? parseInt(req.query.month as string) : (new Date().getMonth() + 1);
-      const start = new Date(year, month - 1, 1);
-      const end = new Date(year, month, 0, 23, 59, 59, 999);
-      const rows = await db.execute(sql`
-        SELECT personnel_id, hours, entry_date, project_id, description, source FROM (
-          SELECT personnel_id, hours, date AS entry_date, project_id, description, 'legacy' AS source
-          FROM time_entries WHERE date >= ${start} AND date <= ${end}
-          UNION ALL
-          SELECT tte.personnel_id, tte.hours, tte.date AS entry_date, t.project_id, tte.description, 'task' AS source
-          FROM task_time_entries tte
-          INNER JOIN tasks t ON t.id = tte.task_id
-          WHERE tte.date >= ${start} AND tte.date <= ${end}
-        ) combined
-      `);
-      const map: Record<number, number> = {};
-      const seen = new Set<string>();
-      let deduped = 0;
-      for (const r of rows.rows as any[]) {
-        const day = new Date(r.entry_date).toISOString().slice(0, 10);
-        const fingerprint = [r.personnel_id, r.project_id ?? "none", day, Number(r.hours).toFixed(4), String(r.description ?? '').trim().toLowerCase()].join('|');
-        if (r.source === 'task' && seen.has(fingerprint)) {
-          deduped += 1;
-          continue;
-        }
-        seen.add(fingerprint);
-        const personnelId = Number(r.personnel_id);
-        map[personnelId] = (map[personnelId] || 0) + (parseFloat(r.hours) || 0);
-      }
-      if (deduped > 0) {
-        console.warn(`[monthly-closing] ${deduped} duplicate legacy/task hour entries ignored for ${year}-${String(month).padStart(2, '0')}`);
-      }
-      res.json(map);
+      res.json(await payrollActualHours(`${year}-${String(month).padStart(2, "0")}`));
     } catch (error) {
       console.error("Error fetching real hours:", error);
       res.status(500).json({ message: "No se pudieron traer las horas reales" });
@@ -26865,6 +26849,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .select({
           billingCurrency: personnel.billingCurrency,
           usdBillingFraction: personnel.usdBillingFraction,
+          contractType: personnel.contractType,
+          monthlyHours: personnel.monthlyHours,
         })
         .from(personnel)
         .where(eq(personnel.id, parsed.personnelId))
@@ -26873,6 +26859,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Personal no encontrado" });
       }
 
+      try {
+        parsed.actualHours = (await payrollActualHours(`${parsed.year}-${String(parsed.month).padStart(2, "0")}`))[parsed.personnelId] ?? 0;
+        parsed.adjustedHours = payableMonthlyHours(person, parsed.actualHours, Number(parsed.adjustments?.unpaidHours ?? 0), parsed.notes ?? "");
+        parsed.adjustments = { unpaidHours: Number(parsed.adjustments?.unpaidHours ?? 0) };
+      } catch (error) { return res.status(400).json({ message: (error as Error).message }); }
       const closingDate = new Date(parsed.year, parsed.month - 1, 1);
       const canonicalRate = await resolveCanonicalPersonnelRate(parsed.personnelId, closingDate);
       const rateError = canonicalRateErrorMessage(canonicalRate, closingDate);
@@ -26931,8 +26922,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const invoiceTotalARS = hourlyRateARS != null
         ? parsed.adjustedHours * hourlyRateARS * (1 - usdFraction)
         : 0;
-      const grandTotalARS = invoiceTotalARS + (fx ? invoiceTotalUSD * fx : 0);
-      const grandTotalUSD = invoiceTotalUSD + (fx ? invoiceTotalARS / fx : 0);
+      const grandTotalARS = Math.round(parsed.adjustedHours * canonicalRate.hourlyRateARS * 100) / 100;
+      const grandTotalUSD = fx ? Math.round(grandTotalARS / fx * 100) / 100 : 0;
 
       // Rate, FX and total are server-owned snapshots. The client only supplies
       // hours and adjustments; this prevents stale or tampered legacy rates.
@@ -26949,6 +26940,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalCost: grandTotalARS,
       };
       const closing = await db.transaction(async (tx) => {
+        const period = `${data.year}-${String(data.month).padStart(2, "0")}`;
+        await lockSettlementPeriod(tx, period);
+        const [settlement] = await tx.select().from(personnelMonthlySettlements).where(and(eq(personnelMonthlySettlements.personnelId, data.personnelId), eq(personnelMonthlySettlements.period, period))).for("update");
+        if (settlement?.status === "published") throw Object.assign(new Error("La base ya está publicada para facturar. No se puede reemplazar desde este paso."), { status: 409 });
         const [original] = await tx.select().from(monthlyClosings).where(and(eq(monthlyClosings.personnelId, data.personnelId), eq(monthlyClosings.year, data.year), eq(monthlyClosings.month, data.month))).for("update");
         if (original) {
           const [declaration] = await tx.select({ id: monthlySettlementDeclarations.id }).from(monthlySettlementDeclarations).where(eq(monthlySettlementDeclarations.closingId, original.id));
@@ -26975,12 +26970,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         })
         .returning();
+        await tx.execute(sql`INSERT INTO financial_audit_events(period_key,entity_type,action,actor_user_id,reason) VALUES(${period},'payroll','base_saved',${req.user!.id},${data.notes ?? null})`);
         return row;
       });
       res.status(201).json(closing);
     } catch (error: any) {
       if (error instanceof z.ZodError) return res.status(400).json({ message: "Datos inválidos", errors: error.errors });
-      res.status(error?.status || 500).json({ message: error?.status ? error.message : "Error creating monthly closing" });
+      res.status(error?.status || error?.statusCode || 500).json({ message: error?.status || error?.statusCode ? error.message : "Error creating monthly closing" });
     }
   });
 

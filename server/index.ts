@@ -1,3 +1,4 @@
+import { teamSettlementWorkflowMigrationSql } from "./migrations/team-settlement-workflow";
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
@@ -908,6 +909,16 @@ async function applyPendingMigrations() {
     await run('0080 prompt existing users without notification channels', userNotificationSetupExistingOptInMigrationSql);
     await run('0081 notification category preferences', userNotificationCategoryPreferencesMigrationSql);
     await run('0082 notification push subscriptions', userNotificationPushSubscriptionsMigrationSql);
+    // Install payroll guards before serving requests; financial cutover stays independent.
+    await client.query("BEGIN");
+    try {
+      await client.query(teamSettlementWorkflowMigrationSql);
+      await client.query("COMMIT");
+      console.log("✅ Migration OK: 0089 team settlement workflow");
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    }
 
     // 0033: feriados duplicados (mismo date+name insertado más de una vez desde el
     // formulario) — borra duplicados conservando la fila más antigua y agrega la
@@ -1169,6 +1180,11 @@ const port = Number(process.env.PORT || 5000);
       const { startIpcPriceAdjustmentsJob } = await import("./jobs/ipc-price-adjustments");
       startIpcPriceAdjustmentsJob();
       console.log("📈 Job de ajuste de precio por IPC iniciado (diario)");
+    }
+
+    if (process.env.DISABLE_TEAM_PAYROLL !== "true") {
+      const { startTeamPayroll } = await import("./jobs/team-payroll");
+      startTeamPayroll();
     }
 
     const { startQuotationExpirationJob } = await import("./jobs/quotation-expiration");

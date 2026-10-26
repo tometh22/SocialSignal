@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.14.7 — 2026-10-26
+
+- Cierre del equipo unifica Base a cobrar y Facturación y seguimiento, con mes compartido, borradores conservados y diseño móvil.
+- Fijos por horas contractuales × tarifa histórica, con vacaciones, feriados y días Epical pagos para todas las personas. Sólo descuenta licencia sin goce explícita con motivo; freelance por horas reales sin duplicar fuentes.
+- Corte automático el último día hábil a las 23:59 de Buenos Aires y preparación de borradores desde el mes de activación, sin publicar importes automáticamente. Reapertura operativa con motivo antes de publicar.
+- Operaciones define porcentaje USD, bonos ARS/USD y adicionales. Cada colaborador carga TC al facturar, TC al cobrar y extras en Mis facturas; autorizaciones por tramo y comprobantes privados revisados por Finanzas hasta Pasivo, sin duplicar el gasto.
+- Guardas de horas por fecha civil, protección de importes y comprobantes aprobados, control de versiones y revisión documental con timestamps consistentes.
+- Publicación independiente de la transición financiera del PR 313: no instala las migraciones 0087/0088, no bloquea importaciones del maestro ni reconstruye sus totales desde el cierre del equipo.
+
 ## 1.14.6 — 2026-10-26
 
 - El filtro de importes para perfiles de tareas se evalúa al enviar la respuesta, después de resolver la autenticación, tanto con cookie como con token. Las facturas y conciliaciones personales conservan los importes del titular; las rutas operativas siguen omitiendo campos financieros.
