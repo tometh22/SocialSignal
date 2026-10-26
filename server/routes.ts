@@ -1,3 +1,4 @@
+import { authenticatedJsonProjection } from "./services/authenticated-json-projection";
 import { externalStageSchema, assertExternalQuotationStage } from "@shared/utils/quotation-external-stage";
 import { personalTaskHours } from "./services/task-hour-privacy";
 import { setQuotationGroupArchived } from "./domain/quotation-group-archive";
@@ -1057,9 +1058,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // responses omit financial fields, including endpoints shared with other
   // roles. Cost calculations still run server-side for the existing ledgers.
   app.use((req, res, next) => {
-    if (!isTaskManagerWithoutFinancialAccess(req) || req.path.startsWith("/api/me/")) return next();
-    const json = res.json.bind(res);
-    res.json = ((body?: unknown) => json(stripTaskManagerFinancialData(body))) as typeof res.json;
+    authenticatedJsonProjection(req, res,
+      request => isTaskManagerWithoutFinancialAccess(request)
+        && !/^\/api\/me\/(?:invoices|monthly-settlement-declarations)(?:\/|\?|$)/.test(request.originalUrl),
+      body => stripTaskManagerFinancialData(body));
     next();
   });
 

@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.14.6 — 2026-10-26
+
+- El filtro de importes para perfiles de tareas se evalúa al enviar la respuesta, después de resolver la autenticación, tanto con cookie como con token. Las facturas y conciliaciones personales conservan los importes del titular; las rutas operativas siguen omitiendo campos financieros.
+
 ## 1.14.5 — 2026-10-26
 
 - PM y analistas acceden solo a proyectos de los que son miembros. El calendario global y Objetivos quedan en Operaciones; las horas, estimaciones y comprobantes personales respetan su titular también por API y MCP.

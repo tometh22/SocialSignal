@@ -1,6 +1,6 @@
 # Implementación del feedback de Mind del 23 de octubre
 
-Versión 1.14.5. El [mapa de las once observaciones](feedback-mind-v2-6-plan.md) se implementa sobre `main`, separado del PR 313 de transición financiera. No requiere migraciones ni recalcula datos económicos históricos.
+Versiones 1.14.5 y 1.14.6. El [mapa de las once observaciones](feedback-mind-v2-6-plan.md) se implementa sobre `main`, separado del PR 313 de transición financiera. No requiere migraciones ni recalcula datos económicos históricos.
 
 ## Resultado por observación
 
@@ -19,8 +19,9 @@ Versión 1.14.5. El [mapa de las once observaciones](feedback-mind-v2-6-plan.md)
 
 ## Validación
 
-- Suite de la versión separada: 976 pruebas aprobadas y 11 omitidas por condiciones existentes, incluyendo PostgreSQL para MCP y Estado actual.
+- Suite de la versión separada: 979 pruebas aprobadas y 11 omitidas por condiciones existentes, incluyendo PostgreSQL para MCP y Estado actual.
 - Chequeo de tipos y build de producción.
+- Corrección 1.14.6: el filtro de costos se evalúa al enviar JSON, después de que el guard de autenticación cargue la identidad. Tres pruebas HTTP cubren autenticación tardía, permisos de Ops y facturas propias. API real: resumen de horas propias sin campos de costos/tarifas e importe, moneda y descarga de la factura personal conservados.
 - Recorridos reales de API con usuarios y registros sintéticos en base local, sin correos ni integraciones de IA activadas.
 - Revisión visual en 390, 768 y 1440 píxeles; menú personal, aceptación externa, alta preseleccionada, calendario expandido y Estado actual. Los calendarios desplazan su contenido dentro de su contenedor en móvil, sin ampliar el ancho de la página.
 - Auditoría productiva de solo lectura: cero combinaciones de persona/proyecto con asignaciones activas sin membresía. `scripts/audit-task-memberships.ts` reproduce ese inventario sin otorgar accesos.
