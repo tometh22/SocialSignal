@@ -43,7 +43,8 @@ type TaskProject = {
   taskCount: number;
   pendingCount: number;
   completedCount: number;
-  totalHours: number;
+  totalHours: number | null;
+  canManageMembers?: boolean;
   briefUrl?: string | null;
   source?: string;
   members: ProjectMember[];
@@ -69,7 +70,7 @@ interface Props {
 
 export default function ProjectTasksPage({ params }: Props) {
   const projectId = parseInt(params.id);
-  const { isTeamManager } = usePermissions();
+  const { isOperations } = usePermissions();
   const [membersOpen, setMembersOpen] = useState(false);
   const [addPersonnelId, setAddPersonnelId] = useState<string>("none");
   const [addRole, setAddRole] = useState("member");
@@ -99,7 +100,7 @@ export default function ProjectTasksPage({ params }: Props) {
   const { data: migration } = useQuery<{ detailedHoursAvailable: boolean; time: { minutes: number } } | null>({
     queryKey: ["/api/tasks/projects", projectId, "migration"],
     queryFn: () => authFetchJson(`/api/tasks/projects/${projectId}/migration`),
-    enabled: !!projectId,
+    enabled: !!projectId && isOperations,
   });
 
   const { data: allPersonnel = [] } = useQuery<Personnel[]>({
@@ -115,7 +116,7 @@ export default function ProjectTasksPage({ params }: Props) {
   }, [project?.members]);
 
   const members: ProjectMember[] = localMembers ?? (project?.members ?? []);
-  const canManageProject = isTeamManager;
+  const canManageProject = Boolean(project?.canManageMembers);
 
   const addMemberMutation = useMutation({
     mutationFn: ({ personnelId, role }: { personnelId: number; role: string }) =>
@@ -300,12 +301,12 @@ export default function ProjectTasksPage({ params }: Props) {
                 <div className="hidden lg:flex items-center gap-3 text-xs text-muted-foreground pl-2 border-l">
                   <span><strong className="text-foreground">{project.pendingCount}</strong> pendientes</span>
                   <span><strong className="text-foreground">{project.taskCount}</strong> total</span>
-                  <span><strong className="text-foreground">{project.totalHours.toFixed(1)}h</strong> en Mind</span>
+                  {project.totalHours != null && <span><strong className="text-foreground">{project.totalHours.toFixed(1)}h</strong> en Mind</span>}
                 </div>
               </div>
             </div>
 
-            {migration?.detailedHoursAvailable && <p className="mt-2 text-xs text-muted-foreground">
+            {migration?.detailedHoursAvailable && project.totalHours != null && <p className="mt-2 text-xs text-muted-foreground">
               <strong className="text-foreground">{(migration.time.minutes / 60).toLocaleString("es-AR", { maximumFractionDigits: 2 })} h</strong> originales de Asana · {project.totalHours.toLocaleString("es-AR", { maximumFractionDigits: 2 })} h cargadas en Mind. Ver detalle en Gestión.
             </p>}
 
@@ -623,7 +624,7 @@ export default function ProjectTasksPage({ params }: Props) {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {PROJECT_ROLE_OPTIONS.filter(r => isTeamManager || r.value !== "owner").map(r => (
+                    {PROJECT_ROLE_OPTIONS.filter(r => isOperations || r.value !== "owner").map(r => (
                       <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
                     ))}
                   </SelectContent>
@@ -668,7 +669,7 @@ export default function ProjectTasksPage({ params }: Props) {
                       {projectRoleLabel(m.role)}
                     </Badge>
                   </div>
-                  {(isTeamManager || m.role !== "owner") && (
+                  {(isOperations || m.role !== "owner") && (
                     <Button
                       variant="ghost"
                       size="sm"

@@ -31,6 +31,7 @@ type TaskHoursSummary = {
   projectId?: number | null;
   assigneeId?: number | null;
   assigneeName?: string | null;
+  canLogForOthers?: boolean;
   hoursOwnerId?: number | null;
   hoursOwnerName?: string | null;
   loggedHours?: number;
@@ -40,7 +41,7 @@ type TaskHoursSummary = {
 
 export default function QuickTaskHours({ taskId, className }: { taskId: number; className?: string }) {
   const { toast } = useToast();
-  const { isTeamManager } = usePermissions();
+  const { isOperations } = usePermissions();
   const [open, setOpen] = useState(false);
   const [manual, setManual] = useState("");
   const [date, setDate] = useState(() => civilDateInBuenosAires(new Date()));
@@ -67,11 +68,11 @@ export default function QuickTaskHours({ taskId, className }: { taskId: number; 
     enabled: open,
   });
   const canModify = (entry: TimeEntrySummary) =>
-    isTeamManager || (myIdentity?.personnelId != null && entry.personnelId === myIdentity.personnelId);
+    isOperations || (myIdentity?.personnelId != null && entry.personnelId === myIdentity.personnelId);
 
   const ownerId = taskSummary?.hoursOwnerId ?? taskSummary?.assigneeId ?? null;
   const ownerPending = open && (!taskSummary || summaryFailed);
-  const attribution = taskHourAttribution(ownerId, myIdentity?.personnelId ?? null, isTeamManager, stoppedTimerPersonnelId);
+  const attribution = taskHourAttribution(ownerId, myIdentity?.personnelId ?? null, Boolean(taskSummary?.canLogForOthers), stoppedTimerPersonnelId);
   const canRegisterHours = !ownerPending && "personnelId" in attribution;
   const timerPersonnelId = ownerId;
   const targetPersonnelId = stoppedTimerPersonnelId ?? ownerId;

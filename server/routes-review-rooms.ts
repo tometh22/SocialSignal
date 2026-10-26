@@ -1,3 +1,4 @@
+import { saveStatusCurrentAction } from "./services/status-current-action";
 import { Router, type Request, type Response, type NextFunction } from "express";
 import { db } from "./db";
 import { storage } from "./storage";
@@ -704,6 +705,10 @@ export function createReviewRoomsRouter(requireAuth: RequireAuth): Router {
       const projectId = parseInt(req.params.projectId, 10);
       if (!Number.isFinite(projectId)) return res.status(400).json({ message: "projectId inválido" });
 
+      if (Object.keys(req.body ?? {}).length === 1 && Object.prototype.hasOwnProperty.call(req.body, "currentAction")) {
+        if (req.body.currentAction != null && (typeof req.body.currentAction !== "string" || req.body.currentAction.length > 20000)) return res.status(400).json({message:"Estado actual demasiado largo"});
+        return res.json(await saveStatusCurrentAction(roomId, { projectId }, req.body.currentAction ?? "", req.user!.id));
+      }
       const { healthStatus, marginStatus, teamStrain, mainRisk, currentAction, nextMilestone, nextMilestoneDate, deadline, ownerId, decisionNeeded, hiddenFromWeekly } = req.body ?? {};
 
       if (healthStatus !== undefined && !VALID_HEALTH.includes(healthStatus)) return res.status(400).json({ message: "healthStatus inválido" });
@@ -760,7 +765,7 @@ export function createReviewRoomsRouter(requireAuth: RequireAuth): Router {
       res.json(result);
     } catch (error) {
       console.error('PATCH /items/project/:projectId error:', error);
-      res.status(500).json({ message: "Error al actualizar status" });
+      res.status((error as any)?.statusCode || 500).json({ message: (error as any)?.statusCode ? (error as Error).message : "Error al actualizar status" });
     }
   });
 
@@ -982,6 +987,10 @@ export function createReviewRoomsRouter(requireAuth: RequireAuth): Router {
       const id = parseInt(req.params.id, 10);
       if (!Number.isFinite(id)) return res.status(400).json({ message: "id inválido" });
 
+      if (Object.keys(req.body ?? {}).length === 1 && Object.prototype.hasOwnProperty.call(req.body, "currentAction")) {
+        if (req.body.currentAction != null && (typeof req.body.currentAction !== "string" || req.body.currentAction.length > 20000)) return res.status(400).json({message:"Estado actual demasiado largo"});
+        return res.json(await saveStatusCurrentAction(roomId, { customId: id }, req.body.currentAction ?? "", req.user!.id));
+      }
       const { title, subtitle, healthStatus, marginStatus, teamStrain, mainRisk, currentAction, nextMilestone, deadline, ownerId, decisionNeeded, hiddenFromWeekly } = req.body ?? {};
       if (healthStatus !== undefined && !VALID_HEALTH.includes(healthStatus)) return res.status(400).json({ message: "healthStatus inválido" });
       if (marginStatus !== undefined && !VALID_LEVEL.includes(marginStatus)) return res.status(400).json({ message: "marginStatus inválido" });
@@ -1035,7 +1044,7 @@ export function createReviewRoomsRouter(requireAuth: RequireAuth): Router {
       res.json(item);
     } catch (error) {
       console.error('PATCH /items/custom/:id error:', error);
-      res.status(500).json({ message: "Error al actualizar ítem" });
+      res.status((error as any)?.statusCode || 500).json({ message: (error as any)?.statusCode ? (error as Error).message : "Error al actualizar ítem" });
     }
   });
 
@@ -1228,29 +1237,12 @@ export function createReviewRoomsRouter(requireAuth: RequireAuth): Router {
   router.post('/:roomId/items/project/:projectId/updates', requireAuth, requireRoomMember(), async (req: Request, res: Response) => {
     try {
       const roomId = req.roomMember!.roomId;
-      const projectId = parseInt(req.params.projectId, 10);
-      const { content } = req.body ?? {};
-      if (!content?.trim()) return res.status(400).json({ message: "Contenido vacío" });
-      const userId = req.user!.id;
-      const [entry] = await db.insert(statusUpdateEntries)
-        .values({ roomId, projectId, content: content.trim(), authorId: userId })
-        .returning();
-      // Reflejar en currentAction del review
-      const [existing] = await db.select({ id: projectStatusReviews.id }).from(projectStatusReviews)
-        .where(and(eq(projectStatusReviews.roomId, roomId), eq(projectStatusReviews.projectId, projectId)));
-      if (existing) {
-        await db.update(projectStatusReviews)
-          .set({ currentAction: content.trim(), updatedAt: new Date(), updatedBy: userId })
-          .where(and(eq(projectStatusReviews.roomId, roomId), eq(projectStatusReviews.projectId, projectId)));
-      } else {
-        await db.insert(projectStatusReviews)
-          .values({ roomId, projectId, currentAction: content.trim(), updatedBy: userId });
-      }
-      res.status(201).json(entry);
-    } catch (error) {
-      console.error('POST project updates error:', error);
-      res.status(500).json({ message: "Error al guardar update" });
-    }
+      const projectId = Number(req.params.projectId);
+      if (!Number.isSafeInteger(projectId) || projectId <= 0) return res.status(400).json({message:"Ítem inválido"});
+      const { content, expectedCurrentAction } = req.body ?? {};
+      if (typeof content !== "string" || content.length > 20000 || (expectedCurrentAction !== undefined && expectedCurrentAction !== null && typeof expectedCurrentAction !== "string")) return res.status(400).json({message:"Estado actual inválido"});
+      res.status(201).json(await saveStatusCurrentAction(roomId, { projectId }, content, req.user!.id, expectedCurrentAction));
+    } catch (error: any) { res.status(error.statusCode || 500).json({message:error.statusCode ? error.message : "No se pudo guardar el Estado actual"}); }
   });
 
   router.get('/:roomId/items/custom/:itemId/updates', requireAuth, requireRoomMember(), async (req: Request, res: Response) => {
@@ -1276,21 +1268,12 @@ export function createReviewRoomsRouter(requireAuth: RequireAuth): Router {
   router.post('/:roomId/items/custom/:itemId/updates', requireAuth, requireRoomMember(), async (req: Request, res: Response) => {
     try {
       const roomId = req.roomMember!.roomId;
-      const itemId = parseInt(req.params.itemId, 10);
-      const { content } = req.body ?? {};
-      if (!content?.trim()) return res.status(400).json({ message: "Contenido vacío" });
-      const userId = req.user!.id;
-      const [entry] = await db.insert(statusUpdateEntries)
-        .values({ roomId, weeklyStatusItemId: itemId, content: content.trim(), authorId: userId })
-        .returning();
-      await db.update(weeklyStatusItems)
-        .set({ currentAction: content.trim(), updatedAt: new Date(), updatedBy: userId })
-        .where(and(eq(weeklyStatusItems.id, itemId), eq(weeklyStatusItems.roomId, roomId)));
-      res.status(201).json(entry);
-    } catch (error) {
-      console.error('POST custom updates error:', error);
-      res.status(500).json({ message: "Error al guardar update" });
-    }
+      const itemId = Number(req.params.itemId);
+      if (!Number.isSafeInteger(itemId) || itemId <= 0) return res.status(400).json({message:"Ítem inválido"});
+      const { content, expectedCurrentAction } = req.body ?? {};
+      if (typeof content !== "string" || content.length > 20000 || (expectedCurrentAction !== undefined && expectedCurrentAction !== null && typeof expectedCurrentAction !== "string")) return res.status(400).json({message:"Estado actual inválido"});
+      res.status(201).json(await saveStatusCurrentAction(roomId, { customId: itemId }, content, req.user!.id, expectedCurrentAction));
+    } catch (error: any) { res.status(error.statusCode || 500).json({message:error.statusCode ? error.message : "No se pudo guardar el Estado actual"}); }
   });
 
   router.patch('/:roomId/updates/:entryId', requireAuth, requireRoomMember(), async (req: Request, res: Response) => {

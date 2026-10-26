@@ -353,7 +353,7 @@ export default function FinancialReviewFinal({ revealAdvanced = false, validatio
         <div className="mb-6 flex flex-col items-start justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 sm:flex-row sm:items-center">
           <div>
             <p className="font-medium text-slate-900">Precio comercial</p>
-            <p className="text-sm text-slate-500">El resumen está listo. Abrí los ajustes solo si necesitás cambiar margen, descuento, herramientas o inflación.</p>
+            <p className="text-sm text-slate-500">El resumen está listo. Abrí los ajustes solo si necesitás cambiar margen, descuento o inflación.</p>
           </div>
           <Button
             type="button"
@@ -367,6 +367,12 @@ export default function FinancialReviewFinal({ revealAdvanced = false, validatio
             {advancedVisible ? 'Ocultar ajustes' : 'Ajustar precio'}
           </Button>
         </div>
+
+        <section className="mb-6 space-y-3 rounded-xl border border-indigo-200 bg-indigo-50/40 p-4" aria-labelledby="additional-costs-heading">
+          <div><h3 id="additional-costs-heading" className="font-semibold text-slate-900">Costos adicionales</h3><p className="text-sm text-slate-600">IA, software, licencias u otros costos fuera del equipo. Cargá el total para esta cotización.</p></div>
+          <div className="max-w-sm space-y-1.5"><Label htmlFor="quotation-tools-cost">Importe adicional (USD)</Label><Input id="quotation-tools-cost" type="number" min="0" step="0.01" inputMode="decimal" value={quotationData.financials.toolsCost || 0} onChange={e => updateFinancials({ toolsCost: Math.max(0, Number(e.target.value) || 0) })} className="bg-white text-right font-mono" /></div>
+          <p className="text-xs text-slate-600">Se incluye en el cálculo y el margen. Si fijaste un precio manual, ese precio se mantiene y el costo reduce el margen. Los importes en pesos usan el TC de la cotización.</p>
+        </section>
 
         {/* Main Content - Responsive Layout */}
         <div className={`grid grid-cols-1 gap-4 lg:gap-6 ${advancedVisible ? 'lg:grid-cols-2 xl:grid-cols-3' : 'lg:grid-cols-2'}`}>
@@ -636,25 +642,6 @@ export default function FinancialReviewFinal({ revealAdvanced = false, validatio
                   )}
                 </div>
 
-                {/* Tools Cost Section */}
-                <Separator className="my-4" />
-                <div className="space-y-3">
-                  <Label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-                    <Settings className="h-4 w-4" />
-                    Costos de Herramientas (USD)
-                  </Label>
-                  <Input
-                    type="number"
-                    placeholder="0.00"
-                    value={quotationData.financials.toolsCost || 0}
-                    onChange={(e) => updateFinancials({ toolsCost: Number(e.target.value) || 0 })}
-                    className="text-right font-mono"
-                  />
-                  <p className="text-xs text-slate-500">
-                    Costos adicionales de software, licencias o herramientas específicas
-                  </p>
-                </div>
-
                 {/* Price Mode Section */}
                 <Separator className="my-4" />
                 <div className="space-y-3">
@@ -849,7 +836,7 @@ export default function FinancialReviewFinal({ revealAdvanced = false, validatio
                   </div>
                   {toolsCostDisplay > 0 && (
                     <div className="flex justify-between items-center mt-2 pt-2 border-t border-emerald-100">
-                      <span className="text-sm text-emerald-800">Costos de Herramientas</span>
+                      <span className="text-sm text-emerald-800">Costos adicionales</span>
                       <span className="font-semibold tabular-nums text-emerald-900">+{formatFinalCurrency(toolsCostDisplay)}</span>
                     </div>
                   )}

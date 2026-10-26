@@ -156,8 +156,8 @@ describe("Feedback 9-10 — filas estables en calendarios", () => {
 
   it("el calendario usa los carriles y mantiene alto fijo por fila", () => {
     const calendar = source("client/src/components/tasks/TaskCalendarView.tsx");
-    expect(calendar).toContain("assignCalendarLanes(tasksWithDate");
-    expect(calendar).toContain('className="h-[18px]"');
+    expect(calendar).toContain("assignCalendarLanes(dated");
+    expect(calendar).toContain('className="h-[24px]"');
     expect(calendar).toContain("overflow.shift()");
   });
 });

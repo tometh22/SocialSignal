@@ -1,5 +1,5 @@
 import { countTemplateTasks, type ProjectTaskTemplate } from "@shared/project-task-template";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getAuthHeader } from "@/lib/queryClient";
@@ -140,6 +140,12 @@ export default function NewProjectWithTooltips() {
   });
   
   const approvedQuotations = quotationsWithClients.filter((q: any) => q?.status === "approved");
+  const requestedQuotationId = Number(new URLSearchParams(window.location.search).get("quotationId"));
+  useEffect(() => {
+    const selected = approvedQuotations.find((quote: any) => quote.id === requestedQuotationId);
+    if (selected && !form.getValues("quotationId")) { form.setValue("quotationId", selected.id); form.setValue("clientId", selected.clientId); }
+  }, [requestedQuotationId, quotationsData]);
+
 
   // Opciones estáticas
   const statusOptions = [

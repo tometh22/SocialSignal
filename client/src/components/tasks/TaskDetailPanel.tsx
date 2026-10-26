@@ -40,6 +40,7 @@ import { useAuth } from "@/hooks/use-auth";
 
 type Task = {
   canDelete?: boolean;
+  canLogForOthers?: boolean;
   asanaTaskGid?: string | null;
   asanaSource?: { actualMinutes?: number | null; parentResolution?: string; assigneeName?: string | null } | null;
   isMilestone?: boolean;
@@ -289,7 +290,7 @@ interface Props {
 
 export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initialFocusTime = false, onNavigateToTask }: Props) {
   const { user } = useAuth();
-  const canLogForOthers = !!(user as any)?.isAdmin || ((user as any)?.permissions || []).some((permission: string) => ["operations", "task_manager"].includes(permission));
+  const canEditOthersHours = !!(user as any)?.isAdmin || ((user as any)?.permissions || []).includes("operations");
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleValue, setTitleValue] = useState("");
   const [showAddSubtask, setShowAddSubtask] = useState(false);
@@ -362,6 +363,7 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
     queryFn: () => authFetchJson("/api/tasks/my-hours"),
   });
 
+  const canLogForOthers = Boolean(task?.canLogForOthers);
   const hoursOwnerId = task?.hoursOwnerId ?? task?.assigneeId ?? null;
   const attribution = taskHourAttribution(hoursOwnerId, myHoursIdentity?.personnelId ?? null, canLogForOthers, stoppedTimerPersonnelId);
   const canRegisterHours = "personnelId" in attribution;
@@ -1288,7 +1290,7 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
                           <span className="min-w-0 flex-1 truncate text-muted-foreground">
                             {entry.personnelName ? `${entry.personnelName}${entry.description ? ` · ${entry.description}` : ""}` : entry.description ? `— ${entry.description}` : ""}
                           </span>
-                          {(canLogForOthers || entry.personnelId === myHoursIdentity?.personnelId) && <>
+                          {(canEditOthersHours || entry.personnelId === myHoursIdentity?.personnelId) && <>
                             <Button variant="ghost" size="sm" className="ml-auto h-5 w-5 flex-shrink-0 p-0 text-muted-foreground opacity-0 group-hover:opacity-100" onClick={() => startEditingTime(entry)} title="Editar carga">
                               <Pencil className="h-3 w-3" />
                             </Button>

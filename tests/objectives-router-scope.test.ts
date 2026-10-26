@@ -65,8 +65,8 @@ describe("el guard de objetivos no puede bloquear rutas ajenas", () => {
     expect((await get("/api/objectives")).status).toBe(401);
   });
 
-  it("quien sí tiene 'status' pasa el guard", async () => {
-    currentUser = { id: 2, isAdmin: false, permissions: ["status"] };
+  it("Operaciones pasa el guard", async () => {
+    currentUser = { id: 2, isAdmin: false, permissions: ["operations"] };
     // Pasa el permiso y entra al handler; falla después por la base falsa,
     // que es justamente la prueba de que el guard lo dejó pasar.
     expect((await get("/api/objectives")).status).not.toBe(403);

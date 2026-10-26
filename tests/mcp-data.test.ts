@@ -47,9 +47,9 @@ describe.skipIf(!process.env.TEST_MCP_DATABASE_URL)("Mind data: read-only SQL, p
         (1,1,'Escucha regional','draft',100,'USD','SECRET'),(2,1,'Escucha mensual','approved',200,'USD','SECRET'),(3,2,'Otra cuenta','approved',30000,'ARS','SECRET');
       INSERT INTO quotation_team_members(id,quotation_id,personnel_id,hours,rate,cost) VALUES(1,1,2,10,10,100);
       INSERT INTO active_projects(id,name,status,budget) VALUES(100,'Proyecto visible','active',1000),(200,'Proyecto ajeno','active',2000);
-      INSERT INTO task_project_members(id,project_id,personnel_id) VALUES(1,100,4);
-      INSERT INTO tasks(id,project_id,title,assignee_id,collaborator_ids) VALUES(1,100,'Mi tarea',4,'[]'),(2,200,'Otra tarea',2,'[]');
-      INSERT INTO task_time_entries(id,task_id,personnel_id,hours,total_cost,hourly_rate_at_time) VALUES(1,1,4,2,200,100),(2,2,2,1,100,100);
+      INSERT INTO task_project_members(id,project_id,personnel_id) VALUES(1,100,4),(2,100,3);
+      INSERT INTO tasks(id,project_id,title,assignee_id,collaborator_ids) VALUES(1,100,'Mi tarea',4,'[]'),(2,200,'Otra tarea',2,'[]'),(3,200,'Asignación sin membresía',4,'[]');
+      INSERT INTO task_time_entries(id,task_id,personnel_id,hours,total_cost,hourly_rate_at_time) VALUES(1,1,4,2,200,100),(2,2,2,1,100,100),(3,1,3,3,300,100);
       INSERT INTO chat_conversations(id,title) VALUES(1,'Privada de cotizaciones'),(2,'Privada de proyectos');
       INSERT INTO chat_conversation_participants(id,conversation_id,user_id) VALUES(1,1,2),(2,2,4);
       INSERT INTO chat_messages(id,conversation_id,sender_id,content) VALUES(1,1,2,'Mi conversación'),(2,2,4,'Ajena');
@@ -113,9 +113,12 @@ describe.skipIf(!process.env.TEST_MCP_DATABASE_URL)("Mind data: read-only SQL, p
   });
   it("enforces task membership and prevents task-only users from reading financial columns", async () => {
     expect((await reader.query(4, { resource: "tasks" })).items.map(r => r.id)).toEqual([1]);
+    expect((await reader.query(4, { resource: "active_projects" })).items.map(r => r.id)).toEqual([100]);
+    await expect(reader.query(4, { resource: "tasks", fields: ["id", "logged_hours"] })).rejects.toThrow();
+    await expect(reader.query(3, { resource: "objectives" })).rejects.toThrow();
     expect((await reader.query(4, { resource: "task_time_entries" })).items.map(r => r.id)).toEqual([1]);
     const entries = await reader.query(3, { resource: "task_time_entries" });
-    expect(entries.items).toHaveLength(2); expect(entries.items[0]).not.toHaveProperty("total_cost");
+    expect(entries.items.map(row => row.id)).toEqual([3]); expect(entries.items[0]).not.toHaveProperty("total_cost");
     expect(entries.items[0]).not.toHaveProperty("hourly_rate_at_time");
     await expect(reader.query(3, { resource: "task_time_entries", filters: [{ field: "total_cost", op: "gt", value: 0 }] })).rejects.toThrow();
     await expect(reader.aggregate(3, { resource: "task_time_entries", metrics: [{ operation: "sum", field: "total_cost" }] })).rejects.toThrow();

@@ -1,3 +1,4 @@
+import { usePermissions } from "@/hooks/use-permissions";
 import { parseTaskCivilDate } from "@shared/utils/task-civil-date";
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -85,6 +86,7 @@ function StatCard({ icon: Icon, label, value, sub, color }: {
 }
 
 export default function ProjectOverviewPanel({ projectId, members, projectColor, canManageMembers, onManageMembers }: Props) {
+  const { isOperations } = usePermissions();
   const [selectedSection, setSelectedSection] = useState<string>("all");
 
   // Si el usuario navega de un proyecto a otro sin desmontar este componente,
@@ -122,7 +124,8 @@ export default function ProjectOverviewPanel({ projectId, members, projectColor,
     (t) => t.status !== "done" && t.status !== "cancelled" && t.dueDate && isAfter(today, startOfDay(parseTaskCivilDate(t.dueDate)))
   ).length;
   const unassigned = allTasks.filter((t) => !t.assigneeId && t.status !== "done").length;
-  const totalLogged = allTasks.reduce((s, t) => s + (t.loggedHours || 0), 0);
+  const visibleTaskIds = new Set(allTasks.map(task => task.id));
+  const totalLogged = allTasks.filter(task => !task.parentTaskId || !visibleTaskIds.has(task.parentTaskId)).reduce((sum, task) => sum + (task.loggedHours || 0), 0);
   const totalEstimated = allTasks.reduce(
     (sum, task) => sum + Number(task.estimatedHoursTotal ?? 0),
     0,
@@ -177,7 +180,7 @@ export default function ProjectOverviewPanel({ projectId, members, projectColor,
         <StatCard icon={Clock} label="Pendientes" value={pending} color="bg-blue-500" />
         <StatCard icon={AlertCircle} label="En progreso" value={inProgress} color="bg-amber-500" />
         <StatCard icon={CheckCircle2} label="Completadas" value={done} color="bg-green-500" />
-        <StatCard icon={Timer} label="Horas registradas" value={formatHours(totalLogged)} sub={totalEstimated > 0 ? `de ${formatHours(totalEstimated)} estimadas` : undefined} />
+        <StatCard icon={Timer} label={isOperations ? "Horas registradas" : "Tus horas registradas"} value={formatHours(totalLogged)} sub={totalEstimated > 0 ? `de ${formatHours(totalEstimated)} estimadas` : undefined} />
       </div>
 
       {/* Overdue + unassigned alerts */}
@@ -277,7 +280,7 @@ export default function ProjectOverviewPanel({ projectId, members, projectColor,
                   <th className="text-center px-3 py-2.5 font-medium">Completadas</th>
                   <th className="text-center px-3 py-2.5 font-medium">Pendientes</th>
                   <th className="text-center px-3 py-2.5 font-medium hidden sm:table-cell">Progreso</th>
-                  <th className="text-right px-5 py-2.5 font-medium">Horas</th>
+                  {isOperations && <th className="text-right px-5 py-2.5 font-medium">Horas</th>}
                 </tr>
               </thead>
               <tbody>
@@ -315,12 +318,12 @@ export default function ProjectOverviewPanel({ projectId, members, projectColor,
                           <span className="text-xs text-muted-foreground w-8 text-right">{pct}%</span>
                         </div>
                       </td>
-                      <td className="px-5 py-3 text-right">
+                      {isOperations && <td className="px-5 py-3 text-right">
                         <span className="text-foreground font-medium">{formatHours(m.logged)}</span>
                         {m.estimated > 0 && (
                           <span className="text-muted-foreground text-xs"> / {formatHours(m.estimated)}</span>
                         )}
-                      </td>
+                      </td>}
                     </tr>
                   );
                 })}
