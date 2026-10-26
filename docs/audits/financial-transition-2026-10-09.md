@@ -6,6 +6,29 @@ Implementación preparada en la rama de trabajo; no desplegada por esta auditor�
 
 La configuración productiva es `hours_data_source=1` y `app_mode_cutover_date=2026-08`. La fecha estaba activada para horas, pero no cerraba todos los importadores financieros.
 
+## Actualización del 26 de octubre
+
+La rama financiera incorpora `main` 1.14.6 mediante un merge, preservando los permisos por membresía, las horas propias, la aceptación externa de cotizaciones y el acceso a facturas personales. Sigue siendo la versión propuesta 1.15.0; no está desplegada ni se declara conciliada por aprobar sus pruebas técnicas.
+
+- Validación local: **1.037 pruebas aprobadas y 11 omitidas**, tipos y build correctos. PostgreSQL 16 y 18 se ejecutaron en forma secuencial y en instancias locales aisladas.
+- Respaldo real de producción obtenido con una transacción repetible de sólo lectura y un snapshot compartido con `pg_dump`. Restaurado en PostgreSQL 18: coinciden los conteos de las **172 tablas** y las huellas completas de las filas de **25 tablas financieras**. El respaldo y los datos de comparación permanecen privados en `.context/finance-transition-2026-10-26/`; no se versionan ni se envían a otro servicio.
+- Las migraciones 0087–0089 se aplicaron dos veces sobre esa restauración. Se conservaron las columnas y valores financieros originales y se comprobó el rechazo de una escritura de Excel posterior al corte. No se ejecutaron migraciones ni escrituras financieras en producción.
+- La revisión detectó una incompatibilidad con el contrato actual de horas: son fechas civiles, incluidas las guardadas a medianoche UTC, no instantes que deban trasladarse a otro día. La guarda financiera ahora conserva el mes del día ingresado, como liquidación y costo laboral. Pruebas reales de inserción, modificación y borrado protegen también el primer día del mes. El instante del corte automático continúa siendo las 23:59 de Buenos Aires.
+- HTTP con autenticación real y datos exclusivamente sintéticos: USD/ARS hasta Pasivo, autorización previa y versiones, factura privada, denegación a otra persona y a Finanzas sin permiso. Sólo ARS se completa sin TC; vacaciones y días Epical conservan la base contractual y sólo la licencia sin goce explícita la reduce. Se verificó también pre-cierre, revisión, snapshot inmutable y reapertura auditada.
+- Facturación muestra la **base del mes** separada del importe autorizado. El desglose incluye bono, adicionales de Operaciones y extras del colaborador; sólo ARS no presenta referencias a TC ni comisiones USD.
+
+### Evidencia disponible para conciliar
+
+El maestro conectado es [Seguimiento Financiero/Economico](https://docs.google.com/spreadsheets/d/1FZLFmTQQOSYQns2cOYlM86UGEH7EHZsJOFegyDR7quc/edit), revisión observada `106950`, modificada el 26/10 a las 15:17 UTC. Se comprobó que la fecha de modificación no cambió durante la lectura. Esa revisión todavía no fue identificada por Finanzas como la versión aprobada de agosto.
+
+Las doce métricas monetarias comparables del Resumen Ejecutivo para julio, agosto y septiembre —36 comparaciones— coinciden con el resumen importado a precisión de centavos. Esto acredita consistencia del resumen de referencia, no una reconstrucción nativa ni conciliación documental. `income_sot` y el resumen no se comparan como si fueran la misma base.
+
+El detalle de agosto conserva 13 filas de Activo, 179 de Pasivo y 184 de CashFlow del maestro. Hay 80 movimientos de referencia en el ledger importado: se conservan ambos conjuntos para revisar mapeos, transferencias y posibles faltantes; la diferencia de cantidad no se clasifica automáticamente como 104 movimientos faltantes. Entre los pasivos hay una fecha de emisión vacía y diez referencias documentales vacías. Los movimientos leídos tienen fecha dentro de agosto.
+
+Los saldos de julio agrupan Santander/Galicia/Nación y una fila de Transferwise carece de monto original, aunque tiene total USD. Se requieren los saldos y monedas por cuenta respaldados por extractos antes de convertir esas filas en aperturas nativas. No se crea una cuenta, fecha, autorización histórica ni importe original por inferencia.
+
+La auditoría actual sigue sin encontrar cuentas, ingresos, cierres nativos, liquidaciones publicadas ni facturas personales. Por lo tanto, no hay comprobantes personales históricos que convertir en nuevas autorizaciones en esta instancia. Faltan la identificación de la versión aprobada, los extractos/saldos de apertura, resolver las excepciones documentales y el presupuesto aprobado. La consulta al usuario sobre esos respaldos queda pendiente. No se desactiva definitivamente el maestro ni se publica el corte financiero con estos faltantes.
+
 ## Hallazgos productivos
 
 - No hay períodos en `financial_close_periods`, eventos en `revenue_events`, cuentas en `financial_accounts` ni elementos en la bandeja financiera.

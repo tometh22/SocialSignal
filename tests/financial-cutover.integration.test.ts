@@ -61,11 +61,12 @@ describe.skipIf(!url)("financial cutover in PostgreSQL",()=>{
   it("moving a native row cannot bypass a closed source month",async()=>{
     await rejected("UPDATE activo_entries SET period_key='2026-11' WHERE period_key='2026-10'");
   });
-  it("freezes source hours using the Buenos Aires civil month",async()=>{
-    // 02:30 UTC on November 1 is still October in Buenos Aires.
-    await rejected("INSERT INTO task_time_entries(date,hours) VALUES('2026-11-01 02:30:00',2)");
+  it("freezes the entered civil month without reinterpreting hour dates as instants",async()=>{
+    // The app stores a selected civil date at UTC midnight; it stays October 1.
+    await rejected("INSERT INTO task_time_entries(date,hours) VALUES('2026-10-01 00:00:00',2)");
+    await rejected("INSERT INTO time_entries(date,hours) VALUES('2026-10-01 00:00:00',2)");
     await rejected("INSERT INTO time_entries(date,hours) VALUES('2026-10-15 12:00:00',2)");
-    await query("INSERT INTO task_time_entries(date,hours) VALUES('2026-11-01 03:00:00',2)");
+    await query("INSERT INTO task_time_entries(date,hours) VALUES('2026-11-01 00:00:00',2),('2026-11-01 02:30:00',2)");
     await rejected("UPDATE task_time_entries SET date='2026-10-15 12:00:00'");
     await query("INSERT INTO financial_close_periods VALUES('2027-02','PRE_CLOSE',now())");
     await query("INSERT INTO time_entries(date,hours) VALUES('2027-02-01 12:00:00',2)");

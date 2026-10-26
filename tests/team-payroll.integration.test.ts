@@ -76,6 +76,28 @@ describe.skipIf(!setup.url)("team payroll workflow with PostgreSQL",()=>{
     await query("INSERT INTO tasks(id,title,project_id) VALUES(1,'QA',1); INSERT INTO task_time_entries(task_id,personnel_id,date,hours,description) VALUES(1,1,'2026-10-10',2,'x'),(1,1,'2026-10-10',2,'x'); INSERT INTO time_entries(personnel_id,project_id,date,hours,description,entry_type,approved) VALUES(1,1,'2026-10-10',2,'x','hours',true),(1,1,'2026-10-10',50,'unapproved','hours',false)");
     expect((await payrollActualHours(period))[1]).toBe(4);
   });
+  it("counts the entered civil dates consistently in both hour sources",async()=>{
+    await query("INSERT INTO tasks(id,title,project_id) VALUES(1,'QA',1)");
+    for (const date of ['2026-09-30 23:59:59','2026-10-01 00:00:00','2026-10-31 23:59:59','2026-11-01 00:00:00']) {
+      await query("INSERT INTO task_time_entries(task_id,personnel_id,date,hours,description) VALUES(1,1,$1,2,'task boundary')",[date]);
+      await query("INSERT INTO time_entries(personnel_id,project_id,date,hours,description,entry_type,approved) VALUES(1,1,$1,3,'legacy boundary','hours',true)",[date]);
+    }
+    expect((await payrollActualHours('2026-09'))[1]).toBe(5);
+    expect((await payrollActualHours(period))[1]).toBe(10);
+    expect((await payrollActualHours('2026-11'))[1]).toBe(5);
+  });
+  it("protects the first civil day at midnight for insertion, moving and deletion",async()=>{
+    await query("INSERT INTO tasks(id,title,project_id) VALUES(1,'QA',1); INSERT INTO task_time_entries(task_id,personnel_id,date,hours) VALUES(1,1,'2026-10-01 00:00:00',2); INSERT INTO time_entries(personnel_id,project_id,date,hours,entry_type) VALUES(1,1,'2026-10-01 00:00:00',3,'hours')");
+    await query("INSERT INTO payroll_periods(period,state) VALUES($1,'cut')",[period]);
+    for (const table of ['task_time_entries','time_entries']) {
+      await expect(query(`UPDATE ${table} SET date='2026-11-02'`)).rejects.toMatchObject({code:'23514'});
+      await expect(query(`DELETE FROM ${table}`)).rejects.toMatchObject({code:'23514'});
+      const fields=table==='task_time_entries' ? "task_id,personnel_id,date,hours" : "project_id,personnel_id,date,hours";
+      await expect(query(`INSERT INTO ${table}(${fields}) VALUES(1,1,'2026-10-01 00:00:00',1)`)).rejects.toMatchObject({code:'23514'});
+      await query(`INSERT INTO ${table}(${fields}) VALUES(1,1,'2026-11-01 00:00:00',1)`);
+      await expect(query(`UPDATE ${table} SET date='2026-10-31 23:59:59' WHERE date='2026-11-01 00:00:00'`)).rejects.toMatchObject({code:'23514'});
+    }
+  });
   it("authorizes USD then receipt and ARS, preserving the confirmed 5970 example",async()=>{
     const row=await published();
     const submitted=await changeSettlement(row.id,1,false,{phase:"usd",action:"submit",version:0,invoiceFx:1500});

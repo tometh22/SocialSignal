@@ -211,7 +211,7 @@ export default function TeamSettlements({ period, onDirtyChange }: { period: str
             <button type="button" className="flex w-full items-center gap-4 px-5 py-4 text-left" onClick={() => setOpenId(isOpen ? null : row.person.id)} aria-expanded={isOpen}>
               <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${state.group === "done" ? "bg-emerald-100 text-emerald-700" : state.group === "ops" ? "bg-indigo-100 text-indigo-700" : "bg-slate-100 text-slate-700"}`}>{state.step}</span>
               <span className="min-w-0 flex-1"><span className="block truncate font-semibold">{row.person.name}</span><span className="block truncate text-xs text-muted-foreground">{row.person.contractType} · {row.person.email || "Sin email vinculado"}</span><span className="mt-0.5 block text-xs font-medium text-indigo-700 md:hidden">{state.label}</span></span>
-              <span className="hidden text-right sm:block"><span className="block text-xs text-muted-foreground">Total del cierre</span><span className="block font-semibold tabular-nums">{ars(row.system.totalARS)}</span></span>
+              <span className="hidden text-right sm:block"><span className="block text-xs text-muted-foreground">Base del mes</span><span className="block font-semibold tabular-nums">{ars(row.system.totalARS)}</span></span>
               <StageBadge tone={state.tone} label={state.label} />
               <ChevronDown className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${isOpen ? "rotate-180" : ""}`} />
             </button>
@@ -220,7 +220,7 @@ export default function TeamSettlements({ period, onDirtyChange }: { period: str
             {!row.closing ? <div className="flex gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /><span>Falta el cierre operativo. Cerrá primero sus horas en Cierre del equipo → Base a cobrar; recién entonces Mind congela el valor hora y el total.</span></div> : <>
               <div>
                 <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Mind completa automáticamente</p>
-                <div className="grid gap-3 sm:grid-cols-3"><ReadOnly label="Horas del cierre" value={`${Number(row.system.hours ?? 0).toFixed(1)} h`} /><ReadOnly label="Valor hora ARS" value={ars(row.system.hourlyRateARS)} /><ReadOnly label="Número a cobrar en ARS" value={ars(row.system.totalARS)} /></div>
+                <div className="grid gap-3 sm:grid-cols-3"><ReadOnly label="Horas del cierre" value={`${Number(row.system.hours ?? 0).toFixed(1)} h`} /><ReadOnly label="Valor hora ARS" value={ars(row.system.hourlyRateARS)} /><ReadOnly label="Base del mes en ARS" value={ars(row.system.totalARS)} /></div>
               </div>
 
               {published && <SettlementAuthorization row={row} period={period} />}
@@ -280,6 +280,7 @@ function SettlementAuthorization({ row, period }: { row: SettlementRow; period: 
   const client = useQueryClient();
   const { toast } = useToast();
   const flow = normalizeWorkflow(row.settlement?.workflow);
+  const usesUSD = Number(row.settlement?.usdPercentage) > 0 || Number(row.settlement?.bonusUSD) > 0;
   const mutation = useMutation({
     mutationFn: ({ phase, action }: { phase: SettlementPhase; action: string }) => authFetchJson(`/api/finance/personnel-settlements/${row.settlement!.id}/authorization`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ phase, action, version: flow.version, reason }) }),
     onSuccess: () => { client.invalidateQueries({ queryKey: ["personnel-settlements", period] }); setReason(""); toast({ title: "Decisión guardada", description: "La persona recibe el siguiente paso en Mis facturas." }); },
@@ -288,6 +289,15 @@ function SettlementAuthorization({ row, period }: { row: SettlementRow; period: 
   return <div className="space-y-3 rounded-xl border border-indigo-200 p-4"><p className="font-semibold">Autorizaciones antes de emitir</p>{(["usd", "ars"] as const).filter(phase => phase === "ars" || Number(row.settlement?.usdPercentage) > 0 || Number(row.settlement?.bonusUSD) > 0).map(phase => {
     const stage = flow[phase];
     const hasInvoice = row.invoices.some(i => i.invoiceComponent === phase || i.invoiceComponent === "single");
-    return <div key={phase} className="space-y-2 rounded border p-3"><div className="flex flex-wrap items-center justify-between gap-2"><span className="font-medium">{phase === "usd" ? "Factura USD" : "Factura ARS"}: {phase === "usd" ? usd(stage.amount) : ars(stage.amount)}</span><Badge variant="outline" className="whitespace-normal">{{draft:"Esperando al colaborador",pending:"Requiere tu autorización",approved:"Importe autorizado",rejected:"Devuelto a corrección"}[stage.status]}</Badge></div><p className="text-sm text-muted-foreground">{phase === "usd" ? `TC al facturar: ${row.settlement?.invoiceFx ?? "pendiente"} · Bono USD: ${row.settlement?.bonusUSD ?? 0}` : `TC al cobrar: ${row.settlement?.receivedFx ?? "no aplica"} · Bono ARS: ${ars(row.settlement?.bonusARS)} · Extras colaborador: ${ars(flow.extrasARS)} · Comisión USD: ${row.settlement?.bankCommissionUSD ?? 0}`}</p>{phase === "ars" && flow.extrasReason && <p className="text-sm">{flow.extrasReason}</p>}{stage.status === "pending" && <div className="flex flex-col gap-2 sm:flex-row"><Button disabled={mutation.isPending} onClick={() => mutation.mutate({phase,action:"approve"})}>Autorizar {phase.toUpperCase()}</Button><Button variant="outline" disabled={mutation.isPending || reason.trim().length < 5} onClick={() => mutation.mutate({phase,action:"reject"})}>Pedir corrección</Button></div>}{stage.status === "approved" && !hasInvoice && <Button variant="outline" disabled={mutation.isPending || reason.trim().length < 5} onClick={() => mutation.mutate({phase,action:"reopen"})}>Devolver importe a corrección</Button>}</div>;
+    const details = phase === "usd"
+      ? `TC al facturar: ${row.settlement?.invoiceFx ?? "pendiente"} · Bono USD: ${row.settlement?.bonusUSD ?? 0}`
+      : [
+          ...(usesUSD ? [`TC al cobrar: ${row.settlement?.receivedFx ?? "pendiente"}`] : []),
+          `Bono ARS: ${ars(row.settlement?.bonusARS)}`,
+          `Otros adicionales ARS: ${ars(row.settlement?.extrasARS)}`,
+          `Extras colaborador: ${ars(flow.extrasARS)}`,
+          ...(usesUSD ? [`Comisión USD: ${row.settlement?.bankCommissionUSD ?? 0}`] : []),
+        ].join(" · ");
+    return <div key={phase} className="space-y-2 rounded border p-3"><div className="flex flex-wrap items-center justify-between gap-2"><span className="font-medium">{phase === "usd" ? "Factura USD" : "Factura ARS"}: {phase === "usd" ? usd(stage.amount) : ars(stage.amount)}</span><Badge variant="outline" className="whitespace-normal">{{draft:"Esperando al colaborador",pending:"Requiere tu autorización",approved:"Importe autorizado",rejected:"Devuelto a corrección"}[stage.status]}</Badge></div><p className="text-sm text-muted-foreground">{details}</p>{phase === "ars" && flow.extrasReason && <p className="text-sm">{flow.extrasReason}</p>}{stage.status === "pending" && <div className="flex flex-col gap-2 sm:flex-row"><Button disabled={mutation.isPending} onClick={() => mutation.mutate({phase,action:"approve"})}>Autorizar {phase.toUpperCase()}</Button><Button variant="outline" disabled={mutation.isPending || reason.trim().length < 5} onClick={() => mutation.mutate({phase,action:"reject"})}>Pedir corrección</Button></div>}{stage.status === "approved" && !hasInvoice && <Button variant="outline" disabled={mutation.isPending || reason.trim().length < 5} onClick={() => mutation.mutate({phase,action:"reopen"})}>Devolver importe a corrección</Button>}</div>;
   })}<Label htmlFor={`correction-${row.person.id}`}>Motivo para pedir una corrección</Label><Textarea id={`correction-${row.person.id}`} value={reason} onChange={e => setReason(e.target.value)} placeholder="Indicá qué debe revisar el colaborador" /></div>;
 }

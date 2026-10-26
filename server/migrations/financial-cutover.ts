@@ -94,7 +94,9 @@ BEGIN
   FOREACH row_data IN ARRAY ARRAY[old_row,new_row] LOOP
     IF row_data IS NULL OR settlement THEN CONTINUE; END IF;
     IF TG_ARGV[0]='civil_date' THEN
-      periods := array_append(periods, to_char((row_data->>'date')::timestamp AT TIME ZONE 'UTC' AT TIME ZONE 'America/Argentina/Buenos_Aires', 'YYYY-MM'));
+      -- Hour dates encode the entered civil day (including legacy midnight),
+      -- not an instant. Match hoursCivilDate and the operational payroll guard.
+      periods := array_append(periods, left(row_data->>'date',7));
     ELSIF TG_ARGV[0]='year_month' THEN
       periods := array_append(periods, (row_data->>'year') || '-' || lpad(row_data->>'month',2,'0'));
     ELSIF TG_ARGV[0]='range' THEN

@@ -2,6 +2,11 @@
 
 ## 1.15.0 — 2026-10-26
 
+- Integración con 1.14.6: conserva alcance por membresía, horas propias, aprobación externa y acceso privado a importes y facturas personales.
+- Las guardas financieras respetan el día civil elegido al cargar horas, también a medianoche del primer día del mes. Se alinean con liquidación, conciliación y costo laboral sin desplazar fechas históricas.
+- Facturación distingue la base salarial del importe autorizado e incluye bonos y ambos tipos de extras en el desglose. Sólo ARS omite TC y comisiones USD.
+- Respaldo productivo restaurado en PostgreSQL 18 aislado: 172 tablas y 25 tablas financieras verificadas; migraciones idempotentes sin modificar importes históricos. La conciliación y la publicación siguen condicionadas a resolver los datos documentales y de apertura con Finanzas.
+
 - Espaciado responsive: los títulos y filtros del cierre mantienen separación respecto de los bordes en escritorio y móvil; se corrigen las reglas de padding que se anulaban desde 640 px.
 
 - UX del cierre: mes compartido, borradores conservados entre pestañas, aviso al cambiar de mes con cambios pendientes, tablas adaptadas a móvil, campos alineados y responsables del próximo paso explícitos. Mis facturas distingue ARS/USD y resume comprobantes enviados o aprobados.
