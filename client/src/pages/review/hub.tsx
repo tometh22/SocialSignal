@@ -1,3 +1,4 @@
+import { usePermissions } from "@/hooks/use-permissions";
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -21,6 +22,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 
 export default function ReviewHubPage() {
+  const { isOperations } = usePermissions();
   const [createOpen, setCreateOpen] = useState(false);
   const [roomToArchive, setRoomToArchive] = useState<ReviewRoomSummary | null>(null);
   const queryClient = useQueryClient();
@@ -52,18 +54,18 @@ export default function ReviewHubPage() {
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
-      <div className="flex items-center justify-between mb-5">
+      <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold text-slate-900">Status</h1>
           <p className="text-sm text-slate-500 mt-0.5">Tus salas de seguimiento semanal</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" asChild>
             <a href="/mcp/connections"><Bot className="h-4 w-4" /> Agentes</a>
           </Button>
-          <Button variant="outline" asChild>
+          {isOperations && <Button variant="outline" asChild>
             <a href="/review/objectives"><Target className="h-4 w-4" /> Objetivos</a>
-          </Button>
+          </Button>}
           <Button onClick={() => setCreateOpen(true)}>
             <Plus className="h-4 w-4 mr-2" />
             Nueva sala

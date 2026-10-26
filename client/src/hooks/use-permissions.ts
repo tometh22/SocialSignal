@@ -38,7 +38,7 @@ export function usePermissions() {
 
   const hasPermission = (section: AppSection): boolean => {
     if (!user) return false;
-    if ((user as any).isAdmin) return true;
+    if ((user as any).isAdmin || user.role === "admin") return true;
     const perms: string[] = (user as any).permissions || [];
     return perms.includes(section);
   };
@@ -58,7 +58,7 @@ export function usePermissions() {
 
   // Admin es un escalón por encima de Operaciones: acciones destructivas o de
   // configuración global se gatean con esto, no con isOperations.
-  const isAdmin = Boolean((user as any)?.isAdmin);
+  const isAdmin = Boolean((user as any)?.isAdmin || user?.role === "admin");
   const isTaskManagerOnly = isTaskManager && !isAdmin && !hasAnyPermission(['projects', 'quotations', 'dashboard', 'finance', 'operations']);
 
   return { hasPermission, hasAnyPermission, getFirstAllowedRoute, allowedSections, isOperations, isTeamManager: isOperations || isTaskManager, isTaskManager, isTaskManagerOnly, isTeamMember, isAdmin };

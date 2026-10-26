@@ -8,7 +8,7 @@ describe("team cost and invoice integration contracts", () => {
     const sidebar = source("client/src/components/layout/sidebar-fixed.tsx");
     const page = source("client/src/pages/my-invoices.tsx");
     const routes = source("server/routes.ts");
-    expect(sidebar).toContain('title: "Mi gestión"');
+    expect(sidebar).not.toContain('title: "Mi gestión"');
     expect(sidebar).toContain('href: "/my-invoices"');
     expect(page).toContain("esperá la autorización de Operaciones");
     expect(page).toContain("Enviar a Administración");

@@ -83,7 +83,7 @@ function formatHoursLabel(hours: number) {
 const PAGE_SIZE = 20;
 
 export default function HoursDashboardPage() {
-  const { isTeamManager } = usePermissions();
+  const { isOperations } = usePermissions();
   const [selectedPersonnelId, setSelectedPersonnelId] = useState<string>("all");
   const [selectedProjectId, setSelectedProjectId] = useState<string>("all");
   const [selectedSection, setSelectedSection] = useState("all");
@@ -104,6 +104,7 @@ export default function HoursDashboardPage() {
   const { data: allPersonnel = [] } = useQuery<Personnel[]>({
     queryKey: ["/api/tasks-personnel"],
     queryFn: () => apiRequest("/api/tasks-personnel", "GET"),
+    enabled: isOperations,
   });
 
   const { data: allProjects = [] } = useQuery<Project[]>({
@@ -208,9 +209,9 @@ export default function HoursDashboardPage() {
   return (
     <PageShell width="wide" spacing="compact">
       <CompactPageHeader
-        eyebrow="Operaciones"
-        title="Panel de horas"
-        description="Analizá las horas registradas por período, persona, proyecto y sección."
+        eyebrow={isOperations ? "Operaciones" : "Mi actividad"}
+        title={isOperations ? "Panel de horas" : "Mis horas"}
+        description={isOperations ? "Analizá las horas registradas por período, persona, proyecto y sección." : "Consultá tus horas por período, proyecto y sección."}
         icon={<Clock className="h-5 w-5" />}
       />
 
@@ -261,7 +262,7 @@ export default function HoursDashboardPage() {
         </div>
 
         <div className="grid w-full min-w-0 gap-3 sm:grid-cols-3">
-          <div className="min-w-0 space-y-1">
+          {isOperations && <div className="min-w-0 space-y-1">
             <Label className="text-xs text-muted-foreground">Persona</Label>
             <Select value={selectedPersonnelId} onValueChange={v => { setSelectedPersonnelId(v); setSelectedSection("all"); handleFilterChange(); }}>
               <SelectTrigger className="h-11 w-full text-sm" aria-label="Filtrar por persona">
@@ -274,7 +275,7 @@ export default function HoursDashboardPage() {
                 ))}
               </SelectContent>
             </Select>
-          </div>
+          </div>}
 
           <div className="min-w-0 space-y-1">
             <Label className="text-xs text-muted-foreground">Proyecto</Label>
@@ -326,7 +327,7 @@ export default function HoursDashboardPage() {
       ) : (
         <>
           {/* KPI cards */}
-          <MetricGrid className={cn(isTeamManager && "xl:grid-cols-3")}>
+          <MetricGrid className={cn(isOperations && "xl:grid-cols-3")}>
             <MetricCard
               label="Total de horas reales"
               value={`${totalHours.toFixed(1)}h`}
@@ -347,7 +348,7 @@ export default function HoursDashboardPage() {
               tone="info"
             />
 
-            {isTeamManager && (
+            {isOperations && (
               <MetricCard
                 label="Horas disponibles"
                 value={`${availableHours}h`}

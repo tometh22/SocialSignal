@@ -1436,15 +1436,12 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
             <div className="pl-4 pr-5 pb-4">
               <div className="space-y-3.5 pt-1">
                 {/* Two-column: Estado actual | Próximo paso, no boxes */}
-                <div className="grid grid-cols-2 gap-x-6">
+                <div className="space-y-3">
                   <div>
                     <p className="text-[10px] text-slate-400 mb-0.5">Estado actual</p>
                     <InlineText value={item.currentAction} placeholder="¿Qué está pasando ahora?" onSave={v => onUpdate({ currentAction: v })} multiline className="text-[12px] leading-relaxed text-slate-700" />
                   </div>
-                  <div>
-                    <p className="text-[10px] text-slate-400 mb-0.5">Próximo paso</p>
-                    <InlineText value={item.nextMilestone} placeholder="Acción concreta esta semana" onSave={v => onUpdate({ nextMilestone: v })} multiline className="text-[12px] leading-relaxed text-slate-700" />
-                  </div>
+{item.nextMilestone && <details className="text-xs text-slate-500"><summary className="cursor-pointer">Próximo paso anterior</summary><p className="mt-1 whitespace-pre-wrap">{item.nextMilestone}</p></details>}
                 </div>
 
                 {/* Comentarios — flat */}
@@ -1935,11 +1932,7 @@ function AlertSidebarCard({ item, accent, currentUserId, roomId, onUpdate, expan
                 <InlineText value={item.currentAction} placeholder="¿Qué está pasando?" onSave={v => onUpdate({ currentAction: v })} multiline className="text-[12px] text-slate-700 leading-relaxed" />
               </div>
 
-              {/* Próximo paso */}
-              <div>
-                <p className="text-[10px] text-slate-400 mb-0.5">Próximo paso</p>
-                <InlineText value={item.nextMilestone} placeholder="Acción concreta" onSave={v => onUpdate({ nextMilestone: v })} multiline className="text-[12px] text-slate-700 leading-relaxed" />
-              </div>
+              {item.nextMilestone && <details className="text-xs text-slate-500"><summary className="cursor-pointer">Próximo paso anterior</summary><p className="mt-1 whitespace-pre-wrap">{item.nextMilestone}</p></details>}
 
               {/* Comentarios — flat composer, no eyebrow, no colored bg */}
               <div>
@@ -2107,15 +2100,7 @@ function DecisionSidebarCard({ item, currentUserId, roomId, expanded, onToggle, 
                 )}
               </div>
 
-              {/* Próximo paso */}
-              <div>
-                <p className="text-[10px] text-slate-400 mb-0.5">Próximo paso</p>
-                {onUpdate ? (
-                  <InlineText value={item.nextMilestone} placeholder="Acción concreta" onSave={v => onUpdate({ nextMilestone: v })} multiline className="text-[12px] text-slate-700 leading-relaxed" />
-                ) : (
-                  <p className="text-[12px] text-slate-600 leading-relaxed">{item.nextMilestone || 'Sin definir'}</p>
-                )}
-              </div>
+              {item.nextMilestone && <details className="text-xs text-slate-500"><summary className="cursor-pointer">Próximo paso anterior</summary><p className="mt-1 whitespace-pre-wrap">{item.nextMilestone}</p></details>}
 
               {/* Comentarios — flat */}
               <div>
@@ -2600,7 +2585,7 @@ function DailyRunner({ queue, quietCount, users, currentUserId, roomId, startInd
   const entry = done ? null : queue[idx];
   const item = entry ? { ...entry.item, ...(local.get(entry.item.key) ?? {}) } as Item : null;
 
-  useEffect(() => { setDraft(''); setPicker(null); if (!done) setTimeout(() => textareaRef.current?.focus(), 30); }, [idx, done]);
+  useEffect(() => { setDraft(item?.currentAction ?? ''); setPicker(null); if (!done) setTimeout(() => textareaRef.current?.focus(), 30); }, [idx, done]);
 
   const record = (it: Item, text: string) => {
     setChanges(prev => {
@@ -2614,7 +2599,7 @@ function DailyRunner({ queue, quietCount, users, currentUserId, roomId, startInd
 
   const postUpdate = async (it: Item, content: string) => {
     const url = it.projectId ? `/api/status-semanal/${it.projectId}/updates` : `/api/status-semanal/custom/${it.customId}/updates`;
-    await mutationFetch(url, 'POST', { content });
+    await mutationFetch(url, 'POST', { content, expectedCurrentAction: it.currentAction });
     const key = it.projectId ? ['/api/status-semanal', it.projectId, 'updates'] : ['/api/status-semanal/custom', it.customId, 'updates'];
     queryClient.refetchQueries({ queryKey: key });
     queryClient.refetchQueries({ queryKey: ['/api/status-semanal?includeHidden=true'] });
@@ -2624,9 +2609,10 @@ function DailyRunner({ queue, quietCount, users, currentUserId, roomId, startInd
   const next = async () => {
     if (!item) return;
     const t = draft.trim();
-    if (t) {
+    if (t !== (item.currentAction ?? '').trim()) {
       try {
         await postUpdate(item, t);
+        patchLocal(item, { currentAction: t });
         record(item, `💬 ${t}`);
       } catch (err: any) {
         toast({ title: 'No se pudo guardar el update', description: err.message, variant: 'destructive' });
@@ -2821,14 +2807,15 @@ function DailyRunner({ queue, quietCount, users, currentUserId, roomId, startInd
               <p className="text-sm text-slate-500 mt-2">{entry.reasons[0].detail}. Pregunta para hoy: <b className="text-slate-700">{entry.reasons[0].question}</b></p>
 
               <div className="mt-5 space-y-2">
-                <div className="text-[11px] text-slate-400 uppercase tracking-wide font-bold">Lo último</div>
+                <div className="text-[11px] text-slate-400 uppercase tracking-wide font-bold">Comentarios y antecedentes</div>
                 <DailyItemContext item={item} />
               </div>
 
               <div className="mt-5">
                 <div className="relative">
-                  <textarea ref={textareaRef} rows={3} value={draft} onChange={e => setDraft(e.target.value)}
-                    placeholder="Qué pasó hoy… (⏎ guarda y sigue · ⇧⏎ salto de línea)"
+                  <label className="mb-2 block text-sm font-medium" htmlFor="daily-current-action">Estado actual</label>
+                  <textarea id="daily-current-action" ref={textareaRef} rows={3} value={draft} onChange={e => setDraft(e.target.value)}
+                    aria-label="Estado actual" placeholder="Estado actual… (⏎ guarda y sigue · ⇧⏎ salto de línea)"
                     className="w-full border border-slate-200 rounded-xl p-3 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none" />
                   <button onClick={toggleListening} title={listening ? 'Detener dictado' : 'Dictar'}
                     className={cn("absolute right-2 bottom-2 p-1.5 rounded-full transition-colors", listening ? "bg-red-100 text-red-600 animate-pulse" : "text-slate-400 hover:text-indigo-600 hover:bg-indigo-50")}>
@@ -2848,7 +2835,7 @@ function DailyRunner({ queue, quietCount, users, currentUserId, roomId, startInd
               <div className="text-[11px] text-slate-400 uppercase tracking-wide font-bold mb-3">Acciones</div>
               <div className="space-y-2 text-sm">
                 <button onClick={() => void next()} className="w-full flex items-center justify-between bg-white border border-slate-200 rounded-lg px-3 py-2.5 hover:border-indigo-300 transition-colors">
-                  <span>{draft.trim() ? 'Guardar y siguiente' : 'Todo igual, siguiente'}</span><kbd className="text-[10px] bg-slate-100 border rounded px-1.5 text-slate-500">⏎</kbd>
+                  <span>{draft.trim() !== (item.currentAction ?? '').trim() ? 'Guardar y siguiente' : 'Todo igual, siguiente'}</span><kbd className="text-[10px] bg-slate-100 border rounded px-1.5 text-slate-500">⏎</kbd>
                 </button>
                 <div className="w-full flex items-center justify-between bg-white border border-slate-200 rounded-lg px-3 py-2">
                   <span>Semáforo</span>

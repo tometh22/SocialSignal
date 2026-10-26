@@ -1,3 +1,4 @@
+import { usePermissions } from "@/hooks/use-permissions";
 import AsanaSourceHours from "./AsanaSourceHours";
 import { useQuery } from "@tanstack/react-query";
 import { authFetchJson } from "@/lib/queryClient";
@@ -19,11 +20,13 @@ type Migration = {
 };
 
 export default function AsanaMigrationSummary({ projectId }: { projectId: number }) {
+  const { isOperations } = usePermissions();
   const { data, isError } = useQuery<Migration | null>({
     queryKey: ["/api/tasks/projects", projectId, "migration"],
     queryFn: () => authFetchJson(`/api/tasks/projects/${projectId}/migration`),
-    enabled: Boolean(projectId),
+    enabled: Boolean(projectId) && isOperations,
   });
+  if (!isOperations) return null;
   if (isError) return <p className="text-sm text-destructive">No se pudo consultar el estado de la migración desde Asana.</p>;
   if (!data) return null;
   return <section className="rounded-xl border p-4 space-y-2 text-sm">

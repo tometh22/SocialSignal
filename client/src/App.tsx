@@ -118,8 +118,7 @@ function OperationsOnlyProjectDetail() {
 }
 
 function MyInvoicesRoute() {
-  const { isTaskManagerOnly } = usePermissions();
-  return isTaskManagerOnly ? <UnauthorizedPage /> : <MyInvoices />;
+  return <MyInvoices />;
 }
 
 function OperationsOnlyProjectEdit() {
@@ -244,7 +243,7 @@ function AppRoutes() {
               <SheetDescription className="sr-only">
                 Acceso a las secciones de la aplicación
               </SheetDescription>
-              <SidebarFixed mobileMode />
+              <SidebarFixed mobileMode onNavigate={() => setMobileSidebarOpen(false)} />
             </SheetContent>
           </Sheet>
 
@@ -314,7 +313,7 @@ function AppRoutes() {
                   {/* Gestión de Tareas */}
                   <ProtectedRoute path="/tasks" component={TasksHomePage} requiredAnyPermission={TASK_ACCESS_SECTIONS} />
                   <ProtectedRoute path="/tasks/my-tasks" component={MyTasksPage} requiredAnyPermission={TASK_ACCESS_SECTIONS} />
-                  <ProtectedRoute path="/tasks/team-calendar" component={TeamCalendarPage} requiredAnyPermission={TASK_ACCESS_SECTIONS} />
+                  <ProtectedRoute path="/tasks/team-calendar" component={TeamCalendarPage} requiredPermission="operations" />
                   <ProtectedRoute path="/tasks/hours-dashboard" component={HoursDashboardPage} requiredAnyPermission={HOURS_DASHBOARD_ACCESS_SECTIONS} />
                   <ProtectedRoute path="/absences" component={PersonnelAbsences} requiredAnyPermission={HOME_ACCESS_SECTIONS} />
                   <ProtectedRoute path="/tasks/projects" component={ProjectsHubPage} requiredAnyPermission={TASK_ACCESS_SECTIONS} />
@@ -325,7 +324,7 @@ function AppRoutes() {
                   <ProtectedRoute path="/crm" component={CRMPage} requiredPermission="crm" />
                   <ProtectedRoute path="/crm/:id" component={CRMLeadPage} requiredPermission="crm" />
                   <ProtectedRoute path="/review" component={ReviewHubPage} requiredPermission="status" />
-                  <ProtectedRoute path="/review/objectives" component={StatusObjectivesPage} requiredPermission="status" />
+                  <ProtectedRoute path="/review/objectives" component={StatusObjectivesPage} requiredPermission="operations" />
                   <ProtectedRoute path="/review/:roomId" component={ReviewRoomPage} requiredPermission="status" />
                   <Route path="/status-semanal">{() => <Redirect to="/review" />}</Route>
 

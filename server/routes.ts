@@ -4,6 +4,9 @@ import { changeSettlement, assertSettlementInvoiceAllowed, lockSettlementPeriod,
 import { settlementWorkflow } from "@shared/utils/settlement-workflow";
 import { payableMonthlyHours } from "@shared/utils/payroll-hours";
 import { assertExcelFinancialImportAllowed } from "./services/financial-source-policy";
+import { authenticatedJsonProjection } from "./services/authenticated-json-projection";
+import { externalStageSchema, assertExternalQuotationStage } from "@shared/utils/quotation-external-stage";
+import { personalTaskHours } from "./services/task-hour-privacy";
 import { setQuotationGroupArchived } from "./domain/quotation-group-archive";
 import { approvalRevisionIsCurrent } from "@shared/utils/quotation-approval";
 import { taskHourOwner, taskHourAttribution } from "@shared/utils/task-hour-owner";
@@ -392,21 +395,16 @@ type AbsenceAccessContext = {
 
 function isOperationsRequest(req: Request): boolean {
   const currentUser = req.user as any;
-  return !!currentUser?.isAdmin || (currentUser?.permissions || []).includes("operations");
+  return !!currentUser?.isAdmin || currentUser?.role === "admin" || (currentUser?.permissions || []).includes("operations");
 }
 
-function hasTaskManagementAccess(req: Request): boolean {
-  const currentUser = req.user as any;
-  return !!currentUser?.isAdmin || (currentUser?.permissions || []).some((permission: string) =>
-    permission === "operations" || permission === "task_manager",
-  );
-}
 
 function isTaskManagerWithoutFinancialAccess(req: Request): boolean {
   const currentUser = req.user as any;
   const permissions: string[] = Array.isArray(currentUser?.permissions) ? currentUser.permissions : [];
   return permissions.includes("task_manager")
     && !currentUser?.isAdmin
+    && currentUser?.role !== "admin"
     && !permissions.includes("projects")
     && !permissions.includes("quotations")
     && !permissions.includes("operations")
@@ -427,7 +425,7 @@ function stripTaskManagerFinancialData<T>(value: T): T {
 }
 
 async function getTaskAccessContext(req: Request): Promise<TaskAccessContext> {
-  if (hasTaskManagementAccess(req)) return { isOperations: true, personnelId: null };
+  if (isOperationsRequest(req)) return { isOperations: true, personnelId: null };
   const currentUser = req.user as any;
   if (!currentUser?.email) return { isOperations: false, personnelId: null };
   const [matched] = await db.select({ id: personnel.id }).from(personnel)
@@ -480,14 +478,6 @@ async function canAccessTaskProject(req: Request, projectId: number): Promise<bo
           WHERE member_filter.project_id = ${activeProjects.id}
             AND member_filter.personnel_id = ${accessContext.personnelId}
         )
-        OR EXISTS (
-          SELECT 1 FROM tasks task_filter
-          WHERE task_filter.project_id = ${activeProjects.id}
-            AND (
-              task_filter.assignee_id = ${accessContext.personnelId}
-              OR task_filter.collaborator_ids @> jsonb_build_array(${accessContext.personnelId}::int)
-            )
-        )
       )`,
     ))
     .limit(1);
@@ -495,7 +485,7 @@ async function canAccessTaskProject(req: Request, projectId: number): Promise<bo
 }
 
 async function canManageTaskProject(req: Request, projectId: number): Promise<boolean> {
-  if (hasTaskManagementAccess(req)) return true;
+  if (isOperationsRequest(req)) return true;
   if (!(await canAccessTaskProject(req, projectId))) return false;
   const accessContext = await getTaskAccessContext(req);
   if (!accessContext.personnelId) return false;
@@ -530,14 +520,6 @@ async function accessibleTaskProjectIds(req: Request): Promise<number[] | null> 
           SELECT 1 FROM task_project_members member_filter
           WHERE member_filter.project_id = project.id
             AND member_filter.personnel_id = ${accessContext.personnelId}
-        )
-        OR EXISTS (
-          SELECT 1 FROM tasks task_filter
-          WHERE task_filter.project_id = project.id
-            AND (
-              task_filter.assignee_id = ${accessContext.personnelId}
-              OR task_filter.collaborator_ids @> jsonb_build_array(${accessContext.personnelId}::int)
-            )
         )
       )
   `);
@@ -1072,22 +1054,46 @@ function parseTimeFilter(filter: string) {
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // A task-manager profile can use operational tasks and hours while all API
-  // responses omit financial fields, including endpoints shared with other
-  // roles. Cost calculations still run server-side for the existing ledgers.
-  app.use((req, res, next) => {
-    if (!isTaskManagerWithoutFinancialAccess(req)) return next();
-    const json = res.json.bind(res);
-    res.json = ((body?: unknown) => json(stripTaskManagerFinancialData(body))) as typeof res.json;
-    next();
-  });
 
   // Create the HTTP server
   const httpServer = createServer(app);
 
   // Setup authentication with storage
   const { requireAuth, resolveUserFromSessionCookie } = setupAuth(app, storage);
+  // A task-manager profile can use operational tasks and hours while all API
+  // responses omit financial fields, including endpoints shared with other
+  // roles. Cost calculations still run server-side for the existing ledgers.
+  app.use((req, res, next) => {
+    authenticatedJsonProjection(req, res,
+      request => isTaskManagerWithoutFinancialAccess(request)
+        && !/^\/api\/me\/(?:invoices|monthly-settlement-declarations)(?:\/|\?|$)/.test(request.originalUrl),
+      body => stripTaskManagerFinancialData(body));
+    next();
+  });
+
   registerMindMcp(app, pool, readMcpConfig(), (id) => storage.getUser(id));
+  // Apply personal-hour visibility to every task read, including detail and estimates.
+  app.use(["/api/tasks", "/api/tasks-projects", "/api/tasks-personnel"], requireAuth, requirePermission("projects", "operations", "task_manager"), async (req, res, next) => {
+    if (req.method !== "GET" || isOperationsRequest(req) || /\/(my-hours|hours-summary)(?:\?|$)/.test(req.originalUrl)) return next();
+    try {
+      const access = await getTaskAccessContext(req);
+      const rows = access.personnelId ? await db.select({ id: tasks.id, assigneeId: tasks.assigneeId, parentTaskId: tasks.parentTaskId }).from(tasks).where(sql`${tasks.projectId} IN (SELECT project_id FROM task_project_members WHERE personnel_id=${access.personnelId})`) : [];
+      const entries = access.personnelId ? await db.select({ taskId: taskTimeEntries.taskId, hours: taskTimeEntries.hours }).from(taskTimeEntries).where(eq(taskTimeEntries.personnelId, access.personnelId)) : [];
+      const ownHours = new Map<number, number>();
+      const byId = new Map(rows.map(row => [row.id, row]));
+      for (const entry of entries) {
+        let id: number | null = entry.taskId;
+        const visited = new Set<number>();
+        while (id != null && !visited.has(id)) {
+          visited.add(id); ownHours.set(id, (ownHours.get(id) ?? 0) + entry.hours);
+          id = byId.get(id)?.parentTaskId ?? null;
+        }
+      }
+      const json = res.json.bind(res);
+      res.json = ((body: unknown) => json(personalTaskHours(body, access.personnelId, ownHours, new Map(rows.map(row => [row.id, row.assigneeId]))))) as typeof res.json;
+      next();
+    } catch (error) { next(error); }
+  });
   registerProposalStudioRoutes(app, requireAuth);
 
   // ═══ Review Rooms (multi-sala) ═══════════════════════════════════════════
@@ -8320,7 +8326,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
       db.select().from(quotationApprovals).where(eq(quotationApprovals.quotationId, id)).orderBy(desc(quotationApprovals.requestedAt)),
       db.select().from(quotationDeliveries).where(eq(quotationDeliveries.quotationId, id)).orderBy(desc(quotationDeliveries.createdAt)),
     ]);
-    res.json({ revisions, events, approvals, deliveries });
+    const quotation = await storage.getQuotation(id);
+    if (!quotation) return res.status(404).json({ message: "Cotización no encontrada" });
+    const variants = await db.select({ id: quotationVariants.id, name: quotationVariants.variantName, totalAmount: quotationVariants.totalAmount }).from(quotationVariants).where(eq(quotationVariants.quotationId,id));
+    res.json({ revisions, events, approvals, deliveries, quotation: { lockVersion: quotation.lockVersion, revisionNumber: quotation.revisionNumber }, variants });
+  });
+
+  // Record a commercial fact that already happened outside Mind. Never sends an email.
+  app.post("/api/quotations/:id/external-stage", requireAuth, requirePermission("operations", "quotations_approve"), async (req, res) => {
+    try {
+      const id = z.coerce.number().int().positive().parse(req.params.id);
+      const input = externalStageSchema.parse(req.body);
+      if (input.occurredOn > civilDateInBuenosAires(new Date())) return res.status(400).json({ message: "La fecha no puede ser futura" });
+      const key = req.get("Idempotency-Key")?.trim();
+      if (!key || key.length < 12 || key.length > 120) return res.status(400).json({ message: "Falta la referencia de esta operación. Volvé a abrir el formulario." });
+      const requestHash = createHash("sha256").update(stableQuotationSnapshot(input)).digest("hex");
+      const result = await db.transaction(async tx => {
+        await tx.execute(sql`SELECT id FROM quotations WHERE id=${id} FOR UPDATE`);
+        const [current] = await tx.select().from(quotations).where(eq(quotations.id,id));
+        if (!current) throw Object.assign(new Error("Cotización no encontrada"), { statusCode: 404 });
+        const eventKey = `external-stage:${id}:${key}`;
+        const [prior] = await tx.select().from(quotationEvents).where(eq(quotationEvents.eventKey,eventKey));
+        if (prior) {
+          if ((prior.metadata as any)?.requestHash !== requestHash) throw Object.assign(new Error("Esta referencia corresponde a otra operación"), {statusCode:409});
+          return current;
+        }
+        if (current.archivedAt || current.lockVersion !== input.expectedLockVersion || current.revisionNumber !== input.expectedRevisionNumber) throw Object.assign(new Error("La cotización cambió. Actualizá antes de registrar la etapa."), {statusCode:409});
+        assertExternalQuotationStage(current.status,input.stage);
+        validatePricingSnapshot(insertQuotationSchema.parse(current));
+        const variants = await tx.select().from(quotationVariants).where(eq(quotationVariants.quotationId,id));
+        if (input.stage === "approved" && variants.length > 0 && !input.variantId) throw Object.assign(new Error("Elegí la variante que aceptó el cliente"), {statusCode:400});
+        const selected = input.variantId ? variants.find(variant => variant.id === input.variantId) : null;
+        if (input.variantId && !selected) throw Object.assign(new Error("La variante no pertenece a esta cotización"), {statusCode:400});
+        const revision = await persistQuotationRevision(tx,id,req.user!.id,"Registro de etapa realizada fuera de Mind");
+        const occurredAt = new Date(`${input.occurredOn}T12:00:00Z`);
+        const selectedTax = selected ? calculateTaxBreakdown(selected.totalAmount,current.taxRate,current.pricesIncludeTax) : null;
+        const [updated] = await tx.update(quotations).set({
+          status: input.stage, updatedBy: req.user!.id, updatedAt: new Date(), lockVersion: sql`${quotations.lockVersion}+1`,
+          ...(input.stage === "internally-approved" ? { internalApprovedAt:occurredAt, internalApprovedBy:req.user!.id } : {}),
+          ...(input.stage === "sent" ? { sentAt:occurredAt } : {}),
+          ...(input.stage === "approved" ? { acceptedAt:occurredAt, acceptedVariantId:selected?.id ?? null, publicTokenHash:null, publicTokenExpiresAt:null,
+            ...(selected ? { totalAmount:selected.totalAmount, subtotalAmount:selectedTax!.netAmount, taxAmount:selectedTax!.taxAmount } : {}) } : {}),
+        }).where(and(eq(quotations.id,id),eq(quotations.lockVersion,input.expectedLockVersion))).returning();
+        if (!updated) throw Object.assign(new Error("La cotización cambió mientras se registraba la etapa"),{statusCode:409});
+        if (input.stage === "approved" && selected) {
+          await tx.update(quotationVariants).set({isSelected:false}).where(eq(quotationVariants.quotationId,id));
+          await tx.update(quotationVariants).set({isSelected:true}).where(eq(quotationVariants.id,selected.id));
+        }
+        await recordQuotationEvent(tx,{ quotationId:id, revisionId:revision.revision.id,eventType:"external-stage-recorded",eventKey,actorUserId:req.user!.id,
+          metadata:{...input,source:"external",previousStatus:current.status,requestHash} });
+        await syncQuotationToCrm(tx,updated,input.stage,req.user!.id,input.reason);
+        return updated;
+      });
+      res.json(result);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) return res.status(400).json({message:"Revisá los datos de la etapa",errors:error.errors});
+      res.status(error.statusCode || 500).json({message:error.statusCode ? error.message : "No se pudo registrar la etapa"});
+    }
   });
 
   app.post("/api/quotations/:id/revisions", requireAuth, async (req, res) => {
@@ -11750,6 +11812,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      if (quotation) {
+        if (validatedData.clientId !== quotation.clientId) return res.status(400).json({message:"El cliente debe coincidir con el de la cotización aceptada"});
+        if (quotation.acceptedVariantId) {
+          if (validatedData.selectedVariantId && validatedData.selectedVariantId !== quotation.acceptedVariantId) return res.status(400).json({message:"El proyecto debe usar la variante que aceptó el cliente"});
+          validatedData.selectedVariantId = quotation.acceptedVariantId;
+        }
+      }
+
       // Sync budget and selected variant from quotation (only if linked)
       if (quotation && quotation.totalAmount && !validatedData.budget) {
         (validatedData as any).budget = quotation.totalAmount;
@@ -12578,7 +12648,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // GET /api/tasks/planned-hours/:projectId — suma de las estimaciones semanales
   // de planificación (task_weekly_estimates) para las tareas de este proyecto.
   // Se muestra junto a (no en reemplazo de) la estimación fija de la cotización.
-  app.get("/api/tasks/planned-hours/:projectId", requireAuth, async (req, res) => {
+  app.get("/api/tasks/planned-hours/:projectId", requireAuth, requirePermission("operations"), async (req, res) => {
     const projectId = parseInt(req.params.projectId);
     if (isNaN(projectId)) return res.status(400).json({ message: "ID de proyecto inválido" });
     try {
@@ -14057,15 +14127,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (!user?.email) return null;
     return (await storage.getPersonnel()).find((row) => row.email?.trim().toLowerCase() === user.email?.trim().toLowerCase()) ?? null;
   }
-
-  // Task managers without financial permissions must not fetch their personal
-  // settlement/invoice amounts through the API either.
-  app.use(["/api/me/invoices", "/api/me/monthly-settlement-declarations"], requireAuth, (req, res, next) => {
-    if (isTaskManagerWithoutFinancialAccess(req)) {
-      return res.status(403).json({ message: "No tenés permiso para consultar importes financieros" });
-    }
-    next();
-  });
 
   app.get("/api/me/invoices/settlement", requireAuth, async (req, res) => {
     try {
@@ -23597,7 +23658,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // GET /api/tasks/team-calendar — todas las tareas para el calendario de equipo
-  app.get("/api/tasks/team-calendar", requireAuth, async (req: Request, res: Response) => {
+  app.get("/api/tasks/team-calendar", requireAuth, requirePermission("operations"), async (req: Request, res: Response) => {
     try {
       const { dateFrom, dateTo, assigneeId, projectId } = req.query;
       taskDateWindowSchema.parse({ dateFrom, dateTo });
@@ -23869,7 +23930,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // GET /api/tasks/hours-cost — costo de horas internas por proyecto (ops/admin only para totalCostUSD)
-  app.get("/api/tasks/hours-cost", requireAuth, async (req: Request, res: Response) => {
+  app.get("/api/tasks/hours-cost", requireAuth, requirePermission("operations"), async (req: Request, res: Response) => {
     try {
       if (isTaskManagerWithoutFinancialAccess(req)) {
         return res.status(403).json({ message: "No tenés permiso para consultar costos" });
@@ -24184,6 +24245,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         LEFT JOIN quotations q ON q.id = ap.quotation_id
         WHERE t.status NOT IN ('done', 'cancelled')
           AND ap.status NOT IN ('voided', 'cancelled')
+          AND EXISTS (SELECT 1 FROM task_project_members own_member WHERE own_member.project_id=t.project_id AND own_member.personnel_id=${person.id})
           AND (t.assignee_id = ${person.id} OR t.collaborator_ids @> jsonb_build_array(${person.id}::int))
           AND NOT EXISTS (
             SELECT 1
@@ -24264,6 +24326,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         hoursOwnerName: hoursOwner?.name ?? null,
         assigneeName: assignee?.name ?? null,
         canDelete: await canManageTaskProject(req, task.projectId),
+        canLogForOthers: await canManageTaskProject(req, task.projectId),
         estimatedHoursTotal: estimatesByTask.get(task.id) ?? 0,
         estimatedHoursForWeek: estimatesForCurrentWeek.get(task.id) ?? 0,
         timeEntries: timeLog,
@@ -24700,7 +24763,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ? (await db.select({ assigneeId: tasks.assigneeId }).from(tasks).where(eq(tasks.id, task.parentTaskId)))[0]
         : null;
       const attribution = taskHourAttribution(taskHourOwner(task, parent), authenticatedPerson?.id ?? null,
-        hasTaskManagementAccess(req), req.body?.personnelId);
+        await canManageTaskProject(req, task.projectId), req.body?.personnelId);
       if ("status" in attribution) return res.status(attribution.status).json({ message: attribution.message });
       const effectivePersonnelId = attribution.personnelId;
       const [targetPerson] = await db.select({ id: personnel.id }).from(personnel)
@@ -24799,7 +24862,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             .where(sql`LOWER(TRIM(${personnel.email})) = LOWER(TRIM(${user.email}))`)
             .limit(1)
         : [];
-      const canEditOthers = hasTaskManagementAccess(req);
+      const canEditOthers = isOperationsRequest(req);
       if (!canEditOthers && authenticatedPerson?.id !== entry.personnelId) {
         return res.status(403).json({ message: "No podés editar la carga de otra persona" });
       }
@@ -24877,7 +24940,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             .where(sql`LOWER(TRIM(${personnel.email})) = LOWER(TRIM(${user.email}))`)
             .limit(1)
         : [];
-      const canDeleteOthers = hasTaskManagementAccess(req);
+      const canDeleteOthers = isOperationsRequest(req);
       if (!canDeleteOthers && authenticatedPerson?.id !== deletedEntry.personnelId) {
         return res.status(403).json({ message: "No podés eliminar la carga de otra persona" });
       }
@@ -25017,6 +25080,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const projectId = await getTaskProjectId(taskId);
       if (!projectId) return res.status(404).json({ message: "Tarea no encontrada" });
       if (!(await canAccessTaskProject(req, projectId))) return res.status(403).json({ message: "No tenés acceso a esta tarea" });
+      if (!isOperationsRequest(req)) {
+        const access = await getTaskAccessContext(req);
+        const [task] = await db.select({assigneeId:tasks.assigneeId}).from(tasks).where(eq(tasks.id,taskId));
+        if (!access.personnelId || task?.assigneeId !== access.personnelId) return res.status(403).json({message:"Solo podés modificar tus propias estimaciones"});
+      }
       const createdBy = (req as any).user?.id ?? null;
       const data = insertTaskWeeklyEstimateSchema.parse({
         ...req.body,
@@ -25057,6 +25125,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const projectId = await getTaskProjectId(taskId);
       if (!projectId) return res.status(404).json({ message: "Tarea no encontrada" });
       if (!(await canAccessTaskProject(req, projectId))) return res.status(403).json({ message: "No tenés acceso a esta tarea" });
+      if (!isOperationsRequest(req)) {
+        const access = await getTaskAccessContext(req);
+        const [task] = await db.select({assigneeId:tasks.assigneeId}).from(tasks).where(eq(tasks.id,taskId));
+        if (!access.personnelId || task?.assigneeId !== access.personnelId) return res.status(403).json({message:"Solo podés modificar tus propias estimaciones"});
+      }
       await db.delete(taskWeeklyEstimates).where(
         and(eq(taskWeeklyEstimates.taskId, taskId), eq(taskWeeklyEstimates.weekStart, weekStart))
       );
@@ -25070,7 +25143,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/tasks-projects", requireAuth, async (req: Request, res: Response) => {
     try {
       const currentUser = req.user as any;
-      const isOperations = hasTaskManagementAccess(req);
+      const isOperations = isOperationsRequest(req);
       const personnelMatch = currentUser?.email
         ? await db.execute(sql`SELECT id FROM personnel WHERE lower(trim(email)) = lower(trim(${currentUser.email})) LIMIT 1`)
         : { rows: [] } as any;
@@ -25083,10 +25156,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ? sql`(
               EXISTS (SELECT 1 FROM task_project_members member_filter
                       WHERE member_filter.project_id = ap.id AND member_filter.personnel_id = ${myPersonnelId})
-              OR EXISTS (SELECT 1 FROM tasks task_filter
-                         WHERE task_filter.project_id = ap.id
-                           AND (task_filter.assignee_id = ${myPersonnelId}
-                                OR task_filter.collaborator_ids @> jsonb_build_array(${myPersonnelId}::int)))
             )`
           : sql`FALSE`;
       const result = await db.execute(sql`
@@ -25109,7 +25178,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/tasks/projects", requireAuth, async (req: Request, res: Response) => {
     try {
       const currentUser = req.user as any;
-      const isOperations = hasTaskManagementAccess(req);
+      const isOperations = isOperationsRequest(req);
       const personnelMatch = currentUser?.email
         ? await db.execute(sql`SELECT id FROM personnel WHERE lower(trim(email)) = lower(trim(${currentUser.email})) LIMIT 1`)
         : { rows: [] } as any;
@@ -25122,10 +25191,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ? sql`(
               EXISTS (SELECT 1 FROM task_project_members member_filter
                       WHERE member_filter.project_id = ap.id AND member_filter.personnel_id = ${myPersonnelId})
-              OR EXISTS (SELECT 1 FROM tasks task_filter
-                         WHERE task_filter.project_id = ap.id
-                           AND (task_filter.assignee_id = ${myPersonnelId}
-                                OR task_filter.collaborator_ids @> jsonb_build_array(${myPersonnelId}::int)))
             )`
           : sql`FALSE`;
       const projectsResult = await db.execute(sql`
@@ -25203,8 +25268,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (!Number.isInteger(parsedProjectId) || !Number.isInteger(parsedPersonnelId)) {
           return res.status(400).json({ message: "Proyecto o persona inválidos" });
         }
-        if (!hasTaskManagementAccess(req)) {
-          return res.status(403).json({ message: "Sólo Operaciones o gestión de tareas puede administrar miembros" });
+        if (!isOperationsRequest(req)) {
+          return res.status(403).json({ message: "Sólo Operaciones puede vincular proyectos existentes" });
         }
         const assignedRole = 'owner';
         await db.execute(sql`
@@ -25226,7 +25291,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Original source hours remain separate from financial posting and payroll.
-  app.get("/api/tasks/projects/:id/asana-time", requireAuth, async (req: Request, res: Response) => {
+  app.get("/api/tasks/projects/:id/asana-time", requireAuth, requirePermission("operations"), async (req: Request, res: Response) => {
     try {
       const id = Number(req.params.id);
       if (!Number.isSafeInteger(id) || id <= 0) return res.status(400).json({ message: "ID inválido" });
@@ -25246,7 +25311,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // GET /api/tasks/projects/:id — detalle de proyecto con members y stats
-  app.get("/api/tasks/projects/:id/migration", requireAuth, async (req: Request, res: Response) => {
+  app.get("/api/tasks/projects/:id/migration", requireAuth, requirePermission("operations"), async (req: Request, res: Response) => {
     try {
       const projectId = Number(req.params.id);
       if (!Number.isSafeInteger(projectId) || projectId <= 0) return res.status(400).json({ message: "ID de proyecto inválido" });
@@ -25327,7 +25392,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         taskCount: parseInt(stats.task_count) || 0,
         pendingCount: parseInt(stats.pending_count) || 0,
         completedCount: parseInt(stats.completed_count) || 0,
-        totalHours: parseFloat(stats.total_hours) || 0,
+        totalHours: isOperationsRequest(req) ? parseFloat(stats.total_hours) || 0 : null,
+        canManageMembers: await canManageTaskProject(req, projectId),
         members: (membersResult.rows as any[]).map(m => ({
           personnelId: m.personnel_id,
           name: m.personnel_name,
@@ -25422,7 +25488,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const parsed = z.object({ personnelId: z.number().int().positive(), role: z.enum(TASK_PROJECT_ROLES).default("member") }).strict().safeParse(req.body);
       if (!Number.isSafeInteger(Number(req.params.id)) || projectId <= 0 || !parsed.success) return res.status(400).json({ message: "Miembro inválido" });
       const { personnelId, role } = parsed.data;
-      if (!hasTaskManagementAccess(req)) return res.status(403).json({ message: "Sólo Operaciones o gestión de tareas pueden administrar miembros" });
+      const [existingMember] = await db.select({role:taskProjectMembers.role}).from(taskProjectMembers).where(and(eq(taskProjectMembers.projectId,projectId),eq(taskProjectMembers.personnelId,personnelId))).limit(1);
+      if (!isOperationsRequest(req) && (role === "owner" || existingMember?.role === "owner")) return res.status(403).json({message:"Solo Operaciones puede cambiar responsables del proyecto"});
+
+      if (!(await canManageTaskProject(req, projectId))) return res.status(403).json({ message: "Sólo responsables del proyecto u Operaciones pueden administrar miembros" });
       const [target] = await db.select({ id: personnel.id }).from(personnel).where(and(eq(personnel.id, personnelId), or(isNull(personnel.activeUntil), gte(personnel.activeUntil, new Date().toISOString().slice(0, 10)))));
       if (!target) return res.status(400).json({ message: "Seleccioná una persona activa de Personal" });
       const [project] = await db.select({ id: activeProjects.id }).from(activeProjects).where(eq(activeProjects.id, projectId));
@@ -25449,7 +25518,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const [targetMember] = await db.select({ role: taskProjectMembers.role }).from(taskProjectMembers)
         .where(and(eq(taskProjectMembers.projectId, projectId), eq(taskProjectMembers.personnelId, personnelId))).limit(1);
       if (!targetMember) return res.status(404).json({ message: "Miembro no encontrado" });
-      if (!hasTaskManagementAccess(req)) return res.status(403).json({ message: "Sólo Operaciones o gestión de tareas pueden administrar miembros" });
+      if (!isOperationsRequest(req) && targetMember.role === "owner") return res.status(403).json({message:"Solo Operaciones puede quitar responsables del proyecto"});
+      if (!(await canManageTaskProject(req, projectId))) return res.status(403).json({ message: "Sólo responsables del proyecto u Operaciones pueden administrar miembros" });
       const [assigned] = await db.select({ id: tasks.id }).from(tasks).where(and(eq(tasks.projectId, projectId), or(eq(tasks.assigneeId, personnelId), sql`COALESCE(${tasks.collaboratorIds}, '[]'::jsonb) @> jsonb_build_array(${personnelId}::int)`))).limit(1);
       if (assigned) return res.status(409).json({ message: "Reasigná primero las tareas y colaboraciones de esta persona antes de quitarla del proyecto" });
       await db.execute(sql`
@@ -26645,7 +26715,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ==================== MONTHLY CLOSINGS CRUD ====================
   app.get("/api/me/monthly-settlement-declarations", requireAuth, async (req, res) => {
-    if (isTaskManagerWithoutFinancialAccess(req)) return res.status(403).json({ message: "No tenés permiso para consultar liquidaciones" });
     const access = await getAbsenceAccessContext(req);
     if (!access.personnelId) return res.status(409).json({ message: "Tu usuario no está vinculado con Personal" });
     const rows = await db.select({ closing: monthlyClosings, declaration: monthlySettlementDeclarations })
@@ -26662,7 +26731,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post("/api/me/monthly-settlement-declarations", requireAuth, async (req, res) => {
-    if (isTaskManagerWithoutFinancialAccess(req)) return res.status(403).json({ message: "No tenés permiso para consultar liquidaciones" });
     try {
       const access = await getAbsenceAccessContext(req);
       if (!access.personnelId) return res.status(409).json({ message: "Tu usuario no está vinculado con Personal" });

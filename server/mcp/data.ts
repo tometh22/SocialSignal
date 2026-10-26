@@ -11,7 +11,7 @@ const resources: readonly Resource[] = mindResources;
 const internalPermissions = ["crm", "quotations", "projects", "operations", "status", "dashboard", "finance", "task_manager", "admin"];
 const isAdmin = (u: User) => u.is_admin || u.role === "admin";
 const has = (u: User, ...permissions: string[]) => isAdmin(u) || permissions.some(p => u.permissions?.includes(p));
-const allowed = (u: User, r: Resource) => r.module === "admin" ? isAdmin(u) : has(u, ...r.permissions);
+const allowed = (u: User, r: Resource) => r.module === "admin" ? isAdmin(u) : r.table.startsWith("objective") ? has(u, "operations") : has(u, ...r.permissions);
 const quote = (name: string) => '"' + name.replaceAll('"', '""') + '"';
 const financialField = /(cost|costo|salary|rate|budget|amount|margin|markup|billing|invoice|revenue|price|sales|usd|ars|^fx$)/i;
 const secretKey = /password|passwd|secret|credential|authorization|cookie|private.?key|api.?key|access.?token|refresh.?token|public.?token|token.?hash|storage.?key|idempotency.?key|^token$|^auth$|^p256dh$/i;
@@ -47,7 +47,8 @@ export function redactMindSecrets(value: unknown): unknown {
 function visibleFields(u: User, r: Resource) {
   return Object.fromEntries(Object.entries(r.fields).filter(([key]) =>
     (r.module === "personal" || has(u, "projects", "quotations", "operations", "finance", "dashboard") || !financialField.test(key)) &&
-    (key !== "admin_notes" || has(u, "operations", "finance"))));
+    (key !== "admin_notes" || has(u, "operations", "finance")) &&
+    (r.table !== "tasks" || has(u, "operations") || !["logged_hours", "estimated_hours", "asana_source"].includes(key))));
 }
 
 // All subqueries are fixed application policy, never supplied by the model.
@@ -71,15 +72,28 @@ function rowPolicy(u: User, r: Resource): string {
   if (r.table === "personal_monthly_invoices") return has(u, "finance") ? "TRUE" : "t.user_id=$1";
   if (r.table === "personal_invoice_project_allocations") return has(u, "finance") ? "TRUE" : "EXISTS (SELECT 1 FROM personal_monthly_invoices i WHERE i.id=t.invoice_id AND i.user_id=$1)";
   if (r.table === "personnel_monthly_settlements") return has(u, "operations", "finance") ? "TRUE" : `t.personnel_id IN (${ownPerson}) AND t.published_at IS NOT NULL`;
+  if (r.module === "projects" && !has(u, "operations")) {
+    const ownProject = (project: string) => `EXISTS (SELECT 1 FROM active_projects p JOIN task_project_members pm ON pm.project_id=p.id WHERE p.id=${project} AND p.status='active' AND pm.personnel_id IN (${ownPerson}))`;
+    if (r.table === "active_projects") return ownProject("t.id");
+    if (r.table === "project_history_links") return "FALSE";
+    if (r.table === "recurring_template_personnel") return `t.personnel_id IN (${ownPerson}) AND ${ownProject("(SELECT rt.parent_project_id FROM recurring_project_templates rt WHERE rt.id=t.template_id)")}`;
+    const refs = r.references.filter(ref => ref.resource === "active_projects");
+    if (refs.length) return `(${refs.map(ref => `t.${quote(ref.fields[0])} IS NOT NULL`).join(" OR ")}) AND ` + refs.map(ref => `(t.${quote(ref.fields[0])} IS NULL OR ${ownProject(`t.${quote(ref.fields[0])}`)})`).join(" AND ") +
+      (r.fields.personnel_id ? ` AND t.personnel_id IN (${ownPerson})` : "");
+    if (r.fields.client_id) return `EXISTS (SELECT 1 FROM active_projects p JOIN task_project_members pm ON pm.project_id=p.id WHERE p.client_id=t.client_id AND p.status='active' AND pm.personnel_id IN (${ownPerson}))`;
+    return "FALSE";
+  }
   if (r.module === "tasks" && r.name !== "people_directory") {
-    if (has(u, "operations", "task_manager")) return "TRUE";
+    if (has(u, "operations")) return "TRUE";
     let project = "t.project_id";
     if (r.name === "task_projects") project = "t.id";
     if (["task_comments", "task_weekly_estimates", "task_time_entries"].includes(r.table)) project = "(SELECT tt.project_id FROM tasks tt WHERE tt.id=t.task_id)";
     if (r.table === "quick_time_entry_details") project = "(SELECT qt.project_id FROM quick_time_entries qt WHERE qt.id=t.quick_time_entry_id)";
     return `EXISTS (SELECT 1 FROM active_projects p WHERE p.id=${project} AND p.status='active' AND
-      (EXISTS (SELECT 1 FROM task_project_members tm WHERE tm.project_id=p.id AND tm.personnel_id IN (${ownPerson})) OR
-       EXISTS (SELECT 1 FROM tasks tt JOIN personnel pp ON pp.id=tt.assignee_id OR tt.collaborator_ids @> jsonb_build_array(pp.id) WHERE tt.project_id=p.id AND pp.id IN (${ownPerson}))))`;
+      EXISTS (SELECT 1 FROM task_project_members tm WHERE tm.project_id=p.id AND tm.personnel_id IN (${ownPerson})))${
+        ["task_time_entries", "time_entries", "asana_time_entries"].includes(r.table) ? ` AND t.personnel_id IN (${ownPerson})` :
+        r.table === "task_weekly_estimates" ? ` AND EXISTS (SELECT 1 FROM tasks own_task WHERE own_task.id=t.task_id AND own_task.assignee_id IN (${ownPerson}))` :
+        ["quick_time_entries", "quick_time_entry_details"].includes(r.table) ? " AND FALSE" : ""}`;
   }
   return "TRUE";
 }

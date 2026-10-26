@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.15.0 — 2026-10-22
+## 1.15.0 — 2026-10-26
 
 - Espaciado responsive: los títulos y filtros del cierre mantienen separación respecto de los bordes en escritorio y móvil; se corrigen las reglas de padding que se anulaban desde 640 px.
 
@@ -19,6 +19,16 @@
 - El cierre incorpora un panel de transición y controles sobre saldos iniciales e ingresos nativos faltantes. No declara conciliación aprobada por tener datos cargados.
 - Migraciones 0087/0088: protecciones transaccionales de períodos cerrados y vistas BI; pruebas PostgreSQL incorporadas a CI.
 - Auditoría de producción de solo lectura documenta los datos y cierres que Finanzas aún debe completar antes de retirar el maestro.
+## 1.14.6 — 2026-10-26
+
+- El filtro de importes para perfiles de tareas se evalúa al enviar la respuesta, después de resolver la autenticación, tanto con cookie como con token. Las facturas y conciliaciones personales conservan los importes del titular; las rutas operativas siguen omitiendo campos financieros.
+
+## 1.14.5 — 2026-10-26
+
+- PM y analistas acceden solo a proyectos de los que son miembros. El calendario global y Objetivos quedan en Operaciones; las horas, estimaciones y comprobantes personales respetan su titular también por API y MCP.
+- Cotizaciones permite registrar etapas realizadas fuera de Mind y una aprobación final con fecha, canal, fundamento y variante, sin enviar otro correo. Los costos adicionales de IA, herramientas y licencias quedan visibles en Inversión.
+- El calendario personal despliega semanas completas y abre el detalle de cada tarea. Status y Daily comparten Estado actual con guardado atómico e historial, conservando Próximo paso como antecedente.
+- Mis facturas y Mis horas quedan en el bloque personal de navegación; los permisos de gestión de miembros se resuelven por proyecto y se comprueba el proyecto ya asociado a una cotización.
 
 ## 1.14.4 — 2026-10-21
 
