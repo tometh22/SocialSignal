@@ -180,8 +180,7 @@ export default function SidebarFixed({ mobileMode = false, onNavigate }: Sidebar
         { href: "/operations/absences", title: "Gestión de ausencias", icon: UserX, description: "Aprobar solicitudes y administrar cupos", permission: 'operations' as AppSection },
         { href: "/tasks/hours-dashboard", title: "Panel de horas", icon: BarChart2, description: "Horas por persona y proyecto", permission: 'operations' as AppSection },
         { href: "/operations/capacity", title: "Capacidad", icon: Gauge, description: "Capacidad semanal del equipo", permission: 'operations' as AppSection },
-        { href: "/operations/monthly-closing", title: "Cierre mensual", icon: CalendarCheck, description: "Cierre de horas del mes", permission: 'operations' as AppSection },
-        { href: "/operations/liquidaciones-equipo", title: "Liquidaciones equipo", icon: Calculator, description: "Definir cómo factura cada persona", permission: 'operations' as AppSection },
+        { href: "/operations/monthly-closing", title: "Cierre del equipo", icon: CalendarCheck, description: "Base a cobrar, autorizaciones y facturas", permission: 'operations' as AppSection },
         { href: "/operations/holidays", title: "Feriados", icon: Calendar, description: "Gestión de feriados", permission: 'operations' as AppSection },
       ]
     },
@@ -195,6 +194,7 @@ export default function SidebarFixed({ mobileMode = false, onNavigate }: Sidebar
     {
       title: "Gestión financiera",
       items: [
+        { href: "/finance/presupuesto", title: "Presupuesto de costos", icon: Calculator, description: "Costos futuros y vigencia", permission: 'finance' as AppSection },
         { href: "/finance/cierre", title: "Cierre financiero", icon: LockKeyhole, description: "Checklist y cierre mensual", permission: 'finance' as AppSection },
         { href: "/finance/cashflow", title: "Cashflow", icon: Wallet, description: "Movimientos y saldos bancarios", permission: 'finance' as AppSection },
         { href: "/finance/activo", title: "Activo", icon: CircleArrowUp, description: "Cuentas a cobrar y activos líquidos", permission: 'finance' as AppSection },

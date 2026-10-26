@@ -1,5 +1,29 @@
 # Changelog
 
+## 1.15.0 — 2026-10-26
+
+- Integración con 1.14.6: conserva alcance por membresía, horas propias, aprobación externa y acceso privado a importes y facturas personales.
+- Las guardas financieras respetan el día civil elegido al cargar horas, también a medianoche del primer día del mes. Se alinean con liquidación, conciliación y costo laboral sin desplazar fechas históricas.
+- Facturación distingue la base salarial del importe autorizado e incluye bonos y ambos tipos de extras en el desglose. Sólo ARS omite TC y comisiones USD.
+- Respaldo productivo restaurado en PostgreSQL 18 aislado: 172 tablas y 25 tablas financieras verificadas; migraciones idempotentes sin modificar importes históricos. La conciliación y la publicación siguen condicionadas a resolver los datos documentales y de apertura con Finanzas.
+
+- Espaciado responsive: los títulos y filtros del cierre mantienen separación respecto de los bordes en escritorio y móvil; se corrigen las reglas de padding que se anulaban desde 640 px.
+
+- UX del cierre: mes compartido, borradores conservados entre pestañas, aviso al cambiar de mes con cambios pendientes, tablas adaptadas a móvil, campos alineados y responsables del próximo paso explícitos. Mis facturas distingue ARS/USD y resume comprobantes enviados o aprobados.
+- Revisión de facturas: la fecha de versión se devuelve en UTC para evitar rechazos falsos de concurrencia en zonas horarias como Argentina, conservando la protección contra revisiones vencidas.
+- Cierre del equipo: recorrido unificado de base y facturación; vacaciones, feriados y días Epical pagos, con descuento excepcional sin goce y motivo.
+- Corte automático el último día hábil a las 23:59 de Buenos Aires, borradores y recordatorios. TC bancarios y extras en Mis facturas; autorización de Operaciones antes de cada comprobante USD/ARS, bonos en ambas monedas y protección de versiones.
+- Migración 0089: corte operativo de horas, estados de autorización y conciliación del costo contractual/bonos/reintegros con Finanzas, sin duplicar gasto al registrar Pasivo. El cierre financiero exige autorizaciones y comprobantes requeridos.
+
+- Cierre: devolución de revisión a corrección con motivo y auditoría; los controles críticos deben resolverse antes de enviar a revisión.
+- Operaciones/Finanzas: horas protegidas por mes civil, recálculo y pre-cierre atómicos, bloqueo de costos laborales incompletos y nueva validación antes de congelar. Las provisiones pueden liberarse en un mes posterior sin reescribir el cierre original.
+
+- Finanzas: las importaciones operativas del maestro se bloquean desde el corte, incluidos tarifas, FX/REM, costos estimados y procesos legacy. El histórico conserva backfill explícito anterior al corte.
+- Presupuesto mensual de costos nativo con moneda, vigencia, auditoría y protección contra ediciones concurrentes.
+- Proyección y BI consumen fuentes nativas; presupuesto o FX ausente se muestra pendiente. Se preservan los snapshots históricos anteriores al corte.
+- El cierre incorpora un panel de transición y controles sobre saldos iniciales e ingresos nativos faltantes. No declara conciliación aprobada por tener datos cargados.
+- Migraciones 0087/0088: protecciones transaccionales de períodos cerrados y vistas BI; pruebas PostgreSQL incorporadas a CI.
+- Auditoría de producción de solo lectura documenta los datos y cierres que Finanzas aún debe completar antes de retirar el maestro.
 ## 1.14.6 — 2026-10-26
 
 - El filtro de importes para perfiles de tareas se evalúa al enviar la respuesta, después de resolver la autenticación, tanto con cookie como con token. Las facturas y conciliaciones personales conservan los importes del titular; las rutas operativas siguen omitiendo campos financieros.

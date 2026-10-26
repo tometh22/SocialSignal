@@ -1,3 +1,4 @@
+import { assertExcelFinancialImportAllowed } from "./financial-source-policy";
 import { db } from "../db";
 import { exchangeRates, systemConfig } from "../../shared/schema";
 import { and, eq, sql } from "drizzle-orm";
@@ -228,6 +229,7 @@ export async function importRemEstimates(estimates: RemEstimate[], createdBy: nu
 }
 
 export async function syncMasterFxRates(rates: Array<Pick<MasterFxRate, "año" | "month" | "tipoCambio" | "rateType" | "notes">>, actorId: number) {
+  await assertExcelFinancialImportAllowed();
   let observed = 0; let projected = 0;
   for (const rate of rates) {
     if (rate.rateType === "estimated") {

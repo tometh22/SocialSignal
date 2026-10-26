@@ -1,4 +1,6 @@
-import { useState, useEffect } from "react";
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { contractualMonthlyHours, payableMonthlyHours } from "@shared/utils/payroll-hours";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -18,7 +20,6 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { getApiErrorMessage } from "@/lib/api-error";
-import { useCurrency } from "@/hooks/use-currency";
 import { Loader2, Check, X, ExternalLink, ChevronDown, Copy, Download } from "lucide-react";
 import { Link } from "wouter";
 import { format } from "date-fns";
@@ -30,21 +31,16 @@ const MONTHS = [
 ];
 
 // Default contractual base hours by contract type
-function defaultBaseHours(person: any): number {
-  const type = (person.contractType || "full-time").toLowerCase();
-  if (type === "freelance") return person.monthlyHours || 0;
-  // Use configured monthlyHours when available; fall back to contract-type defaults
-  if (person.monthlyHours) return person.monthlyHours;
-  return type === "part-time" ? 120 : 160;
-}
+const defaultBaseHours = contractualMonthlyHours;
 
-export default function MonthlyClosing() {
-  const now = new Date();
-  const [year, setYear] = useState(now.getFullYear());
-  const [month, setMonth] = useState(now.getMonth());
+export default function MonthlyClosing({ period, onDirtyChange }: { period: string; onDirtyChange: (dirty: boolean) => void }) {
+  const [year, oneBasedMonth] = period.split("-").map(Number);
+  const month = oneBasedMonth - 1;
   const [contractFilter, setContractFilter] = useState<string>("all");
   // Category-based hours adjustments per person
-  type HoursAdj = { vacaciones: number; feriados: number; epicalGeneral: number; discrecional: number };
+  type HoursAdj = { unpaidHours: number };
+  const [adjustmentReasons, setAdjustmentReasons] = useState<Record<number, string>>({});
+  const dirtyAdjustmentIds = useRef(new Set<number>());
   const [hoursAdjustments, setHoursAdjustments] = useState<Record<number, HoursAdj>>({});
   const [expandedAdj, setExpandedAdj] = useState<number | null>(null);
   // Per-row mutation tracking
@@ -54,7 +50,12 @@ export default function MonthlyClosing() {
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { exchangeRate } = useCurrency();
+  const [reopenReason, setReopenReason] = useState("");
+  const cutoff = useQuery<any>({ queryKey: ["payroll-period",period], queryFn: async () => { const r = await fetch(`/api/payroll-period/${period}`, {credentials:"include"}); if (!r.ok) throw new Error("No se pudo cargar el corte"); return r.json(); } });
+  const prepare = useMutation({ mutationFn: (action: string) => apiRequest(`/api/payroll-period/${period}/${action}`, "POST", {reason:reopenReason}), onSuccess: () => { queryClient.invalidateQueries({queryKey:["payroll-period"]}); queryClient.invalidateQueries({queryKey:["/api/monthly-closings"]}); queryClient.invalidateQueries({queryKey:["personnel-settlements"]}); toast({title:"Corte actualizado",description:"Revisá los pendientes y continuá al paso 2."}); }, onError:(error:Error)=>toast({title:"No se pudo actualizar",description:error.message,variant:"destructive"}) });
+
+  const settlements = useQuery<any[]>({ queryKey: ["personnel-settlements", period], queryFn: async () => { const response = await fetch(`/api/finance/personnel-settlements?period=${period}`, {credentials:"include"}); if (!response.ok) throw new Error("No se pudieron cargar las publicaciones"); return response.json(); }, refetchOnWindowFocus: false });
+  const publishedIds = new Set((settlements.data ?? []).filter(row => row.settlement?.status === "published").map(row => row.person.id));
 
   const { data: personnel, isLoading: personnelLoading } = useQuery<any[]>({ queryKey: ["/api/personnel"] });
   const { data: closings, isLoading: closingsLoading } = useQuery<any[]>({
@@ -76,78 +77,28 @@ export default function MonthlyClosing() {
         headers: { "Content-Type": "application/json" },
       }).then((r) => r.json()),
   });
-  // Holidays for the year, to deduct from base hours
-  const { data: holidaysData = [] } = useQuery<any[]>({
-    queryKey: ["/api/holidays", year],
-    queryFn: () =>
-      fetch(`/api/holidays?year=${year}`, {
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-      }).then((r) => r.json()),
-  });
-  const { data: absencesData = [] } = useQuery<any[]>({
-    queryKey: ["/api/personnel-absences", "monthly-closing"],
-    queryFn: () => fetch("/api/personnel-absences", {
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-    }).then((r) => r.json()),
-  });
-
-  // Number of holidays falling on weekdays in the selected month
-  const monthHolidayCount = (holidaysData || []).filter((h: any) => {
-    const d = new Date(h.date + (h.date?.length === 10 ? "T00:00:00" : ""));
-    if (isNaN(d.getTime())) return false;
-    const dow = d.getDay();
-    return d.getFullYear() === year && d.getMonth() === month && dow !== 0 && dow !== 6;
-  }).length;
-
-  // Día Epical is a paid absence: it reduces contractual capacity but never
-  // removes real time already logged. Count civil weekdays only and de-dupe
-  // overlapping absence ranges before converting days to contractual hours.
-  const epicalDayHoursFor = (person: any): number => {
-    if ((person.contractType || "full-time").toLowerCase() === "freelance") return 0;
-    const monthStart = new Date(year, month, 1);
-    const monthEnd = new Date(year, month + 1, 0);
-    const days = new Set<string>();
-    for (const absence of absencesData || []) {
-      if (absence.type !== "epical_day" || absence.personnelId !== person.id) continue;
-      const start = new Date(`${String(absence.startDate).slice(0, 10)}T00:00:00`);
-      const end = new Date(`${String(absence.endDate).slice(0, 10)}T00:00:00`);
-      const from = new Date(Math.max(start.getTime(), monthStart.getTime()));
-      const to = new Date(Math.min(end.getTime(), monthEnd.getTime()));
-      for (const day = new Date(from); day <= to; day.setDate(day.getDate() + 1)) {
-        if (day.getDay() !== 0 && day.getDay() !== 6) days.add(format(day, "yyyy-MM-dd"));
-      }
-    }
-    const dailyHours = defaultBaseHours(person) / 20;
-    return Math.round(days.size * dailyHours * 100) / 100;
-  };
-
   // Rehydrate saved adjustments when closings load (so manual edits survive reload)
   useEffect(() => {
     if (!closings) return;
     const restored: Record<number, HoursAdj> = {};
     for (const c of closings) {
       if (c.adjustments && typeof c.adjustments === "object") {
-        restored[c.personnelId] = {
-          vacaciones: c.adjustments.vacaciones || 0,
-          feriados: c.adjustments.feriados || 0,
-          epicalGeneral: c.adjustments.epicalGeneral || 0,
-          discrecional: c.adjustments.discrecional || 0,
-        };
+        restored[c.personnelId] = { unpaidHours: c.adjustments.unpaidHours || 0 };
       }
     }
-    if (Object.keys(restored).length > 0) {
-      setHoursAdjustments((prev) => ({ ...restored, ...prev }));
-    }
+    setHoursAdjustments(previous => ({ ...restored, ...Object.fromEntries(Object.entries(previous).filter(([id]) => dirtyAdjustmentIds.current.has(Number(id)))) }));
+    setAdjustmentReasons(previous => ({ ...Object.fromEntries(closings.map((c: any) => [c.personnelId, c.notes || ""])), ...Object.fromEntries(Object.entries(previous).filter(([id]) => dirtyAdjustmentIds.current.has(Number(id)))) }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [closings]);
 
   const closeMutation = useMutation({
     mutationFn: (data: any) => apiRequest("/api/monthly-closings", "POST", data),
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
+      dirtyAdjustmentIds.current.delete(variables.personnelId);
       queryClient.invalidateQueries({ queryKey: ["/api/monthly-closings"] });
-      toast({ title: "Cierre guardado" });
+      queryClient.invalidateQueries({ queryKey: ["personnel-settlements"] });
+      setExpandedAdj(null);
+      toast({ title: "Base guardada", description: "Seguí en el paso 2: Facturación y seguimiento." });
     },
     onError: (error) => {
       toast({
@@ -164,96 +115,42 @@ export default function MonthlyClosing() {
   const getClosing = (personnelId: number) =>
     closings?.find((c: any) => c.personnelId === personnelId);
 
-  // Historical costs synced from Personal are the single rate source.
-  const getEffectiveRate = (person: any): { rate: number; isEstimated: boolean } => {
-    const selectedPeriod = year * 100 + month + 1;
-    const monthly = [...(person.historicalRates ?? [])]
-      .filter((item: any) => item.year * 100 + item.month <= selectedPeriod)
-      .sort((left: any, right: any) =>
-        (right.year * 100 + right.month) - (left.year * 100 + left.month)
-      )[0];
-    const billing = person.billingCurrency ?? "ARS";
-    if (billing === "USD" || billing === "mixed") {
-      return { rate: monthly?.hourlyRateUSD || 0, isEstimated: false };
-    }
-    return { rate: monthly?.hourlyRateARS || 0, isEstimated: false };
+  // The base is expressed in ARS; invoice FX belongs to the next step.
+  const getBaseRateARS = (person: any): number | null => {
+    const closing = getClosing(person.id);
+    if (closing?.adjustedHours > 0) return Number(closing.grandTotalARS ?? closing.totalCost) / closing.adjustedHours;
+    const selected = year * 100 + month + 1;
+    const historical = [...(person.historicalRates ?? [])].filter((r: any) => r.year*100+r.month <= selected).sort((a:any,b:any) => (b.year*100+b.month)-(a.year*100+a.month))[0];
+    return Number(historical?.hourlyRateARS) > 0 ? Number(historical.hourlyRateARS) : null;
   };
-
   const getAdj = (personnelId: number): HoursAdj =>
-    hoursAdjustments[personnelId] ?? { vacaciones: 0, feriados: 0, epicalGeneral: 0, discrecional: 0 };
+    hoursAdjustments[personnelId] ?? { unpaidHours: 0 };
 
   const setAdj = (personnelId: number, field: keyof HoursAdj, value: string) => {
+    dirtyAdjustmentIds.current.add(personnelId);
     const parsed = parseFloat(value);
     const v = isNaN(parsed) ? 0 : parsed;
     setHoursAdjustments(prev => ({ ...prev, [personnelId]: { ...getAdj(personnelId), [field]: v } }));
   };
 
   const resetAdj = (personnelId: number) => {
-    setHoursAdjustments(prev => { const n = { ...prev }; delete n[personnelId]; return n; });
-    setExpandedAdj(null);
+    dirtyAdjustmentIds.current.add(personnelId);
+    setHoursAdjustments(prev => ({ ...prev, [personnelId]: { unpaidHours: 0 } }));
+    setAdjustmentReasons(prev => ({ ...prev, [personnelId]: "" }));
   };
 
-  const hasAdjustment = (personnelId: number): boolean => {
-    const adj = hoursAdjustments[personnelId];
-    const person = personnel?.find((candidate: any) => candidate.id === personnelId);
-    return (!!adj && (adj.vacaciones > 0 || adj.feriados > 0 || adj.epicalGeneral > 0 || adj.discrecional !== 0))
-      || (!!person && epicalDayHoursFor(person) > 0);
-  };
-
-  // Effective base hours for a person: default adjusted by category deductions.
-  // No aplica a freelance — ver effectiveHours.
-  const effectiveBaseHours = (person: any): number => {
-    const base = defaultBaseHours(person);
-    const adj = hoursAdjustments[person.id];
-    const autoEpicalHours = epicalDayHoursFor(person);
-    if (!adj) return Math.max(0, base - autoEpicalHours);
-    return Math.max(0, base - (adj.vacaciones || 0) - (adj.feriados || 0) - (adj.epicalGeneral || 0) - autoEpicalHours + (adj.discrecional || 0));
-  };
-
-  // Horas a facturar: para full-time/part-time es la base ajustada (fija,
-  // independiente de cuánto trabajaron). Para freelance el cálculo debe ser
-  // lineal por horas reales trabajadas, sin piso/techo de horas base — no
-  // tiene sentido ajustar por feriados/vacaciones a alguien que factura
-  // exactamente lo que trabajó.
-  const effectiveHours = (person: any): number => {
-    if ((person.contractType || "full-time").toLowerCase() === "freelance") {
-      return realHoursMap[person.id] ?? 0;
-    }
-    return effectiveBaseHours(person);
-  };
-
-  // Suggested feriado hours for a person this month (holidays × daily hours)
-  const feriadoHoursFor = (person: any): number => {
-    const dailyHours = (defaultBaseHours(person) || 160) / 20;
-    return Math.round(monthHolidayCount * dailyHours);
-  };
+  const hasAdjustment = (id: number) => getAdj(id).unpaidHours > 0;
+  const effectiveBaseHours = (person: any): number => Math.max(0, defaultBaseHours(person) - getAdj(person.id).unpaidHours);
+  const effectiveHours = (person: any): number => person.contractType === "freelance" ? realHoursMap[person.id] ?? 0 : effectiveBaseHours(person);
 
   const doClose = (person: any) => {
     const hrs = effectiveHours(person);
-    const { rate } = getEffectiveRate(person);
-    const existingClosing = getClosing(person.id);
-    if (rate <= 0) {
-      toast({
-        title: "Sin tarifa configurada",
-        description: `${person.name} no tiene tarifa para ${MONTHS[month]} ${year}. Configurala en Configuración → Personal.`,
-        variant: "destructive",
-      });
-      return;
-    }
-    const billing = existingClosing?.billingCurrency ?? getBillingCurrency(person);
+    const rate = getBaseRateARS(person) ?? 0;
     const manualAdjustments = hoursAdjustments[person.id];
-    const autoEpicalHours = epicalDayHoursFor(person);
-    const adjustments = manualAdjustments || autoEpicalHours > 0
-      ? { ...(manualAdjustments || { vacaciones: 0, feriados: 0, epicalGeneral: 0, discrecional: 0 }), epicalGeneral: (manualAdjustments?.epicalGeneral || 0) + autoEpicalHours }
-      : null;
-    let totalCost: number;
-    if (billing === 'USD' || billing === 'mixed') {
-      // rate is already in USD; totalCost stored in ARS equivalent for consistency
-      totalCost = hrs * rate * (exchangeRate || 1);
-    } else {
-      // ARS billing: rate is in ARS
-      totalCost = hrs * rate;
-    }
+    const adjustments = manualAdjustments || { unpaidHours: 0 };
+    try { payableMonthlyHours(person, realHoursMap[person.id] ?? 0, adjustments.unpaidHours, adjustmentReasons[person.id] || ""); }
+    catch (error) { toast({ title: "Revisá el descuento", description: (error as Error).message, variant: "destructive" }); return; }
+    const totalCost = hrs * rate;
     setClosingPersonnelId(person.id);
     closeMutation.mutate({
       personnelId: person.id,
@@ -263,8 +160,9 @@ export default function MonthlyClosing() {
       adjustedHours: hrs,
       hourlyRate: rate,
       totalCost,
-      exchangeRateAtClose: exchangeRate || null,
+      exchangeRateAtClose: null,
       adjustments,
+      notes: adjustmentReasons[person.id] || null,
     });
   };
 
@@ -287,107 +185,19 @@ export default function MonthlyClosing() {
 
   // Billing currency helpers
   const getBillingCurrency = (person: any): string => person.billingCurrency ?? "ARS";
-  const getUsdFraction = (person: any): number => person.usdBillingFraction ?? 0;
-
-  // Cost display: returns {arsText, usdText} based on billing modality.
-  // Si la persona ya tiene un cierre guardado para este mes, se usan los
-  // valores congelados al cierre (horas, tarifa, TC) en vez de recalcular en
-  // vivo — así esta tabla siempre coincide con lo que ve la persona en "Mis
-  // Facturas" (que también lee del registro de cierre una vez cerrado).
+  const baseAmountARS = (person: any): number | null => {
+    const closing = getClosing(person.id);
+    if (closing) return Number(closing.grandTotalARS ?? closing.totalCost);
+    const rate = getBaseRateARS(person);
+    return rate == null ? null : Math.round(effectiveHours(person) * rate * 100) / 100;
+  };
   const getCostDisplay = (person: any) => {
-    const closing = getClosing(person.id);
-    const hrs = closing ? closing.adjustedHours : effectiveHours(person);
-    const billing = closing?.billingCurrency ?? getBillingCurrency(person);
-    const rate = closing ? closing.hourlyRate : getEffectiveRate(person).rate; // ARS o USD según billingCurrency
-    const fx = closing?.exchangeRateAtClose || exchangeRate;
-
-    // New closings persist the exact invoice split. Prefer that snapshot so the
-    // table does not reconstruct a different mixed-currency value than Mi cuenta.
-    if (closing && closing.totalCostARS != null && closing.totalCostUSD != null) {
-      if (billing === "mixed") {
-        return {
-          primary: `USD ${Number(closing.totalCostUSD).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`,
-          secondary: `+ ARS ${Number(closing.totalCostARS).toLocaleString("es-AR", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`,
-        };
-      }
-      if (billing === "USD") {
-        return {
-          primary: `USD ${Number(closing.totalCostUSD).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`,
-          secondary: `≈ ARS ${Number(closing.grandTotalARS ?? closing.totalCost).toLocaleString("es-AR", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`,
-        };
-      }
-      return {
-        primary: `ARS ${Number(closing.totalCostARS).toLocaleString("es-AR", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`,
-        secondary: null,
-      };
-    }
-
-    if (billing === "USD") {
-      const costUSD = hrs * rate;
-      const costARS = costUSD * fx;
-      return {
-        primary: `USD ${costUSD.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`,
-        secondary: `≈ ARS ${costARS.toLocaleString("es-AR", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`,
-      };
-    }
-
-    if (billing === "mixed") {
-      // `rate` está en USD/hora (igual que en el caso "USD" puro). El total en
-      // USD se calcula directo; la porción facturada en ARS debe convertirse
-      // al tipo de cambio del período, no quedar en unidades de USD.
-      const usdFraction = closing?.usdBillingFraction ?? getUsdFraction(person);
-      const costTotalUSD = hrs * rate;
-      const costUSD = costTotalUSD * usdFraction;
-      const costARS = costTotalUSD * (1 - usdFraction) * fx;
-      return {
-        primary: `USD ${costUSD.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`,
-        secondary: `+ ARS ${costARS.toLocaleString("es-AR", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`,
-      };
-    }
-
-    // ARS
-    const costARS = hrs * rate;
-    return {
-      primary: `ARS ${costARS.toLocaleString("es-AR", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`,
-      secondary: null,
-    };
+    const total = baseAmountARS(person);
+    return { primary: total == null ? "Pendiente de preparar" : `ARS ${total.toLocaleString("es-AR", {minimumFractionDigits:2, maximumFractionDigits:2})}`, secondary: null };
   };
-
-  const getRateDisplay = (person: any): { text: string; isEstimated: boolean } => {
-    const closing = getClosing(person.id);
-    const billing = closing?.billingCurrency ?? getBillingCurrency(person);
-    const { rate, isEstimated } = closing ? { rate: closing.hourlyRate, isEstimated: false } : getEffectiveRate(person);
-    let text: string;
-    if (billing === "USD") text = `USD ${rate.toLocaleString("en-US")}`;
-    else if (billing === "mixed") text = `USD ${rate.toLocaleString("en-US")} (mixto)`;
-    else text = `ARS ${rate.toLocaleString("es-AR")}`;
-    return { text, isEstimated };
-  };
-
-  // Raw (numeric) cost split for export — mirrors getCostDisplay's logic but
-  // returns numbers instead of formatted strings.
-  const getCostRaw = (person: any): { costUSD: number; costARS: number } => {
-    const closing = getClosing(person.id);
-    if (closing && closing.totalCostARS != null && closing.totalCostUSD != null) {
-      return {
-        costUSD: Number(closing.totalCostUSD),
-        costARS: Number(closing.totalCostARS),
-      };
-    }
-    const hrs = closing ? closing.adjustedHours : effectiveHours(person);
-    const billing = closing?.billingCurrency ?? getBillingCurrency(person);
-    const rate = closing ? closing.hourlyRate : getEffectiveRate(person).rate;
-    const fx = closing?.exchangeRateAtClose || exchangeRate || 1;
-    if (billing === "USD") {
-      const costUSD = hrs * rate;
-      return { costUSD, costARS: costUSD * fx };
-    }
-    if (billing === "mixed") {
-      const usdFraction = closing?.usdBillingFraction ?? getUsdFraction(person);
-      const totalUSD = hrs * rate;
-      return { costUSD: totalUSD * usdFraction, costARS: totalUSD * (1 - usdFraction) * fx };
-    }
-    return { costUSD: 0, costARS: hrs * rate };
+  const getRateDisplay = (person: any) => {
+    const rate = getBaseRateARS(person);
+    return { text: rate == null ? "Pendiente" : `ARS ${rate.toLocaleString("es-AR", {minimumFractionDigits:2, maximumFractionDigits:2})}`, isEstimated: false };
   };
 
   // Filter personnel
@@ -401,7 +211,7 @@ export default function MonthlyClosing() {
   // paste into Excel as numbers, ready for the honorarios sheet.
   const EXPORT_HEADERS = [
     "Persona", "Contrato", "Facturación", "Hs Base", "Hs Reales",
-    "Valor Hora", "Moneda Tarifa", "Costo USD", "Costo ARS", "Estado",
+    "Valor Hora ARS", "Base a cobrar ARS", "Estado",
   ];
   const buildExportRows = (): (string | number)[][] => {
     return filteredPersonnel.map((p: any) => {
@@ -409,20 +219,17 @@ export default function MonthlyClosing() {
       const baseHrs = closing ? closing.adjustedHours : effectiveHours(p);
       const realHrs = realHoursMap[p.id] ?? 0;
       const billing = getBillingCurrency(p);
-      const { rate } = closing ? { rate: closing.hourlyRate } : getEffectiveRate(p);
-      const { costUSD, costARS } = getCostRaw(p);
-      const rateCurrency = billing === "ARS" ? "ARS" : "USD";
+      const rate = getBaseRateARS(p);
+      const total = baseAmountARS(p);
       return [
         p.name,
         p.contractType || "full-time",
         billing === "mixed" ? "Mixto" : billing,
         Math.round(baseHrs * 100) / 100,
         Math.round(realHrs * 100) / 100,
-        Math.round(rate * 100) / 100,
-        rateCurrency,
-        Math.round(costUSD),
-        Math.round(costARS),
-        closing ? "Cerrado" : "Pendiente",
+        rate == null ? "Pendiente" : Math.round(rate * 100) / 100,
+        total == null ? "Pendiente" : total,
+        publishedIds.has(p.id) ? "Publicada" : closing ? "Base guardada" : "Pendiente",
       ];
     });
   };
@@ -437,7 +244,7 @@ export default function MonthlyClosing() {
     const tsv = [EXPORT_HEADERS, ...rows].map((r) => r.join("\t")).join("\n");
     try {
       await navigator.clipboard.writeText(tsv);
-      toast({ title: "Copiado", description: `${rows.length} filas listas para pegar en el Excel de honorarios.` });
+      toast({ title: "Copiado", description: `${rows.length} filas copiadas para revisión.` });
     } catch {
       toast({ title: "No se pudo copiar", description: "Tu navegador bloqueó el portapapeles. Probá con Descargar CSV.", variant: "destructive" });
     }
@@ -464,7 +271,12 @@ export default function MonthlyClosing() {
     URL.revokeObjectURL(url);
   };
 
-  const hasUnsavedChanges = Object.keys(hoursAdjustments).some(pid => hasAdjustment(Number(pid)));
+  const hasUnsavedChanges = Object.keys(hoursAdjustments).some(pid => {
+    const id = Number(pid), saved = getClosing(id);
+    return getAdj(id).unpaidHours !== Number(saved?.adjustments?.unpaidHours ?? 0) || (getAdj(id).unpaidHours > 0 && (adjustmentReasons[id] || "") !== (saved?.notes || ""));
+  });
+
+  useEffect(() => { onDirtyChange(hasUnsavedChanges); }, [hasUnsavedChanges, onDirtyChange]);
 
   // Loading state
   const isLoading = personnelLoading || closingsLoading;
@@ -479,19 +291,27 @@ export default function MonthlyClosing() {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="min-w-0 space-y-5">
+      <div className="space-y-3 rounded-xl border bg-muted/20 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-2"><p className="font-semibold">Corte de horas</p><Badge variant="outline">{cutoff.data?.state === "cut" ? "Horas con corte" : "Horas abiertas"}</Badge></div>
+        <p className="text-sm text-muted-foreground">{cutoff.data?.day ? format(new Date(`${cutoff.data.day}T12:00:00`), "d 'de' MMMM", {locale:es}) : "Cargando fecha…"} · 23:59, Buenos Aires. Mind congela las horas y prepara los borradores.</p>
+        {cutoff.isError && <p role="alert" className="text-sm text-destructive">No se pudo cargar el corte. Actualizá la página antes de continuar.</p>}
+        {cutoff.data?.issues?.map((issue:string)=><p key={issue} className="text-sm text-amber-800">{issue}</p>)}
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap"><Button disabled={prepare.isPending || cutoff.isError || hasUnsavedChanges} onClick={()=>prepare.mutate("prepare")}>{prepare.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}Preparar bases y borradores</Button>{cutoff.data?.state !== "cut" && <Button variant="outline" disabled={prepare.isPending || !cutoff.data?.canCut} onClick={()=>prepare.mutate("cut")}>Ejecutar corte pendiente</Button>}</div>
+        {cutoff.data?.state === "cut" && (publishedIds.size > 0 ? <p className="text-xs text-muted-foreground">Las bases publicadas están protegidas. La facturación continúa en el paso 2.</p> : <details><summary className="cursor-pointer text-sm font-medium">Corregir horas antes de publicar</summary><div className="mt-3 flex flex-col gap-2 sm:flex-row"><Input aria-label="Motivo de reapertura" value={reopenReason} onChange={e=>setReopenReason(e.target.value)} placeholder="Motivo de la corrección"/><Button variant="outline" disabled={prepare.isPending || reopenReason.trim().length < 5} onClick={()=>prepare.mutate("reopen")}>Reabrir horas</Button></div></details>)}
+      </div>
       {/* Re-close confirmation dialog */}
       <AlertDialog open={reCloseTarget !== null} onOpenChange={(open) => { if (!open) setReCloseTarget(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Re-cerrar el mes?</AlertDialogTitle>
+            <AlertDialogTitle>¿Actualizar la base?</AlertDialogTitle>
             <AlertDialogDescription>
-              ¿Re-cerrar el mes de <strong>{reCloseTarget?.name}</strong>? Esto sobreescribirá el cierre anterior.
+              Se actualizará la base de <strong>{reCloseTarget?.name}</strong> con la tarifa vigente y los descuentos sin goce que hayas indicado.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleReCloseConfirm}>Re-cerrar</AlertDialogAction>
+            <AlertDialogAction onClick={handleReCloseConfirm}>Actualizar base</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -499,29 +319,29 @@ export default function MonthlyClosing() {
       {/* Unsaved changes banner */}
       {hasUnsavedChanges && (
         <div className="rounded-md border border-yellow-400 bg-yellow-50 px-4 py-3 text-sm text-yellow-800">
-          Tenés cambios manuales sin aplicar al cierre. Acordate de usar estos valores al cerrar.
+          Tenés un descuento sin guardar. Abrí las horas de la persona y guardá su base para aplicarlo.
         </div>
       )}
 
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h1 className="text-2xl font-bold">Cierre Mensual de Horas</h1>
+          <h2 className="text-lg font-semibold">Bases del equipo</h2>
           <p className="text-muted-foreground">
-            Reconciliación: ajustar horas reales a horas contractuales para facturación.{" "}
+            Fijos: horas contractuales × tarifa. Freelancers: horas trabajadas × tarifa. Las ausencias pagas no descuentan.{" "}
             <Link href="/admin" className="inline-flex items-center gap-1 text-primary hover:underline text-sm">
               Gestionar tarifas en Personal <ExternalLink className="h-3 w-3" />
             </Link>
           </p>
         </div>
-        <div className="flex gap-2 flex-wrap">
+        <div className="flex w-full flex-wrap gap-2 sm:w-auto">
           <Button
             variant="outline"
             size="sm"
             onClick={handleCopyForExcel}
             disabled={filteredPersonnel.length === 0}
-            title="Copia la tabla en formato tabulado para pegar directo en el Excel de honorarios (Ctrl+V)"
+            title="Copia la tabla para revisión"
           >
-            <Copy className="h-4 w-4 mr-1" /> Copiar para Excel
+            <Copy className="h-4 w-4 mr-1" /> Copiar tabla
           </Button>
           <Button
             variant="outline"
@@ -533,7 +353,7 @@ export default function MonthlyClosing() {
             <Download className="h-4 w-4 mr-1" /> CSV
           </Button>
           <Select value={contractFilter} onValueChange={setContractFilter}>
-            <SelectTrigger className="w-44"><SelectValue placeholder="Tipo de contrato" /></SelectTrigger>
+            <SelectTrigger aria-label="Tipo de contrato" className="w-full sm:w-56"><SelectValue placeholder="Tipo de contrato" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos los contratos</SelectItem>
               <SelectItem value="full-time">Full-time</SelectItem>
@@ -541,22 +361,7 @@ export default function MonthlyClosing() {
               <SelectItem value="freelance">Freelance (por hora)</SelectItem>
             </SelectContent>
           </Select>
-          <Select value={String(month)} onValueChange={(v) => setMonth(parseInt(v))}>
-            <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {MONTHS.map((m, i) => (
-                <SelectItem key={i} value={String(i)}>{m}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Input
-            type="number"
-            value={year}
-            onChange={(e) => setYear(parseInt(e.target.value) || now.getFullYear())}
-            className="w-24"
-            min={2020}
-            max={2030}
-          />
+
         </div>
       </div>
 
@@ -575,8 +380,8 @@ export default function MonthlyClosing() {
               No hay personal para el filtro seleccionado
             </div>
           ) : (
-            <table className="w-full text-sm">
-              <thead>
+            <table className="block w-full text-sm md:table md:min-w-[1100px]">
+              <thead className="hidden md:table-header-group">
                 <tr className="border-b">
                   <th className="text-left py-2 px-3">Persona</th>
                   <th className="text-center py-2 px-3">Contrato</th>
@@ -584,25 +389,26 @@ export default function MonthlyClosing() {
                   <th className="text-center py-2 px-3">Hs Base</th>
                   <th className="text-center py-2 px-3">Hs Reales</th>
                   <th className="text-center py-2 px-3">Valor Hora</th>
-                  <th className="text-center py-2 px-3">Costo Final</th>
+                  <th className="text-center py-2 px-3">Base a cobrar ARS</th>
                   <th className="text-center py-2 px-3">Estado</th>
                   <th className="text-center py-2 px-3">Acción</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="grid gap-4 md:table-row-group">
                 {filteredPersonnel.map((p: any) => {
                   const closing = getClosing(p.id);
                   const baseHrs = closing ? closing.adjustedHours : effectiveHours(p);
                   const cost = getCostDisplay(p);
                   const billing = getBillingCurrency(p);
+                  const isPublished = publishedIds.has(p.id);
                   const isRowPending = closingPersonnelId === p.id && closeMutation.isPending;
                   return (
-                    <tr key={p.id} className="border-b hover:bg-muted/30">
-                      <td className="py-2 px-3 font-medium">{p.name}</td>
-                      <td className="text-center py-2 px-3 capitalize">
+                    <tr key={p.id} className="grid grid-cols-2 gap-x-2 rounded-xl border p-2 md:table-row md:rounded-none md:border-x-0 md:border-t-0 md:p-0 hover:bg-muted/30">
+                      <td data-label="Persona" className="flex min-w-0 flex-col items-start gap-1 py-2 px-3 before:text-left before:text-xs before:font-normal before:text-muted-foreground before:content-[attr(data-label)] md:table-cell md:before:hidden md:whitespace-nowrap col-span-2 font-medium">{p.name}</td>
+                      <td data-label="Contrato" className="flex min-w-0 flex-col items-start gap-1 py-2 px-3 before:text-left before:text-xs before:font-normal before:text-muted-foreground before:content-[attr(data-label)] md:table-cell md:before:hidden md:whitespace-nowrap md:text-center">
                         {p.contractType || "full-time"}
                       </td>
-                      <td className="text-center py-2 px-3">
+                      <td data-label="Facturación" className="flex min-w-0 flex-col items-start gap-1 py-2 px-3 before:text-left before:text-xs before:font-normal before:text-muted-foreground before:content-[attr(data-label)] md:table-cell md:before:hidden md:whitespace-nowrap md:text-center">
                         <Badge
                           variant="outline"
                           title={billing === "mixed" ? "Facturación Mixta" : `Facturación en ${billing}`}
@@ -617,7 +423,7 @@ export default function MonthlyClosing() {
                           {billing === "mixed" ? "Mixto" : billing}
                         </Badge>
                       </td>
-                      <td className="text-center py-2 px-3">
+                      <td data-label="Horas base" className="flex min-w-0 flex-col items-start gap-1 py-2 px-3 before:text-left before:text-xs before:font-normal before:text-muted-foreground before:content-[attr(data-label)] md:table-cell md:before:hidden md:whitespace-nowrap md:text-center">
                         {(p.contractType || "full-time").toLowerCase() === "freelance" ? (
                           // Freelance: horas reales trabajadas, sin ajustes de horas base (no aplica).
                           <span className="text-sm font-medium" title="Cálculo lineal por horas reales trabajadas">
@@ -626,7 +432,10 @@ export default function MonthlyClosing() {
                         ) : (
                         <div className="relative">
                           <button
-                            className={`flex items-center gap-1 justify-center mx-auto text-sm font-medium hover:text-primary transition-colors ${hasAdjustment(p.id) ? "text-amber-700" : ""}`}
+                            className={`flex items-center gap-1 justify-center md:mx-auto text-sm font-medium hover:text-primary transition-colors ${hasAdjustment(p.id) ? "text-amber-700" : ""}`}
+                            disabled={isPublished}
+                            aria-label={`Ajustar base de ${p.name}`}
+                            title={isPublished ? "Base publicada: protegida contra cambios" : "Sólo se descuentan licencias sin goce"}
                             onClick={() => setExpandedAdj(prev => prev === p.id ? null : p.id)}
                           >
                             {baseHrs}h
@@ -636,53 +445,17 @@ export default function MonthlyClosing() {
                             <ChevronDown className={`h-3 w-3 text-muted-foreground transition-transform ${expandedAdj === p.id ? "rotate-180" : ""}`} />
                           </button>
                           {expandedAdj === p.id && (
-                            <div className="absolute z-10 mt-1 left-1/2 -translate-x-1/2 w-52 rounded-lg border bg-background shadow-lg p-3 text-xs space-y-2">
-                              <div className="flex items-center justify-between mb-1">
-                                <span className="font-semibold text-foreground">Ajustar horas base</span>
-                                <button onClick={() => setExpandedAdj(null)} className="text-muted-foreground hover:text-foreground">
-                                  <X className="h-3 w-3" />
-                                </button>
-                              </div>
-                              <div className="text-[10px] text-muted-foreground mb-1" title="Las horas base surgen de las Horas Mensuales configuradas en Admin → Personal (o 160 full-time / 120 part-time por defecto). Ajustá acá con las deducciones o el ajuste discrecional.">
+                            <Dialog open onOpenChange={open => { if (!open) setExpandedAdj(null); }}><DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-md space-y-3"><DialogTitle>Descuento excepcional · {p.name}</DialogTitle><DialogDescription>La base sólo se reduce por una licencia sin goce de sueldo acordada.</DialogDescription>
+                              <div className="text-[10px] text-muted-foreground mb-1" title="Las horas base surgen de las Horas Mensuales configuradas en Admin → Personal (o 160 full-time / 120 part-time por defecto). Sólo se descuentan licencias sin goce explícitas.">
                                 Base contractual: {defaultBaseHours(p)}h <span className="underline decoration-dotted">(de Admin → Personal)</span>
                               </div>
-                              {monthHolidayCount > 0 && (
-                                <div className="flex items-center justify-between gap-2 rounded bg-muted/50 px-1.5 py-1">
-                                  <span className="text-[10px] text-muted-foreground">
-                                    {monthHolidayCount} feriado(s) este mes (≈{feriadoHoursFor(p)}h)
-                                  </span>
-                                  <button
-                                    className="text-[10px] text-primary hover:underline"
-                                    onClick={() => setAdj(p.id, "feriados", String(feriadoHoursFor(p)))}
-                                  >
-                                    Aplicar
-                                  </button>
-                                </div>
-                              )}
-                              {epicalDayHoursFor(p) > 0 && (
-                                <div className="rounded bg-emerald-50 px-1.5 py-1 text-[10px] text-emerald-700">
-                                  Día Epical registrado: −{epicalDayHoursFor(p)}h
-                                </div>
-                              )}
-                              {([
-                                { key: "vacaciones" as const, label: "Vacaciones −" },
-                                { key: "feriados" as const, label: "Feriados −" },
-                                { key: "epicalGeneral" as const, label: "Día Epical manual −" },
-                                { key: "discrecional" as const, label: "Ajuste discrecional ±" },
-                              ] as const).map(({ key, label }) => (
-                                <div key={key} className="flex items-center justify-between gap-2">
-                                  <span className="text-muted-foreground flex-1">{label}</span>
-                                  <Input
-                                    type="number"
-                                    min={key === "discrecional" ? undefined : 0}
-                                    step={1}
-                                    value={getAdj(p.id)[key] || ""}
-                                    onChange={(e) => setAdj(p.id, key, e.target.value)}
-                                    className="w-16 h-6 text-xs text-center"
-                                    placeholder="0"
-                                  />
-                                </div>
-                              ))}
+                              <p className="rounded bg-emerald-50 p-2 text-emerald-800">Vacaciones, feriados y días Epical son pagos. No reducen esta base.</p>
+                              <label className="block">Horas de licencia sin goce
+                                <Input disabled={isRowPending} type="number" min="0" max={defaultBaseHours(p)} step="0.5" value={getAdj(p.id).unpaidHours || ""} onChange={(e) => setAdj(p.id, "unpaidHours", e.target.value)} placeholder="0" />
+                              </label>
+                              <label className="block">Motivo del descuento
+                                <Input disabled={isRowPending} value={adjustmentReasons[p.id] || ""} onChange={(e) => { dirtyAdjustmentIds.current.add(p.id); setAdjustmentReasons(prev => ({ ...prev, [p.id]: e.target.value })); }} placeholder="Licencia sin goce acordada…" />
+                              </label>
                               <div className="border-t pt-2 flex items-center justify-between">
                                 <span className="font-semibold text-foreground">{effectiveBaseHours(p)}h total</span>
                                 {hasAdjustment(p.id) && (
@@ -694,12 +467,13 @@ export default function MonthlyClosing() {
                                   </button>
                                 )}
                               </div>
-                            </div>
+                              <Button disabled={isRowPending} onClick={() => doClose(p)}>{isRowPending ? "Guardando…" : "Guardar base"}</Button>
+                            </DialogContent></Dialog>
                           )}
                         </div>
                         )}
                       </td>
-                      <td className="text-center py-2 px-3">
+                      <td data-label="Horas reales" className="flex min-w-0 flex-col items-start gap-1 py-2 px-3 before:text-left before:text-xs before:font-normal before:text-muted-foreground before:content-[attr(data-label)] md:table-cell md:before:hidden md:whitespace-nowrap md:text-center">
                         {(() => {
                           const real = realHoursMap[p.id] ?? 0;
                           const over = (p.contractType || "full-time").toLowerCase() === "freelance" ? false : real > baseHrs;
@@ -710,7 +484,7 @@ export default function MonthlyClosing() {
                           );
                         })()}
                       </td>
-                      <td className="text-center py-2 px-3">
+                      <td data-label="Valor hora" className="flex min-w-0 flex-col items-start gap-1 py-2 px-3 before:text-left before:text-xs before:font-normal before:text-muted-foreground before:content-[attr(data-label)] md:table-cell md:before:hidden md:whitespace-nowrap md:text-center">
                         {(() => {
                           const { text, isEstimated } = getRateDisplay(p);
                           return (
@@ -720,17 +494,17 @@ export default function MonthlyClosing() {
                           );
                         })()}
                       </td>
-                      <td className="text-center py-2 px-3 font-semibold">
+                      <td data-label="Base a cobrar" className="flex min-w-0 flex-col items-start gap-1 py-2 px-3 before:text-left before:text-xs before:font-normal before:text-muted-foreground before:content-[attr(data-label)] md:table-cell md:before:hidden md:whitespace-nowrap md:text-center">
                         <div>{cost.primary}</div>
                         {cost.secondary && (
                           <div className="text-xs text-muted-foreground font-normal">{cost.secondary}</div>
                         )}
                       </td>
-                      <td className="text-center py-2 px-3">
+                      <td data-label="Estado" className="flex min-w-0 flex-col items-start gap-1 py-2 px-3 before:text-left before:text-xs before:font-normal before:text-muted-foreground before:content-[attr(data-label)] md:table-cell md:before:hidden md:whitespace-nowrap md:text-center">
                         {closing ? (
-                          <div className="flex flex-col items-center gap-0.5">
+                          <div className="flex flex-col items-start gap-0.5 md:items-center">
                             <span className="text-green-600 flex items-center gap-1 text-xs font-medium">
-                              <Check className="h-3.5 w-3.5" /> Cerrado
+                              <Check className="h-3.5 w-3.5" /> Base guardada
                             </span>
                             {closing.closedAt && (
                               <span className="text-[10px] text-muted-foreground">
@@ -742,19 +516,21 @@ export default function MonthlyClosing() {
                           <span className="text-amber-600">Pendiente</span>
                         )}
                       </td>
-                      <td className="text-center py-2 px-3">
+                      <td data-label="Acción" className="flex min-w-0 flex-col items-start gap-1 py-2 px-3 before:text-left before:text-xs before:font-normal before:text-muted-foreground before:content-[attr(data-label)] md:table-cell md:before:hidden md:whitespace-nowrap col-span-2 md:text-center">
                         <Button
                           size="sm"
                           variant={closing ? "outline" : "default"}
                           onClick={() => handleClose(p)}
-                          disabled={isRowPending}
+                          disabled={isRowPending || isPublished}
                         >
                           {isRowPending ? (
                             <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : isPublished ? (
+                            "Publicada"
                           ) : closing ? (
-                            "Re-cerrar"
+                            "Actualizar base"
                           ) : (
-                            "Cerrar"
+                            "Guardar base"
                           )}
                         </Button>
                       </td>
@@ -766,12 +542,12 @@ export default function MonthlyClosing() {
           )}
         </CardContent>
       </Card>
-      <Card>
-        <CardHeader><CardTitle>Conciliación de tipo de cambio bancario</CardTitle></CardHeader>
+      <details><summary className="cursor-pointer text-sm text-muted-foreground">Declaraciones anteriores del cierre operativo</summary><Card>
+        <CardHeader><CardTitle>Historial de conciliación bancaria</CardTitle></CardHeader>
         <CardContent className="overflow-x-auto">
           {!declarations.some((item: any) => item.closingYear === year && item.closingMonth === month + 1) ? <p className="text-sm text-muted-foreground">No hay declaraciones pendientes ni revisadas.</p> : <table className="w-full min-w-[760px] text-sm"><thead><tr className="border-b text-left"><th className="p-2">Persona / período</th><th className="p-2">Tramo USD</th><th className="p-2">FX cierre</th><th className="p-2">FX banco</th><th className="p-2">Diferencia ARS</th><th className="p-2">Estado</th><th className="p-2">Acción</th></tr></thead><tbody>{declarations.filter((item: any) => item.closingYear === year && item.closingMonth === month + 1).map((item: any) => { const row = item.declaration; return <tr key={row.id} className="border-b"><td className="p-2">{item.personName} · {MONTHS[(item.closingMonth ?? 1) - 1]} {item.closingYear}</td><td className="p-2">USD {Number(row.usdAmount).toLocaleString("en-US", { maximumFractionDigits: 2 })}</td><td className="p-2">{Number(row.closingFxRate).toLocaleString("es-AR")}</td><td className="p-2">{Number(row.bankFxRate).toLocaleString("es-AR")}</td><td className="p-2">ARS {Number(row.differenceARS).toLocaleString("es-AR", { maximumFractionDigits: 2 })}</td><td className="p-2"><Badge variant={row.status === "approved" ? "default" : row.status === "rejected" ? "destructive" : "secondary"}>{row.status === "approved" ? "Aprobada" : row.status === "rejected" ? "Rechazada" : "Pendiente"}</Badge>{row.reviewReason && <p className="mt-1 text-xs text-muted-foreground">{row.reviewReason}</p>}</td><td className="p-2">{row.status === "pending" && <div className="flex gap-1"><Button size="sm" disabled={declarationReview.isPending} onClick={() => declarationReview.mutate({ id: row.id, action: "approve", submittedAt: row.submittedAt })}>Aprobar</Button><Button size="sm" disabled={declarationReview.isPending} variant="outline" onClick={() => { const reason = window.prompt("Qué debe corregir la persona?"); if (reason?.trim()) declarationReview.mutate({ id: row.id, action: "reject", reason, submittedAt: row.submittedAt }); }}>Rechazar</Button></div>}</td></tr>; })}</tbody></table>}
         </CardContent>
-      </Card>
+      </Card></details>
     </div>
   );
 }

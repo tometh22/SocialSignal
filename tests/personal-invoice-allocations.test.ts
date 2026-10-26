@@ -10,7 +10,7 @@ describe("team cost and invoice integration contracts", () => {
     const routes = source("server/routes.ts");
     expect(sidebar).not.toContain('title: "Mi gestión"');
     expect(sidebar).toContain('href: "/my-invoices"');
-    expect(page).toContain("Operaciones calcula tu liquidación");
+    expect(page).toContain("esperá la autorización de Operaciones");
     expect(page).toContain("Enviar a Administración");
     expect(routes).toContain("storeFinancialIntakeFile(file)");
     expect(routes).toContain('Cache-Control", "private, no-store"');
@@ -25,7 +25,7 @@ describe("team cost and invoice integration contracts", () => {
     const routes = source("server/routes.ts");
     expect(app).toContain('/operations/liquidaciones-equipo');
     expect(app).toContain('/finance/facturas-equipo');
-    expect(sidebar).toContain('title: "Liquidaciones equipo"');
+    expect(sidebar).toContain('title: "Cierre del equipo"');
     expect(sidebar).toContain('title: "Facturas equipo"');
     expect(operationsPage).toContain("Operaciones completa");
     expect(operationsPage).not.toContain("Administración completa");
@@ -40,10 +40,10 @@ describe("team cost and invoice integration contracts", () => {
     const routes = source("server/routes.ts");
     expect(migration).toContain("invoice_component");
     expect(migration).toContain("UNIQUE (user_id, period, invoice_component)");
-    expect(page).toContain("Fin de mes: factura USD");
-    expect(page).toContain("Después del cobro: factura ARS");
-    expect(page).toContain('component="usd"');
-    expect(page).toContain('component="ars"');
+    expect(page).toContain("1. Factura en dólares");
+    expect(page).toContain("2. Después de recibir los USD");
+    expect(page).toContain('phaseCard("usd")');
+    expect(page).toContain('phaseCard("ars")');
     expect(routes).toContain('invoiceComponent === "usd"');
     expect(routes).toContain('invoiceComponent === "ars"');
     expect(routes).toContain("issueDate.toISOString().slice(0, 7)");
@@ -52,7 +52,7 @@ describe("team cost and invoice integration contracts", () => {
   it("devenga el costo exclusivamente desde Operaciones", () => {
     const builder = source("server/services/financial-native-builders.ts");
     const breakdown = source("server/services/cost-breakdown.ts");
-    expect(builder).toContain("El costo del equipo se devenga 100% desde el cierre de Operaciones");
+    expect(builder).toContain("FROM financial_team_cost_month");
     expect(builder).not.toContain("approved_fixed_invoice");
     expect(builder).not.toContain("invoice.actual_usd*allocation.allocation_percent/100");
     expect(breakdown).not.toContain("actual_fixed_team");
@@ -69,10 +69,10 @@ describe("team cost and invoice integration contracts", () => {
     expect(routes).not.toContain("El reparto entre proyectos suma");
   });
 
-  it("controla documentación de Pasivo sin bloquear el devengamiento del costo", () => {
+  it("exige completar la liquidación antes de aprobar el cierre financiero", () => {
     const close = source("server/services/financial-close.ts");
     expect(close).toContain('code: "fixed_team_invoices_approved"');
-    expect(close).toContain('severity: "warning"');
+    expect(close).toContain('code: "payroll_authorized", severity: "critical"');
     expect(close).toContain("El costo del mes ya está devengado por Operaciones");
     expect(close).not.toContain("Sin ellas el costo financiero seguiría siendo estimado");
   });

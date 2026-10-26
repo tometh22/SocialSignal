@@ -10,7 +10,7 @@ export default function EstimatedRates() {
         <CardHeader>
           <CardTitle>Valor hora unificado</CardTitle>
           <CardDescription>
-            Las tarifas actuales, históricas y usadas por Cotizaciones se sincronizan desde el Máster en Configuración → Personal.
+            Las tarifas actuales, históricas y usadas por Cotizaciones se mantienen en Configuración → Personal, dentro del historial mensual de Mind.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

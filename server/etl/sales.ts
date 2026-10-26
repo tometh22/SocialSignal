@@ -1,3 +1,4 @@
+import { assertExcelFinancialImportAllowed } from "../services/financial-source-policy";
 /**
  * 📊 Sales ETL Process
  * Leer sheets → normalizar → guardar en sales_norm
@@ -28,6 +29,7 @@ export interface SalesETLResult {
  * 🔄 Procesa ventas desde sheets a tabla normalizada
  */
 export async function processSales(): Promise<SalesETLResult> {
+  await assertExcelFinancialImportAllowed();
   const result: SalesETLResult = {
     processed: 0,
     normalized: 0,

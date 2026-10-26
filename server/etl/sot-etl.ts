@@ -1,3 +1,4 @@
+import { assertExcelFinancialImportAllowed } from "../services/financial-source-policy";
 /**
  * ETL para Single Source of Truth (SoT)
  * Procesa Excel MAESTRO → fact_labor_month + fact_rc_month → agg_project_month
@@ -223,6 +224,7 @@ export interface CostoDirectoRow {
  * Aplica filtro "Directo", ANTI×100, normalización y derivación de billing_hours
  */
 export async function processDirectCostsToFactLabor(rows: CostoDirectoRow[]): Promise<void> {
+  await assertExcelFinancialImportAllowed();
   console.log(`📊 [SoT ETL] Procesando ${rows.length} filas de costos directos...`);
   
   let processed = 0;
@@ -656,6 +658,7 @@ function shouldRemoveIVA(row: CostoDirectoRow): boolean {
 }
 
 export async function processCostsByPeriod(rows: CostoDirectoRow[]): Promise<void> {
+  await assertExcelFinancialImportAllowed();
   console.log(`💰 [SoT ETL] Procesando costos agregados por período desde ${rows.length} filas...`);
   console.log(`   ℹ️ NUEVA LÓGICA: Separando indirectos operativos de provisiones para evitar doble conteo`);
   
@@ -834,6 +837,7 @@ export async function processProvisionSheets(): Promise<{
   byPeriod: Map<string, number>;
   errors: string[];
 }> {
+  await assertExcelFinancialImportAllowed();
   console.log(`📊 [SoT ETL] Procesando TODAS las hojas de provisiones...`);
   console.log(`   📋 Fuentes: Provisión Pasivo Proyectos, Impuestos, Pasivo, Activo (facturas futuras), Resumen Ejecutivo (Impuestos USA)`);
   
@@ -1150,6 +1154,7 @@ export interface RendimientoClienteRow {
  * Extrae ingresos/costos mensuales y precio del mes (denominador)
  */
 export async function processRendimientoClienteToFactRC(rows: RendimientoClienteRow[]): Promise<void> {
+  await assertExcelFinancialImportAllowed();
   console.log(`📊 [SoT ETL] Procesando ${rows.length} filas de Rendimiento Cliente...`);
   
   let processed = 0;
@@ -1449,6 +1454,7 @@ export async function executeSoTETL(
   rendimientoClienteRows: RendimientoClienteRow[],
   options: SoTETLOptions = {}
 ): Promise<SoTETLResult> {
+  await assertExcelFinancialImportAllowed();
   const startTime = Date.now();
   console.log('🚀 [SoT ETL] Iniciando ETL completo...');
   
@@ -1629,6 +1635,7 @@ export async function syncResumenEjecutivoToMonthlyFinancialSummary(): Promise<{
   errors: string[];
   executionTimeMs: number;
 }> {
+  await assertExcelFinancialImportAllowed();
   const startTime = Date.now();
   console.log('📊 [Resumen Ejecutivo ETL] Iniciando sincronización...');
   
@@ -1768,6 +1775,7 @@ export async function syncCashFlowMovements(): Promise<{
   errors: string[];
   executionTimeMs: number;
 }> {
+  await assertExcelFinancialImportAllowed();
   const startTime = Date.now();
   console.log('🔄 [CashFlow ETL] Iniciando sincronización...');
   
@@ -1930,6 +1938,7 @@ export async function syncActivoToMonthlyFinancialSummary(): Promise<{
   errors: string[];
   executionTimeMs: number;
 }> {
+  await assertExcelFinancialImportAllowed();
   const startTime = Date.now();
   console.log('🏦 [Activo ETL] Iniciando sincronización de balances de Activo...');
   

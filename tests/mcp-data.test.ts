@@ -81,6 +81,7 @@ describe.skipIf(!process.env.TEST_MCP_DATABASE_URL)("Mind data: read-only SQL, p
     expect(catalog.resources?.some(r => r.resource === "quotations")).toBe(true);
     expect((await reader.catalog(2, { resource: "quotations" })).fields).not.toHaveProperty("public_token_hash");
     await expect(reader.query(5, { resource: "quotations" })).rejects.toThrow("sin permiso");
+    await expect(reader.query(2, { resource: "financial_cost_plans" })).rejects.toThrow("sin permiso");
     await expect(reader.aggregate(2, { resource: "cashflow_transactions", metrics: [{ operation: "count" }] })).rejects.toThrow("sin permiso");
     await expect(reader.field(5, { resource: "proposal_documents", key: { id: 1 }, field: "content" })).rejects.toThrow("sin permiso");
     await expect(reader.query(2, { resource: "quotations", fields: ["public_token_hash"] })).rejects.toThrow();

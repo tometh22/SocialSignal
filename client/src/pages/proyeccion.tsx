@@ -1,13 +1,4 @@
-/**
- * Proyección — ejecutado vs proyectado del ejercicio.
- *
- * Reemplaza la página "Proyección (resumen)" del Looker Studio, leyendo la misma
- * solapa del Excel MAESTRO. Responde la pregunta que el board hace siempre:
- * cómo venimos contra lo que proyectamos.
- *
- * Los costos usan la base consistente con el EBIT (ventas − EBIT, sin impuestos
- * ARG/USA ni intereses). Verificado contra el Looker: coincide al centavo.
- */
+/** Proyección desde snapshots de cierre y presupuestos nativos de Mind. */
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -36,8 +27,9 @@ interface ProyeccionMes {
   costos: number | null;
   resultado: number | null;
 }
-interface Serie { ejecutado: number; proyectado: number; total: number }
+interface Serie { ejecutado: number | null; proyectado: number | null; total: number | null }
 interface Proyeccion {
+  pendingCostPeriods: string[];
   year: number;
   facturacion: Serie;
   costos: Serie;
@@ -83,7 +75,7 @@ export default function ProyeccionPage() {
     <PageShell>
       <CompactPageHeader
         title="Proyección"
-        description="Ejecutado contra proyectado del ejercicio, sobre el Excel MAESTRO"
+        description="Cierres financieros y presupuesto de costos de Mind"
       />
 
       <ToolbarPanel>
@@ -100,6 +92,7 @@ export default function ProyeccionPage() {
         )}
       </ToolbarPanel>
 
+      {!!data?.pendingCostPeriods?.length && <p role="alert" className="rounded border border-amber-200 bg-amber-50 p-3 text-sm">Falta presupuesto o cotización para {data.pendingCostPeriods.join(", ")}. Los totales incompletos se muestran pendientes. <a className="underline" href="/finance/presupuesto">Completar presupuesto</a></p>}
       {isLoading && <p className="text-sm text-muted-foreground">Cargando…</p>}
       {error && <p className="text-sm text-red-600">No se pudo cargar la proyección.</p>}
 
@@ -118,7 +111,7 @@ export default function ProyeccionPage() {
                   label: "Costos totales", icon: TrendingUp,
                   value: fmt(data.costos.total),
                   detalle: `${fmt(data.costos.ejecutado)} ejecutados · ${fmt(data.costos.proyectado)} proyectados`,
-                  tip: "Base consistente con el EBIT: excluye impuestos ARG y USA e intereses de Oxean. Se deriva como Ventas − EBIT, igual que la serie 'sin impuestos' del reporte de Looker.",
+                  tip: "Meses cerrados: costos del snapshot. Meses abiertos: presupuesto mensual de Mind, convertido con el FX del período.",
                 },
                 {
                   label: "Resultado (EBIT)", icon: Target,

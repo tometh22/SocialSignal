@@ -1,3 +1,4 @@
+import { assertExcelFinancialImportAllowed } from "../services/financial-source-policy";
 /**
  * ETL - "Costos estimados" sheet
  *
@@ -158,6 +159,7 @@ export interface EstimatedCostsETLResult {
 export async function runEstimatedCostsETL(
   rows: EstimatedCostRow[]
 ): Promise<EstimatedCostsETLResult> {
+  await assertExcelFinancialImportAllowed();
   const errors: string[] = [];
 
   if (rows.length === 0) return { parsed: 0, inserted: 0, errors };

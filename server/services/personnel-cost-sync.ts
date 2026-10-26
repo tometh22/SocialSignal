@@ -1,3 +1,4 @@
+import { assertExcelFinancialImportAllowed } from "./financial-source-policy";
 import { and, eq } from "drizzle-orm";
 import { db } from "../db";
 import {
@@ -101,6 +102,7 @@ export async function applyCanonicalPersonnelRateRows(
   allPersonnel: Personnel[],
   source = "google-master",
 ): Promise<PersonnelCostSyncResult> {
+  await assertExcelFinancialImportAllowed();
   let updatedPersonnel = 0;
   let cellsUpdated = 0;
   const skipped: string[] = [];
