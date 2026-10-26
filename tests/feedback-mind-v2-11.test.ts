@@ -101,10 +101,11 @@ describe("Feedback Mind V2-11 corrections", () => {
     expect(applyHistoricalEffortBenchmark(workload, { ...benchmark, medianActualHours: 1_000 }).totalHours).toBe(150);
 
     const routes = source("server/routes-proposal-studio.ts");
+    const benchmarkQuery = source("server/queries/quotation-effort-benchmarks.ts");
     expect(routes).toContain('/api/quotation-effort-benchmarks');
-    expect(routes).toContain("percentile_cont(0.5)");
-    expect(routes).toContain("FROM task_time_entries");
-    expect(routes).toContain("FROM time_entries");
+    expect(benchmarkQuery).toContain("percentile_cont(0.5)");
+    expect(benchmarkQuery).toContain("FROM task_time_entries");
+    expect(benchmarkQuery).toContain("FROM time_entries");
   });
 
   it("keeps project activity in the dedicated Tasks module", () => {

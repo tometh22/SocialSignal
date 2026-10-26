@@ -158,10 +158,30 @@ export type EffortBenchmark = {
   serviceBlueprintId: number | null;
   serviceBlueprintSlug?: string | null;
   projectType: string;
+  durationMonths?: number;
   sampleSize: number;
   averageActualHours: number;
   medianActualHours: number;
 };
+
+export function selectEffortBenchmark(
+  benchmarks: EffortBenchmark[],
+  input: { serviceBlueprintId?: number | null; serviceBlueprintSlug?: string | null; projectType: string; durationMonths: number },
+) {
+  const projectType = normalizeCanonicalProjectType(input.projectType);
+  if (!projectType || !Number.isFinite(input.durationMonths) || input.durationMonths <= 0) return null;
+  const comparable = benchmarks.filter((item) => item.sampleSize >= 2
+    && normalizeCanonicalProjectType(item.projectType) === projectType
+    && Number.isFinite(item.durationMonths)
+    && Math.abs(Number(item.durationMonths) - input.durationMonths) < 0.01);
+  const largestSample = (items: EffortBenchmark[]) => items.sort((left, right) => right.sampleSize - left.sampleSize)[0] || null;
+  const exact = input.serviceBlueprintId == null ? null : largestSample(comparable.filter((item) => item.serviceBlueprintId === input.serviceBlueprintId));
+  const sameRecipe = input.serviceBlueprintSlug
+    ? largestSample(comparable.filter((item) => item.serviceBlueprintSlug === input.serviceBlueprintSlug))
+    : null;
+  const projectTypeFallback = largestSample(comparable.filter((item) => item.serviceBlueprintId == null && !item.serviceBlueprintSlug));
+  return exact || sameRecipe || projectTypeFallback;
+}
 
 const volumeFactor: Record<ScopeCoverage["mentionVolume"], number> = {
   small: 0.9,

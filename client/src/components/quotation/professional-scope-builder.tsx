@@ -21,6 +21,7 @@ import {
   canonicalProjectTypeForModality,
   estimateBlueprintWorkload,
   isRecurringBlueprintModality,
+  selectEffortBenchmark,
   workloadForBillingPeriod,
   type BlueprintDefinition,
   type EffortBenchmark,
@@ -56,7 +57,7 @@ export function ProfessionalScopeBuilder({ mode = "all", headless = false }: { m
   const { exchangeRate: liveExchangeRate } = useCurrency();
   const { quotationData, updateQuotationData, updateTeamMembers, availableRoles } = useOptimizedQuote();
   const { data: blueprints = [], isLoading } = useQuery<BlueprintWithWorkload[]>({ queryKey: ["/api/service-blueprints?status=published"] });
-  const { data: effortBenchmarks = [] } = useQuery<EffortBenchmark[]>({ queryKey: ["/api/quotation-effort-benchmarks"] });
+  const { data: effortBenchmarks = [], isError: effortBenchmarksError, isLoading: effortBenchmarksLoading } = useQuery<EffortBenchmark[]>({ queryKey: ["/api/quotation-effort-benchmarks"] });
   const { data: capacity } = useQuery<WeeklyCapacity>({ queryKey: ["/api/capacity/weekly"] });
   const [unmappedRoles, setUnmappedRoles] = useState<string[]>([]);
   const compatibleBlueprints = useMemo(() => blueprints.filter((blueprint) => {
@@ -68,21 +69,14 @@ export function ProfessionalScopeBuilder({ mode = "all", headless = false }: { m
   const orderedBlueprints = useMemo(() => [...compatibleBlueprints].sort((a, b) => Number(b.id === recommendedBlueprintId) - Number(a.id === recommendedBlueprintId)), [compatibleBlueprints, recommendedBlueprintId]);
   const scope = quotationData.scopeSnapshot ? blueprintDefinitionSchema.parse(quotationData.scopeSnapshot) : null;
   const estimate = useMemo(() => scope ? estimateBlueprintWorkload(scope) : null, [scope]);
-  const benchmarkFor = (serviceBlueprintId: number | null | undefined, projectType: string, serviceBlueprintSlug?: string | null) => {
-    const exact = effortBenchmarks
-      .filter((item) => item.serviceBlueprintId === serviceBlueprintId && item.projectType === projectType && item.sampleSize >= 2)
-      .sort((left, right) => right.sampleSize - left.sampleSize)[0];
-    const sameRecipe = serviceBlueprintSlug
-      ? effortBenchmarks
-        .filter((item) => item.serviceBlueprintSlug === serviceBlueprintSlug && item.projectType === projectType && item.sampleSize >= 2)
-        .sort((left, right) => right.sampleSize - left.sampleSize)[0]
-      : null;
-    const projectTypeFallback = effortBenchmarks
-      .filter((item) => item.serviceBlueprintId == null && !item.serviceBlueprintSlug && item.projectType === projectType && item.sampleSize >= 2)
-      .sort((left, right) => right.sampleSize - left.sampleSize)[0];
-    return exact || sameRecipe || projectTypeFallback || null;
-  };
-  const activeBenchmark = benchmarkFor(quotationData.serviceBlueprintId, quotationData.project.type, selected?.slug);
+  const benchmarkFor = (serviceBlueprintId: number | null | undefined, projectType: string, serviceBlueprintSlug: string | null | undefined, durationMonths: number) =>
+    selectEffortBenchmark(effortBenchmarks, { serviceBlueprintId, serviceBlueprintSlug, projectType, durationMonths });
+  const activeBenchmark = benchmarkFor(
+    quotationData.serviceBlueprintId,
+    quotationData.project.type,
+    selected?.slug,
+    scope?.durationMonths ?? (selected ? blueprintDefinitionSchema.parse(selected.definition).durationMonths : 0),
+  );
   const referenceEstimate = useMemo(
     () => estimate && scope ? workloadForBillingPeriod(scope, applyHistoricalEffortBenchmark(estimate, activeBenchmark)) : null,
     [activeBenchmark, estimate, scope],
@@ -159,7 +153,7 @@ export function ProfessionalScopeBuilder({ mode = "all", headless = false }: { m
     const nextProjectType = isBlueprintCompatibleWithProjectType(quotationData.project.type, definition.modality)
       ? quotationData.project.type
       : projectTypeFor(definition.modality);
-    const benchmark = benchmarkFor(blueprint?.id ?? quotationData.serviceBlueprintId, nextProjectType, blueprint?.slug ?? selected?.slug);
+    const benchmark = benchmarkFor(blueprint?.id ?? quotationData.serviceBlueprintId, nextProjectType, blueprint?.slug ?? selected?.slug, definition.durationMonths);
     const contractWorkload = applyHistoricalEffortBenchmark(recipeWorkload, benchmark);
     const workload = workloadForBillingPeriod(definition, contractWorkload);
     const missing: string[] = [];
@@ -330,7 +324,7 @@ export function ProfessionalScopeBuilder({ mode = "all", headless = false }: { m
               const blueprintProjectType = isBlueprintCompatibleWithProjectType(quotationData.project.type, definition.modality)
                 ? quotationData.project.type
                 : projectTypeFor(definition.modality);
-              const benchmark = benchmarkFor(blueprint.id, blueprintProjectType, blueprint.slug);
+              const benchmark = benchmarkFor(blueprint.id, blueprintProjectType, blueprint.slug, definition.durationMonths);
               const historicalWorkload = applyHistoricalEffortBenchmark(blueprint.workload, benchmark);
               const recommended = blueprint.id === recommendedBlueprintId;
               return (
@@ -338,7 +332,7 @@ export function ProfessionalScopeBuilder({ mode = "all", headless = false }: { m
                   <span className="flex items-start justify-between gap-2"><span><strong className="text-sm text-slate-950">{blueprint.name}</strong>{recommended && <Badge className="ml-2 bg-emerald-600 text-[10px]">Para este brief</Badge>}</span>{active && <CheckCircle2 className="h-4 w-4 text-indigo-600" />}</span>
                   <span className="mt-2 block text-xs leading-5 text-slate-500">{blueprint.description}</span>
                   <span className="mt-3 flex flex-wrap items-center gap-1.5">
-                    <Badge variant="outline">{historicalWorkload.totalHours} h estimadas</Badge><Badge variant="outline">{blueprint.definition.deliverables.length} entregables</Badge>{benchmark && <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">{benchmark.sampleSize} proyectos reales</Badge>}
+                    <Badge variant="outline">{historicalWorkload.totalHours} h estimadas</Badge><Badge variant="outline">{blueprint.definition.deliverables.length} entregables</Badge>{benchmark && <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">{benchmark.sampleSize} proyectos {benchmark.serviceBlueprintSlug === blueprint.slug ? "de esta receta" : "del mismo tipo"}</Badge>}
                     {active && (
                       <span
                         role="button" tabIndex={0}
@@ -448,8 +442,10 @@ export function ProfessionalScopeBuilder({ mode = "all", headless = false }: { m
             <CardContent className="space-y-4">
               <div className="grid gap-3 sm:grid-cols-3"><Metric label={isRecurringBlueprintModality(scope.modality) ? "Referencia mensual" : "Referencia"} value={`${referenceEstimate?.totalHours || 0} h${isRecurringBlueprintModality(scope.modality) ? "/mes" : ""}`} /><Metric label={isRecurringBlueprintModality(scope.modality) ? "Configuradas / mes" : "Configuradas"} value={`${currentHours.toFixed(1)} h${isRecurringBlueprintModality(scope.modality) ? "/mes" : ""}`} /><Metric label="Ajuste operativo" value={`${deviation >= 0 ? "+" : ""}${deviation.toFixed(1)}%`} /></div>
               <p className="text-xs leading-5 text-slate-600">Ajuste operativo = (horas configuradas ÷ horas de referencia − 1) × 100. Un valor negativo indica menos horas que la referencia; no es un descuento comercial. El SLA aumenta el esfuerzo de la receta; el ajuste histórico compara esa estimación con horas reales y se aplica por separado.</p>
-              {activeBenchmark && <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">Referencia ajustada con {activeBenchmark.sampleSize} proyectos cerrados: mediana de {activeBenchmark.medianActualHours.toFixed(1)} h reales.</div>}
-              {!activeBenchmark && <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">Todavía no hay dos proyectos comparables cerrados. Se usa la receta profesional sin ajuste histórico.</div>}
+              {activeBenchmark && <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">Referencia de {activeBenchmark.sampleSize} proyectos cerrados de {quotationData.serviceBlueprintId != null && activeBenchmark.serviceBlueprintId === quotationData.serviceBlueprintId ? "esta versión" : activeBenchmark.serviceBlueprintSlug && activeBenchmark.serviceBlueprintSlug === selected?.slug ? "esta receta" : "este tipo de servicio"}, con una duración de {activeBenchmark.durationMonths} meses. Mediana: {activeBenchmark.medianActualHours.toFixed(1)} h reales; ajuste aplicado: ×{(referenceEstimate?.historicalFactor || 1).toFixed(2)}.</div>}
+              {!activeBenchmark && effortBenchmarksLoading && <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">Consultando proyectos cerrados comparables…</div>}
+              {!activeBenchmark && effortBenchmarksError && <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">No pudimos leer el histórico de horas. La recomendación usa solamente la receta profesional.</div>}
+              {!activeBenchmark && !effortBenchmarksLoading && !effortBenchmarksError && <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">Todavía no hay dos proyectos cerrados comparables por receta, tipo de servicio y duración. Se usa la receta profesional sin ajuste histórico.</div>}
               <div className="overflow-x-auto rounded-lg border border-slate-200"><table className="w-full text-sm"><thead className="bg-slate-50 text-left text-xs text-slate-500"><tr><th className="px-3 py-2">Trabajo</th><th className="px-3 py-2">Rol</th><th className="px-3 py-2 text-right">Horas</th></tr></thead><tbody>{referenceEstimate?.lines.map((line, index) => <tr key={`${line.sourceId}-${line.roleKey}-${index}`} className="border-t"><td className="px-3 py-2">{line.sourceName}</td><td className="px-3 py-2 capitalize">{line.roleKey}</td><td className="px-3 py-2 text-right tabular-nums">{line.estimatedHours}</td></tr>)}</tbody></table></div>
               <Button type="button" variant="outline" onClick={() => applyDefinition(scope)}><RefreshCw className="mr-2 h-4 w-4" /> Actualizar equipo sugerido</Button>
               {unmappedRoles.length > 0 && <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />No encontramos roles equivalentes para: {unmappedRoles.join(", ")}. Crealos o asigná el equipo manualmente.</div>}

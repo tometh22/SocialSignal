@@ -1,4 +1,4 @@
-import { and, eq, inArray, max, ne } from "drizzle-orm";
+import { and, eq, inArray, lt, max, ne } from "drizzle-orm";
 import { db } from "../db";
 import { serviceBlueprints } from "@shared/schema";
 import { blueprintDefinitionSchema, LEGACY_SERVICE_BLUEPRINT_SEEDS, SERVICE_BLUEPRINT_SEEDS } from "@shared/quotation-professional";
@@ -13,31 +13,34 @@ const SOURCE_LABELS: Record<string, string> = {
   "bolsa-creditos-epical": "Modelo comercial de créditos Epical",
 };
 
-export async function ensureServiceBlueprintSeeds() {
+export async function ensureServiceBlueprintSeeds(database: typeof db = db) {
   // These used to appear as separate products. They remain archived so every
   // historical quotation keeps its recipe id and definition, while new quotes
   // see only One Shot, Fee, Intelligence Event Track and Demo.
   const legacySlugs = LEGACY_SERVICE_BLUEPRINT_SEEDS.map((seed) => seed.slug);
   if (legacySlugs.length > 0) {
-    await db.update(serviceBlueprints)
+    await database.update(serviceBlueprints)
       .set({ status: "archived", updatedAt: new Date() })
       .where(and(inArray(serviceBlueprints.slug, legacySlugs), ne(serviceBlueprints.status, "archived")));
   }
 
   for (const seed of SERVICE_BLUEPRINT_SEEDS) {
-    await db.update(serviceBlueprints)
+    // Static seeds may be bumped to a newer baseline version. Archive only
+    // older seed versions; user-created drafts and published versions use
+    // larger version numbers and must survive every server restart.
+    await database.update(serviceBlueprints)
       .set({ status: "archived", updatedAt: new Date() })
       .where(and(
         eq(serviceBlueprints.slug, seed.slug),
-        ne(serviceBlueprints.version, seed.version),
+        lt(serviceBlueprints.version, seed.version),
         ne(serviceBlueprints.status, "archived"),
       ));
-    const existing = await db.select({ id: serviceBlueprints.id })
+    const existing = await database.select({ id: serviceBlueprints.id })
       .from(serviceBlueprints)
       .where(and(eq(serviceBlueprints.slug, seed.slug), eq(serviceBlueprints.version, seed.version)))
       .limit(1);
     if (existing.length) continue;
-    await db.insert(serviceBlueprints).values({
+    await database.insert(serviceBlueprints).values({
       slug: seed.slug,
       name: seed.name,
       description: seed.description,
