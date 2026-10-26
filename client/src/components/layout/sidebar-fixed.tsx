@@ -66,9 +66,10 @@ type NavItem = {
 
 interface SidebarFixedProps {
   mobileMode?: boolean;
+  onNavigate?: () => void;
 }
 
-export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps = {}) {
+export default function SidebarFixed({ mobileMode = false, onNavigate }: SidebarFixedProps = {}) {
   const { user } = useAuth();
   const { hasPermission, hasAnyPermission, isOperations, isTaskManagerOnly, isTaskManager } = usePermissions();
   const [currentPath] = useLocation();
@@ -149,14 +150,10 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
       title: "",
       items: [
         { href: "/", title: "Inicio", icon: Home, description: "Resumen personal", anyPermissions: HOME_ACCESS_SECTIONS },
-        { href: "/review/objectives", title: "Objetivos", icon: Flag, description: "Plan del año y acciones de la semana", permission: 'status' as AppSection },
+        { href: "/review/objectives", title: "Objetivos", icon: Flag, description: "Plan del año y acciones de la semana", permission: 'operations' as AppSection },
         { href: "/absences", title: "Mis ausencias", icon: UserX, description: "Solicitudes y saldos", anyPermissions: HOME_ACCESS_SECTIONS },
-      ]
-    },
-    {
-      title: "Mi gestión",
-      items: [
-        { href: "/my-invoices", title: "Mis facturas", icon: Receipt, description: "Comprobantes y proyectos", hideWhenTaskManagerOnly: true },
+        { href: "/my-invoices", title: "Mis facturas", icon: Receipt, description: "Tu cierre y comprobantes", anyPermissions: HOME_ACCESS_SECTIONS },
+        ...(!isOperations ? [{ href: "/tasks/hours-dashboard", title: "Mis horas", icon: BarChart2, description: "Tu carga por período y proyecto", anyPermissions: HOURS_DASHBOARD_ACCESS_SECTIONS }] : []),
       ]
     },
     {
@@ -173,7 +170,7 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
         { href: isOperations ? "/active-projects" : "/tasks/projects", title: isOperations ? "Cartera de proyectos" : isTaskManager ? "Proyectos de tareas" : "Mis proyectos", icon: Briefcase, badge: projectCount > 0 ? projectCount.toString() : undefined, description: isOperations ? "Gestión y rentabilidad" : "Proyectos activos asignados", anyPermissions: TASK_ACCESS_SECTIONS },
         { href: "/tasks/projects/kanban", title: "Kanban de proyectos", icon: LayoutGrid, description: "Estado operativo de cada proyecto", anyPermissions: TASK_ACCESS_SECTIONS },
         { href: "/tasks", title: "Tareas", icon: CheckSquare, description: "Gestión de tareas", anyPermissions: TASK_ACCESS_SECTIONS },
-        { href: "/tasks/team-calendar", title: "Calendario", icon: Calendar, description: "Fechas y responsables de tareas", anyPermissions: TASK_ACCESS_SECTIONS },
+        { href: "/tasks/team-calendar", title: "Calendario", icon: Calendar, description: "Fechas y responsables de tareas", permission: 'operations' as AppSection },
         { href: "/review", title: "Status", icon: ClipboardList, badge: totalReviewPending > 0 ? totalReviewPending.toString() : undefined, description: "Seguimiento y decisiones", permission: 'status' as AppSection },
       ]
     },
@@ -181,7 +178,7 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
       title: "Operaciones",
       items: [
         { href: "/operations/absences", title: "Gestión de ausencias", icon: UserX, description: "Aprobar solicitudes y administrar cupos", permission: 'operations' as AppSection },
-        { href: "/tasks/hours-dashboard", title: "Panel de horas", icon: BarChart2, description: "Horas por persona y proyecto", anyPermissions: HOURS_DASHBOARD_ACCESS_SECTIONS },
+        { href: "/tasks/hours-dashboard", title: "Panel de horas", icon: BarChart2, description: "Horas por persona y proyecto", permission: 'operations' as AppSection },
         { href: "/operations/capacity", title: "Capacidad", icon: Gauge, description: "Capacidad semanal del equipo", permission: 'operations' as AppSection },
         { href: "/operations/monthly-closing", title: "Cierre mensual", icon: CalendarCheck, description: "Cierre de horas del mes", permission: 'operations' as AppSection },
         { href: "/operations/liquidaciones-equipo", title: "Liquidaciones equipo", icon: Calculator, description: "Definir cómo factura cada persona", permission: 'operations' as AppSection },
@@ -254,6 +251,7 @@ export default function SidebarFixed({ mobileMode = false }: SidebarFixedProps =
           <TooltipTrigger asChild>
             <Link
               href={item.href}
+              onClick={onNavigate}
               title={isCollapsed ? item.title : undefined}
               className={cn(
                 "relative flex min-h-11 items-center rounded-xl px-3 py-2 text-[13px] transition-all duration-200 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400/50",

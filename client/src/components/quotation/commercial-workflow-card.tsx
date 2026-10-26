@@ -1,3 +1,8 @@
+import { Link } from "wouter";
+import { invalidateQuotationPortfolio } from "@/lib/quotation-cache";
+import { externalQuotationStages } from "@shared/utils/quotation-external-stage";
+import { civilDateInBuenosAires } from "@shared/utils/buenos-aires-week";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { canDecideQuotationApproval, quotationApprovalGuidance } from "@shared/utils/quotation-approval";
 import { useAuth } from "@/hooks/use-auth";
 import { useEffect, useState } from "react";
@@ -16,6 +21,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { statusLabel } from "@/lib/status-labels";
 
 type CommercialHistory = {
+  quotation: { lockVersion: number; revisionNumber: number };
+  variants: Array<{id:number; name:string; totalAmount:number}>;
   revisions: Array<{ id: number; revisionNumber: number; status: string; reason?: string; documentHash: string; createdAt: string }>;
   approvals: Array<{ id: number; revisionId: number; ruleLabel: string; status: string; requestedBy?: number; decisionReason?: string }>;
   deliveries: Array<{ id: number; recipientEmail: string; status: string; sentAt?: string; errorMessage?: string }>;
@@ -44,12 +51,23 @@ export function CommercialWorkflowCard({ quotationId, status, recipientEmail, qu
   const [sendMessage, setSendMessage] = useState('Adjuntamos nuestra propuesta comercial. Puede revisarla y responder desde el enlace seguro.');
   const [revisionOpen, setRevisionOpen] = useState(false);
   const [revisionReason, setRevisionReason] = useState('');
+  const [externalStage, setExternalStage] = useState("");
+  const [externalDate, setExternalDate] = useState(() => civilDateInBuenosAires(new Date()));
+  const [externalChannel, setExternalChannel] = useState("email");
+  const [externalReason, setExternalReason] = useState("");
+  const [externalVariant, setExternalVariant] = useState("");
+  const [externalKey, setExternalKey] = useState("");
+  const canRecordExternal = Boolean(user?.isAdmin || user?.role === "admin" || user?.permissions?.some(p => ["operations","quotations_approve"].includes(p)));
   const [busy, setBusy] = useState(false);
   const { data, isLoading, isError, refetch } = useQuery<CommercialHistory>({ queryKey: [`/api/quotations/${quotationId}/commercial-history`] });
+  const isOperations = Boolean(user?.isAdmin || user?.role === "admin" || user?.permissions?.includes("operations"));
+  const linkedProjectQuery = useQuery<Array<{id:number}>>({queryKey:[`/api/active-projects/quotation/${quotationId}`],enabled:status === "approved" && isOperations});
+  const linkedProject = linkedProjectQuery.data?.[0];
   const currentRevision = data?.revisions[0];
   const pendingApprovals = (data?.approvals || []).filter((approval) => approval.revisionId === currentRevision?.id && approval.status === 'pending');
   const refresh = async () => {
     await Promise.all([
+      invalidateQuotationPortfolio(queryClient),
       queryClient.invalidateQueries({ queryKey: [`/api/quotations/${quotationId}/commercial-history`] }),
       queryClient.invalidateQueries({ queryKey: [`/api/quotations/${quotationId}`] }),
       queryClient.invalidateQueries({ queryKey: ['/api/quotations'] }),
@@ -105,6 +123,19 @@ export function CommercialWorkflowCard({ quotationId, status, recipientEmail, qu
     } finally { setBusy(false); }
   };
 
+  const recordExternal = async () => {
+    if (!data?.quotation) return;
+    setBusy(true);
+    try {
+      await apiRequest(`/api/quotations/${quotationId}/external-stage`, { method:"POST", headers:{"Idempotency-Key":externalKey}, body:{ stage:externalStage,occurredOn:externalDate,channel:externalChannel,reason:externalReason,variantId:externalVariant ? Number(externalVariant) : null,expectedLockVersion:data.quotation.lockVersion,expectedRevisionNumber:data.quotation.revisionNumber } });
+      setExternalStage(""); setExternalReason(""); setExternalVariant(""); await refresh();
+      toast({title:"Etapa registrada",description:externalStage === "approved" ? "La aprobación final ya permite crear el proyecto asociado." : "Quedó registrada la etapa realizada fuera de Mind."});
+    } catch(error) { toast({title:"No se pudo registrar la etapa",description:getApiErrorMessage(error),variant:"destructive"}); await refresh(); }
+    finally { setBusy(false); }
+  };
+  const stageLabels: Record<string,string> = { "internally-approved":"Aprobada internamente", sent:"Enviada a cliente", "in-negotiation":"En negociación", approved:"Aprobación final" };
+  const stageRank: Record<string,number> = {draft:0,pending:0,"internally-approved":1,sent:2,viewed:2,"in-negotiation":3,approved:4};
+
   return (
     <Card id="commercial-approval" className="scroll-mt-24 overflow-hidden border-indigo-100">
       <CardHeader className="border-b border-indigo-100 bg-indigo-50/40">
@@ -116,8 +147,17 @@ export function CommercialWorkflowCard({ quotationId, status, recipientEmail, qu
           </span>
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4 p-5">
+      <CardContent className="space-y-4 p-5 sm:p-6">
         <p className="text-sm text-slate-600">{quotationApprovalGuidance(status)}</p>
+        {canRecordExternal && status in stageRank && status !== "approved" && <div className="space-y-2 rounded-xl border bg-slate-50 p-3">
+          <Label htmlFor="external-stage-select">Registrar una etapa realizada fuera de Mind</Label>
+          <p className="text-xs text-muted-foreground">Si ya se aprobó o envió por otro canal, registralo acá y continuá desde esa etapa.</p>
+          <Select value="" onValueChange={value => { setExternalStage(value); setExternalKey(crypto.randomUUID()); }} disabled={busy || !data?.quotation}>
+            <SelectTrigger id="external-stage-select" className="w-full bg-white sm:max-w-sm"><SelectValue placeholder="Elegir etapa…" /></SelectTrigger>
+            <SelectContent>{externalQuotationStages.filter(stage => stageRank[stage] > stageRank[status]).map(stage => <SelectItem key={stage} value={stage}>{stageLabels[stage]}</SelectItem>)}</SelectContent>
+          </Select>
+        </div>}
+        {status === "approved" && isOperations && <Button type="button" disabled={linkedProjectQuery.isLoading || linkedProjectQuery.isError} asChild={!linkedProjectQuery.isLoading && !linkedProjectQuery.isError}>{linkedProjectQuery.isLoading ? "Consultando proyecto…" : linkedProjectQuery.isError ? "No se pudo consultar el proyecto" : <Link href={linkedProject ? `/tasks/projects/${linkedProject.id}` : `/active-projects/new?quotationId=${quotationId}`}>{linkedProject ? "Ver proyecto asociado" : "Crear proyecto asociado"}</Link>}</Button>}
         {isError && <div role="alert" className="text-sm text-red-700">No se pudo cargar el historial de aprobación. <Button variant="link" onClick={() => refetch()}>Reintentar</Button></div>}
         {isLoading && <p role="status" className="text-sm text-muted-foreground">Cargando aprobaciones…</p>}
         <div className="flex flex-wrap gap-2">
@@ -139,11 +179,19 @@ export function CommercialWorkflowCard({ quotationId, status, recipientEmail, qu
           </div>
         )}
         <div className="grid gap-3 md:grid-cols-2">
-          <div className="rounded-xl border border-slate-200 p-3"><div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase text-slate-500"><History className="h-3.5 w-3.5" /> Últimos eventos</div>{(data?.events || []).slice(0, 5).map((event) => <div key={event.id} className="flex justify-between py-1 text-xs text-slate-600"><span>{event.eventType === 'margin_alert_dismissed' ? 'alerta de margen desestimada' : event.eventType === 'margin_alert_reactivated' ? 'alerta de margen reactivada' : event.eventType}</span><span>{new Date(event.createdAt).toLocaleString('es-AR')}</span></div>)}</div>
+          <div className="rounded-xl border border-slate-200 p-3"><div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase text-slate-500"><History className="h-3.5 w-3.5" /> Últimos eventos</div>{(data?.events || []).slice(0, 5).map((event) => <div key={event.id} className="flex justify-between py-1 text-xs text-slate-600"><span>{event.eventType === 'external-stage-recorded' ? 'Etapa registrada fuera de Mind' : event.eventType === 'margin_alert_dismissed' ? 'alerta de margen desestimada' : event.eventType === 'margin_alert_reactivated' ? 'alerta de margen reactivada' : event.eventType}</span><span>{new Date(event.createdAt).toLocaleString('es-AR')}</span></div>)}</div>
           <div className="rounded-xl border border-slate-200 p-3"><div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase text-slate-500"><Mail className="h-3.5 w-3.5" /> Entregas</div>{data?.deliveries.length ? data.deliveries.slice(0, 5).map((delivery) => <div key={delivery.id} className="flex justify-between py-1 text-xs text-slate-600"><span className="truncate">{delivery.recipientEmail}</span><Badge variant="outline" className="text-[10px]">{statusLabel(delivery.status)}</Badge></div>) : <p className="text-xs text-slate-400">Todavía no fue enviada.</p>}</div>
         </div>
       </CardContent>
 
+      <Dialog open={Boolean(externalStage)} onOpenChange={open => { if (!open && !busy) setExternalStage(""); }}><DialogContent className="max-h-[90dvh] overflow-y-auto"><DialogHeader><DialogTitle>{stageLabels[externalStage] || "Registrar etapa"}</DialogTitle><DialogDescription>Registrá lo que ya ocurrió por otro canal. Se conserva tu usuario, la fecha, el fundamento y la revisión vigente.</DialogDescription></DialogHeader>
+        <div className="space-y-4">
+          <div className="space-y-1.5"><Label htmlFor="external-date">Fecha en que ocurrió</Label><Input id="external-date" type="date" max={civilDateInBuenosAires(new Date())} value={externalDate} onChange={e=>setExternalDate(e.target.value)} /></div>
+          <div className="space-y-1.5"><Label htmlFor="external-channel">Canal</Label><Select value={externalChannel} onValueChange={setExternalChannel}><SelectTrigger id="external-channel"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="email">Email</SelectItem><SelectItem value="meeting">Reunión</SelectItem><SelectItem value="message">Mensaje</SelectItem><SelectItem value="other">Otro</SelectItem></SelectContent></Select></div>
+          {externalStage === "approved" && Boolean(data?.variants.length) && <div className="space-y-1.5"><Label htmlFor="accepted-variant">Variante aceptada</Label><Select value={externalVariant} onValueChange={setExternalVariant}><SelectTrigger id="accepted-variant"><SelectValue placeholder="Elegir variante" /></SelectTrigger><SelectContent>{data?.variants.map(variant=><SelectItem key={variant.id} value={String(variant.id)}>{variant.name}</SelectItem>)}</SelectContent></Select></div>}
+          <div className="space-y-1.5"><Label htmlFor="external-reason">Referencia o fundamento</Label><Textarea id="external-reason" placeholder="Por ejemplo: aprobación recibida por email de…" value={externalReason} onChange={e=>setExternalReason(e.target.value)} /></div>
+        </div><DialogFooter><Button variant="outline" disabled={busy} onClick={()=>setExternalStage("")}>Cancelar</Button><Button disabled={busy || !externalDate || externalReason.trim().length < 3 || (externalStage === "approved" && Boolean(data?.variants.length) && !externalVariant)} onClick={recordExternal}>{busy ? "Guardando…" : "Registrar etapa"}</Button></DialogFooter></DialogContent>
+      </Dialog>
       <Dialog open={Boolean(decision)} onOpenChange={(open) => !open && setDecision(null)}><DialogContent><DialogHeader><DialogTitle>{decision?.value === 'approved' ? 'Aprobar regla comercial' : 'Rechazar y devolver a borrador'}</DialogTitle><DialogDescription>La decisión queda asociada a tu usuario y a esta revisión.</DialogDescription></DialogHeader><div className="space-y-2"><Label htmlFor="approval-reason">Fundamento</Label><Textarea id="approval-reason" value={decisionReason} onChange={(event) => setDecisionReason(event.target.value)} /></div><DialogFooter><Button variant="outline" onClick={() => setDecision(null)}>Cancelar</Button><Button disabled={busy || decisionReason.trim().length < 3} onClick={decide}>Confirmar</Button></DialogFooter></DialogContent></Dialog>
       <Dialog open={sendOpen} onOpenChange={setSendOpen}><DialogContent><DialogHeader><DialogTitle>Enviar propuesta aprobada</DialogTitle><DialogDescription>Se adjuntará el PDF de la revisión y un enlace seguro para aceptar, rechazar o negociar.</DialogDescription></DialogHeader><div className="space-y-3"><div className="space-y-2"><Label htmlFor="send-recipient">Destinatario</Label><Input id="send-recipient" type="email" value={sendEmail} onChange={(event) => setSendEmail(event.target.value)} /></div><div className="space-y-2"><Label htmlFor="send-message">Mensaje</Label><Textarea id="send-message" rows={5} value={sendMessage} onChange={(event) => setSendMessage(event.target.value)} /></div></div><DialogFooter><Button variant="outline" onClick={() => setSendOpen(false)}>Cancelar</Button><Button disabled={busy || !sendEmail.includes('@')} onClick={send}><Send className="mr-1.5 h-4 w-4" /> Enviar</Button></DialogFooter></DialogContent></Dialog>
       <Dialog open={revisionOpen} onOpenChange={setRevisionOpen}><DialogContent><DialogHeader><DialogTitle>Crear nueva revisión</DialogTitle><DialogDescription>La versión enviada o aceptada permanece inmutable y verificable por su hash.</DialogDescription></DialogHeader><div className="space-y-2"><Label htmlFor="revision-reason">Motivo del cambio</Label><Textarea id="revision-reason" value={revisionReason} onChange={(event) => setRevisionReason(event.target.value)} /></div><DialogFooter><Button variant="outline" onClick={() => setRevisionOpen(false)}>Cancelar</Button><Button disabled={busy || revisionReason.trim().length < 3} onClick={revise}><GitBranch className="mr-1.5 h-4 w-4" /> Crear revisión</Button></DialogFooter></DialogContent></Dialog>

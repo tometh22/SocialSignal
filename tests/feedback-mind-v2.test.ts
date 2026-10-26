@@ -349,7 +349,7 @@ test("project visibility and duplicate holiday rules are enforced server-side", 
   const routes = readFileSync(new URL("../server/routes.ts", import.meta.url), "utf8");
   const projects = routes.slice(routes.indexOf('app.get("/api/tasks/projects"'), routes.indexOf('// POST /api/tasks/projects/create'));
   expect(projects).toContain("task_project_members");
-  expect(projects).toContain("collaborator_ids @>");
+  expect(projects).not.toContain("collaborator_ids @>");
   expect(projects).toContain("requestedStatus");
   const holidays = routes.slice(routes.indexOf('app.post("/api/holidays"'), routes.indexOf('app.delete("/api/holidays/:id"'));
   expect(holidays).toContain("status(409)");

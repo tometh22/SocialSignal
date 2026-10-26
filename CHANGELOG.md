@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.14.5 — 2026-10-26
+
+- PM y analistas acceden solo a proyectos de los que son miembros. El calendario global y Objetivos quedan en Operaciones; las horas, estimaciones y comprobantes personales respetan su titular también por API y MCP.
+- Cotizaciones permite registrar etapas realizadas fuera de Mind y una aprobación final con fecha, canal, fundamento y variante, sin enviar otro correo. Los costos adicionales de IA, herramientas y licencias quedan visibles en Inversión.
+- El calendario personal despliega semanas completas y abre el detalle de cada tarea. Status y Daily comparten Estado actual con guardado atómico e historial, conservando Próximo paso como antecedente.
+- Mis facturas y Mis horas quedan en el bloque personal de navegación; los permisos de gestión de miembros se resuelven por proyecto y se comprueba el proyecto ya asociado a una cotización.
+
 ## 1.14.4 — 2026-10-21
 
 - Las horas nuevas y los cronómetros se atribuyen al responsable de la tarea o de la subtarea, sin selector de terceros ni cambios en las cargas históricas. Se validan los permisos existentes y se detectan reasignaciones antes de guardar; el detalle actualiza el destinatario de horas al cambiar el responsable.

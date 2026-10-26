@@ -219,7 +219,7 @@ export function createObjectivesRouter(requireAuth: RequireAuth): Router {
   // for every request that enters it — including ones it does not handle.
   // That made /api/crm/stages answer 403 to anyone without "status", because
   // the request was rejected here before reaching the CRM router.
-  router.use("/objectives", requireAuth, requirePermission("status"));
+  router.use("/objectives", requireAuth, requirePermission("operations"));
 
   router.get("/objectives", async (req: Request, res: Response) => {
     try {

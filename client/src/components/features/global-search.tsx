@@ -1,3 +1,4 @@
+import { usePermissions } from "@/hooks/use-permissions";
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -49,15 +50,16 @@ interface GlobalSearchProps {
 }
 
 export function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
+  const { isOperations, hasPermission, hasAnyPermission } = usePermissions();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedFilters, setSelectedFilters] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState('all');
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const { data: clients = [] } = useQuery<{ id: number; name: string; [key: string]: unknown }[]>({ queryKey: ['/api/clients'] });
-  const { data: activeProjects = [] } = useQuery<{ id: number; quotationId?: number | null; [key: string]: unknown }[]>({ queryKey: ['/api/active-projects'] });
-  const { data: quotations = [] } = useQuery<{ id: number; projectName?: string; clientId?: number; [key: string]: unknown }[]>({ queryKey: ['/api/quotations'] });
-  const { data: deliverables = [] } = useQuery<{ id: number; [key: string]: unknown }[]>({ queryKey: ['/api/deliverables'] });
+  const { data: clients = [] } = useQuery<{ id: number; name: string; [key: string]: unknown }[]>({ queryKey: ['/api/clients'], enabled:isOpen && hasPermission('crm') });
+  const { data: activeProjects = [] } = useQuery<{ id: number; quotationId?: number | null; [key: string]: unknown }[]>({ queryKey: ['/api/tasks/projects', 'search', isOperations], queryFn:async()=>{ const {authFetchJson}=await import('@/lib/queryClient'); return authFetchJson(`/api/tasks/projects?scope=${isOperations ? 'all' : 'mine'}`); }, enabled:isOpen && hasAnyPermission(['projects','operations','task_manager']) });
+  const { data: quotations = [] } = useQuery<{ id: number; projectName?: string; clientId?: number; [key: string]: unknown }[]>({ queryKey: ['/api/quotations'], enabled:isOpen && hasPermission('quotations') });
+  const { data: deliverables = [] } = useQuery<{ id: number; [key: string]: unknown }[]>({ queryKey: ['/api/deliverables'], enabled:isOpen && isOperations });
 
   // Focus en el input cuando se abre
   useEffect(() => {
@@ -120,22 +122,22 @@ export function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
       const client = clients.find((c: any) => c.id === quotation?.clientId);
       
       if (
-        quotation?.projectName?.toLowerCase().includes(term) ||
-        client?.name?.toLowerCase().includes(term) ||
+        (project.name || quotation?.projectName)?.toLowerCase().includes(term) ||
+        (project.clientName || client?.name)?.toLowerCase().includes(term) ||
         project.id.toString().includes(term)
       ) {
         results.push({
           id: `project-${project.id}`,
           type: 'project',
-          title: quotation?.projectName || `Proyecto #${project.id}`,
-          subtitle: client?.name,
+          title: project.name || quotation?.projectName || `Proyecto #${project.id}`,
+          subtitle: project.clientName || client?.name,
           description: `Estado: ${project.status}`,
           status: project.status,
-          date: project.startDate ? new Date(project.startDate) : new Date(project.createdAt),
-          url: `/project-details/${project.id}`,
+          date: project.startDate || project.createdAt ? new Date(project.startDate || project.createdAt) : undefined,
+          url: `/tasks/projects/${project.id}`,
           metadata: {
             isAlwaysOn: project.isAlwaysOnMacro,
-            budget: quotation?.totalAmount
+            budget: isOperations ? quotation?.totalAmount : undefined
           }
         });
       }
