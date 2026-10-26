@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.14.7 — 2026-10-26
+
+- El benchmark de horas deduplica los registros reflejados entre los dos libros de horas, normaliza tipos heredados y separa duraciones; excluye proyectos cancelados. Las referencias muestran el criterio de selección y exigen al menos dos muestras comparables.
+- El arranque conserva versiones de recetas creadas por usuarios y archiva solo semillas anteriores. Operaciones puede consultar los planos y benchmarks de calibración.
+- La calibración limita el factor aplicado y bloquea la publicación de ediciones sin guardar.
+
 ## 1.14.6 — 2026-10-26
 
 - El filtro de importes para perfiles de tareas se evalúa al enviar la respuesta, después de resolver la autenticación, tanto con cookie como con token. Las facturas y conciliaciones personales conservan los importes del titular; las rutas operativas siguen omitiendo campos financieros.

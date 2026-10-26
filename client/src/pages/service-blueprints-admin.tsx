@@ -10,19 +10,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { ServiceBlueprint } from "@shared/schema";
-import { blueprintDefinitionSchema, canonicalProjectTypeForModality, estimateBlueprintWorkload, type BlueprintDefinition } from "@shared/quotation-professional";
+import { blueprintDefinitionSchema, canonicalProjectTypeForModality, estimateBlueprintWorkload, selectEffortBenchmark, type BlueprintDefinition, type EffortBenchmark } from "@shared/quotation-professional";
 import { statusLabel } from "@/lib/status-labels";
 
 type CatalogItem = ServiceBlueprint & { workload: ReturnType<typeof estimateBlueprintWorkload> };
-type EffortBenchmark = {
-  serviceBlueprintId: number | null;
-  serviceBlueprintSlug?: string | null;
-  projectType: string;
-  sampleSize: number;
-  averageActualHours: number;
-  medianActualHours: number;
-};
-
 const numberFormat = new Intl.NumberFormat("es-AR", { maximumFractionDigits: 1 });
 
 export default function ServiceBlueprintsAdmin() {
@@ -31,9 +22,11 @@ export default function ServiceBlueprintsAdmin() {
   const { toast } = useToast();
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editingDefinition, setEditingDefinition] = useState<BlueprintDefinition | null>(null);
+  const [savedDefinition, setSavedDefinition] = useState<BlueprintDefinition | null>(null);
   const { data: items = [], isLoading } = useQuery<CatalogItem[]>({ queryKey: ["/api/service-blueprints?status=all"] });
-  const { data: benchmarks = [] } = useQuery<EffortBenchmark[]>({ queryKey: ["/api/quotation-effort-benchmarks"] });
+  const { data: benchmarks = [], isError: benchmarksError, isLoading: benchmarksLoading } = useQuery<EffortBenchmark[]>({ queryKey: ["/api/quotation-effort-benchmarks"] });
   const editingItem = items.find((item) => item.id === editingId && item.status === "draft");
+  const isDraftDirty = Boolean(editingDefinition && savedDefinition && JSON.stringify(editingDefinition) !== JSON.stringify(savedDefinition));
   const editingWorkload = useMemo(
     () => editingDefinition ? estimateBlueprintWorkload(editingDefinition) : null,
     [editingDefinition],
@@ -43,11 +36,13 @@ export default function ServiceBlueprintsAdmin() {
     return result;
   }, {}));
   const benchmarkFor = (item: CatalogItem) => {
-    const projectType = canonicalProjectTypeForModality(blueprintDefinitionSchema.parse(item.definition).modality);
-    return benchmarks
-      .filter((entry) => entry.serviceBlueprintSlug === item.slug
-        && entry.projectType === projectType && entry.sampleSize >= 2)
-      .sort((left, right) => right.sampleSize - left.sampleSize)[0];
+    const definition = blueprintDefinitionSchema.parse(item.definition);
+    return selectEffortBenchmark(benchmarks, {
+      serviceBlueprintId: item.id,
+      serviceBlueprintSlug: item.slug,
+      projectType: canonicalProjectTypeForModality(definition.modality),
+      durationMonths: definition.durationMonths,
+    });
   };
 
   const refreshCatalog = () => {
@@ -59,14 +54,19 @@ export default function ServiceBlueprintsAdmin() {
     onSuccess: (created: CatalogItem) => {
       refreshCatalog();
       setEditingId(created.id);
-      setEditingDefinition(blueprintDefinitionSchema.parse(created.definition));
+      const definition = blueprintDefinitionSchema.parse(created.definition);
+      setEditingDefinition(definition);
+      setSavedDefinition(definition);
       toast({ title: "Borrador creado", description: `Versión ${created.version}: ajustá las horas y guardá los cambios.` });
     },
     onError: (error) => toast({ title: "No se pudo crear el borrador", description: error instanceof Error ? error.message : String(error), variant: "destructive" }),
   });
   const saveDraft = useMutation({
     mutationFn: () => apiRequest(`/api/service-blueprints/${editingId}`, "PUT", { definition: editingDefinition }),
-    onSuccess: () => {
+    onSuccess: (updated: CatalogItem) => {
+      const definition = blueprintDefinitionSchema.parse(updated.definition);
+      setSavedDefinition(definition);
+      client.setQueryData<CatalogItem[]>(["/api/service-blueprints?status=all"], (current) => current?.map((item) => item.id === updated.id ? updated : item));
       refreshCatalog();
       toast({ title: "Borrador guardado" });
     },
@@ -79,6 +79,7 @@ export default function ServiceBlueprintsAdmin() {
       if (variables.action === "publish" && editingId === variables.id) {
         setEditingId(null);
         setEditingDefinition(null);
+        setSavedDefinition(null);
       }
       toast({ title: variables.action === "publish" ? "Receta publicada" : "Receta archivada" });
     },
@@ -103,7 +104,7 @@ export default function ServiceBlueprintsAdmin() {
     if (!editingItem || !editingDefinition || !editingWorkload) return;
     const benchmark = benchmarkFor(editingItem);
     if (!benchmark || editingWorkload.totalHours <= 0 || benchmark.medianActualHours <= 0) return;
-    const ratio = benchmark.medianActualHours / editingWorkload.totalHours;
+    const ratio = Math.min(1.5, Math.max(0.65, benchmark.medianActualHours / editingWorkload.totalHours));
     const scale = (hours: number) => Math.round(hours * ratio * 2) / 2;
     setEditingDefinition({
       ...editingDefinition,
@@ -150,12 +151,12 @@ export default function ServiceBlueprintsAdmin() {
                           <p className="mt-1 text-xs text-slate-400">Origen: {item.sourceLabel || "Catálogo Epical"}</p>
                         </div>
                         <div className="flex flex-wrap gap-2">
-                          {item.status === "published" && <Button size="sm" variant="outline" disabled={createDraft.isPending} onClick={() => createDraft.mutate(item)}><Copy className="mr-1.5 h-4 w-4" /> Nueva versión</Button>}
+                          {item.status === "published" && <Button size="sm" variant="outline" disabled={createDraft.isPending || isDraftDirty} onClick={() => createDraft.mutate(item)}><Copy className="mr-1.5 h-4 w-4" /> Nueva versión</Button>}
                           {item.status === "draft" && <>
-                            <Button size="sm" variant="outline" onClick={() => { setEditingId(item.id); setEditingDefinition(blueprintDefinitionSchema.parse(item.definition)); }}>
+                            <Button size="sm" variant="outline" disabled={isDraftDirty && editingId !== item.id} onClick={() => { const definition = blueprintDefinitionSchema.parse(item.definition); setEditingId(item.id); setEditingDefinition(definition); setSavedDefinition(definition); }}>
                               {editingId === item.id ? "Editando" : "Editar horas"}
                             </Button>
-                            <Button size="sm" onClick={() => transition.mutate({ id: item.id, action: "publish" })} disabled={transition.isPending}><BookOpenCheck className="mr-1.5 h-4 w-4" /> Publicar</Button>
+                            <Button size="sm" onClick={() => transition.mutate({ id: item.id, action: "publish" })} disabled={transition.isPending || (editingId === item.id && isDraftDirty)}><BookOpenCheck className="mr-1.5 h-4 w-4" /> Publicar</Button>
                           </>}
                           {item.status === "published" && <CheckCircle2 className="h-5 w-5 self-center text-emerald-500" />}
                           {item.status === "published" && <Button size="sm" variant="ghost" onClick={() => transition.mutate({ id: item.id, action: "archive" })} disabled={transition.isPending}><Archive className="mr-1.5 h-4 w-4" /> Archivar</Button>}
@@ -181,10 +182,11 @@ export default function ServiceBlueprintsAdmin() {
               {(() => {
                 const benchmark = benchmarkFor(editingItem);
                 return benchmark
-                  ? <div className="flex flex-wrap items-center justify-between gap-3"><p className="text-sm text-emerald-800">Referencia de proyectos cerrados comparables: mediana {numberFormat.format(benchmark.medianActualHours)} h en {benchmark.sampleSize} proyectos.</p><Button type="button" size="sm" variant="outline" onClick={calibrateToHistoricalMedian}>Proponer ajuste a mediana</Button></div>
-                  : <p className="text-sm text-amber-800">Todavía no hay dos proyectos cerrados con horas registradas para esta versión. La cifra actual proviene de la receta.</p>;
+                  ? <div className="flex flex-wrap items-center justify-between gap-3"><p className="text-sm text-emerald-800">Referencia de proyectos cerrados comparables de {benchmark.durationMonths} meses: mediana {numberFormat.format(benchmark.medianActualHours)} h en {benchmark.sampleSize} proyectos.</p><Button type="button" size="sm" variant="outline" onClick={calibrateToHistoricalMedian}>Proponer ajuste a mediana</Button></div>
+                  : <p className="text-sm text-amber-800">{benchmarksLoading ? "Consultando proyectos cerrados comparables…" : benchmarksError ? "No pudimos leer el histórico de horas. La cifra actual proviene de la receta." : "Todavía no hay dos proyectos cerrados con horas registradas para esta receta y duración. La cifra actual proviene de la receta."}</p>;
               })()}
-              {benchmarkFor(editingItem) && <p className="text-xs text-slate-500">El ajuste redistribuye las horas base proporcionalmente para acercar el total a la mediana. Revisalo y guardá el borrador; no publica la receta.</p>}
+              {benchmarkFor(editingItem) && <p className="text-xs text-slate-500">El ajuste redistribuye las horas base proporcionalmente con un límite de ×0,65 a ×1,50 para reducir el efecto de valores atípicos. Revisalo y guardá el borrador; no publica la receta.</p>}
+              {isDraftDirty && <p role="status" className="text-sm font-medium text-amber-800">Hay cambios sin guardar. Guardá el borrador antes de publicarlo.</p>}
             </CardHeader>
             <CardContent className="space-y-5">
               <section className="space-y-3">
@@ -201,7 +203,7 @@ export default function ServiceBlueprintsAdmin() {
                 </section>
               ))}
               <div className="flex justify-end gap-2 border-t pt-4">
-                <Button variant="outline" onClick={() => { setEditingId(null); setEditingDefinition(null); }}>Cerrar</Button>
+                <Button variant="outline" onClick={() => { setEditingId(null); setEditingDefinition(null); setSavedDefinition(null); }}>Cerrar</Button>
                 <Button onClick={() => saveDraft.mutate()} disabled={saveDraft.isPending}><Save className="mr-2 h-4 w-4" /> Guardar borrador</Button>
               </div>
             </CardContent>

@@ -24,6 +24,7 @@ import {
   runProposalQa,
 } from "@shared/quotation-professional";
 import { nextBlueprintVersion } from "./services/service-blueprints";
+import { QUOTATION_EFFORT_BENCHMARKS_SQL } from "./queries/quotation-effort-benchmarks";
 import { upload } from "./upload";
 import path from "path";
 import {
@@ -54,7 +55,7 @@ export function registerProposalStudioRoutes(app: Express, requireAuth: AuthMidd
     }
   });
 
-  app.get("/api/service-blueprints", requireAuth, requirePermission("quotations"), async (req, res) => {
+  app.get("/api/service-blueprints", requireAuth, requirePermission("quotations", "operations"), async (req, res) => {
     const requestedStatus = typeof req.query.status === "string" ? req.query.status : "published";
     const status = z.enum(["draft", "published", "archived", "all"]).parse(requestedStatus);
     const rows = status === "all"
@@ -63,59 +64,14 @@ export function registerProposalStudioRoutes(app: Express, requireAuth: AuthMidd
     res.json(rows.map((row) => ({ ...row, workload: estimateBlueprintWorkload(blueprintDefinitionSchema.parse(row.definition)) })));
   });
 
-  app.get("/api/quotation-effort-benchmarks", requireAuth, requirePermission("quotations"), async (_req, res) => {
+  app.get("/api/quotation-effort-benchmarks", requireAuth, requirePermission("quotations", "operations"), async (_req, res) => {
     try {
-      const result = await db.execute(sql`
-        WITH logged_hours AS (
-          SELECT project_id, SUM(hours)::double precision AS actual_hours
-          FROM (
-            SELECT task.project_id, entry.hours
-            FROM task_time_entries entry
-            INNER JOIN tasks task ON task.id = entry.task_id
-            UNION ALL
-            SELECT legacy.project_id, legacy.hours
-            FROM time_entries legacy
-          ) combined_entries
-          GROUP BY project_id
-        ), completed_projects AS (
-          SELECT
-            project.id AS project_id,
-            quote.service_blueprint_id,
-            blueprint.slug AS service_blueprint_slug,
-            quote.project_type,
-            hours.actual_hours
-          FROM active_projects project
-          INNER JOIN quotations quote ON quote.id = project.quotation_id
-          LEFT JOIN service_blueprints blueprint ON blueprint.id = quote.service_blueprint_id
-          INNER JOIN logged_hours hours ON hours.project_id = project.id
-          WHERE hours.actual_hours > 0
-            AND (
-              project.closed_at IS NOT NULL
-              OR project.is_finished = true
-              OR project.status IN ('completed', 'delivered', 'invoiced')
-              OR project.workflow_stage = 'finalizado'
-            )
-        )
-        SELECT
-          service_blueprint_id,
-          service_blueprint_slug,
-          project_type,
-          COUNT(*)::integer AS sample_size,
-          AVG(actual_hours)::double precision AS average_actual_hours,
-          percentile_cont(0.5) WITHIN GROUP (ORDER BY actual_hours)::double precision AS median_actual_hours
-        FROM completed_projects
-        GROUP BY GROUPING SETS (
-          (service_blueprint_id, service_blueprint_slug, project_type),
-          (service_blueprint_slug, project_type),
-          (project_type)
-        )
-        HAVING GROUPING(service_blueprint_slug) = 1 OR service_blueprint_slug IS NOT NULL
-        ORDER BY project_type, service_blueprint_id NULLS LAST
-      `);
+      const result = await db.execute(sql.raw(QUOTATION_EFFORT_BENCHMARKS_SQL));
       res.json(result.rows.map((row) => ({
         serviceBlueprintId: row.service_blueprint_id == null ? null : Number(row.service_blueprint_id),
         serviceBlueprintSlug: row.service_blueprint_slug == null ? null : String(row.service_blueprint_slug),
         projectType: String(row.project_type),
+        durationMonths: Number(row.duration_months),
         sampleSize: Number(row.sample_size),
         averageActualHours: Number(row.average_actual_hours),
         medianActualHours: Number(row.median_actual_hours),
