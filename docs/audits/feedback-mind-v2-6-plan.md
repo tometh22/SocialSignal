@@ -132,4 +132,3 @@ Cada release actualiza juntos `VERSION`, `package.json` y `CHANGELOG.md`, sincro
 - La primera mejora de costos usa el importe adicional existente. Un desglose de múltiples proveedores, monedas o consumo de IA sería una ampliación posterior, no un requisito explícito de este PDF.
 - Las etapas son fáciles de seleccionar, pero Mind mantiene historial, permisos y consistencia económica. No se registran envíos ni decisiones del cliente que no ocurrieron.
 - Los valores históricos de Próximo paso y las horas ya cargadas se conservan.
-
