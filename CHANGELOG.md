@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.14.8 — 2026-10-27
+
+- Corrige el bloqueo de aprobación de cotizaciones normales cuyo programa de créditos histórico quedó como `{}`. Se interpreta como ausencia de programa, sin inventar términos comerciales ni modificar el registro histórico.
+- La migración de créditos deja de convertir valores NULL en objetos vacíos al arrancar. Las bolsas de créditos reales conservan validación estricta y requieren un programa habilitado para avanzar en aprobación.
+- Regresiones con los formatos productivos y PostgreSQL: aprobación externa, solicitud interna, idempotencia, permisos y continuidad hasta proyecto, tarea y horas; costos adicionales de IA y precios preservados.
+
 ## 1.14.7 — 2026-10-26
 
 - Cierre del equipo unifica Base a cobrar y Facturación y seguimiento, con mes compartido, borradores conservados y diseño móvil.

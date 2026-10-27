@@ -32,3 +32,12 @@ Versiones 1.14.5 y 1.14.6. El [mapa de las once observaciones](feedback-mind-v2-
 El calendario restringido no vuelve privada una tarea dentro de un proyecto compartido: los asuntos sensibles deben estar en proyectos con miembros limitados. Las horas históricas conservan su titular y los próximos pasos anteriores no se eliminan. Los costos adicionales son un importe presupuestado manual, no consumo automático de IA ni un gasto real contabilizado.
 
 La publicación del cierre ampliado y la conciliación financiera del PR 313 siguen su proceso independiente. Esta versión habilita el acceso a las facturas personales existentes.
+
+
+## Corrección del bloqueo reportado el 27 de octubre — 1.14.8
+
+La captura de Vicky Achabal muestra un rechazo real al registrar una etapa comercial: la validación exige todos los campos de `creditProgram`. La migración 0056 convertía NULL en `{}` en cada arranque; el schema interpretaba ese sentinel histórico como un programa incompleto. El QA anterior creaba cotizaciones después del arranque con NULL, por lo que no cubría el formato resultante de reiniciar. La comprobación productiva de sólo lectura confirmó ocho cotizaciones no archivadas con ese objeto vacío, todas de tipos ordinarios.
+
+El schema acepta sólo el objeto vacío como ausencia de programa. Los objetos no vacíos siguen validados; los tipos `credit-pack` requieren un programa habilitado, completo y con vigencia válida. La migración deja de reescribir NULL y no corrige datos históricos en lote. El validador comercial compartido conserva los controles de FX y pricing.
+
+Validación: 1.021 pruebas aprobadas y 11 omitidas, incluyendo regresiones de PostgreSQL con lectura por Drizzle y migración repetida sin cambios de datos. HTTP real local con el formato `{}` para on-demand, fee-mensual y one-shot: aceptación externa, reintento idempotente y continuidad hasta proyecto, tarea y horas propias. Solicitud interna válida y bolsas reales completas; rechazo de programas activos incompletos o bolsas sin programa. Costos IA, precios y evidencia histórica conservados. Sin aprobar ni editar cotizaciones reales durante las verificaciones.
