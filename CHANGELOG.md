@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.14.9 — 2026-10-27
+
+- Corrige la creación de proyectos con alcance y entregables sobre el esquema productivo: compatibilidad bidireccional entre el título histórico requerido y el nombre canónico, con migración 0090 transaccional antes de servir solicitudes.
+- El alta muestra los errores reales de validación y ofrece abrir el proyecto existente ante un duplicado. Usa estados iniciales válidos, incluye al PM en el equipo visible y conserva autenticación por token al consultar personal y estructuras.
+- Después de crear abre directamente las tareas del proyecto, evitando que el filtro de otro mes o estado en Cartera oculte el resultado. Actualiza el vínculo con su cotización.
+- Verificación con esquema restaurado y alcance anonimizado del caso reportado: variante aceptada, entregables vendidos, equipo, PM, hitos, horas, ciclos mensuales, plantillas Asana y copia de estructura. Los datos y permisos productivos se consultan en sólo lectura.
+
 ## 1.14.8 — 2026-10-27
 
 - Corrige el bloqueo de aprobación de cotizaciones normales cuyo programa de créditos histórico quedó como `{}`. Se interpreta como ausencia de programa, sin inventar términos comerciales ni modificar el registro histórico.

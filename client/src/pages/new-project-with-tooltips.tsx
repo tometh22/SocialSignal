@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getAuthHeader } from "@/lib/queryClient";
+import { ApiError, getApiErrorMessage, parseApiError } from "@/lib/api-error";
+import { Link } from "wouter";
 
 import { z } from "zod";
 import { useForm } from "react-hook-form";
@@ -48,7 +50,7 @@ const formSchema = z.object({
   quotationId: z.number().optional(),
   clientId: z.number({ required_error: "El cliente es requerido" }),
   name: z.string().optional(),
-  status: z.string().min(1, "El estado es requerido"),
+  status: z.enum(["active", "on-hold"]),
   projectCategory: z.enum(["billable", "internal"]).default("billable"),
   internalType: z.enum(["capacitacion", "automatizacion", "demo", "prospeccion", "otro"]).optional(),
   trackingFrequency: z.string().min(1, "La frecuencia es requerida"),
@@ -68,6 +70,7 @@ export default function NewProjectWithTooltips() {
   const [projectTemplate, setProjectTemplate] = useState("none");
   const [memberIds, setMemberIds] = useState<number[]>([]);
   const [projectManagerId, setProjectManagerId] = useState("");
+  const [existingProjectId, setExistingProjectId] = useState<number | null>(null);
   
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -88,10 +91,10 @@ export default function NewProjectWithTooltips() {
   const { data: clientsData, isLoading: clientsLoading } = useQuery({
     queryKey: ["/api/clients"],
   });
-  const { data: personnelData } = useQuery({ queryKey: ["/api/personnel"], queryFn: async () => { const r = await fetch("/api/personnel", { credentials: "include" }); return r.ok ? r.json() : []; } });
+  const { data: personnelData, isError: personnelError, refetch: reloadPersonnel } = useQuery({ queryKey: ["/api/personnel"], queryFn: async () => { const r = await fetch("/api/personnel", { credentials: "include", headers: getAuthHeader() }); if (!r.ok) throw parseApiError(r.status, await r.text()); return r.json(); } });
 
   const { data: templateProjects = [] } = useQuery<Array<{ id: number; name: string; clientName?: string }>>({ queryKey: ["/api/tasks/projects", "templates"], queryFn: async () => {
-    const response = await fetch("/api/tasks/projects?status=active&scope=mine", { credentials: "include" });
+    const response = await fetch("/api/tasks/projects?status=active&scope=mine", { credentials: "include", headers: getAuthHeader() });
     if (!response.ok) throw new Error("No se pudieron cargar las estructuras de proyectos");
     return response.json();
   } });
@@ -150,8 +153,7 @@ export default function NewProjectWithTooltips() {
   // Opciones estáticas
   const statusOptions = [
     { value: "active", label: "Activo" },
-    { value: "on_hold", label: "En pausa" },
-    { value: "planning", label: "En planificación" },
+    { value: "on-hold", label: "En pausa" },
   ];
 
   const trackingOptions = [
@@ -173,24 +175,28 @@ export default function NewProjectWithTooltips() {
         body: JSON.stringify(data),
       });
       if (!response.ok) {
-        throw new Error("Error al crear el proyecto");
+        throw parseApiError(response.status, await response.text());
       }
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (project: { id: number; quotationId?: number | null }) => {
       toast({
         title: "¡Proyecto creado exitosamente!",
-        description: "El proyecto ha sido agregado a tu lista de proyectos activos.",
+        description: "Ya podés organizar las tareas y cargar horas en el proyecto.",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/active-projects"] });
       queryClient.invalidateQueries({ queryKey: ["/api/tasks/projects"] });
       queryClient.invalidateQueries({ queryKey: ["/api/tasks/team-calendar"] });
-      setLocation("/active-projects");
+      if (project.quotationId) queryClient.invalidateQueries({ queryKey: [`/api/active-projects/quotation/${project.quotationId}`] });
+      setLocation(`/tasks/projects/${project.id}`);
     },
-    onError: (error: any) => {
+    onMutate: () => setExistingProjectId(null),
+    onError: (error: unknown) => {
+      const payload = error instanceof ApiError ? error.payload as { projectId?: unknown } : null;
+      if (error instanceof ApiError && error.status === 409 && Number.isInteger(payload?.projectId) && Number(payload?.projectId) > 0) setExistingProjectId(Number(payload?.projectId));
       toast({
         title: "Error al crear proyecto",
-        description: error?.message || "Hubo un error inesperado",
+        description: getApiErrorMessage(error, "No se pudo crear el proyecto. Intentá nuevamente."),
         variant: "destructive",
       });
     },
@@ -253,11 +259,12 @@ export default function NewProjectWithTooltips() {
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)}>
               <CardContent className="space-y-6">
+                {existingProjectId && <div role="alert" className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm">Esta cotización ya tiene un proyecto. <Link className="font-medium underline" href={`/tasks/projects/${existingProjectId}`}>Abrir proyecto existente</Link></div>}
                 <div className="grid gap-4 rounded-lg border p-4 md:grid-cols-2">
                   <div className="min-w-0">
-                    <FormLabel>Plantilla de proyecto</FormLabel>
+                    <FormLabel htmlFor="project-template">Plantilla de proyecto</FormLabel>
                     <Select value={projectTemplate} onValueChange={setProjectTemplate}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectTrigger id="project-template"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="none">Sin plantilla</SelectItem>
                         {projectTemplateCatalog.map(template => <SelectItem key={template.key} value={template.key}>{template.label}</SelectItem>)}
@@ -280,10 +287,11 @@ export default function NewProjectWithTooltips() {
                       </div>
                     </details>}
                   </div>
-                  <div><FormLabel>Project manager</FormLabel><Select value={projectManagerId || "none"} onValueChange={(value) => setProjectManagerId(value === "none" ? "" : value)}><SelectTrigger><SelectValue placeholder="Sin responsable" /></SelectTrigger><SelectContent><SelectItem value="none">Sin responsable</SelectItem>{(Array.isArray(personnelData) ? personnelData : []).map((person: any) => <SelectItem key={person.id} value={String(person.id)}>{person.name}</SelectItem>)}</SelectContent></Select></div>
-                  <div><FormLabel>Miembros del proyecto</FormLabel><div className="mt-2 max-h-36 space-y-1 overflow-y-auto">{(Array.isArray(personnelData) ? personnelData : []).map((person: any) => <label key={person.id} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={memberIds.includes(person.id)} onChange={(event) => setMemberIds(event.target.checked ? [...memberIds, person.id] : memberIds.filter((id) => id !== person.id))} />{person.name}{person.currentRole ? <span className="text-xs text-muted-foreground">· {person.currentRole}</span> : null}</label>)}</div></div>
+                  <div><FormLabel htmlFor="project-manager">Project manager</FormLabel><Select value={projectManagerId || "none"} onValueChange={(value) => setProjectManagerId(value === "none" ? "" : value)}><SelectTrigger id="project-manager"><SelectValue placeholder="Sin responsable" /></SelectTrigger><SelectContent><SelectItem value="none">Sin responsable</SelectItem>{(Array.isArray(personnelData) ? personnelData : []).map((person: any) => <SelectItem key={person.id} value={String(person.id)}>{person.name}</SelectItem>)}</SelectContent></Select></div>
+                  <div><FormLabel>Miembros del proyecto</FormLabel><div className="mt-2 max-h-36 space-y-1 overflow-y-auto">{(Array.isArray(personnelData) ? personnelData : []).map((person: any) => <label key={person.id} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={memberIds.includes(person.id) || String(person.id) === projectManagerId} disabled={String(person.id) === projectManagerId} onChange={(event) => setMemberIds(event.target.checked ? [...memberIds, person.id] : memberIds.filter((id) => id !== person.id))} />{person.name}{person.currentRole ? <span className="text-xs text-muted-foreground">· {person.currentRole}</span> : null}</label>)}</div></div>
                 </div>
                 {/* Selección de cotización */}
+                {personnelError && <div role="alert" className="rounded-md border p-3 text-sm text-destructive">No se pudo cargar el equipo. <Button type="button" variant="link" size="sm" onClick={() => reloadPersonnel()}>Reintentar</Button></div>}
                 <FormField
                   control={form.control}
                   name="quotationId"
@@ -302,6 +310,7 @@ export default function NewProjectWithTooltips() {
                       </div>
                       <Select
                         onValueChange={(value) => {
+                          setExistingProjectId(null);
                           if (value === '__none__') {
                             field.onChange(undefined);
                             return;

@@ -1,3 +1,4 @@
+import { deliverableNameCompatibilityMigrationSql } from "./migrations/deliverable-name-compatibility";
 import { teamSettlementWorkflowMigrationSql } from "./migrations/team-settlement-workflow";
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
@@ -915,6 +916,17 @@ async function applyPendingMigrations() {
       await client.query(teamSettlementWorkflowMigrationSql);
       await client.query("COMMIT");
       console.log("✅ Migration OK: 0089 team settlement workflow");
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    }
+
+    // Fail startup if the production compatibility contract cannot be installed.
+    await client.query("BEGIN");
+    try {
+      await client.query(deliverableNameCompatibilityMigrationSql);
+      await client.query("COMMIT");
+      console.log("✅ Migration OK: 0090 deliverable name compatibility");
     } catch (error) {
       await client.query("ROLLBACK");
       throw error;
