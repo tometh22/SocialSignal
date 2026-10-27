@@ -1,3 +1,4 @@
+import { validatePricingSnapshot } from "./services/quotation-pricing-snapshot";
 import { personalInvoiceReviewQuery } from "./services/personal-invoice-review";
 import { preparePayroll, payrollCalendar, payrollActualHours } from "./services/monthly-payroll";
 import { changeSettlement, assertSettlementInvoiceAllowed, lockSettlementPeriod, notifySettlement } from "./services/personnel-settlement-workflow";
@@ -7032,33 +7033,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     estimatedHours: z.number().finite().positive(),
     hourlyRate: z.number().finite().nonnegative(),
   })).max(100);
-  const validatePricingSnapshot = (quotation: z.infer<typeof insertQuotationSchema>) => {
-    if ((quotation.pricingVersion ?? 1) >= 2 && !(Number(quotation.exchangeRateAtQuote) > 0)) {
-      throw new z.ZodError([{
-        code: z.ZodIssueCode.custom,
-        path: ["exchangeRateAtQuote"],
-        message: "Pricing v2 requiere un tipo de cambio positivo confirmado",
-      }]);
-    }
-    if (quotation.status === "approved" && (quotation.pricingVersion ?? 1) < 2) {
-      throw new z.ZodError([{
-        code: z.ZodIssueCode.custom,
-        path: ["pricingVersion"],
-        message: "La finalización requiere pricing v2",
-      }]);
-    }
-    if (quotation.creditProgram?.enabled) {
-      const start = new Date(`${quotation.creditProgram.validityStart}T00:00:00`);
-      const end = new Date(`${quotation.creditProgram.validityEnd}T23:59:59`);
-      if (!Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime()) || end <= start) {
-        throw new z.ZodError([{
-          code: z.ZodIssueCode.custom,
-          path: ["creditProgram", "validityEnd"],
-          message: "La vigencia de la bolsa debe finalizar después de su inicio",
-        }]);
-      }
-    }
-  };
 
   const quotationInflationFactor = (quotation: z.infer<typeof insertQuotationSchema>) => {
     if (!quotation.applyInflationAdjustment) return 1;
