@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.14.10 — 2026-10-28
+
+- Operaciones puede publicar condiciones antes del corte general por persona, con confirmación explícita, base revisada y motivo auditable. La base publicada queda protegida mientras las horas operativas siguen abiertas; el corte general conserva la liquidación y las facturas existentes.
+- Cierre del equipo distingue guardar base, preparar borrador y publicar. Muestra fecha y estado del corte, habilita Publicar anticipadamente y explica cómo cargar monotributo y extras sin duplicarlos. Mis facturas informa cuando la base fue fijada anticipadamente.
+- La publicación valida versión y base mostrada dentro de la transacción, conserva la autorización de cada tramo y bloquea meses futuros y períodos financieros en revisión o cerrados.
+
 ## 1.14.9 — 2026-10-27
 
 - Corrige la creación de proyectos con alcance y entregables sobre el esquema productivo: compatibilidad bidireccional entre el título histórico requerido y el nombre canónico, con migración 0090 transaccional antes de servir solicitudes.

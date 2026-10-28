@@ -1,3 +1,4 @@
+import { savePersonnelSettlement } from "./services/personnel-settlement-publication";
 import { validatePricingSnapshot } from "./services/quotation-pricing-snapshot";
 import { personalInvoiceReviewQuery } from "./services/personal-invoice-review";
 import { preparePayroll, payrollCalendar, payrollActualHours } from "./services/monthly-payroll";
@@ -14002,99 +14003,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put("/api/finance/personnel-settlements/:personnelId", requireAuth, requirePermission("operations"), async (req, res) => {
     try {
-      const personnelId = Number(req.params.personnelId);
-      const period = String(req.body?.period ?? "");
-      if (!Number.isInteger(personnelId) || personnelId <= 0 || !/^\d{4}-(0[1-9]|1[0-2])$/.test(period)) {
-        return res.status(400).json({ message: "Persona o período inválido" });
-      }
-      const [year, month] = period.split("-").map(Number);
-      const [[person], [closing], [existing]] = await Promise.all([
-        db.select().from(personnel).where(eq(personnel.id, personnelId)).limit(1),
-        db.select().from(monthlyClosings).where(and(
-          eq(monthlyClosings.personnelId, personnelId),
-          eq(monthlyClosings.year, year),
-          eq(monthlyClosings.month, month),
-        )).limit(1),
-        db.select().from(personnelMonthlySettlements).where(and(
-          eq(personnelMonthlySettlements.personnelId, personnelId),
-          eq(personnelMonthlySettlements.period, period),
-        )).limit(1),
-      ]);
-      if (!person) return res.status(404).json({ message: "Persona no encontrada" });
-      if (!closing) return res.status(409).json({ message: "Primero prepará la base de esta persona en Cierre del equipo → Base a cobrar" });
-      const publish = req.body?.publish === true;
-      if (existing?.status === "published" && !publish) {
-        return res.status(409).json({ message: "La liquidación ya está publicada. Para cambiarla, revisá los datos y elegí Actualizar publicación." });
-      }
-
-      const requestedBillingCurrency = String(req.body?.billingCurrency ?? closing.billingCurrency ?? person.billingCurrency ?? "ARS").toUpperCase();
-      const billingCurrency = ["ARS", "USD", "MIXED"].includes(requestedBillingCurrency) ? requestedBillingCurrency : "ARS";
-      const parseNonNegative = (value: unknown, field: string) => {
-        const parsed = Number(value ?? 0);
-        if (!Number.isFinite(parsed) || parsed < 0) throw Object.assign(new Error(`${field} inválido`), { statusCode: 400 });
-        return parsed;
-      };
-      const requestedPercentage = parseNonNegative(req.body?.usdPercentage, "Porcentaje USD");
-      const usdPercentage = billingCurrency === "USD" ? 100 : billingCurrency === "ARS" ? 0 : requestedPercentage;
-      if (usdPercentage > 100) return res.status(400).json({ message: "El porcentaje USD debe estar entre 0 y 100" });
-      const bonusUSD = billingCurrency !== "ARS" ? parseNonNegative(req.body?.bonusUSD, "Bono USD") : 0;
-      const bonusARS = parseNonNegative(req.body?.bonusARS, "Bono ARS");
-      const extrasARS = parseNonNegative(req.body?.extrasARS, "Extra ARS");
-      const totalARS = Number(closing.grandTotalARS ?? closing.totalCost ?? 0);
-      const hoursSnapshot = Number(closing.adjustedHours ?? 0);
-      const hourlyRateARSSnapshot = hoursSnapshot > 0 ? totalARS / hoursSnapshot : 0;
-      const calculated = calculatePersonnelSettlement({
-        totalARS,
-        usdPercentage,
-        bonusUSD,
-        bonusARS,
-        extrasARS,
-        invoiceFx: null,
-        receivedFx: null,
-        bankCommissionUSD: 0,
-      });
-      const status = publish ? "published" : existing?.status === "published" ? "published" : "draft";
-      const values = {
-        contractTypeSnapshot: person.contractType ?? "full-time",
-        billingCurrencySnapshot: billingCurrency,
-        hoursSnapshot,
-        hourlyRateARSSnapshot,
-        totalARS,
-        usdPercentage,
-        plannedUSDARS: calculated.plannedUSDARS,
-        bonusUSD,
-        bonusARS,
-        extrasARS,
-        baseInvoiceUSD: calculated.baseInvoiceUSD,
-        totalInvoiceUSD: calculated.totalInvoiceUSD,
-        pesifiedBaseARS: calculated.pesifiedBaseARS,
-        finalInvoiceARS: calculated.finalInvoiceARS,
-        adminNotes: String(req.body?.adminNotes ?? "").trim().slice(0, 2000) || null,
-        status,
-        publishedBy: publish ? req.user!.id : existing?.publishedBy ?? null,
-        publishedAt: publish ? new Date() : existing?.publishedAt ?? null,
-        updatedAt: new Date(),
-      };
-      const saved = await db.transaction(async tx => {
-        await lockSettlementPeriod(tx, period);
-        if (publish && !(await tx.execute(sql`SELECT 1 FROM payroll_periods WHERE period=${period} AND state='cut'`)).rows.length) throw Object.assign(new Error("Primero completá el corte de horas del paso 1."), { statusCode: 409 });
-        const [current] = await tx.select().from(personnelMonthlySettlements).where(and(eq(personnelMonthlySettlements.personnelId, personnelId), eq(personnelMonthlySettlements.period, period))).for("update");
-        const flow = settlementWorkflow(current?.workflow);
-        if (Number(req.body?.version ?? 0) !== flow.version) throw Object.assign(new Error("La liquidación cambió. Actualizá antes de publicar."), { statusCode: 409 });
-        const [document] = current ? await tx.select({ id: personalMonthlyInvoices.id }).from(personalMonthlyInvoices).where(eq(personalMonthlyInvoices.settlementId, current.id)).limit(1) : [];
-        if (document || [flow.usd.status, flow.ars.status].some(status => status === "pending" || status === "approved")) throw Object.assign(new Error("Ya hay importes enviados o facturas. Resolvé los tramos antes de cambiar las condiciones."), { statusCode: 409 });
-        const [currentClose] = await tx.select().from(monthlyClosings).where(eq(monthlyClosings.id, closing.id));
-        if (Number(currentClose?.grandTotalARS ?? currentClose?.totalCost) !== totalARS || currentClose?.adjustedHours !== closing.adjustedHours) throw Object.assign(new Error("La base cambió. Actualizá antes de publicar."), { statusCode: 409 });
-        const [result] = await tx.insert(personnelMonthlySettlements)
-          .values({ personnelId, period, createdBy: req.user!.id, ...values, workflow: { ...settlementWorkflow(), version: flow.version + 1 } })
-          .onConflictDoUpdate({ target: [personnelMonthlySettlements.personnelId, personnelMonthlySettlements.period], set: { ...values, invoiceFx: null, receivedFx: null, bankCommissionUSD: 0, workflow: { ...settlementWorkflow(), version: flow.version + 1 } } }).returning();
-        return result;
-      });
-      if (publish) await notifySettlement(saved, "person", "Tu cierre está listo: completá el siguiente paso").catch(console.error);
+      const saved = await savePersonnelSettlement(Number(req.params.personnelId), req.user!.id, req.body);
+      if (saved.status === "published") await notifySettlement(saved, "person", "Tu cierre está listo: completá el siguiente paso").catch(console.error);
       res.json(saved);
     } catch (error: any) {
-      console.error("Error guardando liquidación mensual:", error);
-      res.status(error?.statusCode ?? 500).json({ message: error?.message ?? "No se pudo guardar la liquidación" });
+      if (!error?.statusCode) console.error("Error guardando liquidación mensual", { code: error?.code ?? error?.cause?.code, column: error?.column ?? error?.cause?.column, constraint: error?.constraint ?? error?.cause?.constraint });
+      res.status(error?.statusCode ?? 500).json({ message: error?.statusCode ? error.message : "No se pudo guardar la liquidación" });
     }
   });
 
@@ -26767,7 +26681,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const period = req.params.period;
       const calendar = await payrollCalendar(period);
       const state = (await db.execute(sql`SELECT * FROM payroll_periods WHERE period=${period}`)).rows[0] ?? { state: "open", issues: [] };
-      res.json({ ...state, ...calendar, canCut: new Date() >= calendar.cutoffAt });
+      res.json({ ...state, ...calendar, canCut: new Date() >= calendar.cutoffAt, canPublishEarly: period <= civilDateInBuenosAires(new Date()).slice(0, 7) });
     } catch (error: any) { res.status(400).json({ message: error.message }); }
   });
   app.post("/api/payroll-period/:period/:action", requireAuth, requirePermission("operations"), async (req, res) => {

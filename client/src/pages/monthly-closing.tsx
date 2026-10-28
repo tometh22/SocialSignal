@@ -18,7 +18,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, authFetchJson } from "@/lib/queryClient";
 import { getApiErrorMessage } from "@/lib/api-error";
 import { Loader2, Check, X, ExternalLink, ChevronDown, Copy, Download } from "lucide-react";
 import { Link } from "wouter";
@@ -51,31 +51,23 @@ export default function MonthlyClosing({ period, onDirtyChange }: { period: stri
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [reopenReason, setReopenReason] = useState("");
-  const cutoff = useQuery<any>({ queryKey: ["payroll-period",period], queryFn: async () => { const r = await fetch(`/api/payroll-period/${period}`, {credentials:"include"}); if (!r.ok) throw new Error("No se pudo cargar el corte"); return r.json(); } });
+  const cutoff = useQuery<any>({ queryKey: ["payroll-period",period], queryFn: async () => { return authFetchJson(`/api/payroll-period/${period}`); } });
   const prepare = useMutation({ mutationFn: (action: string) => apiRequest(`/api/payroll-period/${period}/${action}`, "POST", {reason:reopenReason}), onSuccess: () => { queryClient.invalidateQueries({queryKey:["payroll-period"]}); queryClient.invalidateQueries({queryKey:["/api/monthly-closings"]}); queryClient.invalidateQueries({queryKey:["personnel-settlements"]}); toast({title:"Corte actualizado",description:"Revisá los pendientes y continuá al paso 2."}); }, onError:(error:Error)=>toast({title:"No se pudo actualizar",description:error.message,variant:"destructive"}) });
 
-  const settlements = useQuery<any[]>({ queryKey: ["personnel-settlements", period], queryFn: async () => { const response = await fetch(`/api/finance/personnel-settlements?period=${period}`, {credentials:"include"}); if (!response.ok) throw new Error("No se pudieron cargar las publicaciones"); return response.json(); }, refetchOnWindowFocus: false });
+  const settlements = useQuery<any[]>({ queryKey: ["personnel-settlements", period], queryFn: async () => { return authFetchJson(`/api/finance/personnel-settlements?period=${period}`); }, refetchOnWindowFocus: false });
   const publishedIds = new Set((settlements.data ?? []).filter(row => row.settlement?.status === "published").map(row => row.person.id));
 
   const { data: personnel, isLoading: personnelLoading } = useQuery<any[]>({ queryKey: ["/api/personnel"] });
   const { data: closings, isLoading: closingsLoading } = useQuery<any[]>({
     queryKey: ["/api/monthly-closings", year, month + 1],
-    queryFn: () =>
-      fetch(`/api/monthly-closings?year=${year}&month=${month + 1}`, {
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-      }).then((r) => r.json()),
+    queryFn: () => authFetchJson(`/api/monthly-closings?year=${year}&month=${month + 1}`),
   });
-  const { data: declarations = [], refetch: refetchDeclarations } = useQuery<any[]>({ queryKey: ["monthly-settlement-declarations"], queryFn: () => fetch("/api/monthly-settlement-declarations", { credentials: "include" }).then((r) => r.ok ? r.json() : []) });
+  const { data: declarations = [], refetch: refetchDeclarations } = useQuery<any[]>({ queryKey: ["monthly-settlement-declarations"], queryFn: () => authFetchJson("/api/monthly-settlement-declarations") });
   const declarationReview = useMutation({ mutationFn: ({ id, action, reason, submittedAt }: { id: number; action: string; reason?: string; submittedAt: string }) => apiRequest(`/api/monthly-settlement-declarations/${id}`, "PATCH", { action, reason, submittedAt }), onSuccess: () => { refetchDeclarations(); toast({ title: "Declaración revisada" }); }, onError: (error: Error) => toast({ title: "No se pudo revisar", description: error.message, variant: "destructive" }) });
   // Real hours logged per person for the month (time_entries + task_time_entries)
   const { data: realHoursMap = {} } = useQuery<Record<number, number>>({
     queryKey: ["/api/monthly-closings/real-hours", year, month + 1],
-    queryFn: () =>
-      fetch(`/api/monthly-closings/real-hours?year=${year}&month=${month + 1}`, {
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-      }).then((r) => r.json()),
+    queryFn: () => authFetchJson(`/api/monthly-closings/real-hours?year=${year}&month=${month + 1}`),
   });
   // Rehydrate saved adjustments when closings load (so manual edits survive reload)
   useEffect(() => {
@@ -98,7 +90,7 @@ export default function MonthlyClosing({ period, onDirtyChange }: { period: stri
       queryClient.invalidateQueries({ queryKey: ["/api/monthly-closings"] });
       queryClient.invalidateQueries({ queryKey: ["personnel-settlements"] });
       setExpandedAdj(null);
-      toast({ title: "Base guardada", description: "Seguí en el paso 2: Facturación y seguimiento." });
+      toast({ title: "Base guardada", description: "En el paso 2 podés guardar las condiciones o publicarlas anticipadamente. Las horas siguen abiertas hasta el corte general." });
     },
     onError: (error) => {
       toast({
@@ -294,10 +286,10 @@ export default function MonthlyClosing({ period, onDirtyChange }: { period: stri
     <div className="min-w-0 space-y-5">
       <div className="space-y-3 rounded-xl border bg-muted/20 p-4">
         <div className="flex flex-wrap items-center justify-between gap-2"><p className="font-semibold">Corte de horas</p><Badge variant="outline">{cutoff.data?.state === "cut" ? "Horas con corte" : "Horas abiertas"}</Badge></div>
-        <p className="text-sm text-muted-foreground">{cutoff.data?.day ? format(new Date(`${cutoff.data.day}T12:00:00`), "d 'de' MMMM", {locale:es}) : "Cargando fecha…"} · 23:59, Buenos Aires. Mind congela las horas y prepara los borradores.</p>
+        <p className="text-sm text-muted-foreground">{cutoff.data?.day ? format(new Date(`${cutoff.data.day}T12:00:00`), "d 'de' MMMM", {locale:es}) : "Cargando fecha…"} · 23:59, Buenos Aires. En esa fecha Mind congela las horas y prepara los borradores. Guardar una base no ejecuta el corte; podés habilitar la facturación anticipada por persona desde el paso 2.</p>
         {cutoff.isError && <p role="alert" className="text-sm text-destructive">No se pudo cargar el corte. Actualizá la página antes de continuar.</p>}
         {cutoff.data?.issues?.map((issue:string)=><p key={issue} className="text-sm text-amber-800">{issue}</p>)}
-        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap"><Button disabled={prepare.isPending || cutoff.isError || hasUnsavedChanges} onClick={()=>prepare.mutate("prepare")}>{prepare.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}Preparar bases y borradores</Button>{cutoff.data?.state !== "cut" && <Button variant="outline" disabled={prepare.isPending || !cutoff.data?.canCut} onClick={()=>prepare.mutate("cut")}>Ejecutar corte pendiente</Button>}</div>
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap"><Button disabled={prepare.isPending || cutoff.isError || hasUnsavedChanges} onClick={()=>prepare.mutate("prepare")}>{prepare.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}Preparar bases y borradores</Button>{cutoff.data?.state !== "cut" && <Button variant="outline" disabled={prepare.isPending || !cutoff.data?.canCut} onClick={()=>prepare.mutate("cut")}>Realizar corte general</Button>}</div>
         {cutoff.data?.state === "cut" && (publishedIds.size > 0 ? <p className="text-xs text-muted-foreground">Las bases publicadas están protegidas. La facturación continúa en el paso 2.</p> : <details><summary className="cursor-pointer text-sm font-medium">Corregir horas antes de publicar</summary><div className="mt-3 flex flex-col gap-2 sm:flex-row"><Input aria-label="Motivo de reapertura" value={reopenReason} onChange={e=>setReopenReason(e.target.value)} placeholder="Motivo de la corrección"/><Button variant="outline" disabled={prepare.isPending || reopenReason.trim().length < 5} onClick={()=>prepare.mutate("reopen")}>Reabrir horas</Button></div></details>)}
       </div>
       {/* Re-close confirmation dialog */}

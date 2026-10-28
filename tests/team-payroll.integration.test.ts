@@ -16,6 +16,7 @@ vi.mock("../server/services/user-notifications",()=>({createUserNotifications:vi
 import { pool, db } from "../server/db";
 import { runTeamPayroll } from "../server/jobs/team-payroll";
 import { personalInvoiceReviewQuery } from "../server/services/personal-invoice-review";
+import { savePersonnelSettlement } from "../server/services/personnel-settlement-publication";
 import { preparePayroll, payrollActualHours } from "../server/services/monthly-payroll";
 import { changeSettlement, assertSettlementInvoiceAllowed } from "../server/services/personnel-settlement-workflow";
 
@@ -52,6 +53,82 @@ describe.skipIf(!setup.url)("team payroll workflow with PostgreSQL",()=>{
     await preparePayroll(period,2,{cut:true,now:new Date("2026-10-31T03:00:00Z")});
     return (await query("UPDATE personnel_monthly_settlements SET status='published',billing_currency_snapshot=$1,usd_percentage=$2,planned_usd_ars=$3 WHERE personnel_id=1 RETURNING *",[mixed?"MIXED":"ARS",mixed?90:0,mixed?9000:0])).rows[0];
   }
+  const earlyNow = new Date("2026-10-28T15:00:00Z");
+  async function publicationInput(overrides: Record<string, unknown> = {}) {
+    const closing = (await query("SELECT * FROM monthly_closings WHERE personnel_id=1 AND year=2026 AND month=10")).rows[0];
+    const current = (await query("SELECT * FROM personnel_monthly_settlements WHERE personnel_id=1 AND period=$1", [period])).rows[0];
+    return { period, version: current?.workflow?.version ?? 0, publish: true, billingCurrency: "ARS", usdPercentage: 0,
+      expectedBase: { closingId: closing.id, hours: closing.adjusted_hours, totalARS: closing.grand_total_ars },
+      earlyPublication: { confirmed: true, reason: "Facturación anticipada con base revisada" }, ...overrides };
+  }
+  it("requires an explicit early confirmation and the displayed base, while drafts remain available", async () => {
+    await preparePayroll(period, 2);
+    await expect(savePersonnelSettlement(1,2,await publicationInput({earlyPublication:undefined}),earlyNow)).rejects.toThrow("Publicar anticipadamente");
+    await expect(savePersonnelSettlement(1,2,await publicationInput({earlyPublication:{confirmed:true,reason:"x"}}),earlyNow)).rejects.toThrow("motivo");
+    await expect(savePersonnelSettlement(1,2,await publicationInput({expectedBase:undefined}),earlyNow)).rejects.toThrow("base actual");
+    await expect(savePersonnelSettlement(1,2,await publicationInput({expectedBase:{closingId:0,hours:120,totalARS:1}}),earlyNow)).rejects.toThrow("base cambió");
+    const draft=await savePersonnelSettlement(1,2,await publicationInput({publish:false,earlyPublication:undefined}),earlyNow);
+    expect(draft.status).toBe("draft");
+    expect((await query("SELECT * FROM payroll_periods")).rows).toHaveLength(0);
+    expect((await query("SELECT * FROM financial_audit_events WHERE action='settlement_published_early'")).rows).toHaveLength(0);
+  });
+  it("publishes one person early, records who and why, and completes ARS authorization while hours stay open", async () => {
+    await preparePayroll(period,2);
+    const row=await savePersonnelSettlement(1,2,await publicationInput({extrasARS:1000}),earlyNow);
+    expect(row.status).toBe("published");expect(row.workflow.publication).toEqual({beforeCut:true,actorId:2,at:earlyNow.toISOString(),reason:"Facturación anticipada con base revisada"});
+    expect((await query("SELECT * FROM payroll_periods")).rows).toHaveLength(0);
+    const audit=(await query("SELECT actor_user_id,reason,after_data FROM financial_audit_events WHERE action='settlement_published_early'")).rows[0];
+    expect(audit.actor_user_id).toBe(2);expect(audit.reason).toContain("base revisada");expect(audit.after_data.operationalHoursRemainOpen).toBe(true);
+    await query("INSERT INTO tasks(id,title) VALUES(1,'QA'); INSERT INTO task_time_entries(task_id,personnel_id,date,hours) VALUES(1,1,'2026-10-29',4)");
+    const submitted=await changeSettlement(row.id,1,false,{phase:"ars",action:"submit",version:1,extrasARS:500,extrasReason:"Monotributo pendiente"});
+    expect(submitted.finalInvoiceARS).toBe(row.totalARS+1500);
+    const approved=await changeSettlement(row.id,2,true,{phase:"ars",action:"approve",version:2});
+    expect(assertSettlementInvoiceAllowed(approved,"single","ARS")).toBe(row.totalARS+1500);
+    expect(approved.workflow.publication).toEqual(row.workflow.publication);
+    await expect(savePersonnelSettlement(1,2,await publicationInput(),earlyNow)).rejects.toThrow("importes enviados");
+  });
+  it("keeps an early freelance base and invoices unchanged through preparation and the general cut", async () => {
+    await query("UPDATE personnel SET contract_type='freelance'; INSERT INTO tasks(id,title) VALUES(1,'QA'); INSERT INTO task_time_entries(task_id,personnel_id,date,hours) VALUES(1,1,'2026-10-27',10)");
+    await preparePayroll(period,2);
+    const row=await savePersonnelSettlement(1,2,await publicationInput({billingCurrency:'MIXED',usdPercentage:90}),earlyNow);
+    await changeSettlement(row.id,1,false,{phase:'usd',action:'submit',version:1,invoiceFx:1500});
+    await changeSettlement(row.id,2,true,{phase:'usd',action:'approve',version:2});
+    await query("INSERT INTO personal_monthly_invoices(user_id,personnel_id,settlement_id,period,invoice_component,invoice_currency,approval_status) VALUES(1,1,$1,$2,'usd','USD','approved')",[row.id,period]);
+    const before=(await query("SELECT to_jsonb(m) closing,to_jsonb(s) settlement FROM monthly_closings m JOIN personnel_monthly_settlements s ON s.personnel_id=m.personnel_id")).rows[0];
+    await query("INSERT INTO task_time_entries(task_id,personnel_id,date,hours) VALUES(1,1,'2026-10-29',3); INSERT INTO personnel(id,name,role_id,contract_type,monthly_hours) VALUES(3,'Otro colaborador',1,'full-time',160); INSERT INTO personnel_historical_costs(personnel_id,year,month,hourly_rate_ars,is_active) VALUES(3,2026,10,100,true)");
+    expect((await payrollActualHours(period))[1]).toBe(13);
+    await preparePayroll(period,2);
+    await preparePayroll(period,2,{cut:true,now:new Date('2026-10-31T03:00:00Z')});
+    const after=(await query("SELECT to_jsonb(m) closing,to_jsonb(s) settlement FROM monthly_closings m JOIN personnel_monthly_settlements s ON s.personnel_id=m.personnel_id WHERE m.personnel_id=1")).rows[0];
+    expect(after).toEqual(before);expect(after.closing.adjusted_hours).toBe(10);
+    expect((await query("SELECT status FROM personnel_monthly_settlements WHERE personnel_id=3")).rows[0].status).toBe('draft');
+    expect((await query("SELECT * FROM personal_monthly_invoices WHERE settlement_id=$1",[row.id])).rows).toHaveLength(1);
+    await expect(query("UPDATE task_time_entries SET hours=11 WHERE personnel_id=1")).rejects.toMatchObject({code:'23514'});
+  });
+  it("retains normal publication after the general cut and the initial early evidence on updates", async () => {
+    await preparePayroll(period,2);
+    const early=await savePersonnelSettlement(1,2,await publicationInput(),earlyNow);
+    const updated=await savePersonnelSettlement(1,2,await publicationInput({earlyPublication:undefined,bonusARS:100}),earlyNow);
+    expect(updated.workflow.publication).toEqual(early.workflow.publication);
+    await preparePayroll(period,2,{cut:true,now:new Date('2026-10-31T03:00:00Z')});
+    expect((await savePersonnelSettlement(1,2,await publicationInput({earlyPublication:undefined}),earlyNow)).workflow.publication).toEqual(early.workflow.publication);
+    await query("DELETE FROM personnel_monthly_settlements");
+    const normal=await savePersonnelSettlement(1,2,await publicationInput({earlyPublication:undefined}),earlyNow);
+    expect(normal.workflow.publication?.beforeCut).toBe(false);
+  });
+  it("rejects future publication, stale versions, competing publications and financial review", async () => {
+    await preparePayroll(period,2);
+    const input=await publicationInput();
+    const competing=await Promise.allSettled([savePersonnelSettlement(1,2,input,earlyNow),savePersonnelSettlement(1,2,input,earlyNow)]);
+    expect(competing.filter(r=>r.status==='fulfilled')).toHaveLength(1);
+    await expect(savePersonnelSettlement(1,2,input,earlyNow)).rejects.toThrow('cambió');
+    await query("INSERT INTO monthly_closings(personnel_id,year,month,adjusted_hours,grand_total_ars,total_cost) VALUES(1,2026,11,120,10000,10000)");
+    const future={period:'2026-11',publish:false,billingCurrency:'ARS'};
+    await savePersonnelSettlement(1,2,future,earlyNow);
+    await expect(savePersonnelSettlement(1,2,{...future,publish:true,version:1,earlyPublication:input.earlyPublication},earlyNow)).rejects.toThrow('mes futuro');
+    await query("INSERT INTO financial_close_periods(period_key,status) VALUES($1,'IN_REVIEW')",[period]);
+    await expect(savePersonnelSettlement(1,2,await publicationInput(),earlyNow)).rejects.toThrow('financiero está bloqueado');
+  });
   it("starts automation at its activation month without publishing or cutting history",async()=>{
     await query("INSERT INTO system_config(config_key,config_value,description) VALUES('payroll_automation_start',1,$1)",[period]);
     await runTeamPayroll(new Date("2026-10-31T03:00:00Z"));

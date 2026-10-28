@@ -35,7 +35,7 @@ export default function TeamMonthlyClose() {
         <TabsTrigger value="invoices" className="min-h-11 whitespace-normal text-center">2. Facturación y seguimiento</TabsTrigger>
       </TabsList>
       <TabsContent value="base" forceMount hidden={step !== "base"}><MonthlyClosing key={period} period={period} onDirtyChange={setBaseDirty} /></TabsContent>
-      <TabsContent value="invoices" forceMount hidden={step !== "invoices"}><TeamSettlements key={period} period={period} onDirtyChange={setInvoicesDirty} /></TabsContent>
+      <TabsContent value="invoices" forceMount hidden={step !== "invoices"}><TeamSettlements key={period} period={period} onDirtyChange={setInvoicesDirty} onGoToBase={() => setStep("base")} /></TabsContent>
     </Tabs>
     <details className="rounded-lg border bg-muted/30 p-3 text-sm"><summary className="cursor-pointer font-medium">¿En qué se diferencia del cierre financiero?</summary><p className="mt-2 text-muted-foreground">El cierre del equipo prepara la remuneración y sus facturas. En el <strong>cierre financiero</strong>, Finanzas concilia ingresos, costos, cuentas y movimientos de toda la empresa y aprueba el resultado del mes.</p></details>
   </div>;
