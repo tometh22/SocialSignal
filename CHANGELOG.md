@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.14.12 — 2026-10-28
+
+- Los comprobantes se revisan dentro de Mind, con visor PDF de páginas y zoom, vista de imágenes/texto y descarga del original. Conserva los permisos existentes y el almacenamiento privado; los recursos del visor se sirven localmente.
+- Mis facturas distingue los adicionales ya incluidos por Operaciones de los extras nuevos del colaborador y muestra su suma, evitando volver a cargar monotributo o reintegros ya contemplados.
+
 ## 1.14.11 — 2026-10-28
 
 - Cierre del equipo muestra el siguiente paso cuando una factura espera revisión y permite abrir el comprobante exacto en Facturas del equipo, según los permisos existentes de Finanzas.
