@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "wouter";
+import { usePermissions } from "@/hooks/use-permissions";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertCircle, Check, FileText, Loader2, Receipt, Search, X } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -55,9 +57,17 @@ function componentLabel(component?: string) {
   return component === "usd" ? "Factura USD · fin de mes" : component === "ars" ? "Factura ARS · diferencia" : "Factura mensual";
 }
 
+function selectedId(key: string) {
+  const value = new URLSearchParams(window.location.search).get(key) ?? "";
+  return /^[1-9]\d*$/.test(value) && Number.isSafeInteger(Number(value)) ? Number(value) : null;
+}
+
 export default function TeamInvoiceReview() {
+  const { hasPermission } = usePermissions();
+  const [focusedInvoiceId, setFocusedInvoiceId] = useState<number | null>(() => selectedId("invoiceId"));
+  const [focusedPersonnelId, setFocusedPersonnelId] = useState<number | null>(() => selectedId("personnelId"));
   const [period, setPeriod] = useState(() => { const saved = new URLSearchParams(window.location.search).get("period"); return saved && /^\d{4}-(0[1-9]|1[0-2])$/.test(saved) ? saved : currentPeriod(); });
-  useEffect(() => { const url = new URL(window.location.href); url.searchParams.set("period",period); window.history.replaceState(window.history.state,"",url); }, [period]);
+  useEffect(() => { const url = new URL(window.location.href); url.searchParams.set("period",period); for (const [key, value] of [["invoiceId", focusedInvoiceId], ["personnelId", focusedPersonnelId]] as const) { if (value) url.searchParams.set(key, String(value)); else url.searchParams.delete(key); } window.history.replaceState(window.history.state,"",url); }, [period, focusedInvoiceId, focusedPersonnelId]);
   const [search, setSearch] = useState("");
   const [correction, setCorrection] = useState<ReviewInvoice | null>(null);
   const [reason, setReason] = useState("");
@@ -76,6 +86,9 @@ export default function TeamInvoiceReview() {
       }),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["team-invoice-review", period] });
+      queryClient.invalidateQueries({ queryKey: ["personnel-settlements", period] });
+      queryClient.invalidateQueries({ queryKey: ["personal-settlement", period] });
+      queryClient.invalidateQueries({ queryKey: ["personal-invoices"] });
       setCorrection(null);
       setReason("");
       toast({
@@ -83,11 +96,11 @@ export default function TeamInvoiceReview() {
         description: variables.status === "approved" ? "El costo operativo no cambió." : undefined,
       });
     },
-    onError: (error: Error) => toast({ title: "No se pudo actualizar", description: error.message, variant: "destructive" }),
+    onError: (error: Error) => { queryClient.invalidateQueries({ queryKey: ["team-invoice-review", period] }); toast({ title: "No se pudo actualizar", description: error.message, variant: "destructive" }); },
   });
 
   const invoices = query.data ?? [];
-  const rows = useMemo(() => invoices.filter((invoice) => `${invoice.personnel_name ?? ""} ${invoice.user_name ?? ""} ${invoice.email ?? ""} ${invoice.invoice_number ?? ""}`.toLowerCase().includes(search.trim().toLowerCase())), [invoices, search]);
+  const rows = useMemo(() => invoices.filter((invoice) => (!focusedInvoiceId || invoice.id === focusedInvoiceId) && `${invoice.personnel_name ?? ""} ${invoice.user_name ?? ""} ${invoice.email ?? ""} ${invoice.invoice_number ?? ""}`.toLowerCase().includes(search.trim().toLowerCase())), [invoices, search, focusedInvoiceId]);
   const pending = invoices.filter((invoice) => invoice.approval_status === "pending").length;
   const approved = invoices.filter((invoice) => invoice.approval_status === "approved").length;
   const mismatches = invoices.filter((invoice) => {
@@ -110,6 +123,15 @@ export default function TeamInvoiceReview() {
       <p className="mt-1 max-w-3xl text-sm text-muted-foreground">Compará cada factura con el número final publicado por Operaciones. Aprobarla crea el Pasivo en el mes de emisión; nunca modifica Costos ni la rentabilidad.</p>
     </div>
 
+    {focusedInvoiceId && <div className="space-y-3 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm">
+      <p className="font-medium">Mostrando el comprobante seleccionado desde el cierre del equipo.</p>
+      {rows[0]?.approval_status === "approved" ? <p>{rows[0].invoice_currency === "USD" ? "Factura USD aprobada. Cuando la persona reciba el dinero, continúa en Mis facturas: confirma el cobro, carga el TC y los extras y envía el importe ARS a Operaciones." : "Factura ARS aprobada y registrada en Pasivo. Este tramo está completo."}</p> : rows[0]?.approval_status === "rejected" ? <p>El comprobante fue devuelto. La persona debe corregirlo y volver a adjuntarlo en Mis facturas; Administración revisará esa nueva versión.</p> : <p>Primero abrí el comprobante y verificá sus datos. Si está correcto, elegí Aprobar y crear Pasivo; si necesita cambios, elegí Pedir corrección.</p>}
+      <div className="flex flex-col gap-2 sm:flex-row">
+        {hasPermission("operations") && <Button asChild variant="outline" className="h-auto min-h-10 whitespace-normal"><Link href={`/operations/liquidaciones-equipo?period=${encodeURIComponent(period)}${focusedPersonnelId ? `&personnelId=${focusedPersonnelId}` : ""}`}>Volver al cierre de la persona</Link></Button>}
+        <Button variant="outline" className="h-auto min-h-10 whitespace-normal" onClick={() => { setFocusedInvoiceId(null); setFocusedPersonnelId(null); setSearch(""); }}>Ver todas las facturas del mes</Button>
+      </div>
+    </div>}
+    {focusedInvoiceId && <p className="text-xs text-muted-foreground">Resumen de todas las facturas del mes</p>}
     <div className="grid grid-cols-3 gap-2 sm:gap-3">
       <Metric label="Esperando revisión" value={pending} />
       <Metric label="Con diferencia" value={mismatches} warning={mismatches > 0} />
@@ -117,13 +139,13 @@ export default function TeamInvoiceReview() {
     </div>
 
     <Card><CardContent className="flex flex-col gap-3 pt-6 sm:pt-6 sm:flex-row">
-      <div className="sm:w-56"><Label htmlFor="invoice-review-period">Período trabajado</Label><Input id="invoice-review-period" className="mt-1.5" type="month" value={period} onChange={(event) => { if (/^\d{4}-(0[1-9]|1[0-2])$/.test(event.target.value)) setPeriod(event.target.value); }} /></div>
+      <div className="sm:w-56"><Label htmlFor="invoice-review-period">Período trabajado</Label><Input id="invoice-review-period" className="mt-1.5" type="month" value={period} onChange={(event) => { if (/^\d{4}-(0[1-9]|1[0-2])$/.test(event.target.value)) { setPeriod(event.target.value); setFocusedInvoiceId(null); setFocusedPersonnelId(null); } }} /></div>
       <div className="min-w-0 flex-1"><Label htmlFor="invoice-review-search">Buscar</Label><div className="relative mt-1.5"><Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" /><Input id="invoice-review-search" className="pl-9" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Persona o número de factura" /></div></div>
     </CardContent></Card>
 
     {query.isLoading && <div className="flex justify-center gap-2 py-12 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />Cargando facturas…</div>}
     {query.isError && <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900">No se pudieron cargar las facturas.</div>}
-    {!query.isLoading && !query.isError && !rows.length && <div className="rounded-xl border border-dashed p-10 text-center text-sm text-muted-foreground">{search.trim() ? "No hay facturas que coincidan con la búsqueda." : "No hay facturas enviadas para este período trabajado."}</div>}
+    {!query.isLoading && !query.isError && !rows.length && <div className="rounded-xl border border-dashed p-10 text-center text-sm text-muted-foreground">{focusedInvoiceId ? "No encontramos el comprobante seleccionado en este período. Podés ver todas las facturas del mes o volver al cierre." : search.trim() ? "No hay facturas que coincidan con la búsqueda." : "No hay facturas enviadas para este período trabajado."}</div>}
 
     <div className="space-y-3">{rows.map((invoice) => {
       const target = expected(invoice);

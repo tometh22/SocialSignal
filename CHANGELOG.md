@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.14.11 — 2026-10-28
+
+- Cierre del equipo muestra el siguiente paso cuando una factura espera revisión y permite abrir el comprobante exacto en Facturas del equipo, según los permisos existentes de Finanzas.
+- La revisión conserva el mes y el contexto de la persona, explica cómo continuar después de aprobar y permite volver a su cierre. Refresca los estados compartidos al aprobar o pedir correcciones.
+- Los indicadores distinguen factura enviada, en revisión, aprobada y a corregir; se oculta el campo de corrección del importe cuando corresponde revisar el comprobante.
+
 ## 1.14.10 — 2026-10-28
 
 - Operaciones puede publicar condiciones antes del corte general por persona, con confirmación explícita, base revisada y motivo auditable. La base publicada queda protegida mientras las horas operativas siguen abiertas; el corte general conserva la liquidación y las facturas existentes.

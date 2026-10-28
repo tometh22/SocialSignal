@@ -1,6 +1,8 @@
 import { settlementProgress as workflow } from "@shared/utils/settlement-progress";
 import { settlementWorkflow as normalizeWorkflow, type SettlementWorkflow, type SettlementPhase } from "@shared/utils/settlement-workflow";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Link } from "wouter";
+import { usePermissions } from "@/hooks/use-permissions";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -43,7 +45,7 @@ type SettlementRow = {
   system: { hours: number | null; hourlyRateARS: number | null; totalARS: number | null };
   settlement: Settlement | null;
   suggestion: { sourcePeriod: string; billingCurrency: string; usdPercentage: number } | null;
-  invoices: Array<{ id: number; invoiceComponent: "single" | "usd" | "ars"; approvalStatus: "pending" | "approved" | "rejected"; documentCount: number; uploadedAt: string; reviewReason: string | null }>;
+  invoices: Array<{ id: number; invoiceComponent: "single" | "usd" | "ars"; invoiceCurrency?: string | null; approvalStatus: "pending" | "approved" | "rejected"; documentCount: number; uploadedAt: string; reviewReason: string | null }>;
 };
 type Draft = { version: number; billingCurrency: BillingCurrency; usdPercentage: string; bonusUSD: string; bonusARS: string; extrasARS: string; adminNotes: string };
 type WorkflowGroup = "ops" | "team" | "review" | "done" | "no_close";
@@ -91,10 +93,14 @@ function usd(value: number | null | undefined) {
 export default function TeamSettlements({ period, onDirtyChange, onGoToBase }: { period: string; onDirtyChange: (dirty: boolean) => void; onGoToBase: () => void }) {
   const [search, setSearch] = useState("");
   const dirtyIds = useRef(new Set<number>());
-  const [scope, setScope] = useState("ops");
+  const [focusedPersonId, setFocusedPersonId] = useState<number | null>(() => {
+    const value = new URLSearchParams(window.location.search).get("personnelId") ?? "";
+    return /^[1-9]\d*$/.test(value) && Number.isSafeInteger(Number(value)) ? Number(value) : null;
+  });
+  const [scope, setScope] = useState(() => focusedPersonId ? "all" : "ops");
   const [drafts, setDrafts] = useState<Record<number, Draft>>({});
   useEffect(() => { onDirtyChange(dirtyIds.current.size > 0); }, [drafts, onDirtyChange]);
-  const [openId, setOpenId] = useState<number | null>(null);
+  const [openId, setOpenId] = useState<number | null>(focusedPersonId);
   const [earlyTarget, setEarlyTarget] = useState<SettlementRow | null>(null);
   const [earlyReason, setEarlyReason] = useState("");
   const [earlyOpen, setEarlyOpen] = useState(false);
@@ -162,11 +168,12 @@ export default function TeamSettlements({ period, onDirtyChange, onGoToBase }: {
     return result;
   }, { ops: 0, team: 0, review: 0, done: 0, no_close: 0 } as Record<WorkflowGroup, number>), [allRows]);
   const rows = useMemo(() => allRows.filter((row) => {
+    if (focusedPersonId && row.person.id !== focusedPersonId) return false;
     const group = workflow(row).group;
     if (scope !== "all" && scope !== "ready" && group !== scope) return false;
     if (scope === "ready" && !row.closing) return false;
     return `${row.person.name} ${row.person.email ?? ""}`.toLowerCase().includes(search.trim().toLowerCase());
-  }), [allRows, scope, search]);
+  }), [allRows, scope, search, focusedPersonId]);
 
   const update = (personId: number, field: keyof Draft, value: string) => { dirtyIds.current.add(personId); setDrafts((current) => ({
     ...current,
@@ -206,6 +213,7 @@ export default function TeamSettlements({ period, onDirtyChange, onGoToBase }: {
       </>}
     </div>
 
+    {focusedPersonId && <div className="flex flex-col gap-2 rounded-lg border border-indigo-200 bg-indigo-50 p-3 text-sm sm:flex-row sm:items-center sm:justify-between"><p>Mostrando el cierre de {allRows.find(row => row.person.id === focusedPersonId)?.person.name ?? "la persona seleccionada"}.</p><Button variant="outline" size="sm" onClick={() => { setFocusedPersonId(null); const url = new URL(window.location.href); url.searchParams.delete("personnelId"); window.history.replaceState(window.history.state, "", url); }}>Ver todo el equipo</Button></div>}
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
       <Metric icon={Calculator} label="Para Operaciones" value={String(counts.ops)} onSelect={() => setScope("ops")} />
       <Metric icon={Clock3} label="Para el equipo" value={String(counts.team)} onSelect={() => setScope("team")} />
@@ -226,7 +234,7 @@ export default function TeamSettlements({ period, onDirtyChange, onGoToBase }: {
     {!query.isLoading && !query.isError && !rows.length && <div className="rounded-xl border border-dashed p-10 text-center">
       <p className="font-medium">No hay personas en este estado para {periodLabel(period)}.</p>
       <p className="mt-1 text-sm text-muted-foreground">{allRows.length ? "Probá otro estado o quitá la búsqueda para ver al resto del equipo." : "Prepará las bases en el paso 1 para comenzar."}</p>
-      {allRows.length > 0 && <Button className="mt-4" variant="outline" onClick={() => { setScope("all"); setSearch(""); }}>Ver todo el equipo</Button>}
+      {allRows.length > 0 && <Button className="mt-4" variant="outline" onClick={() => { setScope("all"); setSearch(""); setFocusedPersonId(null); }}>Ver todo el equipo</Button>}
     </div>}
 
     <div className="space-y-3">
@@ -258,6 +266,7 @@ export default function TeamSettlements({ period, onDirtyChange, onGoToBase }: {
               </div>
 
               {flow.publication?.beforeCut && <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-3 text-sm"><p className="font-medium">Publicada antes del corte general · base protegida</p><p className="mt-1">{flow.publication.reason}</p></div>}
+              {published && <InvoiceReviewHandoff row={row} period={period} />}
               {published && <SettlementAuthorization row={row} period={period} />}
               <fieldset disabled={conditionsLocked} className="min-w-0 rounded-xl border border-amber-200 bg-amber-50/40 p-3 sm:p-4">
                 <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -281,7 +290,7 @@ export default function TeamSettlements({ period, onDirtyChange, onGoToBase }: {
 
               {isMixed ? <div className="rounded-xl border border-indigo-100 bg-indigo-50/60 p-4"><div className="flex items-center gap-2"><Calculator className="h-4 w-4 text-indigo-600" /><p className="text-xs font-semibold uppercase tracking-wide text-indigo-700">Mind calcula y el colaborador completa los dos TC</p></div><div className="mt-3 grid gap-3 sm:grid-cols-3"><ReadOnly label="Pesos a cobrar en USD" value={ars(planned)} /><ReadOnly label="USD a facturar" value={row.settlement?.invoiceFx ? usd(planned / row.settlement.invoiceFx + Number(draft.bonusUSD || 0)) : "Se calcula con su TC"} /><ReadOnly label="Diferencia final ARS" value={row.settlement?.finalInvoiceARS == null ? "Se calcula al cobrar" : ars(row.settlement.finalInvoiceARS)} /></div></div> : <div className="rounded-lg border bg-slate-50 p-3 text-sm text-muted-foreground">{draft.billingCurrency === "USD" ? "Mind usa el total del cierre como base y la persona adjunta su comprobante en USD." : "Mind usa directamente el total ARS del cierre. La persona agrega extras y envía el importe a autorización. No se pide tipo de cambio."}</div>}
 
-              {published && <div className={`grid gap-3 ${isMixed ? "sm:grid-cols-4" : "sm:grid-cols-3"}`}><ProgressItem done={Boolean(row.settlement?.invoiceFx) || !isMixed} label={isMixed ? "TC al facturar" : "Liquidación publicada"} />{isMixed && <ProgressItem done={Boolean((row.invoices ?? []).find((invoice) => invoice.invoiceComponent === "usd"))} label="Factura USD" />}<ProgressItem done={isMixed ? Boolean(row.settlement?.receivedFx) : (row.invoices ?? []).some(i => i.invoiceComponent === "single")} label={isMixed ? "TC al cobrar" : "Factura adjunta"} /><ProgressItem done={isMixed ? Boolean((row.invoices ?? []).find((invoice) => invoice.invoiceComponent === "ars")) : Boolean((row.invoices ?? []).find((invoice) => invoice.invoiceComponent === "single"))} label={isMixed ? "Factura ARS" : "En Administración"} /></div>}
+              {published && <div className={`grid gap-3 ${isMixed ? "sm:grid-cols-4" : "sm:grid-cols-3"}`}><ProgressItem done={Boolean(row.settlement?.invoiceFx) || !isMixed} label={isMixed ? "TC al facturar" : "Liquidación publicada"} />{isMixed && <InvoiceProgress invoice={invoiceForPhase(row, "usd")} label="Factura USD" />}<ProgressItem done={isMixed ? Boolean(row.settlement?.receivedFx) : (row.invoices ?? []).some(i => i.invoiceComponent === "single")} label={isMixed ? "TC al cobrar" : "Factura adjunta"} /><InvoiceProgress invoice={invoiceForPhase(row, "ars")} label="Factura ARS" /></div>}
 
               <div><Label htmlFor={`notes-${row.person.id}`}>Indicaciones para la persona <span className="font-normal text-muted-foreground">(opcional)</span></Label><Textarea disabled={conditionsLocked} id={`notes-${row.person.id}`} className="mt-1.5" rows={2} value={draft.adminNotes} onChange={(event) => update(row.person.id, "adminNotes", event.target.value)} placeholder="Ej. El bono corresponde al proyecto X" /></div>
               <div className="flex flex-col gap-2 border-t pt-4 lg:flex-row lg:items-center lg:justify-between"><p className="text-xs text-muted-foreground">{published ? "Los cambios se hacen visibles recién cuando actualizás la publicación." : "Guardar borrador no avisa al colaborador. Publicar habilita su siguiente paso."}</p><div className="flex flex-col gap-2 sm:flex-row">{!published && <Button variant="outline" disabled={mutation.isPending} onClick={() => mutation.mutate({ row, publish: false })}>Guardar borrador</Button>}<Button disabled={conditionsLocked || mutation.isPending || !row.person.email || cutoff.isLoading || cutoff.isError || (hoursOpen && !cutoff.data?.canPublishEarly)} onClick={() => { if (hoursOpen && !published) { setEarlyReason(""); setEarlyDraft({ ...draft }); setEarlyTarget(row); setEarlyOpen(true); } else mutation.mutate({ row, publish: true }); }}>{mutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}{published ? "Actualizar publicación" : hoursOpen ? "Publicar anticipadamente" : "Publicar"}</Button></div></div>
@@ -310,12 +319,42 @@ function ProgressItem({ done, label }: { done: boolean; label: string }) {
   return <div className={`flex items-center gap-2 rounded-lg border p-3 text-sm ${done ? "border-emerald-200 bg-emerald-50 text-emerald-900" : "bg-slate-50 text-muted-foreground"}`}>{done ? <CheckCircle2 className="h-4 w-4 shrink-0" /> : <Clock3 className="h-4 w-4 shrink-0" />}<span>{label}</span></div>;
 }
 
+function invoiceForPhase(row: SettlementRow, phase: SettlementPhase) {
+  return row.invoices.find(invoice => invoice.invoiceComponent === phase || (invoice.invoiceComponent === "single" && (invoice.invoiceCurrency?.toUpperCase() === phase.toUpperCase() || (!invoice.invoiceCurrency && phase === "ars" && row.settlement?.billingCurrencySnapshot.toUpperCase() === "ARS"))));
+}
+
+function InvoiceProgress({ invoice, label }: { invoice?: SettlementRow["invoices"][number]; label: string }) {
+  if (!invoice || invoice.approvalStatus === "approved") return <ProgressItem done={invoice?.approvalStatus === "approved"} label={label} />;
+  const rejected = invoice.approvalStatus === "rejected";
+  return <div className={`flex items-center gap-2 rounded-lg border p-3 text-sm ${rejected ? "border-rose-200 bg-rose-50 text-rose-900" : "border-amber-200 bg-amber-50 text-amber-900"}`}>
+    {rejected ? <AlertCircle className="h-4 w-4 shrink-0" /> : <Clock3 className="h-4 w-4 shrink-0" />}<span>{label} · {rejected ? "corregir" : "en revisión"}</span>
+  </div>;
+}
+
+function InvoiceReviewHandoff({ row, period }: { row: SettlementRow; period: string }) {
+  const { hasPermission } = usePermissions();
+  const pending = row.invoices.filter(invoice => invoice.approvalStatus === "pending");
+  if (!pending.length) return null;
+  return <div className="space-y-3 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm">
+    <p className="font-semibold">Siguiente paso: revisar el comprobante en Administración</p>
+    <p>El importe ya está autorizado. Falta revisar la factura adjunta en Facturas del equipo; las condiciones permanecen protegidas durante esa revisión.</p>
+    {pending.map(invoice => {
+      const currency = invoice.invoiceCurrency?.toUpperCase() ?? (invoice.invoiceComponent === "usd" ? "USD" : "ARS");
+      return <div key={invoice.id} className="space-y-2">
+        {hasPermission("finance") ? <Button asChild className="h-auto min-h-10 whitespace-normal"><Link href={`/finance/facturas-equipo?period=${encodeURIComponent(period)}&invoiceId=${invoice.id}&personnelId=${row.person.id}`}>Revisar factura {currency}</Link></Button> : <p>Administración o Finanzas debe revisar el comprobante {currency}. Tu usuario puede autorizar importes, pero la revisión de facturas requiere acceso a Finanzas.</p>}
+        <p className="text-muted-foreground">{currency === "USD" ? "Cuando Administración apruebe el comprobante y la persona reciba los USD, continúa en Mis facturas con el TC al cobrar y los extras." : "Al aprobar el comprobante se registra el Pasivo y se completa este tramo."}</p>
+      </div>;
+    })}
+  </div>;
+}
+
 function SettlementAuthorization({ row, period }: { row: SettlementRow; period: string }) {
   const [reason, setReason] = useState("");
   const client = useQueryClient();
   const { toast } = useToast();
   const flow = normalizeWorkflow(row.settlement?.workflow);
   const usesUSD = Number(row.settlement?.usdPercentage) > 0 || Number(row.settlement?.bonusUSD) > 0;
+  const canRequestCorrection = ([...(usesUSD ? ["usd"] : []), "ars"] as SettlementPhase[]).some(phase => flow[phase].status === "pending" || (flow[phase].status === "approved" && !invoiceForPhase(row, phase)));
   const mutation = useMutation({
     mutationFn: ({ phase, action }: { phase: SettlementPhase; action: string }) => authFetchJson(`/api/finance/personnel-settlements/${row.settlement!.id}/authorization`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ phase, action, version: flow.version, reason }) }),
     onSuccess: () => { client.invalidateQueries({ queryKey: ["personnel-settlements", period] }); setReason(""); toast({ title: "Decisión guardada", description: "La persona recibe el siguiente paso en Mis facturas." }); },
@@ -323,7 +362,7 @@ function SettlementAuthorization({ row, period }: { row: SettlementRow; period: 
   });
   return <div className="space-y-3 rounded-xl border border-indigo-200 p-4"><p className="font-semibold">Autorizaciones antes de emitir</p>{(["usd", "ars"] as const).filter(phase => phase === "ars" || Number(row.settlement?.usdPercentage) > 0 || Number(row.settlement?.bonusUSD) > 0).map(phase => {
     const stage = flow[phase];
-    const hasInvoice = row.invoices.some(i => i.invoiceComponent === phase || i.invoiceComponent === "single");
+    const hasInvoice = Boolean(invoiceForPhase(row, phase));
     const details = phase === "usd"
       ? `TC al facturar: ${row.settlement?.invoiceFx ?? "pendiente"} · Bono USD: ${row.settlement?.bonusUSD ?? 0}`
       : [
@@ -334,5 +373,5 @@ function SettlementAuthorization({ row, period }: { row: SettlementRow; period: 
           ...(usesUSD ? [`Comisión USD: ${row.settlement?.bankCommissionUSD ?? 0}`] : []),
         ].join(" · ");
     return <div key={phase} className="space-y-2 rounded border p-3"><div className="flex flex-wrap items-center justify-between gap-2"><span className="font-medium">{phase === "usd" ? "Factura USD" : "Factura ARS"}: {phase === "usd" ? usd(stage.amount) : ars(stage.amount)}</span><Badge variant="outline" className="whitespace-normal">{{draft:"Esperando al colaborador",pending:"Requiere tu autorización",approved:"Importe autorizado",rejected:"Devuelto a corrección"}[stage.status]}</Badge></div><p className="text-sm text-muted-foreground">{details}</p>{phase === "ars" && flow.extrasReason && <p className="text-sm">{flow.extrasReason}</p>}{stage.status === "pending" && <div className="flex flex-col gap-2 sm:flex-row"><Button disabled={mutation.isPending} onClick={() => mutation.mutate({phase,action:"approve"})}>Autorizar {phase.toUpperCase()}</Button><Button variant="outline" disabled={mutation.isPending || reason.trim().length < 5} onClick={() => mutation.mutate({phase,action:"reject"})}>Pedir corrección</Button></div>}{stage.status === "approved" && !hasInvoice && <Button variant="outline" disabled={mutation.isPending || reason.trim().length < 5} onClick={() => mutation.mutate({phase,action:"reopen"})}>Devolver importe a corrección</Button>}</div>;
-  })}<Label htmlFor={`correction-${row.person.id}`}>Motivo para pedir una corrección</Label><Textarea id={`correction-${row.person.id}`} value={reason} onChange={e => setReason(e.target.value)} placeholder="Indicá qué debe revisar el colaborador" /></div>;
+  })}{canRequestCorrection && <><Label htmlFor={`correction-${row.person.id}`}>Motivo para pedir una corrección</Label><Textarea id={`correction-${row.person.id}`} value={reason} onChange={e => setReason(e.target.value)} placeholder="Indicá qué debe revisar el colaborador" /></>}</div>;
 }
