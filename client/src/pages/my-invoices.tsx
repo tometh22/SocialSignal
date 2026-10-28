@@ -178,6 +178,7 @@ export default function MyInvoices() {
     {(settlementQuery.isError || invoicesQuery.isError) && <Notice tone="danger" title="No pudimos cargar la información" text="Actualizá la página antes de continuar. Tus datos guardados se conservan." />}
 
     {!settlementQuery.isLoading && !settlementQuery.isError && !settlement && <Notice tone="warning" title="Esperando a Operaciones" text={`Todavía no publicaron tus condiciones de ${periodLabel(period)}. Cuando Operaciones las publique, acá se habilitará tu siguiente paso.`} />}
+    {flow.publication?.beforeCut && <Notice tone="info" title="Condiciones publicadas antes del corte general" text="Tu base ya está fijada para facturar. Las horas operativas pueden seguir abiertas; las cargas posteriores no se agregan automáticamente a esta liquidación." />}
     {settlement?.adminNotes && <Notice tone="info" title="Indicación de Operaciones" text={settlement.adminNotes} />}
 
     {settlement && <div className="space-y-4">{usesUSD && phaseCard("usd")}{phaseCard("ars")}</div>}

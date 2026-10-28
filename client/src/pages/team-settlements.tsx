@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { authFetchJson } from "@/lib/queryClient";
 import {
@@ -87,15 +88,25 @@ function usd(value: number | null | undefined) {
   return value == null ? "—" : new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", currencyDisplay: "code", maximumFractionDigits: 2 }).format(value);
 }
 
-export default function TeamSettlements({ period, onDirtyChange }: { period: string; onDirtyChange: (dirty: boolean) => void }) {
+export default function TeamSettlements({ period, onDirtyChange, onGoToBase }: { period: string; onDirtyChange: (dirty: boolean) => void; onGoToBase: () => void }) {
   const [search, setSearch] = useState("");
   const dirtyIds = useRef(new Set<number>());
   const [scope, setScope] = useState("ops");
   const [drafts, setDrafts] = useState<Record<number, Draft>>({});
   useEffect(() => { onDirtyChange(dirtyIds.current.size > 0); }, [drafts, onDirtyChange]);
   const [openId, setOpenId] = useState<number | null>(null);
+  const [earlyTarget, setEarlyTarget] = useState<SettlementRow | null>(null);
+  const [earlyReason, setEarlyReason] = useState("");
+  const [earlyOpen, setEarlyOpen] = useState(false);
+  const [earlyDraft, setEarlyDraft] = useState<Draft | undefined>();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const cutoff = useQuery<{ state: string; day: string; canCut: boolean; canPublishEarly: boolean }>({
+    queryKey: ["payroll-period", period], refetchInterval: 30000,
+    queryFn: () => authFetchJson(`/api/payroll-period/${period}`),
+  });
+  const hoursOpen = cutoff.data?.state !== "cut";
+  const cutoffLabel = cutoff.data?.day ? new Date(`${cutoff.data.day}T12:00:00-03:00`).toLocaleDateString("es-AR", { day: "numeric", month: "long", timeZone: "America/Argentina/Buenos_Aires" }) : "la fecha indicada en Base a cobrar";
   const query = useQuery<SettlementRow[]>({
     queryKey: ["personnel-settlements", period],
     refetchOnWindowFocus: false,
@@ -107,22 +118,24 @@ export default function TeamSettlements({ period, onDirtyChange }: { period: str
     setDrafts(previous => Object.fromEntries(query.data.map(row => [row.person.id, dirtyIds.current.has(row.person.id) && previous[row.person.id] ? previous[row.person.id] : draftFor(row)])));
   }, [query.data]);
 
-  const payloadFor = (row: SettlementRow, publish: boolean) => ({ period, ...(drafts[row.person.id] ?? draftFor(row)), publish });
+  const payloadFor = (row: SettlementRow, publish: boolean, draftOverride?: Draft) => ({ period, ...(draftOverride ?? drafts[row.person.id] ?? draftFor(row)), publish, expectedBase: { closingId: row.closing?.id, totalARS: row.system.totalARS, hours: row.system.hours } });
   const mutation = useMutation({
-    mutationFn: ({ row, publish }: { row: SettlementRow; publish: boolean }) => authFetchJson(`/api/finance/personnel-settlements/${row.person.id}`, {
+    mutationFn: ({ row, publish, earlyPublication, draftOverride }: { row: SettlementRow; publish: boolean; earlyPublication?: { confirmed: true; reason: string }; draftOverride?: Draft }) => authFetchJson(`/api/finance/personnel-settlements/${row.person.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payloadFor(row, publish)),
+      body: JSON.stringify({ ...payloadFor(row, publish, draftOverride), earlyPublication }),
     }),
     onSuccess: (_data, variables) => {
       dirtyIds.current.delete(variables.row.person.id);
+      setEarlyOpen(false);
+      if (variables.publish) setScope("team");
       queryClient.invalidateQueries({ queryKey: ["personnel-settlements", period] });
       toast({
         title: variables.publish ? (variables.row.settlement?.status === "published" ? "Publicación actualizada" : "Liquidación publicada") : "Borrador guardado",
         description: variables.publish ? `${variables.row.person.name} ya ve los importes e instrucciones vigentes.` : "Quedó preparado para que Operaciones lo revise antes de publicar.",
       });
     },
-    onError: (error: Error) => toast({ title: "No se pudo guardar", description: error.message, variant: "destructive" }),
+    onError: (error: Error) => { queryClient.invalidateQueries({ queryKey: ["personnel-settlements", period] }); queryClient.invalidateQueries({ queryKey: ["payroll-period", period] }); toast({ title: "No se pudo guardar", description: error.message, variant: "destructive" }); },
   });
 
   const bulkRows = useMemo(() => (query.data ?? []).filter((row) => row.closing && !row.settlement), [query.data]);
@@ -161,6 +174,18 @@ export default function TeamSettlements({ period, onDirtyChange }: { period: str
   })); };
 
   return <div className="min-w-0 space-y-5">
+    <Dialog open={earlyOpen} onOpenChange={open => { if (!mutation.isPending) setEarlyOpen(open); }}>
+      <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-lg">
+        <DialogHeader><DialogTitle>Publicar anticipadamente</DialogTitle><DialogDescription>Habilitá la facturación de {earlyTarget?.person.name} antes del corte general de {cutoffLabel}, a las 23:59 de Buenos Aires.</DialogDescription></DialogHeader>
+        <div className="space-y-4">
+          <div className="rounded-lg border bg-muted/30 p-3 text-sm"><p className="font-medium">Base a fijar: {ars(earlyTarget?.system.totalARS)}</p><p>{Number(earlyTarget?.system.hours ?? 0).toFixed(1)} horas · {periodLabel(period)}</p></div>
+          <p className="text-sm">Esta base queda protegida para facturar. Las horas operativas de esta persona y del resto del equipo siguen abiertas hasta el corte general.</p>
+          <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">{earlyTarget?.person.contractType === "freelance" ? "Para freelancers, revisá que estén incluidas todas las horas a pagar. " : ""}Las horas cargadas después no se suman automáticamente a esta liquidación. El corte general conservará la base publicada.</p>
+          <div className="space-y-1.5"><Label htmlFor="early-publication-reason">Motivo de la publicación anticipada</Label><Textarea id="early-publication-reason" value={earlyReason} onChange={event => setEarlyReason(event.target.value)} maxLength={2000} placeholder="Ej. Adelantar la factura del mes con la base ya revisada" /><p className="text-xs text-muted-foreground">Queda registrado con tu usuario y la fecha.</p></div>
+        </div>
+        <DialogFooter className="gap-2 sm:gap-0"><Button variant="outline" disabled={mutation.isPending} onClick={() => setEarlyOpen(false)}>Volver</Button><Button disabled={mutation.isPending || earlyReason.trim().length < 5} onClick={() => { if (earlyTarget) mutation.mutate({ row: earlyTarget, publish: true, earlyPublication: { confirmed: true, reason: earlyReason }, draftOverride: earlyDraft }); }}>{mutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Confirmar publicación anticipada</Button></DialogFooter>
+      </DialogContent>
+    </Dialog>
     <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
       <div>
         <h2 className="text-lg font-semibold">Facturación y seguimiento</h2>
@@ -170,6 +195,15 @@ export default function TeamSettlements({ period, onDirtyChange }: { period: str
         {bulkMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <WandSparkles className="mr-2 h-4 w-4" />}
         Preparar {bulkRows.length || ""} borrador{bulkRows.length === 1 ? "" : "es"}
       </Button>
+    </div>
+
+    <div role="status" className="rounded-xl border bg-muted/20 p-4 text-sm">
+      {cutoff.isError ? <><p className="text-destructive">No se pudo verificar el corte. Podés guardar borradores; para publicar, reintentá la consulta.</p><Button variant="link" onClick={() => cutoff.refetch()}>Reintentar</Button></> : cutoff.isLoading ? <p>Consultando el corte de horas…</p> : <>
+        <p className="font-medium">{hoursOpen ? cutoff.data?.canPublishEarly ? "Horas abiertas · podés publicar por persona" : "Mes futuro · sólo borradores" : "Corte general realizado · podés publicar"}</p>
+        <p className="mt-1 text-muted-foreground">{hoursOpen ? `El corte general está previsto para el ${cutoffLabel} a las 23:59, hora de Buenos Aires. Guardar la base no realiza ese corte. Podés guardar un borrador o publicar anticipadamente fijando la base de esa persona.` : "Las horas ya tienen corte. Publicá las condiciones de cada persona para que complete su siguiente paso en Mis facturas."}</p>
+        {hoursOpen && !cutoff.data?.canPublishEarly && <p className="mt-2 text-amber-900">Este mes todavía no comenzó. Podés preparar borradores; la publicación se habilita durante el mes trabajado.</p>}
+        <Button variant="link" className="mt-1 h-auto px-0" onClick={onGoToBase}>Ver base y corte general</Button>
+      </>}
     </div>
 
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -217,12 +251,13 @@ export default function TeamSettlements({ period, onDirtyChange }: { period: str
             </button>
           </CardHeader>
           {isOpen && <CardContent className="space-y-4 border-t pt-5 sm:pt-6">
-            {!row.closing ? <div className="flex gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /><span>Falta el cierre operativo. Cerrá primero sus horas en Cierre del equipo → Base a cobrar; recién entonces Mind congela el valor hora y el total.</span></div> : <>
+            {!row.closing ? <div className="flex gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /><span>Falta el cierre operativo. Prepará primero su base en el paso 1: Base a cobrar. Después podés publicar sus condiciones, también antes del corte general.</span></div> : <>
               <div>
                 <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Mind completa automáticamente</p>
                 <div className="grid gap-3 sm:grid-cols-3"><ReadOnly label="Horas del cierre" value={`${Number(row.system.hours ?? 0).toFixed(1)} h`} /><ReadOnly label="Valor hora ARS" value={ars(row.system.hourlyRateARS)} /><ReadOnly label="Base del mes en ARS" value={ars(row.system.totalARS)} /></div>
               </div>
 
+              {flow.publication?.beforeCut && <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-3 text-sm"><p className="font-medium">Publicada antes del corte general · base protegida</p><p className="mt-1">{flow.publication.reason}</p></div>}
               {published && <SettlementAuthorization row={row} period={period} />}
               <fieldset disabled={conditionsLocked} className="min-w-0 rounded-xl border border-amber-200 bg-amber-50/40 p-3 sm:p-4">
                 <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -239,7 +274,7 @@ export default function TeamSettlements({ period, onDirtyChange }: { period: str
                 <div className={`mt-4 grid gap-4 ${isMixed ? "lg:grid-cols-3" : "sm:grid-cols-2"}`}>
                   {isMixed && <div><Label htmlFor={`bonus-${row.person.id}`}>Bono en USD</Label><Input id={`bonus-${row.person.id}`} className="mt-1.5 bg-white" type="number" min="0" step="0.01" value={draft.bonusUSD} onChange={event => update(row.person.id, "bonusUSD", event.target.value)} /></div>}
                   <div><Label htmlFor={`bonus-ars-${row.person.id}`}>Bono en ARS</Label><Input id={`bonus-ars-${row.person.id}`} className="mt-1.5 bg-white" type="number" min="0" step="0.01" value={draft.bonusARS} onChange={event => update(row.person.id, "bonusARS", event.target.value)} /></div>
-                  <div><Label htmlFor={`extras-ars-${row.person.id}`}>Otros adicionales ARS</Label><Input id={`extras-ars-${row.person.id}`} className="mt-1.5 bg-white" type="number" min="0" step="0.01" value={draft.extrasARS} onChange={event => update(row.person.id, "extrasARS", event.target.value)} /></div>
+                  <div><Label htmlFor={`extras-ars-${row.person.id}`}>Otros adicionales ARS</Label><Input id={`extras-ars-${row.person.id}`} className="mt-1.5 bg-white" type="number" min="0" step="0.01" value={draft.extrasARS} onChange={event => update(row.person.id, "extrasARS", event.target.value)} /><p className="mt-1 text-xs text-muted-foreground">Monotributo u otros reintegros: podés incluirlos acá o agregarlos después en Mis facturas, sin duplicarlos.</p></div>
                 </div>
                 {conditionsLocked && <p className="mt-2 text-sm text-muted-foreground">Condiciones congeladas: ya hay importes enviados o facturas.</p>}
               </fieldset>
@@ -249,7 +284,7 @@ export default function TeamSettlements({ period, onDirtyChange }: { period: str
               {published && <div className={`grid gap-3 ${isMixed ? "sm:grid-cols-4" : "sm:grid-cols-3"}`}><ProgressItem done={Boolean(row.settlement?.invoiceFx) || !isMixed} label={isMixed ? "TC al facturar" : "Liquidación publicada"} />{isMixed && <ProgressItem done={Boolean((row.invoices ?? []).find((invoice) => invoice.invoiceComponent === "usd"))} label="Factura USD" />}<ProgressItem done={isMixed ? Boolean(row.settlement?.receivedFx) : (row.invoices ?? []).some(i => i.invoiceComponent === "single")} label={isMixed ? "TC al cobrar" : "Factura adjunta"} /><ProgressItem done={isMixed ? Boolean((row.invoices ?? []).find((invoice) => invoice.invoiceComponent === "ars")) : Boolean((row.invoices ?? []).find((invoice) => invoice.invoiceComponent === "single"))} label={isMixed ? "Factura ARS" : "En Administración"} /></div>}
 
               <div><Label htmlFor={`notes-${row.person.id}`}>Indicaciones para la persona <span className="font-normal text-muted-foreground">(opcional)</span></Label><Textarea disabled={conditionsLocked} id={`notes-${row.person.id}`} className="mt-1.5" rows={2} value={draft.adminNotes} onChange={(event) => update(row.person.id, "adminNotes", event.target.value)} placeholder="Ej. El bono corresponde al proyecto X" /></div>
-              <div className="flex flex-col gap-2 border-t pt-4 sm:flex-row sm:items-center sm:justify-between"><p className="text-xs text-muted-foreground">{published ? "Los cambios se hacen visibles recién cuando actualizás la publicación." : "Guardar borrador no avisa al colaborador. Publicar habilita su siguiente paso."}</p><div className="flex gap-2">{!published && <Button variant="outline" disabled={mutation.isPending} onClick={() => mutation.mutate({ row, publish: false })}>Guardar borrador</Button>}<Button disabled={conditionsLocked || mutation.isPending || !row.person.email} onClick={() => mutation.mutate({ row, publish: true })}>{mutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}{published ? "Actualizar publicación" : "Publicar"}</Button></div></div>
+              <div className="flex flex-col gap-2 border-t pt-4 lg:flex-row lg:items-center lg:justify-between"><p className="text-xs text-muted-foreground">{published ? "Los cambios se hacen visibles recién cuando actualizás la publicación." : "Guardar borrador no avisa al colaborador. Publicar habilita su siguiente paso."}</p><div className="flex flex-col gap-2 sm:flex-row">{!published && <Button variant="outline" disabled={mutation.isPending} onClick={() => mutation.mutate({ row, publish: false })}>Guardar borrador</Button>}<Button disabled={conditionsLocked || mutation.isPending || !row.person.email || cutoff.isLoading || cutoff.isError || (hoursOpen && !cutoff.data?.canPublishEarly)} onClick={() => { if (hoursOpen && !published) { setEarlyReason(""); setEarlyDraft({ ...draft }); setEarlyTarget(row); setEarlyOpen(true); } else mutation.mutate({ row, publish: true }); }}>{mutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}{published ? "Actualizar publicación" : hoursOpen ? "Publicar anticipadamente" : "Publicar"}</Button></div></div>
             </>}
           </CardContent>}
         </Card>;

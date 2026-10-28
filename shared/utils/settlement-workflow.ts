@@ -2,6 +2,7 @@ export type SettlementPhase = "usd" | "ars";
 export type SettlementStage = { status: "draft" | "pending" | "approved" | "rejected"; amount?: number; reason?: string; actorId?: number; at?: string };
 export type SettlementWorkflow = {
   version: number;
+  publication?: { beforeCut: boolean; actorId: number; at: string; reason?: string };
   usd: SettlementStage;
   ars: SettlementStage;
   extrasARS: number;
