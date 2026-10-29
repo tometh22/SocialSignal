@@ -18,7 +18,7 @@ import {
   blueprintEffortFactorBreakdown,
   resolveScopePresentation,
   blueprintDefinitionSchema,
-  canonicalProjectTypeForModality,
+  resolveBlueprintProjectType,
   estimateBlueprintWorkload,
   isRecurringBlueprintModality,
   workloadForBillingPeriod,
@@ -156,9 +156,7 @@ export function ProfessionalScopeBuilder({ mode = "all", headless = false }: { m
 
   const applyDefinition = (definition: BlueprintDefinition, blueprint = selected) => {
     const recipeWorkload = estimateBlueprintWorkload(definition);
-    const nextProjectType = isBlueprintCompatibleWithProjectType(quotationData.project.type, definition.modality)
-      ? quotationData.project.type
-      : projectTypeFor(definition.modality);
+    const nextProjectType = resolveBlueprintProjectType(quotationData.project.type, definition.modality);
     const benchmark = benchmarkFor(blueprint?.id ?? quotationData.serviceBlueprintId, nextProjectType, blueprint?.slug ?? selected?.slug);
     const contractWorkload = applyHistoricalEffortBenchmark(recipeWorkload, benchmark);
     const workload = workloadForBillingPeriod(definition, contractWorkload);
@@ -327,9 +325,7 @@ export function ProfessionalScopeBuilder({ mode = "all", headless = false }: { m
             {orderedBlueprints.map((blueprint) => {
               const active = quotationData.serviceBlueprintId === blueprint.id;
               const definition = blueprintDefinitionSchema.parse(blueprint.definition);
-              const blueprintProjectType = isBlueprintCompatibleWithProjectType(quotationData.project.type, definition.modality)
-                ? quotationData.project.type
-                : projectTypeFor(definition.modality);
+              const blueprintProjectType = resolveBlueprintProjectType(quotationData.project.type, definition.modality);
               const benchmark = benchmarkFor(blueprint.id, blueprintProjectType, blueprint.slug);
               const historicalWorkload = applyHistoricalEffortBenchmark(blueprint.workload, benchmark);
               const recommended = blueprint.id === recommendedBlueprintId;
@@ -508,9 +504,6 @@ function resolveRole(
   return resolveQuotationBlueprintRole(roleKey, roles, configuredProfile);
 }
 
-function projectTypeFor(modality: BlueprintDefinition["modality"]) {
-  return canonicalProjectTypeForModality(modality);
-}
 
 function countryBucket(count: number) {
   if (count <= 1) return "1";

@@ -13,7 +13,7 @@ import {
   getCountriesFactor,
   getMentionsVolumeFactor,
 } from "@shared/utils/quotation-complexity";
-import { normalizeCanonicalProjectType, type BlueprintDefinition, type CommercialMotion } from "@shared/quotation-professional";
+import { normalizeCanonicalProjectType, resolveBlueprintProjectType, type BlueprintDefinition, type CommercialMotion } from "@shared/quotation-professional";
 import { calculateCreditProgramTotals, createDefaultCreditProgram, type CreditProgram } from "@shared/utils/credit-program";
 
 export interface OptimizedTeamMember {
@@ -1065,7 +1065,7 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
         throw new Error("Debe ingresar el nombre del proyecto");
       }
       if (quotationData.requiresExchangeRateConfirmation) {
-        throw new Error("Confirmá un tipo de cambio positivo para migrar esta cotización legacy al pricing actual");
+        throw new Error("Confirmá un tipo de cambio positivo antes de guardar la cotización.");
       }
 
       // Para borradores, permitir cotizaciones sin equipo
@@ -1082,7 +1082,7 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
       const quotationPayload = {
         clientId: quotationData.client.id,
         projectName: quotationData.project.name,
-        projectType: quotationData.project.type || 'on-demand',
+        projectType: quotationData.project.type || (quotationData.scopeSnapshot ? resolveBlueprintProjectType('', quotationData.scopeSnapshot.modality) : 'on-demand'),
         projectDuration: quotationData.project.duration || '',
         analysisType: quotationData.analysisType || 'standard',
         mentionsVolume: quotationData.mentionsVolume || 'medium',

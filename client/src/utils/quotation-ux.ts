@@ -164,6 +164,9 @@ export function validateQuotationStep(
   }
 
   if (step === 2 || step === 3) {
+    if (quotation.scopeSnapshot && !quotation.project.type) {
+      return [{ field: 'professional-scope', message: 'Volvé a seleccionar el servicio para confirmar la modalidad de la propuesta.' }];
+    }
     return quotation.scopeSnapshot || (quotation.id && Number(quotation.pricingVersion || 2) < 2)
       ? []
       : [{ field: 'professional-scope', message: 'Elegí una receta profesional para definir el servicio.' }];
