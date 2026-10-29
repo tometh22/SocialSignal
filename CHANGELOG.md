@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.14.14 — 2026-10-29
+
+- Mis facturas explica que el tramo ARS de una liquidación mixta sin factura espera la autorización USD de Operaciones y el cobro. No pide aprobación de un comprobante que esa modalidad no requiere. Mantiene las indicaciones anteriores cuando sí corresponde factura.
+
 ## 1.14.13 — 2026-10-29
 
 - Todos los miembros de un proyecto pueden crear secciones y tareas y seleccionar/eliminar tareas vacías. Se mantiene el alcance por membresía y el rechazo transaccional de tareas con horas nativas o importadas; administrar responsables y miembros conserva sus permisos.
