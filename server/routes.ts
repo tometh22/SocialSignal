@@ -13920,6 +13920,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           personnelId: personnelMonthlySettlements.personnelId,
           period: personnelMonthlySettlements.period,
           billingCurrencySnapshot: personnelMonthlySettlements.billingCurrencySnapshot,
+          workflow: personnelMonthlySettlements.workflow,
           usdPercentage: personnelMonthlySettlements.usdPercentage,
         }).from(personnelMonthlySettlements)
           .where(and(
@@ -13989,6 +13990,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             suggestion: prior ? {
               sourcePeriod: prior.period,
               billingCurrency: prior.billingCurrencySnapshot,
+              requiresInvoice: settlementWorkflow(prior.workflow).requiresInvoice !== false,
               usdPercentage: Number(prior.usdPercentage),
             } : null,
             invoices: invoicesByPerson.get(person.id) ?? [],
@@ -14452,6 +14454,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(409).json({ message: "Esta factura ya fue aprobada. Pedile a Finanzas que la reabra antes de reemplazarla." });
       }
       const settlementCalculation = publishedSettlement ? calculatePersonnelSettlement({
+        billingCurrencySnapshot: publishedSettlement.billingCurrencySnapshot,
         totalARS: publishedSettlement.totalARS,
         usdPercentage: publishedSettlement.usdPercentage,
         bonusUSD: publishedSettlement.bonusUSD,
@@ -23697,7 +23700,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Browser views share a flat response so every task is transferred once.
       // Existing consumers keep the original grouped response by default.
       const flat = req.query.layout === "flat";
-      res.json({ canManageSections: await canManageTaskProject(req, parsedProjectId), tasks: enrichedTasks.map(task => ({ ...task, clientId: project?.clientId ?? null, clientName: project?.clientName ?? null })), sections: flat ? Object.fromEntries(Object.keys(sections).map(name => [name, []])) : sections, ...(flat ? { layout: "flat" } : {}) });
+      res.json({ canManageSections: await canManageTaskProject(req, parsedProjectId), canCreateSections: true, canDeleteTasks: true, tasks: enrichedTasks.map(task => ({ ...task, clientId: project?.clientId ?? null, clientName: project?.clientName ?? null })), sections: flat ? Object.fromEntries(Object.keys(sections).map(name => [name, []])) : sections, ...(flat ? { layout: "flat" } : {}) });
     } catch (error) {
       res.status(500).json({ message: "Error al obtener tareas del proyecto" });
     }
@@ -23712,7 +23715,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/tasks/section", requireAuth, async (req, res) => {
     try {
       const { projectId, sectionName } = z.object({ projectId: z.number().int().positive(), sectionName: z.string().trim().min(1).max(250) }).strict().parse(req.body);
-      if (!(await canManageTaskProject(req, projectId))) return res.status(403).json({ message: "Solo responsables u Operaciones pueden administrar secciones" });
+      if (!(await canAccessTaskProject(req, projectId))) return res.status(403).json({ message: "No tenés acceso a este proyecto" });
       await db.transaction(async tx => {
         const names = await lockProjectSectionNames(tx, projectId);
         const [conflict] = await tx.select({ id: tasks.id }).from(tasks).where(and(eq(tasks.projectId, projectId), eq(tasks.sectionName, sectionName))).limit(1);
@@ -23939,8 +23942,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }).from(tasks);
       const allTasks = filterHoursTasks(taskRows, projectId ? Number(projectId) : null, section);
       const recordedTaskIds = new Set(taskEntries.map(entry => entry.taskId));
+      const visibleProjectIds = await accessibleTaskProjectIds(req);
+      const currentProjects = await db.select({ id: activeProjects.id }).from(activeProjects).where(eq(activeProjects.status, "active"));
+      const sectionProjectIds = new Set(currentProjects.map(project => project.id).filter(id => visibleProjectIds === null || visibleProjectIds.includes(id)));
       const availableSections = hoursSectionOptions(filterHoursTasks(taskRows, projectId ? Number(projectId) : null)
-        .filter(task => accessContext.isOperations || task.assigneeId === effectivePersonnelId || recordedTaskIds.has(task.id)));
+        .filter(task => sectionProjectIds.has(task.projectId) && (!effectivePersonnelId || task.assigneeId === effectivePersonnelId || recordedTaskIds.has(task.id))));
       if (!availableSections.some(option => option.value === "unsectioned")) availableSections.push({ value: "unsectioned", label: "Sin sección (incluye registros históricos)" });
       const allTaskIds = allTasks.map((task) => task.id);
       const weeklyEstimateRows = allTaskIds.length > 0
@@ -24211,7 +24217,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         hoursOwnerId,
         hoursOwnerName: hoursOwner?.name ?? null,
         assigneeName: assignee?.name ?? null,
-        canDelete: await canManageTaskProject(req, task.projectId),
+        canDelete: await canAccessTaskProject(req, task.projectId),
         canLogForOthers: await canManageTaskProject(req, task.projectId),
         estimatedHoursTotal: estimatesByTask.get(task.id) ?? 0,
         estimatedHoursForWeek: estimatesForCurrentWeek.get(task.id) ?? 0,
@@ -24595,7 +24601,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/tasks/bulk-delete", requireAuth, async (req, res) => {
     try {
       const { projectId, taskIds } = z.object({ projectId: z.number().int().positive(), taskIds: z.array(z.number().int().positive()).min(1).max(500) }).strict().parse(req.body);
-      if (!(await canManageTaskProject(req, projectId))) return res.status(403).json({ message: "Solo responsables del proyecto u Operaciones pueden eliminar tareas" });
+      if (!(await canAccessTaskProject(req, projectId))) return res.status(403).json({ message: "No tenés acceso a este proyecto" });
       const result = await deleteEmptyTaskTrees(projectId, [...new Set(taskIds)]);
       for (const parentId of result.parentTaskIds) await recalculateTaskLoggedHours(parentId);
       res.json(result);
@@ -24615,8 +24621,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .from(tasks)
         .where(eq(tasks.id, taskId));
       if (!taskToDelete) return res.status(404).json({ message: "Tarea no encontrada" });
-      if (!(await canManageTaskProject(req, taskToDelete.projectId))) {
-        return res.status(403).json({ message: "Solo responsables del proyecto u Operaciones pueden eliminar tareas" });
+      if (!(await canAccessTaskProject(req, taskToDelete.projectId))) {
+        return res.status(403).json({ message: "No tenés acceso a este proyecto" });
       }
 
       const result = await deleteEmptyTaskTrees(taskToDelete.projectId, [taskId]);

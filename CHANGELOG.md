@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.14.13 — 2026-10-29
+
+- Todos los miembros de un proyecto pueden crear secciones y tareas y seleccionar/eliminar tareas vacías. Se mantiene el alcance por membresía y el rechazo transaccional de tareas con horas nativas o importadas; administrar responsables y miembros conserva sus permisos.
+- Panel de horas y Mis horas ofrecen secciones de proyectos activos y accesibles. Las cargas históricas se conservan en los reportes.
+- Pedir corrección abre un diálogo habilitado con motivo obligatorio antes de devolver el importe. Mis facturas recibe el motivo y permite reenviar el TC corregido.
+- Cierre del equipo permite Sólo USD y Sin factura. USD tiene un único tramo, convierte los adicionales ARS al mismo TC y no solicita una diferencia ARS. Sin factura conserva moneda, cálculo y autorización; no crea comprobantes ni registra pagos automáticamente. El cierre financiero y la vista de pendientes controlan las autorizaciones sin exigir facturas de esos casos; migración 0091 transaccional sin cambios a registros de negocio.
+- Mis facturas muestra horas/base ARS congeladas, pesos destinados a USD, TC ingresado, USD calculados y adicionales. Se retira la referencia USD estimada y se indica la base que se convierte junto al TC.
+
 ## 1.14.12 — 2026-10-28
 
 - Los comprobantes se revisan dentro de Mind, con visor PDF de páginas y zoom, vista de imágenes/texto y descarga del original. Conserva los permisos existentes y el almacenamiento privado; los recursos del visor se sirven localmente.

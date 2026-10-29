@@ -1,4 +1,5 @@
 export type PersonnelSettlementInputs = {
+  billingCurrencySnapshot?: string;
   totalARS: number;
   usdPercentage: number;
   bonusARS?: number | null;
@@ -43,6 +44,13 @@ export function calculatePersonnelSettlement(input: PersonnelSettlementInputs): 
   const hasUSD = plannedUSDARS > 0 || bonusUSD > 0;
   const baseInvoiceUSD = !hasUSD ? 0 : invoiceFx ? money(plannedUSDARS / invoiceFx) : null;
   const totalInvoiceUSD = baseInvoiceUSD == null ? null : money(baseInvoiceUSD + bonusUSD);
+  // USD-only has one authorization/document and no later ARS exchange difference.
+  // ARS additions are converted at the same employee-entered FX; the base stays separate.
+  if (input.billingCurrencySnapshot?.toUpperCase() === "USD") {
+    const usdTotal = baseInvoiceUSD == null || !invoiceFx ? null : money(baseInvoiceUSD + bonusUSD + (bonusARS + extrasARS) / invoiceFx);
+    return { plannedUSDARS, baseInvoiceUSD, totalInvoiceUSD: usdTotal, pesifiedBaseARS: null, finalInvoiceARS: 0,
+      financialCostARS: usdTotal == null || !invoiceFx ? null : money(usdTotal * invoiceFx), financialCostUSD: usdTotal };
+  }
   const pesifiedBaseARS = !hasUSD ? 0 : baseInvoiceUSD != null && receivedFx
     ? money(baseInvoiceUSD * receivedFx)
     : null;

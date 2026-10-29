@@ -1,5 +1,6 @@
+import { calculatePersonnelSettlement } from "@shared/utils/personnel-settlement";
 import { settlementProgress as workflow } from "@shared/utils/settlement-progress";
-import { settlementWorkflow as normalizeWorkflow, type SettlementWorkflow, type SettlementPhase } from "@shared/utils/settlement-workflow";
+import { settlementPhases, settlementWorkflow as normalizeWorkflow, type SettlementWorkflow, type SettlementPhase } from "@shared/utils/settlement-workflow";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "wouter";
 import { usePermissions } from "@/hooks/use-permissions";
@@ -44,13 +45,13 @@ type SettlementRow = {
   closing: { id: number } | null;
   system: { hours: number | null; hourlyRateARS: number | null; totalARS: number | null };
   settlement: Settlement | null;
-  suggestion: { sourcePeriod: string; billingCurrency: string; usdPercentage: number } | null;
+  suggestion: { sourcePeriod: string; billingCurrency: string; requiresInvoice?: boolean; usdPercentage: number } | null;
   invoices: Array<{ id: number; invoiceComponent: "single" | "usd" | "ars"; invoiceCurrency?: string | null; approvalStatus: "pending" | "approved" | "rejected"; documentCount: number; uploadedAt: string; reviewReason: string | null }>;
 };
-type Draft = { version: number; billingCurrency: BillingCurrency; usdPercentage: string; bonusUSD: string; bonusARS: string; extrasARS: string; adminNotes: string };
+type Draft = { requiresInvoice: boolean; version: number; billingCurrency: BillingCurrency; usdPercentage: string; bonusUSD: string; bonusARS: string; extrasARS: string; adminNotes: string };
 type WorkflowGroup = "ops" | "team" | "review" | "done" | "no_close";
 
-const EMPTY_DRAFT: Draft = { version: 0, billingCurrency: "ARS", usdPercentage: "0", bonusUSD: "0", bonusARS: "0", extrasARS: "0", adminNotes: "" };
+const EMPTY_DRAFT: Draft = { requiresInvoice: true, version: 0, billingCurrency: "ARS", usdPercentage: "0", bonusUSD: "0", bonusARS: "0", extrasARS: "0", adminNotes: "" };
 
 function currentPeriod() {
   const now = new Date();
@@ -72,7 +73,8 @@ function draftFor(row: SettlementRow): Draft {
   const usdPercentage = row.settlement?.usdPercentage ?? row.suggestion?.usdPercentage ?? (billingCurrency === "USD" ? 100 : billingCurrency === "MIXED" ? 90 : 0);
   return {
     version: normalizeWorkflow(row.settlement?.workflow).version,
-    billingCurrency: billingCurrency === "USD" ? "MIXED" : billingCurrency,
+    billingCurrency,
+    requiresInvoice: row.settlement?.workflow?.requiresInvoice ?? row.suggestion?.requiresInvoice ?? true,
     usdPercentage: String(usdPercentage),
     bonusUSD: String(row.settlement?.bonusUSD ?? 0),
     bonusARS: String(row.settlement?.bonusARS ?? 0),
@@ -175,7 +177,7 @@ export default function TeamSettlements({ period, onDirtyChange, onGoToBase }: {
     return `${row.person.name} ${row.person.email ?? ""}`.toLowerCase().includes(search.trim().toLowerCase());
   }), [allRows, scope, search, focusedPersonId]);
 
-  const update = (personId: number, field: keyof Draft, value: string) => { dirtyIds.current.add(personId); setDrafts((current) => ({
+  const update = (personId: number, field: keyof Draft, value: Draft[keyof Draft]) => { dirtyIds.current.add(personId); setDrafts((current) => ({
     ...current,
     [personId]: { ...(current[personId] ?? EMPTY_DRAFT), [field]: value },
   })); };
@@ -242,11 +244,13 @@ export default function TeamSettlements({ period, onDirtyChange, onGoToBase }: {
         const draft = drafts[row.person.id] ?? draftFor(row);
         const state = workflow(row);
         const isOpen = openId === row.person.id;
-        const isMixed = draft.billingCurrency !== "ARS";
+        const isMixed = draft.billingCurrency === "MIXED";
+        const usesUSD = draft.billingCurrency !== "ARS";
         const pct = isMixed ? Math.min(100, Math.max(0, Number(draft.usdPercentage) || 0)) : draft.billingCurrency === "USD" ? 100 : 0;
         const planned = Number(row.system.totalARS ?? 0) * pct / 100;
         const published = row.settlement?.status === "published";
         const flow = normalizeWorkflow(row.settlement?.workflow);
+        const calculated = calculatePersonnelSettlement({ billingCurrencySnapshot: draft.billingCurrency, totalARS: Number(row.system.totalARS ?? 0), usdPercentage: pct, bonusUSD: Number(draft.bonusUSD), bonusARS: Number(draft.bonusARS), extrasARS: Number(draft.extrasARS) + flow.extrasARS, invoiceFx: row.settlement?.invoiceFx, receivedFx: row.settlement?.receivedFx, bankCommissionUSD: row.settlement?.bankCommissionUSD });
         const conditionsLocked = (row.invoices ?? []).length > 0 || [flow.usd.status, flow.ars.status].some(s => s === "pending" || s === "approved");
         return <Card key={row.person.id} className={state.group === "ops" ? "border-indigo-200" : state.group === "done" ? "border-emerald-200" : ""}>
           <CardHeader className="p-0 sm:p-0">
@@ -272,25 +276,31 @@ export default function TeamSettlements({ period, onDirtyChange, onGoToBase }: {
                 <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <div><p className="text-xs font-semibold uppercase tracking-wide text-amber-800">Operaciones completa</p><p className="text-sm text-muted-foreground">Definí la distribución y los adicionales. Los TC bancarios los carga el colaborador; los importes quedan sujetos a tu autorización.</p></div>
                   {row.suggestion && <Button size="sm" variant="outline" onClick={() => {
-                    update(row.person.id, "billingCurrency", normalizeBillingCurrency(row.suggestion?.billingCurrency) === "USD" ? "MIXED" : normalizeBillingCurrency(row.suggestion?.billingCurrency));
+                    update(row.person.id, "billingCurrency", normalizeBillingCurrency(row.suggestion?.billingCurrency));
                     update(row.person.id, "usdPercentage", String(row.suggestion?.usdPercentage ?? 0));
+                    update(row.person.id, "requiresInvoice", row.suggestion?.requiresInvoice !== false);
                   }}><WandSparkles className="mr-2 h-3.5 w-3.5" />Usar {periodLabel(row.suggestion.sourcePeriod)}</Button>}
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <div><Label htmlFor={`billing-${row.person.id}`}>Cómo factura este mes</Label><Select value={draft.billingCurrency} onValueChange={(value: BillingCurrency) => { update(row.person.id, "billingCurrency", value); if (value === "ARS") { update(row.person.id, "usdPercentage", "0"); update(row.person.id, "bonusUSD", "0"); } }}><SelectTrigger id={`billing-${row.person.id}`} className="mt-1.5 bg-white"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ARS">Sólo ARS</SelectItem><SelectItem value="MIXED">USD + ARS</SelectItem></SelectContent></Select></div>
+                  <div><Label htmlFor={`billing-${row.person.id}`}>Cómo factura este mes</Label><Select value={draft.requiresInvoice ? draft.billingCurrency : "NONE"} onValueChange={(value: BillingCurrency | "NONE") => {
+                    update(row.person.id, "requiresInvoice", value !== "NONE");
+                    if (value !== "NONE") { update(row.person.id, "billingCurrency", value); update(row.person.id, "usdPercentage", value === "USD" ? "100" : value === "ARS" ? "0" : "90"); if (value === "ARS") update(row.person.id, "bonusUSD", "0"); }
+                  }}><SelectTrigger id={`billing-${row.person.id}`} className="mt-1.5 bg-white"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ARS">Sólo ARS</SelectItem><SelectItem value="USD">Sólo USD</SelectItem><SelectItem value="MIXED">USD + ARS</SelectItem><SelectItem value="NONE">Sin factura</SelectItem></SelectContent></Select></div>
+                  {!draft.requiresInvoice && <div><Label htmlFor={`payment-currency-${row.person.id}`}>Moneda de la liquidación</Label><Select value={draft.billingCurrency} onValueChange={(value: BillingCurrency) => { update(row.person.id, "billingCurrency", value); update(row.person.id, "usdPercentage", value === "USD" ? "100" : value === "ARS" ? "0" : "90"); if (value === "ARS") update(row.person.id, "bonusUSD", "0"); }}><SelectTrigger id={`payment-currency-${row.person.id}`} className="mt-1.5 bg-white"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ARS">ARS</SelectItem><SelectItem value="USD">USD</SelectItem><SelectItem value="MIXED">USD + ARS</SelectItem></SelectContent></Select><p className="mt-1 text-xs text-muted-foreground">No se solicita comprobante. Conserva el cálculo y la autorización de Operaciones; Pasivo y pago se registran en Finanzas.</p></div>}
                   {isMixed && <div><Label htmlFor={`pct-${row.person.id}`}>Porcentaje de la base en USD</Label><Input id={`pct-${row.person.id}`} className="mt-1.5 bg-white" type="number" min="0" max="100" step="0.01" value={draft.usdPercentage} onChange={event => update(row.person.id, "usdPercentage", event.target.value)} /></div>}
                 </div>
-                <div className={`mt-4 grid gap-4 ${isMixed ? "lg:grid-cols-3" : "sm:grid-cols-2"}`}>
-                  {isMixed && <div><Label htmlFor={`bonus-${row.person.id}`}>Bono en USD</Label><Input id={`bonus-${row.person.id}`} className="mt-1.5 bg-white" type="number" min="0" step="0.01" value={draft.bonusUSD} onChange={event => update(row.person.id, "bonusUSD", event.target.value)} /></div>}
+                <div className={`mt-4 grid gap-4 ${usesUSD ? "lg:grid-cols-3" : "sm:grid-cols-2"}`}>
+                  {usesUSD && <div><Label htmlFor={`bonus-${row.person.id}`}>Bono en USD</Label><Input id={`bonus-${row.person.id}`} className="mt-1.5 bg-white" type="number" min="0" step="0.01" value={draft.bonusUSD} onChange={event => update(row.person.id, "bonusUSD", event.target.value)} /></div>}
                   <div><Label htmlFor={`bonus-ars-${row.person.id}`}>Bono en ARS</Label><Input id={`bonus-ars-${row.person.id}`} className="mt-1.5 bg-white" type="number" min="0" step="0.01" value={draft.bonusARS} onChange={event => update(row.person.id, "bonusARS", event.target.value)} /></div>
                   <div><Label htmlFor={`extras-ars-${row.person.id}`}>Otros adicionales ARS</Label><Input id={`extras-ars-${row.person.id}`} className="mt-1.5 bg-white" type="number" min="0" step="0.01" value={draft.extrasARS} onChange={event => update(row.person.id, "extrasARS", event.target.value)} /><p className="mt-1 text-xs text-muted-foreground">Monotributo u otros reintegros: podés incluirlos acá o agregarlos después en Mis facturas, sin duplicarlos.</p></div>
                 </div>
                 {conditionsLocked && <p className="mt-2 text-sm text-muted-foreground">Condiciones congeladas: ya hay importes enviados o facturas.</p>}
               </fieldset>
 
-              {isMixed ? <div className="rounded-xl border border-indigo-100 bg-indigo-50/60 p-4"><div className="flex items-center gap-2"><Calculator className="h-4 w-4 text-indigo-600" /><p className="text-xs font-semibold uppercase tracking-wide text-indigo-700">Mind calcula y el colaborador completa los dos TC</p></div><div className="mt-3 grid gap-3 sm:grid-cols-3"><ReadOnly label="Pesos a cobrar en USD" value={ars(planned)} /><ReadOnly label="USD a facturar" value={row.settlement?.invoiceFx ? usd(planned / row.settlement.invoiceFx + Number(draft.bonusUSD || 0)) : "Se calcula con su TC"} /><ReadOnly label="Diferencia final ARS" value={row.settlement?.finalInvoiceARS == null ? "Se calcula al cobrar" : ars(row.settlement.finalInvoiceARS)} /></div></div> : <div className="rounded-lg border bg-slate-50 p-3 text-sm text-muted-foreground">{draft.billingCurrency === "USD" ? "Mind usa el total del cierre como base y la persona adjunta su comprobante en USD." : "Mind usa directamente el total ARS del cierre. La persona agrega extras y envía el importe a autorización. No se pide tipo de cambio."}</div>}
+              {usesUSD ? <div className="rounded-xl border border-indigo-100 bg-indigo-50/60 p-4"><div className="flex items-center gap-2"><Calculator className="h-4 w-4 text-indigo-600" /><p className="text-xs font-semibold uppercase tracking-wide text-indigo-700">{isMixed ? "El colaborador completa el TC al facturar y al cobrar" : "El colaborador completa un TC; el importe se autoriza sólo en USD"}</p></div><div className="mt-3 grid gap-3 sm:grid-cols-3"><ReadOnly label="Pesos a cobrar en USD" value={ars(planned)} /><ReadOnly label={draft.requiresInvoice ? "USD a facturar" : "USD a liquidar"} value={row.settlement?.invoiceFx ? usd(calculated.totalInvoiceUSD) : "Se calcula con su TC"} />{isMixed ? <ReadOnly label="Diferencia final ARS" value={calculated.finalInvoiceARS == null ? "Se calcula al cobrar" : ars(calculated.finalInvoiceARS)} /> : <ReadOnly label="Adicionales ARS a convertir al mismo TC" value={ars(Number(draft.bonusARS || 0) + Number(draft.extrasARS || 0))} />}</div></div> : <div className="rounded-lg border bg-slate-50 p-3 text-sm text-muted-foreground">{draft.billingCurrency === "USD" ? "Mind usa el total del cierre como base y la persona adjunta su comprobante en USD." : "Mind usa directamente el total ARS del cierre. La persona agrega extras y envía el importe a autorización. No se pide tipo de cambio."}</div>}
 
-              {published && <div className={`grid gap-3 ${isMixed ? "sm:grid-cols-4" : "sm:grid-cols-3"}`}><ProgressItem done={Boolean(row.settlement?.invoiceFx) || !isMixed} label={isMixed ? "TC al facturar" : "Liquidación publicada"} />{isMixed && <InvoiceProgress invoice={invoiceForPhase(row, "usd")} label="Factura USD" />}<ProgressItem done={isMixed ? Boolean(row.settlement?.receivedFx) : (row.invoices ?? []).some(i => i.invoiceComponent === "single")} label={isMixed ? "TC al cobrar" : "Factura adjunta"} /><InvoiceProgress invoice={invoiceForPhase(row, "ars")} label="Factura ARS" /></div>}
+              {published && row.settlement && <div className="grid gap-3 sm:grid-cols-2">{settlementPhases(row.settlement).map(phase => <div key={phase} className="space-y-2"><ProgressItem done={flow[phase].status === "approved"} label={`Importe ${phase.toUpperCase()} autorizado`} />{flow.requiresInvoice !== false && <InvoiceProgress invoice={invoiceForPhase(row, phase)} label={`Factura ${phase.toUpperCase()}`} />}</div>)}{flow.requiresInvoice === false && <p className="text-sm text-muted-foreground sm:col-span-2">Sin factura: la autorización no registra un pago. Finanzas debe registrar el Pasivo y el pago correspondientes.</p>}</div>}
+
 
               <div><Label htmlFor={`notes-${row.person.id}`}>Indicaciones para la persona <span className="font-normal text-muted-foreground">(opcional)</span></Label><Textarea disabled={conditionsLocked} id={`notes-${row.person.id}`} className="mt-1.5" rows={2} value={draft.adminNotes} onChange={(event) => update(row.person.id, "adminNotes", event.target.value)} placeholder="Ej. El bono corresponde al proyecto X" /></div>
               <div className="flex flex-col gap-2 border-t pt-4 lg:flex-row lg:items-center lg:justify-between"><p className="text-xs text-muted-foreground">{published ? "Los cambios se hacen visibles recién cuando actualizás la publicación." : "Guardar borrador no avisa al colaborador. Publicar habilita su siguiente paso."}</p><div className="flex flex-col gap-2 sm:flex-row">{!published && <Button variant="outline" disabled={mutation.isPending} onClick={() => mutation.mutate({ row, publish: false })}>Guardar borrador</Button>}<Button disabled={conditionsLocked || mutation.isPending || !row.person.email || cutoff.isLoading || cutoff.isError || (hoursOpen && !cutoff.data?.canPublishEarly)} onClick={() => { if (hoursOpen && !published) { setEarlyReason(""); setEarlyDraft({ ...draft }); setEarlyTarget(row); setEarlyOpen(true); } else mutation.mutate({ row, publish: true }); }}>{mutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}{published ? "Actualizar publicación" : hoursOpen ? "Publicar anticipadamente" : "Publicar"}</Button></div></div>
@@ -342,7 +352,7 @@ function InvoiceReviewHandoff({ row, period }: { row: SettlementRow; period: str
       const currency = invoice.invoiceCurrency?.toUpperCase() ?? (invoice.invoiceComponent === "usd" ? "USD" : "ARS");
       return <div key={invoice.id} className="space-y-2">
         {hasPermission("finance") ? <Button asChild className="h-auto min-h-10 whitespace-normal"><Link href={`/finance/facturas-equipo?period=${encodeURIComponent(period)}&invoiceId=${invoice.id}&personnelId=${row.person.id}`}>Revisar factura {currency}</Link></Button> : <p>Administración o Finanzas debe revisar el comprobante {currency}. Tu usuario puede autorizar importes, pero la revisión de facturas requiere acceso a Finanzas.</p>}
-        <p className="text-muted-foreground">{currency === "USD" ? "Cuando Administración apruebe el comprobante y la persona reciba los USD, continúa en Mis facturas con el TC al cobrar y los extras." : "Al aprobar el comprobante se registra el Pasivo y se completa este tramo."}</p>
+        <p className="text-muted-foreground">{currency === "USD" && row.settlement?.billingCurrencySnapshot !== "USD" ? "Cuando Administración apruebe el comprobante y la persona reciba los USD, continúa en Mis facturas con el TC al cobrar y los extras." : "Al aprobar el comprobante se registra el Pasivo y se completa este tramo."}</p>
       </div>;
     })}
   </div>;
@@ -350,28 +360,27 @@ function InvoiceReviewHandoff({ row, period }: { row: SettlementRow; period: str
 
 function SettlementAuthorization({ row, period }: { row: SettlementRow; period: string }) {
   const [reason, setReason] = useState("");
+  const [correction, setCorrection] = useState<{ phase: SettlementPhase; action: "reject" | "reopen" } | null>(null);
   const client = useQueryClient();
   const { toast } = useToast();
   const flow = normalizeWorkflow(row.settlement?.workflow);
   const usesUSD = Number(row.settlement?.usdPercentage) > 0 || Number(row.settlement?.bonusUSD) > 0;
-  const canRequestCorrection = ([...(usesUSD ? ["usd"] : []), "ars"] as SettlementPhase[]).some(phase => flow[phase].status === "pending" || (flow[phase].status === "approved" && !invoiceForPhase(row, phase)));
   const mutation = useMutation({
     mutationFn: ({ phase, action }: { phase: SettlementPhase; action: string }) => authFetchJson(`/api/finance/personnel-settlements/${row.settlement!.id}/authorization`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ phase, action, version: flow.version, reason }) }),
-    onSuccess: () => { client.invalidateQueries({ queryKey: ["personnel-settlements", period] }); setReason(""); toast({ title: "Decisión guardada", description: "La persona recibe el siguiente paso en Mis facturas." }); },
-    onError: (error: Error) => toast({ title: "No se pudo autorizar", description: error.message, variant: "destructive" }),
+    onSuccess: () => { client.invalidateQueries({ queryKey: ["personnel-settlements", period] }); setCorrection(null); setReason(""); toast({ title: "Decisión guardada", description: "La persona recibe el siguiente paso en Mis facturas." }); },
+    onError: (error: Error) => toast({ title: "No se pudo guardar la decisión", description: error.message, variant: "destructive" }),
   });
-  return <div className="space-y-3 rounded-xl border border-indigo-200 p-4"><p className="font-semibold">Autorizaciones antes de emitir</p>{(["usd", "ars"] as const).filter(phase => phase === "ars" || Number(row.settlement?.usdPercentage) > 0 || Number(row.settlement?.bonusUSD) > 0).map(phase => {
+  const requestCorrection = (phase: SettlementPhase, action: "reject" | "reopen") => { setReason(""); setCorrection({ phase, action }); };
+  return <div className="space-y-3 rounded-xl border border-indigo-200 p-4"><p className="font-semibold">Autorizaciones de importes</p>{row.settlement && settlementPhases(row.settlement).map(phase => {
     const stage = flow[phase];
     const hasInvoice = Boolean(invoiceForPhase(row, phase));
     const details = phase === "usd"
-      ? `TC al facturar: ${row.settlement?.invoiceFx ?? "pendiente"} · Bono USD: ${row.settlement?.bonusUSD ?? 0}`
+      ? `TC de conversión: ${row.settlement?.invoiceFx ?? "pendiente"} · Bono USD: ${row.settlement?.bonusUSD ?? 0}`
       : [
           ...(usesUSD ? [`TC al cobrar: ${row.settlement?.receivedFx ?? "pendiente"}`] : []),
-          `Bono ARS: ${ars(row.settlement?.bonusARS)}`,
-          `Otros adicionales ARS: ${ars(row.settlement?.extrasARS)}`,
-          `Extras colaborador: ${ars(flow.extrasARS)}`,
+          `Bono ARS: ${ars(row.settlement?.bonusARS)}`, `Otros adicionales ARS: ${ars(row.settlement?.extrasARS)}`, `Extras colaborador: ${ars(flow.extrasARS)}`,
           ...(usesUSD ? [`Comisión USD: ${row.settlement?.bankCommissionUSD ?? 0}`] : []),
         ].join(" · ");
-    return <div key={phase} className="space-y-2 rounded border p-3"><div className="flex flex-wrap items-center justify-between gap-2"><span className="font-medium">{phase === "usd" ? "Factura USD" : "Factura ARS"}: {phase === "usd" ? usd(stage.amount) : ars(stage.amount)}</span><Badge variant="outline" className="whitespace-normal">{{draft:"Esperando al colaborador",pending:"Requiere tu autorización",approved:"Importe autorizado",rejected:"Devuelto a corrección"}[stage.status]}</Badge></div><p className="text-sm text-muted-foreground">{details}</p>{phase === "ars" && flow.extrasReason && <p className="text-sm">{flow.extrasReason}</p>}{stage.status === "pending" && <div className="flex flex-col gap-2 sm:flex-row"><Button disabled={mutation.isPending} onClick={() => mutation.mutate({phase,action:"approve"})}>Autorizar {phase.toUpperCase()}</Button><Button variant="outline" disabled={mutation.isPending || reason.trim().length < 5} onClick={() => mutation.mutate({phase,action:"reject"})}>Pedir corrección</Button></div>}{stage.status === "approved" && !hasInvoice && <Button variant="outline" disabled={mutation.isPending || reason.trim().length < 5} onClick={() => mutation.mutate({phase,action:"reopen"})}>Devolver importe a corrección</Button>}</div>;
-  })}{canRequestCorrection && <><Label htmlFor={`correction-${row.person.id}`}>Motivo para pedir una corrección</Label><Textarea id={`correction-${row.person.id}`} value={reason} onChange={e => setReason(e.target.value)} placeholder="Indicá qué debe revisar el colaborador" /></>}</div>;
+    return <div key={phase} className="space-y-2 rounded border p-3"><div className="flex flex-wrap items-center justify-between gap-2"><span className="font-medium">{flow.requiresInvoice === false ? "Liquidación" : "Factura"} {phase.toUpperCase()}: {phase === "usd" ? usd(stage.amount) : ars(stage.amount)}</span><Badge variant="outline" className="whitespace-normal">{{draft:"Esperando al colaborador",pending:"Requiere tu autorización",approved:"Importe autorizado",rejected:"Devuelto a corrección"}[stage.status]}</Badge></div><p className="text-sm text-muted-foreground">{details}</p>{phase === "ars" && flow.extrasReason && <p className="text-sm">{flow.extrasReason}</p>}{stage.status === "pending" && <div className="flex flex-col gap-2 sm:flex-row"><Button disabled={mutation.isPending} onClick={() => mutation.mutate({phase,action:"approve"})}>Autorizar {phase.toUpperCase()}</Button><Button variant="outline" disabled={mutation.isPending || hasInvoice} onClick={() => requestCorrection(phase,"reject")}>Pedir corrección</Button></div>}{stage.status === "approved" && !hasInvoice && <Button variant="outline" disabled={mutation.isPending} onClick={() => requestCorrection(phase,"reopen")}>Devolver importe a corrección</Button>}</div>;
+  })}<Dialog open={Boolean(correction)} onOpenChange={open => { if (!mutation.isPending && !open) setCorrection(null); }}><DialogContent><DialogHeader><DialogTitle>Pedir corrección del importe {correction?.phase.toUpperCase()}</DialogTitle><DialogDescription>El colaborador verá el motivo en Mis facturas y podrá corregir y reenviar sus datos.</DialogDescription></DialogHeader><div className="space-y-2"><Label htmlFor={`correction-${row.person.id}`}>Qué debe revisar</Label><Textarea id={`correction-${row.person.id}`} value={reason} onChange={e => setReason(e.target.value)} placeholder="Ej. Revisá el TC comprador de tu banco del día de emisión" /><p className="text-xs text-muted-foreground">Describí el motivo con al menos 5 caracteres.</p></div><DialogFooter><Button variant="outline" disabled={mutation.isPending} onClick={() => setCorrection(null)}>Cancelar</Button><Button disabled={mutation.isPending || reason.trim().length < 5} onClick={() => correction && mutation.mutate(correction)}>Enviar pedido de corrección</Button></DialogFooter></DialogContent></Dialog></div>;
 }

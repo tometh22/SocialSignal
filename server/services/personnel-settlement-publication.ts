@@ -48,14 +48,17 @@ export async function savePersonnelSettlement(personnelId: number, actorId: numb
       return parsed;
     };
     const requestedCurrency = String(input.billingCurrency ?? closing.billingCurrency ?? person.billingCurrency ?? "ARS").toUpperCase();
-    const billingCurrency = ["ARS", "USD", "MIXED"].includes(requestedCurrency) ? requestedCurrency : "ARS";
+    if (!["ARS", "USD", "MIXED"].includes(requestedCurrency)) fail("Moneda de liquidación inválida", 400);
+    const billingCurrency = requestedCurrency;
+    if (input.requiresInvoice !== undefined && typeof input.requiresInvoice !== "boolean") fail("Indicá si la liquidación requiere factura", 400);
+    const requiresInvoice = input.requiresInvoice ?? flow.requiresInvoice ?? true;
     const requestedPercentage = nonNegative(input.usdPercentage, "Porcentaje USD");
     const usdPercentage = billingCurrency === "USD" ? 100 : billingCurrency === "ARS" ? 0 : requestedPercentage;
     if (usdPercentage > 100) fail("El porcentaje USD debe estar entre 0 y 100", 400);
     const bonusUSD = billingCurrency !== "ARS" ? nonNegative(input.bonusUSD, "Bono USD") : 0;
     const bonusARS = nonNegative(input.bonusARS, "Bono ARS");
     const extrasARS = nonNegative(input.extrasARS, "Extra ARS");
-    const calculated = calculatePersonnelSettlement({ totalARS, usdPercentage, bonusUSD, bonusARS, extrasARS, invoiceFx: null, receivedFx: null, bankCommissionUSD: 0 });
+    const calculated = calculatePersonnelSettlement({ billingCurrencySnapshot: billingCurrency, totalARS, usdPercentage, bonusUSD, bonusARS, extrasARS, invoiceFx: null, receivedFx: null, bankCommissionUSD: 0 });
     const at = now.toISOString();
     const publication = flow.publication ?? (publish ? { beforeCut, actorId, at, ...(beforeCut ? { reason } : {}) } : undefined);
     const action = !publish ? "settlement_draft_saved" : current?.status === "published" ? "settlement_publication_updated" : beforeCut ? "settlement_published_early" : "settlement_published";
@@ -69,15 +72,15 @@ export async function savePersonnelSettlement(personnelId: number, actorId: numb
       status: publish ? "published" : "draft",
       publishedBy: publish ? actorId : current?.publishedBy ?? null,
       publishedAt: publish ? now : current?.publishedAt ?? null, updatedAt: now,
-      workflow: { ...settlementWorkflow(), version: flow.version + 1, publication, events: [...(flow.events ?? []), ...(publish ? [{ action, actorId, at, ...(beforeCut ? { reason: publication?.reason } : {}) }] : [])] },
+      workflow: { ...settlementWorkflow(), requiresInvoice, version: flow.version + 1, publication, events: [...(flow.events ?? []), ...(publish ? [{ action, actorId, at, ...(beforeCut ? { reason: publication?.reason } : {}) }] : [])] },
     };
     const [saved] = await tx.insert(personnelMonthlySettlements).values({ personnelId, period, createdBy: actorId, ...values })
       .onConflictDoUpdate({ target: [personnelMonthlySettlements.personnelId, personnelMonthlySettlements.period], set: { ...values, invoiceFx: null, receivedFx: null, bankCommissionUSD: 0 } }).returning();
     await tx.insert(financialAuditEvents).values({
       periodKey: period, entityType: "personnel_settlement", entityId: saved.id, action, actorUserId: actorId,
       reason: beforeCut ? publication?.reason : null,
-      beforeData: current ? { status: current.status, version: flow.version, totalARS: current.totalARS } : null,
-      afterData: { personnelId, closingId: closing.id, status: saved.status, version: saved.workflow.version, totalARS, hours: hoursSnapshot, beforeCut, operationalHoursRemainOpen: !cut },
+      beforeData: current ? { status: current.status, version: flow.version, totalARS: current.totalARS, billingCurrency: current.billingCurrencySnapshot, requiresInvoice: flow.requiresInvoice !== false } : null,
+      afterData: { personnelId, closingId: closing.id, status: saved.status, version: saved.workflow.version, totalARS, hours: hoursSnapshot, billingCurrency, requiresInvoice, beforeCut, operationalHoursRemainOpen: !cut },
     });
     return saved;
   });

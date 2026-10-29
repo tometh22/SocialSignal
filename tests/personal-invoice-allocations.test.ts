@@ -42,8 +42,6 @@ describe("team cost and invoice integration contracts", () => {
     expect(migration).toContain("UNIQUE (user_id, period, invoice_component)");
     expect(page).toContain("1. Factura en dólares");
     expect(page).toContain("2. Después de recibir los USD");
-    expect(page).toContain('phaseCard("usd")');
-    expect(page).toContain('phaseCard("ars")');
     expect(routes).toContain('invoiceComponent === "usd"');
     expect(routes).toContain('invoiceComponent === "ars"');
     expect(routes).toContain("issueDate.toISOString().slice(0, 7)");
