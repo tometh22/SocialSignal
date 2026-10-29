@@ -2,7 +2,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { db } from "../db";
 import { personnelMonthlySettlements, personalMonthlyInvoices, personnel, users, financialClosePeriods } from "@shared/schema";
 import { calculatePersonnelSettlement } from "./personnel-settlement";
-import { settlementWorkflow, type SettlementPhase } from "@shared/utils/settlement-workflow";
+import { settlementWorkflow, settlementPhases, type SettlementPhase } from "@shared/utils/settlement-workflow";
 import { createUserNotifications } from "./user-notifications";
 
 function fail(message: string, statusCode = 409): never { throw Object.assign(new Error(message), { statusCode }); }
@@ -41,6 +41,7 @@ export async function changeSettlement(id: number, actorId: number, operations: 
     if (Number(input.version) !== flow.version) fail("La liquidación cambió. Actualizá la pantalla antes de continuar.");
     const phase: SettlementPhase = input.phase;
     if (!["usd", "ars"].includes(phase)) fail("Tramo inválido", 400);
+    if (!settlementPhases(row).includes(phase)) fail("Este tramo no corresponde a la moneda publicada", 400);
     const action = String(input.action);
     if (!operations && action !== "submit") fail("La autorización corresponde a Operaciones", 403);
     if (operations && !["approve", "reject", "reopen"].includes(action)) fail("Acción inválida", 400);
@@ -60,7 +61,8 @@ export async function changeSettlement(id: number, actorId: number, operations: 
       } else {
         if (usesUSD) {
           const usdInvoice = invoices.find(i => (i.invoiceComponent === "usd" || i.invoiceCurrency === "USD") && i.approvalStatus === "approved");
-          if (!usdInvoice) fail("Primero debe estar aprobada la factura USD por Administración.");
+          if (flow.requiresInvoice === false && flow.usd.status !== "approved") fail("Operaciones debe autorizar primero el importe USD.");
+          if (flow.requiresInvoice !== false && !usdInvoice) fail("Primero debe estar aprobada la factura USD por Administración.");
           if (input.receivedConfirmed !== true) fail("Confirmá que recibiste los USD en tu cuenta", 400);
           updates.receivedFx = Number(input.receivedFx);
           if (!Number.isFinite(updates.receivedFx) || updates.receivedFx <= 0) fail("Ingresá el TC comprador de tu banco al recibir el dinero", 400);
@@ -93,12 +95,18 @@ export async function changeSettlement(id: number, actorId: number, operations: 
 
     return result;
   });
-  await notifySettlement(saved, operations ? "person" : "operations", operations ? input.action === "approve" ? "Importe autorizado para facturar" : "Revisá tu importe antes de facturar" : "Importe pendiente de autorización").catch(console.error);
+  const withoutInvoice = saved.workflow.requiresInvoice === false;
+  const title = !operations ? "Importe pendiente de autorización" : input.action === "approve"
+    ? withoutInvoice ? "Liquidación autorizada sin factura" : "Importe autorizado para facturar"
+    : withoutInvoice ? "Revisá los datos de tu liquidación" : "Revisá tu importe antes de facturar";
+  await notifySettlement(saved, operations ? "person" : "operations", title).catch(console.error);
   return saved;
 }
 
 export function assertSettlementInvoiceAllowed(row: any, component: string, currency: string) {
+  if (settlementWorkflow(row.workflow).requiresInvoice === false) fail("Esta liquidación está publicada sin factura; no corresponde subir un comprobante.");
   const phase: SettlementPhase = currency === "USD" ? "usd" : "ars";
+  if (!settlementPhases(row).includes(phase)) fail("La moneda no corresponde a la liquidación publicada", 400);
   if (component !== "single" && component !== phase) fail("Moneda incompatible con el tramo", 400);
   const approved = settlementWorkflow(row.workflow)[phase];
   if (approved.status !== "approved") fail("Operaciones debe autorizar este importe antes de emitir y subir la factura.");

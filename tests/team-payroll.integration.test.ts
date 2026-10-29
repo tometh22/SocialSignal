@@ -15,6 +15,8 @@ vi.mock("../server/db", async () => {
 vi.mock("../server/services/user-notifications",()=>({createUserNotifications:vi.fn(async()=>true)}));
 import { pool, db } from "../server/db";
 import { runTeamPayroll } from "../server/jobs/team-payroll";
+import { payrollDocumentModesMigrationSql } from "../server/migrations/payroll-document-modes";
+import { settlementProgress } from "../shared/utils/settlement-progress";
 import { personalInvoiceReviewQuery } from "../server/services/personal-invoice-review";
 import { savePersonnelSettlement } from "../server/services/personnel-settlement-publication";
 import { preparePayroll, payrollActualHours } from "../server/services/monthly-payroll";
@@ -41,6 +43,8 @@ describe.skipIf(!setup.url)("team payroll workflow with PostgreSQL",()=>{
     await query("ALTER TABLE system_config ADD UNIQUE(config_key); ALTER TABLE monthly_closings ADD UNIQUE(personnel_id,year,month); ALTER TABLE personnel_monthly_settlements ADD UNIQUE(personnel_id,period); ALTER TABLE fact_rc_month ADD UNIQUE(project_id,period_key); ALTER TABLE fact_cost_month ADD UNIQUE(period_key)");
     const migration=readFileSync("migrations/0089_team_settlement_workflow.sql","utf8");
     await query(migration);await query(migration);
+    await query(readFileSync("migrations/0091_payroll_document_modes.sql","utf8"));
+    await query(payrollDocumentModesMigrationSql);
   });
   beforeEach(async()=>{
     await query(`TRUNCATE ${tables.map(t=>getTableConfig(t).name).join(",")},payroll_periods RESTART IDENTITY CASCADE`);
@@ -61,6 +65,60 @@ describe.skipIf(!setup.url)("team payroll workflow with PostgreSQL",()=>{
       expectedBase: { closingId: closing.id, hours: closing.adjusted_hours, totalARS: closing.grand_total_ars },
       earlyPublication: { confirmed: true, reason: "Facturación anticipada con base revisada" }, ...overrides };
   }
+  it("authorizes USD-only once, converts ARS additions at the same FX and rejects an ARS phase", async () => {
+    await preparePayroll(period,2);
+    const row=await savePersonnelSettlement(1,2,await publicationInput({billingCurrency:"USD",bonusUSD:3,bonusARS:1000,extrasARS:500}),earlyNow);
+    expect(row.usdPercentage).toBe(100);expect(row.workflow.requiresInvoice).toBe(true);
+    const sent=await changeSettlement(row.id,1,false,{phase:"usd",action:"submit",version:1,invoiceFx:1000,requiresInvoice:false});
+    expect(sent.workflow.requiresInvoice).toBe(true);
+    expect(sent.totalInvoiceUSD).toBe(14.5);expect(sent.finalInvoiceARS).toBe(0);
+    const approved=await changeSettlement(row.id,2,true,{phase:"usd",action:"approve",version:2});
+    expect(assertSettlementInvoiceAllowed(approved,"usd","USD")).toBe(14.5);
+    expect((await query("SELECT * FROM financial_payroll_pending")).rows).toHaveLength(1);
+    await query("INSERT INTO personal_monthly_invoices(settlement_id,invoice_currency,approval_status,declared_invoice_amount) VALUES($1,'USD','approved',14.5)",[row.id]);
+    expect((await query("SELECT * FROM financial_payroll_pending")).rows).toHaveLength(0);
+    await expect(changeSettlement(row.id,1,false,{phase:"ars",action:"submit",version:3})).rejects.toMatchObject({statusCode:400});
+    expect(settlementProgress({closing:{id:1},settlement:approved,invoices:[{invoiceComponent:"usd",approvalStatus:"approved"}]}).group).toBe("done");
+  });
+  it("completes authorized USD without a phantom invoice, and cannot upload a document in that mode", async () => {
+    await preparePayroll(period,2);
+    const row=await savePersonnelSettlement(1,2,await publicationInput({billingCurrency:"USD",requiresInvoice:false}),earlyNow);
+    await changeSettlement(row.id,1,false,{phase:"usd",action:"submit",version:1,invoiceFx:1000});
+    const approved=await changeSettlement(row.id,2,true,{phase:"usd",action:"approve",version:2});
+    expect(()=>assertSettlementInvoiceAllowed(approved,"usd","USD")).toThrow("sin factura");
+    expect(settlementProgress({closing:{id:1},settlement:approved,invoices:[]})).toMatchObject({group:"done",label:"Liquidación autorizada sin factura"});
+    expect((await query("SELECT * FROM financial_payroll_pending")).rows).toHaveLength(0);
+    expect((await query("SELECT * FROM personal_monthly_invoices")).rows).toHaveLength(0);
+    expect((await query("SELECT * FROM pasivo_entries")).rows).toHaveLength(0);
+    const audit=(await query("SELECT after_data FROM financial_audit_events WHERE entity_id=$1 ORDER BY id DESC LIMIT 1",[row.id])).rows[0];
+    expect(audit.after_data.requiresInvoice).toBe(false);
+    await expect(savePersonnelSettlement(1,2,await publicationInput({requiresInvoice:true}),earlyNow)).rejects.toThrow("importes enviados");
+  });
+  it("preserves USD authorization and receipt checks for mixed settlements without invoices", async () => {
+    await preparePayroll(period,2);
+    const row=await savePersonnelSettlement(1,2,await publicationInput({billingCurrency:"MIXED",usdPercentage:90,requiresInvoice:false}),earlyNow);
+    await changeSettlement(row.id,1,false,{phase:"usd",action:"submit",version:1,invoiceFx:1500});
+    await expect(changeSettlement(row.id,1,false,{phase:"ars",action:"submit",version:2,receivedConfirmed:true,receivedFx:1505})).rejects.toThrow("autorizar primero");
+    await changeSettlement(row.id,2,true,{phase:"usd",action:"approve",version:2});
+    await expect(changeSettlement(row.id,1,false,{phase:"ars",action:"submit",version:3,receivedFx:1505})).rejects.toThrow("recibiste");
+    const ars=await changeSettlement(row.id,1,false,{phase:"ars",action:"submit",version:3,receivedConfirmed:true,receivedFx:1505});
+    expect(ars.finalInvoiceARS).toBe(969.6);
+    const done=await changeSettlement(row.id,2,true,{phase:"ars",action:"approve",version:4});
+    expect(settlementProgress({closing:{id:1},settlement:done,invoices:[]}).group).toBe("done");
+    expect((await query("SELECT * FROM financial_payroll_pending")).rows).toHaveLength(0);
+  });
+  it("rejects an invalid invoice requirement and unsupported currency instead of silently changing them", async () => {
+    await preparePayroll(period,2);
+    await expect(savePersonnelSettlement(1,2,await publicationInput({requiresInvoice:"false"}),earlyNow)).rejects.toMatchObject({statusCode:400});
+    await expect(savePersonnelSettlement(1,2,await publicationInput({billingCurrency:"EUR"}),earlyNow)).rejects.toMatchObject({statusCode:400});
+  });
+  it("preserves the approved historical USD document when a legacy workflow has no USD authorization snapshot", async () => {
+    const row=await published();
+    await query("UPDATE personnel_monthly_settlements SET invoice_fx=1500,base_invoice_usd=6,total_invoice_usd=6 WHERE id=$1",[row.id]);
+    await query("INSERT INTO personal_monthly_invoices(settlement_id,invoice_currency,approval_status) VALUES($1,'USD','approved')",[row.id]);
+    const ars=await changeSettlement(row.id,1,false,{phase:"ars",action:"submit",version:0,receivedConfirmed:true,receivedFx:1505});
+    expect(ars.finalInvoiceARS).toBe(970);expect(ars.workflow.ars.status).toBe("pending");
+  });
   it("requires an explicit early confirmation and the displayed base, while drafts remain available", async () => {
     await preparePayroll(period, 2);
     await expect(savePersonnelSettlement(1,2,await publicationInput({earlyPublication:undefined}),earlyNow)).rejects.toThrow("Publicar anticipadamente");

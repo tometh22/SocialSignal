@@ -155,5 +155,5 @@ it("empty projects can create the first task from the toolbar", () => {
 });
 it("task and section controls use backend capabilities", () => {
   expect(source("client/src/components/tasks/TaskDetailPanel.tsx")).toContain('task.canDelete &&');
-  expect(source("client/src/components/tasks/ProjectTaskList.tsx")).toContain('data?.canManageSections &&');
+  expect(source("client/src/components/tasks/ProjectTaskList.tsx")).toContain('data?.canCreateSections &&');
 });

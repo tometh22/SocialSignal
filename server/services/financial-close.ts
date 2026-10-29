@@ -70,7 +70,7 @@ async function collectCloseChecks(periodKey: string, runner: any = db): Promise<
           AND reconciliation_status = 'unmatched')::int AS unmatched_cashflow,
       (SELECT count(*) FROM provision_entries
         WHERE period_key = ${periodKey} AND status = 'PROPOSED')::int AS proposed_provisions,
-      (SELECT COALESCE(sum(CASE WHEN settlement.billing_currency_snapshot='MIXED' THEN 2 ELSE 1 END),0)
+      (SELECT COALESCE(sum(CASE WHEN settlement.workflow->>'requiresInvoice'='false' THEN 0 WHEN settlement.billing_currency_snapshot='MIXED' THEN 2 ELSE 1 END),0)
         FROM (
           SELECT DISTINCT fl.person_id
           FROM fact_labor_month fl
@@ -79,6 +79,13 @@ async function collectCloseChecks(periodKey: string, runner: any = db): Promise<
         ) expected
         LEFT JOIN personnel_monthly_settlements settlement
           ON settlement.personnel_id=expected.person_id AND settlement.period=${periodKey} AND settlement.status='published')::int AS fixed_invoice_expected,
+      (SELECT count(*) FROM personnel_monthly_settlements s
+        WHERE s.period=${periodKey} AND s.status='published'
+          AND s.workflow->>'requiresInvoice'='false')::int AS no_invoice_settlements,
+      (SELECT count(*) FROM personnel_monthly_settlements s
+        WHERE s.period=${periodKey} AND s.status='published' AND s.workflow->>'requiresInvoice'='false'
+          AND (((s.usd_percentage>0 OR s.bonus_usd>0) AND COALESCE(s.workflow->'usd'->>'status','')<>'approved')
+            OR (s.billing_currency_snapshot<>'USD' AND COALESCE(s.workflow->'ars'->>'status','')<>'approved')))::int AS no_invoice_pending,
       (SELECT count(*)
         FROM personal_monthly_invoices i
         WHERE i.period=${periodKey} AND i.approval_status='approved'
@@ -135,6 +142,16 @@ async function collectCloseChecks(periodKey: string, runner: any = db): Promise<
         : `Hay ${pendingIntake} carga(s) sin publicar o rechazar.`,
       expectedValue: 0,
       actualValue: pendingIntake,
+    },
+    {
+      code: "no_invoice_settlements_authorized", severity: "warning",
+      status: numeric(stats.no_invoice_pending) === 0 ? "passed" : "failed",
+      title: "Liquidaciones sin factura autorizadas",
+      detail: numeric(stats.no_invoice_pending) > 0
+        ? `Falta autorizar ${numeric(stats.no_invoice_pending)} liquidación(es) sin factura.`
+        : `${numeric(stats.no_invoice_settlements)} liquidación(es) sin factura autorizadas. No requieren factura; el Pasivo y el pago se registran por separado en Finanzas.`,
+      expectedValue: 0, actualValue: numeric(stats.no_invoice_pending),
+      evidence: { withoutInvoice: numeric(stats.no_invoice_settlements), pendingAuthorization: numeric(stats.no_invoice_pending) },
     },
     {
       code: "fixed_team_invoices_approved",

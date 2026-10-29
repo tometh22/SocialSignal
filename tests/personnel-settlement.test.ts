@@ -60,3 +60,8 @@ describe("personnel monthly settlement", () => {
     });
   });
 });
+
+it("rounds the USD-only base before adding ARS extras converted at the same bank FX", () => {
+  const result = calculatePersonnelSettlement({billingCurrencySnapshot:"USD",totalARS:10000,usdPercentage:100,invoiceFx:1500,extrasARS:1000});
+  expect(result.baseInvoiceUSD).toBe(6.67);expect(result.totalInvoiceUSD).toBe(7.34);expect(result.finalInvoiceARS).toBe(0);
+});

@@ -1,6 +1,6 @@
 import { InvoiceDocument } from "@/components/invoice-document";
 import { calculatePersonnelSettlement } from "@shared/utils/personnel-settlement";
-import { settlementWorkflow, type SettlementWorkflow, type SettlementPhase } from "@shared/utils/settlement-workflow";
+import { settlementPhases, settlementWorkflow, type SettlementWorkflow, type SettlementPhase } from "@shared/utils/settlement-workflow";
 import { calculateSettlementDifference } from "@shared/utils/monthly-settlement-declaration";
 import { useEffect, useMemo, useRef, useState, type ClipboardEvent, type DragEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -106,7 +106,9 @@ export default function MyInvoices() {
   const isMixed = billing !== "ARS";
   const usesUSD = Number(settlement?.usdPercentage ?? 0) > 0 || Number(settlement?.bonusUSD ?? 0) > 0;
   const flow = settlementWorkflow(settlement?.workflow);
-  const complete = Boolean(settlement) && ([...(usesUSD ? ["usd"] : []), "ars"] as SettlementPhase[]).every(phase => flow[phase].status === "approved" && (flow[phase].amount === 0 || periodInvoices.some(i => i.invoiceCurrency === phase.toUpperCase() && i.approvalStatus === "approved")));
+  const requiresInvoice = flow.requiresInvoice !== false;
+  const phases = settlement ? settlementPhases(settlement) : [];
+  const complete = Boolean(settlement) && phases.every(phase => flow[phase].status === "approved" && (!requiresInvoice || flow[phase].amount === 0 || periodInvoices.some(i => i.invoiceCurrency === phase.toUpperCase() && i.approvalStatus === "approved")));
   const usdDocumentApproved = periodInvoices.some(i => i.invoiceCurrency === "USD" && i.approvalStatus === "approved");
 
   useEffect(() => {
@@ -123,7 +125,7 @@ export default function MyInvoices() {
       method: "PATCH", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: settlement?.id, version: flow.version, phase, action: "submit", invoiceFx, receivedFx, receivedConfirmed, bankCommissionUSD, extrasARS, extrasReason }),
     }),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["personal-settlement", period] }); toast({ title: "Enviado a Operaciones", description: "Esperá la autorización antes de emitir la factura. El estado se actualiza acá." }); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["personal-settlement", period] }); toast({ title: "Enviado a Operaciones", description: requiresInvoice ? "Esperá la autorización antes de emitir la factura. El estado se actualiza acá." : "Esperá la autorización de tu liquidación. No se solicita factura." }); },
     onError: (error: Error) => toast({ title: "Revisá los datos", description: error.message, variant: "destructive" }),
   });
   const preview = settlement ? calculatePersonnelSettlement({ ...settlement, invoiceFx: Number(invoiceFx), receivedFx: Number(receivedFx), bankCommissionUSD: Number(bankCommissionUSD), extrasARS: settlement.extrasARS + Number(extrasARS) }) : null;
@@ -132,15 +134,16 @@ export default function MyInvoices() {
     const stage = flow[phase];
     const isUSD = phase === "usd";
     const canEdit = stage.status === "draft" || stage.status === "rejected";
-    const ready = isUSD || !usesUSD || usdDocumentApproved;
+    const ready = isUSD || !usesUSD || (requiresInvoice ? usdDocumentApproved : flow.usd.status === "approved");
     const amount = canEdit ? isUSD ? preview?.totalInvoiceUSD : preview?.finalInvoiceARS : stage.amount;
     const component: InvoiceComponent = isMixed ? phase : "single";
-    const label = isUSD ? "1. Factura en dólares" : usesUSD ? "2. Después de recibir los USD" : "Tu factura en pesos";
-    return <Card key={phase} className={stage.status === "approved" ? "border-emerald-300" : ""}><CardHeader><CardTitle className="text-base">{label}</CardTitle><p className="text-sm text-muted-foreground">{isUSD ? "Ingresá el tipo de cambio comprador más bajo de tu banco del día en que vas a facturar." : usesUSD ? "Confirmá que recibiste el dinero e ingresá el TC comprador más bajo de tu banco de ese día." : "Tu importe base ya está calculado. Agregá extras sólo si corresponde."}</p></CardHeader><CardContent className="space-y-4">
+    const label = isUSD ? requiresInvoice ? "1. Factura en dólares" : "1. Liquidación en dólares" : usesUSD ? "2. Después de recibir los USD" : requiresInvoice ? "Tu factura en pesos" : "Tu liquidación en pesos";
+    return <Card key={phase} className={stage.status === "approved" ? "border-emerald-300" : ""}><CardHeader><CardTitle className="text-base">{label}</CardTitle><p className="text-sm text-muted-foreground">{stage.status === "approved" ? "Operaciones autorizó este importe con los datos enviados." : stage.status === "pending" ? "Operaciones está revisando los datos que enviaste." : isUSD ? requiresInvoice ? "Ingresá el tipo de cambio comprador más bajo de tu banco del día en que vas a facturar." : "Ingresá el TC de conversión de la base indicado para esta liquidación." : usesUSD ? "Confirmá que recibiste el dinero e ingresá el TC comprador más bajo de tu banco de ese día." : "Tu importe base ya está calculado. Agregá extras sólo si corresponde."}</p></CardHeader><CardContent className="space-y-4">
       {!ready && <Notice tone="info" title="Primero completá la factura USD" text="Este paso se habilita después de que Administración apruebe tu comprobante USD y recibas el dinero." />}
       {stage.reason && <Notice tone="warning" title="Operaciones pidió una corrección" text={stage.reason} />}
       {!isUSD && Number(settlement.extrasARS) > 0 && <div className="space-y-2 rounded-lg border border-indigo-200 bg-indigo-50 p-4 text-sm"><p className="font-semibold">Operaciones ya incluyó {money(settlement.extrasARS, "ARS")} de adicionales</p><p>Ese importe ya se suma a tu factura en pesos. No hace falta volver a cargarlo. Abajo podés agregar únicamente comisiones u otros reintegros nuevos.</p><div className="grid gap-2 pt-1 sm:grid-cols-3"><Summary label="Ya cargado por Operaciones" value={money(settlement.extrasARS, "ARS")} detail="Ya incluido en tu importe" /><Summary label="Extras nuevos" value={money(canEdit ? Number(extrasARS) || 0 : flow.extrasARS, "ARS")} detail="Sólo lo que agregues ahora" /><Summary label="Total de adicionales ARS" value={money(settlement.extrasARS + (canEdit ? Number(extrasARS) || 0 : flow.extrasARS), "ARS")} detail="Ops más extras nuevos" /></div></div>}
-      {canEdit && ready && (isUSD ? <div className="max-w-md space-y-1.5"><Label htmlFor="invoice-fx">TC de mi banco al facturar (ARS por USD)</Label><Input id="invoice-fx" type="number" min="0.01" step="0.01" value={invoiceFx} onChange={e => setInvoiceFx(e.target.value)} placeholder="Ej. 1500" /></div> : <div className="grid gap-4 sm:grid-cols-2">
+      {isUSD && <div className="grid gap-3 rounded-lg border bg-muted/20 p-3 sm:grid-cols-3"><Summary label="Base ARS que se convierte a USD" value={money(settlement.plannedUSDARS, "ARS")} detail={`${settlement.usdPercentage}% de la base ARS del mes`} /><Summary label="TC usado para convertir" value={Number(invoiceFx) > 0 ? `${Number(invoiceFx).toLocaleString("es-AR")} ARS/USD` : "Pendiente"} detail="TC ingresado por el colaborador" /><Summary label="Bono en USD" value={money(settlement.bonusUSD, "USD")} detail="Se agrega después de convertir la base" />{billing === "USD" && Number(settlement.bonusARS + settlement.extrasARS) > 0 && <Summary label="Adicionales ARS a convertir" value={money(settlement.bonusARS + settlement.extrasARS, "ARS")} detail="Se convierten al mismo TC para liquidar todo en USD" />}</div>}
+      {canEdit && ready && (isUSD ? <div className="max-w-md space-y-1.5"><Label htmlFor="invoice-fx">{requiresInvoice ? "TC de mi banco al facturar (ARS por USD)" : "TC de conversión (ARS por USD)"}</Label><Input id="invoice-fx" type="number" min="0.01" step="0.01" value={invoiceFx} onChange={e => setInvoiceFx(e.target.value)} placeholder="Ej. 1500" /><p className="text-sm text-muted-foreground">{money(settlement.plannedUSDARS, "ARS")} de base {Number(invoiceFx) > 0 ? `÷ ${Number(invoiceFx).toLocaleString("es-AR")} ARS/USD = ${money(preview?.baseInvoiceUSD, "USD")}` : "se convierten con el TC que ingreses"}.</p></div> : <div className="grid gap-4 sm:grid-cols-2">
         {usesUSD && <>
           <label className="flex items-start gap-2 rounded-lg border bg-muted/20 p-3 text-sm sm:col-span-2"><input className="mt-0.5 h-4 w-4 shrink-0" type="checkbox" checked={receivedConfirmed} onChange={e => setReceivedConfirmed(e.target.checked)} />Ya recibí los USD en mi cuenta</label>
           <div className="space-y-1.5"><Label htmlFor="received-fx">TC de mi banco al recibir (ARS por USD)</Label><Input id="received-fx" type="number" min="0.01" step="0.01" value={receivedFx} onChange={e => setReceivedFx(e.target.value)} placeholder="Ej. 1505" /></div>
@@ -149,11 +152,11 @@ export default function MyInvoices() {
         <div className="space-y-1.5"><Label htmlFor="extras-ars">Extras nuevos en ARS (opcional)</Label><Input id="extras-ars" type="number" min="0" step="0.01" value={extrasARS} onChange={e => setExtrasARS(e.target.value)} /><p className="text-xs text-muted-foreground">Sólo importes que todavía no incluyó Operaciones.</p></div>
         <div className="space-y-1.5"><Label htmlFor="extras-reason">Detalle de los extras nuevos</Label><Textarea id="extras-reason" value={extrasReason} onChange={e => setExtrasReason(e.target.value)} placeholder="Concepto e importe de cada reintegro" /><p className="text-xs text-muted-foreground">Obligatorio sólo si agregás extras nuevos o comisión.</p></div>
       </div>)}
-      <Summary label={stage.status === "approved" ? "Importe autorizado" : "Importe calculado"} value={money(amount, isUSD ? "USD" : "ARS")} detail={isUSD ? "Tramo base ÷ TC + bono USD" : usesUSD ? "Total base − USD base al TC del cobro + bono ARS + extras" : "Base + bono ARS + extras"} />
+      <Summary label={stage.status === "approved" ? "Importe autorizado" : "Importe calculado"} value={money(amount, isUSD ? "USD" : "ARS")} detail={isUSD ? billing === "USD" ? "Base ÷ TC + bono USD + adicionales ARS ÷ TC" : "Tramo base ÷ TC + bono USD" : usesUSD ? "Total base − USD base al TC del cobro + bono ARS + extras" : "Base + bono ARS + extras"} />
       {canEdit && ready && <Button disabled={settlementMutation.isPending || amount == null || amount < 0 || (!isUSD && ((usesUSD && !receivedConfirmed) || Number(extrasARS) < 0 || Number(bankCommissionUSD) < 0 || ((Number(extrasARS) > 0 || Number(bankCommissionUSD) > 0) && extrasReason.trim().length < 5)))} onClick={() => settlementMutation.mutate(phase)}>Enviar importe a Operaciones</Button>}
       {amount != null && amount < 0 && <Notice tone="warning" title="Saldo negativo: requiere revisión" text="El valor de los USD recibidos supera el saldo. Operaciones debe resolver la diferencia antes de emitir." />}
-      {stage.status === "pending" && <Notice tone="info" title="Esperando autorización de Operaciones" text="Todavía no emitas la factura. Cuando aprueben el importe vas a poder adjuntarla en este mismo lugar." />}
-      {stage.status === "approved" && (Number(stage.amount) === 0 ? <Notice tone="info" title="Tramo completo: no requiere factura" text="Operaciones autorizó un saldo de cero." /> : <InvoiceUpload period={period} component={component} currency={isUSD ? "USD" : "ARS"} expected={Number(stage.amount)} existing={invoiceFor(component)} enabled onSaved={() => { queryClient.invalidateQueries({ queryKey: ["personal-invoices"] }); queryClient.invalidateQueries({ queryKey: ["personal-settlement", period] }); }} />)}
+      {stage.status === "pending" && <Notice tone="info" title="Esperando autorización de Operaciones" text={requiresInvoice ? "Todavía no emitas la factura. Cuando aprueben el importe vas a poder adjuntarla en este mismo lugar." : "Operaciones debe autorizar el importe. No se solicita factura; el registro del Pasivo y el pago se gestionan en Finanzas."} />}
+      {stage.status === "approved" && (!requiresInvoice ? <Notice tone="info" title="Importe autorizado sin factura" text="No tenés que emitir ni adjuntar un comprobante. La autorización no significa que el pago ya se realizó; Finanzas gestiona el registro y el pago." /> : Number(stage.amount) === 0 ? <Notice tone="info" title="Tramo completo: no requiere factura" text="Operaciones autorizó un saldo de cero." /> : <InvoiceUpload period={period} component={component} currency={isUSD ? "USD" : "ARS"} expected={Number(stage.amount)} existing={invoiceFor(component)} enabled onSaved={() => { queryClient.invalidateQueries({ queryKey: ["personal-invoices"] }); queryClient.invalidateQueries({ queryKey: ["personal-settlement", period] }); }} />)}
     </CardContent></Card>;
   };
 
@@ -161,31 +164,32 @@ export default function MyInvoices() {
     <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div>
       <p className="text-sm font-medium text-indigo-600">Espacio personal</p>
       <h1 className="text-3xl font-semibold tracking-tight">Mis facturas</h1>
-      <p className="mt-1 max-w-3xl text-sm text-muted-foreground">{settlement && !usesUSD ? "Revisá tu importe y agregá extras si corresponde, esperá la autorización de Operaciones y adjuntá tu factura en pesos." : "Completá el TC y agregá extras nuevos sólo si corresponde, esperá la autorización de Operaciones y adjuntá cada factura. Acá ves siempre el siguiente paso."}</p>
+      <p className="mt-1 max-w-3xl text-sm text-muted-foreground">{!requiresInvoice ? "Revisá tu liquidación y enviá los datos a Operaciones. Este mes no necesitás emitir ni adjuntar factura." : settlement && !usesUSD ? "Revisá tu importe y agregá extras si corresponde, esperá la autorización de Operaciones y adjuntá tu factura en pesos." : "Completá el TC y agregá extras nuevos sólo si corresponde, esperá la autorización de Operaciones y adjuntá cada factura. Acá ves siempre el siguiente paso."}</p>
     </div><div className="w-full shrink-0 sm:w-48"><Label htmlFor="invoice-period">Mes trabajado</Label><Input id="invoice-period" className="mt-1.5" type="month" value={period} onChange={event => { if (/^\d{4}-(0[1-9]|1[0-2])$/.test(event.target.value)) setPeriod(event.target.value); }} /></div></div>
 
     <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
-      <Step number={1} label="Base a cobrar" detail="Importe del mes" done={Boolean(summary?.isClosed)} />
+      <Step number={1} label="Base a cobrar" detail="Importe del mes" done={Boolean(settlement || summary?.isClosed)} />
       <Step number={2} label="Condiciones" detail="Operaciones publica" done={Boolean(settlement)} />
-      <Step number={3} label="Facturación" detail={usesUSD ? "USD y luego ARS" : "Factura en pesos"} active={Boolean(settlement)} />
-      <Step number={4} label="Comprobantes" detail="Administración aprueba" done={complete} />
+      <Step number={3} label={requiresInvoice ? "Facturación" : "Liquidación"} detail={billing === "USD" ? "Sólo USD" : usesUSD ? "USD y luego ARS" : "Importe en pesos"} active={Boolean(settlement) && !complete} done={complete} />
+      <Step number={4} label={requiresInvoice ? "Comprobantes" : "Autorización"} detail={requiresInvoice ? "Administración aprueba" : "Sin factura; pago en Finanzas"} done={complete} />
     </div>
 
-    <details className="rounded-xl border p-4"><summary className="cursor-pointer text-sm font-medium">Ver base del mes y horas contractuales</summary><div className="mt-3 grid gap-3 sm:grid-cols-3">
-      <Summary label="Horas de la base" value={`${Number(summary?.hours ?? 0).toFixed(1)} h`} detail="Las ausencias pagas no reducen las horas fijas" />
-      <Summary label="Base ARS" value={money(summary?.grandTotalARS, "ARS")} detail="Antes de bonos y extras" />
-      <Summary label="Referencia USD" value={money(summary?.grandTotalUSD, "USD")} detail="Cotización del cierre; tu TC bancario se carga abajo" />
+    <details className="rounded-xl border p-4"><summary className="cursor-pointer text-sm font-medium">Ver base del mes y resumen de la liquidación</summary><div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <Summary label="Horas de la base" value={`${Number(settlement?.hoursSnapshot ?? summary?.hours ?? 0).toFixed(1)} h`} detail="Las ausencias pagas no reducen las horas fijas" />
+      <Summary label="Base ARS" value={money(settlement?.totalARS ?? summary?.grandTotalARS, "ARS")} detail="Base publicada antes de bonos y extras" />
+      {settlement && usesUSD && <><Summary label="Base ARS destinada a USD" value={money(settlement.plannedUSDARS, "ARS")} detail={`${settlement.usdPercentage}% de la base del mes`} /><Summary label="TC ingresado por vos" value={Number(invoiceFx) > 0 ? `${Number(invoiceFx).toLocaleString("es-AR")} ARS/USD` : "Pendiente"} detail="El importe USD se calcula con este valor" /><Summary label={requiresInvoice ? "USD a facturar con tu TC" : "USD a liquidar con tu TC"} value={Number(invoiceFx) > 0 ? money(preview?.totalInvoiceUSD, "USD") : "Pendiente de tu TC"} detail={billing === "USD" ? "Base convertida, bono USD y adicionales ARS convertidos al mismo TC" : "Base convertida y bono USD; los adicionales ARS van al tramo en pesos"} /></>}
+      {settlement && <Summary label="Adicionales ya incluidos en ARS" value={money(settlement.bonusARS + settlement.extrasARS, "ARS")} detail="Bono ARS y adicionales de Operaciones" />}
     </div></details>
     {settlementQuery.isLoading && <p role="status" className="text-sm text-muted-foreground">Cargando tus condiciones…</p>}
     {(settlementQuery.isError || invoicesQuery.isError) && <Notice tone="danger" title="No pudimos cargar la información" text="Actualizá la página antes de continuar. Tus datos guardados se conservan." />}
 
     {!settlementQuery.isLoading && !settlementQuery.isError && !settlement && <Notice tone="warning" title="Esperando a Operaciones" text={`Todavía no publicaron tus condiciones de ${periodLabel(period)}. Cuando Operaciones las publique, acá se habilitará tu siguiente paso.`} />}
-    {flow.publication?.beforeCut && <Notice tone="info" title="Condiciones publicadas antes del corte general" text="Tu base ya está fijada para facturar. Las horas operativas pueden seguir abiertas; las cargas posteriores no se agregan automáticamente a esta liquidación." />}
+    {flow.publication?.beforeCut && <Notice tone="info" title="Condiciones publicadas antes del corte general" text={requiresInvoice ? "Tu base ya está fijada para facturar. Las horas operativas pueden seguir abiertas; las cargas posteriores no se agregan automáticamente a esta liquidación." : "Tu base de liquidación ya está fijada. Las horas operativas pueden seguir abiertas; las cargas posteriores no se agregan automáticamente a esta liquidación."} />}
     {settlement?.adminNotes && <Notice tone="info" title="Indicación de Operaciones" text={settlement.adminNotes} />}
 
-    {settlement && <div className="space-y-4">{usesUSD && phaseCard("usd")}{phaseCard("ars")}</div>}
+    {settlement && <div className="space-y-4">{phases.map(phaseCard)}</div>}
 
-    <Card><CardHeader className="pb-3"><CardTitle className="text-base">Historial del período</CardTitle></CardHeader><CardContent className="space-y-3">{!periodInvoices.length ? <p className="py-4 text-sm text-muted-foreground">Todavía no enviaste facturas para este período.</p> : periodInvoices.map((invoice) => <InvoiceStatus key={invoice.id} invoice={invoice} />)}</CardContent></Card>
+    <Card><CardHeader className="pb-3"><CardTitle className="text-base">Historial del período</CardTitle></CardHeader><CardContent className="space-y-3">{!periodInvoices.length ? <p className="py-4 text-sm text-muted-foreground">{requiresInvoice ? "Todavía no enviaste facturas para este período." : "Este mes está configurado sin factura. Las autorizaciones de tu liquidación se muestran arriba."}</p> : periodInvoices.map((invoice) => <InvoiceStatus key={invoice.id} invoice={invoice} />)}</CardContent></Card>
     <details><summary className="cursor-pointer text-sm text-muted-foreground">Declaraciones anteriores del cierre operativo</summary><MonthlyClosingDeclarations /></details>
   </div>;
 }

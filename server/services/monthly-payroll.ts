@@ -69,7 +69,7 @@ export async function preparePayroll(period: string, actorId: number | null, opt
         created++; continue;
       }
       const [prior] = await tx.select().from(personnelMonthlySettlements).where(and(eq(personnelMonthlySettlements.personnelId, person.id), eq(personnelMonthlySettlements.status, "published"), sql`${personnelMonthlySettlements.period}<${period}`)).orderBy(desc(personnelMonthlySettlements.period));
-      await tx.insert(personnelMonthlySettlements).values({ personnelId: person.id, period, contractTypeSnapshot: person.contractType, billingCurrencySnapshot: prior?.billingCurrencySnapshot ?? (currency === "ARS" ? "ARS" : "MIXED"), hoursSnapshot: adjustedHours, hourlyRateARSSnapshot: rate.hourlyRateARS, totalARS, usdPercentage: prior?.usdPercentage ?? fraction*100, plannedUSDARS: totalARS*(prior?.usdPercentage ?? fraction*100)/100, createdBy: actorId, status: "draft" });
+      await tx.insert(personnelMonthlySettlements).values({ personnelId: person.id, period, contractTypeSnapshot: person.contractType, billingCurrencySnapshot: prior?.billingCurrencySnapshot ?? (currency === "USD" ? "USD" : currency === "ARS" ? "ARS" : "MIXED"), hoursSnapshot: adjustedHours, hourlyRateARSSnapshot: rate.hourlyRateARS, totalARS, usdPercentage: prior?.usdPercentage ?? fraction*100, plannedUSDARS: totalARS*(prior?.usdPercentage ?? fraction*100)/100, createdBy: actorId, status: "draft" });
       created++;
     }
     if (options.cut || existing?.state === "cut") await tx.execute(sql`UPDATE payroll_periods SET issues=${JSON.stringify(issues)}::jsonb WHERE period=${period}`);
