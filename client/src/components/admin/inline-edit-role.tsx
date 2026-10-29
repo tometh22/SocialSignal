@@ -258,7 +258,7 @@ function InlineEditRole({ role }: InlineEditRoleProps) {
         {displayRole.rateAverages?.length ? (
           <div className="mt-1 space-y-0.5 text-[11px] text-muted-foreground">
             {displayRole.rateAverages.map((average) => (
-              <div key={`${average.roleName}-${average.sublevel}`}>
+              <div key={`${average.roleName}-${average.sublevel}-${average.area}`}>
                 {average.roleName} · {average.sublevel} · {average.area}: {average.personnelCount} persona{average.personnelCount === 1 ? "" : "s"}
               </div>
             ))}
@@ -272,7 +272,7 @@ function InlineEditRole({ role }: InlineEditRoleProps) {
       </td>
       <td className="px-6 py-4">
         {displayRole.rateAverages?.length ? displayRole.rateAverages.map((average) => (
-          <div key={`${average.roleName}-${average.sublevel}`} className="flex items-center gap-1 text-xs">
+          <div key={`${average.roleName}-${average.sublevel}-${average.area}`} className="flex items-center gap-1 text-xs">
             <span className="font-semibold text-green-700">{average.averageRateARS == null ? "—" : `$${average.averageRateARS.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</span>
             <span className="text-muted-foreground">{average.roleName} · {average.sublevel}</span>
           </div>
@@ -285,7 +285,7 @@ function InlineEditRole({ role }: InlineEditRoleProps) {
       </td>
       <td className="px-6 py-4">
         {displayRole.rateAverages?.length ? displayRole.rateAverages.map((average) => (
-          <div key={`${average.roleName}-${average.sublevel}`} className="flex items-center gap-1 text-xs">
+          <div key={`${average.roleName}-${average.sublevel}-${average.area}`} className="flex items-center gap-1 text-xs">
             <span className="font-semibold text-blue-700">{average.averageRateUSD == null ? "—" : `$${average.averageRateUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</span>
             <span className="text-muted-foreground">{average.roleName} · {average.sublevel}</span>
           </div>

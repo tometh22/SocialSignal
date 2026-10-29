@@ -441,8 +441,8 @@ const EnhancedTeamConfig: React.FC<EnhancedTeamConfigProps> = ({ validationMessa
                 Usar este
               </Button>
             </div>
-            <Button type="button" size="sm" variant="ghost" className="shrink-0 text-red-800 underline hover:bg-red-100" onClick={() => goToStep(5)}>
-              Ir a Inversión
+            <Button type="button" size="sm" variant="ghost" className="shrink-0 text-red-800 underline hover:bg-red-100" onClick={() => goToStep(1)}>
+              Ir a Brief
             </Button>
           </div>
         </div>

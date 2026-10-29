@@ -55,3 +55,7 @@ Los textos “PENDIENTE” de rondas anteriores se conservan en el documento fue
 - Navegador: perfil miembro con selección Shift y botones de alta; resumen bancario; selector de cuatro modalidades; diálogo de corrección con motivo obligatorio, envío, motivo visible al dueño y reenvío del TC con importe recalculado. Vista móvil sin desbordamiento horizontal: viewport y página de 390 px.
 - Validación local final: 1.038 pruebas aprobadas y 11 omitidas por la suite existente; chequeo de tipos, build productivo y diff sin errores. Migración 0091 comprobada con PostgreSQL desde SQL y desde el módulo runtime, con repetición idempotente.
 - Evidencias y logs locales: `.context/feedback-v2-7-2026-10-29/`. Pruebas, typecheck, build y publicación se registran con sus resultados efectivos en el PR de la entrega.
+
+## Reauditoría posterior del documento completo
+
+La [matriz consolidada del 29/10](feedback-mind-complete-2026-10-29.md) continúa la revisión de las rondas anteriores. Identifica evidencia por comportamiento y dos brechas detectadas después de 1.14.14 (área en promedios y moneda/TC al inicio del cotizador). El mapa por fechas de esta página no debe confundirse con una certificación manual de todas las pantallas.

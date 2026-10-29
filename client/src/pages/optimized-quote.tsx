@@ -512,7 +512,7 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
                   <div className="grid gap-6 2xl:grid-cols-2 2xl:items-start">
                   <QuotationBriefIntake
                     onAnalysisChange={setIntakeAnalysis}
-                    canCreateGroup={Boolean(quotationData.client?.id && Number(quotationData.exchangeRateSnapshot) > 0)}
+                    canCreateGroup={Boolean(quotationData.client?.id && Number(quotationData.exchangeRateSnapshot) > 0 && !quotationData.requiresExchangeRateConfirmation)}
                     clientName={quotationData.client?.name}
                     isCreatingGroup={isCreatingGroup}
                     onCreateGroup={handleCreateGroup}
@@ -535,9 +535,9 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
                   </div>
                   {intakeAnalysis?.requiresProposalSelection && (
                     <details className="rounded-xl border border-slate-200 bg-slate-50/60 p-4">
-                      <summary className="cursor-pointer text-sm font-semibold text-slate-800">Moneda, tipo de cambio y condiciones comunes</summary>
+                      <summary className="cursor-pointer text-sm font-semibold text-slate-800">Condiciones comunes del grupo</summary>
                       <p className="mt-2 text-xs text-slate-500">Se copiarán inicialmente a todas las propuestas. Después sólo se propagarán con confirmación explícita.</p>
-                      <div className="mt-4 space-y-4"><OptimizedBasicInfo mode="financial" errors={fieldErrors} /><div className="grid gap-4 rounded-xl border border-slate-200 bg-white p-4 sm:grid-cols-2"><div><Label htmlFor="group-payment-terms">Plazo de pago (días)</Label><Input id="group-payment-terms" className="mt-2" inputMode="numeric" value={quotationData.paymentTermsDays ?? ''} onChange={(event) => updateQuotationData({ paymentTermsDays: event.target.value ? Number(event.target.value) : null })} placeholder="Ej. 30" /></div><div className="sm:col-span-2"><Label htmlFor="group-commercial-terms">Condiciones comerciales comunes</Label><Textarea id="group-commercial-terms" className="mt-2" rows={3} value={quotationData.commercialTerms || ''} onChange={(event) => updateQuotationData({ commercialTerms: event.target.value })} placeholder="Facturación, vigencia o condiciones aplicables a las tres propuestas" /></div></div></div>
+                      <div className="mt-4 space-y-4"><div className="grid gap-4 rounded-xl border border-slate-200 bg-white p-4 sm:grid-cols-2"><div><Label htmlFor="group-payment-terms">Plazo de pago (días)</Label><Input id="group-payment-terms" className="mt-2" inputMode="numeric" value={quotationData.paymentTermsDays ?? ''} onChange={(event) => updateQuotationData({ paymentTermsDays: event.target.value ? Number(event.target.value) : null })} placeholder="Ej. 30" /></div><div className="sm:col-span-2"><Label htmlFor="group-commercial-terms">Condiciones comerciales comunes</Label><Textarea id="group-commercial-terms" className="mt-2" rows={3} value={quotationData.commercialTerms || ''} onChange={(event) => updateQuotationData({ commercialTerms: event.target.value })} placeholder="Facturación, vigencia o condiciones aplicables a las tres propuestas" /></div></div></div>
                     </details>
                   )}
                   {isEditing && !quotationData.scopeSnapshot && (
@@ -588,7 +588,10 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
               {currentStepNumber === 5 && (
                 <div className="space-y-6">
                   <SectionHeading title="Revisá la inversión" description="Confirmá moneda, tipo de cambio, precio y condiciones comerciales antes de preparar el envío." />
-                  <OptimizedBasicInfo mode="financial" errors={fieldErrors} />
+                  <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm sm:flex-row sm:items-center sm:justify-between" data-testid="quotation-currency-snapshot">
+                    <div><p className="font-medium text-slate-900">{quotationData.quotationCurrency} · TC USD/ARS {Number(quotationData.exchangeRateSnapshot) > 0 ? Number(quotationData.exchangeRateSnapshot).toLocaleString('es-AR', { maximumFractionDigits: 2 }) : 'sin confirmar'}</p><p className="mt-1 text-xs text-slate-500">Definidos en Brief. Todos los importes usan este mismo tipo de cambio.</p></div>
+                    <Button type="button" variant="outline" size="sm" onClick={() => handlePhaseNavigation(1)}>Editar moneda y TC en Brief</Button>
+                  </div>
                   {quotationData.scopeSnapshot && <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-indigo-100 bg-indigo-50 p-4 text-sm text-indigo-950"><span>Volumen, cobertura, SLA y presentación determinan las horas y el costo del equipo.</span><Button type="button" variant="outline" size="sm" onClick={() => handlePhaseNavigation(3)}>Editar alcance y factores</Button></div>}
                   <OptimizedFinancialReview revealAdvanced={validationIssues.length > 0} validationMessage={validationIssues[0]?.message} />
                 </div>

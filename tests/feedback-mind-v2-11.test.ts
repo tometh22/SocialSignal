@@ -43,7 +43,7 @@ describe("Feedback Mind V2-11 corrections", () => {
   });
 
   it("derives role averages from the latest canonical historical cost", () => {
-    const routes = source("server/routes.ts");
+    const routes = source("server/services/role-rate-averages.ts");
     expect(routes).toContain("WITH latest_rates AS");
     expect(routes).toContain("LEFT JOIN latest_rates latest ON latest.personnel_id = p.id");
     expect(routes).toContain("latest.hourly_rate_ars / NULLIF(latest.exchange_rate, 0)");

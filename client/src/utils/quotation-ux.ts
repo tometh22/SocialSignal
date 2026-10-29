@@ -14,7 +14,7 @@ export const QUOTATION_PHASES = [
  * use their three validation buckets.
  */
 export const QUOTATION_STEPS = [
-  { num: 1, title: 'Brief', shortTitle: 'Brief', description: 'Cliente, oportunidad y objetivo' },
+  { num: 1, title: 'Brief', shortTitle: 'Brief', description: 'Cliente, oportunidad, moneda y tipo de cambio' },
   { num: 2, title: 'Servicio', shortTitle: 'Servicio', description: 'Elegí una receta probada' },
   { num: 3, title: 'Alcance', shortTitle: 'Alcance', description: 'Definí cobertura y entregables' },
   { num: 4, title: 'Equipo', shortTitle: 'Equipo', description: 'Confirmá capacidad y esfuerzo' },
@@ -159,6 +159,7 @@ export function validateQuotationStep(
     if (!quotation.client?.id) issues.push({ field: 'client', message: 'Seleccioná un cliente.' });
     if (!quotation.project.name?.trim()) issues.push({ field: 'project-name', message: 'Ingresá el nombre del proyecto.' });
     if (!quotation.commercialMotion) issues.push({ field: 'commercial-motion', message: 'Seleccioná el tipo de oportunidad.' });
+    if (!hasPositiveExchangeRate(quotation)) issues.push({ field: 'quotation-exchange-rate', message: 'Confirmá un tipo de cambio positivo antes de configurar el equipo.' });
     return issues;
   }
 

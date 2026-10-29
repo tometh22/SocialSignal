@@ -68,6 +68,10 @@ const OptimizedBasicInfo: React.FC<OptimizedBasicInfoProps> = ({ errors = {}, mo
     }
   }, [quotationData.exchangeRateSnapshot]);
   const parsedExchangeRate = parseLocalizedDecimal(exchangeRateInput);
+  const applyExchangeRate = (rate: number) => {
+    setExchangeRateInput(String(rate));
+    updateQuotationCurrency(quotationData.quotationCurrency || 'ARS', rate);
+  };
   const {
     exchangeRate: configuredExchangeRate,
     exchangeRateLoading,
@@ -97,7 +101,7 @@ const OptimizedBasicInfo: React.FC<OptimizedBasicInfoProps> = ({ errors = {}, mo
   const forecastMonth = projectStartParts?.[1] || 0;
   const { data: projectFxForecast } = useQuery<ExchangeRateForecast>({
     queryKey: [`/api/exchange-rate/forecast?year=${forecastYear}&month=${forecastMonth}`],
-    enabled: !isProjectMode && forecastYear > 0 && forecastMonth >= 1 && forecastMonth <= 12,
+    enabled: forecastYear > 0 && forecastMonth >= 1 && forecastMonth <= 12,
     retry: false,
   });
 
@@ -115,8 +119,7 @@ const OptimizedBasicInfo: React.FC<OptimizedBasicInfoProps> = ({ errors = {}, mo
     updateQuotationData({ billingEntityId: preferred.id });
   }, [billingEntities, isProjectMode, quotationData.billingEntityId, quotationData.client, updateQuotationData]);
 
-  if (isProjectMode) {
-    return (
+  const projectFields = isProjectMode ? (
       <div className="space-y-4">
         {clientsError && (
           <div role="alert" className="flex flex-col gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800 sm:flex-row sm:items-center sm:justify-between">
@@ -128,16 +131,16 @@ const OptimizedBasicInfo: React.FC<OptimizedBasicInfoProps> = ({ errors = {}, mo
           <CardContent className="p-5 sm:p-6">
             <div className="mb-5">
               <h3 className="text-base font-semibold text-slate-950">{isGroupMode ? 'Datos compartidos del grupo' : 'Datos esenciales'}</h3>
-              <p className="mt-1 text-sm text-slate-500">{isGroupMode ? 'Cliente y entidad se solicitan una sola vez para todas las propuestas.' : 'Sólo lo necesario para identificar la oportunidad. Moneda y precio se definen en Finanzas.'}</p>
+              <p className="mt-1 text-sm text-slate-500">{isGroupMode ? 'Cliente y entidad se solicitan una sola vez para todas las propuestas.' : 'Identificá la oportunidad y definí la moneda y el tipo de cambio antes de configurar el equipo.'}</p>
             </div>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <Field label="Cliente" icon={User} required error={errors.client} errorId="client-error">
+              <Field label="Cliente" icon={User} required error={errors.client} errorId="client-error" htmlFor="client">
                 <Select value={quotationData.client ? String(quotationData.client.id) : ''} onValueChange={(value) => { const selectedClient = clients?.find((client) => client.id === Number(value)); updateClient(selectedClient || null); updateQuotationData({ billingEntityId: null }); }} disabled={isLoadingClients}>
                   <SelectTrigger id="client" aria-invalid={Boolean(errors.client)} className="h-10 border-slate-200"><SelectValue placeholder={isLoadingClients ? 'Cargando clientes…' : 'Seleccionar cliente'} /></SelectTrigger>
                   <SelectContent>{clients?.map((client) => <SelectItem key={client.id} value={String(client.id)}>{client.name}</SelectItem>)}</SelectContent>
                 </Select>
               </Field>
-              {!isGroupMode && <Field label="Nombre del proyecto" icon={FolderOpen} required error={errors['project-name']} errorId="project-name-error">
+              {!isGroupMode && <Field label="Nombre del proyecto" icon={FolderOpen} required error={errors['project-name']} errorId="project-name-error" htmlFor="project-name">
                 <Input id="project-name" placeholder="Ej. Playbook regional de TikTok Shop" value={quotationData.project.name} onChange={(event) => updateProjectName(event.target.value)} aria-invalid={Boolean(errors['project-name'])} className="h-10 border-slate-200" />
               </Field>}
               {!isGroupMode && <div className="rounded-xl border border-indigo-100 bg-indigo-50/60 px-4 py-3 text-sm text-indigo-900"><strong>Modalidad y duración:</strong> se eligen una sola vez en el paso Servicio.</div>}
@@ -162,11 +165,11 @@ const OptimizedBasicInfo: React.FC<OptimizedBasicInfoProps> = ({ errors = {}, mo
           </CardContent>
         </Card>
       </div>
-    );
-  }
+    ) : null;
 
   return (
-    <div>
+    <div className="space-y-4">
+      {projectFields}
       <Card className="border-slate-200 shadow-none">
         <CardContent className="p-5 sm:p-6">
           <div className="mb-5">
@@ -174,14 +177,14 @@ const OptimizedBasicInfo: React.FC<OptimizedBasicInfoProps> = ({ errors = {}, mo
             <p className="mt-1 text-sm text-slate-500">El snapshot confirmado será la única referencia para todos los importes de la propuesta.</p>
           </div>
           <div className="grid gap-4 md:grid-cols-2">
-            <Field label="Moneda de cotización" icon={DollarSign}>
+            <Field label="Moneda de cotización" icon={DollarSign} htmlFor="quotation-currency">
               <Select value={quotationData.quotationCurrency || 'ARS'} onValueChange={(currency) => { if (currency === quotationData.quotationCurrency) return; if (quotationData.teamMembers.length > 0) setPendingCurrency(currency); else updateQuotationCurrency(currency); }}>
                 <SelectTrigger id="quotation-currency" className="h-10 border-slate-200"><SelectValue /></SelectTrigger>
                 <SelectContent><SelectItem value="ARS">Pesos argentinos (ARS)</SelectItem><SelectItem value="USD">Dólares (USD)</SelectItem></SelectContent>
               </Select>
             </Field>
-            <Field label="Tipo de cambio USD/ARS" error={errors['quotation-exchange-rate']} errorId="quotation-exchange-rate-error">
-              <Input id="quotation-exchange-rate" inputMode="decimal" value={exchangeRateInput} aria-invalid={parsedExchangeRate == null || parsedExchangeRate <= 0} onChange={(event) => setExchangeRateInput(event.target.value)} onBlur={() => { if (parsedExchangeRate && parsedExchangeRate > 0) { updateQuotationCurrency(quotationData.quotationCurrency || 'ARS', parsedExchangeRate); setExchangeRateInput(String(parsedExchangeRate)); } }} className="h-10 border-slate-200" placeholder="Ej. 1.250,50" />
+            <Field label="Tipo de cambio USD/ARS" error={errors['quotation-exchange-rate']} errorId="quotation-exchange-rate-error" htmlFor="quotation-exchange-rate">
+              <Input id="quotation-exchange-rate" inputMode="decimal" value={exchangeRateInput} aria-invalid={parsedExchangeRate == null || parsedExchangeRate <= 0} onChange={(event) => setExchangeRateInput(event.target.value)} onBlur={() => { if (parsedExchangeRate && parsedExchangeRate > 0) { updateQuotationCurrency(quotationData.quotationCurrency || 'ARS', parsedExchangeRate); setExchangeRateInput(String(parsedExchangeRate)); } else { updateQuotationData({ requiresExchangeRateConfirmation: true }); } }} className="h-10 border-slate-200" placeholder="Ej. 1.250,50" />
             </Field>
           </div>
 
@@ -191,14 +194,14 @@ const OptimizedBasicInfo: React.FC<OptimizedBasicInfoProps> = ({ errors = {}, mo
                 {exchangeRateLoading ? 'Consultando tipo de cambio vigente…' : exchangeRateError || !exchangeRateReady ? <span className="text-red-700">No hay una referencia vigente disponible. Ingresala manualmente.</span> : <>Referencia vigente: <strong className="text-slate-900">ARS {formatRate(configuredExchangeRate)}</strong> · {exchangeRateSource || 'Configuración manual'} · {formatRateDate(exchangeRateUpdatedAt)}</>}
               </div>
               <div className="flex shrink-0 flex-wrap gap-2">
-                {exchangeRateReady && configuredExchangeRate !== quotationData.exchangeRateSnapshot && <Button type="button" size="sm" variant="outline" onClick={() => updateQuotationCurrency(quotationData.quotationCurrency || 'ARS', configuredExchangeRate)}>Usar vigente</Button>}
+                {exchangeRateReady && (configuredExchangeRate !== quotationData.exchangeRateSnapshot || quotationData.requiresExchangeRateConfirmation || !parsedExchangeRate) && <Button type="button" size="sm" variant="outline" onClick={() => applyExchangeRate(configuredExchangeRate)}>Usar vigente</Button>}
                 <Button type="button" size="sm" variant="outline" disabled={isCheckingLiveBlue} onClick={() => void checkLiveBlue()}><RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${isCheckingLiveBlue ? 'animate-spin' : ''}`} /> Corroborar en vivo</Button>
               </div>
             </div>
-            {projectFxForecast && <div className="mt-3 flex flex-col gap-2 rounded-lg border border-slate-200 bg-white p-3 sm:flex-row sm:items-center sm:justify-between"><span>Proyección {String(projectFxForecast.month).padStart(2, '0')}/{projectFxForecast.year}: <strong>ARS {formatRate(projectFxForecast.rate)}</strong> · {projectFxForecast.source || 'estimación interna'}</span><Button type="button" size="sm" variant="outline" onClick={() => updateQuotationCurrency(quotationData.quotationCurrency || 'ARS', projectFxForecast.rate)}>Usar proyección</Button></div>}
+            {projectFxForecast && <div className="mt-3 flex flex-col gap-2 rounded-lg border border-slate-200 bg-white p-3 sm:flex-row sm:items-center sm:justify-between"><span>Proyección {String(projectFxForecast.month).padStart(2, '0')}/{projectFxForecast.year}: <strong>ARS {formatRate(projectFxForecast.rate)}</strong> · {projectFxForecast.source || 'estimación interna'}</span><Button type="button" size="sm" variant="outline" onClick={() => applyExchangeRate(projectFxForecast.rate)}>Usar proyección</Button></div>}
             {liveBlueError && <p role="alert" className="mt-3 text-red-700">No pudimos consultar las fuentes en vivo.</p>}
-            {liveBlue && <div className={`mt-3 rounded-lg border p-3 ${liveBlue.status === 'matched' ? 'border-emerald-200 bg-emerald-50 text-emerald-900' : 'border-amber-200 bg-amber-50 text-amber-900'}`}><div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"><div><p>DolarAPI: {liveBlue.sources.dolarApi ? `ARS ${formatRate(liveBlue.sources.dolarApi.sell)}` : 'no disponible'} · Dólar Hoy: {liveBlue.sources.dolarHoy ? `ARS ${formatRate(liveBlue.sources.dolarHoy.sell)}` : 'no disponible'}</p><p className="mt-1">{liveBlue.status === 'matched' ? 'Las fuentes coinciden dentro del 2%.' : liveBlue.status === 'stale-source' ? 'Una fuente está desactualizada; priorizamos la más reciente.' : liveBlue.status === 'discrepancy' ? `Las fuentes difieren ${liveBlue.differencePercentage?.toFixed(2)}%. Revisá antes de aplicar.` : 'Sólo una fuente respondió; verificá antes de aplicar.'}</p></div><Button type="button" size="sm" onClick={() => updateQuotationCurrency(quotationData.quotationCurrency || 'ARS', liveBlue.recommended.sell)}>Usar ARS {formatRate(liveBlue.recommended.sell)}</Button></div></div>}
-            {quotationData.requiresExchangeRateConfirmation && <p role="alert" className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-800">Cotización histórica: confirmá este tipo de cambio para migrarla al pricing actual.</p>}
+            {liveBlue && <div className={`mt-3 rounded-lg border p-3 ${liveBlue.status === 'matched' ? 'border-emerald-200 bg-emerald-50 text-emerald-900' : 'border-amber-200 bg-amber-50 text-amber-900'}`}><div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"><div><p>DolarAPI: {liveBlue.sources.dolarApi ? `ARS ${formatRate(liveBlue.sources.dolarApi.sell)}` : 'no disponible'} · Dólar Hoy: {liveBlue.sources.dolarHoy ? `ARS ${formatRate(liveBlue.sources.dolarHoy.sell)}` : 'no disponible'}</p><p className="mt-1">{liveBlue.status === 'matched' ? 'Las fuentes coinciden dentro del 2%.' : liveBlue.status === 'stale-source' ? 'Una fuente está desactualizada; priorizamos la más reciente.' : liveBlue.status === 'discrepancy' ? `Las fuentes difieren ${liveBlue.differencePercentage?.toFixed(2)}%. Revisá antes de aplicar.` : 'Sólo una fuente respondió; verificá antes de aplicar.'}</p></div><Button type="button" size="sm" onClick={() => applyExchangeRate(liveBlue.recommended.sell)}>Usar ARS {formatRate(liveBlue.recommended.sell)}</Button></div></div>}
+            {quotationData.requiresExchangeRateConfirmation && !errors['quotation-exchange-rate'] && <p role="alert" className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-800">Confirmá un tipo de cambio válido para continuar con el cálculo de la propuesta.</p>}
           </div>
         </CardContent>
       </Card>
@@ -213,8 +216,8 @@ const OptimizedBasicInfo: React.FC<OptimizedBasicInfoProps> = ({ errors = {}, mo
   );
 };
 
-function Field({ label, icon: Icon, required, error, errorId, children }: { label: string; icon?: typeof User; required?: boolean; error?: string; errorId?: string; children: React.ReactNode }) {
-  return <div className="space-y-2"><Label className="flex items-center text-sm font-medium text-slate-700">{Icon && <Icon className="mr-1.5 h-3.5 w-3.5 text-slate-400" />}{label}{required && <span className="ml-1 text-red-500">*</span>}</Label>{children}{error && <p id={errorId} role="alert" className="text-xs font-medium text-red-600">{error}</p>}</div>;
+function Field({ label, icon: Icon, required, error, errorId, htmlFor, children }: { label: string; icon?: typeof User; required?: boolean; error?: string; errorId?: string; htmlFor?: string; children: React.ReactNode }) {
+  return <div className="space-y-2"><Label htmlFor={htmlFor} className="flex items-center text-sm font-medium text-slate-700">{Icon && <Icon className="mr-1.5 h-3.5 w-3.5 text-slate-400" />}{label}{required && <span className="ml-1 text-red-500">*</span>}</Label>{children}{error && <p id={errorId} role="alert" className="text-xs font-medium text-red-600">{error}</p>}</div>;
 }
 
 export default OptimizedBasicInfo;

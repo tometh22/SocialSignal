@@ -1,6 +1,6 @@
 ---
-version: 2.37.0
-updatedAt: 2026-10-15
+version: 2.38.0
+updatedAt: 2026-10-29
 feedbackCount: 70
 ---
 
@@ -476,3 +476,10 @@ histórica que todavía necesitan cotizaciones y registros anteriores.
 - **Tareas:** el «+» de asignación y el ícono de fecha son siempre visibles con contraste suficiente. Las tareas completadas también se pueden arrastrar entre secciones.
 - **Capacidad:** cada proyecto del desglose por persona se contrae y muestra su estimación semanal; la estimación de cada tarea queda junto a su título.
 - **Ausencias:** la solicitud permite elegir Tentativa o Confirmada al crearla (la aprobación sigue siendo independiente). La tabla de saldos del equipo muestra cupo, traslado, adelanto, cupo Epical, usados de cada tipo y disponibles total, de vacaciones y Epical, más Enfermedad y Otros.
+
+## Addendum — Reauditoría completa del 29-10
+
+- **Moneda y TC:** se definen desde Brief, tanto para una cotización individual como para los datos comunes de un grupo. Antes de avanzar debe existir un TC positivo confirmado. Inversión muestra el snapshot y ofrece volver a Brief; no presenta otro selector que pueda contradecirlo. Cambiar moneda con equipo configurado conserva confirmación y recálculo. El aviso y la corrección rápida de TC en Equipo continúan disponibles para datos históricos. La descripción de GEN-15 de llegar a Equipo sin confirmar TC documenta el problema anterior; no es la regla vigente del nuevo recorrido.
+- **Promedios por rol:** la identidad completa incluye nivel, subnivel y área. La API, las claves de filas y los resúmenes conservan el área; no se funden dos áreas con igual nivel/subnivel. Un cero USD histórico significa ausencia de esa tarifa: si hay ARS y TC se deriva la referencia USD. La tarifa manual de respaldo no se reemplaza al consultar, y se mantienen exclusiones de freelance, baja, costos futuros y personas fuera del costo real.
+- **Miembros y tareas:** los miembros de un proyecto activo pueden crear tareas/secciones, seleccionar y eliminar tareas vacías. Cualquier hora nativa/importada en un árbol impide todo el borrado. Administrar miembros/responsables conserva su permiso específico. Panel de horas y Mis horas ofrecen secciones vigentes y accesibles, sin eliminar cargas históricas.
+- **Liquidación personal:** USD tiene un único tramo; Sin factura es una modalidad explícita por persona/mes con moneda y autorización. No inventa documentos, pasivos ni pagos. En mixtas se conserva la confirmación del cobro y TC antes del tramo ARS. Pedir corrección abre el diálogo con motivo y permite reenviar el TC. El resumen presenta horas/base ARS congeladas, porcentaje, TC ingresado y total USD calculado, sin una referencia USD estimada.
