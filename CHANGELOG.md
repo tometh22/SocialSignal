@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.14.16 — 2026-10-29
+
+- Aplicar una receta después del Brief asigna su modalidad aunque el filtro inicial esté vacío. La compatibilidad para mostrar las cuatro recetas ya no se usa como motivo para conservar un tipo vacío; Fee deja de guardarse como puntual. El cálculo de benchmarks usa la misma resolución.
+- Borradores locales con alcance sin modalidad piden volver a seleccionar el servicio. Al guardar un borrador sin tipo explícito se usa la modalidad de su alcance; se conservan los tipos históricos compatibles y no se reescriben cotizaciones en lote.
+- Pruebas de las cuatro modalidades y recorrido Fee completo en navegador y HTTP: seis pasos, tres variantes, aceptación externa, proyecto con tres ciclos mensuales y horas propias. USD, TC manual y costos IA conservados, sin correos ficticios. Suite: 1.050 aprobadas / 11 omitidas; tipos correctos.
+
 ## 1.14.15 — 2026-10-29
 
 - Reauditoría del feedback acumulado: matriz de 95 criterios consolidando las 138 páginas, con evidencia y límites por comportamiento. Se distinguen los siete puntos nuevos de 1.14.13/14 de las rondas anteriores.

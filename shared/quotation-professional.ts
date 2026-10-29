@@ -38,6 +38,13 @@ export function isCanonicalBlueprintCompatible(projectType: string | null | unde
     && ["demo", "one_shot", "event_pack", "monthly_fee"].includes(modality);
 }
 
+/** Browsing all recipes with no chosen type must still assign a type when applying one. */
+export function resolveBlueprintProjectType(projectType: string | null | undefined, modality: string): string {
+  return projectType && isCanonicalBlueprintCompatible(projectType, modality)
+    ? projectType
+    : canonicalProjectTypeForModality(modality);
+}
+
 export const proposalLocaleSchema = z.enum(["es", "en"]);
 export type ProposalLocale = z.infer<typeof proposalLocaleSchema>;
 

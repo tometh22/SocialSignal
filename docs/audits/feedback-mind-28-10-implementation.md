@@ -58,4 +58,4 @@ Los textos “PENDIENTE” de rondas anteriores se conservan en el documento fue
 
 ## Reauditoría posterior del documento completo
 
-La [matriz consolidada del 29/10](feedback-mind-complete-2026-10-29.md) continúa la revisión de las rondas anteriores. Identifica evidencia por comportamiento y dos brechas detectadas después de 1.14.14 (área en promedios y moneda/TC al inicio del cotizador). El mapa por fechas de esta página no debe confundirse con una certificación manual de todas las pantallas.
+La [matriz consolidada del 29/10](feedback-mind-complete-2026-10-29.md) continúa la revisión de las rondas anteriores. Identifica evidencia por comportamiento y tres brechas detectadas después de 1.14.14 (área/cero USD en promedios, moneda/TC al inicio y modalidad al aplicar una receta). El mapa por fechas de esta página no debe confundirse con una certificación manual de todas las pantallas.

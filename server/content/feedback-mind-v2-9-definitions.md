@@ -1,5 +1,5 @@
 ---
-version: 2.38.0
+version: 2.39.0
 updatedAt: 2026-10-29
 feedbackCount: 70
 ---
@@ -483,3 +483,7 @@ histórica que todavía necesitan cotizaciones y registros anteriores.
 - **Promedios por rol:** la identidad completa incluye nivel, subnivel y área. La API, las claves de filas y los resúmenes conservan el área; no se funden dos áreas con igual nivel/subnivel. Un cero USD histórico significa ausencia de esa tarifa: si hay ARS y TC se deriva la referencia USD. La tarifa manual de respaldo no se reemplaza al consultar, y se mantienen exclusiones de freelance, baja, costos futuros y personas fuera del costo real.
 - **Miembros y tareas:** los miembros de un proyecto activo pueden crear tareas/secciones, seleccionar y eliminar tareas vacías. Cualquier hora nativa/importada en un árbol impide todo el borrado. Administrar miembros/responsables conserva su permiso específico. Panel de horas y Mis horas ofrecen secciones vigentes y accesibles, sin eliminar cargas históricas.
 - **Liquidación personal:** USD tiene un único tramo; Sin factura es una modalidad explícita por persona/mes con moneda y autorización. No inventa documentos, pasivos ni pagos. En mixtas se conserva la confirmación del cobro y TC antes del tramo ARS. Pedir corrección abre el diálogo con motivo y permite reenviar el TC. El resumen presenta horas/base ARS congeladas, porcentaje, TC ingresado y total USD calculado, sin una referencia USD estimada.
+
+## Addendum — Modalidad al aplicar la receta
+
+El filtro de Servicio sin modalidad permite explorar las cuatro recetas. Al aplicar una se asigna su tipo canónico (One Shot, Fee, Intelligence Event Track o Demo); no se conserva el vacío. Un tipo histórico compatible se mantiene. El benchmark y el guardado de un borrador sin tipo usan esa misma resolución. Si un borrador local antiguo conserva alcance sin modalidad, se solicita volver a seleccionar el servicio. No se reescriben precios ni cotizaciones existentes en lote.
