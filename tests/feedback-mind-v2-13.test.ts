@@ -42,11 +42,7 @@ describe("Feedback Mind V2-13 · ronda 27-8", () => {
 
   // ── F27-02 · El promedio por rol no incluye freelancers ──────────────────
   it("excluye freelancers del promedio de tarifa por rol y subnivel", () => {
-    const routes = source("server/routes.ts");
-    const rolesQuery = routes.slice(
-      routes.indexOf("classification_averages AS"),
-      routes.indexOf("ORDER BY average.role_name, average.sublevel"),
-    );
+    const rolesQuery = source("server/services/role-rate-averages.ts");
     expect(rolesQuery).toContain("COALESCE(p.contract_type, '') <> 'freelance'");
     expect(rolesQuery).toContain("COALESCE(NULLIF(TRIM(p.area), ''), 'Sin área') AS area");
     expect(rolesQuery).toContain("p.active_until IS NULL OR p.active_until >= CURRENT_DATE");
@@ -254,7 +250,7 @@ describe("Feedback Mind V2-13 · ronda 27-8", () => {
     const teamConfig = source("client/src/components/optimized/EnhancedTeamConfig.tsx");
     expect(teamConfig).toContain("const missingExchangeRateSnapshot = !(Number(quotationData.exchangeRateSnapshot) > 0);");
     expect(teamConfig).toContain("Falta confirmar el tipo de cambio de esta cotización.");
-    expect(teamConfig).toContain("onClick={() => goToStep(5)}");
+    expect(teamConfig).toContain("onClick={() => goToStep(1)}");
   });
 
   it("resuelve el tipo de cambio sin salir de Equipo: sugiere el registrado o acepta uno manual", () => {
@@ -291,12 +287,12 @@ describe("Feedback Mind V2-13 · ronda 27-8", () => {
     expect(gate).toContain("if (!quotationExchangeRate) return 0;");
   });
 
-  it("el paso Equipo se puede alcanzar sin haber confirmado el tipo de cambio en Inversión", () => {
+  it("el Brief confirma el TC antes de llegar a Equipo y conserva el control final de Inversión", () => {
     const ux = source("client/src/utils/quotation-ux.ts");
     const step1 = ux.slice(ux.indexOf("if (step === 1) {"), ux.indexOf("if (step === 2 || step === 3)"));
     const step4Line = ux.slice(ux.indexOf("if (step === 4)"), ux.indexOf("if (step === 5)"));
-    // El tipo de cambio sólo se exige en el paso 5, nunca antes.
-    expect(step1).not.toContain("hasPositiveExchangeRate");
+    // La revisión completa restaura el pedido de TC al inicio: evita llegar con tarifas cero.
+    expect(step1).toContain("hasPositiveExchangeRate");
     expect(step4Line).not.toContain("hasPositiveExchangeRate");
     expect(ux).toContain("if (!hasPositiveExchangeRate(quotation)) {");
   });

@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.14.15 — 2026-10-29
+
+- Reauditoría del feedback acumulado: matriz de 95 criterios consolidando las 138 páginas, con evidencia y límites por comportamiento. Se distinguen los siete puntos nuevos de 1.14.13/14 de las rondas anteriores.
+- Roles conserva el área al devolver promedios por nivel/subnivel, evitando que las filas y el resumen de Personal mezclen áreas. Se mantienen exclusiones de freelancers, bajas y costos futuros; cero USD histórico se trata como ausencia para convertir la tarifa ARS y la consulta no cambia tarifas.
+- Moneda y TC se definen desde Brief, antes de calcular equipo. Inversión presenta el mismo snapshot y permite volver a editarlo; los grupos comparten esos controles iniciales. Un TC vacío, inválido o pendiente de confirmación bloquea el avance. Se preservan la confirmación de cambio de moneda y la resolución rápida de TC en Equipo para cotizaciones históricas.
+- Regresiones nuevas de PostgreSQL para promedios y de render para el formulario inicial, más 39 comprobaciones HTTP y recorrido visual con TC manual, USD y costos adicionales. 1.044 pruebas aprobadas y 11 omitidas por condiciones existentes.
+
 ## 1.14.14 — 2026-10-29
 
 - Mis facturas explica que el tramo ARS de una liquidación mixta sin factura espera la autorización USD de Operaciones y el cobro. No pide aprobación de un comprobante que esa modalidad no requiere. Mantiene las indicaciones anteriores cuando sí corresponde factura.

@@ -63,6 +63,7 @@ describe("Feedback Mind V2 remaining product decisions", () => {
       client: { id: 1, name: "Cliente" },
       project: { name: "Proyecto", type: "", duration: "" },
       commercialMotion: "new_business",
+      exchangeRateSnapshot: 1500,
     } as any;
     expect(validateQuotationStep(1, quotation)).toEqual([]);
     expect(validateQuotationStep(2, quotation)[0]?.field).toBe("professional-scope");
