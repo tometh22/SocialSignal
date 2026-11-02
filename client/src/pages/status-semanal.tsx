@@ -13,6 +13,8 @@ import MembersDialog from "@/components/review/MembersDialog";
 import AddProjectDialog from "@/components/review/AddProjectDialog";
 import AddItemButton, { type NewItemInput } from "@/components/review/AddStatusItemButton";
 import StatusText from "@/components/review/StatusText";
+import DailyStatusEditor from "@/components/review/DailyStatusEditor";
+import { useAutoResize } from "@/hooks/use-auto-resize-textarea";
 import RoomTitleEditor from "@/components/review/RoomTitleEditor";
 import { useToast } from "@/hooks/use-toast";
 import { ToastAction } from "@/components/ui/toast";
@@ -35,7 +37,7 @@ import {
   Printer, List, LayoutList, HelpCircle, CheckSquare, Square,
   PanelLeftOpen, PanelLeftClose,
   Paperclip, FileText, Link2, XCircle, Film, FileCheck2,
-  Play, Mic, MicOff, Copy, Check, Flame, Sun,
+  Play, Copy, Check, Flame, Sun,
 } from "lucide-react";
 import {
   DndContext, closestCenter, DragOverlay,
@@ -431,7 +433,7 @@ function MentionInput({ value, onChange, onKeyDown, placeholder, className, user
         onKeyDown={handleKeyDown}
         onBlur={() => setTimeout(() => setShowMentions(false), 150)}
         placeholder={placeholder}
-        className={cn("w-full resize-none leading-relaxed", className)}
+        className={cn("w-full resize-y overflow-auto leading-relaxed", className)}
       />
       {showMentions && filtered.length > 0 && (
         <div className="absolute bottom-full left-0 mb-1 z-50 bg-white border border-slate-200 rounded-lg shadow-lg min-w-[140px] py-1 overflow-hidden">
@@ -453,24 +455,6 @@ function MentionInput({ value, onChange, onKeyDown, placeholder, className, user
 
 // ─── Inline editor ────────────────────────────────────────────────────────────
 
-// Grows a textarea to fit its content, capped at maxPx; scrolls beyond that.
-function useAutoResize(
-  ref: React.RefObject<HTMLTextAreaElement | null>,
-  value: string,
-  enabled: boolean = true,
-  maxPx: number = 320,
-) {
-  useEffect(() => {
-    if (!enabled) return;
-    const el = ref.current;
-    if (!el) return;
-    el.style.height = 'auto';
-    const next = Math.min(el.scrollHeight, maxPx);
-    el.style.height = `${next}px`;
-    el.style.overflowY = el.scrollHeight > maxPx ? 'auto' : 'hidden';
-  }, [ref, value, enabled, maxPx]);
-}
-
 function InlineText({ value, placeholder, onSave, multiline = false, className = '', required = false }: {
   value: string | null; placeholder: string; onSave: (v: string) => void;
   multiline?: boolean; className?: string; required?: boolean;
@@ -491,7 +475,7 @@ function InlineText({ value, placeholder, onSave, multiline = false, className =
   };
 
   if (editing) {
-    const cls = `w-full text-sm border border-indigo-300 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-400/25 bg-white shadow-sm resize-none ${className}`;
+    const cls = `w-full text-sm border border-indigo-300 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-400/25 bg-white shadow-sm resize-y overflow-auto ${className}`;
     return multiline
       ? (
         <>
@@ -693,7 +677,7 @@ function NewProposalForm({ onCancel, onSubmit, disabled }: {
     <div className="rounded-lg border border-violet-200 bg-violet-50/40 p-2.5 mb-2">
       <textarea ref={ref} value={content} onChange={e => setContent(e.target.value)} autoFocus
         placeholder="Pegá el texto del posteo, descripción de la propuesta, link, etc."
-        className="w-full text-[13px] leading-relaxed bg-white border border-violet-200 rounded-md px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-violet-300/40 resize-none min-h-[64px]" />
+        className="w-full text-[13px] leading-relaxed bg-white border border-violet-200 rounded-md px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-violet-300/40 resize-y overflow-auto min-h-[64px]" />
       <p className="text-[10px] text-slate-400 mt-1">Después de crear la propuesta podrás adjuntar imágenes, video, PDF o links.</p>
       <div className="flex items-center gap-1.5 mt-1.5">
         <Button size="sm" disabled={!content.trim() || disabled}
@@ -874,7 +858,7 @@ function ProposalCard({ proposal, currentUserId, isOwner, roomId, invalidate, is
             <div className="space-y-1.5">
               <textarea value={rejectReason} onChange={e => setRejectReason(e.target.value)} autoFocus rows={2}
                 placeholder="Motivo del rechazo (qué cambiar para v+1)"
-                className="w-full text-[12px] bg-white border border-red-200 rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-red-300/40 resize-none" />
+                className="w-full text-[12px] bg-white border border-red-200 rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-red-300/40 resize-y overflow-auto" />
               <div className="flex gap-1.5">
                 <Button size="sm"
                   disabled={!rejectReason.trim() || decisionMutation.isPending}
@@ -2234,7 +2218,7 @@ function ActivityPanel({ projectId, customItemId, projectName, onClose }: { proj
                             setEditingId(null);
                           }
                         }}
-                        className="resize-none text-[11px] min-h-[32px] bg-white px-2.5 py-1.5 leading-relaxed"
+                        className="resize-y overflow-auto text-[11px] min-h-[32px] bg-white px-2.5 py-1.5 leading-relaxed"
                       />
                       <div className="flex gap-1">
                         <Button size="sm" className="h-6 px-2 text-[10px] bg-indigo-600 hover:bg-indigo-700 text-white"
@@ -2302,7 +2286,7 @@ function ActivityPanel({ projectId, customItemId, projectName, onClose }: { proj
           <Textarea ref={newNoteRef} value={newNote} onChange={e => setNewNote(e.target.value)}
             rows={1}
             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); const t = newNote.trim(); if (t) { setNewNote(''); addMutation.mutate(t); } } }}
-            placeholder="Escribí un comentario..." className="resize-none text-[11px] min-h-[32px] flex-1 bg-white px-2.5 py-1.5 leading-relaxed" />
+            placeholder="Escribí un comentario..." className="resize-y overflow-auto text-[11px] min-h-[32px] flex-1 bg-white px-2.5 py-1.5 leading-relaxed" />
           <Button size="sm" onClick={() => { const t = newNote.trim(); if (t) { setNewNote(''); addMutation.mutate(t); } }}
             disabled={!newNote.trim() || addMutation.isPending}
             className="bg-indigo-600 hover:bg-indigo-700 text-white h-7 w-7 p-0 shrink-0">
@@ -2612,9 +2596,9 @@ function DailyRunner({ queue, quietCount, users, currentUserId, roomId, startInd
       const inText = el?.tagName === 'TEXTAREA' || el?.tagName === 'INPUT' || el?.tagName === 'SELECT' || el?.isContentEditable;
       if (e.key === 'Escape') { e.preventDefault(); if (picker) setPicker(null); else if (listening) toggleListening(); else onExit(); return; }
       if (done) { if (e.key === 'Enter' && !inText) { e.preventDefault(); void finish(); } return; }
-      // Enter guarda y avanza (Shift+Enter hace salto de línea), igual que los comentarios.
+      // Within the editor, Enter adds a line; Ctrl/⌘+Enter saves and advances.
       const inTextarea = el === textareaRef.current;
-      if (e.key === 'Enter' && (!inText || (inTextarea && !e.shiftKey) || e.metaKey || e.ctrlKey)) { e.preventDefault(); void next(); return; }
+      if (e.key === 'Enter' && (!inText || (inTextarea && (e.metaKey || e.ctrlKey)))) { e.preventDefault(); void next(); return; }
       if (inText) return;
       if (e.key === '1') { e.preventDefault(); setHealth('verde'); }
       else if (e.key === '2') { e.preventDefault(); setHealth('amarillo'); }
@@ -2737,16 +2721,8 @@ function DailyRunner({ queue, quietCount, users, currentUserId, roomId, startInd
               </div>
 
               <div className="mt-5">
-                <div className="relative">
-                  <label className="mb-2 block text-sm font-medium" htmlFor="daily-current-action">Estado actual</label>
-                  <textarea id="daily-current-action" ref={textareaRef} rows={3} value={draft} onChange={e => setDraft(e.target.value)}
-                    aria-label="Estado actual" placeholder="Estado actual… (⏎ guarda y sigue · ⇧⏎ salto de línea)"
-                    className="w-full border border-slate-200 rounded-xl p-3 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none" />
-                  <button onClick={toggleListening} title={listening ? 'Detener dictado' : 'Dictar'}
-                    className={cn("absolute right-2 bottom-2 p-1.5 rounded-full transition-colors", listening ? "bg-red-100 text-red-600 animate-pulse" : "text-slate-400 hover:text-indigo-600 hover:bg-indigo-50")}>
-                    {listening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-                  </button>
-                </div>
+                <DailyStatusEditor itemKey={item.key} value={draft} onChange={setDraft}
+                  textareaRef={textareaRef} listening={listening} onToggleListening={toggleListening} />
                 {changes.get(item.key)?.changes.length ? (
                   <div className="flex flex-wrap gap-1.5 mt-2">
                     {changes.get(item.key)!.changes.map((c, i) => <span key={i} className="text-[11px] bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full px-2 py-0.5">{c}</span>)}
@@ -2760,7 +2736,7 @@ function DailyRunner({ queue, quietCount, users, currentUserId, roomId, startInd
               <div className="text-[11px] text-slate-400 uppercase tracking-wide font-bold mb-3">Acciones</div>
               <div className="space-y-2 text-sm">
                 <button onClick={() => void next()} className="w-full flex items-center justify-between bg-white border border-slate-200 rounded-lg px-3 py-2.5 hover:border-indigo-300 transition-colors">
-                  <span>{draft.trim() !== (item.currentAction ?? '').trim() ? 'Guardar y siguiente' : 'Todo igual, siguiente'}</span><kbd className="text-[10px] bg-slate-100 border rounded px-1.5 text-slate-500">⏎</kbd>
+                  <span>{draft.trim() !== (item.currentAction ?? '').trim() ? 'Guardar y siguiente' : 'Todo igual, siguiente'}</span><kbd className="text-[10px] bg-slate-100 border rounded px-1.5 text-slate-500">Ctrl/⌘ ⏎</kbd>
                 </button>
                 <div className="w-full flex items-center justify-between bg-white border border-slate-200 rounded-lg px-3 py-2">
                   <span>Semáforo</span>

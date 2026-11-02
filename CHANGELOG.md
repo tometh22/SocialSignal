@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.14.18 — 2026-11-02
+
+- El campo Estado actual de la daily crece con su contenido, parte de una altura más cómoda y permite ajustar manualmente el alto desde la esquina inferior derecha. El micrófono queda arriba para no tapar el tirador.
+- Los campos multilínea de Status permiten redimensionado vertical; el autoajuste respeta el tamaño elegido mientras se escribe y se reinicia al cambiar de ítem.
+- Enter agrega una línea en el editor de la daily; Ctrl/⌘ + Enter guarda y avanza. La indicación y el botón muestran el atajo correspondiente.
+
 ## 1.14.17 — 2026-11-02
 
 - Status abre el alta de ítems en un diálogo amplio, adaptable a móvil, con área de texto redimensionable y controles de guardado visibles. Enter agrega una línea en el contexto y Ctrl/⌘ + Enter guarda el ítem.
