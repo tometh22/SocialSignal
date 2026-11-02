@@ -125,7 +125,7 @@ function RoomBody({ roomId, initialItemKey }: { roomId: number; initialItemKey?:
       )}
       {/* StatusSemanalPage uses legacy /api/status-semanal/* URLs; queryClient rewrites
           them to /api/reviews/:roomId/* because the room context is set above. */}
-      <StatusSemanalPage initialItemKey={initialItemKey} />
+      <StatusSemanalPage key={roomId} initialViewMode="daily" initialItemKey={initialItemKey} />
       <AddProjectDialog open={addProjectOpen} onClose={() => setAddProjectOpen(false)} roomId={roomId} />
     </>
   );

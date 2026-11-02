@@ -2225,7 +2225,7 @@ function StatusFocusDetail({ item, users, currentUserId, roomId, onUpdate, onRes
 
 type DailyAgendaEntry = { item: Item; reasons: DailyReason[] };
 
-function DailyAgendaView({ agenda, quiet, dailyStatus, roomId, onStart, onOpenList, addItem }: {
+function DailyAgendaView({ agenda, quiet, dailyStatus, onStart, onOpenList }: {
   agenda: DailyAgendaEntry[];
   quiet: Item[];
   dailyStatus: DailyStatus | undefined;
@@ -2234,115 +2234,54 @@ function DailyAgendaView({ agenda, quiet, dailyStatus, roomId, onStart, onOpenLi
   onOpenList: () => void;
   addItem?: React.ReactNode;
 }) {
-  const estMinutes = Math.max(1, Math.round(agenda.length * 0.7));
-  return (
-    <div className="flex-1 overflow-y-auto min-w-0">
-      <div className="max-w-6xl mx-auto px-6 py-5">
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-          {/* CTA */}
-          <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between gap-4 bg-gradient-to-r from-indigo-50/70 to-white">
-            <div className="min-w-0">
-              <div className="text-sm font-bold text-slate-800 flex items-center gap-2">
-                <Sun className="h-4 w-4 text-amber-500" />
-                {dailyStatus?.todayDone ? 'Daily de hoy hecha' : 'Daily de hoy'}
-              </div>
-              <div className="text-xs text-slate-500 mt-0.5 flex items-center gap-3 flex-wrap">
-                {dailyStatus?.latest ? (
-                  <span>{dailyStatus.todayDone ? 'Hoy duró' : 'La última duró'} <b className="text-slate-700">{formatDuration(dailyStatus.latest.durationSeconds)}</b>{dailyStatus.latest.userName ? ` · ${dailyStatus.latest.userName.split(' ')[0]}` : ''}</span>
-                ) : (
-                  <span>Todavía no hicieron ninguna daily en este room</span>
-                )}
-                {dailyStatus && dailyStatus.streak > 0 && (
-                  <span className="inline-flex items-center gap-1"><Flame className="h-3 w-3 text-orange-500" /> Racha: <b className="text-slate-700">{dailyStatus.streak} día{dailyStatus.streak === 1 ? '' : 's'}</b></span>
-                )}
-              </div>
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              {addItem}
-              <button onClick={onOpenList} className="text-xs text-slate-500 hover:text-slate-800 font-medium px-2 py-1.5">Ver lista completa</button>
-              {agenda.length > 0 && quiet.length > 0 && (
-                <button onClick={() => onStart(0, { includeQuiet: true })} title="Recorrer también los que no tienen novedad"
-                  className="text-xs text-slate-500 hover:text-slate-800 font-medium px-2 py-1.5">Recorrer todos ({agenda.length + quiet.length})</button>
-              )}
-              <button onClick={() => onStart(0, { includeQuiet: agenda.length === 0 })} disabled={agenda.length + quiet.length === 0}
-                className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white font-bold text-sm px-4 py-2 rounded-lg shadow-sm transition-colors">
-                <Play className="h-3.5 w-3.5 fill-current" />
-                {agenda.length === 0 ? 'Recorrer todos igual' : dailyStatus?.todayDone ? 'Repetir la daily' : 'Hacer la daily'}
-                <span className="text-indigo-200 font-normal">{agenda.length === 0 ? quiet.length : agenda.length} ítem{(agenda.length === 0 ? quiet.length : agenda.length) === 1 ? '' : 's'} · ~{agenda.length === 0 ? Math.max(1, Math.round(quiet.length * 0.5)) : estMinutes} min</span>
-              </button>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-3 max-md:grid-cols-1 divide-x max-md:divide-x-0 max-md:divide-y divide-slate-100">
-            {/* Para hablar hoy */}
-            <div className="col-span-2 p-5">
-              <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-3 flex items-center gap-2">
-                Para hablar hoy <span className="bg-slate-100 rounded-full px-2 py-0.5 text-slate-500">{agenda.length}</span>
-              </h3>
-              {agenda.length === 0 ? (
-                <div className="flex items-center gap-2 py-6 px-4 rounded-xl border border-dashed border-emerald-200 bg-emerald-50/50 text-emerald-700 text-sm">
-                  <CheckCircle2 className="h-4 w-4" /> Nada pide conversación hoy. Todo al día.
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {agenda.map(({ item, reasons }, idx) => {
-                    const main = reasons[0];
-                    const meta = DAILY_REASON_META[main.kind];
-                    return (
-                      <div key={item.key} role="button" tabIndex={0}
-                        onClick={() => onStart(idx)}
-                        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onStart(idx); } }}
-                        className={cn("w-full text-left flex gap-3 items-start p-3 rounded-xl border-l-4 hover:shadow-sm transition-shadow", meta.border, meta.bg)}>
-                        <div className="flex flex-col gap-1 shrink-0 mt-0.5">
-                          {reasons.map(r => (
-                            <span key={r.kind} className={cn("text-[10px] font-bold rounded px-1.5 py-0.5 whitespace-nowrap", DAILY_REASON_META[r.kind].chip)}>{DAILY_REASON_META[r.kind].label}</span>
-                          ))}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="font-semibold text-sm text-slate-800 flex items-center gap-2 min-w-0">
-                            <span className={cn("w-2 h-2 rounded-full shrink-0", hm(item.healthStatus).dot)} />
-                            <span className="truncate">{item.title}</span>
-                            {item.subtitle && <span className="text-xs text-slate-400 font-normal truncate">· {item.subtitle}</span>}
-                            {item.ownerName && <span className="text-[10px] text-indigo-600 font-medium shrink-0">{item.ownerName.split(' ')[0]}</span>}
-                          </div>
-                          <StatusText className="text-xs text-slate-500 mt-0.5">{main.detail}</StatusText>
-                        </div>
-                        <span className="text-xs text-slate-400 italic shrink-0 max-md:hidden">{main.question}</span>
-                        <ItemShareButton item={item} roomId={roomId} />
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            {/* Sin novedad */}
-            <div className="p-5 bg-slate-50/60">
-              <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-wide mb-3 flex items-center gap-2">
-                Sin novedad <span className="bg-slate-200 rounded-full px-2 py-0.5">{quiet.length}</span>
-              </h3>
-              {quiet.length === 0 ? (
-                <p className="text-xs text-slate-400">Todos los ítems piden conversación hoy.</p>
-              ) : (
-                <ul className="text-xs text-slate-500 space-y-1.5">
-                  {quiet.map(i => (
-                    <li key={i.key}>
-                      <button onClick={() => onStart(0, { includeQuiet: true, startKey: i.key })} title="Abrir para dejar una novedad"
-                        className="w-full flex justify-between gap-2 rounded px-1 py-0.5 -mx-1 hover:bg-white hover:text-slate-800 transition-colors text-left">
-                        <span className="truncate flex items-center gap-1.5 min-w-0"><span className={cn("w-1.5 h-1.5 rounded-full shrink-0", hm(i.healthStatus).dot)} /><span className="truncate">{i.title}</span></span>
-                        <span className="text-slate-300 shrink-0">{(i.lastUpdateAt || i.updatedAt) ? relTime(i.lastUpdateAt || i.updatedAt!) : '—'}</span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              <p className="text-[11px] text-slate-400 mt-4 leading-relaxed">No hace falta hablar de estos, pero podés tocar uno para dejarle una novedad igual. Al cerrar la daily quedan contados como revisados.</p>
-            </div>
-          </div>
+  const [showAllAgenda, setShowAllAgenda] = useState(false);
+  const shownAgenda = showAllAgenda ? agenda : agenda.slice(0, 6);
+  const total = agenda.length + quiet.length;
+  const minutes = Math.max(1, Math.round(agenda.length ? agenda.length * 0.7 : quiet.length * 0.5));
+  return <div data-testid="status-daily-home" className="flex-1 overflow-y-auto bg-slate-50/50">
+    <div className="max-w-5xl mx-auto px-6 sm:px-10 py-9 sm:py-12">
+      <div className="flex flex-wrap items-start justify-between gap-7 pb-9">
+        <div className="max-w-xl">
+          <div className="flex items-center gap-2 text-xs text-slate-400 mb-3"><Sun className="h-4 w-4" />{dailyStatus?.todayDone ? 'Daily completada hoy' : 'La daily de hoy'}</div>
+          <h2 className="text-[28px] sm:text-[36px] leading-tight font-semibold tracking-tight text-slate-900">{agenda.length ? 'Qué necesitamos conversar hoy' : 'Todo está al día'}</h2>
+          <p className="text-sm text-slate-500 mt-4 leading-6">{agenda.length ? `${agenda.length} temas para revisar juntos, uno por vez.` : total ? 'Podés recorrer los temas igual o dejar una novedad puntual.' : 'Agregá el primer tema para empezar el seguimiento.'}</p>
+          {dailyStatus?.latest && <p className="text-xs text-slate-400 mt-3">{dailyStatus.todayDone ? 'Hoy' : 'Última daily'} · {formatDuration(dailyStatus.latest.durationSeconds)}{dailyStatus.latest.userName ? ` · ${dailyStatus.latest.userName}` : ''}{dailyStatus.streak > 0 ? ` · ${dailyStatus.streak} días de racha` : ''}</p>}
+        </div>
+        <div className="pt-1 flex flex-col items-start sm:items-end gap-2">
+          <button onClick={() => onStart(0, { includeQuiet: agenda.length === 0 })} disabled={total === 0}
+            className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-5 py-3 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-40 shadow-sm">
+            <Play className="h-3.5 w-3.5 fill-current" />{dailyStatus?.todayDone ? 'Repetir la daily' : 'Empezar la daily'}
+          </button>
+          {total > 0 && <span className="text-xs text-slate-400">Aprox. {minutes} min · {agenda.length || quiet.length} temas</span>}
         </div>
       </div>
+
+      <section className="bg-white rounded-2xl border border-slate-200/80 overflow-hidden">
+        <div className="flex items-center justify-between gap-3 px-5 sm:px-6 py-5 border-b border-slate-100">
+          <h3 className="text-sm font-medium text-slate-800">Para hablar hoy <span className="ml-2 text-xs text-slate-400">{agenda.length}</span></h3>
+          <button onClick={onOpenList} className="text-xs text-slate-400 hover:text-slate-800">Ver todos los temas <ArrowRight className="h-3 w-3 inline ml-1" /></button>
+        </div>
+        {shownAgenda.map(({ item, reasons }, index) => <button key={item.key} data-testid="daily-agenda-item" onClick={() => onStart(index)} aria-label={`Empezar la daily por ${item.title}`}
+          className="w-full flex items-center gap-3 sm:gap-4 px-5 sm:px-6 py-4 text-left border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors">
+          <span className="text-[11px] tabular-nums text-slate-300 w-4 shrink-0">{String(index + 1).padStart(2, '0')}</span>
+          <span className={cn('h-1.5 w-1.5 rounded-full shrink-0', hm(item.healthStatus).dot)} />
+          <span className="text-sm font-medium text-slate-700 min-w-0 flex-1 break-words [overflow-wrap:anywhere]">{item.title}</span>
+          <span className="text-[11px] text-slate-400 shrink-0 max-sm:hidden">{DAILY_REASON_META[reasons[0].kind].label}</span>
+          <ChevronRight className="h-3.5 w-3.5 text-slate-300 shrink-0" />
+        </button>)}
+        {agenda.length === 0 && <p className="px-6 py-8 text-sm text-slate-400">Ningún tema necesita conversación hoy.</p>}
+        {agenda.length > 6 && <button onClick={() => setShowAllAgenda(value => !value)} className="w-full py-4 text-xs text-slate-500 hover:bg-slate-50 border-t border-slate-100">{showAllAgenda ? 'Mostrar menos' : `Ver ${agenda.length - 6} temas más`}</button>}
+      </section>
+
+      <div className="flex flex-wrap items-start justify-between gap-4 mt-6 px-1">
+        <details className="text-xs text-slate-400 max-w-xl">
+          <summary className="cursor-pointer hover:text-slate-700">{quiet.length} temas al día</summary>
+          <div className="pt-3 space-y-1">{quiet.length ? quiet.map(item => <button key={item.key} onClick={() => onStart(0, { includeQuiet: true, startKey: item.key })} className="flex items-center gap-2 py-2 text-left hover:text-slate-700"><span className="h-1 w-1 rounded-full bg-emerald-400 shrink-0" />{item.title}</button>) : <p>Todos los temas están incluidos en la agenda de hoy.</p>}</div>
+        </details>
+        {agenda.length > 0 && quiet.length > 0 && <button onClick={() => onStart(0, { includeQuiet: true })} className="text-xs text-slate-400 hover:text-slate-700">Recorrer los {total} temas</button>}
+      </div>
     </div>
-  );
+  </div>;
 }
 
 // ─── Modo Daily: runner (pantallas 2 y 3) ────────────────────────────────────
@@ -2731,7 +2670,7 @@ function DailyRunner({ queue, quietCount, users, currentUserId, roomId, startInd
   );
 }
 
-export default function StatusSemanalPage({ initialItemKey }: { initialItemKey?: string } = {}) {
+export default function StatusSemanalPage({ initialItemKey, initialViewMode }: { initialItemKey?: string; initialViewMode?: 'daily' | 'list' } = {}) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { user } = useAuth();
@@ -2764,6 +2703,7 @@ export default function StatusSemanalPage({ initialItemKey }: { initialItemKey?:
   const [dragActiveId, setDragActiveId] = useState<string | null>(null);
   // 'daily' es la vista por defecto al entrar al room: agenda de qué hablar hoy.
   const [viewMode, setViewModeRaw] = useState<'list' | 'timeline' | 'daily'>(() => {
+    if (initialViewMode) return initialViewMode;
     try {
       const v = localStorage.getItem('status-view-mode');
       return v === 'list' || v === 'timeline' || v === 'daily' ? v : 'daily';
@@ -3285,7 +3225,7 @@ export default function StatusSemanalPage({ initialItemKey }: { initialItemKey?:
     <div className="flex flex-1 min-h-0 h-full overflow-hidden bg-background">
       <div className={cn("flex flex-col flex-1 min-w-0 transition-all duration-200", notesOpen !== null ? "lg:mr-[360px]" : "")}>
 
-        {viewMode === 'list' ? (
+        {viewMode !== 'timeline' ? (
           <header className="shrink-0 border-b border-slate-200/70 bg-white px-5 sm:px-7 py-4 flex items-center justify-between flex-wrap gap-4">
             <div className="flex items-center gap-4 min-w-0">
               <a href="/review" aria-label="Volver a Status" className="text-slate-400 hover:text-slate-900"><ChevronLeft className="h-4 w-4" /></a>
@@ -3294,8 +3234,11 @@ export default function StatusSemanalPage({ initialItemKey }: { initialItemKey?:
                 <p className="text-[11px] text-slate-400 mt-0.5">{currentWeekLabel}</p>
               </div>
             </div>
+            <nav aria-label="Vista del status" className="inline-flex rounded-lg bg-slate-100 p-1">
+              {([['daily', 'Daily'], ['list', 'Temas']] as const).map(([mode, label]) => <button key={mode} aria-pressed={viewMode === mode} onClick={() => setViewMode(mode)} className={cn('rounded-md px-4 py-1.5 text-xs font-medium transition-colors', viewMode === mode ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-slate-700')}>{label}</button>)}
+            </nav>
             <div className="flex items-center gap-3">
-              <button onClick={() => startDaily()} className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-600 hover:text-slate-900"><Play className="h-3 w-3" /> Hacer la daily</button>
+              {viewMode === 'list' && <button onClick={() => startDaily()} className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-600 hover:text-slate-900"><Play className="h-3 w-3" /> Hacer la daily</button>}
               <span className="h-4 w-px bg-slate-200" />
               <AddItemButton onAdd={d => createCustom.mutate(d)} users={appUsers} currentUserId={currentUserId} />
               <Popover><PopoverTrigger asChild><button aria-label="Más acciones" className="text-slate-400 hover:text-slate-900 p-1"><MoreHorizontal className="h-4 w-4" /></button></PopoverTrigger>
@@ -3354,10 +3297,10 @@ export default function StatusSemanalPage({ initialItemKey }: { initialItemKey?:
 
               {/* Vista: daily / lista */}
               <div className="flex items-center rounded-full border border-white/15 bg-white/10 p-0.5 shrink-0">
-                {([['daily', 'Daily'], ['list', 'Lista']] as const).map(([mode, label]) => (
+                {([['daily', 'Daily'], ['list', 'Temas']] as const).map(([mode, label]) => (
                   <button key={mode} onClick={() => setViewMode(mode)}
                     className={cn("text-[11px] font-medium px-2.5 py-0.5 rounded-full transition-colors",
-                      viewMode === mode || (mode === 'list' && viewMode === 'timeline') ? "bg-white text-indigo-700" : "text-indigo-200 hover:text-white")}>
+                      mode === 'list' ? "bg-white text-indigo-700" : "text-indigo-200 hover:text-white")}>
                     {label}
                   </button>
                 ))}
@@ -3437,7 +3380,7 @@ export default function StatusSemanalPage({ initialItemKey }: { initialItemKey?:
                       {viewMode === 'timeline' ? <List className="h-3.5 w-3.5 text-slate-400" /> : <LayoutList className="h-3.5 w-3.5 text-slate-400" />}
                       {viewMode === 'timeline' ? 'Ver lista' : 'Ver timeline'}
                     </button>
-                    {viewMode !== 'daily' && (
+                    {(
                       <button onClick={() => setViewMode('daily')}
                         className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded text-xs text-slate-700 hover:bg-slate-100">
                         <Sun className="h-3.5 w-3.5 text-slate-400" /> Ver agenda de la daily

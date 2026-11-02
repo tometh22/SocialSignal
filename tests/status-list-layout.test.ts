@@ -6,12 +6,12 @@ import { selectStatusFocus } from '../client/src/components/review/StatusFocusWo
 
 vi.mock('../client/src/hooks/use-auth', () => ({ useAuth: () => ({ user: { id: 3 } }) }));
 
-function renderItems(items: Record<string, unknown>[]) {
+function renderItems(items: Record<string, unknown>[], initialViewMode?: 'daily' | 'list') {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
   client.setQueryData(['/api/status-semanal?includeHidden=true'], []);
   client.setQueryData(['/api/status-semanal/custom?includeHidden=true'], items);
   client.setQueryData(['/api/status-semanal/users'], []);
-  const html = renderToStaticMarkup(createElement(QueryClientProvider, { client }, createElement(StatusSemanalPage)));
+  const html = renderToStaticMarkup(createElement(QueryClientProvider, { client }, createElement(StatusSemanalPage, { initialViewMode })));
   client.clear();
   return html;
 }
@@ -27,6 +27,18 @@ beforeEach(() => vi.stubGlobal('localStorage', { getItem: () => 'list' }));
 afterEach(() => vi.unstubAllGlobals());
 
 describe('Status list with uneven groups', () => {
+  it('opens the room home on Daily even when the previous saved view was Temas, with both destinations visible', () => {
+    const html = renderItems(Array.from({ length: 10 }, (_, i) => item(i + 1, { healthStatus: 'rojo' })), 'daily');
+    expect(html).toContain('data-testid="status-daily-home"');
+    expect(html).not.toContain('data-testid="status-list"');
+    expect(html).toContain('aria-label="Vista del status"');
+    expect(html).toContain('>Daily</button>');
+    expect(html).toContain('>Temas</button>');
+    expect(html).toContain('Empezar la daily');
+    expect(html.match(/data-testid="daily-agenda-item"/g)).toHaveLength(6);
+    expect(html).toContain('Ver 4 temas más');
+  });
+
   it('renders every visible item once, prioritizing 22 attention items before three in progress', () => {
     const items = Array.from({ length: 25 }, (_, i) => item(i + 1, { healthStatus: i < 22 ? 'rojo' : 'verde' }));
     const html = renderItems(items);
