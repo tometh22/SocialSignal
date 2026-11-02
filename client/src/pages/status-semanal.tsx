@@ -35,7 +35,6 @@ import {
   Shield, Target, RefreshCw, Lightbulb, ArrowRight,
   Calendar, Clock, Search, Filter, GripVertical,
   Printer, List, LayoutList, HelpCircle, CheckSquare, Square,
-  PanelLeftOpen, PanelLeftClose,
   Paperclip, FileText, Link2, XCircle, Film, FileCheck2,
   Play, Copy, Check, Flame, Sun,
 } from "lucide-react";
@@ -1311,7 +1310,7 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
       kbFocused && "outline outline-2 outline-indigo-300 outline-offset-[-2px]"
     )}>
       {/* Main row */}
-      <div className={cn("flex items-center gap-3 pl-4 pr-5 cursor-pointer", hideSubtitle ? "py-2.5" : "py-3.5")} onClick={onToggle}>
+      <div className={cn("flex items-start gap-3 pl-4 pr-5 cursor-pointer max-sm:flex-wrap", hideSubtitle ? "py-2.5" : "py-3.5")} onClick={onToggle}>
         {dragHandleProps && (
           <div {...dragHandleProps} className="shrink-0 cursor-grab text-slate-200 hover:text-slate-400 touch-none opacity-0 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
             <GripVertical className="h-3.5 w-3.5" />
@@ -1326,10 +1325,10 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
           <HealthDot value={item.healthStatus} onChange={v => onUpdate({ healthStatus: v })} compact />
         </div>
 
-        <div className="flex-1 min-w-0">
-          <div className="flex items-baseline gap-2 min-w-0">
+        <div className="flex-1 min-w-0 max-sm:basis-[calc(100%-3rem)]">
+          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 min-w-0">
             {item.isCustom && <Tag className="h-3 w-3 text-slate-300 shrink-0 self-center" />}
-            <span className="font-medium text-[14px] tracking-tight text-slate-900 truncate" title={item.title}>{item.title}</span>
+            <span className="font-medium text-[14px] tracking-tight text-slate-900 break-words [overflow-wrap:anywhere]" title={item.title}>{item.title}</span>
             {item.subtitle && <span className="text-slate-400 text-[12px] truncate hidden md:block min-w-0" title={item.subtitle}>{item.subtitle}</span>}
             {item.pendingProposalVersion != null && (
               <span className="shrink-0 self-center inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-md border bg-violet-50 text-violet-700 border-violet-200" title="Hay una propuesta pendiente de aprobación">
@@ -1368,7 +1367,7 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
           )}
         </div>
 
-        <div className="flex items-center gap-1.5 shrink-0 ml-2" onClick={e => e.stopPropagation()}>
+        <div className="flex flex-wrap items-center gap-1.5 shrink-0 ml-2 max-sm:ml-7 max-sm:max-w-[calc(100%-1.75rem)]" onClick={e => e.stopPropagation()}>
           {/* Always-visible controls — accessible on touch devices */}
           {decMeta.urgent && (
             <DecisionBadge value={item.decisionNeeded} onChange={v => onUpdate({ decisionNeeded: v })} />
@@ -1379,13 +1378,13 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
           {handleOpenNotes && item.noteCount > 0 && (
             <button onClick={handleOpenNotes}
               className={cn(
-                "relative flex items-center gap-1 rounded-md transition-colors",
+                "relative inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md transition-colors",
                 hasUnread
                   ? "px-2 py-1 bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm font-medium"
                   : "px-1.5 py-0.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100"
               )}
               title={hasUnread ? "Comentarios sin leer" : "Ver historial de comentarios"}>
-              <MessageSquare className={cn(hasUnread ? "h-3.5 w-3.5" : "h-3 w-3")} />
+              <MessageSquare className={cn("shrink-0", hasUnread ? "h-3.5 w-3.5" : "h-3 w-3")} />
               <span className={cn("font-medium", hasUnread ? "text-[11px]" : "text-[10px]")}>
                 {hasUnread ? `Nuevo · ${item.noteCount}` : item.noteCount}
               </span>
@@ -2827,7 +2826,6 @@ export default function StatusSemanalPage({ initialItemKey }: { initialItemKey?:
   });
   // Unified expanded state — one item expanded at a time across all sections
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [aiPopoverOpen, setAiPopoverOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterHealth, setFilterHealth] = useState<string | null>(null);
@@ -3360,18 +3358,37 @@ export default function StatusSemanalPage({ initialItemKey }: { initialItemKey?:
     ? `${openNotesProject.clientName || ''}${openNotesProject.quotationName ? ` · ${openNotesProject.quotationName}` : ''}`
     : openNotesCustom ? openNotesCustom.title : '';
 
+  const renderPriorityRow = (item: Item, accent: 'red' | 'amber') => {
+    const handlers = getItemHandlers(item);
+    const index = flatNavItems.findIndex(i => i.key === item.key);
+    return (
+      <div key={item.key} id={`row-${item.key}`} className="border-b border-slate-100 last:border-b-0">
+        <CompactRow item={item} users={appUsers} currentUserId={currentUserId} roomId={roomCtx?.roomId}
+          {...handlers}
+          isSelected={notesOpen !== null && (item.isCustom ? notesOpen.type === 'custom' && notesOpen.id === item.customId : notesOpen.type === 'project' && notesOpen.id === item.projectId)}
+          expanded={expandedKey === item.key} onToggle={() => setExpandedKey(expandedKey === item.key ? null : item.key)}
+          hasPrev={index > 0} hasNext={index < flatNavItems.length - 1}
+          onPrev={() => { if (index > 0) setExpandedKey(flatNavItems[index - 1].key); }}
+          onNext={() => { if (index < flatNavItems.length - 1) setExpandedKey(flatNavItems[index + 1].key); }}
+          kbFocused={kbFocusKey === item.key} bulkMode={bulkMode} checked={selectedKeys.has(item.key)}
+          onCheck={value => setSelectedKeys(prev => { const next = new Set(prev); value ? next.add(item.key) : next.delete(item.key); return next; })}
+          accent={accent} />
+      </div>
+    );
+  };
+
   const isLoading = loadingProjects || loadingCustom;
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
-      <div className={cn("flex flex-col flex-1 min-w-0 transition-all duration-200", notesOpen !== null ? "mr-[320px]" : "")}>
+      <div className={cn("flex flex-col flex-1 min-w-0 transition-all duration-200", notesOpen !== null ? "lg:mr-[360px]" : "")}>
 
         {/* ── Header ────────────────────────────────────────────── */}
         <div className="relative overflow-hidden border-b border-border shrink-0">
           <div className="absolute inset-0 bg-gradient-to-r from-indigo-600 via-indigo-700 to-violet-700" />
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,_var(--tw-gradient-stops))] from-white/10 via-transparent to-transparent" />
           <div className="relative px-6 py-2.5">
-            <div className="flex items-center justify-between gap-4">
+            <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
               {/* Left: title (room-aware) */}
               <div className="flex items-center gap-2.5 shrink-0">
                 {roomCtx ? (
@@ -3406,7 +3423,7 @@ export default function StatusSemanalPage({ initialItemKey }: { initialItemKey?:
               </div>
 
               {/* Vista: daily / lista */}
-              <div className="flex items-center rounded-full border border-white/15 bg-white/10 p-0.5 shrink-0 max-md:hidden">
+              <div className="flex items-center rounded-full border border-white/15 bg-white/10 p-0.5 shrink-0">
                 {([['daily', 'Daily'], ['list', 'Lista']] as const).map(([mode, label]) => (
                   <button key={mode} onClick={() => setViewMode(mode)}
                     className={cn("text-[11px] font-medium px-2.5 py-0.5 rounded-full transition-colors",
@@ -3423,19 +3440,8 @@ export default function StatusSemanalPage({ initialItemKey }: { initialItemKey?:
                 </button>
               )}
 
-              {/* Sidebar toggle (visible when sidebar has items) */}
-              {(alertItems.length > 0 || decisionItems.length > 0) && viewMode === 'list' && (
-                <button
-                  onClick={() => setSidebarOpen(v => !v)}
-                  title={sidebarOpen ? "Ocultar panel lateral" : "Mostrar panel lateral"}
-                  className={cn("p-1.5 rounded-full border transition-colors backdrop-blur-sm shrink-0",
-                    sidebarOpen ? "bg-white/25 text-white border-white/30" : "bg-white/10 text-indigo-200 border-white/15 hover:bg-white/20 hover:text-white")}>
-                  {sidebarOpen ? <PanelLeftClose className="h-3.5 w-3.5" /> : <PanelLeftOpen className="h-3.5 w-3.5" />}
-                </button>
-              )}
-
               {/* Center: search */}
-              <div className="relative flex-1 max-w-md max-md:hidden">
+              <div className="relative min-w-[180px] flex-1 max-w-md max-md:order-last max-md:basis-full max-md:max-w-none">
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-indigo-300" />
                 <input
                   ref={searchInputRef}
@@ -3452,7 +3458,7 @@ export default function StatusSemanalPage({ initialItemKey }: { initialItemKey?:
               </div>
 
               {/* Right: actions */}
-              <div className="flex items-center gap-1 shrink-0">
+              <div className="flex flex-wrap items-center gap-1 shrink-0 max-w-full">
                 {roomCtx?.room?.members && roomCtx.room.members.length > 0 && (
                   <MemberAvatarsStack
                     members={roomCtx.room.members}
@@ -3742,106 +3748,34 @@ export default function StatusSemanalPage({ initialItemKey }: { initialItemKey?:
           ) : (
             <>
 
-              {/* ── Mobile backdrop for sidebar overlay ─────────────── */}
-              {sidebarOpen && (alertItems.length > 0 || decisionItems.length > 0) && (
-                <div className="hidden max-md:block fixed inset-0 z-20 bg-black/40 backdrop-blur-[2px]"
-                  onClick={() => setSidebarOpen(false)} />
-              )}
-
-              {/* ── Left panel: urgency items ─────────────────────────── */}
-              {(alertItems.length > 0 || decisionItems.length > 0) && (
-              <div className={cn(
-                "shrink-0 border-r border-slate-200 overflow-y-auto bg-slate-50/40 flex flex-col transition-all duration-200",
-                sidebarOpen ? "w-[420px] max-lg:w-[340px] max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:z-30 max-md:w-[85vw] max-md:max-w-[420px] max-md:shadow-2xl max-md:border-r-0" : "w-0 overflow-hidden"
-              )}>
-              <div className="px-4 py-3 border-b border-slate-200 flex items-center gap-2 shrink-0 bg-white/60">
-                <AlertTriangle className="h-3.5 w-3.5 text-slate-400" />
-                <span className="text-xs font-bold text-slate-600 flex-1">Para atender</span>
-                <span className="text-xs font-bold text-slate-400 bg-slate-100 rounded-full px-2 py-0.5">{alertItems.length + decisionItems.length}</span>
-              </div>
-              <div className="p-3 space-y-3 flex-1 overflow-y-auto">
-
-              {/* ── Requieren atención (hidden when empty) ──────────── */}
-              {alertItems.length > 0 && (
-              <div>
-                <div className="flex items-center gap-1.5 mb-2 px-1">
-                  <span className="text-[11px] text-slate-500 flex-1">Requieren atención · {alertItems.length}</span>
-                  <AddItemButton variant="inline" onAdd={d => createCustom.mutate(d)} users={appUsers} currentUserId={currentUserId} />
-                </div>
-                <div className="rounded-xl border border-slate-200/60 bg-white overflow-hidden">
-                  <AnimatePresence initial={false}>
-                    {alertItems.map((item) => {
-                      const h = getItemHandlers(item);
-                      const rowAccent: 'red' | 'amber' = (item.isOverdue || item.healthStatus === 'rojo') ? 'red' : 'amber';
-                      return (
-                        <motion.div key={item.key} id={`row-${item.key}`} layout
-                          initial={{ opacity: 0, y: -4 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: -4 }}
-                          transition={{ duration: 0.14, ease: [0.4, 0, 0.2, 1] }}
-                          className="border-b border-slate-100/80 last:border-b-0">
-                          <AlertSidebarCard item={item} accent={rowAccent} currentUserId={currentUserId} roomId={roomCtx?.roomId}
-                            onUpdate={h.onUpdate}
-                            expanded={expandedKey === item.key}
-                            onToggle={() => setExpandedKey(expandedKey === item.key ? null : item.key)}
-                            users={appUsers}
-                            onOpenNotes={h.onOpenNotes}
-                            onRemove={h.onRemove}
-                            onResolve={h.onResolve}
-                            bulkMode={bulkMode}
-                            checked={selectedKeys.has(item.key)}
-                            onCheck={v => setSelectedKeys(prev => { const n = new Set(prev); v ? n.add(item.key) : n.delete(item.key); return n; })} />
-                        </motion.div>
-                      );
-                    })}
-                  </AnimatePresence>
-                </div>
-              </div>
-              )}
-
-              {/* ── Decisiones pendientes (hidden when empty) ─────── */}
-              {decisionItems.length > 0 && (
-              <div>
-                <div className="flex items-center gap-1.5 mb-2 px-1">
-                  <span className="text-[11px] text-slate-500 flex-1">Decisiones pendientes · {decisionItems.length}</span>
-                </div>
-                <div className="rounded-xl border border-slate-200/60 bg-white overflow-hidden">
-                  <AnimatePresence initial={false}>
-                    {decisionItems.map((item) => {
-                      const h = getItemHandlers(item);
-                      return (
-                        <motion.div key={item.key} id={`row-${item.key}`} layout
-                          initial={{ opacity: 0, y: -4 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: -4 }}
-                          transition={{ duration: 0.14, ease: [0.4, 0, 0.2, 1] }}
-                          className="border-b border-slate-100/80 last:border-b-0">
-                          <DecisionSidebarCard item={item} currentUserId={currentUserId} roomId={roomCtx?.roomId}
-                            expanded={expandedKey === item.key}
-                            onToggle={() => setExpandedKey(expandedKey === item.key ? null : item.key)}
-                            users={appUsers}
-                            onUpdate={h.onUpdate}
-                            onOpenNotes={h.onOpenNotes}
-                            onRemove={h.onRemove}
-                            onResolve={h.onResolve}
-                            bulkMode={bulkMode}
-                            checked={selectedKeys.has(item.key)}
-                            onCheck={v => setSelectedKeys(prev => { const n = new Set(prev); v ? n.add(item.key) : n.delete(item.key); return n; })} />
-                        </motion.div>
-                      );
-                    })}
-                  </AnimatePresence>
-                </div>
-              </div>
-              )}
-
-              </div>
-              </div>
-              )}
-
-              {/* ── Right panel: En curso ─────────────────────────────── */}
-              <div className="flex-1 overflow-y-auto min-w-0">
-              <div className="px-5 py-4 space-y-4">
+              <div className="flex-1 min-w-0 overflow-y-auto" data-testid="status-list">
+              <div className="px-4 py-5 sm:px-6 space-y-6">
+                {alertItems.length > 0 && (
+                  <section aria-labelledby="status-attention-title">
+                    <div className="flex items-center gap-2 mb-3">
+                      <AlertTriangle className="h-4 w-4 text-red-500 shrink-0" />
+                      <h2 id="status-attention-title" className="text-sm font-semibold text-slate-800">Para atender</h2>
+                      <span className="rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700">{alertItems.length}</span>
+                      <div className="flex-1" />
+                      <AddItemButton variant="inline" onAdd={d => createCustom.mutate(d)} users={appUsers} currentUserId={currentUserId} />
+                    </div>
+                    <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
+                      {alertItems.map(item => renderPriorityRow(item, item.isOverdue || item.healthStatus === 'rojo' ? 'red' : 'amber'))}
+                    </div>
+                  </section>
+                )}
+                {decisionItems.length > 0 && (
+                  <section aria-labelledby="status-decisions-title">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Zap className="h-4 w-4 text-amber-500 shrink-0" />
+                      <h2 id="status-decisions-title" className="text-sm font-semibold text-slate-800">Decisiones pendientes</h2>
+                      <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">{decisionItems.length}</span>
+                    </div>
+                    <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
+                      {decisionItems.map(item => renderPriorityRow(item, 'amber'))}
+                    </div>
+                  </section>
+                )}
 
               {/* ── En curso ───────────────────────────────────────── */}
               <div>
@@ -4250,7 +4184,7 @@ export default function StatusSemanalPage({ initialItemKey }: { initialItemKey?:
 
       {/* ── Activity panel (notes + change log) ─────────────────── */}
       {notesOpen !== null && (
-        <div className="fixed top-0 right-0 h-full w-[320px] border-l border-border bg-background shadow-xl z-20 flex flex-col">
+        <div className="fixed top-0 right-0 h-full w-[360px] max-w-full border-l border-border bg-background shadow-xl z-40 flex flex-col">
           {(openNotesProject || openNotesCustom) && (
             <ActivityPanel
               projectId={notesOpen.type === 'project' ? notesOpen.id : undefined}

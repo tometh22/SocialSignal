@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.14.19 — 2026-11-02
+
+- La vista Lista de Status muestra Para atender, Decisiones pendientes y En curso en grupos de ancho completo dentro de una misma zona de desplazamiento. Los temas prioritarios dejan de quedar comprimidos en una columna lateral mientras la otra queda vacía.
+- Los títulos pueden ocupar más de una línea y los controles se reacomodan en pantallas angostas. El indicador de comentarios sin leer conserva texto, icono y cantidad juntos, sin cortar Nuevo · N. La cabecera puede distribuirse en varias líneas y el historial usa un panel adaptable.
+- Regresiones de render con 22 temas prioritarios y tres en curso, decisiones pendientes y temas resueltos, comprobando que cada tema visible aparezca una sola vez.
+
 ## 1.14.18 — 2026-11-02
 
 - El campo Estado actual de la daily crece con su contenido, parte de una altura más cómoda y permite ajustar manualmente el alto desde la esquina inferior derecha. El micrófono queda arriba para no tapar el tirador.
