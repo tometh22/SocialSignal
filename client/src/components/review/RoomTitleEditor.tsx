@@ -12,9 +12,11 @@ type Props = {
   name: string;
   privacy: 'members' | 'private' | string;
   myRole: 'owner' | 'editor';
+  tone?: 'dark' | 'light';
 };
 
-export default function RoomTitleEditor({ roomId, name, privacy, myRole }: Props) {
+export default function RoomTitleEditor({ roomId, name, privacy, myRole, tone = 'dark' }: Props) {
+  const light = tone === 'light';
   const isOwner = myRole === 'owner';
   const isPrivate = privacy === 'private';
   const [open, setOpen] = useState(false);
@@ -50,8 +52,8 @@ export default function RoomTitleEditor({ roomId, name, privacy, myRole }: Props
   if (!isOwner) {
     return (
       <div className="flex items-center gap-2">
-        <h1 className="text-base font-bold leading-tight text-white tracking-tight">{name}</h1>
-        <span className="text-[9px] font-semibold bg-white/20 text-white px-1.5 py-0.5 rounded inline-flex items-center gap-1">
+        <h1 className={`text-base font-semibold leading-tight tracking-tight ${light ? 'text-slate-900' : 'text-white'}`}>{name}</h1>
+        <span className={`text-[9px] font-semibold bg-white/20 text-white px-1.5 py-0.5 rounded inline-flex items-center gap-1 ${light ? 'hidden' : ''}`}>
           {isPrivate && <Lock className="h-2.5 w-2.5" />}
           {roleLabel}
         </span>
@@ -64,12 +66,12 @@ export default function RoomTitleEditor({ roomId, name, privacy, myRole }: Props
       <PopoverTrigger asChild>
         <button
           type="button"
-          className="flex items-center gap-2 group rounded px-1 -mx-1 hover:bg-white/10 transition-colors"
+          className={`flex items-center gap-2 group rounded px-1 -mx-1 transition-colors ${light ? 'hover:bg-slate-100' : 'hover:bg-white/10'}`}
           title="Renombrar sala"
         >
-          <h1 className="text-base font-bold leading-tight text-white tracking-tight">{name}</h1>
-          <Pencil className="h-3 w-3 text-white/50 group-hover:text-white transition-colors" />
-          <span className="text-[9px] font-semibold bg-white/20 text-white px-1.5 py-0.5 rounded inline-flex items-center gap-1">
+          <h1 className={`text-base font-semibold leading-tight tracking-tight ${light ? 'text-slate-900' : 'text-white'}`}>{name}</h1>
+          <Pencil className={`h-3 w-3 transition-colors ${light ? 'text-slate-300 group-hover:text-slate-600' : 'text-white/50 group-hover:text-white'}`} />
+          <span className={`text-[9px] font-semibold bg-white/20 text-white px-1.5 py-0.5 rounded inline-flex items-center gap-1 ${light ? 'hidden' : ''}`}>
             {isPrivate && <Lock className="h-2.5 w-2.5" />}
             {roleLabel}
           </span>

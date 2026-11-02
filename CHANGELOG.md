@@ -3,9 +3,9 @@
 ## 1.14.19 — 2026-11-02
 
 - El historial completo incluye los updates que ya contaba la tarjeta, además de comentarios y cambios de campos, con texto completo, formato, autor y fecha. Pruebas para proyectos y temas propios verifican siete entradas de ambos autores sin perder las que comparten ID.
-- Status distribuye Para atender, Decisiones pendientes y En curso en una grilla adaptable de tarjetas, con título, resumen y metadatos separados. Los temas prioritarios dejan de quedar comprimidos en una columna lateral mientras la otra queda vacía. Abrir un tema amplía su detalle; los temas en curso conservan el reordenado por arrastre.
-- Los títulos pueden ocupar más de una línea y los controles se reacomodan en pantallas angostas. El indicador de comentarios sin leer conserva texto, icono y cantidad juntos, sin cortar Nuevo · N. La cabecera puede distribuirse en varias líneas y el historial usa un panel adaptable.
-- Regresiones de render con 22 temas prioritarios y tres en curso, decisiones pendientes y temas resueltos, comprobando que cada tema visible aparezca una sola vez.
+- Status presenta un índice de temas y un único tema abierto para reducir la repetición de contenido. El índice conserva prioridades, búsqueda, filtros y reordenado de temas en curso; el área de lectura muestra Estado actual y Actividad en pestañas separadas, con acciones secundarias en un menú. La cabecera es neutra y los avisos sin leer usan un indicador discreto.
+- En móvil se alterna entre índice y detalle con regreso a todos los temas. El primer tema disponible se abre automáticamente en escritorio; filtrar o resolver el tema seleccionado elige otro disponible. Títulos largos pueden ocupar varias líneas y el editor del estado conserva su campo amplio y redimensionable.
+- Regresiones con 22 temas prioritarios y tres en curso comprueban que cada tema figure una sola vez en el índice y solo se renderice un contenido completo. Cobertura de selección inicial, selección existente, filtros, temas resueltos y resultados vacíos.
 
 ## 1.14.18 — 2026-11-02
 

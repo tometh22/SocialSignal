@@ -13,6 +13,7 @@ import MembersDialog from "@/components/review/MembersDialog";
 import AddProjectDialog from "@/components/review/AddProjectDialog";
 import AddItemButton, { type NewItemInput } from "@/components/review/AddStatusItemButton";
 import StatusText from "@/components/review/StatusText";
+import StatusFocusWorkspace from "@/components/review/StatusFocusWorkspace";
 import DailyStatusEditor from "@/components/review/DailyStatusEditor";
 import { useAutoResize } from "@/hooks/use-auto-resize-textarea";
 import RoomTitleEditor from "@/components/review/RoomTitleEditor";
@@ -43,7 +44,7 @@ import {
   type DragStartEvent, type DragEndEvent
 } from "@dnd-kit/core";
 import {
-  SortableContext, rectSortingStrategy, useSortable, arrayMove
+  SortableContext, useSortable, arrayMove
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 
@@ -455,9 +456,9 @@ function MentionInput({ value, onChange, onKeyDown, placeholder, className, user
 
 // ─── Inline editor ────────────────────────────────────────────────────────────
 
-function InlineText({ value, placeholder, onSave, multiline = false, className = '', required = false }: {
+function InlineText({ value, placeholder, onSave, multiline = false, className = '', required = false, rows = 1 }: {
   value: string | null; placeholder: string; onSave: (v: string) => void;
-  multiline?: boolean; className?: string; required?: boolean;
+  multiline?: boolean; className?: string; required?: boolean; rows?: number;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value ?? '');
@@ -484,7 +485,7 @@ function InlineText({ value, placeholder, onSave, multiline = false, className =
               if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); save(); }
               if (e.key === 'Escape') { setDraft(value ?? ''); setEditing(false); }
             }}
-            className={cls} rows={1} />
+            className={cls} rows={rows} />
           <p className="text-[9px] text-slate-400 mt-0.5">Ctrl+Enter para guardar · Esc para cancelar</p>
         </>
       )
@@ -495,7 +496,8 @@ function InlineText({ value, placeholder, onSave, multiline = false, className =
 
   const Container = multiline ? "div" : "span";
   return (
-    <Container onClick={() => setEditing(true)}
+    <Container role="button" tabIndex={0} onClick={() => setEditing(true)}
+      onKeyDown={event => { if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); setEditing(true); } }}
       className={cn(
         "group cursor-text rounded-md px-1.5 py-1 transition-all min-h-[26px] gap-1 w-full",
         multiline ? "flex items-start" : "inline-flex items-center",
@@ -1728,190 +1730,6 @@ function SortableCompactRow(props: React.ComponentProps<typeof CompactRow>) {
   );
 }
 
-function SortableStatusCard(props: React.ComponentProps<typeof StatusCard>) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: props.item.key });
-  return <div ref={setNodeRef} className="h-full" style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1 }}>
-    <StatusCard {...props} dragHandleProps={{ ...attributes, ...listeners }} />
-  </div>;
-}
-
-// ─── StatusCard — responsive status board card ─────────────────
-function StatusCard({ item, accent, currentUserId, roomId, onUpdate, expanded, onToggle, users, onOpenNotes, onRemove, onResolve, bulkMode, checked, onCheck, isSelected, kbFocused, dragHandleProps }: {
-  item: Item; accent: 'red' | 'amber' | 'none'; currentUserId?: number | null; roomId?: number;
-  onUpdate: (d: Record<string, any>) => void;
-  expanded?: boolean; onToggle?: () => void; onResolve?: () => void;
-  users?: AppUser[]; onOpenNotes?: () => void; onRemove?: () => void;
-  isSelected?: boolean; kbFocused?: boolean; dragHandleProps?: Record<string, any>;
-  bulkMode?: boolean; checked?: boolean; onCheck?: (v: boolean) => void;
-}) {
-  const accentBorder = accent === 'red' ? 'border-l-red-500' : accent === 'amber' ? 'border-l-amber-400' : 'border-l-emerald-400';
-  const accentBg = accent === 'red' ? 'bg-red-50/40' : accent === 'amber' ? 'bg-amber-50/40' : 'bg-slate-50/40';
-  const { hasUnread, markAsRead } = useUnreadComments(item, roomId);
-  useEffect(() => { if (expanded && hasUnread) markAsRead(); }, [expanded, hasUnread, markAsRead]);
-  const handleOpenNotes = onOpenNotes ? () => { markAsRead(); onOpenNotes(); } : undefined;
-  return (
-    <div className={cn(
-      "h-full rounded-xl border border-slate-200 border-l-[3px] bg-white shadow-sm transition-colors overflow-hidden",
-      isSelected && "ring-2 ring-indigo-400",
-      kbFocused && "outline outline-2 outline-indigo-300 outline-offset-2",
-      accentBorder,
-      expanded ? accentBg : hasUnread ? "bg-indigo-50/30 hover:bg-indigo-50/60" : "hover:bg-slate-50/60"
-    )}>
-      {/* Clickable header */}
-      <div className={cn("p-4 cursor-pointer", !expanded && "min-h-[170px]")} onClick={onToggle} role="button" tabIndex={0} aria-expanded={!!expanded}
-        onKeyDown={e => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); onToggle?.(); } }}>
-        <div className="flex items-start gap-2.5">
-          {dragHandleProps && <div {...dragHandleProps} onClick={e => e.stopPropagation()} className="cursor-grab text-slate-300 touch-none" aria-label="Reordenar tema"><GripVertical className="h-4 w-4" /></div>}
-          {bulkMode && (
-            <div className="shrink-0 mt-0.5" onClick={e => { e.stopPropagation(); onCheck?.(!checked); }}>
-              {checked ? <CheckSquare className="h-4 w-4 text-indigo-500" /> : <Square className="h-4 w-4 text-slate-300" />}
-            </div>
-          )}
-          <div className="shrink-0 mt-0.5" onClick={e => e.stopPropagation()}>
-            <HealthDot value={item.healthStatus} onChange={v => onUpdate({ healthStatus: v })} compact />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-1.5">
-              {item.isCustom && <Tag className="h-3 w-3 text-indigo-400 shrink-0" />}
-              <p className="font-semibold text-[15px] leading-snug text-slate-900 break-words [overflow-wrap:anywhere] flex-1 min-w-0">{item.title}</p>
-              <ItemShareButton item={item} roomId={roomId} />
-              <ChevronDown className={cn("h-3 w-3 text-slate-300 shrink-0 transition-transform", !expanded && "-rotate-90")} />
-            </div>
-            {!expanded && item.currentAction && (
-              <StatusText className="text-[13px] leading-relaxed text-slate-600 mt-2 line-clamp-3">{item.currentAction}</StatusText>
-            )}
-            {/* Owner + deadline + notes meta row — only shown collapsed; the
-                 expanded view has owner/deadline editable in the footer, so
-                 repeating them here is redundant. */}
-            {!expanded && (
-              <div className="flex items-center gap-x-3 gap-y-2 mt-3 flex-wrap">
-                {item.ownerName && (
-                  <div className="flex items-center gap-1">
-                    <div className="h-4 w-4 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-[8px] font-bold shrink-0">
-                      {initials(item.ownerName)}
-                    </div>
-                    <span className="text-xs text-slate-500">{item.ownerName.split(' ')[0]}</span>
-                  </div>
-                )}
-                {item.deadline && (
-                  <span className={cn("text-[10px] font-medium", item.isOverdue ? "text-red-500" : "text-slate-400")}>
-                    {deadlineLabel(item.deadline)}
-                  </span>
-                )}
-                {item.noteCount > 0 && (
-                  <button type="button" onClick={e => { e.stopPropagation(); handleOpenNotes?.(); }} className={cn(
-                    "inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded px-1.5 py-0.5 text-xs hover:bg-indigo-50",
-                    hasUnread ? "text-indigo-600 font-medium" : "text-slate-400"
-                  )}>
-                    <MessageSquare className="h-3 w-3 shrink-0" />
-                    {hasUnread ? `Nuevo · ${item.noteCount}` : `${item.noteCount} entradas`}
-                  </button>
-                )}
-              </div>
-            )}
-            {!expanded && hasUnread && item.lastNoteContent && (
-              <button
-                type="button"
-                onClick={e => { e.stopPropagation(); handleOpenNotes?.(); }}
-                className="mt-1.5 flex items-center gap-1.5 w-full text-left rounded-md px-2 py-1 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 transition-colors"
-                title="Ver comentarios"
-              >
-                <MessageSquare className="h-3 w-3 text-indigo-600 shrink-0" />
-                <span className="text-[10px] font-semibold text-indigo-700 shrink-0">
-                  {item.lastNoteAuthorName?.split(' ')[0] ?? 'Comentario'}:
-                </span>
-                <span className="text-[11px] text-indigo-900/80 italic truncate flex-1 min-w-0">
-                  {item.lastNoteContent}
-                </span>
-                {item.lastNoteAt && (
-                  <span className="text-[10px] text-indigo-400 shrink-0">{relTime(item.lastNoteAt)}</span>
-                )}
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Expanded detail panel */}
-      <AnimatePresence>
-        {expanded && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.16, ease: [0.4, 0, 0.2, 1] }}
-            className="overflow-hidden">
-            <div className="px-4 pb-4 space-y-4" onClick={e => e.stopPropagation()}>
-              {/* Risk — present only when set, kept neutral */}
-              {item.mainRisk && (
-                <div className="flex items-start gap-1.5">
-                  <Shield className="h-3 w-3 text-slate-400 shrink-0 mt-0.5" />
-                  <InlineText value={item.mainRisk} placeholder="Riesgo principal" onSave={v => onUpdate({ mainRisk: v })} className="text-[12px] text-slate-600 leading-snug" />
-                </div>
-              )}
-
-              {/* Estado actual */}
-              <div>
-                <p className="text-[10px] text-slate-400 mb-0.5">Estado actual</p>
-                <InlineText value={item.currentAction} placeholder="¿Qué está pasando?" onSave={v => onUpdate({ currentAction: v })} multiline className="text-[12px] text-slate-700 leading-relaxed" />
-              </div>
-
-              {item.nextMilestone && <details className="text-xs text-slate-500"><summary className="cursor-pointer">Próximo paso anterior</summary><StatusText className="mt-1">{item.nextMilestone}</StatusText></details>}
-
-              {/* Comentarios — flat composer, no eyebrow, no colored bg */}
-              <div>
-                <ItemThread
-                  projectId={item.projectId}
-                  customId={item.customId}
-                  currentUserId={currentUserId}
-                  users={users}
-                  onOpenFull={handleOpenNotes}
-                  compact
-                />
-                {handleOpenNotes && item.noteCount > 1 && (
-                  <button onClick={handleOpenNotes}
-                    className="mt-1 flex items-center gap-0.5 text-[10px] text-slate-400 hover:text-slate-600 transition-colors">
-                    Ver historial · {item.noteCount}
-                    <ChevronRight className="h-2.5 w-2.5" />
-                  </button>
-                )}
-              </div>
-
-              {/* Proposal */}
-              <ProposalSection projectId={item.projectId} customId={item.customId} currentUserId={currentUserId} />
-
-              {/* Footer — minimal */}
-              <div className="flex items-center gap-2 flex-wrap">
-                {users && <OwnerSelect value={item.ownerId} name={item.ownerName} onChange={v => onUpdate({ ownerId: v })} users={users} />}
-                <DeadlinePicker value={item.deadline} isOverdue={item.isOverdue} onChange={v => onUpdate({ deadline: v })} />
-                {item.decisionNeeded && item.decisionNeeded !== 'ninguna' && (
-                  <DecisionBadge value={item.decisionNeeded} onChange={v => onUpdate({ decisionNeeded: v })} />
-                )}
-                <div className="flex-1" />
-                {onResolve && (
-                  <button onClick={onResolve}
-                    className="flex items-center gap-1 text-[11px] text-emerald-600 hover:text-emerald-700 transition-colors">
-                    <CheckCircle2 className="h-3 w-3" />
-                    Resolver
-                  </button>
-                )}
-                {onRemove && (
-                  <button onClick={onRemove}
-                    className="p-1 rounded text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors"
-                    title={item.isCustom ? "Eliminar" : "Quitar"}>
-                    <Trash2 className="h-3 w-3" />
-                  </button>
-                )}
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-}
-
-// ─── DecisionSidebarCard — expandable card for decisions sidebar ─────────────
 function DecisionSidebarCard({ item, currentUserId, roomId, expanded, onToggle, users, onUpdate, onOpenNotes, onRemove, onResolve, bulkMode, checked, onCheck }: {
   item: Item; currentUserId?: number | null; roomId?: number;
   expanded?: boolean; onToggle?: () => void;
@@ -2111,7 +1929,7 @@ function formatChangeValue(fieldName: string, value: string | null): string {
 
 // ─── Activity panel (unified timeline: notes + changes) ─────────────────────
 
-export function ActivityPanel({ projectId, customItemId, projectName, onClose }: { projectId?: number; customItemId?: number; projectName: string; onClose: () => void }) {
+export function ActivityPanel({ projectId, customItemId, projectName, onClose, embedded = false }: { projectId?: number; customItemId?: number; projectName: string; onClose: () => void; embedded?: boolean }) {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const { toast } = useToast();
@@ -2204,16 +2022,16 @@ export function ActivityPanel({ projectId, customItemId, projectName, onClose }:
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex items-center justify-between px-3 py-2 border-b border-border shrink-0 bg-slate-50/80">
+      {!embedded && <div className="flex items-center justify-between px-3 py-2 border-b border-border shrink-0 bg-slate-50/80">
         <div className="flex items-center gap-1.5 min-w-0">
           <ClipboardList className="h-3.5 w-3.5 text-indigo-500 shrink-0" />
           <p className="text-xs font-semibold truncate">{projectName}</p>
           <span className="text-[10px] text-muted-foreground shrink-0">Actividad</span>
         </div>
         <button onClick={onClose} className="p-0.5 hover:bg-accent rounded text-muted-foreground shrink-0"><X className="h-3.5 w-3.5" /></button>
-      </div>
+      </div>}
 
-      <div className="flex-1 overflow-y-auto px-3 py-2 space-y-1.5">
+      <div className={cn("flex-1 overflow-y-auto", embedded ? "px-0 py-4 space-y-5" : "px-3 py-2 space-y-1.5")}>
         {isLoading && <div className="flex justify-center py-6"><Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /></div>}
         {hasError && <p role="alert" className="text-xs text-red-600 py-2">No se pudo cargar todo el historial. Volvé a abrirlo para reintentar.</p>}
         {!isLoading && !hasError && timeline.length === 0 && (
@@ -2274,7 +2092,7 @@ export function ActivityPanel({ projectId, customItemId, projectName, onClose }:
                       </div>
                     </div>
                   ) : (
-                    <StatusText className="text-[11px] bg-white border border-slate-100 rounded-md px-2.5 py-1.5">{entry.content}</StatusText>
+                    <StatusText className={embedded ? "text-sm leading-7 py-1" : "text-[11px] bg-white border border-slate-100 rounded-md px-2.5 py-1.5"}>{entry.content}</StatusText>
                   )}
                 </div>
                 {entry.type === 'note' && isOwn && editingId !== entry.id && (
@@ -2325,9 +2143,9 @@ export function ActivityPanel({ projectId, customItemId, projectName, onClose }:
       <div className="px-3 py-2 border-t border-border shrink-0 bg-slate-50/80">
         <div className="flex gap-1.5 items-end">
           <Textarea ref={newNoteRef} value={newNote} onChange={e => setNewNote(e.target.value)}
-            rows={1}
+            rows={embedded ? 4 : 1}
             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); const t = newNote.trim(); if (t) { setNewNote(''); addMutation.mutate(t); } } }}
-            placeholder="Escribí un comentario..." className="resize-y overflow-auto text-[11px] min-h-[32px] flex-1 bg-white px-2.5 py-1.5 leading-relaxed" />
+            placeholder="Escribí un comentario..." className={cn("resize-y overflow-auto flex-1 bg-white px-2.5 py-1.5 leading-relaxed", embedded ? "text-sm min-h-[100px]" : "text-[11px] min-h-[32px]")} />
           <Button size="sm" onClick={() => { const t = newNote.trim(); if (t) { setNewNote(''); addMutation.mutate(t); } }}
             disabled={!newNote.trim() || addMutation.isPending}
             className="bg-indigo-600 hover:bg-indigo-700 text-white h-7 w-7 p-0 shrink-0">
@@ -2338,6 +2156,67 @@ export function ActivityPanel({ projectId, customItemId, projectName, onClose }:
       </div>
     </div>
   );
+}
+
+function StatusFocusDetail({ item, users, currentUserId, roomId, onUpdate, onResolve, onRemove }: {
+  item: Item; users: AppUser[]; currentUserId: number | null; roomId?: number;
+  onUpdate: (data: Record<string, any>) => void; onResolve: () => void; onRemove: () => void;
+}) {
+  const [tab, setTab] = useState<'overview' | 'activity'>('overview');
+  const { hasUnread, markAsRead } = useUnreadComments(item, roomId);
+  useEffect(() => { if (tab === 'activity' && hasUnread) markAsRead(); }, [tab, hasUnread, markAsRead]);
+  return <div className="flex flex-col flex-1 min-h-0" data-testid="status-focus-detail">
+    <div className="px-6 pt-7 sm:px-10 lg:px-14 shrink-0">
+      <div className="max-w-4xl mx-auto">
+        <div className="flex items-center justify-between gap-3 mb-6">
+          <span className="text-[11px] font-medium text-slate-400 tracking-wide">{item.hiddenFromWeekly ? 'Tema resuelto' : 'Status compartido'}</span>
+          <div className="flex items-center gap-2">
+            <button onClick={item.hiddenFromWeekly ? () => onUpdate({ hiddenFromWeekly: false }) : onResolve} className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-emerald-700 rounded-md border border-slate-200 px-2.5 py-1.5">
+              <Check className="h-3 w-3" />{item.hiddenFromWeekly ? 'Restaurar' : 'Resolver'}
+            </button>
+            <Popover><PopoverTrigger asChild><button aria-label="Acciones del tema" className="p-1.5 rounded-md hover:bg-slate-100 text-slate-400"><MoreHorizontal className="h-4 w-4" /></button></PopoverTrigger>
+              <PopoverContent align="end" className="w-64 p-3 space-y-3">
+                <div className="flex items-center justify-between text-xs text-slate-500">Copiar enlace <ItemShareButton item={item} roomId={roomId} /></div>
+                <div className="flex items-center justify-between text-xs text-slate-500">Decisión <DecisionBadge value={item.decisionNeeded} onChange={v => onUpdate({ decisionNeeded: v })} /></div>
+                <div className="flex items-center justify-between text-xs text-slate-500">Rentabilidad <LevelBadge value={item.marginStatus} onChange={v => onUpdate({ marginStatus: v })} label="Rentabilidad" type="margin" /></div>
+                <div className="flex items-center justify-between text-xs text-slate-500">Carga del equipo <LevelBadge value={item.teamStrain} onChange={v => onUpdate({ teamStrain: v })} label="Carga del equipo" type="team" /></div>
+                <div><label className="text-xs text-slate-500">Riesgo principal</label><InlineText value={item.mainRisk} placeholder="Agregar riesgo" onSave={v => onUpdate({ mainRisk: v })} className="text-xs" /></div>
+                <button onClick={onRemove} className="text-xs text-red-500 inline-flex items-center gap-1.5"><Trash2 className="h-3 w-3" />{item.isCustom ? 'Eliminar tema' : 'Quitar del status'}</button>
+              </PopoverContent>
+            </Popover>
+          </div>
+        </div>
+        <h2 className="text-[26px] sm:text-[32px] font-semibold leading-tight tracking-tight text-slate-900 break-words [overflow-wrap:anywhere]">
+          {item.isCustom ? <InlineText value={item.title} placeholder="Título" required onSave={v => onUpdate({ title: v })} className="!p-0 !text-inherit !leading-tight" /> : item.title}
+        </h2>
+        {item.subtitle && <p className="text-sm text-slate-400 mt-2">{item.subtitle}</p>}
+        <div className="flex items-center flex-wrap gap-x-6 gap-y-3 mt-5 mb-7">
+          <HealthDot value={item.healthStatus} onChange={v => onUpdate({ healthStatus: v })} />
+          <OwnerSelect value={item.ownerId} name={item.ownerName} users={users} onChange={v => onUpdate({ ownerId: v })} />
+          <DeadlinePicker value={item.deadline} isOverdue={item.isOverdue} onChange={v => onUpdate({ deadline: v })} />
+          {dm(item.decisionNeeded).urgent && <DecisionBadge value={item.decisionNeeded} onChange={v => onUpdate({ decisionNeeded: v })} />}
+        </div>
+        <div role="tablist" aria-label="Contenido del tema" className="flex gap-7 border-b border-slate-100">
+          {(['overview', 'activity'] as const).map(value => <button key={value} id={`focus-tab-${value}`} role="tab" tabIndex={tab === value ? 0 : -1} aria-selected={tab === value} aria-controls={`focus-panel-${value}`}
+            onClick={() => setTab(value)} onKeyDown={event => { if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') { event.preventDefault(); setTab(value === 'overview' ? 'activity' : 'overview'); document.getElementById(`focus-tab-${value === 'overview' ? 'activity' : 'overview'}`)?.focus(); } }}
+            className={cn('inline-flex items-center gap-2 py-3 text-sm border-b-2 -mb-px transition-colors', tab === value ? 'border-slate-900 text-slate-900 font-medium' : 'border-transparent text-slate-400 hover:text-slate-700')}>
+            {value === 'overview' ? 'Estado actual' : 'Actividad'}
+            {value === 'activity' && item.noteCount > 0 && <span className="text-[11px] text-slate-400">{item.noteCount}</span>}
+            {value === 'activity' && hasUnread && <span aria-label="Actividad sin leer" className="h-1.5 w-1.5 rounded-full bg-indigo-500" />}
+          </button>)}
+        </div>
+      </div>
+    </div>
+    <div role="tabpanel" id={`focus-panel-${tab}`} aria-labelledby={`focus-tab-${tab}`} className={cn('flex-1 min-h-0 px-6 sm:px-10 lg:px-14', tab === 'overview' ? 'overflow-y-auto' : 'flex flex-col')}>
+      {tab === 'overview' ? <div className="max-w-4xl mx-auto py-8 space-y-8" data-testid="status-focus-content">
+        <InlineText value={item.currentAction} placeholder="Contá qué está pasando con este tema…" multiline rows={8} onSave={v => onUpdate({ currentAction: v })} className="text-[15px] leading-7 !px-0" />
+        {(item.updatedByName || item.updatedAt) && <p className="text-[11px] text-slate-400">{item.updatedByName && `Actualizado por ${item.updatedByName}`}{item.updatedAt && ` · ${shortDateTime(item.updatedAt)}`}</p>}
+        {item.mainRisk && <div className="border-l-2 border-amber-300 pl-4"><p className="text-xs text-slate-400 mb-1">Riesgo a seguir</p><StatusText className="text-sm text-slate-600">{item.mainRisk}</StatusText></div>}
+        {item.nextMilestone && <details className="text-sm text-slate-400"><summary className="cursor-pointer">Próximo paso anterior</summary><StatusText className="mt-3 text-slate-600">{item.nextMilestone}</StatusText></details>}
+        <ProposalSection projectId={item.projectId} customId={item.customId} currentUserId={currentUserId} />
+      </div> : <div className="max-w-4xl w-full mx-auto flex-1 min-h-0 py-4"><ActivityPanel embedded projectId={item.projectId} customItemId={item.customId} projectName={item.title} onClose={() => setTab('overview')} /></div>}
+    </div>
+  </div>;
 }
 
 // ─── Main page ────────────────────────────────────────────────────────────────
@@ -2909,7 +2788,7 @@ export default function StatusSemanalPage({ initialItemKey }: { initialItemKey?:
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const tag = (document.activeElement as HTMLElement)?.tagName;
-      const isInput = tag === 'INPUT' || tag === 'TEXTAREA' || (document.activeElement as HTMLElement)?.isContentEditable;
+      const isInput = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (document.activeElement as HTMLElement)?.isContentEditable;
 
       // El runner de la daily maneja sus propios atajos.
       if (dailyRun) return;
@@ -3251,8 +3130,8 @@ export default function StatusSemanalPage({ initialItemKey }: { initialItemKey?:
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const tag = (document.activeElement as HTMLElement)?.tagName;
-      const isInput = tag === 'INPUT' || tag === 'TEXTAREA' || (document.activeElement as HTMLElement)?.isContentEditable;
-      if (isInput || dailyRun) return;
+      const isInput = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (document.activeElement as HTMLElement)?.isContentEditable;
+      if (isInput || dailyRun || viewMode === 'list') return;
 
       const navKeys = ['j', 'k', 'J', 'K', 'ArrowDown', 'ArrowUp', 'e', 'E'];
       if (!navKeys.includes(e.key)) return;
@@ -3275,7 +3154,7 @@ export default function StatusSemanalPage({ initialItemKey }: { initialItemKey?:
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [kbFocusKey, flatNavItems, expandedKey, dailyRun]);
+  }, [kbFocusKey, flatNavItems, expandedKey, dailyRun, viewMode]);
 
   // ── Modo Daily: agenda del día ───────────────────────────────────────────────
   const { data: dailyStatus, refetch: refetchDailyStatus } = useQuery<DailyStatus>({
@@ -3400,28 +3279,40 @@ export default function StatusSemanalPage({ initialItemKey }: { initialItemKey?:
     ? `${openNotesProject.clientName || ''}${openNotesProject.quotationName ? ` · ${openNotesProject.quotationName}` : ''}`
     : openNotesCustom ? openNotesCustom.title : '';
 
-  const renderStatusCard = (item: Item, accent: 'red' | 'amber' | 'none', sortable = false) => {
-    const handlers = getItemHandlers(item);
-    const Card = sortable ? SortableStatusCard : StatusCard;
-    return (
-      <div key={item.key} id={`row-${item.key}`} className={cn("min-w-0", expandedKey === item.key && "col-span-full")}>
-        <Card item={item} users={appUsers} currentUserId={currentUserId} roomId={roomCtx?.roomId}
-          {...handlers}
-          isSelected={notesOpen !== null && (item.isCustom ? notesOpen.type === 'custom' && notesOpen.id === item.customId : notesOpen.type === 'project' && notesOpen.id === item.projectId)}
-          expanded={expandedKey === item.key} onToggle={() => setExpandedKey(expandedKey === item.key ? null : item.key)}
-          kbFocused={kbFocusKey === item.key} bulkMode={bulkMode} checked={selectedKeys.has(item.key)}
-          onCheck={value => setSelectedKeys(prev => { const next = new Set(prev); value ? next.add(item.key) : next.delete(item.key); return next; })}
-          accent={accent} />
-      </div>
-    );
-  };
-
   const isLoading = loadingProjects || loadingCustom;
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
       <div className={cn("flex flex-col flex-1 min-w-0 transition-all duration-200", notesOpen !== null ? "lg:mr-[360px]" : "")}>
 
+        {viewMode === 'list' ? (
+          <header className="shrink-0 border-b border-slate-200/70 bg-white px-5 sm:px-7 py-4 flex items-center justify-between flex-wrap gap-4">
+            <div className="flex items-center gap-4 min-w-0">
+              <a href="/review" aria-label="Volver a Status" className="text-slate-400 hover:text-slate-900"><ChevronLeft className="h-4 w-4" /></a>
+              <div className="min-w-0">
+                {roomCtx ? <RoomTitleEditor tone="light" roomId={roomCtx.roomId} name={roomCtx.room?.name || 'Status'} privacy={roomCtx.room?.privacy || 'members'} myRole={roomCtx.myRole} /> : <h1 className="text-base font-semibold text-slate-900">Status</h1>}
+                <p className="text-[11px] text-slate-400 mt-0.5">{currentWeekLabel}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <button onClick={() => startDaily()} className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-600 hover:text-slate-900"><Play className="h-3 w-3" /> Hacer la daily</button>
+              <span className="h-4 w-px bg-slate-200" />
+              <AddItemButton onAdd={d => createCustom.mutate(d)} users={appUsers} currentUserId={currentUserId} />
+              <Popover><PopoverTrigger asChild><button aria-label="Más acciones" className="text-slate-400 hover:text-slate-900 p-1"><MoreHorizontal className="h-4 w-4" /></button></PopoverTrigger>
+                <PopoverContent align="end" className="w-52 p-1">
+                  {roomCtx?.isOwner && <button onClick={() => setAddProjectDialogOpen(true)} className="w-full text-left px-3 py-2 rounded text-xs hover:bg-slate-50">Agregar proyecto</button>}
+                  {roomCtx && <button onClick={() => setMembersDialogOpen(true)} className="w-full text-left px-3 py-2 rounded text-xs hover:bg-slate-50">Participantes</button>}
+                  <button onClick={() => setViewMode('daily')} className="w-full text-left px-3 py-2 rounded text-xs hover:bg-slate-50">Agenda de la daily</button>
+                  <button onClick={() => setViewMode('timeline')} className="w-full text-left px-3 py-2 rounded text-xs hover:bg-slate-50">Ver timeline</button>
+                  <button onClick={() => { setViewMode('daily'); setAiPopoverOpen(true); }} className="w-full text-left px-3 py-2 rounded text-xs hover:bg-slate-50">Resumen IA</button>
+                  <button onClick={() => setShowExport(true)} className="w-full text-left px-3 py-2 rounded text-xs hover:bg-slate-50">Exportar semana</button>
+                  <button onClick={() => { setBulkMode(v => !v); setSelectedKeys(new Set()); }} className="w-full text-left px-3 py-2 rounded text-xs hover:bg-slate-50">{bulkMode ? 'Salir de selección' : 'Seleccionar varios'}</button>
+                  <button onClick={() => setShowKbHelp(v => !v)} className="w-full text-left px-3 py-2 rounded text-xs hover:bg-slate-50">Atajos de teclado</button>
+                </PopoverContent>
+              </Popover>
+            </div>
+          </header>
+        ) : <>
         {/* ── Header ────────────────────────────────────────────── */}
         <div className="relative overflow-hidden border-b border-border shrink-0">
           <div className="absolute inset-0 bg-gradient-to-r from-indigo-600 via-indigo-700 to-violet-700" />
@@ -3669,6 +3560,8 @@ export default function StatusSemanalPage({ initialItemKey }: { initialItemKey?:
           </div>
         </div>
 
+        </>}
+
         {/* ── Confirm Delete Dialog ──────────────────────────────── */}
         {confirmDelete && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm" onClick={() => setConfirmDelete(null)}>
@@ -3785,146 +3678,36 @@ export default function StatusSemanalPage({ initialItemKey }: { initialItemKey?:
               );
             })()
           ) : (
-            <>
-
-              <div className="flex-1 min-w-0 overflow-y-auto bg-slate-50/70" data-testid="status-list">
-              <div className="max-w-[1440px] mx-auto px-4 py-6 sm:px-6 space-y-8">
-                {alertItems.length > 0 && (
-                  <section aria-labelledby="status-attention-title">
-                    <div className="flex items-center gap-2 mb-3">
-                      <AlertTriangle className="h-4 w-4 text-red-500 shrink-0" />
-                      <h2 id="status-attention-title" className="text-sm font-semibold text-slate-800">Para atender</h2>
-                      <span className="rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700">{alertItems.length}</span>
-                      <div className="flex-1" />
-                      <AddItemButton variant="inline" onAdd={d => createCustom.mutate(d)} users={appUsers} currentUserId={currentUserId} />
-                    </div>
-                    <div data-testid="status-attention-grid" className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,320px),1fr))] items-start gap-4">
-                      {alertItems.map(item => renderStatusCard(item, item.isOverdue || item.healthStatus === 'rojo' ? 'red' : 'amber'))}
-                    </div>
-                  </section>
-                )}
-                {decisionItems.length > 0 && (
-                  <section aria-labelledby="status-decisions-title">
-                    <div className="flex items-center gap-2 mb-3">
-                      <Zap className="h-4 w-4 text-amber-500 shrink-0" />
-                      <h2 id="status-decisions-title" className="text-sm font-semibold text-slate-800">Decisiones pendientes</h2>
-                      <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">{decisionItems.length}</span>
-                    </div>
-                    <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,320px),1fr))] items-start gap-4">
-                      {decisionItems.map(item => renderStatusCard(item, 'amber'))}
-                    </div>
-                  </section>
-                )}
-
-              {/* ── En curso ───────────────────────────────────────── */}
-              <div>
-                <div className="flex items-center gap-2 mb-3">
-                  <span className="text-sm font-semibold text-slate-700">En curso</span>
-                  <span className="text-sm font-bold text-slate-400">{normalItems.length}</span>
-                  {(() => { const sc = normalItems.filter(i => isStale(i.updatedAt)).length; return sc > 0 ? (
-                    <span className="text-xs font-medium text-amber-500 bg-amber-50 border border-amber-100 rounded-full px-2 py-0.5">{sc} sin update</span>
-                  ) : null; })()}
-                  <div className="flex-1" />
-                  <AddItemButton variant="inline" onAdd={d => createCustom.mutate(d)} users={appUsers} currentUserId={currentUserId} />
-                  {expandedKey && (
-                    <button onClick={() => setExpandedKey(null)} className="text-[10px] text-slate-400 hover:text-slate-600 font-medium">colapsar</button>
-                  )}
+            <StatusFocusWorkspace
+              groups={[
+                { key: 'attention', label: 'Para atender', items: alertItems },
+                { key: 'decisions', label: 'Decisiones pendientes', items: decisionItems },
+                { key: 'progress', label: 'En curso', items: sortedNormalItems, sortable: true },
+                ...(showHidden ? [{ key: 'resolved', label: 'Resueltos', items: allItems.filter(item => item.hiddenFromWeekly) }] : []),
+              ]}
+              selectedKey={expandedKey}
+              onSelect={key => { setExpandedKey(key); setNotesOpen(null); }}
+              onReorder={(active, over) => {
+                const keys = sortedNormalItems.map(item => item.key);
+                const from = keys.indexOf(active), to = keys.indexOf(over);
+                if (from >= 0 && to >= 0) setNormalOrder(arrayMove(keys, from, to));
+              }}
+              search={<div className="flex items-center gap-2">
+                <div className="relative flex-1 min-w-0"><Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400" />
+                  <input ref={searchInputRef} aria-label="Buscar tema o responsable" value={searchQuery} onChange={event => setSearchQuery(event.target.value)} placeholder="Buscar un tema…" className="w-full rounded-lg border border-slate-200 bg-white py-2 pl-8 pr-3 text-xs text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-100" />
                 </div>
-                {normalItems.length === 0 ? (
-                  <div className="flex items-center gap-2 py-2.5 px-3 rounded-lg border border-dashed border-slate-200 bg-slate-50 text-slate-400">
-                    <span className="text-xs">Sin ítems en curso</span>
-                  </div>
-                ) : (
-                  <DndContext
-                    collisionDetection={closestCenter}
-                    onDragStart={(event: DragStartEvent) => setDragActiveId(event.active.id as string)}
-                    onDragEnd={(event: DragEndEvent) => {
-                      setDragActiveId(null);
-                      const { active, over } = event;
-                      if (over && active.id !== over.id) {
-                        setNormalOrder(() => {
-                          const keys = sortedNormalItems.map(i => i.key);
-                          const oldIdx = keys.indexOf(active.id as string);
-                          const newIdx = keys.indexOf(over.id as string);
-                          if (oldIdx < 0 || newIdx < 0) return keys;
-                          return arrayMove(keys, oldIdx, newIdx);
-                        });
-                      }
-                    }}
-                  >
-                    <SortableContext items={sortedNormalItems.map(i => i.key)} strategy={rectSortingStrategy}>
-                      <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,320px),1fr))] items-start gap-4">
-                        {sortedNormalItems.map(item => renderStatusCard(item, 'none', true))}
-                      </div>
-                    </SortableContext>
-                    <DragOverlay>
-                      {dragActiveId && (() => {
-                        const item = sortedNormalItems.find(i => i.key === dragActiveId);
-                        if (!item) return null;
-                        return (
-                          <div className="bg-white border border-indigo-300 shadow-lg rounded-lg px-4 py-2 opacity-90">
-                            <span className="text-sm font-medium text-slate-700">{item.title}</span>
-                          </div>
-                        );
-                      })()}
-                    </DragOverlay>
-                  </DndContext>
-                )}
-              </div>
-
-              {/* Toggle visible cuando hay items resueltos — fácil acceso para
-                   recuperar algo si lo resolviste sin querer */}
-              {hiddenCount > 0 && (
-                <div className="flex justify-center pt-1">
-                  <button onClick={() => setShowHidden(v => !v)}
-                    className="flex items-center gap-1.5 text-[11px] text-slate-400 hover:text-slate-700 transition-colors">
-                    {showHidden ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
-                    {showHidden ? 'Ocultar' : 'Ver'} {hiddenCount} resuelto{hiddenCount === 1 ? '' : 's'}
-                  </button>
-                </div>
-              )}
-
-
-              {/* ── Quitados ───────────────────────────────────────── */}
-              {showHidden && hiddenCount > 0 && (
-                <div>
-                  <div className="flex items-center gap-2 mb-3">
-                    <EyeOff className="h-4 w-4 text-slate-300" />
-                    <h2 className="text-base font-bold text-slate-400">Quitados del status</h2>
-                    <span className="text-xs font-semibold bg-slate-100 text-slate-400 border-slate-200 px-2 py-0.5 rounded-full border">{hiddenCount}</span>
-                  </div>
-                  <div className="rounded-xl border border-dashed border-slate-200 overflow-hidden opacity-60">
-                    <AnimatePresence initial={false}>
-                      {allItems.filter(i => i.hiddenFromWeekly).map(item => {
-                        const h = getItemHandlers(item);
-                        return (
-                          <motion.div key={item.key} layout
-                            initial={{ opacity: 0, height: 0 }}
-                            animate={{ opacity: 1, height: 'auto' }}
-                            exit={{ opacity: 0, height: 0 }}
-                            transition={{ duration: 0.15, ease: 'easeOut' }}
-                            className="flex items-center gap-3 px-4 py-2.5 border-b border-slate-100 last:border-0 hover:bg-slate-50 overflow-hidden">
-                            <div className={cn("w-2.5 h-2.5 rounded-full shrink-0", hm(item.healthStatus).dot)} />
-                            <span className="flex-1 text-sm text-slate-500">{item.title}{item.subtitle && ` · ${item.subtitle}`}</span>
-                            <button onClick={() => h.onUpdate({ hiddenFromWeekly: false })}
-                              className="flex items-center gap-1 text-xs text-indigo-500 hover:text-indigo-700 font-medium">
-                              <Eye className="h-3.5 w-3.5" /> Restaurar
-                            </button>
-                            {item.isCustom && (
-                              <button onClick={h.onRemove} className="flex items-center gap-1 text-xs text-red-400 hover:text-red-600 font-medium ml-2">
-                                <Trash2 className="h-3.5 w-3.5" /> Eliminar
-                              </button>
-                            )}
-                          </motion.div>
-                        );
-                      })}
-                    </AnimatePresence>
-                  </div>
-                </div>
-              )}
-              </div>
-              </div>
-            </>
+                <Popover><PopoverTrigger asChild><button aria-label="Filtrar temas" className={cn('p-2 rounded-lg hover:bg-slate-200/50', filterHealth || filterOwner !== null ? 'text-indigo-600 bg-indigo-50' : 'text-slate-400')}><Filter className="h-3.5 w-3.5" /></button></PopoverTrigger>
+                  <PopoverContent align="start" className="w-60 space-y-4">
+                    <label className="block text-xs text-slate-500 space-y-1"><span>Estado</span><select value={filterHealth ?? ''} onChange={event => setFilterHealth(event.target.value || null)} className="w-full border border-slate-200 rounded-md p-2 bg-white"><option value="">Todos</option>{Object.entries(HEALTH).map(([key, health]) => <option key={key} value={key}>{health.label}</option>)}</select></label>
+                    <label className="block text-xs text-slate-500 space-y-1"><span>Responsable</span><select value={filterOwner?.toString() ?? ''} onChange={event => setFilterOwner(event.target.value ? Number(event.target.value) : null)} className="w-full border border-slate-200 rounded-md p-2 bg-white"><option value="">Todos</option>{appUsers.map(user => <option key={user.id} value={user.id}>{user.name}</option>)}</select></label>
+                    <button onClick={() => { setSearchQuery(''); setFilterHealth(null); setFilterOwner(null); }} className="text-xs text-indigo-600">Limpiar filtros</button>
+                  </PopoverContent>
+                </Popover>
+              </div>}
+              renderSelection={bulkMode ? item => <input type="checkbox" aria-label={`Seleccionar ${item.title}`} checked={selectedKeys.has(item.key)} onChange={event => setSelectedKeys(prev => { const next = new Set(prev); event.target.checked ? next.add(item.key) : next.delete(item.key); return next; })} className="ml-1 accent-indigo-600" /> : undefined}
+              footer={hiddenCount > 0 ? <button onClick={() => setShowHidden(value => !value)} className="flex items-center gap-2 text-xs text-slate-400 hover:text-slate-700"><Eye className="h-3.5 w-3.5" />{showHidden ? 'Ocultar resueltos' : `${hiddenCount} temas resueltos`}</button> : undefined}
+              renderDetail={item => <StatusFocusDetail key={item.key} item={item} users={appUsers} currentUserId={currentUserId} roomId={roomCtx?.roomId} {...getItemHandlers(item)} />}
+            />
           )}
         </div>
       </div>
@@ -4151,9 +3934,9 @@ export default function StatusSemanalPage({ initialItemKey }: { initialItemKey?:
               {[
                 ['J / ↓', 'Siguiente ítem'],
                 ['K / ↑', 'Ítem anterior'],
-                ['E', 'Expandir / colapsar'],
+                [viewMode === 'list' ? 'Enter' : 'E', viewMode === 'list' ? 'Abrir tema' : 'Expandir / colapsar'],
                 ['/', 'Enfocar búsqueda'],
-                ['Esc', 'Colapsar / cerrar'],
+                ['Esc', 'Cerrar diálogo'],
                 ['?', 'Mostrar esta ayuda'],
                 ['— Daily —', ''],
                 ['⏎', 'Guardar y siguiente'],
