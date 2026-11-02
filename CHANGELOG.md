@@ -5,6 +5,7 @@
 - El historial completo incluye los updates que ya contaba la tarjeta, además de comentarios y cambios de campos, con texto completo, formato, autor y fecha. Pruebas para proyectos y temas propios verifican siete entradas de ambos autores sin perder las que comparten ID.
 - Status presenta un índice de temas y un único tema abierto para reducir la repetición de contenido. El índice conserva prioridades, búsqueda, filtros y reordenado de temas en curso; el área de lectura muestra Estado actual y Actividad en pestañas separadas, con acciones secundarias en un menú. La cabecera es neutra y los avisos sin leer usan un indicador discreto.
 - En móvil se alterna entre índice y detalle con regreso a todos los temas. El primer tema disponible se abre automáticamente en escritorio; filtrar o resolver el tema seleccionado elige otro disponible. Títulos largos pueden ocupar varias líneas y el editor del estado conserva su campo amplio y redimensionable.
+- Las salas de Status se integran en el área de contenido de Mind, debajo de la barra superior y junto al menú general, con alto disponible y desplazamiento interno de índice y detalle.
 - Regresiones con 22 temas prioritarios y tres en curso comprueban que cada tema figure una sola vez en el índice y solo se renderice un contenido completo. Cobertura de selección inicial, selección existente, filtros, temas resueltos y resultados vacíos.
 
 ## 1.14.18 — 2026-11-02

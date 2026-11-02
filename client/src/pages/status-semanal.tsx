@@ -3282,7 +3282,7 @@ export default function StatusSemanalPage({ initialItemKey }: { initialItemKey?:
   const isLoading = loadingProjects || loadingCustom;
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
+    <div className="flex flex-1 min-h-0 h-full overflow-hidden bg-background">
       <div className={cn("flex flex-col flex-1 min-w-0 transition-all duration-200", notesOpen !== null ? "lg:mr-[360px]" : "")}>
 
         {viewMode === 'list' ? (
