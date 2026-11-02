@@ -202,6 +202,7 @@ function AppRoutes() {
   // so global theme classes cannot leak into the topbar or page content.
   const [location] = useLocation();
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const isReviewRoom = /^\/review\/\d+(?:\/|$)/.test(location);
 
   useEffect(() => {
     document.title = "mind";
@@ -248,8 +249,8 @@ function AppRoutes() {
 
           <div className="flex min-h-0 flex-col flex-1 overflow-clip min-w-0">
             <Topbar onMenuClick={() => setMobileSidebarOpen(true)} />
-            <main className="app-main flex-1 overflow-y-auto overflow-x-hidden">
-              <div className="app-content max-w-full p-3 sm:p-5 lg:p-6">
+            <main className={isReviewRoom ? "app-main flex-1 min-h-0 flex flex-col overflow-hidden" : "app-main flex-1 overflow-y-auto overflow-x-hidden"}>
+              <div className={isReviewRoom ? "app-content status-room-content max-w-full" : "app-content max-w-full p-3 sm:p-5 lg:p-6"}>
                 <Suspense fallback={<AppRouteFallback />}>
                 <Switch>
                   {/* Unauthorized */}

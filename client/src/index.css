@@ -1772,6 +1772,14 @@ body {
   min-width: 0;
 }
 
+.app-content.status-room-content {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  padding: 0;
+}
+
 .app-content > * {
   min-width: 0;
   max-width: 100%;

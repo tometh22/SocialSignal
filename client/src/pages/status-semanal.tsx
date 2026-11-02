@@ -13,6 +13,7 @@ import MembersDialog from "@/components/review/MembersDialog";
 import AddProjectDialog from "@/components/review/AddProjectDialog";
 import AddItemButton, { type NewItemInput } from "@/components/review/AddStatusItemButton";
 import StatusText from "@/components/review/StatusText";
+import StatusFocusWorkspace from "@/components/review/StatusFocusWorkspace";
 import DailyStatusEditor from "@/components/review/DailyStatusEditor";
 import { useAutoResize } from "@/hooks/use-auto-resize-textarea";
 import RoomTitleEditor from "@/components/review/RoomTitleEditor";
@@ -35,7 +36,6 @@ import {
   Shield, Target, RefreshCw, Lightbulb, ArrowRight,
   Calendar, Clock, Search, Filter, GripVertical,
   Printer, List, LayoutList, HelpCircle, CheckSquare, Square,
-  PanelLeftOpen, PanelLeftClose,
   Paperclip, FileText, Link2, XCircle, Film, FileCheck2,
   Play, Copy, Check, Flame, Sun,
 } from "lucide-react";
@@ -44,7 +44,7 @@ import {
   type DragStartEvent, type DragEndEvent
 } from "@dnd-kit/core";
 import {
-  SortableContext, verticalListSortingStrategy, useSortable, arrayMove
+  SortableContext, useSortable, arrayMove
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 
@@ -196,6 +196,7 @@ type DailySession = {
 
 type ActivityEntry =
   | { type: 'note'; id: number; content: string; authorId: number | null; authorName: string | null; createdAt: string }
+  | { type: 'update'; id: number; content: string; authorId: number | null; authorName: string | null; createdAt: string }
   | { type: 'change'; id: number; userId: number | null; userName: string | null; fieldName: string; oldValue: string | null; newValue: string | null; createdAt: string };
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -455,9 +456,9 @@ function MentionInput({ value, onChange, onKeyDown, placeholder, className, user
 
 // ─── Inline editor ────────────────────────────────────────────────────────────
 
-function InlineText({ value, placeholder, onSave, multiline = false, className = '', required = false }: {
+function InlineText({ value, placeholder, onSave, multiline = false, className = '', required = false, rows = 1 }: {
   value: string | null; placeholder: string; onSave: (v: string) => void;
-  multiline?: boolean; className?: string; required?: boolean;
+  multiline?: boolean; className?: string; required?: boolean; rows?: number;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value ?? '');
@@ -484,7 +485,7 @@ function InlineText({ value, placeholder, onSave, multiline = false, className =
               if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); save(); }
               if (e.key === 'Escape') { setDraft(value ?? ''); setEditing(false); }
             }}
-            className={cls} rows={1} />
+            className={cls} rows={rows} />
           <p className="text-[9px] text-slate-400 mt-0.5">Ctrl+Enter para guardar · Esc para cancelar</p>
         </>
       )
@@ -495,7 +496,8 @@ function InlineText({ value, placeholder, onSave, multiline = false, className =
 
   const Container = multiline ? "div" : "span";
   return (
-    <Container onClick={() => setEditing(true)}
+    <Container role="button" tabIndex={0} onClick={() => setEditing(true)}
+      onKeyDown={event => { if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); setEditing(true); } }}
       className={cn(
         "group cursor-text rounded-md px-1.5 py-1 transition-all min-h-[26px] gap-1 w-full",
         multiline ? "flex items-start" : "inline-flex items-center",
@@ -1311,7 +1313,7 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
       kbFocused && "outline outline-2 outline-indigo-300 outline-offset-[-2px]"
     )}>
       {/* Main row */}
-      <div className={cn("flex items-center gap-3 pl-4 pr-5 cursor-pointer", hideSubtitle ? "py-2.5" : "py-3.5")} onClick={onToggle}>
+      <div className={cn("flex items-start gap-3 pl-4 pr-5 cursor-pointer max-sm:flex-wrap", hideSubtitle ? "py-2.5" : "py-3.5")} onClick={onToggle}>
         {dragHandleProps && (
           <div {...dragHandleProps} className="shrink-0 cursor-grab text-slate-200 hover:text-slate-400 touch-none opacity-0 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
             <GripVertical className="h-3.5 w-3.5" />
@@ -1326,10 +1328,10 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
           <HealthDot value={item.healthStatus} onChange={v => onUpdate({ healthStatus: v })} compact />
         </div>
 
-        <div className="flex-1 min-w-0">
-          <div className="flex items-baseline gap-2 min-w-0">
+        <div className="flex-1 min-w-0 max-sm:basis-[calc(100%-3rem)]">
+          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 min-w-0">
             {item.isCustom && <Tag className="h-3 w-3 text-slate-300 shrink-0 self-center" />}
-            <span className="font-medium text-[14px] tracking-tight text-slate-900 truncate" title={item.title}>{item.title}</span>
+            <span className="font-medium text-[14px] tracking-tight text-slate-900 break-words [overflow-wrap:anywhere]" title={item.title}>{item.title}</span>
             {item.subtitle && <span className="text-slate-400 text-[12px] truncate hidden md:block min-w-0" title={item.subtitle}>{item.subtitle}</span>}
             {item.pendingProposalVersion != null && (
               <span className="shrink-0 self-center inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-md border bg-violet-50 text-violet-700 border-violet-200" title="Hay una propuesta pendiente de aprobación">
@@ -1368,7 +1370,7 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
           )}
         </div>
 
-        <div className="flex items-center gap-1.5 shrink-0 ml-2" onClick={e => e.stopPropagation()}>
+        <div className="flex flex-wrap items-center gap-1.5 shrink-0 ml-2 max-sm:ml-7 max-sm:max-w-[calc(100%-1.75rem)]" onClick={e => e.stopPropagation()}>
           {/* Always-visible controls — accessible on touch devices */}
           {decMeta.urgent && (
             <DecisionBadge value={item.decisionNeeded} onChange={v => onUpdate({ decisionNeeded: v })} />
@@ -1379,13 +1381,13 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
           {handleOpenNotes && item.noteCount > 0 && (
             <button onClick={handleOpenNotes}
               className={cn(
-                "relative flex items-center gap-1 rounded-md transition-colors",
+                "relative inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md transition-colors",
                 hasUnread
                   ? "px-2 py-1 bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm font-medium"
                   : "px-1.5 py-0.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100"
               )}
               title={hasUnread ? "Comentarios sin leer" : "Ver historial de comentarios"}>
-              <MessageSquare className={cn(hasUnread ? "h-3.5 w-3.5" : "h-3 w-3")} />
+              <MessageSquare className={cn("shrink-0", hasUnread ? "h-3.5 w-3.5" : "h-3 w-3")} />
               <span className={cn("font-medium", hasUnread ? "text-[11px]" : "text-[10px]")}>
                 {hasUnread ? `Nuevo · ${item.noteCount}` : item.noteCount}
               </span>
@@ -1577,6 +1579,9 @@ function ItemThread({ projectId, customId, currentUserId, users = [], onOpenFull
     mutationFn: (content: string) => mutationFetch(notesUrl, 'POST', { content }),
     onSuccess: () => {
       queryClient.refetchQueries({ queryKey: notesCacheKey });
+      queryClient.refetchQueries({ queryKey: projectId
+        ? ['/api/status-semanal', projectId, 'activity']
+        : ['/api/status-semanal/custom', customId, 'activity'] });
       queryClient.refetchQueries({ queryKey: ['/api/status-semanal?includeHidden=true'] });
       if (customId) queryClient.refetchQueries({ queryKey: ['/api/status-semanal/custom?includeHidden=true'] });
     },
@@ -1725,178 +1730,6 @@ function SortableCompactRow(props: React.ComponentProps<typeof CompactRow>) {
   );
 }
 
-// ─── AlertSidebarCard — expandable card for CEO/COO sidebar ─────────────────
-function AlertSidebarCard({ item, accent, currentUserId, roomId, onUpdate, expanded, onToggle, users, onOpenNotes, onRemove, onResolve, bulkMode, checked, onCheck }: {
-  item: Item; accent: 'red' | 'amber'; currentUserId?: number | null; roomId?: number;
-  onUpdate: (d: Record<string, any>) => void;
-  expanded?: boolean; onToggle?: () => void; onResolve?: () => void;
-  users?: AppUser[]; onOpenNotes?: () => void; onRemove?: () => void;
-  bulkMode?: boolean; checked?: boolean; onCheck?: (v: boolean) => void;
-}) {
-  const accentBorder = accent === 'red' ? 'border-l-red-500' : 'border-l-amber-400';
-  const accentBg = accent === 'red' ? 'bg-red-50/40' : 'bg-amber-50/40';
-  const { hasUnread, markAsRead } = useUnreadComments(item, roomId);
-  useEffect(() => { if (expanded && hasUnread) markAsRead(); }, [expanded, hasUnread, markAsRead]);
-  const handleOpenNotes = onOpenNotes ? () => { markAsRead(); onOpenNotes(); } : undefined;
-  return (
-    <div className={cn(
-      "border-l-[3px] transition-colors",
-      accentBorder,
-      expanded ? accentBg : hasUnread ? "bg-indigo-50/30 hover:bg-indigo-50/60" : "hover:bg-slate-50/60"
-    )}>
-      {/* Clickable header */}
-      <div className={cn("px-3 py-2.5 cursor-pointer")} onClick={onToggle}>
-        <div className="flex items-start gap-2">
-          {bulkMode && (
-            <div className="shrink-0 mt-0.5" onClick={e => { e.stopPropagation(); onCheck?.(!checked); }}>
-              {checked ? <CheckSquare className="h-4 w-4 text-indigo-500" /> : <Square className="h-4 w-4 text-slate-300" />}
-            </div>
-          )}
-          <div className="shrink-0 mt-0.5" onClick={e => e.stopPropagation()}>
-            <HealthDot value={item.healthStatus} onChange={v => onUpdate({ healthStatus: v })} compact />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-1.5">
-              {item.isCustom && <Tag className="h-3 w-3 text-indigo-400 shrink-0" />}
-              <p className="font-semibold text-[13px] leading-snug text-slate-900 break-words flex-1">{item.title}</p>
-              <ItemShareButton item={item} roomId={roomId} />
-              <ChevronDown className={cn("h-3 w-3 text-slate-300 shrink-0 transition-transform", !expanded && "-rotate-90")} />
-            </div>
-            {!expanded && item.currentAction && (
-              <StatusText className="text-[11px] text-slate-500 mt-0.5 line-clamp-3">{item.currentAction}</StatusText>
-            )}
-            {/* Owner + deadline + notes meta row — only shown collapsed; the
-                 expanded view has owner/deadline editable in the footer, so
-                 repeating them here is redundant. */}
-            {!expanded && (
-              <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                {item.ownerName && (
-                  <div className="flex items-center gap-1">
-                    <div className="h-4 w-4 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-[8px] font-bold shrink-0">
-                      {initials(item.ownerName)}
-                    </div>
-                    <span className="text-[10px] text-slate-400">{item.ownerName.split(' ')[0]}</span>
-                  </div>
-                )}
-                {item.deadline && (
-                  <span className={cn("text-[10px] font-medium", item.isOverdue ? "text-red-500" : "text-slate-400")}>
-                    {deadlineLabel(item.deadline)}
-                  </span>
-                )}
-                {item.noteCount > 0 && (
-                  <span className={cn(
-                    "inline-flex items-center gap-1 text-[10px]",
-                    hasUnread ? "text-indigo-600 font-medium" : "text-slate-400"
-                  )}>
-                    <MessageSquare className="h-3 w-3" />
-                    {hasUnread ? `Nuevo · ${item.noteCount}` : item.noteCount}
-                  </span>
-                )}
-              </div>
-            )}
-            {!expanded && hasUnread && item.lastNoteContent && (
-              <button
-                type="button"
-                onClick={e => { e.stopPropagation(); handleOpenNotes?.(); }}
-                className="mt-1.5 flex items-center gap-1.5 w-full text-left rounded-md px-2 py-1 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 transition-colors"
-                title="Ver comentarios"
-              >
-                <MessageSquare className="h-3 w-3 text-indigo-600 shrink-0" />
-                <span className="text-[10px] font-semibold text-indigo-700 shrink-0">
-                  {item.lastNoteAuthorName?.split(' ')[0] ?? 'Comentario'}:
-                </span>
-                <span className="text-[11px] text-indigo-900/80 italic truncate flex-1 min-w-0">
-                  {item.lastNoteContent}
-                </span>
-                {item.lastNoteAt && (
-                  <span className="text-[10px] text-indigo-400 shrink-0">{relTime(item.lastNoteAt)}</span>
-                )}
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Expanded detail panel */}
-      <AnimatePresence>
-        {expanded && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.16, ease: [0.4, 0, 0.2, 1] }}
-            className="overflow-hidden">
-            <div className="px-3 pb-3 space-y-3.5" onClick={e => e.stopPropagation()}>
-              {/* Risk — present only when set, kept neutral */}
-              {item.mainRisk && (
-                <div className="flex items-start gap-1.5">
-                  <Shield className="h-3 w-3 text-slate-400 shrink-0 mt-0.5" />
-                  <InlineText value={item.mainRisk} placeholder="Riesgo principal" onSave={v => onUpdate({ mainRisk: v })} className="text-[12px] text-slate-600 leading-snug" />
-                </div>
-              )}
-
-              {/* Estado actual */}
-              <div>
-                <p className="text-[10px] text-slate-400 mb-0.5">Estado actual</p>
-                <InlineText value={item.currentAction} placeholder="¿Qué está pasando?" onSave={v => onUpdate({ currentAction: v })} multiline className="text-[12px] text-slate-700 leading-relaxed" />
-              </div>
-
-              {item.nextMilestone && <details className="text-xs text-slate-500"><summary className="cursor-pointer">Próximo paso anterior</summary><StatusText className="mt-1">{item.nextMilestone}</StatusText></details>}
-
-              {/* Comentarios — flat composer, no eyebrow, no colored bg */}
-              <div>
-                <ItemThread
-                  projectId={item.projectId}
-                  customId={item.customId}
-                  currentUserId={currentUserId}
-                  users={users}
-                  onOpenFull={handleOpenNotes}
-                  compact
-                />
-                {handleOpenNotes && item.noteCount > 1 && (
-                  <button onClick={handleOpenNotes}
-                    className="mt-1 flex items-center gap-0.5 text-[10px] text-slate-400 hover:text-slate-600 transition-colors">
-                    Ver historial · {item.noteCount}
-                    <ChevronRight className="h-2.5 w-2.5" />
-                  </button>
-                )}
-              </div>
-
-              {/* Proposal */}
-              <ProposalSection projectId={item.projectId} customId={item.customId} currentUserId={currentUserId} />
-
-              {/* Footer — minimal */}
-              <div className="flex items-center gap-2 flex-wrap">
-                {users && <OwnerSelect value={item.ownerId} name={item.ownerName} onChange={v => onUpdate({ ownerId: v })} users={users} />}
-                <DeadlinePicker value={item.deadline} isOverdue={item.isOverdue} onChange={v => onUpdate({ deadline: v })} />
-                {item.decisionNeeded && item.decisionNeeded !== 'ninguna' && (
-                  <DecisionBadge value={item.decisionNeeded} onChange={v => onUpdate({ decisionNeeded: v })} />
-                )}
-                <div className="flex-1" />
-                {onResolve && (
-                  <button onClick={onResolve}
-                    className="flex items-center gap-1 text-[11px] text-emerald-600 hover:text-emerald-700 transition-colors">
-                    <CheckCircle2 className="h-3 w-3" />
-                    Resolver
-                  </button>
-                )}
-                {onRemove && (
-                  <button onClick={onRemove}
-                    className="p-1 rounded text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors"
-                    title={item.isCustom ? "Eliminar" : "Quitar"}>
-                    <Trash2 className="h-3 w-3" />
-                  </button>
-                )}
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-}
-
-// ─── DecisionSidebarCard — expandable card for decisions sidebar ─────────────
 function DecisionSidebarCard({ item, currentUserId, roomId, expanded, onToggle, users, onUpdate, onOpenNotes, onRemove, onResolve, bulkMode, checked, onCheck }: {
   item: Item; currentUserId?: number | null; roomId?: number;
   expanded?: boolean; onToggle?: () => void;
@@ -2096,7 +1929,7 @@ function formatChangeValue(fieldName: string, value: string | null): string {
 
 // ─── Activity panel (unified timeline: notes + changes) ─────────────────────
 
-function ActivityPanel({ projectId, customItemId, projectName, onClose }: { projectId?: number; customItemId?: number; projectName: string; onClose: () => void }) {
+export function ActivityPanel({ projectId, customItemId, projectName, onClose, embedded = false }: { projectId?: number; customItemId?: number; projectName: string; onClose: () => void; embedded?: boolean }) {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const { toast } = useToast();
@@ -2123,10 +1956,34 @@ function ActivityPanel({ projectId, customItemId, projectName, onClose }: { proj
     ? ['/api/status-semanal', projectId, 'activity']
     : ['/api/status-semanal/custom', customItemId, 'activity'];
 
-  const { data: timeline = [], isLoading } = useQuery<ActivityEntry[]>({
+  const { data: activity = [], isLoading: activityLoading, isError: activityError } = useQuery<ActivityEntry[]>({
     queryKey: activityCacheKey,
-    queryFn: async () => { const r = await authFetch(activityUrl); return r.json(); },
+    queryFn: async () => {
+      const r = await authFetch(activityUrl);
+      if (!r.ok) throw new Error('Error al obtener actividad');
+      return r.json();
+    },
   });
+  // The compact thread counts notes AND updates. Read the same update query here
+  // so opening its history includes all counted entries, not just field changes.
+  const { data: updates = [], isLoading: updatesLoading, isError: updatesError } = useQuery<UpdateEntry[]>({
+    queryKey: projectId
+      ? ['/api/status-semanal', projectId, 'updates']
+      : ['/api/status-semanal/custom', customItemId, 'updates'],
+    queryFn: async () => {
+      const r = await authFetch(projectId
+        ? `/api/status-semanal/${projectId}/updates`
+        : `/api/status-semanal/custom/${customItemId}/updates`);
+      if (!r.ok) throw new Error('Error al obtener updates');
+      return r.json();
+    },
+  });
+  const timeline: ActivityEntry[] = [
+    ...activity,
+    ...updates.map(entry => ({ ...entry, type: 'update' as const })),
+  ].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+  const isLoading = activityLoading || updatesLoading;
+  const hasError = activityError || updatesError;
 
   const addMutation = useMutation({
     mutationFn: (content: string) => mutationFetch(notesUrl, 'POST', { content }),
@@ -2165,34 +2022,36 @@ function ActivityPanel({ projectId, customItemId, projectName, onClose }: { proj
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex items-center justify-between px-3 py-2 border-b border-border shrink-0 bg-slate-50/80">
+      {!embedded && <div className="flex items-center justify-between px-3 py-2 border-b border-border shrink-0 bg-slate-50/80">
         <div className="flex items-center gap-1.5 min-w-0">
           <ClipboardList className="h-3.5 w-3.5 text-indigo-500 shrink-0" />
           <p className="text-xs font-semibold truncate">{projectName}</p>
           <span className="text-[10px] text-muted-foreground shrink-0">Actividad</span>
         </div>
         <button onClick={onClose} className="p-0.5 hover:bg-accent rounded text-muted-foreground shrink-0"><X className="h-3.5 w-3.5" /></button>
-      </div>
+      </div>}
 
-      <div className="flex-1 overflow-y-auto px-3 py-2 space-y-1.5">
+      <div className={cn("flex-1 overflow-y-auto", embedded ? "px-0 py-4 space-y-5" : "px-3 py-2 space-y-1.5")}>
         {isLoading && <div className="flex justify-center py-6"><Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /></div>}
-        {!isLoading && timeline.length === 0 && (
+        {hasError && <p role="alert" className="text-xs text-red-600 py-2">No se pudo cargar todo el historial. Volvé a abrirlo para reintentar.</p>}
+        {!isLoading && !hasError && timeline.length === 0 && (
           <div className="flex flex-col items-center justify-center py-8 text-center">
             <ClipboardList className="h-6 w-6 text-muted-foreground/20 mb-1.5" />
             <p className="text-xs text-muted-foreground">Sin actividad todavía</p>
           </div>
         )}
         {timeline.map((entry, idx) => {
-          if (entry.type === 'note') {
+          if (entry.type === 'note' || entry.type === 'update') {
             const isOwn = entry.authorId === currentUserId;
             return (
-              <div key={`n_${entry.id}`} className="group flex gap-2 py-1">
+              <div key={`${entry.type}_${entry.id}`} data-testid={`activity-${entry.type}-${entry.id}`} className="group flex gap-2 py-1">
                 <div className={cn("h-6 w-6 rounded-full flex items-center justify-center text-[9px] font-bold shrink-0 mt-0.5", isOwn ? "bg-indigo-100 text-indigo-700" : "bg-teal-100 text-teal-700")}>
                   {initials(entry.authorName)}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1 mb-0.5">
                     <span className={cn("text-[11px] font-medium", isOwn ? "text-slate-700" : "text-teal-700")}>{entry.authorName || 'Usuario'}</span>
+                    {entry.type === 'update' && <span className="text-[9px] text-indigo-500">Update</span>}
                     <TooltipProvider>
                       <Tooltip>
                         <TooltipTrigger asChild>
@@ -2202,7 +2061,7 @@ function ActivityPanel({ projectId, customItemId, projectName, onClose }: { proj
                       </Tooltip>
                     </TooltipProvider>
                   </div>
-                  {editingId === entry.id ? (
+                  {entry.type === 'note' && editingId === entry.id ? (
                     <div className="space-y-1">
                       <Textarea
                         ref={editNoteRef}
@@ -2233,10 +2092,10 @@ function ActivityPanel({ projectId, customItemId, projectName, onClose }: { proj
                       </div>
                     </div>
                   ) : (
-                    <StatusText className="text-[11px] bg-white border border-slate-100 rounded-md px-2.5 py-1.5">{entry.content}</StatusText>
+                    <StatusText className={embedded ? "text-sm leading-7 py-1" : "text-[11px] bg-white border border-slate-100 rounded-md px-2.5 py-1.5"}>{entry.content}</StatusText>
                   )}
                 </div>
-                {isOwn && editingId !== entry.id && (
+                {entry.type === 'note' && isOwn && editingId !== entry.id && (
                   <div className="flex flex-col gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-0.5">
                     <button onClick={() => { setEditingId(entry.id); setEditText(entry.content); }} className="p-0.5 text-slate-300 hover:text-indigo-400">
                       <Pencil className="h-3 w-3" />
@@ -2284,9 +2143,9 @@ function ActivityPanel({ projectId, customItemId, projectName, onClose }: { proj
       <div className="px-3 py-2 border-t border-border shrink-0 bg-slate-50/80">
         <div className="flex gap-1.5 items-end">
           <Textarea ref={newNoteRef} value={newNote} onChange={e => setNewNote(e.target.value)}
-            rows={1}
+            rows={embedded ? 4 : 1}
             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); const t = newNote.trim(); if (t) { setNewNote(''); addMutation.mutate(t); } } }}
-            placeholder="Escribí un comentario..." className="resize-y overflow-auto text-[11px] min-h-[32px] flex-1 bg-white px-2.5 py-1.5 leading-relaxed" />
+            placeholder="Escribí un comentario..." className={cn("resize-y overflow-auto flex-1 bg-white px-2.5 py-1.5 leading-relaxed", embedded ? "text-sm min-h-[100px]" : "text-[11px] min-h-[32px]")} />
           <Button size="sm" onClick={() => { const t = newNote.trim(); if (t) { setNewNote(''); addMutation.mutate(t); } }}
             disabled={!newNote.trim() || addMutation.isPending}
             className="bg-indigo-600 hover:bg-indigo-700 text-white h-7 w-7 p-0 shrink-0">
@@ -2299,13 +2158,74 @@ function ActivityPanel({ projectId, customItemId, projectName, onClose }: { proj
   );
 }
 
+function StatusFocusDetail({ item, users, currentUserId, roomId, onUpdate, onResolve, onRemove }: {
+  item: Item; users: AppUser[]; currentUserId: number | null; roomId?: number;
+  onUpdate: (data: Record<string, any>) => void; onResolve: () => void; onRemove: () => void;
+}) {
+  const [tab, setTab] = useState<'overview' | 'activity'>('overview');
+  const { hasUnread, markAsRead } = useUnreadComments(item, roomId);
+  useEffect(() => { if (tab === 'activity' && hasUnread) markAsRead(); }, [tab, hasUnread, markAsRead]);
+  return <div className="flex flex-col flex-1 min-h-0" data-testid="status-focus-detail">
+    <div className="px-6 pt-7 sm:px-10 lg:px-14 shrink-0">
+      <div className="max-w-4xl mx-auto">
+        <div className="flex items-center justify-between gap-3 mb-6">
+          <span className="text-[11px] font-medium text-slate-400 tracking-wide">{item.hiddenFromWeekly ? 'Tema resuelto' : 'Status compartido'}</span>
+          <div className="flex items-center gap-2">
+            <button onClick={item.hiddenFromWeekly ? () => onUpdate({ hiddenFromWeekly: false }) : onResolve} className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-emerald-700 rounded-md border border-slate-200 px-2.5 py-1.5">
+              <Check className="h-3 w-3" />{item.hiddenFromWeekly ? 'Restaurar' : 'Resolver'}
+            </button>
+            <Popover><PopoverTrigger asChild><button aria-label="Acciones del tema" className="p-1.5 rounded-md hover:bg-slate-100 text-slate-400"><MoreHorizontal className="h-4 w-4" /></button></PopoverTrigger>
+              <PopoverContent align="end" className="w-64 p-3 space-y-3">
+                <div className="flex items-center justify-between text-xs text-slate-500">Copiar enlace <ItemShareButton item={item} roomId={roomId} /></div>
+                <div className="flex items-center justify-between text-xs text-slate-500">Decisión <DecisionBadge value={item.decisionNeeded} onChange={v => onUpdate({ decisionNeeded: v })} /></div>
+                <div className="flex items-center justify-between text-xs text-slate-500">Rentabilidad <LevelBadge value={item.marginStatus} onChange={v => onUpdate({ marginStatus: v })} label="Rentabilidad" type="margin" /></div>
+                <div className="flex items-center justify-between text-xs text-slate-500">Carga del equipo <LevelBadge value={item.teamStrain} onChange={v => onUpdate({ teamStrain: v })} label="Carga del equipo" type="team" /></div>
+                <div><label className="text-xs text-slate-500">Riesgo principal</label><InlineText value={item.mainRisk} placeholder="Agregar riesgo" onSave={v => onUpdate({ mainRisk: v })} className="text-xs" /></div>
+                <button onClick={onRemove} className="text-xs text-red-500 inline-flex items-center gap-1.5"><Trash2 className="h-3 w-3" />{item.isCustom ? 'Eliminar tema' : 'Quitar del status'}</button>
+              </PopoverContent>
+            </Popover>
+          </div>
+        </div>
+        <h2 className="text-[26px] sm:text-[32px] font-semibold leading-tight tracking-tight text-slate-900 break-words [overflow-wrap:anywhere]">
+          {item.isCustom ? <InlineText value={item.title} placeholder="Título" required onSave={v => onUpdate({ title: v })} className="!p-0 !text-inherit !leading-tight" /> : item.title}
+        </h2>
+        {item.subtitle && <p className="text-sm text-slate-400 mt-2">{item.subtitle}</p>}
+        <div className="flex items-center flex-wrap gap-x-6 gap-y-3 mt-5 mb-7">
+          <HealthDot value={item.healthStatus} onChange={v => onUpdate({ healthStatus: v })} />
+          <OwnerSelect value={item.ownerId} name={item.ownerName} users={users} onChange={v => onUpdate({ ownerId: v })} />
+          <DeadlinePicker value={item.deadline} isOverdue={item.isOverdue} onChange={v => onUpdate({ deadline: v })} />
+          {dm(item.decisionNeeded).urgent && <DecisionBadge value={item.decisionNeeded} onChange={v => onUpdate({ decisionNeeded: v })} />}
+        </div>
+        <div role="tablist" aria-label="Contenido del tema" className="flex gap-7 border-b border-slate-100">
+          {(['overview', 'activity'] as const).map(value => <button key={value} id={`focus-tab-${value}`} role="tab" tabIndex={tab === value ? 0 : -1} aria-selected={tab === value} aria-controls={`focus-panel-${value}`}
+            onClick={() => setTab(value)} onKeyDown={event => { if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') { event.preventDefault(); setTab(value === 'overview' ? 'activity' : 'overview'); document.getElementById(`focus-tab-${value === 'overview' ? 'activity' : 'overview'}`)?.focus(); } }}
+            className={cn('inline-flex items-center gap-2 py-3 text-sm border-b-2 -mb-px transition-colors', tab === value ? 'border-slate-900 text-slate-900 font-medium' : 'border-transparent text-slate-400 hover:text-slate-700')}>
+            {value === 'overview' ? 'Estado actual' : 'Actividad'}
+            {value === 'activity' && item.noteCount > 0 && <span className="text-[11px] text-slate-400">{item.noteCount}</span>}
+            {value === 'activity' && hasUnread && <span aria-label="Actividad sin leer" className="h-1.5 w-1.5 rounded-full bg-indigo-500" />}
+          </button>)}
+        </div>
+      </div>
+    </div>
+    <div role="tabpanel" id={`focus-panel-${tab}`} aria-labelledby={`focus-tab-${tab}`} className={cn('flex-1 min-h-0 px-6 sm:px-10 lg:px-14', tab === 'overview' ? 'overflow-y-auto' : 'flex flex-col')}>
+      {tab === 'overview' ? <div className="max-w-4xl mx-auto py-8 space-y-8" data-testid="status-focus-content">
+        <InlineText value={item.currentAction} placeholder="Contá qué está pasando con este tema…" multiline rows={8} onSave={v => onUpdate({ currentAction: v })} className="text-[15px] leading-7 !px-0" />
+        {(item.updatedByName || item.updatedAt) && <p className="text-[11px] text-slate-400">{item.updatedByName && `Actualizado por ${item.updatedByName}`}{item.updatedAt && ` · ${shortDateTime(item.updatedAt)}`}</p>}
+        {item.mainRisk && <div className="border-l-2 border-amber-300 pl-4"><p className="text-xs text-slate-400 mb-1">Riesgo a seguir</p><StatusText className="text-sm text-slate-600">{item.mainRisk}</StatusText></div>}
+        {item.nextMilestone && <details className="text-sm text-slate-400"><summary className="cursor-pointer">Próximo paso anterior</summary><StatusText className="mt-3 text-slate-600">{item.nextMilestone}</StatusText></details>}
+        <ProposalSection projectId={item.projectId} customId={item.customId} currentUserId={currentUserId} />
+      </div> : <div className="max-w-4xl w-full mx-auto flex-1 min-h-0 py-4"><ActivityPanel embedded projectId={item.projectId} customItemId={item.customId} projectName={item.title} onClose={() => setTab('overview')} /></div>}
+    </div>
+  </div>;
+}
+
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 // ─── Modo Daily: agenda (pantalla 1) ─────────────────────────────────────────
 
 type DailyAgendaEntry = { item: Item; reasons: DailyReason[] };
 
-function DailyAgendaView({ agenda, quiet, dailyStatus, roomId, onStart, onOpenList, addItem }: {
+function DailyAgendaView({ agenda, quiet, dailyStatus, onStart, onOpenList }: {
   agenda: DailyAgendaEntry[];
   quiet: Item[];
   dailyStatus: DailyStatus | undefined;
@@ -2314,115 +2234,54 @@ function DailyAgendaView({ agenda, quiet, dailyStatus, roomId, onStart, onOpenLi
   onOpenList: () => void;
   addItem?: React.ReactNode;
 }) {
-  const estMinutes = Math.max(1, Math.round(agenda.length * 0.7));
-  return (
-    <div className="flex-1 overflow-y-auto min-w-0">
-      <div className="max-w-6xl mx-auto px-6 py-5">
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-          {/* CTA */}
-          <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between gap-4 bg-gradient-to-r from-indigo-50/70 to-white">
-            <div className="min-w-0">
-              <div className="text-sm font-bold text-slate-800 flex items-center gap-2">
-                <Sun className="h-4 w-4 text-amber-500" />
-                {dailyStatus?.todayDone ? 'Daily de hoy hecha' : 'Daily de hoy'}
-              </div>
-              <div className="text-xs text-slate-500 mt-0.5 flex items-center gap-3 flex-wrap">
-                {dailyStatus?.latest ? (
-                  <span>{dailyStatus.todayDone ? 'Hoy duró' : 'La última duró'} <b className="text-slate-700">{formatDuration(dailyStatus.latest.durationSeconds)}</b>{dailyStatus.latest.userName ? ` · ${dailyStatus.latest.userName.split(' ')[0]}` : ''}</span>
-                ) : (
-                  <span>Todavía no hicieron ninguna daily en este room</span>
-                )}
-                {dailyStatus && dailyStatus.streak > 0 && (
-                  <span className="inline-flex items-center gap-1"><Flame className="h-3 w-3 text-orange-500" /> Racha: <b className="text-slate-700">{dailyStatus.streak} día{dailyStatus.streak === 1 ? '' : 's'}</b></span>
-                )}
-              </div>
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              {addItem}
-              <button onClick={onOpenList} className="text-xs text-slate-500 hover:text-slate-800 font-medium px-2 py-1.5">Ver lista completa</button>
-              {agenda.length > 0 && quiet.length > 0 && (
-                <button onClick={() => onStart(0, { includeQuiet: true })} title="Recorrer también los que no tienen novedad"
-                  className="text-xs text-slate-500 hover:text-slate-800 font-medium px-2 py-1.5">Recorrer todos ({agenda.length + quiet.length})</button>
-              )}
-              <button onClick={() => onStart(0, { includeQuiet: agenda.length === 0 })} disabled={agenda.length + quiet.length === 0}
-                className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white font-bold text-sm px-4 py-2 rounded-lg shadow-sm transition-colors">
-                <Play className="h-3.5 w-3.5 fill-current" />
-                {agenda.length === 0 ? 'Recorrer todos igual' : dailyStatus?.todayDone ? 'Repetir la daily' : 'Hacer la daily'}
-                <span className="text-indigo-200 font-normal">{agenda.length === 0 ? quiet.length : agenda.length} ítem{(agenda.length === 0 ? quiet.length : agenda.length) === 1 ? '' : 's'} · ~{agenda.length === 0 ? Math.max(1, Math.round(quiet.length * 0.5)) : estMinutes} min</span>
-              </button>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-3 max-md:grid-cols-1 divide-x max-md:divide-x-0 max-md:divide-y divide-slate-100">
-            {/* Para hablar hoy */}
-            <div className="col-span-2 p-5">
-              <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-3 flex items-center gap-2">
-                Para hablar hoy <span className="bg-slate-100 rounded-full px-2 py-0.5 text-slate-500">{agenda.length}</span>
-              </h3>
-              {agenda.length === 0 ? (
-                <div className="flex items-center gap-2 py-6 px-4 rounded-xl border border-dashed border-emerald-200 bg-emerald-50/50 text-emerald-700 text-sm">
-                  <CheckCircle2 className="h-4 w-4" /> Nada pide conversación hoy. Todo al día.
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {agenda.map(({ item, reasons }, idx) => {
-                    const main = reasons[0];
-                    const meta = DAILY_REASON_META[main.kind];
-                    return (
-                      <div key={item.key} role="button" tabIndex={0}
-                        onClick={() => onStart(idx)}
-                        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onStart(idx); } }}
-                        className={cn("w-full text-left flex gap-3 items-start p-3 rounded-xl border-l-4 hover:shadow-sm transition-shadow", meta.border, meta.bg)}>
-                        <div className="flex flex-col gap-1 shrink-0 mt-0.5">
-                          {reasons.map(r => (
-                            <span key={r.kind} className={cn("text-[10px] font-bold rounded px-1.5 py-0.5 whitespace-nowrap", DAILY_REASON_META[r.kind].chip)}>{DAILY_REASON_META[r.kind].label}</span>
-                          ))}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="font-semibold text-sm text-slate-800 flex items-center gap-2 min-w-0">
-                            <span className={cn("w-2 h-2 rounded-full shrink-0", hm(item.healthStatus).dot)} />
-                            <span className="truncate">{item.title}</span>
-                            {item.subtitle && <span className="text-xs text-slate-400 font-normal truncate">· {item.subtitle}</span>}
-                            {item.ownerName && <span className="text-[10px] text-indigo-600 font-medium shrink-0">{item.ownerName.split(' ')[0]}</span>}
-                          </div>
-                          <StatusText className="text-xs text-slate-500 mt-0.5">{main.detail}</StatusText>
-                        </div>
-                        <span className="text-xs text-slate-400 italic shrink-0 max-md:hidden">{main.question}</span>
-                        <ItemShareButton item={item} roomId={roomId} />
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            {/* Sin novedad */}
-            <div className="p-5 bg-slate-50/60">
-              <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-wide mb-3 flex items-center gap-2">
-                Sin novedad <span className="bg-slate-200 rounded-full px-2 py-0.5">{quiet.length}</span>
-              </h3>
-              {quiet.length === 0 ? (
-                <p className="text-xs text-slate-400">Todos los ítems piden conversación hoy.</p>
-              ) : (
-                <ul className="text-xs text-slate-500 space-y-1.5">
-                  {quiet.map(i => (
-                    <li key={i.key}>
-                      <button onClick={() => onStart(0, { includeQuiet: true, startKey: i.key })} title="Abrir para dejar una novedad"
-                        className="w-full flex justify-between gap-2 rounded px-1 py-0.5 -mx-1 hover:bg-white hover:text-slate-800 transition-colors text-left">
-                        <span className="truncate flex items-center gap-1.5 min-w-0"><span className={cn("w-1.5 h-1.5 rounded-full shrink-0", hm(i.healthStatus).dot)} /><span className="truncate">{i.title}</span></span>
-                        <span className="text-slate-300 shrink-0">{(i.lastUpdateAt || i.updatedAt) ? relTime(i.lastUpdateAt || i.updatedAt!) : '—'}</span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              <p className="text-[11px] text-slate-400 mt-4 leading-relaxed">No hace falta hablar de estos, pero podés tocar uno para dejarle una novedad igual. Al cerrar la daily quedan contados como revisados.</p>
-            </div>
-          </div>
+  const [showAllAgenda, setShowAllAgenda] = useState(false);
+  const shownAgenda = showAllAgenda ? agenda : agenda.slice(0, 6);
+  const total = agenda.length + quiet.length;
+  const minutes = Math.max(1, Math.round(agenda.length ? agenda.length * 0.7 : quiet.length * 0.5));
+  return <div data-testid="status-daily-home" className="flex-1 overflow-y-auto bg-slate-50/50">
+    <div className="max-w-5xl mx-auto px-6 sm:px-10 py-9 sm:py-12">
+      <div className="flex flex-wrap items-start justify-between gap-7 pb-9">
+        <div className="max-w-xl">
+          <div className="flex items-center gap-2 text-xs text-slate-400 mb-3"><Sun className="h-4 w-4" />{dailyStatus?.todayDone ? 'Daily completada hoy' : 'La daily de hoy'}</div>
+          <h2 className="text-[28px] sm:text-[36px] leading-tight font-semibold tracking-tight text-slate-900">{agenda.length ? 'Qué necesitamos conversar hoy' : 'Todo está al día'}</h2>
+          <p className="text-sm text-slate-500 mt-4 leading-6">{agenda.length ? `${agenda.length} temas para revisar juntos, uno por vez.` : total ? 'Podés recorrer los temas igual o dejar una novedad puntual.' : 'Agregá el primer tema para empezar el seguimiento.'}</p>
+          {dailyStatus?.latest && <p className="text-xs text-slate-400 mt-3">{dailyStatus.todayDone ? 'Hoy' : 'Última daily'} · {formatDuration(dailyStatus.latest.durationSeconds)}{dailyStatus.latest.userName ? ` · ${dailyStatus.latest.userName}` : ''}{dailyStatus.streak > 0 ? ` · ${dailyStatus.streak} días de racha` : ''}</p>}
+        </div>
+        <div className="pt-1 flex flex-col items-start sm:items-end gap-2">
+          <button onClick={() => onStart(0, { includeQuiet: agenda.length === 0 })} disabled={total === 0}
+            className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-5 py-3 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-40 shadow-sm">
+            <Play className="h-3.5 w-3.5 fill-current" />{dailyStatus?.todayDone ? 'Repetir la daily' : 'Empezar la daily'}
+          </button>
+          {total > 0 && <span className="text-xs text-slate-400">Aprox. {minutes} min · {agenda.length || quiet.length} temas</span>}
         </div>
       </div>
+
+      <section className="bg-white rounded-2xl border border-slate-200/80 overflow-hidden">
+        <div className="flex items-center justify-between gap-3 px-5 sm:px-6 py-5 border-b border-slate-100">
+          <h3 className="text-sm font-medium text-slate-800">Para hablar hoy <span className="ml-2 text-xs text-slate-400">{agenda.length}</span></h3>
+          <button onClick={onOpenList} className="text-xs text-slate-400 hover:text-slate-800">Ver todos los temas <ArrowRight className="h-3 w-3 inline ml-1" /></button>
+        </div>
+        {shownAgenda.map(({ item, reasons }, index) => <button key={item.key} data-testid="daily-agenda-item" onClick={() => onStart(index)} aria-label={`Empezar la daily por ${item.title}`}
+          className="w-full flex items-center gap-3 sm:gap-4 px-5 sm:px-6 py-4 text-left border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors">
+          <span className="text-[11px] tabular-nums text-slate-300 w-4 shrink-0">{String(index + 1).padStart(2, '0')}</span>
+          <span className={cn('h-1.5 w-1.5 rounded-full shrink-0', hm(item.healthStatus).dot)} />
+          <span className="text-sm font-medium text-slate-700 min-w-0 flex-1 break-words [overflow-wrap:anywhere]">{item.title}</span>
+          <span className="text-[11px] text-slate-400 shrink-0 max-sm:hidden">{DAILY_REASON_META[reasons[0].kind].label}</span>
+          <ChevronRight className="h-3.5 w-3.5 text-slate-300 shrink-0" />
+        </button>)}
+        {agenda.length === 0 && <p className="px-6 py-8 text-sm text-slate-400">Ningún tema necesita conversación hoy.</p>}
+        {agenda.length > 6 && <button onClick={() => setShowAllAgenda(value => !value)} className="w-full py-4 text-xs text-slate-500 hover:bg-slate-50 border-t border-slate-100">{showAllAgenda ? 'Mostrar menos' : `Ver ${agenda.length - 6} temas más`}</button>}
+      </section>
+
+      <div className="flex flex-wrap items-start justify-between gap-4 mt-6 px-1">
+        <details className="text-xs text-slate-400 max-w-xl">
+          <summary className="cursor-pointer hover:text-slate-700">{quiet.length} temas al día</summary>
+          <div className="pt-3 space-y-1">{quiet.length ? quiet.map(item => <button key={item.key} onClick={() => onStart(0, { includeQuiet: true, startKey: item.key })} className="flex items-center gap-2 py-2 text-left hover:text-slate-700"><span className="h-1 w-1 rounded-full bg-emerald-400 shrink-0" />{item.title}</button>) : <p>Todos los temas están incluidos en la agenda de hoy.</p>}</div>
+        </details>
+        {agenda.length > 0 && quiet.length > 0 && <button onClick={() => onStart(0, { includeQuiet: true })} className="text-xs text-slate-400 hover:text-slate-700">Recorrer los {total} temas</button>}
+      </div>
     </div>
-  );
+  </div>;
 }
 
 // ─── Modo Daily: runner (pantallas 2 y 3) ────────────────────────────────────
@@ -2811,7 +2670,7 @@ function DailyRunner({ queue, quietCount, users, currentUserId, roomId, startInd
   );
 }
 
-export default function StatusSemanalPage({ initialItemKey }: { initialItemKey?: string } = {}) {
+export default function StatusSemanalPage({ initialItemKey, initialViewMode }: { initialItemKey?: string; initialViewMode?: 'daily' | 'list' } = {}) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { user } = useAuth();
@@ -2827,7 +2686,6 @@ export default function StatusSemanalPage({ initialItemKey }: { initialItemKey?:
   });
   // Unified expanded state — one item expanded at a time across all sections
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [aiPopoverOpen, setAiPopoverOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterHealth, setFilterHealth] = useState<string | null>(null);
@@ -2845,6 +2703,7 @@ export default function StatusSemanalPage({ initialItemKey }: { initialItemKey?:
   const [dragActiveId, setDragActiveId] = useState<string | null>(null);
   // 'daily' es la vista por defecto al entrar al room: agenda de qué hablar hoy.
   const [viewMode, setViewModeRaw] = useState<'list' | 'timeline' | 'daily'>(() => {
+    if (initialViewMode) return initialViewMode;
     try {
       const v = localStorage.getItem('status-view-mode');
       return v === 'list' || v === 'timeline' || v === 'daily' ? v : 'daily';
@@ -2869,7 +2728,7 @@ export default function StatusSemanalPage({ initialItemKey }: { initialItemKey?:
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const tag = (document.activeElement as HTMLElement)?.tagName;
-      const isInput = tag === 'INPUT' || tag === 'TEXTAREA' || (document.activeElement as HTMLElement)?.isContentEditable;
+      const isInput = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (document.activeElement as HTMLElement)?.isContentEditable;
 
       // El runner de la daily maneja sus propios atajos.
       if (dailyRun) return;
@@ -3211,8 +3070,8 @@ export default function StatusSemanalPage({ initialItemKey }: { initialItemKey?:
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const tag = (document.activeElement as HTMLElement)?.tagName;
-      const isInput = tag === 'INPUT' || tag === 'TEXTAREA' || (document.activeElement as HTMLElement)?.isContentEditable;
-      if (isInput || dailyRun) return;
+      const isInput = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (document.activeElement as HTMLElement)?.isContentEditable;
+      if (isInput || dailyRun || viewMode === 'list') return;
 
       const navKeys = ['j', 'k', 'J', 'K', 'ArrowDown', 'ArrowUp', 'e', 'E'];
       if (!navKeys.includes(e.key)) return;
@@ -3235,7 +3094,7 @@ export default function StatusSemanalPage({ initialItemKey }: { initialItemKey?:
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [kbFocusKey, flatNavItems, expandedKey, dailyRun]);
+  }, [kbFocusKey, flatNavItems, expandedKey, dailyRun, viewMode]);
 
   // ── Modo Daily: agenda del día ───────────────────────────────────────────────
   const { data: dailyStatus, refetch: refetchDailyStatus } = useQuery<DailyStatus>({
@@ -3363,15 +3222,46 @@ export default function StatusSemanalPage({ initialItemKey }: { initialItemKey?:
   const isLoading = loadingProjects || loadingCustom;
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
-      <div className={cn("flex flex-col flex-1 min-w-0 transition-all duration-200", notesOpen !== null ? "mr-[320px]" : "")}>
+    <div className="flex flex-1 min-h-0 h-full overflow-hidden bg-background">
+      <div className={cn("flex flex-col flex-1 min-w-0 transition-all duration-200", notesOpen !== null ? "lg:mr-[360px]" : "")}>
 
+        {viewMode !== 'timeline' ? (
+          <header className="shrink-0 border-b border-slate-200/70 bg-white px-5 sm:px-7 py-4 flex items-center justify-between flex-wrap gap-4">
+            <div className="flex items-center gap-4 min-w-0">
+              <a href="/review" aria-label="Volver a Status" className="text-slate-400 hover:text-slate-900"><ChevronLeft className="h-4 w-4" /></a>
+              <div className="min-w-0">
+                {roomCtx ? <RoomTitleEditor tone="light" roomId={roomCtx.roomId} name={roomCtx.room?.name || 'Status'} privacy={roomCtx.room?.privacy || 'members'} myRole={roomCtx.myRole} /> : <h1 className="text-base font-semibold text-slate-900">Status</h1>}
+                <p className="text-[11px] text-slate-400 mt-0.5">{currentWeekLabel}</p>
+              </div>
+            </div>
+            <nav aria-label="Vista del status" className="inline-flex rounded-lg bg-slate-100 p-1">
+              {([['daily', 'Daily'], ['list', 'Temas']] as const).map(([mode, label]) => <button key={mode} aria-pressed={viewMode === mode} onClick={() => setViewMode(mode)} className={cn('rounded-md px-4 py-1.5 text-xs font-medium transition-colors', viewMode === mode ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-slate-700')}>{label}</button>)}
+            </nav>
+            <div className="flex items-center gap-3">
+              {viewMode === 'list' && <button onClick={() => startDaily()} className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-600 hover:text-slate-900"><Play className="h-3 w-3" /> Hacer la daily</button>}
+              <span className="h-4 w-px bg-slate-200" />
+              <AddItemButton onAdd={d => createCustom.mutate(d)} users={appUsers} currentUserId={currentUserId} />
+              <Popover><PopoverTrigger asChild><button aria-label="Más acciones" className="text-slate-400 hover:text-slate-900 p-1"><MoreHorizontal className="h-4 w-4" /></button></PopoverTrigger>
+                <PopoverContent align="end" className="w-52 p-1">
+                  {roomCtx?.isOwner && <button onClick={() => setAddProjectDialogOpen(true)} className="w-full text-left px-3 py-2 rounded text-xs hover:bg-slate-50">Agregar proyecto</button>}
+                  {roomCtx && <button onClick={() => setMembersDialogOpen(true)} className="w-full text-left px-3 py-2 rounded text-xs hover:bg-slate-50">Participantes</button>}
+                  <button onClick={() => setViewMode('daily')} className="w-full text-left px-3 py-2 rounded text-xs hover:bg-slate-50">Agenda de la daily</button>
+                  <button onClick={() => setViewMode('timeline')} className="w-full text-left px-3 py-2 rounded text-xs hover:bg-slate-50">Ver timeline</button>
+                  <button onClick={() => { setViewMode('daily'); setAiPopoverOpen(true); }} className="w-full text-left px-3 py-2 rounded text-xs hover:bg-slate-50">Resumen IA</button>
+                  <button onClick={() => setShowExport(true)} className="w-full text-left px-3 py-2 rounded text-xs hover:bg-slate-50">Exportar semana</button>
+                  <button onClick={() => { setBulkMode(v => !v); setSelectedKeys(new Set()); }} className="w-full text-left px-3 py-2 rounded text-xs hover:bg-slate-50">{bulkMode ? 'Salir de selección' : 'Seleccionar varios'}</button>
+                  <button onClick={() => setShowKbHelp(v => !v)} className="w-full text-left px-3 py-2 rounded text-xs hover:bg-slate-50">Atajos de teclado</button>
+                </PopoverContent>
+              </Popover>
+            </div>
+          </header>
+        ) : <>
         {/* ── Header ────────────────────────────────────────────── */}
         <div className="relative overflow-hidden border-b border-border shrink-0">
           <div className="absolute inset-0 bg-gradient-to-r from-indigo-600 via-indigo-700 to-violet-700" />
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,_var(--tw-gradient-stops))] from-white/10 via-transparent to-transparent" />
           <div className="relative px-6 py-2.5">
-            <div className="flex items-center justify-between gap-4">
+            <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
               {/* Left: title (room-aware) */}
               <div className="flex items-center gap-2.5 shrink-0">
                 {roomCtx ? (
@@ -3406,11 +3296,11 @@ export default function StatusSemanalPage({ initialItemKey }: { initialItemKey?:
               </div>
 
               {/* Vista: daily / lista */}
-              <div className="flex items-center rounded-full border border-white/15 bg-white/10 p-0.5 shrink-0 max-md:hidden">
-                {([['daily', 'Daily'], ['list', 'Lista']] as const).map(([mode, label]) => (
+              <div className="flex items-center rounded-full border border-white/15 bg-white/10 p-0.5 shrink-0">
+                {([['daily', 'Daily'], ['list', 'Temas']] as const).map(([mode, label]) => (
                   <button key={mode} onClick={() => setViewMode(mode)}
                     className={cn("text-[11px] font-medium px-2.5 py-0.5 rounded-full transition-colors",
-                      viewMode === mode || (mode === 'list' && viewMode === 'timeline') ? "bg-white text-indigo-700" : "text-indigo-200 hover:text-white")}>
+                      mode === 'list' ? "bg-white text-indigo-700" : "text-indigo-200 hover:text-white")}>
                     {label}
                   </button>
                 ))}
@@ -3423,19 +3313,8 @@ export default function StatusSemanalPage({ initialItemKey }: { initialItemKey?:
                 </button>
               )}
 
-              {/* Sidebar toggle (visible when sidebar has items) */}
-              {(alertItems.length > 0 || decisionItems.length > 0) && viewMode === 'list' && (
-                <button
-                  onClick={() => setSidebarOpen(v => !v)}
-                  title={sidebarOpen ? "Ocultar panel lateral" : "Mostrar panel lateral"}
-                  className={cn("p-1.5 rounded-full border transition-colors backdrop-blur-sm shrink-0",
-                    sidebarOpen ? "bg-white/25 text-white border-white/30" : "bg-white/10 text-indigo-200 border-white/15 hover:bg-white/20 hover:text-white")}>
-                  {sidebarOpen ? <PanelLeftClose className="h-3.5 w-3.5" /> : <PanelLeftOpen className="h-3.5 w-3.5" />}
-                </button>
-              )}
-
               {/* Center: search */}
-              <div className="relative flex-1 max-w-md max-md:hidden">
+              <div className="relative min-w-[180px] flex-1 max-w-md max-md:order-last max-md:basis-full max-md:max-w-none">
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-indigo-300" />
                 <input
                   ref={searchInputRef}
@@ -3452,7 +3331,7 @@ export default function StatusSemanalPage({ initialItemKey }: { initialItemKey?:
               </div>
 
               {/* Right: actions */}
-              <div className="flex items-center gap-1 shrink-0">
+              <div className="flex flex-wrap items-center gap-1 shrink-0 max-w-full">
                 {roomCtx?.room?.members && roomCtx.room.members.length > 0 && (
                   <MemberAvatarsStack
                     members={roomCtx.room.members}
@@ -3501,7 +3380,7 @@ export default function StatusSemanalPage({ initialItemKey }: { initialItemKey?:
                       {viewMode === 'timeline' ? <List className="h-3.5 w-3.5 text-slate-400" /> : <LayoutList className="h-3.5 w-3.5 text-slate-400" />}
                       {viewMode === 'timeline' ? 'Ver lista' : 'Ver timeline'}
                     </button>
-                    {viewMode !== 'daily' && (
+                    {(
                       <button onClick={() => setViewMode('daily')}
                         className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded text-xs text-slate-700 hover:bg-slate-100">
                         <Sun className="h-3.5 w-3.5 text-slate-400" /> Ver agenda de la daily
@@ -3624,6 +3503,8 @@ export default function StatusSemanalPage({ initialItemKey }: { initialItemKey?:
           </div>
         </div>
 
+        </>}
+
         {/* ── Confirm Delete Dialog ──────────────────────────────── */}
         {confirmDelete && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm" onClick={() => setConfirmDelete(null)}>
@@ -3740,266 +3621,36 @@ export default function StatusSemanalPage({ initialItemKey }: { initialItemKey?:
               );
             })()
           ) : (
-            <>
-
-              {/* ── Mobile backdrop for sidebar overlay ─────────────── */}
-              {sidebarOpen && (alertItems.length > 0 || decisionItems.length > 0) && (
-                <div className="hidden max-md:block fixed inset-0 z-20 bg-black/40 backdrop-blur-[2px]"
-                  onClick={() => setSidebarOpen(false)} />
-              )}
-
-              {/* ── Left panel: urgency items ─────────────────────────── */}
-              {(alertItems.length > 0 || decisionItems.length > 0) && (
-              <div className={cn(
-                "shrink-0 border-r border-slate-200 overflow-y-auto bg-slate-50/40 flex flex-col transition-all duration-200",
-                sidebarOpen ? "w-[420px] max-lg:w-[340px] max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:z-30 max-md:w-[85vw] max-md:max-w-[420px] max-md:shadow-2xl max-md:border-r-0" : "w-0 overflow-hidden"
-              )}>
-              <div className="px-4 py-3 border-b border-slate-200 flex items-center gap-2 shrink-0 bg-white/60">
-                <AlertTriangle className="h-3.5 w-3.5 text-slate-400" />
-                <span className="text-xs font-bold text-slate-600 flex-1">Para atender</span>
-                <span className="text-xs font-bold text-slate-400 bg-slate-100 rounded-full px-2 py-0.5">{alertItems.length + decisionItems.length}</span>
-              </div>
-              <div className="p-3 space-y-3 flex-1 overflow-y-auto">
-
-              {/* ── Requieren atención (hidden when empty) ──────────── */}
-              {alertItems.length > 0 && (
-              <div>
-                <div className="flex items-center gap-1.5 mb-2 px-1">
-                  <span className="text-[11px] text-slate-500 flex-1">Requieren atención · {alertItems.length}</span>
-                  <AddItemButton variant="inline" onAdd={d => createCustom.mutate(d)} users={appUsers} currentUserId={currentUserId} />
+            <StatusFocusWorkspace
+              groups={[
+                { key: 'attention', label: 'Para atender', items: alertItems },
+                { key: 'decisions', label: 'Decisiones pendientes', items: decisionItems },
+                { key: 'progress', label: 'En curso', items: sortedNormalItems, sortable: true },
+                ...(showHidden ? [{ key: 'resolved', label: 'Resueltos', items: allItems.filter(item => item.hiddenFromWeekly) }] : []),
+              ]}
+              selectedKey={expandedKey}
+              onSelect={key => { setExpandedKey(key); setNotesOpen(null); }}
+              onReorder={(active, over) => {
+                const keys = sortedNormalItems.map(item => item.key);
+                const from = keys.indexOf(active), to = keys.indexOf(over);
+                if (from >= 0 && to >= 0) setNormalOrder(arrayMove(keys, from, to));
+              }}
+              search={<div className="flex items-center gap-2">
+                <div className="relative flex-1 min-w-0"><Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400" />
+                  <input ref={searchInputRef} aria-label="Buscar tema o responsable" value={searchQuery} onChange={event => setSearchQuery(event.target.value)} placeholder="Buscar un tema…" className="w-full rounded-lg border border-slate-200 bg-white py-2 pl-8 pr-3 text-xs text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-100" />
                 </div>
-                <div className="rounded-xl border border-slate-200/60 bg-white overflow-hidden">
-                  <AnimatePresence initial={false}>
-                    {alertItems.map((item) => {
-                      const h = getItemHandlers(item);
-                      const rowAccent: 'red' | 'amber' = (item.isOverdue || item.healthStatus === 'rojo') ? 'red' : 'amber';
-                      return (
-                        <motion.div key={item.key} id={`row-${item.key}`} layout
-                          initial={{ opacity: 0, y: -4 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: -4 }}
-                          transition={{ duration: 0.14, ease: [0.4, 0, 0.2, 1] }}
-                          className="border-b border-slate-100/80 last:border-b-0">
-                          <AlertSidebarCard item={item} accent={rowAccent} currentUserId={currentUserId} roomId={roomCtx?.roomId}
-                            onUpdate={h.onUpdate}
-                            expanded={expandedKey === item.key}
-                            onToggle={() => setExpandedKey(expandedKey === item.key ? null : item.key)}
-                            users={appUsers}
-                            onOpenNotes={h.onOpenNotes}
-                            onRemove={h.onRemove}
-                            onResolve={h.onResolve}
-                            bulkMode={bulkMode}
-                            checked={selectedKeys.has(item.key)}
-                            onCheck={v => setSelectedKeys(prev => { const n = new Set(prev); v ? n.add(item.key) : n.delete(item.key); return n; })} />
-                        </motion.div>
-                      );
-                    })}
-                  </AnimatePresence>
-                </div>
-              </div>
-              )}
-
-              {/* ── Decisiones pendientes (hidden when empty) ─────── */}
-              {decisionItems.length > 0 && (
-              <div>
-                <div className="flex items-center gap-1.5 mb-2 px-1">
-                  <span className="text-[11px] text-slate-500 flex-1">Decisiones pendientes · {decisionItems.length}</span>
-                </div>
-                <div className="rounded-xl border border-slate-200/60 bg-white overflow-hidden">
-                  <AnimatePresence initial={false}>
-                    {decisionItems.map((item) => {
-                      const h = getItemHandlers(item);
-                      return (
-                        <motion.div key={item.key} id={`row-${item.key}`} layout
-                          initial={{ opacity: 0, y: -4 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: -4 }}
-                          transition={{ duration: 0.14, ease: [0.4, 0, 0.2, 1] }}
-                          className="border-b border-slate-100/80 last:border-b-0">
-                          <DecisionSidebarCard item={item} currentUserId={currentUserId} roomId={roomCtx?.roomId}
-                            expanded={expandedKey === item.key}
-                            onToggle={() => setExpandedKey(expandedKey === item.key ? null : item.key)}
-                            users={appUsers}
-                            onUpdate={h.onUpdate}
-                            onOpenNotes={h.onOpenNotes}
-                            onRemove={h.onRemove}
-                            onResolve={h.onResolve}
-                            bulkMode={bulkMode}
-                            checked={selectedKeys.has(item.key)}
-                            onCheck={v => setSelectedKeys(prev => { const n = new Set(prev); v ? n.add(item.key) : n.delete(item.key); return n; })} />
-                        </motion.div>
-                      );
-                    })}
-                  </AnimatePresence>
-                </div>
-              </div>
-              )}
-
-              </div>
-              </div>
-              )}
-
-              {/* ── Right panel: En curso ─────────────────────────────── */}
-              <div className="flex-1 overflow-y-auto min-w-0">
-              <div className="px-5 py-4 space-y-4">
-
-              {/* ── En curso ───────────────────────────────────────── */}
-              <div>
-                <div className="flex items-center gap-2 mb-3">
-                  <span className="text-sm font-semibold text-slate-700">En curso</span>
-                  <span className="text-sm font-bold text-slate-400">{normalItems.length}</span>
-                  {(() => { const sc = normalItems.filter(i => isStale(i.updatedAt)).length; return sc > 0 ? (
-                    <span className="text-xs font-medium text-amber-500 bg-amber-50 border border-amber-100 rounded-full px-2 py-0.5">{sc} sin update</span>
-                  ) : null; })()}
-                  <div className="flex-1" />
-                  <AddItemButton variant="inline" onAdd={d => createCustom.mutate(d)} users={appUsers} currentUserId={currentUserId} />
-                  {expandedKey && (
-                    <button onClick={() => setExpandedKey(null)} className="text-[10px] text-slate-400 hover:text-slate-600 font-medium">colapsar</button>
-                  )}
-                </div>
-                {normalItems.length === 0 ? (
-                  <div className="flex items-center gap-2 py-2.5 px-3 rounded-lg border border-dashed border-slate-200 bg-slate-50 text-slate-400">
-                    <span className="text-xs">Sin ítems en curso</span>
-                  </div>
-                ) : (
-                  <DndContext
-                    collisionDetection={closestCenter}
-                    onDragStart={(event: DragStartEvent) => setDragActiveId(event.active.id as string)}
-                    onDragEnd={(event: DragEndEvent) => {
-                      setDragActiveId(null);
-                      const { active, over } = event;
-                      if (over && active.id !== over.id) {
-                        setNormalOrder(() => {
-                          const keys = sortedNormalItems.map(i => i.key);
-                          const oldIdx = keys.indexOf(active.id as string);
-                          const newIdx = keys.indexOf(over.id as string);
-                          if (oldIdx < 0 || newIdx < 0) return keys;
-                          return arrayMove(keys, oldIdx, newIdx);
-                        });
-                      }
-                    }}
-                  >
-                    {(() => {
-                      const staleItems = sortedNormalItems.filter(i => isStale(i.updatedAt));
-                      const freshItems = sortedNormalItems.filter(i => !isStale(i.updatedAt));
-                      const renderRow = (item: Item, isStaleGroup: boolean) => {
-                        const h = getItemHandlers(item);
-                        const globalIdx = sortedNormalItems.indexOf(item);
-                        return (
-                          <SortableCompactRow key={item.key} item={item} users={appUsers} currentUserId={currentUserId} roomId={roomCtx?.roomId}
-                            isSelected={notesOpen !== null && ((notesOpen.type === 'project' && item.projectId === notesOpen.id) || (notesOpen.type === 'custom' && item.customId === notesOpen.id))}
-                            onOpenNotes={h.onOpenNotes} onUpdate={h.onUpdate} onRemove={h.onRemove} onResolve={h.onResolve}
-                            expanded={expandedKey === item.key}
-                            onToggle={() => setExpandedKey(expandedKey === item.key ? null : item.key)}
-                            hasPrev={globalIdx > 0}
-                            hasNext={globalIdx < sortedNormalItems.length - 1}
-                            onPrev={() => { if (globalIdx > 0) setExpandedKey(sortedNormalItems[globalIdx - 1].key); }}
-                            onNext={() => { if (globalIdx < sortedNormalItems.length - 1) setExpandedKey(sortedNormalItems[globalIdx + 1].key); }}
-                            kbFocused={kbFocusKey === item.key}
-                            bulkMode={bulkMode}
-                            checked={selectedKeys.has(item.key)}
-                            onCheck={v => setSelectedKeys(prev => { const n = new Set(prev); v ? n.add(item.key) : n.delete(item.key); return n; })}
-                            accent={'none'}
-                            hideSubtitle={!isStaleGroup} />
-                        );
-                      };
-                      return (
-                        <SortableContext items={sortedNormalItems.map(i => i.key)} strategy={verticalListSortingStrategy}>
-                          <div className="rounded-xl border border-slate-200/60 bg-white overflow-hidden">
-                            {staleItems.length > 0 && (
-                              <>
-                                <div className="flex items-center gap-2 px-5 py-1.5 border-b border-slate-100/80">
-                                  <span className="text-[10px] text-amber-600">Sin update · {staleItems.length}</span>
-                                </div>
-                                {staleItems.map((item) => (
-                                  <div key={item.key} id={`row-${item.key}`} className="border-b border-slate-100/80 last:border-b-0">
-                                    {renderRow(item, true)}
-                                  </div>
-                                ))}
-                              </>
-                            )}
-                            {staleItems.length > 0 && freshItems.length > 0 && (
-                              <div className="flex items-center gap-2 px-5 py-1.5 border-b border-slate-100/80 border-t border-t-slate-100">
-                                <span className="text-[10px] text-slate-400">Al día · {freshItems.length}</span>
-                              </div>
-                            )}
-                            {freshItems.map((item) => (
-                              <div key={item.key} id={`row-${item.key}`} className="border-b border-slate-100/80 last:border-b-0">
-                                {renderRow(item, false)}
-                              </div>
-                            ))}
-                          </div>
-                        </SortableContext>
-                      );
-                    })()}
-                    <DragOverlay>
-                      {dragActiveId && (() => {
-                        const item = sortedNormalItems.find(i => i.key === dragActiveId);
-                        if (!item) return null;
-                        return (
-                          <div className="bg-white border border-indigo-300 shadow-lg rounded-lg px-4 py-2 opacity-90">
-                            <span className="text-sm font-medium text-slate-700">{item.title}</span>
-                          </div>
-                        );
-                      })()}
-                    </DragOverlay>
-                  </DndContext>
-                )}
-              </div>
-
-              {/* Toggle visible cuando hay items resueltos — fácil acceso para
-                   recuperar algo si lo resolviste sin querer */}
-              {hiddenCount > 0 && (
-                <div className="flex justify-center pt-1">
-                  <button onClick={() => setShowHidden(v => !v)}
-                    className="flex items-center gap-1.5 text-[11px] text-slate-400 hover:text-slate-700 transition-colors">
-                    {showHidden ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
-                    {showHidden ? 'Ocultar' : 'Ver'} {hiddenCount} resuelto{hiddenCount === 1 ? '' : 's'}
-                  </button>
-                </div>
-              )}
-
-
-              {/* ── Quitados ───────────────────────────────────────── */}
-              {showHidden && hiddenCount > 0 && (
-                <div>
-                  <div className="flex items-center gap-2 mb-3">
-                    <EyeOff className="h-4 w-4 text-slate-300" />
-                    <h2 className="text-base font-bold text-slate-400">Quitados del status</h2>
-                    <span className="text-xs font-semibold bg-slate-100 text-slate-400 border-slate-200 px-2 py-0.5 rounded-full border">{hiddenCount}</span>
-                  </div>
-                  <div className="rounded-xl border border-dashed border-slate-200 overflow-hidden opacity-60">
-                    <AnimatePresence initial={false}>
-                      {allItems.filter(i => i.hiddenFromWeekly).map(item => {
-                        const h = getItemHandlers(item);
-                        return (
-                          <motion.div key={item.key} layout
-                            initial={{ opacity: 0, height: 0 }}
-                            animate={{ opacity: 1, height: 'auto' }}
-                            exit={{ opacity: 0, height: 0 }}
-                            transition={{ duration: 0.15, ease: 'easeOut' }}
-                            className="flex items-center gap-3 px-4 py-2.5 border-b border-slate-100 last:border-0 hover:bg-slate-50 overflow-hidden">
-                            <div className={cn("w-2.5 h-2.5 rounded-full shrink-0", hm(item.healthStatus).dot)} />
-                            <span className="flex-1 text-sm text-slate-500">{item.title}{item.subtitle && ` · ${item.subtitle}`}</span>
-                            <button onClick={() => h.onUpdate({ hiddenFromWeekly: false })}
-                              className="flex items-center gap-1 text-xs text-indigo-500 hover:text-indigo-700 font-medium">
-                              <Eye className="h-3.5 w-3.5" /> Restaurar
-                            </button>
-                            {item.isCustom && (
-                              <button onClick={h.onRemove} className="flex items-center gap-1 text-xs text-red-400 hover:text-red-600 font-medium ml-2">
-                                <Trash2 className="h-3.5 w-3.5" /> Eliminar
-                              </button>
-                            )}
-                          </motion.div>
-                        );
-                      })}
-                    </AnimatePresence>
-                  </div>
-                </div>
-              )}
-              </div>
-              </div>
-            </>
+                <Popover><PopoverTrigger asChild><button aria-label="Filtrar temas" className={cn('p-2 rounded-lg hover:bg-slate-200/50', filterHealth || filterOwner !== null ? 'text-indigo-600 bg-indigo-50' : 'text-slate-400')}><Filter className="h-3.5 w-3.5" /></button></PopoverTrigger>
+                  <PopoverContent align="start" className="w-60 space-y-4">
+                    <label className="block text-xs text-slate-500 space-y-1"><span>Estado</span><select value={filterHealth ?? ''} onChange={event => setFilterHealth(event.target.value || null)} className="w-full border border-slate-200 rounded-md p-2 bg-white"><option value="">Todos</option>{Object.entries(HEALTH).map(([key, health]) => <option key={key} value={key}>{health.label}</option>)}</select></label>
+                    <label className="block text-xs text-slate-500 space-y-1"><span>Responsable</span><select value={filterOwner?.toString() ?? ''} onChange={event => setFilterOwner(event.target.value ? Number(event.target.value) : null)} className="w-full border border-slate-200 rounded-md p-2 bg-white"><option value="">Todos</option>{appUsers.map(user => <option key={user.id} value={user.id}>{user.name}</option>)}</select></label>
+                    <button onClick={() => { setSearchQuery(''); setFilterHealth(null); setFilterOwner(null); }} className="text-xs text-indigo-600">Limpiar filtros</button>
+                  </PopoverContent>
+                </Popover>
+              </div>}
+              renderSelection={bulkMode ? item => <input type="checkbox" aria-label={`Seleccionar ${item.title}`} checked={selectedKeys.has(item.key)} onChange={event => setSelectedKeys(prev => { const next = new Set(prev); event.target.checked ? next.add(item.key) : next.delete(item.key); return next; })} className="ml-1 accent-indigo-600" /> : undefined}
+              footer={hiddenCount > 0 ? <button onClick={() => setShowHidden(value => !value)} className="flex items-center gap-2 text-xs text-slate-400 hover:text-slate-700"><Eye className="h-3.5 w-3.5" />{showHidden ? 'Ocultar resueltos' : `${hiddenCount} temas resueltos`}</button> : undefined}
+              renderDetail={item => <StatusFocusDetail key={item.key} item={item} users={appUsers} currentUserId={currentUserId} roomId={roomCtx?.roomId} {...getItemHandlers(item)} />}
+            />
           )}
         </div>
       </div>
@@ -4226,9 +3877,9 @@ export default function StatusSemanalPage({ initialItemKey }: { initialItemKey?:
               {[
                 ['J / ↓', 'Siguiente ítem'],
                 ['K / ↑', 'Ítem anterior'],
-                ['E', 'Expandir / colapsar'],
+                [viewMode === 'list' ? 'Enter' : 'E', viewMode === 'list' ? 'Abrir tema' : 'Expandir / colapsar'],
                 ['/', 'Enfocar búsqueda'],
-                ['Esc', 'Colapsar / cerrar'],
+                ['Esc', 'Cerrar diálogo'],
                 ['?', 'Mostrar esta ayuda'],
                 ['— Daily —', ''],
                 ['⏎', 'Guardar y siguiente'],
@@ -4250,9 +3901,10 @@ export default function StatusSemanalPage({ initialItemKey }: { initialItemKey?:
 
       {/* ── Activity panel (notes + change log) ─────────────────── */}
       {notesOpen !== null && (
-        <div className="fixed top-0 right-0 h-full w-[320px] border-l border-border bg-background shadow-xl z-20 flex flex-col">
+        <div className="fixed top-0 right-0 h-full w-[360px] max-w-full border-l border-border bg-background shadow-xl z-40 flex flex-col">
           {(openNotesProject || openNotesCustom) && (
             <ActivityPanel
+              key={`${notesOpen.type}-${notesOpen.id}`}
               projectId={notesOpen.type === 'project' ? notesOpen.id : undefined}
               customItemId={notesOpen.type === 'custom' ? notesOpen.id : undefined}
               projectName={notesItemName}
