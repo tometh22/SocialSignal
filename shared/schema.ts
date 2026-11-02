@@ -1656,6 +1656,7 @@ export const activeProjects = pgTable("active_projects", {
   asanaProjectGid: text("asana_project_gid"),
   asanaSource: jsonb("asana_source").$type<Record<string, unknown> | null>(),
   taskSectionNames: jsonb("task_section_names").$type<string[]>().notNull().default([]),
+  capacityEstimationMode: text("capacity_estimation_mode").notNull().default("task"),
   id: serial("id").primaryKey(),
   quotationId: integer("quotation_id").references(() => quotations.id), // nullable — projects can be created without a quotation
   clientId: integer("client_id").notNull().references(() => clients.id),
@@ -2469,6 +2470,7 @@ export const taskWeeklyEstimates = pgTable("task_weekly_estimates", {
   taskId: integer("task_id").notNull().references(() => tasks.id, { onDelete: "cascade" }),
   weekStart: text("week_start").notNull(), // YYYY-MM-DD (Monday)
   estimatedHours: doublePrecision("estimated_hours").notNull(),
+  isExtra: boolean("is_extra").notNull().default(false),
   createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => ({
@@ -2483,6 +2485,18 @@ export const insertTaskWeeklyEstimateSchema = createInsertSchema(taskWeeklyEstim
     estimatedHours: z.number().positive("Las horas estimadas deben ser mayores a cero"),
   });
 export type TaskWeeklyEstimate = typeof taskWeeklyEstimates.$inferSelect;
+
+export const capacityGroupEstimates = pgTable("capacity_group_estimates", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull().references(() => activeProjects.id, { onDelete: "cascade" }),
+  personnelId: integer("personnel_id").notNull().references(() => personnel.id, { onDelete: "cascade" }),
+  weekStart: text("week_start").notNull(),
+  scope: text("scope").notNull(),
+  sectionName: text("section_name").notNull().default(""),
+  estimatedHours: doublePrecision("estimated_hours").notNull(),
+  updatedBy: integer("updated_by").references(() => users.id, { onDelete: "set null" }),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, table => ({ unique: unique("capacity_group_estimate_unique").on(table.projectId, table.personnelId, table.weekStart, table.scope, table.sectionName) }));
 
 export const taskComments = pgTable("task_comments", {
   id: serial("id").primaryKey(),

@@ -55,7 +55,7 @@ export function TaskSelectionProvider({ projectId, canDelete, onDeleted, childre
         if (id != null) { e.preventDefault(); if (anchor.current == null) anchor.current = focused ?? id; toggle(id, true, false); root.current?.querySelector<HTMLInputElement>(`input[data-task-select="${id}"]`)?.focus(); }
       }
     }}>
-      {selected.size > 0 && <div className="sticky top-0 z-20 mb-2 flex items-center gap-3 rounded border bg-background p-2 text-sm"><span>{selected.size} seleccionada(s)</span><Button size="sm" variant="destructive" onClick={() => setConfirm(true)}>Eliminar</Button><Button size="sm" variant="ghost" onClick={() => { setSelected(new Set()); anchor.current = null; }}>Limpiar selección</Button></div>}
+      {selected.size > 0 && <div data-task-selection-toolbar className="sticky z-10 mb-2 flex flex-wrap items-center gap-3 rounded border bg-background p-2 text-sm" style={{ top: "var(--task-project-header-height, 0px)" }}><span>{selected.size} seleccionada(s)</span><Button size="sm" variant="destructive" onClick={() => setConfirm(true)}>Eliminar</Button><Button size="sm" variant="ghost" onClick={() => { setSelected(new Set()); anchor.current = null; }}>Limpiar selección</Button></div>}
       {children}
     </div>
     <Dialog open={confirm} onOpenChange={setConfirm}><DialogContent><DialogHeader><DialogTitle>Eliminar {selected.size} tarea(s)</DialogTitle></DialogHeader>
