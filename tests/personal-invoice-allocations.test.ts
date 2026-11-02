@@ -1,3 +1,4 @@
+import { navigationAreas } from "@/lib/app-navigation";
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
@@ -5,11 +6,10 @@ describe("team cost and invoice integration contracts", () => {
   const source = (path: string) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
 
   it("mantiene un espacio personal de facturación con evidencia privada", () => {
-    const sidebar = source("client/src/components/layout/sidebar-fixed.tsx");
+    const areas = navigationAreas({ isAdmin: true });
     const page = source("client/src/pages/my-invoices.tsx");
     const routes = source("server/routes.ts");
-    expect(sidebar).not.toContain('title: "Mi gestión"');
-    expect(sidebar).toContain('href: "/my-invoices"');
+    expect(areas.find(area => area.id === 'work')!.items.map(item => item.href)).toContain('/my-invoices');
     expect(page).toContain("esperá la autorización de Operaciones");
     expect(page).toContain("Enviar a Administración");
     expect(routes).toContain("storeFinancialIntakeFile(file)");
@@ -19,14 +19,14 @@ describe("team cost and invoice integration contracts", () => {
 
   it("asigna la liquidación a Operaciones y el matching a Finanzas", () => {
     const app = source("client/src/App.tsx");
-    const sidebar = source("client/src/components/layout/sidebar-fixed.tsx");
+    const areas = navigationAreas({ isAdmin: true });
     const operationsPage = source("client/src/pages/team-settlements.tsx");
     const financePage = source("client/src/pages/team-invoice-review.tsx");
     const routes = source("server/routes.ts");
     expect(app).toContain('/operations/liquidaciones-equipo');
     expect(app).toContain('/finance/facturas-equipo');
-    expect(sidebar).toContain('title: "Cierre del equipo"');
-    expect(sidebar).toContain('title: "Facturas equipo"');
+    expect(areas.find(area => area.id === 'operations')!.items.map(item => item.href)).toContain('/operations/monthly-closing');
+    expect(areas.find(area => area.id === 'finance')!.items.map(item => item.href)).toContain('/finance/facturas-equipo');
     expect(operationsPage).toContain("Operaciones completa");
     expect(operationsPage).not.toContain("Administración completa");
     expect(financePage).toContain("Aprobar y crear Pasivo");

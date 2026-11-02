@@ -88,6 +88,7 @@ import HomeDashboard from "@/pages/home-dashboard";
 const UnauthorizedPage = lazy(() => import("@/pages/unauthorized"));
 import SidebarFixed from "@/components/layout/sidebar-fixed";
 import Topbar from "@/components/layout/topbar";
+import AreaNavigation from "@/components/layout/area-navigation";
 import { Sheet, SheetContent, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { AuthProvider } from "@/hooks/use-auth";
 import { ChatProvider } from "@/hooks/use-chat";
@@ -249,6 +250,7 @@ function AppRoutes() {
 
           <div className="flex min-h-0 flex-col flex-1 overflow-clip min-w-0">
             <Topbar onMenuClick={() => setMobileSidebarOpen(true)} />
+            <AreaNavigation />
             <main className={isReviewRoom ? "app-main flex-1 min-h-0 flex flex-col overflow-hidden" : "app-main flex-1 overflow-y-auto overflow-x-hidden"}>
               <div className={isReviewRoom ? "app-content status-room-content max-w-full" : "app-content max-w-full p-3 sm:p-5 lg:p-6"}>
                 <Suspense fallback={<AppRouteFallback />}>

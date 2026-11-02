@@ -1,3 +1,4 @@
+import { navigationAreas } from "@/lib/app-navigation";
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { extractFinancialTextHeuristically, financialExtractionSchema, financialMissingFields } from "../server/services/financial-intake-extractor";
@@ -101,12 +102,10 @@ describe("financial native integration contracts", () => {
     expect(intake).toContain("Curva REM / tipos de cambio futuros");
   });
 
-  it("separa la carga de la gestión y los reportes en la navegación", () => {
-    const sidebar = read("client/src/components/layout/sidebar-fixed.tsx");
-    expect(sidebar).toContain('title: "Carga financiera"');
-    expect(sidebar).toContain('title: "Gestión financiera"');
-    expect(sidebar).toContain('title: "Reportes financieros"');
-    expect(sidebar.indexOf('title: "Carga financiera"')).toBeLessThan(sidebar.indexOf('title: "Reportes financieros"'));
+  it("reúne carga, gestión y reportes dentro de Finanzas sin perder sus destinos", () => {
+    const finance = navigationAreas({ isAdmin: true }).find(area => area.id === 'finance')!;
+    expect(finance.items.map(item => item.href)).toEqual(expect.arrayContaining(['/finance/cargar', '/finance/cashflow', '/finance/proyeccion', '/finance/facturas-equipo']));
+    expect(finance.items).toHaveLength(12);
   });
 
   it("hace explícitos los tres pasos y permite buscar y revisar un lote antes de procesarlo", () => {
