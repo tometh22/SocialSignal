@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.14.17 — 2026-11-02
+
+- Status abre el alta de ítems en un diálogo amplio, adaptable a móvil, con área de texto redimensionable y controles de guardado visibles. Enter agrega una línea en el contexto y Ctrl/⌘ + Enter guarda el ítem.
+- Cards, comentarios, historial y daily conservan párrafos y muestran viñetas de WhatsApp, listas numeradas y formato básico. Los comentarios y la edición de updates usan campos multilínea para no perder los saltos al pegar texto.
+- Regresiones de render para viñetas con caracteres invisibles, listas anidadas, párrafos y contenido seguro; revisión visual del formulario en escritorio y móvil.
+
 ## 1.14.16 — 2026-10-29
 
 - Aplicar una receta después del Brief asigna su modalidad aunque el filtro inicial esté vacío. La compatibilidad para mostrar las cuatro recetas ya no se usa como motivo para conservar un tipo vacío; Fee deja de guardarse como puntual. El cálculo de benchmarks usa la misma resolución.
