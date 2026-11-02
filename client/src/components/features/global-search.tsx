@@ -1,4 +1,6 @@
 import { usePermissions } from "@/hooks/use-permissions";
+import { useAuth } from '@/hooks/use-auth';
+import { navigationAreas, searchNavigation } from '@/lib/app-navigation';
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -51,10 +53,12 @@ interface GlobalSearchProps {
 
 export function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
   const { isOperations, hasPermission, hasAnyPermission } = usePermissions();
+  const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedFilters, setSelectedFilters] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState('all');
   const inputRef = useRef<HTMLInputElement>(null);
+  const toolResults = useMemo(() => searchTerm.trim() ? searchNavigation(navigationAreas(user), searchTerm).slice(0, 12) : [], [user, searchTerm]);
 
   const { data: clients = [] } = useQuery<{ id: number; name: string; [key: string]: unknown }[]>({ queryKey: ['/api/clients'], enabled:isOpen && hasPermission('crm') });
   const { data: activeProjects = [] } = useQuery<{ id: number; quotationId?: number | null; [key: string]: unknown }[]>({ queryKey: ['/api/tasks/projects', 'search', isOperations], queryFn:async()=>{ const {authFetchJson}=await import('@/lib/queryClient'); return authFetchJson(`/api/tasks/projects?scope=${isOperations ? 'all' : 'mine'}`); }, enabled:isOpen && hasAnyPermission(['projects','operations','task_manager']) });
@@ -298,7 +302,7 @@ export function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2">
               <Search className="h-5 w-5" />
-              Búsqueda Global Inteligente
+              Buscar en Mind
             </CardTitle>
             <Button variant="ghost" size="sm" onClick={onClose} aria-label="Cerrar búsqueda">
               <X className="h-4 w-4" />
@@ -310,7 +314,7 @@ export function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <Input
                 ref={inputRef}
-                placeholder="Buscar clientes, proyectos, cotizaciones..."
+                placeholder="Buscar herramientas, clientes, proyectos…"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10 text-base"
@@ -358,14 +362,22 @@ export function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
         </CardHeader>
 
         <CardContent className="min-h-0 flex-1 overflow-y-auto pt-0">
+          {toolResults.length > 0 && <section aria-label="Herramientas" className="mb-6">
+            <h3 className="text-xs font-medium text-slate-400 mb-2">Herramientas</h3>
+            <div className="grid gap-1 sm:grid-cols-2">
+              {toolResults.map(({ area, item }) => <Link key={item.href} href={item.href} onClick={onClose} className="flex items-center gap-3 rounded-lg border border-slate-100 p-3 hover:bg-slate-50">
+                <item.icon className="h-4 w-4 shrink-0 text-slate-400" /><span className="min-w-0 flex-1 text-sm font-medium text-slate-700 break-words">{item.title}<span className="mt-0.5 block text-xs text-slate-400 font-normal">{area.title}</span></span><ChevronRight className="h-3 w-3 text-slate-300 shrink-0" />
+              </Link>)}
+            </div>
+          </section>}
           {searchTerm.trim() === '' ? (
             <div className="text-center py-12 text-gray-500">
               <Search className="h-12 w-12 mx-auto mb-3 text-gray-300" />
               <h3 className="font-medium text-gray-600">Comienza a escribir para buscar</h3>
-              <p className="text-sm">Encuentra clientes, proyectos, cotizaciones y más...</p>
+              <p className="text-sm">Encontrá herramientas, clientes, proyectos y cotizaciones.</p>
             </div>
           ) : searchResults.length === 0 ? (
-            <div className="text-center py-12 text-gray-500">
+            <div className={toolResults.length ? 'hidden' : 'text-center py-12 text-gray-500'}>
               <Search className="h-12 w-12 mx-auto mb-3 text-gray-300" />
               <h3 className="font-medium text-gray-600">No se encontraron resultados</h3>
               <p className="text-sm">Intenta con otros términos de búsqueda</p>

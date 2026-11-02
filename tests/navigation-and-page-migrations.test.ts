@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, test } from "vitest";
 
+import { navigationAreas } from "@/lib/app-navigation";
 import { getFirstAllowedRouteForUser } from "@/lib/first-allowed-route";
 
 const source = (relativePath: string) =>
@@ -21,24 +22,12 @@ describe("navigation and high-traffic page migrations", () => {
     expect(authHook).not.toContain('return \'/statistics\'');
   });
 
-  test("sidebar follows the product information architecture", () => {
-    const sidebar = source("client/src/components/layout/sidebar-fixed.tsx");
-    const labels = [
-      'title: "Comercial"',
-      'title: "Proyectos"',
-      'title: "Operaciones"',
-      'title: "Carga financiera"',
-      'title: "Gestión financiera"',
-      'title: "Reportes financieros"',
-      'title: "Administración"',
-    ];
-    const positions = labels.map((label) => sidebar.indexOf(label));
-
-    expect(positions.every((position) => position >= 0)).toBe(true);
-    expect(positions).toEqual([...positions].sort((a, b) => a - b));
-    expect(sidebar).toContain('href: "/review", title: "Status"');
-    expect(sidebar).not.toContain("reviewsExpanded");
-    expect(sidebar).not.toContain("taskProjects");
+  test("sidebar and contextual tools use the same permission-aware navigation", () => {
+    const areas = navigationAreas({ isAdmin: true });
+    expect(areas.map(area => area.title)).toEqual(['Inicio', 'Mi trabajo', 'Comercial', 'Proyectos', 'Status', 'Operaciones', 'Finanzas', 'Administración']);
+    expect(areas.find(area => area.id === 'finance')?.items).toHaveLength(12);
+    expect(source("client/src/components/layout/sidebar-fixed.tsx")).toContain('useAppNavigation');
+    expect(source("client/src/components/layout/area-navigation.tsx")).toContain('useAppNavigation');
   });
 
   test("financial summary uses compact chrome and accessible controls", () => {

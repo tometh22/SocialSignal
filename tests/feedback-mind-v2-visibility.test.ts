@@ -1,3 +1,4 @@
+import { navigationAreas } from "@/lib/app-navigation";
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
@@ -6,12 +7,11 @@ const source = (relativePath: string) =>
 
 describe("Feedback Mind V2 visibility for Victoria Achabal", () => {
   it("exposes the operational project surfaces in the main navigation", () => {
-    const sidebar = source("client/src/components/layout/sidebar-fixed.tsx");
-
-    expect(sidebar).toContain('href: "/tasks/projects/kanban", title: "Kanban de proyectos"');
-    expect(sidebar).toContain('href: "/tasks/team-calendar", title: "Calendario"');
-    expect(sidebar).toContain('href: "/operations/absences", title: "Gestión de ausencias"');
-    expect(sidebar).toContain('title: isOperations ? "Cartera de proyectos" : isTaskManager ? "Proyectos de tareas" : "Mis proyectos"');
+    const areas = navigationAreas({ permissions: ['operations', 'projects'] });
+    const projects = areas.find(area => area.id === 'projects')!.items.map(item => item.href);
+    expect(projects).toEqual(expect.arrayContaining(['/active-projects', '/tasks/projects/kanban', '/tasks/team-calendar']));
+    expect(areas.find(area => area.id === 'operations')!.items.map(item => item.href)).toContain('/operations/absences');
+    expect(navigationAreas({ permissions: ['task_manager'] }).find(area => area.id === 'projects')!.items[0].href).toBe('/tasks/projects');
 
     const absences = source("client/src/pages/personnel-absences.tsx");
     expect(absences).toContain("Gestión de Operaciones: aprobá solicitudes, administrá cupos");

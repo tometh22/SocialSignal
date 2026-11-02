@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.14.20 — 2026-11-02
+
+- La navegación principal agrupa las herramientas en ocho áreas: Inicio, Mi trabajo, Comercial, Proyectos, Status, Operaciones, Finanzas y Administración. Las vistas de cada área aparecen en una barra contextual, con un menú Más para las herramientas adicionales y selección correcta en enlaces directos.
+- Favoritos personales: hasta cuatro herramientas o salas de Status, guardadas por usuario en este navegador, compartidas entre navegación móvil y escritorio. Se filtran los accesos por los permisos vigentes y las salas disponibles.
+- El buscador de Mind también encuentra herramientas por nombre, área y términos relacionados, respetando los permisos. Los proveedores mantienen su navegación reducida a panel y facturas.
+- Una única definición de navegación alimenta menú, herramientas, favoritos y búsqueda. Cobertura de permisos, destinos existentes, rutas específicas, búsquedas sin tildes y preferencias inválidas; Operaciones sin permiso de Proyectos abre la cartera de tareas permitida.
+
 ## 1.14.19 — 2026-11-02
 
 - El historial completo incluye los updates que ya contaba la tarjeta, además de comentarios y cambios de campos, con texto completo, formato, autor y fecha. Pruebas para proyectos y temas propios verifican siete entradas de ambos autores sin perder las que comparten ID.
