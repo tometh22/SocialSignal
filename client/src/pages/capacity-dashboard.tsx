@@ -10,54 +10,29 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { usePermissions } from "@/hooks/use-permissions";
-import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, authFetchJson } from "@/lib/queryClient";
+import CapacityProjectPlanning from "@/components/tasks/CapacityProjectPlanning";
+import { currentBuenosAiresWeek } from "@shared/utils/buenos-aires-week";
 import { Loader2, Pencil, Check, X, RotateCcw, ChevronRight, ChevronDown } from "lucide-react";
 
 export default function CapacityDashboard() {
   const { isOperations } = usePermissions();
-  const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [resetTarget, setResetTarget] = useState<{ personnelId: number; name: string } | null>(null);
-  const [weekStart, setWeekStart] = useState(() => {
-    const d = new Date();
-    d.setDate(d.getDate() - d.getDay() + 1); // Monday
-    return d.toISOString().split("T")[0];
-  });
+  const [weekStart, setWeekStart] = useState(() => currentBuenosAiresWeek().from);
 
   const [editingCapacityId, setEditingCapacityId] = useState<number | null>(null);
   const [editingCapacityInput, setEditingCapacityInput] = useState<string>("");
 
-  // Expandable per-person task breakdown (Proyecto > sección > tarea)
   const [expandedPersonId, setExpandedPersonId] = useState<number | null>(null);
-  // Proyectos contraídos dentro del desglose, por persona + proyecto.
-  const [collapsedProjects, setCollapsedProjects] = useState<Set<string>>(new Set());
-  const toggleProject = (key: string) => setCollapsedProjects(prev => {
-    const next = new Set(prev);
-    if (next.has(key)) next.delete(key); else next.add(key);
-    return next;
-  });
-  const [editingEstTaskId, setEditingEstTaskId] = useState<number | null>(null);
-  const [editingEstInput, setEditingEstInput] = useState<string>("");
-
-  // Week boundaries (Mon..Sun) for filtering tasks active in the week
-  const weekEndStr = (() => {
-    const d = new Date(weekStart + "T00:00:00");
-    d.setDate(d.getDate() + 6);
-    return d.toISOString().split("T")[0];
-  })();
 
   const queryKey = ["/api/capacity/weekly", weekStart];
 
   const { data, isLoading, isError } = useQuery<any>({
     queryKey,
-    queryFn: () =>
-      fetch(`/api/capacity/weekly?weekStart=${weekStart}`, {
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-      }).then((r) => r.json()),
+    queryFn: () => authFetchJson(`/api/capacity/weekly?weekStart=${weekStart}`),
   });
 
   const saveOverride = useMutation({
@@ -80,71 +55,8 @@ export default function CapacityDashboard() {
     onError: () => toast({ title: "Error al restablecer", variant: "destructive" }),
   });
 
-  // All tasks enriched with project/section names, for the per-person weekly breakdown
-  const { data: allTasks = [] } = useQuery<any[]>({
-    queryKey: ["/api/tasks/team-calendar", "capacity", weekStart],
-    queryFn: () => fetch(`/api/tasks/team-calendar?weekStart=${weekStart}`, { credentials: "include" }).then((r) => r.json()),
-  });
-
-  const updateEstimate = useMutation({
-    mutationFn: (vars: { taskId: number; estimatedHours: number }) =>
-      vars.estimatedHours === 0
-        ? apiRequest(`/api/tasks/${vars.taskId}/weekly-estimates/${weekStart}`, "DELETE")
-        : apiRequest(`/api/tasks/${vars.taskId}/weekly-estimates`, "POST", { weekStart, estimatedHours: vars.estimatedHours }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/tasks/team-calendar"] });
-      queryClient.invalidateQueries({ queryKey });
-      // La tarea dentro del proyecto (y el resumen de horas) leen la misma tabla
-      // task_weekly_estimates — sin esto, el "reloj" de la tarea en el proyecto
-      // queda con el valor viejo hasta que su cache de 5 min expire.
-      queryClient.invalidateQueries({ queryKey: ["/api/tasks/project"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/tasks/hours-summary"] });
-      toast({ title: "Horas estimadas actualizadas" });
-    },
-    onError: () => toast({ title: "Error al actualizar estimación", variant: "destructive" }),
-  });
-
-  // Tasks of a person active during the selected week (start..due overlaps week), excl. done/subtasks
-  const tasksForPersonInWeek = (personnelId: number) => {
-    const ws = weekStart;
-    const we = weekEndStr;
-    return allTasks.filter((t: any) => {
-      if (t.assigneeId !== personnelId || t.parentTaskId || t.status === "done") return false;
-      const start = t.startDate ? String(t.startDate).slice(0, 10) : null;
-      const due = t.dueDate ? String(t.dueDate).slice(0, 10) : null;
-      if (!start && !due) return true; // undated active tasks always show
-      const s = start || due!;
-      const e = due || start!;
-      return s <= we && e >= ws; // overlap
-    });
-  };
-
-  // Group a person's tasks: Proyecto > sección > tareas
-  const groupTasks = (tasks: any[]) => {
-    const projects = new Map<string, { projectName: string; clientName: string | null; sections: Map<string, any[]> }>();
-    for (const t of tasks) {
-      const pName = t.projectName || "Sin proyecto";
-      const pKey = `${t.projectId}:${pName}`;
-      if (!projects.has(pKey)) projects.set(pKey, { projectName: pName, clientName: t.clientName ?? null, sections: new Map() });
-      const proj = projects.get(pKey)!;
-      const sName = t.sectionName || "General";
-      if (!proj.sections.has(sName)) proj.sections.set(sName, []);
-      proj.sections.get(sName)!.push(t);
-    }
-    return projects;
-  };
-
-  const allPersonnel = data?.personnel || [];
+  const personnel = data?.personnel || [];
   const totals = data?.totals;
-
-  // Team members only see their own row; operations sees everyone
-  const personnel = isOperations
-    ? allPersonnel
-    : allPersonnel.filter((p: any) => {
-        const fullName = `${user?.firstName ?? ""} ${user?.lastName ?? ""}`.trim().toLowerCase();
-        const normalize = (s: string) => s.trim().toLowerCase().replace(/\s+/g, ' ');
-        return fullName && normalize(p.name) === normalize(fullName);
-      });
 
   const handleStartEdit = (p: any) => {
     setEditingCapacityInput(String(p.maxCapacity));
@@ -167,8 +79,8 @@ export default function CapacityDashboard() {
   };
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="min-w-0 p-3 sm:p-6 space-y-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold">Capacidad Operativa Semanal</h1>
           <p className="text-muted-foreground text-sm">
@@ -180,8 +92,9 @@ export default function CapacityDashboard() {
         <Input
           type="date"
           value={weekStart}
-          onChange={(e) => setWeekStart(e.target.value)}
-          className="w-44"
+          aria-label="Semana de capacidad"
+          onChange={(e) => { if (e.target.value) setWeekStart(currentBuenosAiresWeek(new Date(`${e.target.value}T12:00:00Z`)).from); }}
+          className="w-full shrink-0 sm:w-44"
         />
       </div>
 
@@ -224,7 +137,7 @@ export default function CapacityDashboard() {
       ) : isError ? (
         <div className="text-center py-12 text-red-500">Error al cargar datos de capacidad</div>
       ) : (
-        <Card>
+        <Card className="min-w-0">
           <CardHeader>
             <CardTitle>
               Detalle por Persona
@@ -233,7 +146,7 @@ export default function CapacityDashboard() {
               )}
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="overflow-x-auto">
             {personnel.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">
                 {isOperations ? "No hay personal configurado esta semana" : "No se encontró tu registro de capacidad para esta semana"}
@@ -244,7 +157,7 @@ export default function CapacityDashboard() {
                   <tr className="border-b">
                     <th className="text-left py-2 px-3">Persona</th>
                     <th className="text-center py-2 px-3">Cap. Máxima</th>
-                    <th className="text-center py-2 px-3">Hs Tareas</th>
+                    <th className="text-center py-2 px-3">Horas estimadas</th>
                     <th className="text-center py-2 px-3">Horas Reales</th>
                     {isOperations && <th className="text-center py-2 px-3">Horas Ociosas</th>}
                     <th className="text-center py-2 px-3">Utilización</th>
@@ -253,8 +166,6 @@ export default function CapacityDashboard() {
                 <tbody>
                   {personnel.map((p: any) => {
                     const isExpanded = expandedPersonId === p.personnelId;
-                    const personTasks = isExpanded ? tasksForPersonInWeek(p.personnelId) : [];
-                    const grouped = isExpanded ? groupTasks(personTasks) : null;
                     return (
                     <Fragment key={p.personnelId}>
                     <tr className="border-b hover:bg-muted/30 group">
@@ -263,7 +174,9 @@ export default function CapacityDashboard() {
                           <button
                             className="text-muted-foreground hover:text-foreground"
                             onClick={() => setExpandedPersonId(isExpanded ? null : p.personnelId)}
-                            title="Ver tareas de la semana"
+                            title="Ver planificación de la semana"
+                            aria-label={`Ver planificación de ${p.name}`}
+                            aria-expanded={isExpanded}
                           >
                             {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
                           </button>
@@ -363,94 +276,7 @@ export default function CapacityDashboard() {
                     {isExpanded && (
                       <tr className="bg-muted/20">
                         <td colSpan={isOperations ? 6 : 5} className="px-3 py-3">
-                          {personTasks.length === 0 ? (
-                            <div className="text-xs text-muted-foreground py-2 pl-6">
-                              Sin tareas activas esta semana ({weekStart} → {weekEndStr}).
-                            </div>
-                          ) : (
-                            <div className="space-y-3 pl-6">
-                              {Array.from(grouped!.values()).map((proj, pi) => {
-                                const projectKey = `${p.personnelId}:${proj.clientName ?? ""}:${proj.projectName}`;
-                                const projectCollapsed = collapsedProjects.has(projectKey);
-                                const projectEstimate = Array.from(proj.sections.values()).flat()
-                                  .reduce((sum: number, t: any) => sum + (Number(t.estimatedHoursForWeek) || 0), 0);
-                                return (
-                                <div key={pi}>
-                                  <button
-                                    type="button"
-                                    className="flex w-full items-center gap-1.5 text-left text-xs font-semibold text-foreground hover:text-primary"
-                                    onClick={() => toggleProject(projectKey)}
-                                    aria-expanded={!projectCollapsed}
-                                    data-testid="capacity-project-toggle"
-                                  >
-                                    {projectCollapsed ? <ChevronRight className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-                                    <span>
-                                      {proj.clientName ? <span className="text-muted-foreground">{proj.clientName} · </span> : null}
-                                      {proj.projectName}
-                                    </span>
-                                    {projectEstimate > 0 && <span className="font-normal text-muted-foreground">· {projectEstimate}h est.</span>}
-                                  </button>
-                                  {!projectCollapsed && Array.from(proj.sections.entries()).map(([sName, sTasks], si) => (
-                                    <div key={si} className="mt-1 pl-3">
-                                      <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{sName}</div>
-                                      <div className="mt-0.5">
-                                        {sTasks.map((t: any) => (
-                                          <div key={t.id} className="flex items-center gap-3 py-0.5 pl-3 text-xs" data-testid="capacity-task-row">
-                                            <span className="min-w-0 max-w-[22rem] flex-1 truncate text-foreground sm:flex-none sm:basis-[22rem]">{t.title}</span>
-                                            {editingEstTaskId === t.id ? (
-                                              <div className="flex items-center gap-1">
-                                                <Input
-                                                  type="number"
-                                                  value={editingEstInput}
-                                                  onChange={e => setEditingEstInput(e.target.value)}
-                                                  className="w-16 h-6 text-xs text-center"
-                                                  min={0}
-                                                  step={0.5}
-                                                  autoFocus
-                                                  onKeyDown={e => {
-                                                    if (e.key === "Enter") {
-                                                      const v = parseFloat(editingEstInput);
-                                                      if (!isNaN(v) && v >= 0) updateEstimate.mutate({ taskId: t.id, estimatedHours: v });
-                                                      setEditingEstTaskId(null);
-                                                    }
-                                                    if (e.key === "Escape") setEditingEstTaskId(null);
-                                                  }}
-                                                />
-                                                <span className="text-muted-foreground">h</span>
-                                                <Button size="sm" variant="ghost" className="h-5 w-5 p-0 text-green-600"
-                                                  onClick={() => {
-                                                    const v = parseFloat(editingEstInput);
-                                                    if (!isNaN(v) && v >= 0) updateEstimate.mutate({ taskId: t.id, estimatedHours: v });
-                                                    setEditingEstTaskId(null);
-                                                  }}>
-                                                  <Check className="h-3 w-3" />
-                                                </Button>
-                                                <Button size="sm" variant="ghost" className="h-5 w-5 p-0" onClick={() => setEditingEstTaskId(null)}>
-                                                  <X className="h-3 w-3" />
-                                                </Button>
-                                              </div>
-                                            ) : (
-                                              <button
-                                                className="flex items-center gap-1 text-muted-foreground hover:text-primary"
-                                                onClick={() => { setEditingEstInput(String(t.estimatedHoursForWeek ?? "")); setEditingEstTaskId(t.id); }}
-                                                title="Editar horas estimadas"
-                                              >
-                                                <span className={t.estimatedHoursForWeek ? "text-foreground" : "text-muted-foreground/50"}>
-                                                  {t.estimatedHoursForWeek ? `${t.estimatedHoursForWeek}h est.` : "+ estimar"}
-                                                </span>
-                                                <Pencil className="h-2.5 w-2.5" />
-                                              </button>
-                                            )}
-                                          </div>
-                                        ))}
-                                      </div>
-                                    </div>
-                                  ))}
-                                </div>
-                                );
-                              })}
-                            </div>
-                          )}
+                          {data?.planning && <CapacityProjectPlanning key={`${p.personnelId}:${weekStart}`} planning={data.planning} personnelId={p.personnelId} weekStart={weekStart} isOperations={isOperations} />}
                         </td>
                       </tr>
                     )}

@@ -1,4 +1,7 @@
 import { roleRateAveragesQuery } from "./services/role-rate-averages";
+import { absenceNotificationDestination, settlementReviewDestination } from "@shared/utils/notification-destinations";
+import { capacityWeekSchema } from "@shared/utils/capacity-planning";
+import { effectiveCapacityEstimatesQuery, loadCapacityPlanning, saveCapacityMode, saveCapacityGroup, saveCapacityExtra, moveCapacitySectionEstimates, type CapacityActor } from "./services/capacity-planning";
 import { savePersonnelSettlement } from "./services/personnel-settlement-publication";
 import { validatePricingSnapshot } from "./services/quotation-pricing-snapshot";
 import { personalInvoiceReviewQuery } from "./services/personal-invoice-review";
@@ -12,7 +15,7 @@ import { personalTaskHours } from "./services/task-hour-privacy";
 import { setQuotationGroupArchived } from "./domain/quotation-group-archive";
 import { approvalRevisionIsCurrent } from "@shared/utils/quotation-approval";
 import { taskHourOwner, taskHourAttribution } from "@shared/utils/task-hour-owner";
-import { filterHoursTasks, hoursSectionOptions, reconcileSectionHours, validHoursSection } from "@shared/utils/hours-section";
+import { filterHoursTasks, hoursSectionKey, hoursSectionOptions, reconcileSectionHours, validHoursSection } from "@shared/utils/hours-section";
 import { assignmentActor, isDelegatedToOthers } from "../shared/utils/task-assignment";
 import { withProjectPeriodMetrics } from "./domain/metrics/project-period-overlay";
 import { markTaskCostSyncPending } from "./domain/task-cost-sync";
@@ -462,7 +465,7 @@ async function createUserNotifications(
   userIds: number[],
   notification: { eventKey: string; type: string; title: string; message: string; entityId?: number; actionUrl?: string },
 ) {
-  await persistUserNotifications(userIds, { ...notification, entityType: "absence", actionUrl: notification.actionUrl ?? "/absences" });
+  await persistUserNotifications(userIds, { ...notification, entityType: notification.type === "monthly_settlement" ? "monthly_settlement" : "absence", actionUrl: notification.actionUrl ?? "/absences" });
 }
 
 async function canAccessTaskProject(req: Request, projectId: number): Promise<boolean> {
@@ -23665,6 +23668,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (names.includes(newName) || conflict) throw Object.assign(new Error("Ya existe una sección con ese nombre"), { status: 409 });
         const changed = await tx.update(tasks).set({ sectionName: newName }).where(and(eq(tasks.projectId, projectId), eq(tasks.sectionName, oldName))).returning({ id: tasks.id });
         if (!names.includes(oldName) && !changed.length) throw Object.assign(new Error("Sección no encontrada"), { status: 404 });
+        await moveCapacitySectionEstimates(tx, projectId, oldName, newName);
         await tx.update(activeProjects).set({ taskSectionNames: [...new Set(names.includes(oldName) ? names.map(name => name === oldName ? newName : name) : [...names, newName])] }).where(eq(activeProjects.id, projectId));
       });
       res.json({ message: "Sección renombrada" });
@@ -23738,6 +23742,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await db.transaction(async tx => {
         const names = await lockProjectSectionNames(tx, Number(projectId));
         await tx.update(tasks).set({ sectionName: "General" }).where(and(eq(tasks.projectId, Number(projectId)), eq(tasks.sectionName, sectionName)));
+        await moveCapacitySectionEstimates(tx, Number(projectId), sectionName, "General");
         await tx.update(activeProjects).set({ taskSectionNames: names.filter(name => name !== sectionName) }).where(eq(activeProjects.id, Number(projectId)));
       });
       res.json({ message: "Sección eliminada" });
@@ -23876,15 +23881,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const availableSections = hoursSectionOptions(filterHoursTasks(taskRows, projectId ? Number(projectId) : null)
         .filter(task => sectionProjectIds.has(task.projectId) && (!effectivePersonnelId || task.assigneeId === effectivePersonnelId || recordedTaskIds.has(task.id))));
       if (!availableSections.some(option => option.value === "unsectioned")) availableSections.push({ value: "unsectioned", label: "Sin sección (incluye registros históricos)" });
-      const allTaskIds = allTasks.map((task) => task.id);
-      const weeklyEstimateRows = allTaskIds.length > 0
-        ? await db.select().from(taskWeeklyEstimates)
-            .where(inArray(taskWeeklyEstimates.taskId, allTaskIds))
-        : [];
-      const weeklyEstimatesByTask = aggregateWeeklyEstimatesByTask(weeklyEstimateRows, {
+      const effectiveResult = await db.execute(effectiveCapacityEstimatesQuery({
         dateFrom: typeof dateFrom === "string" ? dateFrom : null,
         dateTo: typeof dateTo === "string" ? dateTo : null,
-      });
+      }));
+      const scopeEstimates = (effectiveResult.rows as { projectId: number; personnelId: number | null; weekStart: string; estimatedHours: number; sectionName: string | null; taskId: number | null }[])
+        .filter(row => (visibleProjectIds === null || visibleProjectIds.includes(row.projectId))
+          && (!projectId || row.projectId === Number(projectId)) && (!effectivePersonnelId || row.personnelId === effectivePersonnelId));
+      for (const row of scopeEstimates) {
+        const key = hoursSectionKey(row.sectionName);
+        if (row.sectionName && sectionProjectIds.has(row.projectId) && !availableSections.some(option => option.value === key)) availableSections.push({ value: key, label: row.sectionName });
+      }
+      const effectiveEstimates = scopeEstimates.filter(row => !section || hoursSectionKey(row.sectionName) === section);
+      const weeklyEstimatesByTask = aggregateWeeklyEstimatesByTask(effectiveEstimates.filter((row): row is typeof row & { taskId: number } => row.taskId != null));
       
       const projectsWithNames = await db.execute(sql`
         SELECT ap.id, COALESCE(ap.name, q.project_name) as project_name, c.name as client_name
@@ -23934,19 +23943,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ? [parseInt(projectId as string)]
         : [...new Set([
             ...allTasks.map(t => t.projectId),
+            ...effectiveEstimates.map(row => row.projectId),
             ...entries.map((entry) => ("projectId" in entry ? entry.projectId : null)),
           ].filter(Boolean) as number[])];
 
-      // Weekly estimates are the only planned-hours source and use the same
-      // project/person/date scope as the real entries.
-      for (const t of allTasks) {
-        const estimatedHours = weeklyEstimatesByTask.get(t.id) ?? 0;
+      // The selected base and explicit task extras share the same period/person scope.
+      for (const estimate of effectiveEstimates) {
+        const estimatedHours = estimate.estimatedHours;
         if (estimatedHours <= 0) continue;
-        if (t.projectId && !scopeProjectIds.includes(t.projectId)) continue;
-        if (effectivePersonnelId && t.assigneeId !== effectivePersonnelId) continue;
-        const proj = t.projectId ? projectMap.get(t.projectId) : null;
-        const key = String(t.projectId ?? "unassigned");
-        if (!byProjectMap[key]) byProjectMap[key] = { projectId: t.projectId, name: proj?.name || "Sin proyecto", hours: 0, estimatedHours: 0 };
+        const proj = projectMap.get(estimate.projectId);
+        const key = String(estimate.projectId);
+        if (!byProjectMap[key]) byProjectMap[key] = { projectId: estimate.projectId, name: proj?.name || "Sin proyecto", hours: 0, estimatedHours: 0 };
         byProjectMap[key].estimatedHours += estimatedHours;
       }
       const byProject = Object.values(byProjectMap).sort((a, b) => b.hours - a.hours);
@@ -23958,18 +23965,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         byPersonMap[e.personnelId].hours += e.hours;
       }
 
-      // Estimated hours by assignee from task_weekly_estimates.
-      for (const t of allTasks) {
-        const estimatedHours = weeklyEstimatesByTask.get(t.id) ?? 0;
-        if (!t.assigneeId || estimatedHours <= 0) continue;
-        if (t.projectId && !scopeProjectIds.includes(t.projectId)) continue;
-        if (effectivePersonnelId && t.assigneeId !== effectivePersonnelId) continue;
-        if (!byPersonMap[t.assigneeId]) {
-          const p = allPersonnel.find(p => p.id === t.assigneeId);
+      for (const estimate of effectiveEstimates) {
+        const estimatedHours = estimate.estimatedHours;
+        if (!estimate.personnelId || estimatedHours <= 0) continue;
+        if (!byPersonMap[estimate.personnelId]) {
+          const p = allPersonnel.find(p => p.id === estimate.personnelId);
           if (!p) continue;
-          byPersonMap[t.assigneeId] = { personnelId: t.assigneeId, name: p.name, hours: 0, estimatedHours: 0 };
+          byPersonMap[estimate.personnelId] = { personnelId: estimate.personnelId, name: p.name, hours: 0, estimatedHours: 0 };
         }
-        byPersonMap[t.assigneeId].estimatedHours += estimatedHours;
+        byPersonMap[estimate.personnelId].estimatedHours += estimatedHours;
       }
 
       const byPerson = Object.values(byPersonMap).sort((a, b) => b.hours - a.hours);
@@ -24004,6 +24008,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const key = String(legacyProjectId);
         if (!estMap[key]) estMap[key] = { projectId: legacyProjectId, name: proj?.name || "Sin proyecto", realHours: 0, estimatedHours: 0 };
         estMap[key].realHours += realHours;
+      }
+      for (const estimate of effectiveEstimates.filter(row => row.taskId == null)) {
+        const key = String(estimate.projectId);
+        if (!estMap[key]) estMap[key] = { projectId: estimate.projectId, name: projectMap.get(estimate.projectId)?.name || "Sin proyecto", realHours: 0, estimatedHours: 0 };
+        estMap[key].estimatedHours += estimate.estimatedHours;
       }
       const estimationByProject = Object.values(estMap)
         .map(p => ({ ...p, realHours: Math.round(p.realHours * 100) / 100, estimatedHours: Math.round(p.estimatedHours * 100) / 100, delta: Math.round((p.realHours - p.estimatedHours) * 100) / 100 }))
@@ -24925,6 +24934,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           set: {
             estimatedHours: data.estimatedHours,
             createdBy: data.createdBy,
+            ...(req.body.isExtra !== undefined ? { isExtra: data.isExtra } : {}),
           },
         })
         .returning();
@@ -26573,7 +26583,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await tx.insert(monthlySettlementEvents).values({ declarationId: row.id, action: previous ? "resubmitted" : "submitted", actorUserId: access.userId, metadata: { closingId, usdAmount, closingFxRate, bankFxRate, differenceARS, previous: previous ?? null } });
         return { ...row, closingYear: closing.year, closingMonth: closing.month };
       });
-      await createUserNotifications(await operationsNotificationUserIds(), { eventKey: `monthly-settlement:${declaration.id}:${declaration.updatedAt.toISOString()}`, type: "monthly_settlement", title: "Diferencia cambiaria para revisar", message: `Una persona declaró su tipo de cambio bancario para ${declaration.closingYear}-${String(declaration.closingMonth).padStart(2, "0")}.`, entityId: declaration.id });
+      await createUserNotifications(await operationsNotificationUserIds(), { eventKey: `monthly-settlement:${declaration.id}:${declaration.updatedAt.toISOString()}`, type: "monthly_settlement", title: "Diferencia cambiaria para revisar", message: `Una persona declaró su tipo de cambio bancario para ${declaration.closingYear}-${String(declaration.closingMonth).padStart(2, "0")}.`, entityId: declaration.id, actionUrl: settlementReviewDestination(`${declaration.closingYear}-${String(declaration.closingMonth).padStart(2, "0")}`) });
       res.status(201).json(declaration);
     } catch (error: any) {
       if (error instanceof z.ZodError) return res.status(400).json({ message: "Datos inválidos", errors: error.errors });
@@ -26937,6 +26947,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await createUserNotifications(await operationsNotificationUserIds(), {
         eventKey: `absence-requested:${created.id}`, type: "absence_request", title: "Nueva solicitud de ausencia",
         message: `${person?.name || "Una persona"} solicitó ${businessDays.length} día(s) hábil(es).`, entityId: created.id,
+        actionUrl: absenceNotificationDestination("operations"),
       });
       if (access.isOperations && owner) await createUserNotifications([owner.id], {
         eventKey: `absence-created-by-ops:${created.id}`, type: "absence_request", title: "Ausencia registrada",
@@ -27040,7 +27051,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await tx.insert(absenceEvents).values({ absenceId, eventKey: `edited:${absenceId}:${Date.now()}`, action: "edited", fromStatus: current.status, toStatus: updates.status ?? current.status, actorUserId: access.userId, metadata: { previous: current, daysByYear: businessDaysByYear(startDate, endDate, holidayDates), planningStatus: updates.planningStatus ?? current.planningStatus } });
         return [row];
       });
-      if (updates.status === "pending") await createUserNotifications(await operationsNotificationUserIds(), { eventKey: `absence-resubmitted:${absenceId}:${Date.now()}`, type: "absence_request", title: "Ausencia modificada", message: "Una solicitud aprobada fue modificada y requiere nueva aprobación.", entityId: absenceId });
+      if (updates.status === "pending") await createUserNotifications(await operationsNotificationUserIds(), { eventKey: `absence-resubmitted:${absenceId}:${Date.now()}`, type: "absence_request", title: "Ausencia modificada", message: "Una solicitud aprobada fue modificada y requiere nueva aprobación.", entityId: absenceId, actionUrl: absenceNotificationDestination("operations") });
       res.json(updated);
     } catch (error: any) {
       if (error instanceof z.ZodError) return res.status(400).json({ message: "Datos inválidos", errors: error.errors });
@@ -27166,6 +27177,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           eventKey: `absence-cancellation-requested:${absenceId}:${new Date(updated.updatedAt).toISOString()}`,
           type: "absence_cancellation",
           title: "Cancelación de ausencia pendiente", message: "Hay una cancelación que requiere revisión.", entityId: absenceId,
+          actionUrl: absenceNotificationDestination("operations"),
         });
       } else if (!ownerActions.includes(input.action) && current.requestedBy) {
         const decisionTitle: Record<string, string> = {
@@ -27468,13 +27480,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/personnel-absences/:id", requireAuth, (_req, res) => res.status(410).json({ message: "Las ausencias se cancelan mediante el workflow", manageUrl: "/absences" }));
 
   // ==================== CAPACITY DASHBOARD ====================
-  app.get("/api/capacity/weekly", requireAuth, async (req, res) => {
+  async function capacityActor(req: Request): Promise<CapacityActor> {
+    const access = await getTaskAccessContext(req);
+    return { ...access, userId: Number(req.user?.id) };
+  }
+
+  const capacityError = (res: Response, error: any) => res.status(error instanceof z.ZodError ? 400 : error.status || 500)
+    .json({ message: error instanceof z.ZodError ? error.issues[0]?.message : error.status ? error.message : "No se pudo actualizar la planificación" });
+
+  app.put("/api/capacity/projects/:id/mode", requireAuth, requirePermission("operations"), async (req, res) => {
     try {
-      const weekStart = req.query.weekStart as string; // YYYY-MM-DD
-      const weekStartDate = weekStart
-        ? parseCivilDate(weekStart)
-        : new Date();
-      const allPersonnel = await db.select().from(personnel);
+      const id = z.coerce.number().int().positive().parse(req.params.id);
+      const { mode } = z.object({ mode: z.unknown() }).strict().parse(req.body);
+      await saveCapacityMode(id, mode, await capacityActor(req));
+      res.json({ success: true });
+    } catch (error) { capacityError(res, error); }
+  });
+  app.put("/api/capacity/group-estimates", requireAuth, requirePermission("operations", "projects", "task_manager"), async (req, res) => {
+    try { await saveCapacityGroup(req.body, await capacityActor(req)); res.json({ success: true }); }
+    catch (error) { capacityError(res, error); }
+  });
+  app.put("/api/capacity/tasks/:id/extra", requireAuth, requirePermission("operations", "projects", "task_manager"), async (req, res) => {
+    try {
+      const id = z.coerce.number().int().positive().parse(req.params.id);
+      const { weekStart, isExtra } = z.object({ weekStart: capacityWeekSchema, isExtra: z.boolean() }).strict().parse(req.body);
+      await saveCapacityExtra(id, weekStart, isExtra, await capacityActor(req)); res.json({ success: true });
+    } catch (error) { capacityError(res, error); }
+  });
+
+  app.get("/api/capacity/weekly", requireAuth, requirePermission("operations", "projects", "task_manager"), async (req, res) => {
+    try {
+      const actor = await capacityActor(req);
+      const weekStart = capacityWeekSchema.parse(req.query.weekStart ?? currentBuenosAiresWeek().from);
+      const weekStartDate = parseCivilDate(weekStart);
+      const allPersonnel = actor.isOperations ? await db.select().from(personnel)
+        : actor.personnelId ? await db.select().from(personnel).where(eq(personnel.id, actor.personnelId)) : [];
+      const planning = await loadCapacityPlanning(weekStart, actor);
       const year = weekStartDate.getFullYear();
       const holidaysList = await db.select().from(holidays).where(eq(holidays.year, year));
 
@@ -27522,17 +27563,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Weekly estimates are the canonical planned-hours source.
       const weekStartISO = formatCivilDate(weekStartDate);
       const weekTasks = await db.execute(sql`
-        SELECT t.assignee_id, SUM(twe.estimated_hours)::float AS estimated_hours
-        FROM task_weekly_estimates twe
-        JOIN tasks t ON t.id = twe.task_id
-        WHERE twe.week_start = ${weekStartISO}
-          AND t.assignee_id IS NOT NULL
-          AND t.status NOT IN ('done', 'cancelled')
-        GROUP BY t.assignee_id
+        SELECT personnel_id, SUM(estimated_hours)::float AS estimated_hours
+        FROM capacity_effective_weekly_estimates
+        WHERE week_start = ${weekStartISO} AND project_status='active'
+          AND personnel_id IS NOT NULL AND (task_status IS NULL OR task_status NOT IN ('done','cancelled'))
+          AND (${actor.isOperations} OR personnel_id=${actor.personnelId})
+        GROUP BY personnel_id
       `);
       const taskHoursMap: Record<number, number> = {};
       for (const row of weekTasks.rows as any[]) {
-        const assigneeId = Number(row.assignee_id);
+        const assigneeId = Number(row.personnel_id);
         const estimatedHours = Number(row.estimated_hours) || 0;
         if (assigneeId && estimatedHours) {
           taskHoursMap[assigneeId] = estimatedHours;
@@ -27599,6 +27639,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         workingDays,
         holidaysInWeek: holidaysInWeek.map(h => ({ date: h.date, name: h.name })),
         personnel: capacityData,
+        planning,
         totals: {
           totalMaxCapacity: capacityData.reduce((s, p) => s + p.maxCapacity, 0),
           totalActualHours: capacityData.reduce((s, p) => s + p.actualHours, 0),
@@ -27609,13 +27650,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       });
     } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: error.issues[0]?.message });
       console.error("Error in capacity dashboard:", error);
       res.status(500).json({ message: "No se pudieron traer los datos de capacidad" });
     }
   });
 
   // Upsert a capacity override for a person+week
-  app.put("/api/capacity/overrides", requireAuth, async (req: Request, res: Response) => {
+  app.put("/api/capacity/overrides", requireAuth, requirePermission("operations"), async (req: Request, res: Response) => {
     try {
       const { personnelId, weekStart, maxHours } = req.body;
       if (!personnelId || !weekStart || maxHours === undefined || maxHours < 0) {
@@ -27636,7 +27678,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Delete (reset) a capacity override
-  app.delete("/api/capacity/overrides/:personnelId", requireAuth, async (req: Request, res: Response) => {
+  app.delete("/api/capacity/overrides/:personnelId", requireAuth, requirePermission("operations"), async (req: Request, res: Response) => {
     try {
       const personnelId = parseInt(req.params.personnelId);
       const weekStart = req.query.weekStart as string;

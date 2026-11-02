@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.14.20 — 2026-11-02
+
+- Las notificaciones nuevas de solicitud, modificación y cancelación de ausencias abren Gestión de ausencias para Operaciones. Las conciliaciones del circuito anterior abren Cierre del equipo en el mes correspondiente; los avisos personales conservan su destino.
+- La barra de selección de tareas se ubica debajo del encabezado según su altura real y mantiene una capa independiente al hacer scroll, también cuando sus controles ocupan varias líneas.
+- Capacidad permite elegir por proyecto estimación por tarea, sección o proyecto completo. Las bases se cargan por persona y semana; las tareas marcadas como Extra se agregan una sola vez. Cambiar de modalidad conserva las estimaciones anteriores sin duplicarlas.
+- Capacidad y Panel de horas comparten las estimaciones efectivas y los filtros de persona, proyecto, sección y período. Las secciones conservan sus bases al renombrarse o pasar a General. Se incluyen proyectos y secciones vacías.
+- Migración aditiva 0092, transaccional al arrancar, con modalidad por tarea como valor inicial. Validación de membresía y titularidad para estimaciones; modalidad y capacidad máxima reservadas a Operaciones. La tabla nueva queda excluida explícitamente del catálogo MCP.
+
 ## 1.14.19 — 2026-11-02
 
 - El historial completo incluye los updates que ya contaba la tarjeta, además de comentarios y cambios de campos, con texto completo, formato, autor y fecha. Pruebas para proyectos y temas propios verifican siete entradas de ambos autores sin perder las que comparten ID.

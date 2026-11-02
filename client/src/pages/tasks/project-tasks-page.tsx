@@ -1,5 +1,5 @@
 import type { TaskOrigin } from "@shared/utils/task-origin";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { queryClient, apiRequest, authFetch, authFetchJson } from "@/lib/queryClient";
@@ -69,6 +69,8 @@ interface Props {
 }
 
 export default function ProjectTasksPage({ params }: Props) {
+  const headerRef = useRef<HTMLDivElement>(null);
+  const pageRef = useRef<HTMLDivElement>(null);
   const projectId = parseInt(params.id);
   const { isOperations } = usePermissions();
   const [membersOpen, setMembersOpen] = useState(false);
@@ -96,6 +98,17 @@ export default function ProjectTasksPage({ params }: Props) {
     queryFn: () => authFetchJson(`/api/tasks/projects/${projectId}`),
     enabled: !!projectId,
   });
+
+  useEffect(() => {
+    const header = headerRef.current;
+    const page = pageRef.current;
+    if (!header || !page) return;
+    const measure = () => page.style.setProperty("--task-project-header-height", `${header.getBoundingClientRect().height}px`);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(header);
+    return () => observer.disconnect();
+  }, [project?.id]);
 
   const { data: migration } = useQuery<{ detailedHoursAvailable: boolean; time: { minutes: number } } | null>({
     queryKey: ["/api/tasks/projects", projectId, "migration"],
@@ -208,9 +221,9 @@ export default function ProjectTasksPage({ params }: Props) {
 
   return (
     <TooltipProvider>
-      <div className="space-y-0 max-w-6xl mx-auto">
+      <div ref={pageRef} className="space-y-0 max-w-6xl mx-auto">
         {/* ─── Sticky header ─────────────────────────────────────────── */}
-        <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-sm pb-0">
+        <div ref={headerRef} className="sticky top-0 z-20 bg-background pb-0" data-task-project-header>
           {/* Breadcrumb */}
           <nav className="flex min-w-0 items-center gap-1.5 overflow-hidden py-2 text-xs text-muted-foreground">
             <Link href="/tasks" className="hover:text-foreground transition-colors">Tareas</Link>

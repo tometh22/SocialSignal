@@ -1,5 +1,6 @@
 import { deliverableNameCompatibilityMigrationSql } from "./migrations/deliverable-name-compatibility";
 import { payrollDocumentModesMigrationSql } from "./migrations/payroll-document-modes";
+import { capacityPlanningMigrationSql } from "./migrations/capacity-planning";
 import { teamSettlementWorkflowMigrationSql } from "./migrations/team-settlement-workflow";
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
@@ -938,6 +939,16 @@ async function applyPendingMigrations() {
       await client.query(payrollDocumentModesMigrationSql);
       await client.query("COMMIT");
       console.log("✅ Migration OK: 0091 payroll document modes");
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    }
+
+    await client.query("BEGIN");
+    try {
+      await client.query(capacityPlanningMigrationSql);
+      await client.query("COMMIT");
+      console.log("✅ Migration OK: 0092 capacity planning");
     } catch (error) {
       await client.query("ROLLBACK");
       throw error;

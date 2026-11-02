@@ -1,5 +1,6 @@
 // Explicit business-data allowlist. Review permissions and fields before adding resources.
 export const excludedMindTables = {
+  "capacity_group_estimates": "Planificación semanal por persona; se consulta en Capacidad con validación de titularidad",
   "mcp_oauth_grants": "Credenciales OAuth",
   "password_reset_tokens": "Tokens de recuperación",
   "user_notification_push_subscriptions": "Credenciales push",

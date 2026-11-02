@@ -73,7 +73,7 @@ describe("Feedback 9-10 — calendarios, tareas y capacidad", () => {
   });
 
   it("Capacidad contrae proyectos y deja la estimación junto a la tarea", () => {
-    const capacity = source("client/src/pages/capacity-dashboard.tsx");
+    const capacity = source("client/src/components/tasks/CapacityProjectPlanning.tsx");
     expect(capacity).toContain('data-testid="capacity-project-toggle"');
     expect(capacity).toContain("collapsedProjects");
     expect(capacity).not.toContain('className="flex-1 truncate text-foreground">{t.title}');
