@@ -30,6 +30,7 @@ describe('Status list with uneven groups', () => {
     const items = Array.from({ length: 25 }, (_, i) => item(i + 1, { healthStatus: i < 22 ? 'rojo' : 'verde' }));
     const html = renderItems(items);
     expect(html).toContain('data-testid="status-list"');
+    expect(html).toContain('data-testid="status-attention-grid"');
     expect(html.indexOf('Para atender')).toBeLessThan(html.indexOf('En curso'));
     for (let id = 1; id <= 25; id++) expect(html.match(new RegExp(`id="row-c_${id}"`, 'g'))).toHaveLength(1);
     expect(html).not.toContain('panel lateral');

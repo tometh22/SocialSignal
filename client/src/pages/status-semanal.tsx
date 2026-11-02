@@ -43,7 +43,7 @@ import {
   type DragStartEvent, type DragEndEvent
 } from "@dnd-kit/core";
 import {
-  SortableContext, verticalListSortingStrategy, useSortable, arrayMove
+  SortableContext, rectSortingStrategy, useSortable, arrayMove
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 
@@ -1728,28 +1728,40 @@ function SortableCompactRow(props: React.ComponentProps<typeof CompactRow>) {
   );
 }
 
-// ─── AlertSidebarCard — expandable card for CEO/COO sidebar ─────────────────
-function AlertSidebarCard({ item, accent, currentUserId, roomId, onUpdate, expanded, onToggle, users, onOpenNotes, onRemove, onResolve, bulkMode, checked, onCheck }: {
-  item: Item; accent: 'red' | 'amber'; currentUserId?: number | null; roomId?: number;
+function SortableStatusCard(props: React.ComponentProps<typeof StatusCard>) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: props.item.key });
+  return <div ref={setNodeRef} className="h-full" style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1 }}>
+    <StatusCard {...props} dragHandleProps={{ ...attributes, ...listeners }} />
+  </div>;
+}
+
+// ─── StatusCard — responsive status board card ─────────────────
+function StatusCard({ item, accent, currentUserId, roomId, onUpdate, expanded, onToggle, users, onOpenNotes, onRemove, onResolve, bulkMode, checked, onCheck, isSelected, kbFocused, dragHandleProps }: {
+  item: Item; accent: 'red' | 'amber' | 'none'; currentUserId?: number | null; roomId?: number;
   onUpdate: (d: Record<string, any>) => void;
   expanded?: boolean; onToggle?: () => void; onResolve?: () => void;
   users?: AppUser[]; onOpenNotes?: () => void; onRemove?: () => void;
+  isSelected?: boolean; kbFocused?: boolean; dragHandleProps?: Record<string, any>;
   bulkMode?: boolean; checked?: boolean; onCheck?: (v: boolean) => void;
 }) {
-  const accentBorder = accent === 'red' ? 'border-l-red-500' : 'border-l-amber-400';
-  const accentBg = accent === 'red' ? 'bg-red-50/40' : 'bg-amber-50/40';
+  const accentBorder = accent === 'red' ? 'border-l-red-500' : accent === 'amber' ? 'border-l-amber-400' : 'border-l-emerald-400';
+  const accentBg = accent === 'red' ? 'bg-red-50/40' : accent === 'amber' ? 'bg-amber-50/40' : 'bg-slate-50/40';
   const { hasUnread, markAsRead } = useUnreadComments(item, roomId);
   useEffect(() => { if (expanded && hasUnread) markAsRead(); }, [expanded, hasUnread, markAsRead]);
   const handleOpenNotes = onOpenNotes ? () => { markAsRead(); onOpenNotes(); } : undefined;
   return (
     <div className={cn(
-      "border-l-[3px] transition-colors",
+      "h-full rounded-xl border border-slate-200 border-l-[3px] bg-white shadow-sm transition-colors overflow-hidden",
+      isSelected && "ring-2 ring-indigo-400",
+      kbFocused && "outline outline-2 outline-indigo-300 outline-offset-2",
       accentBorder,
       expanded ? accentBg : hasUnread ? "bg-indigo-50/30 hover:bg-indigo-50/60" : "hover:bg-slate-50/60"
     )}>
       {/* Clickable header */}
-      <div className={cn("px-3 py-2.5 cursor-pointer")} onClick={onToggle}>
-        <div className="flex items-start gap-2">
+      <div className={cn("p-4 cursor-pointer", !expanded && "min-h-[170px]")} onClick={onToggle} role="button" tabIndex={0} aria-expanded={!!expanded}
+        onKeyDown={e => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); onToggle?.(); } }}>
+        <div className="flex items-start gap-2.5">
+          {dragHandleProps && <div {...dragHandleProps} onClick={e => e.stopPropagation()} className="cursor-grab text-slate-300 touch-none" aria-label="Reordenar tema"><GripVertical className="h-4 w-4" /></div>}
           {bulkMode && (
             <div className="shrink-0 mt-0.5" onClick={e => { e.stopPropagation(); onCheck?.(!checked); }}>
               {checked ? <CheckSquare className="h-4 w-4 text-indigo-500" /> : <Square className="h-4 w-4 text-slate-300" />}
@@ -1761,24 +1773,24 @@ function AlertSidebarCard({ item, accent, currentUserId, roomId, onUpdate, expan
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1.5">
               {item.isCustom && <Tag className="h-3 w-3 text-indigo-400 shrink-0" />}
-              <p className="font-semibold text-[13px] leading-snug text-slate-900 break-words flex-1">{item.title}</p>
+              <p className="font-semibold text-[15px] leading-snug text-slate-900 break-words [overflow-wrap:anywhere] flex-1 min-w-0">{item.title}</p>
               <ItemShareButton item={item} roomId={roomId} />
               <ChevronDown className={cn("h-3 w-3 text-slate-300 shrink-0 transition-transform", !expanded && "-rotate-90")} />
             </div>
             {!expanded && item.currentAction && (
-              <StatusText className="text-[11px] text-slate-500 mt-0.5 line-clamp-3">{item.currentAction}</StatusText>
+              <StatusText className="text-[13px] leading-relaxed text-slate-600 mt-2 line-clamp-3">{item.currentAction}</StatusText>
             )}
             {/* Owner + deadline + notes meta row — only shown collapsed; the
                  expanded view has owner/deadline editable in the footer, so
                  repeating them here is redundant. */}
             {!expanded && (
-              <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+              <div className="flex items-center gap-x-3 gap-y-2 mt-3 flex-wrap">
                 {item.ownerName && (
                   <div className="flex items-center gap-1">
                     <div className="h-4 w-4 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-[8px] font-bold shrink-0">
                       {initials(item.ownerName)}
                     </div>
-                    <span className="text-[10px] text-slate-400">{item.ownerName.split(' ')[0]}</span>
+                    <span className="text-xs text-slate-500">{item.ownerName.split(' ')[0]}</span>
                   </div>
                 )}
                 {item.deadline && (
@@ -1787,13 +1799,13 @@ function AlertSidebarCard({ item, accent, currentUserId, roomId, onUpdate, expan
                   </span>
                 )}
                 {item.noteCount > 0 && (
-                  <span className={cn(
-                    "inline-flex items-center gap-1 text-[10px]",
+                  <button type="button" onClick={e => { e.stopPropagation(); handleOpenNotes?.(); }} className={cn(
+                    "inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded px-1.5 py-0.5 text-xs hover:bg-indigo-50",
                     hasUnread ? "text-indigo-600 font-medium" : "text-slate-400"
                   )}>
-                    <MessageSquare className="h-3 w-3" />
-                    {hasUnread ? `Nuevo · ${item.noteCount}` : item.noteCount}
-                  </span>
+                    <MessageSquare className="h-3 w-3 shrink-0" />
+                    {hasUnread ? `Nuevo · ${item.noteCount}` : `${item.noteCount} entradas`}
+                  </button>
                 )}
               </div>
             )}
@@ -1829,7 +1841,7 @@ function AlertSidebarCard({ item, accent, currentUserId, roomId, onUpdate, expan
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.16, ease: [0.4, 0, 0.2, 1] }}
             className="overflow-hidden">
-            <div className="px-3 pb-3 space-y-3.5" onClick={e => e.stopPropagation()}>
+            <div className="px-4 pb-4 space-y-4" onClick={e => e.stopPropagation()}>
               {/* Risk — present only when set, kept neutral */}
               {item.mainRisk && (
                 <div className="flex items-start gap-1.5">
@@ -3388,18 +3400,15 @@ export default function StatusSemanalPage({ initialItemKey }: { initialItemKey?:
     ? `${openNotesProject.clientName || ''}${openNotesProject.quotationName ? ` · ${openNotesProject.quotationName}` : ''}`
     : openNotesCustom ? openNotesCustom.title : '';
 
-  const renderPriorityRow = (item: Item, accent: 'red' | 'amber') => {
+  const renderStatusCard = (item: Item, accent: 'red' | 'amber' | 'none', sortable = false) => {
     const handlers = getItemHandlers(item);
-    const index = flatNavItems.findIndex(i => i.key === item.key);
+    const Card = sortable ? SortableStatusCard : StatusCard;
     return (
-      <div key={item.key} id={`row-${item.key}`} className="border-b border-slate-100 last:border-b-0">
-        <CompactRow item={item} users={appUsers} currentUserId={currentUserId} roomId={roomCtx?.roomId}
+      <div key={item.key} id={`row-${item.key}`} className={cn("min-w-0", expandedKey === item.key && "col-span-full")}>
+        <Card item={item} users={appUsers} currentUserId={currentUserId} roomId={roomCtx?.roomId}
           {...handlers}
           isSelected={notesOpen !== null && (item.isCustom ? notesOpen.type === 'custom' && notesOpen.id === item.customId : notesOpen.type === 'project' && notesOpen.id === item.projectId)}
           expanded={expandedKey === item.key} onToggle={() => setExpandedKey(expandedKey === item.key ? null : item.key)}
-          hasPrev={index > 0} hasNext={index < flatNavItems.length - 1}
-          onPrev={() => { if (index > 0) setExpandedKey(flatNavItems[index - 1].key); }}
-          onNext={() => { if (index < flatNavItems.length - 1) setExpandedKey(flatNavItems[index + 1].key); }}
           kbFocused={kbFocusKey === item.key} bulkMode={bulkMode} checked={selectedKeys.has(item.key)}
           onCheck={value => setSelectedKeys(prev => { const next = new Set(prev); value ? next.add(item.key) : next.delete(item.key); return next; })}
           accent={accent} />
@@ -3778,8 +3787,8 @@ export default function StatusSemanalPage({ initialItemKey }: { initialItemKey?:
           ) : (
             <>
 
-              <div className="flex-1 min-w-0 overflow-y-auto" data-testid="status-list">
-              <div className="px-4 py-5 sm:px-6 space-y-6">
+              <div className="flex-1 min-w-0 overflow-y-auto bg-slate-50/70" data-testid="status-list">
+              <div className="max-w-[1440px] mx-auto px-4 py-6 sm:px-6 space-y-8">
                 {alertItems.length > 0 && (
                   <section aria-labelledby="status-attention-title">
                     <div className="flex items-center gap-2 mb-3">
@@ -3789,8 +3798,8 @@ export default function StatusSemanalPage({ initialItemKey }: { initialItemKey?:
                       <div className="flex-1" />
                       <AddItemButton variant="inline" onAdd={d => createCustom.mutate(d)} users={appUsers} currentUserId={currentUserId} />
                     </div>
-                    <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
-                      {alertItems.map(item => renderPriorityRow(item, item.isOverdue || item.healthStatus === 'rojo' ? 'red' : 'amber'))}
+                    <div data-testid="status-attention-grid" className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,320px),1fr))] items-start gap-4">
+                      {alertItems.map(item => renderStatusCard(item, item.isOverdue || item.healthStatus === 'rojo' ? 'red' : 'amber'))}
                     </div>
                   </section>
                 )}
@@ -3801,8 +3810,8 @@ export default function StatusSemanalPage({ initialItemKey }: { initialItemKey?:
                       <h2 id="status-decisions-title" className="text-sm font-semibold text-slate-800">Decisiones pendientes</h2>
                       <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">{decisionItems.length}</span>
                     </div>
-                    <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
-                      {decisionItems.map(item => renderPriorityRow(item, 'amber'))}
+                    <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,320px),1fr))] items-start gap-4">
+                      {decisionItems.map(item => renderStatusCard(item, 'amber'))}
                     </div>
                   </section>
                 )}
@@ -3843,59 +3852,11 @@ export default function StatusSemanalPage({ initialItemKey }: { initialItemKey?:
                       }
                     }}
                   >
-                    {(() => {
-                      const staleItems = sortedNormalItems.filter(i => isStale(i.updatedAt));
-                      const freshItems = sortedNormalItems.filter(i => !isStale(i.updatedAt));
-                      const renderRow = (item: Item, isStaleGroup: boolean) => {
-                        const h = getItemHandlers(item);
-                        const globalIdx = sortedNormalItems.indexOf(item);
-                        return (
-                          <SortableCompactRow key={item.key} item={item} users={appUsers} currentUserId={currentUserId} roomId={roomCtx?.roomId}
-                            isSelected={notesOpen !== null && ((notesOpen.type === 'project' && item.projectId === notesOpen.id) || (notesOpen.type === 'custom' && item.customId === notesOpen.id))}
-                            onOpenNotes={h.onOpenNotes} onUpdate={h.onUpdate} onRemove={h.onRemove} onResolve={h.onResolve}
-                            expanded={expandedKey === item.key}
-                            onToggle={() => setExpandedKey(expandedKey === item.key ? null : item.key)}
-                            hasPrev={globalIdx > 0}
-                            hasNext={globalIdx < sortedNormalItems.length - 1}
-                            onPrev={() => { if (globalIdx > 0) setExpandedKey(sortedNormalItems[globalIdx - 1].key); }}
-                            onNext={() => { if (globalIdx < sortedNormalItems.length - 1) setExpandedKey(sortedNormalItems[globalIdx + 1].key); }}
-                            kbFocused={kbFocusKey === item.key}
-                            bulkMode={bulkMode}
-                            checked={selectedKeys.has(item.key)}
-                            onCheck={v => setSelectedKeys(prev => { const n = new Set(prev); v ? n.add(item.key) : n.delete(item.key); return n; })}
-                            accent={'none'}
-                            hideSubtitle={!isStaleGroup} />
-                        );
-                      };
-                      return (
-                        <SortableContext items={sortedNormalItems.map(i => i.key)} strategy={verticalListSortingStrategy}>
-                          <div className="rounded-xl border border-slate-200/60 bg-white overflow-hidden">
-                            {staleItems.length > 0 && (
-                              <>
-                                <div className="flex items-center gap-2 px-5 py-1.5 border-b border-slate-100/80">
-                                  <span className="text-[10px] text-amber-600">Sin update · {staleItems.length}</span>
-                                </div>
-                                {staleItems.map((item) => (
-                                  <div key={item.key} id={`row-${item.key}`} className="border-b border-slate-100/80 last:border-b-0">
-                                    {renderRow(item, true)}
-                                  </div>
-                                ))}
-                              </>
-                            )}
-                            {staleItems.length > 0 && freshItems.length > 0 && (
-                              <div className="flex items-center gap-2 px-5 py-1.5 border-b border-slate-100/80 border-t border-t-slate-100">
-                                <span className="text-[10px] text-slate-400">Al día · {freshItems.length}</span>
-                              </div>
-                            )}
-                            {freshItems.map((item) => (
-                              <div key={item.key} id={`row-${item.key}`} className="border-b border-slate-100/80 last:border-b-0">
-                                {renderRow(item, false)}
-                              </div>
-                            ))}
-                          </div>
-                        </SortableContext>
-                      );
-                    })()}
+                    <SortableContext items={sortedNormalItems.map(i => i.key)} strategy={rectSortingStrategy}>
+                      <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,320px),1fr))] items-start gap-4">
+                        {sortedNormalItems.map(item => renderStatusCard(item, 'none', true))}
+                      </div>
+                    </SortableContext>
                     <DragOverlay>
                       {dragActiveId && (() => {
                         const item = sortedNormalItems.find(i => i.key === dragActiveId);
