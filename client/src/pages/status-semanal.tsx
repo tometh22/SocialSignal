@@ -195,6 +195,7 @@ type DailySession = {
 
 type ActivityEntry =
   | { type: 'note'; id: number; content: string; authorId: number | null; authorName: string | null; createdAt: string }
+  | { type: 'update'; id: number; content: string; authorId: number | null; authorName: string | null; createdAt: string }
   | { type: 'change'; id: number; userId: number | null; userName: string | null; fieldName: string; oldValue: string | null; newValue: string | null; createdAt: string };
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -1576,6 +1577,9 @@ function ItemThread({ projectId, customId, currentUserId, users = [], onOpenFull
     mutationFn: (content: string) => mutationFetch(notesUrl, 'POST', { content }),
     onSuccess: () => {
       queryClient.refetchQueries({ queryKey: notesCacheKey });
+      queryClient.refetchQueries({ queryKey: projectId
+        ? ['/api/status-semanal', projectId, 'activity']
+        : ['/api/status-semanal/custom', customId, 'activity'] });
       queryClient.refetchQueries({ queryKey: ['/api/status-semanal?includeHidden=true'] });
       if (customId) queryClient.refetchQueries({ queryKey: ['/api/status-semanal/custom?includeHidden=true'] });
     },
@@ -2095,7 +2099,7 @@ function formatChangeValue(fieldName: string, value: string | null): string {
 
 // ─── Activity panel (unified timeline: notes + changes) ─────────────────────
 
-function ActivityPanel({ projectId, customItemId, projectName, onClose }: { projectId?: number; customItemId?: number; projectName: string; onClose: () => void }) {
+export function ActivityPanel({ projectId, customItemId, projectName, onClose }: { projectId?: number; customItemId?: number; projectName: string; onClose: () => void }) {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const { toast } = useToast();
@@ -2122,10 +2126,34 @@ function ActivityPanel({ projectId, customItemId, projectName, onClose }: { proj
     ? ['/api/status-semanal', projectId, 'activity']
     : ['/api/status-semanal/custom', customItemId, 'activity'];
 
-  const { data: timeline = [], isLoading } = useQuery<ActivityEntry[]>({
+  const { data: activity = [], isLoading: activityLoading, isError: activityError } = useQuery<ActivityEntry[]>({
     queryKey: activityCacheKey,
-    queryFn: async () => { const r = await authFetch(activityUrl); return r.json(); },
+    queryFn: async () => {
+      const r = await authFetch(activityUrl);
+      if (!r.ok) throw new Error('Error al obtener actividad');
+      return r.json();
+    },
   });
+  // The compact thread counts notes AND updates. Read the same update query here
+  // so opening its history includes all counted entries, not just field changes.
+  const { data: updates = [], isLoading: updatesLoading, isError: updatesError } = useQuery<UpdateEntry[]>({
+    queryKey: projectId
+      ? ['/api/status-semanal', projectId, 'updates']
+      : ['/api/status-semanal/custom', customItemId, 'updates'],
+    queryFn: async () => {
+      const r = await authFetch(projectId
+        ? `/api/status-semanal/${projectId}/updates`
+        : `/api/status-semanal/custom/${customItemId}/updates`);
+      if (!r.ok) throw new Error('Error al obtener updates');
+      return r.json();
+    },
+  });
+  const timeline: ActivityEntry[] = [
+    ...activity,
+    ...updates.map(entry => ({ ...entry, type: 'update' as const })),
+  ].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+  const isLoading = activityLoading || updatesLoading;
+  const hasError = activityError || updatesError;
 
   const addMutation = useMutation({
     mutationFn: (content: string) => mutationFetch(notesUrl, 'POST', { content }),
@@ -2175,23 +2203,25 @@ function ActivityPanel({ projectId, customItemId, projectName, onClose }: { proj
 
       <div className="flex-1 overflow-y-auto px-3 py-2 space-y-1.5">
         {isLoading && <div className="flex justify-center py-6"><Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /></div>}
-        {!isLoading && timeline.length === 0 && (
+        {hasError && <p role="alert" className="text-xs text-red-600 py-2">No se pudo cargar todo el historial. Volvé a abrirlo para reintentar.</p>}
+        {!isLoading && !hasError && timeline.length === 0 && (
           <div className="flex flex-col items-center justify-center py-8 text-center">
             <ClipboardList className="h-6 w-6 text-muted-foreground/20 mb-1.5" />
             <p className="text-xs text-muted-foreground">Sin actividad todavía</p>
           </div>
         )}
         {timeline.map((entry, idx) => {
-          if (entry.type === 'note') {
+          if (entry.type === 'note' || entry.type === 'update') {
             const isOwn = entry.authorId === currentUserId;
             return (
-              <div key={`n_${entry.id}`} className="group flex gap-2 py-1">
+              <div key={`${entry.type}_${entry.id}`} data-testid={`activity-${entry.type}-${entry.id}`} className="group flex gap-2 py-1">
                 <div className={cn("h-6 w-6 rounded-full flex items-center justify-center text-[9px] font-bold shrink-0 mt-0.5", isOwn ? "bg-indigo-100 text-indigo-700" : "bg-teal-100 text-teal-700")}>
                   {initials(entry.authorName)}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1 mb-0.5">
                     <span className={cn("text-[11px] font-medium", isOwn ? "text-slate-700" : "text-teal-700")}>{entry.authorName || 'Usuario'}</span>
+                    {entry.type === 'update' && <span className="text-[9px] text-indigo-500">Update</span>}
                     <TooltipProvider>
                       <Tooltip>
                         <TooltipTrigger asChild>
@@ -2201,7 +2231,7 @@ function ActivityPanel({ projectId, customItemId, projectName, onClose }: { proj
                       </Tooltip>
                     </TooltipProvider>
                   </div>
-                  {editingId === entry.id ? (
+                  {entry.type === 'note' && editingId === entry.id ? (
                     <div className="space-y-1">
                       <Textarea
                         ref={editNoteRef}
@@ -2235,7 +2265,7 @@ function ActivityPanel({ projectId, customItemId, projectName, onClose }: { proj
                     <StatusText className="text-[11px] bg-white border border-slate-100 rounded-md px-2.5 py-1.5">{entry.content}</StatusText>
                   )}
                 </div>
-                {isOwn && editingId !== entry.id && (
+                {entry.type === 'note' && isOwn && editingId !== entry.id && (
                   <div className="flex flex-col gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-0.5">
                     <button onClick={() => { setEditingId(entry.id); setEditText(entry.content); }} className="p-0.5 text-slate-300 hover:text-indigo-400">
                       <Pencil className="h-3 w-3" />
@@ -4187,6 +4217,7 @@ export default function StatusSemanalPage({ initialItemKey }: { initialItemKey?:
         <div className="fixed top-0 right-0 h-full w-[360px] max-w-full border-l border-border bg-background shadow-xl z-40 flex flex-col">
           {(openNotesProject || openNotesCustom) && (
             <ActivityPanel
+              key={`${notesOpen.type}-${notesOpen.id}`}
               projectId={notesOpen.type === 'project' ? notesOpen.id : undefined}
               customItemId={notesOpen.type === 'custom' ? notesOpen.id : undefined}
               projectName={notesItemName}

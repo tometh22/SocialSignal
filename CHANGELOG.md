@@ -2,6 +2,7 @@
 
 ## 1.14.19 — 2026-11-02
 
+- El historial completo incluye los updates que ya contaba la tarjeta, además de comentarios y cambios de campos, con texto completo, formato, autor y fecha. Pruebas para proyectos y temas propios verifican siete entradas de ambos autores sin perder las que comparten ID.
 - La vista Lista de Status muestra Para atender, Decisiones pendientes y En curso en grupos de ancho completo dentro de una misma zona de desplazamiento. Los temas prioritarios dejan de quedar comprimidos en una columna lateral mientras la otra queda vacía.
 - Los títulos pueden ocupar más de una línea y los controles se reacomodan en pantallas angostas. El indicador de comentarios sin leer conserva texto, icono y cantidad juntos, sin cortar Nuevo · N. La cabecera puede distribuirse en varias líneas y el historial usa un panel adaptable.
 - Regresiones de render con 22 temas prioritarios y tres en curso, decisiones pendientes y temas resueltos, comprobando que cada tema visible aparezca una sola vez.
